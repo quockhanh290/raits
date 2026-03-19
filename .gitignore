@@ -1,0 +1,176 @@
+# RAITS Project .gitignore
+# Prevents committing sensitive data, large files, and temporary files
+
+# ============================================
+# Virtual Environments
+# ============================================
+venv/
+env/
+ENV/
+.venv/
+
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ============================================
+# Data Files (CRITICAL - Large files)
+# ============================================
+# Raw data from Polygon.io
+raits/data/raw/
+raits/data/cache/
+raits/data/processed/*.parquet
+raits/data/processed/*.csv
+raits/data/processed/*.h5
+
+# Specific large file formats
+*.csv
+*.parquet
+*.h5
+*.hdf5
+*.feather
+
+# ============================================
+# Logs
+# ============================================
+raits/logs/
+*.log
+logs/
+
+# ============================================
+# Backtest Results
+# ============================================
+raits/results/
+results/
+*.html
+*.pdf
+
+# ============================================
+# Jupyter Notebooks
+# ============================================
+.ipynb_checkpoints/
+*.ipynb
+notebooks/*.ipynb
+
+# ============================================
+# IDEs and Editors
+# ============================================
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+
+# ============================================
+# Operating System
+# ============================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.Trash-*
+
+# ============================================
+# API Keys and Secrets (CRITICAL!)
+# ============================================
+.env
+.env.local
+.env.*.local
+secrets.py
+config_private.py
+*.key
+*.pem
+credentials.json
+
+# ============================================
+# Testing
+# ============================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.hypothesis/
+
+# ============================================
+# Profiling
+# ============================================
+*.prof
+*.lprof
+
+# ============================================
+# Temporary Files
+# ============================================
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# ============================================
+# Model Checkpoints (if using ML models)
+# ============================================
+models/checkpoints/
+*.pkl
+*.pickle
+*.joblib
+
+# ============================================
+# Documentation Build
+# ============================================
+docs/_build/
+docs/_static/
+docs/_templates/
+
+# ============================================
+# Specific to RAITS
+# ============================================
+# Vault test results (keep only summary, not full data)
+vault_test_results/
+wfo_results/
+
+# Backtest cache files
+*.backtest_cache
