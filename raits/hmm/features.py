@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 ANNUALISATION_FACTOR = np.sqrt(252)      # Daily → annual vol
-DEFAULT_VOL_WINDOW = 5                   # Rolling realised vol lookback (days)
+DEFAULT_VOL_WINDOW = 20             # Rolling realised vol lookback (days)
 MIN_OBSERVATIONS = 30                    # Minimum rows to build a valid matrix
 
 # Number of initial rows that will be NaN due to rolling windows — must be
