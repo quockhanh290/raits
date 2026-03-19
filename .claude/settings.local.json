@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(venv/Scripts/python verify_step_1_complete.py)",
+      "Bash(venv/Scripts/python -c \"import sys; sys.stdout.reconfigure\\(encoding=''utf-8''\\)\")",
+      "Bash(venv/Scripts/python -X utf8 verify_step_1_complete.py)"
+    ]
+  }
+}

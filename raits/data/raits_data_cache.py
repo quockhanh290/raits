@@ -12,7 +12,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import pandas as pd
-from raits_data_models import HistoricalData
+from raits.data.raits_data_models import HistoricalData
 
 
 class DataCache:

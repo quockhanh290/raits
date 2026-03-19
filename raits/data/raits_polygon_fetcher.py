@@ -12,9 +12,9 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional, List
 import requests
-from raits_data_models import BarData, HistoricalData, StockMetadata, SplitDividend
-from raits_data_cache import DataCache
-from raits_mock_data import MockDataGenerator
+from raits.data.raits_data_models import BarData, HistoricalData, StockMetadata, SplitDividend
+from raits.data.raits_data_cache import DataCache
+from raits.data.raits_mock_data import MockDataGenerator
 
 
 class RateLimiter:

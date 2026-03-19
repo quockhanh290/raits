@@ -10,10 +10,10 @@ from typing import List, Optional, Dict
 from pathlib import Path
 import pandas as pd
 
-from raits_data_models import HistoricalData, DataQualityReport
-from raits_polygon_fetcher import PolygonDataFetcher
-from raits_data_cache import DataCache
-from raits_mock_data import MockDataGenerator
+from raits.data.raits_data_models import HistoricalData, DataQualityReport
+from raits.data.raits_polygon_fetcher import PolygonDataFetcher
+from raits.data.raits_data_cache import DataCache
+from raits.data.raits_mock_data import MockDataGenerator
 
 
 class DataPipeline:

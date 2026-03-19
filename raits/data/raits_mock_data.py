@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta, time
 from typing import List, Optional
-from raits_data_models import BarData, HistoricalData, StockMetadata, SplitDividend
+from raits.data.raits_data_models import BarData, HistoricalData, StockMetadata, SplitDividend
 
 
 class MockDataGenerator:
