@@ -1,0 +1,88 @@
+{
+  "smoke_test": true,
+  "vault_boundary": "2026-04-01",
+  "wfo_passes": false,
+  "proceed_to_vault": false,
+  "stitched_metrics": {
+    "total_trades": 7,
+    "win_rate": 0.42857142857142855,
+    "profit_factor": 0.7577804370686632,
+    "avg_win": 10.483950702082316,
+    "avg_loss": 10.376307756080628,
+    "gross_profit": 31.45185210624695,
+    "gross_loss": 41.50523102432251,
+    "total_costs": 8.83822999229431,
+    "calmar_ratio": -3.138598335199627,
+    "sharpe_ratio": -1.9565876708630057,
+    "max_drawdown": -0.0009213559389533591,
+    "recovery_days": null,
+    "total_return": -0.0004021351567230886,
+    "annual_return": -0.002891766216125302,
+    "tail_risk_99": -0.00033981765408027666,
+    "r_squared_spy": 0.007901780802004972
+  },
+  "dominance_check": {
+    "passes": false,
+    "window_contributions": [
+      {
+        "window": 1,
+        "net_profit": 6.047076154325623,
+        "pct_contribution": -0.6014968901104717,
+        "exceeds_60pct": false
+      },
+      {
+        "window": 2,
+        "net_profit": -16.100455072402838,
+        "pct_contribution": 1.6014968901104716,
+        "exceeds_60pct": true
+      }
+    ],
+    "total_profit": -10.053378918077215
+  },
+  "production_params": {
+    "orb_range_minutes": 10,
+    "vwap_bb_std": 1.5,
+    "ema_period": 20,
+    "aggregation_method": "MEAN"
+  },
+  "windows": [
+    {
+      "window_idx": 1,
+      "train_start": "2026-01-16",
+      "train_end": "2026-02-06",
+      "test_start": "2026-02-09",
+      "test_end": "2026-02-23",
+      "best_orb_range": 10,
+      "best_bb_std": 1.5,
+      "best_ema_period": 20,
+      "train_calmar": -11.997625198839415,
+      "oos_calmar": 15.712257504781643,
+      "oos_sharpe": 2.142261022551165,
+      "oos_max_dd": -0.00027767225821544433,
+      "oos_profit_factor": 1.2403508149815947,
+      "oos_win_rate": 0.5,
+      "oos_total_return": 0.00024188304617302493,
+      "oos_total_trades": 4,
+      "oos_net_profit": 6.047076154325623
+    },
+    {
+      "window_idx": 2,
+      "train_start": "2026-02-09",
+      "train_end": "2026-03-02",
+      "test_start": "2026-03-03",
+      "test_end": "2026-03-16",
+      "best_orb_range": 10,
+      "best_bb_std": 1.5,
+      "best_ema_period": 20,
+      "train_calmar": 3.827113723404398,
+      "oos_calmar": -18.981165511213064,
+      "oos_sharpe": -7.8253137123300185,
+      "oos_max_dd": -0.0006538278448193661,
+      "oos_profit_factor": 0.01501307058152136,
+      "oos_win_rate": 0.3333333333333333,
+      "oos_total_return": -0.0006440182028961135,
+      "oos_total_trades": 3,
+      "oos_net_profit": -16.100455072402838
+    }
+  ]
+}

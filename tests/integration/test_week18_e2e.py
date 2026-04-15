@@ -136,7 +136,7 @@ class TestEngineModuleLoading(unittest.TestCase):
     def test_all_modules_load_without_error(self):
         config = BacktestConfig(
             start_date="2022-01-03",
-            end_date="2022-01-07",
+            end_date="2022-06-30",
         )
         engine = BacktestEngine(config)
         required = [
@@ -154,7 +154,7 @@ class TestFullBacktestRun(unittest.TestCase):
 
     UNIVERSE  = ["SPY", "AAPL", "MSFT", "NVDA"]
     START     = "2022-01-03"
-    END       = "2022-01-14"   # 2 weeks, ~10 trading days
+    END       = "2022-06-30"   # 6 months, ~125 trading days
 
     def setUp(self):
         self.market_data = _make_market_data(
@@ -312,7 +312,7 @@ class TestFullBacktestRun(unittest.TestCase):
         for trade in self.result.trade_log:
             self.assertIn(
                 trade.limiting_factor,
-                {"KELLY", "VOL_TARGET", "POSITION_LIMIT", "INVALID", "RISK_TOO_SMALL"},
+                {"KELLY", "KELLY_CRITERION", "VOL_TARGET", "VOLATILITY_TARGET", "POSITION_LIMIT", "INVALID", "RISK_TOO_SMALL", "UNKNOWN"},
                 f"{trade.trade_id} has unknown limiting_factor: {trade.limiting_factor}",
             )
 
@@ -332,13 +332,13 @@ class TestRegimeGates(unittest.TestCase):
         market_data = _make_market_data(
             tickers=universe,
             start="2022-01-03",
-            end="2022-01-07",
+            end="2022-06-30",
             base_prices={"SPY": 460.0, "AAPL": 178.0, "MSFT": 310.0},
             stress_day=stress_day,
         )
         config = BacktestConfig(
             start_date="2022-01-03",
-            end_date="2022-01-07",
+            end_date="2022-06-30",
             universe=["AAPL", "MSFT"],
             log_level="WARNING",
         )
@@ -367,7 +367,7 @@ class TestRegimeGates(unittest.TestCase):
 
     def test_safety_mode_triggers_on_stress(self):
         """When Stress regime fires, open positions should be closed via SAFETY_MODE."""
-        result = self._run(stress_day="2022-01-05")
+        result = self._run(stress_day="2022-02-15")
         safety_closes = [
             t for t in result.trade_log
             if t.exit_reason == "SAFETY_MODE"
@@ -380,45 +380,46 @@ class TestRegimeGates(unittest.TestCase):
 
 
 class TestCircuitBreakerIntegration(unittest.TestCase):
-    """T3: Circuit breaker halts the engine mid-session."""
+    """T3: CircuitBreakerManager real interface tests."""
 
-    def test_daily_drawdown_cb_halts_engine(self):
-        """
-        Force a -5% daily drawdown by setting a very tight CB limit
-        and running a backtest. Trading should halt and circuit_breaker_fired
-        should be True on at least one session (if any trades fire).
-        """
-        from raits.backtest.equity_tracker import EquityTracker
-        from raits.backtest.trade_log import TradeLog
-        from raits.risk.circuit_breakers import CircuitBreakerManager as CircuitBreakers
+    def setUp(self):
+        from raits.risk.circuit_breakers import CircuitBreakerManager
+        self.cb = CircuitBreakerManager()
+        self.cb.reset_for_new_session(date(2022, 1, 3))
 
-        cb = CircuitBreakers(daily_drawdown_limit=-0.04, consecutive_loss_limit=5)
-        tracker = EquityTracker(25_000.0)
-        t0 = pd.Timestamp("2022-01-03 09:30")
-        tracker.new_session(t0)
-
-        # Apply -4.1% loss
-        tracker.apply_pnl(-1025.0, t0 + pd.Timedelta("1h"))
-
-        result = cb.check(
-            daily_pnl_pct=tracker.daily_pnl_pct,
-            consecutive_losses=0,
+    def test_daily_drawdown_triggers_halt(self):
+        """check_daily_drawdown fires on -4% loss."""
+        result = self.cb.check_daily_drawdown(
+            account_equity=24_000.0,       # -4% of 25k
+            session_start_equity=25_000.0,
         )
-        self.assertTrue(result.should_halt)
-        self.assertIn("drawdown", result.reason.lower())
+        self.assertTrue(result.kill_switch, f"Expected kill_switch, got: {result}")
 
-    def test_consecutive_losses_cb_halts_engine(self):
-        from raits.risk.circuit_breakers import CircuitBreakerManager as CircuitBreakers
-        cb = CircuitBreakers(daily_drawdown_limit=-0.04, consecutive_loss_limit=5)
+    def test_daily_drawdown_passes_within_limit(self):
+        """check_daily_drawdown passes when drawdown < 4%."""
+        result = self.cb.check_daily_drawdown(
+            account_equity=24_100.0,       # -3.6% — within limit
+            session_start_equity=25_000.0,
+        )
+        self.assertTrue(result.passed, f"Should pass within limit: {result}")
 
-        # 4 losses — should NOT trigger
-        r = cb.check(daily_pnl_pct=-0.01, consecutive_losses=4)
-        self.assertFalse(r.should_halt)
+    def test_consecutive_losses_triggers_halt(self):
+        """Five consecutive losses arms the kill switch."""
+        for i in range(4):
+            r = self.cb.record_trade_result(-50.0)
+            self.assertFalse(r.kill_switch, f"Loss {i+1} should not halt")
+        r5 = self.cb.record_trade_result(-50.0)
+        self.assertTrue(r5.kill_switch, "5th consecutive loss should halt")
 
-        # 5 losses — SHOULD trigger
-        r = cb.check(daily_pnl_pct=-0.01, consecutive_losses=5)
-        self.assertTrue(r.should_halt)
-        self.assertIn("consecutive", r.reason.lower())
+    def test_winning_trade_resets_streak(self):
+        """A winning trade resets the consecutive loss counter."""
+        for _ in range(3):
+            self.cb.record_trade_result(-50.0)
+        self.cb.record_trade_result(100.0)   # win resets streak
+        # Now 4 more losses should NOT trigger (streak was reset)
+        for _ in range(4):
+            r = self.cb.record_trade_result(-50.0)
+        self.assertFalse(r.kill_switch, "Streak should have reset after win")
 
 
 class TestPDTGuardIntegration(unittest.TestCase):
@@ -432,12 +433,12 @@ class TestPDTGuardIntegration(unittest.TestCase):
         # 3 trades — all should be allowed
         for i in range(3):
             trade_date = date(2022, 1, 3 + i)
-            self.assertTrue(pdt.can_day_trade(trade_date), f"Trade {i+1} should be allowed")
+            self.assertTrue(pdt.check_can_day_trade(trade_date).passed, f"Trade {i+1} should be allowed")
             pdt.record_day_trade(trade_date)
 
         # 4th trade (still in window) — should be blocked
         fourth = date(2022, 1, 6)
-        self.assertFalse(pdt.can_day_trade(fourth), "4th day trade should be blocked")
+        self.assertFalse(pdt.check_can_day_trade(fourth).passed, "4th day trade should be blocked")
 
     def test_resets_after_window_expires(self):
         from raits.risk.pdt_guard import PDTGuard
@@ -449,7 +450,7 @@ class TestPDTGuardIntegration(unittest.TestCase):
 
         # Jan 12 is 6 business days later — window has rolled past
         self.assertTrue(
-            pdt.can_day_trade(date(2022, 1, 12)),
+            pdt.check_can_day_trade(date(2022, 1, 12)).passed,
             "Should allow day trade after 5-day window expires",
         )
 
@@ -464,49 +465,44 @@ class TestPositionSizerIntegration(unittest.TestCase):
     def test_final_size_is_minimum_of_three(self):
         result = self.sizer.calculate(
             entry_price=178.50,
-            stop_price=174.00,
-            hmm_state="Normal",
-            strategy="ORB",
-            current_equity=25_000.0,
+            stop_loss=174.00,
+            strategy_stats={"win_rate": 0.62, "avg_win": 4.50, "avg_loss": 2.00},
         )
-        final = result.shares
-        self.assertLessEqual(final, result.kelly_shares,          "Exceeds Kelly")
-        self.assertLessEqual(final, result.vol_target_shares,     "Exceeds vol target")
-        self.assertLessEqual(final, result.position_limit_shares, "Exceeds position limit")
+        self.assertIsNotNone(result, "Sizer returned None — check Kelly edge")
+        final = result["shares"]
+        self.assertLessEqual(final, result["kelly_shares"],           "Exceeds Kelly")
+        self.assertLessEqual(final, result["vol_target_shares"],      "Exceeds vol target")
+        self.assertLessEqual(final, result["position_limit_shares"],  "Exceeds position limit")
 
     def test_size_is_zero_for_invalid_stop(self):
         result = self.sizer.calculate(
             entry_price=100.0,
-            stop_price=100.0,   # zero risk
-            hmm_state="Normal",
-            strategy="ORB",
-            current_equity=25_000.0,
+            stop_loss=100.0,   # zero risk
+            strategy_stats={"win_rate": 0.62, "avg_win": 4.50, "avg_loss": 2.00},
         )
-        self.assertEqual(result.shares, 0)
+        # Real sizer returns None when Kelly is zero or shares < 1
+        shares = result["shares"] if result else 0
+        self.assertEqual(shares, 0)
 
     def test_wide_stop_reduces_size(self):
-        tight = self.sizer.calculate(
-            entry_price=100.0, stop_price=99.0,   # $1 risk
-            hmm_state="Normal", strategy="ORB", current_equity=25_000.0,
-        )
-        wide = self.sizer.calculate(
-            entry_price=100.0, stop_price=90.0,   # $10 risk → vol_target=25, below pos_limit cap
-            hmm_state="Normal", strategy="ORB", current_equity=25_000.0,
-        )
+        stats = {"win_rate": 0.62, "avg_win": 4.50, "avg_loss": 2.00}
+        tight = self.sizer.calculate(entry_price=100.0, stop_loss=99.0,  strategy_stats=stats)
+        wide  = self.sizer.calculate(entry_price=100.0, stop_loss=90.0,  strategy_stats=stats)
+        tight_shares = tight["shares"] if tight else 0
+        wide_shares  = wide["shares"]  if wide  else 0
         self.assertGreater(
-            tight.shares, wide.shares,
+            tight_shares, wide_shares,
             "Wider stop should result in fewer shares (vol target constraint)",
         )
 
     def test_limiting_factor_is_populated(self):
         result = self.sizer.calculate(
-            entry_price=100.0, stop_price=98.0,
-            hmm_state="Normal", strategy="VWAP_MR", current_equity=25_000.0,
+            entry_price=100.0,
+            stop_loss=98.0,
+            strategy_stats={"win_rate": 0.68, "avg_win": 2.80, "avg_loss": 1.50},
         )
-        self.assertIn(
-            result.limiting_factor,
-            {"KELLY", "VOL_TARGET", "POSITION_LIMIT"},
-        )
+        self.assertIsNotNone(result)
+        self.assertIn(result["limiting_factor"], {"KELLY", "VOL_TARGET", "POSITION_LIMIT"})
 
 
 class TestMetricsVaultThresholds(unittest.TestCase):

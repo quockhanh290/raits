@@ -1,0 +1,7 @@
+# SMOKE TEST PARAMS — not for production use
+# RAITS Production Parameters — locked for Vault test
+# Aggregation method: MEAN
+# DO NOT MODIFY after Vault test begins
+orb_range_minutes: 10
+vwap_bb_std: 1.5
+ema_period: 20
