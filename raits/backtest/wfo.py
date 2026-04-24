@@ -78,6 +78,7 @@ class WFOConfig:
     universe: List[str] = field(
         default_factory=lambda: ["AAPL", "MSFT", "NVDA", "TSLA", "AMZN"]
     )
+    orb_universe: List[str] = field(default_factory=list)
     account_equity: float = 25_000.0
 
     # Grid search
@@ -353,7 +354,7 @@ class WFOEngine:
                     best_calmar = calmar
                     best_combo = (orb_min, bb_std, ema_per)
             except Exception as e:
-                logger.debug(f"    Combo {combo_idx+1} failed: {e}")
+                logger.warning(f"    Combo {combo_idx+1} failed: {type(e).__name__}: {e}")
                 continue
 
         elapsed = time.time() - t0
@@ -515,7 +516,7 @@ class WFOEngine:
                 pd.Timestamp(days[test_start_idx]),
                 pd.Timestamp(days[test_end_idx]),
             ))
-            offset += train_days   # slide by one training window
+            offset += test_days    # slide by 1 year (rolling windows per blueprint)
 
         return windows
 
@@ -557,6 +558,7 @@ class WFOEngine:
             start_date=start,
             end_date=end,
             universe=self.cfg.universe,
+            orb_universe=self.cfg.orb_universe,
             orb_range_minutes=orb,
             vwap_bb_std=std,
             ema_period=ema,

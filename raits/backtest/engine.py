@@ -101,13 +101,25 @@ class BacktestEngine:
             account_equity=self.config.account_equity
         )
         coordinator      = self._mods["RegimeCoordinator"]()
-        orb     = self._mods["ORBStrategy"]()
+        # Pass WFO-optimised hyperparameters to each strategy
+        # Lower opening volume multiplier from 2.0 to 1.2
+        # Blueprint default of 2.0 excludes normally high-volume stocks like NVDA/TSLA
+        # 1.2x still confirms above-average participation without over-filtering
+        orb     = self._mods["ORBStrategy"](config={"opening_vol_multiplier": 1.2})
         vwap_mr = self._mods["VWAPMRStrategy"](
             config={"bb_std_dev": self.config.vwap_bb_std}
         )
         trend   = self._mods["TrendStrategy"](
             config={"ema_period": self.config.ema_period}
         )
+
+        # Dynamic ORB timing from config (WFO optimizes this)
+        from datetime import datetime as _dt, timedelta as _td
+        _base = _dt(2000, 1, 1, 9, 30)
+        _sig_start = _base + _td(minutes=self.config.orb_range_minutes)
+        _sig_end   = _sig_start + _td(minutes=30)
+        orb_signal_start = _sig_start.time()
+        orb_signal_end   = _sig_end.time()
 
         hmm = HMMEngine()
         logger.info("Training HMM...")
@@ -138,6 +150,8 @@ class BacktestEngine:
                 orb=orb,
                 vwap_mr=vwap_mr,
                 trend=trend,
+                orb_signal_start=orb_signal_start,
+                orb_signal_end=orb_signal_end,
             )
 
             if self.config.hmm_retrain_weekly and day.weekday() == 0:
@@ -183,7 +197,14 @@ class BacktestEngine:
         orb: Any,
         vwap_mr: Any,
         trend: Any,
+        orb_signal_start: Any = None,
+        orb_signal_end: Any = None,
     ) -> None:
+        # Use module-level defaults if not passed
+        if orb_signal_start is None:
+            orb_signal_start = ORB_SIGNAL_START
+        if orb_signal_end is None:
+            orb_signal_end = ORB_SIGNAL_END
         # ── Daily reset ───────────────────────────────────────────────────────
         self._circuit_breaker_active = False
         self._safety_mode_active = False
@@ -213,9 +234,14 @@ class BacktestEngine:
         if day_spy.empty:
             return
 
+        # Build combined ticker set: trading universe + ORB-specific universe
+        _all_tickers = list(self.config.universe) + [
+            t for t in self.config.orb_universe
+            if t not in self.config.universe
+        ]
         day_stocks: Dict[str, pd.DataFrame] = {
             ticker: market_data[ticker][market_data[ticker].index.normalize() == day]
-            for ticker in self.config.universe
+            for ticker in _all_tickers
             if ticker in market_data and ticker != "SPY"
             and not market_data[ticker][market_data[ticker].index.normalize() == day].empty
         }
@@ -289,7 +315,7 @@ class BacktestEngine:
 
             # 5. ORB scanner at 9:35
             if bar_t == ORB_SCAN_TIME and not orb_scanned and "ORB" in active:
-                candidates = self._build_orb_candidates(day_stocks)
+                candidates = self._build_orb_candidates(day_stocks, market_data, day)
                 try:
                     orb.run_scanner(candidates)
                 except Exception as e:
@@ -297,8 +323,8 @@ class BacktestEngine:
                 orb_scanned = True
                 logger.info(f"{bar_ts} | ORB scan → {len(orb.watchlist)} candidates")
 
-            # 6. ORB range formation 9:30–9:45
-            if ORB_RANGE_START <= bar_t < ORB_SIGNAL_START and "ORB" in active:
+            # 6. ORB range formation 9:30–signal_start (config-driven)
+            if ORB_RANGE_START <= bar_t < orb_signal_start and "ORB" in active:
                 for ticker in orb.watchlist:
                     if ticker not in day_stocks:
                         continue
@@ -315,8 +341,8 @@ class BacktestEngine:
                     except Exception as e:
                         logger.debug(f"OR calc error {ticker}: {e}")
 
-            # 7. ORB signals 9:45–10:15
-            if ORB_SIGNAL_START <= bar_t <= ORB_SIGNAL_END and "ORB" in active:
+            # 7. ORB signals (config-driven window)
+            if orb_signal_start <= bar_t <= orb_signal_end and "ORB" in active:
                 for ticker, (or_high, or_low) in list(or_ranges.items()):
                     if not self._position_ok(ticker, "ORB"):
                         continue
@@ -344,11 +370,19 @@ class BacktestEngine:
                         logger.debug(f"ORB signal error {ticker}: {e}")
 
             # 8. VWAP MR 10:15–14:00
+            # Run scanner each bar (designed to run continuously per blueprint)
             if VWAP_MR_START <= bar_t < VWAP_MR_END and "VWAP_MR" in active:
-                for ticker, stock_df in day_stocks.items():
+                vwap_candidates = self._build_vwap_candidates(
+                    day_stocks, bar_ts, self.config.universe
+                )
+                vwap_mr.run_scanner(vwap_candidates)
+
+                for ticker in vwap_mr.watchlist:
                     if not self._position_ok(ticker, "VWAP_MR"):
                         continue
-                    bars_so_far = stock_df.loc[:bar_ts]
+                    if ticker not in day_stocks:
+                        continue
+                    bars_so_far = day_stocks[ticker].loc[:bar_ts]
                     if len(bars_so_far) < 22:
                         continue
                     try:
@@ -358,7 +392,7 @@ class BacktestEngine:
                             std_dev=self.config.vwap_bb_std,
                         )
                         vwap_val = vwap_mr.calculate_vwap(bars_so_far)
-                        atr = self._compute_atr(bars_so_far)
+                        atr      = self._compute_atr(bars_so_far)
                         prev_bar  = bars_so_far.iloc[-2]
                         entry_bar = bars_so_far.iloc[-1]
                         sig = vwap_mr.generate_signal(
@@ -373,35 +407,65 @@ class BacktestEngine:
                     except Exception as e:
                         logger.debug(f"VWAP MR error {ticker}: {e}")
 
-            # 9. Trend 14:00–15:55
+            # 9. Trend Follow 14:00–15:55
+            # Run scanner once at 14:00 to select stocks near HOD/LOD with volume
             if TREND_START <= bar_t < EOD_HARD_EXIT and "TREND_FOLLOW" in active:
-                for ticker, stock_df in day_stocks.items():
+                if bar_t == TREND_START:
+                    # Compute sector strength from universe intraday returns
+                    sector_str = self._compute_sector_strength(
+                        day_stocks, bar_ts, self.config.universe
+                    )
+                    # All stocks eligible for trend: universe + orb_universe
+                    trend_eligible = list(self.config.universe) + [
+                        t for t in self.config.orb_universe
+                        if t not in self.config.universe
+                    ]
+                    trend_candidates = self._build_trend_candidates(
+                        day_stocks, bar_ts, trend_eligible, sector_str
+                    )
+                    trend.run_scanner(trend_candidates)
+                    logger.info(
+                        f"{bar_ts} | Trend scanner: {len(trend.watchlist)} stocks "
+                        f"selected (sector_strength={sector_str:+.2%})"
+                    )
+
+                for ticker in trend.watchlist:
                     if not self._position_ok(ticker, "TREND_FOLLOW"):
                         continue
-                    bars_so_far = stock_df.loc[:bar_ts]
+                    if ticker not in day_stocks:
+                        continue
+                    bars_so_far = day_stocks[ticker].loc[:bar_ts]
                     if len(bars_so_far) < 3:
                         continue
                     try:
-                        ema_val = trend.calculate_ema(
-                            bars_so_far, period=self.config.ema_period
-                        )
-                        atr = self._compute_atr(bars_so_far)
+                        ema_val    = trend.calculate_ema(bars_so_far, period=self.config.ema_period)
+                        atr        = self._compute_atr(bars_so_far)
                         avg_vol_10 = float(bars_so_far["volume"].tail(10).mean()) or 1.0
                         pullback_bar = bars_so_far.iloc[-2]
-                        resume_bar  = bars_so_far.iloc[-1]
+                        resume_bar   = bars_so_far.iloc[-1]
                         sig = trend.generate_signal(
                             pullback_bar, resume_bar, ema_val, atr,
                             self._hmm_state, avg_vol_10,
                         )
                         if sig:
-                            # Trend has no fixed target — add 3×ATR placeholder
-                            if "target" not in sig:
-                                atr_t = sig.get("atr", atr)
-                                sig["target"] = (
-                                    sig["entry_price"] + 3 * atr_t
-                                    if sig["direction"] == "LONG"
-                                    else sig["entry_price"] - 3 * atr_t
-                                )
+                            # Override stop/target with daily ATR scale.
+                            # 5-min Chandelier ATR (~$0.12) is noise — use
+                            # daily ATR (~$4-15) for meaningful stop distances.
+                            daily_atr = self._compute_daily_atr(
+                                market_data, ticker, bar_ts
+                            )
+                            entry_p   = sig.get("entry_price", 0.0)
+                            direction = sig.get("direction", "LONG")
+                            # Stop at 0.20× daily ATR, target at 1.5R (0.30× daily ATR)
+                            # Gives ~0.5-1.5% stop depending on stock volatility
+                            stop_dist   = max(daily_atr * 0.20, entry_p * 0.005)
+                            target_dist = stop_dist * 1.5
+                            if direction == "LONG":
+                                sig["initial_stop"] = round(entry_p - stop_dist, 2)
+                                sig["target"]       = round(entry_p + target_dist, 2)
+                            else:
+                                sig["initial_stop"] = round(entry_p + stop_dist, 2)
+                                sig["target"]       = round(entry_p - target_dist, 2)
                             sig = self._normalise_signal(sig)
                             self._attempt_entry(
                                 sig, ticker, "TREND_FOLLOW", bar_ts, position_sizer, pdt_guard
@@ -409,7 +473,7 @@ class BacktestEngine:
                     except Exception as e:
                         logger.debug(f"Trend signal error {ticker}: {e}")
 
-            # 10. Exit checks
+            # 10. Exit checks (with Chandelier stop update for Trend Follow)
             for trade in list(self.trade_log.open_trades):
                 exit_result = self._check_exits(trade, bar_ts, bar_t, day_stocks)
                 if exit_result:
@@ -496,30 +560,94 @@ class BacktestEngine:
         return float(tr.tail(period).mean())
 
     def _build_orb_candidates(
-        self, day_stocks: Dict[str, pd.DataFrame]
+        self,
+        day_stocks: Dict[str, pd.DataFrame],
+        market_data: Dict[str, pd.DataFrame],
+        today: pd.Timestamp,
     ) -> List[Dict[str, Any]]:
         """
         Build the candidates list expected by ORBStrategy.run_scanner.
-        In the absence of pre-market data we synthesise a ~3% gap so the
-        gap filter passes, and use opening bar volume for the liquidity check.
+        Uses real previous day close to compute genuine gap percentage.
+
+        If config.orb_universe is set, only those tickers are scanned.
+        Otherwise falls back to the full universe (day_stocks).
         """
+        # Determine which tickers to scan for ORB
+        orb_tickers = self.config.orb_universe
+        if orb_tickers:
+            # Only scan the volatile ORB-specific stocks
+            scan_stocks = {
+                t: df for t, df in day_stocks.items()
+                if t in orb_tickers
+            }
+            logger.debug(
+                f"ORB scanning {len(scan_stocks)} ORB-universe stocks "
+                f"(not full universe of {len(day_stocks)})"
+            )
+        else:
+            # Fallback: scan all stocks (original behaviour)
+            scan_stocks = day_stocks
+
         candidates = []
-        for ticker, df in day_stocks.items():
+        for ticker, df in scan_stocks.items():
             if df.empty:
                 continue
-            first = df.iloc[0]
+
+            first  = df.iloc[0]
             open_p = float(first["open"])
-            # Synthetic prev_close: 3% gap guarantees gap filter passes (min 2%)
-            prev_close = open_p / 1.03
-            avg_vol = max(int(df["volume"].mean()), 1)
+
+            # ── Real previous day close ───────────────────────────────────────
+            prev_close = None
+            prior_bars = pd.DataFrame()
+            if ticker in market_data:
+                full_df   = market_data[ticker]
+                prior_all = full_df[full_df.index.normalize() < today]
+                if not prior_all.empty:
+                    prev_close = float(prior_all.iloc[-1]["close"])
+                    prior_bars = prior_all
+
+            if prev_close is None or prev_close <= 0:
+                logger.debug(f"ORB skip {ticker}: no prior day close available")
+                continue
+
+            gap_pct = abs(open_p - prev_close) / prev_close
+            if gap_pct < 0.005:
+                logger.debug(f"ORB skip {ticker}: gap {gap_pct:.2%} too small")
+                continue
+
+            # ── Historical opening bar volume (9:30-9:35) ────────────────────
+            # The ORB scanner compares opening_5min_volume to avg_daily_volume/78.
+            # Using all-day ADV/78 overestimates the threshold because opening
+            # bars have 3-4x more volume than midday bars.
+            # Instead, compute the average of the first 5-min bar across the
+            # prior 20 trading days — a like-for-like comparison.
+            if not prior_bars.empty:
+                # Get first bar of each prior trading day
+                prior_opening_vols = (
+                    prior_bars.groupby(prior_bars.index.normalize())
+                    .first()["volume"]
+                    .tail(20)
+                )
+                avg_opening_vol = int(prior_opening_vols.mean()) if len(prior_opening_vols) > 0 else int(first["volume"])
+                # avg_daily_volume is used as: threshold = 2 × (avg_daily_volume/78)
+                # So set avg_daily_volume = avg_opening_vol × 78 so that
+                # threshold = 2 × avg_opening_vol (correct comparison)
+                avg_daily_volume = avg_opening_vol * 78
+            else:
+                avg_daily_volume = int(df["volume"].mean() * 78)
+
+            avg_daily_volume = max(avg_daily_volume, 1)
+
             candidates.append({
                 "ticker":              ticker,
                 "prev_close":          round(prev_close, 2),
                 "open_price":          open_p,
                 "premarket_volume":    0,
-                "avg_daily_volume":    avg_vol,
+                "avg_daily_volume":    avg_daily_volume,
                 "opening_5min_volume": int(first["volume"]),
             })
+
+        logger.info(f"ORB candidates: {len(candidates)} stocks with real gaps")
         return candidates
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -605,6 +733,183 @@ class BacktestEngine:
             f"Regime:{self._hmm_state} Limit:{limit_factor}"
         )
 
+
+    @staticmethod
+    def _compute_adx(bars: pd.DataFrame, period: int = 14) -> float:
+        """
+        Compute 14-period Average Directional Index from 5-min bars.
+        Returns 0.0 if insufficient data.
+        """
+        if len(bars) < period + 1:
+            return 0.0
+        try:
+            high  = bars["high"]
+            low   = bars["low"]
+            close = bars["close"]
+
+            # True Range
+            prev_close = close.shift(1)
+            tr = pd.concat([
+                high - low,
+                (high - prev_close).abs(),
+                (low  - prev_close).abs(),
+            ], axis=1).max(axis=1)
+
+            # Directional Movement
+            up   = high.diff()
+            down = -low.diff()
+            plus_dm  = up.where((up > down) & (up > 0), 0.0)
+            minus_dm = down.where((down > up) & (down > 0), 0.0)
+
+            # Wilder smoothing (approximate with EWM)
+            atr_s      = tr.ewm(span=period, adjust=False).mean()
+            plus_di    = 100 * plus_dm.ewm(span=period, adjust=False).mean() / atr_s.replace(0, 1e-9)
+            minus_di   = 100 * minus_dm.ewm(span=period, adjust=False).mean() / atr_s.replace(0, 1e-9)
+            dx         = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, 1e-9)
+            adx        = dx.ewm(span=period, adjust=False).mean()
+            return float(adx.iloc[-1])
+        except Exception:
+            return 0.0
+
+    def _compute_sector_strength(
+        self,
+        day_stocks: Dict[str, pd.DataFrame],
+        bar_ts: pd.Timestamp,
+        universe: List[str],
+    ) -> float:
+        """
+        Average intraday return of universe stocks up to bar_ts.
+        Positive = sector bullish, negative = sector bearish.
+        """
+        returns = []
+        for ticker in universe:
+            if ticker not in day_stocks:
+                continue
+            df = day_stocks[ticker].loc[:bar_ts]
+            if len(df) < 2:
+                continue
+            open_p  = float(df.iloc[0]["open"])
+            close_p = float(df.iloc[-1]["close"])
+            if open_p > 0:
+                returns.append((close_p - open_p) / open_p)
+        return float(sum(returns) / len(returns)) if returns else 0.0
+
+    def _build_vwap_candidates(
+        self,
+        day_stocks: Dict[str, pd.DataFrame],
+        bar_ts: pd.Timestamp,
+        universe: List[str],
+    ) -> List[Dict[str, Any]]:
+        """Build candidate dicts for VWAPMRStrategy.run_scanner()."""
+        candidates = []
+        for ticker in universe:
+            if ticker not in day_stocks:
+                continue
+            bars = day_stocks[ticker].loc[:bar_ts]
+            if len(bars) < 22:   # need 20 for SMA + 2 for ATR comparison
+                continue
+            try:
+                current_price  = float(bars.iloc[-1]["close"])
+                current_volume = float(bars.iloc[-1]["volume"])
+                avg_daily_vol  = float(bars["volume"].mean()) * 78   # scale to daily
+                sma_20         = float(bars["close"].rolling(20).mean().iloc[-1])
+                atr_current    = self._compute_atr(bars)
+                atr_5bars_ago  = self._compute_atr(bars.iloc[:-5]) if len(bars) > 19 else atr_current
+                adx            = self._compute_adx(bars)
+
+                if pd.isna(sma_20) or sma_20 <= 0:
+                    continue
+
+                candidates.append({
+                    "ticker":           ticker,
+                    "adx":              adx,
+                    "sma_20":           sma_20,
+                    "current_price":    current_price,
+                    "current_volume":   current_volume,
+                    "avg_daily_volume": avg_daily_vol,
+                    "atr_current":      atr_current,
+                    "atr_5bars_ago":    atr_5bars_ago,
+                    "has_earnings":     False,   # no earnings data available
+                })
+            except Exception as e:
+                logger.debug(f"VWAP candidate error {ticker}: {e}")
+        return candidates
+
+    def _build_trend_candidates(
+        self,
+        day_stocks: Dict[str, pd.DataFrame],
+        bar_ts: pd.Timestamp,
+        universe: List[str],
+        sector_strength: float,
+    ) -> List[Dict[str, Any]]:
+        """Build candidate dicts for TrendFollowStrategy.run_scanner()."""
+        candidates = []
+        for ticker in universe:
+            if ticker not in day_stocks:
+                continue
+            bars = day_stocks[ticker].loc[:bar_ts]
+            if len(bars) < 3:
+                continue
+            try:
+                current_price     = float(bars.iloc[-1]["close"])
+                current_volume    = float(bars.iloc[-1]["volume"])
+                hod               = float(bars["high"].max())
+                lod               = float(bars["low"].min())
+                atr               = self._compute_atr(bars)
+                avg_intraday_vol  = float(bars["volume"].tail(10).mean())
+
+                candidates.append({
+                    "ticker":              ticker,
+                    "current_price":       current_price,
+                    "hod":                 hod,
+                    "lod":                 lod,
+                    "atr":                 atr,
+                    "avg_intraday_volume": avg_intraday_vol,
+                    "current_volume":      current_volume,
+                    "sector_strength":     sector_strength,
+                })
+            except Exception as e:
+                logger.debug(f"Trend candidate error {ticker}: {e}")
+        return candidates
+
+
+    @staticmethod
+    def _compute_daily_atr(
+        market_data: Dict[str, pd.DataFrame],
+        ticker: str,
+        as_of: pd.Timestamp,
+        period: int = 14,
+    ) -> float:
+        """
+        Compute 14-period ATR from daily closes for a ticker.
+        Used to size Trend Follow stops at a meaningful scale.
+        Falls back to 1% of price if insufficient data.
+        """
+        if ticker not in market_data:
+            return 0.0
+        try:
+            df = market_data[ticker]
+            # Get daily OHLC by resampling
+            daily = df.loc[df.index < as_of].resample("B").agg({
+                "open":  "first",
+                "high":  "max",
+                "low":   "min",
+                "close": "last",
+            }).dropna()
+
+            if len(daily) < period + 1:
+                # Fallback: 1% of last close
+                last_close = float(df.loc[df.index < as_of]["close"].iloc[-1])
+                return last_close * 0.01
+
+            hl  = daily["high"] - daily["low"]
+            hpc = (daily["high"] - daily["close"].shift(1)).abs()
+            lpc = (daily["low"]  - daily["close"].shift(1)).abs()
+            tr  = pd.concat([hl, hpc, lpc], axis=1).max(axis=1)
+            return float(tr.tail(period).mean())
+        except Exception:
+            return 0.0
+
     def _check_exits(
         self,
         trade: Trade,
@@ -635,7 +940,7 @@ class BacktestEngine:
 
         if trade.strategy == "VWAP_MR":
             elapsed = (bar_ts - trade.entry_time).total_seconds() / 60
-            if elapsed >= 45:
+            if elapsed >= 90:   # extended from 45→90 min to allow full mean reversion
                 return bar_close, "TIME_STOP"
 
         return None

@@ -60,6 +60,9 @@ class BacktestConfig:
     universe: List[str] = field(
         default_factory=lambda: ["AAPL", "MSFT", "NVDA", "TSLA", "AMZN"]
     )
+    # ORB-specific universe — volatile gappers only.
+    # If empty, falls back to full universe (old behaviour).
+    orb_universe: List[str] = field(default_factory=list)
 
     # The 3 WFO-optimized hyperparameters (Section 7.1)
     orb_range_minutes: int = 15    # 10 | 15 | 20
