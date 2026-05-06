@@ -1,6 +1,6 @@
 """
 raits/backtest/wfo.py
-Walk-Forward Optimization engine — Week 19.
+Walk-Forward Optimization engine -- Week 19.
 
 Implements blueprint Section 7.2-7.4:
   - Rolling 3-year training / 1-year test windows
@@ -113,11 +113,11 @@ class WFOReport:
         lines = [
             "=" * 70,
             "RAITS Walk-Forward Optimization Report",
-            f"  Dataset:        {self.config.full_dataset_start} → {self.config.full_dataset_end}",
+            f"  Dataset:        {self.config.full_dataset_start} -> {self.config.full_dataset_end}",
             f"  Vault boundary: {self.vault_boundary} (15% held out)",
             f"  Windows run:    {len(self.window_results)}",
             "",
-            "── Stitched OOS Performance (all windows combined) ──────────────",
+            "-- Stitched OOS Performance (all windows combined) --------------",
             f"  Calmar ratio:   {m.get('calmar_ratio',0):.2f}  (target >2.0)",
             f"  Profit factor:  {m.get('profit_factor',0):.2f}  (target >1.75)",
             f"  Max drawdown:   {m.get('max_drawdown',0):.1%}  (target <15%)",
@@ -129,7 +129,7 @@ class WFOReport:
             f"  R² vs SPY:      {self.spy_r_squared:.3f}  (target <0.4)"
                 if self.spy_r_squared is not None else "  R² vs SPY:      N/A",
             "",
-            "── Window Dominance Check ───────────────────────────────────────",
+            "-- Window Dominance Check ---------------------------------------",
         ]
         for wc in self.dominance_check.get("window_contributions", []):
             flag = " ⚠️  >60% — UNSTABLE" if wc["exceeds_60pct"] else ""
@@ -138,17 +138,17 @@ class WFOReport:
                 f"  (${wc['net_profit']:.0f}){flag}"
             )
         lines += [
-            f"  Dominance check: {'PASS ✓' if self.dominance_check['passes'] else 'FAIL ✗'}",
+            f"  Dominance check: {'PASS [OK]' if self.dominance_check['passes'] else 'FAIL [FAIL]'}",
             "",
-            "── Production Parameters (locked for Vault) ─────────────────────",
+            "-- Production Parameters (locked for Vault) ---------------------",
             f"  ORB range:      {self.production_params.orb_range_minutes} min",
-            f"  VWAP BB std:    {self.production_params.vwap_bb_std}σ",
+            f"  VWAP BB std:    {self.production_params.vwap_bb_std} sigma",
             f"  EMA period:     {self.production_params.ema_period} bars",
             f"  Method:         {self.production_params.aggregation_method}",
             "",
-            f"── Verdict ──────────────────────────────────────────────────────",
-            f"  WFO targets met:    {'YES ✓' if self.wfo_passes else 'NO ✗'}",
-            f"  Proceed to Vault:   {'YES ✓' if self.proceed_to_vault else 'NO — fix issues first ✗'}",
+            f"-- Verdict ------------------------------------------------------",
+            f"  WFO targets met:    {'YES [OK]' if self.wfo_passes else 'NO [FAIL]'}",
+            f"  Proceed to Vault:   {'YES [OK]' if self.proceed_to_vault else 'NO -- fix issues first [FAIL]'}",
             "=" * 70,
         ]
         return "\n".join(lines)
@@ -161,7 +161,7 @@ class WFOReport:
         yaml_path = os.path.join(output_dir, "final_params.yaml")
         with open(yaml_path, "w") as f:
             f.write(self.production_params.to_yaml_str())
-        logger.info(f"Production params saved → {yaml_path}")
+        logger.info(f"Production params saved -> {yaml_path}")
 
         # Full report → JSON (audit trail)
         report_path = os.path.join(output_dir, "wfo_report.json")
@@ -178,7 +178,7 @@ class WFOReport:
         }
         with open(report_path, "w") as f:
             json.dump(report_dict, f, indent=2, default=str)
-        logger.info(f"WFO report saved → {report_path}")
+        logger.info(f"WFO report saved -> {report_path}")
 
 
 # ── WFO Engine ────────────────────────────────────────────────────────────────
@@ -233,7 +233,7 @@ class WFOEngine:
         """
         logger.warning("=" * 60)
         logger.warning("WFO ENGINE STARTING")
-        logger.warning(f"Dataset: {self.cfg.full_dataset_start} → {self.cfg.full_dataset_end}")
+        logger.warning(f"Dataset: {self.cfg.full_dataset_start} -> {self.cfg.full_dataset_end}")
         logger.warning(f"Vault fraction: {self.cfg.vault_fraction:.0%}")
         logger.warning("=" * 60)
 
@@ -249,12 +249,12 @@ class WFOEngine:
         windows = self._build_windows(spy_wfo)
         logger.warning(f"WFO windows scheduled: {len(windows)}")
         for i, (ts, te, oos_s, oos_e) in enumerate(windows):
-            logger.warning(f"  Window {i+1}: train {ts.date()}→{te.date()}  test {oos_s.date()}→{oos_e.date()}")
+            logger.warning(f"  Window {i+1}: train {ts.date()}->{te.date()}  test {oos_s.date()}->{oos_e.date()}")
 
         # ── Step 3: run each window ───────────────────────────────────────────
         window_results: List[WindowResult] = []
         for idx, (train_s, train_e, test_s, test_e) in enumerate(windows, start=1):
-            logger.warning(f"\n── Window {idx}/{len(windows)} ──────────────")
+            logger.warning(f"\n-- Window {idx}/{len(windows)} --------------")
             result = self._run_window(
                 window_idx=idx,
                 train_start=train_s,
@@ -303,7 +303,7 @@ class WFOEngine:
                 "DO NOT run Vault test."
             )
         else:
-            logger.warning("✓  WFO targets met. Dominance check passed. Ready for cooling-off period.")
+            logger.warning("[OK]  WFO targets met. Dominance check passed. Ready for cooling-off period.")
 
         return WFOReport(
             config=self.cfg,
@@ -360,7 +360,7 @@ class WFOEngine:
         elapsed = time.time() - t0
         logger.warning(
             f"  Grid search done in {elapsed:.1f}s  "
-            f"Best: ORB={best_combo[0]}min BB={best_combo[1]}σ EMA={best_combo[2]}  "
+            f"Best: ORB={best_combo[0]}min BB={best_combo[1]}sigma EMA={best_combo[2]}  "
             f"Train Calmar={best_calmar:.2f}"
         )
 
@@ -484,7 +484,7 @@ class WFOEngine:
 
         if len(days) < train_days + test_days:
             raise ValueError(
-                f"Insufficient data for WFO. Need ≥"
+                f"Insufficient data for WFO. Need >="
                 f"{train_days + test_days} trading days, "
                 f"got {len(days)}."
             )

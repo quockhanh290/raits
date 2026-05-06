@@ -67,7 +67,7 @@ DEFAULT_CONFIG = {
     'bb_std_dev':    2.0,   # WFO grid: 1.5, 2.0, 2.5 — default 2.0
 
     # Entry / exit (Section 4.3)
-    'stop_atr_multiple':  1.5,   # stop = entry ± 1.5 × ATR
+    'stop_atr_multiple':  0.5,   # stop = entry ± 1.5 × ATR
 
     # Regime filter (Section 6.1)
     'allowed_regimes': ['Calm'],   # ONLY Calm — most restrictive strategy

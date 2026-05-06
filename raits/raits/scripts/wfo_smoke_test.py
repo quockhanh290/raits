@@ -1,6 +1,6 @@
 """
 scripts/wfo_smoke_test.py
-─────────────────────────
+-------------------------
 Mini WFO smoke test using real yfinance 5-minute data.
 
 Purpose:
@@ -32,9 +32,13 @@ import logging
 import warnings
 warnings.filterwarnings("ignore")
 
-# ── Path setup ────────────────────────────────────────────────────────────────
+# -- Path setup ----------------------------------------------------------------
 # Run from raits/ subdirectory (where pyproject.toml lives)
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add project root to sys.path
+_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+if _root not in sys.path:
+    sys.path.insert(0, _root)
+
 
 import pandas as pd
 import numpy as np
@@ -43,14 +47,14 @@ import yfinance as yf
 from raits.backtest.wfo import WFOEngine, WFOConfig
 from raits.backtest.wfo_grid import ProductionParams
 
-# ── Logging ───────────────────────────────────────────────────────────────────
+# -- Logging -------------------------------------------------------------------
 logging.basicConfig(
     level=logging.WARNING,
     format="%(asctime)s | %(levelname)s | %(message)s",
 )
 logger = logging.getLogger("smoke_test")
 
-# ── Configuration ─────────────────────────────────────────────────────────────
+# -- Configuration -------------------------------------------------------------
 UNIVERSE  = ["AAPL", "MSFT", "NVDA"]   # keep small for speed
 TICKERS   = ["SPY"] + UNIVERSE
 
@@ -81,7 +85,7 @@ def download_data(tickers: list, period: str = "60d") -> dict:
                 progress=False,
             )
             if df.empty:
-                print(f"  ✗ {ticker}: no data returned")
+                print(f"  [FAIL] {ticker}: no data returned")
                 continue
 
             # Flatten MultiIndex columns if present (newer yfinance versions)
@@ -97,12 +101,12 @@ def download_data(tickers: list, period: str = "60d") -> dict:
             # Keep only market hours (09:30–16:00 ET)
             df = df.between_time("09:30", "16:00")
 
-            print(f"  ✓ {ticker}: {len(df)} bars  "
-                  f"{df.index[0].date()} → {df.index[-1].date()}")
+            print(f"  [OK] {ticker}: {len(df)} bars  "
+                  f"{df.index[0].date()} -> {df.index[-1].date()}")
             market_data[ticker] = df
 
         except Exception as e:
-            print(f"  ✗ {ticker}: {e}")
+            print(f"  [FAIL] {ticker}: {e}")
 
     return market_data
 
@@ -110,22 +114,22 @@ def download_data(tickers: list, period: str = "60d") -> dict:
 def validate_data(market_data: dict) -> bool:
     """Basic sanity checks before running WFO."""
     if "SPY" not in market_data:
-        print("\n✗ FATAL: SPY data missing — cannot compute HMM regime")
+        print("\n[FAIL] FATAL: SPY data missing — cannot compute HMM regime")
         return False
 
     spy_days = len(market_data["SPY"].index.normalize().unique())
     print(f"\nSPY trading days available: {spy_days}")
 
     if spy_days < 25:
-        print("✗ FATAL: Need at least 25 trading days for HMM (50 daily obs minimum)")
+        print("[FAIL] FATAL: Need at least 25 trading days for HMM (50 daily obs minimum)")
         return False
 
     stock_count = sum(1 for t in UNIVERSE if t in market_data)
     if stock_count == 0:
-        print("✗ FATAL: No stock data available — no trades can fire")
+        print("[FAIL] FATAL: No stock data available — no trades can fire")
         return False
 
-    print(f"✓ Data validated: {spy_days} SPY days, {stock_count}/{len(UNIVERSE)} stocks")
+    print(f"[OK] Data validated: {spy_days} SPY days, {stock_count}/{len(UNIVERSE)} stocks")
     return True
 
 
@@ -149,7 +153,7 @@ def build_wfo_config(market_data: dict) -> WFOConfig:
 
     print(f"\nWFO config:")
     print(f"  Total days:  {total_days}")
-    print(f"  WFO days:    {wfo_days}  ({start_date} → {end_date})")
+    print(f"  WFO days:    {wfo_days}  ({start_date} -> {end_date})")
     print(f"  Vault days:  {vault_days} (held out)")
 
     # Use very small windows for smoke test
@@ -177,20 +181,20 @@ def run_smoke_test():
     print("RAITS WFO SMOKE TEST — yfinance data")
     print("="*60)
 
-    # ── 1. Download data ──────────────────────────────────────────────────────
+    # -- 1. Download data ------------------------------------------------------
     market_data = download_data(TICKERS)
 
     if not validate_data(market_data):
         sys.exit(1)
 
-    # ── 2. Build config ───────────────────────────────────────────────────────
+    # -- 2. Build config -------------------------------------------------------
     try:
         cfg = build_wfo_config(market_data)
     except Exception as e:
-        print(f"\n✗ Config build failed: {e}")
+        print(f"\n[FAIL] Config build failed: {e}")
         sys.exit(1)
 
-    # ── 3. Run WFO ────────────────────────────────────────────────────────────
+    # -- 3. Run WFO ------------------------------------------------------------
     print(f"\nRunning WFO grid search ({27} combinations × windows)...")
     print("This may take a few minutes on real data.\n")
 
@@ -198,15 +202,15 @@ def run_smoke_test():
         engine = WFOEngine(cfg)
         report = engine.run(market_data)
     except Exception as e:
-        print(f"\n✗ WFO run failed: {e}")
+        print(f"\n[FAIL] WFO run failed: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
 
-    # ── 4. Print results ──────────────────────────────────────────────────────
+    # -- 4. Print results ------------------------------------------------------
     print("\n" + report.summary())
 
-    # ── 5. Save outputs ───────────────────────────────────────────────────────
+    # -- 5. Save outputs -------------------------------------------------------
     os.makedirs("configs", exist_ok=True)
     try:
         # Save with smoke-test prefix so it doesn't overwrite real WFO results
@@ -241,19 +245,19 @@ def run_smoke_test():
         with open(report_path, "w") as f:
             json.dump(report_dict, f, indent=2, default=default)
 
-        print(f"\n✓ Smoke params saved → {params_path}")
-        print(f"✓ Smoke report saved → {report_path}")
+        print(f"\n[OK] Smoke params saved -> {params_path}")
+        print(f"[OK] Smoke report saved -> {report_path}")
 
     except Exception as e:
-        print(f"\n⚠ Save failed (non-fatal): {e}")
+        print(f"\n[WARN] Save failed (non-fatal): {e}")
 
-    # ── 6. Verdict ────────────────────────────────────────────────────────────
+    # -- 6. Verdict ------------------------------------------------------------
     print("\n" + "="*60)
     m = report.stitched_metrics
     trades = m.get("total_trades", 0)
 
     if trades == 0:
-        print("⚠  NO TRADES FIRED")
+        print("[WARN]  NO TRADES FIRED")
         print("   This means the strategies rejected all signals on this data.")
         print("   Common causes:")
         print("   - HMM stayed in Stress/Safety mode all session")
@@ -261,16 +265,16 @@ def run_smoke_test():
         print("   - Not enough bars per day (data gaps)")
         print("   The engine itself is working — this is a signal quality issue.")
     else:
-        print(f"✓ {trades} trades fired across WFO windows")
+        print(f"[OK] {trades} trades fired across WFO windows")
         print(f"  Calmar:  {m.get('calmar_ratio', 0):.2f}  (target >2.0 for Tier 1)")
         print(f"  Sharpe:  {m.get('sharpe_ratio', 0):.2f}  (target >1.5)")
         print(f"  Max DD:  {m.get('max_drawdown', 0):.1%}  (target <15%)")
         print(f"  Win rate:{m.get('win_rate', 0):.1%}  (target >40%)")
         print()
         if report.wfo_passes:
-            print("✓ WFO targets met on smoke data")
+            print("[OK] WFO targets met on smoke data")
         else:
-            print("⚠  WFO targets not met — expected on 60-day smoke data")
+            print("[WARN]  WFO targets not met — expected on 60-day smoke data")
             print("   Run again with 7-year Polygon.io data for real results.")
 
     print("="*60)
