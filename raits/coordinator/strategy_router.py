@@ -237,9 +237,10 @@ class StrategyRouter:
     def _window_to_strategy(window: TimeWindow) -> str | None:
         """Return the strategy name for a given active time window."""
         mapping = {
-            TimeWindow.ORB_SCAN:     "ORB",
-            TimeWindow.ORB_MONITOR:  "ORB",
-            TimeWindow.VWAP_MR:      "VWAP_MR",
-            TimeWindow.TREND_FOLLOW: "TREND_FOLLOW",
-        }
+    TimeWindow.ORB_SCAN:     "ORB",
+    TimeWindow.ORB_MONITOR:  "ORB",
+    # VWAP_MR disabled -- structural fit failure on trending universe
+    # TimeWindow.VWAP_MR:   "VWAP_MR",
+    TimeWindow.TREND_FOLLOW: "TREND_FOLLOW",
+}
         return mapping.get(window)

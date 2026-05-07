@@ -459,7 +459,7 @@ class BacktestEngine:
                             # Stop at 0.20× daily ATR, target at 1.5R (0.30× daily ATR)
                             # Gives ~0.5-1.5% stop depending on stock volatility
                             stop_dist   = max(daily_atr * 0.20, entry_p * 0.005)
-                            target_dist = stop_dist * 1.5
+                            target_dist = stop_dist * 0.75
                             if direction == "LONG":
                                 sig["initial_stop"] = round(entry_p - stop_dist, 2)
                                 sig["target"]       = round(entry_p + target_dist, 2)
@@ -642,7 +642,7 @@ class BacktestEngine:
                 "ticker":              ticker,
                 "prev_close":          round(prev_close, 2),
                 "open_price":          open_p,
-                "premarket_volume":    0,
+                "premarket_volume":    int(df[df.index.time < dtime(9, 30)]["volume"].sum()),
                 "avg_daily_volume":    avg_daily_volume,
                 "opening_5min_volume": int(first["volume"]),
             })

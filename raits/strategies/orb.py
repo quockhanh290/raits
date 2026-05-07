@@ -68,8 +68,8 @@ DEFAULT_CONFIG = {
     'min_gap_pct':               0.02,    # ±2% minimum gap from prev close
     'min_price':                 10.0,    # $10 minimum stock price
     'max_price':                1000.0,    # $200 maximum stock price
-    'premarket_vol_threshold':  50_000,   # pre-market volume Option A threshold
-    'opening_vol_multiplier':    2.0,     # opening 5-min volume Option B multiplier
+    'premarket_vol_threshold':  10_000,   # pre-market volume Option A threshold
+    'opening_vol_multiplier':    1.5,     # opening 5-min volume Option B multiplier
 
     # Opening Range validation (Section 4.2 "Opening Range Definition")
     'min_range_atr_multiple':    0.5,     # OR range must be >= 0.5 × ATR
