@@ -90,10 +90,18 @@ PROD_ORB_RANGE = 15
 PROD_BB_STD    = 2.5
 PROD_EMA       = 30
 
-# Same universe as the diagnostic WFO run
-UNIVERSE     = ["TSLA", "NFLX", "AMD", "BABA", "ROKU", "SQ"]
-ORB_UNIVERSE = ["TSLA", "AMD", "NVDA", "META", "NFLX", "BABA"]
-TICKERS      = ["SPY"] + UNIVERSE + [t for t in ORB_UNIVERSE if t not in UNIVERSE]
+# TREND_FOLLOW universe — original big-tech universe.
+# Diagnostic showed this outperforms the diverse universe (50% WR vs 44%).
+UNIVERSE = ["TSLA", "NVDA", "AAPL", "META", "AMZN", "MSFT", "AMD", "GOOGL"]
+
+# ORB disabled — fixed universe produces 0 trades (needs dynamic scanner).
+ORB_UNIVERSE = []
+
+# VWAP_MR disabled — no edge found on any tested universe.
+VWAP_UNIVERSE = []
+
+# SPY required for HMM training.
+TICKERS = ["SPY"] + UNIVERSE
 
 CACHE_DIR     = "./raits/data/cache"
 INTERVAL_MINS = 5
@@ -114,7 +122,7 @@ def fetch_market_data(
         api_key=POLYGON_API_KEY,
         use_cache=True,
         cache_dir=CACHE_DIR,
-        rate_limit_calls_per_minute=100,
+        rate_limit_calls_per_minute=99999,
     )
 
     # Need historical SPY back to 2017 for HMM fit; for stocks we only need OOS span
@@ -410,7 +418,7 @@ def main():
         sys.exit(1)
 
     stocks_loaded = sum(
-        1 for t in UNIVERSE + ORB_UNIVERSE
+        1 for t in set(UNIVERSE + ORB_UNIVERSE)
         if t in market_data and not market_data[t].empty
     )
     print(f"\n[OK] Loaded SPY + {stocks_loaded} stocks")
@@ -422,18 +430,22 @@ def main():
         end_date=OOS_END,
         universe=UNIVERSE,
         orb_universe=ORB_UNIVERSE,
+        vwap_universe=VWAP_UNIVERSE,
         orb_range_minutes=PROD_ORB_RANGE,
         vwap_bb_std=PROD_BB_STD,
         ema_period=PROD_EMA,
         enable_costs=True,
-        enable_pdt_guard=False,    # above $25k, same as WFO
+        enable_pdt_guard=False,
         log_level="WARNING",
+        allow_swing_hold=True,
+        max_hold_days=5,
+        stress_size_fraction=0.5,
     )
 
     print(f"\n{'='*60}")
     print(f"Running BacktestEngine over OOS span...")
     print(f"  Span:   {OOS_START} -> {OOS_END}")
-    print(f"  Params: ORB={PROD_ORB_RANGE}, BB={PROD_BB_STD}σ, EMA={PROD_EMA}")
+    print(f"  Params: ORB={PROD_ORB_RANGE}, BB={PROD_BB_STD}std, EMA={PROD_EMA}")
     print(f"  Equity: ${ACCOUNT_EQUITY:,.0f}")
     print(f"{'='*60}\n")
 

@@ -4,7 +4,7 @@
 #
 # Blueprint ref: Section 4.4
 # Active period:    2:00 PM – 3:55 PM ET
-# Allowed regimes:  Normal, Stress  (skip Calm — opposite of VWAP MR)
+# Allowed regimes:  Normal, Stress
 # Max positions:    2 concurrent
 # Bar resolution:   5-MINUTE bars (not 1-minute)
 #
@@ -47,7 +47,6 @@
 
 import logging
 import pandas as pd
-import numpy as np
 from typing import Optional
 
 logger = logging.getLogger('RAITS.TrendFollow')
@@ -63,7 +62,7 @@ DEFAULT_CONFIG = {
     'ema_period':               20,     # WFO grid: 20, 30, 50
 
     # Entry: EMA proximity
-    'ema_proximity_pct':        0.002,  # pullback bar close within 0.2% of EMA
+    'ema_proximity_pct':        0.005,  # pullback bar close within 0.5% of EMA
 
     # Volume pattern
     'resume_volume_surge_mult': 1.3,    # resume bar volume > 1.3× avg
@@ -72,7 +71,7 @@ DEFAULT_CONFIG = {
     'chandelier_atr_mult':      3.0,    # stop = highest_high - 3×ATR
 
     # Regime filter (Section 6.1)
-    'allowed_regimes': ['Normal', 'Stress'],  # NOT Calm
+    'allowed_regimes': ['Normal', 'Stress'],
 }
 
 
@@ -107,9 +106,11 @@ class TrendFollowStrategy:
     def __init__(self, config: Optional[dict] = None):
         self.config = {**DEFAULT_CONFIG, **(config or {})}
         self.watchlist: list = []
+        self.watchlist_directions: dict = {}  # ticker → 'LONG' or 'SHORT'
 
     def reset(self):
         self.watchlist = []
+        self.watchlist_directions = {}
 
     # ──────────────────────────────────────────────────────────────────────────
     # METHOD 1: run_scanner
@@ -171,6 +172,17 @@ class TrendFollowStrategy:
                              f"price ${price:.2f} not near HOD ${hod:.2f} or LOD ${lod:.2f}")
                 continue
 
+            # Direction intent locked at scan time based on HOD/LOD position.
+            # Used in engine to reject signals that contradict the intraday trend.
+            # If near both HOD and LOD (tight range or wide ATR), intent is None
+            # — engine falls back to signal direction without enforcement.
+            if near_hod and near_lod:
+                intent = None   # ambiguous — don't enforce direction
+            elif near_hod:
+                intent = 'LONG'
+            else:
+                intent = 'SHORT'
+
             # ── Filter 2: Volume confirmation ─────────────────────────────────
             # Late-day momentum must be backed by volume, not just price drift.
             vol_ratio = c['current_volume'] / c['avg_intraday_volume']
@@ -180,18 +192,10 @@ class TrendFollowStrategy:
                              f"(min {self.config['min_volume_ratio']:.1f}×)")
                 continue
 
-            # ── Filter 3: Sector strength ─────────────────────────────────────
-            # Don't buy a stock near HOD if its whole sector is selling off.
-            # Sector momentum confirms the individual stock move isn't an outlier.
-            if c['sector_strength'] <= 0:
-                logger.debug(f"TrendFollow Scanner REJECT {ticker}: "
-                             f"sector_strength={c['sector_strength']:.2f} <= 0")
-                continue
-
             logger.info(f"TrendFollow Scanner ACCEPT {ticker}: "
-                        f"near_hod={near_hod}, near_lod={near_lod}, "
-                        f"vol_ratio={vol_ratio:.1f}×")
+                        f"intent={intent}, vol_ratio={vol_ratio:.1f}×")
             accepted.append(ticker)
+            self.watchlist_directions[ticker] = intent
 
         self.watchlist = accepted
         return accepted

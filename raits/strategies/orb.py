@@ -65,7 +65,7 @@ logger = logging.getLogger('RAITS.ORB')
 
 DEFAULT_CONFIG = {
     # Scanner filters (Section 4.2 "Scanner Criteria")
-    'min_gap_pct':               0.02,    # ±2% minimum gap from prev close
+    'min_gap_pct':               0.015,   # ±1.5% minimum gap from prev close
     'min_price':                 10.0,    # $10 minimum stock price
     'max_price':                1000.0,    # $200 maximum stock price
     'premarket_vol_threshold':  10_000,   # pre-market volume Option A threshold
@@ -137,6 +137,11 @@ class ORBStrategy:
         # Type: dict[str, tuple[float, float]]  →  {ticker: (or_high, or_low)}
         self.opening_ranges: dict = {}
 
+        # Delayed-entry state: breakouts detected on bar B but not yet executed.
+        # Engine stores confirmed signals here; confirm_or_cancel() checks bar B+1.
+        # Type: dict[str, dict]  →  {ticker: signal_dict}
+        self.pending_breakouts: dict = {}
+
     def reset(self):
         """
         Clear intra-session state. Call once at the start of each trading day
@@ -144,6 +149,7 @@ class ORBStrategy:
         """
         self.watchlist = []
         self.opening_ranges = {}
+        self.pending_breakouts = {}
 
     # ──────────────────────────────────────────────────────────────────────────
     # METHOD 1: run_scanner
@@ -397,7 +403,94 @@ class ORBStrategy:
         return False
 
     # ──────────────────────────────────────────────────────────────────────────
-    # METHOD 5: generate_signal  (main entry point)
+    # METHOD 5: confirm_or_cancel  (delayed-entry confirmation)
+    # Called by engine on bar B+1 to check whether a pending breakout held.
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def confirm_or_cancel(self,
+                          candle: pd.Series,
+                          or_high: float,
+                          or_low: float,
+                          pending_sig: dict) -> Optional[dict]:
+        """
+        Check bar B+1 to confirm or cancel a pending ORB entry.
+
+        Confirmed (price still outside OR in breakout direction):
+            Return the original ORB signal so the engine executes it normally.
+
+        Failed breakout (price returned inside OR):
+            Return a FADE signal — trade the reversal with stop 0.5% outside
+            the OR boundary and a 2R target.
+
+        Returns None if the result is degenerate (zero risk).
+        """
+        direction = pending_sig["direction"]
+        is_fakeout = pending_sig.get("is_fakeout", False)
+        close = float(candle["close"])
+
+        if direction == "LONG":
+            if close > or_high:
+                if is_fakeout:
+                    # Fakeout candle on B but price still outside on B+1 — drop.
+                    # Never confirm a fakeout candle as an ORB entry.
+                    logger.debug(f"ORB FAKEOUT drop: LONG still above OR high, no entry")
+                    return None
+                logger.info(
+                    f"ORB CONFIRMED (B+1): LONG @ ${close:.2f}, "
+                    f"still above OR high ${or_high:.2f}"
+                )
+                return pending_sig
+            # Failed — enter Fade SHORT; target = OR low (opposite boundary)
+            stop_loss = or_high * 1.005
+            risk = abs(close - stop_loss)
+            if risk <= 0:
+                return None
+            target = or_low
+            if abs(target - close) <= 0:
+                return None
+            logger.info(
+                f"ORB→FADE SHORT @ ${close:.2f} | stop=${stop_loss:.2f} | target=${target:.2f} (OR_low)"
+            )
+            return {
+                "type":        "FADE",
+                "direction":   "SHORT",
+                "entry_price": close,
+                "stop_loss":   stop_loss,
+                "target":      target,
+                "rvol":        pending_sig.get("rvol", 0.0),
+            }
+        else:  # SHORT
+            if close < or_low:
+                if is_fakeout:
+                    logger.debug(f"ORB FAKEOUT drop: SHORT still below OR low, no entry")
+                    return None
+                logger.info(
+                    f"ORB CONFIRMED (B+1): SHORT @ ${close:.2f}, "
+                    f"still below OR low ${or_low:.2f}"
+                )
+                return pending_sig
+            # Failed — enter Fade LONG; target = OR high (opposite boundary)
+            stop_loss = or_low * 0.995
+            risk = abs(close - stop_loss)
+            if risk <= 0:
+                return None
+            target = or_high
+            if abs(target - close) <= 0:
+                return None
+            logger.info(
+                f"ORB→FADE LONG @ ${close:.2f} | stop=${stop_loss:.2f} | target=${target:.2f} (OR_high)"
+            )
+            return {
+                "type":        "FADE",
+                "direction":   "LONG",
+                "entry_price": close,
+                "stop_loss":   stop_loss,
+                "target":      target,
+                "rvol":        pending_sig.get("rvol", 0.0),
+            }
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # METHOD 6: generate_signal  (main entry point)
     # Blueprint ref: Section 4.2 "Entry Logic" + Section 6.2 "Strategy Router"
     # ──────────────────────────────────────────────────────────────────────────
 
@@ -444,18 +537,10 @@ class ORBStrategy:
         """
 
         # ── Gate 1: HMM Regime ───────────────────────────────────────────────
-        # ORB only runs in Calm and Normal. During Stress, volatility is too
-        # high for breakout trades — false breakouts increase dramatically and
-        # gaps at execution blow out the R:R ratio.
         if hmm_state not in self.config['allowed_regimes']:
-            logger.debug(f"ORB BLOCKED: regime={hmm_state} not in {self.config['allowed_regimes']}")
             return None
 
         # ── Gate 2: Direction — did price break the OR? ──────────────────────
-        # We use candle.close (not candle.high) for breakout confirmation.
-        # Using high would fire on a momentary pierce that reverses — a classic
-        # fakeout. Requiring a CLOSE above/below the level is more conservative
-        # and matches how most ORB practitioners define "breakout confirmed".
         entry_price = candle['close']
 
         if entry_price > or_high:
@@ -463,24 +548,18 @@ class ORBStrategy:
         elif entry_price < or_low:
             direction = 'SHORT'
         else:
-            # Price is still inside the OR — no breakout yet.
             return None
 
         # ── Gate 3: Volume confirmation ──────────────────────────────────────
-        # Blueprint: "RVol >= 2.0 for entry confirmation"
-        # A breakout on low volume is often a fake-out caused by a single large
-        # order. We require real participation from multiple market participants.
         if rvol < self.config['rvol_threshold']:
-            logger.debug(f"ORB BLOCKED: rvol={rvol:.2f} < {self.config['rvol_threshold']:.1f} threshold")
             return None
 
-        # ── Gate 4: Fakeout (candlestick pattern) ────────────────────────────
-        # Even with a close above OR high AND good volume, the candle shape can
-        # reveal that sellers immediately overwhelmed buyers (Shooting Star).
-        # check_fakeout() returns True if the pattern is a rejection.
-        if self.check_fakeout(candle, direction):
-            logger.debug(f"ORB BLOCKED: fakeout pattern detected on {direction} candle")
-            return None
+        # ── Gate 4: Fakeout — mark signal instead of blocking ────────────────
+        # Fakeout candles (shooting star / hammer) are the best Fade candidates:
+        # price spiked outside the OR with volume but sellers/buyers immediately
+        # pushed it back. We allow these into pending as FADE_ONLY — they can
+        # never confirm as an ORB entry, only as a Fade if B+1 reverts.
+        is_fakeout = self.check_fakeout(candle, direction)
 
         # ── All gates passed — compute trade levels ──────────────────────────
 
@@ -522,6 +601,7 @@ class ORBStrategy:
             'stop_loss':   stop_loss,
             'target':      round(target, 2),
             'rvol':        rvol,
+            'is_fakeout':  is_fakeout,
         }
 
         logger.info(

@@ -315,7 +315,7 @@ class RetrainingScheduler:
         count = len(self._emergency_history)
         if count >= EMERGENCY_ALERT_COUNT:
             msg = (
-                f"🚨 CRITICAL: {count} emergency HMM retrains in the last "
+                f"CRITICAL: {count} emergency HMM retrains in the last "
                 f"{EMERGENCY_ALERT_WINDOW_DAYS} days (latest: {current_dt}). "
                 "Market may be in unprecedented volatility regime. "
                 "Manual intervention recommended."

@@ -42,14 +42,16 @@ logger = logging.getLogger(__name__)
 HMM_STATES: dict[int, str] = {
     0: "Calm",    # Low variance, stable returns
     1: "Normal",  # Medium variance, moderate volatility
-    2: "Stress",  # High variance, extreme volatility
+    2: "Stress",  # High variance, elevated volatility
+    3: "Crisis",  # Extreme variance + sustained negative return (crash)
 }
 
 STATE_LABELS: dict[str, int] = {v: k for k, v in HMM_STATES.items()}
 
-CALM = 0
+CALM   = 0
 NORMAL = 1
 STRESS = 2
+CRISIS = 3
 
 # Weights for composite sorting score
 _VARIANCE_WEIGHT = 1.0
@@ -62,13 +64,13 @@ _RETURN_WEIGHT = 0.1
 
 def sort_hmm_states(hmm: GaussianHMM) -> GaussianHMM:
     """
-    Return a *copy* of `hmm` with states reordered so that:
-        State 0 = Calm, State 1 = Normal, State 2 = Stress.
+    Return a *copy* of `hmm` with states reordered by ascending variance so that:
+        State 0 = Calm, State 1 = Normal, State 2 = Stress, State 3 = Crisis (4-state).
 
     Parameters
     ----------
     hmm : GaussianHMM (fitted)
-        A trained hmmlearn Gaussian HMM with n_components = 3.
+        A trained hmmlearn Gaussian HMM with n_components = 3 or 4.
 
     Returns
     -------
@@ -78,11 +80,11 @@ def sort_hmm_states(hmm: GaussianHMM) -> GaussianHMM:
     Raises
     ------
     ValueError
-        If hmm.n_components != 3.
+        If hmm.n_components is not 3 or 4.
     """
-    if hmm.n_components != 3:
+    if hmm.n_components not in (3, 4):
         raise ValueError(
-            f"RAITS requires exactly 3 HMM states; got {hmm.n_components}."
+            f"RAITS requires 3 or 4 HMM states; got {hmm.n_components}."
         )
 
     scores = _compute_sort_scores(hmm)
@@ -106,12 +108,11 @@ def state_index(label: str) -> int:
 
 def validate_state_order(hmm: GaussianHMM) -> bool:
     """
-    Return True if state variance increases monotonically (0 < 1 < 2).
-
-    Useful as a quick sanity-check after fitting or loading a model.
+    Return True if state variance increases monotonically.
+    Works for both 3-state (0<1<2) and 4-state (0<1<2<3) models.
     """
     variances = _extract_variances(hmm)
-    return bool(variances[0] < variances[1] < variances[2])
+    return all(variances[i] < variances[i + 1] for i in range(len(variances) - 1))
 
 
 # ---------------------------------------------------------------------------

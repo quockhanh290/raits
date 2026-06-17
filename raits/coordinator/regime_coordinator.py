@@ -147,39 +147,21 @@ class RegimeCoordinator:
     # Notification API
     # ------------------------------------------------------------------
 
-    def notify_hmm_state(self, hmm_state: str, current_time: datetime) -> SystemState:
+    def notify_hmm_state(self, hmm_state: str, current_time: datetime = None) -> SystemState:
         """
         Called each bar with the latest HMM output.
 
-        If HMM transitions to Stress and override is not already active,
-        transitions to SAFETY_MODE.  If HMM returns to Calm/Normal while
-        in SAFETY_MODE, transitions back to ACTIVE.
+        HMM Stress does NOT block trading — SAFETY_MODE is reserved for Layer 0 only.
+        However if we enter a session stuck in SAFETY_MODE (reset_for_new_session saw
+        yesterday's Stress) and HMM has already returned to Normal/Calm, unblock trading
+        so we don't lose an entire Normal day at the start of a recovery.
         """
         self._hmm_state = hmm_state
-
-        if self._current.state == SystemState.SHUTDOWN:
-            return self._current.state   # circuit breaker — nothing overrides
-
-        if self._current.state == SystemState.OVERRIDE_STRESS:
-            return self._current.state   # override trumps HMM
-
-        if self._current.state == SystemState.COOLDOWN:
-            # During cooldown HMM cannot restart normal trading directly —
-            # cooldown must expire first (handled in notify_override).
-            if hmm_state == "Stress":
-                # HMM went Stress during cooldown → upgrade to SAFETY_MODE
-                self._transition(SystemState.SAFETY_MODE, current_time,
-                                 "HMM→Stress during override cooldown")
-            return self._current.state
-
-        if hmm_state == "Stress" and self._current.state != SystemState.SAFETY_MODE:
-            self._transition(SystemState.SAFETY_MODE, current_time,
-                             f"HMM detected Stress regime")
-
-        elif hmm_state in ("Calm", "Normal") and self._current.state == SystemState.SAFETY_MODE:
-            self._transition(SystemState.ACTIVE, current_time,
-                             f"HMM returned to {hmm_state} — safety mode cleared")
-
+        if (hmm_state not in ("Stress", "Crisis")
+                and self._current.state == SystemState.SAFETY_MODE
+                and self._current.state not in (SystemState.OVERRIDE_STRESS, SystemState.COOLDOWN)):
+            self._transition(SystemState.ACTIVE, current_time or datetime.utcnow(),
+                             f"HMM returned to {hmm_state} — exit SAFETY_MODE")
         return self._current.state
 
     def notify_override(self, override_active: bool, current_time: datetime) -> SystemState:
@@ -221,7 +203,7 @@ class RegimeCoordinator:
                 elapsed = (current_time - self._cooldown_started_at).total_seconds() / 60
                 if elapsed >= COOLDOWN_MINUTES:
                     # Transition back to HMM-driven state
-                    target = SystemState.SAFETY_MODE if self._hmm_state == "Stress" else SystemState.ACTIVE
+                    target = SystemState.SAFETY_MODE if self._hmm_state in ("Stress", "Crisis") else SystemState.ACTIVE
                     self._transition(target, current_time,
                                      f"Cooldown complete ({elapsed:.0f} min) — resuming {target.value}")
 
@@ -245,13 +227,14 @@ class RegimeCoordinator:
         Clears SHUTDOWN and SAFETY_MODE; resets override tracking.
         """
         prev = self._current.state.value
-        target = SystemState.SAFETY_MODE if self._hmm_state == "Stress" else SystemState.ACTIVE
-        self._current = _StateRecord(state=target, entered_at=session_start,
+        # Always reset to ACTIVE — HMM Stress no longer implies SAFETY_MODE.
+        # SAFETY_MODE is reserved for real-time Layer 0 events (notify_override).
+        self._current = _StateRecord(state=SystemState.ACTIVE, entered_at=session_start,
                                      reason=f"session reset (was {prev})")
         self._override_active = False
         self._override_triggered_at = None
         self._cooldown_started_at = None
-        logger.info("RegimeCoordinator reset for new session — state=%s", target.value)
+        logger.info("RegimeCoordinator reset for new session — state=ACTIVE")
 
     # ------------------------------------------------------------------
     # Private

@@ -121,7 +121,7 @@ class CashDefenseMode:
                 orders = self._build_liquidation_orders(open_positions)
 
                 logger.critical(
-                    f"🚨 CASH/DEFENSE ACTIVATED | "
+                    f"CASH/DEFENSE ACTIVATED | "
                     f"regime={hmm_state} | "
                     f"positions_to_close={len(open_positions)} | "
                     f"orders_generated={len(orders)}"
@@ -151,7 +151,7 @@ class CashDefenseMode:
                 self._active = False
 
                 logger.info(
-                    f"✅ CASH/DEFENSE DEACTIVATED | "
+                    f"CASH/DEFENSE DEACTIVATED | "
                     f"regime={hmm_state} — returning to normal trading"
                 )
 

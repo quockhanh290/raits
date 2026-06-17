@@ -313,7 +313,7 @@ class CircuitBreakerManager:
                 f"{ticker}: MOC sell imbalance {frac:.1%} of ADV "
                 f"exceeds {MOC_IMBALANCE_FRACTION:.0%} — emergency exit"
             )
-            logger.warning("⚠️  %s", msg)
+            logger.warning("WARNING: %s", msg)
             # Position-level kill: do NOT change self._state
             return BreakerResult(
                 passed=False, kill_switch=True,
@@ -346,7 +346,7 @@ class CircuitBreakerManager:
         """Arm the account-level kill switch."""
         self._state = BreakerState.HALTED
         self._trigger_reason = reason
-        logger.critical("🛑 KILL SWITCH — %s | %s", reason.value, message)
+        logger.critical("KILL SWITCH -- %s | %s", reason.value, message)
         return BreakerResult(
             passed=False, kill_switch=True,
             reason=message,

@@ -183,7 +183,7 @@ class VolatilityOverride:
 
         if abs(latest_return) > threshold:
             logger.warning(
-                "🚨 VOLATILITY OVERRIDE TRIGGER 1 — SPY 5-min return %.2f%% > "
+                "VOLATILITY OVERRIDE TRIGGER 1 -- SPY 5-min return %.2f%% > "
                 "3σ threshold %.2f%% (%.1fσ)",
                 latest_return * 100,
                 threshold * 100,
@@ -220,7 +220,7 @@ class VolatilityOverride:
 
         if abs(twenty_min_return) > threshold:
             logger.warning(
-                "🚨 VOLATILITY OVERRIDE TRIGGER 2 — SPY 20-min return %.2f%% > "
+                "VOLATILITY OVERRIDE TRIGGER 2 -- SPY 20-min return %.2f%% > "
                 "5σ threshold %.2f%% (%.1fσ)",
                 twenty_min_return * 100,
                 threshold * 100,
@@ -259,7 +259,7 @@ class VolatilityOverride:
 
         if vix_spike_pct > TRIGGER_3_VIX_PCT:
             logger.warning(
-                "🚨 VOLATILITY OVERRIDE TRIGGER 3 — VIX spike %.1f%% "
+                "VOLATILITY OVERRIDE TRIGGER 3 -- VIX spike %.1f%% "
                 "(%.1f → %.1f)",
                 vix_spike_pct * 100,
                 vix_prev,

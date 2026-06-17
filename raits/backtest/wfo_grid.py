@@ -19,17 +19,21 @@ from statistics import mode as stat_mode
 from typing import List, Tuple
 
 
-# ── The 27-combination grid (Section 7.1) ─────────────────────────────────────
+# ── The parameter grid ────────────────────────────────────────────────────────
+# ORB: 10/15/20/30 min — 15 is standard, 30 is also widely used in industry
+# BB:  1.5/2.0/2.5/3.0 σ — covers moderate to conservative entry thresholds
+# EMA: 20/30/50 bars — standard trend filter periods on 5-min chart
 
-ORB_RANGE_VALUES:  List[int]   = [10, 15, 20]       # minutes
-VWAP_BB_STD_VALUES: List[float] = [1.5, 2.0, 2.5]   # σ
-EMA_PERIOD_VALUES:  List[int]   = [20, 30, 50]       # bars (5-min chart)
+ORB_RANGE_VALUES:  List[int]   = [10, 15, 20, 30]      # minutes
+VWAP_BB_STD_VALUES: List[float] = [1.5, 2.0, 2.5, 3.0] # σ
+EMA_PERIOD_VALUES:  List[int]   = [20, 30, 50]          # bars (5-min chart)
 
 
 def all_param_combinations() -> List[Tuple[int, float, int]]:
-    """Return all 27 (orb_range, bb_std, ema_period) combinations."""
+    """Return all 48 (orb_range, bb_std, ema_period) combinations."""
     combos = list(product(ORB_RANGE_VALUES, VWAP_BB_STD_VALUES, EMA_PERIOD_VALUES))
-    assert len(combos) == 27, f"Expected 27 combinations, got {len(combos)}"
+    expected = len(ORB_RANGE_VALUES) * len(VWAP_BB_STD_VALUES) * len(EMA_PERIOD_VALUES)
+    assert len(combos) == expected, f"Expected {expected} combinations, got {len(combos)}"
     return combos
 
 

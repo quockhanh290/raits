@@ -3,7 +3,23 @@
     "allow": [
       "Bash(venv/Scripts/python verify_step_1_complete.py)",
       "Bash(venv/Scripts/python -c \"import sys; sys.stdout.reconfigure\\(encoding=''utf-8''\\)\")",
-      "Bash(venv/Scripts/python -X utf8 verify_step_1_complete.py)"
+      "Bash(venv/Scripts/python -X utf8 verify_step_1_complete.py)",
+      "Bash(find /c/Users/quock -name \"*.parquet\" 2>/dev/null | head -3; find /c/Users/quock -name \"cache\" -type d 2>/dev/null | head -5)",
+      "Read(//c/Users/quock/**)",
+      "Bash(python -c \"import raits; print\\(raits.__file__\\)\")",
+      "Bash(python -c \"import pandas, hmmlearn, polygon; print\\('deps OK'\\)\")",
+      "Bash(python raits\\\\raits\\\\raits\\\\scripts\\\\per_strategy_diagnostic.py)",
+      "Bash(python \"raits/raits/raits/scripts/per_strategy_diagnostic.py\")",
+      "Bash(python \"raits/raits/scripts/per_strategy_diagnostic.py\")",
+      "Bash(python -m pip install --force-reinstall scikit-learn hmmlearn)",
+      "Bash(python -m pip install --force-reinstall --no-deps scikit-learn==1.8.0)",
+      "Bash(python -m pip install --force-reinstall hmmlearn)",
+      "Bash(python -c \"import sklearn; print\\(sklearn.__file__\\)\")",
+      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\quock\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python311\\\\Lib\\\\site-packages\\\\sklearn\" -ErrorAction SilentlyContinue)",
+      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\quock\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python311\\\\Lib\\\\site-packages\\\\scikit_learn*\" -ErrorAction SilentlyContinue)",
+      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\quock\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python311\\\\Lib\\\\site-packages\\\\scikit-learn*\" -ErrorAction SilentlyContinue)",
+      "Bash(python -m pip install scikit-learn hmmlearn)",
+      "Bash(python -c \"from hmmlearn.hmm import GaussianHMM; print\\('hmmlearn OK'\\)\")"
     ]
   }
 }

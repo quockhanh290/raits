@@ -161,7 +161,6 @@ class PolygonDataFetcher:
                 interval='day'
             )
             if cached_data:
-                print(f"✓ Cache hit for {ticker} daily data")
                 return cached_data
 
         # Fetch from API or generate mock data
@@ -312,12 +311,12 @@ class PolygonDataFetcher:
                 interval=interval_str
             )
             if cached_data:
-                print(f"✓ Cache hit for {ticker} {interval_minutes}min data on {date.date()}")
                 return cached_data
 
         # Fetch from API or generate mock
+        from_api = False
         if self._is_api_configured():
-            data = self._fetch_from_polygon_intraday(ticker, date, interval_minutes)
+            data, from_api = self._fetch_from_polygon_intraday(ticker, date, interval_minutes)
         else:
             print(f"⚠️  API key not configured, using mock data for {ticker}")
             data = self.mock_generator.generate_intraday_bars(
@@ -326,8 +325,8 @@ class PolygonDataFetcher:
                 interval_minutes=interval_minutes
             )
 
-        # Cache
-        if use_cache and self.cache:
+        # Only cache real API data — never cache fallback mock data
+        if use_cache and self.cache and from_api:
             self.cache.set(
                 ticker=ticker,
                 start_date=start_date,
@@ -408,16 +407,50 @@ class PolygonDataFetcher:
                 bars=bars,
                 data_source='polygon',
                 fetch_timestamp=datetime.now()
-            )
+            ), True
 
         except requests.exceptions.RequestException as e:
-            print(f"❌ API request failed for {ticker} intraday: {e}")
-            print(f"   Falling back to mock data")
+            # Retry up to 3 times with backoff before falling back to mock
+            import time
+            for attempt in range(1, 4):
+                wait = attempt * 10
+                print(f"❌ API request failed for {ticker} intraday (attempt {attempt}/3): {e}")
+                print(f"   Retrying in {wait}s...")
+                time.sleep(wait)
+                try:
+                    self.rate_limiter.wait_if_needed()
+                    response = requests.get(url, params=params, timeout=30)
+                    response.raise_for_status()
+                    self.api_calls_made += 1
+                    data = response.json()
+                    results = data.get('results', [])
+                    bars = []
+                    for result in results:
+                        bar = BarData(
+                            timestamp=_utc_ms_to_et(result['t']),
+                            open=result['o'],
+                            high=result['h'],
+                            low=result['l'],
+                            close=result['c'],
+                            volume=result['v'],
+                            vwap=result.get('vw'),
+                            transactions=result.get('n')
+                        )
+                        bars.append(bar)
+                    return HistoricalData(
+                        ticker=ticker,
+                        bars=bars,
+                        data_source='polygon',
+                        fetch_timestamp=datetime.now()
+                    ), True
+                except requests.exceptions.RequestException:
+                    continue
+            print(f"   All retries failed — skipping {ticker} {date.date()}")
             return self.mock_generator.generate_intraday_bars(
                 ticker=ticker,
                 date=date,
                 interval_minutes=interval_minutes
-            )
+            ), False
 
     def get_api_usage(self) -> dict:
         """

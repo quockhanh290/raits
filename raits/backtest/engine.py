@@ -31,6 +31,7 @@ from .data_types import BacktestConfig, BacktestResult, SessionSummary, Trade
 from .equity_tracker import EquityTracker
 from .trade_log import TradeLog
 from .metrics import compute_metrics, compute_regime_breakdown
+from raits.strategies.universe_scanner import DailyUniverseScanner, MRUniverseScanner, ORBUniverseScanner, ORBFadeUniverseScanner
 
 logger = logging.getLogger("RAITS.backtest")
 
@@ -45,24 +46,32 @@ TREND_START      = dtime(14, 0)
 EOD_HARD_EXIT    = dtime(15, 55)
 
 # ── Position limits ───────────────────────────────────────────────────────────
-MAX_TOTAL     = 5
+MAX_TOTAL     = 8
 MAX_ORB       = 2
+MAX_FADE      = 5
 MAX_VWAP      = 3
 MAX_TREND     = 2
-STRATEGY_CAPS = {"ORB": MAX_ORB, "VWAP_MR": MAX_VWAP, "TREND_FOLLOW": MAX_TREND}
+STRATEGY_CAPS = {"ORB": MAX_ORB, "ORB_FADE": MAX_ORB, "FADE": MAX_FADE, "VWAP_MR": MAX_VWAP, "TREND_FOLLOW": MAX_TREND, "STRESS_ORB": 2}
 
 # ── Regime → active strategies (from each strategy's allowed_regimes config) ──
 _REGIME_STRATEGIES: Dict[str, List[str]] = {
-    "Calm":   ["ORB", "VWAP_MR"],
-    "Normal": ["ORB", "TREND_FOLLOW"],
-    "Stress": [],
+    "Calm":   ["VWAP_MR", "FADE"],
+    "Normal": ["ORB", "TREND_FOLLOW", "FADE"],
+    "Stress": ["TREND_FOLLOW"],
+    "Crisis": [],
 }
 
+# ETFs used for Stress-regime ORB (broad market proxies, always liquid)
+_ETF_STRESS_UNIVERSE = ["SPY", "QQQ", "IWM"]
+
 # ── Strategy stats for PositionSizer ─────────────────────────────────────────
+# WFO-observed win rate 52.3%; 2:1 R:R is the target structure (stop × 2 = target).
 STRATEGY_STATS = {
     "ORB":          {"win_rate": 0.62, "avg_win": 4.50, "avg_loss": 2.00},
-    "VWAP_MR":      {"win_rate": 0.68, "avg_win": 2.80, "avg_loss": 1.50},
-    "TREND_FOLLOW": {"win_rate": 0.45, "avg_win": 8.00, "avg_loss": 3.50},
+    "ORB_FADE":     {"win_rate": 0.50, "avg_win": 3.50, "avg_loss": 2.00},
+    "FADE":         {"win_rate": 0.45, "avg_win": 3.00, "avg_loss": 2.00},
+    "VWAP_MR":      {"win_rate": 0.42, "avg_win": 2.80, "avg_loss": 1.50},
+    "TREND_FOLLOW": {"win_rate": 0.52, "avg_win": 2.00, "avg_loss": 1.00},
 }
 
 
@@ -78,14 +87,20 @@ class BacktestEngine:
         self._safety_mode_active: bool = False
         self._circuit_breaker_active: bool = False
         self._last_retrain_date: Optional[datetime] = None
-        self._regime_bar_counts: Dict[str, int] = {}
+        self._regime_bar_counts: Dict[str, int] = {"Calm": 0, "Normal": 0, "Stress": 0, "Crisis": 0}
+        self._swing_state: Dict[int, dict] = {}  # id(trade) → {extreme, hold_days}
+        self._tf_cooldown: Dict[str, Dict[str, float]] = {}  # {ticker: {direction: block_stop}}
         self._mods = self._load_modules()
 
     # ─────────────────────────────────────────────────────────────────────────
     # Public API
     # ─────────────────────────────────────────────────────────────────────────
 
-    def run(self, market_data: Dict[str, pd.DataFrame]) -> BacktestResult:
+    def run(
+        self,
+        market_data: Dict[str, pd.DataFrame],
+        daily_data: Optional[Dict[str, pd.DataFrame]] = None,
+    ) -> BacktestResult:
         if "SPY" not in market_data:
             raise ValueError("market_data must contain 'SPY'.")
 
@@ -98,14 +113,39 @@ class BacktestEngine:
         pdt_guard        = self._mods["PDTGuard"]()
         circuit_breakers = self._mods["CircuitBreakers"]()
         position_sizer   = self._mods["PositionSizer"](
-            account_equity=self.config.account_equity
+            account_equity=self.config.account_equity,
+            max_risk_pct=self.config.max_risk_pct,
         )
         coordinator      = self._mods["RegimeCoordinator"]()
         # Pass WFO-optimised hyperparameters to each strategy
         # Lower opening volume multiplier from 2.0 to 1.2
         # Blueprint default of 2.0 excludes normally high-volume stocks like NVDA/TSLA
         # 1.2x still confirms above-average participation without over-filtering
-        orb     = self._mods["ORBStrategy"](config={"opening_vol_multiplier": 1.2})
+        orb     = self._mods["ORBStrategy"](config={
+            "opening_vol_multiplier": 1.2,
+            "min_price": 1.0,      # universe is pre-screened; disable penny-stock filter
+            "max_price": 1e9,      # split-adjusted prices vary; disable price cap
+            "min_gap_pct": 0.01,   # 1% gap (vs default 2%) — large-caps gap less
+        })
+        # Stress-regime ORB: trades SPY/QQQ/IWM only, no gap requirement.
+        # Direction filter (bear/bull) is applied by the engine after signal generation.
+        stress_orb = self._mods["ORBStrategy"](config={
+            "allowed_regimes":        ["Stress"],
+            "min_gap_pct":            0.0,    # ETFs don't need gap catalyst
+            "rvol_threshold":         1.0,    # ETFs always liquid
+            "min_price":              1.0,
+            "max_price":              1e9,
+            "min_range_atr_multiple": 0.2,    # more permissive OR range for ETFs
+        })
+        # FADE strategy: relaxed RVol (1.5x vs 2.0x) — high vol = momentum = bad for fade.
+        # Uses ORBFadeUniverseScanner universe which selects mean-reverting stocks.
+        fade_orb = self._mods["ORBStrategy"](config={
+            "opening_vol_multiplier": 1.2,
+            "min_price":              1.0,
+            "max_price":              1e9,
+            "min_gap_pct":            0.01,
+            "rvol_threshold":         0.0,  # FADE fades weak breakouts — no min-rvol gate
+        })
         vwap_mr = self._mods["VWAPMRStrategy"](
             config={"bb_std_dev": self.config.vwap_bb_std}
         )
@@ -124,11 +164,69 @@ class BacktestEngine:
         hmm = HMMEngine()
         logger.info("Training HMM...")
         try:
-            hmm.fit(to_daily_close(spy_data))
+            # Prefer SPY historical daily (2007-2024) so HMM sees 2008 GFC and
+            # 2020 COVID for proper Crisis state calibration.  Falls back to the
+            # Polygon 5-min data resampled to daily (starts 2017) if the file is
+            # not present — run raits/scripts/fetch_spy_historical.py first.
+            _hist_path = os.path.join(
+                os.path.dirname(__file__), "..", "data", "cache", "daily",
+                "SPY_daily_2007_2024.parquet",
+            )
+            _hist_path = os.path.normpath(_hist_path)
+            if os.path.exists(_hist_path):
+                _spy_hist = pd.read_parquet(_hist_path)
+                _spy_hist.index = pd.DatetimeIndex(_spy_hist.index)
+                _spy_hist_close = _spy_hist["close"].sort_index()
+                # Slice to data before backtest start to avoid lookahead.
+                _bt_start = pd.Timestamp(min(market_data["SPY"].index.normalize()))
+                _spy_hist_close = _spy_hist_close[_spy_hist_close.index < _bt_start]
+                if len(_spy_hist_close) >= 50:
+                    logger.info(
+                        "HMM initial fit: SPY historical daily (%d days, %s–%s)",
+                        len(_spy_hist_close),
+                        _spy_hist_close.index[0].date(),
+                        _spy_hist_close.index[-1].date(),
+                    )
+                    hmm.fit(_spy_hist_close)
+                else:
+                    logger.info("HMM initial fit: SPY historical file short — using Polygon 5-min resample")
+                    hmm.fit(to_daily_close(spy_data))
+            else:
+                logger.info(
+                    "SPY_daily_2007_2024.parquet not found — using Polygon 5-min resample. "
+                    "Run raits/scripts/fetch_spy_historical.py for better HMM calibration."
+                )
+                hmm.fit(to_daily_close(spy_data))
             logger.info("HMM trained.")
         except Exception as e:
             logger.warning(f"HMM fit failed ({e}) — using default regime Normal")
             hmm = None
+
+        # Scanner: select dynamic universe from T-1 daily bars each day.
+        # Only active when use_scanner=True AND daily_data is provided.
+        scanner: Optional[DailyUniverseScanner] = None
+        if self.config.use_scanner and daily_data is not None:
+            scanner = DailyUniverseScanner(top_n=self.config.scanner_top_n)
+            logger.info(f"DailyUniverseScanner active (top_n={self.config.scanner_top_n})")
+
+        # MR scanner: separate daily scan for VWAP_MR using range-bound stocks.
+        # Uses same daily_data as TF scanner. Falls back to config.vwap_universe.
+        mr_scanner: Optional[MRUniverseScanner] = None
+        if self.config.use_mr_scanner and daily_data is not None:
+            mr_scanner = MRUniverseScanner(top_n=self.config.mr_scanner_top_n)
+            logger.info(f"MRUniverseScanner active (top_n={self.config.mr_scanner_top_n})")
+
+        # ORB scanner: selects high-ATR stocks for ORB. Falls back to config.orb_universe.
+        orb_daily_scanner: Optional[ORBUniverseScanner] = None
+        if self.config.use_orb_scanner and daily_data is not None:
+            orb_daily_scanner = ORBUniverseScanner(top_n=self.config.orb_scanner_top_n)
+            logger.info(f"ORBUniverseScanner active (top_n={self.config.orb_scanner_top_n})")
+
+        # FADE scanner: selects mean-reverting stocks (high gap reversal rate).
+        fade_daily_scanner: Optional[ORBFadeUniverseScanner] = None
+        if self.config.use_fade_scanner and daily_data is not None:
+            fade_daily_scanner = ORBFadeUniverseScanner(top_n=self.config.fade_scanner_top_n)
+            logger.info(f"ORBFadeUniverseScanner active (top_n={self.config.fade_scanner_top_n})")
 
         all_days = pd.DatetimeIndex(spy_data.index.normalize().unique())
         all_days = all_days[
@@ -136,34 +234,101 @@ class BacktestEngine:
             & (all_days <= pd.Timestamp(self.config.end_date))
         ]
 
+        # Pre-build sorted list of all daily-data dates for fast T-1 lookup.
+        # Needed by any scanner that does T-1 daily lookups.
+        _any_scanner = any(s is not None for s in (scanner, mr_scanner, orb_daily_scanner, fade_daily_scanner))
+        if _any_scanner and daily_data is not None:
+            _spy_daily_dates = sorted(
+                daily_data["SPY"].index.normalize().unique()
+                if "SPY" in daily_data else []
+            )
+        else:
+            _spy_daily_dates = []
+
         for day in all_days:
+            # Determine today's universe via scanner (T-1 scan) or static config.
+            if scanner is not None and _spy_daily_dates:
+                # Find the last daily-data date strictly before today.
+                _prev = [d for d in _spy_daily_dates if d < day.normalize()]
+                if _prev:
+                    day_universe = scanner.scan(daily_data, _prev[-1])
+                    logger.debug(f"{day.date()} scanner universe: {day_universe}")
+                else:
+                    day_universe = list(self.config.universe)
+            else:
+                day_universe = None  # _run_day falls back to config.universe
+
+            # MR universe: separate daily scan for VWAP_MR (range-bound stocks).
+            if mr_scanner is not None and _spy_daily_dates:
+                _prev_mr = [d for d in _spy_daily_dates if d < day.normalize()]
+                mr_universe: Optional[List[str]] = mr_scanner.scan(daily_data, _prev_mr[-1]) if _prev_mr else None
+            else:
+                mr_universe = None  # _run_day falls back to config.vwap_universe
+
+            # ORB universe: daily scan for high-ATR ORB candidates.
+            if orb_daily_scanner is not None and _spy_daily_dates:
+                _prev_orb = [d for d in _spy_daily_dates if d < day.normalize()]
+                orb_scanned_universe: Optional[List[str]] = orb_daily_scanner.scan(daily_data, _prev_orb[-1]) if _prev_orb else None
+            else:
+                orb_scanned_universe = None  # _run_day falls back to config.orb_universe
+
+            # FADE universe: daily scan for mean-reverting FADE candidates.
+            if fade_daily_scanner is not None and _spy_daily_dates:
+                _prev_fade = [d for d in _spy_daily_dates if d < day.normalize()]
+                fade_scanned_universe: Optional[List[str]] = fade_daily_scanner.scan(daily_data, _prev_fade[-1]) if _prev_fade else None
+            else:
+                fade_scanned_universe = None
+
             self._run_day(
                 day=day,
                 market_data=market_data,
                 spy_data=spy_data,
-                hmm=hmm,
+                _hmm=hmm,
                 to_daily_close=to_daily_close,
                 pdt_guard=pdt_guard,
                 circuit_breakers=circuit_breakers,
                 position_sizer=position_sizer,
                 coordinator=coordinator,
                 orb=orb,
+                stress_orb=stress_orb,
+                fade_orb=fade_orb,
                 vwap_mr=vwap_mr,
                 trend=trend,
                 orb_signal_start=orb_signal_start,
                 orb_signal_end=orb_signal_end,
+                day_universe=day_universe,
+                mr_universe=mr_universe,
+                orb_scanned_universe=orb_scanned_universe,
+                fade_scanned_universe=fade_scanned_universe,
             )
 
             if self.config.hmm_retrain_weekly and day.weekday() == 0:
                 if (self._last_retrain_date is None
                         or (day - self._last_retrain_date).days >= 7):
                     recent_spy = spy_data[spy_data.index.normalize() <= day]
-                    if hmm is not None:
+                    daily_close = to_daily_close(recent_spy)
+                    if hmm is not None and len(daily_close) >= 35:
                         try:
-                            hmm.retrain(to_daily_close(recent_spy))
+                            hmm.retrain(daily_close)
                         except Exception as e:
                             logger.debug(f"HMM retrain failed: {e}")
                     self._last_retrain_date = day
+
+        # Force-close any positions still open at end of test period.
+        # These arise when max_hold hasn't elapsed by the last calendar day.
+        if self.trade_log.open_trades and all_days.size > 0:
+            _last_day = all_days[-1]
+            _last_spy = spy_data[spy_data.index.normalize() == _last_day]
+            _last_ts  = _last_spy.index[-1] if not _last_spy.empty else pd.Timestamp(self.config.end_date)
+            for _trade in list(self.trade_log.open_trades):
+                _ticker = _trade.ticker
+                _ticker_data = market_data.get(_ticker, pd.DataFrame())
+                _day_bars = _ticker_data[_ticker_data.index.normalize() == _last_day] if not _ticker_data.empty else pd.DataFrame()
+                _px = float(_day_bars.iloc[-1]["close"]) if not _day_bars.empty else _trade.entry_price
+                self._close_trade(_trade, _last_ts, _px, "END_OF_PERIOD",
+                                  circuit_breakers, coordinator,
+                                  _last_ts.to_pydatetime())
+                self._swing_state.pop(id(_trade), None)
 
         equity_curve    = self.equity_tracker.get_equity_curve()
         all_trades      = self.trade_log.all_trades()
@@ -188,17 +353,23 @@ class BacktestEngine:
         day: pd.Timestamp,
         market_data: Dict[str, pd.DataFrame],
         spy_data: pd.DataFrame,
-        hmm: Any,
+        _hmm: Any,
         to_daily_close: Any,
         pdt_guard: Any,
         circuit_breakers: Any,
         position_sizer: Any,
         coordinator: Any,
         orb: Any,
+        stress_orb: Any,
+        fade_orb: Any,
         vwap_mr: Any,
         trend: Any,
         orb_signal_start: Any = None,
         orb_signal_end: Any = None,
+        day_universe: Optional[List[str]] = None,
+        mr_universe: Optional[List[str]] = None,
+        orb_scanned_universe: Optional[List[str]] = None,
+        fade_scanned_universe: Optional[List[str]] = None,
     ) -> None:
         # Use module-level defaults if not passed
         if orb_signal_start is None:
@@ -208,7 +379,7 @@ class BacktestEngine:
         # ── Daily reset ───────────────────────────────────────────────────────
         self._circuit_breaker_active = False
         self._safety_mode_active = False
-        self._regime_bar_counts = {"Calm": 0, "Normal": 0, "Stress": 0}
+        self._regime_bar_counts = {"Calm": 0, "Normal": 0, "Stress": 0, "Crisis": 0}
 
         session_dt = day.to_pydatetime()
         try:
@@ -221,6 +392,8 @@ class BacktestEngine:
             pass
 
         orb.reset()
+        stress_orb.reset()
+        fade_orb.reset()
         if hasattr(vwap_mr, "reset"):
             vwap_mr.reset()
         if hasattr(trend, "reset"):
@@ -234,10 +407,26 @@ class BacktestEngine:
         if day_spy.empty:
             return
 
-        # Build combined ticker set: trading universe + ORB-specific universe
-        _all_tickers = list(self.config.universe) + [
-            t for t in self.config.orb_universe
-            if t not in self.config.universe
+        # Build combined ticker set: dynamic scanner universe (if active) or static
+        # config.universe, plus any fixed ORB/VWAP universes.
+        _base_universe = day_universe if day_universe is not None else list(self.config.universe)
+        # Merge: scanner picks range-bound stocks from daily data; config.vwap_universe
+        # provides ETFs that have no daily data but always qualify for MR.
+        _scanner_vwap = list(mr_universe) if mr_universe else []
+        _effective_vwap_universe = _scanner_vwap + [
+            t for t in self.config.vwap_universe if t not in _scanner_vwap
+        ]
+        _effective_orb_universe = orb_scanned_universe if orb_scanned_universe is not None else list(self.config.orb_universe)
+        _effective_fade_universe = list(fade_scanned_universe) if fade_scanned_universe is not None else []
+        _all_tickers = _base_universe + [
+            t for t in _effective_orb_universe
+            if t not in _base_universe
+        ] + [
+            t for t in _effective_vwap_universe
+            if t not in _base_universe and t not in _effective_orb_universe
+        ] + [
+            t for t in _effective_fade_universe
+            if t not in _base_universe and t not in _effective_orb_universe and t not in _effective_vwap_universe
         ]
         day_stocks: Dict[str, pd.DataFrame] = {
             ticker: market_data[ticker][market_data[ticker].index.normalize() == day]
@@ -246,12 +435,79 @@ class BacktestEngine:
             and not market_data[ticker][market_data[ticker].index.normalize() == day].empty
         }
 
+        # Ensure open swing trade tickers are always in day_stocks so exit
+        # conditions (stop/target) are checked even if today's scanner didn't
+        # select them. Without this, a ticker dropped from the scanner universe
+        # would miss all exit checks and close at entry_price via _close_all.
+        for _open_trade in self.trade_log.open_trades:
+            _ot = _open_trade.ticker
+            if _ot not in day_stocks and _ot in market_data and _ot != "SPY":
+                _bars = market_data[_ot][market_data[_ot].index.normalize() == day]
+                if not _bars.empty:
+                    day_stocks[_ot] = _bars
+
         _regime_updated_today = False
         orb_scanned = False
         or_ranges: Dict[str, Tuple[float, float]] = {}
+        pending_orb: Dict[str, dict] = {}          # ticker → pending ORB signal (delayed entry)
+        orb_hist_avg_vol: Dict[str, float] = {}  # ticker → historical avg opening vol
+        fade_scanned_done = False
+        fade_or_ranges: Dict[str, Tuple[float, float]] = {}
+        pending_fades: Dict[str, dict] = {}        # ticker → pending FADE signal (delayed entry)
         spy_history: List[pd.Series] = []
 
+        # Stress ETF ORB state (reset each day alongside regular ORB)
+        stress_orb_scanned = False
+        stress_or_ranges: Dict[str, Tuple[float, float]] = {}
+        # SPY comes from day_spy (excluded from day_stocks); QQQ/IWM from day_stocks
+        _stress_stocks: Dict[str, pd.DataFrame] = {"SPY": day_spy}
+        for _etf in ("QQQ", "IWM"):
+            if _etf in day_stocks and not day_stocks[_etf].empty:
+                _stress_stocks[_etf] = day_stocks[_etf]
+
+        # ── Swing hold: pre-compute T-1 daily closes for SPY macro trend ────────
+        try:
+            _daily_spy_close = spy_data["close"].resample("B").last().dropna()
+            _daily_spy_close = _daily_spy_close[
+                _daily_spy_close.index.normalize() < day.normalize()
+            ]
+        except Exception:
+            _daily_spy_close = pd.Series(dtype=float)
+
+        # SPY macro trend for Stress-regime directional filter.
+        # Computed once per day from T-1 daily closes (same data already fetched above).
+        # True  = SPY SMA50 > SMA200 → bull trend → allow LONG in Stress
+        # False = SPY SMA50 < SMA200 → bear/crash  → SHORT only in Stress
+        _spy_bull_trend = True  # default: allow both directions
+        try:
+            if len(_daily_spy_close) >= 200:
+                _sma50  = float(_daily_spy_close.iloc[-50:].mean())
+                _sma200 = float(_daily_spy_close.iloc[-200:].mean())
+                _spy_bull_trend = _sma50 > _sma200
+        except Exception:
+            pass
+
+        if self.config.allow_swing_hold and self.trade_log.open_trades and not day_spy.empty:
+            _open_ts = day_spy.index[0]
+            for _trade in list(self.trade_log.open_trades):
+                if _trade.strategy != "TREND_FOLLOW":
+                    continue
+                _hold = (day - pd.Timestamp(_trade.entry_time).normalize()).days
+                _force = _hold >= self.config.max_hold_days
+                if _force:
+                    _reason = "MAX_HOLD"
+                    _ticker = _trade.ticker
+                    if _ticker in day_stocks and not day_stocks[_ticker].empty:
+                        _px = float(day_stocks[_ticker].iloc[0]["open"])
+                    else:
+                        _px = _trade.entry_price
+                    self._close_trade(_trade, _open_ts, _px, _reason,
+                                      circuit_breakers, coordinator,
+                                      _open_ts.to_pydatetime())
+                    self._swing_state.pop(id(_trade), None)
+
         # ── Bar loop ──────────────────────────────────────────────────────────
+        _cur_vol: float = 0.20  # default Normal; updated at first bar from SPY realized vol
         for bar_ts, spy_bar in day_spy.iterrows():
             if self._circuit_breaker_active:
                 break
@@ -266,12 +522,23 @@ class BacktestEngine:
                     spy_data[spy_data.index.normalize() <= bar_ts.normalize()]
                 )
                 if len(spy_daily) >= 20:
-                    if hmm is not None:
-                        try:
-                            idx = hmm.predict_current(spy_daily)
-                            self._hmm_state = ["Calm", "Normal", "Stress"][min(int(idx), 2)]
-                        except Exception as e:
-                            logger.debug(f"predict_current failed: {e}")
+                    try:
+                        # Use HMM predictions for regime detection.
+                        # Crisis override: if 5-day realized vol > 50% (VIX ~50+),
+                        # force Crisis regardless of HMM output — avoids self-referential
+                        # problem where COVID vol shifts HMM state boundaries.
+                        if _hmm is not None and len(spy_daily) >= 21:
+                            _state_idx = _hmm.predict_current(spy_daily)
+                            self._hmm_state = _hmm.state_name(_state_idx)
+                        _log_ret = np.log(spy_daily / spy_daily.shift(1)).dropna()
+                        _rv = _log_ret.rolling(5).std() * np.sqrt(252)
+                        _rv = _rv.dropna()
+                        if len(_rv) >= 5:
+                            _cur_vol = float(_rv.iloc[-1])
+                            if _cur_vol >= 0.50:
+                                self._hmm_state = "Crisis"
+                    except Exception as e:
+                        logger.debug(f"regime detection failed: {e}")
                 try:
                     coordinator.notify_hmm_state(self._hmm_state, bar_dt)
                 except Exception:
@@ -282,14 +549,29 @@ class BacktestEngine:
                 self._regime_bar_counts.get(self._hmm_state, 0) + 1
             )
 
-            # 2. Layer 0 override
+            # 2. TF exit checks run unconditionally — stops/targets are always active.
+            # TF is a swing strategy; it holds through intraday volatility events.
+            # We check exits here (before the trading_ok gate) so TF positions are
+            # still managed by their stops even when SAFETY_MODE is active.
+            for _tf_trade in list(self.trade_log.open_trades):
+                if _tf_trade.strategy != "TREND_FOLLOW":
+                    continue
+                _tf_exit = self._check_exits(_tf_trade, bar_ts, bar_t, day_stocks)
+                if _tf_exit:
+                    _tf_price, _tf_reason = _tf_exit
+                    self._close_trade(
+                        _tf_trade, bar_ts, _tf_price, _tf_reason,
+                        circuit_breakers, coordinator, bar_dt,
+                    )
+
+            # 3. Layer 0 override
             override = self._check_layer0(spy_history)
             try:
                 coordinator.notify_override(override, bar_dt)
             except Exception:
                 pass
 
-            # 3. Trading allowed?
+            # 4. Trading allowed?
             try:
                 trading_ok = coordinator.trading_allowed
             except Exception:
@@ -299,7 +581,10 @@ class BacktestEngine:
                 if not self._safety_mode_active:
                     logger.critical(f"{bar_ts} | SAFETY MODE ON")
                     self._safety_mode_active = True
-                self._close_all(bar_ts, day_stocks, "SAFETY_MODE")
+                # Close intraday strategies (ORB, VWAP_MR) immediately.
+                # TF positions already had exits checked above and will hold
+                # through the event — their stops protect against runaway loss.
+                self._close_all(bar_ts, day_stocks, "SAFETY_MODE", skip_tf=True)
                 continue
             else:
                 if self._safety_mode_active:
@@ -315,13 +600,29 @@ class BacktestEngine:
 
             # 5. ORB scanner at 9:35
             if bar_t == ORB_SCAN_TIME and not orb_scanned and "ORB" in active:
-                candidates = self._build_orb_candidates(day_stocks, market_data, day)
+                candidates = self._build_orb_candidates(day_stocks, market_data, day, _effective_orb_universe)
                 try:
                     orb.run_scanner(candidates)
                 except Exception as e:
                     logger.debug(f"ORB scanner error: {e}")
+                # Per-time-slot avg volume for correct rvol at signal time (9:45–10:15).
+                # Key: time object matching bar_ts.time(); value: avg volume for that slot.
+                orb_hist_avg_vol = {
+                    c["ticker"]: c.get("avg_vol_by_time", {})
+                    for c in candidates
+                }
                 orb_scanned = True
                 logger.info(f"{bar_ts} | ORB scan → {len(orb.watchlist)} candidates")
+
+            # 5b. FADE scanner at 9:35 — same timing as ORB but uses fade universe
+            if bar_t == ORB_SCAN_TIME and not fade_scanned_done and "FADE" in active and _effective_fade_universe:
+                fade_candidates = self._build_orb_candidates(day_stocks, market_data, day, _effective_fade_universe)
+                try:
+                    fade_orb.run_scanner(fade_candidates)
+                except Exception as e:
+                    logger.debug(f"FADE scanner error: {e}")
+                fade_scanned_done = True
+                logger.info(f"{bar_ts} | FADE scan → {len(fade_orb.watchlist)} candidates")
 
             # 6. ORB range formation 9:30–signal_start (config-driven)
             if ORB_RANGE_START <= bar_t < orb_signal_start and "ORB" in active:
@@ -341,9 +642,83 @@ class BacktestEngine:
                     except Exception as e:
                         logger.debug(f"OR calc error {ticker}: {e}")
 
-            # 7. ORB signals (config-driven window)
+            # 6a. FADE OR range formation 9:30–signal_start (same window as ORB)
+            if ORB_RANGE_START <= bar_t < orb_signal_start and "FADE" in active:
+                for ticker in fade_orb.watchlist:
+                    if ticker not in day_stocks:
+                        continue
+                    bars_so_far = day_stocks[ticker].loc[:bar_ts]
+                    if len(bars_so_far) < 2:
+                        continue
+                    atr = self._compute_atr(bars_so_far)
+                    try:
+                        or_high, or_low, status = fade_orb.calculate_opening_range(bars_so_far, atr)
+                        if status == "VALID":
+                            fade_or_ranges[ticker] = (or_high, or_low)
+                    except Exception as e:
+                        logger.debug(f"FADE OR calc error {ticker}: {e}")
+
+            # 6b. ORB delayed-entry: confirm or cancel pending breakouts from previous bar.
+            # pending_orb is populated in section 7 below (breakout detected on bar B).
+            # Here on bar B+1 we check whether price held outside the OR (confirm ORB)
+            # or reverted inside (failed breakout → enter Fade in the opposite direction).
+            if orb_signal_start < bar_t <= orb_signal_end and "ORB" in active and pending_orb:
+                for _pticker, _psig in list(pending_orb.items()):
+                    pending_orb.pop(_pticker)
+                    if _pticker not in or_ranges or _pticker not in day_stocks:
+                        continue
+                    _pbars = day_stocks[_pticker].loc[:bar_ts]
+                    if _pbars.empty:
+                        continue
+                    try:
+                        _pcandle = _pbars.iloc[-1]
+                        _por_high, _por_low = or_ranges[_pticker]
+                        _result = orb.confirm_or_cancel(_pcandle, _por_high, _por_low, _psig)
+                        if not _result:
+                            continue
+                        _strategy_name = "ORB_FADE" if _result.get("type") == "FADE" else "ORB"
+                        if not self._position_ok(_pticker, _strategy_name):
+                            continue
+                        if _strategy_name == "ORB" and not _spy_bull_trend and _result.get("direction") == "LONG":
+                            logger.debug(f"ORB CONFIRM skip {_pticker}: LONG blocked in bear trend")
+                            continue
+                        _result = self._normalise_signal(_result)
+                        self._attempt_entry(_result, _pticker, _strategy_name, bar_ts, position_sizer, pdt_guard)
+                    except Exception as e:
+                        logger.debug(f"ORB confirm error {_pticker}: {e}")
+
+            # 6c. FADE delayed-entry: on bar B+1, if price reverted inside OR → enter FADE.
+            # If price confirmed breakout → drop (fade scanner stocks are mean-reverters;
+            # we only want the fade, not the momentum leg).
+            if orb_signal_start < bar_t <= orb_signal_end and "FADE" in active and pending_fades:
+                for _fticker, _fsig in list(pending_fades.items()):
+                    pending_fades.pop(_fticker)
+                    if _fticker not in fade_or_ranges or _fticker not in day_stocks:
+                        continue
+                    _fbars = day_stocks[_fticker].loc[:bar_ts]
+                    if _fbars.empty:
+                        continue
+                    try:
+                        _fcandle = _fbars.iloc[-1]
+                        _for_high, _for_low = fade_or_ranges[_fticker]
+                        _fresult = fade_orb.confirm_or_cancel(_fcandle, _for_high, _for_low, _fsig)
+                        if not _fresult:
+                            continue
+                        if _fresult.get("type") != "FADE":
+                            continue  # breakout confirmed — not a mean-revert, skip
+                        if not self._position_ok(_fticker, "FADE"):
+                            continue
+                        _fresult = self._normalise_signal(_fresult)
+                        self._attempt_entry(_fresult, _fticker, "FADE", bar_ts, position_sizer, pdt_guard)
+                    except Exception as e:
+                        logger.debug(f"FADE confirm error {_fticker}: {e}")
+
+            # 7. ORB signals (config-driven window) — detect breakouts, store as pending.
+            # Actual entry happens on bar B+1 via section 6b (delayed-entry logic).
             if orb_signal_start <= bar_t <= orb_signal_end and "ORB" in active:
                 for ticker, (or_high, or_low) in list(or_ranges.items()):
+                    if ticker in pending_orb:         # already have a pending for this ticker
+                        continue
                     if not self._position_ok(ticker, "ORB"):
                         continue
                     if ticker not in day_stocks:
@@ -354,26 +729,126 @@ class BacktestEngine:
                     try:
                         candle = bars_so_far.iloc[-1]
                         vwap_val = vwap_mr.calculate_vwap(bars_so_far)
-                        avg_vol = float(bars_so_far["volume"].mean()) or 1.0
+                        _time_avgs = orb_hist_avg_vol.get(ticker, {})
+                        _slot_avg = _time_avgs.get(bar_ts.time(), 0.0) if isinstance(_time_avgs, dict) else 0.0
+                        hist_avg = max(_slot_avg if _slot_avg > 0 else float(bars_so_far["volume"].mean()), 1.0)
                         rvol = orb.calculate_intraday_rvol(
-                            int(candle["volume"]), avg_vol
+                            int(candle["volume"]), hist_avg
                         )
                         sig = orb.generate_signal(
                             candle, or_high, or_low, vwap_val, rvol, self._hmm_state
                         )
                         if sig:
-                            sig = self._normalise_signal(sig)
-                            self._attempt_entry(
-                                sig, ticker, "ORB", bar_ts, position_sizer, pdt_guard
+                            # Bear trend (SMA50 < SMA200): skip LONG ORB — gap-ups fade.
+                            if not _spy_bull_trend and sig.get("direction") == "LONG":
+                                logger.debug(
+                                    f"ORB skip {ticker}: LONG blocked in bear trend"
+                                )
+                                continue
+                            # Delayed entry: store signal, execute on next bar after confirmation.
+                            pending_orb[ticker] = sig
+                            logger.debug(
+                                f"ORB PENDING {ticker}: {sig['direction']} @ ${sig['entry_price']:.2f}"
                             )
                     except Exception as e:
                         logger.debug(f"ORB signal error {ticker}: {e}")
 
+            # 7b. FADE signals — detect breakouts for fade candidates, store as pending.
+            # Entry on bar B+1 via section 6c; only enters if B+1 reverts inside OR.
+            if orb_signal_start <= bar_t <= orb_signal_end and "FADE" in active:
+                for ticker, (or_high, or_low) in list(fade_or_ranges.items()):
+                    if ticker in pending_fades:
+                        continue
+                    if not self._position_ok(ticker, "FADE"):
+                        continue
+                    if ticker not in day_stocks:
+                        continue
+                    bars_so_far = day_stocks[ticker].loc[:bar_ts]
+                    if bars_so_far.empty:
+                        continue
+                    try:
+                        candle = bars_so_far.iloc[-1]
+                        vwap_val = vwap_mr.calculate_vwap(bars_so_far)
+                        hist_avg = max(float(bars_so_far["volume"].mean()), 1.0)
+                        rvol = fade_orb.calculate_intraday_rvol(int(candle["volume"]), hist_avg)
+                        sig = fade_orb.generate_signal(candle, or_high, or_low, vwap_val, rvol, self._hmm_state)
+                        if sig:
+                            pending_fades[ticker] = sig
+                            logger.debug(
+                                f"FADE PENDING {ticker}: {sig['direction']} @ ${sig['entry_price']:.2f}"
+                            )
+                    except Exception as e:
+                        logger.debug(f"FADE signal error {ticker}: {e}")
+
+            # 7c. Stress ETF ORB — scanner at 9:35
+            if bar_t == ORB_SCAN_TIME and not stress_orb_scanned and "STRESS_ORB" in active:
+                stress_orb.watchlist = list(_stress_stocks.keys())
+                stress_orb_scanned = True
+                logger.info(f"{bar_ts} | Stress ORB scan → {stress_orb.watchlist}")
+
+            # 7c. Stress ETF ORB — OR range formation 9:30–signal_start
+            if ORB_RANGE_START <= bar_t < orb_signal_start and "STRESS_ORB" in active:
+                for ticker in stress_orb.watchlist:
+                    if ticker not in _stress_stocks:
+                        continue
+                    bars_so_far = _stress_stocks[ticker].loc[:bar_ts]
+                    if len(bars_so_far) < 2:
+                        continue
+                    atr = self._compute_atr(bars_so_far)
+                    try:
+                        or_high, or_low, status = stress_orb.calculate_opening_range(
+                            bars_so_far, atr
+                        )
+                        if status == "VALID":
+                            stress_or_ranges[ticker] = (or_high, or_low)
+                    except Exception as e:
+                        logger.debug(f"Stress OR calc error {ticker}: {e}")
+
+            # 7d. Stress ETF ORB — signals signal_start–signal_end
+            if orb_signal_start <= bar_t <= orb_signal_end and "STRESS_ORB" in active:
+                for ticker, (or_high, or_low) in list(stress_or_ranges.items()):
+                    if not self._position_ok(ticker, "STRESS_ORB"):
+                        continue
+                    if ticker not in _stress_stocks:
+                        continue
+                    bars_so_far = _stress_stocks[ticker].loc[:bar_ts]
+                    if bars_so_far.empty:
+                        continue
+                    try:
+                        candle   = bars_so_far.iloc[-1]
+                        vwap_val = vwap_mr.calculate_vwap(bars_so_far)
+                        hist_avg = max(float(bars_so_far["volume"].mean()), 1.0)
+                        rvol     = stress_orb.calculate_intraday_rvol(
+                            int(candle["volume"]), hist_avg
+                        )
+                        sig = stress_orb.generate_signal(
+                            candle, or_high, or_low, vwap_val, rvol, self._hmm_state
+                        )
+                        if sig:
+                            # Bear trend (SMA50 < SMA200): SHORT only — no longs in crash
+                            if not _spy_bull_trend and sig.get("direction") == "LONG":
+                                logger.debug(
+                                    f"Stress ORB skip {ticker}: LONG blocked in bear trend"
+                                )
+                                continue
+                            sig = self._normalise_signal(sig)
+                            self._attempt_entry(
+                                sig, ticker, "STRESS_ORB", bar_ts, position_sizer, pdt_guard
+                            )
+                    except Exception as e:
+                        logger.debug(f"Stress ORB signal error {ticker}: {e}")
+
             # 8. VWAP MR 10:15–14:00
-            # Run scanner each bar (designed to run continuously per blueprint)
-            if VWAP_MR_START <= bar_t < VWAP_MR_END and "VWAP_MR" in active:
+            # Vol-based gate independent of main regime: VWAP_MR runs whenever
+            # SPY 5-day realized vol <= vwap_mr_vol_threshold (default=0.12=Calm).
+            # Raise threshold in config to allow trading on "low Normal" days.
+            _vwap_mr_vol_ok = _cur_vol <= self.config.vwap_mr_vol_threshold
+            if VWAP_MR_START <= bar_t < VWAP_MR_END and _vwap_mr_vol_ok and (self.config.vwap_universe or mr_universe):
+                # VWAP_MR uses its own range-bound universe — NOT the TF momentum stocks.
+                # mr_universe (MRUniverseScanner) takes priority; falls back to config.vwap_universe.
+                _vwap_tickers = _effective_vwap_universe
                 vwap_candidates = self._build_vwap_candidates(
-                    day_stocks, bar_ts, self.config.universe
+                    day_stocks, bar_ts, _vwap_tickers
                 )
                 vwap_mr.run_scanner(vwap_candidates)
 
@@ -397,7 +872,7 @@ class BacktestEngine:
                         entry_bar = bars_so_far.iloc[-1]
                         sig = vwap_mr.generate_signal(
                             prev_bar, entry_bar, bb_upper, bb_lower,
-                            vwap_val, atr, self._hmm_state,
+                            vwap_val, atr, "Calm",  # vol gate handled by engine; always pass Calm
                         )
                         if sig:
                             sig = self._normalise_signal(sig)
@@ -413,12 +888,12 @@ class BacktestEngine:
                 if bar_t == TREND_START:
                     # Compute sector strength from universe intraday returns
                     sector_str = self._compute_sector_strength(
-                        day_stocks, bar_ts, self.config.universe
+                        day_stocks, bar_ts, _base_universe
                     )
-                    # All stocks eligible for trend: universe + orb_universe
-                    trend_eligible = list(self.config.universe) + [
-                        t for t in self.config.orb_universe
-                        if t not in self.config.universe
+                    # All stocks eligible for trend: scanner universe + orb_universe
+                    trend_eligible = list(_base_universe) + [
+                        t for t in _effective_orb_universe
+                        if t not in _base_universe
                     ]
                     trend_candidates = self._build_trend_candidates(
                         day_stocks, bar_ts, trend_eligible, sector_str
@@ -448,6 +923,52 @@ class BacktestEngine:
                             self._hmm_state, avg_vol_10,
                         )
                         if sig:
+                            # Enforce direction matches scanner's HOD/LOD intent.
+                            # Scanner sets intent=LONG when near HOD, SHORT when near LOD.
+                            # EMA-based signal can disagree (lag) — reject mismatches.
+                            _intent = trend.watchlist_directions.get(ticker)
+                            if _intent and sig.get("direction") != _intent:
+                                logger.debug(
+                                    f"TF skip {ticker}: signal={sig['direction']} "
+                                    f"but scanner intent={_intent}"
+                                )
+                                continue
+
+                            # Stress regime directional filter: only trade WITH macro trend.
+                            # SPY SMA50 < SMA200 (bear/crash) → skip LONG entries.
+                            # SPY SMA50 > SMA200 (bull)       → allow both directions.
+                            if self._hmm_state in ("Stress", "Crisis") and not _spy_bull_trend:
+                                if sig.get("direction") == "LONG":
+                                    logger.debug(
+                                        f"TF skip {ticker}: LONG blocked in {self._hmm_state} bear trend"
+                                    )
+                                    continue
+
+                            # Dynamic cooldown: after STOP_HIT, block same direction
+                            # until daily close crosses back past the stop price.
+                            direction = sig.get("direction", "LONG")
+                            _cd = self._tf_cooldown.get(ticker, {}).get(direction)
+                            if _cd is not None:
+                                _prev_close = float(
+                                    market_data[ticker].loc[
+                                        market_data[ticker].index < bar_ts
+                                    ]["close"].iloc[-1]
+                                ) if ticker in market_data else None
+                                _recovered = (
+                                    (_prev_close > _cd) if direction == "LONG"
+                                    else (_prev_close < _cd)
+                                ) if _prev_close is not None else False
+                                if _recovered:
+                                    self._tf_cooldown[ticker].pop(direction)
+                                    if not self._tf_cooldown[ticker]:
+                                        self._tf_cooldown.pop(ticker)
+                                else:
+                                    logger.debug(
+                                        f"TF skip {ticker} {direction}: cooldown "
+                                        f"(block_stop={_cd:.2f}, prev_close={_prev_close:.2f})"
+                                    )
+                                    continue
+
                             # Override stop/target with daily ATR scale.
                             # 5-min Chandelier ATR (~$0.12) is noise — use
                             # daily ATR (~$4-15) for meaningful stop distances.
@@ -456,10 +977,18 @@ class BacktestEngine:
                             )
                             entry_p   = sig.get("entry_price", 0.0)
                             direction = sig.get("direction", "LONG")
-                            # Stop at 0.20× daily ATR, target at 1.5R (0.30× daily ATR)
-                            # Gives ~0.5-1.5% stop depending on stock volatility
-                            stop_dist   = max(daily_atr * 0.20, entry_p * 0.005)
-                            target_dist = stop_dist * 0.75
+                            # HMM-adaptive stop: regime already encodes
+                            # realized volatility, so use it to scale the
+                            # stop distance rather than a fixed multiplier.
+                            # Calm  → tight stop (clean trends, low noise)
+                            # Normal→ standard swing stop
+                            # Stress→ wider stop (high vol, avoid shakeout)
+                            _atr_mult = {"Calm": 0.5, "Normal": 1.0, "Stress": 1.5, "Crisis": 2.0}
+                            stop_dist   = max(
+                                daily_atr * _atr_mult.get(self._hmm_state, 1.0),
+                                entry_p * 0.005,
+                            )
+                            target_dist = stop_dist * 2.0
                             if direction == "LONG":
                                 sig["initial_stop"] = round(entry_p - stop_dist, 2)
                                 sig["target"]       = round(entry_p + target_dist, 2)
@@ -473,8 +1002,11 @@ class BacktestEngine:
                     except Exception as e:
                         logger.debug(f"Trend signal error {ticker}: {e}")
 
-            # 10. Exit checks (with Chandelier stop update for Trend Follow)
+            # 10. Exit checks for intraday strategies (ORB, VWAP_MR).
+            # TF exits are handled in step 2 before the trading_ok gate.
             for trade in list(self.trade_log.open_trades):
+                if trade.strategy == "TREND_FOLLOW":
+                    continue  # already checked in step 2
                 exit_result = self._check_exits(trade, bar_ts, bar_t, day_stocks)
                 if exit_result:
                     exit_price, reason = exit_result
@@ -508,9 +1040,14 @@ class BacktestEngine:
                     self._circuit_breaker_active = True
                     break
 
-        # EOD close
+        # EOD close — skip TREND_FOLLOW swing positions
         if not self._circuit_breaker_active:
-            self._close_all(day, day_stocks, "EOD")
+            self._close_all(day, day_stocks, "EOD",
+                            skip_swing=self.config.allow_swing_hold)
+
+        # Update Chandelier trailing stops for held swing positions
+        if self.config.allow_swing_hold:
+            self._update_swing_stops(day, market_data, day_stocks)
 
         day_trades = self.trade_log.trades_on_date(day.date())
         self._session_summaries.append(SessionSummary(
@@ -564,16 +1101,17 @@ class BacktestEngine:
         day_stocks: Dict[str, pd.DataFrame],
         market_data: Dict[str, pd.DataFrame],
         today: pd.Timestamp,
+        effective_orb_universe: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Build the candidates list expected by ORBStrategy.run_scanner.
         Uses real previous day close to compute genuine gap percentage.
 
-        If config.orb_universe is set, only those tickers are scanned.
+        If effective_orb_universe is set, only those tickers are scanned.
         Otherwise falls back to the full universe (day_stocks).
         """
         # Determine which tickers to scan for ORB
-        orb_tickers = self.config.orb_universe
+        orb_tickers = effective_orb_universe or self.config.orb_universe
         if orb_tickers:
             # Only scan the volatile ORB-specific stocks
             scan_stocks = {
@@ -621,18 +1159,26 @@ class BacktestEngine:
             # bars have 3-4x more volume than midday bars.
             # Instead, compute the average of the first 5-min bar across the
             # prior 20 trading days — a like-for-like comparison.
+            avg_vol_by_time: dict = {}
             if not prior_bars.empty:
-                # Get first bar of each prior trading day
+                # Get first bar of each prior trading day (for scanner threshold)
                 prior_opening_vols = (
                     prior_bars.groupby(prior_bars.index.normalize())
                     .first()["volume"]
                     .tail(20)
                 )
                 avg_opening_vol = int(prior_opening_vols.mean()) if len(prior_opening_vols) > 0 else int(first["volume"])
-                # avg_daily_volume is used as: threshold = 2 × (avg_daily_volume/78)
-                # So set avg_daily_volume = avg_opening_vol × 78 so that
-                # threshold = 2 × avg_opening_vol (correct comparison)
+                # avg_daily_volume used by scanner: threshold = 1.5 × (avg_daily_volume/78)
+                # Set avg_daily_volume = avg_opening_vol × 78 → threshold = 1.5 × avg_opening_vol
                 avg_daily_volume = avg_opening_vol * 78
+
+                # Per-time-slot avg volume across last 20 days — used for rvol at signal time.
+                # Blueprint intent: compare 9:45 bar against avg 9:45 bar, not avg opening bar.
+                last_20_days = sorted(prior_bars.index.normalize().unique())[-20:]
+                _recent = prior_bars[prior_bars.index.normalize().isin(last_20_days)].copy()
+                if not _recent.empty:
+                    _recent["_t"] = _recent.index.time
+                    avg_vol_by_time = _recent.groupby("_t")["volume"].mean().to_dict()
             else:
                 avg_daily_volume = int(df["volume"].mean() * 78)
 
@@ -645,6 +1191,7 @@ class BacktestEngine:
                 "premarket_volume":    int(df[df.index.time < dtime(9, 30)]["volume"].sum()),
                 "avg_daily_volume":    avg_daily_volume,
                 "opening_5min_volume": int(first["volume"]),
+                "avg_vol_by_time":     avg_vol_by_time,
             })
 
         logger.info(f"ORB candidates: {len(candidates)} stocks with real gaps")
@@ -703,12 +1250,16 @@ class BacktestEngine:
         n_shares     = int(size["shares"]) if isinstance(size, dict) else int(getattr(size, "shares", 0))
         limit_factor = size.get("limiting_factor", "UNKNOWN") if isinstance(size, dict) else getattr(size, "limiting_factor", "UNKNOWN")
 
+        # Reduce size in Stress regime for TREND_FOLLOW
+        if strategy == "TREND_FOLLOW" and self._hmm_state in ("Stress", "Crisis"):
+            n_shares = max(1, int(n_shares * self.config.stress_size_fraction))
+
         if n_shares <= 0:
             return
 
         target = signal.get("target", entry * 1.05 if signal.get("direction") == "LONG" else entry * 0.95)
 
-        trade = self.trade_log.open_trade(
+        self.trade_log.open_trade(
             ticker=ticker,
             strategy=strategy,
             direction=signal["direction"],
@@ -811,7 +1362,7 @@ class BacktestEngine:
             try:
                 current_price  = float(bars.iloc[-1]["close"])
                 current_volume = float(bars.iloc[-1]["volume"])
-                avg_daily_vol  = float(bars["volume"].mean()) * 78   # scale to daily
+                avg_bar_vol    = float(bars["volume"].mean())   # per-5min-bar average today
                 sma_20         = float(bars["close"].rolling(20).mean().iloc[-1])
                 atr_current    = self._compute_atr(bars)
                 atr_5bars_ago  = self._compute_atr(bars.iloc[:-5]) if len(bars) > 19 else atr_current
@@ -826,7 +1377,7 @@ class BacktestEngine:
                     "sma_20":           sma_20,
                     "current_price":    current_price,
                     "current_volume":   current_volume,
-                    "avg_daily_volume": avg_daily_vol,
+                    "avg_daily_volume": avg_bar_vol,   # per-bar avg; scanner ratio = current_bar / avg_bar
                     "atr_current":      atr_current,
                     "atr_5bars_ago":    atr_5bars_ago,
                     "has_earnings":     False,   # no earnings data available
@@ -929,6 +1480,8 @@ class BacktestEngine:
         bar_close = float(bar["close"])
 
         if bar_t >= EOD_HARD_EXIT:
+            if self.config.allow_swing_hold and trade.strategy == "TREND_FOLLOW":
+                return None  # swing trades do not EOD-close
             return bar_close, "EOD"
 
         if trade.direction == "LONG":
@@ -978,6 +1531,9 @@ class BacktestEngine:
         except Exception as e:
             logger.debug(f"record_trade_result error: {e}")
 
+        if reason == "STOP_HIT" and trade.strategy == "TREND_FOLLOW":
+            self._tf_cooldown.setdefault(trade.ticker, {})[trade.direction] = trade.stop
+
         logger.info(
             f"{exit_ts} | CLOSE {trade.ticker} {trade.strategy} "
             f"@ ${exit_price:.2f} [{reason}] | "
@@ -989,14 +1545,33 @@ class BacktestEngine:
         timestamp: pd.Timestamp,
         day_stocks: Dict[str, pd.DataFrame],
         reason: str,
+        skip_swing: bool = False,
+        skip_tf: bool = False,
     ) -> None:
         open_trades = list(self.trade_log.open_trades)
         if not open_trades:
             return
-        logger.warning(f"{timestamp} | Closing {len(open_trades)} positions — {reason}")
-        for trade in open_trades:
+        trades_to_close = [
+            t for t in open_trades
+            if not (
+                (skip_swing and t.strategy == "TREND_FOLLOW") or
+                (skip_tf   and t.strategy == "TREND_FOLLOW")
+            )
+        ]
+        if not trades_to_close:
+            return
+        logger.warning(f"{timestamp} | Closing {len(trades_to_close)} positions — {reason}")
+        for trade in trades_to_close:
             if trade.ticker in day_stocks and not day_stocks[trade.ticker].empty:
-                price = float(day_stocks[trade.ticker].iloc[-1]["close"])
+                _bar  = day_stocks[trade.ticker].iloc[-1]
+                price = float(_bar["close"])
+                # If stop was crossed during this bar, cap exit at stop price.
+                # Prevents SAFETY_MODE from closing at a price worse than stop.
+                if trade.stop is not None:
+                    if trade.direction == "LONG" and float(_bar["low"]) <= trade.stop:
+                        price = max(price, trade.stop)
+                    elif trade.direction == "SHORT" and float(_bar["high"]) >= trade.stop:
+                        price = min(price, trade.stop)
             else:
                 price = trade.entry_price
             costs = self._compute_costs(trade, price)
@@ -1008,6 +1583,46 @@ class BacktestEngine:
                 total_costs=costs,
             )
             self.equity_tracker.apply_pnl(trade.net_pnl or 0.0, timestamp)
+
+    def _update_swing_stops(
+        self,
+        day: pd.Timestamp,
+        market_data: Dict[str, pd.DataFrame],
+        day_stocks: Dict[str, pd.DataFrame],
+    ) -> None:
+        """Update Chandelier trailing stops EOD for open TREND_FOLLOW swing positions."""
+        for trade in self.trade_log.open_trades:
+            if trade.strategy != "TREND_FOLLOW":
+                continue
+            ticker = trade.ticker
+            if ticker not in day_stocks or day_stocks[ticker].empty:
+                continue
+
+            day_high = float(day_stocks[ticker]["high"].max())
+            day_low  = float(day_stocks[ticker]["low"].min())
+            daily_atr = self._compute_daily_atr(market_data, ticker, day)
+            if daily_atr <= 0:
+                continue
+
+            state = self._swing_state.get(id(trade), {})
+
+            if trade.direction == "LONG":
+                prev_extreme = state.get("extreme", day_high)
+                new_extreme  = max(prev_extreme, day_high)
+                new_stop     = round(new_extreme - 3.0 * daily_atr, 2)
+                if new_stop > (trade.stop or 0.0):
+                    trade.stop = new_stop
+            else:
+                prev_extreme = state.get("extreme", day_low)
+                new_extreme  = min(prev_extreme, day_low)
+                new_stop     = round(new_extreme + 3.0 * daily_atr, 2)
+                if new_stop < (trade.stop or float("inf")):
+                    trade.stop = new_stop
+
+            state["extreme"] = new_extreme
+            self._swing_state[id(trade)] = state
+            logger.debug(f"Swing stop update {ticker} {trade.direction}: "
+                         f"stop={trade.stop:.2f} extreme={new_extreme:.2f}")
 
     def _compute_costs(self, trade: Trade, exit_price: float) -> float:
         if not self.config.enable_costs:
@@ -1045,7 +1660,12 @@ class BacktestEngine:
             std     = returns[:-1].std()
             if std <= 0:
                 return False
-            return bool(abs(returns.iloc[-1] / std) > 3.0)
+            latest_ret = returns.iloc[-1]
+            # Require BOTH: statistical outlier (>3σ) AND meaningful absolute move.
+            # 0.6% in a single 5-min SPY bar ≈ genuine flash event (not normal vol).
+            # 0.4% was too sensitive: in a 2022 bear market with 1-2% daily SPY moves,
+            # a single 5-min bar at 0.4% is common and was triggering 1-2×/week.
+            return bool(abs(latest_ret / std) > 3.0 and abs(latest_ret) > 0.006)
         except Exception:
             return False
 

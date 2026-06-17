@@ -32,9 +32,9 @@ import numpy as np
 import pandas as pd
 from hmmlearn.hmm import GaussianHMM
 
-from raits.hmm.features import build_feature_matrix, build_feature_row
+from raits.hmm.features import build_feature_matrix
 from raits.hmm.state_sorting import (
-    CALM, HMM_STATES, NORMAL, STRESS,
+    HMM_STATES,
     sort_hmm_states, validate_state_order,
 )
 
@@ -44,8 +44,8 @@ logger = logging.getLogger(__name__)
 # Default hyperparameters
 # ---------------------------------------------------------------------------
 
-N_COMPONENTS = 3                   # Calm / Normal / Stress
-COVARIANCE_TYPE = "diag"           # Diagonal covariance — robust, sufficient for 2 features
+N_COMPONENTS = 4                   # Calm / Normal / Stress / Crisis
+COVARIANCE_TYPE = "diag"           # Diagonal covariance — robust, sufficient for 3 features
 N_ITER = 200                       # EM iterations
 N_INIT = 10                        # Multiple random restarts (picks best log-L)
 RANDOM_SEED = 42

@@ -48,7 +48,6 @@
 
 import logging
 import pandas as pd
-import numpy as np
 from typing import Optional
 
 logger = logging.getLogger('RAITS.VWAP_MR')
@@ -67,10 +66,11 @@ DEFAULT_CONFIG = {
     'bb_std_dev':    2.0,   # WFO grid: 1.5, 2.0, 2.5 — default 2.0
 
     # Entry / exit (Section 4.3)
-    'stop_atr_multiple':  0.5,   # stop = entry ± 1.5 × ATR
+    'stop_atr_multiple':  1.5,   # stop = entry ± 1.5 × ATR
+    'min_rr_ratio':       1.5,   # skip signal if (entry→VWAP) / stop_dist < 1.5
 
     # Regime filter (Section 6.1)
-    'allowed_regimes': ['Calm'],   # ONLY Calm — most restrictive strategy
+    'allowed_regimes': ['Calm'],
 }
 
 
@@ -378,10 +378,24 @@ class VWAPMRStrategy:
             stop_loss = round(entry_price - stop_distance, 2)
 
         # Target: VWAP (fair value / mean)
-        # This is fundamentally different from ORB's 2R target.
-        # We're not targeting a fixed multiple — we're targeting the point
-        # the stock SHOULD return to given current volume distribution.
         target = round(vwap, 2)
+
+        # ── Gate 3: Minimum R:R — skip if entry is already too close to VWAP ──
+        # After prev_bar partially reverted, entry may be near VWAP already.
+        # Only take the trade when potential reward justifies the stop risk.
+        if direction == 'SHORT':
+            reward_dist = entry_price - target   # positive when entry > VWAP
+        else:
+            reward_dist = target - entry_price   # positive when VWAP > entry
+
+        min_rr = self.config.get('min_rr_ratio', 1.5)
+        if stop_distance <= 0 or reward_dist / stop_distance < min_rr:
+            logger.debug(
+                f"VWAP_MR SKIP (R:R too low): {direction} entry=${entry_price:.2f} "
+                f"vwap=${vwap:.2f} reward={reward_dist:.3f} stop={stop_distance:.3f} "
+                f"ratio={reward_dist/stop_distance if stop_distance>0 else 0:.2f} < {min_rr}"
+            )
+            return None
 
         signal = {
             'direction':   direction,

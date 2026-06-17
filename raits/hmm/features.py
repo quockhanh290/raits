@@ -1,7 +1,7 @@
 """
 RAITS HMM Feature Engineering
 ==============================
-Builds the observation matrix fed into the 3-state Gaussian HMM.
+Builds the observation matrix fed into the 4-state Gaussian HMM.
 
 Features (2-dimensional, daily frequency):
   [0] SPY log-return        – direction / drift signal
@@ -10,11 +10,12 @@ Features (2-dimensional, daily frequency):
 Design notes
 ------------
 - Only SPY (market proxy) is used so the HMM captures *regime*, not stock alpha.
-- Realized vol is annualised (× √252) so Calm/Normal/Stress covariance values
-  map naturally to VIX-like numbers the state-sorting algorithm can compare.
+- Realized vol is annualised (× √252) so Calm/Normal/Stress/Crisis covariance
+  values map naturally to VIX-like numbers the state-sorting algorithm can compare.
 - All computations are strictly backward-looking (no look-ahead bias).
-- The 5-day vol window is short enough to react within a week; the 20-day
-  alternative is available as a parameter for sensitivity analysis.
+- Vol alone is sufficient to separate 4 states when trained on 2007-2024 data
+  (2008 GFC and 2020 COVID provide clear Crisis examples at vol 60-80%+).
+- Crisis override at vol>50% in the backtest engine acts as an additional backstop.
 
 Section references: 3.1, 3.2 (burn-in), 3.5 (state-sorting uses mean/var).
 """
@@ -22,7 +23,6 @@ Section references: 3.1, 3.2 (burn-in), 3.5 (state-sorting uses mean/var).
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 ANNUALISATION_FACTOR = np.sqrt(252)      # Daily → annual vol
-DEFAULT_VOL_WINDOW = 20             # Rolling realised vol lookback (days)
+DEFAULT_VOL_WINDOW = 5                   # Rolling realised vol lookback (days)
 MIN_OBSERVATIONS = 30                    # Minimum rows to build a valid matrix
 
 # Number of initial rows that will be NaN due to rolling windows — must be
@@ -75,17 +75,21 @@ def build_feature_matrix(
     ValueError
         If the resulting matrix has fewer than MIN_OBSERVATIONS rows.
     """
-    if len(spy_close) < vol_window + MIN_OBSERVATIONS:
+    min_required = vol_window + MIN_OBSERVATIONS
+    if len(spy_close) < min_required:
         raise ValueError(
-            f"Need at least {vol_window + MIN_OBSERVATIONS} price observations; "
+            f"Need at least {min_required} price observations; "
             f"got {len(spy_close)}."
         )
 
-    log_returns = _compute_log_returns(spy_close)
+    log_returns  = _compute_log_returns(spy_close)
     realised_vol = _compute_realised_vol(log_returns, vol_window)
 
     features = pd.DataFrame(
-        {"log_return": log_returns, "realised_vol": realised_vol},
+        {
+            "log_return":   log_returns,
+            "realised_vol": realised_vol,
+        },
         index=spy_close.index,
     )
 
@@ -115,9 +119,6 @@ def build_feature_row(
     """
     Build a single-row (1 × 2) observation for real-time regime inference.
 
-    The series must contain at least `vol_window + 1` prices so that both
-    the latest log-return and the rolling vol can be computed without NaN.
-
     Parameters
     ----------
     spy_close_recent : pd.Series
@@ -134,13 +135,12 @@ def build_feature_row(
             f"got {len(spy_close_recent)}."
         )
 
-    # Use only the tail we need (avoid recomputing the full history)
-    tail = spy_close_recent.iloc[-(vol_window + 1):]
-    log_ret = _compute_log_returns(tail)
+    tail_vol     = spy_close_recent.iloc[-(vol_window + 1):]
+    log_ret      = _compute_log_returns(tail_vol)
     realised_vol = _compute_realised_vol(log_ret, vol_window).dropna()
 
     latest_log_ret = float(log_ret.iloc[-1])
-    latest_vol = float(realised_vol.iloc[-1])
+    latest_vol     = float(realised_vol.iloc[-1])
 
     row = np.array([[latest_log_ret, latest_vol]], dtype=np.float64)
     logger.debug(

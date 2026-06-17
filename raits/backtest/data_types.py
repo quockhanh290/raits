@@ -64,6 +64,10 @@ class BacktestConfig:
     # If empty, falls back to full universe (old behaviour).
     orb_universe: List[str] = field(default_factory=list)
 
+    # VWAP MR universe — ETFs only (SPY, QQQ, IWM).
+    # If empty, falls back to full universe (backward compatible).
+    vwap_universe: List[str] = field(default_factory=list)
+
     # The 3 WFO-optimized hyperparameters (Section 7.1)
     orb_range_minutes: int = 15    # 10 | 15 | 20
     vwap_bb_std: float = 2.0       # 1.5 | 2.0 | 2.5
@@ -81,6 +85,40 @@ class BacktestConfig:
     hmm_retrain_weekly: bool = True
     log_level: str = "INFO"
     bar_size_minutes: int = 5
+
+    # Swing hold — allow TREND_FOLLOW positions to carry overnight
+    allow_swing_hold: bool = False
+    max_hold_days: int = 5          # force-close after N calendar days
+
+    # Position size multiplier when HMM = Stress (TREND_FOLLOW only)
+    stress_size_fraction: float = 0.5
+
+    # Dynamic universe via DailyUniverseScanner (T-1 daily bars)
+    use_scanner: bool = False
+    scanner_top_n: int = 15
+
+    # Separate MR scanner — selects range-bound stocks for VWAP_MR
+    # Requires daily_data (same as use_scanner). vwap_universe used as fallback.
+    use_mr_scanner: bool = False
+    mr_scanner_top_n: int = 8
+
+    # ORB scanner — selects high-ATR stocks for ORB. orb_universe used as fallback.
+    use_orb_scanner: bool = False
+    orb_scanner_top_n: int = 10
+
+    # FADE scanner — selects mean-reverting stocks (high gap reversal rate).
+    use_fade_scanner: bool = False
+    fade_scanner_top_n: int = 10
+
+    # VWAP_MR vol-based regime gate (independent of main HMM Calm threshold).
+    # VWAP_MR runs whenever SPY 5-day realized vol <= this threshold.
+    # Default 0.12 = same as Calm (<12% annualized). Raise to test on more days.
+    vwap_mr_vol_threshold: float = 0.12
+
+    # Position sizer: max loss per trade as % of account equity.
+    # Default 1% = $500 on $50K. VolTarget is usually the binding constraint.
+    # Raise to increase position sizes and returns (drawdown scales proportionally).
+    max_risk_pct: float = 0.01
 
 
 # ── Session and result ────────────────────────────────────────────────────────
