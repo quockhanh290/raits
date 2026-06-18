@@ -137,14 +137,14 @@ class BacktestEngine:
             "max_price":              1e9,
             "min_range_atr_multiple": 0.2,    # more permissive OR range for ETFs
         })
-        # FADE strategy: relaxed RVol (1.5x vs 2.0x) — high vol = momentum = bad for fade.
+        # FADE strategy: relaxed RVol — high vol = momentum = bad for fade.
         # Uses ORBFadeUniverseScanner universe which selects mean-reverting stocks.
         fade_orb = self._mods["ORBStrategy"](config={
-            "opening_vol_multiplier": 1.2,
+            "opening_vol_multiplier": 0.0,   # TEST: remove volume gate only
             "min_price":              1.0,
             "max_price":              1e9,
-            "min_gap_pct":            0.01,
-            "rvol_threshold":         0.0,  # FADE fades weak breakouts — no min-rvol gate
+            "min_gap_pct":            0.0,
+            "rvol_threshold":         0.0,
         })
         vwap_mr = self._mods["VWAPMRStrategy"](
             config={"bb_std_dev": self.config.vwap_bb_std}
@@ -616,7 +616,7 @@ class BacktestEngine:
 
             # 5b. FADE scanner at 9:35 — same timing as ORB but uses fade universe
             if bar_t == ORB_SCAN_TIME and not fade_scanned_done and "FADE" in active and _effective_fade_universe:
-                fade_candidates = self._build_orb_candidates(day_stocks, market_data, day, _effective_fade_universe)
+                fade_candidates = self._build_orb_candidates(day_stocks, market_data, day, _effective_fade_universe, skip_gap_filter=True)
                 try:
                     fade_orb.run_scanner(fade_candidates)
                 except Exception as e:
@@ -1102,10 +1102,12 @@ class BacktestEngine:
         market_data: Dict[str, pd.DataFrame],
         today: pd.Timestamp,
         effective_orb_universe: Optional[List[str]] = None,
+        skip_gap_filter: bool = False,
     ) -> List[Dict[str, Any]]:
         """
         Build the candidates list expected by ORBStrategy.run_scanner.
         Uses real previous day close to compute genuine gap percentage.
+        skip_gap_filter=True: bypass the 0.5% gap pre-filter (used for FADE).
 
         If effective_orb_universe is set, only those tickers are scanned.
         Otherwise falls back to the full universe (day_stocks).
@@ -1149,7 +1151,7 @@ class BacktestEngine:
                 continue
 
             gap_pct = abs(open_p - prev_close) / prev_close
-            if gap_pct < 0.005:
+            if not skip_gap_filter and gap_pct < 0.005:
                 logger.debug(f"ORB skip {ticker}: gap {gap_pct:.2%} too small")
                 continue
 

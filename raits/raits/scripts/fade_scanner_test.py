@@ -323,15 +323,55 @@ def print_results(label, trades, show_time_breakdown=False):
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
+ENGINE_WINDOW = ("09:45", "10:15")
+
+def engine_window_trades(trades):
+    b_start = pd.Timestamp("1970-01-01 09:45")
+    b_end   = pd.Timestamp("1970-01-01 10:15")
+    return [t for t in trades if b_start <= _time_key(t["entry_time"]) < b_end]
+
+def print_ticker_breakdown(label, trades):
+    """Show per-ticker P&L for the engine window (09:45-10:15)."""
+    ew = engine_window_trades(trades)
+    if not ew:
+        print(f"  [{label}] engine window: 0 trades")
+        return
+    by_ticker = {}
+    for t in ew:
+        tk = t["ticker"]
+        by_ticker.setdefault(tk, []).append(t)
+    rows = []
+    for tk, ts in by_ticker.items():
+        total = sum(t["net_pnl"] for t in ts)
+        wr    = sum(1 for t in ts if t["net_pnl"] > 0) / len(ts) * 100
+        rows.append((tk, len(ts), wr, total))
+    rows.sort(key=lambda x: x[3], reverse=True)
+    ew_total = sum(t["net_pnl"] for t in ew)
+    print(f"  [{label}] engine window 09:45-10:15 — {len(ew)} trades  Total=${ew_total:+,.0f}")
+    print(f"    {'Ticker':<8}  {'N':>4}  {'WR':>6}  {'Total':>10}")
+    for tk, n, wr, total in rows:
+        print(f"    {tk:<8}  {n:>4}  {wr:>5.1f}%  {total:>+10,.0f}")
+
+
 print("\n" + "=" * 70)
-print("  FADE SCANNER TEST — OOS 2020 / 2021 / 2022")
+print("  FADE SCANNER TEST — ticker breakdown per year (cap=5, engine window)")
 print("=" * 70)
 
-print(f"\n  FADE Scanner — cap simulation")
-print(f"  {'─'*60}")
-for cap in [None, 10, 5, 3, 2]:
-    label = f"cap=unlimited" if cap is None else f"cap={cap}/day    "
-    print(f"\n  {label}")
-    run_mode(fade_mode=True, max_per_day=cap)
+all_trades_by_yr = {}
+for start, end, yr in WINDOWS:
+    yr_trades = []
+    yr_days = [d for d in window_days if pd.Timestamp(start) <= d <= pd.Timestamp(end)]
+    for day in yr_days:
+        day_str   = str(day.date())
+        universe  = get_universe(scanner_data, day_str, TOP_N, fade_mode=True)
+        day_trades = []
+        for ticker in universe:
+            day_trades.extend(simulate_day(ticker, day))
+        if len(day_trades) > 5:
+            day_trades.sort(key=lambda t: t["entry_time"])
+            day_trades = day_trades[:5]
+        yr_trades.extend(day_trades)
+    all_trades_by_yr[yr] = yr_trades
+    print_ticker_breakdown(yr, yr_trades)
 
 print(f"\n{'='*70}")

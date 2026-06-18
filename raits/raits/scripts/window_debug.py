@@ -21,6 +21,7 @@ import time as _time
 import pandas as pd
 from collections import defaultdict
 from datetime import time as dtime
+from concurrent.futures import ProcessPoolExecutor
 
 from raits.backtest.engine import BacktestEngine
 from raits.backtest.data_types import BacktestConfig
@@ -1229,6 +1230,22 @@ def check_tf_baseline(results):
     print(f"  {'─'*55}")
 
 
+def _run_window(args):
+    """Top-level worker for ProcessPoolExecutor (must be picklable on Windows)."""
+    test_start, test_end, label, cfg_base, oos_data, daily_data = args
+    cfg = BacktestConfig(start_date=test_start, end_date=test_end, **cfg_base)
+    result = BacktestEngine(cfg).run(oos_data, daily_data=daily_data)
+    eq    = result.equity_curve
+    eq_s  = float(eq.iloc[0])  if not eq.empty else cfg_base.get("account_equity", 50_000.0)
+    eq_e  = float(eq.iloc[-1]) if not eq.empty else eq_s
+    max_dd = result.metrics.get("max_drawdown", 0.0)
+    return {
+        "label":  label,
+        "stats":  collect_stats(result.trade_log, eq_s, eq_e, max_dd),
+        "trades": result.trade_log,
+    }
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser()
@@ -1238,6 +1255,8 @@ def main():
                         help="Use fixed 8-stock universe (disable DailyUniverseScanner)")
     parser.add_argument("--rebuild-cache", action="store_true",
                         help="Force reload from parquets and rebuild pickle cache")
+    parser.add_argument("--year", type=int, default=None,
+                        help="Run only a specific year (e.g. --year 2021). Skips the other windows.")
     parser.add_argument("--top-n", type=int, default=15,
                         help="Scanner top-N stocks per day (default: 15)")
     parser.add_argument("--analyze-b", action="store_true",
@@ -1332,22 +1351,23 @@ def main():
             max_risk_pct=args.max_risk_pct,
         )
 
-        results = []
-        for test_start, test_end, label in WINDOWS:
-            oos_data = slice_oos(full_data, test_start, test_end)
-            cfg = BacktestConfig(start_date=test_start, end_date=test_end, **cfg_base)
-            result = BacktestEngine(cfg).run(oos_data, daily_data=daily_data)
+        windows = [(s, e, l) for s, e, l in WINDOWS if args.year is None or l == str(args.year)]
+        if not windows:
+            print(f"No windows match --year {args.year}. Available: {[l for _,_,l in WINDOWS]}")
+            return
 
-            eq     = result.equity_curve
-            eq_s   = float(eq.iloc[0])  if not eq.empty else 50_000.0
-            eq_e   = float(eq.iloc[-1]) if not eq.empty else 50_000.0
-            max_dd = result.metrics.get("max_drawdown", 0.0)
+        worker_args = [
+            (s, e, l, cfg_base, slice_oos(full_data, s, e), daily_data)
+            for s, e, l in windows
+        ]
 
-            results.append({
-                "label":  label,
-                "stats":  collect_stats(result.trade_log, eq_s, eq_e, max_dd),
-                "trades": result.trade_log,
-            })
+        n_workers = len(worker_args)
+        if n_workers == 1:
+            results = [_run_window(worker_args[0])]
+        else:
+            print(f"\nRunning {n_workers} windows in parallel...")
+            with ProcessPoolExecutor(max_workers=n_workers) as ex:
+                results = list(ex.map(_run_window, worker_args))
 
         print_summary(results)
 
