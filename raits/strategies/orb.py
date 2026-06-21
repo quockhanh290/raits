@@ -80,6 +80,8 @@ DEFAULT_CONFIG = {
     'rvol_threshold':            2.0,     # intraday RVol must be >= 2.0×
     'fakeout_wick_ratio':        0.5,     # wick/body ratio threshold for fakeout
     'doji_body_threshold':       0.01,    # body < $0.01 → treat as doji/fakeout
+    'fade_require_midpoint':     False,   # FADE: bar B+1 must close past OR midpoint (50% retracement)
+    'fade_long_enabled':         True,    # FADE: allow LONG fades (fading failed short breakdowns)
 
     # Risk / reward (Section 4.2 "Exit Logic")
     'target_rr':                 2.0,     # 2R target
@@ -441,6 +443,13 @@ class ORBStrategy:
                 )
                 return pending_sig
             # Failed — enter Fade SHORT; target = OR low (opposite boundary)
+            # Midpoint filter: reversal must close past OR midpoint (50% retracement)
+            # Weak reversals (barely inside OR) stop out at high rate.
+            if self.config.get('fade_require_midpoint', False):
+                midpoint = (or_high + or_low) / 2
+                if close >= midpoint:
+                    logger.debug(f"FADE skip (midpoint): close={close:.2f} >= mid={midpoint:.2f}")
+                    return None
             stop_loss = or_high * 1.005
             risk = abs(close - stop_loss)
             if risk <= 0:
@@ -470,6 +479,14 @@ class ORBStrategy:
                 )
                 return pending_sig
             # Failed — enter Fade LONG; target = OR high (opposite boundary)
+            if not self.config.get('fade_long_enabled', True):
+                logger.debug("FADE LONG disabled by config — skipping failed short breakdown")
+                return None
+            if self.config.get('fade_require_midpoint', False):
+                midpoint = (or_high + or_low) / 2
+                if close <= midpoint:
+                    logger.debug(f"FADE skip (midpoint): close={close:.2f} <= mid={midpoint:.2f}")
+                    return None
             stop_loss = or_low * 0.995
             risk = abs(close - stop_loss)
             if risk <= 0:

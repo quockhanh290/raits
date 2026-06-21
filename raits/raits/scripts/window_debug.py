@@ -186,11 +186,16 @@ def collect_stats(trades, equity_start, equity_end, max_dd):
         "pnl":     equity_end - equity_start,
         "ret":     (equity_end - equity_start) / equity_start,
         "dd":      max_dd,
-        "orb":     strat_row(by_strat.get("ORB", [])),
+        "orb":      strat_row(by_strat.get("ORB", [])),
         "orb_fade": strat_row(by_strat.get("ORB_FADE", [])),
-        "fade":    strat_row(by_strat.get("FADE", [])),
-        "tf":      strat_row(by_strat.get("TREND_FOLLOW", [])),
-        "vmr":     strat_row(by_strat.get("VWAP_MR", [])),
+        "fade":     strat_row(by_strat.get("FADE", [])),
+        "tf":       strat_row(by_strat.get("TREND_FOLLOW", [])),
+        "vmr":      strat_row(by_strat.get("VWAP_MR", [])),
+        "gap_fill": strat_row(by_strat.get("GAP_FILL", [])),
+        "gf_short":    strat_row(by_strat.get("GF_SHORT", [])),
+        "rs_short":    strat_row(by_strat.get("RS_SHORT", [])),
+        "stress_orb":  strat_row(by_strat.get("STRESS_ORB", [])),
+        "stress_mid":  strat_row(by_strat.get("STRESS_MID", [])),
         "calm":    strat_row(by_regime.get("Calm", [])),
         "normal":  strat_row(by_regime.get("Normal", [])),
         "stress":  strat_row(by_regime.get("Stress", [])),
@@ -228,7 +233,7 @@ def print_summary(results):
     print(f"\n  {'Net P&L (all)':20}" + f"  ${total_pnl:+,.0f}")
 
     # ── By strategy ──────────────────────────────────────────────────────────
-    for strat_key, strat_name in [("orb", "ORB"), ("orb_fade", "ORB_FADE"), ("fade", "FADE"), ("tf", "TREND_FOLLOW"), ("vmr", "VWAP_MR")]:
+    for strat_key, strat_name in [("orb", "ORB"), ("orb_fade", "ORB_FADE"), ("fade", "FADE"), ("tf", "TREND_FOLLOW"), ("vmr", "VWAP_MR"), ("gap_fill", "GAP_FILL"), ("gf_short", "GF_SHORT"), ("rs_short", "RS_SHORT"), ("stress_orb", "STRESS_ORB"), ("stress_mid", "STRESS_MID")]:
         hdr(f"{strat_name}")
         row("Trades",     [s[strat_key][0] for s in stats], "{:d}")
         row("Win %",      [s[strat_key][1] for s in stats], "{:.1f}", "%")
@@ -1273,6 +1278,8 @@ def main():
                         help="Retroactively apply dynamic cooldown: block same direction after STOP_HIT until daily close crosses stop price")
     parser.add_argument("--use-results-cache", action="store_true",
                         help="Skip engine run — load cached results from previous run (fast analysis only)")
+    parser.add_argument("--label", type=str, default=None,
+                        help="Label for auto-snapshot (e.g. --label baseline). Default: timestamp.")
     parser.add_argument("--save-tf-baseline", action="store_true",
                         help="Save current TF results as the locked baseline for regression checks")
     parser.add_argument("--analyze-vmr-rr", action="store_true",
@@ -1293,6 +1300,8 @@ def main():
                         help="VWAP_MR vol gate: allow trades when SPY 5-day realized vol <= threshold (default: 0.12=Calm)")
     parser.add_argument("--max-risk-pct", type=float, default=0.01,
                         help="Max loss per trade as %% of account (default: 0.01=1%%). Raise to increase position sizes.")
+    parser.add_argument("--profile", action="store_true",
+                        help="Run cProfile on the engine and print top-30 slowest functions.")
     args = parser.parse_args()
 
     use_scanner = not args.no_scanner
@@ -1362,7 +1371,18 @@ def main():
         ]
 
         n_workers = len(worker_args)
-        if n_workers == 1:
+        if args.profile:
+            import cProfile, pstats, io
+            pr = cProfile.Profile()
+            pr.enable()
+            results = [_run_window(worker_args[0])]
+            pr.disable()
+            s = io.StringIO()
+            ps = pstats.Stats(pr, stream=s).sort_stats("cumulative")
+            ps.print_stats(30)
+            print("\n── cProfile top-30 (cumulative) ──")
+            print(s.getvalue())
+        elif n_workers == 1:
             results = [_run_window(worker_args[0])]
         else:
             print(f"\nRunning {n_workers} windows in parallel...")
@@ -1374,6 +1394,15 @@ def main():
         with open(PICKLE_RESULTS, "wb") as f:
             pickle.dump(results, f)
         print(f"  [cache saved -> {PICKLE_RESULTS}]")
+
+        # Auto-snapshot: copy to snapshots/ with label arg or timestamp
+        _snap_dir = os.path.join(os.path.dirname(PICKLE_RESULTS), "snapshots")
+        os.makedirs(_snap_dir, exist_ok=True)
+        _snap_label = getattr(args, "label", None) or __import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S")
+        _snap_path = os.path.join(_snap_dir, f"results_{_snap_label}.pkl")
+        import shutil
+        shutil.copy2(PICKLE_RESULTS, _snap_path)
+        print(f"  [snapshot -> snapshots/results_{_snap_label}.pkl]")
 
     # ── TF baseline save / check ──────────────────────────────────────────────
     if args.save_tf_baseline:
