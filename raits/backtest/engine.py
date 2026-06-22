@@ -66,8 +66,9 @@ MAX_GF_SHORT  = 3
 MAX_RS_SHORT  = 2
 STRATEGY_CAPS = {
     "ORB": MAX_ORB, "FADE": MAX_FADE, "VWAP_MR": MAX_VWAP,
-    "TREND_FOLLOW": MAX_TREND, "STRESS_ORB": 3, "STRESS_MID": 2,
+    "TREND_FOLLOW": MAX_TREND, "STRESS_ORB": 2, "STRESS_MID": 2,
     "GAP_FILL": MAX_GAP_FILL, "GF_SHORT": MAX_GF_SHORT, "RS_SHORT": MAX_RS_SHORT,
+
 }
 
 # ── Regime → active strategies (from each strategy's allowed_regimes config) ──
@@ -81,27 +82,19 @@ _REGIME_STRATEGIES: Dict[str, List[str]] = {
 # ETFs used for Stress-regime ORB (broad market proxies, always liquid)
 _ETF_STRESS_UNIVERSE = ["SPY", "QQQ", "IWM"]
 
-# Individual stocks eligible for Stress ORB SHORT (must also gap down ≥1.5%)
-_STRESS_ORB_STOCKS = [
-    "TSLA", "NVDA", "AAPL", "META", "AMZN", "MSFT", "AMD", "GOOGL",
-    "INTU", "COST", "VRTX", "AMAT", "REGN", "AVGO", "ADBE", "MS",
-    "SBUX", "TXN", "XOM", "AMGN", "ORCL", "EBAY", "QCOM", "CVX",
-    "CSCO", "GS", "CRM", "JPM", "MU", "HON", "MA", "NFLX", "INTC",
-    "V", "GILD", "BIIB", "MMM",
-]
-_STRESS_ORB_MIN_GAP = 0.015  # gap down ≥1.5% required for individual stocks
 
 # ── Strategy stats for PositionSizer ─────────────────────────────────────────
 # WFO-observed win rate 52.3%; 2:1 R:R is the target structure (stop × 2 = target).
 STRATEGY_STATS = {
-    "ORB":          {"win_rate": 0.62, "avg_win": 4.50, "avg_loss": 2.00},
-    "FADE":         {"win_rate": 0.45, "avg_win": 3.00, "avg_loss": 2.00},
-    "VWAP_MR":      {"win_rate": 0.42, "avg_win": 2.80, "avg_loss": 1.50},
-    "TREND_FOLLOW": {"win_rate": 0.52, "avg_win": 2.00, "avg_loss": 1.00},
-    "GAP_FILL":     {"win_rate": 0.78, "avg_win": 3.00, "avg_loss": 1.50},
-    "GF_SHORT":     {"win_rate": 0.40, "avg_win": 3.00, "avg_loss": 1.50},
-    "RS_SHORT":     {"win_rate": 0.42, "avg_win": 2.50, "avg_loss": 1.50},
-    "STRESS_MID":   {"win_rate": 0.66, "avg_win": 2.00, "avg_loss": 1.00},
+    "ORB":            {"win_rate": 0.62, "avg_win": 4.50, "avg_loss": 2.00},
+    "FADE":           {"win_rate": 0.45, "avg_win": 3.00, "avg_loss": 2.00},
+    "VWAP_MR":        {"win_rate": 0.42, "avg_win": 2.80, "avg_loss": 1.50},
+    "TREND_FOLLOW":   {"win_rate": 0.52, "avg_win": 2.00, "avg_loss": 1.00},
+    "GAP_FILL":       {"win_rate": 0.78, "avg_win": 3.00, "avg_loss": 1.50},
+    "GF_SHORT":       {"win_rate": 0.40, "avg_win": 3.00, "avg_loss": 1.50},
+    "RS_SHORT":       {"win_rate": 0.42, "avg_win": 2.50, "avg_loss": 1.50},
+    "STRESS_MID":     {"win_rate": 0.66, "avg_win": 2.00, "avg_loss": 1.00},
+
 }
 
 
@@ -276,22 +269,6 @@ class BacktestEngine:
             )
         else:
             _spy_daily_dates = []
-
-        # Precompute daily lookups for Stress ORB individual stocks (done once, not per day)
-        self._stress_orb_prev_close: Dict[tuple, float] = {}  # (stk, date) → prev_close, O(1) lookup
-        self._stress_orb_daily_bars: Dict[str, Dict] = {}     # stk → {date: DataFrame}
-        for _stk in _STRESS_ORB_STOCKS:
-            if _stk not in market_data or market_data[_stk].empty:
-                continue
-            _stk_mkt = market_data[_stk]
-            _daily = _stk_mkt["close"].resample("D").last().dropna()
-            _dates = _daily.index.tolist()
-            for _i in range(1, len(_dates)):
-                self._stress_orb_prev_close[(_stk, _dates[_i])] = float(_daily.iloc[_i - 1])
-            _by_day: Dict = {}
-            for _d, _df in _stk_mkt.groupby(_stk_mkt.index.normalize()):
-                _by_day[_d] = _df
-            self._stress_orb_daily_bars[_stk] = _by_day
 
         for day in all_days:
             # Determine today's universe via scanner (T-1 scan) or static config.
@@ -542,23 +519,6 @@ class BacktestEngine:
         for _etf in ("QQQ", "IWM"):
             if _etf in day_stocks and not day_stocks[_etf].empty:
                 _stress_stocks[_etf] = day_stocks[_etf]
-
-        # Stress ORB individual stocks — separate section with fixed 5-min OR + 10:15 time exit
-        _stress_orb_stk_today: Dict[str, pd.DataFrame] = {}
-        _stress_stk_or5: Dict[str, Tuple[float, float]] = {}
-        _day_date = day.normalize()
-        for _stk in _STRESS_ORB_STOCKS:
-            _stk_today_df = self._stress_orb_daily_bars.get(_stk, {}).get(_day_date)
-            if _stk_today_df is None or _stk_today_df.empty:
-                continue
-            _stk_prev_close = self._stress_orb_prev_close.get((_stk, _day_date))
-            if _stk_prev_close is None or _stk_prev_close <= 0:
-                continue
-            _stk_open = float(_stk_today_df.iloc[0]["open"])
-            if (_stk_open - _stk_prev_close) / _stk_prev_close <= -_STRESS_ORB_MIN_GAP:
-                _stress_orb_stk_today[_stk] = _stk_today_df
-                if _stk not in day_stocks:
-                    day_stocks[_stk] = _stk_today_df
 
         # ── Swing hold: pre-compute T-1 daily closes for SPY macro trend ────────
         try:
@@ -947,55 +907,6 @@ class BacktestEngine:
                             )
                     except Exception as e:
                         logger.debug(f"Stress ORB signal error {ticker}: {e}")
-
-            # 7d-stk. Stress ORB individual stocks — 5-min OR, SHORT only, 9:35–10:10
-            # OR locked at 9:35 from 9:30 bar only. TIME_STOP handled in _check_exits.
-            if bar_t == ORB_SCAN_TIME and "STRESS_ORB" in active and _stress_orb_stk_today:
-                for _stk, _stk_df in _stress_orb_stk_today.items():
-                    _or5_bars = _stk_df[_stk_df.index.time < ORB_SCAN_TIME]
-                    if _or5_bars.empty:
-                        continue
-                    _or5_high = float(_or5_bars["high"].max())
-                    _or5_low  = float(_or5_bars["low"].min())
-                    _or5_range = _or5_high - _or5_low
-                    if _or5_range <= 0:
-                        continue
-                    _or5_atr = self._compute_atr(_or5_bars)
-                    if _or5_atr > 0 and (_or5_range < 0.5 * _or5_atr or _or5_range > 5 * _or5_atr):
-                        continue
-                    _stress_stk_or5[_stk] = (_or5_high, _or5_low)
-                logger.debug(f"{bar_ts} | Stress ORB stocks OR5: {len(_stress_stk_or5)} qualified")
-
-            if ORB_SCAN_TIME <= bar_t < ORB_SIGNAL_END and "STRESS_ORB" in active and _stress_stk_or5:
-                for _stk, (_or5_high, _or5_low) in list(_stress_stk_or5.items()):
-                    if not self._position_ok(_stk, "STRESS_ORB"):
-                        continue
-                    _stk_df = _stress_orb_stk_today.get(_stk)
-                    if _stk_df is None:
-                        continue
-                    try:
-                        _stk_bar = _stk_df.loc[bar_ts]
-                    except KeyError:
-                        continue
-                    _bar_low   = float(_stk_bar["low"])
-                    _bar_close = float(_stk_bar["close"])
-                    if _bar_low < _or5_low and _bar_close < _or5_low:
-                        _stk_hist = _stk_df.loc[:bar_ts]
-                        _atr5 = self._compute_atr(_stk_hist)
-                        _stop_px   = _or5_high + 0.5 * _atr5
-                        _stop_dist = _stop_px - _bar_close
-                        if _stop_dist <= 0:
-                            continue
-                        _target_px = _bar_close - 2.0 * _stop_dist
-                        _sig = self._normalise_signal({
-                            "direction": "SHORT",
-                            "entry_price": _bar_close,
-                            "stop": _stop_px,
-                            "target": _target_px,
-                        })
-                        self._attempt_entry(
-                            _sig, _stk, "STRESS_ORB", bar_ts, position_sizer, pdt_guard
-                        )
 
             # 7e. Stress Mid-Morning Momentum — fires once at 10:15 in Stress regime.
             # Signal: close[10:15] < VWAP(9:30-10:15) AND close[10:15] < open → SHORT.
@@ -2028,11 +1939,6 @@ class BacktestEngine:
             return bar_close, "TIME_STOP"
 
         if trade.strategy == "STRESS_MID" and bar_t >= STRESS_MID_EXIT:
-            return bar_close, "TIME_STOP"
-
-        if (trade.strategy == "STRESS_ORB"
-                and trade.ticker not in _ETF_STRESS_UNIVERSE
-                and bar_t >= ORB_SIGNAL_END):
             return bar_close, "TIME_STOP"
 
         return None

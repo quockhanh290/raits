@@ -4,112 +4,84 @@
 
 - **Calm regime gap fill = negative**: Tested explicitly — 5t, -$193, WR=40% in Calm. Gap Fill edge is Normal-regime specific. Do NOT add Calm regime even if user asks "can we get more signals."
 
+- **gap_fill_stop_dists cleanup**: engine.py tracks _gf_stop_dists dict by id(trade). When trade closes, dict entry is popped in section 10. If circuit breaker fires (_close_all), entries may linger but this is harmless since the dict resets next day (_gf_stop_dists is a local variable per _run_day call).
+
 - **PositionSizer vs sim $500/trade**: Sim used fixed $500 risk. Engine uses max_risk_pct of account equity. Backtest shares/P&L will differ from sim numbers. Don't interpret this as a bug.
 
-- **VWAP_MR TIME_STOP**: was 45 min, extended to 90 min (already in engine before this session).
+- **--use-results-cache invalidated**: engine.py was modified (Gap Fill added, ORB_FADE removed). Must run window_debug.py WITHOUT --use-results-cache until a fresh pkl is generated.
 
-- **TF equity amplification**: Removing losing trades → account equity higher at 14:00 → TF position sizer gives more shares → TF P&L increases. Works in reverse too. Always run full system backtest after any strategy change, not just check the target strategy.
+- **VWAP_MR TIME_STOP**: was 45 min, extended to 90 min (already in engine before this session). Noted here in case someone wonders why it differs from original blueprint.
 
-- **Sim vs engine gap — always check 3 things before reverting:**
-  1. Universe mismatch (sim fixed ~37 tickers vs engine dynamic scanner)
-  2. Cross-strategy blocking (sim doesn't check MAX_TOTAL=8 or other strategies' open positions)
-  3. Trailing stop / exit logic differences
+- **ORB_FADE removal**: ORB_FADE label never appeared in actual trade path — engine was generating "FADE" label. ORB_FADE only existed in STRATEGY_CAPS and STRATEGY_STATS as dead config. Removing it had no behavioral change, just cleaned up -$330 phantom stats.
 
-- **--use-results-cache invalid after engine.py changes**: Must drop flag whenever backtest logic modified. Data PKL (5min) is separate from results PKL.
+- **Calm afternoon: no edge**: 52 Calm days total (14 / 37 / 1 per year), UP rate 56%, stock MR rate 34.5%, early→late corr +0.31, PM→EOD corr +0.32. No strategy fits. Do NOT revisit without more Calm days.
 
-- **Low-beta 5min data fetched**: PG, KO, PEP, WMT, MO, CL, KMB, GIS, MDLZ, NEE, DUK, SO, D, AEP, JNJ, ABT, MRK, PFE, BMY, WFC, USB — saved to `data/cache/data/{ticker}_5min_{year}.parquet`. Used for Calm midday sims only, NOT in engine universe.
+## VWAP_MR Root Cause Analysis (completed, no further action)
 
-- **SMA50/SMA200 vs close/200MA lag**: Engine uses SMA50>SMA200 (death cross, ~6 weeks lag). Close vs 200MA is faster (catches Jan 2022 drop, SMA50/SMA200 doesn't until March 2022). Current engine has SMA50/SMA200 — consistent but misses early bear moves.
+**Finding**: STOP:TARGET = 2:1 (140 stops vs 70 targets). Root cause identified:
 
----
+**H2 (stop too wide): REJECTED**
+- 54% of TARGET_HIT trades have MAE < 0.3×ATR — win cleanly with almost no adverse move
+- 0% of winners had MAE > 1.5×ATR — stop never blocks an eventual winner
+- Tightening to 1.0×ATR would kill 18% of winners. Stop 1.5×ATR is correct.
 
-## Strategy Discovery Map — COMPLETED INVESTIGATIONS
+**H1 (signal quality): NOT ACTIONABLE**
+- Wick ratio: smaller wick = better WR (71% for tiny <0.1×ATR) but only 21 trades
+- Rejection ratio: ~0.05 across all trades — measurement issue, bars don't snap back before entry
+- Volume filters: make things WORSE in combined tests
+- All H1e combined filters: worse than or equal to baseline
 
-### BASELINE HISTORY
-| Date | Baseline | Change |
-|------|----------|--------|
-| Session start | $14,203 | — |
-| ORB bear filter (SHORT added) | **$14,932** | +$729 |
+**H3 (universe): CURVE FITTING**
+- IWM, QQQ, XLV, XLP are systematic losers (-$98 of -$128 total)
+- Removing them based on backtest results = curve fitting. Rejected.
 
----
+**F2+F3 filters: available but not implemented**
+- F2: skip SHORT when SPY > VWAP after 12:30
+- F3: skip LONG 12:00–13:00
+- Sim: 133t, +$54, WR=48%, sys $9,230 (+$182 vs baseline)
+- 2020 still negative (-$29). Not implemented — improvement too small and 2020 unresolved.
+- Can revisit if needed. Code preview in TASK history.
 
-### Calm midday (10:15–14:00) — PERMANENTLY CLOSED
-
-**Tested 4 approaches, all fail with WR~37%:**
-
-| Approach | Trades | P&L | WR | Stop rate |
-|----------|--------|-----|----|-----------|
-| VWAP_MR moving target, high-beta | ~144t | ~$0 | 47% | — |
-| ORB boundary retest, high-beta | 294t | -$6,715 | 41% | 55% |
-| ORB boundary retest, low-beta (PG/KO/NEE/JNJ) | 294t | -$25,146 | 37% | 59% |
-| VWAP_MR snapshot VWAP target, low-beta | 294t | -$31,402 | 37% | 48% |
-
-**Root cause**: OR boundaries are NOT reliable support/resistance in midday for ANY universe (high-beta OR low-beta). Individual stocks trend intraday regardless of SPY regime.
-
-**Conclusion**: Do NOT revisit Calm midday mean-reversion without fundamentally different signal (non-OHLCV, or order flow data).
-
----
-
-### GAP_FILL continuous fire (10:30→11:30) — REVERTED
-
-- Sim: +$3,357, WR=59%, p=0.053 (NOT significant)
-- Engine: -$905 net (TF position compression: more intraday churn → lower equity at 14:00 → smaller TF positions → TF -$880)
-- Root cause was NOT slot competition (TF had same 284 trades). Was equity compression.
-- Scripts: `gap_fill_window_sim.py`
-
----
-
-### GF_SHORT window extension (10:30→11:30) — REJECTED
-
-- Sim: 46t, -$981, WR=37%, p=0.771
-- Script: `gf_short_window_sim.py`
-
----
-
-### ORB 2022 bear filter — IMPLEMENTED ✓
-
-- **Change**: Extended SMA50/SMA200 filter from "block LONG only" → "block ALL directions" in bear trend
-- **Engine lines**: ~736 (confirm section), ~810 (signal section)
-- **Result**: +$729 system (+$229 ORB direct, +$652 TF equity amplification, -$213 FADE/STRESS_MID ripple)
-- **Caveat**: SMA50/SMA200 lags, misses Jan 2022 TSLA/GS losses (-$779) that close/200MA would catch
-- Script: `orb_bear_filter_sim.py`
-
----
-
-### STRESS_ORB QQQ-only filter — REJECTED (curve fitting)
-
-- QQQ: 100t +$1,180 consistent all 3 years | SPY: 131t -$269 | IWM: 64t -$404
-- Rejected: post-hoc selection. We saw QQQ win → wanted to keep. That's data snooping.
-- If testing again: need out-of-sample data (2023+) or a priori hypothesis before seeing data.
-
----
-
-### STRESS_ORB individual stocks — IN PROGRESS
-
-- Hypothesis: high-beta stocks gap down harder than ETFs in Stress → better SHORT ORB follow-through
-- Script: `stress_orb_stocks_sim.py`
-- Setup: Stress days, gap↓≥1.5%, OR=9:30-9:35, SHORT breakout 9:35-10:15, stop=OR_high+0.5×ATR, target=2R
-
----
+**Conclusion**: VWAP_MR has thin edge in 2020-2022 with current design. No clean fix found. Left at -$128 / 267t / WR=40%.
 
 ## Rejected approaches
 
-- **RS LONG**: ALL configs negative.
-- **RS SHORT**: tested 10 rounds, best=26t +$2,932 (Round 8). DEFERRED: 2021-driven (130% P&L), 2020=-$1,002, universe too small. Do NOT implement until re-evaluated with broader universe.
-- **Gap Fill SHORT**: WR=40%, 2022 always negative.
-- **Calm afternoon strategy**: No edge. 52 days.
-- **VWAP_MR universe removal (IWM, QQQ, XLV, XLP)**: Curve fitting.
-- **VWAP_MR signal filters (wick/rejection/volume)**: All worse in combined tests.
-- **VWAP_MR F2+F3 filters**: +$182 system improvement — too small, 2020 unresolved.
-- **ORB boundary retest (Calm midday)**: Concept wrong. Tested high-beta AND low-beta. Both fail.
-- **VWAP_MR fixed target, low-beta**: -$31,402, WR=37%. Worse than everything. Universe not the issue.
+- **RS LONG**: ALL configs negative. Buying after strength = entering overextended moves.
+- **RS breakeven stop**: WR drops from 47% → 13%. Wrong for this setup.
+- **Gap Fill retrace ≥40% or ≥30%**: Marginal trades only $17-35/trade vs $123/trade baseline.
+- **Gap Fill SHORT**: WR=40%, 2022 always negative, no regime combination helped.
+- **RVOL filter for RS**: >1.2x collapses to 5 trades. Universe too small.
+- **Calm afternoon strategy**: No edge. 52 days, 71% in 2021, all signal types noisy.
+- **VWAP_MR universe removal (IWM, QQQ, XLV, XLP)**: Curve fitting. Rejected.
+- **VWAP_MR signal filters (wick/rejection/volume)**: All make things worse in combined tests.
 
----
+## STRESS_MID (Stress 10:15–14:00 ETF momentum)
 
-## Open questions / Future work
+**Signal**: close[10:15] < VWAP(9:30-10:15) AND close[10:15] < open → SHORT
+**Stop**: swing high (9:45-10:15) + 0.1% — VWAP stop too tight (47% stop-hit rate)
+**Results** (sim, 97 Stress days): 86t, +$21,918, WR=66%, avg=$254.9/trade
+- 2020: 20t +$4,693 WR=60% | 2021: 20t +$7,390 WR=80% | 2022: 46t +$9,835 WR=63%
+- Raw directional edge: 73% WR without stops
+- **Position sizing caveat**: stop=$2.165 avg → 231 shares × $315 = $72k notional on $25k account
+  Engine PositionSizer sẽ cap position → real P&L estimate ~$2,800–4,000
+- **Status**: NOT yet in engine. Edge confirmed, worth implementing.
+- Script: `raits/raits/scripts/stress_mid_sim.py`
 
-- **Calm midday**: Accept no edge. Move on.
-- **Normal 13:30–14:00 gap**: 30-min window with no strategy. Untested.
-- **FADE consistency**: 2020: -$334, 2021: +$1,591, 2022: -$208. High variance, unclear root cause.
-- **STRESS_ORB individual stocks**: sim in progress.
-- **STRESS_ORB**: accept +$507 flat if individual stocks sim also fails.
+## STRESS_ORB_STK (DEFERRED — reverted from engine)
+
+**Status**: Reverted. Engine produced -$2,528 / 224 trades across 3 windows (2020-2022). Sim showed +$5,581. Discrepancy unresolved.
+
+**Root causes to investigate before re-enabling**:
+1. **Universe expansion**: Adding `_STOCK_STRESS_UNIVERSE` to `_all_tickers` caused FADE/GAP_FILL to also trade these stocks → -$380 + -$264 collateral P&L. Fix: fetch STK stock bars separately, don't inject into global `day_stocks`.
+2. **9:35 co-confirm timing works** (confirmed via debug log — TRADE_OPENED events fired correctly). Timing is NOT the problem.
+3. **Engine P&L -$2,528**: possible causes: (a) HMM Normal in H1 2022 → too few Stress days in 2020/2021 to show edge; (b) stop too wide (1.0×ATR vs sim's 0.5×ATR); (c) SHORT bias wrong during 2020 COVID recovery; (d) position sizing reduces trade size vs sim's fixed $500 risk.
+4. **Sim vs engine discrepancy**: sim used fixed per-trade risk, engine uses Kelly × account equity. On a 37-stock universe the trades are infrequent enough that sim/engine diverge materially.
+
+**When to re-investigate**: after STRESS_MID is live and baseline is stable. Baseline after revert: **$14,932**.
+
+## Open questions
+
+- **GAP_FILL discrepancy**: sim +$2,838 vs engine actual -$61 — needs debug
+- **ORB 2022 crash**: WR=26%, -$1,574 — direction filter (SPY alignment) could fix
+- RS SHORT: already running in engine (136t, -$81 total) despite "deferred" status
+- STRESS_ORB: enabled in engine but results not shown in last window_debug output
