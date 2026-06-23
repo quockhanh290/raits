@@ -40,9 +40,19 @@ PHASE1        = [
 # Phase 2 new stocks (downloaded after Phase 1 results confirmed)
 PHASE2        = ["MU", "HON", "MA", "NFLX", "INTC", "V", "GILD", "BIIB", "MMM"]
 
+# PE_SHORT expansion universe — fetch 5-min data to unlock these
+PE_EXPANSION  = [
+    "PFE", "MRK", "LLY", "ABBV", "JNJ", "BMY",
+    "BAC", "WFC", "C",
+    "WMT", "TGT", "HD", "LOW", "MCD", "NKE",
+    "PG", "KO", "PEP",
+    "CAT", "DE", "BA", "GE",
+    "PYPL", "PANW", "NOW",
+]
+
 # All tickers that need 5-min data loaded
 SECTOR_ETFS   = ["XLF", "XLE", "XLV", "XLU", "XLI", "XLK", "XLP", "XLB", "XLY", "GLD"]
-TICKERS       = ["SPY", "QQQ", "IWM"] + SECTOR_ETFS + UNIVERSE + PHASE1 + PHASE2
+TICKERS       = ["SPY", "QQQ", "IWM"] + SECTOR_ETFS + UNIVERSE + PHASE1 + PHASE2 + PE_EXPANSION
 INTERVAL_MINS = 5
 DATASET_START = "2017-01-03"
 DATASET_END   = "2024-12-31"
@@ -196,6 +206,7 @@ def collect_stats(trades, equity_start, equity_end, max_dd):
         "rs_short":    strat_row(by_strat.get("RS_SHORT", [])),
         "stress_orb":  strat_row(by_strat.get("STRESS_ORB", [])),
         "stress_mid":  strat_row(by_strat.get("STRESS_MID", [])),
+        "pe_short":    strat_row(by_strat.get("PE_SHORT", [])),
         "calm":    strat_row(by_regime.get("Calm", [])),
         "normal":  strat_row(by_regime.get("Normal", [])),
         "stress":  strat_row(by_regime.get("Stress", [])),
@@ -233,7 +244,7 @@ def print_summary(results):
     print(f"\n  {'Net P&L (all)':20}" + f"  ${total_pnl:+,.0f}")
 
     # ── By strategy ──────────────────────────────────────────────────────────
-    for strat_key, strat_name in [("orb", "ORB"), ("orb_fade", "ORB_FADE"), ("fade", "FADE"), ("tf", "TREND_FOLLOW"), ("vmr", "VWAP_MR"), ("gap_fill", "GAP_FILL"), ("gf_short", "GF_SHORT"), ("rs_short", "RS_SHORT"), ("stress_orb", "STRESS_ORB"), ("stress_mid", "STRESS_MID")]:
+    for strat_key, strat_name in [("orb", "ORB"), ("orb_fade", "ORB_FADE"), ("fade", "FADE"), ("tf", "TREND_FOLLOW"), ("vmr", "VWAP_MR"), ("gap_fill", "GAP_FILL"), ("gf_short", "GF_SHORT"), ("rs_short", "RS_SHORT"), ("stress_orb", "STRESS_ORB"), ("stress_mid", "STRESS_MID"), ("pe_short", "PE_SHORT")]:
         hdr(f"{strat_name}")
         row("Trades",     [s[strat_key][0] for s in stats], "{:d}")
         row("Win %",      [s[strat_key][1] for s in stats], "{:.1f}", "%")
@@ -1358,6 +1369,7 @@ def main():
             fade_scanner_top_n=10,
             vwap_mr_vol_threshold=args.vmr_vol_threshold,
             max_risk_pct=args.max_risk_pct,
+            max_position_pct=0.30,
         )
 
         windows = [(s, e, l) for s, e, l in WINDOWS if args.year is None or l == str(args.year)]

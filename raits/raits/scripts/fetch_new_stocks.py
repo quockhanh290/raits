@@ -133,6 +133,22 @@ ETF_PHASE2 = [
     "GLD",   # SPDR Gold Shares
 ]
 
+# PE_SHORT expansion universe — 25 stocks not yet in 5-min cache
+PE_EXPANSION = [
+    # Pharma (frequent >5% earnings reactions)
+    "PFE", "MRK", "LLY", "ABBV", "JNJ", "BMY",
+    # Financials
+    "BAC", "WFC", "C",
+    # Consumer / Retail
+    "WMT", "TGT", "HD", "LOW", "MCD", "NKE",
+    # Consumer Staples
+    "PG", "KO", "PEP",
+    # Industrials
+    "CAT", "DE", "BA", "GE",
+    # Tech / Fintech
+    "PYPL", "PANW", "NOW",
+]
+
 
 def get_cached_dates(ticker: str) -> set:
     """
@@ -275,7 +291,18 @@ def main() -> None:
     grp.add_argument("--all",      action="store_true", help="Download all 29 stocks (Phase 1 + Phase 2)")
     grp.add_argument("--etf",      action="store_true", help="Download sector ETFs for VWAP_MR (XLF, XLE, XLV, XLU, XLI)")
     grp.add_argument("--etf2",     action="store_true", help="Download expanded ETFs (XLK, XLP, XLB, XLY, GLD)")
+    grp.add_argument("--pe",       action="store_true", help="Download PE_SHORT expansion (25 stocks, 2019-2022)")
     args = parser.parse_args()
+
+    if args.pe:
+        # Narrow date range — only need 2019+ for ATR warmup + 2020-2022 backtest
+        global DATE_START, DATE_END
+        DATE_START = "2019-01-02"
+        DATE_END   = "2022-12-30"
+        tickers = PE_EXPANSION
+        print(f"Mode: PE_SHORT expansion (25 stocks, {DATE_START} → {DATE_END})")
+        run_fetch(tickers)
+        return
 
     if args.all:
         tickers = PHASE1 + PHASE2

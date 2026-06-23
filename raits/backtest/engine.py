@@ -55,6 +55,31 @@ STRESS_MID_STOP_PAD  = 0.001           # 0.1% above swing high
 STRESS_MID_MAX_STOP  = 0.015           # reject if stop > 1.5% of entry
 RS_SHORT_ATR_MULT = 1.5    # stop = entry + 1.5×ATR
 
+# ── POST_EARNINGS_SHORT ───────────────────────────────────────────────────────
+PE_SHORT_GAP_MIN   = 0.05   # ≥5% gap-down required
+PE_SHORT_STOP_MULT = 1.5    # stop = 1.5×ATR14 above entry
+PE_SHORT_TARGET_RR = 2.0    # target = 2×stop_dist below entry (2:1 RR)
+MAX_PE_SHORT       = 2
+
+PE_SHORT_UNIVERSE = [
+    # Existing 37-stock pool (5-min data already in pkl)
+    "AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA", "TSLA", "AMD",
+    "QCOM", "INTC", "MU", "AVGO", "TXN", "AMAT",
+    "ADBE", "CRM", "ORCL", "INTU", "CSCO",
+    "AMGN", "GILD", "BIIB", "REGN", "VRTX",
+    "COST", "SBUX", "NFLX", "EBAY",
+    "JPM", "GS", "MS", "V", "MA",
+    "HON", "MMM",
+    "XOM", "CVX",
+    # Expansion (Phase 2 — skipped until 5-min data is fetched)
+    "PFE", "MRK", "LLY", "ABBV", "JNJ", "BMY",
+    "BAC", "WFC", "C",
+    "WMT", "TGT", "HD", "LOW", "MCD", "NKE",
+    "PG", "KO", "PEP",
+    "CAT", "DE", "BA", "GE",
+    "PYPL", "PANW", "NOW",
+]
+
 # ── Position limits ───────────────────────────────────────────────────────────
 MAX_TOTAL     = 8
 MAX_ORB       = 2
@@ -68,15 +93,15 @@ STRATEGY_CAPS = {
     "ORB": MAX_ORB, "FADE": MAX_FADE, "VWAP_MR": MAX_VWAP,
     "TREND_FOLLOW": MAX_TREND, "STRESS_ORB": 2, "STRESS_MID": 2,
     "GAP_FILL": MAX_GAP_FILL, "GF_SHORT": MAX_GF_SHORT, "RS_SHORT": MAX_RS_SHORT,
-
+    "PE_SHORT": MAX_PE_SHORT,
 }
 
 # ── Regime → active strategies (from each strategy's allowed_regimes config) ──
 _REGIME_STRATEGIES: Dict[str, List[str]] = {
-    "Calm":   ["VWAP_MR", "FADE"],
-    "Normal": ["ORB", "TREND_FOLLOW", "FADE", "GAP_FILL", "GF_SHORT"],
-    "Stress": ["TREND_FOLLOW", "STRESS_ORB", "STRESS_MID"],
-    "Crisis": [],
+    "Calm":   ["VWAP_MR", "FADE", "PE_SHORT"],
+    "Normal": ["ORB", "TREND_FOLLOW", "FADE", "GAP_FILL", "GF_SHORT", "PE_SHORT"],
+    "Stress": ["TREND_FOLLOW", "STRESS_ORB", "STRESS_MID", "PE_SHORT"],
+    "Crisis": ["PE_SHORT"],
 }
 
 # ETFs used for Stress-regime ORB (broad market proxies, always liquid)
@@ -94,7 +119,7 @@ STRATEGY_STATS = {
     "GF_SHORT":       {"win_rate": 0.40, "avg_win": 3.00, "avg_loss": 1.50},
     "RS_SHORT":       {"win_rate": 0.42, "avg_win": 2.50, "avg_loss": 1.50},
     "STRESS_MID":     {"win_rate": 0.66, "avg_win": 2.00, "avg_loss": 1.00},
-
+    "PE_SHORT":       {"win_rate": 0.72, "avg_win": 2.00, "avg_loss": 1.00},
 }
 
 
@@ -113,6 +138,7 @@ class BacktestEngine:
         self._regime_bar_counts: Dict[str, int] = {"Calm": 0, "Normal": 0, "Stress": 0, "Crisis": 0}
         self._swing_state: Dict[int, dict] = {}  # id(trade) → {extreme, hold_days}
         self._tf_cooldown: Dict[str, Dict[str, float]] = {}  # {ticker: {direction: block_stop}}
+        self._pe_short_calendar: Dict[pd.Timestamp, List[str]] = {}  # date → [tickers with earnings]
         self._mods = self._load_modules()
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -226,6 +252,30 @@ class BacktestEngine:
         except Exception as e:
             logger.warning(f"HMM fit failed ({e}) — using default regime Normal")
             hmm = None
+
+        # Load PE_SHORT earnings calendar (8-K filing dates from Polygon).
+        # filing_date == reaction day open (BMO same day; AMC next morning).
+        # Tickers missing 5-min data are skipped silently at entry time.
+        import json as _json
+        _earnings_path = os.path.normpath(os.path.join(
+            os.path.dirname(__file__), "..", "data", "cache",
+            "earnings_dates_expanded.json",
+        ))
+        self._pe_short_calendar = {}
+        if os.path.exists(_earnings_path):
+            with open(_earnings_path) as _ef:
+                _raw_earnings = _json.load(_ef)
+            for _tk, _dates in _raw_earnings.items():
+                for _d in _dates:
+                    _ts = pd.Timestamp(_d)
+                    self._pe_short_calendar.setdefault(_ts, []).append(_tk)
+            logger.info(
+                "PE_SHORT calendar loaded: %d ticker-dates from %s",
+                sum(len(v) for v in self._pe_short_calendar.values()),
+                os.path.basename(_earnings_path),
+            )
+        else:
+            logger.info("PE_SHORT calendar not found at %s — PE_SHORT disabled", _earnings_path)
 
         # Scanner: select dynamic universe from T-1 daily bars each day.
         # Only active when use_scanner=True AND daily_data is provided.
@@ -510,6 +560,7 @@ class BacktestEngine:
         _gfs_stop_dists: Dict[int, float] = {}  # id(trade) → initial stop_dist for GF SHORT trailing
         _rs_triggered = False              # RS SHORT fires once at 10:30
         _stress_mid_triggered = False      # STRESS_MID fires once at 10:15
+        _pe_triggered = False              # PE_SHORT fires once at 9:30 open
 
         # Stress ETF ORB state (reset each day alongside regular ORB)
         stress_orb_scanned = False
@@ -604,12 +655,12 @@ class BacktestEngine:
                 self._regime_bar_counts.get(self._hmm_state, 0) + 1
             )
 
-            # 2. TF exit checks run unconditionally — stops/targets are always active.
-            # TF is a swing strategy; it holds through intraday volatility events.
-            # We check exits here (before the trading_ok gate) so TF positions are
+            # 2. Swing exit checks run unconditionally — stops/targets are always active.
+            # TF and PE_SHORT are swing strategies; they hold through intraday volatility events.
+            # We check exits here (before the trading_ok gate) so positions are
             # still managed by their stops even when SAFETY_MODE is active.
             for _tf_trade in list(self.trade_log.open_trades):
-                if _tf_trade.strategy != "TREND_FOLLOW":
+                if _tf_trade.strategy not in ("TREND_FOLLOW", "PE_SHORT"):
                     continue
                 _tf_exit = self._check_exits(_tf_trade, bar_ts, bar_t, day_stocks)
                 if _tf_exit:
@@ -962,6 +1013,64 @@ class BacktestEngine:
                         f"{bar_ts} | STRESS_MID {_sm['ticker']} SHORT "
                         f"entry={_sm['entry_px']:.2f} stop={_sm['stop']:.2f}"
                     )
+
+            # 7f. POST_EARNINGS_SHORT — fires once at 9:30 open.
+            # Setup: stock gaps down ≥5% vs prior close on earnings reaction day (8-K filing_date).
+            # Entry: SHORT at 9:30 open. Stop: 1.5×ATR14 above entry. Target: 2×stop_dist below.
+            # Hold: overnight swing — exits at EOD of T+1 (or stop/target intraday).
+            # Active in ALL regimes. Tickers missing 5-min data are skipped silently.
+            if bar_t == dtime(9, 30) and not _pe_triggered:
+                _pe_triggered = True
+                _pe_today = self._pe_short_calendar.get(day.normalize(), [])
+                for _pe_ticker in _pe_today:
+                    if _pe_ticker not in market_data:
+                        continue  # no 5-min data yet — skip
+                    if not self._position_ok(_pe_ticker, "PE_SHORT"):
+                        continue
+                    # Inject into day_stocks so exit checks work for rest of today
+                    if _pe_ticker not in day_stocks:
+                        _pe_bars_today = market_data[_pe_ticker][
+                            market_data[_pe_ticker].index.normalize() == day
+                        ]
+                        if not _pe_bars_today.empty:
+                            day_stocks[_pe_ticker] = _pe_bars_today
+                    if _pe_ticker not in day_stocks:
+                        continue
+                    try:
+                        _pe_today_bars = day_stocks[_pe_ticker]
+                        _pe_first = _pe_today_bars[_pe_today_bars.index.time >= dtime(9, 30)]
+                        if _pe_first.empty:
+                            continue
+                        _pe_open = float(_pe_first.iloc[0]["open"])
+                        _pe_prev = market_data[_pe_ticker][
+                            market_data[_pe_ticker].index.normalize() < day
+                        ]
+                        if _pe_prev.empty:
+                            continue
+                        _pe_prev_close = float(_pe_prev["close"].iloc[-1])
+                        if _pe_prev_close <= 0:
+                            continue
+                        _pe_gap = (_pe_open - _pe_prev_close) / _pe_prev_close
+                        if _pe_gap >= -PE_SHORT_GAP_MIN:
+                            continue  # not a big enough gap-down
+                        _pe_atr = self._compute_daily_atr(market_data, _pe_ticker, day)
+                        if _pe_atr <= 0:
+                            continue
+                        _pe_stop_dist = PE_SHORT_STOP_MULT * _pe_atr
+                        _pe_sig = {
+                            "direction":    "SHORT",
+                            "entry_price":  _pe_open,
+                            "stop":         round(_pe_open + _pe_stop_dist, 2),
+                            "target":       round(_pe_open - PE_SHORT_TARGET_RR * _pe_stop_dist, 2),
+                            "is_day_trade": False,
+                        }
+                        self._attempt_entry(_pe_sig, _pe_ticker, "PE_SHORT", bar_ts, position_sizer, pdt_guard)
+                        logger.info(
+                            f"{bar_ts} | PE_SHORT {_pe_ticker} SHORT entry={_pe_open:.2f} "
+                            f"gap={_pe_gap:.1%} stop={_pe_sig['stop']:.2f} target={_pe_sig['target']:.2f}"
+                        )
+                    except Exception as _pe_err:
+                        logger.debug(f"PE_SHORT entry error {_pe_ticker}: {_pe_err}")
 
             # 8. VWAP MR 10:15–14:00
             # Vol-based gate independent of main regime: VWAP_MR runs whenever
@@ -1371,8 +1480,8 @@ class BacktestEngine:
                         pass
 
             for trade in list(self.trade_log.open_trades):
-                if trade.strategy == "TREND_FOLLOW":
-                    continue  # already checked in step 2
+                if trade.strategy in ("TREND_FOLLOW", "PE_SHORT"):
+                    continue  # swing strategies — already checked in step 2
                 exit_result = self._check_exits(trade, bar_ts, bar_t, day_stocks, spy_bar=spy_bar)
                 if exit_result:
                     exit_price, reason = exit_result
@@ -1455,7 +1564,7 @@ class BacktestEngine:
 
     @staticmethod
     def _compute_atr(bars: pd.DataFrame, period: int = 14) -> float:
-        """14-period ATR. Falls back to 1.5% of close on insufficient data."""
+        """14-period ATR from intraday bars. Falls back to 1.5% of close on insufficient data."""
         if len(bars) < 2:
             return float(bars["close"].iloc[-1]) * 0.015
         hl  = bars["high"] - bars["low"]
@@ -1914,7 +2023,11 @@ class BacktestEngine:
 
         if bar_t >= EOD_HARD_EXIT:
             if self.config.allow_swing_hold and trade.strategy == "TREND_FOLLOW":
-                return None  # swing trades do not EOD-close
+                return None  # TF swing — hold overnight
+            if trade.strategy == "PE_SHORT":
+                _pe_entry_day = pd.Timestamp(trade.entry_time).normalize()
+                if _pe_entry_day == bar_ts.normalize():
+                    return None  # entry day — hold overnight, exit at T+1 EOD
             return bar_close, "EOD"
 
         if trade.direction == "LONG":
@@ -1996,11 +2109,16 @@ class BacktestEngine:
         open_trades = list(self.trade_log.open_trades)
         if not open_trades:
             return
+        _ts_day = timestamp.normalize()
         trades_to_close = [
             t for t in open_trades
             if not (
                 (skip_swing and t.strategy == "TREND_FOLLOW") or
-                (skip_tf   and t.strategy == "TREND_FOLLOW")
+                (skip_tf   and t.strategy == "TREND_FOLLOW") or
+                # PE_SHORT is always a swing — keep alive in SAFETY_MODE and on entry day EOD
+                (skip_tf   and t.strategy == "PE_SHORT") or
+                (t.strategy == "PE_SHORT"
+                 and pd.Timestamp(t.entry_time).normalize() == _ts_day)
             )
         ]
         if not trades_to_close:

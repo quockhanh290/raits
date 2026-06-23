@@ -50,10 +50,14 @@
 - **RS breakeven stop**: WR drops from 47% → 13%. Wrong for this setup.
 - **Gap Fill retrace ≥40% or ≥30%**: Marginal trades only $17-35/trade vs $123/trade baseline.
 - **Gap Fill SHORT**: WR=40%, 2022 always negative, no regime combination helped.
+- **Gap Fill 3-5%**: Only 1 trade in 3 years — gaps this large almost never qualify on Normal days.
+- **Gap Fill window extension 10:30→11:30**: p=0.053, ticker concentrated (61% top 3), scan times noisy. Old PKL.
 - **RVOL filter for RS**: >1.2x collapses to 5 trades. Universe too small.
 - **Calm afternoon strategy**: No edge. 52 days, 71% in 2021, all signal types noisy.
 - **VWAP_MR universe removal (IWM, QQQ, XLV, XLP)**: Curve fitting. Rejected.
 - **VWAP_MR signal filters (wick/rejection/volume)**: All make things worse in combined tests.
+- **Yesterday's large mover momentum/reversal** (threshold 2.5%): Total 2771t -$82,636. STOP_HIT rate 29-33% kills 2R setup. TIME_STOP positive drift (+$76-86/trade) but 2R target unreachable. 2021 vs 2022 inconsistent.
+- **Failed Gap Short** (gap UP 1.5-3%, fail at 10:30): 106t +$10,156 overall BUT 2022-only edge. 2020 p=0.434, 2021 p=0.165, 2020+2021 combined p=0.282. SPY filter does all the work — removes 106 trades worth -$9,228. In 2022 SPY was below VWAP 100% of signal days (bear market), TARGET_HIT 75% vs 28% in 2020. Structurally a macro bear-market bet, not a replicable Normal-regime edge. DEFERRED.
 
 ## STRESS_MID (Stress 10:15–14:00 ETF momentum)
 
@@ -64,7 +68,7 @@
 - Raw directional edge: 73% WR without stops
 - **Position sizing caveat**: stop=$2.165 avg → 231 shares × $315 = $72k notional on $25k account
   Engine PositionSizer sẽ cap position → real P&L estimate ~$2,800–4,000
-- **Status**: NOT yet in engine. Edge confirmed, worth implementing.
+- **Status**: IMPLEMENTED in engine.py section 7e. Verify trades appear via window_debug --year 2022.
 - Script: `raits/raits/scripts/stress_mid_sim.py`
 
 ## STRESS_ORB_STK (DEFERRED — reverted from engine)
@@ -79,9 +83,37 @@
 
 **When to re-investigate**: after STRESS_MID is live and baseline is stable. Baseline after revert: **$14,932**.
 
+## Post-earnings gap-down SHORT (DEFERRED)
+
+**Finding**: SHORT after earnings gap-down ≥1% on Normal regime days.
+- Polygon data (8-K dates): 27t +$2,689 WR=70%, all 3 years positive
+- Best config: Normal ≥1%, Hold 1 day, Stop 1.5×ATR, Target 3×ATR
+- Engine estimate: ~$900–1,100
+
+**Why deferred**:
+- 2022 = +$228 only (bear market → mostly Stress regime → no Normal days → no signal)
+- 9 trades/year too thin for implementation overhead
+- SHORT execution complex (margin, borrow)
+- Needs earnings calendar maintenance (Polygon API weekly)
+
+**Revisit when**: universe expanded to 60+ stocks → expect 15+/year → worth implementing.
+- Data source confirmed: Polygon `/vX/reference/financials` `filing_date` = 8-K date = reaction day
+- yfinance was noisier (more "trades" but lower quality, non-earnings gaps included)
+
+## Pre-market bar exploration (all dead)
+
+Pre-market bars ARE in raw parquet cache (04:00 ET start, all 50 tickers). PKL strips them at line 94.
+Built `raits/data/raits_premarket.py` + `premarket_strategy_sim.py`. Results:
+
+- **H1 PM direction filter**: removes good trades (WR filtered=50% vs removed=63%). Dead.
+- **H2 Gap-and-Go LONG** (pm_return>1.5%, not fading → LONG 9:35): 91t +$1,788 p=0.234, 2022=-$462. Dead.
+- **H3 PM Fade SHORT** (pm_return>1.5%, fading → SHORT 9:35): 2 trades in 3yr. Dead.
+
+Pre-market data adds no edge over existing signals on current universe.
+
 ## Open questions
 
-- **GAP_FILL discrepancy**: sim +$2,838 vs engine actual -$61 — needs debug
+- **GAP_FILL discrepancy**: CLOSED. Engine 21t +$1,163 WR=81% (GF_SHORT 25t +$140). Shortfall vs sim ($2,838) explained by position limit being binding: max_position_pct=20%×$50k=$10k/trade cap → actual risk ~$100-200/trade vs sim's fixed $500. Vol target ($500) never binding because most stocks need 500 shares = $50k notional. Not a bug — deliberate 20% concentration limit. To match sim, raise max_position_pct (but affects ALL strategies).
 - **ORB 2022 crash**: WR=26%, -$1,574 — direction filter (SPY alignment) could fix
 - RS SHORT: already running in engine (136t, -$81 total) despite "deferred" status
 - STRESS_ORB: enabled in engine but results not shown in last window_debug output
