@@ -111,9 +111,35 @@ Built `raits/data/raits_premarket.py` + `premarket_strategy_sim.py`. Results:
 
 Pre-market data adds no edge over existing signals on current universe.
 
+## VIX gate — T-1 vs same-day
+
+**Bug**: initial implementation used prior-day VIX close (T-1). STRESS_ORB went -$510 because:
+- Spike day (most profitable SHORT): T-1 VIX = 25-28 → gate BLOCKS it
+- Recovery day (bad SHORT): T-1 VIX = 35+ → gate ALLOWS it
+**Fix**: same-day VIX close. Works for STRESS_ORB (brief spikes). T-1 works for ORB (sustained VIX≥25 periods).
+
+## VWAP Reclaim LONG — DEAD
+
+**Signal**: dip below VWAP before 10:30, reclaim at 11:00, SPY above VWAP → LONG to 14:00
+**Results**: 4,584t -$109,143 WR=45% | 2020=+$18,540 | 2021=-$31,380 | 2022=-$96,304
+**Bootstrap**: p=1.000, CI=[$-150k, -$69k]
+**Root cause**: Stop:Target = 578:59 (10:1), 23 trades/day = too noisy, 2022 bear kills edge.
+**Do not revisit.**
+
+## VIX cascade effects (accepted, no fix)
+
+VIX gate unblocks circuit breaker → STRESS_MID fires 2× more days (106→208t), GAP_FILL fires on 6 extra bad days. Attempts to fix with VIX gate on STRESS_MID would block $+982 of profitable trades. GAP_FILL fix requires N=6 threshold = curve fitting. Accepted as cost of VIX gates; net system is still +$1,015.
+
+## New strategy exploration results (all dead/deferred)
+
+- **D Sector ETF divergence**: 9 ETFs vs SPY 9:35 divergence, WR=32-35% all configs, all negative. DEAD.
+- **B ORB direction/DOW**: both LONG and SHORT profitable (WR=57% each). No filter justified.
+- **E ORB SPY bar filter**: SPY 9:30 bar >2× mean → N=5 blocked, N=3 incremental after VIX gate. Curve fitting. DEAD.
+- **C Earnings Gap UP + Fail SHORT**: best gap≥3% fail@10:15, 21t +$4,500 WR=57% p=0.040 — CI touches zero, 2022-concentrated, N too small. DEFERRED.
+- **A Power Hour**: overlaps TF window (14:00-15:55). Not tested — structural conflict.
+- Strategy space exhausted with current data. New sources needed for new edges (options IV, etc.).
+
 ## Open questions
 
 - **GAP_FILL discrepancy**: CLOSED. Engine 21t +$1,163 WR=81% (GF_SHORT 25t +$140). Shortfall vs sim ($2,838) explained by position limit being binding: max_position_pct=20%×$50k=$10k/trade cap → actual risk ~$100-200/trade vs sim's fixed $500. Vol target ($500) never binding because most stocks need 500 shares = $50k notional. Not a bug — deliberate 20% concentration limit. To match sim, raise max_position_pct (but affects ALL strategies).
-- **ORB 2022 crash**: WR=26%, -$1,574 — direction filter (SPY alignment) could fix
-- RS SHORT: already running in engine (136t, -$81 total) despite "deferred" status
-- STRESS_ORB: enabled in engine but results not shown in last window_debug output
+- **ORB 2022 crash**: WR=26%, fixed by VIX≥25 gate (-437 in 2022 = only 4 remaining bad trades, no more easy fix)

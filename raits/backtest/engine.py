@@ -2083,6 +2083,7 @@ class BacktestEngine:
         if trade.strategy == "STRESS_MID" and bar_t >= STRESS_MID_EXIT:
             return bar_close, "TIME_STOP"
 
+
         return None
 
     def _close_trade(
