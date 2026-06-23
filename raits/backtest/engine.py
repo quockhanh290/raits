@@ -277,6 +277,24 @@ class BacktestEngine:
         else:
             logger.info("PE_SHORT calendar not found at %s — PE_SHORT disabled", _earnings_path)
 
+        # Load VIX daily closes for ORB/STRESS_ORB regime gates.
+        # Run raits/scripts/fetch_vix_daily.py to populate this file.
+        _vix_daily: dict = {}
+        _vix_path = os.path.normpath(os.path.join(
+            os.path.dirname(__file__), "..", "data", "cache", "daily", "vix_daily.parquet"
+        ))
+        if os.path.exists(_vix_path):
+            _vix_df = pd.read_parquet(_vix_path)
+            _vix_df.index = pd.DatetimeIndex(_vix_df.index).normalize()
+            _vix_daily = _vix_df["vix"].to_dict()
+            logger.info("VIX daily loaded: %d days", len(_vix_daily))
+        else:
+            logger.info(
+                "VIX daily not found at %s — VIX gates disabled (run fetch_vix_daily.py)",
+                _vix_path,
+            )
+        _sorted_vix_dates = sorted(_vix_daily.keys())
+
         # Scanner: select dynamic universe from T-1 daily bars each day.
         # Only active when use_scanner=True AND daily_data is provided.
         scanner: Optional[DailyUniverseScanner] = None
@@ -366,6 +384,11 @@ class BacktestEngine:
                 if _prev_d:
                     _fade_atr_top2 = self._compute_fade_atr_top2(daily_data, _prev_d[-1])
 
+            # VIX gate: use same-day close as proxy for intraday VIX at trade time.
+            # (In production: use real-time intraday VIX at 9:30 ET instead.)
+            _day_key = day.normalize()
+            _day_vix: Optional[float] = float(_vix_daily[_day_key]) if _day_key in _vix_daily else None
+
             self._run_day(
                 day=day,
                 market_data=market_data,
@@ -388,6 +411,7 @@ class BacktestEngine:
                 orb_scanned_universe=orb_scanned_universe,
                 fade_scanned_universe=fade_scanned_universe,
                 fade_atr_top2=_fade_atr_top2,
+                day_vix=_day_vix,
             )
 
             if self.config.hmm_retrain_weekly and day.weekday() == 0:
@@ -459,6 +483,7 @@ class BacktestEngine:
         orb_scanned_universe: Optional[List[str]] = None,
         fade_scanned_universe: Optional[List[str]] = None,
         fade_atr_top2: Optional[set] = None,
+        day_vix: Optional[float] = None,
     ) -> None:
         # Use module-level defaults if not passed
         if orb_signal_start is None:
@@ -467,6 +492,10 @@ class BacktestEngine:
             orb_signal_end = ORB_SIGNAL_END
         if fade_atr_top2 is None:
             fade_atr_top2 = set()
+        _orb_vix_ok        = (day_vix is None or day_vix < 25.0)
+        _stress_orb_vix_ok = (day_vix is None or day_vix >= 30.0)
+        if day_vix is not None:
+            logger.debug("VIX gate: %.1f  orb_ok=%s  stress_orb_ok=%s", day_vix, _orb_vix_ok, _stress_orb_vix_ok)
         # ── Daily reset ───────────────────────────────────────────────────────
         self._circuit_breaker_active = False
         self._safety_mode_active = False
@@ -731,7 +760,7 @@ class BacktestEngine:
                 logger.info(f"{bar_ts} | FADE scan → {len(fade_orb.watchlist)} candidates")
 
             # 6. ORB range formation 9:30–signal_start (config-driven)
-            if ORB_RANGE_START <= bar_t < orb_signal_start and "ORB" in active:
+            if ORB_RANGE_START <= bar_t < orb_signal_start and "ORB" in active and _orb_vix_ok:
                 for ticker in orb.watchlist:
                     if ticker not in day_stocks:
                         continue
@@ -836,7 +865,7 @@ class BacktestEngine:
 
             # 7. ORB signals (config-driven window) — detect breakouts, store as pending.
             # Actual entry happens on bar B+1 via section 6b (delayed-entry logic).
-            if orb_signal_start <= bar_t <= orb_signal_end and "ORB" in active:
+            if orb_signal_start <= bar_t <= orb_signal_end and "ORB" in active and _orb_vix_ok:
                 for ticker, (or_high, or_low) in list(or_ranges.items()):
                     if ticker in pending_orb:         # already have a pending for this ticker
                         continue
@@ -904,13 +933,13 @@ class BacktestEngine:
                         logger.debug(f"FADE signal error {ticker}: {e}")
 
             # 7c. Stress ETF ORB — scanner at 9:35
-            if bar_t == ORB_SCAN_TIME and not stress_orb_scanned and "STRESS_ORB" in active:
+            if bar_t == ORB_SCAN_TIME and not stress_orb_scanned and "STRESS_ORB" in active and _stress_orb_vix_ok:
                 stress_orb.watchlist = list(_stress_stocks.keys())
                 stress_orb_scanned = True
                 logger.info(f"{bar_ts} | Stress ORB scan → {stress_orb.watchlist}")
 
             # 7c. Stress ETF ORB — OR range formation 9:30–signal_start
-            if ORB_RANGE_START <= bar_t < orb_signal_start and "STRESS_ORB" in active:
+            if ORB_RANGE_START <= bar_t < orb_signal_start and "STRESS_ORB" in active and _stress_orb_vix_ok:
                 for ticker in stress_orb.watchlist:
                     if ticker not in _stress_stocks:
                         continue
@@ -928,7 +957,7 @@ class BacktestEngine:
                         logger.debug(f"Stress OR calc error {ticker}: {e}")
 
             # 7d. Stress ETF ORB — signals signal_start–signal_end
-            if orb_signal_start <= bar_t <= orb_signal_end and "STRESS_ORB" in active:
+            if orb_signal_start <= bar_t <= orb_signal_end and "STRESS_ORB" in active and _stress_orb_vix_ok:
                 for ticker, (or_high, or_low) in list(stress_or_ranges.items()):
                     if not self._position_ok(ticker, "STRESS_ORB"):
                         continue
