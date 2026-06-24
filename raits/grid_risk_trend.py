@@ -32,8 +32,8 @@ WINDOWS_IS = [
     ("2022-01-03","2022-12-30","2022"),
 ]
 
-GRID_RISK  = [0.010, 0.015, 0.020, 0.025, 0.030]
-GRID_TREND = [2, 3, 4]
+GRID_RISK  = [0.015]
+GRID_TREND = [2, 3]
 
 # ── Worker globals (populated once per process by initializer) ────────────────
 _full_data  = None
@@ -171,17 +171,21 @@ def main():
     print("  YEAR-BY-YEAR: baseline vs best Calmar vs best Return")
     print("=" * 72)
     bc = grp.loc[best_c]; br = grp.loc[best_r]
-    base = df[(df.risk_pct==0.010)&(df.max_trend==2)].sort_values('label')
+    base_r = GRID_RISK[0]; base_t = GRID_TREND[0]
+    base = df[(df.risk_pct==base_r)&(df.max_trend==base_t)].sort_values('label')
     dbc  = df[(df.risk_pct==bc['risk_pct'])&(df.max_trend==int(bc['max_trend']))].sort_values('label')
     dbr  = df[(df.risk_pct==br['risk_pct'])&(df.max_trend==int(br['max_trend']))].sort_values('label')
-    print("%-6s %14s %14s %14s" % ("Year","Base 1%/2",
+    print("%-6s %14s %14s %14s" % ("Year",
+          "Base %.0f%%/%d"%(base_r*100,base_t),
           "Calmar %.0f%%/%d"%(bc['risk_pct']*100,int(bc['max_trend'])),
           "Return %.0f%%/%d"%(br['risk_pct']*100,int(br['max_trend']))))
     print("-" * 52)
     for i in range(len(WINDOWS_IS)):
         lbl = WINDOWS_IS[i][2]
-        print("%-6s %+14.0f %+14.0f %+14.0f" % (
-            lbl, base.iloc[i]['pnl'], dbc.iloc[i]['pnl'], dbr.iloc[i]['pnl']))
+        b_pnl  = base.iloc[i]['pnl'] if i < len(base) else 0.0
+        bc_pnl = dbc.iloc[i]['pnl']  if i < len(dbc)  else 0.0
+        br_pnl = dbr.iloc[i]['pnl']  if i < len(dbr)  else 0.0
+        print("%-6s %+14.0f %+14.0f %+14.0f" % (lbl, b_pnl, bc_pnl, br_pnl))
     print("-" * 52)
     print("%-6s %+14.0f %+14.0f %+14.0f" % (
         "TOT", base['pnl'].sum(), dbc['pnl'].sum(), dbr['pnl'].sum()))

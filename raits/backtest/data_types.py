@@ -77,7 +77,7 @@ class BacktestConfig:
     atr_stop_multiplier: float = 3.0
     risk_per_trade_pct: float = 0.01     # 1% of equity
     max_position_pct: float = 0.20       # 20% of equity
-    kelly_fraction: float = 0.5          # Half-Kelly
+    kelly_fraction: float = 0.75         # 3/4-Kelly
 
     # Feature flags
     enable_costs: bool = True

@@ -1312,10 +1312,12 @@ def main():
                         help="MFE/MAE analysis for ORB_FADE: how far did price move in favorable vs adverse direction")
     parser.add_argument("--vmr-vol-threshold", type=float, default=0.12,
                         help="VWAP_MR vol gate: allow trades when SPY 5-day realized vol <= threshold (default: 0.12=Calm)")
-    parser.add_argument("--max-risk-pct", type=float, default=0.01,
+    parser.add_argument("--max-risk-pct", type=float, default=0.015,
                         help="Max loss per trade as %% of account (default: 0.01=1%%). Raise to increase position sizes.")
     parser.add_argument("--profile", action="store_true",
                         help="Run cProfile on the engine and print top-30 slowest functions.")
+    parser.add_argument("--detail", action="store_true",
+                        help="Print per-trade detail for ORB, TF, VWAP_MR after summary.")
     args = parser.parse_args()
 
     use_scanner = not args.no_scanner
@@ -1466,6 +1468,8 @@ def main():
         _analyze_orb_fade_mfe(results, full_data)
 
     # ── Per-trade detail for ORB (all windows) ───────────────────────────────
+    if not args.detail:
+        return
     all_orb = []
     for r in results:
         if r["label"] not in ("2017", "2018", "2019", "2020", "2021", "2022"):
