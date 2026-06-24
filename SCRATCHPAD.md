@@ -139,7 +139,86 @@ VIX gate unblocks circuit breaker → STRESS_MID fires 2× more days (106→208t
 - **A Power Hour**: overlaps TF window (14:00-15:55). Not tested — structural conflict.
 - Strategy space exhausted with current data. New sources needed for new edges (options IV, etc.).
 
+## VWAP Reclaim SHORT — DEAD
+
+**Signal**: SPY<VWAP@10:15 (bearish day), stock bounces to VWAP from below and closes below (rejection) → SHORT 10:30-13:30.
+**Results**: 1419t P&L=-$135 WR=36% p=0.565 CI=[-$1,753, +$1,556]
+- 2020: 415t -$420 | 2021: 452t +$524 | 2022: 552t -$238
+- Core ETF: 435t -$7 | Stocks+ETF: 984t -$128
+- 881/1419 (62%) STOP_HIT — VWAP does not act as consistent resistance
+**Root cause**: Signal fires on ~4.3 tickers/day whenever SPY is bearish (328/756 days = 43%). Too common → essentially random short momentum. WR=36% barely above 33% break-even for 2R target but commission drag overwhelms thin edge.
+**Do not revisit.**
+
+## GAP_FILL sizing fix — DEAD (sizing illusion)
+
+**Hypothesis**: Engine's max_position_pct=20% caps P&L. Raise to 50% or use uncapped vol-sizing.
+**Analysis**: 27 engine GAP_FILL trades, all POSITION_LIMIT-bound (100%). Stop_dist range $0.10–$7.84 (mean $1.84).
+
+| Scenario | P&L | 2020 | 2021 | 2022 |
+|---|---|---|---|---|
+| A Current (Kelly+20% cap) | +$81 | -$297 | +$586 | -$208 |
+| B Vol-sizing, 20% cap | +$102 | -$291 | +$600 | -$207 |
+| C Vol-sizing, 50% cap | +$435 | -$557 | +$1,508 | -$516 |
+| D Uncapped $500/stop_dist | +$10,133 | +$4,053 | +$5,704 | +$376 |
+
+**Why C fails**: amplifies losers equally — 2020 and 2022 get worse.
+**Why D is fake**: TSLA 2020 trade (stop_dist=$0.098) gets 5,079 shares × $49 = $248k position. Same sizing illusion as STRESS_ORB_STK's +$6,368 sim → artificial leverage on tight stops.
+**The sim's +$2,838 was also a sizing illusion.** Not a real edge.
+**Do not revisit.**
+
+## BacktestConfig orphaned fields (found 2026-06-23)
+
+`BacktestConfig` trong `data_types.py` có 4 fields không được wire đúng:
+- `max_position_pct` (0.20) — không truyền vào PositionSizer → luôn dùng default 0.20. **Fixed** (engine.py init).
+- `kelly_fraction` (0.5) — không truyền, nhưng PositionSizer cũng default 0.5 → no bug. **Fixed** (engine.py init).
+- `atr_stop_multiplier` (3.0) — chỉ khai báo, không dùng ở bất kỳ đâu. Dead field, để nguyên.
+- `risk_per_trade_pct` (0.01) — shadow bởi `max_risk_pct` (cùng giá trị). Dead field, để nguyên.
+
+Root cause: fields thêm vào dataclass qua nhiều iteration, không update engine init caller.
+Limiting factor per strategy: FADE/GAP_FILL/ORB/STRESS_MID = POSITION_LIMIT. TF/VWAP_MR/STRESS_ORB/GF_SHORT = KELLY.
+
+## System deep analysis (2026-06-23, snapshot results_20260623_070518.pkl)
+
+**Risk-adjusted metrics (baseline $17,629):**
+- CAGR: 11.75%/yr | Sharpe: 2.49 | Sortino: 3.67 | Calmar: 3.42
+- Max DD: -$1,720 (-3.4%) — comfortably within -4% circuit breaker
+- 2020=+$6,139 | 2021=+$8,017 | 2022=+$3,473
+
+**Structural findings:**
+- TREND_FOLLOW = 54% of P&L (concentration risk). TF avg/trade declining: 2020=$49 → 2021=$34 → 2022=$21.7
+- TSLA = 17.3% of total P&L, top-5 tickers = 64% — extreme concentration
+- Swing trades (>7hr): 292t → $12,437 (70.5% of P&L). Intraday: 717t → $5,192 (29.5%)
+- Dead zone 11:00-14:00 is **structural** (all new strategy attempts fail there)
+- VWAP_MR Sharpe=-0.20 (only negative), but kept: exits at 14:00 (TF start), no slot conflict
+- Strategies by Sharpe: PE_SHORT=6.35 | GF_SHORT=5.03 | STRESS_ORB=4.71 | ORB=4.36 | TF=3.06 | VWAP_MR=-0.20
+
+**Key OOS risks:**
+- TF declining trend (main revenue driver degrading year-over-year)
+- STRESS_ORB + STRESS_MID idle in low-VIX 2023-2024 environment
+- TSLA dynamics changed post-2022 (high beta factor gone)
+
+## Gap-filling strategy exploration — all dead (2026-06-23)
+
+Tested 4 new strategies for architectural gaps, all with proper engine filters (scanner + CB + overlap):
+
+| Strategy | Trades | P&L | WR | p-value | 2021 | Verdict |
+|---|---|---|---|---|---|---|
+| Midday Continuation LONG | v1: 278t +$4,747 | — | 55.8% | 0.019 | — | v1 MISLEADING |
+| Midday Continuation LONG (v2, filtered) | 70t | +$18 | 45.7% | 0.491 | neg | DEAD |
+| Late-Day Breakout (15:00-15:55) | 56t | +$1,268 | 55.4% | 0.067 | -$217 | DEAD |
+| Calm Swing LONG (T+1) | 74t | +$1,462 | 51.4% | 0.238 | -$173 | DEAD |
+| Normal SHORT Breakdown (T+1) | 132t | +$1,006 | 47.7% | 0.429 | -$2,302 | DEAD |
+
+**Root cause — all fail in 2021 (bull/low-VIX):** System is structurally optimized for volatile/trending environments (2020 COVID + 2022 bear). Low-VIX bull markets require different signal types (options IV, sector rotation, macro calendar). 2020-2022 OHLCV data cannot generate edge for this environment.
+
+**Do not sim more strategies with 2020-2022 data — strategy space is exhausted.**
+
+## Look-ahead bias lesson (Late-Day Breakout)
+
+First run: checking `b1500.iloc[0]['high'] > prior_high` then entering at `b1500 open` = look-ahead (bar high unknown at open). Fix: check `b1455.high > prior_high`, enter at `b1500 open`. Impact: 61t → 56t, +$2,530 → +$1,268, p=0.006 → 0.067. Always verify signal bar vs entry bar distinction.
+
 ## Open questions
 
-- **GAP_FILL discrepancy**: CLOSED. Engine 21t +$1,163 WR=81% (GF_SHORT 25t +$140). Shortfall vs sim ($2,838) explained by position limit being binding: max_position_pct=20%×$50k=$10k/trade cap → actual risk ~$100-200/trade vs sim's fixed $500. Vol target ($500) never binding because most stocks need 500 shares = $50k notional. Not a bug — deliberate 20% concentration limit. To match sim, raise max_position_pct (but affects ALL strategies).
+- **GAP_FILL discrepancy**: CLOSED. Sim +$2,838 was sizing illusion — uncapped $500/stop_dist on $0.10 stop = $248k hypothetical position. Engine's 20% cap is correct risk management. No fix viable.
 - **ORB 2022 crash**: WR=26%, fixed by VIX≥25 gate (-437 in 2022 = only 4 remaining bad trades, no more easy fix)
+- **Strategy space exhausted (2020-2022)**: All buildable strategies tested. Need 2023-2024 OOS data or new data sources (options IV, sentiment, earnings calendar expansion).

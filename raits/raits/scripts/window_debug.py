@@ -147,6 +147,9 @@ def load_daily_data(rebuild=False):
     return daily_data
 
 WINDOWS = [
+    ("2017-01-03", "2017-12-29", "2017"),
+    ("2018-01-02", "2018-12-31", "2018"),
+    ("2019-01-02", "2019-12-31", "2019"),
     ("2020-01-02", "2020-12-31", "2020"),
     ("2021-01-04", "2021-12-31", "2021"),
     ("2022-01-03", "2022-12-30", "2022"),
@@ -1465,7 +1468,7 @@ def main():
     # ── Per-trade detail for ORB (all windows) ───────────────────────────────
     all_orb = []
     for r in results:
-        if r["label"] not in ("2020", "2021", "2022"):
+        if r["label"] not in ("2017", "2018", "2019", "2020", "2021", "2022"):
             continue
         orb_trades = sorted(
             [t for t in r["trades"] if t.strategy == "ORB"],
@@ -1522,7 +1525,7 @@ def main():
 
     # ── Per-trade detail for TREND_FOLLOW (all windows) ──────────────────────
     for r in results:
-        if r["label"] not in ("2020", "2021", "2022"):
+        if r["label"] not in ("2017", "2018", "2019", "2020", "2021", "2022"):
             continue
         tf_trades = [t for t in r["trades"] if t.strategy == "TREND_FOLLOW"]
         if not tf_trades:
@@ -1555,7 +1558,7 @@ def main():
     # ── Per-trade detail for VWAP_MR (all windows) ───────────────────────────
     all_vmr = []
     for r in results:
-        if r["label"] not in ("2020", "2021", "2022"):
+        if r["label"] not in ("2017", "2018", "2019", "2020", "2021", "2022"):
             continue
         vmr_trades = sorted(
             [t for t in r["trades"] if t.strategy == "VWAP_MR"],

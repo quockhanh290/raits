@@ -20,7 +20,7 @@ import yfinance as yf
 OUTPUT     = os.path.normpath(os.path.join(
     os.path.dirname(__file__), "..", "..", "data", "cache", "daily", "vix_daily.parquet"
 ))
-START_DATE = "2018-01-01"
+START_DATE = "2017-01-01"
 
 print(f"Fetching ^VIX {START_DATE} → today via yfinance ...")
 raw = yf.download("^VIX", start=START_DATE, auto_adjust=True, progress=False)

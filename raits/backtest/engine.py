@@ -164,6 +164,8 @@ class BacktestEngine:
         position_sizer   = self._mods["PositionSizer"](
             account_equity=self.config.account_equity,
             max_risk_pct=self.config.max_risk_pct,
+            max_position_pct=self.config.max_position_pct,
+            kelly_fraction=self.config.kelly_fraction,
         )
         coordinator      = self._mods["RegimeCoordinator"]()
         # Pass WFO-optimised hyperparameters to each strategy
