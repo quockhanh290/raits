@@ -1,62 +1,68 @@
-## Task: RAITS — Phase Transition to WFO + OOS
+## Task: RAITS — IS Optimization → WFO → OOS Preparation
 Status: IN PROGRESS
 
 ### Completed
-- [x] Remove ORB_FADE from engine.py → +$330
-- [x] RS Momentum — DEFERRED (2021-driven, universe too small)
-- [x] Gap Fill — implemented (27t +$81 engine, WR=63%)
-- [x] GF_SHORT — implemented (25t +$140 engine, WR=60%)
-- [x] STRESS_MID — verified in engine (208t +$1,569 WR=52%)
-- [x] PE_SHORT — implemented + expanded (18t +$2,630, 37+25 stock universe)
-- [x] VIX gates — ORB (VIX<25) + STRESS_ORB (VIX≥30), same-day close
-- [x] STRESS_ORB_STK — REVERTED (engine fires only 23% sim trades, all configs negative)
-- [x] Strategy exploration Round 1 — 7+ hypotheses, all dead or deferred
-- [x] Strategy exploration Round 2 (structural gaps) — all dead after engine filters:
-  - Midday Continuation LONG: v1 +$4,747 → v2 -$1,133 after scanner filter (edge was in low-quality stocks)
-  - Late-Day Breakout: 56t +$1,268 p=0.067 — borderline, 2021=-$217 (fails in target env)
-  - Calm Swing LONG: 74t +$1,462 p=0.238 — not significant, 2021=-$173
-  - Normal SHORT Breakdown: 132t +$1,006 p=0.429 — not significant, 2021=-$2,302
-  - VWAP Reclaim LONG: -$109,143 p=1.0 — dead
-  - PE_LONG (gap-up): -$2,314 WR=39% — dead (from prior session)
-- [x] System deep analysis — Sharpe=2.49, Sortino=3.67, Calmar=3.42, CAGR=11.75%/yr
-  - TREND_FOLLOW = 54% of P&L (concentration risk)
-  - TSLA = 17.3% of P&L, top 5 tickers = 64%
-  - TF declining: 2020 avg $49 → 2021 $34 → 2022 $21.7/trade
-  - Max DD = -3.4% (well within -4% circuit breaker)
-  - Swing > intraday: $12,437 / 292t vs $5,192 / 717t
-  - Dead zone 11:00-14:00: structural (all strategies fail there)
+- [x] Extended IS from 3yr (2020-2022) → 6yr (2017-2022), $50k account
+- [x] Fix BacktestConfig orphaned fields (max_position_pct, kelly_fraction not wired)
+- [x] max_risk_pct 1% → 1.5% (VolTarget constraint)
+- [x] kelly_fraction 0.5 → 0.75 (3/4 Kelly) → P&L +37%
+- [x] PE_SHORT_GAP_MIN confirmed at 5%
+- [x] MAX_TREND 2 → 3 → +$3,158 (+11%), ann 9.4%→10.5%
+- [x] Bootstrap per strategy (10,000 iterations) — FADE/GAP_FILL/VWAP_MR no edge confirmed
+- [x] Remove FADE + GAP_FILL + VWAP_MR from engine._REGIME_STRATEGIES
+- [x] Fix VWAP_MR zombie (engine section 8 bypassed _REGIME_STRATEGIES via _vwap_mr_vol_ok gate)
+  - Added `_vwap_mr_regime_ok` check → 0 VWAP_MR trades confirmed (snapshots 151115, 152940, 155030)
+- [x] max_position_pct 0.30 → 0.40
+  - TF: Kelly-bound at 21%, unaffected
+  - ORB: switches from PosLimit ($15k) to Kelly ($16,900) → +12.7% per trade
+  - STRESS_MID, PE_SHORT: also benefit (were PosLimit-bound)
+- [x] Full data coverage audit:
+  - CANDIDATE_POOL (37 stocks), PHASE1, PHASE2, QQQ, IWM: 2017-2024 ✓
+  - META: 2021-2024 only (missing 2017-2020) → fetch in progress
+  - PE_EXPANSION (25 stocks): 2019-mid2024 (missing IS 2017-2018 + OOS tail 2024) → fetch in progress
+  - Sector ETFs (XLF, XLE...): 2023-2024 only → fetch in progress (fetch_sector_etfs.py)
 
-### Current baseline — LOCKED
-- **snapshot: results_20260623_070518.pkl**
-- **Total: $17,629** | 2020=+$6,139 | 2021=+$8,017 | 2022=+$3,473
-- **CAGR: 11.75%/yr | Max DD: -3.4% | Sharpe: 2.49 | Sortino: 3.67**
-- TREND_FOLLOW: 277t +$9,526 | PE_SHORT: 18t +$2,630 | ORB: 39t +$2,042
-- STRESS_MID: 208t +$1,569 | STRESS_ORB: 76t +$933 | FADE: 196t +$717
-- GF_SHORT: 25t +$140 | GAP_FILL: 27t +$81 | VWAP_MR: 143t -$11
+### Current baseline — INTERMEDIATE (pre-fetch, clean engine)
+- **Snapshot: results_20260624_155030.pkl**
+- **Settings: IS 2017-2022 | $50k | 1.5% risk | 0.75K | MAX_TREND=3 | 5% PE gap | max_pos=0.40 | zombie fixed**
+- **Total: +$34,439 | Calmar~1.6 | VWAP_MR=0 trades**
+- Year: 2017=+$1,629 | 2018=+$8,180 | 2019=+$655 | 2020=+$9,601 | 2021=+$5,614 | 2022=+$8,761
+- Strategy: ORB=$5,910 | TF=$16,191 | PE_SHORT=$7,114 | STRESS_MID=$3,290 | STRESS_ORB=$1,734 | GF_SHORT=$203
+- NOTE: PE_SHORT understated (PE_EXPANSION missing 2017-2018). True baseline pending after fetch+rebuild.
+
+**Prior baseline (results_20260624_135619.pkl):** +$31,484 | Ann: 10.5% | 1,878 trades (with FADE/GAP_FILL/VWAP_MR)
+
+### In progress
+- [ ] Fetch PE_EXPANSION IS gap (2017-2018) + OOS tail (2024) — ~2.5hr running
+- [ ] Fetch META IS gap (2017-2020) — running alongside above
+- [ ] Fetch sector ETFs IS (2017-2022) + OOS (2023-2024) — fetch_sector_etfs.py, run after above
 
 ### Next steps (ordered)
-- [ ] **BLOCKER: VWAP_MR replacement** — must find + implement before WFO/OOS
-  - VWAP_MR: 143t -$11 Sharpe=-0.20. Occupies 10:15-14:00 slot (Calm + Normal)
-  - All intraday replacements tested with 2020-2022 data failed (midday continuation, VWAP reclaim, etc.)
-  - Need new approach or new data source (options IV? sector rotation?)
-- [ ] **WFO** (blocked by above) — 48 combos, lock hyperparams
-- [ ] **Fetch 2023-2024 data** (blocked) — ~3hr Polygon download
-- [ ] **OOS 2023-2024** (blocked) — run once, no iteration
+- [ ] window_debug --rebuild → establish TRUE final baseline with complete data
+- [ ] Re-evaluate VWAP_MR on sector ETF data:
+  - Add "VWAP_MR" back to _REGIME_STRATEGIES (Calm + Normal) temporarily
+  - Run window_debug → check IS P&L on ETF universe (XLF, XLE, XLV...)
+  - Bootstrap (10k iter) → if p<0.05 and P&L positive → re-add permanently
+  - If still no edge → removal confirmed, ETF data gap was not the cause
+- [ ] Run WFO (wfo_real_run.py) — params 15/2.0/30 are stale, engine changed significantly
+- [ ] After WFO: update configs/final_params.yaml with new optimal params
+- [ ] Run final snapshot post-WFO as pre-OOS baseline
+- [ ] Fetch OOS 2023-2024 5-min data if needed
+- [ ] OOS vault test — run ONCE, no iteration
 
 ### Key decisions
-- WFO/OOS blocked until VWAP_MR is replaced — OOS là one-shot; nếu dùng OOS với VWAP_MR còn âm rồi sau đó tìm được replacement, không thể re-run OOS nữa (data đã bị nhìn)
-- Strategy space exhausted with 2020-2022 data — all gap-filling attempts fail in 2021 (bull/low-VIX)
-- 11:00-14:00 dead zone is structural (market microstructure, not fixable with OHLCV data)
-- OOS must be run ONCE without iteration — viewing results and adjusting = in-sample
-- New strategies for 2023-2024 gap require options IV data or economic calendar
+- OOS is one-shot — do NOT run until engine is fully locked and WFO complete
+- VWAP_MR removal may need re-evaluation: was trading stocks (wrong instrument), not ETFs
+- STRESS_MID kept (p=0.112, borderline but positive across stress years)
+- GF_SHORT kept (n=33 too small to decide; p=0.128)
+- max_position_pct=0.40 decided: Kelly-based, ORB/STRESS_MID/PE_SHORT benefit
+- Do NOT run WFO until fetch+rebuild complete and true baseline locked
+- --use-results-cache INVALID: engine changed (zombie fix), always use fresh run or --rebuild
 
 ### Files touched
-raits/backtest/engine.py
-raits/raits/scripts/window_debug.py
-raits/raits/scripts/midday_continuation_sim.py (new — dead)
-raits/raits/scripts/midday_continuation_sim_v2.py (new — dead after filters)
-raits/raits/scripts/remaining_strategies_sim.py (new — all dead)
-raits/raits/scripts/fetch_new_stocks.py
-d:\raits\analyze_system.py (diagnostic)
-d:\raits\analyze_timeframe.py (diagnostic)
-d:\raits\analyze_deep.py (diagnostic)
+raits/backtest/engine.py (_REGIME_STRATEGIES, VWAP_MR zombie fix, MAX_TREND=3, PE_SHORT_GAP_MIN=0.05)
+raits/backtest/data_types.py (kelly_fraction=0.75)
+raits/backtest/wfo.py (max_position_pct added to WFOConfig + _make_config)
+raits/raits/scripts/window_debug.py (max_position_pct=0.40)
+raits/raits/scripts/wfo_real_run.py (max_risk_pct=0.015, max_position_pct=0.40)
+raits/fetch_sector_etfs.py (new — fetch XLF/XLE/etc IS+OOS data)

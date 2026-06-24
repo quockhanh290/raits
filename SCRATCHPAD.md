@@ -217,6 +217,76 @@ Tested 4 new strategies for architectural gaps, all with proper engine filters (
 
 First run: checking `b1500.iloc[0]['high'] > prior_high` then entering at `b1500 open` = look-ahead (bar high unknown at open). Fix: check `b1455.high > prior_high`, enter at `b1500 open`. Impact: 61t → 56t, +$2,530 → +$1,268, p=0.006 → 0.067. Always verify signal bar vs entry bar distinction.
 
+## VWAP_MR instrument bias — discovered 2026-06-24
+
+**Finding:** VWAP_MR bootstrap (p=0.613) and IS removal were based on trades on **stocks** (MR_CANDIDATE_POOL via MR scanner), NOT sector ETFs.
+
+Engine logic (engine.py lines 545-546):
+```python
+_effective_vwap_universe = mr_scanner_results + [t for t in config.vwap_universe if t not in scanner]
+```
+Sector ETFs (XLF, XLE...) in `config.vwap_universe` had NO data for 2017-2022 → ETF universe = empty → all 272 zombie trades were on momentum stocks (TSLA, NVDA, AMD) = wrong instrument for mean reversion.
+
+**Implication:** Must re-evaluate VWAP_MR on sector ETF data (fetch in progress) before treating removal as final. Could be meaningfully different on range-bound ETFs vs momentum stocks.
+
+## Data gap — sector ETFs missing IS data (2026-06-24)
+
+XLF, XLE, XLV, XLU, XLI, XLK, XLP, XLB, XLY, GLD: only 2023-2024 in cache.
+Fix: `fetch_sector_etfs.py` (d:\raits\raits\) — fetches 2017-2022 IS + 2023-2024 OOS.
+Run after PE_EXPANSION/META fetch completes.
+
+## IS 2017-2022 Optimization Session (2026-06-24)
+
+### New baseline settings
+- IS period: 2017-2022, $50k account
+- max_risk_pct=1.5%, kelly_fraction=0.75, MAX_TREND=3, PE_SHORT_GAP_MIN=0.05
+- Snapshot: results_20260624_135619.pkl → Ann=10.5%, +$31,484/6yr
+
+### Bootstrap per strategy (results_20260624_135619.pkl)
+- CONFIRMED (CI>0): TF p=0.008, PE_SHORT p=0.007, ORB p=0.019, STRESS_ORB p=0.019
+- NO EDGE: FADE p=0.754, GAP_FILL p=0.687, VWAP_MR p=0.613
+- BORDERLINE: STRESS_MID p=0.112, GF_SHORT p=0.128
+- STRESS_MID surprise: 270t +$2,406 total but mean=+$9/trade vs high variance → CI crosses zero
+
+### MAX_TREND=3 analysis
+- +$3,158 total, ann 10.5% (crosses 10% target)
+- 2021 worse by -$3,704: slot 3 takes 49 extra trades (avg -$27, WR=43%, 61% MAX_HOLD)
+- Extra trades bad across ALL regimes and directions — structural: slot 3 = weakest setups
+- ADX gate sim: ADX≥15 removes 21 bad trades (+$1,357) but p=0.113 → too few trades, likely overfit
+- Accept TF=3: net 6yr benefit outweighs 2021 cost
+
+### FADE exhaustive analysis — REMOVE confirmed
+- Gap size: <1% best (WR=53%, avg=+$10) but CI still crosses zero (p=0.113)
+- Prior day return: abs<1% best but p=0.088 — still no confirmed edge
+- Combined Calm+prior<1%: p=0.095 — closest but not confirmed
+- Year-by-year with any filter: inconsistent (2017 negative even in "good" conditions)
+- p-hacking path: adding 5 conditions → n=5 trades, p=0.004 — meaningless (overfitting)
+- SPY_5d signal: good trades have SPY_5d=-0.3% vs bad trades SPY_5d=+1.7% — real signal but sample too small
+- Thursday WR=73% vs Friday WR=47% — real pattern but sample too small
+- Verdict: No filter rescues FADE. 2017/2021 outperformance = random variation.
+
+### Coverage after removing FADE/GAP_FILL/VWAP_MR
+- Calm regime: 421 → 8 trades (only PE_SHORT, earnings days only)
+- Normal: 863 → 781 (ORB + TF + GF_SHORT + PE_SHORT) — well covered
+- Stress: 592 → 592 (STRESS_MID + STRESS_ORB + TF) — well covered
+- Midday 10:15-14:00 in Calm = zero coverage — ACCEPTABLE (both strategies had no edge)
+- Years most affected: 2017 (51% Calm), 2019 (36% Calm), 2021 (32% Calm)
+
+### Position sizer limiting factors (current baseline)
+- TF: Kelly-bound 97% trades → kelly_fraction is the lever
+- ORB: PosLimit-bound 100% → max_position_pct=0.30 is binding (Kelly cap ~$16,900 > $15k)
+- STRESS_MID: PosLimit-bound 100% → Kelly cap ~$18,400 > $15k
+- PE_SHORT: Mixed (70% PosLimit, 30% VolTarget) → Kelly cap ~$21,750 > $15k
+
+### Actual IS strategy stats vs hardcoded bootstrap
+All strategies have LOWER actual Kelly fraction than hardcoded values:
+- TF: 0.280 (hardcoded) → 0.134 actual (-52%)
+- STRESS_MID: 0.490 → 0.074 (-85%) — most over-estimated
+- ORB: 0.451 → 0.262 (-42%)
+- PE_SHORT: 0.580 → 0.478 (-18%) — most accurate
+- Payoff ratios lower because many trades exit before target (time stop, swing exit)
+- Do NOT update STRATEGY_STATS — would reduce position sizes and hurt P&L
+
 ## Open questions
 
 - **GAP_FILL discrepancy**: CLOSED. Sim +$2,838 was sizing illusion — uncapped $500/stop_dist on $0.10 stop = $248k hypothetical position. Engine's 20% cap is correct risk management. No fix viable.

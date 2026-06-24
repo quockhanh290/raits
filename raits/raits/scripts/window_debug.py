@@ -1374,7 +1374,7 @@ def main():
             fade_scanner_top_n=10,
             vwap_mr_vol_threshold=args.vmr_vol_threshold,
             max_risk_pct=args.max_risk_pct,
-            max_position_pct=0.30,
+            max_position_pct=0.40,
         )
 
         windows = [(s, e, l) for s, e, l in WINDOWS if args.year is None or l == str(args.year)]

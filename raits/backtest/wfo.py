@@ -192,6 +192,7 @@ class WFOConfig:
     orb_scanner_top_n: int  = 10
     vwap_mr_vol_threshold: float = 0.12
     max_risk_pct:     float = 0.01
+    max_position_pct: float = 0.20
 
     # Grid search data loading — subprocesses load from disk directly (avoids pickling)
     cache_data_dir: str = ""   # path to 5-min parquet directory (e.g. data/cache/data)
@@ -489,6 +490,7 @@ class WFOEngine:
                 orb_scanner_top_n=self.cfg.orb_scanner_top_n,
                 vwap_mr_vol_threshold=self.cfg.vwap_mr_vol_threshold,
                 max_risk_pct=self.cfg.max_risk_pct,
+                max_position_pct=self.cfg.max_position_pct,
             )
             start_str = str(train_start.date())
             end_str   = str(train_end.date())
@@ -776,6 +778,15 @@ class WFOEngine:
             allow_swing_hold=self.cfg.allow_swing_hold,
             max_hold_days=self.cfg.max_hold_days,
             stress_size_fraction=self.cfg.stress_size_fraction,
+            max_risk_pct=self.cfg.max_risk_pct,
+            max_position_pct=self.cfg.max_position_pct,
+            use_scanner=self.cfg.use_scanner,
+            scanner_top_n=self.cfg.scanner_top_n,
+            use_mr_scanner=self.cfg.use_mr_scanner,
+            mr_scanner_top_n=self.cfg.mr_scanner_top_n,
+            use_orb_scanner=self.cfg.use_orb_scanner,
+            orb_scanner_top_n=self.cfg.orb_scanner_top_n,
+            vwap_mr_vol_threshold=self.cfg.vwap_mr_vol_threshold,
         )
 
     def _check_wfo_targets(self, metrics: Dict[str, Any]) -> bool:

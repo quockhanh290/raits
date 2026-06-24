@@ -98,8 +98,8 @@ STRATEGY_CAPS = {
 
 # ── Regime → active strategies (from each strategy's allowed_regimes config) ──
 _REGIME_STRATEGIES: Dict[str, List[str]] = {
-    "Calm":   ["VWAP_MR", "FADE", "PE_SHORT"],
-    "Normal": ["ORB", "TREND_FOLLOW", "FADE", "GAP_FILL", "GF_SHORT", "PE_SHORT"],
+    "Calm":   ["PE_SHORT"],
+    "Normal": ["ORB", "TREND_FOLLOW", "GF_SHORT", "PE_SHORT"],
     "Stress": ["TREND_FOLLOW", "STRESS_ORB", "STRESS_MID", "PE_SHORT"],
     "Crisis": ["PE_SHORT"],
 }
@@ -1104,11 +1104,11 @@ class BacktestEngine:
                         logger.debug(f"PE_SHORT entry error {_pe_ticker}: {_pe_err}")
 
             # 8. VWAP MR 10:15–14:00
-            # Vol-based gate independent of main regime: VWAP_MR runs whenever
-            # SPY 5-day realized vol <= vwap_mr_vol_threshold (default=0.12=Calm).
-            # Raise threshold in config to allow trading on "low Normal" days.
+            # Gated by both vol threshold AND _REGIME_STRATEGIES — if VWAP_MR is
+            # not listed for the current regime, skip entirely.
             _vwap_mr_vol_ok = _cur_vol <= self.config.vwap_mr_vol_threshold
-            if VWAP_MR_START <= bar_t < VWAP_MR_END and _vwap_mr_vol_ok and (self.config.vwap_universe or mr_universe):
+            _vwap_mr_regime_ok = "VWAP_MR" in _REGIME_STRATEGIES.get(self._hmm_state, [])
+            if VWAP_MR_START <= bar_t < VWAP_MR_END and _vwap_mr_vol_ok and _vwap_mr_regime_ok and (self.config.vwap_universe or mr_universe):
                 # VWAP_MR uses its own range-bound universe — NOT the TF momentum stocks.
                 # mr_universe (MRUniverseScanner) takes priority; falls back to config.vwap_universe.
                 _vwap_tickers = _effective_vwap_universe
