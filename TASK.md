@@ -52,13 +52,16 @@ Status: IN PROGRESS
 - [ ] OOS vault test — run ONCE, no iteration
 
 ### Key decisions
-- OOS is one-shot — do NOT run until engine is fully locked and WFO complete
+- OOS is one-shot -- do NOT run until engine is fully locked and WFO complete
 - VWAP_MR removal may need re-evaluation: was trading stocks (wrong instrument), not ETFs
 - STRESS_MID kept (p=0.112, borderline but positive across stress years)
 - GF_SHORT kept (n=33 too small to decide; p=0.128)
 - max_position_pct=0.40 decided: Kelly-based, ORB/STRESS_MID/PE_SHORT benefit
 - Do NOT run WFO until fetch+rebuild complete and true baseline locked
 - --use-results-cache INVALID: engine changed (zombie fix), always use fresh run or --rebuild
+- OPTIONS IDEA DEAD: BS proxy on 200216 baseline: stock +$34,214 vs option -$257,572 (-852.8%).
+  ORB and PE_SHORT benefit (+52k/+121k option edge) but TF/STRESS_MID are catastrophic (-288k/-171k).
+  RAITS edge = high-freq small wins; options spread+theta destroys this profile. Skip ORATS.
 
 ### Files touched
 raits/backtest/engine.py (_REGIME_STRATEGIES, VWAP_MR zombie fix, MAX_TREND=3, PE_SHORT_GAP_MIN=0.05)
