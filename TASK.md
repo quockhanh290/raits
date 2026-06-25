@@ -22,28 +22,29 @@ Status: IN PROGRESS
   - PE_EXPANSION (25 stocks): 2019-mid2024 (missing IS 2017-2018 + OOS tail 2024) → fetch in progress
   - Sector ETFs (XLF, XLE...): 2023-2024 only → fetch in progress (fetch_sector_etfs.py)
 
-### Current baseline — INTERMEDIATE (pre-fetch, clean engine)
-- **Snapshot: results_20260624_155030.pkl**
+### Current baseline — LOCKED (post PE_EXPANSION fetch)
+- **Snapshot: results_20260624_200216.pkl**
 - **Settings: IS 2017-2022 | $50k | 1.5% risk | 0.75K | MAX_TREND=3 | 5% PE gap | max_pos=0.40 | zombie fixed**
-- **Total: +$34,439 | Calmar~1.6 | VWAP_MR=0 trades**
-- Year: 2017=+$1,629 | 2018=+$8,180 | 2019=+$655 | 2020=+$9,601 | 2021=+$5,614 | 2022=+$8,761
-- Strategy: ORB=$5,910 | TF=$16,191 | PE_SHORT=$7,114 | STRESS_MID=$3,290 | STRESS_ORB=$1,734 | GF_SHORT=$203
-- NOTE: PE_SHORT understated (PE_EXPANSION missing 2017-2018). True baseline pending after fetch+rebuild.
+- **Total: +$34,214 | Calmar~1.55 | VWAP_MR=0 trades**
+- Year: 2017=+$2,156 | 2018=+$7,427 | 2019=+$655 | 2020=+$9,601 | 2021=+$5,614 | 2022=+$8,761
+- Strategy: ORB=$5,910 | TF=$16,191 | PE_SHORT=$6,888 | STRESS_MID=$3,290 | STRESS_ORB=$1,734 | GF_SHORT=$203
+- NOTE: META still missing 2017-2020 (FB ticker issue). Sector ETFs pending (for VWAP_MR re-eval only).
+- PE_EXPANSION effect: net -$226 (2018 bad trade -$753 outweighs 2017 gain +$527)
 
 **Prior baseline (results_20260624_135619.pkl):** +$31,484 | Ann: 10.5% | 1,878 trades (with FADE/GAP_FILL/VWAP_MR)
 
 ### In progress
-- [ ] Fetch PE_EXPANSION IS gap (2017-2018) + OOS tail (2024) — ~2.5hr running
-- [ ] Fetch META IS gap (2017-2020) — running alongside above
-- [ ] Fetch sector ETFs IS (2017-2022) + OOS (2023-2024) — fetch_sector_etfs.py, run after above
+- [ ] window_debug --rebuild — running now (PE_EXPANSION complete, META/ETFs pending)
+- [ ] Fetch META IS gap as ticker "FB" (2017-2022-06-08) → save META_5min_FB_history.parquet
+  - Meta rebranded FB→META on 2022-06-09; Polygon stores under original ticker
+- [ ] Fetch sector ETFs IS (2017-2022) + OOS (2023-2024) — fetch_sector_etfs.py (pending)
 
 ### Next steps (ordered)
-- [ ] window_debug --rebuild → establish TRUE final baseline with complete data
-- [ ] Re-evaluate VWAP_MR on sector ETF data:
-  - Add "VWAP_MR" back to _REGIME_STRATEGIES (Calm + Normal) temporarily
-  - Run window_debug → check IS P&L on ETF universe (XLF, XLE, XLV...)
-  - Bootstrap (10k iter) → if p<0.05 and P&L positive → re-add permanently
-  - If still no edge → removal confirmed, ETF data gap was not the cause
+- [x] PE_EXPANSION (25 stocks): 2017-2024 ✓ fetched
+- [x] window_debug --rebuild → baseline 200216 ($34,214). PE_EXPANSION net -$226 (2018 bad trade)
+- [ ] Fetch FB (META pre-rename) + sector ETFs → rebuild again for complete baseline
+- [ ] Run vwap_mr_etf_sim.py (after ETF data ready) → re-evaluate VWAP_MR on proper universe
+  - If p<0.05 and P&L positive → re-add permanently; else removal confirmed
 - [ ] Run WFO (wfo_real_run.py) — params 15/2.0/30 are stale, engine changed significantly
 - [ ] After WFO: update configs/final_params.yaml with new optimal params
 - [ ] Run final snapshot post-WFO as pre-OOS baseline
