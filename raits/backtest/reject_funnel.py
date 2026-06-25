@@ -38,7 +38,7 @@ _STRUCTURAL_KEYWORDS: frozenset = frozenset([
 
 # ── Keywords that imply a setup was LOST due to missing/bad data ─────────────
 _MECHANICAL_KEYWORDS: frozenset = frozenset([
-    "no prior", "no or", "missing", "empty", "5-min", "no data", "no range",
+    "no prior", "no or", "missing", "empty", "-min", "no data", "no range",
 ])
 
 # ── Regex patterns for normalisation ─────────────────────────────────────────

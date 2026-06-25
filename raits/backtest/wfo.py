@@ -391,10 +391,10 @@ class WFOEngine:
             )
 
         # ── Step 4: stitch OOS equity curves ──────────────────────────────────
-        stitched_curve = self._stitch_oos_curves(window_results, wfo_data)
+        stitched_curve = self._stitch_oos_curves(window_results, wfo_data, daily_data=daily_data)
 
         # ── Step 5: compute stitched metrics ──────────────────────────────────
-        all_oos_trades = self._collect_oos_trades(window_results, wfo_data)
+        all_oos_trades = self._collect_oos_trades(window_results, wfo_data, daily_data=daily_data)
         stitched_metrics = compute_metrics(stitched_curve, all_oos_trades)
 
         # R² vs SPY on stitched curve
@@ -567,6 +567,7 @@ class WFOEngine:
         self,
         window_results: List[WindowResult],
         market_data: Dict[str, pd.DataFrame],
+        daily_data: Optional[Dict[str, pd.DataFrame]] = None,
     ) -> pd.Series:
         """
         Re-run each OOS window with its best params and concatenate the
@@ -587,7 +588,7 @@ class WFOEngine:
                 orb=wr.best_orb_range, std=wr.best_bb_std, ema=wr.best_ema_period,
                 account_equity=running_equity,
             )
-            result = BacktestEngine(cfg).run(test_data)
+            result = BacktestEngine(cfg).run(test_data, daily_data=daily_data)
             curve = result.equity_curve
             if not curve.empty:
                 curves.append(curve)
@@ -604,6 +605,7 @@ class WFOEngine:
         self,
         window_results: List[WindowResult],
         market_data: Dict[str, pd.DataFrame],
+        daily_data: Optional[Dict[str, pd.DataFrame]] = None,
     ) -> list:
         """Re-run each OOS window and collect all trades for composite metrics."""
         all_trades = []
@@ -619,7 +621,7 @@ class WFOEngine:
                 orb=wr.best_orb_range, std=wr.best_bb_std, ema=wr.best_ema_period,
                 account_equity=running_equity,
             )
-            result = BacktestEngine(cfg).run(test_data)
+            result = BacktestEngine(cfg).run(test_data, daily_data=daily_data)
             all_trades.extend(result.trade_log)
             if not result.equity_curve.empty:
                 running_equity = float(result.equity_curve.iloc[-1])

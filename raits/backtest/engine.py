@@ -565,6 +565,16 @@ class BacktestEngine:
             and not market_data[ticker][market_data[ticker].index.normalize() == day].empty
         }
 
+        # Log tickers silently dropped from day_stocks (missing 5-min data)
+        _missing_5min = [
+            t for t in _all_tickers
+            if t != "SPY" and t not in day_stocks
+        ]
+        if _missing_5min:
+            logger.debug(
+                f"{day.date()} skip tickers: no 5-min bars today: {_missing_5min}"
+            )
+
         # Ensure open swing trade tickers are always in day_stocks so exit
         # conditions (stop/target) are checked even if today's scanner didn't
         # select them. Without this, a ticker dropped from the scanner universe
@@ -872,11 +882,18 @@ class BacktestEngine:
                     if ticker in pending_orb:         # already have a pending for this ticker
                         continue
                     if not self._position_ok(ticker, "ORB"):
+                        logger.debug(
+                            f"ORB skip {ticker}: position limit "
+                            f"(total={self.trade_log.total_open_count()}, "
+                            f"orb={self.trade_log.open_count_by_strategy('ORB')})"
+                        )
                         continue
                     if ticker not in day_stocks:
+                        logger.debug(f"ORB skip {ticker}: no intraday bars (no day_stocks entry)")
                         continue
                     bars_so_far = day_stocks[ticker].loc[:bar_ts]
                     if bars_so_far.empty:
+                        logger.debug(f"ORB skip {ticker}: empty bars so far at {bar_t}")
                         continue
                     try:
                         candle = bars_so_far.iloc[-1]
@@ -982,6 +999,9 @@ class BacktestEngine:
                             # SHORT only: Stress = trending market, ETF ORB is
                             # trend-following. LONGs on breakdown days perform poorly.
                             if sig.get("direction") == "LONG":
+                                logger.debug(
+                                    f"STRESS_ORB skip {ticker}: LONG blocked in Stress regime"
+                                )
                                 continue
                             sig = self._normalise_signal(sig)
                             self._attempt_entry(
@@ -999,22 +1019,33 @@ class BacktestEngine:
                 for _sm_ticker in _ETF_STRESS_UNIVERSE:
                     _sm_all = _stress_stocks.get(_sm_ticker, pd.DataFrame())
                     if _sm_all.empty:
+                        logger.debug(f"STRESS_MID skip {_sm_ticker}: no intraday bars")
                         continue
                     _sm_bars = _sm_all[_sm_all.index <= bar_ts]
                     if len(_sm_bars) < 3:
+                        logger.debug(f"STRESS_MID skip {_sm_ticker}: fewer than 3 bars")
                         continue
                     try:
                         _sm_entry = float(_sm_bars.iloc[-1]["close"])
                         _sm_open  = float(_sm_bars.iloc[0]["open"])
                         _sm_vwap  = vwap_mr.calculate_vwap(_sm_bars)
                         if _sm_entry >= _sm_vwap or _sm_entry >= _sm_open:
+                            logger.debug(
+                                f"STRESS_MID skip {_sm_ticker}: entry {_sm_entry:.2f} "
+                                f"not below VWAP {_sm_vwap:.2f} / open {_sm_open:.2f}"
+                            )
                             continue
                         _sm_swing = _sm_bars[_sm_bars.index.time >= dtime(9, 45)]
                         if _sm_swing.empty:
+                            logger.debug(f"STRESS_MID skip {_sm_ticker}: no bars after 9:45")
                             continue
                         _sm_stop  = float(_sm_swing["high"].max()) * (1 + STRESS_MID_STOP_PAD)
                         _sm_sdist = _sm_stop - _sm_entry
                         if _sm_sdist <= 0 or _sm_sdist / _sm_entry > STRESS_MID_MAX_STOP:
+                            logger.debug(
+                                f"STRESS_MID skip {_sm_ticker}: stop dist {_sm_sdist:.3f} "
+                                f"out of range (max {STRESS_MID_MAX_STOP:.1%})"
+                            )
                             continue
                         _sm_setups.append({
                             "ticker":    _sm_ticker,
