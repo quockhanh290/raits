@@ -85,6 +85,7 @@ def _run_grid_combo(packed):
             ["SPY", "QQQ", "IWM"]
             + list(base_kwargs.get("universe", []))
             + list(base_kwargs.get("vwap_universe", []))
+            + list(base_kwargs.get("pe_universe", []))
         ))
         start_ts = _pd.Timestamp(start)
         end_ts   = _pd.Timestamp(end) + _pd.Timedelta("1D")
@@ -109,11 +110,13 @@ def _run_grid_combo(packed):
         # Scanner requires daily_data which subprocesses don't have — disable.
         # hmm_retrain_weekly disabled: grid search only needs relative param ranking,
         # not HMM accuracy. Saves ~155 Monday retrains per combo (~6x speedup).
+        # pe_universe is only used above for Parquet loading — not a BacktestConfig field.
         gs_kwargs = {**base_kwargs,
                      "use_scanner": False,
                      "use_orb_scanner": False,
                      "use_mr_scanner": False,
                      "hmm_retrain_weekly": False}
+        gs_kwargs.pop("pe_universe", None)
 
         cfg = BacktestConfig(
             start_date=start, end_date=end,
@@ -159,6 +162,7 @@ class WFOConfig:
     )
     orb_universe: List[str] = field(default_factory=list)
     vwap_universe: List[str] = field(default_factory=list)
+    pe_universe: List[str] = field(default_factory=list)   # PE_SHORT extra tickers (not traded by TF/ORB)
     account_equity: float = 25_000.0
 
     # Grid search
@@ -193,6 +197,7 @@ class WFOConfig:
     vwap_mr_vol_threshold: float = 0.12
     max_risk_pct:     float = 0.01
     max_position_pct: float = 0.20
+    kelly_fraction:   float = 0.75
 
     # Grid search data loading — subprocesses load from disk directly (avoids pickling)
     cache_data_dir: str = ""   # path to 5-min parquet directory (e.g. data/cache/data)
@@ -491,6 +496,8 @@ class WFOEngine:
                 vwap_mr_vol_threshold=self.cfg.vwap_mr_vol_threshold,
                 max_risk_pct=self.cfg.max_risk_pct,
                 max_position_pct=self.cfg.max_position_pct,
+                kelly_fraction=self.cfg.kelly_fraction,
+                pe_universe=list(self.cfg.pe_universe),
             )
             start_str = str(train_start.date())
             end_str   = str(train_end.date())
@@ -600,6 +607,7 @@ class WFOEngine:
     ) -> list:
         """Re-run each OOS window and collect all trades for composite metrics."""
         all_trades = []
+        running_equity = self.cfg.account_equity
         for wr in window_results:
             test_data = self._slice_oos(
                 market_data,
@@ -609,9 +617,12 @@ class WFOEngine:
             cfg = self._make_config(
                 start=wr.test_start, end=wr.test_end,
                 orb=wr.best_orb_range, std=wr.best_bb_std, ema=wr.best_ema_period,
+                account_equity=running_equity,
             )
             result = BacktestEngine(cfg).run(test_data)
             all_trades.extend(result.trade_log)
+            if not result.equity_curve.empty:
+                running_equity = float(result.equity_curve.iloc[-1])
         return all_trades
 
     # ── Helpers ───────────────────────────────────────────────────────────────
@@ -780,6 +791,7 @@ class WFOEngine:
             stress_size_fraction=self.cfg.stress_size_fraction,
             max_risk_pct=self.cfg.max_risk_pct,
             max_position_pct=self.cfg.max_position_pct,
+            kelly_fraction=self.cfg.kelly_fraction,
             use_scanner=self.cfg.use_scanner,
             scanner_top_n=self.cfg.scanner_top_n,
             use_mr_scanner=self.cfg.use_mr_scanner,

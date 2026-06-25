@@ -2,5 +2,5 @@
 # Aggregation method: MEAN
 # DO NOT MODIFY after Vault test begins
 orb_range_minutes: 15
-vwap_bb_std: 2.5
+vwap_bb_std: 2.0
 ema_period: 30

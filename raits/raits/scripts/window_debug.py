@@ -1351,7 +1351,7 @@ def main():
                               "XLK", "XLP", "XLB", "XLY", "GLD", "QQQ", "IWM"]
 
         cfg_base = dict(
-            universe=UNIVERSE,
+            universe=CANDIDATE_POOL,
             orb_universe=[],
             vwap_universe=MR_UNIVERSE_STATIC,
             orb_range_minutes=15,

@@ -87,11 +87,20 @@ PHASE1        = [
     "CSCO", "GS", "CRM", "JPM",
 ]
 PHASE2        = ["MU", "HON", "MA", "NFLX", "INTC", "V", "GILD", "BIIB", "MMM"]
+CANDIDATE_POOL = UNIVERSE + PHASE1 + PHASE2   # full 37-stock ORB/TF pool
 SECTOR_ETFS   = ["XLF", "XLE", "XLV", "XLU", "XLI", "XLK", "XLP", "XLB", "XLY", "GLD"]
 MR_UNIVERSE   = ["XLF", "XLE", "XLV", "XLU", "XLI", "XLK", "XLP", "XLB", "XLY", "GLD", "QQQ", "IWM"]
 ORB_UNIVERSE  = []
 VWAP_UNIVERSE = MR_UNIVERSE
-TICKERS       = ["SPY", "QQQ", "IWM"] + SECTOR_ETFS + UNIVERSE + PHASE1 + PHASE2
+PE_EXPANSION  = [
+    "PFE", "MRK", "LLY", "ABBV", "JNJ", "BMY",
+    "BAC", "WFC", "C",
+    "WMT", "TGT", "HD", "LOW", "MCD", "NKE",
+    "PG", "KO", "PEP",
+    "CAT", "DE", "BA", "GE",
+    "PYPL", "PANW", "NOW",
+]
+TICKERS       = ["SPY", "QQQ", "IWM"] + SECTOR_ETFS + CANDIDATE_POOL + PE_EXPANSION
 
 CACHE_DIR     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data", "cache")
 INTERVAL_MINS = 5
@@ -259,7 +268,7 @@ def run_real_wfo(market_data: dict, daily_data: dict, fixed_params: bool = False
         vault_fraction=0.0,           # 2023-2024 not loaded at all — sealed true OOS
         train_years=3,                # Blueprint: 3-year training windows
         test_years=1,                 # Blueprint: 1-year OOS test
-        universe=UNIVERSE,
+        universe=CANDIDATE_POOL,
         orb_universe=ORB_UNIVERSE,
         vwap_universe=VWAP_UNIVERSE,
         account_equity=50_000.0,
@@ -279,6 +288,8 @@ def run_real_wfo(market_data: dict, daily_data: dict, fixed_params: bool = False
         vwap_mr_vol_threshold=0.12,
         max_risk_pct=0.015,
         max_position_pct=0.40,
+        kelly_fraction=0.75,
+        pe_universe=PE_EXPANSION,
         cache_data_dir=os.path.join(CACHE_DIR, "data"),
         interval_mins=INTERVAL_MINS,
         fixed_orb_range=15 if fixed_params else None,

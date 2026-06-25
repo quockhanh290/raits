@@ -74,7 +74,7 @@ def compute_metrics(
     total_return = (final - initial) / initial
 
     span_days = max((equity_curve.index[-1] - equity_curve.index[0]).days, 1)
-    annual_return = (1 + total_return) ** (trading_days_per_year / span_days) - 1
+    annual_return = (1 + total_return) ** (365.25 / span_days) - 1
 
     # Calmar: annualized return / absolute max drawdown
     calmar = annual_return / abs(max_drawdown) if max_drawdown != 0 else float("inf")
