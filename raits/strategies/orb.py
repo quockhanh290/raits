@@ -67,7 +67,7 @@ DEFAULT_CONFIG = {
     # Scanner filters (Section 4.2 "Scanner Criteria")
     'min_gap_pct':               0.015,   # ±1.5% minimum gap from prev close
     'min_price':                 10.0,    # $10 minimum stock price
-    'max_price':                1000.0,    # $200 maximum stock price
+    'max_price':                1000.0,    # $1000 maximum stock price
     'premarket_vol_threshold':  10_000,   # pre-market volume Option A threshold
     'opening_vol_multiplier':    1.5,     # opening 5-min volume Option B multiplier
 

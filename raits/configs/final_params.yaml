@@ -1,6 +1,6 @@
 # RAITS Production Parameters — locked for Vault test
 # Aggregation method: MEAN
 # DO NOT MODIFY after Vault test begins
-orb_range_minutes: 15
-vwap_bb_std: 2.0
+orb_range_minutes: 20
+vwap_bb_std: 1.5
 ema_period: 30

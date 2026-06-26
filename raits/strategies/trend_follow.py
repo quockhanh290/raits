@@ -136,6 +136,11 @@ class TrendFollowStrategy:
                 avg_intraday_volume : float  — 10-bar avg 5-min volume
                 current_volume      : float  — current 5-min bar volume
                 sector_strength     : float  — positive = sector bullish today
+                                              (KNOWN OMISSION: field accepted but not
+                                               filtered — sector ETF data unavailable
+                                               during IS development 2017-2022. Filter
+                                               not implemented to avoid engine change
+                                               pre-vault. Post-vault improvement target.)
 
         Returns
         -------

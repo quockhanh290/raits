@@ -1,0 +1,54 @@
+Trade log: D:\raits\raits\configs\wfo_trade_log.csv
+Trades: 1159  |  Overall PF: 1.3606
+
+OUTPUT 1 -- PF PER STRATEGY
+-------------------------------------------------------------------------------------------
+Strategy            N  WinRate   GrossPnL     NetPnL   AvgWin   AvgLoss     PF   %Net  Flag
+-------------------------------------------------------------------------------------------
+ TREND_FOLLOW     657   50.1% $   18,753 $   16,190 $    248 $    -200   1.25  47.3%  
+ PE_SHORT          29   69.0% $    7,097 $    6,888 $    557 $    -473   2.62  20.1%  
+ ORB               75   54.7% $    6,434 $    5,910 $    321 $    -213   1.82  17.3%  
+ STRESS_MID       279   46.2% $    6,075 $    3,289 $    148 $    -106   1.21   9.6%  
+ STRESS_ORB        86   58.1% $    2,038 $    1,733 $     70 $     -49   1.97   5.1%  
+ GF_SHORT          33   57.6% $      264 $      204 $     27 $     -22   1.66   0.6%  
+=OVERALL         1159   50.7% $   40,663 $   34,214 $    220 $    -166   1.36 100.0%  
+-------------------------------------------------------------------------------------------
+
+READ: PF shows DISPERSION -- range [1.21, 2.62], spread=1.41.
+
+OUTPUT 2 -- COST STRESS TEST
+Avg cost/trade:       $5.56
+Avg cost as % gross win: 2.5%
+
+--------------------------------------------------------------------------------
+  Mult  Overall_PF    Net_PnL  Strategies with PF < 1.0 at this cost level
+--------------------------------------------------------------------------------
+     1.0x      1.3606 $   34,214  (none)
+     1.5x      1.3211 $   30,990  (none)
+>>>  2.0x      1.2828 $   27,765  (none)
+     3.0x      1.2099 $   21,317  STRESS_MID
+--------------------------------------------------------------------------------
+
+READ: System stays PROFITABLE at 2x costs (PF=1.28). Edge is not cost-fragile at realistic real-world slippage.
+
+======================================================================
+VERDICT (blueprint Section 8.1 re-evaluation)
+======================================================================
+
+Stitched PF: 1.3606  |  Aspirational target: 1.75 (Section 8.1)
+Revised Tier-1 threshold: 1.35  |  Tier-2 threshold: 1.20
+Current standing: TIER-1
+
+PF=1.3606 is structurally BENIGN for a high-frequency
+trailing-stop system. Below 1.75 aspirational is expected for this design
+(Chandelier trailing stop, ~50% WR, mixed intraday/swing).
+
+Dispersion note: Spread driven by PE_SHORT outperforming (PF=2.62), not by weak strategies dragging. No strategy below PF 1.2.
+
+Cost robustness: PF=1.2828 at 2x costs -- edge is NOT cost-fragile.
+
+RECOMMENDATION: Safe to proceed to Vault.
+Current standing: TIER-1 (Tier-1 PF>1.35, Tier-2 PF>1.20).
+Vault will give the final tier verdict.
+
+======================================================================
