@@ -1,0 +1,2417 @@
+{
+  "QQQ": {
+    "n": 240,
+    "win_rate": 0.4208,
+    "avg_win_pct": 0.00302,
+    "avg_loss_pct": -0.0021,
+    "profit_factor": 1.049,
+    "expectancy_pct": 6e-05,
+    "total_pct": 0.0142,
+    "by_regime": {
+      "Normal": 141,
+      "Stress": 99
+    },
+    "_trades": [
+      {
+        "entry_ts": "2017-03-21 14:45:00",
+        "exit_ts": "2017-03-21 15:50:00",
+        "direction": "SHORT",
+        "entry": 130.16,
+        "exit": 129.86,
+        "pnl_pct": 0.0023048555623846265,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2017-04-26 14:00:00",
+        "exit_ts": "2017-04-26 15:50:00",
+        "direction": "SHORT",
+        "entry": 135.07,
+        "exit": 134.87,
+        "pnl_pct": 0.0014807137040052465,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2017-04-27 14:00:00",
+        "exit_ts": "2017-04-27 15:05:00",
+        "direction": "LONG",
+        "entry": 135.5631,
+        "exit": 135.5,
+        "pnl_pct": -0.00046546589743072785,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2017-04-27 15:30:00",
+        "exit_ts": "2017-04-27 15:50:00",
+        "direction": "LONG",
+        "entry": 135.65,
+        "exit": 135.65,
+        "pnl_pct": 0.0,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2017-05-18 15:20:00",
+        "exit_ts": "2017-05-18 15:50:00",
+        "direction": "LONG",
+        "entry": 137.4,
+        "exit": 137.43,
+        "pnl_pct": 0.00021834061135372006,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2017-05-22 14:00:00",
+        "exit_ts": "2017-05-22 15:50:00",
+        "direction": "LONG",
+        "entry": 138.76,
+        "exit": 139.07,
+        "pnl_pct": 0.0022340732199481283,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2017-07-11 14:00:00",
+        "exit_ts": "2017-07-11 15:50:00",
+        "direction": "LONG",
+        "entry": 139.02,
+        "exit": 139.01,
+        "pnl_pct": -7.193209610141941e-05,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2017-08-14 14:00:00",
+        "exit_ts": "2017-08-14 14:15:00",
+        "direction": "LONG",
+        "entry": 143.881,
+        "exit": 143.77,
+        "pnl_pct": -0.0007714708682869176,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2017-08-14 14:45:00",
+        "exit_ts": "2017-08-14 15:50:00",
+        "direction": "LONG",
+        "entry": 143.79,
+        "exit": 143.89,
+        "pnl_pct": 0.0006954586549829218,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2017-08-15 14:00:00",
+        "exit_ts": "2017-08-15 15:15:00",
+        "direction": "SHORT",
+        "entry": 143.9842,
+        "exit": 144.2,
+        "pnl_pct": -0.0014987755600961881,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2017-08-15 15:25:00",
+        "exit_ts": "2017-08-15 15:50:00",
+        "direction": "LONG",
+        "entry": 144.13,
+        "exit": 144.085,
+        "pnl_pct": -0.00031221813640454793,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-01-30 14:15:00",
+        "exit_ts": "2018-01-30 14:35:00",
+        "direction": "LONG",
+        "entry": 168.89,
+        "exit": 168.43,
+        "pnl_pct": -0.0027236662916690127,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-01-30 15:15:00",
+        "exit_ts": "2018-01-30 15:50:00",
+        "direction": "LONG",
+        "entry": 168.82,
+        "exit": 168.87,
+        "pnl_pct": 0.00029617343916604294,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-02-01 14:10:00",
+        "exit_ts": "2018-02-01 14:45:00",
+        "direction": "SHORT",
+        "entry": 168.56,
+        "exit": 168.66,
+        "pnl_pct": -0.0005932605600379349,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-02-21 14:20:00",
+        "exit_ts": "2018-02-21 14:45:00",
+        "direction": "LONG",
+        "entry": 167.6293,
+        "exit": 166.92,
+        "pnl_pct": -0.004231360507978099,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-02-21 15:00:00",
+        "exit_ts": "2018-02-21 15:50:00",
+        "direction": "SHORT",
+        "entry": 166.26,
+        "exit": 165.42,
+        "pnl_pct": 0.005052327679538094,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-02-23 14:00:00",
+        "exit_ts": "2018-02-23 15:50:00",
+        "direction": "LONG",
+        "entry": 166.79,
+        "exit": 167.895,
+        "pnl_pct": 0.006625097427903461,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-03-07 14:00:00",
+        "exit_ts": "2018-03-07 15:50:00",
+        "direction": "LONG",
+        "entry": 168.11,
+        "exit": 168.81,
+        "pnl_pct": 0.004163940277199385,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2018-03-13 14:00:00",
+        "exit_ts": "2018-03-13 15:50:00",
+        "direction": "SHORT",
+        "entry": 172.79,
+        "exit": 171.8167,
+        "pnl_pct": 0.005632849123213119,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-03-15 15:05:00",
+        "exit_ts": "2018-03-15 15:50:00",
+        "direction": "LONG",
+        "entry": 171.49,
+        "exit": 171.47,
+        "pnl_pct": -0.00011662487608612881,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-04-11 14:50:00",
+        "exit_ts": "2018-04-11 15:50:00",
+        "direction": "SHORT",
+        "entry": 160.7748,
+        "exit": 160.27,
+        "pnl_pct": 0.0031397955400970104,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2018-04-16 15:15:00",
+        "exit_ts": "2018-04-16 15:40:00",
+        "direction": "SHORT",
+        "entry": 162.46,
+        "exit": 162.82,
+        "pnl_pct": -0.002215930075095317,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-04-17 14:00:00",
+        "exit_ts": "2018-04-17 15:50:00",
+        "direction": "LONG",
+        "entry": 166.1,
+        "exit": 166.0599,
+        "pnl_pct": -0.0002414208308247764,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-04-18 14:00:00",
+        "exit_ts": "2018-04-18 14:10:00",
+        "direction": "SHORT",
+        "entry": 166.48,
+        "exit": 166.7,
+        "pnl_pct": -0.0013214800576645776,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-04-18 15:40:00",
+        "exit_ts": "2018-04-18 15:50:00",
+        "direction": "SHORT",
+        "entry": 166.63,
+        "exit": 166.52,
+        "pnl_pct": 0.0006601452319509406,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-04-23 15:10:00",
+        "exit_ts": "2018-04-23 15:50:00",
+        "direction": "SHORT",
+        "entry": 161.541,
+        "exit": 161.82,
+        "pnl_pct": -0.001727115716753,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-04-24 15:00:00",
+        "exit_ts": "2018-04-24 15:50:00",
+        "direction": "SHORT",
+        "entry": 158.5,
+        "exit": 158.59,
+        "pnl_pct": -0.000567823343848602,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-04-25 14:00:00",
+        "exit_ts": "2018-04-25 15:35:00",
+        "direction": "LONG",
+        "entry": 158.52,
+        "exit": 158.44,
+        "pnl_pct": -0.0005046681806712875,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-05-02 14:00:00",
+        "exit_ts": "2018-05-02 14:20:00",
+        "direction": "LONG",
+        "entry": 163.25,
+        "exit": 163.06,
+        "pnl_pct": -0.0011638591117917165,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-05-02 14:55:00",
+        "exit_ts": "2018-05-02 15:50:00",
+        "direction": "SHORT",
+        "entry": 162.68,
+        "exit": 161.72,
+        "pnl_pct": 0.005901155642980133,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-05-07 14:00:00",
+        "exit_ts": "2018-05-07 14:50:00",
+        "direction": "LONG",
+        "entry": 166.59,
+        "exit": 166.29,
+        "pnl_pct": -0.0018008283810553537,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-05-07 15:00:00",
+        "exit_ts": "2018-05-07 15:10:00",
+        "direction": "SHORT",
+        "entry": 166.3992,
+        "exit": 166.29,
+        "pnl_pct": 0.0006562531550633387,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-05-31 14:15:00",
+        "exit_ts": "2018-05-31 15:50:00",
+        "direction": "SHORT",
+        "entry": 170.13,
+        "exit": 169.95,
+        "pnl_pct": 0.001058014459530987,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-06-29 14:00:00",
+        "exit_ts": "2018-06-29 15:20:00",
+        "direction": "LONG",
+        "entry": 172.32,
+        "exit": 172.12,
+        "pnl_pct": -0.001160631383472543,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-07-16 15:40:00",
+        "exit_ts": "2018-07-16 15:50:00",
+        "direction": "SHORT",
+        "entry": 179.16,
+        "exit": 179.005,
+        "pnl_pct": 0.0008651484706407743,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-11-01 14:00:00",
+        "exit_ts": "2018-11-01 15:35:00",
+        "direction": "LONG",
+        "entry": 171.645,
+        "exit": 171.13,
+        "pnl_pct": -0.00300037868857243,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2018-11-07 15:30:00",
+        "exit_ts": "2018-11-07 15:50:00",
+        "direction": "LONG",
+        "entry": 175.1,
+        "exit": 175.1821,
+        "pnl_pct": 0.0004688749286122042,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-11-08 14:00:00",
+        "exit_ts": "2018-11-08 14:05:00",
+        "direction": "LONG",
+        "entry": 174.11,
+        "exit": 174.34,
+        "pnl_pct": 0.00132100396301183,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-11-08 14:40:00",
+        "exit_ts": "2018-11-08 15:50:00",
+        "direction": "SHORT",
+        "entry": 173.75,
+        "exit": 174.26,
+        "pnl_pct": -0.0029352517985610986,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-11-09 14:00:00",
+        "exit_ts": "2018-11-09 14:35:00",
+        "direction": "SHORT",
+        "entry": 170.755,
+        "exit": 170.82,
+        "pnl_pct": -0.0003806623524933251,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2018-11-09 15:05:00",
+        "exit_ts": "2018-11-09 15:50:00",
+        "direction": "LONG",
+        "entry": 171.44,
+        "exit": 171.82,
+        "pnl_pct": 0.0022165188987400574,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2018-11-13 14:00:00",
+        "exit_ts": "2018-11-13 15:50:00",
+        "direction": "SHORT",
+        "entry": 167.11,
+        "exit": 166.89,
+        "pnl_pct": 0.0013164981150142257,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2018-11-14 14:10:00",
+        "exit_ts": "2018-11-14 14:50:00",
+        "direction": "SHORT",
+        "entry": 164.88,
+        "exit": 165.84,
+        "pnl_pct": -0.005822416302765697,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-11-14 15:00:00",
+        "exit_ts": "2018-11-14 15:50:00",
+        "direction": "LONG",
+        "entry": 166.3,
+        "exit": 165.4,
+        "pnl_pct": -0.005411906193626011,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-11-19 14:00:00",
+        "exit_ts": "2018-11-19 15:10:00",
+        "direction": "SHORT",
+        "entry": 161.8001,
+        "exit": 163.12,
+        "pnl_pct": -0.008157596935972341,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2018-11-20 14:00:00",
+        "exit_ts": "2018-11-20 15:25:00",
+        "direction": "SHORT",
+        "entry": 158.93,
+        "exit": 159.52,
+        "pnl_pct": -0.003712326181337717,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2018-11-29 14:40:00",
+        "exit_ts": "2018-11-29 15:50:00",
+        "direction": "LONG",
+        "entry": 168.9,
+        "exit": 168.47,
+        "pnl_pct": -0.0025458851391356235,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2018-12-20 14:00:00",
+        "exit_ts": "2018-12-20 14:25:00",
+        "direction": "SHORT",
+        "entry": 151.28,
+        "exit": 152.2,
+        "pnl_pct": -0.006081438392384899,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2018-12-20 15:40:00",
+        "exit_ts": "2018-12-20 15:50:00",
+        "direction": "LONG",
+        "entry": 152.41,
+        "exit": 152.01,
+        "pnl_pct": -0.0026244997047438208,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-01-25 14:00:00",
+        "exit_ts": "2019-01-25 14:25:00",
+        "direction": "LONG",
+        "entry": 165.47,
+        "exit": 165.09,
+        "pnl_pct": -0.002296488789508645,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2019-01-25 15:25:00",
+        "exit_ts": "2019-01-25 15:50:00",
+        "direction": "SHORT",
+        "entry": 165.1039,
+        "exit": 165.0263,
+        "pnl_pct": 0.0004700070682765101,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2019-01-30 14:00:00",
+        "exit_ts": "2019-01-30 14:10:00",
+        "direction": "LONG",
+        "entry": 165.1,
+        "exit": 164.86,
+        "pnl_pct": -0.001453664445790313,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-02-05 14:00:00",
+        "exit_ts": "2019-02-05 15:50:00",
+        "direction": "LONG",
+        "entry": 170.76,
+        "exit": 170.93,
+        "pnl_pct": 0.0009955493089717493,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-02-15 14:00:00",
+        "exit_ts": "2019-02-15 14:45:00",
+        "direction": "SHORT",
+        "entry": 171.54,
+        "exit": 171.77,
+        "pnl_pct": -0.0013407951498193903,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-02-15 14:55:00",
+        "exit_ts": "2019-02-15 15:50:00",
+        "direction": "LONG",
+        "entry": 171.76,
+        "exit": 171.72,
+        "pnl_pct": -0.00023288309268742458,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-02-19 14:00:00",
+        "exit_ts": "2019-02-19 14:25:00",
+        "direction": "SHORT",
+        "entry": 172.42,
+        "exit": 172.58,
+        "pnl_pct": -0.0009279665932027899,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-02-19 14:40:00",
+        "exit_ts": "2019-02-19 15:20:00",
+        "direction": "LONG",
+        "entry": 172.74,
+        "exit": 172.56,
+        "pnl_pct": -0.0010420284821118838,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-03-13 14:15:00",
+        "exit_ts": "2019-03-13 14:45:00",
+        "direction": "LONG",
+        "entry": 177.76,
+        "exit": 177.48,
+        "pnl_pct": -0.0015751575157515816,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-03-13 15:30:00",
+        "exit_ts": "2019-03-13 15:50:00",
+        "direction": "SHORT",
+        "entry": 177.38,
+        "exit": 177.09,
+        "pnl_pct": 0.0016349081068891198,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-04-01 14:50:00",
+        "exit_ts": "2019-04-01 15:50:00",
+        "direction": "LONG",
+        "entry": 182.01,
+        "exit": 182.1,
+        "pnl_pct": 0.0004944783253667569,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-05-14 14:00:00",
+        "exit_ts": "2019-05-14 14:05:00",
+        "direction": "LONG",
+        "entry": 181.2176,
+        "exit": 181.04,
+        "pnl_pct": -0.0009800372590742423,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2019-05-14 14:40:00",
+        "exit_ts": "2019-05-14 14:45:00",
+        "direction": "LONG",
+        "entry": 181.51,
+        "exit": 181.06,
+        "pnl_pct": -0.0024792022478099755,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2019-05-14 15:30:00",
+        "exit_ts": "2019-05-14 15:50:00",
+        "direction": "SHORT",
+        "entry": 180.68,
+        "exit": 180.78,
+        "pnl_pct": -0.0005534646889528133,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2019-05-24 14:50:00",
+        "exit_ts": "2019-05-24 15:50:00",
+        "direction": "SHORT",
+        "entry": 178.4,
+        "exit": 178.17,
+        "pnl_pct": 0.0012892376681615369,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-05-28 14:00:00",
+        "exit_ts": "2019-05-28 15:50:00",
+        "direction": "SHORT",
+        "entry": 178.63,
+        "exit": 177.84,
+        "pnl_pct": 0.0044225494037955105,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-05-29 15:35:00",
+        "exit_ts": "2019-05-29 15:50:00",
+        "direction": "LONG",
+        "entry": 176.22,
+        "exit": 175.99,
+        "pnl_pct": -0.0013051866984450673,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-05-31 14:00:00",
+        "exit_ts": "2019-05-31 14:15:00",
+        "direction": "LONG",
+        "entry": 174.66,
+        "exit": 174.43,
+        "pnl_pct": -0.001316844154356978,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-05-31 15:00:00",
+        "exit_ts": "2019-05-31 15:50:00",
+        "direction": "SHORT",
+        "entry": 174.21,
+        "exit": 174.11,
+        "pnl_pct": 0.0005740198610871609,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-06-10 14:00:00",
+        "exit_ts": "2019-06-10 14:45:00",
+        "direction": "SHORT",
+        "entry": 183.405,
+        "exit": 183.59,
+        "pnl_pct": -0.0010086966004198483,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-06-10 15:10:00",
+        "exit_ts": "2019-06-10 15:40:00",
+        "direction": "LONG",
+        "entry": 183.46,
+        "exit": 183.17,
+        "pnl_pct": -0.0015807260438243783,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-07-01 14:00:00",
+        "exit_ts": "2019-07-01 15:15:00",
+        "direction": "SHORT",
+        "entry": 188.7,
+        "exit": 188.93,
+        "pnl_pct": -0.0012188659247483742,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-07-01 15:20:00",
+        "exit_ts": "2019-07-01 15:50:00",
+        "direction": "LONG",
+        "entry": 189.005,
+        "exit": 189.24,
+        "pnl_pct": 0.0012433533504405368,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-08-05 14:25:00",
+        "exit_ts": "2019-08-05 15:10:00",
+        "direction": "SHORT",
+        "entry": 180.0,
+        "exit": 180.19,
+        "pnl_pct": -0.0010555555555555429,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2019-08-05 15:45:00",
+        "exit_ts": "2019-08-05 15:50:00",
+        "direction": "LONG",
+        "entry": 180.8,
+        "exit": 180.91,
+        "pnl_pct": 0.0006084070796459359,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2019-08-26 14:00:00",
+        "exit_ts": "2019-08-26 15:00:00",
+        "direction": "SHORT",
+        "entry": 183.93,
+        "exit": 184.32,
+        "pnl_pct": -0.0021203718806066785,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2019-08-26 15:45:00",
+        "exit_ts": "2019-08-26 15:50:00",
+        "direction": "SHORT",
+        "entry": 183.99,
+        "exit": 184.4,
+        "pnl_pct": -0.0022283819772813554,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2019-09-03 14:00:00",
+        "exit_ts": "2019-09-03 15:30:00",
+        "direction": "SHORT",
+        "entry": 185.32,
+        "exit": 185.69,
+        "pnl_pct": -0.0019965465141377325,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-09-03 15:45:00",
+        "exit_ts": "2019-09-03 15:50:00",
+        "direction": "LONG",
+        "entry": 185.77,
+        "exit": 185.92,
+        "pnl_pct": 0.0008074500726703841,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-10-01 14:00:00",
+        "exit_ts": "2019-10-01 14:30:00",
+        "direction": "SHORT",
+        "entry": 187.34,
+        "exit": 187.68,
+        "pnl_pct": -0.0018148820326678947,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-10-01 15:00:00",
+        "exit_ts": "2019-10-01 15:40:00",
+        "direction": "LONG",
+        "entry": 187.7301,
+        "exit": 187.31,
+        "pnl_pct": -0.0022377871209784198,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2019-10-09 14:00:00",
+        "exit_ts": "2019-10-09 15:40:00",
+        "direction": "LONG",
+        "entry": 187.2923,
+        "exit": 187.6,
+        "pnl_pct": 0.0016428865468574136,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-01-27 14:00:00",
+        "exit_ts": "2020-01-27 14:45:00",
+        "direction": "LONG",
+        "entry": 218.692,
+        "exit": 218.65,
+        "pnl_pct": -0.00019205092092989954,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-01-29 14:00:00",
+        "exit_ts": "2020-01-29 15:00:00",
+        "direction": "LONG",
+        "entry": 222.84,
+        "exit": 222.36,
+        "pnl_pct": -0.002154011847065113,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-01-29 15:15:00",
+        "exit_ts": "2020-01-29 15:50:00",
+        "direction": "SHORT",
+        "entry": 222.16,
+        "exit": 221.9,
+        "pnl_pct": 0.00117032769175365,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-01-31 14:00:00",
+        "exit_ts": "2020-01-31 15:50:00",
+        "direction": "SHORT",
+        "entry": 220.01,
+        "exit": 219.23,
+        "pnl_pct": 0.003545293395754744,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-04-29 14:55:00",
+        "exit_ts": "2020-04-29 15:50:00",
+        "direction": "LONG",
+        "entry": 219.094,
+        "exit": 218.975,
+        "pnl_pct": -0.0005431458643322034,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-05-14 14:30:00",
+        "exit_ts": "2020-05-14 15:50:00",
+        "direction": "LONG",
+        "entry": 218.7601,
+        "exit": 221.6,
+        "pnl_pct": 0.012981800611720329,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-05-27 14:00:00",
+        "exit_ts": "2020-05-27 15:50:00",
+        "direction": "LONG",
+        "entry": 228.63,
+        "exit": 230.01,
+        "pnl_pct": 0.006035953286970194,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-06-03 14:00:00",
+        "exit_ts": "2020-06-03 15:50:00",
+        "direction": "LONG",
+        "entry": 236.715,
+        "exit": 236.83,
+        "pnl_pct": 0.0004858162769575612,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-06-05 14:35:00",
+        "exit_ts": "2020-06-05 15:10:00",
+        "direction": "LONG",
+        "entry": 239.91,
+        "exit": 239.39,
+        "pnl_pct": -0.00216747947146851,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-06-05 15:45:00",
+        "exit_ts": "2020-06-05 15:50:00",
+        "direction": "SHORT",
+        "entry": 239.305,
+        "exit": 239.435,
+        "pnl_pct": -0.0005432397985833787,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-06-10 14:00:00",
+        "exit_ts": "2020-06-10 14:05:00",
+        "direction": "SHORT",
+        "entry": 246.58,
+        "exit": 245.98,
+        "pnl_pct": 0.0024332873712386354,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-06-10 14:15:00",
+        "exit_ts": "2020-06-10 14:40:00",
+        "direction": "LONG",
+        "entry": 247.3,
+        "exit": 246.15,
+        "pnl_pct": -0.0046502224019409856,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-06-22 14:00:00",
+        "exit_ts": "2020-06-22 15:15:00",
+        "direction": "LONG",
+        "entry": 245.8825,
+        "exit": 246.18,
+        "pnl_pct": 0.0012099275060242743,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-06-22 15:40:00",
+        "exit_ts": "2020-06-22 15:50:00",
+        "direction": "SHORT",
+        "entry": 246.339,
+        "exit": 246.62,
+        "pnl_pct": -0.0011407044763517183,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-06-23 14:00:00",
+        "exit_ts": "2020-06-23 14:45:00",
+        "direction": "LONG",
+        "entry": 250.455,
+        "exit": 250.09,
+        "pnl_pct": -0.001457347627318317,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-06-23 15:40:00",
+        "exit_ts": "2020-06-23 15:50:00",
+        "direction": "SHORT",
+        "entry": 249.39,
+        "exit": 249.15,
+        "pnl_pct": 0.000962348129435746,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-06-24 14:00:00",
+        "exit_ts": "2020-06-24 14:25:00",
+        "direction": "SHORT",
+        "entry": 242.79,
+        "exit": 244.16,
+        "pnl_pct": -0.0056427365212735475,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-06-24 14:30:00",
+        "exit_ts": "2020-06-24 15:50:00",
+        "direction": "LONG",
+        "entry": 244.22,
+        "exit": 243.505,
+        "pnl_pct": -0.0029276881500286765,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-06-25 14:00:00",
+        "exit_ts": "2020-06-25 14:30:00",
+        "direction": "LONG",
+        "entry": 244.19,
+        "exit": 243.38,
+        "pnl_pct": -0.0033170891518899312,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-06-25 14:55:00",
+        "exit_ts": "2020-06-25 15:05:00",
+        "direction": "SHORT",
+        "entry": 243.81,
+        "exit": 244.52,
+        "pnl_pct": -0.0029121036872975185,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-06-25 15:45:00",
+        "exit_ts": "2020-06-25 15:50:00",
+        "direction": "LONG",
+        "entry": 245.38,
+        "exit": 246.2134,
+        "pnl_pct": 0.0033963648219089235,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-06-26 14:00:00",
+        "exit_ts": "2020-06-26 15:45:00",
+        "direction": "SHORT",
+        "entry": 242.305,
+        "exit": 241.39,
+        "pnl_pct": 0.0037762324343287197,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-07-08 14:00:00",
+        "exit_ts": "2020-07-08 15:00:00",
+        "direction": "SHORT",
+        "entry": 257.77,
+        "exit": 258.86,
+        "pnl_pct": -0.004228575862202863,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-07-08 15:35:00",
+        "exit_ts": "2020-07-08 15:50:00",
+        "direction": "LONG",
+        "entry": 259.1599,
+        "exit": 259.785,
+        "pnl_pct": 0.0024120243911192733,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-07-15 14:00:00",
+        "exit_ts": "2020-07-15 14:05:00",
+        "direction": "SHORT",
+        "entry": 261.08,
+        "exit": 261.12,
+        "pnl_pct": -0.00015320974413980567,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-07-15 15:05:00",
+        "exit_ts": "2020-07-15 15:30:00",
+        "direction": "SHORT",
+        "entry": 259.8035,
+        "exit": 260.96,
+        "pnl_pct": -0.004451441185357372,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-07-15 15:45:00",
+        "exit_ts": "2020-07-15 15:50:00",
+        "direction": "LONG",
+        "entry": 261.09,
+        "exit": 260.35,
+        "pnl_pct": -0.0028342717070740063,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-07-20 14:55:00",
+        "exit_ts": "2020-07-20 15:50:00",
+        "direction": "LONG",
+        "entry": 265.7174,
+        "exit": 267.2306,
+        "pnl_pct": 0.005694771964500569,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-07-23 15:45:00",
+        "exit_ts": "2020-07-23 15:50:00",
+        "direction": "SHORT",
+        "entry": 257.7,
+        "exit": 257.64,
+        "pnl_pct": 0.00023282887077998555,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-07-27 14:00:00",
+        "exit_ts": "2020-07-27 14:45:00",
+        "direction": "LONG",
+        "entry": 259.06,
+        "exit": 259.21,
+        "pnl_pct": 0.0005790164440669238,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-07-27 15:00:00",
+        "exit_ts": "2020-07-27 15:50:00",
+        "direction": "LONG",
+        "entry": 260.08,
+        "exit": 260.07,
+        "pnl_pct": -3.8449707782185885e-05,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-07-29 14:30:00",
+        "exit_ts": "2020-07-29 14:55:00",
+        "direction": "LONG",
+        "entry": 259.9799,
+        "exit": 259.68,
+        "pnl_pct": -0.0011535507168053364,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-08-12 14:15:00",
+        "exit_ts": "2020-08-12 15:30:00",
+        "direction": "LONG",
+        "entry": 272.55,
+        "exit": 271.89,
+        "pnl_pct": -0.0024215740231151163,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-08-18 14:00:00",
+        "exit_ts": "2020-08-18 15:50:00",
+        "direction": "LONG",
+        "entry": 277.36,
+        "exit": 277.88,
+        "pnl_pct": 0.0018748197288721582,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-09-16 14:00:00",
+        "exit_ts": "2020-09-16 14:15:00",
+        "direction": "SHORT",
+        "entry": 277.3,
+        "exit": 278.52,
+        "pnl_pct": -0.004399567255679662,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-09-16 14:35:00",
+        "exit_ts": "2020-09-16 14:50:00",
+        "direction": "LONG",
+        "entry": 279.03,
+        "exit": 277.11,
+        "pnl_pct": -0.006880980539726765,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-09-16 15:00:00",
+        "exit_ts": "2020-09-16 15:50:00",
+        "direction": "SHORT",
+        "entry": 277.2448,
+        "exit": 274.78,
+        "pnl_pct": 0.008890338069460726,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-09-22 14:00:00",
+        "exit_ts": "2020-09-22 15:50:00",
+        "direction": "LONG",
+        "entry": 271.53,
+        "exit": 272.815,
+        "pnl_pct": 0.004732442087430579,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-09-23 14:00:00",
+        "exit_ts": "2020-09-23 15:10:00",
+        "direction": "SHORT",
+        "entry": 267.03,
+        "exit": 265.01,
+        "pnl_pct": 0.007564693105643493,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-09-23 15:45:00",
+        "exit_ts": "2020-09-23 15:50:00",
+        "direction": "SHORT",
+        "entry": 264.17,
+        "exit": 263.48,
+        "pnl_pct": 0.0026119544232880254,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-09-24 14:00:00",
+        "exit_ts": "2020-09-24 14:25:00",
+        "direction": "LONG",
+        "entry": 267.22,
+        "exit": 265.87,
+        "pnl_pct": -0.005052017064591058,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-09-24 14:35:00",
+        "exit_ts": "2020-09-24 15:40:00",
+        "direction": "SHORT",
+        "entry": 267.12,
+        "exit": 265.62,
+        "pnl_pct": 0.005615453728661276,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-09-25 14:00:00",
+        "exit_ts": "2020-09-25 15:35:00",
+        "direction": "LONG",
+        "entry": 270.03,
+        "exit": 271.29,
+        "pnl_pct": 0.004666148205755094,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-09-28 14:00:00",
+        "exit_ts": "2020-09-28 15:50:00",
+        "direction": "LONG",
+        "entry": 275.79,
+        "exit": 275.12,
+        "pnl_pct": -0.0024293846767468575,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-09-30 14:20:00",
+        "exit_ts": "2020-09-30 14:25:00",
+        "direction": "LONG",
+        "entry": 279.66,
+        "exit": 279.6,
+        "pnl_pct": -0.0002145462347135889,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-09-30 15:10:00",
+        "exit_ts": "2020-09-30 15:20:00",
+        "direction": "LONG",
+        "entry": 278.145,
+        "exit": 276.93,
+        "pnl_pct": -0.004368225206277211,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-10-01 14:30:00",
+        "exit_ts": "2020-10-01 15:50:00",
+        "direction": "LONG",
+        "entry": 281.97,
+        "exit": 282.13,
+        "pnl_pct": 0.0005674362520834421,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-10-02 14:30:00",
+        "exit_ts": "2020-10-02 15:50:00",
+        "direction": "SHORT",
+        "entry": 275.21,
+        "exit": 274.64,
+        "pnl_pct": 0.002071145670578806,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-10-05 14:25:00",
+        "exit_ts": "2020-10-05 14:50:00",
+        "direction": "SHORT",
+        "entry": 278.1,
+        "exit": 278.88,
+        "pnl_pct": -0.002804746494066784,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-10-05 14:55:00",
+        "exit_ts": "2020-10-05 15:50:00",
+        "direction": "LONG",
+        "entry": 279.68,
+        "exit": 280.39,
+        "pnl_pct": 0.002538615560640659,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-10-22 14:00:00",
+        "exit_ts": "2020-10-22 15:50:00",
+        "direction": "LONG",
+        "entry": 284.38,
+        "exit": 284.28,
+        "pnl_pct": -0.0003516421689289779,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-10-27 14:30:00",
+        "exit_ts": "2020-10-27 15:50:00",
+        "direction": "LONG",
+        "entry": 282.14,
+        "exit": 283.06,
+        "pnl_pct": 0.0032607925143546324,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-11-05 14:00:00",
+        "exit_ts": "2020-11-05 15:10:00",
+        "direction": "LONG",
+        "entry": 294.47,
+        "exit": 294.31,
+        "pnl_pct": -0.0005433490678168404,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-11-05 15:25:00",
+        "exit_ts": "2020-11-05 15:45:00",
+        "direction": "LONG",
+        "entry": 294.7,
+        "exit": 293.32,
+        "pnl_pct": -0.004682728198167613,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-11-17 14:00:00",
+        "exit_ts": "2020-11-17 15:20:00",
+        "direction": "SHORT",
+        "entry": 293.06,
+        "exit": 292.4,
+        "pnl_pct": 0.0022520985463728416,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-11-24 14:00:00",
+        "exit_ts": "2020-11-24 14:25:00",
+        "direction": "LONG",
+        "entry": 294.7279,
+        "exit": 294.12,
+        "pnl_pct": -0.00206258043435987,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2020-12-07 14:35:00",
+        "exit_ts": "2020-12-07 15:45:00",
+        "direction": "LONG",
+        "entry": 306.875,
+        "exit": 306.34,
+        "pnl_pct": -0.0017433808553972301,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-12-16 14:00:00",
+        "exit_ts": "2020-12-16 14:05:00",
+        "direction": "LONG",
+        "entry": 308.26,
+        "exit": 307.91,
+        "pnl_pct": -0.0011354051774474985,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-12-16 14:20:00",
+        "exit_ts": "2020-12-16 14:35:00",
+        "direction": "SHORT",
+        "entry": 308.12,
+        "exit": 308.55,
+        "pnl_pct": -0.0013955601713618291,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2020-12-16 15:10:00",
+        "exit_ts": "2020-12-16 15:50:00",
+        "direction": "LONG",
+        "entry": 309.094,
+        "exit": 309.32,
+        "pnl_pct": 0.0007311691588966434,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-01-05 14:00:00",
+        "exit_ts": "2021-01-05 14:55:00",
+        "direction": "LONG",
+        "entry": 311.33,
+        "exit": 311.28,
+        "pnl_pct": -0.00016060129123441805,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-01-05 15:00:00",
+        "exit_ts": "2021-01-05 15:30:00",
+        "direction": "LONG",
+        "entry": 311.55,
+        "exit": 310.92,
+        "pnl_pct": -0.0020221473278767307,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-01-05 15:40:00",
+        "exit_ts": "2021-01-05 15:45:00",
+        "direction": "SHORT",
+        "entry": 311.54,
+        "exit": 311.85,
+        "pnl_pct": -0.0009950568145342565,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-01-12 14:00:00",
+        "exit_ts": "2021-01-12 14:45:00",
+        "direction": "LONG",
+        "entry": 314.59,
+        "exit": 313.57,
+        "pnl_pct": -0.003242315394640586,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-01-12 15:00:00",
+        "exit_ts": "2021-01-12 15:50:00",
+        "direction": "LONG",
+        "entry": 314.08,
+        "exit": 314.18,
+        "pnl_pct": 0.00031839021905254313,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-01-13 14:00:00",
+        "exit_ts": "2021-01-13 15:20:00",
+        "direction": "LONG",
+        "entry": 316.68,
+        "exit": 316.06,
+        "pnl_pct": -0.0019578123026399033,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-01-21 14:00:00",
+        "exit_ts": "2021-01-21 15:50:00",
+        "direction": "LONG",
+        "entry": 325.98,
+        "exit": 326.59,
+        "pnl_pct": 0.0018712804466530363,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-01-27 14:15:00",
+        "exit_ts": "2021-01-27 14:25:00",
+        "direction": "LONG",
+        "entry": 322.9138,
+        "exit": 322.13,
+        "pnl_pct": -0.0024272731608249174,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-03-12 14:00:00",
+        "exit_ts": "2021-03-12 15:50:00",
+        "direction": "LONG",
+        "entry": 314.018,
+        "exit": 315.11,
+        "pnl_pct": 0.0034775076587967614,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-03-26 15:30:00",
+        "exit_ts": "2021-03-26 15:50:00",
+        "direction": "LONG",
+        "entry": 313.405,
+        "exit": 314.54,
+        "pnl_pct": 0.0036215121009557853,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-04-07 14:55:00",
+        "exit_ts": "2021-04-07 15:15:00",
+        "direction": "LONG",
+        "entry": 331.89,
+        "exit": 331.47,
+        "pnl_pct": -0.0012654795263489682,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-04-07 15:25:00",
+        "exit_ts": "2021-04-07 15:50:00",
+        "direction": "SHORT",
+        "entry": 331.1917,
+        "exit": 331.82,
+        "pnl_pct": -0.0018970886045754389,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-04-21 14:35:00",
+        "exit_ts": "2021-04-21 15:50:00",
+        "direction": "LONG",
+        "entry": 337.875,
+        "exit": 339.34,
+        "pnl_pct": 0.0043359230484645945,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-04-27 14:00:00",
+        "exit_ts": "2021-04-27 14:30:00",
+        "direction": "SHORT",
+        "entry": 339.83,
+        "exit": 340.55,
+        "pnl_pct": -0.0021187064120296245,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-04-27 15:30:00",
+        "exit_ts": "2021-04-27 15:50:00",
+        "direction": "LONG",
+        "entry": 340.35,
+        "exit": 340.41,
+        "pnl_pct": 0.0001762891141472081,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-04-28 14:00:00",
+        "exit_ts": "2021-04-28 14:05:00",
+        "direction": "SHORT",
+        "entry": 339.31,
+        "exit": 339.33,
+        "pnl_pct": -5.894314933241522e-05,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-04-28 14:35:00",
+        "exit_ts": "2021-04-28 14:40:00",
+        "direction": "SHORT",
+        "entry": 340.395,
+        "exit": 340.42,
+        "pnl_pct": -7.34440870166545e-05,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-04-28 15:10:00",
+        "exit_ts": "2021-04-28 15:50:00",
+        "direction": "LONG",
+        "entry": 339.51,
+        "exit": 338.61,
+        "pnl_pct": -0.0026508792082706764,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-05-10 14:10:00",
+        "exit_ts": "2021-05-10 15:45:00",
+        "direction": "SHORT",
+        "entry": 327.5,
+        "exit": 327.03,
+        "pnl_pct": 0.0014351145038168772,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-05-13 14:35:00",
+        "exit_ts": "2021-05-13 15:50:00",
+        "direction": "LONG",
+        "entry": 320.34,
+        "exit": 319.96,
+        "pnl_pct": -0.0011862396204033075,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-05-14 14:40:00",
+        "exit_ts": "2021-05-14 15:00:00",
+        "direction": "LONG",
+        "entry": 326.7702,
+        "exit": 326.67,
+        "pnl_pct": -0.0003066375085609781,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-05-14 15:30:00",
+        "exit_ts": "2021-05-14 15:50:00",
+        "direction": "LONG",
+        "entry": 326.5,
+        "exit": 327.21,
+        "pnl_pct": 0.002174578866768697,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-05-17 14:00:00",
+        "exit_ts": "2021-05-17 14:50:00",
+        "direction": "SHORT",
+        "entry": 322.24,
+        "exit": 323.14,
+        "pnl_pct": -0.002792949354518301,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-05-19 14:00:00",
+        "exit_ts": "2021-05-19 14:05:00",
+        "direction": "LONG",
+        "entry": 320.3199,
+        "exit": 320.12,
+        "pnl_pct": -0.0006240636313885391,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-05-25 14:00:00",
+        "exit_ts": "2021-05-25 15:50:00",
+        "direction": "LONG",
+        "entry": 332.33,
+        "exit": 332.51,
+        "pnl_pct": 0.0005416303072247671,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-07-13 14:00:00",
+        "exit_ts": "2021-07-13 14:25:00",
+        "direction": "SHORT",
+        "entry": 361.69,
+        "exit": 363.24,
+        "pnl_pct": -0.004285437805855875,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-07-13 14:40:00",
+        "exit_ts": "2021-07-13 15:50:00",
+        "direction": "SHORT",
+        "entry": 362.58,
+        "exit": 362.29,
+        "pnl_pct": 0.000799823487230304,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-07-26 14:00:00",
+        "exit_ts": "2021-07-26 14:45:00",
+        "direction": "SHORT",
+        "entry": 368.24,
+        "exit": 368.45,
+        "pnl_pct": -0.0005702802520095034,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-07-26 14:55:00",
+        "exit_ts": "2021-07-26 15:45:00",
+        "direction": "LONG",
+        "entry": 368.498,
+        "exit": 368.1,
+        "pnl_pct": -0.0010800601360115053,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-07-27 14:00:00",
+        "exit_ts": "2021-07-27 14:15:00",
+        "direction": "SHORT",
+        "entry": 361.43,
+        "exit": 362.45,
+        "pnl_pct": -0.0028221232327144447,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-09-22 14:00:00",
+        "exit_ts": "2021-09-22 14:05:00",
+        "direction": "SHORT",
+        "entry": 370.0,
+        "exit": 368.97,
+        "pnl_pct": 0.00278378378378371,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-09-22 14:15:00",
+        "exit_ts": "2021-09-22 14:40:00",
+        "direction": "LONG",
+        "entry": 370.32,
+        "exit": 369.25,
+        "pnl_pct": -0.002889392957442194,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-09-24 14:00:00",
+        "exit_ts": "2021-09-24 14:55:00",
+        "direction": "SHORT",
+        "entry": 372.29,
+        "exit": 372.74,
+        "pnl_pct": -0.0012087351258427265,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-09-27 14:00:00",
+        "exit_ts": "2021-09-27 15:50:00",
+        "direction": "LONG",
+        "entry": 370.558,
+        "exit": 370.21,
+        "pnl_pct": -0.0009391242396602238,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-09-30 14:00:00",
+        "exit_ts": "2021-09-30 15:40:00",
+        "direction": "LONG",
+        "entry": 360.37,
+        "exit": 359.74,
+        "pnl_pct": -0.001748203235563436,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-10-04 14:00:00",
+        "exit_ts": "2021-10-04 15:00:00",
+        "direction": "SHORT",
+        "entry": 351.84,
+        "exit": 352.99,
+        "pnl_pct": -0.003268531150523062,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-10-04 15:40:00",
+        "exit_ts": "2021-10-04 15:50:00",
+        "direction": "SHORT",
+        "entry": 352.27,
+        "exit": 351.415,
+        "pnl_pct": 0.002427115564765553,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-10-06 14:00:00",
+        "exit_ts": "2021-10-06 15:50:00",
+        "direction": "LONG",
+        "entry": 358.5371,
+        "exit": 359.38,
+        "pnl_pct": 0.0023509422037495866,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-10-07 14:00:00",
+        "exit_ts": "2021-10-07 15:20:00",
+        "direction": "SHORT",
+        "entry": 364.355,
+        "exit": 364.43,
+        "pnl_pct": -0.00020584320237128248,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-10-13 15:10:00",
+        "exit_ts": "2021-10-13 15:50:00",
+        "direction": "LONG",
+        "entry": 359.49,
+        "exit": 359.81,
+        "pnl_pct": 0.0008901499346295952,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-10-15 14:00:00",
+        "exit_ts": "2021-10-15 15:05:00",
+        "direction": "LONG",
+        "entry": 368.36,
+        "exit": 367.95,
+        "pnl_pct": -0.0011130415897492264,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-10-15 15:25:00",
+        "exit_ts": "2021-10-15 15:50:00",
+        "direction": "LONG",
+        "entry": 368.57,
+        "exit": 368.66,
+        "pnl_pct": 0.0002441869929729274,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-12-07 14:00:00",
+        "exit_ts": "2021-12-07 14:35:00",
+        "direction": "LONG",
+        "entry": 398.0,
+        "exit": 397.38,
+        "pnl_pct": -0.0015577889447236295,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-12-07 15:05:00",
+        "exit_ts": "2021-12-07 15:50:00",
+        "direction": "SHORT",
+        "entry": 397.32,
+        "exit": 397.04,
+        "pnl_pct": 0.0007047216349541244,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-12-10 14:00:00",
+        "exit_ts": "2021-12-10 15:50:00",
+        "direction": "LONG",
+        "entry": 396.52,
+        "exit": 397.67,
+        "pnl_pct": 0.002900232018561571,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-12-15 14:00:00",
+        "exit_ts": "2021-12-15 14:25:00",
+        "direction": "LONG",
+        "entry": 388.08,
+        "exit": 388.33,
+        "pnl_pct": 0.0006441970727685014,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2021-12-28 14:00:00",
+        "exit_ts": "2021-12-28 15:10:00",
+        "direction": "SHORT",
+        "entry": 400.7415,
+        "exit": 402.02,
+        "pnl_pct": -0.003190335914797964,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-12-28 15:30:00",
+        "exit_ts": "2021-12-28 15:50:00",
+        "direction": "LONG",
+        "entry": 401.76,
+        "exit": 401.4,
+        "pnl_pct": -0.0008960573476702848,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2021-12-30 14:15:00",
+        "exit_ts": "2021-12-30 15:50:00",
+        "direction": "SHORT",
+        "entry": 402.45,
+        "exit": 400.81,
+        "pnl_pct": 0.004075040377686636,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-01-05 14:00:00",
+        "exit_ts": "2022-01-05 15:50:00",
+        "direction": "SHORT",
+        "entry": 390.7918,
+        "exit": 385.34,
+        "pnl_pct": 0.01395065096043481,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-01-11 14:00:00",
+        "exit_ts": "2022-01-11 15:50:00",
+        "direction": "LONG",
+        "entry": 384.9418,
+        "exit": 385.1,
+        "pnl_pct": 0.00041097121694765834,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-01-13 14:00:00",
+        "exit_ts": "2022-01-13 15:50:00",
+        "direction": "SHORT",
+        "entry": 382.7,
+        "exit": 376.94,
+        "pnl_pct": 0.01505095374967335,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-01-26 14:00:00",
+        "exit_ts": "2022-01-26 14:05:00",
+        "direction": "SHORT",
+        "entry": 355.18,
+        "exit": 355.79,
+        "pnl_pct": -0.0017174390449913104,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-02-07 15:10:00",
+        "exit_ts": "2022-02-07 15:25:00",
+        "direction": "LONG",
+        "entry": 359.03,
+        "exit": 357.04,
+        "pnl_pct": -0.00554271230816353,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-02-16 14:00:00",
+        "exit_ts": "2022-02-16 14:05:00",
+        "direction": "SHORT",
+        "entry": 352.59,
+        "exit": 352.67,
+        "pnl_pct": -0.00022689242462928878,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-02-16 14:20:00",
+        "exit_ts": "2022-02-16 15:50:00",
+        "direction": "LONG",
+        "entry": 354.97,
+        "exit": 356.06,
+        "pnl_pct": 0.003070682029467208,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-03-24 14:00:00",
+        "exit_ts": "2022-03-24 15:50:00",
+        "direction": "LONG",
+        "entry": 357.63,
+        "exit": 359.1,
+        "pnl_pct": 0.004110393423370599,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-03-30 14:25:00",
+        "exit_ts": "2022-03-30 15:45:00",
+        "direction": "SHORT",
+        "entry": 367.8039,
+        "exit": 366.93,
+        "pnl_pct": 0.002375994381788752,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-04-01 14:00:00",
+        "exit_ts": "2022-04-01 14:25:00",
+        "direction": "SHORT",
+        "entry": 360.109,
+        "exit": 360.98,
+        "pnl_pct": -0.0024187121121661435,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-04-01 14:30:00",
+        "exit_ts": "2022-04-01 15:15:00",
+        "direction": "LONG",
+        "entry": 361.49,
+        "exit": 360.14,
+        "pnl_pct": -0.003734543140889161,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-04-06 14:00:00",
+        "exit_ts": "2022-04-06 14:05:00",
+        "direction": "LONG",
+        "entry": 355.23,
+        "exit": 353.96,
+        "pnl_pct": -0.0035751484953411555,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-04-06 14:30:00",
+        "exit_ts": "2022-04-06 15:00:00",
+        "direction": "SHORT",
+        "entry": 354.31,
+        "exit": 355.59,
+        "pnl_pct": -0.0036126555840929487,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-04-08 14:20:00",
+        "exit_ts": "2022-04-08 14:50:00",
+        "direction": "SHORT",
+        "entry": 350.28,
+        "exit": 350.68,
+        "pnl_pct": -0.001141943587986851,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-04-08 15:10:00",
+        "exit_ts": "2022-04-08 15:50:00",
+        "direction": "SHORT",
+        "entry": 350.44,
+        "exit": 348.79,
+        "pnl_pct": 0.004708366624814454,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-04-14 14:50:00",
+        "exit_ts": "2022-04-14 15:50:00",
+        "direction": "SHORT",
+        "entry": 339.9,
+        "exit": 338.65,
+        "pnl_pct": 0.0036775522212415417,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-06-08 14:40:00",
+        "exit_ts": "2022-06-08 15:30:00",
+        "direction": "SHORT",
+        "entry": 307.83,
+        "exit": 308.62,
+        "pnl_pct": -0.002566351557678006,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-07-06 14:00:00",
+        "exit_ts": "2022-07-06 14:05:00",
+        "direction": "LONG",
+        "entry": 287.78,
+        "exit": 288.09,
+        "pnl_pct": 0.001077211758982564,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-07-06 14:25:00",
+        "exit_ts": "2022-07-06 14:30:00",
+        "direction": "SHORT",
+        "entry": 288.62,
+        "exit": 288.96,
+        "pnl_pct": -0.0011780195412652448,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-07-07 14:40:00",
+        "exit_ts": "2022-07-07 15:35:00",
+        "direction": "LONG",
+        "entry": 294.505,
+        "exit": 294.92,
+        "pnl_pct": 0.0014091441571451094,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-07-13 14:00:00",
+        "exit_ts": "2022-07-13 15:50:00",
+        "direction": "LONG",
+        "entry": 285.3,
+        "exit": 286.2399,
+        "pnl_pct": 0.0032944269190324778,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-07-27 14:30:00",
+        "exit_ts": "2022-07-27 14:35:00",
+        "direction": "LONG",
+        "entry": 302.0305,
+        "exit": 302.43,
+        "pnl_pct": 0.0013227140967550929,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-08-08 14:00:00",
+        "exit_ts": "2022-08-08 15:50:00",
+        "direction": "SHORT",
+        "entry": 320.2,
+        "exit": 320.7,
+        "pnl_pct": -0.0015615240474703312,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-08-16 14:35:00",
+        "exit_ts": "2022-08-16 14:40:00",
+        "direction": "LONG",
+        "entry": 331.91,
+        "exit": 331.74,
+        "pnl_pct": -0.000512187038655105,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-08-16 14:55:00",
+        "exit_ts": "2022-08-16 15:30:00",
+        "direction": "SHORT",
+        "entry": 331.54,
+        "exit": 332.45,
+        "pnl_pct": -0.0027447668456293903,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-08-17 14:00:00",
+        "exit_ts": "2022-08-17 14:05:00",
+        "direction": "LONG",
+        "entry": 329.18,
+        "exit": 328.65,
+        "pnl_pct": -0.0016100613646030425,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-08-17 15:10:00",
+        "exit_ts": "2022-08-17 15:50:00",
+        "direction": "LONG",
+        "entry": 328.78,
+        "exit": 328.59,
+        "pnl_pct": -0.0005778940324837208,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-08-18 14:00:00",
+        "exit_ts": "2022-08-18 15:50:00",
+        "direction": "LONG",
+        "entry": 329.43,
+        "exit": 329.17,
+        "pnl_pct": -0.0007892420241022096,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-08-24 14:00:00",
+        "exit_ts": "2022-08-24 15:10:00",
+        "direction": "SHORT",
+        "entry": 315.14,
+        "exit": 315.56,
+        "pnl_pct": -0.0013327410039982736,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-08-24 15:35:00",
+        "exit_ts": "2022-08-24 15:50:00",
+        "direction": "LONG",
+        "entry": 315.86,
+        "exit": 315.33,
+        "pnl_pct": -0.0016779585892484946,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-09-07 14:00:00",
+        "exit_ts": "2022-09-07 15:50:00",
+        "direction": "LONG",
+        "entry": 298.72,
+        "exit": 299.45,
+        "pnl_pct": 0.0024437600428493613,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-09-09 14:00:00",
+        "exit_ts": "2022-09-09 15:50:00",
+        "direction": "LONG",
+        "entry": 306.485,
+        "exit": 307.36,
+        "pnl_pct": 0.0028549521183744717,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-09-23 14:00:00",
+        "exit_ts": "2022-09-23 15:05:00",
+        "direction": "SHORT",
+        "entry": 274.57,
+        "exit": 273.53,
+        "pnl_pct": 0.0037877408311178225,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-09-23 15:40:00",
+        "exit_ts": "2022-09-23 15:50:00",
+        "direction": "LONG",
+        "entry": 275.625,
+        "exit": 275.26,
+        "pnl_pct": -0.001324263038548786,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-09-28 14:00:00",
+        "exit_ts": "2022-09-28 15:50:00",
+        "direction": "LONG",
+        "entry": 278.14,
+        "exit": 280.78,
+        "pnl_pct": 0.009491622923707437,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-09-29 14:15:00",
+        "exit_ts": "2022-09-29 14:35:00",
+        "direction": "SHORT",
+        "entry": 268.89,
+        "exit": 270.45,
+        "pnl_pct": -0.005801628918888774,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-09-29 14:50:00",
+        "exit_ts": "2022-09-29 15:15:00",
+        "direction": "SHORT",
+        "entry": 269.3,
+        "exit": 270.96,
+        "pnl_pct": -0.006164129223913732,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-09-30 14:00:00",
+        "exit_ts": "2022-09-30 15:50:00",
+        "direction": "SHORT",
+        "entry": 270.28,
+        "exit": 267.88,
+        "pnl_pct": 0.008879680331507982,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-10-12 14:00:00",
+        "exit_ts": "2022-10-12 14:05:00",
+        "direction": "SHORT",
+        "entry": 262.94,
+        "exit": 263.96,
+        "pnl_pct": -0.003879211987525602,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-10-12 15:15:00",
+        "exit_ts": "2022-10-12 15:50:00",
+        "direction": "SHORT",
+        "entry": 263.575,
+        "exit": 263.26,
+        "pnl_pct": 0.0011951057573745527,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-11-02 14:00:00",
+        "exit_ts": "2022-11-02 14:10:00",
+        "direction": "LONG",
+        "entry": 276.86,
+        "exit": 275.74,
+        "pnl_pct": -0.004045365888896931,
+        "reason": "STOP",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-11-02 14:50:00",
+        "exit_ts": "2022-11-02 15:50:00",
+        "direction": "SHORT",
+        "entry": 270.97,
+        "exit": 266.23,
+        "pnl_pct": 0.017492711370262422,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-11-18 14:00:00",
+        "exit_ts": "2022-11-18 15:00:00",
+        "direction": "SHORT",
+        "entry": 283.595,
+        "exit": 284.38,
+        "pnl_pct": -0.0027680318764434072,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-11-18 15:20:00",
+        "exit_ts": "2022-11-18 15:50:00",
+        "direction": "LONG",
+        "entry": 284.0929,
+        "exit": 284.38,
+        "pnl_pct": 0.0010105849178209292,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-11-22 14:35:00",
+        "exit_ts": "2022-11-22 15:50:00",
+        "direction": "LONG",
+        "entry": 284.705,
+        "exit": 285.76,
+        "pnl_pct": 0.0037055899966632368,
+        "reason": "EOD",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-11-23 14:00:00",
+        "exit_ts": "2022-11-23 14:10:00",
+        "direction": "LONG",
+        "entry": 289.135,
+        "exit": 287.81,
+        "pnl_pct": -0.00458263440953184,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-11-29 14:00:00",
+        "exit_ts": "2022-11-29 15:50:00",
+        "direction": "SHORT",
+        "entry": 281.105,
+        "exit": 280.29,
+        "pnl_pct": 0.0028992725138293437,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-12-09 14:00:00",
+        "exit_ts": "2022-12-09 15:50:00",
+        "direction": "SHORT",
+        "entry": 283.8501,
+        "exit": 282.42,
+        "pnl_pct": 0.00503822263934373,
+        "reason": "EOD",
+        "regime": "Stress"
+      },
+      {
+        "entry_ts": "2022-12-14 14:00:00",
+        "exit_ts": "2022-12-14 14:05:00",
+        "direction": "LONG",
+        "entry": 287.39,
+        "exit": 288.45,
+        "pnl_pct": 0.003688367723302837,
+        "reason": "STOP",
+        "regime": "Normal"
+      },
+      {
+        "entry_ts": "2022-12-27 14:25:00",
+        "exit_ts": "2022-12-27 15:15:00",
+        "direction": "SHORT",
+        "entry": 263.39,
+        "exit": 264.1,
+        "pnl_pct": -0.0026956224609895455,
+        "reason": "STOP",
+        "regime": "Stress"
+      }
+    ]
+  }
+}

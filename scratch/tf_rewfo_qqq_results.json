@@ -1,0 +1,543 @@
+{
+  "15_2.0": {
+    "summary": {
+      "n": 259,
+      "win_rate": 0.3436,
+      "avg_win_pct": 0.00153,
+      "avg_loss_pct": -0.00125,
+      "profit_factor": 0.64,
+      "expectancy_pct": -0.0003,
+      "total_pct": -0.0767
+    },
+    "by_year": {
+      "2017": {
+        "n": 18,
+        "total_pct": -0.44
+      },
+      "2018": {
+        "n": 53,
+        "total_pct": -3.63
+      },
+      "2019": {
+        "n": 41,
+        "total_pct": -0.66
+      },
+      "2020": {
+        "n": 78,
+        "total_pct": -0.64
+      },
+      "2021": {
+        "n": 69,
+        "total_pct": -2.31
+      }
+    }
+  },
+  "15_2.5": {
+    "summary": {
+      "n": 220,
+      "win_rate": 0.3545,
+      "avg_win_pct": 0.00199,
+      "avg_loss_pct": -0.00165,
+      "profit_factor": 0.662,
+      "expectancy_pct": -0.00036,
+      "total_pct": -0.0793
+    },
+    "by_year": {
+      "2017": {
+        "n": 15,
+        "total_pct": -0.19
+      },
+      "2018": {
+        "n": 43,
+        "total_pct": -3.2
+      },
+      "2019": {
+        "n": 34,
+        "total_pct": -0.8
+      },
+      "2020": {
+        "n": 71,
+        "total_pct": -2.04
+      },
+      "2021": {
+        "n": 57,
+        "total_pct": -1.71
+      }
+    }
+  },
+  "15_3.0": {
+    "summary": {
+      "n": 195,
+      "win_rate": 0.3795,
+      "avg_win_pct": 0.00251,
+      "avg_loss_pct": -0.00192,
+      "profit_factor": 0.8,
+      "expectancy_pct": -0.00024,
+      "total_pct": -0.0463
+    },
+    "by_year": {
+      "2017": {
+        "n": 13,
+        "total_pct": -0.02
+      },
+      "2018": {
+        "n": 39,
+        "total_pct": -3.17
+      },
+      "2019": {
+        "n": 31,
+        "total_pct": -1.02
+      },
+      "2020": {
+        "n": 62,
+        "total_pct": 1.43
+      },
+      "2021": {
+        "n": 50,
+        "total_pct": -1.85
+      }
+    }
+  },
+  "15_3.5": {
+    "summary": {
+      "n": 179,
+      "win_rate": 0.3911,
+      "avg_win_pct": 0.00263,
+      "avg_loss_pct": -0.00223,
+      "profit_factor": 0.76,
+      "expectancy_pct": -0.00033,
+      "total_pct": -0.0584
+    },
+    "by_year": {
+      "2017": {
+        "n": 11,
+        "total_pct": -0.35
+      },
+      "2018": {
+        "n": 38,
+        "total_pct": -2.94
+      },
+      "2019": {
+        "n": 29,
+        "total_pct": -1.33
+      },
+      "2020": {
+        "n": 56,
+        "total_pct": 0.63
+      },
+      "2021": {
+        "n": 45,
+        "total_pct": -1.85
+      }
+    }
+  },
+  "20_2.0": {
+    "summary": {
+      "n": 256,
+      "win_rate": 0.3477,
+      "avg_win_pct": 0.00155,
+      "avg_loss_pct": -0.00125,
+      "profit_factor": 0.657,
+      "expectancy_pct": -0.00028,
+      "total_pct": -0.0719
+    },
+    "by_year": {
+      "2017": {
+        "n": 18,
+        "total_pct": -0.61
+      },
+      "2018": {
+        "n": 53,
+        "total_pct": -3.29
+      },
+      "2019": {
+        "n": 40,
+        "total_pct": -0.45
+      },
+      "2020": {
+        "n": 76,
+        "total_pct": -0.61
+      },
+      "2021": {
+        "n": 69,
+        "total_pct": -2.24
+      }
+    }
+  },
+  "20_2.5": {
+    "summary": {
+      "n": 217,
+      "win_rate": 0.3733,
+      "avg_win_pct": 0.00202,
+      "avg_loss_pct": -0.00166,
+      "profit_factor": 0.722,
+      "expectancy_pct": -0.00029,
+      "total_pct": -0.063
+    },
+    "by_year": {
+      "2017": {
+        "n": 15,
+        "total_pct": -0.15
+      },
+      "2018": {
+        "n": 43,
+        "total_pct": -2.77
+      },
+      "2019": {
+        "n": 33,
+        "total_pct": -0.5
+      },
+      "2020": {
+        "n": 69,
+        "total_pct": -1.39
+      },
+      "2021": {
+        "n": 57,
+        "total_pct": -1.49
+      }
+    }
+  },
+  "20_3.0": {
+    "summary": {
+      "n": 194,
+      "win_rate": 0.3866,
+      "avg_win_pct": 0.00246,
+      "avg_loss_pct": -0.00193,
+      "profit_factor": 0.804,
+      "expectancy_pct": -0.00023,
+      "total_pct": -0.045
+    },
+    "by_year": {
+      "2017": {
+        "n": 12,
+        "total_pct": 0.19
+      },
+      "2018": {
+        "n": 39,
+        "total_pct": -3.17
+      },
+      "2019": {
+        "n": 32,
+        "total_pct": -1.21
+      },
+      "2020": {
+        "n": 61,
+        "total_pct": 1.61
+      },
+      "2021": {
+        "n": 50,
+        "total_pct": -1.93
+      }
+    }
+  },
+  "20_3.5": {
+    "summary": {
+      "n": 177,
+      "win_rate": 0.3955,
+      "avg_win_pct": 0.00254,
+      "avg_loss_pct": -0.00222,
+      "profit_factor": 0.748,
+      "expectancy_pct": -0.00034,
+      "total_pct": -0.0598
+    },
+    "by_year": {
+      "2017": {
+        "n": 10,
+        "total_pct": -0.19
+      },
+      "2018": {
+        "n": 38,
+        "total_pct": -2.94
+      },
+      "2019": {
+        "n": 29,
+        "total_pct": -1.69
+      },
+      "2020": {
+        "n": 56,
+        "total_pct": 0.38
+      },
+      "2021": {
+        "n": 44,
+        "total_pct": -1.55
+      }
+    }
+  },
+  "30_2.0": {
+    "summary": {
+      "n": 246,
+      "win_rate": 0.3496,
+      "avg_win_pct": 0.00162,
+      "avg_loss_pct": -0.00125,
+      "profit_factor": 0.694,
+      "expectancy_pct": -0.00025,
+      "total_pct": -0.0612
+    },
+    "by_year": {
+      "2017": {
+        "n": 17,
+        "total_pct": -0.53
+      },
+      "2018": {
+        "n": 52,
+        "total_pct": -2.74
+      },
+      "2019": {
+        "n": 40,
+        "total_pct": -0.99
+      },
+      "2020": {
+        "n": 73,
+        "total_pct": -0.51
+      },
+      "2021": {
+        "n": 64,
+        "total_pct": -1.36
+      }
+    }
+  },
+  "30_2.5": {
+    "summary": {
+      "n": 213,
+      "win_rate": 0.3803,
+      "avg_win_pct": 0.00204,
+      "avg_loss_pct": -0.00167,
+      "profit_factor": 0.749,
+      "expectancy_pct": -0.00026,
+      "total_pct": -0.0553
+    },
+    "by_year": {
+      "2017": {
+        "n": 14,
+        "total_pct": 0.03
+      },
+      "2018": {
+        "n": 42,
+        "total_pct": -2.09
+      },
+      "2019": {
+        "n": 33,
+        "total_pct": -0.97
+      },
+      "2020": {
+        "n": 67,
+        "total_pct": -1.38
+      },
+      "2021": {
+        "n": 57,
+        "total_pct": -1.11
+      }
+    }
+  },
+  "30_3.0": {
+    "summary": {
+      "n": 190,
+      "win_rate": 0.4053,
+      "avg_win_pct": 0.00245,
+      "avg_loss_pct": -0.00198,
+      "profit_factor": 0.844,
+      "expectancy_pct": -0.00018,
+      "total_pct": -0.0349
+    },
+    "by_year": {
+      "2017": {
+        "n": 11,
+        "total_pct": 0.38
+      },
+      "2018": {
+        "n": 38,
+        "total_pct": -1.97
+      },
+      "2019": {
+        "n": 32,
+        "total_pct": -1.66
+      },
+      "2020": {
+        "n": 60,
+        "total_pct": 1.13
+      },
+      "2021": {
+        "n": 49,
+        "total_pct": -1.38
+      }
+    }
+  },
+  "30_3.5": {
+    "summary": {
+      "n": 173,
+      "win_rate": 0.422,
+      "avg_win_pct": 0.00256,
+      "avg_loss_pct": -0.00229,
+      "profit_factor": 0.815,
+      "expectancy_pct": -0.00024,
+      "total_pct": -0.0424
+    },
+    "by_year": {
+      "2017": {
+        "n": 10,
+        "total_pct": 0.13
+      },
+      "2018": {
+        "n": 37,
+        "total_pct": -1.62
+      },
+      "2019": {
+        "n": 28,
+        "total_pct": -1.78
+      },
+      "2020": {
+        "n": 55,
+        "total_pct": 0.01
+      },
+      "2021": {
+        "n": 43,
+        "total_pct": -0.98
+      }
+    }
+  },
+  "50_2.0": {
+    "summary": {
+      "n": 236,
+      "win_rate": 0.3517,
+      "avg_win_pct": 0.00164,
+      "avg_loss_pct": -0.00125,
+      "profit_factor": 0.712,
+      "expectancy_pct": -0.00023,
+      "total_pct": -0.0549
+    },
+    "by_year": {
+      "2017": {
+        "n": 17,
+        "total_pct": -0.42
+      },
+      "2018": {
+        "n": 51,
+        "total_pct": -1.86
+      },
+      "2019": {
+        "n": 39,
+        "total_pct": -0.5
+      },
+      "2020": {
+        "n": 65,
+        "total_pct": -0.9
+      },
+      "2021": {
+        "n": 64,
+        "total_pct": -1.82
+      }
+    }
+  },
+  "50_2.5": {
+    "summary": {
+      "n": 202,
+      "win_rate": 0.3911,
+      "avg_win_pct": 0.00203,
+      "avg_loss_pct": -0.00166,
+      "profit_factor": 0.787,
+      "expectancy_pct": -0.00022,
+      "total_pct": -0.0434
+    },
+    "by_year": {
+      "2017": {
+        "n": 14,
+        "total_pct": 0.13
+      },
+      "2018": {
+        "n": 39,
+        "total_pct": -0.74
+      },
+      "2019": {
+        "n": 32,
+        "total_pct": -0.64
+      },
+      "2020": {
+        "n": 60,
+        "total_pct": -2.45
+      },
+      "2021": {
+        "n": 57,
+        "total_pct": -0.64
+      }
+    }
+  },
+  "50_3.0": {
+    "summary": {
+      "n": 179,
+      "win_rate": 0.419,
+      "avg_win_pct": 0.00247,
+      "avg_loss_pct": -0.0019,
+      "profit_factor": 0.938,
+      "expectancy_pct": -7e-05,
+      "total_pct": -0.0123
+    },
+    "by_year": {
+      "2017": {
+        "n": 11,
+        "total_pct": 0.38
+      },
+      "2018": {
+        "n": 36,
+        "total_pct": -0.51
+      },
+      "2019": {
+        "n": 30,
+        "total_pct": -0.82
+      },
+      "2020": {
+        "n": 54,
+        "total_pct": -1.22
+      },
+      "2021": {
+        "n": 48,
+        "total_pct": 0.94
+      }
+    }
+  },
+  "50_3.5": {
+    "summary": {
+      "n": 160,
+      "win_rate": 0.4562,
+      "avg_win_pct": 0.00272,
+      "avg_loss_pct": -0.00214,
+      "profit_factor": 1.069,
+      "expectancy_pct": 8e-05,
+      "total_pct": 0.0129
+    },
+    "by_year": {
+      "2017": {
+        "n": 10,
+        "total_pct": 0.42
+      },
+      "2018": {
+        "n": 35,
+        "total_pct": 0.34
+      },
+      "2019": {
+        "n": 25,
+        "total_pct": -0.15
+      },
+      "2020": {
+        "n": 48,
+        "total_pct": -0.69
+      },
+      "2021": {
+        "n": 42,
+        "total_pct": 1.37
+      }
+    }
+  },
+  "_oos_winner": {
+    "ema": 50,
+    "chand": 3.5,
+    "oos": {
+      "n": 49,
+      "win_rate": 0.5714,
+      "avg_win_pct": 0.00531,
+      "avg_loss_pct": -0.00323,
+      "profit_factor": 2.191,
+      "expectancy_pct": 0.00165,
+      "total_pct": 0.0808
+    }
+  }
+}

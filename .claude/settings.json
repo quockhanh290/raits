@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(mkdir -p \"d:/raits/.superpowers/sdd\")",
+      "Bash(git -C d:/raits rev-parse HEAD)"
     ]
   }
 }

@@ -1,0 +1,54 @@
+{
+  "SPY": {
+    "Calm": {
+      "days": 152,
+      "avg_fwd_vol_ann": 0.1139,
+      "avg_fwd_ret": 0.00043,
+      "pct_up_days": 0.566
+    },
+    "Crisis": {
+      "days": 5,
+      "avg_fwd_vol_ann": 0.1681,
+      "avg_fwd_ret": -0.0048,
+      "pct_up_days": 0.2
+    },
+    "Normal": {
+      "days": 197,
+      "avg_fwd_vol_ann": 0.173,
+      "avg_fwd_ret": 0.00061,
+      "pct_up_days": 0.523
+    },
+    "Stress": {
+      "days": 160,
+      "avg_fwd_vol_ann": 0.2322,
+      "avg_fwd_ret": -0.00037,
+      "pct_up_days": 0.456
+    }
+  },
+  "QQQ": {
+    "Calm": {
+      "days": 152,
+      "avg_fwd_vol_ann": 0.1503,
+      "avg_fwd_ret": 0.00041,
+      "pct_up_days": 0.566
+    },
+    "Crisis": {
+      "days": 5,
+      "avg_fwd_vol_ann": 0.2527,
+      "avg_fwd_ret": -0.00873,
+      "pct_up_days": 0.2
+    },
+    "Normal": {
+      "days": 197,
+      "avg_fwd_vol_ann": 0.2375,
+      "avg_fwd_ret": 0.00075,
+      "pct_up_days": 0.518
+    },
+    "Stress": {
+      "days": 160,
+      "avg_fwd_vol_ann": 0.3179,
+      "avg_fwd_ret": -0.00122,
+      "pct_up_days": 0.456
+    }
+  }
+}

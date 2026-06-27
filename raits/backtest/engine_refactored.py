@@ -750,29 +750,34 @@ class RefactoredBacktestEngine:
                     except Exception:
                         pass
 
-            # Daily drawdown circuit breaker (stays in engine — needs equity)
-            try:
-                dd = circuit_breakers.check_daily_drawdown(
-                    account_equity=self.equity_tracker.equity,
-                    session_start_equity=session_start_equity,
-                )
-                if dd.kill_switch:
-                    try:
-                        coordinator.notify_circuit_breaker(bar_dt)
-                    except Exception:
-                        pass
-                    logger.critical(f"{bar_ts} | CIRCUIT BREAKER: {dd.reason}")
-                    self._close_all(bar_ts, day_stocks, "CIRCUIT_BREAKER")
-                    self._circuit_breaker_active = True
-                    break
-            except Exception as e:
-                logger.debug(f"CB check error: {e}")
-                pnl_pct = self.equity_tracker.daily_pnl_pct
-                if pnl_pct <= -0.04:
-                    logger.critical(f"{bar_ts} | CIRCUIT BREAKER (fallback): {pnl_pct:.2%}")
-                    self._close_all(bar_ts, day_stocks, "CIRCUIT_BREAKER")
-                    self._circuit_breaker_active = True
-                    break
+            # Daily drawdown circuit breaker (stays in engine — needs equity).
+            # Skip when SAFETY_MODE was active: engine.py uses `continue` after
+            # _close_all("SAFETY_MODE"), which implicitly skips this check.
+            print(f">>> OVERRIDE_GUARD bar={bar_ts} override_active={result.override_active}", flush=True)
+            if not result.override_active:
+                print(f">>> CB_WILL_RUN bar={bar_ts}", flush=True)
+                try:
+                    dd = circuit_breakers.check_daily_drawdown(
+                        account_equity=self.equity_tracker.equity,
+                        session_start_equity=session_start_equity,
+                    )
+                    if dd.kill_switch:
+                        try:
+                            coordinator.notify_circuit_breaker(bar_dt)
+                        except Exception:
+                            pass
+                        logger.critical(f"{bar_ts} | CIRCUIT BREAKER: {dd.reason}")
+                        self._close_all(bar_ts, day_stocks, "CIRCUIT_BREAKER")
+                        self._circuit_breaker_active = True
+                        break
+                except Exception as e:
+                    logger.debug(f"CB check error: {e}")
+                    pnl_pct = self.equity_tracker.daily_pnl_pct
+                    if pnl_pct <= -0.04:
+                        logger.critical(f"{bar_ts} | CIRCUIT BREAKER (fallback): {pnl_pct:.2%}")
+                        self._close_all(bar_ts, day_stocks, "CIRCUIT_BREAKER")
+                        self._circuit_breaker_active = True
+                        break
 
         # EOD close — skip TREND_FOLLOW swing positions
         if not self._circuit_breaker_active:

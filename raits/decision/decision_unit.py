@@ -797,8 +797,14 @@ class DecisionUnit:
                 )
                 self.trend.run_scanner(trend_cands)
 
+            # Mirror engine.py: _close_trade() removes trade from live log BEFORE
+            # section-9 position check. Replicate by excluding already-queued exits
+            # so _position_ok sees the post-exit open count, not the pre-exit snapshot.
+            _exited_ids = {id(e.trade) for e in exits}
+            _effective_open = [t for t in ctx.open_trades if id(t) not in _exited_ids]
+
             for ticker in self.trend.watchlist:
-                if not self._position_ok(ticker, "TREND_FOLLOW", ctx.open_trades, pending_entries):
+                if not self._position_ok(ticker, "TREND_FOLLOW", _effective_open, pending_entries):
                     continue
                 if ticker not in ctx.day_stocks:
                     continue
@@ -823,11 +829,14 @@ class DecisionUnit:
                     direction = sig.get("direction", "LONG")
                     _cd = self._tf_cooldown.get(ticker, {}).get(direction)
                     if _cd is not None:
-                        _prev_bars = ctx.market_data.get(ticker)
-                        _prev_close = None
-                        if _prev_bars is not None:
-                            _pb = _prev_bars.loc[_prev_bars.index < bar_ts]
-                            _prev_close = float(_pb["close"].iloc[-1]) if not _pb.empty else None
+                        # Exact match of engine.py: prev close of most-recent 5-min bar
+                        # before bar_ts. IndexError on empty slice is caught by outer
+                        # try/except, same as engine.py — net effect: skip this ticker.
+                        _prev_close = float(
+                            ctx.market_data[ticker].loc[
+                                ctx.market_data[ticker].index < bar_ts
+                            ]["close"].iloc[-1]
+                        ) if ticker in ctx.market_data else None
                         _recovered = (
                             (_prev_close > _cd) if direction == "LONG"
                             else (_prev_close < _cd)
@@ -837,6 +846,10 @@ class DecisionUnit:
                             if not self._tf_cooldown[ticker]:
                                 self._tf_cooldown.pop(ticker)
                         else:
+                            logger.debug(
+                                "TF skip %s %s: cooldown (block_stop=%.2f, prev_close=%s)",
+                                ticker, direction, _cd, _prev_close,
+                            )
                             continue
                     daily_atr = self._compute_daily_atr(ctx.market_data, ticker, bar_ts)
                     entry_p   = sig.get("entry_price", 0.0)
