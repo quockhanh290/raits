@@ -53,6 +53,11 @@ CACHE_DAILY = os.path.join(os.path.dirname(__file__), "..", "..", "data", "cache
 PICKLE_5MIN  = os.path.join(os.path.dirname(__file__), "..", "..", "data", "cache", "window_debug_5min.pkl")
 PICKLE_DAILY = os.path.join(os.path.dirname(__file__), "..", "..", "data", "cache", "window_debug_daily.pkl")
 
+import yaml as _yaml
+_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "configs", "final_params.yaml")
+with open(_PARAMS_PATH) as _f:
+    _params = _yaml.safe_load(_f)
+
 COMPARED_FIELDS = [
     "ticker", "strategy", "direction",
     "entry_time", "entry_price", "shares",
@@ -93,9 +98,9 @@ def make_config() -> BacktestConfig:
         universe=UNIVERSE + PHASE1 + PHASE2,
         orb_universe=list(CANDIDATE_POOL),
         vwap_universe=["SPY", "QQQ", "IWM"],
-        orb_range_minutes=15,
-        vwap_bb_std=2.0,
-        ema_period=30,
+        orb_range_minutes=_params["orb_range_minutes"],
+        vwap_bb_std=_params["vwap_bb_std"],
+        ema_period=_params["ema_period"],
         max_risk_pct=0.015,
         max_position_pct=0.40,
         kelly_fraction=0.75,
