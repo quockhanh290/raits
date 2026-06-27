@@ -882,9 +882,9 @@ class DecisionUnit:
                             pass
 
         # Exit checks for intraday strategies
-        already_exiting = {e.trade for e in exits}
+        already_exiting_ids = {id(e.trade) for e in exits}
         for trade in list(ctx.open_trades):
-            if trade in already_exiting:
+            if id(trade) in already_exiting_ids:
                 continue
             if trade.strategy in ("TREND_FOLLOW", "PE_SHORT"):
                 continue
