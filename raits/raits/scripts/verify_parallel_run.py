@@ -1,0 +1,223 @@
+"""
+scripts/verify_parallel_run.py
+-------------------------------
+Parallel-run verification: run BacktestEngine (original) and
+RefactoredBacktestEngine on the same IS 2017-2022 data and assert
+100% identical trade logs.
+
+Usage:
+    cd d:\\raits\\raits
+    python raits/scripts/verify_parallel_run.py
+
+SUCCESS: "✓ IDENTICAL: N trades matched 100%"
+FAILURE: diff printed with every mismatched field
+"""
+
+import sys, os, pickle, time
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..')))
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import glob as _glob
+import pandas as pd
+
+from raits.backtest.engine import BacktestEngine
+from raits.backtest.engine_refactored import RefactoredBacktestEngine
+from raits.backtest.data_types import BacktestConfig
+from raits.strategies.universe_scanner import CANDIDATE_POOL
+
+# ── Config ───────────────────────────────────────────────────────────────────
+# Must match the locked IS baseline (window_debug.py settings)
+UNIVERSE      = ["TSLA", "NVDA", "AAPL", "META", "AMZN", "MSFT", "AMD", "GOOGL"]
+PHASE1        = [
+    "INTU", "COST", "VRTX", "AMAT", "REGN", "AVGO", "ADBE", "MS",
+    "SBUX", "TXN", "XOM", "AMGN", "ORCL", "EBAY", "QCOM", "CVX",
+    "CSCO", "GS", "CRM", "JPM",
+]
+PHASE2        = ["MU", "HON", "MA", "NFLX", "INTC", "V", "GILD", "BIIB", "MMM"]
+PE_EXPANSION  = [
+    "PFE", "MRK", "LLY", "ABBV", "JNJ", "BMY",
+    "BAC", "WFC", "C", "WMT", "TGT", "HD", "LOW", "MCD", "NKE",
+    "PG", "KO", "PEP", "CAT", "DE", "BA", "GE", "PYPL", "PANW", "NOW",
+]
+SECTOR_ETFS   = ["XLF", "XLE", "XLV", "XLU", "XLI", "XLK", "XLP", "XLB", "XLY", "GLD"]
+TICKERS       = ["SPY", "QQQ", "IWM"] + SECTOR_ETFS + UNIVERSE + PHASE1 + PHASE2 + PE_EXPANSION
+
+# IS period only — vault (2023+) stays sealed
+IS_START = "2017-01-03"
+IS_END   = "2022-12-30"
+
+CACHE_5MIN  = os.path.join(os.path.dirname(__file__), "..", "..", "data", "cache", "data")
+CACHE_DAILY = os.path.join(os.path.dirname(__file__), "..", "..", "data", "cache", "daily")
+PICKLE_5MIN  = os.path.join(os.path.dirname(__file__), "..", "..", "data", "cache", "window_debug_5min.pkl")
+PICKLE_DAILY = os.path.join(os.path.dirname(__file__), "..", "..", "data", "cache", "window_debug_daily.pkl")
+
+COMPARED_FIELDS = [
+    "ticker", "strategy", "direction",
+    "entry_time", "entry_price", "shares",
+    "exit_time", "exit_price", "exit_reason",
+    "stop", "target", "hmm_state",
+    "gross_pnl", "net_pnl",
+]
+
+
+def load_market_data():
+    print("Loading 5-min data from pickle cache...")
+    if not os.path.exists(PICKLE_5MIN):
+        raise FileNotFoundError(
+            f"5-min pickle not found: {PICKLE_5MIN}\n"
+            "Run window_debug.py once first to build the cache."
+        )
+    with open(PICKLE_5MIN, "rb") as f:
+        all_data = pickle.load(f)
+    market_data = {t: df for t, df in all_data.items() if t in TICKERS}
+    print(f"  Loaded {len(market_data)} tickers")
+    return market_data
+
+
+def load_daily_data():
+    print("Loading daily data from pickle cache...")
+    if not os.path.exists(PICKLE_DAILY):
+        print("  Daily pickle not found — daily scanners disabled")
+        return None
+    with open(PICKLE_DAILY, "rb") as f:
+        return pickle.load(f)
+
+
+def make_config() -> BacktestConfig:
+    return BacktestConfig(
+        account_equity=50_000.0,
+        start_date=IS_START,
+        end_date=IS_END,
+        universe=UNIVERSE + PHASE1 + PHASE2,
+        orb_universe=list(CANDIDATE_POOL),
+        vwap_universe=["SPY", "QQQ", "IWM"],
+        orb_range_minutes=15,
+        vwap_bb_std=2.0,
+        ema_period=30,
+        max_risk_pct=0.015,
+        max_position_pct=0.40,
+        kelly_fraction=0.75,
+        enable_costs=True,
+        enable_pdt_guard=True,
+        hmm_retrain_weekly=True,
+        allow_swing_hold=True,
+        max_hold_days=5,
+        stress_size_fraction=0.5,
+        log_level="WARNING",
+    )
+
+
+def compare_trade_logs(orig_trades, refac_trades):
+    mismatches = []
+    if len(orig_trades) != len(refac_trades):
+        mismatches.append({
+            "type": "TRADE_COUNT",
+            "diff": f"count {len(orig_trades)} vs {len(refac_trades)}",
+        })
+        return mismatches
+
+    for i, (a, b) in enumerate(zip(orig_trades, refac_trades)):
+        for field in COMPARED_FIELDS:
+            va = getattr(a, field, None)
+            vb = getattr(b, field, None)
+            if isinstance(va, float) and isinstance(vb, float):
+                match = abs(va - vb) < 0.01
+            else:
+                match = (va == vb)
+            if not match:
+                mismatches.append({
+                    "type": "FIELD_MISMATCH",
+                    "trade_index": i,
+                    "ticker": getattr(a, "ticker", "?"),
+                    "strategy": getattr(a, "strategy", "?"),
+                    "entry_time": str(getattr(a, "entry_time", "?")),
+                    "field": field,
+                    "original": va,
+                    "refactored": vb,
+                })
+    return mismatches
+
+
+def run_engine(engine_cls, market_data, daily_data, config, label):
+    print(f"\nRunning {label}...")
+    t0 = time.time()
+    engine = engine_cls(config)
+    result = engine.run(market_data, daily_data)
+    elapsed = time.time() - t0
+    trades  = result.trade_log
+    total_pnl = sum(t.net_pnl or 0.0 for t in trades)
+    print(f"  {label}: {len(trades)} trades | P&L ${total_pnl:,.2f} | {elapsed:.1f}s")
+    return result
+
+
+def main():
+    print("=" * 60)
+    print("RAITS Parallel-Run Verification (IS 2017-2022)")
+    print("=" * 60)
+
+    market_data = load_market_data()
+    daily_data  = load_daily_data()
+    config      = make_config()
+
+    # Filter to IS period
+    for ticker in list(market_data.keys()):
+        df = market_data[ticker]
+        market_data[ticker] = df[
+            (df.index >= pd.Timestamp(IS_START))
+            & (df.index <= pd.Timestamp(IS_END))
+        ]
+
+    orig_result   = run_engine(BacktestEngine,           market_data, daily_data, config, "BacktestEngine (original)")
+    refac_result  = run_engine(RefactoredBacktestEngine, market_data, daily_data, config, "RefactoredBacktestEngine")
+
+    orig_trades  = orig_result.trade_log
+    refac_trades = refac_result.trade_log
+
+    print(f"\n{'─'*60}")
+    print("COMPARISON")
+    print(f"  Original trades:   {len(orig_trades)}")
+    print(f"  Refactored trades: {len(refac_trades)}")
+
+    mismatches = compare_trade_logs(orig_trades, refac_trades)
+
+    if not mismatches:
+        print(f"\n✓ IDENTICAL: {len(orig_trades)} trades matched 100%")
+        # Aggregate metrics
+        def metrics(result):
+            trades = result.trade_log
+            pnl   = sum(t.net_pnl or 0.0 for t in trades)
+            return len(trades), pnl
+        n_o, p_o = metrics(orig_result)
+        n_r, p_r = metrics(refac_result)
+        print(f"\nAggregate metrics:")
+        print(f"  Original:   {n_o} trades, P&L ${p_o:,.2f}")
+        print(f"  Refactored: {n_r} trades, P&L ${p_r:,.2f}")
+        diff_pnl = abs(p_o - p_r)
+        if diff_pnl < 1.0:
+            print(f"  P&L diff: ${diff_pnl:.4f} ✓ (< $1)")
+        else:
+            print(f"  ✗ P&L diff: ${diff_pnl:.4f} (unexpected)")
+    else:
+        count_mm = [m for m in mismatches if m["type"] == "TRADE_COUNT"]
+        field_mm = [m for m in mismatches if m["type"] == "FIELD_MISMATCH"]
+        print(f"\n✗ MISMATCH DETECTED")
+        if count_mm:
+            print(f"  Count: {count_mm[0]['diff']}")
+        if field_mm:
+            print(f"  Field mismatches: {len(field_mm)}")
+            for m in field_mm[:20]:
+                print(
+                    f"    trade[{m['trade_index']}] {m['ticker']}/{m['strategy']} "
+                    f"@ {m['entry_time']}  "
+                    f"{m['field']}: {m['original']!r} → {m['refactored']!r}"
+                )
+            if len(field_mm) > 20:
+                print(f"    ... and {len(field_mm) - 20} more")
+        print("\n  → Extraction is WRONG. Fix DecisionUnit before declaring success.")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
