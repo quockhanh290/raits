@@ -776,26 +776,6 @@ class RefactoredBacktestEngine:
                         trade, bar_ts, bar_t, day_stocks,
                         self.config.allow_swing_hold, spy_bar,
                     )
-                    # --- TRACE (remove after bug resolved) ---
-                    _trace_date = str(bar_ts.date())
-                    if (entry_intent.ticker in ("VRTX", "QQQ") and
-                            _trace_date in ("2019-08-01", "2019-01-03", "2020-10-30")):
-                        try:
-                            _tb  = day_stocks[trade.ticker].loc[bar_ts]
-                            _tlo = float(_tb["low"])
-                            _thi = float(_tb["high"])
-                            _tcl = float(_tb["close"])
-                        except Exception:
-                            _tlo = _thi = _tcl = float("nan")
-                        print(
-                            f"[SB_TRACE] {bar_ts} {trade.ticker}/{trade.strategy}"
-                            f" dir={trade.direction}"
-                            f" stop={trade.stop:.4f} target={trade.target:.4f}"
-                            f" bar_low={_tlo:.4f} bar_high={_thi:.4f} bar_close={_tcl:.4f}"
-                            f" -> sb_exit={_sb_exit}",
-                            flush=True,
-                        )
-                    # --- end TRACE ---
                     if _sb_exit:
                         _sb_price, _sb_reason = _sb_exit
                         self._close_trade(
@@ -1455,19 +1435,6 @@ class RefactoredBacktestEngine:
                         price = min(price, trade.stop)
             else:
                 price = trade.entry_price
-            # --- TRACE (remove after exit-price bug resolved) ---
-            _trace_date = str(timestamp.date()) if hasattr(timestamp, "date") else str(timestamp)[:10]
-            if (getattr(trade, "ticker", None) in ("VRTX", "QQQ")
-                    and _trace_date in ("2019-08-01", "2019-01-03", "2020-10-30")
-                    and getattr(trade, "strategy", None) in ("ORB", "STRESS_MID", "STRESS_ORB")):
-                _last_idx = day_stocks[trade.ticker].index[-1] if trade.ticker in day_stocks and not day_stocks[trade.ticker].empty else "N/A"
-                print(
-                    f"[CA_TRACE] {timestamp} {trade.ticker}/{trade.strategy}"
-                    f" reason={reason} price={price:.4f}"
-                    f" last_bar_idx={_last_idx}",
-                    flush=True,
-                )
-            # --- end TRACE ---
             costs = self._compute_costs(trade, price)
             self.trade_log.close_trade(
                 trade,

@@ -227,7 +227,19 @@ class DecisionUnit:
             for trade in list(ctx.open_trades):
                 if trade.strategy in ("TREND_FOLLOW", "PE_SHORT"):
                     continue
-                price = self._last_close_price(trade, bar_ts, ctx.day_stocks)
+                # Mirror engine.py _close_all exactly: use iloc[-1] (last bar of day),
+                # NOT loc[bar_ts] (current bar).  day_stocks holds the full day's
+                # bars from the start, so iloc[-1] is the end-of-day bar.
+                if trade.ticker in ctx.day_stocks and not ctx.day_stocks[trade.ticker].empty:
+                    _sm_bar = ctx.day_stocks[trade.ticker].iloc[-1]
+                    price   = float(_sm_bar["close"])
+                    if trade.stop is not None:
+                        if trade.direction == "LONG" and float(_sm_bar["low"]) <= trade.stop:
+                            price = max(price, trade.stop)
+                        elif trade.direction == "SHORT" and float(_sm_bar["high"]) >= trade.stop:
+                            price = min(price, trade.stop)
+                else:
+                    price = trade.entry_price
                 exits.append(ExitIntent(trade=trade, exit_price=price, reason="SAFETY_MODE"))
             return DecisionResult(entries=[], exits=exits, override_active=True)
 
@@ -805,25 +817,8 @@ class DecisionUnit:
             _exited_ids = {id(e.trade) for e in exits}
             _effective_open = [t for t in ctx.open_trades if id(t) not in _exited_ids]
 
-            # TRACE: dump capacity+cooldown state at 2017-02-07 14:00 only
-            _TRACE_BAR = (bar_ts.year == 2017 and bar_ts.month == 2 and bar_ts.day == 7 and bar_ts.hour == 14 and bar_ts.minute == 0)
-            if _TRACE_BAR:
-                print(f"\n[DU_TRACE] *** bar_ts={bar_ts} ***", flush=True)
-                print(f"[DU_TRACE] open_trades={len(ctx.open_trades)} exits_sec2={len(exits)} effective_open={len(_effective_open)} pending_start={len(pending_entries)}", flush=True)
-                print(f"[DU_TRACE] effective_open tickers: {[t.ticker for t in _effective_open]}", flush=True)
-                print(f"[DU_TRACE] _tf_cooldown state: {dict(self._tf_cooldown)}", flush=True)
-                print(f"[DU_TRACE] watchlist ({len(self.trend.watchlist)}): {self.trend.watchlist}", flush=True)
-
             for ticker in self.trend.watchlist:
                 _pos_ok = self._position_ok(ticker, "TREND_FOLLOW", _effective_open, pending_entries)
-                if _TRACE_BAR:
-                    _tot = len(_effective_open) + len(pending_entries)
-                    _sc  = (sum(1 for t in _effective_open if t.strategy=="TREND_FOLLOW")
-                            + sum(1 for e in pending_entries if e.strategy=="TREND_FOLLOW"))
-                    if not _pos_ok:
-                        print(f">>> TF_BLOCK_CAP {ticker} total={_tot} tf_strat={_sc}", flush=True)
-                    else:
-                        print(f"[DU_TRACE]   check {ticker}: pos_ok=True total={_tot} tf_strat={_sc}", flush=True)
                 if not _pos_ok:
                     continue
                 if ticker not in ctx.day_stocks:
@@ -839,18 +834,12 @@ class DecisionUnit:
                     res_bar    = bars_so_far.iloc[-1]
                     sig = self.trend.generate_signal(pb_bar, res_bar, ema_val, atr, ctx.hmm_state, avg_vol_10)
                     if not sig:
-                        if _TRACE_BAR:
-                            print(f"[DU_TRACE]   {ticker}: SKIP signal=None", flush=True)
                         continue
                     _intent = self.trend.watchlist_directions.get(ticker)
                     if _intent and sig.get("direction") != _intent:
-                        if _TRACE_BAR:
-                            print(f"[DU_TRACE]   {ticker}: SKIP direction_mismatch sig={sig.get('direction')} intent={_intent}", flush=True)
                         continue
                     if ctx.hmm_state in ("Stress", "Crisis") and not ctx.spy_bull_trend:
                         if sig.get("direction") == "LONG":
-                            if _TRACE_BAR:
-                                print(f"[DU_TRACE]   {ticker}: SKIP stress_bear_filter", flush=True)
                             continue
                     direction = sig.get("direction", "LONG")
                     _cd = self._tf_cooldown.get(ticker, {}).get(direction)
@@ -869,8 +858,6 @@ class DecisionUnit:
                             if not self._tf_cooldown[ticker]:
                                 self._tf_cooldown.pop(ticker)
                         else:
-                            if _TRACE_BAR:
-                                print(f"[DU_TRACE]   {ticker}: SKIP cooldown block_stop={_cd} prev_close={_prev_close}", flush=True)
                             logger.debug(
                                 "TF skip %s %s: cooldown (block_stop=%.2f, prev_close=%s)",
                                 ticker, direction, _cd, _prev_close,
@@ -889,15 +876,8 @@ class DecisionUnit:
                         sig["initial_stop"] = round(entry_p + stop_dist, 2)
                         sig["target"]       = round(entry_p - target_dist, 2)
                     sig = self._normalise_signal(sig)
-                    _pe_before = len(pending_entries)
                     self._attempt_entry(sig, ticker, "TREND_FOLLOW", bar_ts,
                                         ctx, pending_entries, entries)
-                    if _TRACE_BAR:
-                        _added = len(pending_entries) > _pe_before
-                        if _added:
-                            print(f">>> TF_ADMIT {ticker} pending_now={len(pending_entries)}", flush=True)
-                        else:
-                            print(f"[DU_TRACE]   {ticker}: attempt_entry REJECTED (sizing/PDT)", flush=True)
                 except Exception as e:
                     logger.debug(f"Trend signal error {ticker}: {e}")
 
@@ -1081,20 +1061,6 @@ class DecisionUnit:
             except KeyError:
                 return None
 
-        # --- TRACE helper (remove after exit-price bug resolved) ---
-        _is_traced = (
-            str(bar_ts.date()) in ("2019-08-01", "2019-01-03", "2020-10-30")
-            and getattr(trade, "ticker", None) in ("VRTX", "QQQ")
-            and getattr(trade, "strategy", None) in ("ORB", "STRESS_MID", "STRESS_ORB")
-        )
-        def _tr(price, reason):
-            if _is_traced:
-                print(f"[CE] {bar_ts} {trade.ticker}/{trade.strategy} bar_t={bar_t}"
-                      f" -> {price:.4f}/{reason}  stop={trade.stop:.4f} tgt={trade.target:.4f}",
-                      flush=True)
-            return price, reason
-        # --- end TRACE helper ---
-
         if bar_t >= EOD_HARD_EXIT:
             if allow_swing_hold and trade.strategy == "TREND_FOLLOW":
                 return None
@@ -1102,23 +1068,23 @@ class DecisionUnit:
                 _pe_entry_day = pd.Timestamp(trade.entry_time).normalize()
                 if _pe_entry_day == bar_ts.normalize():
                     return None
-            return _tr(bar_close, "EOD")
+            return bar_close, "EOD"
 
         if trade.direction == "LONG":
-            if bar_low  <= trade.stop:   return _tr(trade.stop,   "STOP_HIT")
-            if bar_high >= trade.target: return _tr(trade.target, "TARGET_HIT")
+            if bar_low  <= trade.stop:   return trade.stop,   "STOP_HIT"
+            if bar_high >= trade.target: return trade.target, "TARGET_HIT"
         else:
-            if bar_high >= trade.stop:   return _tr(trade.stop,   "STOP_HIT")
-            if bar_low  <= trade.target: return _tr(trade.target, "TARGET_HIT")
+            if bar_high >= trade.stop:   return trade.stop,   "STOP_HIT"
+            if bar_low  <= trade.target: return trade.target, "TARGET_HIT"
 
         if trade.strategy == "VWAP_MR":
             elapsed = (bar_ts - trade.entry_time).total_seconds() / 60
             if elapsed >= 90:
-                return _tr(bar_close, "TIME_STOP")
-        if trade.strategy == "GAP_FILL"  and bar_t >= GAP_FILL_EXIT:  return _tr(bar_close, "TIME_STOP")
-        if trade.strategy == "GF_SHORT"  and bar_t >= GAP_FILL_EXIT:  return _tr(bar_close, "TIME_STOP")
-        if trade.strategy == "RS_SHORT"  and bar_t >= RS_SHORT_EXIT:   return _tr(bar_close, "TIME_STOP")
-        if trade.strategy == "STRESS_MID" and bar_t >= STRESS_MID_EXIT: return _tr(bar_close, "TIME_STOP")
+                return bar_close, "TIME_STOP"
+        if trade.strategy == "GAP_FILL"  and bar_t >= GAP_FILL_EXIT:  return bar_close, "TIME_STOP"
+        if trade.strategy == "GF_SHORT"  and bar_t >= GAP_FILL_EXIT:  return bar_close, "TIME_STOP"
+        if trade.strategy == "RS_SHORT"  and bar_t >= RS_SHORT_EXIT:   return bar_close, "TIME_STOP"
+        if trade.strategy == "STRESS_MID" and bar_t >= STRESS_MID_EXIT: return bar_close, "TIME_STOP"
         return None
 
     # ── Helpers (static, mirror engine.py methods exactly) ────────────────────
