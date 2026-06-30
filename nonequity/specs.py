@@ -47,8 +47,18 @@ CL  = Contract("CL",  "CL", point_value=1000.0, tick=0.01, est_margin=6000, comm
 MCL = Contract("MCL", "CL", point_value=100.0,  tick=0.01, est_margin=600,  commission_rt=1.24,
                note="NYMEX 100bbl micro. DEPLOY instrument; same price series as CL.")
 
+
+# Nikkei 225 (CME, USD-denominated, GLBX). 1.00 = 1 index point. Min fluctuation
+# 5 index points. NKD pv $5/pt → tick value $25; Micro Nikkei USD pv $0.50 → $2.50.
+# Trades ~23h/day on Globex; the validated power-hour entry is applied in JST
+# (Tokyo cash session) via tz-convert, not ET. Micro ticker: confirm with IBKR.
+NKD  = Contract("NKD",  "NKD", point_value=5.0,  tick=5.0, est_margin=9000, commission_rt=2.50,
+                note="CME Nikkei USD. Full — clean liquid data for backtest. tick=$25.")
+MNKD = Contract("MNKD", "NKD", point_value=0.5,  tick=5.0, est_margin=900,  commission_rt=1.40,
+                note="CME Micro Nikkei USD (verify ticker). DEPLOY instrument; same series as NKD.")
+
 # Registry for the first discovery round (metals + energy = two real factors).
-SPECS = {"GC": GC, "MGC": MGC, "CL": CL, "MCL": MCL}
+SPECS = {"GC": GC, "MGC": MGC, "CL": CL, "MCL": MCL, "NKD": NKD, "MNKD": MNKD}
 
 
 def summary() -> str:

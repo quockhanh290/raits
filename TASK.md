@@ -34,10 +34,7 @@ Status: IN PROGRESS
 **Prior baseline (results_20260624_135619.pkl):** +$31,484 | Ann: 10.5% | 1,878 trades (with FADE/GAP_FILL/VWAP_MR)
 
 ### In progress
-- [ ] window_debug --rebuild — running now (PE_EXPANSION complete, META/ETFs pending)
-- [ ] Fetch META IS gap as ticker "FB" (2017-2022-06-08) → save META_5min_FB_history.parquet
-  - Meta rebranded FB→META on 2022-06-09; Polygon stores under original ticker
-- [ ] Fetch sector ETFs IS (2017-2022) + OOS (2023-2024) — fetch_sector_etfs.py (pending)
+(none — pick next from Next steps)
 
 ### Next steps (ordered)
 - [x] PE_EXPANSION (25 stocks): 2017-2024 ✓ fetched
@@ -50,6 +47,13 @@ Status: IN PROGRESS
 - [ ] Run final snapshot post-WFO as pre-OOS baseline
 - [ ] Fetch OOS 2023-2024 5-min data if needed
 - [ ] OOS vault test — run ONCE, no iteration
+
+### Completed (refactor gate)
+- [x] **Gate 1 PASSED**: RefactoredBacktestEngine byte-identical to BacktestEngine on IS 2017-2022
+  - 604 == 604 trades, 100% field match, P&L diff $0.00
+  - Bug A: PE_SHORT inject wrote local copy (discarded) → fixed to mutate ctx.day_stocks in-place
+  - Bug B: Same-bar entry+exit missed (pending_entries not in ctx.open_trades) → fixed with post-open _check_exits call in engine_refactored
+  - Bug C: SAFETY_MODE exit price used loc[bar_ts] (current bar) vs engine.py iloc[-1] (last bar of day) → fixed in decision_unit.py §4
 
 ### Key decisions
 - OOS is one-shot -- do NOT run until engine is fully locked and WFO complete
@@ -70,3 +74,6 @@ raits/backtest/wfo.py (max_position_pct added to WFOConfig + _make_config)
 raits/raits/scripts/window_debug.py (max_position_pct=0.40)
 raits/raits/scripts/wfo_real_run.py (max_risk_pct=0.015, max_position_pct=0.40)
 raits/fetch_sector_etfs.py (new — fetch XLF/XLE/etc IS+OOS data)
+raits/backtest/engine_refactored.py (Bug B same-bar exit fix)
+raits/decision/decision_unit.py (Bug A PE_SHORT inject; Bug C SAFETY_MODE iloc[-1] fix)
+raits/raits/scripts/verify_parallel_run.py (orig engine cache + --reset-orig-cache flag)
