@@ -1318,6 +1318,8 @@ def main():
                         help="Run cProfile on the engine and print top-30 slowest functions.")
     parser.add_argument("--detail", action="store_true",
                         help="Print per-trade detail for ORB, TF, VWAP_MR after summary.")
+    parser.add_argument("--final-params", action="store_true",
+                        help="Use production params from configs/final_params.yaml (ORB=20, BB=1.5, EMA=30).")
     args = parser.parse_args()
 
     use_scanner = not args.no_scanner
@@ -1354,8 +1356,8 @@ def main():
             universe=CANDIDATE_POOL,
             orb_universe=[],
             vwap_universe=MR_UNIVERSE_STATIC,
-            orb_range_minutes=15,
-            vwap_bb_std=2.0,
+            orb_range_minutes=20 if args.final_params else 15,
+            vwap_bb_std=1.5      if args.final_params else 2.0,
             ema_period=30,
             account_equity=50_000.0,
             enable_costs=True,

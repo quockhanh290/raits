@@ -19,12 +19,26 @@ Usage:
     python raits/scripts/diagnose_first_divergence.py --year 2018
 """
 
-import sys, os, pickle, warnings, time, argparse
+import sys, os, pickle, warnings, time, argparse, hashlib
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..')))
 warnings.filterwarnings("ignore")
 
 import yaml, pandas as pd
 from collections import defaultdict
+
+
+def _code_hash() -> str:
+    """SHA-256 of the two files whose changes should bust the results cache."""
+    h = hashlib.sha256()
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+    for rel in (
+        "raits/backtest/engine_refactored.py",
+        "raits/decision/decision_unit.py",
+    ):
+        path = os.path.join(root, rel)
+        if os.path.exists(path):
+            h.update(open(path, "rb").read())
+    return h.hexdigest()[:16]
 
 from raits.backtest.engine            import BacktestEngine
 from raits.backtest.engine_refactored import RefactoredBacktestEngine
@@ -191,13 +205,13 @@ def print_divergence_report(div, orig_trades, refac_trades):
     if o_keys == r_keys:
         print("    [identical in both engines]")
         for k in all_keys:
-            print(f"    ✓  {k[0]:<10} {k[1]:<16} {k[2]}")
+            print(f"    OK {k[0]:<10} {k[1]:<16} {k[2]}")
     else:
         print(f"    {'Ticker':<10} {'Strategy':<16} {'Dir':<6}  Orig  Refac")
         for k in all_keys:
-            in_o = "✓" if k in o_keys else "✗"
-            in_r = "✓" if k in r_keys else "✗"
-            flag = "  ← DIFF" if (k in o_keys) != (k in r_keys) else ""
+            in_o = "Y" if k in o_keys else "N"
+            in_r = "Y" if k in r_keys else "N"
+            flag = "  <- DIFF" if (k in o_keys) != (k in r_keys) else ""
             print(f"    {k[0]:<10} {k[1]:<16} {k[2]:<6}  {in_o}     {in_r}{flag}")
 
     # ── Capacity summary ──────────────────────────────────────────────────────
@@ -243,8 +257,56 @@ def print_divergence_report(div, orig_trades, refac_trades):
     for k in both_recent:
         in_o = "O" if k in o_keys_recent else " "
         in_r = "R" if k in r_keys_recent else " "
-        flag = " ←" if (k in o_keys_recent) != (k in r_keys_recent) else ""
+        flag = " <-" if (k in o_keys_recent) != (k in r_keys_recent) else ""
         print(f"    [{in_o}{in_r}]  {k[3]}  {k[0]:<8} {k[1]:<14} {k[2]}{flag}")
+
+
+COMPARED_FIELDS = [
+    "ticker", "strategy", "direction",
+    "entry_time", "entry_price", "shares",
+    "exit_time", "exit_price", "exit_reason",
+    "stop", "target", "hmm_state",
+    "gross_pnl", "net_pnl",
+]
+
+
+def _field_compare(orig_trades, refac_trades):
+    print(f"\n{'='*72}")
+    print("FIELD-BY-FIELD COMPARISON")
+    print(f"{'='*72}")
+
+    if len(orig_trades) != len(refac_trades):
+        print(f"  COUNT MISMATCH: orig={len(orig_trades)} refac={len(refac_trades)}")
+        return
+
+    mismatches = []
+    for i, (a, b) in enumerate(zip(orig_trades, refac_trades)):
+        for field in COMPARED_FIELDS:
+            va = getattr(a, field, None)
+            vb = getattr(b, field, None)
+            if isinstance(va, float) and isinstance(vb, float):
+                ok = abs(va - vb) < 0.01
+            else:
+                ok = (va == vb)
+            if not ok:
+                mismatches.append({
+                    "i": i, "ticker": getattr(a, "ticker", "?"),
+                    "strategy": getattr(a, "strategy", "?"),
+                    "entry_time": str(getattr(a, "entry_time", "?")),
+                    "field": field, "orig": va, "refac": vb,
+                })
+
+    n = len(orig_trades)
+    bad_trades = len({m["i"] for m in mismatches})
+    if not mismatches:
+        print(f"\n  OK {n}/{n} trades match 100% on all fields.")
+    else:
+        print(f"\n  {n - bad_trades}/{n} trades fully clean  |  {bad_trades} trades have mismatches")
+        print(f"  Total field mismatches: {len(mismatches)}\n")
+        for m in mismatches:
+            print(f"  trade[{m['i']:>3}]  {m['ticker']:<8} {m['strategy']:<14} "
+                  f"@ {m['entry_time']}   "
+                  f"{m['field']}: orig={m['orig']!r}  refac={m['refac']!r}")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -256,20 +318,36 @@ def main():
     args = parser.parse_args()
 
     cache_path = os.path.join(CACHE_DIR, f"first_div_{args.year}.pkl")
+    current_hash = _code_hash()
+
+    # Invalidate cache if --no-cache flag OR source files changed since last run
+    def _cache_valid():
+        if not os.path.exists(cache_path):
+            return False
+        try:
+            with open(cache_path, "rb") as f:
+                data = pickle.load(f)
+            saved_hash = data[3] if len(data) == 4 else None
+            if saved_hash != current_hash:
+                print(f"Cache hash mismatch ({saved_hash} vs {current_hash}) — re-running.")
+                return False
+            return True
+        except Exception:
+            return False
 
     if args.no_cache and os.path.exists(cache_path):
         os.remove(cache_path)
         print(f"Removed cache: {cache_path}")
 
     print("=" * 72)
-    print(f"RAITS First-Divergence Diagnostic  (year={args.year})")
+    print(f"RAITS First-Divergence Diagnostic  (year={args.year})  hash={current_hash}")
     print("=" * 72)
 
     # ── Run or load ───────────────────────────────────────────────────────────
-    if os.path.exists(cache_path):
+    if _cache_valid():
         print(f"Loading from cache: {cache_path}")
         with open(cache_path, "rb") as f:
-            orig_trades, refac_trades, market_data_year = pickle.load(f)
+            orig_trades, refac_trades, market_data_year, _ = pickle.load(f)
     else:
         print("Loading 5-min data...", end=" ", flush=True)
         with open(PICKLE_5MIN, "rb") as f:
@@ -299,8 +377,8 @@ def main():
         refac_trades = run_engine(RefactoredBacktestEngine, market_data_year, daily_data, config, "Refac")
 
         with open(cache_path, "wb") as f:
-            pickle.dump((orig_trades, refac_trades, market_data_year), f)
-        print(f"Cached to: {cache_path}")
+            pickle.dump((orig_trades, refac_trades, market_data_year, current_hash), f)
+        print(f"Cached to: {cache_path}  hash={current_hash}")
 
     print(f"\nOrig={len(orig_trades)} trades   Refac={len(refac_trades)} trades"
           f"  (delta={len(refac_trades)-len(orig_trades):+d})")
@@ -315,13 +393,13 @@ def main():
     div = find_first_divergence(orig_trades, refac_trades, all_bar_ts)
 
     if div is None:
-        print("\n✓ NO ENTRY/EXIT DIVERGENCE at any bar.")
-        print("  (trade counts differ only in timing — run field comparison)")
+        print("\nOK NO ENTRY/EXIT DIVERGENCE at any bar.")
+        _field_compare(orig_trades, refac_trades)
         return
 
     print_divergence_report(div, orig_trades, refac_trades)
 
-    print(f"\n{'─'*72}")
+    print(f"\n{'-'*72}")
     print("NEXT: run both engines on just the divergence day with detailed")
     print("per-candidate traces to identify the differing input.")
 

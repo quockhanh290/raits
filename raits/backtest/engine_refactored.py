@@ -402,7 +402,6 @@ class RefactoredBacktestEngine:
                 spy_data=spy_data,
                 _hmm=hmm,
                 to_daily_close=to_daily_close,
-                pdt_guard=pdt_guard,
                 circuit_breakers=circuit_breakers,
                 position_sizer=position_sizer,
                 coordinator=coordinator,
@@ -474,7 +473,6 @@ class RefactoredBacktestEngine:
         spy_data: pd.DataFrame,
         _hmm: Any,
         to_daily_close: Any,
-        pdt_guard: Any,
         circuit_breakers: Any,
         position_sizer: Any,
         coordinator: Any,
@@ -715,8 +713,31 @@ class RefactoredBacktestEngine:
                     logger.info(f"{bar_ts} | SAFETY MODE OFF")
                     self._safety_mode_active = False
 
-            # Execute exits
-            for exit_intent in result.exits:
+            # Execute exits: swing strategies first, then intraday.
+            # Mirrors engine.py's ordering: section 2 (TF/PE_SHORT exits) runs
+            # BEFORE section 4 (trading_ok / SAFETY_MODE check), which runs
+            # BEFORE section 10 (intraday exits).  If a swing exit trips the
+            # consecutive-loss CB, engine.py's section 4 sees coordinator
+            # blocked → SAFETY_MODE → `continue` (skips intraday exits,
+            # entries, and daily-drawdown check).  Replicating that here by
+            # splitting exits and inserting the CB-active guard between them.
+            _SWING = ("TREND_FOLLOW", "PE_SHORT")
+            _swing_exits    = [e for e in result.exits if e.trade.strategy in _SWING]
+            _intraday_exits = [e for e in result.exits if e.trade.strategy not in _SWING]
+
+            for exit_intent in _swing_exits:
+                self._close_trade(
+                    exit_intent.trade, bar_ts, exit_intent.exit_price, exit_intent.reason,
+                    circuit_breakers, coordinator, bar_dt,
+                )
+
+            # If CB tripped during swing exits the coordinator is now blocked.
+            # Engine.py detects this in section 4 → SAFETY_MODE → `continue`,
+            # skipping intraday exits, entries, and the daily-drawdown check.
+            if self._circuit_breaker_active:
+                continue
+
+            for exit_intent in _intraday_exits:
                 self._close_trade(
                     exit_intent.trade, bar_ts, exit_intent.exit_price, exit_intent.reason,
                     circuit_breakers, coordinator, bar_dt,
@@ -744,18 +765,52 @@ class RefactoredBacktestEngine:
                     f"stop=${entry_intent.stop:.2f} target=${entry_intent.target:.2f} | "
                     f"Regime:{entry_intent.hmm_state} Limit:{entry_intent.limiting_factor}"
                 )
-                if self.config.enable_pdt_guard and entry_intent.is_day_trade:
-                    try:
-                        pdt_guard.record_day_trade(bar_ts.date())
-                    except Exception:
-                        pass
+                # Same-bar exit check: engine.py opens trades immediately in
+                # trade_log so section 10 can exit them on the entry bar.
+                # DecisionUnit queues them in pending_entries → ctx.open_trades
+                # misses them → exit detected one bar late.  Fix: run
+                # _check_exits here for each newly opened intraday trade.
+                if (entry_intent.strategy not in ("TREND_FOLLOW", "PE_SHORT")
+                        and not self._circuit_breaker_active):
+                    _sb_exit = self._decision_unit._check_exits(
+                        trade, bar_ts, bar_t, day_stocks,
+                        self.config.allow_swing_hold, spy_bar,
+                    )
+                    # --- TRACE (remove after bug resolved) ---
+                    _trace_date = str(bar_ts.date())
+                    if (entry_intent.ticker in ("VRTX", "QQQ") and
+                            _trace_date in ("2019-08-01", "2019-01-03", "2020-10-30")):
+                        try:
+                            _tb  = day_stocks[trade.ticker].loc[bar_ts]
+                            _tlo = float(_tb["low"])
+                            _thi = float(_tb["high"])
+                            _tcl = float(_tb["close"])
+                        except Exception:
+                            _tlo = _thi = _tcl = float("nan")
+                        print(
+                            f"[SB_TRACE] {bar_ts} {trade.ticker}/{trade.strategy}"
+                            f" dir={trade.direction}"
+                            f" stop={trade.stop:.4f} target={trade.target:.4f}"
+                            f" bar_low={_tlo:.4f} bar_high={_thi:.4f} bar_close={_tcl:.4f}"
+                            f" -> sb_exit={_sb_exit}",
+                            flush=True,
+                        )
+                    # --- end TRACE ---
+                    if _sb_exit:
+                        _sb_price, _sb_reason = _sb_exit
+                        self._close_trade(
+                            trade, bar_ts, _sb_price, _sb_reason,
+                            circuit_breakers, coordinator, bar_dt,
+                        )
+                # PDT recording is done inside DecisionUnit._attempt_entry
+                # immediately when an entry is queued, so subsequent candidates
+                # in the same bar see the updated count. Recording here again
+                # would double-count every trade against the PDT limit.
 
             # Daily drawdown circuit breaker (stays in engine — needs equity).
             # Skip when SAFETY_MODE was active: engine.py uses `continue` after
             # _close_all("SAFETY_MODE"), which implicitly skips this check.
-            print(f">>> OVERRIDE_GUARD bar={bar_ts} override_active={result.override_active}", flush=True)
             if not result.override_active:
-                print(f">>> CB_WILL_RUN bar={bar_ts}", flush=True)
                 try:
                     dd = circuit_breakers.check_daily_drawdown(
                         account_equity=self.equity_tracker.equity,
@@ -1400,6 +1455,19 @@ class RefactoredBacktestEngine:
                         price = min(price, trade.stop)
             else:
                 price = trade.entry_price
+            # --- TRACE (remove after exit-price bug resolved) ---
+            _trace_date = str(timestamp.date()) if hasattr(timestamp, "date") else str(timestamp)[:10]
+            if (getattr(trade, "ticker", None) in ("VRTX", "QQQ")
+                    and _trace_date in ("2019-08-01", "2019-01-03", "2020-10-30")
+                    and getattr(trade, "strategy", None) in ("ORB", "STRESS_MID", "STRESS_ORB")):
+                _last_idx = day_stocks[trade.ticker].index[-1] if trade.ticker in day_stocks and not day_stocks[trade.ticker].empty else "N/A"
+                print(
+                    f"[CA_TRACE] {timestamp} {trade.ticker}/{trade.strategy}"
+                    f" reason={reason} price={price:.4f}"
+                    f" last_bar_idx={_last_idx}",
+                    flush=True,
+                )
+            # --- end TRACE ---
             costs = self._compute_costs(trade, price)
             self.trade_log.close_trade(
                 trade,

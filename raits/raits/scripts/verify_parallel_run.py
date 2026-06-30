@@ -13,7 +13,7 @@ SUCCESS: "✓ IDENTICAL: N trades matched 100%"
 FAILURE: diff printed with every mismatched field
 """
 
-import sys, os, pickle, time
+import sys, os, pickle, time, argparse
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..')))
 
 import warnings
@@ -52,6 +52,8 @@ CACHE_5MIN  = os.path.join(os.path.dirname(__file__), "..", "..", "data", "cache
 CACHE_DAILY = os.path.join(os.path.dirname(__file__), "..", "..", "data", "cache", "daily")
 PICKLE_5MIN  = os.path.join(os.path.dirname(__file__), "..", "..", "data", "cache", "window_debug_5min.pkl")
 PICKLE_DAILY = os.path.join(os.path.dirname(__file__), "..", "..", "data", "cache", "window_debug_daily.pkl")
+# engine.py never changes — cache its IS trade log so we skip the ~25-min run every iteration
+ORIG_CACHE   = os.path.join(os.path.dirname(__file__), "..", "..", "data", "cache", "verify_orig_trades_IS.pkl")
 
 import yaml as _yaml
 _PARAMS_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "configs", "final_params.yaml")
@@ -158,6 +160,15 @@ def run_engine(engine_cls, market_data, daily_data, config, label):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--reset-orig-cache", action="store_true",
+                        help="Delete cached original trade log and re-run engine.py")
+    args = parser.parse_args()
+
+    if args.reset_orig_cache and os.path.exists(ORIG_CACHE):
+        os.remove(ORIG_CACHE)
+        print(f"Deleted orig cache: {ORIG_CACHE}")
+
     print("=" * 60)
     print("RAITS Parallel-Run Verification (IS 2017-2022)")
     print("=" * 60)
@@ -174,13 +185,24 @@ def main():
             & (df.index <= pd.Timestamp(IS_END))
         ]
 
-    orig_result   = run_engine(BacktestEngine,           market_data, daily_data, config, "BacktestEngine (original)")
+    # engine.py is read-only — cache its trade log; only re-run with --reset-orig-cache
+    if os.path.exists(ORIG_CACHE):
+        print(f"\nLoading original trade log from cache (use --reset-orig-cache to force re-run)...")
+        with open(ORIG_CACHE, "rb") as f:
+            orig_trades = pickle.load(f)
+        print(f"  BacktestEngine (cached): {len(orig_trades)} trades")
+    else:
+        orig_result = run_engine(BacktestEngine, market_data, daily_data, config, "BacktestEngine (original)")
+        orig_trades = orig_result.trade_log
+        with open(ORIG_CACHE, "wb") as f:
+            pickle.dump(orig_trades, f)
+        print(f"  Cached to: {ORIG_CACHE}")
+
     refac_result  = run_engine(RefactoredBacktestEngine, market_data, daily_data, config, "RefactoredBacktestEngine")
 
-    orig_trades  = orig_result.trade_log
     refac_trades = refac_result.trade_log
 
-    print(f"\n{'─'*60}")
+    print(f"\n{'-'*60}")
     print("COMPARISON")
     print(f"  Original trades:   {len(orig_trades)}")
     print(f"  Refactored trades: {len(refac_trades)}")
@@ -188,26 +210,21 @@ def main():
     mismatches = compare_trade_logs(orig_trades, refac_trades)
 
     if not mismatches:
-        print(f"\n✓ IDENTICAL: {len(orig_trades)} trades matched 100%")
-        # Aggregate metrics
-        def metrics(result):
-            trades = result.trade_log
-            pnl   = sum(t.net_pnl or 0.0 for t in trades)
-            return len(trades), pnl
-        n_o, p_o = metrics(orig_result)
-        n_r, p_r = metrics(refac_result)
+        print(f"\nOK IDENTICAL: {len(orig_trades)} trades matched 100%")
+        pnl_o = sum(t.net_pnl or 0.0 for t in orig_trades)
+        pnl_r = sum(t.net_pnl or 0.0 for t in refac_trades)
         print(f"\nAggregate metrics:")
-        print(f"  Original:   {n_o} trades, P&L ${p_o:,.2f}")
-        print(f"  Refactored: {n_r} trades, P&L ${p_r:,.2f}")
-        diff_pnl = abs(p_o - p_r)
+        print(f"  Original:   {len(orig_trades)} trades, P&L ${pnl_o:,.2f}")
+        print(f"  Refactored: {len(refac_trades)} trades, P&L ${pnl_r:,.2f}")
+        diff_pnl = abs(pnl_o - pnl_r)
         if diff_pnl < 1.0:
-            print(f"  P&L diff: ${diff_pnl:.4f} ✓ (< $1)")
+            print(f"  P&L diff: ${diff_pnl:.4f} OK (< $1)")
         else:
-            print(f"  ✗ P&L diff: ${diff_pnl:.4f} (unexpected)")
+            print(f"  FAIL P&L diff: ${diff_pnl:.4f} (unexpected)")
     else:
         count_mm = [m for m in mismatches if m["type"] == "TRADE_COUNT"]
         field_mm = [m for m in mismatches if m["type"] == "FIELD_MISMATCH"]
-        print(f"\n✗ MISMATCH DETECTED")
+        print(f"\nFAIL MISMATCH DETECTED")
         if count_mm:
             print(f"  Count: {count_mm[0]['diff']}")
         if field_mm:
@@ -216,11 +233,11 @@ def main():
                 print(
                     f"    trade[{m['trade_index']}] {m['ticker']}/{m['strategy']} "
                     f"@ {m['entry_time']}  "
-                    f"{m['field']}: {m['original']!r} → {m['refactored']!r}"
+                    f"{m['field']}: {m['original']!r} -> {m['refactored']!r}"
                 )
             if len(field_mm) > 20:
                 print(f"    ... and {len(field_mm) - 20} more")
-        print("\n  → Extraction is WRONG. Fix DecisionUnit before declaring success.")
+        print("\n  -> Extraction is WRONG. Fix DecisionUnit before declaring success.")
         sys.exit(1)
 
 
