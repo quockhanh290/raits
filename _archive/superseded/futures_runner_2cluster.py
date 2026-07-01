@@ -1,3 +1,7 @@
+# SUPERSEDED runner (2-cluster net_exposure, pre-NKD). Risk layer replaced by
+#  global_index/net_exposure_multi + live_decision. engine_signals() here is the
+#  reference for the future global_index/runner.py (swing/stress live-signal).
+#  NOTE: khi viết runner đầy đủ, NKD cần live-wrapper + reconcile_nkd trước khi wire live.
 """
 futures/runner.py — orchestration: regime → engines → risk layer → orders
 =========================================================================

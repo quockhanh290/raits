@@ -1,3 +1,5 @@
+# HARNESS: documents 2-cluster risk-layer stage (pre cap/priority/NKD). Intentionally
+#  uses futures.net_exposure. Live deploy uses global_index/net_exposure_multi + live_decision.
 """
 futures/backtest_system.py — FULL SYSTEM backtest (engines + risk layer)
 ========================================================================

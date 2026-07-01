@@ -14,11 +14,14 @@ from futures.cost import FuturesCost
 from futures.basket import BASKET, SWING_TF_PARAM, REGIME, RISK, Contract
 from futures.swing_tf import SwingTFEngine
 from futures.stress_mid import StressMidEngine
-from futures.net_exposure import NetExposureGuard, Position
+# net_exposure (2-cluster) không re-export — live deploy dùng
+#  global_index/net_exposure_multi. backtest_system.py import trực tiếp nếu cần.
 from futures.circuit_breaker import CircuitBreaker
 from futures.sizer import size_basket, SizingResult
-from futures.runner import RaitsFuturesRunner, Signal, Order
+# runner archived → _archive/superseded/futures_runner_2cluster.py (2-cluster net_exposure, pre-NKD).
+# Risk layer thay bằng global_index/net_exposure_multi + live_decision.
+# Runner đầy đủ sẽ ở global_index/ (cần NKD live-wrapper + reconcile_nkd trước khi wire live).
 
 __all__ = ["FuturesCost", "BASKET", "SWING_TF_PARAM", "REGIME", "RISK", "Contract",
-           "SwingTFEngine", "StressMidEngine", "NetExposureGuard", "Position",
-           "CircuitBreaker", "size_basket", "SizingResult", "RaitsFuturesRunner", "Signal", "Order"]
+           "SwingTFEngine", "StressMidEngine",
+           "CircuitBreaker", "size_basket", "SizingResult"]
