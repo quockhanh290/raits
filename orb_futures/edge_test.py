@@ -36,12 +36,12 @@ def orb_backtest(df, labels, cost, *, or_start="09:31", or_end="09:45",
                  min_atr_mult=0.5, max_atr_mult=5.0, target_rr=2.0):
     """Opening-range breakout, intraday exit. df index ET tz-aware, 1-min bars."""
     trades = []
-    days = sorted(set(df.index.normalize()))
-    for day in days:
-        d = df[df.index.normalize() == day]
+    day_groups = df.groupby(df.index.normalize())
+    for day_raw, d in day_groups:
         if d.empty:
             continue
-        reg = labels.get(day.tz_localize(None) if day.tzinfo else day)
+        day = pd.Timestamp(day_raw).tz_localize(None).normalize()  # match swing TF key
+        reg = labels.get(day)
         if reg not in allowed:
             continue
         orb = d.between_time(or_start, or_end)
@@ -50,7 +50,7 @@ def orb_backtest(df, labels, cost, *, or_start="09:31", or_end="09:45",
         or_high = orb["high"].max(); or_low = orb["low"].min()
         or_range = or_high - or_low
         if atr is not None:
-            av = atr.asof(day.tz_localize(None) if day.tzinfo else day)
+            av = atr.asof(day)
             if av and not pd.isna(av):
                 if or_range < min_atr_mult * av or or_range > max_atr_mult * av:
                     continue

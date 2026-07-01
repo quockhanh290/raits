@@ -131,6 +131,9 @@ class RefactoredBacktestEngine:
         # _tf_cooldown removed — now owned by DecisionUnit
         self._decision_unit: Optional[DecisionUnit] = None
         self._pe_short_calendar: Dict[pd.Timestamp, List[str]] = {}  # date → [tickers with earnings]
+        # Read-only capture hook for context verification — no logic change.
+        # Set to a callable(BarContext) to record every ctx before decide().
+        self._ctx_capture_hook = None
         self._mods = self._load_modules()
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -702,6 +705,8 @@ class RefactoredBacktestEngine:
             )
 
             # Get decisions from DecisionUnit
+            if self._ctx_capture_hook is not None:
+                self._ctx_capture_hook(ctx)
             result = self._decision_unit.decide(ctx)
 
             if result.override_active:

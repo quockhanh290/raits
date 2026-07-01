@@ -233,6 +233,18 @@ class PaperTrader:
             # Inject open positions into ctx so DecisionUnit can exit them
             ctx.open_trades = list(self._open_positions.values())
 
+            # Mirror engine behavior: swing trade tickers must be in day_stocks
+            # even if today's universe scan dropped them, so exit checks work.
+            for _trade in ctx.open_trades:
+                _tk = _trade.ticker
+                if (_tk not in ctx.day_stocks and _tk != "SPY"
+                        and _tk in ctx.market_data):
+                    _day_bars = ctx.market_data[_tk][
+                        ctx.market_data[_tk].index.normalize() == ctx.day
+                    ]
+                    if not _day_bars.empty:
+                        ctx.day_stocks[_tk] = _day_bars
+
             # === DecisionUnit call (read-only) ===
             decision: DecisionResult = self._du.decide(ctx)
 
