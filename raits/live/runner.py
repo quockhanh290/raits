@@ -231,16 +231,23 @@ class PaperTrader:
         """Run the full paper-trading loop over the feed."""
         result = RunResult()
         current_day = None
+        _prev_ctx = None  # last ctx of previous day — needed for EOD swing-stop update
 
         for ctx in feed:
             bar_day = ctx.bar_ts.normalize()
 
             # Day reset
             if bar_day != current_day:
+                # EOD swing-stop update for the previous day
+                # Mirrors engine_refactored._run_day() line 829: _update_swing_stops(day, ...)
+                if _prev_ctx is not None and self._allow_swing_hold:
+                    self._update_swing_stops(
+                        _prev_ctx.day, _prev_ctx.market_data, _prev_ctx.day_stocks
+                    )
                 current_day = bar_day
                 self._daily_pnl = 0.0
                 # MAX_HOLD: mirrors engine_refactored._run_day() day-start block (lines 615-632)
-                # Must run before reset_day() and before open_trades injection into ctx
+                # Must run after EOD swing-stop update and before reset_day()
                 self._check_max_hold(bar_day, ctx)
                 self._du.reset_day(bar_day, ctx.orb_signal_start, ctx.orb_signal_end)
 
@@ -277,6 +284,14 @@ class PaperTrader:
             # Then entries
             for entry_intent in decision.entries:
                 self._process_entry(entry_intent, ctx.bar_ts, result)
+
+            _prev_ctx = ctx  # keep last bar of this day for EOD swing-stop update
+
+        # EOD swing-stop update for the final day (no day boundary follows it)
+        if _prev_ctx is not None and self._allow_swing_hold:
+            self._update_swing_stops(
+                _prev_ctx.day, _prev_ctx.market_data, _prev_ctx.day_stocks
+            )
 
         result.simulated_pnl = self._daily_pnl
         return result
@@ -357,10 +372,91 @@ class PaperTrader:
             trade.net_pnl     = gross_pnl - total_costs
 
             self._daily_pnl += gross_pnl
+            self._swing_state.pop(id(trade), None)
             del self._open_positions[trade.trade_id]
             self._closed_trades.append(trade)
         else:
             result.orders_rejected += 1
+
+    def _update_swing_stops(
+        self,
+        day: Any,
+        market_data: Any,
+        day_stocks: Any,
+    ) -> None:
+        """EOD chandelier trailing-stop update for open TREND_FOLLOW swing positions.
+
+        Mirrors engine_refactored._update_swing_stops() exactly:
+        - daily ATR recomputed each day (using bars BEFORE `day` midnight)
+        - running extreme (highest high / lowest low) tracked in _swing_state
+        - stop advances in the trade's favour; never retreats
+        """
+        import pandas as pd
+        for trade in list(self._open_positions.values()):
+            if trade.strategy != "TREND_FOLLOW":
+                continue
+            ticker = trade.ticker
+            if ticker not in day_stocks or day_stocks[ticker].empty:
+                continue
+
+            day_high  = float(day_stocks[ticker]["high"].max())
+            day_low   = float(day_stocks[ticker]["low"].min())
+            daily_atr = self._compute_daily_atr(market_data, ticker, day)
+            if daily_atr <= 0:
+                continue
+
+            state = self._swing_state.get(id(trade), {})
+
+            if trade.direction == "LONG":
+                prev_extreme = state.get("extreme", day_high)
+                new_extreme  = max(prev_extreme, day_high)
+                new_stop     = round(new_extreme - 3.0 * daily_atr, 2)
+                if new_stop > (trade.stop or 0.0):
+                    trade.stop = new_stop
+            else:
+                prev_extreme = state.get("extreme", day_low)
+                new_extreme  = min(prev_extreme, day_low)
+                new_stop     = round(new_extreme + 3.0 * daily_atr, 2)
+                if new_stop < (trade.stop or float("inf")):
+                    trade.stop = new_stop
+
+            state["extreme"] = new_extreme
+            self._swing_state[id(trade)] = state
+
+    @staticmethod
+    def _compute_daily_atr(
+        market_data: Any,
+        ticker: str,
+        as_of: Any,
+        period: int = 14,
+    ) -> float:
+        """14-period ATR from daily bars strictly before `as_of`.
+
+        Mirrors engine_refactored._compute_daily_atr() exactly.
+        """
+        import pandas as pd
+        if ticker not in market_data:
+            return 0.0
+        try:
+            df = market_data[ticker]
+            daily = df.loc[df.index < as_of].resample("B").agg({
+                "open":  "first",
+                "high":  "max",
+                "low":   "min",
+                "close": "last",
+            }).dropna()
+
+            if len(daily) < period + 1:
+                last_close = float(df.loc[df.index < as_of]["close"].iloc[-1])
+                return last_close * 0.01
+
+            hl  = daily["high"] - daily["low"]
+            hpc = (daily["high"] - daily["close"].shift(1)).abs()
+            lpc = (daily["low"]  - daily["close"].shift(1)).abs()
+            tr  = pd.concat([hl, hpc, lpc], axis=1).max(axis=1)
+            return float(tr.tail(period).mean())
+        except Exception:
+            return 0.0
 
     def _check_max_hold(self, bar_day: Any, ctx: Any) -> None:
         """Force-close TREND_FOLLOW positions held >= max_hold_days calendar days.
@@ -394,6 +490,7 @@ class PaperTrader:
             trade.total_costs = total_costs
             trade.net_pnl     = gross_pnl - total_costs
             self._daily_pnl  += gross_pnl
+            self._swing_state.pop(id(trade), None)
             del self._open_positions[trade_id]
             self._closed_trades.append(trade)
 
