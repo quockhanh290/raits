@@ -356,7 +356,7 @@ def main():
         print("  (skipping hmm_state / cur_vol — use --skip-hmm to disable)")
 
     first_fail = None
-    for i, (e_ctx, f_ctx) in enumerate(zip(engine_contexts, feed_contexts)):
+    for i, (e_ctx, f_ctx) in enumerate(zip(engine_contexts[:n_compare], feed_contexts[:n_compare])):
         diffs = _compare_ctx(e_ctx, f_ctx, skip_hmm=args.skip_hmm)
         if diffs:
             first_fail = (i, e_ctx.bar_ts, diffs)
@@ -364,7 +364,7 @@ def main():
 
     print("-" * 60)
     if first_fail is None:
-        print(f"CONTEXT MATCH: {len(engine_contexts)}/{len(engine_contexts)} bars identical")
+        print(f"CONTEXT MATCH: {n_compare}/{n_compare} bars identical")
         if args.skip_hmm:
             print("  (hmm_state / cur_vol NOT compared — add those checks when HMM training is unified)")
     else:
