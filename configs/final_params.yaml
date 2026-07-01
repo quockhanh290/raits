@@ -1,4 +1,6 @@
-# RAITS Production Parameters — locked for Vault test
+# STALE â€” pre-vault params (orb=15/bb=2.5/ema=30). DO NOT USE for production.
+# Production canonical: raits/configs/final_params.yaml (orb=20/bb=1.5/ema=30).
+# RAITS Production Parametersï¿½ locked for Vault test
 # Aggregation method: MEAN
 # DO NOT MODIFY after Vault test begins
 orb_range_minutes: 15

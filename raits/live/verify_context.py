@@ -341,35 +341,40 @@ def main():
     feed_contexts = list(feed)
     print(f"  Generated {len(feed_contexts)} contexts")
 
-    # ── Step 3: Count check ────────────────────────────────────────────────────
-    n_compare = min(len(engine_contexts), len(feed_contexts))
-    if len(engine_contexts) != len(feed_contexts):
-        print(
-            f"\n  NOTE: bar count differs — engine={len(engine_contexts)} "
-            f"feed={len(feed_contexts)}. Engine likely halted early (circuit breaker). "
-            f"Comparing first {n_compare} bars."
-        )
+    # ── Step 3 + 4: Pair by bar_ts, then compare field-by-field ─────────────
+    # Index-based pairing breaks when the engine's circuit breaker fires mid-day:
+    # the engine stops the bar loop early, shifting all subsequent bars left in
+    # its index while the feed generates every bar unconditionally.
+    engine_map = {ctx.bar_ts: ctx for ctx in engine_contexts}
+    feed_map   = {ctx.bar_ts: ctx for ctx in feed_contexts}
+    common_ts  = sorted(set(engine_map) & set(feed_map))
+    engine_only = set(engine_map) - set(feed_map)
+    feed_only   = set(feed_map) - set(engine_map)
 
-    # ── Step 4: Field-by-field comparison ─────────────────────────────────────
-    print(f"\nComparing {n_compare} bar contexts field-by-field...")
+    print(f"\nPairing by bar_ts: {len(common_ts)} shared bars "
+          f"(engine-only={len(engine_only)}, feed-only={len(feed_only)})")
+    if engine_only:
+        print(f"  engine-only bars: circuit breaker caused feed to skip them")
+    if feed_only:
+        print(f"  feed-only bars: engine halted before reaching them")
     if args.skip_hmm:
         print("  (skipping hmm_state / cur_vol — use --skip-hmm to disable)")
 
     first_fail = None
-    for i, (e_ctx, f_ctx) in enumerate(zip(engine_contexts[:n_compare], feed_contexts[:n_compare])):
-        diffs = _compare_ctx(e_ctx, f_ctx, skip_hmm=args.skip_hmm)
+    for i, ts in enumerate(common_ts):
+        diffs = _compare_ctx(engine_map[ts], feed_map[ts], skip_hmm=args.skip_hmm)
         if diffs:
-            first_fail = (i, e_ctx.bar_ts, diffs)
+            first_fail = (i, ts, diffs)
             break
 
     print("-" * 60)
     if first_fail is None:
-        print(f"CONTEXT MATCH: {n_compare}/{n_compare} bars identical")
+        print(f"CONTEXT MATCH: {len(common_ts)}/{len(common_ts)} shared bars identical")
         if args.skip_hmm:
             print("  (hmm_state / cur_vol NOT compared — add those checks when HMM training is unified)")
     else:
         idx, ts, diffs = first_fail
-        print(f"FAIL: First mismatch at bar {idx} ({ts}):")
+        print(f"FAIL: First mismatch at shared bar {idx} ({ts}):")
         for d in diffs[:10]:
             print(f"  {d}")
         if len(diffs) > 10:

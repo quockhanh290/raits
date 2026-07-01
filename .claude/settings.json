@@ -3,7 +3,8 @@
     "allow": [
       "Bash(python -c ' *)",
       "Bash(mkdir -p \"d:/raits/.superpowers/sdd\")",
-      "Bash(git -C d:/raits rev-parse HEAD)"
+      "Bash(git -C d:/raits rev-parse HEAD)",
+      "PowerShell(\\(Get-ChildItem D:\\\\raits\\\\data\\\\ -Recurse -File | Measure-Object -Property Length -Sum\\).Sum / 1MB)"
     ]
   }
 }

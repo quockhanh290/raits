@@ -26,6 +26,8 @@ FUTURES ADAPTATION (stated, not hidden):
     python swing_tf_harness.py --parquet ES_8y.parquet --regime-csv spy_daily.csv \
         --point-value 5 --hmm-train-end 2019-06-30 --dump-csv es_swingtf.csv
 """
+# HARNESS cho pool scripts (gate4_wfo, pooled_swing_wfo, pooled_swing_vault). Khong co return_open param.
+# Ban futures/swing_tf_harness.py (co return_open) la canonical cho futures/_validated_core.
 from __future__ import annotations
 import argparse, sys
 from datetime import time as dtime

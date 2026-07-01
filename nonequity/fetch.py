@@ -35,6 +35,8 @@ Usage
     python -m nonequity.fetch --readjust-from nonequity/data/GC_continuous_1m_8y_raw.parquet \
         --adjust ratio --out nonequity/data/GC_continuous_1m_8y_ratio.parquet
 """
+# BYTE-IDENTICAL copy cua global_index/fetch.py (canonical, duoc import boi tier2/fetch.py).
+# Dung standalone qua python -m nonequity.fetch. Sync neu global_index/fetch.py doi.
 from __future__ import annotations
 
 import argparse

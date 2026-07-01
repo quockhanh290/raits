@@ -14,6 +14,9 @@ NOT copied: backtest_swing_tf / StressMidAdapter — those are the equity power-
 entry (between_time 14:00-15:55 / 09:30-14:00) and are deliberately excluded; the
 daily-bar entry lives in swing_tf_daily.py.
 """
+# COPY of futures/_validated_core primitives (canonical = futures/_validated_core.py).
+# Sync thu cong + re-run futures.reconcile_gd0 / reconcile_stress neu source doi.
+# NOTE: docstring tren ghi "nonequity/_core.py" la copy artifact — day la global_index/_core.py.
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional

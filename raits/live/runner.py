@@ -194,6 +194,9 @@ class PaperTrader:
         kill_switch_pct: float = DEFAULT_KILL_SWITCH_PCT,
         discipline_params: Optional[Dict[str, Any]] = None,
         expected_hash: Optional[str] = None,
+        cost_fn: Optional[Any] = None,
+        allow_swing_hold: bool = False,
+        max_hold_days: int = 5,
     ) -> None:
         # Guards
         check_paper_only(ibkr_port, live_mode)
@@ -205,10 +208,22 @@ class PaperTrader:
         self._recon = recon
         self._equity = account_equity
         self._kill_switch_pct = kill_switch_pct
+        self._cost_fn = cost_fn  # Optional[Callable[[Trade, float], float]]
+        self._allow_swing_hold = allow_swing_hold
+        self._max_hold_days = max_hold_days
 
         # Simulated portfolio: trade_id → Trade (open positions)
         self._open_positions: Dict[str, Trade] = {}
         self._daily_pnl: float = 0.0
+        # Completed trades (entry + exit fully populated)
+        self._closed_trades: List[Trade] = []
+        # Chandelier trailing-stop state for TF swing positions:
+        # id(trade) → {"extreme": float}  (mirrors engine._swing_state)
+        self._swing_state: Dict[int, dict] = {}
+
+    @property
+    def closed_trades(self) -> List[Trade]:
+        return list(self._closed_trades)
 
     # ── Public ────────────────────────────────────────────────────────────────
 
@@ -224,7 +239,10 @@ class PaperTrader:
             if bar_day != current_day:
                 current_day = bar_day
                 self._daily_pnl = 0.0
-                self._du.reset_day()
+                # MAX_HOLD: mirrors engine_refactored._run_day() day-start block (lines 615-632)
+                # Must run before reset_day() and before open_trades injection into ctx
+                self._check_max_hold(bar_day, ctx)
+                self._du.reset_day(bar_day, ctx.orb_signal_start, ctx.orb_signal_end)
 
             # Kill-switch check (before decide)
             if self._kill_switch_triggered(ctx.bar_ts, result):
@@ -285,12 +303,14 @@ class PaperTrader:
 
         if filled_order.fill_status == FillStatus.FILLED:
             result.orders_filled += 1
-            trade = _intent_to_trade(intent, filled_order)
+            trade = _intent_to_trade(intent, filled_order, bar_ts)
             self._open_positions[trade.trade_id] = trade
+            self._du.on_trade_opened(trade, intent)
         elif filled_order.fill_status == FillStatus.PARTIAL:
             result.orders_partial += 1
-            trade = _intent_to_trade(intent, filled_order, use_filled_qty=True)
+            trade = _intent_to_trade(intent, filled_order, bar_ts, use_filled_qty=True)
             self._open_positions[trade.trade_id] = trade
+            self._du.on_trade_opened(trade, intent)
         else:
             result.orders_rejected += 1
 
@@ -322,17 +342,60 @@ class PaperTrader:
             else:
                 result.orders_partial += 1
 
-            # Compute simulated P&L
-            fill_qty = filled_order.filled_qty
-            if trade.direction == "LONG":
-                pnl = (filled_order.fill_price - trade.entry_price) * fill_qty
-            else:
-                pnl = (trade.entry_price - filled_order.fill_price) * fill_qty
-            self._daily_pnl += pnl
+            fill_qty   = filled_order.filled_qty
+            fill_price = filled_order.fill_price
+            multiplier = 1 if trade.direction == "LONG" else -1
+            gross_pnl  = multiplier * (fill_price - trade.entry_price) * fill_qty
 
+            # Populate exit fields — mirrors trade_log.close_trade()
+            total_costs = self._cost_fn(trade, fill_price) if self._cost_fn else 0.0
+            trade.exit_time   = bar_ts
+            trade.exit_price  = fill_price
+            trade.exit_reason = exit_intent.reason
+            trade.gross_pnl   = gross_pnl
+            trade.total_costs = total_costs
+            trade.net_pnl     = gross_pnl - total_costs
+
+            self._daily_pnl += gross_pnl
             del self._open_positions[trade.trade_id]
+            self._closed_trades.append(trade)
         else:
             result.orders_rejected += 1
+
+    def _check_max_hold(self, bar_day: Any, ctx: Any) -> None:
+        """Force-close TREND_FOLLOW positions held >= max_hold_days calendar days.
+
+        Mirrors engine_refactored._run_day() lines 615-632:
+        - exit price = first bar's open of the expiry day
+        - exit_time  = ctx.bar_ts (first bar of day == engine's day_spy.index[0])
+        - only fires when allow_swing_hold is True
+        """
+        if not self._allow_swing_hold:
+            return
+        import pandas as pd
+        for trade_id in list(self._open_positions):
+            trade = self._open_positions[trade_id]
+            if trade.strategy != "TREND_FOLLOW":
+                continue
+            _hold = (bar_day - pd.Timestamp(trade.entry_time).normalize()).days
+            if _hold < self._max_hold_days:
+                continue
+            if trade.ticker in ctx.day_stocks and not ctx.day_stocks[trade.ticker].empty:
+                _exit_px = float(ctx.day_stocks[trade.ticker].iloc[0]["open"])
+            else:
+                _exit_px = trade.entry_price
+            multiplier  = 1 if trade.direction == "LONG" else -1
+            gross_pnl   = multiplier * (_exit_px - trade.entry_price) * trade.shares
+            total_costs = self._cost_fn(trade, _exit_px) if self._cost_fn else 0.0
+            trade.exit_time   = ctx.bar_ts
+            trade.exit_price  = _exit_px
+            trade.exit_reason = "MAX_HOLD"
+            trade.gross_pnl   = gross_pnl
+            trade.total_costs = total_costs
+            trade.net_pnl     = gross_pnl - total_costs
+            self._daily_pnl  += gross_pnl
+            del self._open_positions[trade_id]
+            self._closed_trades.append(trade)
 
     def _kill_switch_triggered(self, bar_ts: Any, result: RunResult) -> bool:
         if self._equity <= 0:
@@ -352,16 +415,20 @@ class PaperTrader:
 # ── Helper ────────────────────────────────────────────────────────────────────
 
 def _intent_to_trade(
-    intent: EntryIntent, order: Order, use_filled_qty: bool = False
+    intent: EntryIntent, order: Order, bar_ts: Any, use_filled_qty: bool = False
 ) -> Trade:
-    """Convert EntryIntent + filled Order → a Trade in the simulated portfolio."""
+    """Convert EntryIntent + filled Order → a Trade in the simulated portfolio.
+
+    entry_time is set to bar_ts (not the broker fill timestamp) so it matches
+    the engine's convention: engine.trade_log.open_trade(entry_time=bar_ts).
+    """
     qty = order.filled_qty if use_filled_qty else intent.shares
     return Trade(
         trade_id=order.order_id,
         ticker=intent.ticker,
         strategy=intent.strategy,
         direction=intent.direction,
-        entry_time=order.fill_ts,
+        entry_time=bar_ts,
         entry_price=order.fill_price,
         shares=qty,
         stop=intent.stop,

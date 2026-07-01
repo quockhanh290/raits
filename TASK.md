@@ -1,6 +1,29 @@
 ## Task: RAITS — IS Optimization → WFO → OOS Preparation
 Status: IN PROGRESS
 
+---
+## Sub-task: Repo Cleanup (DONE 2026-07-01)
+Status: DONE
+
+### Completed
+- [x] Full structural audit → AUDIT.md
+- [x] Futures production verification (DEBT-2, HMM determinism, CWD sensitivity)
+- [x] CLEANUP_PLAN.md — classification tables + execution plan
+- [x] Bước 1: Annotated STALE (configs/final_params.yaml root), fixed __init__.py docstring, annotated 6 coexist/copy files
+- [x] Bước 2: Archived 8 DEAD files → _archive/dead/
+- [x] Bước 3: Archived 25 root SCRATCH files → _archive/scratch/root/
+- [x] Bước 4: Archived 33 raits/+raits/raits/scripts/ SCRATCH files → _archive/scratch/raits/ + raits_scripts/
+- [x] Bước 5: README markers added to 5 folders (orb_futures, tier2, xsect, nonequity, raits)
+- [x] Final reconcile_gd0 PASS (MES 423t/$7,249 | MNQ 435t/$10,055 | MYM 438t/$7,466 | M2K 437t/$1,617)
+- [x] Final reconcile_stress PASS (112 Stress days, 46 enter/match, 66 skip, 0 mismatches)
+
+### CẦN XEM (user to decide — NOT touched)
+- config_private.py — keep as-is (gitignored, contains Polygon API key)
+- raits/raits/scripts/_check_oos_data.py — may be useful pre-OOS; user to decide archive or keep
+- raits/raits/tests/decision/ — decision unit tests; keep (production test suite)
+
+---
+
 ### Completed
 - [x] Extended IS from 3yr (2020-2022) → 6yr (2017-2022), $50k account
 - [x] Fix BacktestConfig orphaned fields (max_position_pct, kelly_fraction not wired)
@@ -33,8 +56,20 @@ Status: IN PROGRESS
 
 **Prior baseline (results_20260624_135619.pkl):** +$31,484 | Ann: 10.5% | 1,878 trades (with FADE/GAP_FILL/VWAP_MR)
 
+### Completed (paper-trading harness)
+- [x] **Phase 1 DONE**: Paper-trading harness skeleton — broker/reconciliation/runner, 75 tests
+  - MockBroker: slippage/partial/reject/latency, seed RNG
+  - ReconciliationLog: CSV+JSONL, analyze() with p90 latency/slippage
+  - PaperTrader: DISCIPLINE_LOCK, PAPER_ONLY, KILL_SWITCH discipline guards
+- [x] **Phase 2 DONE**: ReplayContextFeed — replicates engine_refactored's BarContext field-by-field
+  - context_feed.py builds identical BarContext per bar: universes, VIX gates, spy_or_high/low,
+    day_stocks, spy_history, HMM state, cur_vol, fade_atr_top2, pe_short_calendar
+  - Verified on full IS 2017-2022: **116926/116926 bars identical** (incl. hmm_state, cur_vol)
+  - Circuit breaker bars gracefully excluded via bar_ts pairing
+  - PE_SHORT ticker injection (decide() mutates day_stocks) tolerated as expected extra_engine
+
 ### In progress
-(none — pick next from Next steps)
+- [ ] Phase 3: End-to-end PaperTrader with ReplayContextFeed — compare trade log to engine_refactored
 
 ### Next steps (ordered)
 - [x] PE_EXPANSION (25 stocks): 2017-2024 ✓ fetched

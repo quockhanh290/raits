@@ -1,8 +1,8 @@
 """
 futures/ — self-contained futures engine for RAITS.
 
-Deploys the validated swing-TF basket (RỔ 4) + STRESS_MID sleeve. Imports ONLY
-raits.hmm (regime brain, read-only); reimplements all other layers fresh so the
+Deploys the validated swing-TF basket (RỔ 4) + STRESS_MID sleeve. Imports raits.hmm (regime brain) AND raits.strategies.trend_follow (entry signal)
+— the two shared-core equity modules. All other layers reimplemented fresh so the
 existing equities engine is never touched (locked constraint).
 
 Modules:
