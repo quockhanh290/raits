@@ -13,7 +13,7 @@ clock differs, so the SPY regime must be mapped WITHOUT lookahead:
 
 Regime itself is produced by the VALIDATED path (benchmark_daily + label_regimes
 from futures._validated_core), the same SPY-based 3-state HMM Rổ 4 uses. Pass the
-same --regime-csv and the same hmm_fit_end as basket.py (2022-12-31).
+same --regime-csv and the same hmm_fit_end as basket.py (2024-12-31).
 """
 from __future__ import annotations
 import sys
@@ -23,7 +23,7 @@ import pandas as pd
 
 
 def load_spy_regime(regime_csv: str, train_end: str = "2018-01-01",
-                    n_components: int = 3, hmm_fit_end: str = "2022-12-31") -> pd.Series:
+                    n_components: int = 3, hmm_fit_end: str = "2024-12-31") -> pd.Series:
     """SPY daily regime via the validated path. Returns a Series indexed by ET
     trading date (tz-naive, normalized), values 'Calm'/'Normal'/'Stress'."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))   # D:\raits root

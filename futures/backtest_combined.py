@@ -79,7 +79,7 @@ def main():
         daily_bench = daily_bench[daily_bench.index >= pd.Timestamp(a.start)]
     if a.end:
         daily_bench = daily_bench[daily_bench.index <= pd.Timestamp(a.end)]
-    labels = label_regimes(daily_bench, a.hmm_train_end, 3, "2022-12-31")
+    labels = label_regimes(daily_bench, a.hmm_train_end, 3, "2022-12-31")  # harness — fit_A reference, not paper path
     costs = costs_for_basket(slippage_ticks=a.slippage_ticks)
 
     tf = SwingTFEngine().backtest_basket(dfs, labels, costs)

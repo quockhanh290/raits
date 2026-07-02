@@ -22,7 +22,7 @@ import pandas as pd
 
 from futures._validated_core import (load_parquet, benchmark_daily, label_regimes,
                                       backtest_swing_tf, daily_atr_series)
-from futures.basket import BASKET, data_filename, RISK
+from futures.basket import BASKET, data_filename, RISK, REGIME
 from futures.stress_mid import StressMidEngine
 from futures.circuit_breaker import CircuitBreaker
 from futures.swing_tf import SwingTFEngine, basket_labels, costs_for_basket
@@ -56,7 +56,7 @@ c_spec = gi_specs.SPECS["MNKD"]
 ndf    = gi_load(NKD_PAR)
 ndf.index = ndf.index.tz_convert(c_spec.session_tz)
 
-spy_raw = pd.Series(label_regimes(benchmark_daily(REGIME_CSV), "2018-01-01", 3, "2022-12-31"))
+spy_raw = pd.Series(label_regimes(benchmark_daily(REGIME_CSV), "2018-01-01", 3, REGIME["hmm_fit_end"]))
 spy_idx = pd.DatetimeIndex(spy_raw.index)
 spy_raw.index = (spy_idx.tz_localize(None) if spy_idx.tz else spy_idx).normalize()
 spy_raw = spy_raw.sort_index()

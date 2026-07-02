@@ -44,6 +44,31 @@ Status: IN PROGRESS
       | rejected swing=507/stress=64/nkd=13 identical | OPEN=CLOSE=1927 residual=0
       | broker equity $84,731.15 == ACCOUNT+net
 
+### Completed (HMM fit_C upgrade — 2026-07-02)
+- [x] HMM sensitivity gate: fit_C (2024-12-31) passes flip check
+      A→C label change 17.16% but economically justified (83/101 Normal→Stress in 2020+2022 bear)
+      B→C label change 0.99% → HMM stable from here; annual re-freeze is safe
+- [x] hmm_fit_end 2022→2024 in 4 production files:
+      futures/basket.py (canonical), global_index/regime.py (NKD path),
+      global_index/deploy_sim.py (CLI default), global_index/generate_replay_snapshots.py (REGIME indirection)
+- [x] 5-layer reconcile with fit_C labels — all PASS (no runtime params passed):
+      GĐ0: MES/MNQ/MYM/M2K MATCH | Stress: 4×instruments 0 mismatches (269 Stress days)
+      NKD Phase 1: 515t/$12,306 field_mismatch=0
+- [x] Baseline fit_C (paper): net $52,962 | Calmar 2.75 | MaxDD $2,789 → baseline_fit_c.txt
+      Historical baseline (fit_A/conservative floor): net $47,838 | Calmar 2.38
+      degradation.backtest_calmar = 2.3782 (fit_A floor, locked)
+- [x] Snapshot regenerated fit_C: calmar=2.7456, per_cluster sum=net diff=0
+- [x] Cleanup: backtest_combined.py + backtest_system.py annotated as harness (fit_A ref, not paper path)
+- [x] regime.py docstring updated "2022-12-31" → "2024-12-31"
+
+### Completed (NKD fit_C verification — 2026-07-02)
+- [x] Verified NKD reads fit_C SPY labels (NOT fit_A residual) — direct measurement via nkd_fit_verify.py:
+      225/1556 NKD session days (14.5%) receive different labels fit_A vs fit_C
+      Trades differ: fit_A 496t/$11,177 vs fit_C 515t/$12,306 (+19 trades, +$1,129 IS-only)
+      Flip breakdown: 189 Normal→Stress, 35 Calm→Normal, 1 Normal→Calm
+      Confirmed: load_spy_regime() → RegimeLabels(lag=1) path uses hmm_fit_end="2024-12-31" ✅
+      Snapshot NKD $13,694 = IS $12,306 + OOS 2023 tail ~$1,388 (no bug, different date range)
+
 ### Next steps
 - [ ] Wire generate_today_signals as real signal_fn for FuturesRunner (currently tested with pre-computed verify_signal_fn)
 - [ ] Reconcile desired_position() for swing TF (different call from backtest_basket; gd0 proves backtest path only)
@@ -54,12 +79,19 @@ Status: IN PROGRESS
 - daily_atr_series from futures._validated_core shared by deploy_sim and signal_layer (identical impl in both)
 - MockBroker realizes pnl from backtest ledger (not bars) for apples-to-apples vs deploy_sim
 - FuturesRunner.state.breaker must be set manually after construction to match deploy_sim
+- HMM fit_C (2024-12-31) is paper baseline; fit_A (2022-12-31) kept as conservative degradation floor
+- Re-freeze gate: run hmm_sensitivity_gate.py annually; approve if label change <5%, investigate if >5%
 
 ### Files touched
 global_index/signal_layer.py (risk_sized fix: to_candidate new signature, _asof_naive, ROSKA4_MULT/NKD_MULT)
 global_index/broker.py (new — MockBroker + Order/Fill/BrokerPosition + Broker ABC)
 global_index/runner.py (new — FuturesRunner, run_day, run_history)
 futures/reconcile_nkd.py (new — Phase 1+2 reconciliation, committed f9d3f98)
+futures/basket.py (hmm_fit_end 2022→2024)
+global_index/regime.py (hmm_fit_end default 2022→2024, docstring updated)
+global_index/deploy_sim.py (hmm_fit_end default 2022→2024)
+global_index/generate_replay_snapshots.py (REGIME indirection for NKD labels, was hardcoded 2022)
+futures/backtest_combined.py + futures/backtest_system.py (annotated harness)
 
 ---
 

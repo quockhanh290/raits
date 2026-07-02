@@ -136,7 +136,7 @@ def main():
                     help="exclude NKD → Rổ-4-only baseline through the SAME risk layer "
                          "(apples-to-apples to measure NKD's true contribution)")
     ap.add_argument("--hmm-train-end", default="2018-01-01")
-    ap.add_argument("--hmm-fit-end", default="2022-12-31")
+    ap.add_argument("--hmm-fit-end", default="2024-12-31")
     a = ap.parse_args()
 
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

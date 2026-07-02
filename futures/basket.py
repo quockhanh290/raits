@@ -41,7 +41,7 @@ SWING_TF_PARAM = {"ema_period": 30, "chandelier_atr_mult": 2.5, "max_hold_days":
 REGIME = {
     "source": "SPY",              # instrument-agnostic; SPY daily closes
     "n_components": 3,            # Calm / Normal / Stress
-    "hmm_fit_end": "2022-12-31",  # fit on diverse window incl. stress; never on vault
+    "hmm_fit_end": "2024-12-31",  # fit on diverse window incl. stress; never on vault
     "allowed_regimes": {"Normal", "Stress"},  # swing TF trades these (not Calm)
 }
 
