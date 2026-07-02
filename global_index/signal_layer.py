@@ -29,17 +29,34 @@ WHAT NEEDS REAL-DATA RECONCILE (Claude Code, before trusting live):
 """
 from __future__ import annotations
 from dataclasses import dataclass
+import pandas as pd
+from futures._validated_core import daily_atr_series
 
 # cluster names must match net_exposure_multi / deploy_sim exactly
 CLUSTER_SWING = "roska4_swing"
 CLUSTER_STRESS = "roska4_stress"
 CLUSTER_NKD = "global_nkd"
 
+# chandelier multipliers — must match deploy_sim --roska4-mult / --nkd-mult defaults
+ROSKA4_MULT = 2.5
+NKD_MULT    = 2.5
 
-def to_candidate(inst, direction, entry, stop, cluster, contracts, point_value):
+
+def _asof_naive(atr_s: "pd.Series", ts) -> float:
+    """ATR lookup: strip tz before asof() because daily_atr_series index is tz-naive."""
+    t = pd.Timestamp(ts)
+    if t.tzinfo is not None:
+        t = t.tz_localize(None)
+    av = atr_s.asof(t)
+    return float(av) if av is not None and not pd.isna(av) else float(atr_s.median())
+
+
+def to_candidate(inst, direction, entry, stop, cluster, contracts, point_value,
+                 daily_atr, mult):
     """Build an entry_candidate dict in the exact shape decide_day expects.
-    risk_sized = stop distance × point value × contracts (real $ at risk)."""
-    risk_sized = abs(float(entry) - float(stop)) * float(point_value) * int(contracts)
+    risk_sized = daily_ATR × mult × pv × contracts  (deploy_sim real_risk formula).
+    entry/stop kept in dict for order execution; risk_sized drives guard cap."""
+    risk_sized = int(contracts) * float(mult) * float(daily_atr) * float(point_value)
     return dict(inst=inst, direction=direction, cluster=cluster,
                 risk_sized=risk_sized, entry=float(entry), stop=float(stop))
 
@@ -101,23 +118,41 @@ def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs
     # state-diff → entry/exit events for swing + NKD
     state_entries, exits = diff_desired_vs_held(desired, held)
 
+    # pre-compute daily ATR series — same as deploy_sim's  atr = {n: daily_atr_series(df) ...}
+    atr_swing = {inst: daily_atr_series(df) for inst, df in swing_dfs.items()}
+    atr_nkd   = daily_atr_series(nkd_df)
+
     candidates = []
     for inst, cluster, sig in state_entries:
+        if cluster == CLUSTER_NKD:
+            atr_s, mult = atr_nkd, NKD_MULT
+        else:  # CLUSTER_SWING
+            atr_s, mult = atr_swing[inst], ROSKA4_MULT
+        av = _asof_naive(atr_s, sig["entry_day"])
         candidates.append(to_candidate(
             inst, sig["direction"], sig["entry"], sig["stop"],
-            cluster, contracts_by_inst.get(inst, 1), point_values[inst]))
+            cluster, contracts_by_inst.get(inst, 1), point_values[inst],
+            daily_atr=av, mult=mult))
 
     # --- STRESS_MID : EVENT (only at 10:15, only in Stress regime) ---
     if stress_bars_1015 and today_regime == "Stress":
+        # derive today (tz-naive) for ATR lookup — stress entry is always today
+        _any = next(iter(stress_bars_1015.values()))
+        _ts = pd.Timestamp(_any.index[-1])
+        today_naive = _ts.tz_localize(None).normalize() if _ts.tzinfo else _ts.normalize()
+
         held_stress = {(p.inst, p.cluster) for p in held}
         for inst, bars in stress_bars_1015.items():
             if (inst, CLUSTER_STRESS) in held_stress:
                 continue
             s = stress_engine.entry_signal(bars, today_regime)
             if s:
+                atr_s = atr_swing.get(inst, daily_atr_series(bars))
+                av = _asof_naive(atr_s, today_naive)
                 candidates.append(to_candidate(
                     inst, s["direction"], s["entry"], s["stop"],
-                    CLUSTER_STRESS, contracts_by_inst.get(inst, 1), point_values[inst]))
+                    CLUSTER_STRESS, contracts_by_inst.get(inst, 1), point_values[inst],
+                    daily_atr=av, mult=ROSKA4_MULT))
 
     return candidates, exits
 
@@ -128,9 +163,11 @@ if __name__ == "__main__":
     class _Held:
         inst: str; cluster: str; direction: str
 
-    # to_candidate: risk_sized = |entry-stop| × pv × contracts
-    c = to_candidate("MES", "LONG", 5000.0, 4980.0, CLUSTER_SWING, 2, 5.0)
-    assert c["risk_sized"] == 20.0 * 5.0 * 2, c
+    # to_candidate: risk_sized = daily_atr × mult × pv × contracts (deploy_sim formula)
+    c = to_candidate("MES", "LONG", 5000.0, 4980.0, CLUSTER_SWING, 2, 5.0,
+                     daily_atr=20.0, mult=ROSKA4_MULT)
+    assert c["risk_sized"] == 20.0 * ROSKA4_MULT * 5.0 * 2, c   # = 500.0
+    assert c["entry"] == 5000.0 and c["stop"] == 4980.0           # kept for order execution
     assert c["cluster"] == CLUSTER_SWING and c["direction"] == "LONG"
 
     # diff: new desired, nothing held → 1 entry, 0 exit
