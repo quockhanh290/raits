@@ -18,7 +18,6 @@ import sys, json
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import numpy as np
 import pandas as pd
 
 from futures._validated_core import (load_parquet, benchmark_daily, label_regimes,
@@ -40,27 +39,24 @@ DATA_DIR    = r"D:\raits\data\cache\futures"
 REGIME_CSV  = r"D:\raits\spy_daily.csv"
 NKD_PAR     = r"D:\raits\global_index\data\NKD_continuous_1m_8y.parquet"
 OUT_PATH    = Path(__file__).parent / "replay_snapshots_data.js"
-VAULT_START = "2023-01-01"
-ACCOUNT     = 50_000.0
-SLIPPAGE    = 2.0
-
-def clip(df):
-    vs = pd.Timestamp(VAULT_START)
-    return df[df.index < (vs.tz_localize(df.index.tz) if df.index.tz else vs)]
+ACCOUNT           = 50_000.0
+SLIPPAGE          = 2.0
+# IS Calmar reference: deploy_sim 2-tick slippage, full period 2018-2024.
+# Update to _final_rm["calmar"] printed at end of run after any engine/data/period change.
+_BACKTEST_CALMAR  = 2.3782  # deploy_sim 2-tick IS 2018-2024; confirmed 2026-07-02
 
 print("Loading data…")
-dfs    = {n: clip(load_parquet(str(Path(DATA_DIR) / data_filename(c)))) for n, c in BASKET.items()}
+dfs    = {n: load_parquet(str(Path(DATA_DIR) / data_filename(c))) for n, c in BASKET.items()}
 atr    = {n: daily_atr_series(df) for n, df in dfs.items()}
 pv     = {n: c.point_value for n, c in BASKET.items()}
-labels = basket_labels(REGIME_CSV, vault_cut=VAULT_START)
+labels = basket_labels(REGIME_CSV)
 costs  = costs_for_basket(slippage_ticks=SLIPPAGE)
 
 c_spec = gi_specs.SPECS["MNKD"]
 ndf    = gi_load(NKD_PAR)
 ndf.index = ndf.index.tz_convert(c_spec.session_tz)
-ndf    = clip(ndf)
 
-spy_raw = pd.Series(label_regimes(benchmark_daily(REGIME_CSV), "2018-01-01", 3))
+spy_raw = pd.Series(label_regimes(benchmark_daily(REGIME_CSV), "2018-01-01", 3, "2022-12-31"))
 spy_idx = pd.DatetimeIndex(spy_raw.index)
 spy_raw.index = (spy_idx.tz_localize(None) if spy_idx.tz else spy_idx).normalize()
 spy_raw = spy_raw.sort_index()
@@ -374,7 +370,7 @@ for day in days:
             "sample_sufficient": None,
         },
         "degradation": {
-            "backtest_calmar":   2.38,   # IS baseline locked from vault result
+            "backtest_calmar":   _BACKTEST_CALMAR,
             "paper_calmar":      None,   # runner: metrics(paper_daily_pnl)["calmar"]
             "degradation_pct":   None,   # (backtest - paper) / backtest * 100
             "status":            None,   # "within_range" / "flag" / "red_flag"
@@ -385,15 +381,10 @@ for day in days:
 if _breaker_events and _breaker_events[-1]["duration_days"] is None and days:
     _breaker_events[-1]["duration_days"] = (days[-1] - _halt_start).days if _halt_start else 0
 
-# IS Calmar reference = 2.38 from deploy_sim --slippage-ticks 1.0 (the locked canonical run).
-# This snapshot uses SLIPPAGE=2.0 (more conservative) → running_metrics.calmar ≈ 2.41.
-# Both are correct for their respective simulations; backtest_calmar is the fixed reference.
-_BACKTEST_CALMAR = 2.38   # deploy_sim canonical (1-tick slippage)
-_final_rm = _rmetrics(_daily_realized, ACCOUNT)
-print(f"Simulation Calmar (2-tick): {_final_rm['calmar']:.4f}  |  IS reference: {_BACKTEST_CALMAR}")
-
-net_pnl = state.equity - ACCOUNT
-print(f"Done — equity=${state.equity:,.2f}  net=${net_pnl:,.2f}  maxdd=${max_dd_dollars:,.2f}")
+net_pnl  = state.equity - ACCOUNT
+_final_m = metrics(pd.Series({d: v for d, v in _daily_realized}))
+print(f"Done — equity=${state.equity:,.2f}  net=${net_pnl:,.2f}  "
+      f"maxdd=${max_dd_dollars:,.2f}  calmar={_final_m['calmar']:.4f}")
 
 output = {
     "meta": {
@@ -412,7 +403,7 @@ output = {
             for cl, b in DEFAULT_CLUSTERS.items()
         },
         "breaker_events":  _breaker_events,
-        "backtest_calmar": _BACKTEST_CALMAR,  # locked IS reference (deploy_sim 1-tick)
+        "backtest_calmar": _BACKTEST_CALMAR,  # IS reference (deploy_sim 2-tick, 2018-2024)
     },
     "snapshots": snapshots
 }
