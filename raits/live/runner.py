@@ -38,11 +38,16 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional
 
 from raits.decision.types import BarContext, DecisionResult, EntryIntent, ExitIntent
 from raits.backtest.data_types import Trade
+from raits.risk.circuit_breakers import CircuitBreakerManager
 
 from .broker import BrokerInterface, FillStatus, Order
 from .reconciliation import ReconciliationLog
 
 logger = logging.getLogger("RAITS.live.runner")
+
+# Sentinel to detect stale bytecode — changed each fix iteration
+_RUNNER_VERSION = "EOD+EOP+CB-v5-same-bar-exit"
+print(f"[RUNNER] loaded runner.py version={_RUNNER_VERSION} from {__file__}")
 
 # Default kill-switch threshold: -4% daily drawdown (matches circuit-breaker)
 DEFAULT_KILL_SWITCH_PCT = 0.04
@@ -221,6 +226,15 @@ class PaperTrader:
         # id(trade) → {"extreme": float}  (mirrors engine._swing_state)
         self._swing_state: Dict[int, dict] = {}
 
+        # Circuit breaker — mirrors engine's circuit_breakers object.
+        # Two triggers: daily drawdown (-4%) and consecutive losses (5).
+        self._cb = CircuitBreakerManager()
+        # Running equity: updated via net_pnl on every close (mirrors equity_tracker).
+        self._running_equity: float = account_equity
+        self._session_start_equity: float = account_equity
+        # Per-day flag: True once CB fires; causes bar loop to skip remaining bars.
+        self._cb_active: bool = False
+
     @property
     def closed_trades(self) -> List[Trade]:
         return list(self._closed_trades)
@@ -228,38 +242,65 @@ class PaperTrader:
     # ── Public ────────────────────────────────────────────────────────────────
 
     def run(self, feed: ContextFeed) -> RunResult:
-        """Run the full paper-trading loop over the feed."""
+        """Run the full paper-trading loop over the feed.
+
+        Bar-loop order mirrors engine_refactored._run_day() exactly:
+          1. Swing exits (TF + PE_SHORT) — may trigger consecutive-loss CB
+          2. Skip remainder if CB fired (engine: `continue`)
+          3. Intraday exits
+          4. Entries
+          5. Daily-drawdown CB check → _close_all_cb() if triggered
+        """
         result = RunResult()
         current_day = None
         _prev_ctx = None  # last ctx of previous day — needed for EOD swing-stop update
+        _SWING = ("TREND_FOLLOW", "PE_SHORT")
 
         for ctx in feed:
             bar_day = ctx.bar_ts.normalize()
 
-            # Day reset
+            # ── Day reset ────────────────────────────────────────────────────
             if bar_day != current_day:
                 # EOD swing-stop update for the previous day
-                # Mirrors engine_refactored._run_day() line 829: _update_swing_stops(day, ...)
                 if _prev_ctx is not None and self._allow_swing_hold:
                     self._update_swing_stops(
                         _prev_ctx.day, _prev_ctx.market_data, _prev_ctx.day_stocks
                     )
+                # EOD force-close for previous day's non-swing positions.
+                # Mirrors engine._close_all(day, day_stocks, "EOD", skip_swing=True).
+                # No-op on normal days (intraday positions already closed by TIME_STOP
+                # signal from decide()). Fires on half-days (13:00 close) where the
+                # 15:55 TIME_STOP bar never exists.
+                if _prev_ctx is not None:
+                    _prev_day_str = str(_prev_ctx.day.date()) if hasattr(_prev_ctx.day, "date") else str(_prev_ctx.day)[:10]
+                    if _prev_day_str == "2020-11-27":
+                        _open_now = [(t.ticker, t.strategy) for t in self._open_positions.values()]
+                        print(f"[TRACE EOD] day={_prev_day_str}: {len(_open_now)} open positions: {_open_now}")
+                    self._close_all_eod(_prev_ctx.day, _prev_ctx.day_stocks)
                 current_day = bar_day
                 self._daily_pnl = 0.0
-                # MAX_HOLD: mirrors engine_refactored._run_day() day-start block (lines 615-632)
-                # Must run after EOD swing-stop update and before reset_day()
+                # Reset CB for new session (consecutive-loss counter carries forward)
+                self._cb_active = False
+                self._session_start_equity = self._running_equity
+                self._cb.reset_for_new_session(bar_day.date())
+                # MAX_HOLD pre-bar close (mirrors engine lines 615-632)
                 self._check_max_hold(bar_day, ctx)
                 self._du.reset_day(bar_day, ctx.orb_signal_start, ctx.orb_signal_end)
 
-            # Kill-switch check (before decide)
+            # If CB fired earlier this day, skip all bar processing
+            if self._cb_active:
+                _prev_ctx = ctx
+                continue
+
+            # Harness kill-switch (separate from engine CB; disabled during verify)
             if self._kill_switch_triggered(ctx.bar_ts, result):
                 break
 
             # Inject open positions into ctx so DecisionUnit can exit them
             ctx.open_trades = list(self._open_positions.values())
 
-            # Mirror engine behavior: swing trade tickers must be in day_stocks
-            # even if today's universe scan dropped them, so exit checks work.
+            # Mirror engine: swing trade tickers must remain in day_stocks even if
+            # scanner dropped them today, so stop/target exit checks work.
             for _trade in ctx.open_trades:
                 _tk = _trade.ticker
                 if (_tk not in ctx.day_stocks and _tk != "SPY"
@@ -270,28 +311,98 @@ class PaperTrader:
                     if not _day_bars.empty:
                         ctx.day_stocks[_tk] = _day_bars
 
-            # === DecisionUnit call (read-only) ===
+            # === DecisionUnit call ===
             decision: DecisionResult = self._du.decide(ctx)
 
             result.bars_processed += 1
             result.entries_signalled += len(decision.entries)
             result.exits_signalled   += len(decision.exits)
 
-            # Process exits first (free up capital)
+            # ── Step 1: Swing exits first (TF + PE_SHORT) ───────────────────
+            # Mirrors engine: swing exits run before intraday; consecutive-loss
+            # CB may fire here, causing `continue` to skip the rest of the bar.
             for exit_intent in decision.exits:
-                self._process_exit(exit_intent, ctx.bar_ts, result)
+                if exit_intent.trade.strategy in _SWING:
+                    self._process_exit(exit_intent, ctx.bar_ts, result)
 
-            # Then entries
+            # ── Step 2: Skip if consecutive-loss CB fired during swing exits ─
+            if self._cb_active:
+                _prev_ctx = ctx
+                continue
+
+            # ── Step 3: Intraday exits ───────────────────────────────────────
+            for exit_intent in decision.exits:
+                if exit_intent.trade.strategy not in _SWING:
+                    self._process_exit(exit_intent, ctx.bar_ts, result)
+
+            # ── Step 4: Entries ──────────────────────────────────────────────
+            # Pre-compute spy_bar once per bar for same-bar exit check below.
+            _bar_t = ctx.bar_ts.time()
+            _spy_bar = None
+            if "SPY" in ctx.day_stocks:
+                try:
+                    _spy_bar = ctx.day_stocks["SPY"].loc[ctx.bar_ts]
+                except (KeyError, TypeError):
+                    pass
             for entry_intent in decision.entries:
-                self._process_entry(entry_intent, ctx.bar_ts, result)
+                new_trade = self._process_entry(entry_intent, ctx.bar_ts, result)
+                # Same-bar exit check: mirrors engine_refactored lines 778-789.
+                # Engine calls _check_exits immediately after entry so the entry
+                # bar's high/low can trigger stop/target before the next bar.
+                # PaperTrader must do the same or it holds the trade one bar too long.
+                if (new_trade is not None
+                        and new_trade.strategy not in _SWING
+                        and not self._cb_active):
+                    _sb = self._du._check_exits(
+                        new_trade, ctx.bar_ts, _bar_t, ctx.day_stocks,
+                        self._allow_swing_hold, _spy_bar,
+                    )
+                    if _sb:
+                        _sb_price, _sb_reason = _sb
+                        self._process_exit(
+                            ExitIntent(trade=new_trade, exit_price=_sb_price,
+                                       reason=_sb_reason),
+                            ctx.bar_ts, result,
+                        )
 
-            _prev_ctx = ctx  # keep last bar of this day for EOD swing-stop update
+            # ── Step 5: Daily-drawdown CB check ──────────────────────────────
+            # Mirrors engine lines 795-820; skipped when SAFETY_MODE was active.
+            if not decision.override_active:
+                try:
+                    dd = self._cb.check_daily_drawdown(
+                        account_equity=self._running_equity,
+                        session_start_equity=self._session_start_equity,
+                    )
+                    if dd.kill_switch:
+                        self._close_all_cb(ctx.bar_ts, bar_day, ctx.day_stocks)
+                        self._cb_active = True
+                        _prev_ctx = ctx
+                        continue
+                except Exception:
+                    # Fallback: same -4% threshold
+                    if self._session_start_equity > 0:
+                        pnl_pct = (self._running_equity - self._session_start_equity) / self._session_start_equity
+                        if pnl_pct <= -0.04:
+                            self._close_all_cb(ctx.bar_ts, bar_day, ctx.day_stocks)
+                            self._cb_active = True
+                            _prev_ctx = ctx
+                            continue
 
-        # EOD swing-stop update for the final day (no day boundary follows it)
-        if _prev_ctx is not None and self._allow_swing_hold:
-            self._update_swing_stops(
-                _prev_ctx.day, _prev_ctx.market_data, _prev_ctx.day_stocks
-            )
+            _prev_ctx = ctx
+
+        # ── Post-loop: mirror engine's end-of-day + end-of-period cleanup ──────
+        if _prev_ctx is not None:
+            # EOD swing-stop update for the final day
+            if self._allow_swing_hold:
+                self._update_swing_stops(
+                    _prev_ctx.day, _prev_ctx.market_data, _prev_ctx.day_stocks
+                )
+            # EOD force-close for any remaining non-swing positions on the final day
+            # (mirrors engine._close_all(day, day_stocks, "EOD", skip_swing=True))
+            self._close_all_eod(_prev_ctx.day, _prev_ctx.day_stocks)
+            # END_OF_PERIOD: close remaining swing positions still open at IS end
+            # (mirrors engine lines 438-452 — uses _close_trade so updates CB)
+            self._close_end_of_period(_prev_ctx)
 
         result.simulated_pnl = self._daily_pnl
         return result
@@ -300,7 +411,8 @@ class PaperTrader:
 
     def _process_entry(
         self, intent: EntryIntent, bar_ts: Any, result: RunResult
-    ) -> None:
+    ) -> Optional[Any]:
+        """Return the opened Trade (or None if order was rejected)."""
         side = "BUY" if intent.direction == "LONG" else "SELL"
         order = Order(
             order_id=str(uuid.uuid4()),
@@ -321,13 +433,16 @@ class PaperTrader:
             trade = _intent_to_trade(intent, filled_order, bar_ts)
             self._open_positions[trade.trade_id] = trade
             self._du.on_trade_opened(trade, intent)
+            return trade
         elif filled_order.fill_status == FillStatus.PARTIAL:
             result.orders_partial += 1
             trade = _intent_to_trade(intent, filled_order, bar_ts, use_filled_qty=True)
             self._open_positions[trade.trade_id] = trade
             self._du.on_trade_opened(trade, intent)
+            return trade
         else:
             result.orders_rejected += 1
+            return None
 
     def _process_exit(
         self, exit_intent: ExitIntent, bar_ts: Any, result: RunResult
@@ -371,12 +486,161 @@ class PaperTrader:
             trade.total_costs = total_costs
             trade.net_pnl     = gross_pnl - total_costs
 
-            self._daily_pnl += gross_pnl
+            self._daily_pnl      += gross_pnl
+            self._running_equity += trade.net_pnl
             self._swing_state.pop(id(trade), None)
             del self._open_positions[trade.trade_id]
             self._closed_trades.append(trade)
+            # Consecutive-loss CB (mirrors engine._close_trade → record_trade_result)
+            cb_res = self._cb.record_trade_result(trade.net_pnl or 0.0)
+            if cb_res.kill_switch:
+                self._cb_active = True
         else:
             result.orders_rejected += 1
+
+    def _close_all_eod(self, prev_day: Any, day_stocks: Any) -> None:
+        """Force-close non-swing positions remaining after a day's bar loop.
+
+        Mirrors engine._close_all(day, day_stocks, "EOD", skip_swing=True):
+        - TF excluded (skip_swing=True with allow_swing_hold=True)
+        - PE_SHORT entered on prev_day excluded (entry-day EOD hold)
+        - exit_time = prev_day midnight (engine uses day timestamp, not bar_ts)
+        - exit_price = day_stocks[ticker].iloc[-1]["close"] with stop-cap
+        - Does NOT call record_trade_result (engine._close_all bypasses _close_trade)
+        No-op on normal days (intraday positions closed by TIME_STOP from decide()).
+        Active on half-days where 15:55 bar never exists.
+        """
+        import pandas as pd
+        _prev_day_str = str(prev_day.date()) if hasattr(prev_day, "date") else str(prev_day)[:10]
+        if _prev_day_str == "2020-11-27":
+            _open_tickers = [(t.ticker, t.strategy) for t in self._open_positions.values()]
+            print(f"[TRACE _close_all_eod] entered for {_prev_day_str}: {len(_open_tickers)} positions: {_open_tickers}")
+        for trade_id in list(self._open_positions):
+            trade = self._open_positions[trade_id]
+            # Mirror engine._close_all(skip_swing=True): skip TF (when swing hold on)
+            # and ALL PE_SHORT regardless of entry day — engine never EOD-closes PE_SHORT
+            if self._allow_swing_hold and trade.strategy == "TREND_FOLLOW":
+                continue
+            if trade.strategy == "PE_SHORT":
+                continue
+            ticker = trade.ticker
+            if _prev_day_str == "2020-11-27":
+                print(f"[TRACE _close_all_eod] closing {ticker} {trade.strategy}")
+            if ticker in day_stocks and not day_stocks[ticker].empty:
+                _bar = day_stocks[ticker].iloc[-1]
+                _px  = float(_bar["close"])
+                if trade.stop is not None:
+                    if trade.direction == "LONG" and float(_bar["low"]) <= trade.stop:
+                        _px = max(_px, trade.stop)
+                    elif trade.direction == "SHORT" and float(_bar["high"]) >= trade.stop:
+                        _px = min(_px, trade.stop)
+            else:
+                _px = trade.entry_price
+            multiplier  = 1 if trade.direction == "LONG" else -1
+            gross_pnl   = multiplier * (_px - trade.entry_price) * trade.shares
+            total_costs = self._cost_fn(trade, _px) if self._cost_fn else 0.0
+            trade.exit_time   = prev_day   # midnight timestamp, matches engine
+            trade.exit_price  = _px
+            trade.exit_reason = "EOD"
+            trade.gross_pnl   = gross_pnl
+            trade.total_costs = total_costs
+            trade.net_pnl     = gross_pnl - total_costs
+            self._running_equity += trade.net_pnl
+            self._daily_pnl     += gross_pnl
+            self._swing_state.pop(id(trade), None)
+            del self._open_positions[trade_id]
+            self._closed_trades.append(trade)
+            # No record_trade_result — engine._close_all doesn't call _close_trade
+
+    def _close_end_of_period(self, last_ctx: Any) -> None:
+        """Force-close all positions remaining at the end of the IS period.
+
+        Mirrors engine lines 438-452 (END_OF_PERIOD force-close after the run loop):
+        - exit_time = last bar timestamp of the final day (not midnight)
+        - exit_price = last bar's close for each ticker
+        - Uses _close_trade equivalent (calls record_trade_result, updates CB)
+        Covers swing positions (TF, PE_SHORT) still open after the final day's EOD.
+        """
+        import pandas as pd
+        last_bar_ts = last_ctx.bar_ts
+        last_day    = last_ctx.day
+        day_stocks  = last_ctx.day_stocks
+        market_data = last_ctx.market_data
+
+        for trade_id in list(self._open_positions):
+            trade = self._open_positions[trade_id]
+            ticker = trade.ticker
+            # Engine: uses market_data[ticker][normalize == last_day].iloc[-1]["close"]
+            if ticker in day_stocks and not day_stocks[ticker].empty:
+                _px = float(day_stocks[ticker].iloc[-1]["close"])
+            elif ticker in market_data:
+                _day_bars = market_data[ticker][
+                    market_data[ticker].index.normalize() == last_day
+                ]
+                _px = float(_day_bars.iloc[-1]["close"]) if not _day_bars.empty else trade.entry_price
+            else:
+                _px = trade.entry_price
+            multiplier  = 1 if trade.direction == "LONG" else -1
+            gross_pnl   = multiplier * (_px - trade.entry_price) * trade.shares
+            total_costs = self._cost_fn(trade, _px) if self._cost_fn else 0.0
+            trade.exit_time   = last_bar_ts
+            trade.exit_price  = _px
+            trade.exit_reason = "END_OF_PERIOD"
+            trade.gross_pnl   = gross_pnl
+            trade.total_costs = total_costs
+            trade.net_pnl     = gross_pnl - total_costs
+            self._running_equity += trade.net_pnl
+            self._daily_pnl     += gross_pnl
+            self._swing_state.pop(id(trade), None)
+            del self._open_positions[trade_id]
+            self._closed_trades.append(trade)
+            # Engine uses _close_trade → record_trade_result (updates consecutive-loss CB)
+            cb_res = self._cb.record_trade_result(trade.net_pnl or 0.0)
+            if cb_res.kill_switch:
+                self._cb_active = True
+
+    def _close_all_cb(self, bar_ts: Any, bar_day: Any, day_stocks: Any) -> None:
+        """Force-close all eligible positions at last-bar close with reason CIRCUIT_BREAKER.
+
+        Mirrors engine_refactored._close_all(bar_ts, day_stocks, "CIRCUIT_BREAKER"):
+        - exit price = day_stocks[ticker].iloc[-1]["close"]  (last bar of day = 15:55)
+        - stop-cap applied if stop was breached on that bar
+        - PE_SHORT entered the same day is excluded (same as engine)
+        - Does NOT go through broker (engine's _close_all bypasses broker too)
+        - Does NOT call record_trade_result (engine's _close_all doesn't call _close_trade)
+        """
+        import pandas as pd
+        for trade_id in list(self._open_positions):
+            trade = self._open_positions[trade_id]
+            # PE_SHORT entered same day: excluded (engine exclusion condition)
+            if (trade.strategy == "PE_SHORT"
+                    and pd.Timestamp(trade.entry_time).normalize() == bar_day):
+                continue
+            if trade.ticker in day_stocks and not day_stocks[trade.ticker].empty:
+                _bar = day_stocks[trade.ticker].iloc[-1]
+                _px  = float(_bar["close"])
+                # Stop-cap: prevent close worse than stop (engine _close_all lines 1436-1440)
+                if trade.stop is not None:
+                    if trade.direction == "LONG" and float(_bar["low"]) <= trade.stop:
+                        _px = max(_px, trade.stop)
+                    elif trade.direction == "SHORT" and float(_bar["high"]) >= trade.stop:
+                        _px = min(_px, trade.stop)
+            else:
+                _px = trade.entry_price
+            multiplier  = 1 if trade.direction == "LONG" else -1
+            gross_pnl   = multiplier * (_px - trade.entry_price) * trade.shares
+            total_costs = self._cost_fn(trade, _px) if self._cost_fn else 0.0
+            trade.exit_time   = bar_ts
+            trade.exit_price  = _px
+            trade.exit_reason = "CIRCUIT_BREAKER"
+            trade.gross_pnl   = gross_pnl
+            trade.total_costs = total_costs
+            trade.net_pnl     = gross_pnl - total_costs
+            self._running_equity += trade.net_pnl
+            self._daily_pnl     += gross_pnl
+            self._swing_state.pop(id(trade), None)
+            del self._open_positions[trade_id]
+            self._closed_trades.append(trade)
 
     def _update_swing_stops(
         self,
@@ -489,10 +753,15 @@ class PaperTrader:
             trade.gross_pnl   = gross_pnl
             trade.total_costs = total_costs
             trade.net_pnl     = gross_pnl - total_costs
-            self._daily_pnl  += gross_pnl
+            self._daily_pnl      += gross_pnl
+            self._running_equity += trade.net_pnl
             self._swing_state.pop(id(trade), None)
             del self._open_positions[trade_id]
             self._closed_trades.append(trade)
+            # Consecutive-loss CB (mirrors engine._close_trade → record_trade_result)
+            cb_res = self._cb.record_trade_result(trade.net_pnl or 0.0)
+            if cb_res.kill_switch:
+                self._cb_active = True
 
     def _kill_switch_triggered(self, bar_ts: Any, result: RunResult) -> bool:
         if self._equity <= 0:

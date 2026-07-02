@@ -70,6 +70,7 @@ class DayDecision:
     rejected: list       # entry candidates blocked by cap
     halted: list         # entry candidates blocked by circuit breaker
     realized: float      # P&L realized today
+    rejected_details: list = field(default_factory=list)  # per-rejection {inst,direction,cluster,risk_sized,reason}
 
 
 def decide_day(day, state: DecisionState, entry_candidates, guard, contracts_by_inst):
@@ -96,14 +97,25 @@ def decide_day(day, state: DecisionState, entry_candidates, guard, contracts_by_
 
     # 3. entries — priority sort, cap, breaker (same order as deploy_sim)
     accepted, rejected, halted = [], [], []
+    rejected_details = []
     for t in sorted(entry_candidates, key=entry_priority_key):
         if not allow:
-            halted.append(t); state.halted += 1; continue
+            halted.append(t); state.halted += 1
+            rejected_details.append({"inst": t["inst"], "direction": t["direction"],
+                                     "cluster": t["cluster"],
+                                     "risk_sized": round(t.get("risk_sized", 0), 2),
+                                     "reason": "breaker_halt"})
+            continue
         n = contracts_by_inst.get(t["inst"], 1)
         pos = Position(t["inst"], t["direction"], n, t["risk_sized"], t["cluster"])
-        ok, _ = guard.admits(pos, [p.as_position() for p in state.open_positions])
+        ok, why = guard.admits(pos, [p.as_position() for p in state.open_positions])
         if not ok:
             rejected.append(t); state.rejected[t["cluster"]] = state.rejected.get(t["cluster"], 0) + 1
+            rejected_details.append({"inst": t["inst"], "direction": t["direction"],
+                                     "cluster": t["cluster"],
+                                     "risk_sized": round(t.get("risk_sized", 0), 2),
+                                     "reason": "cap_gross" if "gross" in why else "cap_net" if "net" in why else "cap",
+                                     "detail": why})
             continue
         accepted.append(t); state.taken[t["cluster"]] = state.taken.get(t["cluster"], 0) + 1
         newp = OpenPos(t["inst"], t["direction"], n, t["risk_sized"], t["cluster"],
@@ -112,7 +124,8 @@ def decide_day(day, state: DecisionState, entry_candidates, guard, contracts_by_
             state.equity += newp.pnl_sized; realized += newp.pnl_sized
         else:
             state.open_positions.append(newp)
-    return DayDecision(day, exits, accepted, rejected, halted, realized)
+    return DayDecision(day, exits, accepted, rejected, halted, realized,
+                       rejected_details=rejected_details)
 
 
 def replay_via_decision(all_trades, account, guard, contracts_by_inst, breaker_cls):

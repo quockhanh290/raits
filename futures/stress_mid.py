@@ -46,7 +46,10 @@ class StressMidEngine:
                                     regime=t.regime, direction=t.direction,
                                     entry=round(t.entry, 2), exit=round(t.exit, 2),
                                     points=round(t.points, 2), pnl=round(t.pnl, 2),
-                                    reason="STRESS_MID"))
+                                    reason="STRESS_MID",
+                                    entry_time=t.entry_time,
+                                    exit_time=t.exit_time,
+                                    exit_reason=(t.meta.get("reason") if t.meta else None)))
         return out
 
     def backtest_basket(self, dfs: dict, labels, costs: dict):
