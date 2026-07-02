@@ -45,10 +45,6 @@ from .reconciliation import ReconciliationLog
 
 logger = logging.getLogger("RAITS.live.runner")
 
-# Sentinel to detect stale bytecode — changed each fix iteration
-_RUNNER_VERSION = "EOD+EOP+CB-v5-same-bar-exit"
-print(f"[RUNNER] loaded runner.py version={_RUNNER_VERSION} from {__file__}")
-
 # Default kill-switch threshold: -4% daily drawdown (matches circuit-breaker)
 DEFAULT_KILL_SWITCH_PCT = 0.04
 
@@ -272,10 +268,6 @@ class PaperTrader:
                 # signal from decide()). Fires on half-days (13:00 close) where the
                 # 15:55 TIME_STOP bar never exists.
                 if _prev_ctx is not None:
-                    _prev_day_str = str(_prev_ctx.day.date()) if hasattr(_prev_ctx.day, "date") else str(_prev_ctx.day)[:10]
-                    if _prev_day_str == "2020-11-27":
-                        _open_now = [(t.ticker, t.strategy) for t in self._open_positions.values()]
-                        print(f"[TRACE EOD] day={_prev_day_str}: {len(_open_now)} open positions: {_open_now}")
                     self._close_all_eod(_prev_ctx.day, _prev_ctx.day_stocks)
                 current_day = bar_day
                 self._daily_pnl = 0.0
@@ -336,20 +328,17 @@ class PaperTrader:
                     self._process_exit(exit_intent, ctx.bar_ts, result)
 
             # ── Step 4: Entries ──────────────────────────────────────────────
-            # Pre-compute spy_bar once per bar for same-bar exit check below.
-            _bar_t = ctx.bar_ts.time()
-            _spy_bar = None
-            if "SPY" in ctx.day_stocks:
-                try:
-                    _spy_bar = ctx.day_stocks["SPY"].loc[ctx.bar_ts]
-                except (KeyError, TypeError):
-                    pass
+            # Pre-compute once per bar for same-bar exit check below.
+            # ctx.spy_bar is the current-bar SPY Series (mirrors engine's spy_bar
+            # from day_spy.iterrows()). SPY is excluded from ctx.day_stocks, so we
+            # must use ctx.spy_bar directly — NOT look it up in day_stocks.
+            _bar_t   = ctx.bar_ts.time()
+            _spy_bar = getattr(ctx, "spy_bar", None)
             for entry_intent in decision.entries:
                 new_trade = self._process_entry(entry_intent, ctx.bar_ts, result)
                 # Same-bar exit check: mirrors engine_refactored lines 778-789.
                 # Engine calls _check_exits immediately after entry so the entry
                 # bar's high/low can trigger stop/target before the next bar.
-                # PaperTrader must do the same or it holds the trade one bar too long.
                 if (new_trade is not None
                         and new_trade.strategy not in _SWING
                         and not self._cb_active):
@@ -511,10 +500,6 @@ class PaperTrader:
         Active on half-days where 15:55 bar never exists.
         """
         import pandas as pd
-        _prev_day_str = str(prev_day.date()) if hasattr(prev_day, "date") else str(prev_day)[:10]
-        if _prev_day_str == "2020-11-27":
-            _open_tickers = [(t.ticker, t.strategy) for t in self._open_positions.values()]
-            print(f"[TRACE _close_all_eod] entered for {_prev_day_str}: {len(_open_tickers)} positions: {_open_tickers}")
         for trade_id in list(self._open_positions):
             trade = self._open_positions[trade_id]
             # Mirror engine._close_all(skip_swing=True): skip TF (when swing hold on)
@@ -524,8 +509,6 @@ class PaperTrader:
             if trade.strategy == "PE_SHORT":
                 continue
             ticker = trade.ticker
-            if _prev_day_str == "2020-11-27":
-                print(f"[TRACE _close_all_eod] closing {ticker} {trade.strategy}")
             if ticker in day_stocks and not day_stocks[ticker].empty:
                 _bar = day_stocks[ticker].iloc[-1]
                 _px  = float(_bar["close"])
