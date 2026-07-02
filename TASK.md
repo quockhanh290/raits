@@ -24,6 +24,45 @@ Status: DONE
 
 ---
 
+## Sub-task: Futures signal pipeline — live orchestration (IN PROGRESS)
+Status: IN PROGRESS
+
+### Completed
+- [x] reconcile_nkd Phase 1 PASS — 496 NKD trades, 0 field mismatches, P&L diff $0.00
+- [x] reconcile_nkd Phase 2 PASS — 496 trades, desired_position boundary checks OK → NKD safe to wire live
+- [x] risk_sized fix in global_index/signal_layer.py — to_candidate now uses deploy_sim formula:
+      risk_sized = n × mult × daily_ATR14.asof(entry_day) × point_value
+      (was using chandelier stop-distance ATR → ~94.3% median discrepancy fixed to ~0%)
+- [x] Unit tests updated for new to_candidate(daily_atr=, mult=) signature — all PASS
+- [x] _asof_naive() helper: strips tz before asof() because daily_atr_series index is tz-naive
+- [x] generate_today_signals: pre-computes atr_swing/atr_nkd; STRESS_MID uses atr_swing fallback
+- [x] ROSKA4_MULT = NKD_MULT = 2.5 constants exported for test harness use
+- [x] reconcile_gd0 baseline PASS (unchanged after signal_layer fix)
+- [x] reconcile_stress baseline PASS (unchanged after signal_layer fix)
+- [x] FuturesRunner + MockBroker orchestration VALIDATED vs deploy_sim:
+      Net P&L $34,731.15 diff=$0.00 | taken swing=1226/stress=117/nkd=584 identical
+      | rejected swing=507/stress=64/nkd=13 identical | OPEN=CLOSE=1927 residual=0
+      | broker equity $84,731.15 == ACCOUNT+net
+
+### Next steps
+- [ ] Wire generate_today_signals as real signal_fn for FuturesRunner (currently tested with pre-computed verify_signal_fn)
+- [ ] Reconcile desired_position() for swing TF (different call from backtest_basket; gd0 proves backtest path only)
+- [ ] IBKRBroker stub (when IBKR account ready)
+
+### Key decisions
+- mult=2.5 for ALL clusters (roska4_swing, roska4_stress, global_nkd) — matches deploy_sim defaults
+- daily_atr_series from futures._validated_core shared by deploy_sim and signal_layer (identical impl in both)
+- MockBroker realizes pnl from backtest ledger (not bars) for apples-to-apples vs deploy_sim
+- FuturesRunner.state.breaker must be set manually after construction to match deploy_sim
+
+### Files touched
+global_index/signal_layer.py (risk_sized fix: to_candidate new signature, _asof_naive, ROSKA4_MULT/NKD_MULT)
+global_index/broker.py (new — MockBroker + Order/Fill/BrokerPosition + Broker ABC)
+global_index/runner.py (new — FuturesRunner, run_day, run_history)
+futures/reconcile_nkd.py (new — Phase 1+2 reconciliation, committed f9d3f98)
+
+---
+
 ### Completed
 - [x] Extended IS from 3yr (2020-2022) → 6yr (2017-2022), $50k account
 - [x] Fix BacktestConfig orphaned fields (max_position_pct, kelly_fraction not wired)
