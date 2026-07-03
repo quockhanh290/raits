@@ -17,7 +17,7 @@ from __future__ import annotations
 import random
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
@@ -141,39 +141,182 @@ class MockBroker(BrokerInterface):
         self._equity = equity
 
 
+class IBKRConnectionError(RuntimeError):
+    """Raised when IBKRBroker is called without a live IB Gateway connection."""
+    pass
+
+
 class IBKRBroker(BrokerInterface):
     """
-    Interactive Brokers broker stub.
+    Interactive Brokers equity broker via ib_async.
 
-    Raises NotImplementedError on all methods.
-    ib_async is imported lazily so mock mode never requires it installed.
+    Not yet tested against live IBKR — pending account approval.
+    Verified only that it imports and instantiates without ib_async present
+    (lazy import), and that calling a method without connect() raises
+    IBKRConnectionError (not ImportError).
 
-    Wire this up once:
-      1. pip install ib_async
-      2. TWS / IB Gateway running on port 7497 (paper) or 7496 (live)
-      3. Pass --i-understand-this-is-live to PaperTrader
+    Wire-up checklist
+    -----------------
+    1. pip install ib_async
+    2. IB Gateway (or TWS) running — paper port 7497, live port 7496
+    3. Pass ibkr_port=7497 to PaperTrader (or 7496 + live_flag=True for live)
+    4. Call broker.connect() before PaperTrader.run()
+    5. Call broker.disconnect() in a finally block after the run
+
+    Parameters
+    ----------
+    host          : IB Gateway host (default 127.0.0.1)
+    port          : IB Gateway port (7497 paper, 7496 live)
+    client_id     : IB API client ID — must be unique per simultaneous connection
+    fill_timeout_s: seconds to wait for order fill before marking PENDING (default 30)
     """
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 7497, client_id: int = 1):
-        self._host = host
-        self._port = port
-        self._client_id = client_id
-        self._ib = None  # lazy
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 7497,
+        client_id: int = 1,
+        fill_timeout_s: float = 30.0,
+    ) -> None:
+        self._host         = host
+        self._port         = port
+        self._client_id    = client_id
+        self._fill_timeout = fill_timeout_s
+        self._ib           = None  # ib_async.IB instance; None until connect()
 
-    def _connect(self):
+    # ── Connection lifecycle ──────────────────────────────────────────────────
+
+    def connect(self) -> None:
+        """Connect to IB Gateway. Call once before PaperTrader.run()."""
         try:
-            import ib_async as ib  # type: ignore
+            import ib_async  # type: ignore  # lazy import
         except ImportError as exc:
             raise ImportError(
                 "ib_async not installed. Run: pip install ib_async"
             ) from exc
-        raise NotImplementedError("IBKRBroker._connect not yet implemented")
+        ib = ib_async.IB()
+        ib.connect(self._host, self._port, clientId=self._client_id)
+        self._ib = ib
+
+    def disconnect(self) -> None:
+        """Disconnect from IB Gateway. Call in a finally block after run()."""
+        if self._ib is not None:
+            try:
+                self._ib.disconnect()
+            except Exception:
+                pass
+            self._ib = None
+
+    def _require_connection(self):
+        """Return connected IB instance, or raise IBKRConnectionError."""
+        if self._ib is None or not self._ib.isConnected():
+            raise IBKRConnectionError(
+                "IBKRBroker is not connected — call broker.connect() first.\n"
+                f"  host={self._host}, port={self._port}, clientId={self._client_id}"
+            )
+        return self._ib
+
+    # ── BrokerInterface ───────────────────────────────────────────────────────
 
     def submit_order(self, order: Order) -> Order:
-        raise NotImplementedError("IBKRBroker is a stub — not yet implemented")
+        """
+        Submit an equity market order to IBKR and wait for fill.
 
-    def cancel_order(self, order_id: str) -> bool:
-        raise NotImplementedError("IBKRBroker is a stub — not yet implemented")
+        Uses MarketOrder to guarantee fill (accepts market impact on illiquid
+        names; acceptable for RAITS's liquid large-cap universe).
+
+        Waits up to fill_timeout_s for execution; marks PENDING on timeout.
+
+        TODOs (for production hardening)
+        ---------------------------------
+        - Add LimitOrder fallback for large qty / low-liquidity names
+        - Maintain a UUID→IBKR orderId mapping so cancel_order works
+        - Subscribe to orderStatus events instead of polling
+        - Handle partial fills: IBKR can partially fill large market orders
+        - Retry / cancel zombie orders on fill timeout
+        """
+        ib = self._require_connection()  # IBKRConnectionError if not connected
+        try:
+            import ib_async  # type: ignore  # lazy import
+
+            contract = ib_async.Stock(order.ticker, "SMART", "USD")
+            ib_order = ib_async.MarketOrder(order.side, order.qty)
+            trade    = ib.placeOrder(contract, ib_order)
+
+            # Poll for fill
+            elapsed  = 0.0
+            interval = 0.1
+            while not trade.isDone() and elapsed < self._fill_timeout:
+                ib.sleep(interval)
+                elapsed += interval
+
+            if trade.isDone() and trade.fills:
+                total_shares = sum(f.execution.shares for f in trade.fills)
+                avg_price    = (
+                    sum(f.execution.price * f.execution.shares for f in trade.fills)
+                    / total_shares
+                )
+                order.filled_qty = int(total_shares)
+                order.fill_price = float(avg_price)
+                order.fill_ts    = time.time()
+                if order.filled_qty >= order.qty:
+                    order.fill_status = FillStatus.FILLED
+                else:
+                    order.fill_status = FillStatus.PARTIAL
+            elif trade.isDone():
+                order.fill_status   = FillStatus.REJECTED
+                order.reject_reason = (
+                    f"IBKR rejected/cancelled: {trade.orderStatus.status}"
+                )
+            else:
+                # Timeout — still in-flight
+                order.fill_status   = FillStatus.PENDING
+                order.reject_reason = f"Fill timeout after {self._fill_timeout}s"
+
+        except IBKRConnectionError:
+            raise
+        except Exception as exc:
+            order.fill_status   = FillStatus.REJECTED
+            order.reject_reason = f"IBKR submit_order error: {exc}"
+
+        return order
+
+    def cancel_order(self, _order_id: str) -> bool:
+        """
+        Cancel a pending order by our UUID order_id.
+
+        TODO: maintain self._order_map[uuid] = ib_trade in submit_order so
+        we can look up the IBKR trade object here.
+        For now, raises NotImplementedError with a clear message.
+        """
+        self._require_connection()  # raises IBKRConnectionError if not connected
+        raise NotImplementedError(
+            "cancel_order requires a UUID→IBKR orderId map. "
+            "TODO: populate self._order_map in submit_order."
+        )
 
     def account_equity(self) -> float:
-        raise NotImplementedError("IBKRBroker is a stub — not yet implemented")
+        """
+        Return current NetLiquidation (USD) from IBKR account values.
+
+        TODO: subscribe to accountValue updates and cache locally rather than
+        requesting a fresh update on every call.
+        """
+        try:
+            import ib_async  # type: ignore  # lazy import
+            ib = self._require_connection()
+            ib.reqAccountUpdates()
+            ib.sleep(1.0)  # allow account values to populate
+            for av in ib.accountValues():
+                if av.tag == "NetLiquidation" and av.currency == "USD":
+                    return float(av.value)
+            raise IBKRConnectionError(
+                "NetLiquidation not found in IBKR account values — "
+                "check that the account is fully logged in."
+            )
+        except IBKRConnectionError:
+            raise
+        except Exception as exc:
+            raise IBKRConnectionError(
+                f"account_equity() failed: {exc}"
+            ) from exc

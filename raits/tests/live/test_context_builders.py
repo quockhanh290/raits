@@ -12,11 +12,9 @@ Unit tests for ReplayContextFeed incremental builders:
   - config-derived fields (orb_signal_start/end, vwap_bb_std, etc.)
   - context count matches bar count
 """
-import os
 import pytest
 import pandas as pd
-import numpy as np
-from datetime import time as dtime, datetime
+from datetime import time as dtime
 
 from raits.backtest.data_types import BacktestConfig
 from raits.live.context_feed import (
@@ -24,9 +22,7 @@ from raits.live.context_feed import (
     LivePolygonFeed,
     _compute_fade_atr_top2,
     _compute_spy_bull_trend,
-    _to_daily_close,
 )
-from raits.decision.types import BarContext
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -380,8 +376,306 @@ def test_multi_day_context_count():
     assert len(ctxs) == 26  # 13 per day × 2
 
 
-# ── LivePolygonFeed stub ──────────────────────────────────────────────────────
+# ── _BarAccumulator ───────────────────────────────────────────────────────────
 
-def test_live_polygon_feed_raises():
-    with pytest.raises(NotImplementedError):
+from raits.live.context_feed import _BarAccumulator
+
+
+def _make_row(close: float, ts: pd.Timestamp) -> pd.Series:
+    return pd.Series(
+        {"open": close, "high": close + 0.5, "low": close - 0.5,
+         "close": close, "volume": 1_000_000.0},
+        name=ts,
+    )
+
+
+def test_accumulator_add_and_retrieve():
+    acc = _BarAccumulator()
+    day = pd.Timestamp("2022-01-03")
+    ts  = pd.Timestamp("2022-01-03 09:30:00")
+    row = _make_row(100.0, ts)
+    acc.add("AAPL", ts, row)
+    ds = acc.get_day_stocks(day, ts)
+    assert "AAPL" in ds
+    assert len(ds["AAPL"]) == 1
+
+
+def test_accumulator_late_bar_ordered():
+    """Late bar arriving after a later bar is sorted into correct position."""
+    acc = _BarAccumulator()
+    day = pd.Timestamp("2022-01-03")
+    ts1 = pd.Timestamp("2022-01-03 09:30:00")
+    ts2 = pd.Timestamp("2022-01-03 09:35:00")
+    # ts2 arrives first, then ts1 (late)
+    acc.add("AAPL", ts2, _make_row(102.0, ts2))
+    acc.add("AAPL", ts1, _make_row(100.0, ts1))
+    ds = acc.get_day_stocks(day, ts2)
+    df = ds["AAPL"]
+    assert list(df.index) == [ts1, ts2]
+    assert float(df.iloc[0]["close"]) == pytest.approx(100.0)
+    assert float(df.iloc[1]["close"]) == pytest.approx(102.0)
+
+
+def test_accumulator_duplicate_last_write_wins():
+    """A corrected bar (same ts) replaces the earlier version."""
+    acc = _BarAccumulator()
+    day = pd.Timestamp("2022-01-03")
+    ts  = pd.Timestamp("2022-01-03 09:30:00")
+    acc.add("AAPL", ts, _make_row(100.0, ts))  # original
+    acc.add("AAPL", ts, _make_row(101.5, ts))  # correction
+    ds = acc.get_day_stocks(day, ts)
+    assert len(ds["AAPL"]) == 1
+    assert float(ds["AAPL"].iloc[0]["close"]) == pytest.approx(101.5)
+
+
+def test_accumulator_missing_bar_ticker_absent():
+    """A ticker with no bar for a slot is simply absent from day_stocks."""
+    acc = _BarAccumulator()
+    day = pd.Timestamp("2022-01-03")
+    ts  = pd.Timestamp("2022-01-03 09:30:00")
+    acc.add("AAPL", ts, _make_row(100.0, ts))
+    ds = acc.get_day_stocks(day, ts)
+    assert "MSFT" not in ds   # MSFT never added → missing bar → absent
+
+
+def test_accumulator_as_of_filters_future_bars():
+    """get_day_stocks(as_of=ts1) excludes bars for ts2 > ts1."""
+    acc = _BarAccumulator()
+    day = pd.Timestamp("2022-01-03")
+    ts1 = pd.Timestamp("2022-01-03 09:30:00")
+    ts2 = pd.Timestamp("2022-01-03 09:35:00")
+    acc.add("AAPL", ts1, _make_row(100.0, ts1))
+    acc.add("AAPL", ts2, _make_row(102.0, ts2))
+    ds = acc.get_day_stocks(day, ts1)
+    assert len(ds["AAPL"]) == 1
+    assert float(ds["AAPL"].iloc[0]["close"]) == pytest.approx(100.0)
+
+
+def test_accumulator_reset_clears_all_bars():
+    acc = _BarAccumulator()
+    day = pd.Timestamp("2022-01-03")
+    ts  = pd.Timestamp("2022-01-03 09:30:00")
+    acc.add("AAPL", ts, _make_row(100.0, ts))
+    acc.reset()
+    ds = acc.get_day_stocks(day, ts)
+    assert ds == {}
+
+
+def test_accumulator_excludes_other_day():
+    """Only bars for the requested day are returned."""
+    acc = _BarAccumulator()
+    day1 = pd.Timestamp("2022-01-03")
+    day2 = pd.Timestamp("2022-01-04")
+    ts1  = pd.Timestamp("2022-01-03 09:30:00")
+    ts2  = pd.Timestamp("2022-01-04 09:30:00")
+    acc.add("AAPL", ts1, _make_row(100.0, ts1))
+    acc.add("AAPL", ts2, _make_row(101.0, ts2))
+    ds = acc.get_day_stocks(day1, ts1)
+    assert len(ds["AAPL"]) == 1
+    assert float(ds["AAPL"].iloc[0]["close"]) == pytest.approx(100.0)
+
+
+# ── LivePolygonFeed — constructor ─────────────────────────────────────────────
+
+def test_live_feed_requires_config():
+    """LivePolygonFeed() with no args raises TypeError (config is required)."""
+    with pytest.raises(TypeError):
         LivePolygonFeed()
+
+
+def test_live_feed_test_mode_no_api_key_needed():
+    """Test mode works without an API key."""
+    mkt = _minimal_market_data()
+    cfg = _minimal_config()
+    feed = LivePolygonFeed(config=cfg, _test_market_data=mkt, vix_daily={})
+    ctxs = list(feed)
+    assert len(ctxs) == 13
+
+
+# ── LivePolygonFeed — field equivalence vs ReplayContextFeed ──────────────────
+
+def _both_feeds(mkt: dict, cfg: BacktestConfig, **kw):
+    """Return (replay_contexts, live_contexts) for the same inputs."""
+    replay = list(ReplayContextFeed(mkt, cfg, **kw))
+    live   = list(LivePolygonFeed(config=cfg, _test_market_data=mkt, **kw))
+    return replay, live
+
+
+def test_live_feed_context_count_matches_replay():
+    mkt = _minimal_market_data()
+    cfg = _minimal_config()
+    replay, live = _both_feeds(mkt, cfg, vix_daily={})
+    assert len(live) == len(replay)
+
+
+def test_live_feed_hmm_state_matches_replay():
+    mkt = _minimal_market_data()
+    cfg = _minimal_config()
+    replay, live = _both_feeds(mkt, cfg, vix_daily={})
+    for r, l in zip(replay, live):
+        assert l.hmm_state == r.hmm_state
+
+
+def test_live_feed_cur_vol_matches_replay():
+    mkt = _minimal_market_data()
+    cfg = _minimal_config()
+    replay, live = _both_feeds(mkt, cfg, vix_daily={})
+    for r, l in zip(replay, live):
+        assert l.cur_vol == pytest.approx(r.cur_vol, rel=1e-9)
+
+
+def test_live_feed_vix_gates_match_replay():
+    mkt = _minimal_market_data()
+    cfg = _minimal_config()
+    vix = {pd.Timestamp("2022-01-03"): 32.0}
+    replay, live = _both_feeds(mkt, cfg, vix_daily=vix)
+    for r, l in zip(replay, live):
+        assert l.orb_vix_ok        == r.orb_vix_ok
+        assert l.stress_orb_vix_ok == r.stress_orb_vix_ok
+
+
+def test_live_feed_spy_or_matches_replay():
+    """
+    spy_or_high / spy_or_low converge once the OR window closes (>= 9:45).
+
+    ReplayContextFeed pre-computes OR from all 9:30-9:44 bars before the
+    bar loop, so it has the final value from bar 0.  LivePolygonFeed
+    accumulates incrementally, so values match only after the window closes.
+    """
+    mkt = _minimal_market_data()
+    spy = mkt["SPY"].copy()
+    spy.loc[spy.index[0], "high"] = 460.0   # 9:30 — within window
+    spy.loc[spy.index[1], "high"] = 462.0   # 9:35 — within window (max)
+    spy.loc[spy.index[0], "low"]  = 445.0   # 9:30 — within window
+    spy.loc[spy.index[1], "low"]  = 443.0   # 9:35 — within window (min)
+    mkt["SPY"] = spy
+    cfg = _minimal_config()
+    replay, live = _both_feeds(mkt, cfg, vix_daily={})
+    # After the OR window closes (bar_ts >= 9:45), both feeds agree
+    _OR_CLOSE = dtime(9, 45)
+    for r, l in zip(replay, live):
+        if r.bar_ts.time() >= _OR_CLOSE and r.spy_or_high is not None:
+            assert l.spy_or_high == pytest.approx(r.spy_or_high, abs=0.01)
+            assert l.spy_or_low  == pytest.approx(r.spy_or_low,  abs=0.01)
+
+    # Verify the final OR values are correct (max of all window bars)
+    final_r = replay[-1]
+    final_l = live[-1]
+    assert final_l.spy_or_high == pytest.approx(final_r.spy_or_high, abs=0.01)
+    assert final_l.spy_or_low  == pytest.approx(final_r.spy_or_low,  abs=0.01)
+
+
+def test_live_feed_spy_bull_trend_matches_replay():
+    mkt = _minimal_market_data()
+    cfg = _minimal_config()
+    replay, live = _both_feeds(mkt, cfg, vix_daily={})
+    for r, l in zip(replay, live):
+        assert l.spy_bull_trend == r.spy_bull_trend
+
+
+def test_live_feed_universes_match_replay():
+    mkt = _minimal_market_data()
+    cfg = _minimal_config(
+        universe=["AAPL"],
+        orb_universe=["AAPL"],
+        vwap_universe=["SPY", "QQQ", "IWM"],
+    )
+    replay, live = _both_feeds(mkt, cfg, vix_daily={})
+    for r, l in zip(replay, live):
+        assert l.base_universe          == r.base_universe
+        assert l.effective_orb_universe == r.effective_orb_universe
+        assert l.effective_vwap_universe == r.effective_vwap_universe
+
+
+def test_live_feed_config_fields_propagated():
+    mkt = _minimal_market_data()
+    cfg = _minimal_config(vwap_bb_std=2.0, ema_period=20, stress_size_fraction=0.4)
+    feed = LivePolygonFeed(config=cfg, _test_market_data=mkt, vix_daily={})
+    ctx  = next(iter(feed))
+    assert ctx.vwap_bb_std          == pytest.approx(2.0)
+    assert ctx.ema_period           == 20
+    assert ctx.stress_size_fraction == pytest.approx(0.4)
+    assert ctx.orb_signal_start     == dtime(9, 50)
+    assert ctx.orb_signal_end       == dtime(10, 20)
+
+
+# ── LivePolygonFeed — live semantics (incremental day_stocks) ─────────────────
+
+def test_live_feed_day_stocks_excludes_spy():
+    mkt = _minimal_market_data()
+    cfg = _minimal_config()
+    feed = LivePolygonFeed(config=cfg, _test_market_data=mkt, vix_daily={})
+    for ctx in feed:
+        assert "SPY" not in ctx.day_stocks
+
+
+def test_live_feed_day_stocks_incremental():
+    """
+    At bar i (0-indexed), day_stocks["AAPL"] has exactly i+1 rows.
+    (ReplayContextFeed has n_bars rows at every bar; live mode is incremental.)
+    """
+    mkt = _minimal_market_data()
+    cfg = _minimal_config()
+    feed = LivePolygonFeed(config=cfg, _test_market_data=mkt, vix_daily={})
+    for i, ctx in enumerate(feed):
+        if "AAPL" in ctx.day_stocks:
+            assert len(ctx.day_stocks["AAPL"]) == i + 1
+
+
+def test_live_feed_spy_history_incremental():
+    mkt = _minimal_market_data()
+    cfg = _minimal_config()
+    feed = LivePolygonFeed(config=cfg, _test_market_data=mkt, vix_daily={})
+    for i, ctx in enumerate(feed):
+        assert len(ctx.spy_history) == i + 1
+
+
+def test_live_feed_spy_history_last_matches_spy_bar():
+    mkt = _minimal_market_data()
+    cfg = _minimal_config()
+    feed = LivePolygonFeed(config=cfg, _test_market_data=mkt, vix_daily={})
+    for ctx in feed:
+        assert float(ctx.spy_history[-1]["close"]) == pytest.approx(
+            float(ctx.spy_bar["close"])
+        )
+
+
+def test_live_feed_open_trades_always_empty():
+    mkt = _minimal_market_data()
+    cfg = _minimal_config()
+    feed = LivePolygonFeed(config=cfg, _test_market_data=mkt, vix_daily={})
+    for ctx in feed:
+        assert ctx.open_trades == []
+
+
+def test_live_feed_stress_stocks_contains_spy():
+    """stress_stocks["SPY"] is always present (full day_spy)."""
+    mkt = _minimal_market_data()
+    cfg = _minimal_config()
+    feed = LivePolygonFeed(config=cfg, _test_market_data=mkt, vix_daily={})
+    ctx  = next(iter(feed))
+    assert "SPY" in ctx.stress_stocks
+
+
+def test_live_feed_multi_day():
+    """Context count equals n_spy_bars × n_days across multiple days."""
+    spy_d1  = _spy_bars("2022-01-03", n=13)
+    spy_d2  = _spy_bars("2022-01-04", n=13)
+    aapl_d1 = _ticker_bars("2022-01-03")
+    aapl_d2 = _ticker_bars("2022-01-04")
+    mkt = {
+        "SPY":  pd.concat([spy_d1, spy_d2]),
+        "AAPL": pd.concat([aapl_d1, aapl_d2]),
+        "QQQ":  pd.concat([_ticker_bars("2022-01-03", base=300.0), _ticker_bars("2022-01-04", base=300.0)]),
+        "IWM":  pd.concat([_ticker_bars("2022-01-03", base=200.0), _ticker_bars("2022-01-04", base=200.0)]),
+    }
+    cfg = _minimal_config(start_date="2022-01-03", end_date="2022-01-04")
+    feed = LivePolygonFeed(config=cfg, _test_market_data=mkt, vix_daily={})
+    ctxs = list(feed)
+    assert len(ctxs) == 26
+
+    # At the first bar of day 2 (index 13), day_stocks["AAPL"] resets to 1 row
+    d2_first = ctxs[13]
+    assert d2_first.day == pd.Timestamp("2022-01-04")
+    if "AAPL" in d2_first.day_stocks:
+        assert len(d2_first.day_stocks["AAPL"]) == 1

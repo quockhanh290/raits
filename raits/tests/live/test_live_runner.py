@@ -8,18 +8,22 @@ Unit tests for PaperTrader runner:
   (4) MockContextFeed iteration
   (5) end-to-end: slippage=0 → $0 reconciliation diff
   (6) end-to-end: slippage>0 → measured by reconciliation
+  (7) LivePolygonFeed wires into PaperTrader (Step 1)
+  (8) Full pipeline with all guards + LivePolygonFeed (Step 3)
 """
 import time
 import uuid
+import numpy as np
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 import pandas as pd
 
+from raits.backtest.data_types import BacktestConfig
 from raits.live.broker import FillStatus, MockBroker, Order
+from raits.live.context_feed import LivePolygonFeed
 from raits.live.reconciliation import ReconciliationLog
 from raits.live.runner import (
     DisciplineLockError,
-    KillSwitchTripped,
     MockContextFeed,
     LiveContextFeed,
     PaperOnlyViolation,
@@ -113,22 +117,24 @@ def _filled_order(
 
 
 def test_intent_to_trade_full_fill():
-    intent = _make_entry_intent(shares=10, entry_price=150.0)
-    order  = _filled_order(fill_price=150.5, filled_qty=10)
-    trade  = _intent_to_trade(intent, order)
-    assert trade.ticker     == "AAPL"
-    assert trade.strategy   == "ORB"
-    assert trade.direction  == "LONG"
-    assert trade.shares     == 10
+    intent  = _make_entry_intent(shares=10, entry_price=150.0)
+    order   = _filled_order(fill_price=150.5, filled_qty=10)
+    bar_ts  = pd.Timestamp("2022-01-03 09:35:00")
+    trade   = _intent_to_trade(intent, order, bar_ts)
+    assert trade.ticker      == "AAPL"
+    assert trade.strategy    == "ORB"
+    assert trade.direction   == "LONG"
+    assert trade.shares      == 10
     assert trade.entry_price == pytest.approx(150.5)  # actual fill price
-    assert trade.stop       == pytest.approx(145.0)
-    assert trade.target     == pytest.approx(160.0)
+    assert trade.stop        == pytest.approx(145.0)
+    assert trade.target      == pytest.approx(160.0)
 
 
 def test_intent_to_trade_partial_fill_uses_filled_qty():
-    intent = _make_entry_intent(shares=10)
-    order  = _filled_order(filled_qty=5, fill_status=FillStatus.PARTIAL)
-    trade  = _intent_to_trade(intent, order, use_filled_qty=True)
+    intent  = _make_entry_intent(shares=10)
+    order   = _filled_order(filled_qty=5, fill_status=FillStatus.PARTIAL)
+    bar_ts  = pd.Timestamp("2022-01-03 09:35:00")
+    trade   = _intent_to_trade(intent, order, bar_ts, use_filled_qty=True)
     assert trade.shares == 5
 
 
@@ -285,6 +291,7 @@ def test_end_to_end_slippage_measured(tmp_path):
 
     du = MagicMock()
     du.reset_day = MagicMock()
+    du._check_exits = MagicMock(return_value=None)  # no same-bar exit
     du.decide = MagicMock(return_value=DecisionResult(entries=[entry], exits=[]))
 
     trader = PaperTrader(du, broker, recon, account_equity=50_000.0)
@@ -318,3 +325,103 @@ def test_paper_trader_discipline_lock_wrong_hash_raises(tmp_path):
     params = {"orb_range_minutes": 20, "vwap_bb_std": 1.5, "ema_period": 30}
     with pytest.raises(DisciplineLockError):
         PaperTrader(du, broker, recon, discipline_params=params, expected_hash="badhash")
+
+
+# ── LivePolygonFeed helpers ───────────────────────────────────────────────────
+
+def _live_spy_bars(day_str: str = "2022-01-03") -> pd.DataFrame:
+    day   = pd.Timestamp(day_str)
+    times = pd.date_range(start=day.replace(hour=9, minute=30), periods=13, freq="5min")
+    n     = len(times)
+    rng   = np.random.default_rng(seed=42)
+    close = 470.0 + np.cumsum(rng.standard_normal(n) * 0.3)
+    return pd.DataFrame({
+        "open": close - 0.1, "high": close + 0.5,
+        "low":  close - 0.5, "close": close,
+        "volume": np.full(n, 500_000),
+    }, index=times)
+
+
+def _live_stock_bars(day_str: str = "2022-01-03", seed: int = 0) -> pd.DataFrame:
+    day   = pd.Timestamp(day_str)
+    times = pd.date_range(start=day.replace(hour=9, minute=30), periods=13, freq="5min")
+    n     = len(times)
+    rng   = np.random.default_rng(seed=seed)
+    close = 150.0 + np.cumsum(rng.standard_normal(n) * 0.5)
+    return pd.DataFrame({
+        "open": close - 0.15, "high": close + 0.8,
+        "low":  close - 0.8,  "close": close,
+        "volume": np.full(n, 200_000), "vwap": close,
+    }, index=times)
+
+
+def _minimal_live_mkt(day_str: str = "2022-01-03") -> dict:
+    return {
+        "SPY":  _live_spy_bars(day_str),
+        "AAPL": _live_stock_bars(day_str, seed=1),
+        "MSFT": _live_stock_bars(day_str, seed=2),
+    }
+
+
+# ── Step 1: LivePolygonFeed wires into PaperTrader ───────────────────────────
+
+def test_live_polygon_feed_wires_into_paper_trader(tmp_path):
+    """LivePolygonFeed (test mode) is a valid ContextFeed and drives PaperTrader without error."""
+    cfg  = BacktestConfig(
+        start_date="2022-01-03", end_date="2022-01-03",
+        universe=["AAPL", "MSFT"], account_equity=50_000.0,
+    )
+    mkt  = _minimal_live_mkt()
+    feed = LivePolygonFeed(config=cfg, _test_market_data=mkt, vix_daily={})
+
+    broker = MockBroker(slippage_pct=0.0, seed=0)
+    recon  = ReconciliationLog(out_dir=str(tmp_path))
+    du     = MagicMock()
+    du.reset_day = MagicMock()
+    du.decide    = MagicMock(return_value=DecisionResult(entries=[], exits=[]))
+
+    trader = PaperTrader(du, broker, recon, account_equity=50_000.0)
+    result = trader.run(feed)
+
+    assert not result.kill_switch_tripped
+    assert du.decide.call_count >= 13  # 13 bars in one day
+
+
+# ── Step 3: Full pipeline + all guards ───────────────────────────────────────
+
+def test_live_feed_all_guards_clean_run(tmp_path):
+    """Full pipeline: LivePolygonFeed + DISCIPLINE_LOCK + KILL_SWITCH + $0 slippage."""
+    params    = {"orb_range_minutes": 20, "vwap_bb_std": 1.5, "ema_period": 30}
+    good_hash = _config_hash(params)
+
+    cfg  = BacktestConfig(
+        start_date="2022-01-03", end_date="2022-01-03",
+        universe=["AAPL", "MSFT"], account_equity=50_000.0,
+        orb_range_minutes=20, vwap_bb_std=1.5, ema_period=30,
+    )
+    mkt  = _minimal_live_mkt()
+    feed = LivePolygonFeed(config=cfg, _test_market_data=mkt, vix_daily={})
+
+    broker = MockBroker(slippage_pct=0.0, seed=0)
+    recon  = ReconciliationLog(out_dir=str(tmp_path))
+    du     = MagicMock()
+    du.reset_day = MagicMock()
+    du.decide    = MagicMock(return_value=DecisionResult(entries=[], exits=[]))
+
+    trader = PaperTrader(
+        du, broker, recon,
+        account_equity=50_000.0,
+        discipline_params=params,
+        expected_hash=good_hash,
+    )
+    result  = trader.run(feed)
+    summary = recon.analyze()
+
+    assert not result.kill_switch_tripped
+    assert summary.get("total_slippage_usd", 0.0) == pytest.approx(0.0)
+
+
+def test_paper_only_still_blocks_live_port_with_live_feed(tmp_path):
+    """PAPER_ONLY guard fires regardless of which ContextFeed is used."""
+    with pytest.raises(PaperOnlyViolation, match="PAPER_ONLY"):
+        check_paper_only(ibkr_port=7496, live_flag=False)

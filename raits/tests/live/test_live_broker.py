@@ -1,7 +1,8 @@
 """
 tests/live/test_live_broker.py
 
-Unit tests for MockBroker fill/slippage/partial/reject logic.
+Unit tests for MockBroker fill/slippage/partial/reject logic,
+and IBKRBroker lazy-import / connection-guard behaviour.
 """
 import pytest
 import time
@@ -10,6 +11,7 @@ from raits.live.broker import (
     BrokerInterface,
     FillStatus,
     IBKRBroker,
+    IBKRConnectionError,
     MockBroker,
     Order,
 )
@@ -114,25 +116,54 @@ def test_mock_broker_is_broker_interface():
     assert isinstance(broker, BrokerInterface)
 
 
-# ── IBKRBroker stub ───────────────────────────────────────────────────────────
+# ── IBKRBroker ────────────────────────────────────────────────────────────────
+# ib_async is NOT required to import or instantiate IBKRBroker (lazy import).
+# Calling any method without connect() raises IBKRConnectionError — not ImportError.
 
-def test_ibkr_broker_submit_raises():
+def test_ibkr_broker_instantiates_without_ib_async():
+    """IBKRBroker() must succeed even if ib_async is not installed."""
     broker = IBKRBroker()
-    with pytest.raises(NotImplementedError):
-        broker.submit_order(_order())
-
-
-def test_ibkr_broker_cancel_raises():
-    broker = IBKRBroker()
-    with pytest.raises(NotImplementedError):
-        broker.cancel_order("x")
-
-
-def test_ibkr_broker_equity_raises():
-    broker = IBKRBroker()
-    with pytest.raises(NotImplementedError):
-        broker.account_equity()
+    assert broker is not None
 
 
 def test_ibkr_broker_is_broker_interface():
     assert isinstance(IBKRBroker(), BrokerInterface)
+
+
+def test_ibkr_broker_default_params():
+    broker = IBKRBroker()
+    assert broker._host == "127.0.0.1"
+    assert broker._port == 7497
+    assert broker._client_id == 1
+
+
+def test_ibkr_broker_submit_without_connection_raises_connection_error():
+    """submit_order without connect() must raise IBKRConnectionError, not ImportError."""
+    broker = IBKRBroker()
+    with pytest.raises(IBKRConnectionError):
+        broker.submit_order(_order())
+
+
+def test_ibkr_broker_cancel_without_connection_raises_connection_error():
+    broker = IBKRBroker()
+    with pytest.raises(IBKRConnectionError):
+        broker.cancel_order("some-uuid")
+
+
+def test_ibkr_broker_equity_without_connection_raises_connection_error():
+    broker = IBKRBroker()
+    with pytest.raises(IBKRConnectionError):
+        broker.account_equity()
+
+
+def test_ibkr_broker_error_message_includes_host_port():
+    """Connection error message must tell the user what to check."""
+    broker = IBKRBroker(host="192.168.1.10", port=7499)
+    with pytest.raises(IBKRConnectionError, match="192.168.1.10"):
+        broker.submit_order(_order())
+
+
+def test_ibkr_broker_disconnect_when_not_connected_is_safe():
+    """disconnect() on an unconnected broker must not raise."""
+    broker = IBKRBroker()
+    broker.disconnect()  # should be a no-op
