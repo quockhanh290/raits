@@ -574,6 +574,12 @@ class LivePolygonFeed(ContextFeed):
     _VIX_PATH      = ReplayContextFeed._VIX_PATH
     _HMM_HIST_PATH = ReplayContextFeed._HMM_HIST_PATH
 
+    # Massive.com (Polygon rebranded) endpoints.
+    # Feed → plan: delayed.massive.com = Developer/Starter (15-min delayed)
+    #              socket.massive.com   = Advanced/Business (real-time)
+    _DEFAULT_WS_FEED   = "delayed.massive.com"
+    _DEFAULT_REST_BASE = "https://api.massive.com"
+
     def __init__(
         self,
         config: BacktestConfig,
@@ -584,15 +590,19 @@ class LivePolygonFeed(ContextFeed):
         hmm: Optional[Any] = None,
         emit_timeout: float = 10.0,
         backfill_on_reconnect: bool = True,
+        ws_feed: Optional[str] = None,
+        rest_base: Optional[str] = None,
         _test_market_data: Optional[Dict[str, pd.DataFrame]] = None,
     ) -> None:
-        self._config   = config
-        self._api_key  = api_key
-        self._daily    = daily_data
-        self._hmm_init = hmm
-        self._emit_to  = emit_timeout
-        self._backfill = backfill_on_reconnect
-        self._test_md  = _test_market_data
+        self._config    = config
+        self._api_key   = api_key
+        self._daily     = daily_data
+        self._hmm_init  = hmm
+        self._emit_to   = emit_timeout
+        self._backfill  = backfill_on_reconnect
+        self._ws_feed   = ws_feed  or self._DEFAULT_WS_FEED
+        self._rest_base = rest_base or self._DEFAULT_REST_BASE
+        self._test_md   = _test_market_data
 
         if pe_short_calendar is not None:
             self._pe_cal: Dict = pe_short_calendar
@@ -961,6 +971,10 @@ class LivePolygonFeed(ContextFeed):
             dt = dt.astimezone(ZoneInfo("America/New_York")).replace(tzinfo=None)
             return pd.Timestamp(dt)
 
+        # Tracks the last successfully received bar timestamp across reconnects
+        # so _backfill_bars knows the gap start. Mutable list for closure capture.
+        _last_bar_ts: List[Optional[pd.Timestamp]] = [None]
+
         def _ws_thread() -> None:
             delays = _RECONNECT_DELAYS + [30] * 9999
             d_idx  = 0
@@ -971,6 +985,7 @@ class LivePolygonFeed(ContextFeed):
 
                     client = WebSocketClient(
                         api_key=self._api_key,
+                        feed=self._ws_feed,
                         market=Market.Stocks,
                         subscriptions=[f"AM.{t}" for t in all_subscribe],
                     )
@@ -987,6 +1002,9 @@ class LivePolygonFeed(ContextFeed):
                                     "volume": float(msg.volume),
                                 }, name=ts)
                                 bar_q.put((msg.symbol, ts, row))
+                                # Track last timestamp for backfill on next reconnect
+                                if _last_bar_ts[0] is None or ts > _last_bar_ts[0]:
+                                    _last_bar_ts[0] = ts
                             except Exception as exc:
                                 logger.warning(
                                     "Malformed WS bar (ticker=%s): %s",
@@ -1013,6 +1031,9 @@ class LivePolygonFeed(ContextFeed):
 
                 if not stop_event.is_set():
                     _threading.Event().wait(delays[min(d_idx, len(delays) - 1)])
+                    # Backfill bars missed during the disconnect gap
+                    if self._backfill and _last_bar_ts[0] is not None:
+                        self._backfill_bars(bar_q, _last_bar_ts[0], all_subscribe)
                     d_idx = min(d_idx + 1, len(delays) - 1)
 
         ws_t = _threading.Thread(target=_ws_thread, daemon=True, name="polygon-ws")
@@ -1163,6 +1184,21 @@ class LivePolygonFeed(ContextFeed):
                 try:
                     item = bar_q.get(timeout=self._emit_to)
                 except _queue.Empty:
+                    # Detect market close: end the live session cleanly rather than
+                    # hanging indefinitely when the feed goes quiet after close.
+                    try:
+                        from raits.live import trading_calendar as _tcal
+                        import datetime as _dtm
+                        _today = _cur_day.date() if _cur_day is not None else _dtm.date.today()
+                        _close_t = _tcal.market_close_time(_today)
+                        if _tcal.et_now_time() >= _close_t:
+                            logger.info(
+                                "LivePolygonFeed: market closed at %s ET — ending live session",
+                                _close_t,
+                            )
+                            return
+                    except Exception:
+                        pass
                     continue
 
                 if item is None:
@@ -1257,3 +1293,103 @@ class LivePolygonFeed(ContextFeed):
 
         finally:
             stop_event.set()
+
+    def _backfill_bars(
+        self,
+        bar_q: Any,
+        from_ts: pd.Timestamp,
+        tickers: List[str],
+    ) -> None:
+        """
+        REST backfill: fetch 5-min aggregates for all tickers from from_ts to now.
+
+        Called by _ws_thread after each reconnect (when backfill_on_reconnect=True)
+        to fill the bar gap that occurred during the WebSocket outage.
+
+        Bars are put into bar_q as (ticker, ts, row) tuples — the same format the
+        WebSocket handler uses.  The main generator loop in _iter_live processes them
+        identically to live WebSocket bars.
+
+        A full failure (RESTClient unavailable or network error) is logged as ERROR
+        so the operator knows the gap exists before strategy decisions are made.
+        Individual per-ticker failures are logged as ERROR (not WARNING) because a
+        missing ticker's bars can affect that day's P&L.
+        """
+        def _ms_to_ts(utc_ms: int) -> pd.Timestamp:
+            from datetime import datetime, timezone
+            from zoneinfo import ZoneInfo
+            dt = datetime.fromtimestamp(utc_ms / 1000, tz=timezone.utc)
+            return pd.Timestamp(
+                dt.astimezone(ZoneInfo("America/New_York")).replace(tzinfo=None)
+            )
+
+        try:
+            from polygon import RESTClient  # type: ignore  # lazy import
+        except ImportError:
+            logger.warning(
+                "Backfill skipped — polygon REST client not installed. "
+                "Missing bars from %s onward may affect decisions.", from_ts,
+            )
+            return
+
+        from_ms = int(from_ts.timestamp() * 1000) + 1  # +1 ms: exclusive start
+        now_et  = pd.Timestamp.now("UTC").tz_convert("US/Eastern").tz_localize(None)
+        to_ms   = int(now_et.timestamp() * 1000)
+
+        logger.info(
+            "Backfill start: from=%s to=%s (%d tickers)", from_ts, now_et, len(tickers)
+        )
+
+        ok_count   = 0
+        fail_count = 0
+
+        try:
+            rest = RESTClient(api_key=self._api_key, base=self._rest_base)
+        except Exception as exc:
+            logger.error(
+                "BACKFILL FAILED — cannot create REST client. "
+                "Bar gap from %s is unrecovered. Error: %s", from_ts, exc,
+            )
+            return
+
+        for ticker in tickers:
+            try:
+                bars = rest.list_aggs(
+                    ticker=ticker,
+                    multiplier=5,
+                    timespan="minute",
+                    from_=from_ms,
+                    to=to_ms,
+                    adjusted=False,
+                    limit=50_000,
+                )
+                n = 0
+                for bar in bars:
+                    ts  = _ms_to_ts(bar.timestamp)
+                    row = pd.Series({
+                        "open":   float(bar.open),
+                        "high":   float(bar.high),
+                        "low":    float(bar.low),
+                        "close":  float(bar.close),
+                        "volume": float(bar.volume),
+                    }, name=ts)
+                    bar_q.put((ticker, ts, row))
+                    n += 1
+                ok_count += 1
+                logger.debug("Backfill %s: %d bars", ticker, n)
+            except Exception as exc:
+                fail_count += 1
+                logger.error(
+                    "BACKFILL FAILED for %s — bars from %s missing. "
+                    "Decisions using %s data may be stale. Error: %s",
+                    ticker, from_ts, ticker, exc,
+                )
+
+        if fail_count > 0:
+            logger.error(
+                "BACKFILL PARTIAL — %d/%d tickers failed. "
+                "Review the above ERRORs and consider manual gap handling.",
+                fail_count, ok_count + fail_count,
+            )
+        else:
+            logger.info("Backfill complete: %d tickers OK", ok_count)

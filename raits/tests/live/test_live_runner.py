@@ -425,3 +425,131 @@ def test_paper_only_still_blocks_live_port_with_live_feed(tmp_path):
     """PAPER_ONLY guard fires regardless of which ContextFeed is used."""
     with pytest.raises(PaperOnlyViolation, match="PAPER_ONLY"):
         check_paper_only(ibkr_port=7496, live_flag=False)
+
+
+# ── Proactive EOD (live mode) ─────────────────────────────────────────────────
+
+def _make_trader_live(tmp_path, clock_fn, equity=50_000.0):
+    """PaperTrader in live_mode with injected clock and no-op DU."""
+    broker = MockBroker(slippage_pct=0.0, seed=0)
+    recon  = ReconciliationLog(out_dir=str(tmp_path))
+    du     = MagicMock()
+    du.reset_day  = MagicMock()
+    du._check_exits = MagicMock(return_value=None)
+    du.on_trade_opened = MagicMock()
+    du.decide = MagicMock(return_value=DecisionResult(entries=[], exits=[]))
+    return PaperTrader(
+        du, broker, recon,
+        account_equity=equity,
+        live_mode=True,
+        clock_fn=clock_fn,
+    ), du
+
+
+import datetime as _dt_mod
+from unittest.mock import patch as _patch
+
+
+def test_proactive_eod_closes_intraday_position_on_half_day(tmp_path):
+    """
+    Half-day scenario: VWAP_MR position opened at 10:00, bars stop at 12:55.
+    Clock injected to return 13:01 ET on every call.
+    Proactive EOD should close the position; it must NOT wait for next-day bar.
+    """
+    entry_intent = _make_entry_intent(strategy="VWAP_MR", entry_price=100.0)
+
+    call_count = [0]
+    open_trade_slot: list = []
+
+    def _decide(ctx):
+        call_count[0] += 1
+        if call_count[0] == 1:          # first bar: open position
+            return DecisionResult(entries=[entry_intent], exits=[])
+        return DecisionResult(entries=[], exits=[])
+
+    broker = MockBroker(slippage_pct=0.0, seed=0)
+    recon  = ReconciliationLog(out_dir=str(tmp_path))
+    du     = MagicMock()
+    du.reset_day       = MagicMock()
+    du._check_exits    = MagicMock(return_value=None)
+    du.on_trade_opened = MagicMock()
+    du.decide          = MagicMock(side_effect=_decide)
+
+    # Clock always reads 13:01 ET → proactive EOD fires after each bar
+    clock_fn = MagicMock(return_value=_dt_mod.time(13, 1))
+
+    with _patch("raits.live.runner._market_close_time",
+                return_value=_dt_mod.time(13, 0)):
+        trader = PaperTrader(
+            du, broker, recon,
+            live_mode=True,
+            clock_fn=clock_fn,
+        )
+        ctxs = [
+            _dummy_ctx("2026-07-03 10:00:00"),  # bar 1: entry
+            _dummy_ctx("2026-07-03 12:55:00"),  # bar 2: last bar, clock > 13:00
+        ]
+        trader.run(MockContextFeed(ctxs))
+
+    # Position must have been closed by proactive EOD, not held overnight
+    assert len(trader.closed_trades) == 1
+    closed = trader.closed_trades[0]
+    assert closed.exit_reason == "EOD"
+    assert closed.ticker == "AAPL"
+
+
+def test_proactive_eod_fires_exactly_once_per_day(tmp_path):
+    """
+    Proactive EOD fires once per day; the _eod_fired flag prevents double-close
+    when the next day's first bar arrives.
+    """
+    broker = MockBroker(slippage_pct=0.0, seed=0)
+    recon  = ReconciliationLog(out_dir=str(tmp_path))
+    du     = MagicMock()
+    du.reset_day    = MagicMock()
+    du._check_exits = MagicMock(return_value=None)
+    du.decide       = MagicMock(return_value=DecisionResult(entries=[], exits=[]))
+
+    clock_fn = MagicMock(return_value=_dt_mod.time(13, 1))
+
+    with _patch("raits.live.runner._market_close_time",
+                return_value=_dt_mod.time(13, 0)):
+        trader = PaperTrader(du, broker, recon, live_mode=True, clock_fn=clock_fn)
+        with _patch.object(trader, "_close_all_eod", wraps=trader._close_all_eod) as mock_eod:
+            ctxs = [
+                _dummy_ctx("2026-07-03 12:55:00"),  # half-day bar
+                _dummy_ctx("2026-07-07 09:35:00"),  # next week's first bar
+            ]
+            trader.run(MockContextFeed(ctxs))
+
+    # _close_all_eod should fire once (proactive) for July 3,
+    # once (post-loop) for July 7, not twice for July 3.
+    eod_days = [call.args[0].date() if hasattr(call.args[0], "date") else None
+                for call in mock_eod.call_args_list]
+    jul3_calls = sum(1 for d in eod_days if d == _dt_mod.date(2026, 7, 3))
+    assert jul3_calls == 1, f"Expected 1 proactive EOD for Jul 3, got {jul3_calls}"
+
+
+def test_reactive_eod_unchanged_in_replay_mode(tmp_path):
+    """
+    Replay mode (live_mode=False, default): reactive EOD fires at day boundary
+    as before; proactive path is never taken.
+    """
+    broker = MockBroker(slippage_pct=0.0, seed=0)
+    recon  = ReconciliationLog(out_dir=str(tmp_path))
+    du     = MagicMock()
+    du.reset_day    = MagicMock()
+    du._check_exits = MagicMock(return_value=None)
+    du.decide       = MagicMock(return_value=DecisionResult(entries=[], exits=[]))
+
+    # No live_mode, no clock_fn — reactive only
+    trader = PaperTrader(du, broker, recon, live_mode=False)
+    with _patch.object(trader, "_close_all_eod", wraps=trader._close_all_eod) as mock_eod:
+        ctxs = [
+            _dummy_ctx("2022-01-03 12:55:00"),  # day 1 last bar
+            _dummy_ctx("2022-01-04 09:35:00"),  # day 2 first bar → triggers reactive EOD
+        ]
+        trader.run(MockContextFeed(ctxs))
+
+    # Reactive EOD fires once for Jan 3 (at Jan 4's day boundary) + once post-loop for Jan 4
+    assert mock_eod.call_count == 2

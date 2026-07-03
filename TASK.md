@@ -69,10 +69,51 @@ Status: IN PROGRESS
       Confirmed: load_spy_regime() → RegimeLabels(lag=1) path uses hmm_fit_end="2024-12-31" ✅
       Snapshot NKD $13,694 = IS $12,306 + OOS 2023 tail ~$1,388 (no bug, different date range)
 
+### Completed (verify_runner_real — 2026-07-02)
+- [x] FuturesRunner + MockBroker + real signal_fn verified == deploy_sim fit_C:
+      P&L diff=$0.00 | taken swing=1749/stress=312/nkd=645 identical
+      | rejected swing=693/stress=117/nkd=46 identical | OPEN=CLOSE=2706 residual=0
+      | broker equity $102,961.74 == ACCOUNT+net | ALL PASS
+      Bug fixed: `desired_at` kept returning rejected trades as "desired" on every subsequent
+      runner day (one spurious retry per day). Fix: only generate entry when new_ed==day_ts.
+- [x] reconcile_gd0 no-harm PASS (MES/MNQ/MYM/M2K all MATCH after fix)
+- [x] signal_layer unit tests no-harm PASS
+
+### Completed (reconcile_swing_desired — 2026-07-03)
+- [x] Swing desired_position() == backtest, all 4 instruments — PASS:
+      Phase 1: MES 423t/$7,249 | MNQ 435t/$10,055 | MYM 438t/$7,466 | M2K 437t/$1,617 — MATCH
+      Phase 2: 20/inst samples boundary-checked (entry_day + exit_day) — PASS
+      Machinery identical to NKD (same backtest_swing_tf, return_open=True); only params differ.
+      Safe to wire swing live.
+
+### Completed (run_smoke_test — viết xong, chưa run)
+- [ ] global_index/run_smoke_test.py — cold-start integration smoke test; pending first run
+
 ### Next steps
-- [ ] Wire generate_today_signals as real signal_fn for FuturesRunner (currently tested with pre-computed verify_signal_fn)
-- [ ] Reconcile desired_position() for swing TF (different call from backtest_basket; gd0 proves backtest path only)
-- [ ] IBKRBroker stub (when IBKR account ready)
+
+**KHI IBKR ACCOUNT MỞ:**
+- [ ] 1. Data: xác nhận NKD trong CME bundle + subscribe + permission + Rule 576 cert
+- [ ] 2. IBKRBroker: fetch_bars + send_order (ib_async, Gateway 7497) + format adapter
+- [ ] 3. runner.dump_state(): điền Group B (slippage, fill quality, paper-vs-backtest, health, timing)
+- [ ] 4. Dashboard live mode: poll live_state.json
+- [ ] 5. Reconcile IBKRBroker fill khớp assumption deploy_sim (khi có fill thật)
+
+**TRƯỚC LIVE (sau paper, có data mới):**
+- [ ] 6. Re-freeze lần 1 (anchored 2018→data-mới) + build cơ chế re-freeze (GĐ3)
+- [ ] 7. Vault 2025 test với fit cuối
+
+**RÀNG BUỘC:**
+- Sửa HMMEngine class → đụng cả stocks pipeline — verify cả hai (futures + raits/backtest) trước khi commit
+
+### Pending: File cleanup (cân nhắc sau)
+Đề xuất xóa (user duyệt — đã verify 3 cách, an toàn vì trong git history):
+- d:\raits\part3_costs.txt      ~1.3MB scratch (NKD cost debug output)
+- d:\raits\part3_costs2.txt     ~1.3MB scratch
+- d:\raits\part3_debug.txt      ~1.3MB scratch
+- d:\raits\part3_final.txt      ~1.3MB scratch
+- d:\raits\debug_vault_labels.py        one-off Gate-5 debug, resolved
+Giữ lại: baseline_fit_c.txt, baseline_deploy_sim.txt, nkd_fit_verify.py
+reconcile_gd0 không ảnh hưởng: phiên này 0 file production bị sửa.
 
 ### Key decisions
 - mult=2.5 for ALL clusters (roska4_swing, roska4_stress, global_nkd) — matches deploy_sim defaults
@@ -139,8 +180,31 @@ futures/backtest_combined.py + futures/backtest_system.py (annotated harness)
   - Circuit breaker bars gracefully excluded via bar_ts pairing
   - PE_SHORT ticker injection (decide() mutates day_stocks) tolerated as expected extra_engine
 
-### In progress
-- [ ] Phase 3: End-to-end PaperTrader with ReplayContextFeed — compare trade log to engine_refactored
+### Completed (Phase 3 + LivePolygonFeed — 2026-07-02)
+- [x] **Phase 3 DONE**: End-to-end PaperTrader with ReplayContextFeed — 604/604 trades identical, costs on, net P&L $15,926.85 == $15,926.85 to the cent
+  - Bugs fixed: half-day EOD close, END_OF_PERIOD, CB integration, PE_SHORT EOD exclusion (ALL, not same-day), same-bar exit for intraday, SPY spy_bar source (ctx.spy_bar not day_stocks["SPY"])
+- [x] **LivePolygonFeed DONE**: real-time Polygon WebSocket BarContext feed (raits/live/context_feed.py)
+  - _BarAccumulator: thread-safe, late/OOO bars sorted, duplicates last-write-wins, missing bar = absent
+  - _iter_test (test mode): replays _test_market_data incrementally, all non-day_stocks fields byte-identical to ReplayContextFeed
+  - _iter_live (live mode): Polygon WebSocket (lazy import), background thread, exponential backoff reconnect (1→2→4→8→16→30s), day-level context from daily_data
+  - day_stocks is incremental in live mode (bars up to bar_ts only) — correct live semantics; spy_or converges after 9:44
+  - 49/49 tests pass (raits/tests/live/test_context_builders.py)
+
+### Completed (LivePolygonFeed smoke test — 2026-07-03)
+- [x] **IBKRBroker complete**: connect/disconnect lifecycle, connection-guard ordering (check before lazy import), submit_order fill-poll, cancel_order stub, account_equity via NetLiquidation
+  - 8 tests pass (test_live_broker.py): lazy import, connection guard, error message, disconnect-when-not-connected safe
+- [x] **test_live_runner.py fixes**: pre-existing bugs fixed (_intent_to_trade now requires bar_ts; _check_exits mock; recon.analyze() missing key)
+  - Added: test_live_polygon_feed_wires_into_paper_trader, test_live_feed_all_guards_clean_run
+  - 117/117 tests pass (all raits/tests/live/)
+- [x] **Reconnect/backfill tests** (raits/tests/live/test_reconnect_backfill.py): 12 tests
+  - A/B: backoff delay math, d_idx reset
+  - C-F: _backfill_bars REST call, enqueue, full-fail logger.error, partial-fail, polygon-not-installed warning
+  - G: backfill_on_reconnect flag stored
+  - H: WS thread reconnects after exception (integration test — root cause was wrong epoch ms: 1641214200000→1641220200000 for 09:30 ET)
+  - I: _backfill_bars called after reconnect with correct from_ts
+- [x] **context_feed.py**: _backfill_bars method (REST gap fill), _last_bar_ts closure, backfill wired after reconnect sleep; pd.Timestamp.utcnow() → .now("UTC") deprecation fix
+- [x] **ws_handshake_test.py** (raits/live/scripts/): off-hours connection/auth/subscribe test — checks connection open, connected status, auth_success, AM.SPY subscribed, clean disconnect; exit 0/1
+- [x] **live_smoke.py** (raits/live/scripts/): market-hours feed observation — logs every bar, prints summary + pass/fail checklist; --minutes N configurable; no orders placed
 
 ### Next steps (ordered)
 - [x] PE_EXPANSION (25 stocks): 2017-2024 ✓ fetched

@@ -27,6 +27,7 @@ Usage (mock / replay)
 """
 from __future__ import annotations
 
+import datetime
 import hashlib
 import json
 import logging
@@ -34,7 +35,10 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, Iterator, List, Optional
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional
+
+from raits.live.trading_calendar import et_now_time as _et_now_time
+from raits.live.trading_calendar import market_close_time as _market_close_time
 
 from raits.decision.types import BarContext, DecisionResult, EntryIntent, ExitIntent
 from raits.backtest.data_types import Trade
@@ -198,11 +202,14 @@ class PaperTrader:
         cost_fn: Optional[Any] = None,
         allow_swing_hold: bool = False,
         max_hold_days: int = 5,
+        clock_fn: Optional[Callable[[], datetime.time]] = None,
     ) -> None:
         # Guards
         check_paper_only(ibkr_port, live_mode)
         if discipline_params is not None and expected_hash is not None:
             check_discipline_lock(discipline_params, expected_hash)
+        self._live_mode = live_mode
+        self._clock_fn: Callable[[], datetime.time] = clock_fn if clock_fn is not None else _et_now_time
 
         self._du = decision_unit
         self._broker = broker
@@ -250,6 +257,7 @@ class PaperTrader:
         result = RunResult()
         current_day = None
         _prev_ctx = None  # last ctx of previous day — needed for EOD swing-stop update
+        _eod_fired = False  # True after proactive or reactive EOD close fires for current_day
         _SWING = ("TREND_FOLLOW", "PE_SHORT")
 
         for ctx in feed:
@@ -265,11 +273,13 @@ class PaperTrader:
                 # EOD force-close for previous day's non-swing positions.
                 # Mirrors engine._close_all(day, day_stocks, "EOD", skip_swing=True).
                 # No-op on normal days (intraday positions already closed by TIME_STOP
-                # signal from decide()). Fires on half-days (13:00 close) where the
-                # 15:55 TIME_STOP bar never exists.
-                if _prev_ctx is not None:
+                # signal from decide()). In replay mode, fires on half-days (13:00 close)
+                # where the 15:55 TIME_STOP bar never exists. In live mode, the proactive
+                # clock-based EOD fires first, so this is a safety net only.
+                if _prev_ctx is not None and not _eod_fired:
                     self._close_all_eod(_prev_ctx.day, _prev_ctx.day_stocks)
                 current_day = bar_day
+                _eod_fired = False
                 self._daily_pnl = 0.0
                 # Reset CB for new session (consecutive-loss counter carries forward)
                 self._cb_active = False
@@ -379,6 +389,21 @@ class PaperTrader:
 
             _prev_ctx = ctx
 
+            # ── Proactive EOD (live mode only) ────────────────────────────────
+            # In live mode, fire _close_all_eod as soon as wall clock passes the
+            # day's market close time (13:00 on half-days, 16:00 normally).
+            # This prevents intraday positions from sitting unmanaged overnight
+            # when the feed goes quiet after an early close.
+            if self._live_mode and current_day is not None and not _eod_fired:
+                _close_t = _market_close_time(current_day.date())
+                if self._clock_fn() >= _close_t:
+                    logger.info(
+                        "Proactive EOD: market closed at %s ET for %s — closing positions",
+                        _close_t, current_day.date(),
+                    )
+                    self._close_all_eod(current_day, ctx.day_stocks)
+                    _eod_fired = True
+
         # ── Post-loop: mirror engine's end-of-day + end-of-period cleanup ──────
         if _prev_ctx is not None:
             # EOD swing-stop update for the final day
@@ -386,9 +411,10 @@ class PaperTrader:
                 self._update_swing_stops(
                     _prev_ctx.day, _prev_ctx.market_data, _prev_ctx.day_stocks
                 )
-            # EOD force-close for any remaining non-swing positions on the final day
-            # (mirrors engine._close_all(day, day_stocks, "EOD", skip_swing=True))
-            self._close_all_eod(_prev_ctx.day, _prev_ctx.day_stocks)
+            # EOD force-close for any remaining non-swing positions on the final day.
+            # Skipped if proactive EOD already fired (live mode half-day).
+            if not _eod_fired:
+                self._close_all_eod(_prev_ctx.day, _prev_ctx.day_stocks)
             # END_OF_PERIOD: close remaining swing positions still open at IS end
             # (mirrors engine lines 438-452 — uses _close_trade so updates CB)
             self._close_end_of_period(_prev_ctx)
