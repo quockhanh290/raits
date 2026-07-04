@@ -180,6 +180,22 @@ futures/backtest_combined.py + futures/backtest_system.py (annotated harness)
   - Circuit breaker bars gracefully excluded via bar_ts pairing
   - PE_SHORT ticker injection (decide() mutates day_stocks) tolerated as expected extra_engine
 
+### Completed (Gap 1 investigation — 2026-07-04)
+- [x] **Gap 1 CONFIRMED + DOCUMENTED**: LivePolygonFeed vs ReplayContextFeed — 9/604 trades diverge on exit_price
+  - Root cause: `day_stocks[ticker].iloc[-1]` in CB (`runner.py:629`) and SAFETY_MODE (`decision_unit.py:234`) assumes full-day data
+  - ReplayContextFeed: `day_stocks` pre-loaded full day → `iloc[-1]` = 15:55 bar (look-ahead bias)
+  - LivePolygonFeed: `day_stocks` incremental → `iloc[-1]` = trigger bar T (correct live semantics)
+  - Full `iloc[-1]` / full-day-assumption scan: 3 UNSAFE (all in CB/SAFETY_MODE exit path, all known); all others safe
+  - Backtest net PnL on 9 affected trades: -$340.88. Live P&L quantification pending (re-run verify_live_path.py --live-feed --full --costs)
+  - Engine/decision_unit NOT modified (per constraints); gap is backtest look-ahead, not a live bug
+  - Files created: `GAP1_REPORT.md` (full 4-step root cause), `KNOWN_DIFFERENCES.md` (known divergence registry with full iloc[-1] scan appendix)
+
+### Completed (Gap 1 live P&L quantification — 2026-07-04)
+- [x] Full IS `--live-feed --costs` run complete: exactly 9 trades diverge, nothing else
+  - Live net PnL on 9 trades: -$653.60 vs backtest -$340.88 → backtest optimism +$312.72 (~2% of $15,952 IS)
+  - Largest: QQQ STRESS_MID SAFETY_MODE sign flip (+$286.92), VRTX ORB SAFETY_MODE (+$123.45)
+  - KNOWN_DIFFERENCES.md KD-001 updated with measured numbers
+
 ### Completed (Phase 3 + LivePolygonFeed — 2026-07-02)
 - [x] **Phase 3 DONE**: End-to-end PaperTrader with ReplayContextFeed — 604/604 trades identical, costs on, net P&L $15,926.85 == $15,926.85 to the cent
   - Bugs fixed: half-day EOD close, END_OF_PERIOD, CB integration, PE_SHORT EOD exclusion (ALL, not same-day), same-bar exit for intraday, SPY spy_bar source (ctx.spy_bar not day_stocks["SPY"])
