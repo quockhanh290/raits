@@ -89,6 +89,31 @@ Status: IN PROGRESS
 ### Completed (run_smoke_test — viết xong, chưa run)
 - [ ] global_index/run_smoke_test.py — cold-start integration smoke test; pending first run
 
+### Completed (Divergence Sweep — 2026-07-04)
+- [x] UT-2 FIXED: generate_today_signals stale-price retry guard (swing + NKD); same-direction rollover via force_entries
+- [x] UT-5 FIXED: NKD date alignment — replaced nkd_today_norm with today_norm (ET); late-feed suppressed (conservative)
+- [x] UT-1 closed: FuturesRunner requires breaker as positional arg; verified TypeError on omission; both callers updated
+- [x] UT-3 closed: same-day state-diff path structurally dead in live (no exit field); synthetic injection PASS
+- [x] UT-4 closed: half-day CME — A1-A4 PASS (no crash, no entry, position carries through)
+- [x] WARN documented: size_multiplier=0.5 intentionally not wired; binary protection design confirmed
+- [x] NKD operational constraint documented in runner.py + DIVERGENCE_SWEEP.md: runner must execute after ~02:30 ET
+- [x] E-injection C1-C7 tested:
+      C1 (late bar) PASS, C2 (dup bar) PASS, C3 (out-of-order) no crash/documented,
+      C4 (missing bars) PASS, C7 (NKD late) PASS (UT-5 covers)
+      C5 (reconnect double-count) FAIL — pre-live: IBKRBroker must reconcile state on reconnect
+      C6 (uppercase OHLC) FAIL — pre-live: IBKRBroker must lowercase column names on ingestion
+- [x] Final verify_runner_real: $52,961.74 diff=$0.00 ALL PASS — baseline preserved through all sweep work
+- [x] UT-6 and UT-1: remain 🟡 Medium (path dead by design, no code change needed)
+
+### Completed (IBKRBroker C3/C5/C6 — 2026-07-04)
+- [x] global_index/ibkr_broker.py: IBKRBroker implementing Broker ABC with 3 mandatory specs:
+      C3: fetch_bars sort_index() — unsorted IBKR bars corrupt chandelier ratchet
+      C5: reconcile_positions(runner_state) — dedup (inst, cluster) after reconnect double-count
+      C6: fetch_bars lowercase columns — IBKR uppercase OHLCV crashes engine
+      _raw_fetcher injection point for offline testing (no live Gateway needed)
+- [x] global_index/test_ibkr_injection.py: 14/14 PASS (C3: 3/3, C6: 4/4, C5: 7/7)
+      C5.7 contrast proves: WITHOUT reconcile pnl doubled ($50,300 vs expected $50,150)
+
 ### Next steps
 
 **KHI IBKR ACCOUNT MỞ:**

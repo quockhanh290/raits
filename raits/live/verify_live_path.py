@@ -31,7 +31,7 @@ import os
 import pickle
 import sys
 import warnings
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List
 
 warnings.filterwarnings("ignore")
 
@@ -45,7 +45,7 @@ from raits.backtest.data_types import BacktestConfig, Trade
 from raits.costs import calculate_total_costs
 from raits.decision.decision_unit import DecisionUnit
 from raits.live.broker import MockBroker
-from raits.live.context_feed import ReplayContextFeed
+from raits.live.context_feed import ReplayContextFeed, LivePolygonFeed
 from raits.live.reconciliation import ReconciliationLog
 from raits.live.runner import PaperTrader
 from raits.strategies.universe_scanner import CANDIDATE_POOL
@@ -289,6 +289,9 @@ def main():
                         help="Full IS 2017-2022")
     parser.add_argument("--costs", action="store_true",
                         help="Enable cost model (verify net_pnl to the cent)")
+    parser.add_argument("--live-feed", action="store_true",
+                        help="Drive PaperTrader with LivePolygonFeed (incremental day_stocks) "
+                             "instead of ReplayContextFeed (full-day). Closes Gap 1 audit.")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -335,8 +338,9 @@ def main():
     engine_pnl    = sum(t.net_pnl or 0.0 for t in engine_closed)
     print(f"  engine: {len(engine_closed)} closed trades | net P&L ${engine_pnl:,.2f}")
 
-    # ── Step 2: PaperTrader with ReplayContextFeed ────────────────────────────
-    print("\nStep 2: Running PaperTrader (ReplayContextFeed + MockBroker zero-slippage)...")
+    # ── Step 2: PaperTrader with ReplayContextFeed or LivePolygonFeed ────────
+    feed_label = "LivePolygonFeed (incremental)" if args.live_feed else "ReplayContextFeed (full-day)"
+    print(f"\nStep 2: Running PaperTrader ({feed_label} + MockBroker zero-slippage)...")
 
     du     = build_decision_unit(config)
     broker = MockBroker(slippage_pct=0.0, partial_fill_rate=0.0, reject_rate=0.0)
@@ -352,11 +356,19 @@ def main():
         allow_swing_hold=config.allow_swing_hold,
         max_hold_days=config.max_hold_days,
     )
-    feed = ReplayContextFeed(
-        market_data=market_data,
-        config=config,
-        daily_data=daily_data,
-    )
+    if args.live_feed:
+        feed = LivePolygonFeed(
+            config=config,
+            _test_market_data=market_data,
+            daily_data=daily_data,
+            emit_timeout=0.01,
+        )
+    else:
+        feed = ReplayContextFeed(
+            market_data=market_data,
+            config=config,
+            daily_data=daily_data,
+        )
     trader.run(feed)
     paper_trades = trader.closed_trades
     paper_pnl    = sum(t.net_pnl or 0.0 for t in paper_trades)

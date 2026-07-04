@@ -47,6 +47,10 @@ def et_now_time() -> datetime.time:
     except Exception:
         pass
     # Fallback: UTC - 4h (EDT; off by 1h in winter, acceptable for live guard)
+    logger.warning(
+        "et_now_time: ZoneInfo and pytz both unavailable — using UTC-4 static fallback. "
+        "This is 1h WRONG in EST (November–March). Fix: pip install tzdata"
+    )
     return (datetime.datetime.utcnow() - datetime.timedelta(hours=4)).time()
 
 
