@@ -29,6 +29,12 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+# Ensure project root (d:\raits) is on sys.path so `import raits` works when
+# running the script directly: python raits/raits/scripts/bootstrap_strategy.py
+_ROOT = Path(__file__).resolve().parents[3]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 import numpy as np
 
 

@@ -1,15 +1,15 @@
-Bootstrap per-strategy â€” results_20260624_135619.pkl
-N_BOOT=200  seed=42
+Bootstrap per-strategy — results_20260624_135619.pkl
+N_BOOT=10000  seed=42
 ------------------------------------------------------
 Strategy           N    WR%     Avg$   p-value Verdict
 ------------------------------------------------------
-FADE             447  43.0%    -4.87     0.725  NO EDGE
-GAP_FILL          42  50.0%    -8.76     0.620  NO EDGE
-GF_SHORT          31  54.8%     3.97     0.195  NO EDGE
-ORB               72  54.2%    78.76     0.020  CONFIRMED
-PE_SHORT          27  70.4%   219.90     0.020  CONFIRMED
-STRESS_MID       273  46.2%     7.62     0.135  BORDERLINE
-STRESS_ORB        80  58.8%    15.25     0.015  CONFIRMED
-TREND_FOLLOW     641  51.5%    29.72     0.005  CONFIRMED
-VWAP_MR          265  46.0%    -0.20     0.615  NO EDGE
+FADE             447  43.0%    -4.87     0.784  NO EDGE
+GAP_FILL          42  50.0%    -8.76     0.626  NO EDGE
+GF_SHORT          31  54.8%     3.97     0.233  NO EDGE
+ORB               72  54.2%    78.76     0.018  CONFIRMED
+PE_SHORT          27  70.4%   219.90     0.011  CONFIRMED
+STRESS_MID       273  46.2%     7.62     0.150  NO EDGE
+STRESS_ORB        80  58.8%    15.25     0.020  CONFIRMED
+TREND_FOLLOW     641  51.5%    29.72     0.002  CONFIRMED
+VWAP_MR          265  46.0%    -0.20     0.638  NO EDGE
 ------------------------------------------------------

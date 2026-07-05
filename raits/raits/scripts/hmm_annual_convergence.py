@@ -23,6 +23,12 @@ import sys
 import warnings
 from pathlib import Path
 
+# Ensure project root (d:\raits) is on sys.path so `import raits` works when
+# running the script directly: python raits/raits/scripts/hmm_annual_convergence.py
+_ROOT = Path(__file__).resolve().parents[3]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 import numpy as np
 import pandas as pd
 
@@ -170,7 +176,7 @@ def main() -> None:
     out_dir = Path("raits/configs") if Path("raits/configs").is_dir() else Path("configs")
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "hmm_annual_convergence_report.txt"
-    out.write_text(report)
+    out.write_text(report, encoding="utf-8")
     print(f"\nSaved: {out}", file=sys.stderr)
 
 
