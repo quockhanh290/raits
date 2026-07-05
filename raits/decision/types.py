@@ -95,3 +95,9 @@ class BarContext:
     stress_size_fraction: float
     orb_signal_start: dtime
     orb_signal_end: dtime
+
+    # Regime reliability flag — set by the live feed when daily_data["SPY"] is
+    # hard-stale (> _HARD_STALE_SPY_BDAYS behind).  When True, PaperTrader blocks
+    # new entries but keeps normal exit logic (stops/targets are pre-committed and
+    # HMM-independent).  Always False in backtest / replay.
+    regime_unreliable: bool = False

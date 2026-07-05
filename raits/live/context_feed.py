@@ -32,6 +32,7 @@ import pandas as pd
 from raits.backtest.data_types import BacktestConfig
 from raits.decision.types import BarContext
 from raits.live.runner import ContextFeed
+from raits.live.notify import notify
 
 logger = logging.getLogger("RAITS.live.context_feed")
 
@@ -89,6 +90,55 @@ def _compute_fade_atr_top2(
             continue
     ranked = sorted(atrs.items(), key=lambda x: x[1], reverse=True)
     return {t for t, _ in ranked[:top_n]}
+
+
+# Soft-stale threshold: warn + skip retrain but do NOT halt entries.
+# A normal Friday→Monday gap is 1; 5 covers short weeks / holidays.
+_STALE_SPY_BDAYS = 5
+
+# Hard-stale threshold: warn + skip retrain + HALT new entries + notify operator.
+# 10 business days ≈ 2 calendar weeks — clearly intentional neglect, not a holiday.
+_HARD_STALE_SPY_BDAYS = 10
+
+
+def _spy_gap_bdays(daily_spy_close: pd.Series, cur_day: pd.Timestamp) -> int:
+    """Business-day gap between latest close in ``daily_spy_close`` and ``cur_day``.
+
+    Returns 0 for an empty series (no data → cannot assert staleness).
+    """
+    if daily_spy_close.empty:
+        return 0
+    last = daily_spy_close.index[-1]
+    return max(0, len(pd.bdate_range(last, cur_day)) - 1)
+
+
+def _check_stale_and_warn(
+    daily_spy_close: pd.Series,
+    cur_day: pd.Timestamp,
+    threshold_bdays: int = _STALE_SPY_BDAYS,
+) -> bool:
+    """
+    Return True and emit a WARNING if ``daily_spy_close`` is stale relative
+    to ``cur_day`` (more than ``threshold_bdays`` business days behind).
+
+    Called before every weekly HMM retrain in ``_iter_live``.  A stale series
+    means the weekly retrain would silently operate on the startup snapshot
+    instead of recent market data — defeating the purpose of weekly adaptation.
+
+    Returns False (and emits nothing) when the series is fresh or empty.
+    """
+    gap = _spy_gap_bdays(daily_spy_close, cur_day)
+    if gap > threshold_bdays:
+        logger.warning(
+            "HMM weekly retrain SKIPPED — daily_data['SPY'] is STALE "
+            "(last close %s, current day %s, %d business days behind). "
+            "Retrain would NOT adapt to recent market conditions. "
+            "Refresh daily_data['SPY'] with recent SPY closes before "
+            "starting live trading.",
+            daily_spy_close.index[-1].date(), cur_day.date(), gap,
+        )
+        return True
+    return False
 
 
 class ReplayContextFeed(ContextFeed):
@@ -535,8 +585,26 @@ class LivePolygonFeed(ContextFeed):
     ----------
     config       : BacktestConfig (universe, orb params, scanner flags, etc.)
     api_key      : Polygon.io API key used for WebSocket + REST backfill.
-    daily_data   : Daily OHLCV per ticker — drives scanner universes and
-                   fade_atr_top2.  Same dict as BacktestEngine.run(daily_data=…).
+    daily_data   : Daily OHLCV per ticker — drives scanner universes,
+                   fade_atr_top2, and weekly HMM retrain window.
+                   Same dict as BacktestEngine.run(daily_data=…).
+
+                   **Live-deployment requirement:** ``daily_data["SPY"]``
+                   must contain SPY daily closes up to (at least) the prior
+                   business day before each live session starts.  The weekly
+                   HMM retrain reads this series to adapt the regime model to
+                   recent market conditions.  If the series is a static
+                   snapshot frozen at startup, the retrain silently operates on
+                   stale data and the regime model never adapts.  The feed
+                   detects staleness (> 5 business days behind) and emits a
+                   loud WARNING rather than retraining on stale input.
+
+                   TODO (live-prep): implement automatic daily_data refresh
+                   (REST fetch of recent SPY closes at session startup and
+                   before each Monday retrain).  Design question: source from
+                   Polygon REST, IBKR, or by aggregating the 5-min WebSocket
+                   bars into daily closes.
+
     pe_short_calendar : Pre-loaded {pd.Timestamp → [tickers]} dict.
                         If None, loaded from the earnings JSON cache.
     vix_daily    : Pre-loaded {pd.Timestamp → float} VIX dict.
@@ -705,8 +773,38 @@ class LivePolygonFeed(ContextFeed):
         ]
 
         last_retrain: Optional[pd.Timestamp] = None
+        _regime_unreliable: bool = False
 
         for day in all_days:
+            # ── Staleness assessment (runs every test day) ────────────────────
+            # Use self._daily["SPY"] (the daily_data snapshot passed at construction),
+            # not spy_data (mkt["SPY"]), so the same staleness logic fires as _iter_live.
+            if daily and "SPY" in daily:
+                try:
+                    _ds_raw = daily["SPY"]["close"].resample("B").last().dropna()
+                    _gap = _spy_gap_bdays(_ds_raw, day)
+                except Exception:
+                    _gap = 0
+            else:
+                _gap = 0
+
+            if _gap > _HARD_STALE_SPY_BDAYS:
+                if not _regime_unreliable:
+                    notify(
+                        "TRADING HALTED",
+                        f"HMM regime data STALE {_gap} business days "
+                        f"(current day {day.date()}). "
+                        f"New entries BLOCKED. Refresh daily_data['SPY'] to resume.",
+                    )
+                _regime_unreliable = True
+            elif _regime_unreliable and _gap <= _STALE_SPY_BDAYS:
+                notify(
+                    "TRADING RESUMED",
+                    f"HMM regime data fresh ({_gap} business day gap). "
+                    f"Entry halt cleared — normal trading resumes.",
+                )
+                _regime_unreliable = False
+
             yield from self._iter_test_day(
                 day=day,
                 spy_data=spy_data,
@@ -719,6 +817,7 @@ class LivePolygonFeed(ContextFeed):
                 mr_scanner=mr_scanner,
                 orb_scanner=orb_scanner,
                 fade_scanner=fade_scanner,
+                regime_unreliable=_regime_unreliable,
             )
 
             # ── HMM weekly retrain (mirrors ReplayContextFeed) ────────────────
@@ -746,6 +845,7 @@ class LivePolygonFeed(ContextFeed):
         mr_scanner: Any,
         orb_scanner: Any,
         fade_scanner: Any,
+        regime_unreliable: bool = False,
     ) -> Iterator[BarContext]:
         config = self._config
 
@@ -916,6 +1016,7 @@ class LivePolygonFeed(ContextFeed):
                 stress_size_fraction=config.stress_size_fraction,
                 orb_signal_start=self._orb_signal_start,
                 orb_signal_end=self._orb_signal_end,
+                regime_unreliable=regime_unreliable,
             )
 
     # ── Live WebSocket mode ───────────────────────────────────────────────────
@@ -1066,6 +1167,10 @@ class LivePolygonFeed(ContextFeed):
         _hmm = self._hmm_init
         _last_retrain: Optional[pd.Timestamp] = None
 
+        # Regime reliability — True when daily_data["SPY"] is hard-stale.
+        # Propagated to every BarContext; PaperTrader uses it to block new entries.
+        _regime_unreliable: bool = False
+
         # ── Scanners (same flags as _iter_test) ──────────────────────────────
         from raits.strategies.universe_scanner import (
             DailyUniverseScanner, MRUniverseScanner,
@@ -1138,7 +1243,9 @@ class LivePolygonFeed(ContextFeed):
             else:
                 _fade_atr_top2 = set()
 
-            # Daily SPY close
+            # Daily SPY close — sourced from self._daily (static snapshot passed at
+            # construction).  WebSocket 5-min bars are NOT aggregated back here.
+            # Caller must keep daily_data["SPY"] current; see _check_stale_and_warn.
             if daily and "SPY" in daily:
                 try:
                     _sc = daily["SPY"]["close"].resample("B").last().dropna()
@@ -1211,17 +1318,45 @@ class LivePolygonFeed(ContextFeed):
                 # Day boundary
                 if _cur_day is None or bar_day != _cur_day:
                     if _cur_day is not None:
-                        # HMM weekly retrain at day boundary
+                        # ── Staleness assessment (runs every day boundary) ─────────
+                        # _daily_spy_close is from self._daily["SPY"] (static snapshot
+                        # passed at construction — NOT from live WebSocket bars).
+                        _gap = _spy_gap_bdays(_daily_spy_close, _cur_day)
+                        if _gap > _HARD_STALE_SPY_BDAYS:
+                            if not _regime_unreliable:
+                                _last_close = (
+                                    _daily_spy_close.index[-1].date()
+                                    if not _daily_spy_close.empty else "N/A"
+                                )
+                                notify(
+                                    "TRADING HALTED",
+                                    f"HMM regime data STALE {_gap} business days "
+                                    f"(last SPY close {_last_close}, "
+                                    f"current day {_cur_day.date()}). "
+                                    f"New entries BLOCKED. "
+                                    f"Refresh daily_data['SPY'] to resume.",
+                                )
+                            _regime_unreliable = True
+                        elif _regime_unreliable and _gap <= _STALE_SPY_BDAYS:
+                            notify(
+                                "TRADING RESUMED",
+                                f"HMM regime data fresh ({_gap} business day gap). "
+                                f"Entry halt cleared — normal trading resumes.",
+                            )
+                            _regime_unreliable = False
+
+                        # ── HMM weekly retrain (gated by soft-stale check) ─────────
                         if (config.hmm_retrain_weekly
                                 and _cur_day.weekday() == 0
                                 and (_last_retrain is None
                                      or (_cur_day - _last_retrain).days >= 7)
                                 and _hmm is not None
                                 and len(_daily_spy_close) >= 35):
-                            try:
-                                _hmm.retrain(_daily_spy_close)
-                            except Exception as e:
-                                logger.debug("HMM retrain failed: %s", e)
+                            if not _check_stale_and_warn(_daily_spy_close, _cur_day):
+                                try:
+                                    _hmm.retrain(_daily_spy_close)
+                                except Exception as e:
+                                    logger.debug("HMM retrain failed: %s", e)
                             _last_retrain = _cur_day
                         _acc.reset()
                     _cur_day = bar_day
@@ -1286,6 +1421,7 @@ class LivePolygonFeed(ContextFeed):
                         stress_size_fraction=config.stress_size_fraction,
                         orb_signal_start=self._orb_signal_start,
                         orb_signal_end=self._orb_signal_end,
+                        regime_unreliable=_regime_unreliable,
                     )
                 else:
                     # Non-SPY bar: add to accumulator for inclusion at next slot

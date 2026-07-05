@@ -16,10 +16,15 @@ import pytest
 import pandas as pd
 from datetime import time as dtime
 
+import logging
 from raits.backtest.data_types import BacktestConfig
 from raits.live.context_feed import (
     ReplayContextFeed,
     LivePolygonFeed,
+    _check_stale_and_warn,
+    _STALE_SPY_BDAYS,
+    _HARD_STALE_SPY_BDAYS,
+    _spy_gap_bdays,
     _compute_fade_atr_top2,
     _compute_spy_bull_trend,
 )
@@ -679,3 +684,155 @@ def test_live_feed_multi_day():
     assert d2_first.day == pd.Timestamp("2022-01-04")
     if "AAPL" in d2_first.day_stocks:
         assert len(d2_first.day_stocks["AAPL"]) == 1
+
+
+# ── _check_stale_and_warn ─────────────────────────────────────────────────────
+
+def _bdate_series(end: str, n: int = 40) -> pd.Series:
+    """Construct a SPY-like daily close series ending on `end` with `n` points."""
+    idx = pd.bdate_range(end=end, periods=n)
+    return pd.Series([400.0 + i * 0.1 for i in range(n)], index=idx)
+
+
+def test_stale_spy_retrain_warns_and_skips(caplog):
+    """Stale daily_data['SPY'] (> 5 business days behind) triggers a WARNING."""
+    stale_close = _bdate_series(end="2024-01-05", n=40)
+    cur_day = pd.Timestamp("2024-02-15")  # ~29 business days later
+
+    with caplog.at_level(logging.WARNING, logger="RAITS.live.context_feed"):
+        is_stale = _check_stale_and_warn(stale_close, cur_day)
+
+    assert is_stale is True
+    assert any("STALE" in r.message for r in caplog.records), "expected STALE in warning"
+    assert any("daily_data" in r.message for r in caplog.records)
+
+
+def test_fresh_spy_retrain_no_warning(caplog):
+    """Fresh daily_data['SPY'] (1 business day behind) does not trigger a warning."""
+    # last close = 2024-01-31 (Wednesday), current = 2024-02-01 (Thursday) → gap = 1
+    fresh_close = _bdate_series(end="2024-01-31", n=40)
+    cur_day = pd.Timestamp("2024-02-01")
+
+    with caplog.at_level(logging.WARNING, logger="RAITS.live.context_feed"):
+        is_stale = _check_stale_and_warn(fresh_close, cur_day)
+
+    assert is_stale is False
+    assert not any("STALE" in r.message for r in caplog.records)
+
+
+def test_staleness_exactly_at_threshold_is_not_stale(caplog):
+    """A gap of exactly _STALE_SPY_BDAYS business days is not stale (threshold is strict >)."""
+    # Build a series whose last business date is exactly _STALE_SPY_BDAYS bdays before cur_day
+    cur_day = pd.Timestamp("2024-02-08")  # Thursday
+    last_date = pd.bdate_range(end=cur_day, periods=_STALE_SPY_BDAYS + 1)[0]
+    close = _bdate_series(end=str(last_date.date()), n=40)
+
+    with caplog.at_level(logging.WARNING, logger="RAITS.live.context_feed"):
+        is_stale = _check_stale_and_warn(close, cur_day)
+
+    assert is_stale is False
+
+
+def test_staleness_one_over_threshold_is_stale(caplog):
+    """A gap of _STALE_SPY_BDAYS + 1 business days triggers the warning."""
+    cur_day = pd.Timestamp("2024-02-08")
+    last_date = pd.bdate_range(end=cur_day, periods=_STALE_SPY_BDAYS + 2)[0]
+    close = _bdate_series(end=str(last_date.date()), n=40)
+
+    with caplog.at_level(logging.WARNING, logger="RAITS.live.context_feed"):
+        is_stale = _check_stale_and_warn(close, cur_day)
+
+    assert is_stale is True
+
+
+def test_empty_spy_series_is_not_stale():
+    """An empty daily SPY series returns False (no data → no assertion possible)."""
+    empty = pd.Series(dtype=float)
+    assert _check_stale_and_warn(empty, pd.Timestamp("2024-02-01")) is False
+
+
+# ── _spy_gap_bdays ────────────────────────────────────────────────────────────
+
+def test_spy_gap_bdays_empty_returns_zero():
+    assert _spy_gap_bdays(pd.Series(dtype=float), pd.Timestamp("2024-02-01")) == 0
+
+
+def test_spy_gap_bdays_one_day():
+    # last close = 2024-01-31, cur_day = 2024-02-01 → 1 bday
+    idx = pd.bdate_range(end="2024-01-31", periods=5)
+    close = pd.Series([430.0] * 5, index=idx)
+    assert _spy_gap_bdays(close, pd.Timestamp("2024-02-01")) == 1
+
+
+def test_spy_gap_bdays_hard_stale():
+    idx = pd.bdate_range(end="2024-01-05", periods=40)
+    close = pd.Series([430.0] * 40, index=idx)
+    assert _spy_gap_bdays(close, pd.Timestamp("2024-02-15")) > _HARD_STALE_SPY_BDAYS
+
+
+# ── regime_unreliable propagation via _iter_test ─────────────────────────────
+
+def _daily_spy_df(last_date: str, n: int = 40) -> pd.DataFrame:
+    """Minimal daily SPY DataFrame ending on last_date."""
+    idx = pd.bdate_range(end=last_date, periods=n)
+    return pd.DataFrame({
+        "open":   [430.0] * n,
+        "high":   [431.0] * n,
+        "low":    [429.0] * n,
+        "close":  [430.0 + i * 0.1 for i in range(n)],
+        "volume": [1_000_000] * n,
+    }, index=idx)
+
+
+def test_hard_stale_daily_spy_sets_regime_unreliable(capfd):
+    """daily_data['SPY'] >10 bdays stale → all BarContexts carry regime_unreliable=True
+    and a TRADING HALTED box appears on stderr."""
+    mkt = _minimal_market_data("2022-01-03")
+    # last close ~2021-06-01, test day 2022-01-03 → ~150 bdays gap >> _HARD_STALE_SPY_BDAYS
+    daily = {"SPY": _daily_spy_df("2021-06-01")}
+    cfg = _minimal_config(start_date="2022-01-03", end_date="2022-01-03")
+    feed = LivePolygonFeed(config=cfg, _test_market_data=mkt, daily_data=daily, vix_daily={})
+
+    ctxs = list(feed)
+
+    assert len(ctxs) > 0, "feed produced no bars"
+    assert all(ctx.regime_unreliable for ctx in ctxs), (
+        "expected every bar to have regime_unreliable=True"
+    )
+    captured = capfd.readouterr()
+    assert "TRADING HALTED" in captured.err, "expected HALTED box on stderr"
+
+
+def test_soft_stale_daily_spy_no_regime_unreliable():
+    """daily_data['SPY'] 7 bdays stale (soft only, ≤ hard threshold) → regime_unreliable=False."""
+    mkt = _minimal_market_data("2022-01-03")
+    # 7-bday gap: > _STALE_SPY_BDAYS (5) but ≤ _HARD_STALE_SPY_BDAYS (10)
+    last_date = pd.bdate_range(end="2022-01-03", periods=9)[0]  # 8 bdays before → gap = 8
+    # Verify the gap is in the soft zone
+    assert _STALE_SPY_BDAYS < _spy_gap_bdays(
+        pd.Series([1.0], index=[last_date]), pd.Timestamp("2022-01-03")
+    ) <= _HARD_STALE_SPY_BDAYS
+    daily = {"SPY": _daily_spy_df(str(last_date.date()))}
+    cfg = _minimal_config(start_date="2022-01-03", end_date="2022-01-03")
+    feed = LivePolygonFeed(config=cfg, _test_market_data=mkt, daily_data=daily, vix_daily={})
+
+    ctxs = list(feed)
+
+    assert len(ctxs) > 0
+    assert not any(ctx.regime_unreliable for ctx in ctxs), (
+        "soft-stale should NOT set regime_unreliable"
+    )
+
+
+def test_fresh_daily_spy_no_regime_unreliable():
+    """Fresh daily_data['SPY'] (1 bday gap) → regime_unreliable=False on all bars."""
+    mkt = _minimal_market_data("2022-01-03")
+    # last close = 2021-12-31 (prior business day to 2022-01-03 Monday) → gap = 1
+    daily = {"SPY": _daily_spy_df("2021-12-31")}
+    cfg = _minimal_config(start_date="2022-01-03", end_date="2022-01-03")
+    feed = LivePolygonFeed(config=cfg, _test_market_data=mkt, daily_data=daily, vix_daily={})
+
+    ctxs = list(feed)
+
+    assert len(ctxs) > 0
+    assert not any(ctx.regime_unreliable for ctx in ctxs)

@@ -553,3 +553,106 @@ def test_reactive_eod_unchanged_in_replay_mode(tmp_path):
 
     # Reactive EOD fires once for Jan 3 (at Jan 4's day boundary) + once post-loop for Jan 4
     assert mock_eod.call_count == 2
+
+
+# ── regime_unreliable (Level-2 stale-SPY halt) ────────────────────────────────
+
+def _unreliable_ctx(ts_str: str = "2022-01-03 09:35:00") -> BarContext:
+    """Like _dummy_ctx but with regime_unreliable=True."""
+    ctx = _dummy_ctx(ts_str)
+    return BarContext(**{**ctx.__dict__, "regime_unreliable": True})
+
+
+def test_regime_unreliable_blocks_entries(tmp_path):
+    """When regime_unreliable=True, entry signals are NOT processed and the counter increments."""
+    broker = MockBroker(slippage_pct=0.0, seed=0)
+    recon  = ReconciliationLog(out_dir=str(tmp_path))
+    du     = MagicMock()
+    du.reset_day    = MagicMock()
+    du._check_exits = MagicMock(return_value=None)
+    entry = _make_entry_intent()
+    du.decide = MagicMock(return_value=DecisionResult(entries=[entry], exits=[]))
+
+    trader = PaperTrader(du, broker, recon, account_equity=50_000.0)
+    ctx = _unreliable_ctx("2022-01-03 09:35:00")
+    result = trader.run(MockContextFeed([ctx]))
+
+    assert result.entries_blocked_regime_unreliable == 1
+    assert len(trader._open_positions) == 0, "no position should have been opened"
+
+
+def test_regime_unreliable_exits_still_fire(tmp_path):
+    """Exit signals fire normally even when regime_unreliable=True.
+
+    Strategy: inject a fake open Trade directly into trader._open_positions,
+    then run with a regime_unreliable=True context that returns an exit for it.
+    The exit should fire and move the trade to closed_trades.
+    """
+    from datetime import datetime as _dt
+    broker = MockBroker(slippage_pct=0.0, seed=0)
+    recon  = ReconciliationLog(out_dir=str(tmp_path))
+    du     = MagicMock()
+    du.reset_day    = MagicMock()
+    du._check_exits = MagicMock(return_value=None)
+    du.on_trade_closed = MagicMock()
+
+    fake_trade = Trade(
+        trade_id="test-exit-123",
+        ticker="AAPL",
+        strategy="ORB",
+        direction="LONG",
+        entry_time=_dt(2022, 1, 3, 9, 35),
+        entry_price=150.0,
+        shares=5,
+        stop=145.0,
+        target=160.0,
+        hmm_state="Normal",
+        limiting_factor="KELLY",
+    )
+
+    exit_intent = ExitIntent(trade=fake_trade, exit_price=155.0, reason="TARGET_HIT")
+    du.decide = MagicMock(return_value=DecisionResult(entries=[], exits=[exit_intent]))
+
+    trader = PaperTrader(du, broker, recon, account_equity=50_000.0)
+    trader._open_positions[fake_trade.trade_id] = fake_trade
+
+    ctx = _unreliable_ctx("2022-01-03 09:35:00")
+    result = trader.run(MockContextFeed([ctx]))
+
+    assert len(trader.closed_trades) >= 1, "exit should have fired despite regime_unreliable"
+    assert result.entries_blocked_regime_unreliable == 0, "no entries were attempted"
+
+
+def test_regime_unreliable_recovery_resumes_entries(tmp_path):
+    """After regime_unreliable flips back to False, entries are allowed again."""
+    broker = MockBroker(slippage_pct=0.0, seed=0)
+    recon  = ReconciliationLog(out_dir=str(tmp_path))
+    du     = MagicMock()
+    du.reset_day    = MagicMock()
+    du._check_exits = MagicMock(return_value=None)
+    entry = _make_entry_intent()
+    du.decide = MagicMock(return_value=DecisionResult(entries=[entry], exits=[]))
+
+    trader = PaperTrader(du, broker, recon, account_equity=50_000.0)
+
+    # Day 1: regime_unreliable=True — entry blocked
+    ctx_halted = _unreliable_ctx("2022-01-03 09:35:00")
+    result = trader.run(MockContextFeed([ctx_halted]))
+    assert result.entries_blocked_regime_unreliable >= 1
+    assert len(trader._open_positions) == 0
+
+    # Day 2: regime_unreliable=False — entry resumes
+    ctx_fresh = _dummy_ctx("2022-01-04 09:35:00")  # regime_unreliable defaults False
+    result2 = trader.run(MockContextFeed([ctx_fresh]))
+    # The entry should be processed (position opened or attempt made); counter stays 0
+    assert result2.entries_blocked_regime_unreliable == 0
+
+
+def test_notify_halt_format(capfd):
+    """notify() emits a boxed TRADING HALTED message on stderr."""
+    from raits.live.notify import notify
+    notify("TRADING HALTED", "HMM regime data STALE 15 business days — refresh daily_data['SPY'].")
+    captured = capfd.readouterr()
+    assert "TRADING HALTED" in captured.err
+    assert "HMM regime data STALE" in captured.err
+    assert "=" * 10 in captured.err  # border is present

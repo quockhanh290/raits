@@ -156,6 +156,7 @@ class RunResult:
     kill_switch_tripped: bool = False
     kill_switch_bar: Optional[Any] = None    # bar_ts when tripped
     simulated_pnl: float = 0.0
+    entries_blocked_regime_unreliable: int = 0  # entries dropped due to stale HMM data
 
 
 # ── PaperTrader ───────────────────────────────────────────────────────────────
@@ -259,6 +260,7 @@ class PaperTrader:
         _prev_ctx = None  # last ctx of previous day — needed for EOD swing-stop update
         _eod_fired = False  # True after proactive or reactive EOD close fires for current_day
         _SWING = ("TREND_FOLLOW", "PE_SHORT")
+        _regime_unreliable_notified_today = False  # log once per day when entries blocked
 
         for ctx in feed:
             bar_day = ctx.bar_ts.normalize()
@@ -280,6 +282,7 @@ class PaperTrader:
                     self._close_all_eod(_prev_ctx.day, _prev_ctx.day_stocks)
                 current_day = bar_day
                 _eod_fired = False
+                _regime_unreliable_notified_today = False
                 self._daily_pnl = 0.0
                 # Reset CB for new session (consecutive-loss counter carries forward)
                 self._cb_active = False
@@ -344,25 +347,40 @@ class PaperTrader:
             # must use ctx.spy_bar directly — NOT look it up in day_stocks.
             _bar_t   = ctx.bar_ts.time()
             _spy_bar = getattr(ctx, "spy_bar", None)
-            for entry_intent in decision.entries:
-                new_trade = self._process_entry(entry_intent, ctx.bar_ts, result)
-                # Same-bar exit check: mirrors engine_refactored lines 778-789.
-                # Engine calls _check_exits immediately after entry so the entry
-                # bar's high/low can trigger stop/target before the next bar.
-                if (new_trade is not None
-                        and new_trade.strategy not in _SWING
-                        and not self._cb_active):
-                    _sb = self._du._check_exits(
-                        new_trade, ctx.bar_ts, _bar_t, ctx.day_stocks,
-                        self._allow_swing_hold, _spy_bar,
-                    )
-                    if _sb:
-                        _sb_price, _sb_reason = _sb
-                        self._process_exit(
-                            ExitIntent(trade=new_trade, exit_price=_sb_price,
-                                       reason=_sb_reason),
-                            ctx.bar_ts, result,
+
+            if getattr(ctx, "regime_unreliable", False):
+                # HMM regime data is hard-stale (> _HARD_STALE_SPY_BDAYS behind).
+                # Block new entries; existing exits still run normally (Steps 1-3).
+                n_blocked = len(decision.entries)
+                if n_blocked:
+                    result.entries_blocked_regime_unreliable += n_blocked
+                    if not _regime_unreliable_notified_today:
+                        logger.warning(
+                            "REGIME_UNRELIABLE halt: %d entry signal(s) BLOCKED at %s "
+                            "— HMM data stale, refresh daily_data['SPY'] to resume.",
+                            n_blocked, ctx.bar_ts,
                         )
+                        _regime_unreliable_notified_today = True
+            else:
+                for entry_intent in decision.entries:
+                    new_trade = self._process_entry(entry_intent, ctx.bar_ts, result)
+                    # Same-bar exit check: mirrors engine_refactored lines 778-789.
+                    # Engine calls _check_exits immediately after entry so the entry
+                    # bar's high/low can trigger stop/target before the next bar.
+                    if (new_trade is not None
+                            and new_trade.strategy not in _SWING
+                            and not self._cb_active):
+                        _sb = self._du._check_exits(
+                            new_trade, ctx.bar_ts, _bar_t, ctx.day_stocks,
+                            self._allow_swing_hold, _spy_bar,
+                        )
+                        if _sb:
+                            _sb_price, _sb_reason = _sb
+                            self._process_exit(
+                                ExitIntent(trade=new_trade, exit_price=_sb_price,
+                                           reason=_sb_reason),
+                                ctx.bar_ts, result,
+                            )
 
             # ── Step 5: Daily-drawdown CB check ──────────────────────────────
             # Mirrors engine lines 795-820; skipped when SAFETY_MODE was active.
