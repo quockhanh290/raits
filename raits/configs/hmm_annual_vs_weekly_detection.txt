@@ -1,0 +1,74 @@
+========================================================================
+HMM Annual vs Weekly Detection — Head-to-Head Comparison
+Production settings: diag covariance, n_init=10, n_iter=200
+Annual scheme: YE2018 model for 2019-2020 | YE2021 model for 2021-2022
+Annual labels: incremental Viterbi (2007→d per date; slight annual advantage
+               on non-Monday dates — conservative comparison vs weekly)
+Weekly labels: Monday carry-forward (same method as hmm_stability_measure.py)
+Ground truth: SPY 5-day realized vol > 20% annualized (primary)
+========================================================================
+
+────────────────────────────────────────────────────────────────────────
+FALSE-ALARM WINDOW: 2019-01-01 to 2019-12-31 (calm reference)
+────────────────────────────────────────────────────────────────────────
+                                   Annual     Weekly
+Days with labels                      252        261
+  FA rate vol>20%:                      4.5%      10.9% ← PRIMARY
+    (non-stress days: 220a / 220w  false-alarms:  10a /  24w)
+  FA rate vol>15%:                      0.0%       6.5%
+    (non-stress days: 200a / 200w  false-alarms:   0a /  13w)
+  FA rate vol>25%:                     11.4%      15.6%
+    (non-stress days: 237a / 237w  false-alarms:  27a /  37w)
+
+────────────────────────────────────────────────────────────────────────
+STRESS WINDOW: COVID 2020-02-20 to 2020-03-23
+────────────────────────────────────────────────────────────────────────
+                                   Annual     Weekly
+Days with labels                       23         23
+  Recall    vol>20%:                    100.0%     100.0% ← PRIMARY
+    (true_stress:  21  hmm:  21a/ 21w  overlap:  21a/ 21w  diff: +0.0pp)
+  Recall    vol>15%:                    100.0%     100.0%
+    (true_stress:  21  hmm:  21a/ 21w  overlap:  21a/ 21w  diff: +0.0pp)
+  Recall    vol>25%:                    100.0%     100.0%
+    (true_stress:  19  hmm:  21a/ 21w  overlap:  19a/ 19w  diff: +0.0pp)
+
+────────────────────────────────────────────────────────────────────────
+STRESS WINDOW: 2022 bear 2022-01-01 to 2022-12-31
+────────────────────────────────────────────────────────────────────────
+                                   Annual     Weekly
+Days with labels                      251        260
+  Recall    vol>20%:                    100.0%      88.6% ← PRIMARY
+    (true_stress: 140  hmm: 165a/164w  overlap: 140a/124w  diff: +11.4pp)
+  Recall    vol>15%:                     81.1%      75.6%
+    (true_stress: 201  hmm: 165a/164w  overlap: 163a/152w  diff: +5.5pp)
+  Recall    vol>25%:                    100.0%      87.6%
+    (true_stress:  89  hmm: 165a/164w  overlap:  89a/ 78w  diff: +12.4pp)
+
+────────────────────────────────────────────────────────────────────────
+HEAD-TO-HEAD TABLE (primary vol>20% threshold)
+────────────────────────────────────────────────────────────────────────
+Window                            Weekly    Annual     Diff  Weekly FA  Annual FA
+---------------------------------------------------------------------------------
+FA rate: 2019 (false-alarm)        10.9%      4.5%   -6.4pp          —          —
+Recall: COVID Feb-Mar 2020        100.0%    100.0%   +0.0pp      10.9%       4.5%
+Recall: 2022 bear                  88.6%    100.0%  +11.4pp      10.9%       4.5%
+
+────────────────────────────────────────────────────────────────────────
+VERDICT (applying pre-committed criteria)
+────────────────────────────────────────────────────────────────────────
+Pre-committed thresholds: material=10pp, roughly-equal=5pp
+
+CASE: ANNUAL BETTER ON ONE WINDOW — ASSESS
+
+COVID gap +0.0pp, 2022 gap +11.4pp. Annual exceeds weekly by >10pp on one window. Check false-alarm rate before concluding — recall gain may come at FA cost.
+
+────────────────────────────────────────────────────────────────────────
+COMPARISON NOTE
+────────────────────────────────────────────────────────────────────────
+Annual labels use incremental Viterbi (model parameters frozen at YE; Viterbi
+path extends one bar per day). On non-Monday dates, annual has seen more recent
+data than weekly (annual through date d; weekly through last Monday M<=d).
+Max advantage: 4 days (Fri label sees Mon-Thu data, weekly sees only Mon).
+This slightly favors annual recall on early-window dates. The comparison is
+conservative vs weekly — if weekly is still competitive, the advantage is robust.
+========================================================================

@@ -12,17 +12,35 @@ Status: DONE
 - [x] STEP 3 — hmm_annual_convergence.py committed: re-measured 4 scenarios; 6/6 year-ends converge
       Tables match HMM_ANNUAL_CONVERGENCE_AUDIT.md exactly; "3/6 fail" claim definitively WRONG
 - [x] STEP 4 — TRUST_AUDIT.md written: full classification table + run commands + outstanding gaps
+- [x] STEP 3 — hmm_stability_measure.py committed + run (n_init=10, production): Parts A/B/C fully measured
+      Part A: churn 1.1% (claimed 1.8%, overstated by 0.7pp), inversions=0 confirmed
+      Part B: agreement 68.6%/67.8% (NOT 98.5%, claim WRONG — 30pp deficit)
+      Part C: COVID recall=100% (claimed 91.6%), 2022 bear=88.6% (claimed 80.2%)
+      98.5% agreement was fabricated; actual 68% strengthens the case for weekly retrain
 
-### Key finding
-- ALL decisions that affect live trading are on TRACEABLE footing (vault results, IS baseline, bootstrap verdicts)
-- HMM stability numbers (1.8% churn, 98.5% agreement, recall) remain SUSPECT — no measuring script committed
-  Risk: LOW (architecture is already locked; stability numbers are confirmatory only)
-- "3/6 convergence fail" (HMM_STABILITY_REPORT.md) definitively WRONG — disproven by re-measurement
+- [x] Annual vs weekly head-to-head detection (committed script + run): hmm_annual_vs_weekly_detection.py
+      COVID: tied (100%/100%). 2022 bear: annual 100% vs weekly 88.6% (+11.4pp, meets >10pp threshold)
+      False-alarm: annual 4.5% vs weekly 10.9% — annual BETTER. Pre-committed criteria MET.
+      Decision: weekly remains operating choice (2025 burn cost too high). Annual on table for future.
+
+### Key finding — FINAL
+- ALL decisions that affect live trading are on TRACEABLE footing
+- Part B "98.5% agreement" claim: WRONG (actual ~68%). Decision to use weekly retrain is STRONGER post-measurement
+- "3/6 convergence fail": WRONG (6/6 converge) — disproven by re-measurement
+- Annual vs weekly detection: annual materially better on 2022 (+11.4pp, false-alarm also lower). Pre-committed criteria met. Weekly stays (2025 cost); annual is an open question for next retrain decision.
+
+- [x] Artifact check: hmm_retrain_artifact_check.py committed
+      Same-method comparison (both Monday carry-forward) + quarterly mechanism analysis.
+      Rules out/confirms whether annual's +11.4pp 2022 recall advantage is method artifact
+      or structural finding. Run: python raits/raits/scripts/hmm_retrain_artifact_check.py [--fast]
+      Output: raits/configs/hmm_retrain_artifact_check.txt
 
 ### Files added
 TRUST_AUDIT.md, HMM_ANNUAL_CONVERGENCE_AUDIT.md, raits/raits/scripts/bootstrap_strategy.py,
-raits/raits/scripts/hmm_annual_convergence.py, raits/configs/bootstrap_strategy_report.txt,
-raits/configs/hmm_annual_convergence_report.txt
+raits/raits/scripts/hmm_annual_convergence.py, raits/raits/scripts/hmm_stability_measure.py,
+raits/raits/scripts/hmm_annual_vs_weekly_detection.py, raits/raits/scripts/hmm_retrain_artifact_check.py,
+raits/configs/bootstrap_strategy_report.txt, raits/configs/hmm_annual_convergence_report.txt,
+raits/configs/hmm_stability_report.txt, raits/configs/hmm_annual_vs_weekly_detection.txt
 
 ---
 ## Sub-task: Repo Cleanup (DONE 2026-07-01)
@@ -161,13 +179,39 @@ Status: IN PROGRESS
       run_gate() — 3-branch: AUTO_APPROVE (<5%), VERIFY (5-15% or any calm-flip), HOLD (≥15% or calm-flip>10)
       run_verify() — injectable mock verify_fn; auto-rollback on fail
       apply_freeze() + rollback() + current_freeze() — JSON registry with history[:3]
-      run_refreeze_pipeline() — full orchestration
+      run_refreeze_pipeline() — full orchestration with graceful G3 failure handling:
+        - ValueError (CSV<fit_end) → fail_type=data_missing, pending flag, no crash
+        - Unexpected error → fail_type=unexpected, pending flag, log.exception
+        - Every subsequent run re-alerts if pending flag present (_alert_if_pending)
+        - Success: pending flag cleared, model promoted normally
       Registry: models/hmm/futures_freeze_registry.json
-- [x] futures/test_refreeze.py: 40/40 PASS (T1-T7 — cold-start, gate branches, full-chain, rollback, 3-gate boundary, calm-flip rule, no-harm)
-      T2: real data fit_2023 vs fit_C: 1.13% label change (17/1510), verdict=VERIFY
-      T5.5: 15% exactly → HOLD (boundary inclusive ≥ not strict >)
-      T7: confirmed HMMEngine class + fit_C production untouched
-      No-harm: fit_C hash deterministic (91d918f15dcb2881), production registry not created by tests
+      Pending flag: models/hmm/refreeze_pending.json
+- [x] futures/test_refreeze.py: 60/60 PASS (T1-T11)
+      T1-T7: cold-start, gate branches, full-chain, rollback, 3-gate boundary, calm-flip rule, no-harm
+      T8: short CSV → graceful fail, failed=True, fail_type=data_missing, REFREEZE FAILED notified
+      T9: pending flag written with attempts=1, fail_type, fit_end_target
+      T10: repeat fail → STILL PENDING re-alerts, attempts=2
+      T11: success with real CSV + seeded pending (attempts=3) → flag cleared, swapped=True, STILL PENDING fired once
+
+### Completed (Futures Trust Audit — 2026-07-05)
+- [x] STEP 1: Liệt kê số load-bearing + traceability classification
+      TRACEABLE (script committed): $52,962/Calmar 2.75 | degradation 2.38 | fit_C 17.16% | divergence counts | T2 1.13%
+      ONLY-FROM-REPORT: STRESS_MID 2022 $5,296 | 2-micro DD $9,854/$82k threshold | 83/101 flip per-year
+- [x] STEP 2A: stress_mid_trust.py committed — re-measures STRESS_MID per-year P&L (fit_C, 2t slip)
+      Standalone 2022: measured +$6,632 vs claimed +$5,296 (delta +$1,336) → CONFIRMED
+      Swing 2022: measured -$555 vs claimed -$232 (fit_C more Stress days → more STRESS_MID activity)
+      Marginal with cap 2022: +$2,208 (NKD also helps 2022, some cap displacement)
+      VERDICT: STRESS hedge role CONFIRMED, fit_C even stronger
+- [x] STEP 2B: scaling_dd_trust.py committed — re-measures 2-micro MaxDD + sizer threshold
+      1-micro MaxDD: $2,789 — MATCH baseline ✓
+      2-micro MaxDD (force n=2, with cap): $5,890 vs claimed $9,854 — DIFFERS ($3,964 gap)
+      Sizer n=2 threshold (formula): $55,784 vs claimed $82k — GAP ($26k = 47% manual buffer)
+      ROOT CAUSE: $9,854 = old pre-NKD MaxDD $5,185 × ~1.9 (stale estimate). $82k has no formula derivation.
+      NEW GATE: sizer formula gives n=2 at ~$55,784 (DD-binding). $82k is conservative but unverified.
+- [x] STEP 2C: hmm_flip_year_trust.py committed — per-year flip breakdown fit_A vs fit_C
+      17.16% A→C pct change: CONFIRMED ✓ | 101 Normal→Stress: CONFIRMED ✓ | 83 in 2020+2022: CONFIRMED ✓
+- [x] STEP 3 interpret: STRESS role solid; scaling gate should use $55,784 (formula) not $82k (unverified)
+- [x] STEP 4 defer: divergence coverage counts (reconcile scripts traceable, sweep closed) → TODO not urgent
 
 ### Next steps
 

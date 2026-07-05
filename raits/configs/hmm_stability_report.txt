@@ -1,0 +1,114 @@
+======================================================================
+HMM STABILITY MEASURE — Trust Audit Report
+Production settings: diag covariance, n_init=10, n_iter=200
+Anchored-expanding from 2007-01-03. IS period 2017-01-01 to 2022-12-31.
+Vol ground truth threshold: 20% annualized (Part C primary).
+======================================================================
+
+──────────────────────────────────────────────────────────────────────
+PART A — Weekly Label Churn
+──────────────────────────────────────────────────────────────────────
+Monday retrains simulated: 312
+
+% of IS days ever flipped: 9.1%  (claimed 10.5%, diff=1.4pp)
+Average quarterly churn:   1.1%  (claimed 1.8%, diff=0.7pp)
+Calm<->Stress inversions:  0  (claimed 0, matches)
+
+Quarterly churn breakdown:
+  2017Q1: avg=0.92%  min=0.00%  max=2.57%  n=12 Mondays
+  2017Q2: avg=1.08%  min=0.04%  max=3.63%  n=13 Mondays
+  2017Q3: avg=1.21%  min=0.00%  max=2.93%  n=13 Mondays
+  2017Q4: avg=1.16%  min=0.00%  max=2.76%  n=13 Mondays
+  2018Q1: avg=1.31%  min=0.04%  max=2.62%  n=13 Mondays
+  2018Q2: avg=0.44%  min=0.00%  max=1.06%  n=13 Mondays
+  2018Q3: avg=0.45%  min=0.00%  max=1.37%  n=13 Mondays
+  2018Q4: avg=0.46%  min=0.03%  max=1.36%  n=14 Mondays
+  2019Q1: avg=0.57%  min=0.00%  max=2.12%  n=12 Mondays
+  2019Q2: avg=0.90%  min=0.00%  max=1.71%  n=13 Mondays
+  2019Q3: avg=1.23%  min=0.03%  max=2.10%  n=14 Mondays
+  2019Q4: avg=0.77%  min=0.00%  max=2.18%  n=13 Mondays
+  2020Q1: avg=0.56%  min=0.06%  max=1.32%  n=13 Mondays
+  2020Q2: avg=1.08%  min=0.12%  max=3.18%  n=13 Mondays
+  2020Q3: avg=1.14%  min=0.06%  max=3.86%  n=13 Mondays
+  2020Q4: avg=1.99%  min=0.06%  max=3.68%  n=13 Mondays
+  2021Q1: avg=1.49%  min=0.00%  max=4.21%  n=13 Mondays
+  2021Q2: avg=0.97%  min=0.00%  max=2.23%  n=13 Mondays
+  2021Q3: avg=1.57%  min=0.00%  max=2.54%  n=13 Mondays
+  2021Q4: avg=1.61%  min=0.00%  max=2.67%  n=13 Mondays
+  2022Q1: avg=0.61%  min=0.00%  max=1.65%  n=13 Mondays
+  2022Q2: avg=1.50%  min=0.13%  max=3.48%  n=13 Mondays
+  2022Q3: avg=1.70%  min=0.03%  max=3.90%  n=13 Mondays
+  2022Q4: avg=1.01%  min=0.23%  max=3.08%  n=13 Mondays
+
+IS live-label distribution (weekly carry-forward):
+  Calm    :  635 days (40.7%)
+  Normal  :  480 days (30.8%)
+  Stress  :  335 days (21.5%)
+  Crisis  :  110 days (7.1%)
+
+──────────────────────────────────────────────────────────────────────
+PART B — Weekly vs Annual Scheme Agreement
+──────────────────────────────────────────────────────────────────────
+Annual YE2018 model vs weekly labels (2019-2022):
+  Total days compared: 1008
+  Agreement:           68.6%  ← MATERIAL DIFF vs claimed 98.5%
+  Disagreements (317):
+    Normal->Calm             :   81 (8.0%)
+    Calm->Normal             :   60 (6.0%)
+    Normal->Stress           :   59 (5.9%)
+    Stress->Normal           :   41 (4.1%)
+    Crisis->Stress           :   25 (2.5%)
+    Stress->Crisis           :   20 (2.0%)
+    Crisis->Normal           :    9 (0.9%)
+    Calm->Stress             :    7 (0.7%)
+    Normal->Crisis           :    6 (0.6%)
+    Calm->Crisis             :    5 (0.5%)
+
+Annual YE2021 model vs weekly labels (2019-2022):
+  Total days compared: 1008
+  Agreement:           67.8%  ← MATERIAL DIFF vs claimed 98.5%
+  Disagreements (325):
+    Normal->Calm             :   88 (8.7%)
+    Calm->Normal             :   60 (6.0%)
+    Normal->Stress           :   59 (5.9%)
+    Stress->Normal           :   49 (4.9%)
+    Crisis->Stress           :   28 (2.8%)
+    Stress->Crisis           :   12 (1.2%)
+    Calm->Stress             :   10 (1.0%)
+    Crisis->Normal           :    9 (0.9%)
+    Stress->Calm             :    5 (0.5%)
+    Normal->Crisis           :    5 (0.5%)
+
+──────────────────────────────────────────────────────────────────────
+PART C — Stress Detection Recall
+Ground truth: SPY 5-day realized vol (annualized) > threshold
+──────────────────────────────────────────────────────────────────────
+Window: COVID 2020-02-20 to 2020-03-23  (23 trading days)
+  vol>20%:  true_stress=21d  hmm_stress=21d  overlap=21d  recall=100.0%  ← MATERIAL DIFF vs claimed 91.6% ← PRIMARY
+  vol>15%:  true_stress=21d  hmm_stress=21d  overlap=21d  recall=100.0%
+  vol>25%:  true_stress=19d  hmm_stress=21d  overlap=19d  recall=100.0%
+
+Window: 2022 bear 2022-01-01 to 2022-12-31  (260 trading days)
+  vol>20%:  true_stress=140d  hmm_stress=170d  overlap=124d  recall=88.6%  ← MATERIAL DIFF vs claimed 80.2% ← PRIMARY
+  vol>15%:  true_stress=201d  hmm_stress=170d  overlap=152d  recall=75.6%
+  vol>25%:  true_stress=89d  hmm_stress=170d  overlap=78d  recall=87.6%
+
+──────────────────────────────────────────────────────────────────────
+VERDICT
+──────────────────────────────────────────────────────────────────────
+Keep-weekly retrain: SUPPORTED
+  Low quarterly churn (1.1%) and zero Calm<->Stress inversions → labels are stable between retrains.
+Annual YE2018 agreement 68.6%: MATERIAL DIVERGENCE — investigate
+Annual YE2021 agreement 67.8%: MATERIAL DIVERGENCE — investigate
+Stress detection (COVID 2020): recall=100.0% — adequate
+Stress detection (2022 bear ): recall=88.6% — adequate
+
+Claimed vs measured (primary threshold):
+  pct_ever_flipped:       claimed=10.5%   measured=9.1%
+  avg_quarterly_churn:    claimed=1.8%    measured=1.1%
+  calm_stress_inversions: claimed=0       measured=0
+  agreement_YE2018:      claimed=98.5%  measured=68.6%
+  agreement_YE2021:      claimed=98.5%  measured=67.8%
+  covid_recall:  claimed=91.6%  measured=100.0%
+  bear_2022_recall:  claimed=80.2%  measured=88.6%
+======================================================================

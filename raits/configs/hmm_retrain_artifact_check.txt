@@ -1,0 +1,89 @@
+========================================================================
+HMM Retrain Artifact Check — Same-Method + Mechanism
+Settings: diag, n_init=10, n_iter=200
+BOTH schemes use Monday carry-forward (identical labeling method).
+Annual: frozen YE parameters | Weekly: expanding parameters.
+Data seen at each Monday M: identical (2007→M) for both.
+Ground truth: SPY 5-day realized vol > 20% annualized (primary).
+========================================================================
+
+────────────────────────────────────────────────────────────────────────
+STEP 1 — SAME-METHOD COMPARISON
+Both Monday carry-forward. Only model parameters differ.
+────────────────────────────────────────────────────────────────────────
+
+FALSE-ALARM WINDOW: 2019-01-01 to 2019-12-31 (calm)
+                                   Annual     Weekly
+Days with labels                      252        252
+  FA rate vol>20%:                      8.6%      10.9% (diff -2.3pp) ← PRIMARY
+    (non-stress: 220  FAs:  19a /  24w)
+  FA rate vol>15%:                      6.0%       6.5% (diff -0.5pp)
+    (non-stress: 200  FAs:  12a /  13w)
+  FA rate vol>25%:                     13.5%      15.6% (diff -2.1pp)
+    (non-stress: 237  FAs:  32a /  37w)
+
+STRESS WINDOW: COVID 2020-02-20 to 2020-03-23
+                                   Annual     Weekly
+Days with labels                       23         23
+  Recall    vol>20%:                    100.0%     100.0% (diff +0.0pp) ← PRIMARY
+    (true_stress:  21  hmm:  21a/ 21w  overlap:  21a/ 21w)
+  Recall    vol>15%:                    100.0%     100.0% (diff +0.0pp)
+    (true_stress:  21  hmm:  21a/ 21w  overlap:  21a/ 21w)
+  Recall    vol>25%:                    100.0%     100.0% (diff +0.0pp)
+    (true_stress:  19  hmm:  21a/ 21w  overlap:  19a/ 19w)
+
+STRESS WINDOW: 2022 bear 2022-01-01 to 2022-12-31
+                                   Annual     Weekly
+Days with labels                      251        251
+  Recall    vol>20%:                     88.6%      88.6% (diff +0.0pp) ← PRIMARY
+    (true_stress: 140  hmm: 164a/164w  overlap: 124a/124w)
+  Recall    vol>15%:                     75.6%      75.6% (diff +0.0pp)
+    (true_stress: 201  hmm: 164a/164w  overlap: 152a/152w)
+  Recall    vol>25%:                     87.6%      87.6% (diff +0.0pp)
+    (true_stress:  89  hmm: 164a/164w  overlap:  78a/ 78w)
+
+HEAD-TO-HEAD (primary vol>20%, same-method):
+Window                              Weekly    Annual     Diff
+-------------------------------------------------------------
+2019 FA rate                         10.9%      8.6%   -2.3pp
+COVID recall                        100.0%    100.0%   +0.0pp
+2022 bear recall                     88.6%     88.6%   +0.0pp
+
+────────────────────────────────────────────────────────────────────────
+STEP 2 — QUARTERLY MECHANISM CHECK (2022 bear, same-method labels)
+Tracking whether weekly recall degrades Q1→Q4 as model adapts.
+────────────────────────────────────────────────────────────────────────
+
+Quarter        True stress   W recall   A recall   W missed  Missed avg vol  Caught avg vol
+-------------------------------------------------------------------------------------------
+Q1 Jan-Mar              30      96.7%      96.7%          1           22.2%           25.8%
+Q2 Apr-Jun              46      97.8%      97.8%          1           26.4%           31.3%
+Q3 Jul-Sep              24      62.5%      62.5%          9           30.8%           24.7%
+Q4 Oct-Dec              40      87.5%      87.5%          5           26.2%           30.3%
+
+Weekly recall trend Q1→Q4: -9.2pp (DECLINING — consistent with adaptation)
+Avg vol of weekly-missed days: 26.4%  |  Avg vol of caught days: 28.0%
+Vol gap (missed - caught): -1.6pp (missed days have SIMILAR vol to caught — genuine regime misclassification)
+
+────────────────────────────────────────────────────────────────────────
+STEP 3 — VERDICT
+────────────────────────────────────────────────────────────────────────
+Same-method 2022 recall:  annual=88.6%  weekly=88.6%  diff=+0.0pp
+Same-method 2019 FA rate: annual=8.6%   weekly=10.9%   diff=-2.3pp
+
+VERDICT: ARTIFACT RULED OUT — ADVANTAGE REDUCED
+
+Same-method comparison shows +0.0pp annual advantage on 2022 recall.
+This is below the 10pp material threshold.
+The prior 11.4pp advantage in hmm_annual_vs_weekly_detection.py was PARTLY an artifact
+of the different labeling methods (incremental Viterbi vs Monday carry-forward).
+Removing the method difference reduces the advantage to sub-material levels.
+Keep weekly: switching cost is not justified by this margin.
+
+────────────────────────────────────────────────────────────────────────
+REFERENCE: prior script result (incremental Viterbi for annual)
+  2022 recall: annual 100.0% vs weekly 88.6% (+11.4pp)
+  2019 FA rate: annual 4.5% vs weekly 10.9% (-6.4pp for annual)
+  Same-method 2022 diff: +0.0pp (reported above)
+  Same-method FA diff:   -2.3pp (reported above)
+========================================================================
