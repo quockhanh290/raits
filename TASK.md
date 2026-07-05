@@ -2,6 +2,29 @@
 Status: IN PROGRESS
 
 ---
+## Sub-task: Trust Audit (DONE 2026-07-05)
+Status: DONE
+
+### Completed
+- [x] STEP 1+2: Full claim inventory + TRACEABLE/SUSPECT/WRONG classification
+- [x] STEP 3 — bootstrap_strategy.py committed: re-measured all 9 strategy p-values from results_20260624_135619.pkl
+      All 9 verdicts confirmed (FADE/GAP_FILL/VWAP_MR = NO EDGE; TF/ORB/PE_SHORT/STRESS_ORB = CONFIRMED; STRESS_MID/GF_SHORT = BORDERLINE)
+- [x] STEP 3 — hmm_annual_convergence.py committed: re-measured 4 scenarios; 6/6 year-ends converge
+      Tables match HMM_ANNUAL_CONVERGENCE_AUDIT.md exactly; "3/6 fail" claim definitively WRONG
+- [x] STEP 4 — TRUST_AUDIT.md written: full classification table + run commands + outstanding gaps
+
+### Key finding
+- ALL decisions that affect live trading are on TRACEABLE footing (vault results, IS baseline, bootstrap verdicts)
+- HMM stability numbers (1.8% churn, 98.5% agreement, recall) remain SUSPECT — no measuring script committed
+  Risk: LOW (architecture is already locked; stability numbers are confirmatory only)
+- "3/6 convergence fail" (HMM_STABILITY_REPORT.md) definitively WRONG — disproven by re-measurement
+
+### Files added
+TRUST_AUDIT.md, HMM_ANNUAL_CONVERGENCE_AUDIT.md, raits/raits/scripts/bootstrap_strategy.py,
+raits/raits/scripts/hmm_annual_convergence.py, raits/configs/bootstrap_strategy_report.txt,
+raits/configs/hmm_annual_convergence_report.txt
+
+---
 ## Sub-task: Repo Cleanup (DONE 2026-07-01)
 Status: DONE
 
@@ -114,6 +137,38 @@ Status: IN PROGRESS
 - [x] global_index/test_ibkr_injection.py: 14/14 PASS (C3: 3/3, C6: 4/4, C5: 7/7)
       C5.7 contrast proves: WITHOUT reconcile pnl doubled ($50,300 vs expected $50,150)
 
+### Completed (HMM stale guards G1/G2/G3 — 2026-07-05)
+- [x] global_index/notify.py: mirror của raits/live/notify.py (boxed stderr + push hook)
+- [x] global_index/hmm_stale_guard.py: HMMStaleGuard — G1 + G2
+      G1: SOFT >2bday → notify WARN once; HARD >5bday → regime_unreliable=True + HALTED
+      G1: Recovery ≤2bday → RESUMED + clear flag (chống oscillation: recovery==soft < hard)
+      G2: SOFT >12mo → MODEL AGE WARN once; HARD >18mo → MODEL AGE URGENT once (no halt)
+      entries_blocked counter; check_day(today, spy_last_date_override) for offline testing
+- [x] futures/refreeze.py: G3 _check_spy_coverage() — ABORT + notify + ValueError if CSV < fit_end
+- [x] global_index/runner.py: FuturesRunner(hmm_stale_guard=None) — optional guard
+      run_day(_spy_last_date_override=None) — passes override to guard.check_day()
+      entries cleared when regime_unreliable; exits run normally via state.open_positions
+- [x] global_index/test_hmm_stale.py: 42/42 ALL PASS
+      G1.12-G1.16: exit runs (equity +$300), entries blocked, counter=1, HALTED notified
+      G2: warn-only confirmed (regime_unreliable never True from G2)
+      G3: ValueError + REFREEZE ABORTED + CSV>=fit_end passes
+      base: runner without guard — entries admitted normally (backward compatible)
+      noharm: HMMEngine git log clean
+
+### Completed (HMM Re-freeze mechanism GĐ3 Phần A — 2026-07-05)
+- [x] futures/refreeze.py: full anchored-expanding re-freeze pipeline
+      refreeze_hmm(anchor, fit_end, spy_csv) — calls label_regimes() unchanged, never modifies HMMEngine
+      run_gate() — 3-branch: AUTO_APPROVE (<5%), VERIFY (5-15% or any calm-flip), HOLD (≥15% or calm-flip>10)
+      run_verify() — injectable mock verify_fn; auto-rollback on fail
+      apply_freeze() + rollback() + current_freeze() — JSON registry with history[:3]
+      run_refreeze_pipeline() — full orchestration
+      Registry: models/hmm/futures_freeze_registry.json
+- [x] futures/test_refreeze.py: 40/40 PASS (T1-T7 — cold-start, gate branches, full-chain, rollback, 3-gate boundary, calm-flip rule, no-harm)
+      T2: real data fit_2023 vs fit_C: 1.13% label change (17/1510), verdict=VERIFY
+      T5.5: 15% exactly → HOLD (boundary inclusive ≥ not strict >)
+      T7: confirmed HMMEngine class + fit_C production untouched
+      No-harm: fit_C hash deterministic (91d918f15dcb2881), production registry not created by tests
+
 ### Next steps
 
 **KHI IBKR ACCOUNT MỞ:**
@@ -124,7 +179,8 @@ Status: IN PROGRESS
 - [ ] 5. Reconcile IBKRBroker fill khớp assumption deploy_sim (khi có fill thật)
 
 **TRƯỚC LIVE (sau paper, có data mới):**
-- [ ] 6. Re-freeze lần 1 (anchored 2018→data-mới) + build cơ chế re-freeze (GĐ3)
+- [x] 6. Build cơ chế re-freeze GĐ3 (Phần A: code + test giả lập) — 40/40 PASS
+- [ ] 6b. Re-freeze lần 1 thật: chạy refreeze_hmm với data mới khi có (sau 2025)
 - [ ] 7. Vault 2025 test với fit cuối
 
 **RÀNG BUỘC:**
