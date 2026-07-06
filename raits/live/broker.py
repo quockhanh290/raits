@@ -19,7 +19,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Dict, Optional
 
 
 class FillStatus(str, Enum):
@@ -63,6 +63,14 @@ class BrokerInterface(ABC):
     @abstractmethod
     def account_equity(self) -> float:
         """Current account equity (cash + positions at market)."""
+
+    @abstractmethod
+    def get_open_positions(self) -> Dict[str, float]:
+        """Return {ticker: shares} for all currently open positions.
+
+        Used by PaperTrader at startup to detect state↔broker mismatch.
+        A fresh MockBroker has no positions; IBKRBroker queries the gateway.
+        """
 
 
 class MockBroker(BrokerInterface):
@@ -139,6 +147,10 @@ class MockBroker(BrokerInterface):
     def set_equity(self, equity: float) -> None:
         """For runner to update equity as P&L accumulates."""
         self._equity = equity
+
+    def get_open_positions(self) -> Dict[str, float]:
+        """MockBroker tracks no real positions — always returns empty."""
+        return {}
 
 
 class IBKRConnectionError(RuntimeError):
@@ -319,4 +331,27 @@ class IBKRBroker(BrokerInterface):
         except Exception as exc:
             raise IBKRConnectionError(
                 f"account_equity() failed: {exc}"
+            ) from exc
+
+    def get_open_positions(self) -> Dict[str, float]:
+        """Return {ticker: shares} for all open positions at IBKR.
+
+        Queries the gateway portfolio; used at startup to detect
+        state↔IBKR mismatches before generating any entry signals.
+        """
+        try:
+            import ib_async  # type: ignore  # lazy import
+            ib = self._require_connection()
+            ib.reqAccountUpdates()
+            ib.sleep(1.0)  # allow portfolio to populate
+            result: Dict[str, float] = {}
+            for item in ib.portfolio():
+                if item.position != 0:
+                    result[item.contract.symbol] = float(item.position)
+            return result
+        except IBKRConnectionError:
+            raise
+        except Exception as exc:
+            raise IBKRConnectionError(
+                f"get_open_positions() failed: {exc}"
             ) from exc

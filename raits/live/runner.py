@@ -31,11 +31,12 @@ import datetime
 import hashlib
 import json
 import logging
+import math
 import time
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Set
 
 from raits.live.trading_calendar import et_now_time as _et_now_time
 from raits.live.trading_calendar import market_close_time as _market_close_time
@@ -45,6 +46,7 @@ from raits.backtest.data_types import Trade
 from raits.risk.circuit_breakers import CircuitBreakerManager
 
 from .broker import BrokerInterface, FillStatus, Order
+from .notify import notify
 from .reconciliation import ReconciliationLog
 
 logger = logging.getLogger("RAITS.live.runner")
@@ -112,6 +114,14 @@ class PaperOnlyViolation(RuntimeError):
     pass
 
 
+class StartupMismatchError(RuntimeError):
+    """Raised when IBKR holds positions not tracked in our state at startup.
+
+    Halts the runner before any bar processing to prevent duplicate orders
+    on top of unknown existing IBKR positions.
+    """
+
+
 def check_discipline_lock(config_params: Dict[str, Any], expected_hash: str) -> None:
     """
     Raise DisciplineLockError if the hash of config_params does not match
@@ -157,6 +167,11 @@ class RunResult:
     kill_switch_bar: Optional[Any] = None    # bar_ts when tripped
     simulated_pnl: float = 0.0
     entries_blocked_regime_unreliable: int = 0  # entries dropped due to stale HMM data
+    orders_pending: int = 0    # entry orders with unknown fill status (IBKR timeout)
+    exits_failed: int = 0      # exit orders rejected after retry — position stays open
+    bars_errored: int = 0          # bars where decide() raised → bar skipped, loop continues
+    entries_nan_rejected: int = 0  # entries rejected for NaN/inf/<=0 price or shares
+    pnl_nan_guarded: int = 0       # closes where NaN pnl was detected; equity/CB NOT updated
 
 
 # ── PaperTrader ───────────────────────────────────────────────────────────────
@@ -204,6 +219,7 @@ class PaperTrader:
         allow_swing_hold: bool = False,
         max_hold_days: int = 5,
         clock_fn: Optional[Callable[[], datetime.time]] = None,
+        reconcile_on_startup: bool = True,
     ) -> None:
         # Guards
         check_paper_only(ibkr_port, live_mode)
@@ -220,6 +236,11 @@ class PaperTrader:
         self._cost_fn = cost_fn  # Optional[Callable[[Trade, float], float]]
         self._allow_swing_hold = allow_swing_hold
         self._max_hold_days = max_hold_days
+
+        self._reconcile_on_startup = reconcile_on_startup
+        # Tickers whose last entry fill status is PENDING (IBKR timeout).
+        # New entries for these tickers are blocked until cleared by operator.
+        self._pending_tickers: Set[str] = set()
 
         # Simulated portfolio: trade_id → Trade (open positions)
         self._open_positions: Dict[str, Trade] = {}
@@ -255,6 +276,9 @@ class PaperTrader:
           4. Entries
           5. Daily-drawdown CB check → _close_all_cb() if triggered
         """
+        if self._reconcile_on_startup:
+            self._startup_reconcile()
+
         result = RunResult()
         current_day = None
         _prev_ctx = None  # last ctx of previous day — needed for EOD swing-stop update
@@ -316,8 +340,20 @@ class PaperTrader:
                     if not _day_bars.empty:
                         ctx.day_stocks[_tk] = _day_bars
 
-            # === DecisionUnit call ===
-            decision: DecisionResult = self._du.decide(ctx)
+            # === DecisionUnit call === (FIX 4: crash here → skip bar, loop continues)
+            try:
+                decision: DecisionResult = self._du.decide(ctx)
+            except Exception as _exc:
+                result.bars_errored += 1
+                _msg = (
+                    f"BAR EXCEPTION (decide): bar={ctx.bar_ts} — "
+                    f"{type(_exc).__name__}: {_exc}. "
+                    "Entries AND exits for this bar skipped. Open positions remain active."
+                )
+                logger.error(_msg, exc_info=True)
+                notify(_msg)
+                _prev_ctx = ctx
+                continue
 
             result.bars_processed += 1
             result.entries_signalled += len(decision.entries)
@@ -326,9 +362,20 @@ class PaperTrader:
             # ── Step 1: Swing exits first (TF + PE_SHORT) ───────────────────
             # Mirrors engine: swing exits run before intraday; consecutive-loss
             # CB may fire here, causing `continue` to skip the rest of the bar.
+            # FIX 4: each exit wrapped independently — one crash doesn't block others.
             for exit_intent in decision.exits:
                 if exit_intent.trade.strategy in _SWING:
-                    self._process_exit(exit_intent, ctx.bar_ts, result)
+                    try:
+                        self._process_exit(exit_intent, ctx.bar_ts, result)
+                    except Exception as _exc:
+                        _msg = (
+                            f"EXIT EXCEPTION (swing): ticker={exit_intent.trade.ticker} "
+                            f"trade_id={exit_intent.trade.trade_id} bar={ctx.bar_ts} — "
+                            f"{type(_exc).__name__}: {_exc}. "
+                            "Position remains OPEN — operator action required."
+                        )
+                        logger.error(_msg, exc_info=True)
+                        notify(_msg)
 
             # ── Step 2: Skip if consecutive-loss CB fired during swing exits ─
             if self._cb_active:
@@ -336,9 +383,20 @@ class PaperTrader:
                 continue
 
             # ── Step 3: Intraday exits ───────────────────────────────────────
+            # FIX 4: each exit wrapped independently — one crash doesn't block others.
             for exit_intent in decision.exits:
                 if exit_intent.trade.strategy not in _SWING:
-                    self._process_exit(exit_intent, ctx.bar_ts, result)
+                    try:
+                        self._process_exit(exit_intent, ctx.bar_ts, result)
+                    except Exception as _exc:
+                        _msg = (
+                            f"EXIT EXCEPTION (intraday): ticker={exit_intent.trade.ticker} "
+                            f"trade_id={exit_intent.trade.trade_id} bar={ctx.bar_ts} — "
+                            f"{type(_exc).__name__}: {_exc}. "
+                            "Position remains OPEN — operator action required."
+                        )
+                        logger.error(_msg, exc_info=True)
+                        notify(_msg)
 
             # ── Step 4: Entries ──────────────────────────────────────────────
             # Pre-compute once per bar for same-bar exit check below.
@@ -363,23 +421,56 @@ class PaperTrader:
                         _regime_unreliable_notified_today = True
             else:
                 for entry_intent in decision.entries:
-                    new_trade = self._process_entry(entry_intent, ctx.bar_ts, result)
+                    # FIX 4: entry crash → skip this entry, notify, continue to next.
+                    try:
+                        new_trade = self._process_entry(entry_intent, ctx.bar_ts, result)
+                    except Exception as _exc:
+                        logger.error(
+                            "ENTRY EXCEPTION: ticker=%s bar=%s — %s: %s",
+                            entry_intent.ticker, ctx.bar_ts, type(_exc).__name__, _exc,
+                            exc_info=True,
+                        )
+                        notify(
+                            f"ENTRY EXCEPTION: {entry_intent.ticker} bar={ctx.bar_ts} — "
+                            f"{type(_exc).__name__}: {_exc}. Entry skipped."
+                        )
+                        continue
                     # Same-bar exit check: mirrors engine_refactored lines 778-789.
                     # Engine calls _check_exits immediately after entry so the entry
                     # bar's high/low can trigger stop/target before the next bar.
                     if (new_trade is not None
                             and new_trade.strategy not in _SWING
                             and not self._cb_active):
-                        _sb = self._du._check_exits(
-                            new_trade, ctx.bar_ts, _bar_t, ctx.day_stocks,
-                            self._allow_swing_hold, _spy_bar,
-                        )
-                        if _sb:
-                            _sb_price, _sb_reason = _sb
-                            self._process_exit(
-                                ExitIntent(trade=new_trade, exit_price=_sb_price,
-                                           reason=_sb_reason),
-                                ctx.bar_ts, result,
+                        try:
+                            _sb = self._du._check_exits(
+                                new_trade, ctx.bar_ts, _bar_t, ctx.day_stocks,
+                                self._allow_swing_hold, _spy_bar,
+                            )
+                            if _sb:
+                                _sb_price, _sb_reason = _sb
+                                try:
+                                    self._process_exit(
+                                        ExitIntent(trade=new_trade, exit_price=_sb_price,
+                                                   reason=_sb_reason),
+                                        ctx.bar_ts, result,
+                                    )
+                                except Exception as _exc:
+                                    _msg = (
+                                        f"SAME-BAR EXIT EXCEPTION: ticker={new_trade.ticker} "
+                                        f"trade_id={new_trade.trade_id} bar={ctx.bar_ts} — "
+                                        f"{type(_exc).__name__}: {_exc}. Position remains OPEN."
+                                    )
+                                    logger.error(_msg, exc_info=True)
+                                    notify(_msg)
+                        except Exception as _exc:
+                            logger.error(
+                                "SAME-BAR CHECK EXCEPTION: ticker=%s bar=%s — %s: %s",
+                                new_trade.ticker, ctx.bar_ts, type(_exc).__name__, _exc,
+                                exc_info=True,
+                            )
+                            notify(
+                                f"SAME-BAR CHECK EXCEPTION: {new_trade.ticker} "
+                                f"bar={ctx.bar_ts} — {type(_exc).__name__}: {_exc}."
                             )
 
             # ── Step 5: Daily-drawdown CB check ──────────────────────────────
@@ -442,10 +533,65 @@ class PaperTrader:
 
     # ── Internal ──────────────────────────────────────────────────────────────
 
+    def _startup_reconcile(self) -> None:
+        """FIX 3: Query IBKR for open positions before the first bar.
+
+        If IBKR holds positions that are absent from our state, we cannot
+        safely generate entry signals (we would stack on top of unknown
+        existing positions).  Halt immediately with StartupMismatchError.
+
+        For MockBroker, get_open_positions() always returns {} — no halt.
+        For IBKRBroker that is not connected, IBKRConnectionError propagates
+        up to the caller (it is a hard stop, not a silent mismatch).
+        """
+        ibkr_positions = self._broker.get_open_positions()
+        if not ibkr_positions:
+            return  # clean slate — proceed normally
+
+        # Our state is always empty at startup (PaperTrader is freshly constructed).
+        # Any non-zero IBKR positions are unknown to us → halt.
+        tickers = sorted(ibkr_positions.keys())
+        msg = (
+            "STARTUP MISMATCH: IBKR holds positions not tracked in runner state. "
+            f"Tickers: {tickers}. "
+            "Resolve manually (flatten in IBKR or load prior state) then restart."
+        )
+        logger.critical(msg)
+        notify(msg)
+        raise StartupMismatchError(msg)
+
     def _process_entry(
         self, intent: EntryIntent, bar_ts: Any, result: RunResult
     ) -> Optional[Any]:
-        """Return the opened Trade (or None if order was rejected)."""
+        """Return the opened Trade (or None if order did not fill cleanly).
+
+        FIX 1: PENDING (IBKR 30s fill timeout) is NOT treated as rejected.
+        The ticker is added to _pending_tickers to block subsequent entries
+        until the operator clears it. IBKR may hold a real position; logging
+        and notify() are fired so the operator can investigate.
+        """
+        # FIX 5: Reject entries with NaN/inf/zero price or shares before touching broker.
+        _price, _shares = intent.entry_price, intent.shares
+        if not (math.isfinite(_price) and _price > 0
+                and math.isfinite(float(_shares)) and _shares > 0):
+            _msg = (
+                f"NaN/INF ENTRY REJECTED: {intent.ticker} "
+                f"price={_price} shares={_shares} bar={bar_ts}. "
+                "Order not submitted — check signal computation."
+            )
+            logger.error(_msg)
+            notify(_msg)
+            result.entries_nan_rejected += 1
+            return None
+
+        if intent.ticker in self._pending_tickers:
+            logger.warning(
+                "ENTRY BLOCKED: %s has a pending IBKR order from a prior bar — "
+                "operator must confirm fill/cancel before new entries.",
+                intent.ticker,
+            )
+            return None
+
         side = "BUY" if intent.direction == "LONG" else "SELL"
         order = Order(
             order_id=str(uuid.uuid4()),
@@ -473,6 +619,20 @@ class PaperTrader:
             self._open_positions[trade.trade_id] = trade
             self._du.on_trade_opened(trade, intent)
             return trade
+        elif filled_order.fill_status == FillStatus.PENDING:
+            # IBKR timed out — order is still in-flight.  We cannot record a
+            # position (we don't know if it filled) and must not send another
+            # entry.  Block this ticker until the operator resolves it.
+            result.orders_pending += 1
+            self._pending_tickers.add(intent.ticker)
+            msg = (
+                f"ENTRY PENDING: {intent.ticker} order {filled_order.order_id} "
+                f"timed out at IBKR ({filled_order.reject_reason}). "
+                "Position state is UNKNOWN — operator action required."
+            )
+            logger.error(msg)
+            notify(msg)
+            return None
         else:
             result.orders_rejected += 1
             return None
@@ -509,27 +669,120 @@ class PaperTrader:
             fill_price = filled_order.fill_price
             multiplier = 1 if trade.direction == "LONG" else -1
             gross_pnl  = multiplier * (fill_price - trade.entry_price) * fill_qty
-
-            # Populate exit fields — mirrors trade_log.close_trade()
             total_costs = self._cost_fn(trade, fill_price) if self._cost_fn else 0.0
+            net_pnl     = gross_pnl - total_costs
+
+            # FIX 5: NaN guard — close position but do NOT corrupt equity/CB state.
+            if not math.isfinite(gross_pnl) or not math.isfinite(net_pnl):
+                result.pnl_nan_guarded += 1
+                _msg = (
+                    f"NaN/INF P&L (exit): {trade.ticker} {trade.trade_id} "
+                    f"fill={fill_price} entry={trade.entry_price} qty={fill_qty} "
+                    f"gross={gross_pnl}. Closed; equity/CB NOT updated — reconcile manually."
+                )
+                logger.error(_msg)
+                notify(_msg)
+                trade.exit_time = bar_ts
+                trade.exit_price = fill_price
+                trade.exit_reason = exit_intent.reason
+                trade.gross_pnl = trade.total_costs = trade.net_pnl = None
+                self._swing_state.pop(id(trade), None)
+                del self._open_positions[trade.trade_id]
+                self._closed_trades.append(trade)
+                return
+
             trade.exit_time   = bar_ts
             trade.exit_price  = fill_price
             trade.exit_reason = exit_intent.reason
             trade.gross_pnl   = gross_pnl
             trade.total_costs = total_costs
-            trade.net_pnl     = gross_pnl - total_costs
+            trade.net_pnl     = net_pnl
 
             self._daily_pnl      += gross_pnl
-            self._running_equity += trade.net_pnl
+            self._running_equity += net_pnl
             self._swing_state.pop(id(trade), None)
             del self._open_positions[trade.trade_id]
             self._closed_trades.append(trade)
             # Consecutive-loss CB (mirrors engine._close_trade → record_trade_result)
-            cb_res = self._cb.record_trade_result(trade.net_pnl or 0.0)
+            cb_res = self._cb.record_trade_result(net_pnl or 0.0)
             if cb_res.kill_switch:
                 self._cb_active = True
         else:
-            result.orders_rejected += 1
+            # FIX 2: retry once before giving up; on persistent failure alert operator.
+            # Position stays open — removing it from _open_positions would hide the risk.
+            result.orders_submitted += 1
+            retry_order = Order(
+                order_id=str(uuid.uuid4()),
+                ticker=trade.ticker,
+                side=side,
+                qty=trade.shares,
+                limit_price=exit_intent.exit_price,
+                strategy=trade.strategy,
+                hmm_state=trade.hmm_state,
+                signal_ts=time.time(),
+            )
+            retry_filled = self._broker.submit_order(retry_order)
+            self._recon.record(retry_filled)
+
+            if retry_filled.fill_status in (FillStatus.FILLED, FillStatus.PARTIAL):
+                if retry_filled.fill_status == FillStatus.FILLED:
+                    result.orders_filled += 1
+                else:
+                    result.orders_partial += 1
+                    result.orders_submitted -= 1  # undo double-count; partial still submitted
+
+                fill_qty   = retry_filled.filled_qty
+                fill_price = retry_filled.fill_price
+                multiplier = 1 if trade.direction == "LONG" else -1
+                gross_pnl  = multiplier * (fill_price - trade.entry_price) * fill_qty
+                total_costs = self._cost_fn(trade, fill_price) if self._cost_fn else 0.0
+                net_pnl     = gross_pnl - total_costs
+
+                # FIX 5: NaN guard — close position but do NOT corrupt equity/CB.
+                if not math.isfinite(gross_pnl) or not math.isfinite(net_pnl):
+                    result.pnl_nan_guarded += 1
+                    _msg = (
+                        f"NaN/INF P&L (exit retry): {trade.ticker} {trade.trade_id} "
+                        f"fill={fill_price} entry={trade.entry_price} qty={fill_qty} "
+                        f"gross={gross_pnl}. Closed; equity/CB NOT updated."
+                    )
+                    logger.error(_msg)
+                    notify(_msg)
+                    trade.exit_time = bar_ts
+                    trade.exit_price = fill_price
+                    trade.exit_reason = exit_intent.reason
+                    trade.gross_pnl = trade.total_costs = trade.net_pnl = None
+                    self._swing_state.pop(id(trade), None)
+                    del self._open_positions[trade.trade_id]
+                    self._closed_trades.append(trade)
+                    return
+
+                trade.exit_time   = bar_ts
+                trade.exit_price  = fill_price
+                trade.exit_reason = exit_intent.reason
+                trade.gross_pnl   = gross_pnl
+                trade.total_costs = total_costs
+                trade.net_pnl     = net_pnl
+                self._daily_pnl      += gross_pnl
+                self._running_equity += net_pnl
+                self._swing_state.pop(id(trade), None)
+                del self._open_positions[trade.trade_id]
+                self._closed_trades.append(trade)
+                cb_res = self._cb.record_trade_result(net_pnl or 0.0)
+                if cb_res.kill_switch:
+                    self._cb_active = True
+            else:
+                # Both attempts failed — position stays open; alert operator loudly.
+                result.orders_rejected += 1
+                result.exits_failed += 1
+                msg = (
+                    f"EXIT FAILED (both attempts): {trade.ticker} trade {trade.trade_id} "
+                    f"({exit_intent.reason}) — position remains OPEN. "
+                    "Operator must manually close via IBKR. "
+                    f"Retry reject reason: {retry_filled.reject_reason}"
+                )
+                logger.error(msg)
+                notify(msg)
 
     def _close_all_eod(self, prev_day: Any, day_stocks: Any) -> None:
         """Force-close non-swing positions remaining after a day's bar loop.
@@ -566,13 +819,28 @@ class PaperTrader:
             multiplier  = 1 if trade.direction == "LONG" else -1
             gross_pnl   = multiplier * (_px - trade.entry_price) * trade.shares
             total_costs = self._cost_fn(trade, _px) if self._cost_fn else 0.0
+            net_pnl     = gross_pnl - total_costs
+            # FIX 5: NaN guard — close without corrupting equity.
+            if not math.isfinite(gross_pnl) or not math.isfinite(net_pnl):
+                _msg = (
+                    f"NaN/INF P&L (EOD): {trade.ticker} {trade_id} "
+                    f"px={_px} entry={trade.entry_price} gross={gross_pnl}. "
+                    "Closed without equity update."
+                )
+                logger.error(_msg); notify(_msg)
+                trade.exit_time = prev_day; trade.exit_price = _px
+                trade.exit_reason = "EOD"
+                trade.gross_pnl = trade.total_costs = trade.net_pnl = None
+                self._swing_state.pop(id(trade), None)
+                del self._open_positions[trade_id]; self._closed_trades.append(trade)
+                continue
             trade.exit_time   = prev_day   # midnight timestamp, matches engine
             trade.exit_price  = _px
             trade.exit_reason = "EOD"
             trade.gross_pnl   = gross_pnl
             trade.total_costs = total_costs
-            trade.net_pnl     = gross_pnl - total_costs
-            self._running_equity += trade.net_pnl
+            trade.net_pnl     = net_pnl
+            self._running_equity += net_pnl
             self._daily_pnl     += gross_pnl
             self._swing_state.pop(id(trade), None)
             del self._open_positions[trade_id]
@@ -610,19 +878,34 @@ class PaperTrader:
             multiplier  = 1 if trade.direction == "LONG" else -1
             gross_pnl   = multiplier * (_px - trade.entry_price) * trade.shares
             total_costs = self._cost_fn(trade, _px) if self._cost_fn else 0.0
+            net_pnl     = gross_pnl - total_costs
+            # FIX 5: NaN guard — close without corrupting equity/CB.
+            if not math.isfinite(gross_pnl) or not math.isfinite(net_pnl):
+                _msg = (
+                    f"NaN/INF P&L (END_OF_PERIOD): {trade.ticker} {trade_id} "
+                    f"px={_px} entry={trade.entry_price} gross={gross_pnl}. "
+                    "Closed without equity/CB update."
+                )
+                logger.error(_msg); notify(_msg)
+                trade.exit_time = last_bar_ts; trade.exit_price = _px
+                trade.exit_reason = "END_OF_PERIOD"
+                trade.gross_pnl = trade.total_costs = trade.net_pnl = None
+                self._swing_state.pop(id(trade), None)
+                del self._open_positions[trade_id]; self._closed_trades.append(trade)
+                continue
             trade.exit_time   = last_bar_ts
             trade.exit_price  = _px
             trade.exit_reason = "END_OF_PERIOD"
             trade.gross_pnl   = gross_pnl
             trade.total_costs = total_costs
-            trade.net_pnl     = gross_pnl - total_costs
-            self._running_equity += trade.net_pnl
+            trade.net_pnl     = net_pnl
+            self._running_equity += net_pnl
             self._daily_pnl     += gross_pnl
             self._swing_state.pop(id(trade), None)
             del self._open_positions[trade_id]
             self._closed_trades.append(trade)
             # Engine uses _close_trade → record_trade_result (updates consecutive-loss CB)
-            cb_res = self._cb.record_trade_result(trade.net_pnl or 0.0)
+            cb_res = self._cb.record_trade_result(net_pnl or 0.0)
             if cb_res.kill_switch:
                 self._cb_active = True
 
@@ -657,13 +940,28 @@ class PaperTrader:
             multiplier  = 1 if trade.direction == "LONG" else -1
             gross_pnl   = multiplier * (_px - trade.entry_price) * trade.shares
             total_costs = self._cost_fn(trade, _px) if self._cost_fn else 0.0
+            net_pnl     = gross_pnl - total_costs
+            # FIX 5: NaN guard — close without corrupting equity.
+            if not math.isfinite(gross_pnl) or not math.isfinite(net_pnl):
+                _msg = (
+                    f"NaN/INF P&L (CB): {trade.ticker} {trade_id} "
+                    f"px={_px} entry={trade.entry_price} gross={gross_pnl}. "
+                    "Closed without equity update."
+                )
+                logger.error(_msg); notify(_msg)
+                trade.exit_time = bar_ts; trade.exit_price = _px
+                trade.exit_reason = "CIRCUIT_BREAKER"
+                trade.gross_pnl = trade.total_costs = trade.net_pnl = None
+                self._swing_state.pop(id(trade), None)
+                del self._open_positions[trade_id]; self._closed_trades.append(trade)
+                continue
             trade.exit_time   = bar_ts
             trade.exit_price  = _px
             trade.exit_reason = "CIRCUIT_BREAKER"
             trade.gross_pnl   = gross_pnl
             trade.total_costs = total_costs
-            trade.net_pnl     = gross_pnl - total_costs
-            self._running_equity += trade.net_pnl
+            trade.net_pnl     = net_pnl
+            self._running_equity += net_pnl
             self._daily_pnl     += gross_pnl
             self._swing_state.pop(id(trade), None)
             del self._open_positions[trade_id]
@@ -774,19 +1072,34 @@ class PaperTrader:
             multiplier  = 1 if trade.direction == "LONG" else -1
             gross_pnl   = multiplier * (_exit_px - trade.entry_price) * trade.shares
             total_costs = self._cost_fn(trade, _exit_px) if self._cost_fn else 0.0
+            net_pnl     = gross_pnl - total_costs
+            # FIX 5: NaN guard — close without corrupting equity/CB.
+            if not math.isfinite(gross_pnl) or not math.isfinite(net_pnl):
+                _msg = (
+                    f"NaN/INF P&L (MAX_HOLD): {trade.ticker} {trade_id} "
+                    f"px={_exit_px} entry={trade.entry_price} gross={gross_pnl}. "
+                    "Closed without equity/CB update."
+                )
+                logger.error(_msg); notify(_msg)
+                trade.exit_time = ctx.bar_ts; trade.exit_price = _exit_px
+                trade.exit_reason = "MAX_HOLD"
+                trade.gross_pnl = trade.total_costs = trade.net_pnl = None
+                self._swing_state.pop(id(trade), None)
+                del self._open_positions[trade_id]; self._closed_trades.append(trade)
+                continue
             trade.exit_time   = ctx.bar_ts
             trade.exit_price  = _exit_px
             trade.exit_reason = "MAX_HOLD"
             trade.gross_pnl   = gross_pnl
             trade.total_costs = total_costs
-            trade.net_pnl     = gross_pnl - total_costs
+            trade.net_pnl     = net_pnl
             self._daily_pnl      += gross_pnl
-            self._running_equity += trade.net_pnl
+            self._running_equity += net_pnl
             self._swing_state.pop(id(trade), None)
             del self._open_positions[trade_id]
             self._closed_trades.append(trade)
             # Consecutive-loss CB (mirrors engine._close_trade → record_trade_result)
-            cb_res = self._cb.record_trade_result(trade.net_pnl or 0.0)
+            cb_res = self._cb.record_trade_result(net_pnl or 0.0)
             if cb_res.kill_switch:
                 self._cb_active = True
 
