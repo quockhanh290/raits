@@ -77,7 +77,7 @@ def main():
     ap.add_argument("--start", default=None)
     ap.add_argument("--end", default=None)
     ap.add_argument("--hmm-train-end", default="2018-01-01")
-    ap.add_argument("--hmm-fit-end", default="2022-12-31")
+    ap.add_argument("--hmm-fit-end", default="2024-12-31")
     ap.add_argument("--slippage-ticks", type=float, default=1.0)
     a = ap.parse_args()
 

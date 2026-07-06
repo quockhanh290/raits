@@ -41,7 +41,7 @@ def main():
     ap.add_argument("--roska4-mult", type=float, default=2.5)
     ap.add_argument("--account", type=float, default=50_000.0)
     ap.add_argument("--hmm-train-end", default="2018-01-01")
-    ap.add_argument("--hmm-fit-end", default="2022-12-31")
+    ap.add_argument("--hmm-fit-end", default="2024-12-31")
     a = ap.parse_args()
 
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

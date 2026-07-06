@@ -12,7 +12,7 @@ each, daily P&L summed. Reports per-YEAR breakdown (a continuous strategy should
 be spread across years, not carried by one).
 
     python pooled_swing_vault.py --instruments "ES=...:5,NQ=...:2,YM=...:0.5,RTY=...:5" \
-        --regime-csv spy_daily.csv --vault-start 2023-01-01 --hmm-fit-end 2022-12-31 \
+        --regime-csv spy_daily.csv --vault-start 2023-01-01 --hmm-fit-end 2024-12-31 \
         --ema-period 30 --chandelier-atr-mult 2.5 --i-understand-one-shot
 """
 from __future__ import annotations
@@ -60,7 +60,7 @@ def main():
     ap.add_argument("--regime-csv", required=True)
     ap.add_argument("--vault-start", default="2023-01-01")
     ap.add_argument("--hmm-train-end", default="2018-01-01")
-    ap.add_argument("--hmm-fit-end", default="2022-12-31")
+    ap.add_argument("--hmm-fit-end", default="2024-12-31")
     ap.add_argument("--hmm-components", type=int, default=3)
     ap.add_argument("--ema-period", type=int, default=30)
     ap.add_argument("--chandelier-atr-mult", type=float, default=2.5)

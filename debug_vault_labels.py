@@ -5,7 +5,7 @@ vs (B) a date-alignment bug between SPY labels and instrument days.
 Read-only.
 
     python debug_vault_labels.py --parquet NQ_8y.parquet --regime-csv spy_daily.csv \
-        --hmm-train-end 2018-01-01 --hmm-fit-end 2022-12-31 --vault-start 2023-01-01
+        --hmm-train-end 2018-01-01 --hmm-fit-end 2024-12-31 --vault-start 2023-01-01
 """
 import argparse, sys
 from pathlib import Path
@@ -16,7 +16,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--parquet", required=True)
 ap.add_argument("--regime-csv", required=True)
 ap.add_argument("--hmm-train-end", default="2018-01-01")
-ap.add_argument("--hmm-fit-end", default="2022-12-31")
+ap.add_argument("--hmm-fit-end", default="2024-12-31")
 ap.add_argument("--vault-start", default="2023-01-01")
 ap.add_argument("--hmm-components", type=int, default=3)
 a = ap.parse_args()

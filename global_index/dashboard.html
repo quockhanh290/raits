@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="replay_snapshots_data.js"></script>
-<!-- <script src="live_state_data.js"></script> -->
+<script src="live_state_data.js" onerror="void 0"></script>
 <style>
 :root {
   --bg:     #0a0c10;
@@ -377,6 +377,121 @@ header::before {
   font-family: 'JetBrains Mono', monospace;
 }
 
+/* ── OPERATIONAL STATUS BAR ── */
+#ops-status {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  padding: 10px 24px; background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.ops-item {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 6px; padding: 7px 12px; flex: 1 1 auto; min-width: 155px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.ops-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.ops-dot.ok   { background: var(--green); box-shadow: 0 0 5px 1px rgba(46,160,67,.45); }
+.ops-dot.warn { background: var(--amber); box-shadow: 0 0 5px 1px rgba(192,128,0,.45); }
+.ops-dot.halt { background: var(--red);   box-shadow: 0 0 5px 1px rgba(218,54,51,.45); animation: pulse 1.2s ease-in-out infinite; }
+.ops-dot.na   { background: var(--dim); }
+.ops-item-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; white-space: nowrap; }
+.ops-item-val   { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ops-item-val.ok   { color: var(--green); }
+.ops-item-val.warn { color: var(--amber); }
+.ops-item-val.halt { color: var(--red);   }
+.ops-item-val.na   { color: var(--dim); font-style: italic; }
+
+/* ── MAIN LAYOUT (sidebar log) ── */
+.main-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  align-items: start;
+}
+.log-col {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+  border-left: 1px solid var(--border);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+}
+.log-col #log-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-bottom: none;
+}
+.log-col .log-controls { flex-shrink: 0; }
+.log-col .log-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+/* ── LOG PANEL ── */
+.log-controls {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;
+}
+.log-filter-btn {
+  padding: 3px 9px; font-size: 11px; border-radius: 3px;
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--border); cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; transition: all .12s;
+}
+.log-filter-btn:hover { border-color: var(--blue); color: var(--blue); }
+.log-filter-btn.active { background: rgba(91,157,255,.10); color: var(--blue); border-color: rgba(91,157,255,.30); }
+.log-filter-btn.btn-crit { }
+.log-filter-btn.btn-crit.active { background: rgba(218,54,51,.12); color: var(--red); border-color: rgba(218,54,51,.35); }
+.log-sep { width: 1px; height: 18px; background: var(--border); display: inline-block; margin: 0 4px; flex-shrink: 0; align-self: center; }
+.log-count { font-size: 11px; color: var(--muted); margin-left: auto; font-family: 'JetBrains Mono', monospace; }
+.log-scroll {
+  max-height: 360px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--card);
+}
+.log-entry {
+  display: grid;
+  grid-template-columns: 128px 76px 60px 1fr minmax(0,220px);
+  align-items: center; gap: 10px;
+  padding: 5px 12px; border-bottom: 1px solid rgba(30,37,45,0.5);
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  border-left: 3px solid transparent;
+}
+.log-entry:last-child { border-bottom: none; }
+.log-entry:hover { background: rgba(91,157,255,.04); }
+.log-entry.lvl-CRITICAL { border-left-color: var(--red);   background: rgba(218,54,51,.065); }
+.log-entry.lvl-ALERT    { border-left-color: var(--red);   background: rgba(218,54,51,.04); }
+.log-entry.lvl-WARN     { border-left-color: var(--amber); background: rgba(192,128,0,.03); }
+.log-ts  { font-size: 11px; color: var(--dim); white-space: nowrap; }
+.log-lbadge {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 1px 6px; border-radius: 3px;
+  font-size: 10px; font-weight: 700; letter-spacing: .4px; white-space: nowrap;
+}
+.log-lbadge.CRITICAL { background: rgba(218,54,51,.18); color: var(--red);   border: 1px solid rgba(218,54,51,.35); }
+.log-lbadge.ALERT    { background: rgba(218,54,51,.10); color: #e88;         border: 1px solid rgba(218,54,51,.22); }
+.log-lbadge.WARN     { background: rgba(192,128,0,.12); color: var(--amber); border: 1px solid rgba(192,128,0,.28); }
+.log-lbadge.INFO     { background: rgba(90,100,114,.08); color: var(--muted); border: 1px solid rgba(90,100,114,.18); }
+.log-cbadge {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 1px 5px; border-radius: 3px;
+  font-size: 10px; font-weight: 600; letter-spacing: .3px; white-space: nowrap;
+  color: var(--dim); border: 1px solid rgba(90,100,114,.18);
+}
+.log-msg { line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log-entry.lvl-CRITICAL .log-msg { color: #f08888; font-weight: 600; }
+.log-entry.lvl-ALERT    .log-msg { color: #e07070; }
+.log-entry.lvl-WARN     .log-msg { color: var(--text); }
+.log-entry.lvl-INFO     .log-msg { color: var(--muted); }
+.log-ctx { font-size: 10.5px; color: var(--dim); white-space: nowrap; text-align: right; overflow: hidden; text-overflow: ellipsis; }
+.log-empty { padding: 24px; text-align: center; color: var(--dim); font-style: italic; font-size: 12px; }
+
 @media (max-width: 900px) {
   #positions-split { grid-template-columns: 1fr; }
   .analytics-grid-3 { grid-template-columns: 1fr; }
@@ -385,6 +500,12 @@ header::before {
   #dd-section { grid-template-columns: auto auto; }
   #dd-section .dd-gauge-wrap { grid-column: 1 / -1; }
   .section { padding: 16px 18px; }
+  #ops-status { padding: 10px 18px; }
+  .main-layout { grid-template-columns: 1fr; }
+  .log-col { position: static; height: auto; border-left: none; border-top: 1px solid var(--border); }
+  .log-col .log-scroll { max-height: 300px; }
+  .log-entry { grid-template-columns: 100px 62px 54px 1fr; }
+  .log-ctx { display: none; }
 }
 </style>
 </head>
@@ -428,6 +549,48 @@ header::before {
     <span class="mbar-value" id="mbIsCalmar" style="color:var(--muted)">—</span>
   </div>
 </div>
+
+<!-- OPERATIONAL STATUS BAR -->
+<div id="ops-status">
+  <div class="ops-item">
+    <div class="ops-dot na" id="opsRunnerDot"></div>
+    <span class="ops-item-label">Runner</span>
+    <span class="ops-item-val na" id="opsRunnerVal">N/A — replay</span>
+  </div>
+  <div class="ops-item">
+    <div class="ops-dot na" id="opsBreakerDot"></div>
+    <span class="ops-item-label">Breaker</span>
+    <span class="ops-item-val na" id="opsBreakerVal">—</span>
+  </div>
+  <div class="ops-item">
+    <div class="ops-dot na" id="opsFreshDot"></div>
+    <span class="ops-item-label">Regime SPY</span>
+    <span class="ops-item-val na" id="opsFreshVal">N/A — needs runner</span>
+  </div>
+  <div class="ops-item">
+    <div class="ops-dot na" id="opsModelDot"></div>
+    <span class="ops-item-label">Model Age</span>
+    <span class="ops-item-val na" id="opsModelVal">N/A — needs runner</span>
+  </div>
+  <div class="ops-item">
+    <div class="ops-dot na" id="opsPossDot"></div>
+    <span class="ops-item-label">Positions</span>
+    <span class="ops-item-val na" id="opsPossVal">—</span>
+  </div>
+  <div class="ops-item">
+    <div class="ops-dot na" id="opsRefDot"></div>
+    <span class="ops-item-label">Re-freeze</span>
+    <span class="ops-item-val na" id="opsRefVal">N/A — needs runner</span>
+  </div>
+  <div class="ops-item">
+    <div class="ops-dot na" id="opsUrDot"></div>
+    <span class="ops-item-label">Regime Lock</span>
+    <span class="ops-item-val na" id="opsUrVal">N/A — needs runner</span>
+  </div>
+</div>
+
+<div class="main-layout">
+<div class="main-col">
 
 <!-- DD SECTION (3-col: big pct | badge | gauge) -->
 <section id="dd-section">
@@ -637,6 +800,33 @@ header::before {
   </div>
 </section>
 
+</div><!-- /main-col -->
+<div class="log-col">
+
+<!-- OPERATIONAL LOG -->
+<section class="section" id="log-section">
+  <div class="section-title">Operational Log &amp; Events — <span id="logTotal">0</span></div>
+  <div class="log-controls">
+    <button class="log-filter-btn active" id="logBtnALL"      onclick="setLogFilter('ALL')">ALL</button>
+    <button class="log-filter-btn btn-crit" id="logBtnCRITICAL" onclick="setLogFilter('CRITICAL')">CRITICAL</button>
+    <button class="log-filter-btn" id="logBtnWARN"   onclick="setLogFilter('WARN')">WARN</button>
+    <button class="log-filter-btn" id="logBtnINFO"   onclick="setLogFilter('INFO')">INFO</button>
+    <span class="log-sep"></span>
+    <button class="log-filter-btn" id="logBtnGUARD"  onclick="setLogFilter('GUARD')">GUARD</button>
+    <button class="log-filter-btn" id="logBtnSTATE"  onclick="setLogFilter('STATE')">STATE</button>
+    <button class="log-filter-btn" id="logBtnSIGNAL" onclick="setLogFilter('SIGNAL')">SIGNAL</button>
+    <button class="log-filter-btn" id="logBtnFEED"   onclick="setLogFilter('FEED')">FEED</button>
+    <button class="log-filter-btn" id="logBtnORDER"  onclick="setLogFilter('ORDER')">ORDER</button>
+    <span class="log-count" id="logCount">0 events</span>
+  </div>
+  <div class="log-scroll" id="logScroll">
+    <div class="log-empty">No operational log — events appear in live mode when runner emits them</div>
+  </div>
+</section>
+
+</div><!-- /log-col -->
+</div><!-- /main-layout -->
+
 <div id="errorBanner" style="display:none">
   <div id="error-banner">
     <h2>No data loaded</h2>
@@ -685,9 +875,7 @@ window.addEventListener('DOMContentLoaded', () => {
   else if (typeof window.REPLAY_DATA !== 'undefined') startReplay(window.REPLAY_DATA);
   else {
     document.getElementById('errorBanner').style.display = 'block';
-    ['dd-section','chart-section','positions-section','closed-section',
-     'rejected-section','decisions-section','analytics-section','paper-section',
-     'metrics-bar'].forEach(id => {
+    ['main-layout','ops-status','metrics-bar'].forEach(id => {
       const el = document.getElementById(id); if (el) el.style.display='none';
     });
     document.querySelector('header').style.display = 'none';
@@ -865,6 +1053,8 @@ function updateDayView() {
   renderHeader(snap, meta);
   renderDD(snap, meta);
   renderMetricsBar(snap);
+  renderOpsStatus(snap);
+  renderLog();
   renderOpenPositions(snap, meta);
   renderClosedTrades();
   renderRejected();
@@ -1328,6 +1518,179 @@ function renderPaperStatus(snap) {
     const el = document.getElementById(id);
     if (el) el.style.color = color(el.textContent);
   });
+}
+
+// ── OPERATIONAL STATUS ────────────────────────────────────────────────────
+function _opsSet(dotId, valId, level, text) {
+  const dot = document.getElementById(dotId);
+  const val = document.getElementById(valId);
+  if (!dot || !val) return;
+  dot.className = 'ops-dot ' + level;
+  val.className = 'ops-item-val ' + level;
+  val.textContent = text;
+}
+
+function renderOpsStatus(snap) {
+  const ops = (data.meta && data.meta.operational_status) ||
+              (snap && snap.operational_status) || null;
+
+  // ── Runner ──
+  if (ops && ops.runner) {
+    const r = ops.runner;
+    const alive = r.alive !== false;
+    const pid   = r.pid ? ' · PID ' + r.pid : '';
+    const last  = r.last_run_day ? ' · last ' + r.last_run_day : '';
+    _opsSet('opsRunnerDot','opsRunnerVal', alive ? 'ok' : 'halt',
+      alive ? 'alive' + pid + last : 'DEAD' + last);
+  } else if (mode === 'live') {
+    const h = (data.meta && data.meta.runner_health) || {};
+    _opsSet('opsRunnerDot','opsRunnerVal','na',
+      h.last_heartbeat ? 'heartbeat ' + h.last_heartbeat : 'no runner data');
+  } else {
+    _opsSet('opsRunnerDot','opsRunnerVal','na','N/A — replay');
+  }
+
+  // ── Breaker — derivable from snap in any mode ──
+  if (snap) {
+    const lvl = (ops && ops.breaker && ops.breaker.level) || snap.breaker_level || 'OK';
+    const ddPct = ((ops && ops.breaker && ops.breaker.dd_pct != null)
+      ? ops.breaker.dd_pct
+      : snap.drawdown_pct * 100).toFixed(2);
+    const dayStr = (ops && ops.breaker && ops.breaker.day_dd_pct != null)
+      ? ' · day ' + ops.breaker.day_dd_pct.toFixed(2) + '%' : '';
+    const dotLvl = lvl === 'OK' ? 'ok' : (lvl === 'WARN' ? 'warn' : 'halt');
+    _opsSet('opsBreakerDot','opsBreakerVal', dotLvl,
+      lvl + ' · DD ' + ddPct + '%' + dayStr);
+  }
+
+  // ── Regime freshness (G1) ──
+  if (ops && ops.regime_freshness) {
+    const f = ops.regime_freshness;
+    const dotLvl = f.status === 'OK' ? 'ok' : (f.status === 'SOFT_WARN' ? 'warn' : 'halt');
+    const bd = f.bday_stale != null ? f.bday_stale + 'bd stale' : '';
+    const dt = f.last_spy_date ? f.last_spy_date + ' · ' : '';
+    const label = f.status === 'OK' ? 'OK · ' + dt + bd
+      : f.status === 'SOFT_WARN' ? 'SOFT WARN · ' + bd + ' (G1)'
+      : 'HALT ENTRY · ' + bd + ' (G1)';
+    _opsSet('opsFreshDot','opsFreshVal', dotLvl, label);
+  } else {
+    _opsSet('opsFreshDot','opsFreshVal','na',
+      mode === 'live' ? 'no data from runner' : 'N/A — replay');
+  }
+
+  // ── Model age (G2) ──
+  if (ops && ops.model_age) {
+    const m = ops.model_age;
+    const dotLvl = m.status === 'OK' ? 'ok' : (m.status === 'WARN' ? 'warn' : 'halt');
+    _opsSet('opsModelDot','opsModelVal', dotLvl,
+      m.status + ' · ' + (m.model_name || 'fit_C') + ' (' + (m.months_old || '?') + 'mo)');
+  } else {
+    _opsSet('opsModelDot','opsModelVal','na',
+      mode === 'live' ? 'no data from runner' : 'N/A — replay');
+  }
+
+  // ── Positions — count from snap, persist flag from ops ──
+  if (snap) {
+    const cnt = (snap.open_positions || []).length;
+    const match = ops && ops.positions ? ops.positions.persist_match : null;
+    const matchStr = match === true ? ' · persist ✓' : (match === false ? ' · persist MISMATCH' : '');
+    const dotLvl  = match === false ? 'warn' : 'ok';
+    _opsSet('opsPossDot','opsPossVal', dotLvl, cnt + ' open' + matchStr);
+  }
+
+  // ── Re-freeze (G3) ──
+  if (ops && ops.refreeze != null) {
+    const pending = ops.refreeze.pending;
+    _opsSet('opsRefDot','opsRefVal', pending ? 'warn' : 'ok',
+      pending ? 'PENDING — refreeze needed' : 'not pending');
+  } else {
+    _opsSet('opsRefDot','opsRefVal','na',
+      mode === 'live' ? 'no data from runner' : 'N/A — replay');
+  }
+
+  // ── regime_unreliable ──
+  if (ops && ops.regime_unreliable != null) {
+    const ur = ops.regime_unreliable;
+    _opsSet('opsUrDot','opsUrVal', ur ? 'halt' : 'ok',
+      ur ? 'UNRELIABLE — entries blocked' : 'regime reliable');
+  } else {
+    _opsSet('opsUrDot','opsUrVal','na',
+      mode === 'live' ? 'no data from runner' : 'N/A — replay');
+  }
+}
+
+// ── LOG ───────────────────────────────────────────────────────────────────
+let logFilter = 'ALL';
+const LOG_LEVEL_ORD = { CRITICAL: 0, ALERT: 1, WARN: 2, INFO: 3 };
+const LOG_CAT_FILTERS = ['GUARD','STATE','SIGNAL','FEED','ORDER'];
+
+function setLogFilter(f) {
+  logFilter = f;
+  document.querySelectorAll('.log-filter-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('logBtn' + f);
+  if (btn) btn.classList.add('active');
+  renderLog();
+}
+
+function _logCtx(ctx) {
+  if (!ctx || typeof ctx !== 'object') return '';
+  return Object.entries(ctx).map(([k, v]) => {
+    if (typeof v === 'number') v = Math.round(v * 1000) / 1000;
+    return k + ': ' + v;
+  }).join(' · ');
+}
+
+function renderLog() {
+  const allEvents = (data.meta && data.meta.events) || [];
+  document.getElementById('logTotal').textContent = allEvents.length;
+
+  let events = allEvents;
+  if (logFilter === 'CRITICAL' || logFilter === 'ALERT' || logFilter === 'WARN' || logFilter === 'INFO') {
+    const cutoff = LOG_LEVEL_ORD[logFilter] ?? 99;
+    events = allEvents.filter(e => (LOG_LEVEL_ORD[e.level] ?? 99) <= cutoff);
+  } else if (LOG_CAT_FILTERS.includes(logFilter)) {
+    events = allEvents.filter(e => e.category === logFilter);
+  }
+
+  // CRITICAL/ALERT float to top, then newest first
+  events = [...events].sort((a, b) => {
+    const la = LOG_LEVEL_ORD[a.level] ?? 99;
+    const lb = LOG_LEVEL_ORD[b.level] ?? 99;
+    if (la !== lb) return la - lb;
+    return (b.ts || '').localeCompare(a.ts || '');
+  });
+
+  document.getElementById('logCount').textContent =
+    'showing ' + events.length + (events.length < allEvents.length ? ' of ' + allEvents.length : '');
+
+  const scroll = document.getElementById('logScroll');
+  if (!allEvents.length) {
+    scroll.innerHTML = '<div class="log-empty">' +
+      (mode === 'live'
+        ? 'No events yet — runner has not written any events to live_state'
+        : 'No operational log in replay mode — events appear in live mode when runner emits them') +
+      '</div>';
+    return;
+  }
+  if (!events.length) {
+    scroll.innerHTML = '<div class="log-empty">No events match this filter</div>';
+    return;
+  }
+
+  scroll.innerHTML = events.map(e => {
+    const ts  = e.ts ? e.ts.replace('T',' ').slice(0,16) : '—';
+    const lvl = e.level    || 'INFO';
+    const cat = e.category || '—';
+    const msg = (e.message || '').replace(/</g,'&lt;');
+    const ctx = _logCtx(e.context || {});
+    return '<div class="log-entry lvl-' + lvl + '">' +
+      '<span class="log-ts">'    + ts  + '</span>' +
+      '<span class="log-lbadge ' + lvl + '">' + lvl + '</span>' +
+      '<span class="log-cbadge">' + cat + '</span>' +
+      '<span class="log-msg">'   + msg + '</span>' +
+      '<span class="log-ctx">'   + ctx + '</span>' +
+      '</div>';
+  }).join('');
 }
 
 // ── HEALTH ────────────────────────────────────────────────────────────────

@@ -6,10 +6,21 @@ equity (both engines, all instruments) and halts NEW entries when drawdown from
 peak crosses thresholds. This is the "brake" the validated backtest never had
 (backtest runs forever regardless of losses).
 
-Three layers (escalating):
-  WARN  at target DD (10%)  → log + flag; reduce new size (caller may halve).
-  HALT  at hard DD  (15%)   → no new entries; manage/exit open positions only.
-  DAILY loss stop           → optional intraday loss cap (no new entries today).
+Two active protection layers (binary — full size or full stop, no gradual de-risk):
+  HALT      at hard DD  (15%)   → no new entries; manage/exit open positions only.
+  HALT_DAY  at daily loss (>4%) → no new entries today.
+
+WARN layer (10% DD) — INTENTIONALLY NOT WIRED:
+  status() returns level="WARN" and size_multiplier=0.5 at 10% DD, but the deploy
+  path (decide_day / FuturesRunner) reads only allow_new_entries and ignores
+  size_multiplier. This is a deliberate design decision: the system runs at full
+  size until HALT, with no gradual de-risking in between. Wiring size_multiplier
+  would change trade sizing and requires re-validating WFO and vault results.
+  size_multiplier is a dead field by intent — do not wire without re-validation.
+
+  Note: WARN is also nearly unreachable in practice. A same-day loss of 10% trips
+  HALT_DAY (4% daily stop) before the WARN branch is evaluated, so WARN only
+  surfaces through gradual multi-day accumulation where no single day loses > 4%.
 
 State is explicit (peak_equity, current_equity) so it can be persisted/restored
 across runner restarts. Halt is on NEW entries; it never forces-closes (exits

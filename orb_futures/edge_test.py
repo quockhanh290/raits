@@ -141,7 +141,7 @@ def main():
     ap.add_argument("--cost-mult", type=float, default=1.0)
     ap.add_argument("--target-rr", type=float, default=2.0)
     ap.add_argument("--hmm-train-end", default="2018-01-01")
-    ap.add_argument("--hmm-fit-end", default="2022-12-31")
+    ap.add_argument("--hmm-fit-end", default="2024-12-31")
     a = ap.parse_args()
 
     allowed = tuple(a.allowed.split(","))

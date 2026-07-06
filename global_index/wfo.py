@@ -68,7 +68,7 @@ def main():
     ap.add_argument("--regime-csv", help="required if --regime-mode gated")
     ap.add_argument("--regime-lag", type=int, default=1)
     ap.add_argument("--hmm-train-end", default="2018-01-01")
-    ap.add_argument("--hmm-fit-end", default="2022-12-31")
+    ap.add_argument("--hmm-fit-end", default="2024-12-31")
     ap.add_argument("--vault-start", default="2023-01-01")
     ap.add_argument("--train-months", type=int, default=18)
     ap.add_argument("--test-months", type=int, default=6)

@@ -37,7 +37,7 @@ def size_basket(backtest_basket_maxdd: float,
                 hard_dd_pct: float | None = None,
                 margin_budget_pct: float = 0.40) -> SizingResult:
     """backtest_basket_maxdd: $ MaxDD of the pooled basket at 1-micro-each
-    (e.g. ~$2,517 from the vault, or use the WFO MaxDD for a through-cycle view —
+    (e.g. ~$2,789 fit_C 3-engine baseline, or use the WFO MaxDD for a through-cycle view —
     prefer the LARGER for safety). Returns integer micro contracts per instrument.
 
     margin_budget_pct: cap on total margin as a fraction of the account (default
@@ -91,8 +91,8 @@ def report(maxdd_1micro: float, **kw) -> str:
 
 
 if __name__ == "__main__":
-    # illustrative: vault basket MaxDD ~$2,517 (tighter); WFO MaxDD is larger/safer
-    print(report(2517))
+    # illustrative: baseline MaxDD ~$2,789 (fit_C 3-engine); WFO MaxDD is larger/safer
+    print(report(2789))
     print()
     print("Through-cycle (use a more conservative MaxDD, e.g. $4,500 from WFO):")
     print(report(4500))

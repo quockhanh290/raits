@@ -100,7 +100,7 @@ def swing_ref_daily(df, labels, cost):
     return daily_series(sw)
 
 
-def setup(data_dir, regime_csv, hmm_train_end="2018-01-01", hmm_fit_end="2022-12-31",
+def setup(data_dir, regime_csv, hmm_train_end="2018-01-01", hmm_fit_end="2024-12-31",
           cost_mult=1.0):
     """Common load: dfs, atrs, labels, costs. Returns dict."""
     bench = benchmark_daily(regime_csv)

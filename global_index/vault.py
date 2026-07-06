@@ -70,7 +70,7 @@ def main():
     ap.add_argument("--regime-mode", choices=["gated", "agnostic"], default="agnostic")
     ap.add_argument("--regime-csv")
     ap.add_argument("--regime-lag", type=int, default=1)
-    ap.add_argument("--hmm-fit-end", default="2022-12-31")
+    ap.add_argument("--hmm-fit-end", default="2024-12-31")
     ap.add_argument("--ema-period", type=int, default=10)
     ap.add_argument("--mult", type=float, default=2.5)
     ap.add_argument("--max-hold-days", type=int, default=5)

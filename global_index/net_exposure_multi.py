@@ -17,9 +17,9 @@ crowds Rổ 4 out — exactly the pattern STRESS_MID already uses.
 CRITICAL — this caps EXPOSURE, not DRAWDOWN. The 15% drawdown cap stays at the
 ACCOUNT level (circuit_breaker), combined across all clusters, because it is ONE
 account and a global risk-off still draws every equity cluster down the same day
-(timezone lag does not save you in a crash). combined.py showed combined MaxDD
-barely rose ($5,185→$5,232) — so the account DD cap is not threatened — but that
-is an empirical 2018-2024 fact, not a structural guarantee. Keep DD combined.
+(timezone lag does not save you in a crash). fit_C 3-engine baseline MaxDD = $2,789
+(deploy_sim; pre-NKD context was $5,185→$5,232 — stale, superseded by fit_C) —
+so the account DD cap is not threatened — but that is empirical, not structural. Keep DD combined.
 
 Cluster caps: roska4_swing (5%/4.4%) is the swept optimum; roska4_stress and
 global_nkd (2%) remain ESTIMATES — calibrate during paper trading.

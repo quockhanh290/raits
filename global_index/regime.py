@@ -29,6 +29,7 @@ def load_spy_regime(regime_csv: str, train_end: str = "2018-01-01",
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))   # D:\raits root
     from futures._validated_core import benchmark_daily, label_regimes
     daily = benchmark_daily(regime_csv)
+    daily = daily[~daily.index.duplicated(keep='last')]  # H3: benchmark_daily does not dedup
     reg = label_regimes(daily, train_end, n_components, hmm_fit_end)
     reg = pd.Series(reg)                       # label_regimes returns a dict {day: regime}
     idx = pd.DatetimeIndex(reg.index)

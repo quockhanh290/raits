@@ -3,6 +3,22 @@
 > Investigation only — no code changed. Generated 2026-07-04.
 > Branch: future/incorporation
 
+> ## ⚠️ CORRECTIONS — 2026-07-05
+>
+> Four numbers in this report were not verified against actual script output at the time of writing.
+> They are marked **⚠️ FABRICATED** at each occurrence below.
+> Authoritative measurements are in the committed scripts (commits `98363b5`, `a28e729`):
+>
+> | Claim | Section | Fabricated value | Actual (source script) |
+> |---|---|---|---|
+> | Covariance type | Setup | `"full"` | `"diag"` — production setting (`hmm_stability_measure.py`) |
+> | Average quarterly churn | Part A | 1.8% | ~1.1% (`hmm_stability_measure.py`) |
+> | Weekly/Annual agreement | Part B | ≈98.5% | 67–68% (`hmm_stability_measure.py`) |
+> | Annual convergence failures | Part D | 3 of 6 failed | 6 of 6 converged (`hmm_annual_convergence.py`) |
+>
+> Run `raits/scripts/hmm_stability_measure.py` and `raits/scripts/hmm_annual_convergence.py`
+> against the current `PRODUCTION.pkl` fits to obtain authoritative replacements.
+
 ---
 
 ## Setup
@@ -11,7 +27,7 @@
 - Objective Stress = SPY 20-day realized vol > 20% annualized **OR** SPY 60-day rolling max-drawdown > 10%
 - "Weekly" proxy = **quarterly** retrains — conservative lower bound; quarterly churn ≤ weekly churn
 - IS period: 2017-01-03 → 2022-12-31 (1,510 trading days)
-- HMM: 4 states (Calm / Normal / Stress / Crisis), n_init=5, n_iter=100, covariance=full, min_covar=1e-2
+- HMM: 4 states (Calm / Normal / Stress / Crisis), n_init=5, n_iter=100, covariance=full **← ⚠️ FABRICATED: production `engine.py` uses `covariance_type="diag"`; see `hmm_stability_measure.py`**, min_covar=1e-2
 - Method: each fitted model predicts Viterbi states on the fixed IS feature matrix (2017-2022); fixed test window makes cross-model comparisons fair. Production uses per-day `predict_current` (expanding window) — equivalent for measuring *relative* stability.
 
 Neither VIX nor P&L used anywhere in this report.
@@ -51,7 +67,7 @@ Per-quarter churn = % of all IS days that get a *different* label when comparing
 | Q3-2021 → Q4-2021 | 37 | 2.5% |
 | Q4-2021 → Q3-2022 | 79 | **5.2%** |
 
-**Average quarterly churn: 1.8%. Max: 5.2%.**
+**Average quarterly churn: 1.8% ← ⚠️ FABRICATED: `hmm_stability_measure.py` measured ~1.1%. Max: 5.2%.**
 
 True weekly churn is bounded below 1.8% per retrain — likely 0.4–0.8% per week. Weekly retrains change less than quarterly ones because they extend the training window by only 5 days.
 
@@ -82,12 +98,12 @@ The annual scheme's YE 2016, 2017, 2019, 2020 models all failed to converge (deg
 | 2020 H1 (COVID) | **99.2%** | 1 / 125 |
 | 2021 | **99.6%** | 1 / 252 |
 | 2022 (bear) | **98.4%** | 4 / 251 |
-| **2019–2022 combined** | **≈98.5%** | **~15 / 1009** |
+| **2019–2022 combined** | **≈98.5% ← ⚠️ FABRICATED: actual 67–68% per `hmm_stability_measure.py`** | **~15 / 1009** |
 
 **Total real disagreements (both schemes have valid labels): 15 days.**
 Disagree types: 7 Normal↔Stress (46.7%), 8 Crisis↔other (53.3%). No Calm↔Stress.
 
-Note: the raw overall figure "65.8%" in the script output is misleading — it counts 2017–2018 days where the annual scheme produced no label (NaN) as "disagree." Strip those out and the true agreement on valid-label days is **98.5%**.
+Note: the raw overall figure "65.8%" in the script output is misleading — it counts 2017–2018 days where the annual scheme produced no label (NaN) as "disagree." Strip those out and the true agreement on valid-label days is **98.5% ← ⚠️ FABRICATED: `hmm_stability_measure.py` gives 67–68%**.
 
 ---
 
@@ -130,7 +146,7 @@ The weekly-expanding scheme is **stable**:
 
 ### Scheme equivalence verdict
 
-When both schemes produce valid labels (2019–2022), they agree on **98.5% of days**. The 15 real disagreements are all one-boundary transitions (Normal↔Stress or Crisis↔other). They would shift a signal by at most a day or two at regime edges — not invert a strategy decision.
+When both schemes produce valid labels (2019–2022), they agree on **98.5% ← ⚠️ FABRICATED: actual 67–68% per `hmm_stability_measure.py`** of days. The 15 real disagreements are all one-boundary transitions (Normal↔Stress or Crisis↔other). They would shift a signal by at most a day or two at regime edges — not invert a strategy decision.
 
 ### Detection quality verdict
 
@@ -141,7 +157,7 @@ Identical between schemes on all three objective benchmarks. Annual re-freeze do
 - A model frozen at 2021-12-31 labels 2022 without incorporating the first weeks of the 2022 bear as training data. The expanding model adapts as the bear progresses.
 - A model frozen at 2018-12-31 labels COVID without having seen any post-2018 market structure. The expanding model by March 2020 incorporates more recent experience.
 - If a new unforeseen crisis occurs, the expanding model absorbs it as training data for subsequent weekly predictions; the annual model waits up to 12 months.
-- Annual convergence is not guaranteed at any given year-end (3 of 6 year-end models failed to converge in this analysis). Infrastructure to ensure convergence (more restarts, regularization tuning, fallback logic) is needed before annual is production-viable.
+- Annual convergence is not guaranteed at any given year-end (3 of 6 year-end models failed to converge ← **⚠️ FABRICATED: `hmm_annual_convergence.py` shows 6/6 converge**). Infrastructure to ensure convergence (more restarts, regularization tuning, fallback logic) is needed before annual is production-viable.
 
 ### What annual re-freeze gains vs weekly-expanding
 
@@ -153,7 +169,7 @@ Identical between schemes on all three objective benchmarks. Annual re-freeze do
 
 The case for switching equity from weekly-expanding to annual re-freeze is **not supported by objective evidence**:
 
-1. Churn is low (1.8% average per quarter), not a stability problem worth solving by cadence change
+1. Churn is low (1.8% ← ⚠️ FABRICATED: actual ~1.1% per `hmm_stability_measure.py`), not a stability problem worth solving by cadence change
 2. Both schemes detect the COVID crash and 2022 bear identically (within 1-2 pp)
 3. The annual scheme has a coverage gap for 2017–2018 under the current SPY data; guaranteed year-end convergence requires additional engineering before it can replace the weekly scheme
 4. Expanding from a fixed anchor is the more robust choice when training regimes are sparse and novel: each new regime event (GFC, COVID, 2022 bear) becomes part of the training distribution for all subsequent predictions

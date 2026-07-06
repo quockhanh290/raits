@@ -14,6 +14,17 @@ Read: pick the highest cap whose MaxDD% stays under target 10% — that's the mo
 return you can take without crowding the hard cap. If full-basket (≈7%) pushes
 MaxDD past ~10-12%, a tighter cap is the smarter point despite lower net.
 
+SLIPPAGE NOTE: cap_sweep defaults to 1-tick slippage (not the canonical 2-tick).
+Rationale: the purpose is relative ranking across caps, and cap rank is stable across
+slippage levels. Net$ in the output table (e.g. ~$58,602 at 5% gross cap, fit_C) is
+therefore HIGHER than the canonical baseline ($52,962 at 2-tick). Do NOT read those
+as production P&L — they are comparison-only. Canonical numbers come from deploy_sim
+with --slippage-ticks 2.
+
+VERIFIED: cap_sweep fit_C (2024-12-31) confirms 5% gross / 4.4% net as optimal cap
+(highest Calmar under 10% DD target). This matches DEFAULT_CLUSTERS in
+net_exposure_multi.py (roska4_swing max_gross_pct=0.05, max_net_pct=0.044).
+
     python -m global_index.cap_sweep --data-dir data\\cache\\futures \
         --nkd-parquet global_index/data/NKD_continuous_1m_8y.parquet --regime-csv spy_daily.csv
 """
@@ -47,7 +58,7 @@ def main():
     ap.add_argument("--caps", default="0.04,0.05,0.06,0.07,0.08",
                     help="Rổ-4 gross caps to sweep (net cap = gross × 0.875)")
     ap.add_argument("--hmm-train-end", default="2018-01-01")
-    ap.add_argument("--hmm-fit-end", default="2022-12-31")
+    ap.add_argument("--hmm-fit-end", default="2024-12-31")
     a = ap.parse_args()
 
     from futures._validated_core import (load_parquet, benchmark_daily, label_regimes,

@@ -42,7 +42,7 @@ def main():
     ap.add_argument("--account", type=float, default=50_000.0)
     ap.add_argument("--slippage-ticks", type=float, default=1.0)
     ap.add_argument("--hmm-train-end", default="2018-01-01")
-    ap.add_argument("--hmm-fit-end", default="2022-12-31")
+    ap.add_argument("--hmm-fit-end", default="2024-12-31")
     a = ap.parse_args()
 
     from futures._validated_core import (load_parquet, benchmark_daily, label_regimes,

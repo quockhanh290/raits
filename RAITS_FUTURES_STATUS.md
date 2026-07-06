@@ -1,5 +1,5 @@
 # RAITS Futures — Trạng thái triển khai
-_Cập nhật: 2026-07-05. Source of truth DUY NHẤT cho futures system._  
+_Cập nhật: 2026-07-05 (session 2). Source of truth DUY NHẤT cho futures system._  
 _Chi tiết divergence audit → `global_index/DIVERGENCE_SWEEP.md`_
 
 ---
@@ -56,6 +56,53 @@ Operational constraint (NKD): runner phải chạy sau ~02:30 ET (NKD đóng c�
 
 Chi tiết → `FUTURES_TRUST_AUDIT.md`.
 
+### Stale number audit — production sạch (2026-07-05)
+- Live production path: SẠCH — không stale number nào ảnh hưởng quyết định live.
+- 14 diagnostic scripts: default hmm-fit-end 2022→2024 (không phải 2024-12-31) — chỉ diagnostic, không ảnh hưởng production.
+- `cap_sweep.py` verify caps khớp fit_C production: swing 5%/4.4%, stress 2.5%, NKD 2%.
+- Doc số sửa: sizer `$2,517→$2,789` (MaxDD fit_C), net_exposure `$5,185→$2,789`.
+- Cố ý giữ nguyên: CALMAR_FLOOR 2.38 (fit_A floor = degradation floor), account $50k, DD caps (15%/4%).
+
+### Re-freeze cơ chế — Phần A DONE (2026-07-05)
+`futures/refreeze.py` — anchored-expanding fit, gate 3 nhánh, auto-rollback, JSON registry `history[:3]`
+- Gate logic (calm-flip-aware): `calm_flip > 0` → VERIFY dù % thấp; `≥15%` hoặc `calm_flip > 10` → HOLD/REJECT
+- AUTO_APPROVE: `label_change < 5%` và `calm_flip == 0`
+- 40/40 PASS (`futures/test_refreeze.py`). fit_C hash bất biến khi re-run. HMMEngine class không sửa (stocks an toàn).
+- T2 thật: fit_2023 vs fit_C = 1.13% label change, calm_flip=0 → verdict=VERIFY
+- G3 caller-side: fail graceful (không crash runner), re-alert lặp (T10), recovery clear flag (T11)
+- Phần B (data pipeline live, trigger định kỳ, wire vào runner) → §3
+
+### HMM stale guards G1/G2/G3 — DONE (2026-07-05)
+`global_index/hmm_stale_guard.py` + `global_index/notify.py`
+- **G1** SPY CSV stale: SOFT >2 bday warn-once / HARD >5 bday halt-entry-GIỮ-exit / recovery ≤2 bday clear
+- **G2** model-age: SOFT >12 tháng warn / HARD >18 tháng urgent — warn-only, không halt (model degraded gradually, không sai ngay)
+- **G3** re-freeze data coverage: abort nếu CSV < fit_end — caller-side trong `refreeze.py`
+- Chặn-entry-GIỮ-exit verified: exits là HMM-independent (exit_day-based), không bị G1 block
+- `runner.py` default `hmm_stale_guard=None` (disabled); production pass instance
+
+### Operational fixes — 8 gaps DONE (2026-07-05)
+`global_index/runner.py` + `global_index/signal_layer.py`  
+59/59 PASS (`global_index/test_operational_fixes.py`). Baseline $52,961.74 bất biến.
+
+| Fix | Mô tả |
+|---|---|
+| **B1** | Position persist: `_persist_state()` atomic `.tmp`+`os.replace`, load với try/except corrupt |
+| **peak_equity** | CircuitBreaker state persist: `peak_equity` + `_day_start_equity` + `cur_day` trong `live_positions.json` → DD không reset về 0 sau restart |
+| **C1** | `signal_fn()` try/except → entries skip, exits vẫn chạy qua exit_day |
+| **C2** | `hmm_stale_guard.check_day()` try/except → block entries (conservative) on throw |
+| **C3** | Empty `fetch_bars` alert cho instrument đang hold open position |
+| **C4** | Per-cluster try/except trong `signal_layer`: swing/NKD fail → inject "hold" dummies, không spurious exit |
+| **E1** | PID lockfile `RunnerLockError`; Windows dùng `OpenProcess` (không dùng `os.kill(pid,0)` = CTRL_C) |
+| **E3** | Clock skew sanity: `today − last_bar > 3d` → alert + discard entries |
+
+IBKR-gated (chưa fix được offline): B3 broker↔runner reconcile, B1 layer-2 cross-check, A2 partial fill, A5 duplicate order, A1/A4 → xem §2.
+
+**Persist rà đầy đủ (2026-07-05):** Sau B1 + peak_equity fix, KHÔNG còn field nào LOST+gây-sai quyết định.  
+- HALT là computed state (không stateful flag): `dd=(peak-cur)/peak ≥ 15%` → tự recover từ peak_equity persist.  
+- `taken/rejected/halted` counter: LOST, nhưng chỉ audit — không dùng để ra quyết định.  
+- `regime_unreliable`: LOST, nhưng re-derived từ CSV mỗi `check_day()` — không có window sai.  
+- Cosmetic còn (low, TODO trước notify production): counter reset làm mất audit history; `_g1_soft_active`/`_g2_*_notified` reset → có thể gửi duplicate notification. Fix: persist dưới key `"guard"` trong `live_positions.json`.
+
 ### IBKRBroker skeleton — viết xong, chờ live
 File: `global_index/ibkr_broker.py`  
 Ba specs baked in, không thể bypass:
@@ -90,6 +137,22 @@ Sau khi implement: chạy `test_ibkr_injection.py` với IBKR thật (không ch�
 | MNKD | IBKR CME bundle | Verify MNKD có trong bundle + Rule 576 cert |
 | Không mua | Polygon/Databento real-time | IBKR tự cấp đủ |
 
+### Operational — IBKR-gated (chưa fix được offline)
+| Item | Vấn đề |
+|---|---|
+| **B3** | Không có reconcile broker↔runner thật — `get_positions()` → NotImplementedError |
+| **B1 lớp-2** | `live_positions.json` chưa cross-check vs IBKR `get_positions()` khi load |
+| **A2** | Partial fill không handle — runner assume filled=ordered qty |
+| **A5** | Duplicate OPEN sau restart — crash sau IBKR fill nhưng trước runner ghi state |
+| **A1/A4** | Order reject + timeout → `NotImplementedError` (known, deferred) |
+
+### Scale 1→2 micro (số đúng từ trust audit ee75963)
+- Sizer n=2 ở **equity ≥ $55,784** — binding: `n × MaxDD ≤ 20%` của account
+- 2-micro MaxDD = **$5,890** (2.11× 1-micro $2,789) = 11.8% của $50k → dưới hard cap 15%
+- _$82k cũ = $55,784 + 47% buffer thủ công, không có derivation công thức_
+- _$9,854 cũ = MaxDD pre-NKD (hệ cũ chưa có NKD), không áp dụng fit_C_
+- Gate thực: DD thật trong paper + qua ≥1 Stress live (không đổi)
+
 ### Vận hành sau khi connect
 - `dump_state()` Group B: slippage thật, fill quality, paper-vs-backtest, health, timing
 - Dashboard live mode: poll `live_state.json`
@@ -99,17 +162,10 @@ Sau khi implement: chạy `test_ibkr_injection.py` với IBKR thật (không ch�
 
 ## 3. TRƯỚC LIVE (sau paper)
 
-1. **Re-freeze lần 1**: chạy `futures/refreeze.py` khi có data mới sau 2025 — approve nếu <5% label change (AUTO_APPROVE)
-2. **Cơ chế GĐ3**: ✅ DONE — `futures/refreeze.py` + `futures/test_refreeze.py` 40/40 PASS
-   - anchored-expanding: fit_once(2018→fit_end), gate 3 nhánh, auto-rollback, JSON registry
-   - T2 thật: fit_2023 vs fit_C = 1.13% label change → verdict=VERIFY (dưới ngưỡng cần lo)
+1. **Re-freeze Phần A**: ✅ DONE — `futures/refreeze.py` 40/40 PASS. Gate + rollback + registry xong.
+2. **Re-freeze Phần B**: Wire pipeline live vào runner (data tự động, trigger re-freeze định kỳ)
 3. **Vault 2025**: one-shot OOS — không iterate, không chỉnh params sau khi nhìn kết quả
-4. **Scale 1→2 micro** (sizer auto-select, từ `scaling_dd_trust.py` ee75963):
-   - Equity ≥ **$55,784** → sizer tự chọn n=2 (binding: drawdown = 20 × $2,789 MaxDD)
-   - 2-micro MaxDD = **$5,890** (2.11× 1-micro $2,789) = 11.8% của $50k → dưới 15% hard cap
-   - Gate thực sự (không đổi): DD thật từ paper + qua ≥1 Stress regime live
-   - _$82k cũ = $55,784 + 47% buffer thủ công, không có derivation — dùng làm thận trọng được nhưng không phải gate công thức_
-   - _Nguồn sai: $9,854 ≈ 1.9 × $5,185 (MaxDD hệ pre-NKD, chưa cập nhật sau thêm NKD)_
+4. **Scale 1→2 micro** (số từ `scaling_dd_trust.py` ee75963 — xem §2 và §4)
 
 ---
 
@@ -125,10 +181,23 @@ Sau khi implement: chạy `test_ibkr_injection.py` với IBKR thật (không ch�
 | **Non-compound** | Deploy mặc định 1 micro/instrument. Sizer auto-select n=2 ở equity ≥ **$55,784** (DD-binding; 2-micro MaxDD = $5,890 = 11.8% của $50k). Gate thực: DD thật trong paper + qua ≥1 Stress live. $82k cũ là buffer thủ công +47%, không có derivation (xem §3.4). |
 | **IBKRBroker C3/C5/C6** | Ba specs hardwired — không bypass. Test injection suite phải PASS trước paper. |
 | **NKD runner timing** | Runner phải chạy sau ~02:30 ET. Nếu schedule thay đổi → review NKD date alignment. |
+| **Operational state persist** | `live_positions.json`: `{"positions":[...], "breaker":{"peak_equity":..., "day_start_equity":..., "cur_day":"YYYY-MM-DD"}}`. Backward-compat: plain list → positions only. Không xóa/overwrite file thủ công khi runner đang chạy. |
+| **Breaker HALT không stateful** | CircuitBreaker KHÔNG có `halted: bool` field. HALT = computed: `dd=(peak-cur)/peak ≥ 15%`. Persist `peak_equity` đủ để recover HALT đúng sau restart (T13 verified). Không cần persist thêm. |
+| **Notification dedup TODO** | `_g1_soft_active`, `_g2_soft_notified`, `_g2_hard_notified` reset trên restart → duplicate notification. Low severity. Fix trước khi dùng `notify.py` production: persist 3 bool dưới key `"guard"` trong `live_positions.json`. |
 
 ---
 
-## 5. STOCKS — hệ riêng, chờ vault 2025
+## 5. UI MONITOR — chưa implement backend
+
+UI RAITS Futures Monitor tồn tại (frontend). Operational status panel cần backend:
+- **Chưa có**: event writer — runner chưa ghi guard/order/state/signal ra file mà UI đọc
+- **Cần implement trước live**: `dump_state()` Group B ghi `live_state.json` định kỳ (signal/position/guard/breaker status)
+- Dashboard live mode: UI poll `live_state.json` — wire lại sau khi runner ghi đủ fields
+- Logging hoạt động (`runner.py` logger), nhưng không có structured JSON feed cho UI
+
+---
+
+## 6. STOCKS — hệ riêng, chờ vault 2025
 
 Equity RAITS (`raits/`) là hệ độc lập. Vault params locked (`configs/final_params.yaml`).  
 **Không đụng futures khi làm stocks, không đụng stocks khi làm futures.**  
