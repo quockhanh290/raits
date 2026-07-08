@@ -1,0 +1,218 @@
+
+==========================================================================================
+  STEP 1 — BOOTSTRAP METHOD SOUNDNESS
+==========================================================================================
+
+Method: IID bootstrap — resample individual trades independently with replacement.
+        H0: mean(net_pnl) <= 0 (one-sided), N_BOOT=10000, seed=42.
+        IDENTICAL method between bootstrap_strategy.py (YbY) and bootstrap_continuous.py.
+        The comparison of p-values is apples-to-apples on method.
+
+IID ASSUMPTION VIOLATION:
+        Trades are NOT independent. In the continuous 2017-2022 run, TF entries cluster
+        during trend regimes. A bull regime creates correlated wins; a bear regime creates
+        correlated losses. IID bootstrap treats them as independent draws — this UNDERSTATES
+        the variance of the resample mean, producing p-values LOWER than a block bootstrap
+        would give.
+
+        Direction of bias: IID makes p-values look MORE significant (lower p) than reality.
+        Implication for our results:
+          - TF p=0.116 under IID may be an OPTIMISTIC estimate of significance.
+            Block bootstrap would likely give p HIGHER than 0.116.
+          - ORB p=0.329 and STRESS_ORB p=0.215 are already well above 0.05 even with
+            the IID optimism — block bootstrap would push them higher, not reverse the verdict.
+          - PE_SHORT p=0.011 could be more fragile than it appears (see Step 3).
+
+        Conclusion: the continuous bootstrap is not block-bootstrapped, which is the
+        correct method for time-series trades. The p-values are optimistic. Any strategy
+        that is already near or above 0.05 with IID is almost certainly NOT significant
+        under block bootstrap. This strengthens, not weakens, the concern about TF.
+
+
+==========================================================================================
+  STEP 2 — N-CONTROL: TF p=0.116 — N effect or per-trade edge weakness?
+==========================================================================================
+  Continuous TF: N=353, mean=$15.96, std=$253.03
+  t-stat = 1.185  |  CoV (std/mean) = 15.9x  |  Cohen's d = 0.063
+  Verified p at N=353: 0.117
+
+  YbY TF: N=656, mean=$22.45, std=$273.40
+  t-stat = 2.103  |  CoV = 12.2x  |  Cohen's d = 0.082
+
+  Per-trade quality (Cohen's d): YbY=0.082 vs Continuous=0.063
+  ** Per-trade edge quality IS different — not purely a N effect **
+
+  N-control simulation (same mean/std, varying N; 500 outer draws, 1000 inner boot):
+       N    median p       verdict  note
+  -------------------------------------------------------
+     353       0.141    BORDERLINE  <-- actual
+     500       0.078    BORDERLINE  (hypothetical)
+     650       0.064    BORDERLINE  (hypothetical)
+     800       0.033     CONFIRMED  (hypothetical)
+    1000       0.027     CONFIRMED  (hypothetical)
+    1500       0.006     CONFIRMED  (hypothetical)
+
+  Breakeven N (p<0.05 with same distribution): ~1500
+
+  INTERPRETATION:
+    t-stat for TF at N=353 is 1.185. A t-stat below 1.0 indicates the mean is smaller
+    than one standard error — the distribution of trade P&Ls is very noisy relative to the
+    mean. Compare to PE_SHORT (see below) which has a much higher t-stat despite small N.
+
+    If the breakeven N is > 650 (2x actual): the p flip is NOT just an N effect —
+    the per-trade edge quality in continuous design is genuinely weaker than in YbY.
+    Possible causes:
+      (a) PDT on changes which TF entries fire (PDT rations day-trade capacity)
+      (b) Kelly 0.75 changes position sizes, affecting which size-constrained exits trigger
+      (c) MAX_TREND change (could be different from YbY) changes concurrent TF positions
+      (d) Continuous capital compounding creates different entry timing than annual reset
+
+
+==========================================================================================
+  STEP 3 — PE_SHORT IS FRAGILITY CHECK
+==========================================================================================
+  PE_SHORT: N=29, mean=$246.13, std=$588.92
+  t-stat = 2.251  |  ~4.8 trades/year
+  p at N=29: 0.011
+
+  Jackknife sensitivity (remove top winning trades):
+     k removed    new N     new p       verdict  trades removed ($)
+  ----------------------------------------------------------------------
+             1       28     0.025     CONFIRMED  [$1499]
+             2       27     0.055    BORDERLINE  [$1499, $1488]
+             3       26     0.109    BORDERLINE  [$1499, $1488, $1176]
+             5       24     0.247       NO EDGE  [$1499, $1488, $1176, $771, $682]
+
+  Top 10 PE_SHORT trades by P&L:
+    #1: $  1498.81  (21.0% of total PE_SHORT P&L)
+    #2: $  1488.01  (20.8% of total PE_SHORT P&L)
+    #3: $  1175.63  (16.5% of total PE_SHORT P&L)
+    #4: $   771.24  (10.8% of total PE_SHORT P&L)
+    #5: $   681.86  (9.6% of total PE_SHORT P&L)
+    #6: $   551.09  (7.7% of total PE_SHORT P&L)
+    #7: $   549.16  (7.7% of total PE_SHORT P&L)
+    #8: $   536.44  (7.5% of total PE_SHORT P&L)
+    #9: $   527.36  (7.4% of total PE_SHORT P&L)
+    #10: $   511.59  (7.2% of total PE_SHORT P&L)
+
+  Top 3 trades = $4162.44 (58% of total PE_SHORT P&L)
+
+  INTERPRETATION:
+    PE_SHORT has N=29 over 6 years — ~5 trades/year. Despite confirmed p=0.011,
+    the t-stat of 2.25 reflects 29 draws. The jackknife shows how many
+    "lucky" trades are needed to sustain the verdict.
+
+    Concentration risk: if the top 1-3 trades flip the verdict, PE_SHORT's edge
+    is CONCENTRATED not CONSISTENT. A concentrated IS edge is more likely IS-specific.
+
+    The user notes "short strategies were flagged as losing OOS earlier" — this likely
+    refers to the vault OOS 2023-2024 context where short strategies in a strong bull
+    market (2023: SPY +26%) would be expected to underperform. PE_SHORT's IS edge
+    may not survive the 2025 OOS test.
+
+
+==========================================================================================
+  STEP 4 — SYSTEM CHARACTERIZATION ON CONTINUOUS DESIGN
+==========================================================================================
+  Full system (6yr IS, 2017-2022):
+    Strategies: GF_SHORT, ORB, PE_SHORT, STRESS_MID, STRESS_ORB, TREND_FOLLOW
+    N trades:   605
+    Total P&L:  $15,019.79
+    Ann. P&L:   $2,503.30/yr
+    Ann. return: 5.0% (on $50,000 initial equity)
+
+  System WITHOUT ORB + STRESS_ORB (flipped strategies):
+    Strategies: GF_SHORT, PE_SHORT, STRESS_MID, TREND_FOLLOW
+    N trades:   422
+    Total P&L:  $13,297.88  (removed: $1,721.90)
+    Ann. P&L:   $2,216.31/yr
+    Ann. return: 4.4% (on $50,000)
+
+  TF + PE_SHORT only (confirmed/borderline-only core):
+    N trades:   382
+    Total P&L:  $12,772.47  (85% of system)
+    Ann. P&L:   $2,128.74/yr
+    Ann. return: 4.3%
+
+  Per-strategy breakdown:
+  Strategy           N    TotalP&L      Ann$    %sys   ContinP      YbYP  Verdict
+  ---------------------------------------------------------------------------------
+  GF_SHORT          12  $      283  $     47      2%     0.010     0.128  CONFIRMED 
+  ORB               75  $    1,215  $    202      8%     0.329     0.019  NO EDGE FLIP
+  PE_SHORT          29  $    7,138  $  1,190     48%     0.011     0.007  CONFIRMED 
+  STRESS_MID        28  $      242  $     40      2%     0.401     0.112  NO EDGE 
+  STRESS_ORB       108  $      507  $     85      3%     0.215     0.019  NO EDGE FLIP
+  TREND_FOLLOW     353  $    5,635  $    939     38%     0.116     0.008  BORDERLINE 
+
+==========================================================================================
+  STEP 4 — HONEST VERDICT
+==========================================================================================
+
+  THE QUESTION: Is this a "trim two strategies" situation, or "edge is marginal"?
+
+  EVIDENCE FOR "TRIM TWO":
+    - ORB ($1,215 / 6yr = $202/yr) and STRESS_ORB ($508 / 6yr = $85/yr) contribute little.
+    - Their combined IS contribution is $1,722 out of $15,020 (11%).
+    - Removing them leaves TF + PE_SHORT + GF_SHORT + STRESS_MID, still positive.
+    - "Trim" framing: the system's IS edge is mostly PE_SHORT and TF. Remove noise.
+
+  EVIDENCE FOR "EDGE IS MARGINAL":
+    - TF is 58% of trades but p=0.116 BORDERLINE (possibly optimistic due to IID bias).
+      Block bootstrap would likely push TF to p>0.15 = NO EDGE. The backbone is not confirmed.
+    - PE_SHORT p=0.011 with N=29 — concentrated. One bad year removes the verdict.
+    - IS annualized return: 5.0% on $50,000. After Kelly and costs, this is thin.
+    - The system was designed, tuned, and bootstrapped on YbY (wrong design).
+      The continuous bootstrap is the FIRST valid test on the deployed design,
+      and only PE_SHORT fully passes.
+    - IID bootstrap is optimistic -> true p-values are higher -> even fewer strategies pass.
+
+  THE HONEST FRAMING:
+    The strategy inclusion decisions were made on a design (YbY, PDT off, Kelly=0.5) that
+    does not match the deployed system (continuous, PDT on, Kelly=0.75). On the correct
+    design, the system has ONE confirmed strategy (PE_SHORT, N=29, concentrated),
+    ONE borderline backbone (TF, p=0.116, IID-optimistic), and two NO-EDGE strategies
+    that are in the deployed system (ORB, STRESS_ORB).
+
+    This is NOT a "trim two" situation — trimming ORB/STRESS_ORB post-hoc on continuous
+    IS would be re-selecting strategies on the data used to evaluate them, which is
+    overfitting. The correct read is:
+
+    ** The IS evidence for a deployable multi-strategy edge is weak under the correct
+       design. The 2025 OOS test is the real arbiter of whether the system works.
+       The vault OOS 2023-2024 (+$7,404, Sharpe=0.88) is a 2-year sample and
+       insufficient to override this conclusion. **
+
+    WHAT THIS MEANS FOR ACTION:
+    - Do NOT drop ORB/STRESS_ORB based on continuous IS alone (overfitting).
+    - Do NOT re-run strategy selection on continuous IS (overfitting).
+    - The system's IS inclusion decisions were made on YbY, which was the design at the
+      time. Those decisions cannot be retroactively re-optimized on continuous IS.
+    - The honest position: treat 2025 OOS as a live strategy validity test.
+      If ORB/STRESS_ORB underperform OOS as well, that's the signal to remove them.
+    - PE_SHORT's IS edge is concentrated — worth monitoring closely OOS.
+      If it's 2-3 strong trades per year and the OOS year catches none, edge is gone.
+    - TF is borderline on the correct design. The vault OOS validated the whole system,
+      not TF specifically. TF OOS decomposition would be required to evaluate it alone.
+
+
+==========================================================================================
+  SUMMARY TABLE
+==========================================================================================
+  Strategy          Cont p     YbY p    Cont verdict  Action
+  ---------------------------------------------------------------------------
+  GF_SHORT           0.010     0.128       CONFIRMED  Monitor — improved but N=12, fragile
+  ORB                0.329     0.019         NO EDGE  Keep — don't re-cut on IS (OOS will tell)
+  PE_SHORT           0.011     0.007       CONFIRMED  Monitor — confirmed but concentrated (N=29)
+  STRESS_MID         0.401     0.112         NO EDGE  Keep — small contributor, low harm
+  STRESS_ORB         0.215     0.019         NO EDGE  Keep — don't re-cut on IS (OOS will tell)
+  TREND_FOLLOW       0.116     0.008      BORDERLINE  Monitor — backbone, borderline
+
+  BOTTOM LINE:
+    - Continuous bootstrap IS methodologically consistent with YbY bootstrap.
+    - IID assumption is a SHARED limitation — but biases toward lower p (optimistic).
+      P-values reported are best-case estimates; true values may be higher.
+    - TF N-control: see breakeven N above. If > 650, the flip is NOT just N —
+      per-trade edge quality genuinely declined from YbY to continuous design.
+    - PE_SHORT: check jackknife above. If removing top 1-3 trades flips verdict,
+      the edge is concentrated and fragile despite p=0.011.
+    - DO NOT re-cut strategies on continuous IS. The 2025 OOS is the real test.

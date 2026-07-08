@@ -1,0 +1,19 @@
+Bootstrap — CONTINUOUS IS design vs YEAR-BY-YEAR (deployed comparison)
+Baseline : is_baseline_cb_fixed_2026-07-08.csv  (605 trades)
+Design   : continuous 2017-2022, Kelly=0.75, PDT on, MAX_TREND=3
+N_BOOT=10000  seed=42
+----------------------------------------------------------------------------------------------
+Strategy           N    WR%     Avg$   p-val  Continuous   Year-by-year p   YbY verdict  FLIP?
+----------------------------------------------------------------------------------------------
+GF_SHORT          12  75.0%    23.62   0.010   CONFIRMED  0.128 BORDERLINE    BORDERLINE  * partial
+ORB               75  53.3%    16.20   0.329     NO EDGE  0.019 CONFIRMED     CONFIRMED  *** FLIP
+PE_SHORT          29  69.0%   246.13   0.011   CONFIRMED  0.007 CONFIRMED     CONFIRMED  
+STRESS_MID        28  46.4%     8.64   0.401     NO EDGE  0.112 BORDERLINE    BORDERLINE  * partial
+STRESS_ORB       108  47.2%     4.70   0.215     NO EDGE  0.019 CONFIRMED     CONFIRMED  *** FLIP
+TREND_FOLLOW     353  48.4%    15.96   0.116  BORDERLINE  0.008 CONFIRMED     CONFIRMED  * partial
+----------------------------------------------------------------------------------------------
+Total: 605 trades | total P&L $+15,019.79
+
+*** 2 VERDICT FLIP(S) — strategy inclusion decisions may need revisiting:
+   ORB: CONFIRMED → NO EDGE
+   STRESS_ORB: CONFIRMED → NO EDGE
