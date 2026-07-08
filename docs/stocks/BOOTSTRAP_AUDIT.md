@@ -167,6 +167,46 @@ The **2025 live OOS test is the real arbiter** of whether the system has deploya
 
 ---
 
+## Removed Strategies — Continuous IS Test
+
+`diagnose_removed_strategies.py` re-enables FADE/GAP_FILL/VWAP_MR via `_REGIME_STRATEGIES` patch and `use_fade_scanner=True`, runs the continuous IS engine, then applies IID + block bootstrap + jackknife.
+
+| Strategy | N | WR% | Mean$/t | t-stat | IID p | Block p | IID verdict | Bucket |
+|---|---|---|---|---|---|---|---|---|
+| FADE | 199 | 33.7% | -$32.53 | -2.87 | 0.997 | 1.000 | NO EDGE | removal-correct |
+| GAP_FILL | 16 | 75.0% | +$80.52 | +1.31 | 0.100 | 0.000* | BORDERLINE | uncertain-needs-OOS |
+| VWAP_MR | 33 | 24.2% | -$1.54 | -1.23 | 0.889 | 0.998 | NO EDGE | removal-correct |
+
+*GAP_FILL block p=0.000 is a methodological artifact: `n_blocks = ceil(16/20) = 1` makes every bootstrap resample a circular permutation of all 16 trades → mean is identical every iteration. Degenerate case. Block result is uninformative.
+
+### Verdicts
+
+**FADE — removal definitively correct.** Not just "no edge" — actively destructive. WR=33.7%, mean -$32.53/trade, t=-2.87. The YbY verdict (p=0.754, no edge) understated the damage; continuous design reveals systematic value destruction at Kelly=0.75, PDT on. Jackknife irrelevant (p=0.998 with any trades removed).
+
+**VWAP_MR — removal definitively correct.** WR=24.2%, mean -$1.54/trade (near-zero but negative). Structurally broken on stocks universe (SPY/QQQ/IWM) under continuous design. Removal stands unconditionally.
+
+**GAP_FILL — removal correct by default; N=16 is untestable.** IID p=0.100 is borderline but jackknife fragile at k=1 (p=0.167 → NO EDGE). Top 3 trades = 80% of total P&L — concentrated. 2.7 trades/year over 6 years is insufficient to confirm edge by any method. Do not re-add; even OOS would remain inconclusive for years at this trade frequency.
+
+### Complete Bootstrap Audit Summary
+
+All strategy decisions examined against continuous IS design:
+
+| Strategy | Status | Continuous verdict | Action |
+|---|---|---|---|
+| TREND_FOLLOW | In system | BORDERLINE p=0.116 | Monitor OOS |
+| ORB | In system | NO EDGE p=0.329 | Keep — don't re-cut on IS |
+| STRESS_ORB | In system | NO EDGE p=0.215 | Keep — don't re-cut on IS |
+| PE_SHORT | In system | CONFIRMED p=0.011 | Monitor — concentrated N=29 |
+| GF_SHORT | In system | CONFIRMED p=0.010 | Monitor — N=12, fragile |
+| STRESS_MID | In system | NO EDGE p=0.401 | Keep — minor, OOS will tell |
+| FADE | Removed | NO EDGE p=0.997 (negative) | Removal confirmed |
+| VWAP_MR | Removed | NO EDGE p=0.889 (negative) | Removal confirmed |
+| GAP_FILL | Removed | BORDERLINE p=0.100 (N=16) | Removal stands — untestable |
+
+**Bottom line:** No removal was an error by any robustness test. No active strategy should be re-cut on IS. The 2025 OOS test is the final arbiter for all active strategies.
+
+---
+
 ## Files
 
 | File | Purpose |

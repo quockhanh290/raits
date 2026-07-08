@@ -244,10 +244,20 @@ Status: IN PROGRESS
 - [x] OPEN_QUESTIONS.md: Bug Sweep section (offline cạn, F1/F2 monitor)
 - [x] IBKR_TODO.md: account APPROVED, thứ tự implement wired
 
+### Completed (GIAI ĐOẠN 1 — _fetch_raw() + connect test — 2026-07-08)
+- [x] P2 timezone bug fixed in `global_index/ibkr_broker.py:_fetch_raw()`:
+      `formatDate=1` trả chuỗi ET — cũ parse `utc=True` → shift -5h. Fix: `pd.to_datetime(df.index)` (naive ET, no UTC).
+- [x] Empty bars guard: `if not bars: return pd.DataFrame()` + `if df is None or df.empty` trước set_index
+- [x] Pre-existing typo fixed: `_handle_rollover()` log dùng `contracts/cluster` → `_contracts/_cluster`
+- [x] `global_index/connect_test_paper.py` viết xong:
+      CON.1-3 (connect/equity/positions) + DATA.1-4 (fetch/C6/C3/dtype) + P2.1-3 (timezone range/no-shift/naive)
+- [x] VERIFY: 14 injection + 42 stale + 123 operational + 68 refreeze = **247/247 ALL PASS**; baseline unchanged
+- **CÒN LẠI: user chạy `connect_test_paper.py` với IB Gateway paper (port 7497)**
+
 ### Next steps (IBKR ACCOUNT APPROVED → PAPER)
 
 **Thứ tự implement:**
-- [ ] 1. Wire `IBKRBroker._fetch_raw()` → test C6 (column case), C3 (out-of-order), P2 (timezone)
+- [x] 1. Wire `IBKRBroker._fetch_raw()` → P2 fixed; C6/C3 đã test offline; `connect_test_paper.py` cho live test
 - [ ] 2. Wire `IBKRBroker.send_order()` → test A1 (fill/reject/timeout), A2 (partial), A4 (timing)
 - [ ] 3. Wire `IBKRBroker.get_positions()` → implement B3 reconcile sau restart
 - [ ] 4. Wire `_handle_rollover()` → roll cost, `contract_month` field, timing
@@ -550,6 +560,39 @@ futures/backtest_combined.py + futures/backtest_system.py (annotated harness)
   **Diagnostic scripts** (raits/raits/scripts/):
   - diagnose_cvx_entry.py, diagnose_streak_stateful.py, diagnose_orig_jan18.py
   - diagnose_jan3_ordering.py, diagnose_jan3_engine_order.py
+
+### Completed (Bootstrap Audit — 2026-07-08)
+- [x] **ISSUE 1 CLOSED**: Fresh verify_parallel_run.py --reset-orig-cache = 605 trades / $15,019.79
+      IDENTICAL to current engine. Stale cache (verify_orig_trades_IS.pkl) was the source of 604.
+      No unexplained drift. Investigation closed.
+- [x] **ISSUE 2 — Continuous IS bootstrap**: bootstrap_continuous.py committed + run
+      2 hard flips: ORB (CONFIRMED → NO EDGE, p=0.329), STRESS_ORB (CONFIRMED → NO EDGE, p=0.215)
+      TF partial: CONFIRMED → BORDERLINE (p=0.116). PE_SHORT holds (p=0.011).
+      Saved: raits/configs/bootstrap_continuous_report.txt
+- [x] **Bootstrap soundness audit**: diagnose_bootstrap_soundness.py committed + run
+      IID method consistent (both YbY and continuous). Bias direction: optimistic (true p higher).
+      TF N-control: breakeven N ~1,500 (4x actual) — per-trade edge genuinely weaker, not just N.
+      YbY TF: Cohen's d=0.082 vs continuous: 0.063 (23% decline in per-trade quality).
+      PE_SHORT jackknife: remove top 2 trades → p=0.055 (BORDERLINE). Top 3 = 58% of P&L. Fragile.
+      IS annualized return: 5.0% on $50k — thin. Honest read: edge marginal on correct design.
+      Saved: raits/configs/bootstrap_soundness_report.txt
+- [x] **BOOTSTRAP_AUDIT.md written**: docs/stocks/BOOTSTRAP_AUDIT.md — full audit record
+- [x] **diagnose_removed_strategies.py committed + RUN** (FADE/GAP_FILL/VWAP_MR continuous IS)
+      Script patches _REGIME_STRATEGIES + use_fade_scanner=True, runs engine (~35min), IID+block bootstrap+jackknife
+      Results:
+        FADE    (N=199): IID p=0.997, block p=1.000 → removal-correct (actively losing: WR=33.7%, mean=-$32.53/t, t=-2.87)
+        GAP_FILL (N=16): IID p=0.100, block p=0.000* → uncertain-needs-OOS (* ARTIFACT: N<block_size → degenerate)
+          Jackknife k=1: p=0.167 (NO EDGE). Top 3 trades = 80% P&L. N=16 untestable.
+        VWAP_MR (N=33): IID p=0.889, block p=0.998 → removal-correct (WR=24.2%, mean=-$1.54/t, t=-1.23)
+      Saved: raits/configs/removed_strategies_report.txt
+
+### Verdict: Bootstrap Audit (CLOSED)
+- 605/$15,019.79 IS the correct baseline (stale cache confirmed).
+- FADE/GAP_FILL/VWAP_MR removals: all stand on continuous design.
+  FADE and VWAP_MR: definitively removed (negative edge). GAP_FILL: untestable (N=16) but not confirmable.
+- Strategy inclusion decisions were made on YbY design (wrong). On continuous (correct) design:
+  ONE confirmed (PE_SHORT, concentrated N=29), ONE borderline (TF, IID-optimistic p=0.116), TWO NO EDGE in system (ORB p=0.329, STRESS_ORB p=0.215).
+- Do NOT re-cut active strategies on IS. Do NOT re-add removed strategies on IS. 2025 OOS is the real arbiter.
 
 ### Key decisions
 - OOS is one-shot -- do NOT run until engine is fully locked and WFO complete

@@ -1,0 +1,110 @@
+
+========================================================================================
+  REMOVED STRATEGIES — Continuous IS design (Kelly=0.75, PDT on, 2017-2022)
+========================================================================================
+  Engine run time: 2133s
+  IID N_BOOT=10000, Block N_BOOT=5000 block_size=20 days
+  YbY p (wrong design): FADE=0.754, GAP_FILL=0.687, VWAP_MR=0.613
+
+  Summary:
+  Strategy         N     WR%     Avg$    YbY p    IID p    Blk p   IID verdict   Blk verdict  BUCKET
+  ----------------------------------------------------------------------------------------------------
+  FADE           199   33.7%   -32.53    0.754    0.997    1.000       NO EDGE       NO EDGE  removal-correct
+  GAP_FILL        16   75.0%    80.52    0.687    0.100    0.000    BORDERLINE     CONFIRMED  uncertain-needs-OOS
+  VWAP_MR         33   24.2%    -1.54    0.613    0.889    0.998       NO EDGE       NO EDGE  removal-correct
+
+========================================================================================
+  FADE -- Detail
+========================================================================================
+  N=199  WR=33.7%  Mean=$-32.53  Std=$159.76
+  t-stat=-2.872  Cohen's d=-0.2036
+  IID p=0.997 (NO EDGE)   Block p=1.000 (NO EDGE)
+  YbY p=0.754
+
+  Jackknife (remove top k winning trades):
+     k   new N     IID p       verdict  top trades removed
+  ------------------------------------------------------------
+     1     198     0.998       NO EDGE  [$425]
+     2     197     0.999       NO EDGE  [$425, $385]
+     3     196     1.000       NO EDGE  [$425, $385, $336]
+
+  Top 5 trades by P&L:
+    #1: $  425.26  (-6.6% of total P&L)
+    #2: $  384.51  (-5.9% of total P&L)
+    #3: $  335.94  (-5.2% of total P&L)
+    #4: $  324.78  (-5.0% of total P&L)
+    #5: $  319.09  (-4.9% of total P&L)
+
+  VERDICT: REMOVAL-CORRECT
+  p=0.997 on continuous design — no edge. YbY verdict was correct.
+  Strategy does not gain edge on the correct design. Removal stands.
+
+========================================================================================
+  GAP_FILL -- Detail
+========================================================================================
+  N=16  WR=75.0%  Mean=$80.52  Std=$246.03
+  t-stat=1.309  Cohen's d=0.3273
+  IID p=0.100 (BORDERLINE)   Block p=0.000 (CONFIRMED)
+  YbY p=0.687
+
+  Jackknife (remove top k winning trades):
+     k   new N     IID p       verdict  top trades removed
+  ------------------------------------------------------------
+     1      15     0.167       NO EDGE  [$416]
+     2      14     0.262       NO EDGE  [$416, $336]
+     3      13     0.369       NO EDGE  [$416, $336, $280]
+
+  Top 5 trades by P&L:
+    #1: $  416.43  (32.3% of total P&L)
+    #2: $  335.95  (26.1% of total P&L)
+    #3: $  280.40  (21.8% of total P&L)
+    #4: $  264.92  (20.6% of total P&L)
+    #5: $  214.93  (16.7% of total P&L)
+
+  VERDICT: UNCERTAIN-NEEDS-OOS
+  IID p=0.100 but block p=0.000 or jackknife fragile.
+  Cannot distinguish edge from noise on this looked-at IS dataset.
+  Do not re-add. OOS is the correct arbiter.
+
+========================================================================================
+  VWAP_MR -- Detail
+========================================================================================
+  N=33  WR=24.2%  Mean=$-1.54  Std=$7.19
+  t-stat=-1.230  Cohen's d=-0.2140
+  IID p=0.889 (NO EDGE)   Block p=0.998 (NO EDGE)
+  YbY p=0.613
+
+  Jackknife (remove top k winning trades):
+     k   new N     IID p       verdict  top trades removed
+  ------------------------------------------------------------
+     1      32     0.984       NO EDGE  [$23]
+     2      31     0.998       NO EDGE  [$23, $12]
+     3      30     1.000       NO EDGE  [$23, $12, $9]
+
+  Top 5 trades by P&L:
+    #1: $   22.72  (-44.7% of total P&L)
+    #2: $   12.45  (-24.5% of total P&L)
+    #3: $    9.49  (-18.7% of total P&L)
+    #4: $    8.95  (-17.6% of total P&L)
+    #5: $    7.11  (-14.0% of total P&L)
+
+  VERDICT: REMOVAL-CORRECT
+  p=0.889 on continuous design — no edge. YbY verdict was correct.
+  Strategy does not gain edge on the correct design. Removal stands.
+
+========================================================================================
+  FINAL SUMMARY
+========================================================================================
+
+  FRAMEWORK REMINDER:
+    - A ROBUST flip (low IID p AND low block p AND survives jackknife) = potential error.
+      Valid to reconsider removal — but requires deliberate decision, not auto re-add.
+    - A FRAGILE flip (IID p near 0.05, dies under jackknife or block) = noise on a
+      dataset that has been heavily examined. Re-adding would be overfitting.
+    - No flip (p stays high) = removal was correct on both designs.
+    - "uncertain-needs-OOS" = the IS data cannot distinguish edge from noise.
+      OOS is the only valid test.
+
+  FADE        : removal-correct                 (IID p=0.997, block p=1.000)
+  GAP_FILL    : uncertain-needs-OOS             (IID p=0.100, block p=0.000)
+  VWAP_MR     : removal-correct                 (IID p=0.889, block p=0.998)
