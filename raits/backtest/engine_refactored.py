@@ -709,27 +709,15 @@ class RefactoredBacktestEngine:
                 self._ctx_capture_hook(ctx)
             result = self._decision_unit.decide(ctx)
 
-            if result.override_active:
-                if not self._safety_mode_active:
-                    logger.critical(f"{bar_ts} | SAFETY MODE ON")
-                    self._safety_mode_active = True
-            else:
-                if self._safety_mode_active:
-                    logger.info(f"{bar_ts} | SAFETY MODE OFF")
-                    self._safety_mode_active = False
-
-            # Execute exits: swing strategies first, then intraday.
-            # Mirrors engine.py's ordering: section 2 (TF/PE_SHORT exits) runs
-            # BEFORE section 4 (trading_ok / SAFETY_MODE check), which runs
-            # BEFORE section 10 (intraday exits).  If a swing exit trips the
-            # consecutive-loss CB, engine.py's section 4 sees coordinator
-            # blocked → SAFETY_MODE → `continue` (skips intraday exits,
-            # entries, and daily-drawdown check).  Replicating that here by
-            # splitting exits and inserting the CB-active guard between them.
+            # Execute exits: swing strategies first, then SAFETY_MODE / intraday.
+            # Mirrors engine.py ordering: section 2 (TF/PE_SHORT) runs BEFORE
+            # section 4 (SAFETY_MODE check), which runs BEFORE section 10
+            # (intraday exits).
             _SWING = ("TREND_FOLLOW", "PE_SHORT")
             _swing_exits    = [e for e in result.exits if e.trade.strategy in _SWING]
             _intraday_exits = [e for e in result.exits if e.trade.strategy not in _SWING]
 
+            # Swing exits first — via _close_trade (CB updated, same as ORIG section 2)
             for exit_intent in _swing_exits:
                 self._close_trade(
                     exit_intent.trade, bar_ts, exit_intent.exit_price, exit_intent.reason,
@@ -737,11 +725,24 @@ class RefactoredBacktestEngine:
                 )
 
             # If CB tripped during swing exits the coordinator is now blocked.
-            # Engine.py detects this in section 4 → SAFETY_MODE → `continue`,
-            # skipping intraday exits, entries, and the daily-drawdown check.
             if self._circuit_breaker_active:
                 continue
 
+            # SAFETY_MODE: close remaining intraday positions via _close_all (bypasses
+            # CB update).  Mirrors engine.py section 4 — flash event, not strategy
+            # failure; counting it toward the streak would fire CB hardest in Stress.
+            if result.override_active:
+                if not self._safety_mode_active:
+                    logger.critical(f"{bar_ts} | SAFETY MODE ON")
+                    self._safety_mode_active = True
+                self._close_all(bar_ts, day_stocks, "SAFETY_MODE", skip_tf=True)
+                continue
+
+            if self._safety_mode_active:
+                logger.info(f"{bar_ts} | SAFETY MODE OFF")
+                self._safety_mode_active = False
+
+            # Intraday exits — via _close_trade (CB updated, same as ORIG section 10)
             for exit_intent in _intraday_exits:
                 self._close_trade(
                     exit_intent.trade, bar_ts, exit_intent.exit_price, exit_intent.reason,
@@ -807,7 +808,8 @@ class RefactoredBacktestEngine:
                         except Exception:
                             pass
                         logger.critical(f"{bar_ts} | CIRCUIT BREAKER: {dd.reason}")
-                        self._close_all(bar_ts, day_stocks, "CIRCUIT_BREAKER")
+                        self._close_all(bar_ts, day_stocks, "CIRCUIT_BREAKER",
+                                        circuit_breakers=circuit_breakers, update_cb=True)
                         self._circuit_breaker_active = True
                         break
                 except Exception as e:
@@ -815,7 +817,8 @@ class RefactoredBacktestEngine:
                     pnl_pct = self.equity_tracker.daily_pnl_pct
                     if pnl_pct <= -0.04:
                         logger.critical(f"{bar_ts} | CIRCUIT BREAKER (fallback): {pnl_pct:.2%}")
-                        self._close_all(bar_ts, day_stocks, "CIRCUIT_BREAKER")
+                        self._close_all(bar_ts, day_stocks, "CIRCUIT_BREAKER",
+                                        circuit_breakers=circuit_breakers, update_cb=True)
                         self._circuit_breaker_active = True
                         break
 
@@ -1408,6 +1411,8 @@ class RefactoredBacktestEngine:
         reason: str,
         skip_swing: bool = False,
         skip_tf: bool = False,
+        circuit_breakers=None,
+        update_cb: bool = False,
     ) -> None:
         open_trades = list(self.trade_log.open_trades)
         if not open_trades:
@@ -1449,6 +1454,8 @@ class RefactoredBacktestEngine:
                 total_costs=costs,
             )
             self.equity_tracker.apply_pnl(trade.net_pnl or 0.0, timestamp)
+            if update_cb and circuit_breakers is not None:
+                circuit_breakers.record_trade_result(trade.net_pnl or 0.0)
 
     def _update_swing_stops(
         self,

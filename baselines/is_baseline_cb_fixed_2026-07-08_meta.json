@@ -1,0 +1,56 @@
+{
+  "generated": "2026-07-08",
+  "data_source": "window_debug_5min.pkl + window_debug_daily.pkl",
+  "is_period": "2017-01-03 to 2022-12-30",
+  "account_equity": 50000,
+  "cb_semantics": {
+    "count_stop_hit": true,
+    "count_target_hit": true,
+    "count_time_stop": true,
+    "count_daily_drawdown_cb": true,
+    "count_safety_mode": false,
+    "count_eod": false
+  },
+  "engine": "BacktestEngine (engine.py) == RefactoredBacktestEngine (engine_refactored.py)",
+  "trade_count": 605,
+  "total_pnl": 15019.79,
+  "by_strategy": {
+    "GF_SHORT": {
+      "trades": 12,
+      "pnl": 283.39
+    },
+    "ORB": {
+      "trades": 75,
+      "pnl": 1214.72
+    },
+    "PE_SHORT": {
+      "trades": 29,
+      "pnl": 7137.79
+    },
+    "STRESS_MID": {
+      "trades": 28,
+      "pnl": 242.03
+    },
+    "STRESS_ORB": {
+      "trades": 108,
+      "pnl": 507.18
+    },
+    "TREND_FOLLOW": {
+      "trades": 353,
+      "pnl": 5634.67
+    }
+  },
+  "daily_cb_events_in_is": {
+    "days_fired": 13,
+    "positions_closed": 10,
+    "note": "3 days fired with 0 open positions at CB bar"
+  },
+  "vs_old_baseline": {
+    "old_trades": 604,
+    "old_pnl": 15952.15,
+    "old_cb_semantics": "ORIG: only STOP/TARGET/TIME_STOP counted",
+    "delta_trades": 1,
+    "delta_pnl": -932.36,
+    "note": "Same data source (window_debug_5min.pkl). Delta caused by CB semantics change only."
+  }
+}

@@ -1566,7 +1566,8 @@ class BacktestEngine:
                     except Exception:
                         pass
                     logger.critical(f"{bar_ts} | CIRCUIT BREAKER: {dd.reason}")
-                    self._close_all(bar_ts, day_stocks, "CIRCUIT_BREAKER")
+                    self._close_all(bar_ts, day_stocks, "CIRCUIT_BREAKER",
+                                    circuit_breakers=circuit_breakers, update_cb=True)
                     self._circuit_breaker_active = True
                     break
             except Exception as e:
@@ -1575,7 +1576,8 @@ class BacktestEngine:
                 pnl_pct = self.equity_tracker.daily_pnl_pct
                 if pnl_pct <= -0.04:
                     logger.critical(f"{bar_ts} | CIRCUIT BREAKER (fallback): {pnl_pct:.2%}")
-                    self._close_all(bar_ts, day_stocks, "CIRCUIT_BREAKER")
+                    self._close_all(bar_ts, day_stocks, "CIRCUIT_BREAKER",
+                                    circuit_breakers=circuit_breakers, update_cb=True)
                     self._circuit_breaker_active = True
                     break
 
@@ -2168,6 +2170,8 @@ class BacktestEngine:
         reason: str,
         skip_swing: bool = False,
         skip_tf: bool = False,
+        circuit_breakers=None,
+        update_cb: bool = False,
     ) -> None:
         open_trades = list(self.trade_log.open_trades)
         if not open_trades:
@@ -2209,6 +2213,8 @@ class BacktestEngine:
                 total_costs=costs,
             )
             self.equity_tracker.apply_pnl(trade.net_pnl or 0.0, timestamp)
+            if update_cb and circuit_breakers is not None:
+                circuit_breakers.record_trade_result(trade.net_pnl or 0.0)
 
     def _update_swing_stops(
         self,

@@ -51,6 +51,11 @@ raits/data/processed/*.h5
 *.hdf5
 *.feather
 
+# Exception: committed baselines (survive cache wipe)
+!baselines/
+!baselines/*.csv
+!baselines/*.json
+
 # ============================================
 # Logs
 # ============================================

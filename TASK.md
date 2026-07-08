@@ -130,6 +130,24 @@ Status: IN PROGRESS
 ### Completed (run_smoke_test — viết xong, chưa run)
 - [ ] global_index/run_smoke_test.py — cold-start integration smoke test; pending first run
 
+### Completed (Offline bug fixes — 2026-07-08)
+- [x] Fill.status + filled_qty + avg_price + error_msg (broker.py) — backwards-compat defaults; MockBroker → status="FILLED"
+- [x] OpenPos.exit_pending: bool = False (live_decision.py) — persist + restore; _openpos_to_dict/from_dict
+- [x] I4.8: capture fill return in CLOSE loop (runner.py) — if FAILED: exit_pending=True + restore to open_positions
+- [x] _retry_pending_exits() skeleton (runner.py) — retries exit_pending positions at start of next run_day
+- [x] STRESS_MID 2-pass (runner.py) — same-day entries (pass 1) → H4 sync → multi-day entries (pass 2); HALT_DAY now covers STRESS_MID same-session loss
+- [x] T7.4 updated (expected_keys includes exit_pending); T30 exit_pending persist/restore; T31 STRESS 2-pass HALT_DAY
+- [x] docs/futures/IBKR_TODO.md: B3/A1-A5/P2/P3/Roll items (blocked on IBKR account)
+- **123/123 ALL PASS** (was 116/116); baseline $52,961.74 diff=$0.00 intact
+
+### Completed (Scaling docs correction — 2026-07-08)
+- [x] Measured n=2 @$55,784: MaxDD=$3,810 (không phải $5,890 — NKD bug trong scaling_dd_trust.py inflate)
+- [x] Confirmed threshold self-referential: $55,784 dùng MaxDD@$50k, tại $55,784 dd_scale=1.92<2 → sizer vẫn n=1
+- [x] Three-way inconsistency documented: $55,784 doc / ~$58-59k true threshold / Calmar 2.28 < floor 2.38
+- [x] SCALING_ANALYSIS.md: full analysis, data table, root cause structural, 4 alternatives, threshold recompute
+- [x] Corrected in-place tất cả docs (DECISIONS, ASSUMPTIONS, ISSUES_LOG, OPEN_QUESTIONS, STATUS, LESSONS, GLOSSARY, ARCHIVE_LOG, SCRIPT_INVENTORY, README)
+- n=1 ceiling decision added to DECISIONS.md; 3 open questions added to OPEN_QUESTIONS.md
+
 ### Completed (Divergence Sweep — 2026-07-04)
 - [x] UT-2 FIXED: generate_today_signals stale-price retry guard (swing + NKD); same-direction rollover via force_entries
 - [x] UT-5 FIXED: NKD date alignment — replaced nkd_today_norm with today_norm (ET); late-feed suppressed (conservative)
@@ -347,6 +365,99 @@ futures/backtest_combined.py + futures/backtest_system.py (annotated harness)
 - [x] **ws_handshake_test.py** (raits/live/scripts/): off-hours connection/auth/subscribe test — checks connection open, connected status, auth_success, AM.SPY subscribed, clean disconnect; exit 0/1
 - [x] **live_smoke.py** (raits/live/scripts/): market-hours feed observation — logs every bar, prints summary + pass/fail checklist; --minutes N configurable; no orders placed
 
+### Completed (Refreeze GĐ3 anchor fix + Sizer Guard — 2026-07-07)
+- [x] futures/refreeze.py: anchor default fix `2018-01-01` → `2017-01-01` (CLI + was wrong default causing Calmar 2.49 vs 2.744)
+- [x] futures/refreeze.py: FreezeRecord.invalid field + rollback() skips invalid entries (last-valid semantics)
+- [x] futures/test_refreeze.py: T12 rollback tests (8 cases T12.1-T12.8: skip-invalid, audit trail, from_dict backward compat)
+- [x] global_index/deploy_sim.py: `--n-contracts` flag, sizer guard WARNING (--start/--end without pin), NKD hardcoded n=1, labels on full bench before clip
+- [x] global_index/generate_replay_snapshots.py: NKD structural n=1 fix (cb_map["MNKD"] = 1)
+- [x] docs/futures/STATUS.md: fix stale "40/40 PASS" → "~76/76" + new section Sizer Guard + NKD Structural Fix
+- [x] docs/futures/DECISIONS.md: added NKD hardcoded n=1 decision entry
+- [x] Regression confirm: ALL PASS (2026-07-07) — baseline $52,936/Calmar 2.744 intact, 4 reconcile PASS, all test suites PASS
+
+### Completed (Bug Sweep Round 2 — 2026-07-07)
+- [x] CAT 1: Live decision path — pnl_sized là pattern duy nhất live≠backtest. Exhaustive grep xác nhận. H4 là fix đúng và đủ.
+- [x] CAT 2: Exec path — I4.8 mới: position removed from state BEFORE CLOSE sent, Fill discarded. _retry_pending_exits() không tồn tại (grep: 0 matches). IBKR-gated (A1-A5).
+- [x] CAT 3: State restart — peak/day_start/cur_day/exit_day persist đúng. Stale-file window 265s documented (B3 gap). HALT persists correctly via peak_equity.
+- [x] CAT 4: n=2 config — code đúng về logic (NKD hardcoded n=1, Rổ4 n=n_contracts). CHƯA run end-to-end. Command: `python global_index/deploy_sim.py --n-contracts 2`.
+- [x] CAT 5: Reconcile edge — backtest coverage đầy đủ (2018-2024 includes all rolls/COVID). Live roll handling = IBKR-gated (I5.2), không phải reconcile gap.
+- [x] CAT 6: Systematic live vs backtest grep — không phát hiện pattern ẩn ngoài pnl_sized.
+- [x] Docs: `docs/futures/BUG_SWEEP_R2.md` (new), `docs/futures/ISSUES_LOG.md` I4.8 (new)
+
+### Completed (H4 fix: HALT_DAY equity sync — 2026-07-07)
+- [x] Bug sweep H4: HALT_DAY mù intraday → root cause confirmed (state.equity không sync từ broker trong session)
+- [x] H4 fix in `global_index/runner.py`: sync `state.equity = broker.get_equity()` sau CLOSE loop, trước OPEN entries
+      MockBroker: delta ≈ 0 → no-op (backwards-compatible). IBKRBroker live: syncs real fills → HALT_DAY hoạt động.
+      Residual gap: STRESS_MID (same-session, decide_day atomic) — tác động thực tế nhỏ.
+- [x] T29 test added to `global_index/test_operational_fixes.py`:
+      T29.1: no OPEN orders when daily loss ≥ 4% → PASS
+      T29.2: HALT_DAY event emitted → PASS ("BREAKER HALT_DAY: daily loss 4.2% — entries blocked today")
+      116/116 ALL PASS (full suite)
+- [x] Docs: ISSUES_LOG.md I4.6 (H4 root+fix+classify) + I4.7 (C1-EXIT accepted, low)
+- [x] OPEN_QUESTIONS.md: H4 là điều kiện cứng pre-live (PREREQ, đã fix)
+- [x] STATUS.md: Operational fixes → 116/116 PASS, H4 documented
+
+### Completed (Session wrap-up + full doc consolidation — 2026-07-07)
+- [x] docs/futures/ISSUES_LOG.md: nhật ký 22 vấn đề (6 nhóm), verify code + nguồn thật
+      I1 Data Integrity (CSV bug, live divergence)
+      I2 HMM/Regime (anchor bug, contamination, rollback, C2 doc, equity restart)
+      I3 Sizing/Validation (sizer n=3, NKD sizing, $82k threshold, vault verdict sleeves)
+      I4 Ops Safety (16 cơ chế grep-verified, WARN dead, same-day phases, B1, J2)
+      I5 Wire pending (fill handling, rollover, D5/F3, spy_csv timing)
+      I6 Docs (SYSTEM_MODEL, CROSS_SYSTEM)
+- [x] docs/futures/LESSONS.md: 9 bài học meta từ lỗi thật
+      L1 data self-consistent ≠ correct | L2 grep verify completeness | L3 bug ẩn non-default config
+      L4 estimate ≠ measurement | L5 "passed" ≠ correct setup | L6 per-sleeve verdict
+      L7 no fabrication | L8 rollback = last valid | L9 contamination → path-dependent metrics
+- [x] docs/README.md: thêm SYSTEM_MODEL/VISUALIZE/ISSUES_LOG/LESSONS/CROSS_SYSTEM; thêm "khi nào đọc" rows
+- [x] docs/futures/STATUS.md: thêm "System Model + Cross-System Docs" block
+
+### Completed (Cross-system analysis + futures model docs — 2026-07-07)
+- [x] docs/futures/SYSTEM_MODEL.md: full 4-dimension model (Control Flow, Data Flow, Safety, State)
+      16 safety mechanisms verified via grep, CHIỀU 3 intervention order table (17 rows incl C2)
+- [x] docs/futures/VISUALIZE.md: 4 ASCII tầng (system map, data flow, safety layers, state lifecycle)
+- [x] 4 issues reviewed from SYSTEM_MODEL:
+      F1 — C2 missing from intervention diagram → FIXED in both docs
+      F2 — equity restart two-source → VERIFIED CORRECT: broker is source-of-truth, B1 persists peak separately
+      F3 — same-day order phases → CLARIFIED: nested per-entry (not all-OPEN then all-CLOSE)
+      F4 — WARN dead field → DOCUMENTED INTENTIONAL (circuit_breaker.py:19)
+- [x] docs/CROSS_SYSTEM_FINDINGS.md: futures findings classified → stocks code verified for each
+      Adjustment: stocks path already tracked in stocks/OPEN_QUESTIONS.md
+      HMM contamination: CLEAN (initial fit < _bt_start; vault excluded via _slice_before; retrains causal)
+      Annual refreeze gate: GAP — stocks has per-retrain validation only, no formal gate
+      State persistence: NOT APPLICABLE — stocks is paper-only (LiveContextFeed NotImplementedError)
+- [x] docs/stocks/OPEN_QUESTIONS.md: 2 new entries added (refreeze gate, state persistence)
+
+### Completed (Futures Script Inventory + Pipeline Docs — 2026-07-06)
+- [x] SCRIPT_INVENTORY.md created: 53 scripts classified (global_index/ 35 + futures/ 18)
+      Production manifest traced from runner.py run_day() import chain
+      SUPERSEDED / ANSWERED / RESEARCH / TEST / PRODUCTION / DATA-PREP / BACKTEST / PRODUCTION-PLANNED
+- [x] PIPELINE_FLOW.md created: run_day() fully traced step-by-step
+      Exact execution order (D5 kill-switch → fetch → signal → stale-guard → exits → decide → exec → persist)
+      ASCII data flow diagram, sleeve activation table, 5 non-obvious observations
+
+### Completed (Futures Script Cleanup — 2026-07-06)
+- [x] 14 non-production scripts archived (reversible — moved to _archive/, NOT deleted)
+      Superseded → `_archive/superseded/`: futures/backtest_system.py, futures/net_exposure.py
+      Answered research → `_archive/answered/`: combined.py, combined_system.py, wfo.py, vault.py,
+        scaling_dd_trust.py, stress_mid_trust.py, hmm_flip_year_trust.py,
+        risk_diagnostic.py, hold_vs_entry_diagnostic.py, reject_diagnostic.py,
+        reject_value_diagnostic.py, priority_sweep.py
+- [x] ARCHIVE_LOG.md created: docs/futures/ARCHIVE_LOG.md — reason + replacement per script
+- [x] SCRIPT_INVENTORY.md updated: ARCHIVED status for all 14 moved scripts
+- [x] Production chain verified: no production files import any archived scripts
+
+### Completed (Futures SYSTEM_EXPLORER + GLOSSARY — 2026-07-06)
+- [x] docs/futures/SYSTEM_EXPLORER.html: 9-step interactive pipeline explorer (self-contained)
+      PRE/01-08 steps: files + logic + non-obvious notes + pending (OFFLINE/IBKR/PAPER) + decisions
+      Tabs: Pipeline view, Tất cả TO-DO (grouped by blocker), Tìm file (search), Glossary
+- [x] docs/futures/GLOSSARY.md: mọi mã nội bộ A–J, UT-1–6, KD-001, fit_A/B/C, calm-flip
+      Groups: Guards, Exception Safety, State/Restart, IBKR specs, UT, HMM/Regime, naming collisions
+      Nguồn: trích từ code/docs (file:line), không đoán
+- [x] SYSTEM_EXPLORER Glossary tab: renderGlossary() + naming collision table
+- [x] SYSTEM_EXPLORER tooltips: wrapCodeRefs() adds hover tooltips trên mọi mã trong step text
+- [x] docs/README.md updated: GLOSSARY.md added to directory tree
+
 ### Next steps (ordered)
 - [x] PE_EXPANSION (25 stocks): 2017-2024 ✓ fetched
 - [x] window_debug --rebuild → baseline 200216 ($34,214). PE_EXPANSION net -$226 (2018 bad trade)
@@ -365,6 +476,63 @@ futures/backtest_combined.py + futures/backtest_system.py (annotated harness)
   - Bug A: PE_SHORT inject wrote local copy (discarded) → fixed to mutate ctx.day_stocks in-place
   - Bug B: Same-bar entry+exit missed (pending_entries not in ctx.open_trades) → fixed with post-open _check_exits call in engine_refactored
   - Bug C: SAFETY_MODE exit price used loc[bar_ts] (current bar) vs engine.py iloc[-1] (last bar of day) → fixed in decision_unit.py §4
+
+### Completed (CB fix implemented — 2026-07-08)
+- [x] **CB FIX IMPLEMENTED — both engines corrected; verification pending (user runs script)**
+
+  **Changes made:**
+  - `engine.py` `_close_all()`: added `circuit_breakers=None, update_cb=False` params. When `update_cb=True`, calls `circuit_breakers.record_trade_result(trade.net_pnl or 0.0)` after each close. Daily-drawdown-CB call sites (lines 1569+1578) now pass `update_cb=True`. SAFETY_MODE and EOD unchanged.
+  - `engine_refactored.py` `_close_all()`: identical change.
+  - `engine_refactored.py` bar loop: SAFETY_MODE ExitIntents NO LONGER committed via `_close_trade()`. Instead, when `override_active=True`, calls `_close_all("SAFETY_MODE", skip_tf=True)` (bypasses CB) and `continue`. Matches ORIG section-4 behavior exactly.
+  - Stale ORIG cache deleted: `data/cache/verify_orig_trades_IS.pkl`
+
+  **VERIFIED 2026-07-08:**
+  ```
+  ORIG == REFAC: 605 trades | P&L $15,019.79 | diff $0.0000  ✓
+  ```
+  Daily-CB events in IS: 13 days fired, 10 positions actually closed (3 days had 0 open at CB bar).
+  New baseline = 605 trades (+1 vs old 604). The SAFETY_MODE fix in REFAC unblocked 1 trade that REFAC's
+  over-counting had been blocking; this outweighed the daily-CB counting's additional blocking.
+  New baseline committed: `data/cache/verify_cb_fixed_baseline.pkl`
+
+### Completed (CB semantics analysis — 2026-07-08)
+- [x] **CB SEMANTICS FULLY ANALYZED — fix plan written, code not yet changed**
+
+  **Issue 1 — Correct CB vs what each engine does:**
+  ORIG is 4/5 correct: correctly skips SAFETY_MODE + EOD, correctly counts STOP/TARGET/TIME_STOP. Wrong only for daily-drawdown-CB (should count, both engines miss it via `_close_all("CIRCUIT_BREAKER")`).
+  REFAC is 3/5 correct: also misses daily-drawdown-CB AND over-counts SAFETY_MODE (via ExitIntents→`_close_trade`). **Neither engine is fully correct. ORIG is closer.**
+  
+  Prior CB_INVESTIGATION.md error corrected: claimed "REFAC marginally better for daily-CB" — FALSE. Both engines call `_close_all("CIRCUIT_BREAKER")` (ORIG:1569, REFAC:810), both miss daily-CB.
+
+  **Issue 2 — Quantification on Parquet IS data:**
+  Diff = 1 trade: CVX TF 2019-01-18 14:00, pnl=-$208.09. ORIG IS worse by $208.09 (extra loser).
+  Stress-concentrated: YES — triggered by SAFETY_MODE on 2019-01-03 (post-Q4 2018 bear market).
+  On window_debug (the actual validated baseline): 604==604 byte-identical → principle "deploy==validated" is satisfied on the validated dataset.
+  On live Parquet data: REFAC more conservative (halts earlier in stress) — protective direction.
+
+  **Issue 3 — Fix plan (before paper):**
+  Add `update_cb` flag to `_close_all()` in both engines. Pass `update_cb=True` only for `"CIRCUIT_BREAKER"` reason (daily-drawdown-CB). In REFAC, route SAFETY_MODE exits through `_close_all()` instead of `_close_trade()`. Re-run IS → new ORIG==REFAC baseline → validated==deployed.
+  Full implementation details in `docs/stocks/CB_INVESTIGATION.md` Issues 1-3 sections.
+
+### Completed (605 vs 604 root cause — 2026-07-08)
+- [x] **ROOT CAUSE CONFIRMED**: `_close_all()` never calls `record_trade_result()` in ORIG; REFAC does.
+
+  In ORIG (engine.py): `_close_all()` → `trade_log.close_trade()` directly. Never calls `_close_trade()` → never calls `circuit_breakers.record_trade_result()` → CB streak unchanged for any SAFETY_MODE/EOD close.
+
+  In REFAC (engine_refactored.py): SAFETY_MODE → `decide()` ExitIntents → `_close_trade()` → `record_trade_result()` called → streak updated.
+
+  **Trigger day: 2019-01-03**. SAFETY_MODE (or EOD) fires in window_debug run, closing QQQ STRESS_ORB, IWM STRESS_ORB, SPY STRESS_MID via `_close_all()`. Confirmed: instrumented run of ORIG shows zero [BEFORE/AFTER] output for Jan 3 (all exits bypassed `_close_trade()`).
+
+  **Divergence**: ORIG enters Jan 18 with consec=3; REFAC with consec=4.
+  **Jan 18 09:30**: MMM TREND_FOLLOW closes (pnl=-$230.37).
+  - ORIG: 3→4 < 5 (CB limit) → bar loop continues → CVX TF LONG enters 14:00 → **605 trades**
+  - REFAC: 4→5 = CB limit → `_circuit_breaker_active=True` → bar loop breaks at 09:35 → no CVX → **604 trades**
+
+  This is a deliberate architectural difference, not a bug. The 604==604 gate passed on ORIG's full IS Parquet baseline vs REFAC replication of that same run; the 605 vs 604 discrepancy only appears when SAFETY_MODE fires differently across data sources (window_debug vs Parquet).
+
+  **Diagnostic scripts** (raits/raits/scripts/):
+  - diagnose_cvx_entry.py, diagnose_streak_stateful.py, diagnose_orig_jan18.py
+  - diagnose_jan3_ordering.py, diagnose_jan3_engine_order.py
 
 ### Key decisions
 - OOS is one-shot -- do NOT run until engine is fully locked and WFO complete
