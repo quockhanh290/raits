@@ -130,6 +130,7 @@ def _openpos_to_dict(p: OpenPos) -> dict:
         "entry_day":    str(p.entry_day) if p.entry_day is not None else None,
         "exit_day":     str(p.exit_day)  if p.exit_day  is not None else None,
         "pnl_sized":    p.pnl_sized,
+        "exit_pending": p.exit_pending,
     }
 
 
@@ -146,6 +147,7 @@ def _openpos_from_dict(d: dict) -> OpenPos:
         entry_day=pd.Timestamp(d["entry_day"]) if d.get("entry_day") else None,
         exit_day=pd.Timestamp(d["exit_day"])   if d.get("exit_day")  else None,
         pnl_sized=float(d.get("pnl_sized", 0.0)),
+        exit_pending=bool(d.get("exit_pending", False)),
     )
 
 
@@ -155,7 +157,7 @@ class FuturesRunner:
 
     def __init__(self, broker, guard, contracts_by_inst, signal_fn, breaker,
                  hmm_stale_guard=None, positions_path=None, lock_path=None,
-                 live_state_path=None):
+                 live_state_path=None, stop_path=None, max_contracts_per_order=10):
         """signal_fn(day, bars_by_inst, held) -> (entry_candidates, exit_positions)
         wraps signal_layer.generate_today_signals with the engines/labels/costs bound.
         Injecting it keeps the runner testable without real engines.
@@ -252,6 +254,10 @@ class FuturesRunner:
         self._last_breaker_level: str = "OK"
         self._live_state_path = Path(live_state_path) if live_state_path else None
 
+        # D5: kill-switch (STOP_FILE) + F3: fat-finger cap
+        self._stop_path = Path(stop_path) if stop_path else None
+        self._max_contracts = int(max_contracts_per_order)
+
         self.broker = broker
         self.guard = guard
         self.contracts = contracts_by_inst
@@ -318,6 +324,55 @@ class FuturesRunner:
                 {"error": str(exc)[:80]},
             )
 
+    # ── retry pending exits ───────────────────────────────────────────────────
+
+    def _retry_pending_exits(self, day) -> None:
+        """Retry positions flagged exit_pending=True from a prior session's failed CLOSE.
+        Called at the start of run_day() before decide_day so failed exits are retried
+        before new decisions are made.
+
+        Live: IBKRBroker.send_order(CLOSE) returns Fill.status indicating success/fail.
+        Verify (MockBroker): all fills succeed (status="FILLED") → no exit_pending in
+        practice → this method is a no-op in offline/test mode.
+        """
+        pending = [p for p in self.state.open_positions
+                   if getattr(p, "exit_pending", False)]
+        if not pending:
+            return
+        logger.warning(
+            "_retry_pending_exits: %d position(s) exit_pending=True on %s",
+            len(pending), pd.Timestamp(day).date(),
+        )
+        self._emit_event(
+            "ALERT", "EXEC",
+            f"retry_pending_exits: {len(pending)} CLOSE(s) retrying",
+            {"count": len(pending), "day": str(pd.Timestamp(day).date())},
+        )
+        for p in list(pending):
+            _f = self.broker.send_order(Order(
+                p.inst, "CLOSE", p.direction, p.contracts, p.cluster, day,
+                exit_day=day, pnl_sized=p.pnl_sized,
+            ))
+            if _f.status != "FAILED":
+                p.exit_pending = False
+                self.state.open_positions = [
+                    x for x in self.state.open_positions if x is not p
+                ]
+                self.state.equity += p.pnl_sized  # verify mode: ledger pnl; live: H4 sync later
+                logger.info(
+                    "_retry: CLOSE success %s/%s — exit_pending cleared", p.inst, p.cluster,
+                )
+            else:
+                logger.error(
+                    "_retry: CLOSE still FAILED %s/%s — manual intervention may be required",
+                    p.inst, p.cluster,
+                )
+                self._emit_event(
+                    "ALERT", "EXEC",
+                    f"retry_pending_exits: CLOSE still FAILED {p.inst}/{p.cluster}",
+                    {"inst": p.inst, "cluster": p.cluster, "error": _f.error_msg or ""},
+                )
+
     # ── main daily loop ──────────────────────────────────────────────────────
 
     def run_day(self, day, _spy_last_date_override=None):
@@ -330,6 +385,27 @@ class FuturesRunner:
             f"Day started: {pd.Timestamp(day).date()}, "
             f"{len(self.state.open_positions)} position(s) open",
         )
+
+        # Retry positions with exit_pending=True from a prior session's failed CLOSE.
+        # Runs before decide_day so failed exits are resolved before new decisions are made.
+        self._retry_pending_exits(day)
+
+        # D5: kill-switch gate — operator creates STOP_FILE to halt new entries gracefully.
+        #     Exits are NOT affected: existing positions still exit on their exit_day.
+        #     To resume trading, delete the STOP_FILE. To force-close everything, kill PID.
+        _stop_active = self._stop_path is not None and self._stop_path.exists()
+        if _stop_active:
+            logger.warning(
+                "D5: STOP_FILE present (%s) on %s — new entries HALTED; "
+                "existing exits proceed normally. Remove file to resume.",
+                self._stop_path, pd.Timestamp(day).date(),
+            )
+            self._emit_event(
+                "CRITICAL", "SYSTEM",
+                f"STOP_FILE: entries halted for {pd.Timestamp(day).date()}. "
+                f"Existing positions exit normally. "
+                f"Remove {self._stop_path.name} to resume.",
+            )
 
         # 1. fetch bars through today (per instrument) — causal
         insts = {p.inst for p in self.state.open_positions} | set(self.contracts)
@@ -410,6 +486,10 @@ class FuturesRunner:
         if _e3_skip_entries:
             entry_candidates = []
 
+        # D5: discard entries if STOP_FILE is present (exits unaffected)
+        if _stop_active:
+            entry_candidates = []
+
         # 2b. HMM stale guard — C2: wrapped in try/except; throw → block entries (conservative).
         #     Exits are determined by state.open_positions[*].exit_day (set in step 3)
         #     and are unaffected by this gate — held positions always exit normally.
@@ -476,22 +556,100 @@ class FuturesRunner:
         # 4. risk brain — same decide_day validated vs deploy_sim
         decision = decide_day(day, self.state, entry_candidates, self.guard, self.contracts)
 
-        # 5. execute: CLOSE exits first, then OPEN admitted entries (order matters for cap)
+        # 5. execute: CLOSE multi-day exits, then split entries into same-day / multi-day.
         for p in decision.exits:
-            self.broker.send_order(Order(
+            _f = self.broker.send_order(Order(
                 p.inst, "CLOSE", p.direction, p.contracts, p.cluster, day,
                 exit_day=day, pnl_sized=p.pnl_sized))
-        for t in decision.entries:
+            # I4.8: if CLOSE fails, restore position for retry next session.
+            # decide_day already removed p from open_positions; add it back with
+            # exit_pending=True so _retry_pending_exits() picks it up tomorrow.
+            # Live: IBKRBroker returns Fill.status="FAILED" on reject/timeout.
+            # Verify (MockBroker): status always "FILLED" → this branch never taken.
+            if _f.status == "FAILED":
+                p.exit_pending = True
+                self.state.open_positions.append(p)
+                logger.warning(
+                    "I4.8: CLOSE FAILED %s/%s — exit_pending=True, restored for retry",
+                    p.inst, p.cluster,
+                )
+                self._emit_event(
+                    "ALERT", "EXEC",
+                    f"I4.8: CLOSE FAILED {p.inst}/{p.cluster} — exit_pending=True",
+                    {"inst": p.inst, "cluster": p.cluster},
+                )
+
+        # Split entries: same-day (e.g. STRESS_MID OPEN+CLOSE in one session) execute
+        # BEFORE H4 equity sync so their pnl is included in the HALT_DAY check.
+        # Multi-day entries execute AFTER and can be blocked if HALT_DAY fires.
+        _sameday  = [t for t in decision.entries if t.get("exit") == day]
+        _multiday = [t for t in decision.entries if t.get("exit") != day]
+
+        # Pass 1: same-day entry+exit (STRESS_MID and similar)
+        for t in _sameday:
             n = self.contracts.get(t["inst"], 1)
+            if n > self._max_contracts:
+                logger.error(
+                    "F3: FAT_FINGER BLOCKED: %s ordered %d contracts (max_contracts_per_order=%d)"
+                    " — order NOT sent to broker",
+                    t["inst"], n, self._max_contracts,
+                )
+                self._emit_event(
+                    "CRITICAL", "RISK",
+                    f"FAT_FINGER BLOCKED: {t['inst']} {n} contracts > max {self._max_contracts}"
+                    f" — order NOT sent",
+                    {"inst": t["inst"], "ordered": n, "max": self._max_contracts},
+                )
+                continue
             self.broker.send_order(Order(
                 t["inst"], "OPEN", t["direction"], n, t["cluster"], day,
                 exit_day=t.get("exit"), pnl_sized=t.get("pnl_sized", 0.0)))
-            # same-day entry+exit (hold=0): decide_day realizes it inline and never
-            # holds it → runner must CLOSE it today so the broker realizes pnl too.
-            if t.get("exit") == day:
-                self.broker.send_order(Order(
-                    t["inst"], "CLOSE", t["direction"], n, t["cluster"], day,
-                    exit_day=day, pnl_sized=t.get("pnl_sized", 0.0)))
+            self.broker.send_order(Order(
+                t["inst"], "CLOSE", t["direction"], n, t["cluster"], day,
+                exit_day=day, pnl_sized=t.get("pnl_sized", 0.0)))
+
+        # H4: sync state.equity from broker after ALL closes (multi-day exits + same-day
+        # STRESS_MID). In live mode: captures real intraday pnl including STRESS_MID
+        # same-session result → HALT_DAY can fire if that trade lost ≥4%.
+        # In verify mode (MockBroker): both track the same ledger pnl → delta ≈ 0 → no-op.
+        _h4_eq = self.broker.get_equity()
+        if abs(_h4_eq - self.state.equity) > 0.01:
+            logger.info("H4: equity sync state=%.2f → broker=%.2f (delta=%.2f)",
+                        self.state.equity, _h4_eq, _h4_eq - self.state.equity)
+            self.state.equity = _h4_eq
+            if self.state.breaker is not None:
+                self.state.breaker.update(self.state.equity)
+                if not self.state.breaker.status(self.state.equity).get(
+                        "allow_new_entries", True):
+                    logger.warning(
+                        "H4: %s after equity sync — blocking %d multi-day entries",
+                        self.state.breaker.status(self.state.equity)["level"],
+                        len(_multiday),
+                    )
+                    _multiday.clear()
+
+        # Pass 2: multi-day entries — OPEN only (exit on a future day)
+        for t in _multiday:
+            n = self.contracts.get(t["inst"], 1)
+            # F3: fat-finger guard — block orders that exceed the per-order contract cap.
+            #     Catches accidental contracts_by_inst changes (e.g. 1 → 100).
+            #     Cap is intentionally generous (default 10) — raise only if scaling up deliberately.
+            if n > self._max_contracts:
+                logger.error(
+                    "F3: FAT_FINGER BLOCKED: %s ordered %d contracts (max_contracts_per_order=%d)"
+                    " — order NOT sent to broker",
+                    t["inst"], n, self._max_contracts,
+                )
+                self._emit_event(
+                    "CRITICAL", "RISK",
+                    f"FAT_FINGER BLOCKED: {t['inst']} {n} contracts > max {self._max_contracts}"
+                    f" — order NOT sent",
+                    {"inst": t["inst"], "ordered": n, "max": self._max_contracts},
+                )
+                continue
+            self.broker.send_order(Order(
+                t["inst"], "OPEN", t["direction"], n, t["cluster"], day,
+                exit_day=t.get("exit"), pnl_sized=t.get("pnl_sized", 0.0)))
 
         # Detect breaker level transitions; emit once per level change
         if self.state.breaker is not None:

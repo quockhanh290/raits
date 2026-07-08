@@ -1,0 +1,14 @@
+Run: CORRECTED (Polygon adjusted snapshot 2026-07-06)
+CSV: d:/raits/_archive/scratch/spy_adjusted_v1_2026-07-06.csv
+Regime distribution: {'Normal': 788, 'Calm': 708, 'Stress': 265}
+naive pooled: pnl=60336.90 calmar=1.667 maxdd=5232.11 pf=1.614
+FULL SYSTEM:  pnl=60336.90 calmar=1.773 maxdd=4919.53 pf=1.565
+vault:        pnl=20627.87 calmar=4.102 maxdd=2519.67
+per-year:
+  2018  7953.76
+  2019  2510.67
+  2020  17555.22
+  2021  6682.35
+  2022  5007.03
+  2023  13410.50
+  2024  7217.37

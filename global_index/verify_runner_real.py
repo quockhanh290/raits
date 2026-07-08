@@ -183,7 +183,7 @@ def main():
     guard_ref  = MultiClusterGuard(account=ACCOUNT)
     ref_daily, ref_stats = deploy_replay(all_tr, ACCOUNT, guard_ref, contracts_by, CircuitBreaker)
     ref_net    = float(ref_daily.sum())
-    print(f"  ref net P&L:  ${ref_net:>10,.2f}  (expect ~$52,962)")
+    print(f"  ref net P&L:  ${ref_net:>10,.2f}  (expect ~$52,936)")
     print(f"  ref taken:    {ref_stats['taken']}")
     print(f"  ref rejected: {ref_stats['rejected']}")
     print(f"  ref halted:   {ref_stats['halted']}")

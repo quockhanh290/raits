@@ -140,6 +140,12 @@ Status: IN PROGRESS
 - [x] docs/futures/IBKR_TODO.md: B3/A1-A5/P2/P3/Roll items (blocked on IBKR account)
 - **123/123 ALL PASS** (was 116/116); baseline $52,961.74 diff=$0.00 intact
 
+### Completed (Sweep 3 — protected-file fixes — 2026-07-08)
+- [x] signal_layer.py Zone 4: _asof_naive NaN bypass bug fixed — raises ValueError on empty/all-NaN ATR series; to_candidate raises on NaN risk_sized; C4 cluster try/except catches both
+- [x] _validated_core.py Change 1 (safe): silent HMM exception — added logger.error + `import logging` + `logger = getLogger(__name__)`; no control flow change
+- [x] _validated_core.py Change 2 (guard): ATR=0 → `da > 0` added to chandelier guard (`if not np.isnan(da) and da > 0 and len(high):`)
+- [x] VERIFY PASS — 4 reconciles + baseline: gd0/stress/nkd/swing_desired all 0 mismatch; deploy_sim 2-tick = $52,936 / Calmar 2.74 UNCHANGED
+
 ### Completed (Scaling docs correction — 2026-07-08)
 - [x] Measured n=2 @$55,784: MaxDD=$3,810 (không phải $5,890 — NKD bug trong scaling_dd_trust.py inflate)
 - [x] Confirmed threshold self-referential: $55,784 dùng MaxDD@$50k, tại $55,784 dd_scale=1.92<2 → sizer vẫn n=1
@@ -231,14 +237,25 @@ Status: IN PROGRESS
 - [x] STEP 3 interpret: STRESS role solid; scaling gate should use $55,784 (formula) not $82k (unverified)
 - [x] STEP 4 defer: divergence coverage counts (reconcile scripts traceable, sweep closed) → TODO not urgent
 
-### Next steps
+### Completed (Pre-paper milestone + docs — 2026-07-08)
+- [x] STATUS.md rewrite — PRE-PAPER MILESTONE (NỀN/VAULT/AN TOÀN/BUG SWEEP/SCALING/BLOCKER/GIỚI HẠN)
+- [x] ISSUES_LOG.md: I4.8 update (OFFLINE DONE), I4.9/I4.10/I4.11 added, NHÓM 4B sweep findings (F1/F2/F3)
+- [x] LESSONS.md: L10 added (reconcile = consistency not correctness)
+- [x] OPEN_QUESTIONS.md: Bug Sweep section (offline cạn, F1/F2 monitor)
+- [x] IBKR_TODO.md: account APPROVED, thứ tự implement wired
 
-**KHI IBKR ACCOUNT MỞ:**
-- [ ] 1. Data: xác nhận NKD trong CME bundle + subscribe + permission + Rule 576 cert
-- [ ] 2. IBKRBroker: fetch_bars + send_order (ib_async, Gateway 7497) + format adapter
-- [ ] 3. runner.dump_state(): điền Group B (slippage, fill quality, paper-vs-backtest, health, timing)
-- [ ] 4. Dashboard live mode: poll live_state.json
-- [ ] 5. Reconcile IBKRBroker fill khớp assumption deploy_sim (khi có fill thật)
+### Next steps (IBKR ACCOUNT APPROVED → PAPER)
+
+**Thứ tự implement:**
+- [ ] 1. Wire `IBKRBroker._fetch_raw()` → test C6 (column case), C3 (out-of-order), P2 (timezone)
+- [ ] 2. Wire `IBKRBroker.send_order()` → test A1 (fill/reject/timeout), A2 (partial), A4 (timing)
+- [ ] 3. Wire `IBKRBroker.get_positions()` → implement B3 reconcile sau restart
+- [ ] 4. Wire `_handle_rollover()` → roll cost, `contract_month` field, timing
+
+**Trước paper:**
+- [ ] Confirm NKD trong CME bundle + Rule 576 cert
+- [ ] runner.dump_state(): điền Group B (slippage, fill quality, paper-vs-backtest, health)
+- [ ] update_spy_csv timing: run trước runner, không intra-session (I5.4)
 
 **TRƯỚC LIVE (sau paper, có data mới):**
 - [x] 6. Build cơ chế re-freeze GĐ3 (Phần A: code + test giả lập) — 40/40 PASS

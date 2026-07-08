@@ -369,7 +369,7 @@ def test_ratchet_not_in_openpos():
     d = _openpos_to_dict(pos)
     check("T7.3 _openpos_to_dict has no 'stop' key", "stop" not in d, f"keys={list(d)}")
     expected_keys = {"inst", "direction", "contracts", "risk_dollars", "cluster",
-                     "entry_day", "exit_day", "pnl_sized"}
+                     "entry_day", "exit_day", "pnl_sized", "exit_pending"}
     check("T7.4 serialized fields match OpenPos exactly", set(d.keys()) == expected_keys,
           f"extra={set(d.keys())-expected_keys}, missing={expected_keys-set(d.keys())}")
 
@@ -1047,11 +1047,161 @@ def test_persist_fail_event():
                   f"context: {persist_fail_events[0].get('context')}")
 
 
+
+# ─── T29: H4 HALT_DAY fires after equity sync (intraday brake) ───────────────
+
+def test_h4_halt_day_fires_after_equity_sync():
+    print("\nT29: H4: HALT_DAY fires after equity sync post-close (intraday brake)")
+    account = 50_000.0
+    # $47,900 = 4.2% daily loss from $50k; exceeds the 4% HALT_DAY threshold
+    live_equity = 47_900.0
+
+    class _LiveLossBroker(MockBroker):
+        """Simulates IBKRBroker reporting a real intraday loss the runner did not track.
+        First get_equity() call (construction) returns nominal account so state.equity
+        starts at $50k. All subsequent calls return live_equity ($47,900), mimicking
+        IBKRBroker knowing about fills the runner hasn't synced yet (H4 scenario)."""
+        def __init__(self):
+            super().__init__({}, account=account)
+            self._calls = 0
+
+        def get_equity(self) -> float:
+            self._calls += 1
+            if self._calls == 1:
+                return self._equity   # construction: state initialized at $50k
+            return live_equity        # subsequent: IBKR reports real intraday loss
+
+    broker = _LiveLossBroker()
+    guard = _make_guard()
+    breaker = CircuitBreaker(account=account)
+
+    runner = FuturesRunner(
+        broker=broker, guard=guard, contracts_by_inst={"MES": 1},
+        signal_fn=_one_entry_signal, breaker=breaker,
+    )
+    # After construction: state.equity = $50k (first call). broker now returns $47,900.
+    # decide_day admits the entry (breaker OK at $50k). H4 fix syncs equity after
+    # CLOSE loop → daily_loss = (50k-47.9k)/50k = 4.2% ≥ 4% → HALT_DAY → entries cleared.
+    runner.run_day(pd.Timestamp("2024-06-17"))
+
+    open_fills = [f for f in broker.fills if f.action == "OPEN"]
+    halt_day_events = [e for e in runner._events
+                       if "HALT_DAY" in e.get("message", "")]
+    check("T29.1 H4: no OPEN orders sent when daily loss ≥ 4%",
+          len(open_fills) == 0,
+          f"OPEN fills: {len(open_fills)}, all actions: {[f.action for f in broker.fills]}")
+    check("T29.2 H4: HALT_DAY event emitted",
+          len(halt_day_events) >= 1,
+          f"events: {[e['message'] for e in runner._events]}")
+
+
+# ─── T30: exit_pending persists + restores across runner restart ──────────────
+
+def test_exit_pending_persist_restore():
+    print("\nT30: exit_pending=True persists to JSON and restores correctly")
+    with tempfile.TemporaryDirectory() as td:
+        pos_path = Path(td) / "live_positions.json"
+
+        broker = _empty_broker()
+        runner = _make_runner(broker, _noop_signal, positions_path=pos_path)
+
+        # Inject a position with exit_pending=True (simulates a prior session's failed CLOSE)
+        p = OpenPos("MES", "LONG", 1, 250.0, "roska4_swing",
+                    pd.Timestamp("2024-06-10"),
+                    exit_day=pd.Timestamp("2024-06-17"),
+                    pnl_sized=300.0,
+                    exit_pending=True)
+        runner.state.open_positions = [p]
+        runner._persist_state()
+
+        # Reload via a fresh runner
+        broker2 = _empty_broker()
+        runner2 = _make_runner(broker2, _noop_signal, positions_path=pos_path)
+        loaded = runner2.state.open_positions
+
+        check("T30.1 position loaded after restart",
+              len(loaded) == 1, f"len={len(loaded)}")
+        if loaded:
+            check("T30.2 exit_pending=True preserved",
+                  loaded[0].exit_pending is True,
+                  f"exit_pending={loaded[0].exit_pending}")
+            check("T30.3 other fields intact",
+                  loaded[0].inst == "MES" and abs(loaded[0].pnl_sized - 300.0) < 0.01,
+                  f"inst={loaded[0].inst} pnl={loaded[0].pnl_sized}")
+
+
+# ─── T31: STRESS_MID 2-pass — same-session loss → HALT_DAY blocks multi-day ──
+
+def test_stress_mid_2pass_halt_day():
+    print("\nT31: STRESS_MID 2-pass: same-session loss → H4 sync → HALT_DAY blocks multi-day")
+    account = 50_000.0
+
+    class _StressMidLossBroker(MockBroker):
+        """After any CLOSE: pretend IBKRBroker reports a real intraday loss > 4%."""
+        def __init__(self):
+            super().__init__({}, account=account)
+            self._closed = False
+
+        def send_order(self, order):
+            f = super().send_order(order)
+            if order.action == "CLOSE":
+                self._closed = True
+            return f
+
+        def get_equity(self) -> float:
+            if self._closed:
+                return 47_900.0   # 4.2% below $50k → HALT_DAY
+            return self._equity   # before first close: nominal $50k
+
+    # Signal: MES same-day (STRESS_MID, exit=day, no pnl_sized = live mode)
+    #         MNQ multi-day swing entry
+    day = pd.Timestamp("2024-06-17")
+
+    def _stress_and_swing(d, bars, held):
+        return [
+            {"inst": "MES", "direction": "SHORT", "cluster": "roska4_stress",
+             "risk_sized": 250.0, "entry": 5000.0, "stop": 4980.0, "exit": d},
+            {"inst": "MNQ", "direction": "LONG",  "cluster": "roska4_swing",
+             "risk_sized": 250.0, "entry": 5000.0, "stop": 4980.0},
+        ], []
+
+    broker = _StressMidLossBroker()
+    guard = MultiClusterGuard(clusters={
+        "roska4_swing":  ClusterBudget("roska4_swing",  max_gross_pct=0.05, max_net_pct=0.044),
+        "roska4_stress": ClusterBudget("roska4_stress", max_gross_pct=0.025, max_net_pct=None),
+        "global_nkd":    ClusterBudget("global_nkd",    max_gross_pct=0.02,  max_net_pct=0.02),
+    }, account=account)
+    breaker = CircuitBreaker(account=account)
+    runner = FuturesRunner(
+        broker=broker, guard=guard,
+        contracts_by_inst={"MES": 1, "MNQ": 1},
+        signal_fn=_stress_and_swing,
+        breaker=breaker,
+    )
+    runner.run_day(day)
+
+    open_fills  = [f for f in broker.fills if f.action == "OPEN"]
+    close_fills = [f for f in broker.fills if f.action == "CLOSE"]
+    mes_opens   = [f for f in open_fills  if f.inst == "MES"]
+    mnq_opens   = [f for f in open_fills  if f.inst == "MNQ"]
+    halt_day_events = [e for e in runner._events if "HALT_DAY" in e.get("message", "")]
+
+    check("T31.1 STRESS_MID OPEN sent in pass 1",
+          len(mes_opens) == 1, f"MES opens={len(mes_opens)}")
+    check("T31.2 STRESS_MID CLOSE sent same-day",
+          len(close_fills) >= 1, f"closes={len(close_fills)}")
+    check("T31.3 multi-day MNQ OPEN blocked after H4 sync (HALT_DAY fires)",
+          len(mnq_opens) == 0, f"MNQ opens={len(mnq_opens)}")
+    check("T31.4 HALT_DAY event emitted",
+          len(halt_day_events) >= 1,
+          f"events: {[e['message'] for e in runner._events]}")
+
+
 # ─── main ────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("Operational fixes test suite (B1/C1/C4/E1/C2/C3/E3/peak_equity/J2/H2/H1/G4a/H3/events/dump_state)")
+    print("Operational fixes test suite (B1/C1/C4/E1/C2/C3/E3/peak_equity/J2/H2/H1/G4a/H3/H4/I4.8/STRESS-2pass/events/dump_state)")
     print("=" * 60)
 
     test_b1_persist_reload()
@@ -1082,6 +1232,9 @@ if __name__ == "__main__":
     test_breaker_halt_event_emitted()
     test_dump_state_writes_file()
     test_persist_fail_event()
+    test_h4_halt_day_fires_after_equity_sync()
+    test_exit_pending_persist_restore()
+    test_stress_mid_2pass_halt_day()
 
     print("\n" + "=" * 60)
     passed = sum(1 for _, ok, _ in _results if ok)

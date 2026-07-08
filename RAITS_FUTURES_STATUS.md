@@ -128,7 +128,7 @@ Sau khi implement: chạy `test_ibkr_injection.py` với IBKR thật (không ch�
 1. C6 format: kiểm IBKR reqHistoricalData thực sự trả uppercase OHLC — confirm lowercase fix applies
 2. C3: kiểm có trường hợp out-of-order không với live backfill
 3. C5: test reconnect với vị thế thật (paper mode)
-4. Reconcile fill: verify `send_order` slippage/fill model khớp assumption deploy_sim (1-tick)
+4. Reconcile fill: đo slippage thật từ paper fills, so với **baseline 2-tick/side** (`baseline_fit_c.txt`, `run_smoke_test.py SLIPPAGE=2.0`). `deploy_sim` default 1-tick là upper-bound tham chiếu, KHÔNG phải baseline. Paper slippage > 2-tick → P&L sẽ thấp hơn $52,936.
 
 ### Data — đã chốt: IBKR only
 | Instrument | Source | Ghi chú |
@@ -175,7 +175,7 @@ Sau khi implement: chạy `test_ibkr_injection.py` với IBKR thật (không ch�
 |---|---|
 | **WARN không wire** | `CircuitBreaker.status()` trả `size_multiplier=0.5` tại 10% DD nhưng `decide_day` không đọc. Cố ý: binary protection, wire = re-validate WFO + vault. Xem `futures/circuit_breaker.py` docstring. |
 | **HMM shared class** | Sửa `HMMEngine` class → phải verify cả stocks pipeline. Đổi tham số (không đổi interface) là an toàn. |
-| **Baseline locked** | `baseline_fit_c.txt` = $52,962/Calmar 2.75. Không re-run baseline trừ annual re-freeze. |
+| **Baseline locked** | `baseline_fit_c.txt` = $52,936/Calmar 2.74 (corrected 2026-07-06, CSV freeze-2017 bug fixed). Không re-run baseline trừ annual re-freeze. |
 | **CWD = D:\raits** | Script chạy từ repo root. `_validated_core` resolve từ đây. |
 | **Sửa _validated_core** | Bất kỳ sửa nào → phải re-run reconcile (gd0/stress/nkd/swing_desired) để chứng minh identical. |
 | **Non-compound** | Deploy mặc định 1 micro/instrument. Sizer auto-select n=2 ở equity ≥ **$55,784** (DD-binding; 2-micro MaxDD = $5,890 = 11.8% của $50k). Gate thực: DD thật trong paper + qua ≥1 Stress live. $82k cũ là buffer thủ công +47%, không có derivation (xem §3.4). |

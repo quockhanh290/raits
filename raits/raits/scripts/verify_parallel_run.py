@@ -116,6 +116,10 @@ def make_config() -> BacktestConfig:
     )
 
 
+def _trade_key(t):
+    return (str(getattr(t, "entry_time", "?")), getattr(t, "ticker", "?"), getattr(t, "strategy", "?"))
+
+
 def compare_trade_logs(orig_trades, refac_trades):
     mismatches = []
     if len(orig_trades) != len(refac_trades):
@@ -123,6 +127,31 @@ def compare_trade_logs(orig_trades, refac_trades):
             "type": "TRADE_COUNT",
             "diff": f"count {len(orig_trades)} vs {len(refac_trades)}",
         })
+        # Show which specific trades differ (set-based on entry_time+ticker+strategy)
+        orig_keys = {}
+        for t in orig_trades:
+            k = _trade_key(t)
+            orig_keys[k] = orig_keys.get(k, 0) + 1
+        refac_keys = {}
+        for t in refac_trades:
+            k = _trade_key(t)
+            refac_keys[k] = refac_keys.get(k, 0) + 1
+        only_in_orig = []
+        only_in_refac = []
+        all_keys = set(list(orig_keys.keys()) + list(refac_keys.keys()))
+        for k in sorted(all_keys):
+            oc = orig_keys.get(k, 0)
+            rc = refac_keys.get(k, 0)
+            if oc > rc:
+                for _ in range(oc - rc):
+                    only_in_orig.append(k)
+            elif rc > oc:
+                for _ in range(rc - oc):
+                    only_in_refac.append(k)
+        if only_in_orig:
+            mismatches.append({"type": "ONLY_IN_ORIG", "trades": only_in_orig})
+        if only_in_refac:
+            mismatches.append({"type": "ONLY_IN_REFAC", "trades": only_in_refac})
         return mismatches
 
     for i, (a, b) in enumerate(zip(orig_trades, refac_trades)):
@@ -222,11 +251,21 @@ def main():
         else:
             print(f"  FAIL P&L diff: ${diff_pnl:.4f} (unexpected)")
     else:
-        count_mm = [m for m in mismatches if m["type"] == "TRADE_COUNT"]
-        field_mm = [m for m in mismatches if m["type"] == "FIELD_MISMATCH"]
+        count_mm   = [m for m in mismatches if m["type"] == "TRADE_COUNT"]
+        field_mm   = [m for m in mismatches if m["type"] == "FIELD_MISMATCH"]
+        orig_only  = [m for m in mismatches if m["type"] == "ONLY_IN_ORIG"]
+        refac_only = [m for m in mismatches if m["type"] == "ONLY_IN_REFAC"]
         print(f"\nFAIL MISMATCH DETECTED")
         if count_mm:
             print(f"  Count: {count_mm[0]['diff']}")
+        if orig_only:
+            print(f"  In ORIGINAL only (BacktestEngine has but Refactored lacks):")
+            for k in orig_only[0]["trades"]:
+                print(f"    entry_time={k[0]}  ticker={k[1]}  strategy={k[2]}")
+        if refac_only:
+            print(f"  In REFACTORED only (Refactored has but BacktestEngine lacks):")
+            for k in refac_only[0]["trades"]:
+                print(f"    entry_time={k[0]}  ticker={k[1]}  strategy={k[2]}")
         if field_mm:
             print(f"  Field mismatches: {len(field_mm)}")
             for m in field_mm[:20]:

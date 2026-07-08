@@ -45,7 +45,11 @@ class Fill:
     direction: str
     contracts: int
     cluster: str
-    pnl_sized: float = 0.0   # realized on CLOSE (verify mode: from ledger)
+    pnl_sized: float = 0.0        # realized on CLOSE (verify mode: from ledger)
+    status: str = "FILLED"         # "FILLED" | "PARTIAL" | "CANCELLED" | "FAILED"
+    filled_qty: int = 0            # 0 = full fill; IBKRBroker sets from execution report
+    avg_price: float = 0.0         # fill price; IBKRBroker sets from execution report
+    error_msg: str | None = None   # set on FAILED/CANCELLED (IBKRBroker only)
 
 
 @dataclass

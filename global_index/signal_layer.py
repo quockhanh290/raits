@@ -46,20 +46,36 @@ NKD_MULT    = 2.5
 
 
 def _asof_naive(atr_s: "pd.Series", ts) -> float:
-    """ATR lookup: strip tz before asof() because daily_atr_series index is tz-naive."""
+    """ATR lookup: strip tz before asof() because daily_atr_series index is tz-naive.
+    Raises ValueError if series is empty or all-NaN (NaN would bypass MultiClusterGuard
+    cap — caught by C4 per-cluster try/except in generate_today_signals)."""
     t = pd.Timestamp(ts)
     if t.tzinfo is not None:
         t = t.tz_localize(None)
-    av = atr_s.asof(t)
-    return float(av) if av is not None and not pd.isna(av) else float(atr_s.median())
+    try:
+        av = atr_s.asof(t)
+    except (IndexError, KeyError):
+        av = None   # empty series raises IndexError from pandas
+    if av is not None and not pd.isna(av):
+        return float(av)
+    med = atr_s.median()   # fallback for early data (< 14 bars before ts)
+    if not (float(med) > 0):   # catches NaN (empty series) and zero
+        raise ValueError(
+            f"ATR series empty or all-NaN at {t.date()!r} — cannot compute risk_sized")
+    return float(med)
 
 
 def to_candidate(inst, direction, entry, stop, cluster, contracts, point_value,
                  daily_atr, mult):
     """Build an entry_candidate dict in the exact shape decide_day expects.
     risk_sized = daily_ATR × mult × pv × contracts  (deploy_sim real_risk formula).
-    entry/stop kept in dict for order execution; risk_sized drives guard cap."""
+    entry/stop kept in dict for order execution; risk_sized drives guard cap.
+    Raises ValueError if risk_sized is not finite-positive (NaN bypasses cap guard)."""
     risk_sized = int(contracts) * float(mult) * float(daily_atr) * float(point_value)
+    if not (risk_sized > 0):   # catches NaN and zero; propagates to C4 try/except
+        raise ValueError(
+            f"to_candidate({inst}): risk_sized={risk_sized!r} — "
+            f"daily_atr={daily_atr!r} must be finite and positive")
     return dict(inst=inst, direction=direction, cluster=cluster,
                 risk_sized=risk_sized, entry=float(entry), stop=float(stop))
 
@@ -306,5 +322,20 @@ if __name__ == "__main__":
     assert len(e) == 1 and e[0][0] == "MNQ", e
     assert len(x) == 1 and x[0].inst == "MYM", x
 
+    # guard: _asof_naive with empty ATR series must raise, not return NaN
+    # (NaN risk_sized would silently bypass MultiClusterGuard cap — wrong behaviour)
+    try:
+        _asof_naive(pd.Series(dtype=float), pd.Timestamp("2020-01-01"))
+        assert False, "expected ValueError for empty ATR series"
+    except ValueError:
+        pass
+    # guard: to_candidate with NaN daily_atr must raise (second line of defence)
+    try:
+        to_candidate("MES", "LONG", 5000.0, 4980.0, CLUSTER_SWING, 1, 5.0,
+                     daily_atr=float("nan"), mult=ROSKA4_MULT)
+        assert False, "expected ValueError for NaN daily_atr"
+    except ValueError:
+        pass
+
     print("signal_layer core logic: all unit tests PASS")
-    print("  (state-diff + to_candidate verified; engine integration needs real-data reconcile)")
+    print("  (state-diff + to_candidate + NaN-guard verified; engine integration needs real-data reconcile)")

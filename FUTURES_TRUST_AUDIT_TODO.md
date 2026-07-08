@@ -109,11 +109,10 @@ is recorded in `project_system_analysis` memory. No action needed.
 | Annual convergence check | `raits/scripts/hmm_annual_convergence.py` | ✅ committed `a28e729` |
 | Sensitivity gate | `raits/scripts/hmm_sensitivity_gate.py` | ✅ committed `5cc8dbf` |
 | OOS vault test (equity) | `configs/wfo_report.json` | ✅ sealed in `final_params.yaml` |
-| OOS vault test (futures) | **NONE** | ❌ NO futures OOS vault run exists |
+| OOS vault test (futures) | `pooled_swing_vault.py` | ✅ **SEALED 2026-07-06** — GO, Calmar 3.18 / PF 1.58 / net $14,170 → `vault_2023_2024_result.txt` |
 
-**Critical gap:** The futures path has no sealed OOS test equivalent to the equity vault test.
-The fit_C baseline is IS performance (2017–2024 includes the training period).
-Before futures go-live, an equivalent OOS period (2023–2024 held out) must be run and sealed.
+**CLOSED:** Vault 2023-2024 run and sealed 2026-07-06. All 3 pre-registered GO criteria pass.
+Result: `vault_2023_2024_result.txt`. Engine deployable.
 
 ---
 

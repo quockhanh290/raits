@@ -139,7 +139,7 @@ m1     = metrics(d1)
 base_margin = sum(BASKET[nm].est_margin for nm in BASKET) + c_spec.est_margin
 n_contracts, sz = size_combined(m1["maxdd"], base_margin, ACCOUNT)
 cb_map = {nm: n_contracts for nm in BASKET}
-cb_map["MNKD"] = n_contracts
+cb_map["MNKD"] = 1  # NKD fixed n=1: budget 2% = $1,000 only fits 1 MNKD at any n_contracts
 print(f"Sizer: n_contracts={n_contracts}  maxdd1=${m1['maxdd']:,.0f}  binding={sz['binding']}")
 
 all_tr = build_rows(n_contracts)

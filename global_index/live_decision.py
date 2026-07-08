@@ -45,6 +45,7 @@ class OpenPos:
     entry_day: pd.Timestamp
     exit_day: pd.Timestamp | None = None
     pnl_sized: float = 0.0
+    exit_pending: bool = False  # True when CLOSE failed; _retry_pending_exits() retries next day
 
     def as_position(self) -> Position:
         return Position(self.inst, self.direction, self.contracts,

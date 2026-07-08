@@ -62,12 +62,13 @@ COMMON_START    = "2019-01-01"   # start of gate comparison window
 class FreezeRecord:
     version:     str         # "futures_{fit_end}_{yyyymmdd_HHMMSS}"
     fit_end:     str         # "2024-12-31"
-    anchor:      str         # "2018-01-01"
+    anchor:      str         # "2017-01-01" (must match production: full spy_daily.csv start)
     n_components: int        # 3 (futures uses 3-state HMM)
     labels_hash: str         # SHA-256 of sorted labels for integrity check
     frozen_at:   str         # ISO datetime UTC
     calmar:      float       # Calmar ratio from verify step (0.0 if skipped)
-    note:        str = ""    # operator note
+    note:        str  = ""   # operator note
+    invalid:     bool = False  # True → audit-only; rollback() skips this entry
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -469,13 +470,18 @@ def apply_freeze(record: FreezeRecord,
 def rollback(registry_path: Path = REGISTRY_PATH) -> Optional[FreezeRecord]:
     """
     Restore previous freeze from registry history.
-    Returns the restored record, or None if no history.
+    Skips entries marked invalid=True (audit-only; not eligible for restore).
+    Returns the restored record, or None if no valid history exists.
     """
     reg = _load_registry(registry_path)
-    if not reg["history"]:
-        log.warning("rollback: no history to restore")
+    valid_idx = next(
+        (i for i, e in enumerate(reg["history"]) if not e.get("invalid", False)),
+        None,
+    )
+    if valid_idx is None:
+        log.warning("rollback: no valid history to restore")
         return None
-    prev = reg["history"].pop(0)
+    prev = reg["history"].pop(valid_idx)
     reg["current"] = prev
     _save_registry(reg, registry_path)
     restored = FreezeRecord.from_dict(prev)
@@ -658,7 +664,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     ap = argparse.ArgumentParser(description="RAITS futures HMM re-freeze pipeline")
-    ap.add_argument("--anchor",     default="2018-01-01")
+    ap.add_argument("--anchor",     default="2017-01-01")
     ap.add_argument("--fit-end",    required=True)
     ap.add_argument("--spy-csv",    default="spy_daily.csv")
     ap.add_argument("--data-dir",   required=True)

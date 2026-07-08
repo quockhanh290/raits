@@ -39,7 +39,6 @@ After any reconnect:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 import pandas as pd
@@ -47,6 +46,82 @@ import pandas as pd
 from global_index.broker import Broker, Order, Fill, BrokerPosition
 
 log = logging.getLogger(__name__)
+
+# ── C2: Rollover schedule ─────────────────────────────────────────────────────
+#
+# Backtest uses continuous (roll-adjusted) parquet.  Live needs the specific
+# front-month contract for each instrument.
+#
+# Roll rule: roll ROLL_BDAYS_BEFORE_EXPIRY business days before last trading day (LTD).
+#   CME micro equity (MES/MNQ/MYM/M2K): LTD = 3rd Friday of March/June/Sep/Dec.
+#   NKD (Nikkei/Dollar CME): LTD = 2nd Friday of March/June/Sep/Dec.
+#
+# 2026 pre-computed roll dates (LTD - 5 bdays):
+#
+# | Inst          | LTD        | Roll (5 bday before) |
+# |---------------|------------|----------------------|
+# | MES/MNQ/MYM/M2K | 2026-03-20 | 2026-03-13         |
+# |               | 2026-06-19 | 2026-06-12           |
+# |               | 2026-09-18 | 2026-09-11           |
+# |               | 2026-12-18 | 2026-12-11           |
+# | NKD           | 2026-03-13 | 2026-03-06           |
+# |               | 2026-06-12 | 2026-06-05           |
+# |               | 2026-09-11 | 2026-09-04           |
+# |               | 2026-12-11 | 2026-12-04           |
+#
+# Next-month contract code: "YYYYMM" e.g. "202606" for June 2026.
+# IB Future contract: ibi.Future(symbol, lastTradeDateOrContractMonth="202606", exchange="CME")
+#
+# ROLL_SCHEDULE maps inst → list of (roll_date, front_month, next_month) tuples.
+# A row means: on roll_date, close front_month and open next_month.
+
+ROLL_BDAYS_BEFORE_EXPIRY = 5
+
+ROLL_SCHEDULE: dict[str, list[tuple[str, str, str]]] = {
+    # (roll_date, close_this_contract_month, open_this_contract_month)
+    "MES": [
+        ("2026-03-13", "202603", "202606"),
+        ("2026-06-12", "202606", "202609"),
+        ("2026-09-11", "202609", "202612"),
+        ("2026-12-11", "202612", "202703"),
+    ],
+    "MNQ": [
+        ("2026-03-13", "202603", "202606"),
+        ("2026-06-12", "202606", "202609"),
+        ("2026-09-11", "202609", "202612"),
+        ("2026-12-11", "202612", "202703"),
+    ],
+    "MYM": [
+        ("2026-03-13", "202603", "202606"),
+        ("2026-06-12", "202606", "202609"),
+        ("2026-09-11", "202609", "202612"),
+        ("2026-12-11", "202612", "202703"),
+    ],
+    "M2K": [
+        ("2026-03-13", "202603", "202606"),
+        ("2026-06-12", "202606", "202609"),
+        ("2026-09-11", "202609", "202612"),
+        ("2026-12-11", "202612", "202703"),
+    ],
+    "NKD": [
+        ("2026-03-06", "202603", "202606"),
+        ("2026-06-05", "202606", "202609"),
+        ("2026-09-04", "202609", "202612"),
+        ("2026-12-04", "202612", "202703"),
+    ],
+}
+
+
+def get_roll_event(inst: str, today) -> "tuple[str, str] | None":
+    """
+    Return (front_month, next_month) if today is a roll date for inst, else None.
+    today: str "YYYY-MM-DD" or pd.Timestamp.
+    """
+    today_str = str(pd.Timestamp(today).date())
+    for roll_date, front, nxt in ROLL_SCHEDULE.get(inst, []):
+        if roll_date == today_str:
+            return front, nxt
+    return None
 
 
 class IBKRConnectionError(RuntimeError):
@@ -214,13 +289,50 @@ class IBKRBroker(Broker):
 
     def send_order(self, order: Order) -> Fill:
         """
-        Submit a futures market order to IBKR.
+        Submit a futures market order to IBKR. BLOCKING — returns after fill confirmation.
 
-        Production TODO (not yet tested against live Gateway):
+        Full contract: see FILL_HANDLING_DESIGN.md
+
+        Four design constraints (do not violate when implementing):
+
+        [1] ENTRY timeout = 30s (ENTRY_FILL_TIMEOUT_SECS).
+            After timeout: cancel order, return Fill(status='CANCELLED').
+            Runner logs divergence (+1 to _entry_divergence_count) and skips the entry.
+            NOTE: skip count is a FLOOR on true divergence — each skip frees cap and
+            may admit a different trade, cascading. True optimism = paper P&L vs backtest.
+
+        [2] EXIT order type = MARKET, no timeout.
+            Exit CANCELLED/FAILED → return Fill(status='FAILED'), runner sets exit_pending=True.
+            PARTIAL exit → runner flags remaining contracts exit_pending=True.
+            exit_pending positions are retried via _retry_pending_exits() at next run_day start.
+            NOTE: remaining uses exit_pending flag, NOT exit_day (already fired, won't re-trigger).
+
+        [3] Exit fail escalation at 3× consecutive fails:
+            Indicates market halt / instrument suspension — beyond automated resolution.
+            Runner response: CRITICAL alert + halt new entries + continue retrying exits
+            + flag operational_status "manual_required". Code cannot self-resolve.
+            Operator must close manually via TWS or contact broker.
+
+        [4] Blocking time budget (order counts MEASURED, fill times DESIGN ASSUMPTION):
+            Order counts from IS 2018-2024 (N=1381 days):
+              median = 2E+2X, p99 = 6E+5X, peak = 8E+5X (2018-03-27, all-cluster stress day)
+            Fill times — NOT yet measured, unverified design assumptions:
+              entry fast fill ~5s, entry timeout 30s; exit fast fill ~5s
+            Block time = n_entries×entry_time + n_exits×exit_time:
+              typical peak = 8×5s + 5×5s = 65s
+              worst-case peak = 8×30s + 5×5s = 265s (4m25s, all entries timeout)
+            Original "105s" estimate was p75 (3E+3X), not worst-case.
+            At implementation: verify runner_start + 300s < session_end_time (5-min buffer).
+            Emit WARN if remaining_session_time < 300s at run_day start.
+            Verify actual fill times in first paper weeks; update 30s/5s assumptions.
+
+        Production TODOs (not yet tested against live Gateway):
           - Build correct futures Contract (symbol, lastTradeDateOrContractMonth, exchange)
-          - Use LimitOrder at bid/ask instead of MarketOrder for micro futures
-          - Map cluster → contractMonth for rollover handling
-          - Poll orderStatus events; return Fill after confirmation
+          - Use Market order for BOTH entry and exit (see [2])
+          - Map cluster → contractMonth: use get_roll_event(inst, today) to check roll date;
+            on roll date close front_month contract, open next_month. See _handle_rollover().
+          - Implement _wait_for_fill(trade, timeout_secs=30 for entry, None for exit)
+          - Extend Fill dataclass with status/filled_qty/avg_price/error_msg (see broker.py)
         """
         if self._raw_fetcher is not None:
             # Test mode: simulate fill
@@ -237,7 +349,7 @@ class IBKRBroker(Broker):
             return Fill(order.inst, order.action, order.direction,
                         order.contracts, order.cluster, order.pnl_sized)
 
-        ib = self._require_connection()
+        self._require_connection()
         raise NotImplementedError(
             "send_order live path not yet implemented — pending IBKR account setup. "
             "Implement: build Contract, placeOrder, poll orderStatus, return Fill."
@@ -247,7 +359,7 @@ class IBKRBroker(Broker):
         """Return current open positions known to this broker instance."""
         if self._raw_fetcher is not None:
             return list(self._positions)
-        ib = self._require_connection()
+        self._require_connection()
         raise NotImplementedError(
             "get_positions live path not yet implemented — pending IBKR account setup. "
             "Implement: ib.positions() → map to BrokerPosition list."
@@ -271,3 +383,49 @@ class IBKRBroker(Broker):
             raise
         except Exception as exc:
             raise IBKRConnectionError(f"get_equity() failed: {exc}") from exc
+
+    # ── C2: Rollover ──────────────────────────────────────────────────────────
+
+    def _handle_rollover(self, inst: str, today, _direction: str,
+                         _contracts: int, _cluster: str) -> "tuple[Fill, Fill] | None":
+        """
+        C2: Roll a futures position from front-month to next-month contract.
+
+        Called by runner._handle_rollover_if_needed() at the START of run_day
+        for each open position, BEFORE signal generation.
+
+        Roll logic:
+          1. Check get_roll_event(inst, today) → (front_month, next_month) or None.
+          2. If roll day:
+             a. CLOSE front_month: placeOrder(Future(inst, front_month), direction, SELL, contracts)
+             b. OPEN  next_month:  placeOrder(Future(inst, next_month),  direction, BUY,  contracts)
+          3. Return (close_fill, open_fill) so runner can update position contract_month.
+          4. Position identity is preserved: entry_day/exit_day/cluster/risk$ unchanged,
+             only contract_month updates.
+
+        Position identity across roll:
+          runner.state.open_positions keeps the same OpenPos object; only the
+          contract_month field (TBD in OpenPos) changes.  P&L accounting is based
+          on risk_dollars and exit_day — not contract price — so no adjustment needed.
+
+        NOT YET IMPLEMENTED — pending IBKR account + get_roll_event() verification.
+        Implement after send_order live path is working and first paper run confirms
+        contract month mapping is correct.
+        """
+        roll = get_roll_event(inst, today)
+        if roll is None:
+            return None  # not a roll day
+
+        front_month, next_month = roll
+        log.info(
+            "C2: ROLLOVER %s on %s — close %s, open %s (%s contracts, cluster=%s)",
+            inst, pd.Timestamp(today).date(), front_month, next_month, contracts, cluster,
+        )
+        raise NotImplementedError(
+            f"C2 rollover not yet implemented: "
+            f"close {inst} {front_month} → open {inst} {next_month}. "
+            f"Implement: build two ibi.Future contracts with lastTradeDateOrContractMonth, "
+            f"call send_order for each, return (close_fill, open_fill). "
+            f"See ROLL_SCHEDULE for 2026 dates. "
+            f"(contracts={_contracts}, cluster={_cluster})"
+        )

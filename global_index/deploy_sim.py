@@ -137,7 +137,19 @@ def main():
                          "(apples-to-apples to measure NKD's true contribution)")
     ap.add_argument("--hmm-train-end", default="2018-01-01")
     ap.add_argument("--hmm-fit-end", default="2024-12-31")
+    ap.add_argument("--n-contracts", type=int, default=None,
+                    help="pin contract count instead of auto-sizing from period maxDD. "
+                         "Use --n-contracts 1 for vault tests to match production config "
+                         "(IS baseline n=1 because COVID 2020 dominates the full-history maxDD).")
     a = ap.parse_args()
+
+    if (a.start or a.end) and a.n_contracts is None:
+        print(
+            "\nWARNING: --start/--end without --n-contracts\n"
+            "  Sizer will auto-size from this period's maxDD.\n"
+            "  If the period excludes COVID-2020, auto-n may be 2-3 (not production n=1).\n"
+            "  Add --n-contracts 1 for vault/subset tests.\n"
+        )
 
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from futures._validated_core import (load_parquet, benchmark_daily, label_regimes,
@@ -158,10 +170,11 @@ def main():
     dfs = {n: clip(load_parquet(str(Path(a.data_dir) / data_filename(c)))) for n, c in BASKET.items()}
     atr = {n: daily_atr_series(df) for n, df in dfs.items()}            # real ATR per instrument
     pv = {n: c.point_value for n, c in BASKET.items()}
-    bench = benchmark_daily(a.regime_csv)
+    bench_full = benchmark_daily(a.regime_csv)
+    labels = label_regimes(bench_full, a.hmm_train_end, 3, a.hmm_fit_end)
+    bench = bench_full
     if a.start: bench = bench[bench.index >= pd.Timestamp(a.start)]
     if a.end:   bench = bench[bench.index <= pd.Timestamp(a.end)]
-    labels = label_regimes(bench, a.hmm_train_end, 3, a.hmm_fit_end)
     costs = costs_for_basket(slippage_ticks=a.slippage_ticks)
     swing = SwingTFEngine().backtest_basket(dfs, labels, costs)
     stress = None
@@ -226,14 +239,26 @@ def main():
     m1 = metrics(d1)
 
     base_margin = sum(BASKET[n].est_margin for n in BASKET) + c.est_margin
-    n_contracts, sz = size_combined(m1["maxdd"], base_margin, a.account)
+    auto_n, sz = size_combined(m1["maxdd"], base_margin, a.account)
+    if a.n_contracts is not None:
+        # Production-config override: vault tests must pin n to match IS baseline
+        # (IS baseline n=1 because COVID 2020 dominates full-history maxDD; vault
+        # windows without COVID auto-size to n=2-3, testing a different config).
+        n_contracts = a.n_contracts
+        sz["dd_scale"] = sz.get("dd_scale", 0); sz["binding"] = "FIXED (--n-contracts override)"
+        sz["proj_dd_pct"] = n_contracts * m1["maxdd"] / a.account
+    else:
+        n_contracts = auto_n
 
     # ── replay at SIZED contracts, real risk$ scaled by contracts ────────────
+    # NKD fixed at n=1: budget 2% = $1,000 only fits 1 MNKD (risk ~$400-500/contract).
+    # Rổ 4 scales with n_contracts; NKD does not scale.
     contracts_by = {n: n_contracts for n in BASKET}
-    contracts_by[a.nkd_instrument] = n_contracts
+    contracts_by[a.nkd_instrument] = 1
     for t in all_tr:
-        t["risk_sized"] = real_risk(t["atr"], t["mult"], t["pv"], t["_atr_entry"], n_contracts)
-        t["pnl_sized"] = t["pnl1"] * n_contracts
+        n = 1 if t["cluster"] == "global_nkd" else n_contracts
+        t["risk_sized"] = real_risk(t["atr"], t["mult"], t["pv"], t["_atr_entry"], n)
+        t["pnl_sized"] = t["pnl1"] * n
     guard = MultiClusterGuard(account=a.account)
     sized_daily, st = replay(all_tr, a.account, guard, contracts_by, CircuitBreaker)
     msz = metrics(sized_daily)

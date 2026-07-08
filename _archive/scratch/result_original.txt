@@ -1,0 +1,14 @@
+Run: ORIGINAL (spy_daily.csv frozen 2017)
+CSV: d:/raits/spy_daily.csv
+Regime distribution: {'Normal': 757, 'Calm': 735, 'Stress': 269}
+naive pooled: pnl=60224.22 calmar=1.664 maxdd=5232.11 pf=1.625
+FULL SYSTEM:  pnl=60224.22 calmar=1.770 maxdd=4919.53 pf=1.575
+vault:        pnl=20075.33 calmar=4.113 maxdd=2445.39
+per-year:
+  2018  8059.63
+  2019  2561.87
+  2020  17885.60
+  2021  6896.62
+  2022  4745.17
+  2023  13829.65
+  2024  6245.68

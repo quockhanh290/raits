@@ -29,6 +29,7 @@ import pandas as pd
 import numpy as np
 
 from global_index.ibkr_broker import IBKRBroker
+from global_index.broker import Fill
 from global_index.live_decision import DecisionState, OpenPos
 from global_index.net_exposure_multi import MultiClusterGuard
 from global_index.runner import FuturesRunner
@@ -179,6 +180,7 @@ class _MinimalBroker:
         self.orders.append(o)
         if o.action == "CLOSE":
             self._eq += o.pnl_sized
+        return Fill(o.inst, o.action, o.direction, o.contracts, o.cluster, o.pnl_sized)
 
 ibkr_broker = IBKRBroker(
     _raw_fetcher=lambda inst, through: pd.DataFrame()

@@ -9,7 +9,7 @@ Runs FuturesRunner + MockBroker from a clean production entry point. Verifies:
   3. fit_C (2024-12-31) is live, NOT fit_A residual
   4. UTF-8 / "Rổ 4" logging survives cold start
   5. n_contracts from deploy_sim.size_combined() == 1
-  6. net P&L / taken / rejected / lifecycle == deploy_sim fit_C ($52,962)
+  6. net P&L / taken / rejected / lifecycle == deploy_sim fit_C ($52,936)
 
 HOW THIS DIFFERS FROM verify_runner_real.py:
   verify_runner_real.py is a reconcile harness: hardcodes SLIPPAGE=2.0 / N_CONTRACTS=1,
@@ -243,7 +243,7 @@ def main():
     ref_net = float(ref_daily.sum())
     ref_m   = metrics(ref_daily)
     print(f"       net=${ref_net:>10,.2f}  Calmar={ref_m['calmar']:.2f}  "
-          f"MaxDD=${ref_m['maxdd']:,.0f}  (expect ~$52,962)")
+          f"MaxDD=${ref_m['maxdd']:,.0f}  (expect ~$52,936)")
 
     # ── signal_fn (pre-computed timelines, same as verify_runner_real fix) ─────
     ledger: dict = {}

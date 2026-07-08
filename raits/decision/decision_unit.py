@@ -250,6 +250,14 @@ class DecisionUnit:
             effective = ctx.hmm_state
         active = _REGIME_STRATEGIES.get(effective, [])
 
+        # Mirror engine.py: _close_trade() removes a trade from the live log
+        # immediately, so subsequent _position_ok checks in the same bar see
+        # the post-exit open count.  Here ctx.open_trades is a snapshot from
+        # bar start; exclude already-queued swing exits so every strategy's
+        # position check sees the same reduced count engine.py would see.
+        _exited_ids = {id(e.trade) for e in exits}
+        _effective_open = [t for t in ctx.open_trades if id(t) not in _exited_ids]
+
         # ── 5. ORB scanner at 9:35 ────────────────────────────────────────────
         if bar_t == ORB_SCAN_TIME and not self.orb_scanned and "ORB" in active:
             candidates = self._build_orb_candidates(
@@ -326,7 +334,7 @@ class DecisionUnit:
                         continue
                     if not ctx.spy_bull_trend:
                         continue
-                    if not self._position_ok(_pticker, "ORB", ctx.open_trades, pending_entries):
+                    if not self._position_ok(_pticker, "ORB", _effective_open, pending_entries):
                         continue
                     _result = self._normalise_signal(_result)
                     self._attempt_entry(_result, _pticker, "ORB", bar_ts,
@@ -356,7 +364,7 @@ class DecisionUnit:
                             continue
                     if _fade_dir == "LONG" and _fticker in ctx.fade_atr_top2:
                         continue
-                    if not self._position_ok(_fticker, "FADE", ctx.open_trades, pending_entries):
+                    if not self._position_ok(_fticker, "FADE", _effective_open, pending_entries):
                         continue
                     _fresult = self._normalise_signal(_fresult)
                     self._attempt_entry(_fresult, _fticker, "FADE", bar_ts,
@@ -369,7 +377,7 @@ class DecisionUnit:
             for ticker, (or_high, or_low) in list(self.or_ranges.items()):
                 if ticker in self.pending_orb:
                     continue
-                if not self._position_ok(ticker, "ORB", ctx.open_trades, pending_entries):
+                if not self._position_ok(ticker, "ORB", _effective_open, pending_entries):
                     continue
                 if ticker not in ctx.day_stocks:
                     continue
@@ -396,7 +404,7 @@ class DecisionUnit:
             for ticker, (or_high, or_low) in list(self.fade_or_ranges.items()):
                 if ticker in self.pending_fades:
                     continue
-                if not self._position_ok(ticker, "FADE", ctx.open_trades, pending_entries):
+                if not self._position_ok(ticker, "FADE", _effective_open, pending_entries):
                     continue
                 if ticker not in ctx.day_stocks:
                     continue
@@ -441,7 +449,7 @@ class DecisionUnit:
         if (orb_signal_start <= bar_t <= orb_signal_end
                 and "STRESS_ORB" in active and ctx.stress_orb_vix_ok):
             for ticker, (or_high, or_low) in list(self.stress_or_ranges.items()):
-                if not self._position_ok(ticker, "STRESS_ORB", ctx.open_trades, pending_entries):
+                if not self._position_ok(ticker, "STRESS_ORB", _effective_open, pending_entries):
                     continue
                 if ticker not in ctx.stress_stocks:
                     continue
@@ -498,7 +506,7 @@ class DecisionUnit:
                     logger.debug(f"STRESS_MID error {_sm_ticker}: {e}")
             _sm_setups.sort(key=lambda x: -x["vwap_gap"])
             for _sm in _sm_setups:
-                if not self._position_ok(_sm["ticker"], "STRESS_MID", ctx.open_trades, pending_entries):
+                if not self._position_ok(_sm["ticker"], "STRESS_MID", _effective_open, pending_entries):
                     continue
                 sig = {
                     "direction": "SHORT", "entry_price": _sm["entry_px"],
@@ -514,7 +522,7 @@ class DecisionUnit:
             for _pe_ticker in _pe_today:
                 if _pe_ticker not in ctx.market_data:
                     continue
-                if not self._position_ok(_pe_ticker, "PE_SHORT", ctx.open_trades, pending_entries):
+                if not self._position_ok(_pe_ticker, "PE_SHORT", _effective_open, pending_entries):
                     continue
                 # Inject into ctx.day_stocks so exit checks work for the rest of
                 # today. engine.py writes day_stocks[_pe_ticker] in-place; a local
@@ -571,7 +579,7 @@ class DecisionUnit:
             )
             self.vwap_mr.run_scanner(vwap_cands)
             for ticker in self.vwap_mr.watchlist:
-                if not self._position_ok(ticker, "VWAP_MR", ctx.open_trades, pending_entries):
+                if not self._position_ok(ticker, "VWAP_MR", _effective_open, pending_entries):
                     continue
                 if ticker not in ctx.day_stocks:
                     continue
@@ -634,7 +642,7 @@ class DecisionUnit:
                 for ticker in ctx.all_tickers:
                     if ticker == "SPY":
                         continue
-                    if not self._position_ok(ticker, "GAP_FILL", ctx.open_trades, pending_entries):
+                    if not self._position_ok(ticker, "GAP_FILL", _effective_open, pending_entries):
                         continue
                     if ticker not in ctx.day_stocks:
                         continue
@@ -707,7 +715,7 @@ class DecisionUnit:
                 for ticker in ctx.all_tickers:
                     if ticker == "SPY":
                         continue
-                    if not self._position_ok(ticker, "GF_SHORT", ctx.open_trades, pending_entries):
+                    if not self._position_ok(ticker, "GF_SHORT", _effective_open, pending_entries):
                         continue
                     if ticker not in ctx.day_stocks:
                         continue
@@ -788,7 +796,7 @@ class DecisionUnit:
                         logger.debug(f"RS_SHORT scan error {ticker}: {e}")
                 _rs_candidates.sort(key=lambda x: x[0])
                 for _alpha_val, ticker, entry_px, atr in _rs_candidates[:1]:
-                    if not self._position_ok(ticker, "RS_SHORT", ctx.open_trades, pending_entries):
+                    if not self._position_ok(ticker, "RS_SHORT", _effective_open, pending_entries):
                         continue
                     stop_px   = entry_px + RS_SHORT_ATR_MULT * atr
                     target_px = entry_px * 0.70
@@ -810,12 +818,6 @@ class DecisionUnit:
                     ctx.day_stocks, bar_ts, trend_eligible, sector_str
                 )
                 self.trend.run_scanner(trend_cands)
-
-            # Mirror engine.py: _close_trade() removes trade from live log BEFORE
-            # section-9 position check. Replicate by excluding already-queued exits
-            # so _position_ok sees the post-exit open count, not the pre-exit snapshot.
-            _exited_ids = {id(e.trade) for e in exits}
-            _effective_open = [t for t in ctx.open_trades if id(t) not in _exited_ids]
 
             for ticker in self.trend.watchlist:
                 _pos_ok = self._position_ok(ticker, "TREND_FOLLOW", _effective_open, pending_entries)

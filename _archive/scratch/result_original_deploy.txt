@@ -1,0 +1,14 @@
+Run: ORIGINAL (spy_daily.csv frozen 2017)
+CSV: d:/raits/spy_daily.csv
+n_contracts=1 binding=drawdown
+Regime dist: {'Normal': 757, 'Calm': 735, 'Stress': 269}
+DEPLOY: pnl=52961.74 calmar=2.746 maxdd=2789.22 pf=1.603 sharpe=2.075
+vault:  pnl=14357.32 calmar=3.222 maxdd=2232.59
+per-year:
+  2018  7893.12
+  2019  1647.20
+  2020  16522.62
+  2021  4825.44
+  2022  7716.04
+  2023  9607.53
+  2024  4749.79

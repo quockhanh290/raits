@@ -17,7 +17,7 @@ MaxDD past ~10-12%, a tighter cap is the smarter point despite lower net.
 SLIPPAGE NOTE: cap_sweep defaults to 1-tick slippage (not the canonical 2-tick).
 Rationale: the purpose is relative ranking across caps, and cap rank is stable across
 slippage levels. Net$ in the output table (e.g. ~$58,602 at 5% gross cap, fit_C) is
-therefore HIGHER than the canonical baseline ($52,962 at 2-tick). Do NOT read those
+therefore HIGHER than the canonical baseline ($52,936 at 2-tick). Do NOT read those
 as production P&L — they are comparison-only. Canonical numbers come from deploy_sim
 with --slippage-ticks 2.
 

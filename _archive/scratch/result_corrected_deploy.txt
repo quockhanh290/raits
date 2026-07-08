@@ -1,0 +1,14 @@
+Run: CORRECTED (Polygon adjusted 2026-07-06)
+CSV: d:/raits/_archive/scratch/spy_adjusted_v1_2026-07-06.csv
+n_contracts=1 binding=drawdown
+Regime dist: {'Normal': 788, 'Calm': 708, 'Stress': 265}
+DEPLOY: pnl=52936.36 calmar=2.744 maxdd=2789.22 pf=1.591 sharpe=2.039
+vault:  pnl=14836.39 calmar=4.745 maxdd=1566.71
+per-year:
+  2018  7780.25
+  2019  1585.01
+  2020  16174.64
+  2021  4588.17
+  2022  7971.90
+  2023  9195.13
+  2024  5641.26

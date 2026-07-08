@@ -44,7 +44,7 @@ SPY_CSV     = "spy_daily.csv"
 DATA_DIR    = "data/cache/futures"
 NKD_PARQ    = "global_index/data/NKD_continuous_1m_8y.parquet"
 REGIME_CSV  = "spy_daily.csv"
-ANCHOR      = "2018-01-01"
+ANCHOR      = "2017-01-01"  # must match production fit window (full spy_daily.csv from 2017-01-03)
 FIT_C       = "2024-12-31"   # production freeze
 FIT_2023    = "2023-12-31"   # one year earlier — simulation "new" candidate
 
@@ -528,6 +528,75 @@ check("T11.5 STILL PENDING re-alerted before fitting (attempts=3 was in flag)",
       any("STILL PENDING" in n[0] for n in notifs_t11),
       f"notifs={[n[0] for n in notifs_t11]}")
 check("T11.6 r.new_record is not None", r11 is not None and r11.new_record is not None)
+
+print()
+
+# ─── T12: rollback skip-invalid ──────────────────────────────────────────────
+print("=" * 60)
+print("T12: rollback() skips invalid=True entries")
+print("=" * 60)
+
+import tempfile as _tmp12
+tmp12 = Path(_tmp12.mkdtemp(prefix="refreeze_t12_"))
+REG12 = tmp12 / "registry.json"
+
+try:
+    from futures.refreeze import _save_registry as _sr12
+
+    valid_entry = {
+        "version": "futures_20241231_VALID", "fit_end": "2024-12-31",
+        "anchor": "2017-01-01", "n_components": 3,
+        "labels_hash": "aabbccdd11223344", "frozen_at": "2026-01-01T00:00:00+00:00",
+        "calmar": 2.74, "note": "valid reference", "invalid": False,
+    }
+    invalid_entry = {
+        "version": "futures_20241231_BUG", "fit_end": "2024-12-31",
+        "anchor": "2018-01-01", "n_components": 3,
+        "labels_hash": "73a7ceb693ce1f96", "frozen_at": "2026-01-01T00:00:00+00:00",
+        "calmar": 2.49, "note": "anchor=2018 bug", "invalid": True,
+    }
+
+    # Case A: history=[invalid, valid] → rollback() → valid (skip invalid)
+    current_a = {
+        "version": "futures_20251231_CURRENT", "fit_end": "2025-12-31",
+        "anchor": "2017-01-01", "n_components": 3,
+        "labels_hash": "ffffffffffffffff", "frozen_at": "2026-07-01T00:00:00+00:00",
+        "calmar": 2.80, "note": "", "invalid": False,
+    }
+    _sr12({"current": current_a, "history": [invalid_entry, valid_entry]}, REG12)
+    restored_a = rollback(REG12)
+    check("T12.1 rollback skips invalid, returns valid entry",
+          restored_a is not None and restored_a.calmar == 2.74,
+          f"calmar={restored_a.calmar if restored_a else None}")
+    check("T12.2 current after rollback = valid (not invalid)",
+          current_freeze(REG12) is not None and current_freeze(REG12).calmar == 2.74)
+    reg12_state = json.loads(REG12.read_text())
+    check("T12.3 invalid entry stays in history (audit trail)",
+          any(e.get("invalid") for e in reg12_state["history"]),
+          f"history={[(e['version'], e.get('invalid')) for e in reg12_state['history']]}")
+
+    # Case B: history=[invalid only] → rollback() → None, current unchanged
+    _sr12({"current": current_a, "history": [invalid_entry]}, REG12)
+    restored_b = rollback(REG12)
+    check("T12.4 rollback with only-invalid history returns None", restored_b is None)
+    check("T12.5 current unchanged when no valid history",
+          current_freeze(REG12) is not None and current_freeze(REG12).fit_end == "2025-12-31")
+
+    # Case C: FreezeRecord.invalid field loads correctly from JSON (from_dict)
+    fr = FreezeRecord.from_dict(invalid_entry)
+    check("T12.6 FreezeRecord.from_dict loads invalid=True", fr.invalid is True)
+    fr2 = FreezeRecord.from_dict(valid_entry)
+    check("T12.7 FreezeRecord.from_dict loads invalid=False", fr2.invalid is False)
+    # Old entries without 'invalid' key → default False
+    old_entry = {k: v for k, v in valid_entry.items() if k != "invalid"}
+    fr3 = FreezeRecord.from_dict(old_entry)
+    check("T12.8 old entry without invalid field → default False", fr3.invalid is False)
+
+except Exception as e:
+    check("T12 rollback skip-invalid runs", False, str(e))
+    import traceback; traceback.print_exc()
+finally:
+    shutil.rmtree(tmp12, ignore_errors=True)
 
 print()
 

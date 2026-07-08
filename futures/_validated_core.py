@@ -17,8 +17,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import time as dtime
 from typing import Dict, List, Optional
+import logging
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 # ── from gate2_edge_harness.py ──────────────────────────────────────────────
 ET = "America/New_York"
@@ -114,7 +117,8 @@ def label_regimes(daily: pd.Series, train_end: Optional[str], n_components: int,
         try:
             state = eng.predict_current(window)
             labels[pd.Timestamp(d).normalize()] = eng.state_name(state)
-        except Exception:
+        except Exception as exc:
+            logger.error("HMM label failed for %s: %s", pd.Timestamp(d).date(), exc)
             continue
     return labels
 
@@ -258,7 +262,7 @@ def backtest_swing_tf(df, labels, cost, *, ema_period=20, chandelier_atr_mult=3.
             else:
                 high, low, opn, isg = hl[day]
                 da = float(datr.asof(day)) if len(datr) else np.nan
-                if not np.isnan(da) and len(high):
+                if not np.isnan(da) and da > 0 and len(high):
                     if pos["dir"] == "LONG":
                         # stop IN FORCE at each bar's open = ratchet from extreme through PRIOR bar
                         run_full = np.maximum.accumulate(np.maximum(high, pos["extreme"]))
