@@ -1,0 +1,76 @@
+Bootstrap — NORMALIZED (R-multiple) vs DOLLAR per-trade P&L
+Baseline : is_baseline_cb_fixed_2026-07-08.csv  (605 trades, continuous IS 2017-2022)
+N_BOOT=10000  seed=42
+R-multiple = net_pnl / (shares * |entry_price - stop|)
+H0: mean(R) <= 0  |  same threshold as dollar bootstrap
+
+STEP 1 — METHODOLOGY DIAGNOSIS
+------------------------------------------------------------
+Dollar bootstrap problem: Kelly=0.75 + compounding -> position size scales with
+equity at each trade. Dollar P&L from different equity levels is NOT homogeneous.
+A trade at $60k equity has ~20% larger positions than the same trade at $50k.
+Bootstrapping raw dollar P&L treats these as comparable — they are not.
+
+R-multiple fix: initial_risk = shares * |entry_price - stop| is set at entry
+and reflects the actual dollar at risk regardless of equity level.
+R = net_pnl / initial_risk is scale-independent — the same entry/exit logic
+produces the same R regardless of position size or account equity.
+
+STEP 2 — R-MULTIPLE STATISTICS BY STRATEGY
+-----------------------------------------------------------------------------------------------
+Strategy          N    Mean$   MeanR    StdR    d_R  avg_risk
+-----------------------------------------------------------------------------------------------
+GF_SHORT         12   +23.62 +8.5856 13.4840 +0.637     22.29
+ORB              75   +16.20 +0.0707  0.8741 +0.081    377.96
+PE_SHORT         29  +246.13 +0.3486  0.8286 +0.421    704.14
+STRESS_MID       28    +8.64 +0.0755  1.2503 +0.060    134.31
+STRESS_ORB      108    +4.70 +0.0407  1.2436 +0.033     50.52
+TREND_FOLLOW    353   +15.96 +0.1503  1.2734 +0.118    255.55
+-----------------------------------------------------------------------------------------------
+
+STEP 3 — BOOTSTRAP COMPARISON: DOLLAR vs R-MULTIPLE
+===============================================================================================
+Strategy          N  Dollar p   Dollar v       R p  R verdict     Delta  Verdict change?
+===============================================================================================
+GF_SHORT         12     0.010  CONFIRMED     0.000  CONFIRMED    -0.010  
+ORB              75     0.329    NO EDGE     0.241    NO EDGE    -0.088  
+PE_SHORT         29     0.011  CONFIRMED     0.010  CONFIRMED    -0.001  
+STRESS_MID       28     0.401    NO EDGE     0.380    NO EDGE    -0.021  
+STRESS_ORB      108     0.215    NO EDGE     0.366    NO EDGE    +0.151  
+TREND_FOLLOW    353     0.116 BORDERLINE     0.009  CONFIRMED    -0.107  * partial
+===============================================================================================
+
+STEP 4 — WHAT EACH TEST ANSWERS
+------------------------------------------------------------
+  R-multiple bootstrap (this script):
+    H0: mean(R) <= 0  -> 'Does the strategy generate positive expected
+    value per unit of risk, independent of position size and compounding?'
+    This is the correct test for EDGE — scale-independent, path-independent.
+
+  Dollar bootstrap (bootstrap_continuous.py):
+    H0: mean(dollar_pnl) <= 0  -> conflates edge with compounding scale.
+    Trades at higher equity (larger positions) have disproportionate weight.
+    Underestimates edge if strategy performs better early (low-equity phase);
+    overestimates if strategy performs better late (high-equity phase).
+    NOT the right test for 'does the strategy have edge.'
+
+  Equity-curve metrics (Calmar, Sharpe):
+    DO correctly account for compounding and path dependency.
+    Right for 'how much does the compounded system earn?' — not per-trade.
+
+VERDICT SUMMARY (R-multiple bootstrap = correct edge test)
+------------------------------------------------------------
+  GF_SHORT       N=12  d=+0.637  R-p=0.000 -> CONFIRMED  (dollar and R-multiple agree — scale artifact minimal)
+  ORB            N=75  d=+0.081  R-p=0.241 -> NO EDGE    (R-multiple STRONGER than dollar — dollar underestimated edge)
+  PE_SHORT       N=29  d=+0.421  R-p=0.010 -> CONFIRMED  (dollar and R-multiple agree — scale artifact minimal)
+  STRESS_MID     N=28  d=+0.060  R-p=0.380 -> NO EDGE    (R-multiple STRONGER than dollar — dollar underestimated edge)
+  STRESS_ORB     N=108 d=+0.033  R-p=0.366 -> NO EDGE    (R-multiple WEAKER than dollar — dollar compounding inflated edge)
+  TREND_FOLLOW   N=353 d=+0.118  R-p=0.009 -> CONFIRMED  (R-multiple STRONGER than dollar — dollar underestimated edge)
+
+ANSWER TO METHODOLOGY QUESTION
+------------------------------------------------------------
+  TF: R-p=0.009 vs dollar-p=0.116 -> dollar UNDERSTATED TF edge (TF performed better early when equity was low).
+  The 'weakness on continuous' was partly a compounding-scale artifact.
+
+  ORB: R-verdict=NO EDGE (dollar: NO EDGE). No-edge verdict confirmed on R-multiple.
+  STRESS_ORB: R-verdict=NO EDGE (dollar: NO EDGE). No-edge verdict confirmed on R-multiple.

@@ -134,13 +134,15 @@ Per-strategy IS contribution:
 
 ## Honest Verdict
 
-**This is not a "trim two strategies" situation. This is an "edge is marginal on the correct design" situation.**
+**Update (2026-07-08): Dollar bootstrap understated TF. Revised: system has a confirmed backbone.**
 
-### What the data shows
-- One strategy confirmed on the correct design: PE_SHORT — but N=29, jackknife-fragile, concentrated.
-- One borderline backbone: TF — IID optimistic, block bootstrap likely NO EDGE.
-- Two deployed strategies with no confirmed edge: ORB, STRESS_ORB.
-- IS annualized return: 5.0% on $50,000. Thin, especially considering costs and slippage not fully captured.
+The original "edge is marginal" conclusion was based on a flawed bootstrap metric — see Normalized Bootstrap section below.
+
+### What the data shows (corrected — R-multiple bootstrap)
+- **Confirmed backbone: TF** (p=0.009, d=+0.118 on R-multiple). The dollar bootstrap p=0.116 was a compounding-scale artifact.
+- **Confirmed short strategies: PE_SHORT** (p=0.010) and **GF_SHORT** (p=0.000).
+- **No confirmed edge: ORB, STRESS_ORB, STRESS_MID** — confirmed on both tests.
+- IS annualized return: 5.0% on $50,000. Thin in dollar terms, but edge confirmed at the trade level.
 
 ### What this does NOT mean
 - It does not mean the system is broken. The vault OOS (2023–2024: +$7,404, Sharpe=0.88) is positive.
@@ -149,7 +151,7 @@ Per-strategy IS contribution:
 ### The correct framing
 The strategy inclusion decisions were made on the YbY design, which was the available methodology at the time. Those decisions cannot be retroactively optimized using the continuous IS data that was used to evaluate them.
 
-The **2025 live OOS test is the real arbiter** of whether the system has deployable edge. The IS evidence is not strong enough to call it pre-determined either way.
+The **2025 live OOS test is the real arbiter** of whether the system has deployable edge.
 
 ---
 
@@ -158,12 +160,13 @@ The **2025 live OOS test is the real arbiter** of whether the system has deploya
 | Item | Action |
 |---|---|
 | ORB, STRESS_ORB | **Keep** — do not re-cut on IS. OOS performance is the correct removal signal. |
-| TREND_FOLLOW | **Monitor** — backbone strategy, borderline on correct design. Track OOS P&L per-strategy. |
-| PE_SHORT | **Monitor closely** — confirmed but concentrated. If OOS runs dry (0–1 big trades), verdict gone. |
-| GF_SHORT | **Monitor** — improved verdict but N=12, fragile. |
+| TREND_FOLLOW | **Track OOS** — confirmed on correct (R-multiple) test. Dollar bootstrap was misleading. |
+| PE_SHORT | **Monitor closely** — confirmed on both tests. Concentration (N=29) unchanged; still jackknife-fragile. |
+| GF_SHORT | **Monitor** — confirmed strongly on R-multiple but N=12. Tight stops driving high R. |
 | STRESS_MID | **Keep** — minor contributor, low harm, OOS will tell. |
-| Block bootstrap | **Future work** — replace IID with block bootstrap (recommended block size: 20–40 bars) to get non-optimistic p-values. This should be the standard before any next strategy evaluation cycle. |
-| OOS decomposition | **Future work** — when 2025 OOS data is available, decompose by strategy. TF and PE_SHORT OOS verdict is the key question. |
+| Block bootstrap | **Future work** — replace IID with block bootstrap (recommended block size: 20–40 bars). |
+| OOS decomposition | **Future work** — when 2025 OOS data is available, decompose by strategy. TF P&L per-trade is the key OOS verification. |
+| R-multiple bootstrap | **Use by default** — for all future strategy edge tests, use R-multiple not dollar P&L. Dollar bootstrap is biased under Kelly/compounding. |
 
 ---
 
@@ -207,12 +210,131 @@ All strategy decisions examined against continuous IS design:
 
 ---
 
+## Normalized Bootstrap — R-Multiple vs Dollar P&L
+
+**Date:** 2026-07-08  
+**Script:** `raits/raits/scripts/bootstrap_normalized.py`
+
+### Methodology problem with dollar bootstrap
+
+The continuous IS design uses Kelly=0.75 + compounding. Position size scales with account equity at each trade's time. Dollar P&L is therefore non-homogeneous across trades: a trade at $60k equity has ~20% larger positions than the same trade at $50k. Bootstrapping raw dollar P&L mixes trades at different scales and breaks path dependency. This biases p-values in both directions depending on when the strategy performs.
+
+**R-multiple = net_pnl / (shares × |entry_price − stop|)** is the correct normalization:
+- `initial_risk` is set at entry and is scale-independent
+- Same entry/exit logic → same R regardless of equity or position size
+- Answers the right question: "does the strategy generate positive expected value per unit of risk?"
+
+### Results
+
+| Strategy | N | Mean R | d (R) | Dollar p | R-multiple p | Delta | Verdict |
+|---|---|---|---|---|---|---|---|
+| TREND_FOLLOW | 353 | +0.150 | +0.118 | 0.116 | **0.009** | −0.107 | **CONFIRMED** ↑ |
+| PE_SHORT | 29 | +0.349 | +0.421 | 0.011 | 0.010 | −0.001 | CONFIRMED = |
+| GF_SHORT | 12 | +8.586 | +0.637 | 0.010 | 0.000 | −0.010 | CONFIRMED = |
+| ORB | 75 | +0.071 | +0.081 | 0.329 | 0.241 | −0.088 | NO EDGE = |
+| STRESS_ORB | 108 | +0.041 | +0.033 | 0.215 | 0.366 | +0.151 | NO EDGE ↓ |
+| STRESS_MID | 28 | +0.076 | +0.060 | 0.401 | 0.380 | −0.021 | NO EDGE = |
+
+### Key findings
+
+**TF: BORDERLINE → CONFIRMED (delta = −0.107).** This is the most significant result. TF performed better early in IS (2017–2019) when equity was low → small dollar P&L from those wins was underweighted in the dollar bootstrap. On R-multiple, TF's mean R = +0.150/trade, p = 0.009, d = +0.118. The "borderline on correct design" conclusion was a compounding-scale artifact, not a genuine edge weakness.
+
+**STRESS_ORB: NO EDGE hardens (delta = +0.151).** Dollar compounding inflated STRESS_ORB — it fired predominantly in later IS years (2020–2022 Stress regimes) when equity was higher. On R-multiple the no-edge verdict is even clearer (p = 0.366, d = +0.033). The no-edge verdict is not an artifact; it's understated by dollar bootstrap.
+
+**ORB: NO EDGE remains (R-p = 0.241).** The dollar bootstrap actually understated ORB's edge slightly (delta = −0.088), but it's still clearly no-edge.
+
+**PE_SHORT, GF_SHORT: unchanged on R-multiple.** Scale artifact is minimal. The concentration concern for PE_SHORT (jackknife fragility at k=2) is a real structural issue, not a dollar-scale artifact.
+
+### The two questions cleanly separated
+
+| Question | Correct method |
+|---|---|
+| "Does strategy X have edge?" | R-multiple bootstrap — scale-independent |
+| "How much does the compounded system earn?" | Equity-curve metrics (Calmar/Sharpe) |
+| "Is dollar per-trade bootstrap valid under Kelly?" | NO — biased under compounding |
+
+### Updated complete summary (R-multiple = correct test)
+
+| Strategy | Status | R-multiple verdict | Dollar verdict | Action |
+|---|---|---|---|---|
+| TREND_FOLLOW | In system | **CONFIRMED p=0.009** | BORDERLINE p=0.116 | Track OOS — confirmed backbone |
+| PE_SHORT | In system | CONFIRMED p=0.010 | CONFIRMED p=0.011 | Monitor — concentrated N=29 |
+| GF_SHORT | In system | CONFIRMED p=0.000 | CONFIRMED p=0.010 | Monitor — N=12, tight stops |
+| ORB | In system | NO EDGE p=0.241 | NO EDGE p=0.329 | Keep — OOS will tell |
+| STRESS_ORB | In system | NO EDGE p=0.366 | NO EDGE p=0.215 | Keep — OOS will tell |
+| STRESS_MID | In system | NO EDGE p=0.380 | NO EDGE p=0.401 | Keep — minor, OOS will tell |
+| FADE | Removed | (not tested — not in IS baseline) | NO EDGE p=0.997 (negative) | Removal confirmed |
+| VWAP_MR | Removed | (not tested — not in IS baseline) | NO EDGE p=0.889 (negative) | Removal confirmed |
+| GAP_FILL | Removed | (not tested — not in IS baseline) | BORDERLINE p=0.100 (N=16) | Removal stands — untestable |
+
+**Revised bottom line:** TF (p=0.009) + PE_SHORT (p=0.010) confirmed. GF_SHORT verdict withdrawn — R-multiple was an artifact. See Block-R + GF_SHORT Artifact section.
+
+---
+
+## Block-R + GF_SHORT Artifact — Final Closure
+
+**Date:** 2026-07-08  
+**Script:** `raits/raits/scripts/bootstrap_block_r.py`
+
+### GF_SHORT: "CONFIRMED" is a trailing-stop artifact — withdrawn
+
+**Root cause:** The `stop` column in the CSV for GF_SHORT stores the **final chandelier stop position at exit**, not the initial risk stop. The engine updates GF_SHORT's trailing stop down each bar (`_new_trail = bar_low + _sd`, only if lower). For profitable trades the trail moves far below entry, making `|entry − CSV_stop|` tiny at exit.
+
+Examples: COST entry=490.420, CSV_stop=490.229 → computed risk=**$1.33** → R=+37.73.
+Actual initial risk: `morning_hod + 0.1*atr` was well above entry; the $1.33 is the trail distance at the moment of exit, not the dollar risked at entry.
+
+**Systematic bias direction:** Only profitable trades have tiny final-stop distances (the trail followed price down). Losing trades hit the initial stop early → trail barely moved → final stop ≈ initial stop → reasonable denominator. This biases R upward for winners specifically, inflating mean R from a realistic ~0.1 to an artifactual +8.59.
+
+**TF is not affected:** TF's chandelier also trails, but the trail never moved past the entry price for any of 353 trades (0 trades with stop on wrong side). TF's `|entry − CSV_stop|` therefore overstates the denominator (trail is larger than initial stop for profitable trades) → TF's R-multiple is **conservative**, not inflated. TF's CONFIRMED verdict (p=0.009) is sound.
+
+**GF_SHORT valid test reverts to dollar IID only:** p=0.010 (N=12, block-degenerate, jackknife fragile at k=2). Not reliably confirmed.
+
+### Final honest edge picture (all IS evidence combined)
+
+| Strategy | Final verdict | Basis | Notes |
+|---|---|---|---|
+| **TREND_FOLLOW** | **CONFIRMED (robust)** | R-p=0.009, Block-R(B20) confirmed, JK-R holds k=2 | Trunk. Scale-independent, path-robust, not concentration-driven. |
+| **PE_SHORT** | **CONFIRMED (concentrated)** | R-p=0.010, unchanged from dollar | Top-5 trades = 75% of R. Remove top 3 → fragile. N=29 in 6yr = 5/yr. |
+| GF_SHORT | **UNTRUSTWORTHY** | R-multiple invalid (trailing stop artifact); dollar p=0.010 N=12 block-degen | Cannot confirm. N=12 is untestable by any method. |
+| ORB | NO EDGE | All tests — IID-dollar, IID-R, block-R | Not confirmed on any credible test. |
+| STRESS_ORB | NO EDGE | All tests — dollar p=0.215 flatters it; block-R p=0.366 is the honest read | Dollar compounding inflated it; true picture is clearer no-edge. |
+| STRESS_MID | NO EDGE | All tests — p=0.38-0.40 across all metrics | Minor, consistent no-edge. |
+
+**Deployable-edge set confirmed by IS:** TF (robust) + PE_SHORT (confirmed, concentrated). GF_SHORT and the three no-edge strategies are neutral contributors — do not re-cut on IS.
+
+### What 2025 OOS must confirm
+
+These are pre-committed OOS questions, not re-selection criteria:
+
+**TF — most important (38% of IS P&L, only robust confirmed strategy):**
+- Does mean per-trade R stay positive OOS?
+- Alert if: OOS TF P&L after 12 months is negative, or per-trade mean dollar P&L < $5 (significantly below IS $15.96/trade).
+
+**PE_SHORT — concentrated edge, fragile by construction (5 trades/yr):**
+- Does the concentrated edge repeat? Need 2-3 large-R trades per year to maintain IS P&L rate.
+- Alert if: OOS year 1-2 shows 0-1 PE_SHORT big wins (>$500/trade). That's the IS edge not transferring.
+
+**No-edge strategies (ORB, STRESS_ORB, STRESS_MID) — drag vs neutral:**
+- Combined IS contribution is small positive dollar P&L without confirmed edge.
+- Alert if: OOS running total for these three combined turns consistently negative after 2+ years.
+- That is the correct OOS signal for removal — not IS re-cutting.
+
+**GF_SHORT — accumulate N before re-assessing:**
+- N=12 over 6yr IS (2 trades/yr) means OOS is also too slow to test.
+- Monitor dollar P&L but don't read statistical significance into OOS GF_SHORT results for 3+ years.
+
+---
+
 ## Files
 
 | File | Purpose |
 |---|---|
 | `raits/raits/scripts/bootstrap_continuous.py` | Bootstrap on continuous IS baseline (verdict comparison) |
 | `raits/raits/scripts/diagnose_bootstrap_soundness.py` | N-control, PE_SHORT jackknife, system characterization |
+| `raits/raits/scripts/bootstrap_normalized.py` | R-multiple bootstrap (correct edge test, scale-independent) |
+| `raits/raits/scripts/bootstrap_block_r.py` | Block-R bootstrap + GF_SHORT sanity check + PE_SHORT JK-R |
 | `raits/raits/configs/bootstrap_continuous_report.txt` | Saved verdict comparison output |
 | `raits/raits/configs/bootstrap_soundness_report.txt` | Saved soundness diagnostic output |
+| `raits/raits/configs/bootstrap_normalized_report.txt` | Saved R-multiple bootstrap output |
+| `raits/raits/configs/bootstrap_block_r_report.txt` | Saved block-R + final verdict output |
 | `baselines/is_baseline_cb_fixed_2026-07-08.csv` | Committed IS 605-trade baseline |

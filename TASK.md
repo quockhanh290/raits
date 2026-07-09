@@ -127,8 +127,19 @@ Status: IN PROGRESS
       Machinery identical to NKD (same backtest_swing_tf, return_open=True); only params differ.
       Safe to wire swing live.
 
-### Completed (run_smoke_test — viết xong, chưa run)
-- [ ] global_index/run_smoke_test.py — cold-start integration smoke test; pending first run
+### Completed (run_smoke_test — PASS 2026-07-08)
+- [x] global_index/run_smoke_test.py — cold-start integration smoke test: ALL PASS
+      P&L diff=$0.00 | taken swing=1799/stress=312/nkd=665 | rej 704/117/48 | OPEN=CLOSE=2776 residual=0
+      broker_equity=$102,936.36 | circuit_breaker ref=run=0 | Calmar=2.74 MaxDD=$2,789
+      No divergence from verify_runner_real.py — integration stack clean
+
+### Completed (run_live_day.py — production entry point — 2026-07-08)
+- [x] global_index/run_live_day.py: IBKRBroker → FuturesRunner → run_day(today)
+      Same data loading + signal_fn as run_smoke_test, but IBKRBroker (not MockBroker)
+      --dry-run: connect + fetch_bars + B3 reconcile, but empty signal_fn (no orders)
+      Full run: pre-computed backtest timelines; signal for today if parquet covers today
+      Verifies: connect, B3 reconcile, rollover check, fetch_bars, signal→order pipeline
+      NOTE: signals are empty for dates past parquet coverage (A5 step: update parquet first)
 
 ### Completed (Offline bug fixes — 2026-07-08)
 - [x] Fill.status + filled_qty + avg_price + error_msg (broker.py) — backwards-compat defaults; MockBroker → status="FILLED"
@@ -244,23 +255,41 @@ Status: IN PROGRESS
 - [x] OPEN_QUESTIONS.md: Bug Sweep section (offline cạn, F1/F2 monitor)
 - [x] IBKR_TODO.md: account APPROVED, thứ tự implement wired
 
-### Completed (GIAI ĐOẠN 1 — _fetch_raw() + connect test — 2026-07-08)
-- [x] P2 timezone bug fixed in `global_index/ibkr_broker.py:_fetch_raw()`:
-      `formatDate=1` trả chuỗi ET — cũ parse `utc=True` → shift -5h. Fix: `pd.to_datetime(df.index)` (naive ET, no UTC).
-- [x] Empty bars guard: `if not bars: return pd.DataFrame()` + `if df is None or df.empty` trước set_index
-- [x] Pre-existing typo fixed: `_handle_rollover()` log dùng `contracts/cluster` → `_contracts/_cluster`
-- [x] `global_index/connect_test_paper.py` viết xong:
-      CON.1-3 (connect/equity/positions) + DATA.1-4 (fetch/C6/C3/dtype) + P2.1-3 (timezone range/no-shift/naive)
-- [x] VERIFY: 14 injection + 42 stale + 123 operational + 68 refreeze = **247/247 ALL PASS**; baseline unchanged
-- **CÒN LẠI: user chạy `connect_test_paper.py` với IB Gateway paper (port 7497)**
+### Completed (GIAI ĐOẠN 1 — _fetch_raw() + connect test — 2026-07-08) ✓ LIVE VERIFIED
+- [x] P2 timezone: ib_insync 0.9.86 trả `datetime64[us, US/Central]` (tz-aware Chicago).
+      Fix: `tz_convert("America/New_York").tz_localize(None)` → ET naive đúng.
+      VERIFIED: first_bar=2026-07-06 18:00:00 ET (CME Globex open chính xác), 1380 bars/day (23h session)
+- [x] Contract ambiguity: `ibi.Future("MES", exchange="CME")` bị reject (nhiều contract month).
+      Fix: `_current_front_month(inst)` → lookup ROLL_SCHEDULE → dùng `lastTradeDateOrContractMonth="202609"`
+- [x] get_equity() hang: `reqAccountUpdates()` gây block — ib_insync đã auto-subscribe on connect.
+      Fix: remove `reqAccountUpdates()`, dùng `ib.sleep(2.0)` + `ib.accountValues()`
+- [x] IB Gateway paper port = **4002** (không phải 7497 — đó là TWS paper port)
+- [x] `connect_test_paper.py` **9/9 PASS** (live, paper account DUR125337, equity CA$1,000,480):
+      CON.1 connect | CON.2 equity | DATA.1 2701 bars | DATA.2 lowercase | DATA.3 sorted | DATA.4 datetime64
+      P2.1 session open 18:00 ET | P2.2 1380 bars/day | P2.3 tz-naive
+- [x] VERIFY: 247/247 offline tests ALL PASS; baseline unchanged
 
 ### Next steps (IBKR ACCOUNT APPROVED → PAPER)
 
 **Thứ tự implement:**
 - [x] 1. Wire `IBKRBroker._fetch_raw()` → P2 fixed; C6/C3 đã test offline; `connect_test_paper.py` cho live test
-- [ ] 2. Wire `IBKRBroker.send_order()` → test A1 (fill/reject/timeout), A2 (partial), A4 (timing)
-- [ ] 3. Wire `IBKRBroker.get_positions()` → implement B3 reconcile sau restart
-- [ ] 4. Wire `_handle_rollover()` → roll cost, `contract_month` field, timing
+- [x] 2. Wire `IBKRBroker.send_order()` → **LIVE VERIFIED 2026-07-08** (17/17 PASS incl. orders)
+      outsideRth=True required: futures 23h/day, IBKR's preset forces TIF=DAY → cancel nếu không set flag
+      Error 10349 = INFORMATIONAL (not fatal) — ib_insync log "Canceled order" nhưng order vẫn fill
+      Fill time: 0.26s entry / 0.15s exit (design assumption 5s → 20× faster than assumed)
+      Slippage: 1 tick round-trip. Price dev 0.07% vs last bar. A1/A4 PASS.
+      A2 partial / A3 timeout chưa test (cần inject reject/timeout — để GIAI ĐOẠN 2b khi cần)
+      Log noise fixed: ib_insync.errorEvent.clear() + custom handler; 2109/10349/2174 → DEBUG
+- [x] 3. Wire `IBKRBroker.get_positions()` → **LIVE VERIFIED 2026-07-08** (11/11 PASS)
+      ib.positions() → BrokerPosition list. CON.3 PASS: n_positions=1 [(MES, LONG, 1)]
+      B3 cross-check in runner.py: so sánh file state vs broker on startup; CRITICAL nếu mismatch/orphan
+      NOTE: paper account còn open 1 MES LONG từ test — cần close trong Gateway trước khi live
+- [x] 4. Wire `_handle_rollover()` → **CODE DONE 2026-07-08** (live verify pending Sep 11 roll)
+      CLOSE front_month + OPEN next_month, same polling pattern as send_order()
+      3 outcomes handled: (FILLED,FILLED)=log slippage / (FAILED,*)=position unchanged /
+      (FILLED,FAILED)=position flat → remove from state + CRITICAL
+      _handle_rollover_if_needed() in runner: runs before fetch_bars each day (no-op if not roll date)
+      MockBroker: _roll_fn=None → skip; test path: synthetic FILLED fills; 14/14 offline PASS
 
 **Trước paper:**
 - [ ] Confirm NKD trong CME bundle + Rule 576 cert
@@ -593,6 +622,29 @@ futures/backtest_combined.py + futures/backtest_system.py (annotated harness)
 - Strategy inclusion decisions were made on YbY design (wrong). On continuous (correct) design:
   ONE confirmed (PE_SHORT, concentrated N=29), ONE borderline (TF, IID-optimistic p=0.116), TWO NO EDGE in system (ORB p=0.329, STRESS_ORB p=0.215).
 - Do NOT re-cut active strategies on IS. Do NOT re-add removed strategies on IS. 2025 OOS is the real arbiter.
+
+### Completed (R-multiple + Block Bootstrap — 2026-07-08)
+- [x] **bootstrap_normalized.py** committed + run: R = net_pnl / (shares x |entry_price - stop|)
+      TF: dollar p=0.116 -> R-p=0.009 CONFIRMED (delta=-0.107; dollar understated early-equity wins)
+      PE_SHORT: p=0.011 -> R-p=0.010 CONFIRMED | ORB/STRESS_ORB/STRESS_MID: NO EDGE =
+      GF_SHORT: MeanR=8.59 flagged as artifact (see below)
+      Saved: raits/configs/bootstrap_normalized_report.txt
+- [x] **GF_SHORT artifact confirmed**: CSV `stop` = FINAL trailing chandelier stop (not initial risk).
+      engine.py:1529-1540 trails stop down per bar -> profitable shorts end with tiny |entry-stop|.
+      COST: entry=490.420, final_stop=490.229 (below entry for SHORT) -> fake risk=$1.33 -> R=+37.73.
+      TF CLEAN: 0/353 wrong-side stops -> TF R-multiple is conservative, not inflated.
+      GF_SHORT R verdict WITHDRAWN. Reverts to dollar IID p=0.010 (N=12, untrustworthy size).
+- [x] **bootstrap_block_r.py** committed + run: circular block bootstrap B20/B40
+      TF: B20 p=0.012 CONFIRMED (survives path-dependency). PE_SHORT: B20 p=0.009 CONFIRMED.
+      GF_SHORT degenerate (N=12<20). ORB/STRESS_ORB/STRESS_MID: NO EDGE.
+      Saved: raits/configs/bootstrap_block_r_report.txt
+- [x] **Final honest edge picture (4 filters: IID-dollar | IID-R | block-R | JK-R)**:
+      TF: CONFIRMED robust (all 4). PE_SHORT: CONFIRMED concentrated (top-5=75% CumR; JK k=3 borderline).
+      GF_SHORT: UNTRUSTWORTHY (R artifact + N=12 degenerate). ORB/STRESS_ORB/STRESS_MID: NO EDGE.
+      Pre-committed 2025 OOS criteria written in BOOTSTRAP_AUDIT.md.
+- [x] **Vault OOS jackknife BLOCKED**: 5-min parquets max 2022-12-30; vault data lost (snapshot overwritten).
+      Requires ~2h Polygon re-fetch. Deferred.
+- [x] **BOOTSTRAP_AUDIT.md updated**: GF_SHORT root cause, TF validation, 4-filter table, OOS criteria.
 
 ### Key decisions
 - OOS is one-shot -- do NOT run until engine is fully locked and WFO complete
