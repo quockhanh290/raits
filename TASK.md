@@ -133,12 +133,11 @@ Status: IN PROGRESS
       broker_equity=$102,936.36 | circuit_breaker ref=run=0 | Calmar=2.74 MaxDD=$2,789
       No divergence from verify_runner_real.py — integration stack clean
 
-### Completed (run_live_day.py — production entry point — 2026-07-08)
+### Completed (run_live_day.py — production entry point — 2026-07-08) ✓ LIVE VERIFIED
 - [x] global_index/run_live_day.py: IBKRBroker → FuturesRunner → run_day(today)
+      --dry-run LIVE VERIFIED 2026-07-08: connect → B3 reconcile → rollover check → fetch_bars → COMPLETE
       Same data loading + signal_fn as run_smoke_test, but IBKRBroker (not MockBroker)
-      --dry-run: connect + fetch_bars + B3 reconcile, but empty signal_fn (no orders)
       Full run: pre-computed backtest timelines; signal for today if parquet covers today
-      Verifies: connect, B3 reconcile, rollover check, fetch_bars, signal→order pipeline
       NOTE: signals are empty for dates past parquet coverage (A5 step: update parquet first)
 
 ### Completed (Offline bug fixes — 2026-07-08)
@@ -292,6 +291,11 @@ Status: IN PROGRESS
       MockBroker: _roll_fn=None → skip; test path: synthetic FILLED fills; 14/14 offline PASS
 
 **Trước paper:**
+- [x] [A5] Parquet gap filled — Databento LIVE VERIFIED 2026-07-08:
+      All 5 instruments updated through 2026-07-07 (2024-12-01→2026-07-07, overlap 30d)
+      Splice offset applied (diff back-adjust re-anchored Dec2024→Sep2026)
+      Daily mỗi sáng: python -m global_index.update_ibkr_daily (IBKR ContFuture)
+      Files: global_index/update_futures_data.py, global_index/update_ibkr_daily.py
 - [ ] Confirm NKD trong CME bundle + Rule 576 cert
 - [ ] runner.dump_state(): điền Group B (slippage, fill quality, paper-vs-backtest, health)
 - [ ] update_spy_csv timing: run trước runner, không intra-session (I5.4)

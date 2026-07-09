@@ -1,5 +1,19 @@
 ## Gotchas
 
+- **IBKR IB Gateway paper port = 4002** (2026-07-08, futures wire): IB Gateway paper dùng port 4002, KHÔNG phải 7497. Port 7497 là TWS paper. Khi dùng IB Gateway (recommended cho algo) → `--port 4002`.
+
+- **ib_insync 0.9.86 trả bars tz-aware US/Central** (2026-07-08): `reqHistoricalData(formatDate=1)` với CME futures → ib_insync parse date thành `datetime64[us, US/Central]` (Chicago tz), KHÔNG phải naive string hay UTC. Fix trong `_fetch_raw()`: `tz_convert("America/New_York").tz_localize(None)`. Verified: first_bar=18:00 ET (CME Globex open).
+
+- **CME futures sessions = 23h/day, KHÔNG phải RTH** (2026-07-08): MES/MNQ/MYM/M2K trade 18:00–17:00 ET daily (23h). Overnight bars (00:00–04:00 ET) là bình thường. P2 timezone check không thể dùng RTH window (09:00–16:30). Dùng: first_bar.hour ∈ [17,19] và bars/day > 800.
+
+- **IBKR contract ambiguity: phải chỉ định contract month** (2026-07-08): `ibi.Future("MES", exchange="CME")` bị IBKR reject với error "Ambiguous contract" vì nhiều expiry đang active. Phải dùng `lastTradeDateOrContractMonth` cụ thể. Fix: `_current_front_month(inst)` lookup từ ROLL_SCHEDULE → trả "202609" cho MES hôm nay.
+
+- **get_equity() KHÔNG được gọi reqAccountUpdates()** (2026-07-08): ib_insync tự auto-subscribe account updates khi connect. Gọi thêm `reqAccountUpdates()` gây hang vô thời hạn. Dùng `ib.sleep(2.0)` + `ib.accountValues()` thay thế.
+
+- **outsideRth=True BẮT BUỘC cho futures orders** (2026-07-08): CME futures trade 23h/day. Không set flag → IBKR preset đổi TIF=DAY và cancel order ngoài RTH (16:15–09:30 ET). Với `outsideRth=True`: order fill trong electronic session bình thường. Error 10349 vẫn xuất hiện nhưng là INFORMATIONAL — order vẫn fill, ib_insync log "Canceled order" là misleading (intermediate state, không phải final cancel).
+
+- **IBKR fill time thực tế: ~0.2s** (2026-07-08, paper MES): Design assumption 5s là conservative 25×. Entry 0.26s, exit 0.15s. Slippage 1 tick round-trip. Block time worst-case thực tế << 265s design limit. Đo thêm trong paper weeks đầu trước khi update assumption.
+
 - **20 pytest failures — all stale tests, zero production bugs** (2026-06-25): Verified pre-vault. Categories: VWAP_MR removed (7), HMM Stress→SAFETY_MODE design changed (6), ORB fakeout→FADE design (1), ORB max_price $200→$1000 (1), grid 27→48 combos (1), Crisis HMM missing in test data (1), strategy_router safety_mode stale (1), sector_strength not implemented (1 — see dedicated note below). Tests reflect old design; current behavior is intentional and embedded in WFO results.
 
 - **TrendFollow sector_strength filter NOT implemented** (2026-06-25): `run_scanner()` accepts `sector_strength` field but does not filter on it. Sector ETF data (XLF, XLE...) was unavailable during IS development 2017-2022. Implementing filter pre-vault would require new WFO run — deferred post-vault. Impact: TF may accept trades when sector is selling off. Documented in `trend_follow.py` docstring.

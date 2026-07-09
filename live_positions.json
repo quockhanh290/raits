@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "positions": [],
+  "breaker": {
+    "peak_equity": 994212.7,
+    "day_start_equity": 994212.37,
+    "cur_day": "2026-07-08"
+  }
+}

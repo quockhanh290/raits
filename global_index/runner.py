@@ -218,10 +218,45 @@ class FuturesRunner:
                     if bkr.get("cur_day"):
                         loaded_cur_day = pd.Timestamp(bkr["cur_day"])
                 logger.info(
-                    "B1: loaded %d persisted position(s) from %s "
-                    "[TODO B3: cross-check vs broker.get_positions() once IBKR is live]",
+                    "B1: loaded %d persisted position(s) from %s",
                     len(loaded_positions), self._positions_path,
                 )
+                # B3: cross-check loaded positions against live broker state.
+                # IBKR is the ground truth for what's actually open; the JSON
+                # file is our metadata store (cluster, entry_day, pnl_sized).
+                # Mismatch = potential orphan order from a prior crash → CRITICAL.
+                try:
+                    broker_pos = broker.get_positions()
+                    # Index broker positions by (inst, direction) for fast lookup.
+                    broker_key = {(p.inst, p.direction): p.contracts for p in broker_pos}
+                    file_key   = {}
+                    for p in loaded_positions:
+                        k = (p.inst, p.direction)
+                        file_key[k] = file_key.get(k, 0) + p.contracts
+                    mismatches = 0
+                    for k, qty in file_key.items():
+                        broker_qty = broker_key.get(k, 0)
+                        if broker_qty != qty:
+                            logger.critical(
+                                "B3 MISMATCH: file has %s %s ×%d but IBKR shows ×%d "
+                                "— investigate before trading; file state will be used",
+                                k[1], k[0], qty, broker_qty,
+                            )
+                            mismatches += 1
+                    for k, qty in broker_key.items():
+                        if k not in file_key:
+                            logger.critical(
+                                "B3 ORPHAN: IBKR has %s %s ×%d with no matching file entry "
+                                "— position opened outside this runner?",
+                                k[1], k[0], qty,
+                            )
+                            mismatches += 1
+                    if mismatches == 0:
+                        logger.info("B3: broker/file positions match (%d position(s))", len(broker_pos))
+                except NotImplementedError:
+                    logger.info("B3: broker.get_positions() not available — skipping cross-check")
+                except Exception as _exc:
+                    logger.warning("B3: cross-check failed (%s) — proceeding with file state", _exc)
             except Exception as exc:
                 logger.warning(
                     "B1: failed to load %s (%s) — fresh start; "
@@ -373,6 +408,82 @@ class FuturesRunner:
                     {"inst": p.inst, "cluster": p.cluster, "error": _f.error_msg or ""},
                 )
 
+    def _handle_rollover_if_needed(self, day) -> None:
+        """C2: Roll open positions whose contract expires today (roll date per ROLL_SCHEDULE).
+
+        Called at the start of run_day(), before fetch_bars, so the signal layer
+        sees the new contract on its first bar.
+
+        Delegates to broker._handle_rollover() — only IBKRBroker implements this;
+        MockBroker has no such method so offline runs are no-ops.
+
+        Fill outcome actions:
+          (FILLED, FILLED) → log slippage, position continues unchanged.
+          (FAILED, *)      → CLOSE did not execute; position stays in old contract;
+                             log CRITICAL and leave state untouched (IBKR still holds it).
+          (FILLED, FAILED) → CLOSE succeeded but OPEN timed out; position is NOW FLAT
+                             in IBKR but still in runner state. Remove from state and
+                             emit CRITICAL so operator can intervene manually.
+        """
+        _roll_fn = getattr(self.broker, "_handle_rollover", None)
+        if _roll_fn is None:
+            return  # MockBroker — rollover not applicable offline
+
+        to_remove = []
+        for pos in list(self.state.open_positions):
+            result = _roll_fn(pos.inst, day, pos.direction, pos.contracts, pos.cluster)
+            if result is None:
+                continue  # not a roll date for this instrument
+
+            close_fill, open_fill = result
+
+            if close_fill.status != "FILLED":
+                # CLOSE did not execute — position still in old contract in IBKR
+                logger.critical(
+                    "C2: Roll CLOSE FAILED %s %s — position unchanged. Error: %s",
+                    pos.inst, pos.direction, close_fill.error_msg,
+                )
+                self._emit_event(
+                    "CRITICAL", "ROLLOVER",
+                    f"C2: Roll CLOSE failed {pos.inst} {pos.direction} ×{pos.contracts} — "
+                    f"position unchanged. {close_fill.error_msg}",
+                )
+                continue
+
+            if open_fill.status != "FILLED":
+                # CLOSE OK but OPEN failed — position is FLAT in IBKR
+                logger.critical(
+                    "C2: Roll OPEN FAILED %s %s after CLOSE succeeded — "
+                    "position is FLAT IN IBKR. Removing from runner state. "
+                    "Manual verification required. Error: %s",
+                    pos.inst, pos.direction, open_fill.error_msg,
+                )
+                self._emit_event(
+                    "CRITICAL", "ROLLOVER",
+                    f"C2: Roll OPEN failed {pos.inst} {pos.direction} ×{pos.contracts} "
+                    f"AFTER CLOSE — position FLAT in IBKR. Removed from state. "
+                    f"{open_fill.error_msg}",
+                )
+                to_remove.append(pos)
+                continue
+
+            # Full success — log slippage
+            roll_slippage = abs(open_fill.avg_price - close_fill.avg_price)
+            logger.info(
+                "C2: Roll complete %s %s ×%d: close@%.4f → open@%.4f  slippage=%.4f",
+                pos.inst, pos.direction, pos.contracts,
+                close_fill.avg_price, open_fill.avg_price, roll_slippage,
+            )
+            self._emit_event(
+                "INFO", "ROLLOVER",
+                f"C2: Roll {pos.inst} {pos.direction} ×{pos.contracts}: "
+                f"close@{close_fill.avg_price:.2f} → open@{open_fill.avg_price:.2f}  "
+                f"slippage={roll_slippage:.2f}",
+            )
+
+        for pos in to_remove:
+            self.state.open_positions = [p for p in self.state.open_positions if p is not pos]
+
     # ── main daily loop ──────────────────────────────────────────────────────
 
     def run_day(self, day, _spy_last_date_override=None):
@@ -389,6 +500,10 @@ class FuturesRunner:
         # Retry positions with exit_pending=True from a prior session's failed CLOSE.
         # Runs before decide_day so failed exits are resolved before new decisions are made.
         self._retry_pending_exits(day)
+
+        # C2: roll any positions whose front-month contract expires today.
+        # Must run before fetch_bars so the signal layer sees the new contract.
+        self._handle_rollover_if_needed(day)
 
         # D5: kill-switch gate — operator creates STOP_FILE to halt new entries gracefully.
         #     Exits are NOT affected: existing positions still exit on their exit_day.

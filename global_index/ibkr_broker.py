@@ -39,6 +39,7 @@ After any reconnect:
 from __future__ import annotations
 
 import logging
+import time
 from typing import Callable, Optional
 
 import pandas as pd
@@ -46,6 +47,41 @@ import pandas as pd
 from global_index.broker import Broker, Order, Fill, BrokerPosition
 
 log = logging.getLogger(__name__)
+
+# IBKR error codes that are purely informational — no action required.
+# These appear as "Error NNNN" in ib_insync output but are NOT failures.
+#   10349 — Order TIF overridden by account preset (e.g. DAY). Order still
+#            processes normally. ib_insync also logs a misleading "Canceled order"
+#            line when it receives this code; the trade's FINAL status is FILLED.
+#   2109  — outsideRth flag "ignored based on order type/destination" — IBKR
+#            confirming the order is being processed; not an error.
+#   2174  — endDateTime without explicit timezone (deprecated format warning).
+#            The current "%Y%m%d %H:%M:%S" format works and returns correct bars.
+#            Fix properly when IBKR removes implied-tz support (next API release).
+#   10147 — OrderId not found — can fire on cancel-after-fill race; harmless.
+#   202   — Order cancelled by API request — expected when send_order() cancels
+#            a timed-out entry; not an unexpected error.
+_IBKR_INFORMATIONAL: frozenset[int] = frozenset({10349, 2109, 2174, 10147, 202})
+
+# raits internal instrument name → IBKR Future symbol (where they differ).
+# "MNKD" is the raits mini-NKD identifier; IBKR uses "NKD" for the CME Nikkei/USD futures.
+_RAITS_TO_IBKR: dict[str, str] = {
+    "MNKD": "NKD",
+}
+
+# IBKR exchange override per symbol. MYM (Micro Dow) trades on CBOT, not CME, in IBKR.
+# All other basket instruments (MES/MNQ/M2K/NKD) trade on CME.
+_IBKR_EXCHANGE: dict[str, str] = {
+    "MYM": "CBOT",
+}
+
+# ── Order fill timeouts ────────────────────────────────────────────────────────
+# Design constraint [1]: ENTRY timeout 30s → cancel → Fill(status='CANCELLED').
+# EXIT uses MARKET order; no protocol timeout per design [2] but we add a safety
+# limit to prevent process hang if exchange is in maintenance window.
+# Measure actual fill times in first paper weeks and update if needed (A4).
+ENTRY_FILL_TIMEOUT_SECS: int = 30
+EXIT_FILL_TIMEOUT_SECS: int = 120
 
 # ── C2: Rollover schedule ─────────────────────────────────────────────────────
 #
@@ -124,6 +160,23 @@ def get_roll_event(inst: str, today) -> "tuple[str, str] | None":
     return None
 
 
+def _current_front_month(inst: str, today=None) -> "str | None":
+    """
+    Return the active front-month contract string (e.g. '202609') for inst on today.
+    Walks ROLL_SCHEDULE: before first roll → use first front_month; after each roll → switch to nxt.
+    Returns None if inst not in ROLL_SCHEDULE (caller falls back to unqualified contract).
+    """
+    today_str = str(pd.Timestamp(today or pd.Timestamp.now()).date())
+    schedule = ROLL_SCHEDULE.get(inst, [])
+    if not schedule:
+        return None
+    current = schedule[0][1]  # front_month of first row = pre-roll default
+    for roll_date, _front, nxt in schedule:
+        if roll_date <= today_str:
+            current = nxt
+    return current
+
+
 class IBKRConnectionError(RuntimeError):
     """Raised when IBKRBroker is called without a live IB Gateway connection."""
 
@@ -165,6 +218,12 @@ class IBKRBroker(Broker):
         # Injection point for tests (C3/C5/C6) — not used in production
         self._raw_fetcher = _raw_fetcher
 
+        # A3/A2 test hooks — set by test scripts only, never in production
+        # _test_entry_lmt_price: if set, OPEN uses LimitOrder at this price (guaranteed miss → timeout)
+        # _test_entry_timeout:   if set, overrides ENTRY_FILL_TIMEOUT_SECS for this session
+        self._test_entry_lmt_price: "float | None" = None
+        self._test_entry_timeout:   "int   | None" = None
+
     # ── Connection lifecycle ──────────────────────────────────────────────────
 
     def connect(self) -> None:
@@ -173,10 +232,51 @@ class IBKRBroker(Broker):
             import ib_insync as ibi  # type: ignore
         except ImportError as exc:
             raise ImportError("ib_insync not installed. Run: pip install ib_insync") from exc
+
+        # Silence ib_insync BEFORE connect — initial data (execDetails, positions,
+        # commissionReports) arrives during connect() and would flood the log otherwise.
+        # propagate=False prevents records from reaching root-logger handlers even
+        # if ib_insync internals reset the level after connect.
+        for _ln in ("ib_insync", "ib_insync.ib", "ib_insync.wrapper",
+                    "ib_insync.client", "ib_insync.util"):
+            _l = logging.getLogger(_ln)
+            _l.setLevel(logging.ERROR)
+            _l.propagate = False
+            if not any(isinstance(h, logging.NullHandler) for h in _l.handlers):
+                _l.addHandler(logging.NullHandler())
+
         ib = ibi.IB()
         ib.connect(self._host, self._port, clientId=self._client_id)
         self._ib = ib
+
+        # Take full ownership of errorEvent: remove ALL built-in ib_insync
+        # handlers (which log every code at WARNING), then add ours which
+        # downgrades informational codes to DEBUG.
+        try:
+            ib.errorEvent.clear()  # eventkit.Event.clear() — removes all listeners
+        except AttributeError:
+            try:
+                ib.errorEvent -= ib._onError  # type: ignore[attr-defined]
+            except Exception:
+                pass
+        ib.errorEvent += self._on_ibkr_error
+
         log.info("IBKRBroker connected: %s:%s clientId=%s", self._host, self._port, self._client_id)
+
+    def _on_ibkr_error(self, reqId: int, errorCode: int, errorString: str, _contract) -> None:
+        """Custom IBKR error event handler.
+
+        ib_insync fires errorEvent for every TWS message code. We downgrade known
+        informational codes to DEBUG so operator logs stay clean; unknown codes
+        are emitted at WARNING for investigation.
+        """
+        if errorCode in _IBKR_INFORMATIONAL:
+            log.debug(
+                "IBKR notify code=%d reqId=%d: %s (informational — no action needed)",
+                errorCode, reqId, errorString,
+            )
+        else:
+            log.warning("IBKR code=%d reqId=%d: %s", errorCode, reqId, errorString)
 
     def disconnect(self) -> None:
         """Disconnect gracefully. Safe to call when already disconnected."""
@@ -265,8 +365,18 @@ class IBKRBroker(Broker):
         try:
             import ib_insync as ibi  # type: ignore
 
-            # Build a generic futures contract (caller responsible for correct symbol)
-            contract = ibi.Future(inst, exchange="CME")
+            # Resolve front-month from ROLL_SCHEDULE to avoid "Ambiguous contract" error.
+            # IBKR rejects ibi.Future("MES") when multiple contract months are active.
+            # _RAITS_TO_IBKR maps internal names (MNKD) → IBKR symbols (NKD).
+            # _IBKR_EXCHANGE overrides exchange per symbol (MYM → CBOT).
+            ibkr_sym = _RAITS_TO_IBKR.get(inst, inst)
+            exchange = _IBKR_EXCHANGE.get(ibkr_sym, "CME")
+            front_month = _current_front_month(ibkr_sym)
+            if front_month:
+                contract = ibi.Future(ibkr_sym, lastTradeDateOrContractMonth=front_month,
+                                      exchange=exchange)
+            else:
+                contract = ibi.Future(ibkr_sym, exchange=exchange)
             ib.qualifyContracts(contract)
 
             bars = ib.reqHistoricalData(
@@ -277,14 +387,27 @@ class IBKRBroker(Broker):
                 whatToShow="TRADES",
                 useRTH=False,
                 formatDate=1,
+                # P2: formatDate=1 returns strings in exchange local time (ET for CME/NKD).
+                # Do NOT use formatDate=2 (epoch UTC) — ib_insync may not expose it cleanly.
+                # Index is parsed below as naive ET (no UTC conversion).
             )
-            df = ibi.util.df(bars).set_index("date")
-            df.index = pd.to_datetime(df.index, utc=True).tz_convert("America/New_York").tz_localize(None)
+            if not bars:
+                return pd.DataFrame()
+            df = ibi.util.df(bars)
+            if df is None or df.empty:
+                return pd.DataFrame()
+            df = df.set_index("date")
+            # P2: ib_insync 0.9.86 parses formatDate=1 bars into tz-aware datetime (US/Central
+            # for CME — Chicago exchange tz). Convert to ET naive so runner comparisons work.
+            # If ib_insync ever returns naive strings instead, parse directly (assumed ET).
+            df.index = pd.to_datetime(df.index)
+            if df.index.tz is not None:
+                df.index = df.index.tz_convert("America/New_York").tz_localize(None)
             return df
         except IBKRConnectionError:
             raise
         except Exception as exc:
-            log.error("IBKRBroker.fetch_bars(%s) failed: %s", inst, exc)
+            log.error("IBKRBroker._fetch_raw(%s) failed: %s", inst, exc)
             return pd.DataFrame()
 
     def send_order(self, order: Order) -> Fill:
@@ -349,35 +472,191 @@ class IBKRBroker(Broker):
             return Fill(order.inst, order.action, order.direction,
                         order.contracts, order.cluster, order.pnl_sized)
 
-        self._require_connection()
-        raise NotImplementedError(
-            "send_order live path not yet implemented — pending IBKR account setup. "
-            "Implement: build Contract, placeOrder, poll orderStatus, return Fill."
-        )
+        ib = self._require_connection()
+        try:
+            import ib_insync as ibi  # type: ignore
+
+            # Build contract with front-month (same logic as _fetch_raw to avoid ambiguity)
+            ibkr_sym = _RAITS_TO_IBKR.get(order.inst, order.inst)
+            exchange = _IBKR_EXCHANGE.get(ibkr_sym, "CME")
+            front_month = _current_front_month(ibkr_sym)
+            if front_month:
+                contract = ibi.Future(ibkr_sym,
+                                      lastTradeDateOrContractMonth=front_month,
+                                      exchange=exchange)
+            else:
+                contract = ibi.Future(ibkr_sym, exchange=exchange)
+            ib.qualifyContracts(contract)
+
+            # Map direction+action → IBKR BUY/SELL
+            # OPEN LONG→BUY, OPEN SHORT→SELL, CLOSE LONG→SELL, CLOSE SHORT→BUY
+            if order.action == "OPEN":
+                ibkr_action = "BUY" if order.direction == "LONG" else "SELL"
+                timeout_secs = (self._test_entry_timeout
+                                if self._test_entry_timeout is not None
+                                else ENTRY_FILL_TIMEOUT_SECS)
+            else:
+                ibkr_action = "SELL" if order.direction == "LONG" else "BUY"
+                timeout_secs = EXIT_FILL_TIMEOUT_SECS
+
+            # A3 hook: LimitOrder at unreachable price forces timeout (test only).
+            # A2 hook: LimitOrder near market with large qty can trigger partial fill.
+            if order.action == "OPEN" and self._test_entry_lmt_price is not None:
+                ibkr_order = ibi.LimitOrder(ibkr_action, order.contracts,
+                                            self._test_entry_lmt_price)
+            else:
+                ibkr_order = ibi.MarketOrder(ibkr_action, order.contracts)
+            # Futures trade 23h/day (electronic session 18:00–17:00 ET).
+            # outsideRth=True lets IBKR execute outside regular trading hours (RTH 09:30–16:15).
+            # Without this, IBKR's "DAY" order preset cancels orders placed after RTH close.
+            ibkr_order.outsideRth = True
+            t0 = time.time()
+            trade = ib.placeOrder(contract, ibkr_order)
+            log.info(
+                "send_order: placed %s %s %s ×%d cluster=%s",
+                order.action, ibkr_action, order.inst, order.contracts, order.cluster,
+            )
+
+            # Poll until terminal state or timeout
+            deadline = t0 + timeout_secs
+            while not trade.isDone() and time.time() < deadline:
+                ib.sleep(0.1)
+
+            elapsed = time.time() - t0
+
+            if not trade.isDone():
+                ib.cancelOrder(trade.order)
+                ib.sleep(2.0)
+                if order.action == "OPEN":
+                    log.warning(
+                        "send_order: ENTRY timeout %ss %s %s — CANCELLED (elapsed=%.1fs)",
+                        timeout_secs, order.inst, order.direction, elapsed,
+                    )
+                    return Fill(order.inst, order.action, order.direction,
+                                order.contracts, order.cluster,
+                                status="CANCELLED",
+                                error_msg=f"entry timeout after {timeout_secs}s")
+                else:
+                    log.error(
+                        "send_order: EXIT timeout %ss %s %s — FAILED, exit_pending (elapsed=%.1fs)",
+                        timeout_secs, order.inst, order.direction, elapsed,
+                    )
+                    return Fill(order.inst, order.action, order.direction,
+                                order.contracts, order.cluster,
+                                status="FAILED",
+                                error_msg=f"exit timeout after {timeout_secs}s")
+
+            status = trade.orderStatus.status
+            actual_filled = int(trade.orderStatus.filled or 0)
+            avg_price = float(trade.orderStatus.avgFillPrice or 0.0)
+
+            if status == "Filled":
+                # Partial fill: filled < ordered (rare for MARKET on liquid futures)
+                if 0 < actual_filled < order.contracts:
+                    log.warning(
+                        "send_order: PARTIAL %s %s %d/%d @ %.4f (elapsed=%.1fs)",
+                        order.action, order.inst, actual_filled, order.contracts,
+                        avg_price, elapsed,
+                    )
+                    return Fill(order.inst, order.action, order.direction,
+                                order.contracts, order.cluster,
+                                status="PARTIAL", filled_qty=actual_filled,
+                                avg_price=avg_price)
+
+                log.info(
+                    "send_order: FILLED %s %s ×%d @ %.4f (elapsed=%.1fs)",
+                    order.action, order.inst, order.contracts, avg_price, elapsed,
+                )
+                return Fill(order.inst, order.action, order.direction,
+                            order.contracts, order.cluster,
+                            # pnl_sized=0: live equity tracked via get_equity(), not pnl accumulation
+                            pnl_sized=0.0, status="FILLED", avg_price=avg_price)
+
+            # Terminal but not Filled (Cancelled / ApiCancelled / Inactive)
+            if order.action == "OPEN":
+                log.warning(
+                    "send_order: OPEN %s %s not filled — status=%s",
+                    order.inst, order.direction, status,
+                )
+                return Fill(order.inst, order.action, order.direction,
+                            order.contracts, order.cluster,
+                            status="CANCELLED", error_msg=f"order status: {status}")
+            else:
+                log.error(
+                    "send_order: CLOSE %s %s not filled — status=%s (will retry next day)",
+                    order.inst, order.direction, status,
+                )
+                return Fill(order.inst, order.action, order.direction,
+                            order.contracts, order.cluster,
+                            status="FAILED", error_msg=f"exit order status: {status}")
+
+        except IBKRConnectionError:
+            raise
+        except Exception as exc:
+            log.error(
+                "send_order(%s %s %s ×%d) failed: %s",
+                order.action, order.inst, order.direction, order.contracts, exc,
+            )
+            fail_status = "CANCELLED" if order.action == "OPEN" else "FAILED"
+            return Fill(order.inst, order.action, order.direction,
+                        order.contracts, order.cluster,
+                        status=fail_status, error_msg=str(exc))
 
     def get_positions(self) -> list:
-        """Return current open positions known to this broker instance."""
+        """Return current open positions from IBKR.
+
+        Live path: calls ib.positions() which returns ib_insync-cached data
+        (ib_insync auto-subscribes to position updates on connect). Fields
+        cluster/entry_day/pnl_sized are not available from IBKR — set to
+        sentinel values. Caller (B3 reconcile) compares only inst/direction/contracts.
+
+        Test path (_raw_fetcher set): returns self._positions directly (injected).
+        """
         if self._raw_fetcher is not None:
             return list(self._positions)
-        self._require_connection()
-        raise NotImplementedError(
-            "get_positions live path not yet implemented — pending IBKR account setup. "
-            "Implement: ib.positions() → map to BrokerPosition list."
-        )
+        ib = self._require_connection()
+        # ib_insync caches positions received during connect; brief sleep ensures
+        # any late-arriving position updates from TWS have been processed.
+        ib.sleep(1.0)
+        result = []
+        for pos in ib.positions():
+            qty = pos.position  # signed: positive = LONG, negative = SHORT
+            if qty == 0:
+                continue
+            result.append(BrokerPosition(
+                inst=pos.contract.symbol,
+                direction="LONG" if qty > 0 else "SHORT",
+                contracts=int(abs(qty)),
+                cluster="UNKNOWN",   # IBKR has no cluster concept; B3 ignores this field
+                entry_day=None,
+                exit_day=None,
+                pnl_sized=0.0,
+            ))
+        return result
 
     def get_equity(self) -> float:
-        """Return current account equity (NetLiquidation)."""
+        """Return current account equity (NetLiquidation) in account base currency.
+
+        ib_insync auto-subscribes to account updates on connect — reqAccountUpdates()
+        is redundant and causes hangs. Just sleep to let initial data arrive, then read
+        the cached accountValues(). Accept any currency (CAD/USD/BASE accounts all work).
+        """
         if self._raw_fetcher is not None:
             return self._equity
 
         ib = self._require_connection()
         try:
-            import ib_insync as ibi  # type: ignore
-            ib.reqAccountUpdates()
-            ib.sleep(1.0)
-            for av in ib.accountValues():
-                if av.tag == "NetLiquidation" and av.currency == "USD":
+            ib.sleep(2.0)  # let initial account subscription data arrive
+            # Prefer BASE (account base currency), fall back to first NetLiquidation found
+            candidates = [av for av in ib.accountValues() if av.tag == "NetLiquidation"]
+            for av in candidates:
+                if av.currency == "BASE":
                     return float(av.value)
+            for av in candidates:
+                if av.currency in ("USD", "CAD"):
+                    return float(av.value)
+            if candidates:
+                return float(candidates[0].value)
             raise IBKRConnectionError("NetLiquidation not found in IBKR account values")
         except IBKRConnectionError:
             raise
@@ -418,14 +697,125 @@ class IBKRBroker(Broker):
 
         front_month, next_month = roll
         log.info(
-            "C2: ROLLOVER %s on %s — close %s, open %s (%s contracts, cluster=%s)",
-            inst, pd.Timestamp(today).date(), front_month, next_month, contracts, cluster,
+            "C2: ROLLOVER %s on %s — close %s → open %s (×%d cluster=%s)",
+            inst, pd.Timestamp(today).date(), front_month, next_month, _contracts, _cluster,
         )
-        raise NotImplementedError(
-            f"C2 rollover not yet implemented: "
-            f"close {inst} {front_month} → open {inst} {next_month}. "
-            f"Implement: build two ibi.Future contracts with lastTradeDateOrContractMonth, "
-            f"call send_order for each, return (close_fill, open_fill). "
-            f"See ROLL_SCHEDULE for 2026 dates. "
-            f"(contracts={_contracts}, cluster={_cluster})"
-        )
+
+        # Test path: synthetic fills so runner rollover logic can be unit-tested offline
+        if self._raw_fetcher is not None:
+            return (
+                Fill(inst, "CLOSE", _direction, _contracts, _cluster,
+                     status="FILLED", avg_price=0.0),
+                Fill(inst, "OPEN",  _direction, _contracts, _cluster,
+                     status="FILLED", avg_price=0.0),
+            )
+
+        ib = self._require_connection()
+        import ib_insync as ibi  # type: ignore
+
+        close_side = "SELL" if _direction == "LONG" else "BUY"
+        open_side  = "BUY"  if _direction == "LONG" else "SELL"
+
+        # ── CLOSE front month ────────────────────────────────────────────────
+        front_contract = ibi.Future(inst, lastTradeDateOrContractMonth=front_month,
+                                    exchange="CME")
+        ib.qualifyContracts(front_contract)
+        close_ibkr = ibi.MarketOrder(close_side, _contracts)
+        close_ibkr.outsideRth = True
+        t0 = time.time()
+        close_trade = ib.placeOrder(front_contract, close_ibkr)
+        log.info("C2: placed CLOSE %s %s ×%d", close_side, front_month, _contracts)
+
+        deadline = t0 + EXIT_FILL_TIMEOUT_SECS
+        while not close_trade.isDone() and time.time() < deadline:
+            ib.sleep(0.1)
+        elapsed = time.time() - t0
+
+        if not close_trade.isDone():
+            ib.cancelOrder(close_trade.order)
+            ib.sleep(2.0)
+            log.critical(
+                "C2: ROLLOVER CLOSE timed out %s %s (%.1fs) — roll ABORTED; "
+                "position unchanged in runner state",
+                inst, front_month, elapsed,
+            )
+            return (
+                Fill(inst, "CLOSE", _direction, _contracts, _cluster, status="FAILED",
+                     error_msg=f"roll-close timeout {EXIT_FILL_TIMEOUT_SECS}s"),
+                Fill(inst, "OPEN",  _direction, _contracts, _cluster, status="FAILED",
+                     error_msg="skipped — close timed out"),
+            )
+
+        close_st    = close_trade.orderStatus.status
+        close_price = float(close_trade.orderStatus.avgFillPrice or 0.0)
+        close_fill  = Fill(inst, "CLOSE", _direction, _contracts, _cluster,
+                           status="FILLED" if close_st == "Filled" else "FAILED",
+                           avg_price=close_price,
+                           error_msg=None if close_st == "Filled"
+                                     else f"roll-close status: {close_st}")
+
+        if close_fill.status != "FILLED":
+            log.critical(
+                "C2: ROLLOVER CLOSE status=%s for %s %s — roll ABORTED; position unchanged",
+                close_st, inst, front_month,
+            )
+            return (
+                close_fill,
+                Fill(inst, "OPEN", _direction, _contracts, _cluster, status="FAILED",
+                     error_msg="skipped — close did not fill"),
+            )
+
+        log.info("C2: CLOSE filled %s %s @ %.4f (%.1fs)", inst, front_month, close_price, elapsed)
+
+        # ── OPEN next month ──────────────────────────────────────────────────
+        next_contract = ibi.Future(inst, lastTradeDateOrContractMonth=next_month,
+                                   exchange="CME")
+        ib.qualifyContracts(next_contract)
+        open_ibkr = ibi.MarketOrder(open_side, _contracts)
+        open_ibkr.outsideRth = True
+        t0 = time.time()
+        open_trade = ib.placeOrder(next_contract, open_ibkr)
+        log.info("C2: placed OPEN %s %s ×%d", open_side, next_month, _contracts)
+
+        deadline = t0 + ENTRY_FILL_TIMEOUT_SECS
+        while not open_trade.isDone() and time.time() < deadline:
+            ib.sleep(0.1)
+        elapsed = time.time() - t0
+
+        if not open_trade.isDone():
+            ib.cancelOrder(open_trade.order)
+            ib.sleep(2.0)
+            log.critical(
+                "C2: ROLLOVER OPEN timed out %s %s (%.1fs) AFTER CLOSE SUCCEEDED — "
+                "POSITION IS NOW FLAT IN IBKR. Manual intervention required.",
+                inst, next_month, elapsed,
+            )
+            return (
+                close_fill,
+                Fill(inst, "OPEN", _direction, _contracts, _cluster, status="FAILED",
+                     error_msg=f"roll-open timeout {ENTRY_FILL_TIMEOUT_SECS}s — position flat"),
+            )
+
+        open_st    = open_trade.orderStatus.status
+        open_price = float(open_trade.orderStatus.avgFillPrice or 0.0)
+        open_fill  = Fill(inst, "OPEN", _direction, _contracts, _cluster,
+                          status="FILLED" if open_st == "Filled" else "FAILED",
+                          avg_price=open_price,
+                          error_msg=None if open_st == "Filled"
+                                    else f"roll-open status: {open_st} — position flat")
+
+        if open_fill.status == "FILLED":
+            log.info(
+                "C2: ROLLOVER complete %s: close %s@%.4f → open %s@%.4f  "
+                "roll_slippage=%.4f",
+                inst, front_month, close_price, next_month, open_price,
+                abs(open_price - close_price),
+            )
+        else:
+            log.critical(
+                "C2: ROLLOVER OPEN status=%s for %s %s AFTER CLOSE SUCCEEDED — "
+                "POSITION IS NOW FLAT IN IBKR. Manual intervention required.",
+                open_st, inst, next_month,
+            )
+
+        return close_fill, open_fill

@@ -423,17 +423,19 @@ def main() -> None:
     # ── Data check ────────────────────────────────────────────────────────────
     print("\nChecking 5-min data coverage...")
     sample = _glob.glob(os.path.join(CACHE_5MIN, "AAPL_5min_*.parquet"))
-    if sample:
-        df_check = pd.read_parquet(sample[0])
-        max_date = df_check.index.max()
-        if max_date.year < 2023:
-            print(f"\n  [BLOCK] Max 5-min date: {max_date} — 2023-2024 data missing!")
-            print("  Run first: python raits/scripts/fetch_oos_data.py  (~2h)")
-            sys.exit(1)
-        print(f"  Max 5-min date: {max_date} — OK")
-    else:
+    if not sample:
         print("  [BLOCK] No 5-min AAPL parquets found. Check data/cache/data/")
         sys.exit(1)
+    # Check max date across ALL AAPL files — individual files are date-chunked
+    max_date = max(
+        pd.read_parquet(f, columns=[]).index.max()
+        for f in sample
+    )
+    if max_date.year < 2023:
+        print(f"\n  [BLOCK] Max 5-min date: {max_date} — 2023-2024 data missing!")
+        print("  Run first: python raits/scripts/fetch_oos_data.py  (~2h)")
+        sys.exit(1)
+    print(f"  Max 5-min date: {max_date} — OK")
 
     # ── Load ─────────────────────────────────────────────────────────────────
     print("\nLoading data...")
