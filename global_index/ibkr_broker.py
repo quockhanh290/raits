@@ -390,6 +390,7 @@ class IBKRBroker(Broker):
                 # P2: formatDate=1 returns strings in exchange local time (ET for CME/NKD).
                 # Do NOT use formatDate=2 (epoch UTC) — ib_insync may not expose it cleanly.
                 # Index is parsed below as naive ET (no UTC conversion).
+                timeout=120,  # IBKR pacing: default 60s too short when 5+ contracts queued
             )
             if not bars:
                 return pd.DataFrame()
@@ -662,6 +663,125 @@ class IBKRBroker(Broker):
             raise
         except Exception as exc:
             raise IBKRConnectionError(f"get_equity() failed: {exc}") from exc
+
+    # ── STP: stop order management ───────────────────────────────────────────
+
+    def place_stop(self, inst: str, direction: str, contracts: int,
+                   stop_price: float, cluster: str) -> str:
+        """Place a GTC stop order for overnight exit protection on a multi-day position.
+
+        LONG  → SELL STP at stop_price  (exit if price falls to stop_price)
+        SHORT → BUY  STP at stop_price  (exit if price rises to stop_price)
+
+        outsideRth=True: stop triggers in extended/overnight Globex session.
+        tif='GTC': order survives session boundaries until manually cancelled.
+
+        Returns IBKR orderId string on success, '' on failure.
+        Failure is non-fatal — runner logs ALERT and continues (position open without STP).
+        """
+        if self._raw_fetcher is not None:
+            return f"mock-stp-{inst}"  # offline / test mode
+
+        ib = self._require_connection()
+        try:
+            import ib_insync as ibi  # type: ignore
+
+            ibkr_sym = _RAITS_TO_IBKR.get(inst, inst)
+            exchange = _IBKR_EXCHANGE.get(ibkr_sym, "CME")
+            front_month = _current_front_month(ibkr_sym)
+            if front_month:
+                contract = ibi.Future(ibkr_sym,
+                                      lastTradeDateOrContractMonth=front_month,
+                                      exchange=exchange)
+            else:
+                contract = ibi.Future(ibkr_sym, exchange=exchange)
+            ib.qualifyContracts(contract)
+
+            ibkr_action = "SELL" if direction == "LONG" else "BUY"
+            stp_order = ibi.StopOrder(ibkr_action, contracts, stop_price)
+            stp_order.outsideRth = True
+            stp_order.tif = "GTC"
+
+            trade = ib.placeOrder(contract, stp_order)
+            ib.sleep(0.5)  # let IBKR assign orderId before reading it
+            order_id = str(trade.order.orderId)
+            log.info(
+                "place_stop: placed %s %s STP ×%d @ %.4f orderId=%s cluster=%s",
+                direction, inst, contracts, stop_price, order_id, cluster,
+            )
+            return order_id
+
+        except IBKRConnectionError:
+            raise
+        except Exception as exc:
+            log.error("place_stop(%s %s ×%d @ %.4f) failed: %s",
+                      direction, inst, contracts, stop_price, exc)
+            return ""
+
+    def cancel_order(self, order_id: str) -> bool:
+        """Cancel an open order by IBKR orderId. Returns True on success, False otherwise."""
+        if self._raw_fetcher is not None:
+            return True  # offline / test mode
+
+        ib = self._require_connection()
+        try:
+            order_id_int = int(order_id)
+            matching = [t for t in ib.trades()
+                        if t.order.orderId == order_id_int and not t.isDone()]
+            if not matching:
+                log.warning("cancel_order: orderId=%s not found in open trades", order_id)
+                return False
+            ib.cancelOrder(matching[0].order)
+            ib.sleep(1.0)
+            log.info("cancel_order: cancelled orderId=%s", order_id)
+            return True
+
+        except IBKRConnectionError:
+            raise
+        except Exception as exc:
+            log.error("cancel_order(orderId=%s) failed: %s", order_id, exc)
+            return False
+
+    def get_order_status(self, order_id: str) -> str:
+        """Query order status by IBKR orderId.
+
+        Returns 'FILLED' | 'CANCELLED' | 'PENDING' | 'NOT_FOUND'.
+        Used by B3 reconciliation to distinguish STP-triggered exits from orphan positions.
+
+        Note: after a TWS/Gateway daily restart, session-level trade history is cleared.
+        A GTC STP that filled in the previous session may not appear in ib.trades(),
+        but may appear in ib.fills() (execution reports) if the same session is still live.
+        Return 'NOT_FOUND' if the order cannot be located — B3 will treat as mismatch.
+        """
+        if self._raw_fetcher is not None:
+            return "PENDING"  # offline / test mode
+
+        ib = self._require_connection()
+        try:
+            order_id_int = int(order_id)
+
+            # Check open/recent trades
+            for t in ib.trades():
+                if t.order.orderId == order_id_int:
+                    s = t.orderStatus.status
+                    if s == "Filled":
+                        return "FILLED"
+                    if s in ("Cancelled", "ApiCancelled", "Inactive"):
+                        return "CANCELLED"
+                    return "PENDING"
+
+            # Check execution reports (filled orders, current session)
+            for fill in ib.fills():
+                if getattr(fill.execution, "orderId", None) == order_id_int:
+                    return "FILLED"
+
+            return "NOT_FOUND"
+
+        except IBKRConnectionError:
+            raise
+        except Exception as exc:
+            log.error("get_order_status(orderId=%s) failed: %s", order_id, exc)
+            return "NOT_FOUND"
 
     # ── C2: Rollover ──────────────────────────────────────────────────────────
 

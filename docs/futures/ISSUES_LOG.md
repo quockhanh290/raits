@@ -277,6 +277,27 @@ _Cập nhật: 2026-07-07_
 | **Fix proposal** | Chạy update_spy_csv TRƯỚC khi khởi động runner, không intra-session. |
 | **Nguồn** | OPEN_QUESTIONS.md "update_spy_csv timing look-ahead risk" |
 
+### I5.5 — Databento re-fetch contamination (A5 in-place update mất frozen baseline)
+| Trường | Nội dung |
+|---|---|
+| **Trạng thái** | RESOLVED (2026-07-09) — frozen ground truth = $53,021 (clean Databento full-refetch) |
+| **Root cause** | `update_futures_data.py` append mode thực hiện 2 thao tác: (1) shift toàn lịch sử bằng constant offset → ATR/P&L KHÔNG đổi (differences cancel); (2) **replace overlap window bars** (30 ngày) bằng new_adj từ anchor mới → bar-level giá Dec 2024 thay đổi → ATR14 cuối 2024 thay đổi → baseline drift $52,936 → $53,172 (+$236). |
+| **A5 cụ thể** | 2026-07-08: `*_8y.parquet` update in-place qua Databento, overlap Dec 2024, không có frozen copy → ground truth mất. |
+| **Fix baseline** | Re-fetch `--full-refetch --end 2024-12-31`. Frozen files: `data/cache/futures/*_frozen_2024.parquet` + `global_index/data/NKD_frozen_2024.parquet`. Staged tại `frozen_sim/` cho deploy_sim. |
+| **Kết quả** | Net=$53,021 / Calmar=3.07 / MaxDD=$2,501. Run 2 = byte-identical (**REPRODUCIBLE**). $52,936 là incremental artifact (non-reproducible). $53,021 = ground truth thật. Fit_A floor trên frozen: $51,459 / Calmar=2.69 (thay thế stale 2.38). |
+| **Live signal** | **STABLE**: `update_ibkr_daily.py` chỉ append new bars (không re-splice lịch sử). Rủi ro chỉ xảy ra khi chạy `update_futures_data.py` (Databento re-fetch). |
+| **Quy tắc mới** | TRƯỚC BẤT KỲ `update_futures_data.py` nào: tạo frozen copy `*_frozen_YYYY.parquet`, verify baseline, sau đó mới update. |
+| **Nguồn** | `global_index/update_futures_data.py` lines 87-108 (`_compute_splice_offset`), 210-235 (overlap replacement); đo 2026-07-09. |
+
+### I5.6 — Live signal stability qua quarterly roll (IBKR ContFuture)
+| Trường | Nội dung |
+|---|---|
+| **Trạng thái** | VERIFIED STABLE — minor caveat documented |
+| **Phân tích** | `update_ibkr_daily.py` append-only: (1) một lần duy nhất compute splice offset Databento→IBKR, lưu `_ibkr_splice_offsets.json`; (2) các lần sau apply stored offset uniformly cho new bars; (3) historical bars NEVER touched. → Signal ổn định giữa các lần Databento re-fetch. |
+| **Quarterly IBKR roll** | IBKR ContFuture tự handle back-adjust khi contract roll (Mar/Jun/Sep/Dec). Stored splice offset áp uniformly cho tất cả new bars. Historical parquet không đổi. ATR14 có thể lệch nhẹ ~14 ngày sau roll do roll spread (~1-3 ES points) — chấp nhận được. |
+| **Risk còn lại** | Chỉ xảy ra khi chạy lại `update_futures_data.py` (Databento re-fetch) không có frozen copy → xem I5.5. |
+| **Nguồn** | `global_index/update_ibkr_daily.py` lines 119-133 (`_apply_splice_offset`), 236-253 (stored offset logic); phân tích 2026-07-09. |
+
 ---
 
 ## NHÓM 6 — DOCUMENTATION (session này)
@@ -330,5 +351,7 @@ _Cập nhật: 2026-07-07_
 | I5.2 | Rollover C2 wire | Wire | PENDING IBKR |
 | I5.3 | Kill-switch D5 / Fat-finger F3 | Wire | PENDING VERIFY |
 | I5.4 | update_spy_csv timing look-ahead | Wire | OPEN |
+| I5.5 | Databento re-fetch contamination (A5 overlap replacement → $236 drift) | Data | RESOLVED ($53,021 / Calmar 3.07) |
+| I5.6 | Live signal stability qua quarterly roll | Data | VERIFIED STABLE |
 | I6.1 | SYSTEM_MODEL + VISUALIZE docs | Docs | DONE |
 | I6.2 | CROSS_SYSTEM_FINDINGS docs | Docs | DONE |

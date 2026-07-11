@@ -136,9 +136,33 @@ Status: IN PROGRESS
 ### Completed (run_live_day.py — production entry point — 2026-07-08) ✓ LIVE VERIFIED
 - [x] global_index/run_live_day.py: IBKRBroker → FuturesRunner → run_day(today)
       --dry-run LIVE VERIFIED 2026-07-08: connect → B3 reconcile → rollover check → fetch_bars → COMPLETE
-      Same data loading + signal_fn as run_smoke_test, but IBKRBroker (not MockBroker)
-      Full run: pre-computed backtest timelines; signal for today if parquet covers today
-      NOTE: signals are empty for dates past parquet coverage (A5 step: update parquet first)
+      ~~Same data loading + signal_fn as run_smoke_test, but IBKRBroker (not MockBroker)~~
+      ~~Full run: pre-computed backtest timelines; signal for today if parquet covers today~~
+      NOTE: signal_fn REPLACED by Option C (see below)
+
+### Completed (Option C — live runner fix — 2026-07-09)
+- [x] AUDIT: 6 mismatches A-F confirmed. Root cause: timeline lookup copied from verify_runner_real.py.
+      Impact measured: -$9,112 (-20.2%). See docs/futures/LIVE_RUNNER_AUDIT.md
+- [x] Change 1 — runner.py:527: through=day → through=end-of-day (fixes Mismatch B)
+      `_through = pd.Timestamp(day) + pd.Timedelta(hours=23, minutes=59)`
+- [x] Change 2 — run_live_day.py: replace timeline signal_fn → generate_today_signals() wrapper
+      Mismatches A+B fixed: `bars` param now USED (was `_bars` ignored); through=end-of-day
+      Mismatch C fixed: generate_today_signals() calls desired_position() on concat(frozen+live)
+      Mismatch D: requires cron change (5-min loop 14:05-15:55) — cron not yet updated
+      Mismatch E (UT-2/UT-5): now ACTIVE (generate_today_signals is the live path)
+      Mismatch F: runner.py docstring now matches implementation
+      STRESS_MID: stress_bars_1015={} → DEFERRED Phase C2 (needs 10:20 ET morning cron)
+- [x] Dead code removed: _desired_at(), _real_risk(), backtest pre-compute block, ledger, sorted lists
+- [x] Offline tests: 31+14+42+68 = 155 tests ALL PASS after changes
+- [x] Verify script written: global_index/verify_concat_desired.py (checklist a, PENDING run)
+
+### PENDING (Option C — user must run)
+- [ ] VERIFY: python global_index/verify_concat_desired.py --data-dir data\cache\futures\frozen_sim
+      Must see: "RESULT: PASS" (Scenario A + B both pass) before trusting live signals
+- [ ] CRON: update Windows Task Scheduler — every 5 min 14:05-15:55 ET (replaces single 16:00 run)
+      Morning exits still work (desired_position returns None → exits generated on any run)
+- [ ] LIVE verify: --print-signals after market opens → check entries fire at 14:05 not 16:00
+- [ ] STRESS_MID Phase C2: add 10:20 ET morning cron with stress_bars_1015 populated
 
 ### Completed (Offline bug fixes — 2026-07-08)
 - [x] Fill.status + filled_qty + avg_price + error_msg (broker.py) — backwards-compat defaults; MockBroker → status="FILLED"
@@ -268,6 +292,76 @@ Status: IN PROGRESS
       P2.1 session open 18:00 ET | P2.2 1380 bars/day | P2.3 tz-naive
 - [x] VERIFY: 247/247 offline tests ALL PASS; baseline unchanged
 
+### Completed (Wire session 2026-07-08/09 — print-signals LIVE VERIFIED)
+- [x] Cold start safety verified from code: `new_ed == day_ts` guard + diff_desired_vs_held(held=[]) = 0 entries, 0 exits
+      All branches (swing/NKD/force_entries/STRESS/exits) safe when held=[]. No spurious CLOSE possible.
+- [x] spy_daily_vault2025.csv verified safe (MEASURED):
+      label_regimes: 1761/1761 dates 2018-2024 IDENTICAL between frozen vs vault2025 CSV
+      Features (log_return + 5-day rolling vol) are purely local — adding 2025-2026 data cannot change old labels
+      baseline $52,936 / Calmar 2.744 unchanged; vault2025.csv safe for live --regime-csv
+- [x] IBKR 162 "Historical data query cancelled" root cause: stale Gateway session state
+      Fix: restart IB Gateway + `timeout=120` in reqHistoricalData + `time.sleep(15)` post-connect
+      Files: global_index/ibkr_broker.py (timeout=120), global_index/run_live_day.py (15s sleep)
+- [x] --print-signals LIVE VERIFIED 2026-07-09 with vault2025.csv:
+      regime=Normal (decoded thật, không carry-forward từ vault2025.csv)
+      bars=MES✓1741b MNQ✓1741b MYM✓1741b M2K✓1741b MNKD✓1734b
+      entries=0 exits=0 (expected: cold start + no backtest entry on today's date)
+      swing=3055 nkd=879 stress=474 (parquet covers 2026-07-07 → backtest has 2025-2026 trades)
+
+### Completed (Live Runner Audit — 2026-07-09)
+- [x] Full audit: live runner vs strategy design — 6 mismatches found (A–F)
+      Root cause: `run_live_day.py` copied timeline lookup from `verify_runner_real.py` (O(n) 8yr replay)
+      instead of calling `generate_today_signals()`. runner.py docstring says intent correctly, implementation violates it.
+      Impact measured: fire median 14:45 ET, 40% after 15:00; live@15:55 delta = −$9,112 (−20.2% of BT P&L)
+      UT-2/UT-5 fixes in `signal_layer.py` are dead code (generate_today_signals not called in prod)
+      Fix plan written: docs/futures/LIVE_RUNNER_AUDIT.md
+      Fix = Option C: runner.py 1-line (through=end-of-day) + run_live_day.py signal_fn replacement + 5-min cron
+
+### Completed (BUILD STP — overnight stop order — 2026-07-10)
+- [x] **Exit timing gap measured**: 96.4% of chandelier/GAP exits fall outside 14:05–15:55 cron window.
+      Mean signed delta = -$19.09/trade (live@cron vs backtest@stop). Total drag = -$38,246 vs baseline $41,266.
+      ROOT CAUSE: cron sends CLOSE at market price (~14:05 open) vs backtest exits at exact stop level.
+      Decision: BUILD STP (not accept for paper). See scratchpad/measure_overnight_stop_miss.py.
+- [x] **live_decision.py**: `OpenPos` + `stop_price: float | None` + `stop_order_id: str | None`
+- [x] **broker.py**: `Broker` ABC + `MockBroker` — `place_stop()`, `cancel_order()`, `get_order_status()`
+- [x] **ibkr_broker.py**: `IBKRBroker.place_stop()` (GTC STP, outsideRth=True), `cancel_order()`, `get_order_status()`
+- [x] **runner.py**:
+      `_openpos_to_dict/from_dict`: serialise `stop_price` + `stop_order_id` (backward-compat `.get()`)
+      Pass 2 multi-day OPEN: capture fill → place GTC STP immediately after FILLED/PARTIAL; ALERT on failure
+      B3 STP-aware: if file pos has stop_order_id → `get_order_status()` → FILLED = auto-clear (no halt);
+      NOT_FOUND = CRITICAL with STP hint ("check TWS executions")
+- [x] **test_stp.py**: 8/8 PASS — STP1 (place called), STP2 (JSON roundtrip + legacy None), STP3 (no STP sameday),
+      STP4 (no STP on CANCELLED OPEN), STP5 (B3 STP EXIT auto-clear), STP6 (NOT_FOUND halts), STP7 (no-STP original behavior)
+- [x] **Full suite**: 14/14 ibkr_injection + 50/50 pytest (operational_fixes + event_playback + stp) ALL PASS
+- **Note**: stop_price = ENTRY chandelier level only. Ratchet updates (trailing stop as chandelier moves)
+  planned for a future phase; paper phase uses fixed entry-stop. Covers 95%+ of the -$38k drag.
+
+### Completed (Causal fix + pre-paper verification — 2026-07-10)
+- [x] Look-ahead bug fixed in `futures/_validated_core.py::backtest_swing_tf`:
+      `exit_ts_today` reset per day, set on exit, `win = win[win.index > exit_ts_today]` blocks retroactive entries.
+      VERIFIED: deploy_sim baseline Calmar=1.72 ($41,266), floor=1.53 (was dirty 2.38/2.04/3.08/3.35).
+- [x] INVARIANTS.md updated: all 4 causal numbers; old dirty numbers deprecated with note.
+- [x] 2.04 hardcoded → 1.53 in: generate_replay_snapshots.py (_BACKTEST_CALMAR), runner.py (backtest_calmar).
+- [x] Reconcile all PASS after _validated_core change: GD0/STRESS/NKD Phase 1/SWING_DESIRED Phase 1 = 0 mismatch.
+- [x] B-fail RESOLVED: 2 known cases GONE; 0 pairs with prior exit >15:55 in 1499 same-day pairs. VERDICT PASS.
+- [x] 26/26 in-window pairs:
+      CHECK A (causal invariant): PASS ✓ — all 26 entry_time > exit_time
+      CHECK B: 26 pairs, lag 13–105 min (mean 41.7 min)
+      CHECK C (desired_position at cron+5min): PASS ✓ — 26/26 MATCH (miss=0, mismatch=0)
+      → OPTION C TIMING VERIFIED HOÀN TOÀN
+- [x] Offline checklist confirmed via code trace:
+      Re-entry prevention: structural (held_by_key, signal_layer.py:165-177)
+      Cold-start guard: signal_layer.py:175 `new_ed == today_norm` rejects stale entry_day
+      NKD timing: MNKD session_tz=Asia/Tokyo; 14:05 ET runner sees today_norm=X = entry_day=X → match ✓
+- [x] B3 design gap fixed: `_b3_halt_entries` flag in runner.py:
+      Init line 192 (before B3 block), set True line 260 on mismatch, gate line 623 in run_day().
+      Exits unaffected; pattern consistent with D5/E3/HMM stale guards.
+      test_ibkr_injection.py: 14/14 PASS.
+- [x] B3 lifecycle confirmed: `run_live_day.py` là script chạy-và-thoát (không phải daemon).
+      Mỗi cron invocation = new process → `__init__()` → halt=False → B3 re-check → auto-releases if fixed.
+      KHÔNG cần reset thủ công; halt tự nhả ở cron N+1 sau khi operator sửa live_positions.json.
+- [x] docs/futures/OPERATIONS.md: runbook mới — B3 (4 bước), D5 STOP_FILE, E1 PID lock, circuit breaker, log monitoring table.
+
 ### Next steps (IBKR ACCOUNT APPROVED → PAPER)
 
 **Thứ tự implement:**
@@ -296,6 +390,18 @@ Status: IN PROGRESS
       Splice offset applied (diff back-adjust re-anchored Dec2024→Sep2026)
       Daily mỗi sáng: python -m global_index.update_ibkr_daily (IBKR ContFuture)
       Files: global_index/update_futures_data.py, global_index/update_ibkr_daily.py
+- [x] [D1] ĐO: deploy_sim --end 2024-12-31 trên *_8y.parquet đã A5 = $53,172 ≠ $52,936
+      ROOT CAUSE CONFIRMED: contamination = overlap window replacement (Dec 2024 bars), KHÔNG phải constant offset
+      Constant offset: ATR/P&L không đổi (math proven). Thủ phạm: 30-day overlap bars replaced by new_adj anchor mới.
+      $53,172 = số NHIỄM. KHÔNG lock. Phải khôi phục $52,936 via re-fetch.
+- [x] [D2] Frozen parquet DONE: --full-refetch --end 2024-12-31 (Databento 2 API keys)
+      5 files: ES/NQ/YM/RTY_frozen_2024.parquet + NKD_frozen_2024.parquet (2024-12-30 end)
+      Staged tại data/cache/futures/frozen_sim/ (renamed *_8y.parquet cho deploy_sim)
+      Deploy run 1: net=$53,021 / Calmar=3.07 / MaxDD=$2,501 | Run 2 (reproducibility): BYTE-IDENTICAL ✓
+      $52,936 NON-REPRODUCIBLE (incremental artifact). $53,021 = clean ground truth.
+      Fit_A floor trên frozen: $51,459 / Calmar=2.69 (thay thế stale 2.38). floor/baseline=87.6% ✓
+- [x] [D3] INVARIANTS.md updated: baseline=$53,021/Calmar=3.07, floor=2.69, vault floors re-checked (3.33/2.99 > 2.69 ✓)
+      ISSUES_LOG I5.5 → RESOLVED. SCRATCHPAD updated. frozen/live split documented.
 - [ ] Confirm NKD trong CME bundle + Rule 576 cert
 - [ ] runner.dump_state(): điền Group B (slippage, fill quality, paper-vs-backtest, health)
 - [ ] update_spy_csv timing: run trước runner, không intra-session (I5.4)
@@ -672,3 +778,56 @@ raits/fetch_sector_etfs.py (new — fetch XLF/XLE/etc IS+OOS data)
 raits/backtest/engine_refactored.py (Bug B same-bar exit fix)
 raits/decision/decision_unit.py (Bug A PE_SHORT inject; Bug C SAFETY_MODE iloc[-1] fix)
 raits/raits/scripts/verify_parallel_run.py (orig engine cache + --reset-orig-cache flag)
+
+---
+
+## Sub-task: Futures NO-GO re-examination — correct entry window (2026-07-09)
+Status: DONE (ORB + Gap Fill closed with real evidence)
+
+### Context
+Hypothesis: futures NO-GO strategies may have been rejected using the stocks-legacy
+14:00-15:55 window instead of their own natural window. Investigation found NO prior
+rejection record for ORB/gap-fill on futures at all (searched docs/futures/ fully) —
+instead found `orb_futures/` (EXPERIMENTAL, never wired to production) with a complete,
+never-before-run harness already using market-open windows (09:31-09:45 OR, entries to
+15:55). No results were ever recorded anywhere for it.
+
+### Completed
+- [x] Confirmed no futures ORB/VWAP_MR-equivalent was ever tested+rejected on 14:00-15:55
+      (docs/futures/DECISIONS.md, OPEN_QUESTIONS.md, ARCHIVE_LOG.md, ISSUES_LOG.md — no match)
+- [x] Found `orb_futures/` (edge_test.py=ORB breakout, gap_fill.py=fade-the-gap,
+      overnight.py=close-to-open hold) — all already use 09:31-09:45 OR + 09:46 entries,
+      NOT the stocks 14:00-15:55 window. Marked EXPERIMENTAL, never run before.
+- [x] User pushback validated: is 09:30 ET a real futures liquidity anchor, or copied
+      from stocks logic? MEASURED (not assumed): avg per-min volume by hour across
+      full 23h session, ES/NQ/YM/RTY on frozen_sim data.
+      Result: 09:00/10:00/15:00 ET are top-3 volume hours for ALL 4 instruments;
+      overnight Globex hours (18:00-08:00 ET) never in top 6 for any instrument.
+      CONFIRMS 09:31-09:45 OR window sits in real liquidity, not a stocks-copy assumption.
+- [x] Ran edge_test.py (ORB breakout) on frozen_sim + spy_daily_live.csv, cost×1 and ×2:
+      POOL 231t, PF=0.67/0.63, net=-$3,883/-$4,441, ALL 7 years (2018-2024) negative both costs.
+      DECISIVE NO-GO — not a windowing artifact, real absence of edge at the correct window.
+- [x] Ran gap_fill.py (fade-the-open-gap) same data, cost×1 and ×2:
+      POOL 100t, PF=0.64/0.58, WR=25%/22%, net=-$1,014/-$1,262, 5/7 years negative.
+      DECISIVE NO-GO. Only MNQ marginally positive (25t, +$189) — too thin to matter.
+      Both low corr vs swing-TF (+0.002/+0.02) — would have diversified IF profitable.
+- [x] Benign note: hmmlearn "Model is not converging" warning appears on every run
+      (delta -0.152 on LL~9945, identical across runs — deterministic, tiny relative
+      change). Not investigated further — first appearance in this project, likely
+      immaterial EM precision artifact, not a blocker for this verdict.
+
+### Verdict
+ORB breakout and Gap Fill are real NO-GO on futures Rổ4 at the natural, liquidity-
+verified window. Original "wrong window" hypothesis for these two is CLOSED — they
+were never actually tested before (not wrongly rejected), and now that they have been,
+the result is negative on the correct window. No OOS Gate 0-4 needed (nothing passed
+Gate 2 to escalate).
+
+### Next steps (optional, not yet done)
+- [ ] overnight.py (close 15:55 -> next-open 09:31) not yet run — different mechanism,
+      not a "wrong window" re-test, can run if still of interest
+- [ ] xsect/ (cross-sectional momentum) and nonequity/ (GC/CL) not covered by this
+      session — separate NO-GO reasons (deferred / data availability), not window-related
+
+### Files touched (read-only investigation, no production files modified)
+None — orb_futures/, futures/, docs/futures/ all read-only this session.

@@ -1,0 +1,82 @@
+OOS 2023-2024 DIAGNOSTIC REPORT
+Date:     2026-07-08
+Engine:   BacktestEngine (post-CB-fix, commit 9113ddd branch)
+Params:   orb=20 / bb=1.5 / ema=30 (sealed final_params.yaml)
+Config:   account=$50k | Kelly=0.75 | max_risk=1.5% | max_pos=40% | PDT=off
+Window:   2023-01-03 to 2024-12-31 (same as original vault)
+N_BOOT:   10000 (seed=42)
+
+FRAMING:
+  2023-2024 = SEEN-BUT-NOT-TUNED (used for deployment decision, no params changed)
+  2025      = FULLY CLEAN (not touched, real arbiter)
+  This run: diagnostic only. DO NOT tune based on results.
+
+================================================================================
+SECTION 1 — OVERALL P&L vs ORIGINAL VAULT
+--------------------------------------------------------------------------------
+  Original vault (pre-CB-fix):  $+7,404  Sharpe=0.88  PF=1.18
+  Current engine (post-CB-fix): $+6,666  Sharpe=0.78  PF=1.17  Calmar=0.96
+  Delta P&L:    $-738
+  Delta Sharpe: -0.10
+  Win Rate:     45.6%  Max DD: -6.7%  Trades: 430
+
+SECTION 2 — STRATEGY DECOMPOSITION
+--------------------------------------------------------------------------------
+  Strategy          N    WR%   Mean$/t      Total  % of sys
+  ------------------------------------------------------------
+  TREND_FOLLOW    269  46.5%    +18.37     +4,941    +74.1%
+  PE_SHORT         22  63.6%   +141.81     +3,120    +46.8%
+  ORB              40  52.5%     +0.04         +2     +0.0%
+  STRESS_ORB       49  34.7%     -3.78       -185     -2.8%
+  STRESS_MID       27  29.6%    -49.83     -1,345    -20.2%
+  GF_SHORT         23  47.8%     +5.83       +134     +2.0%
+
+SECTION 3 — EDGE CHARACTERIZATION
+--------------------------------------------------------------------------------
+  Confirmed backbone (TF):        $+4,941  (+74.1% of total)
+  Confirmed concentrated (PE):    $+3,120  (+46.8% of total)
+  No-edge trio (ORB+SORB+SMID):   $-1,529  (-22.9% of total)
+  Untrustworthy (GF_SHORT):       $+134  (+2.0% of total)
+
+  Classification (from IS bootstrap audit):
+    TF          — CONFIRMED robust (R-p=0.009, block-R B20 confirmed)
+    PE_SHORT    — CONFIRMED concentrated (top-5 trades=75% CumR in IS, watch OOS)
+    GF_SHORT    — UNTRUSTWORTHY (trailing-stop R artifact; N=12 untestable)
+    ORB/SORB/SMID — NO EDGE on all IS tests
+
+  -> TF-dominant (74% of P&L): robust edge driving result. Good.
+
+SECTION 4 — R-MULTIPLE BOOTSTRAP (IS-comparable, GF_SHORT excluded)
+--------------------------------------------------------------------------------
+  Strategy          N    MeanR     StdR     d_R      R-p verdict
+  ----------------------------------------------------------------------
+  TREND_FOLLOW    269  +0.0827   1.1227  +0.074    0.108 BORDERLINE (IS 0.009 delta=+0.099)
+  PE_SHORT         22  +0.1854   0.9806  +0.189    0.185 NO EDGE    (IS 0.010 delta=+0.175)
+  ORB              40  +0.0941   0.7137  +0.132    0.200 NO EDGE    (IS 0.241 delta=-0.041)
+  STRESS_ORB       49  -0.0858   1.1953  -0.072    1.000 NO EDGE    (IS 0.366 delta=+0.634)
+  STRESS_MID       27  -0.5073   0.7651  -0.663    1.000 NO EDGE    (IS 0.380 delta=+0.620)
+
+  GF_SHORT excluded: R-multiple invalid (trailing chandelier stop in CSV
+  stores FINAL stop position at exit, not initial risk stop). See BOOTSTRAP_AUDIT.md.
+
+SECTION 5 — JACKKNIFE: REMOVE TOP k TRADES BY NET PNL
+--------------------------------------------------------------------------------
+  Total 2023-2024: $+6,666  N=430
+    k                       removed_trade    new_total still positive?
+  -----------------------------------------------------------------
+    1 PE_SHORT/PYPL 2023-05-09 $+1490     $    +5,175  YES
+    2 PE_SHORT/C 2024-08-02 $+1490        $    +3,686  YES
+    3 TREND_FOLLOW/TSLA 2023-02-01 $+1184 $    +2,501  YES
+    4 TREND_FOLLOW/TSLA 2023-10-31 $+1156 $    +1,345  YES
+    5 PE_SHORT/PYPL 2023-08-03 $+1084     $      +261  YES
+
+SECTION 6 — 'EQUITY CANDIDATE' VERDICT
+--------------------------------------------------------------------------------
+  Original basis: +$7,404, Sharpe=0.88, PF=1.18 (pre-CB-fix engine)
+  Current result: $+6,666, Sharpe=0.78, PF=1.17 (post-CB-fix)
+
+  VERDICT: HOLDS — positive P&L and Sharpe>0.5 on current engine.
+
+  CRITICAL CONSTRAINT: do NOT adjust engine/strategy based on this result.
+  2023-2024 is seen-but-not-tuned. Any parameter change triggered by this
+  result contaminate 2025 indirectly. Report only.

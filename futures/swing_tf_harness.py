@@ -67,14 +67,15 @@ def _swing_cache(df):
     is_gap_full = deltas > GAP_MIN          # True where a real time-break precedes the bar
     is_gap_full[0] = False
     df = df.assign(_isgap=is_gap_full)
-    day_hl, day_b5 = {}, {}
+    day_hl, day_b5, day_ts = {}, {}, {}
     for d, g in df.groupby(df.index.normalize()):
         key = pd.Timestamp(d).tz_localize(None).normalize()
         day_hl[key] = (g["high"].to_numpy(), g["low"].to_numpy(),
                        g["open"].to_numpy(), g["_isgap"].to_numpy())
         day_b5[key] = G.resample_5m(g.drop(columns="_isgap"))
+        day_ts[key] = g.index
     days = sorted(day_hl.keys())
-    cache = dict(datr=datr, days=days, hl=day_hl, b5=day_b5)
+    cache = dict(datr=datr, days=days, hl=day_hl, b5=day_b5, ts=day_ts)
     _SWING_CACHE[k] = cache
     return cache
 
@@ -91,7 +92,7 @@ def backtest_swing_tf(df, labels, cost, *, ema_period=20, chandelier_atr_mult=3.
                              "chandelier_atr_mult": chandelier_atr_mult})
     allowed = set(s.config["allowed_regimes"])
     c = _swing_cache(df)
-    datr, days, hl, b5 = c["datr"], c["days"], c["hl"], c["b5"]
+    datr, days, hl, b5, ts = c["datr"], c["days"], c["hl"], c["b5"], c.get("ts", {})
     mult = chandelier_atr_mult
     trades = []
     pos = None
@@ -100,7 +101,23 @@ def backtest_swing_tf(df, labels, cost, *, ema_period=20, chandelier_atr_mult=3.
         if pos is not None:
             hold = (day - pos["entry_day"]).days
             if hold >= max_hold_days:
-                op = float(hl[day][2][0])
+                # Exit at RTH open (09:30 ET) — see _validated_core.py for full rationale.
+                _day_ts = ts.get(day)
+                if _day_ts is not None and len(_day_ts):
+                    _930    = day + pd.Timedelta(hours=9, minutes=30)
+                    _tz_str = str(_day_ts.tzinfo) if _day_ts.tzinfo is not None else ""
+                    if _tz_str in ("", "America/New_York", "US/Eastern"):
+                        _ts_cmp = _day_ts.tz_localize(None) if _day_ts.tzinfo is not None else _day_ts
+                        _idx    = int(np.searchsorted(_ts_cmp.asi8, _930.value))
+                        if _idx >= len(hl[day][2]):
+                            _idx = 0
+                    else:
+                        _idx = 0
+                    if _idx >= len(hl[day][2]):
+                        _idx = 0
+                    op = float(hl[day][2][_idx])
+                else:
+                    op = float(hl[day][2][0])
                 pts = (op - pos["entry"]) if pos["dir"] == "LONG" else (pos["entry"] - op)
                 trades.append(dict(day=pos["entry_day"].date(), exit_day=day.date(),
                                    regime=pos["regime"], direction=pos["dir"],

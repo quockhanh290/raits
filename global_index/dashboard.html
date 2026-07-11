@@ -797,7 +797,7 @@ header::before {
     <div class="an-card">
       <div class="an-card-title">Performance Degradation <span style="color:var(--muted);font-size:9px">— go/no-go metric</span></div>
       <div id="anDegradation">
-        <div class="an-row"><span class="an-label">Backtest Calmar (IS baseline)</span><span class="an-value go" id="degBacktest">2.38</span></div>
+        <div class="an-row"><span class="an-label">Backtest Calmar (IS baseline)</span><span class="an-value go" id="degBacktest">2.04</span></div>
         <div class="an-row"><span class="an-label">Paper Calmar</span><span class="an-value" id="degPaper" style="color:var(--muted)">N/A — replay</span></div>
         <div class="an-row"><span class="an-label">Degradation</span><span class="an-value" id="degPct" style="color:var(--muted)">N/A</span></div>
         <div class="an-row">
@@ -1533,7 +1533,7 @@ function renderAnalytics(snap, meta) {
   const wr30Cls = wr30 == null ? '' : wr30 >= 0.55 ? 'go' : wr30 >= 0.45 ? '' : 'red';
 
   document.getElementById('anRunMetrics').innerHTML = `
-    <div class="an-row"><span class="an-label">Calmar (target 2.38)</span>
+    <div class="an-row"><span class="an-label">Calmar (floor 2.04)</span>
       <span class="an-value ${calCls}">${calmar != null ? calmar.toFixed(2) : '—'}</span></div>
     <div class="an-row"><span class="an-label">Sharpe</span>
       <span class="an-value">${rm.sharpe != null ? rm.sharpe.toFixed(2) : '—'}</span></div>
@@ -1643,7 +1643,7 @@ function renderAnalytics(snap, meta) {
 function renderPaperStatus(snap) {
   // Degradation — backtest_calmar from meta (n_contracts IS run), fallback to snap
   const deg = snap.degradation || {};
-  const isCalmar = data.meta.backtest_calmar ?? deg.backtest_calmar ?? 2.38;
+  const isCalmar = data.meta.backtest_calmar ?? deg.backtest_calmar ?? 2.04;
   document.getElementById('degBacktest').textContent = isCalmar.toFixed(2);
   document.getElementById('degPaper').textContent = deg.paper_calmar != null ? deg.paper_calmar.toFixed(2) : 'N/A — replay';
   document.getElementById('degPaper').style.color = deg.paper_calmar != null ? 'var(--text)' : 'var(--muted)';

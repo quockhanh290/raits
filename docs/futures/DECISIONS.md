@@ -32,9 +32,14 @@ Rejected: freeze khi data available — không có reference point để so sán
 Why: most recent full-year fit, 17.16% A→C flip là justified (83/101 Normal→Stress trong 2020+2022 bear markets).  
 Rejected: giữ fit_A — stale, underestimates Stress.
 
-**Degradation floor = Calmar 2.38 (fit_A)**  
-Why: conservative floor — fit_A là worst-case retrain đã observe, dùng làm minimum acceptable.  
-Rejected: floor từ fit_C (2.75) — quá optimistic, không account for degradation.
+**Degradation floor = Calmar 2.04 (fit_A, frozen_2024, no-stress, 2-tick)**  
+Why: conservative floor — fit_A (fit-2022) là worst-case retrain đã observe; no-stress vì with-stress floor (2.54) > baseline with-stress (2.50) = inverted (lý do: fit_A label nhiều Stress hơn → IS P&L cao hơn bằng STRESS_MID, không phải core system tốt hơn). 2-tick = production slippage convention. floor/baseline ratio = 85.7% (2.04/2.38) ổn định.  
+Rejected: floor từ fit_C (2.50/2.38) — baseline không phải floor; floor từ 1-tick (2.69) — không match production slippage; with-stress floor (2.54) — inverted logic.
+
+**Giữ fit-2024 (hmm_fit_end=2024-12-31), KHÔNG refit gồm 2025 — 2026-07-09**  
+Why: đo fit-2024 vs fit-2025 decode 2026 → 93.7% giống (118/126 ngày), chỉ 6.3% khác (8 ngày). 7/8 flip là Normal↔Calm (ít impact hành vi giao dịch); 1/8 là Stress→Normal (2026-04-06). Cải thiện MINIMAL — không bù được chi phí refit: mất OOS 2025 backtest (Calmar 3.42) + re-validate baseline/floor/vault. Decode-forward (fit cố định, gán nhãn ngày mới không retrain) là đủ cho paper regime 2026.  
+Rejected: refit gồm 2025 — cải thiện 6.3% không đáng đánh đổi; refit định kỳ ("mỗi năm") — quán tính, không theo nhu cầu đo được.  
+Measurement: `compare_refit_2025.py` (scratchpad, 2026-07-09); see LESSONS.md L11 cho refit criteria tổng quát.
 
 **Deploy dùng `label_regimes()` (không dùng `regime_coordinator`)**  
 Why: validated path qua toàn bộ reconcile chain; regime_coordinator là code path khác, chưa validate.  
@@ -118,6 +123,6 @@ Rejected: fit-2024 cho vault 2023-2024 — contamination +1.19 Calmar đo đư�
 Why: asymmetry — STRESS hibernates trong calm (phí $0), active chỉ trong Stress regime. Cost thực tế $0–44/năm. Mất hedge bear nếu bỏ. Logic đúng (regime-gated, round-number defaults, không tune 2022). OOS chưa proven nhưng phí ≈ 0 → không cần proven để giữ.  
 Rejected: bỏ STRESS vì OOS yếu — chi phí bỏ (mất hedge bear asymmetric) > chi phí giữ ($44/năm).
 
-**Vault verdict = direction + floor 2.38 (không điểm Calmar chính xác)**  
-Why: vault 1-2 năm, mẫu nhỏ → Calmar fragile (swing lớn giữa các năm). Direction (3 năm dương liên tiếp: 2023 +$8k / 2024 +$6k / 2025 +$6.7k) + floor từ fit_A degradation bền hơn điểm cụ thể.  
-Rejected: Calmar ≥ 1.0 — không có basis từ degradation history, threshold quá thấp.
+**Vault verdict = Calmar > floor 2.04 (không điểm chính xác) + direction**  
+Why: vault 1-2 năm, mẫu nhỏ → Calmar fragile. Floor 2.04 (fit_A degradation, 2-tick) làm ngưỡng hard; direction (3 năm dương: 2023 +$8k / 2024 +$6k / 2025 +$6.7k) là confirmation thứ hai. Biên rộng (3.08/3.35 vs floor 2.04) quan trọng hơn điểm chính xác.  
+Rejected: Calmar ≥ 1.0 — không có basis từ degradation history; floor cũ 2.38 (1-tick) — không match production slippage convention 2-tick.

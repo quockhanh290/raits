@@ -122,15 +122,17 @@ def _release_lock(lock_path: Path) -> None:
 
 def _openpos_to_dict(p: OpenPos) -> dict:
     return {
-        "inst":         p.inst,
-        "direction":    p.direction,
-        "contracts":    p.contracts,
-        "risk_dollars": p.risk_dollars,
-        "cluster":      p.cluster,
-        "entry_day":    str(p.entry_day) if p.entry_day is not None else None,
-        "exit_day":     str(p.exit_day)  if p.exit_day  is not None else None,
-        "pnl_sized":    p.pnl_sized,
-        "exit_pending": p.exit_pending,
+        "inst":           p.inst,
+        "direction":      p.direction,
+        "contracts":      p.contracts,
+        "risk_dollars":   p.risk_dollars,
+        "cluster":        p.cluster,
+        "entry_day":      str(p.entry_day) if p.entry_day is not None else None,
+        "exit_day":       str(p.exit_day)  if p.exit_day  is not None else None,
+        "pnl_sized":      p.pnl_sized,
+        "exit_pending":   p.exit_pending,
+        "stop_price":     p.stop_price,
+        "stop_order_id":  p.stop_order_id,
     }
 
 
@@ -148,6 +150,8 @@ def _openpos_from_dict(d: dict) -> OpenPos:
         exit_day=pd.Timestamp(d["exit_day"])   if d.get("exit_day")  else None,
         pnl_sized=float(d.get("pnl_sized", 0.0)),
         exit_pending=bool(d.get("exit_pending", False)),
+        stop_price=float(d["stop_price"]) if d.get("stop_price") is not None else None,
+        stop_order_id=d.get("stop_order_id"),
     )
 
 
@@ -187,6 +191,9 @@ class FuturesRunner:
         if self._lock_path is not None:
             _acquire_lock(self._lock_path)
             atexit.register(_release_lock, self._lock_path)
+
+        # B3: halt new entries if broker/file mismatch detected on startup (set below)
+        self._b3_halt_entries: bool = False
 
         # B1: load persisted positions + breaker state if path is supplied and file exists
         self._positions_path = Path(positions_path) if positions_path else None
@@ -234,15 +241,55 @@ class FuturesRunner:
                         k = (p.inst, p.direction)
                         file_key[k] = file_key.get(k, 0) + p.contracts
                     mismatches = 0
+                    # Build lookup: (inst, direction) → list of loaded OpenPos
+                    _file_pos_by_key: dict = {}
+                    for _lp in loaded_positions:
+                        _file_pos_by_key.setdefault((_lp.inst, _lp.direction), []).append(_lp)
+
                     for k, qty in file_key.items():
                         broker_qty = broker_key.get(k, 0)
                         if broker_qty != qty:
-                            logger.critical(
-                                "B3 MISMATCH: file has %s %s ×%d but IBKR shows ×%d "
-                                "— investigate before trading; file state will be used",
-                                k[1], k[0], qty, broker_qty,
+                            # B3 STP-aware: if the mismatched position has a stop_order_id,
+                            # check whether it filled overnight (expected exit, not orphan).
+                            _stp_cand = next(
+                                (p for p in _file_pos_by_key.get(k, []) if p.stop_order_id),
+                                None,
                             )
-                            mismatches += 1
+                            _stp_status = None
+                            if _stp_cand is not None:
+                                try:
+                                    _stp_status = broker.get_order_status(_stp_cand.stop_order_id)
+                                except Exception:
+                                    pass
+
+                            if _stp_status == "FILLED":
+                                # STP triggered overnight — clean up state, no halt needed.
+                                logger.info(
+                                    "B3 STP EXIT: %s %s stop orderId=%s filled overnight "
+                                    "— position cleared (stop_price=%.4f)",
+                                    k[1], k[0], _stp_cand.stop_order_id,
+                                    _stp_cand.stop_price or 0.0,
+                                )
+                                loaded_positions[:] = [
+                                    p for p in loaded_positions if p is not _stp_cand]
+                            elif _stp_cand is not None:
+                                logger.critical(
+                                    "B3 MISMATCH: file has %s %s ×%d but IBKR shows ×%d "
+                                    "— stop orderId=%s status=%s; "
+                                    "STP may have triggered overnight — check TWS executions. "
+                                    "If STP filled: remove position from live_positions.json "
+                                    "and restart. If not: investigate crash/orphan.",
+                                    k[1], k[0], qty, broker_qty,
+                                    _stp_cand.stop_order_id, _stp_status,
+                                )
+                                mismatches += 1
+                            else:
+                                logger.critical(
+                                    "B3 MISMATCH: file has %s %s ×%d but IBKR shows ×%d "
+                                    "— investigate before trading; file state will be used",
+                                    k[1], k[0], qty, broker_qty,
+                                )
+                                mismatches += 1
                     for k, qty in broker_key.items():
                         if k not in file_key:
                             logger.critical(
@@ -253,6 +300,13 @@ class FuturesRunner:
                             mismatches += 1
                     if mismatches == 0:
                         logger.info("B3: broker/file positions match (%d position(s))", len(broker_pos))
+                    else:
+                        self._b3_halt_entries = True
+                        logger.critical(
+                            "B3: %d mismatch(es) — new entries HALTED until resolved. "
+                            "Verify live_positions.json matches IBKR, then restart.",
+                            mismatches,
+                        )
                 except NotImplementedError:
                     logger.info("B3: broker.get_positions() not available — skipping cross-check")
                 except Exception as _exc:
@@ -408,6 +462,68 @@ class FuturesRunner:
                     {"inst": p.inst, "cluster": p.cluster, "error": _f.error_msg or ""},
                 )
 
+    def run_maxhold_exit(self, day, max_hold_days: int = 5) -> list:
+        """09:30 ET cron: close any position that has reached max_hold_days at RTH open.
+
+        Called from a separate 09:31 ET cron (run_maxhold_exit.py) BEFORE the main
+        14:05 ET run_day(). Positions closed here are removed from state.open_positions
+        so run_day() does not see them and will not attempt a second close.
+
+        If a CLOSE fails, the position stays with exit_pending=True so _retry_pending_exits()
+        at the next run_day() retries it (at 14:05 ET).
+
+        Returns list of (inst, cluster) pairs that were successfully closed.
+        """
+        today = pd.Timestamp(day).normalize()
+        closed = []
+        for p in list(self.state.open_positions):
+            if p.entry_day is None:
+                continue
+            hold = (today - pd.Timestamp(p.entry_day).normalize()).days
+            if hold < max_hold_days:
+                continue
+            logger.info(
+                "MAX_HOLD_EXIT: %s/%s held=%d days >= %d — closing at RTH open",
+                p.inst, p.cluster, hold, max_hold_days,
+            )
+            _f = self.broker.send_order(Order(
+                p.inst, "CLOSE", p.direction, p.contracts, p.cluster, day,
+                exit_day=day, pnl_sized=p.pnl_sized,
+            ))
+            if _f.status != "FAILED":
+                if p.stop_order_id is not None:
+                    try:
+                        self.broker.cancel_order(p.stop_order_id)
+                        logger.info(
+                            "MAX_HOLD_EXIT: cancelled GTC stop orderId=%s for %s/%s",
+                            p.stop_order_id, p.inst, p.cluster,
+                        )
+                    except Exception as _e:
+                        logger.error(
+                            "MAX_HOLD_EXIT: cancel_order(%s) FAILED for %s/%s — "
+                            "cancel manually in TWS: %s",
+                            p.stop_order_id, p.inst, p.cluster, _e,
+                        )
+                self.state.open_positions = [
+                    x for x in self.state.open_positions if x is not p
+                ]
+                closed.append((p.inst, p.cluster))
+                logger.info("MAX_HOLD_EXIT: closed %s/%s", p.inst, p.cluster)
+            else:
+                p.exit_pending = True
+                logger.error(
+                    "MAX_HOLD_EXIT: CLOSE FAILED %s/%s — exit_pending=True, "
+                    "will retry at 14:05 ET run_day()",
+                    p.inst, p.cluster,
+                )
+                self._emit_event(
+                    "ALERT", "EXEC",
+                    f"MAX_HOLD_EXIT: CLOSE FAILED {p.inst}/{p.cluster} — retry at 14:05",
+                    {"inst": p.inst, "cluster": p.cluster, "hold_days": hold},
+                )
+        self._persist_positions()
+        return closed
+
     def _handle_rollover_if_needed(self, day) -> None:
         """C2: Roll open positions whose contract expires today (roll date per ROLL_SCHEDULE).
 
@@ -522,9 +638,13 @@ class FuturesRunner:
                 f"Remove {self._stop_path.name} to resume.",
             )
 
-        # 1. fetch bars through today (per instrument) — causal
+        # 1. fetch bars through end-of-day (per instrument) — causal.
+        #    `day` = midnight (normalized). With through=midnight, IBKR "2 D" returns
+        #    only yesterday's bars. Using end-of-day lets signal_fn see today's live bars
+        #    (needed for generate_today_signals / Option C continuous runner).
         insts = {p.inst for p in self.state.open_positions} | set(self.contracts)
-        bars = {i: self.broker.fetch_bars(i, through=day) for i in insts}
+        _through = pd.Timestamp(day) + pd.Timedelta(hours=23, minutes=59)
+        bars = {i: self.broker.fetch_bars(i, through=_through) for i in insts}
 
         # C3: alert on empty bars for instruments with open positions (feed gap → loud not silent).
         #     Exits are bar-independent (exit_day-based) and still run normally.
@@ -603,6 +723,21 @@ class FuturesRunner:
 
         # D5: discard entries if STOP_FILE is present (exits unaffected)
         if _stop_active:
+            entry_candidates = []
+
+        # B3: halt entries if broker/file mismatch detected on startup (exits unaffected)
+        if self._b3_halt_entries and entry_candidates:
+            n = len(entry_candidates)
+            logger.critical(
+                "B3 HALT: %d entry signal(s) BLOCKED — broker/file mismatch on startup. "
+                "Resolve mismatch and restart runner to re-enable entries.",
+                n,
+            )
+            self._emit_event(
+                "CRITICAL", "GUARD",
+                f"B3 HALT: {n} entry signal(s) blocked — broker/file mismatch; restart required",
+                {"count": n, "day": str(pd.Timestamp(day).date())},
+            )
             entry_candidates = []
 
         # 2b. HMM stale guard — C2: wrapped in try/except; throw → block entries (conservative).
@@ -693,6 +828,21 @@ class FuturesRunner:
                     f"I4.8: CLOSE FAILED {p.inst}/{p.cluster} — exit_pending=True",
                     {"inst": p.inst, "cluster": p.cluster},
                 )
+            else:
+                # Cancel any GTC STP placed for this position so it doesn't
+                # create an unintended position after the LONG/SHORT is gone.
+                if p.stop_order_id is not None:
+                    try:
+                        self.broker.cancel_order(p.stop_order_id)
+                        logger.info(
+                            "STP: cancelled GTC stop orderId=%s for closed %s/%s",
+                            p.stop_order_id, p.inst, p.cluster,
+                        )
+                    except Exception as _e:
+                        logger.error(
+                            "STP: cancel_order(%s) FAILED for %s/%s — cancel manually in TWS: %s",
+                            p.stop_order_id, p.inst, p.cluster, _e,
+                        )
 
         # Split entries: same-day (e.g. STRESS_MID OPEN+CLOSE in one session) execute
         # BEFORE H4 equity sync so their pnl is included in the HALT_DAY check.
@@ -762,9 +912,45 @@ class FuturesRunner:
                     {"inst": t["inst"], "ordered": n, "max": self._max_contracts},
                 )
                 continue
-            self.broker.send_order(Order(
+            _open_fill = self.broker.send_order(Order(
                 t["inst"], "OPEN", t["direction"], n, t["cluster"], day,
                 exit_day=t.get("exit"), pnl_sized=t.get("pnl_sized", 0.0)))
+
+            # STP: place GTC stop order immediately after successful OPEN fill.
+            # Provides overnight exit protection when chandelier fires outside 14:05–15:55 window.
+            # Only for multi-day entries (same-day STRESS_MID entries close within hours — no STP needed).
+            # Note: stop_price = entry chandelier level; ratchet updates are not yet implemented
+            # (planned for a future phase — paper phase uses fixed entry-stop only).
+            if _open_fill.status in ("FILLED", "PARTIAL") and t.get("stop") is not None:
+                _stp_pos = next(
+                    (p for p in self.state.open_positions
+                     if p.inst == t["inst"] and p.cluster == t["cluster"]
+                     and p.stop_order_id is None),
+                    None,
+                )
+                if _stp_pos is not None:
+                    _stp_id = self.broker.place_stop(
+                        t["inst"], t["direction"], n, t["stop"], t["cluster"])
+                    _stp_pos.stop_price = float(t["stop"])
+                    _stp_pos.stop_order_id = _stp_id if _stp_id else None
+                    if _stp_id:
+                        logger.info(
+                            "STP: placed %s %s stop @ %.4f orderId=%s cluster=%s",
+                            t["inst"], t["direction"], t["stop"], _stp_id, t["cluster"],
+                        )
+                    else:
+                        logger.error(
+                            "STP: place_stop FAILED %s %s @ %.4f cluster=%s "
+                            "— position open without overnight stop protection",
+                            t["inst"], t["direction"], t["stop"], t["cluster"],
+                        )
+                        self._emit_event(
+                            "ALERT", "EXEC",
+                            f"STP: place_stop FAILED {t['inst']} {t['direction']}"
+                            f" @ {t['stop']:.4f} — no overnight stop protection",
+                            {"inst": t["inst"], "direction": t["direction"],
+                             "stop": t["stop"], "cluster": t["cluster"]},
+                        )
 
         # Detect breaker level transitions; emit once per level change
         if self.state.breaker is not None:
@@ -1032,7 +1218,7 @@ class FuturesRunner:
                 "global_nkd":    {"max_gross_pct": 0.02,  "max_net_pct": 0.02},
             },
             "breaker_events":    [],
-            "backtest_calmar":   2.38,
+            "backtest_calmar":   1.53,
             "operational_status": ops_status,
             "events":            list(self._events),
             "runner_health": {

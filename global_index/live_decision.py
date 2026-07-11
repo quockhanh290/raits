@@ -46,6 +46,8 @@ class OpenPos:
     exit_day: pd.Timestamp | None = None
     pnl_sized: float = 0.0
     exit_pending: bool = False  # True when CLOSE failed; _retry_pending_exits() retries next day
+    stop_price: float | None = None      # STP: entry chandelier stop level (GTC stop order placed at this price)
+    stop_order_id: str | None = None     # STP: IBKR orderId for the active GTC stop order
 
     def as_position(self) -> Position:
         return Position(self.inst, self.direction, self.contracts,

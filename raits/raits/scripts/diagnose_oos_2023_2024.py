@@ -431,9 +431,11 @@ def main() -> None:
         pd.read_parquet(f, columns=[]).index.max()
         for f in sample
     )
-    if max_date.year < 2023:
-        print(f"\n  [BLOCK] Max 5-min date: {max_date} — 2023-2024 data missing!")
-        print("  Run first: python raits/scripts/fetch_oos_data.py  (~2h)")
+    # Gate: require full-year coverage through Dec 2024 (not just any 2023 data)
+    required = pd.Timestamp("2024-12-01")
+    if max_date < required:
+        print(f"\n  [BLOCK] Max 5-min date: {max_date} — need data through Dec 2024!")
+        print("  Run first: python raits/scripts/fetch_oos_remaining.py  (~70 min)")
         sys.exit(1)
     print(f"  Max 5-min date: {max_date} — OK")
 

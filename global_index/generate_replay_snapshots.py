@@ -43,7 +43,7 @@ ACCOUNT           = 50_000.0
 SLIPPAGE          = 2.0
 # IS Calmar reference: deploy_sim 2-tick slippage, full period 2018-2024.
 # Update to _final_rm["calmar"] printed at end of run after any engine/data/period change.
-_BACKTEST_CALMAR  = 2.3782  # deploy_sim 2-tick IS 2018-2024; confirmed 2026-07-02
+_BACKTEST_CALMAR  = 1.53    # fit_A degradation floor, frozen_2024, causal (look-ahead fixed), 2-tick; confirmed 2026-07-10
 
 print("Loading data…")
 dfs    = {n: load_parquet(str(Path(DATA_DIR) / data_filename(c))) for n, c in BASKET.items()}
@@ -403,7 +403,7 @@ output = {
             for cl, b in DEFAULT_CLUSTERS.items()
         },
         "breaker_events":  _breaker_events,
-        "backtest_calmar": _BACKTEST_CALMAR,  # IS reference (deploy_sim 2-tick, 2018-2024)
+        "backtest_calmar": _BACKTEST_CALMAR,  # fit_A degradation floor (frozen_2024, no-stress, 2-tick)
     },
     "snapshots": snapshots
 }

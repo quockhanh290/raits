@@ -176,11 +176,15 @@ class _MinimalBroker:
         self.orders = []; self._eq = ACCOUNT
     def get_equity(self): return self._eq
     def fetch_bars(self, inst, through): return pd.DataFrame()
+    def get_positions(self): return []
     def send_order(self, o):
         self.orders.append(o)
         if o.action == "CLOSE":
             self._eq += o.pnl_sized
         return Fill(o.inst, o.action, o.direction, o.contracts, o.cluster, o.pnl_sized)
+    def place_stop(self, inst, _d, _c, _sp, _cl): return f"mock-{inst}"
+    def cancel_order(self, _oid): return True
+    def get_order_status(self, _oid): return "PENDING"
 
 ibkr_broker = IBKRBroker(
     _raw_fetcher=lambda inst, through: pd.DataFrame()

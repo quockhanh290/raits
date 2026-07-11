@@ -1,5 +1,49 @@
 ## Gotchas
 
+- **Futures liquidity concentrates at 09:00-11:00 + 15:00 ET, not overnight** (2026-07-09):
+  Measured avg per-min volume by hour across full 23h session (ES/NQ/YM/RTY, frozen_sim).
+  09:00/10:00/15:00 ET are top-3 for all 4 instruments; 18:00-08:00 ET (bulk of Globex
+  session) never in top 6 anywhere. This is why `orb_futures/` OR window (09:31-09:45,
+  cash-index-open anchored) is a real liquidity-grounded choice, not a stocks-logic
+  copy-paste — even though futures trade ~23h, volume still clusters at cash-market
+  open/close. Don't assume overnight hours have tradeable signal without checking volume.
+
+- **orb_futures/ ORB breakout + gap-fill: real NO-GO on correct window** (2026-07-09):
+  Never run before this session (no results existed anywhere). Ran on frozen_sim +
+  spy_daily_live.csv at the natural market-open window (09:31-09:45 OR, entries to
+  15:55) — NOT the stocks 14:00-15:55 window. ORB: POOL 231t PF=0.67, ALL 7 years
+  negative. Gap-fill: POOL 100t PF=0.64 WR=25%, 5/7 years negative. Both decisive
+  NO-GO — closes the "was it rejected on the wrong window" question for these two;
+  they were never tested before, and now that they have been, there's no edge.
+  See TASK.md sub-task "Futures NO-GO re-examination — correct entry window".
+
+- **hmmlearn "Model is not converging" warning on orb_futures label_regimes call**
+  (2026-07-09): appears every run of `orb_futures.edge_test`/`gap_fill`, identical
+  delta (-0.152 on LL~9945) — deterministic, tiny relative magnitude. First time seen
+  in this project. Not investigated (didn't affect the decisive NO-GO verdicts above).
+  Flag if it recurs somewhere the regime labels actually matter for a close call.
+
+- **A5 Databento re-fetch: contamination = overlap window bar replacement** (2026-07-09):
+  Root cause là 2 thao tác của update_futures_data.py:
+  (1) Constant offset lên toàn lịch sử → KHÔNG thay đổi ATR/P&L (differences cancel, math verified).
+  (2) **Overlap window (Dec 2024, 30 ngày) bar REPLACEMENT** bằng new_adj từ anchor Sep 2026 → individual bar prices khác → ATR14 cuối 2024 thay đổi → $52,936 → $53,172 (+$236).
+  $53,172 là số NHIỄM. Không lock. Cần khôi phục frozen.
+
+- **Frozen parquet: --full-refetch không tái tạo $52,936** (2026-07-09 RESOLVED):
+  `create_frozen_parquet.py` (đã xóa) chỉ clip *_8y → VẪN chứa Dec 2024 bars nhiễm. Không dùng.
+  Cách đúng: `--full-refetch --end 2024-12-31` → tạo `*_frozen_2024.parquet` sạch.
+  NHƯNG: kết quả = $53,021 / Calmar=3.07 (KHÔNG phải $52,936).
+  $52,936 là incremental-build artifact (nhiều splice qua các lần fetch → cumulative offset history khác). NON-REPRODUCIBLE.
+  $53,021 = clean full-refetch, reproducible (run 2 byte-identical). **$53,021 là ground truth thật, tốt hơn $52,936.**
+  Fit_A floor trên frozen: $51,459 / Calmar=2.69 (floor/baseline=87.6%, consistent với old 86.7%).
+  Deploy_sim command: `python -m global_index.deploy_sim --data-dir data\cache\futures\frozen_sim --nkd-parquet global_index/data/NKD_frozen_2024.parquet --regime-csv spy_daily.csv --end 2024-12-31 --n-contracts 1`
+
+- **Live signal STABLE qua daily IBKR update** (2026-07-09):
+  update_ibkr_daily.py: append-only, không re-splice lịch sử. Stored splice offset áp uniformly cho new bars.
+  Rủi ro chỉ từ `update_futures_data.py` (Databento re-fetch). Trước A6/A7...: tạo frozen copy TRƯỚC.
+
+- **INVARIANT: TRƯỚC BẤT KỲ update_futures_data.py nào** → tạo `*_frozen_YYYY.parquet`, verify baseline, sau đó mới update *_8y.
+
 - **IBKR IB Gateway paper port = 4002** (2026-07-08, futures wire): IB Gateway paper dùng port 4002, KHÔNG phải 7497. Port 7497 là TWS paper. Khi dùng IB Gateway (recommended cho algo) → `--port 4002`.
 
 - **ib_insync 0.9.86 trả bars tz-aware US/Central** (2026-07-08): `reqHistoricalData(formatDate=1)` với CME futures → ib_insync parse date thành `datetime64[us, US/Central]` (Chicago tz), KHÔNG phải naive string hay UTC. Fix trong `_fetch_raw()`: `tz_convert("America/New_York").tz_localize(None)`. Verified: first_bar=18:00 ET (CME Globex open).

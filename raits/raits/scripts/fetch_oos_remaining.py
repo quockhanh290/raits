@@ -49,42 +49,40 @@ ALL_TICKERS = sorted(existing_pkl.keys())
 print(f"  Universe: {len(ALL_TICKERS)} tickers")
 
 
-# ── Determine what's missing per ticker (use pkl, not parquets) ───────────────
-# pkl already has more data than parquets (accumulated from earlier runs + Q1 fetch)
-# Check pkl max date per ticker so we don't re-fetch what we already have.
-OOS_START = date(2023, 1, 3)
-OOS_END   = date(2024, 12, 31)
-FULL_THRESHOLD = date(2024, 12, 20)   # allow a few days slack for holidays
+# ── Determine what's missing per ticker (check each year independently) ────────
+# Previous bug: took overall max(2023+) date, so a ticker with Q1-2023 + full-2024
+# looked "covered" at Dec-2024, causing the May-Dec 2023 gap to be silently skipped.
+# Fix: check 2023 max and 2024 max separately; build separate date ranges per gap.
+YEAR_RANGES = {
+    2023: (date(2023, 1, 3),  date(2023, 12, 29), date(2023, 12, 10)),
+    2024: (date(2024, 1, 2),  date(2024, 12, 31), date(2024, 12, 20)),
+    # (year_start, year_end, full_threshold — allow a few days slack for holidays)
+}
 
-print("\nAuditing 2023-2024 coverage in pkl per ticker...")
-fetch_plan = {}   # ticker -> (start_date, end_date)
-pkl_max_dates = {}
+print("\nAuditing 2023-2024 coverage in pkl per ticker (per year)...")
+fetch_plan = {}   # ticker -> list of (start_date, end_date) ranges to fetch
 
 for ticker in ALL_TICKERS:
     df = existing_pkl.get(ticker, pd.DataFrame())
-    if df.empty:
-        pkl_max_dates[ticker] = None
-        fetch_plan[ticker] = (OOS_START, OOS_END)
-        continue
-    idx = pd.DatetimeIndex(df.index)
-    oos_bars = idx[(idx.year >= 2023)]
-    if len(oos_bars) == 0:
-        pkl_max_dates[ticker] = None
-        fetch_plan[ticker] = (OOS_START, OOS_END)
-    else:
-        mx = oos_bars.max().date()
-        pkl_max_dates[ticker] = mx
-        if mx < FULL_THRESHOLD:
-            fetch_plan[ticker] = (mx + timedelta(days=1), OOS_END)
-        # else: fully covered — skip
+    idx = pd.DatetimeIndex(df.index) if not df.empty else pd.DatetimeIndex([])
+    ranges_needed = []
+    for yr, (yr_start, yr_end, threshold) in YEAR_RANGES.items():
+        yr_bars = idx[idx.year == yr]
+        if len(yr_bars) == 0:
+            ranges_needed.append((yr_start, yr_end))
+        else:
+            mx = yr_bars.max().date()
+            if mx < threshold:
+                ranges_needed.append((mx + timedelta(days=1), yr_end))
+            # else: year fully covered
+    if ranges_needed:
+        fetch_plan[ticker] = ranges_needed
 
 covered = [t for t in ALL_TICKERS if t not in fetch_plan]
-partial  = [t for t in ALL_TICKERS if t in fetch_plan and pkl_max_dates[t] is not None]
-missing  = [t for t in ALL_TICKERS if t in fetch_plan and pkl_max_dates[t] is None]
+partial  = [t for t in ALL_TICKERS if t in fetch_plan]
 
-print(f"  Fully covered: {len(covered)} tickers (pkl max >= 2024-12-20)")
-print(f"  Partial:       {len(partial)} tickers (will fetch remainder)")
-print(f"  Missing:       {len(missing)} tickers (no 2023+ data in pkl)")
+print(f"  Fully covered: {len(covered)} tickers")
+print(f"  Need fetch:    {len(partial)} tickers")
 
 if not fetch_plan:
     print("\nAll tickers already have complete 2023-2024 data. Nothing to do.")
@@ -92,10 +90,9 @@ if not fetch_plan:
 
 # Show a sample
 for t in sorted(partial)[:5]:
-    mx = pkl_max_dates[t]
-    s, e = fetch_plan[t]
-    print(f"  {t}: pkl_max={mx}, will fetch {s} -> {e}")
-print(f"  ... ({len(fetch_plan)} total to fetch)")
+    for s, e in fetch_plan[t]:
+        print(f"  {t}: will fetch {s} -> {e}")
+print(f"  ... ({len(fetch_plan)} tickers total)")
 
 
 # ── Business day list ─────────────────────────────────────────────────────────
@@ -152,29 +149,37 @@ total_calls = 0
 total_ok = 0
 total_fail = 0
 
-for ticker_idx, (ticker, (start_d, end_d)) in enumerate(sorted(fetch_plan.items())):
-    days = bday_range(start_d, end_d)
+for ticker_idx, (ticker, ranges) in enumerate(sorted(fetch_plan.items())):
     ticker_frames = []
     ticker_ok = 0
+    ticker_total_days = 0
 
-    for day in days:
-        time.sleep(SLEEP_BETWEEN)
-        df = fetch_day(ticker, day)
-        total_calls += 1
-        if df is not None:
-            ticker_frames.append(df)
-            ticker_ok += 1
-            total_ok += 1
-        else:
-            total_fail += 1
+    for start_d, end_d in ranges:
+        days = bday_range(start_d, end_d)
+        ticker_total_days += len(days)
+        for day in days:
+            time.sleep(SLEEP_BETWEEN)
+            df = fetch_day(ticker, day)
+            total_calls += 1
+            if df is not None:
+                ticker_frames.append(df)
+                ticker_ok += 1
+                total_ok += 1
+            else:
+                total_fail += 1
 
     if ticker_frames:
         combined = pd.concat(ticker_frames).sort_index()
         combined = combined[~combined.index.duplicated(keep="first")]
         new_frames[ticker] = combined
         max_d = combined.index.max()
-        # Save as monthly chunks to avoid giant single parquet
-        for month_start in pd.date_range(start_d.strftime("%Y-%m-01"), end_d.strftime("%Y-%m-01"), freq="MS"):
+        # Save monthly chunks covering the full fetched span
+        all_starts = [s for s, _ in ranges]
+        all_ends   = [e for _, e in ranges]
+        chunk_start = min(all_starts)
+        chunk_end   = max(all_ends)
+        for month_start in pd.date_range(chunk_start.strftime("%Y-%m-01"),
+                                         chunk_end.strftime("%Y-%m-01"), freq="MS"):
             month_end = month_start + pd.offsets.MonthEnd(0)
             chunk = combined[(combined.index >= month_start) & (combined.index <= month_end)]
             if chunk.empty:
@@ -184,7 +189,7 @@ for ticker_idx, (ticker, (start_d, end_d)) in enumerate(sorted(fetch_plan.items(
             chunk.to_parquet(fpath)
 
         progress = f"[{ticker_idx+1}/{len(fetch_plan)}]"
-        print(f"  {progress} {ticker}: {ticker_ok}/{len(days)} days → max={max_d.date()}")
+        print(f"  {progress} {ticker}: {ticker_ok}/{ticker_total_days} days → max={max_d.date()}")
     else:
         print(f"  [{ticker_idx+1}/{len(fetch_plan)}] {ticker}: 0 days fetched")
 

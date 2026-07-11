@@ -244,12 +244,34 @@ def backtest_swing_tf(df, labels, cost, *, ema_period=20, chandelier_atr_mult=3.
     pos = None
 
     for day in days:
+        exit_ts_today = None  # causal: set if exit fires within session; entry scan filters to bars after
         if pos is not None:
             hold = (day - pos["entry_day"]).days
             if hold >= max_hold_days:
-                op = float(hl[day][2][0])
+                # Exit at RTH open (09:30 ET): stocks engine used iloc[0]["open"] on
+                # RTH-only data = 09:30. Futures 24h port inherited hl[day][2][0] = 00:00.
+                # Corrected: find first 1m bar at or after 09:30 ET on exit_day.
+                _day_ts = ts.get(day)
+                if _day_ts is not None and len(_day_ts):
+                    _930    = day + pd.Timedelta(hours=9, minutes=30)
+                    _tz_str = str(_day_ts.tzinfo) if _day_ts.tzinfo is not None else ""
+                    _is_et  = _tz_str in ("", "America/New_York", "US/Eastern")
+                    if _is_et:
+                        # US ET futures: find first 1m bar at or after 09:30 ET local time.
+                        # load_parquet keeps tz-aware ET; strip tz before asi8 so naive
+                        # _930.value compares local-time to local-time (not UTC to UTC).
+                        _ts_cmp = _day_ts.tz_localize(None) if _day_ts.tzinfo is not None else _day_ts
+                        _idx    = int(np.searchsorted(_ts_cmp.asi8, _930.value))
+                        if _idx >= len(hl[day][2]):
+                            _idx = 0
+                    else:
+                        _idx = 0  # non-ET (e.g. NKD/Tokyo): use first bar of day
+                    op           = float(hl[day][2][_idx])
+                    exit_bar_ts  = _day_ts[_idx]
+                else:
+                    op          = float(hl[day][2][0])
+                    exit_bar_ts = None
                 pts = (op - pos["entry"]) if pos["dir"] == "LONG" else (pos["entry"] - op)
-                _ts_exit = ts.get(day)
                 trades.append(dict(day=pos["entry_day"].date(), exit_day=day.date(),
                                    regime=pos["regime"], direction=pos["dir"],
                                    entry=round(pos["entry"], 2), exit=round(op, 2),
@@ -257,8 +279,9 @@ def backtest_swing_tf(df, labels, cost, *, ema_period=20, chandelier_atr_mult=3.
                                    pnl=round(pts * cost.point_value - cost.round_turn_cost(), 2),
                                    hold_days=hold, reason="MAX_HOLD",
                                    entry_time=pos.get("entry_time"),
-                                   exit_time=(_ts_exit[0] if _ts_exit is not None and len(_ts_exit) > 0 else None)))
+                                   exit_time=exit_bar_ts))
                 pos = None
+                exit_ts_today = exit_bar_ts
             else:
                 high, low, opn, isg = hl[day]
                 da = float(datr.asof(day)) if len(datr) else np.nan
@@ -296,6 +319,7 @@ def backtest_swing_tf(df, labels, cost, *, ema_period=20, chandelier_atr_mult=3.
                                            entry_time=pos.get("entry_time"),
                                            exit_time=(_ts_exit[i] if _ts_exit is not None and i < len(_ts_exit) else None)))
                         pos = None
+                        exit_ts_today = _ts_exit[i] if _ts_exit is not None and i < len(_ts_exit) else None
                     else:
                         # carry ratcheted stop (based on ALL of today's highs) to next day
                         if pos["dir"] == "LONG":
@@ -308,6 +332,10 @@ def backtest_swing_tf(df, labels, cost, *, ema_period=20, chandelier_atr_mult=3.
             reg = labels.get(day)
             if reg in allowed and (entry_days is None or day in entry_days):
                 bars5 = b5[day]; win = bars5.between_time("14:00", "15:55")
+                if exit_ts_today is not None:
+                    win = win[win.index > exit_ts_today]
+                    if len(win) < 2:
+                        continue
                 idx = list(win.index)
                 for n in range(1, len(idx)):
                     hist = bars5.loc[:idx[n]]

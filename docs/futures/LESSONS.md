@@ -112,6 +112,28 @@ _Cập nhật: 2026-07-07_
 
 ---
 
+## L11 — Đo trước khi refit: data mới ≠ model cũ sai
+
+**Case:** 2026-07-09: câu hỏi "refit HMM gồm 2025 không?". Cám dỗ tự nhiên: có data mới → nên refit. Nhưng đo fit-2024 vs fit-2025 decode 2026 cho thấy 93.7% giống nhau (8/126 ngày flip, phần lớn Normal↔Calm ít tác động). Refit sẽ tốn OOS 2025 backtest (Calmar 3.42 bằng chứng độc lập) cho 6.3% cải thiện decode.
+
+**Bài học:**  
+Refit trigger phải là *model cũ sai*, không phải *có data mới*.  
+Ba điều kiện độc lập cần kiểm tra:
+1. **Decode khác đáng kể?** (đo: fit-cũ vs fit-mới decode period hiện tại, ngưỡng ~15-20%)  
+2. **Model cũ miss regime thật?** (so label với thực tế thị trường: rõ ràng Stress mà label Normal?)  
+3. **Có OOS mới bù?** (paper/live 2026+ thay thế OOS period bị đưa vào fit)
+
+Nếu không đủ 3 điều kiện → giữ model cũ. Decode-forward (model freeze, gán nhãn ngày mới) đủ tốt khi market regime không đổi chất.
+
+**Chi phí refit (luôn ghi rõ trước khi quyết):**
+- Period đưa vào fit → thành in-sample → mất OOS evidence cho period đó
+- Re-validate toàn bộ: baseline / floor / vault trên fit mới
+- Rủi ro fit mới tệ hơn (new regime không well-represented trong training)
+
+**Fix pattern:** Trước mỗi câu hỏi "refit không?" → chạy `compare_refit_*.py` (pattern từ scratchpad), đo % flip, so threshold 15-20%. Chỉ tiếp tục nếu flip đáng kể VÀ có OOS mới bù.
+
+---
+
 ## Tổng hợp — Class of mistakes
 
 | Class | Lessons |
@@ -123,3 +145,4 @@ _Cập nhật: 2026-07-07_
 | State machine | L8 (rollback = last valid, not last written) |
 | Metric interpretation | L9 (contamination through path-dependent metrics) |
 | Verification scope | L10 (reconcile = consistency, not correctness) |
+| Model update | L11 (data mới ≠ model sai — đo trước khi refit) |

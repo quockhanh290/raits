@@ -73,6 +73,18 @@ class Broker(ABC):
     def get_positions(self) -> list: ...
     @abstractmethod
     def get_equity(self) -> float: ...
+    @abstractmethod
+    def place_stop(self, inst: str, direction: str, contracts: int,
+                   stop_price: float, cluster: str) -> str:
+        """Place a GTC stop order for exit protection on a multi-day position.
+        Returns the broker order ID string on success, '' on failure.
+        LONG → SELL STP at stop_price; SHORT → BUY STP at stop_price."""
+    @abstractmethod
+    def cancel_order(self, order_id: str) -> bool:
+        """Cancel an order by ID. Returns True if cancelled, False if not found/failed."""
+    @abstractmethod
+    def get_order_status(self, order_id: str) -> str:
+        """Returns 'FILLED' | 'CANCELLED' | 'PENDING' | 'NOT_FOUND'."""
 
 
 class MockBroker(Broker):
@@ -115,3 +127,12 @@ class MockBroker(Broker):
 
     def get_equity(self) -> float:
         return self._equity
+
+    def place_stop(self, inst, _direction, _contracts, _stop_price, _cluster) -> str:
+        return f"mock-stp-{inst}"
+
+    def cancel_order(self, _order_id) -> bool:
+        return True
+
+    def get_order_status(self, _order_id) -> str:
+        return "PENDING"

@@ -140,6 +140,30 @@ Test case: chạy với last_date = yesterday, expect 1 row returned, check date
 
 ---
 
+## HMM Refit — Monitoring & Trigger
+
+**Khi nào refit HMM tiếp theo?**  
+Priority: LOW (không urgent — fit-2024 decode-forward đủ tốt cho 2026)  
+Status: OPEN — theo dõi 2 trigger dưới
+
+**Trigger 1 — Decode lệch thực tế:**  
+Quan sát: fit-2024 có label Normal nhưng thị trường rõ ràng đang Stress (VIX > 30, SPY giảm >10% peak)?  
+Nếu có → chạy compare_refit ngay, không đợi cuối năm.
+
+**Trigger 2 — Sau paper 1-2 năm (OOS live bù):**  
+Khi có đủ paper/live OOS 2026-2027 → refit gồm 2024-2025 không mất OOS evidence thực sự (có evidence mạnh hơn = live fills thay thế backtest).  
+Dự kiến: cuối 2027 hoặc sau bear market cycle tiếp theo.
+
+**Quy trình khi trigger:**  
+1. Chạy `compare_refit_*.py`: đo % flip fit-cũ vs fit-mới trên period hiện tại  
+2. Nếu < ~15% flip VÀ không có miss rõ ràng → giữ fit cũ (đo lại sau 6 tháng)  
+3. Nếu ≥ 15% flip HOẶC miss regime thật → refit + re-validate (baseline/floor/vault)  
+4. Xem DECISIONS.md "Giữ fit-2024" + LESSONS.md L11 cho chi phí và criteria đầy đủ.
+
+Note: Paper 2026 với fit-2024 = OOS live (model chưa thấy 2026) — mạnh hơn backtest OOS. Giữ fit-2024 không làm mất bằng chứng OOS.
+
+---
+
 ## Đã đóng (giữ để reference)
 
 **CSV freeze-2017 dividend bug** → RESOLVED 2026-07-06: chuyển Polygon adjusted=True, 80 label changes, deploy −0.05% ($52,936 vs $52,962), byte-for-byte verified.  

@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import shutil
 import sys
 from datetime import date
 from pathlib import Path
@@ -40,6 +41,59 @@ from pathlib import Path
 import pandas as pd
 
 log = logging.getLogger(__name__)
+
+# ── Snapshot discipline ───────────────────────────────────────────────────────
+
+SNAPSHOT_DIR = Path("spy_snapshots")  # relative to CWD (d:\raits)
+
+
+def save_snapshot(csv_path: Path, snapshot_dir: Path = SNAPSHOT_DIR) -> Path | None:
+    """Copy csv_path → snapshot_dir/<stem>_snapshot_<last_date>.csv before any update.
+    Returns snapshot path, or None if CSV does not exist yet.
+    Skips silently if an identical snapshot already exists (idempotent).
+    """
+    if not csv_path.exists():
+        return None
+    df = pd.read_csv(csv_path)
+    df.columns = [c.lower() for c in df.columns]
+    last_date = pd.to_datetime(df["date"]).max().date().isoformat()
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    snap = snapshot_dir / f"{csv_path.stem}_snapshot_{last_date}.csv"
+    if snap.exists():
+        log.info("Snapshot already exists (no-op): %s", snap.name)
+    else:
+        shutil.copy2(str(csv_path), str(snap))
+        log.info("Snapshot saved: %s", snap)
+    return snap
+
+
+def verify_historical_prices(snap_path: Path, new_csv: Path, overlap_start: date) -> int:
+    """Compare rows BEFORE overlap_start between snapshot and updated CSV.
+    Returns count of rows whose close price changed (should be 0).
+    Logs WARNING if any change detected — Polygon may have revised history.
+    """
+    old = pd.read_csv(snap_path)
+    new = pd.read_csv(new_csv)
+    for df in (old, new):
+        df.columns = [c.lower() for c in df.columns]
+        df["date"] = pd.to_datetime(df["date"])
+
+    cutoff = pd.Timestamp(overlap_start)
+    old_h = old[old["date"] < cutoff].set_index("date")["close"]
+    new_h = new[new["date"] < cutoff].set_index("date")["close"]
+    common = old_h.index.intersection(new_h.index)
+    changed = int(((old_h.loc[common] - new_h.loc[common]).abs() > 0.001).sum())
+    if changed:
+        log.warning(
+            "PRICE REVISION: %d historical row(s) changed before %s — "
+            "SPY labels may have shifted. Compare %s vs updated CSV.",
+            changed, overlap_start, snap_path.name,
+        )
+    else:
+        log.info("Historical prices unchanged (%d rows verified before %s) — labels stable",
+                 len(common), overlap_start)
+    return changed
+
 
 # ── Data fetch (wire here when ready) ────────────────────────────────────────
 
@@ -83,7 +137,8 @@ def fetch_spy_close(api_key: str, from_date: date, to_date: date) -> pd.DataFram
 OVERLAP_DAYS = 30   # re-fetch last N calendar days and replace them (see docstring)
 
 
-def update_spy_csv(csv_path: Path, api_key: str) -> int:
+def update_spy_csv(csv_path: Path, api_key: str,
+                   snapshot_dir: Path = SNAPSHOT_DIR) -> int:
     """
     Extend spy_daily.csv with new rows.  Returns number of NEW rows added.
     Raises NotImplementedError until fetch_spy_close() is wired.
@@ -129,6 +184,9 @@ def update_spy_csv(csv_path: Path, api_key: str) -> int:
         log.info("spy_daily.csv up-to-date (last=%s)", last_date)
         return 0
 
+    # ── Snapshot BEFORE any mutation ──────────────────────────────────────────
+    snap_path = save_snapshot(csv_path, snapshot_dir)
+
     from datetime import timedelta
     fetch_from = max(last_date - timedelta(days=OVERLAP_DAYS), first_date)
     log.info(
@@ -156,6 +214,9 @@ def update_spy_csv(csv_path: Path, api_key: str) -> int:
     combined[["date", "close"]].to_csv(tmp, index=False)
     os.replace(str(tmp), str(csv_path))
 
+    if snap_path:
+        verify_historical_prices(snap_path, csv_path, fetch_from)
+
     n_after = len(combined)
     n_new = max(0, n_after - n_before)
     log.info(
@@ -181,6 +242,10 @@ def main(argv=None):
         "--api-key", default=None,
         help="Polygon.io API key (fallback: POLYGON_API_KEY env var)",
     )
+    parser.add_argument(
+        "--snapshot-dir", default=str(SNAPSHOT_DIR),
+        help=f"Directory for pre-update snapshots (default: {SNAPSHOT_DIR})",
+    )
     args = parser.parse_args(argv)
 
     api_key = args.api_key or os.environ.get("POLYGON_API_KEY", "")
@@ -193,7 +258,7 @@ def main(argv=None):
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     try:
-        n = update_spy_csv(Path(args.csv), api_key)
+        n = update_spy_csv(Path(args.csv), api_key, snapshot_dir=Path(args.snapshot_dir))
     except NotImplementedError as exc:
         sys.exit(f"fetch_spy_close not yet wired: {exc}")
 

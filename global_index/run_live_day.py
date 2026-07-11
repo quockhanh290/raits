@@ -35,7 +35,7 @@ Usage:
     # DO NOT use port 7496/7497 (live/paper TWS) without explicit intent
 """
 from __future__ import annotations
-import argparse, json, logging, sys
+import argparse, json, logging, sys, time
 from pathlib import Path
 
 # ── [1] CWD guard — must be d:\raits before anything else ──────────────────
@@ -59,7 +59,6 @@ try:
 except Exception:
     pass
 
-import numpy as np
 import pandas as pd
 
 # ── [3] Production imports ──────────────────────────────────────────────────
@@ -67,15 +66,12 @@ from futures.basket import BASKET, REGIME, RISK, SWING_TF_PARAM, data_filename
 from futures.swing_tf import SwingTFEngine, costs_for_basket
 from futures.stress_mid import StressMidEngine
 from futures.circuit_breaker import CircuitBreaker
-from futures._validated_core import (load_parquet, benchmark_daily, label_regimes,
-                                      backtest_swing_tf, daily_atr_series)
+from futures._validated_core import load_parquet, benchmark_daily, label_regimes
 from global_index._core import load_parquet as gi_load, FuturesCost as GIFC
 from global_index import specs as gi_specs
 from global_index.regime import RegimeLabels
 from global_index.net_exposure_multi import MultiClusterGuard
-from global_index.signal_layer import (CLUSTER_SWING, CLUSTER_STRESS, CLUSTER_NKD,
-                                        ROSKA4_MULT, NKD_MULT,
-                                        _asof_naive, to_candidate, diff_desired_vs_held)
+from global_index.signal_layer import generate_today_signals
 from global_index.ibkr_broker import IBKRBroker
 from global_index.runner import FuturesRunner, _openpos_from_dict
 
@@ -94,30 +90,6 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 log = logging.getLogger("run_live_day")
-
-
-# ── Helpers (identical to run_smoke_test) ───────────────────────────────────
-def _desired_at(trades_sorted, day_ts):
-    d = day_ts.normalize()
-    cur = None
-    for t in trades_sorted:
-        e = pd.Timestamp(t["day"]).normalize()
-        if e > d:
-            break
-        x = pd.Timestamp(t["exit_day"]).normalize()
-        if e <= d < x:
-            cur = t
-    return cur
-
-
-def _real_risk(atr_s, mult, pv, entry_day, n):
-    try:
-        av = atr_s.asof(pd.Timestamp(entry_day))
-    except Exception:
-        av = np.nan
-    if av is None or (isinstance(av, float) and pd.isna(av)):
-        av = float(atr_s.median())
-    return n * mult * float(av) * pv
 
 
 def main():
@@ -140,6 +112,9 @@ def main():
                     help="Connect + fetch bars but emit no orders (empty signal_fn)")
     ap.add_argument("--print-signals",   action="store_true",
                     help="Connect + fetch bars + compute real signals, print candidates, no orders")
+    ap.add_argument("--live-state-path", default=None,
+                    help="Path to write live_state_data.js for dashboard live mode "
+                         "(e.g. global_index/live_state_data.js). Omit to skip dashboard update.")
     a = ap.parse_args()
 
     today = pd.Timestamp.now().normalize()
@@ -183,150 +158,89 @@ def main():
 
     log.info("  %d SPY label days", len(swing_labels))
 
-    # ── Backtests ─────────────────────────────────────────────────────────────
-    log.info("[bt]   Computing backtests (slippage=%s)...", SLIPPAGE)
-    costs_2t  = costs_for_basket(slippage_ticks=SLIPPAGE)
-    swing_bt  = SwingTFEngine().backtest_basket(dfs, swing_labels, costs_2t)
-    ncost_2t  = GIFC(point_value=c_nkd.point_value, tick=c_nkd.tick,
-                     commission_rt=c_nkd.commission_rt, slippage_ticks_per_side=SLIPPAGE)
-    nkd_bt    = backtest_swing_tf(ndf, nkd_labels, ncost_2t,
-                                   ema_period=NKD_EMA,
-                                   chandelier_atr_mult=NKD_MULT_PARAM,
-                                   max_hold_days=5, gap_fill=True)
-    stress_bt = StressMidEngine().backtest_basket(dfs, swing_labels, costs_2t)
-    log.info("  swing=%d  nkd=%d  stress=%d",
-             sum(len(v) for v in swing_bt.values()),
-             len(nkd_bt),
-             sum(len(v) for v in stress_bt.values()))
+    # ── Costs + engines ──────────────────────────────────────────────────────
+    # Option C: generate_today_signals() + concat(frozen_parquet + live_bars).
+    # No full backtest pre-compute — desired_position() runs on concat per call.
+    costs_2t     = costs_for_basket(slippage_ticks=SLIPPAGE)
+    ncost_2t     = GIFC(point_value=c_nkd.point_value, tick=c_nkd.tick,
+                        commission_rt=c_nkd.commission_rt, slippage_ticks_per_side=SLIPPAGE)
+    swing_engine = SwingTFEngine()
+    nkd_engine   = SwingTFEngine(ema_period=NKD_EMA,
+                                  chandelier_atr_mult=NKD_MULT_PARAM,
+                                  max_hold_days=5)
+    stress_engine = StressMidEngine()   # passed to generate_today_signals; unused when stress_bars_1015={}
 
-    # ── ATR series + point values ─────────────────────────────────────────────
-    atr_swing = {n: daily_atr_series(df) for n, df in dfs.items()}
-    atr_nkd   = daily_atr_series(ndf)
-    pv        = {n: c.point_value for n, c in BASKET.items()}
+    # point values + contract map
+    pv           = {n: c.point_value for n, c in BASKET.items()}
     pv[NKD_INST] = c_nkd.point_value
-
-    # n_contracts = 1 (production sizing gate: size_combined() must yield 1)
     N_CONTRACTS  = 1
     contracts_by = {n: N_CONTRACTS for n in list(BASKET) + [NKD_INST]}
 
-    # ── Pre-compute signal timelines ─────────────────────────────────────────
-    ledger: dict = {}
-    for inst, lst in swing_bt.items():
-        for t in lst:
-            k = (inst, CLUSTER_SWING, pd.Timestamp(t["day"]).normalize())
-            ledger[k] = {"exit": pd.Timestamp(t["exit_day"]).normalize(),
-                         "pnl_sized": t["pnl"] * N_CONTRACTS}
-    for inst, lst in stress_bt.items():
-        for t in lst:
-            k = (inst, CLUSTER_STRESS, pd.Timestamp(t["day"]).normalize())
-            ledger[k] = {"exit": pd.Timestamp(t["exit_day"]).normalize(),
-                         "pnl_sized": t["pnl"] * N_CONTRACTS}
-    for t in nkd_bt:
-        k = (NKD_INST, CLUSTER_NKD, pd.Timestamp(t["day"]).normalize())
-        ledger[k] = {"exit": pd.Timestamp(t["exit_day"]).normalize(),
-                     "pnl_sized": t["pnl"] * N_CONTRACTS}
+    def _concat_live(frozen_df, live_df):
+        """Merge frozen parquet + live IBKR bars; live bars win on duplicate timestamps."""
+        if live_df is None or live_df.empty:
+            return frozen_df
+        merged = pd.concat([frozen_df, live_df])
+        return merged[~merged.index.duplicated(keep="last")].sort_index()
 
-    swing_sorted  = {inst: sorted(lst, key=lambda t: pd.Timestamp(t["day"]))
-                     for inst, lst in swing_bt.items()}
-    nkd_sorted    = sorted(nkd_bt, key=lambda t: pd.Timestamp(t["day"]))
-    stress_by_day = {(pd.Timestamp(t["day"]).normalize(), inst): t
-                     for inst, lst in stress_bt.items() for t in lst}
+    def _concat_nkd_live(frozen_nkd_df, live_nkd_et):
+        """Merge frozen NKD parquet (JST tz-aware) + IBKR NKD bars (ET naive)."""
+        if live_nkd_et is None or live_nkd_et.empty:
+            return frozen_nkd_df
+        live_jst = live_nkd_et.copy()
+        live_jst.index = (live_jst.index
+                          .tz_localize("America/New_York")
+                          .tz_convert("Asia/Tokyo"))
+        merged = pd.concat([frozen_nkd_df, live_jst])
+        return merged[~merged.index.duplicated(keep="last")].sort_index()
 
-    # ── signal_fn ─────────────────────────────────────────────────────────────
-    # --print-signals uses real signal_fn even if --dry-run is also set,
-    # so signals can be inspected without sending orders.
+    # ── signal_fn — Option C ─────────────────────────────────────────────────
+    # Calls generate_today_signals() with concat(frozen_parquet + live_IBKR_bars).
+    # Swing/NKD: desired_position() on concat → fires at actual bar, not at 16:00.
+    # STRESS_MID: stress_bars_1015={} → skipped here (needs separate 10:20 ET morning
+    #   cron that passes bars through 10:15 — DEFERRED, implement as Phase C2).
+    # Exit detection: desired_position() returning None → diff_desired_vs_held → exits.
+    # --print-signals uses real signal_fn even when --dry-run is set.
     if a.dry_run and not a.print_signals:
         log.info("[sig]  --dry-run: signal_fn returns empty (no orders)")
         def signal_fn(day, _bars, held):
             return [], []
     else:
-        def signal_fn(day, _bars, held):
-            day_ts      = pd.Timestamp(day).normalize()
-            held_by_key = {(p.inst, p.cluster): p for p in held}
-            force_entries: list = []
-            desired: dict = {}
+        def signal_fn(day, bars, held):
+            day_ts = pd.Timestamp(day).normalize()
 
-            for inst in dfs:
-                key = (inst, CLUSTER_SWING)
-                t   = _desired_at(swing_sorted[inst], day_ts)
-                if t is not None:
-                    new_ed = pd.Timestamp(t["day"]).normalize()
-                    sig = {"direction": t["direction"],
-                           "entry": float(t.get("entry", 0.0)),
-                           "stop":  float(t.get("stop",  0.0)),
-                           "entry_day": new_ed}
-                    cur = held_by_key.get(key)
-                    if cur is not None and cur.direction == sig["direction"] \
-                            and cur.entry_day.normalize() != new_ed:
-                        desired[key] = None
-                        force_entries.append((inst, CLUSTER_SWING, sig))
-                    elif cur is None:
-                        desired[key] = sig if new_ed == day_ts else None
-                    else:
-                        desired[key] = sig
-                else:
-                    desired[key] = None
+            # concat frozen parquet + live bars from IBKR (Mismatch A+B fix)
+            concat_swing = {
+                inst: _concat_live(dfs[inst], bars.get(inst))
+                for inst in dfs
+            }
+            concat_nkd = _concat_nkd_live(ndf, bars.get(NKD_INST))
 
-            nkd_key = (NKD_INST, CLUSTER_NKD)
-            nt      = _desired_at(nkd_sorted, day_ts)
-            if nt is not None:
-                new_ed  = pd.Timestamp(nt["day"]).normalize()
-                nkd_sig = {"direction": nt["direction"],
-                           "entry": float(nt.get("entry", 0.0)),
-                           "stop":  float(nt.get("stop",  0.0)),
-                           "entry_day": new_ed}
-                cur = held_by_key.get(nkd_key)
-                if cur is not None and cur.direction == nkd_sig["direction"] \
-                        and cur.entry_day.normalize() != new_ed:
-                    desired[nkd_key] = None
-                    force_entries.append((NKD_INST, CLUSTER_NKD, nkd_sig))
-                elif cur is None:
-                    desired[nkd_key] = nkd_sig if new_ed == day_ts else None
-                else:
-                    desired[nkd_key] = nkd_sig
-            else:
-                desired[nkd_key] = None
-
-            state_entries, exits = diff_desired_vs_held(desired, held)
-            state_entries.extend(force_entries)
-
-            candidates = []
-            for inst, cluster, sig in state_entries:
-                atr_s = atr_nkd if cluster == CLUSTER_NKD else atr_swing[inst]
-                mult  = NKD_MULT if cluster == CLUSTER_NKD else ROSKA4_MULT
-                av    = _asof_naive(atr_s, sig["entry_day"])
-                cand  = to_candidate(inst, sig["direction"], sig["entry"], sig["stop"],
-                                     cluster, contracts_by.get(inst, N_CONTRACTS),
-                                     pv[inst], daily_atr=av, mult=mult)
-                lk = (inst, cluster, sig["entry_day"].normalize())
-                if lk in ledger:
-                    cand["exit"]      = ledger[lk]["exit"]
-                    cand["pnl_sized"] = ledger[lk]["pnl_sized"]
-                candidates.append(cand)
-
-            if _regime(day_ts) == "Stress":
-                held_st = {(p.inst, p.cluster) for p in held}
-                for inst in dfs:
-                    if (inst, CLUSTER_STRESS) in held_st:
-                        continue
-                    st = stress_by_day.get((day_ts, inst))
-                    if st is not None:
-                        av   = _asof_naive(atr_swing[inst], day_ts)
-                        cand = to_candidate(inst, st["direction"],
-                                            float(st.get("entry", 0.0)), 0.0,
-                                            CLUSTER_STRESS,
-                                            contracts_by.get(inst, N_CONTRACTS),
-                                            pv[inst], daily_atr=av, mult=ROSKA4_MULT)
-                        cand["exit"]      = day_ts
-                        cand["pnl_sized"] = st["pnl"] * N_CONTRACTS
-                        candidates.append(cand)
-            return candidates, exits
+            return generate_today_signals(
+                swing_engine=swing_engine,
+                swing_dfs=concat_swing,
+                swing_labels=swing_labels,
+                swing_costs=costs_2t,
+                nkd_engine=nkd_engine,
+                nkd_df=concat_nkd,
+                nkd_labels=nkd_labels,
+                nkd_cost=ncost_2t,
+                nkd_inst=NKD_INST,
+                stress_engine=stress_engine,
+                stress_bars_1015={},   # STRESS_MID deferred to Phase C2 morning cron
+                today_regime=_regime(day_ts),
+                held=held,
+                point_values=pv,
+                contracts_by_inst=contracts_by,
+                today=day_ts,
+            )
 
     # ── --print-signals: connect + fetch + compute signals, no orders ──────────
     if a.print_signals:
         log.info("[sig]  --print-signals: connect + fetch + compute, no orders")
         _ps_broker = IBKRBroker(host="127.0.0.1", port=a.port, client_id=a.client_id)
         _ps_broker.connect()
+        time.sleep(15)  # wait for IB Gateway farm connections to stabilize (2103/2104 flicker)
         try:
             # Fetch bars for all instruments
             _ps_insts = list(contracts_by.keys())
@@ -399,6 +313,7 @@ def main():
         breaker=CircuitBreaker(account=ACCOUNT),
         positions_path=a.positions_path,
         lock_path=a.lock_path,
+        live_state_path=a.live_state_path,
     )
 
     # ── run_day(today) ───────────────────────────────────────────────────────
