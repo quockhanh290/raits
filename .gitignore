@@ -179,3 +179,9 @@ wfo_results/
 
 # Backtest cache files
 *.backtest_cache
+
+# ============================================
+# Live runtime state (changes every session)
+# ============================================
+live_positions.json
+global_index/live_state_data.js
