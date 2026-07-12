@@ -611,29 +611,54 @@ class IBKRBroker(Broker):
         cluster/entry_day/pnl_sized are not available from IBKR — set to
         sentinel values. Caller (B3 reconcile) compares only inst/direction/contracts.
 
+        Uses retry-until-stable: reads until two consecutive results are identical,
+        confirming the subscription has settled. A sleep-only approach cannot verify
+        settlement — IB pushes position data asynchronously and a single empty read
+        may arrive before IB has sent all positions.
+
         Test path (_raw_fetcher set): returns self._positions directly (injected).
         """
         if self._raw_fetcher is not None:
             return list(self._positions)
         ib = self._require_connection()
-        # ib_insync caches positions received during connect; brief sleep ensures
-        # any late-arriving position updates from TWS have been processed.
-        ib.sleep(1.0)
-        result = []
-        for pos in ib.positions():
-            qty = pos.position  # signed: positive = LONG, negative = SHORT
-            if qty == 0:
-                continue
-            result.append(BrokerPosition(
-                inst=pos.contract.symbol,
-                direction="LONG" if qty > 0 else "SHORT",
-                contracts=int(abs(qty)),
-                cluster="UNKNOWN",   # IBKR has no cluster concept; B3 ignores this field
-                entry_day=None,
-                exit_day=None,
-                pnl_sized=0.0,
-            ))
-        return result
+
+        def _read() -> "tuple[frozenset, list]":
+            result = []
+            for pos in ib.positions():
+                qty = pos.position   # signed: positive = LONG, negative = SHORT
+                if qty == 0:
+                    continue
+                result.append(BrokerPosition(
+                    inst=pos.contract.symbol,
+                    direction="LONG" if qty > 0 else "SHORT",
+                    contracts=int(abs(qty)),
+                    cluster="UNKNOWN",   # IBKR has no cluster concept; B3 ignores
+                    entry_day=None,
+                    exit_day=None,
+                    pnl_sized=0.0,
+                ))
+            return frozenset((p.inst, p.direction, p.contracts) for p in result), result
+
+        # Read until two consecutive reads match (subscription settled).
+        # Max 4 reads × 2s = ~8s; warns and returns last result if not stable.
+        _DELAY_S, _MAX = 2.0, 4
+        ib.sleep(_DELAY_S)
+        prev_key, prev_result = _read()
+        for _n in range(_MAX - 1):
+            ib.sleep(_DELAY_S)
+            curr_key, curr_result = _read()
+            if curr_key == prev_key:
+                log.debug("get_positions: stable at read %d (%d position(s))", _n + 2, len(curr_result))
+                return curr_result
+            log.debug("get_positions: read %d %d→%d positions — still settling",
+                      _n + 2, len(prev_result), len(curr_result))
+            prev_key, prev_result = curr_key, curr_result
+
+        log.warning(
+            "get_positions: not stable after %d reads (%.0fs) — returning last result (%d positions)",
+            _MAX, _MAX * _DELAY_S, len(prev_result),
+        )
+        return prev_result
 
     def get_equity(self) -> float:
         """Return current account equity (NetLiquidation) in account base currency.
@@ -827,6 +852,39 @@ class IBKRBroker(Broker):
         except Exception as exc:
             log.error("get_order_status(orderId=%s) failed: %s", order_id, exc)
             return "NOT_FOUND"
+
+    def find_execution(self, order_id: str) -> bool:
+        """Check IB server-side execution history for a confirmed fill of order_id.
+
+        Uses ib.reqExecutions() — queries IB's *persistent* server history and
+        survives TWS daily restart (unlike ib.fills() which is session-only / cleared
+        at 17:00 ET). Looks back 2 days so that STPs fired during yesterday's regular
+        session (before the 17:00 ET trading-day boundary) are also caught.
+
+        Returns True only when a matching fill record is found.
+        Returns False on not-found OR any error — callers must treat False conservatively
+        (halt the strategy, not silently infer a clean exit).
+        """
+        if self._raw_fetcher is not None:
+            return False   # test mode — caller uses get_order_status() FILLED path
+        ib = self._require_connection()
+        try:
+            import ib_insync as ibi
+            import datetime
+            # 2-day lookback covers: STP fired yesterday before 17:00 ET boundary
+            # (IB's "previous trading day") plus overnight + early-morning fills.
+            lookback = (
+                datetime.date.today() - datetime.timedelta(days=2)
+            ).strftime("%Y%m%d 00:00:00")
+            order_id_int = int(order_id)
+            fills = ib.reqExecutions(ibi.ExecutionFilter(time=lookback))
+            for fill in fills:
+                if getattr(fill.execution, "orderId", None) == order_id_int:
+                    return True
+            return False
+        except Exception as exc:
+            log.warning("find_execution(orderId=%s) failed: %s", order_id, exc)
+            return False
 
     # ── C2: Rollover ──────────────────────────────────────────────────────────
 
