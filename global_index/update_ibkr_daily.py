@@ -268,9 +268,24 @@ def main() -> None:
                 updated = pd.concat([existing[keep_cols], new_only[keep_cols]])
                 updated = updated[~updated.index.duplicated(keep="last")].sort_index()
 
+                # History invariant: existing bars must be UNCHANGED after append.
+                # new_only contains only bars AFTER last_existing → no overlap.
+                # This guard catches any future logic bug that modifies history.
+                check_n   = min(200, len(existing))
+                old_tail  = existing[keep_cols].tail(check_n)
+                new_tail  = updated[keep_cols].reindex(old_tail.index)
+                if not old_tail.equals(new_tail):
+                    log.error("  %s: HISTORY INVARIANT VIOLATED — existing bars changed!", name)
+                    log.error("       Rows with diff: %s",
+                              old_tail.index[~old_tail.eq(new_tail).all(axis=1)].tolist()[:5])
+                    log.error("  → NOT saving parquet. Investigate before proceeding.")
+                    failed.append(name)
+                    continue
+
                 parquet_path.parent.mkdir(parents=True, exist_ok=True)
                 updated.to_parquet(parquet_path)
-                log.info("  %s: saved %s  (%d bars total)", name, parquet_path.name, len(updated))
+                log.info("  %s: saved %s  (%d bars total, history-check OK)",
+                         name, parquet_path.name, len(updated))
 
             except Exception as exc:
                 log.exception("  %s: ERROR — %s", name, exc)

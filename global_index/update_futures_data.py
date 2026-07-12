@@ -135,9 +135,38 @@ def main() -> None:
     ap.add_argument("--dry-run",      action="store_true",
                     help="Show what would be fetched; no API calls.")
     ap.add_argument("--api-key",      default=os.environ.get("DATABENTO_API_KEY"))
+    ap.add_argument("--i-confirmed-frozen-backup", action="store_true",
+                    help="Required with --full-refetch: confirm frozen parquets are backed up "
+                         "externally BEFORE re-splicing (re-splice changes historical prices).")
     a = ap.parse_args()
 
-    end_date  = a.end or str((pd.Timestamp.now() - pd.Timedelta(days=1)).date())
+    # ── DANGER GATE: --full-refetch re-splices history ────────────────────────
+    if a.full_refetch and not a.dry_run:
+        if not a.i_confirmed_frozen_backup:
+            print("=" * 72)
+            print("BLOCKED: --full-refetch requires --i-confirmed-frozen-backup")
+            print()
+            print("  --full-refetch re-fetches from Databento and RE-SPLICES historical")
+            print("  prices. This CHANGES price levels in the parquet files you already")
+            print("  have. If frozen backups (ES/NQ/YM/RTY/NKD _frozen_*.parquet) are")
+            print("  not backed up externally FIRST, the baseline ($40,919/Calmar 1.66)")
+            print("  and vault results will become IRREPRODUCIBLE.")
+            print()
+            print("  Checklist before proceeding:")
+            print("    1. python -m global_index.verify_frozen verify   ← all OK?")
+            print("    2. python -m global_index.verify_frozen backup --dest <ext_drive>")
+            print("    3. Confirm backup completed successfully")
+            print("    4. Then re-run with: --full-refetch --i-confirmed-frozen-backup")
+            print("=" * 72)
+            sys.exit(1)
+        else:
+            print("=" * 72)
+            print("WARNING: --full-refetch + --i-confirmed-frozen-backup")
+            print("  Re-splicing historical prices. Frozen backups confirmed by operator.")
+            print("  This will shift price levels in *_8y.parquet (NOT frozen files).")
+            print("=" * 72)
+
+    end_date  = a.end or str((pd.Timestamp.now(tz="America/New_York") - pd.Timedelta(days=1)).date())
     data_dir  = Path(a.data_dir)
     nkd_path  = Path(a.nkd_parquet)
     jobs      = _build_jobs(data_dir, nkd_path)

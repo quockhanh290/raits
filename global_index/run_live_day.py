@@ -117,7 +117,7 @@ def main():
                          "(e.g. global_index/live_state_data.js). Omit to skip dashboard update.")
     a = ap.parse_args()
 
-    today = pd.Timestamp.now().normalize()
+    today = pd.Timestamp.now(tz="America/New_York").normalize().tz_localize(None)
     print("=" * 72)
     print("RAITS — live paper trading day")
     print(f"  CWD:            {_CWD}")
@@ -126,6 +126,26 @@ def main():
     print(f"  positions-path: {a.positions_path}")
     print(f"  dry-run:        {a.dry_run}")
     print("=" * 72)
+
+    # ── Frozen integrity fast-check (size-only, <0.1s) ──────────────────────
+    # WARNING when not OK (missing manifest, size mismatch) — never blocks paper.
+    # "Silent pass" would conflate "unverified" with "verified OK" — avoid that.
+    try:
+        from global_index.verify_frozen import quick_check_manifest
+        ok, issues = quick_check_manifest()
+    except Exception as _e:
+        ok, issues = False, [f"verify_frozen import failed: {_e}"]
+
+    if not ok:
+        print("!" * 72)
+        print("  WARNING: frozen integrity check — UNVERIFIED (paper continues)")
+        for iss in issues:
+            print(f"  {iss}")
+        print("  Size-only check; full verify: python -m global_index.verify_frozen verify")
+        print("!" * 72)
+        log.warning("[frozen] %d integrity issue(s) — see banner above", len(issues))
+    else:
+        log.info("[frozen] Primary frozen files intact (size check OK)")
 
     # ── Load bar data ────────────────────────────────────────────────────────
     log.info("[data] Loading parquet bar data...")

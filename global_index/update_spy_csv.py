@@ -67,6 +67,70 @@ def save_snapshot(csv_path: Path, snapshot_dir: Path = SNAPSHOT_DIR) -> Path | N
     return snap
 
 
+def verify_regime_labels(snap_path: Path, new_csv: Path,
+                          check_end: str = "2024-12-31") -> int:
+    """Compare HMM regime labels for 2018-2024 between snapshot and updated CSV.
+    Returns count of dates where label changed (should be 0).
+
+    Why labels, not just prices:
+        Labels = HMM.decode(prices). Prices bất biến + HMM code bất biến → labels bất biến.
+        But HMM refit (code change / different seed / different fit_end) with SAME prices
+        can give DIFFERENT labels. Price verify alone does NOT catch HMM drift.
+        This function verifies labels DIRECTLY.
+
+    Logs WARNING if any label changed, with date list (up to 10 examples).
+    Runs label_regimes twice (old spy + new spy) with production HMM params.
+    """
+    try:
+        from futures._validated_core import benchmark_daily, label_regimes
+    except ImportError:
+        log.warning("verify_regime_labels: cannot import futures._validated_core — skipping")
+        return 0
+
+    try:
+        old_bench = benchmark_daily(str(snap_path))
+        new_bench = benchmark_daily(str(new_csv))
+    except Exception as exc:
+        log.warning("verify_regime_labels: could not load CSVs — %s", exc)
+        return 0
+
+    hmm_train_end = "2018-01-01"
+    n_components  = 3
+    hmm_fit_end   = check_end  # production: 2024-12-31
+
+    try:
+        old_labels = label_regimes(old_bench, hmm_train_end, n_components, hmm_fit_end)
+        new_labels = label_regimes(new_bench, hmm_train_end, n_components, hmm_fit_end)
+    except Exception as exc:
+        log.warning("verify_regime_labels: label_regimes failed — %s", exc)
+        return 0
+
+    import pandas as _pd
+    cutoff = _pd.Timestamp(check_end)
+    common = old_labels.index.intersection(new_labels.index)
+    common = common[common <= cutoff]
+
+    diff_idx = [d for d in common if old_labels.get(d) != new_labels.get(d)]
+    n_diff = len(diff_idx)
+
+    if n_diff:
+        log.warning(
+            "LABEL DRIFT: %d date(s) with changed regime label (2018→%s): %s%s",
+            n_diff, check_end,
+            [str(d.date()) for d in diff_idx[:10]],
+            " ..." if n_diff > 10 else "",
+        )
+        log.warning(
+            "  Possible causes: (1) Polygon revised SPY prices, "
+            "(2) HMM code/params changed, (3) refit with different seed. "
+            "Compare snapshot vs updated CSV and check HMM fit_end."
+        )
+    else:
+        log.info("Regime labels unchanged (%d dates verified through %s) — HMM stable",
+                 len(common), check_end)
+    return n_diff
+
+
 def verify_historical_prices(snap_path: Path, new_csv: Path, overlap_start: date) -> int:
     """Compare rows BEFORE overlap_start between snapshot and updated CSV.
     Returns count of rows whose close price changed (should be 0).
@@ -216,6 +280,7 @@ def update_spy_csv(csv_path: Path, api_key: str,
 
     if snap_path:
         verify_historical_prices(snap_path, csv_path, fetch_from)
+        verify_regime_labels(snap_path, csv_path)   # verify labels directly (prices→labels insufficient)
 
     n_after = len(combined)
     n_new = max(0, n_after - n_before)
