@@ -521,7 +521,7 @@ class FuturesRunner:
                     f"MAX_HOLD_EXIT: CLOSE FAILED {p.inst}/{p.cluster} — retry at 14:05",
                     {"inst": p.inst, "cluster": p.cluster, "hold_days": hold},
                 )
-        self._persist_positions()
+        self._persist_state()
         return closed
 
     def _handle_rollover_if_needed(self, day) -> None:
