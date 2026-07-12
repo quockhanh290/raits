@@ -196,22 +196,27 @@ def main():
     N_CONTRACTS  = 1
     contracts_by = {n: N_CONTRACTS for n in list(BASKET) + [NKD_INST]}
 
+    def _strip_tz(df: pd.DataFrame) -> pd.DataFrame:
+        """Return df with tz-naive DatetimeIndex. load_parquet yields tz-aware US/Eastern;
+        fetch_bars yields tz-naive ET. Strip tz so concat+sort_index() works without
+        'Cannot compare tz-naive and tz-aware timestamps' TypeError."""
+        if df.index.tz is not None:
+            df = df.copy()
+            df.index = df.index.tz_localize(None)
+        return df
+
     def _concat_live(frozen_df, live_df):
         """Merge frozen parquet + live IBKR bars; live bars win on duplicate timestamps."""
         if live_df is None or live_df.empty:
-            return frozen_df
-        merged = pd.concat([frozen_df, live_df])
+            return _strip_tz(frozen_df)
+        merged = pd.concat([_strip_tz(frozen_df), live_df])
         return merged[~merged.index.duplicated(keep="last")].sort_index()
 
     def _concat_nkd_live(frozen_nkd_df, live_nkd_et):
-        """Merge frozen NKD parquet (JST tz-aware) + IBKR NKD bars (ET naive)."""
+        """Merge frozen NKD parquet + IBKR NKD bars (both tz-naive ET after strip)."""
         if live_nkd_et is None or live_nkd_et.empty:
-            return frozen_nkd_df
-        live_jst = live_nkd_et.copy()
-        live_jst.index = (live_jst.index
-                          .tz_localize("America/New_York")
-                          .tz_convert("Asia/Tokyo"))
-        merged = pd.concat([frozen_nkd_df, live_jst])
+            return _strip_tz(frozen_nkd_df)
+        merged = pd.concat([_strip_tz(frozen_nkd_df), live_nkd_et])
         return merged[~merged.index.duplicated(keep="last")].sort_index()
 
     # ── signal_fn — Option C ─────────────────────────────────────────────────
