@@ -107,8 +107,8 @@ def backtest_swing_tf(df, labels, cost, *, ema_period=20, chandelier_atr_mult=3.
                     _930    = day + pd.Timedelta(hours=9, minutes=30)
                     _tz_str = str(_day_ts.tzinfo) if _day_ts.tzinfo is not None else ""
                     if _tz_str in ("", "America/New_York", "US/Eastern"):
-                        _ts_cmp = _day_ts.tz_localize(None) if _day_ts.tzinfo is not None else _day_ts
-                        _idx    = int(np.searchsorted(_ts_cmp.asi8, _930.value))
+                        _930_cmp = _930.tz_localize("America/New_York") if _day_ts.tzinfo is not None else _930
+                        _idx     = int(_day_ts.searchsorted(_930_cmp))
                         if _idx >= len(hl[day][2]):
                             _idx = 0
                     else:

@@ -257,11 +257,14 @@ def backtest_swing_tf(df, labels, cost, *, ema_period=20, chandelier_atr_mult=3.
                     _tz_str = str(_day_ts.tzinfo) if _day_ts.tzinfo is not None else ""
                     _is_et  = _tz_str in ("", "America/New_York", "US/Eastern")
                     if _is_et:
-                        # US ET futures: find first 1m bar at or after 09:30 ET local time.
-                        # load_parquet keeps tz-aware ET; strip tz before asi8 so naive
-                        # _930.value compares local-time to local-time (not UTC to UTC).
-                        _ts_cmp = _day_ts.tz_localize(None) if _day_ts.tzinfo is not None else _day_ts
-                        _idx    = int(np.searchsorted(_ts_cmp.asi8, _930.value))
+                        # US ET futures: find first 1m bar at or after 09:30 ET.
+                        # Use DatetimeIndex.searchsorted() with TZ-aware target — handles
+                        # both ns and us resolution indexes without asi8/value unit mismatch.
+                        if _day_ts.tzinfo is not None:
+                            _930_cmp = _930.tz_localize(ET)          # TZ-aware ET
+                        else:
+                            _930_cmp = _930                          # naive ET (already local)
+                        _idx = int(_day_ts.searchsorted(_930_cmp))
                         if _idx >= len(hl[day][2]):
                             _idx = 0
                     else:

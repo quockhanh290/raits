@@ -77,7 +77,7 @@ def main():
                     help="Connect + check positions but emit no orders")
     a = ap.parse_args()
 
-    today = pd.Timestamp.now().normalize()
+    today = pd.Timestamp.now(tz="America/New_York").normalize().tz_localize(None)
     print("=" * 68)
     print("MAX_HOLD EXIT — 09:31 ET RTH open cron")
     print(f"  today:          {today.date()}")
