@@ -52,7 +52,10 @@ def _run(args: list[str], label: str, dry_run: bool) -> None:
         log.info("[%s] completed OK", label)
 
 
-def make_scheduler(port: int, dry_run: bool):
+def make_scheduler(port: int, dry_run: bool,
+                   data_dir: str = "data/cache/futures",
+                   nkd_parquet: str = "global_index/data/NKD_continuous_1m_8y.parquet",
+                   regime_csv: str = "spy_daily_live.csv"):
     try:
         from apscheduler.schedulers.blocking import BlockingScheduler
     except ImportError:
@@ -74,7 +77,10 @@ def make_scheduler(port: int, dry_run: bool):
                          id="live_day", name="Daily run 14:05 ET")
     def job_live_day():
         _run([sys.executable, "-m", "global_index.run_live_day",
-              "--port", str(port)],
+              "--data-dir",     data_dir,
+              "--nkd-parquet",  nkd_parquet,
+              "--regime-csv",   regime_csv,
+              "--port",         str(port)],
              label="LIVE_DAY", dry_run=dry_run)
 
     return sched
@@ -82,13 +88,21 @@ def make_scheduler(port: int, dry_run: bool):
 
 def main():
     ap = argparse.ArgumentParser(description="TZ-independent APScheduler cron for RAITS")
-    ap.add_argument("--port",    type=int, default=4002,
+    ap.add_argument("--port",        type=int, default=4002,
                     help="IB Gateway port (default: 4002 paper)")
-    ap.add_argument("--dry-run", action="store_true",
+    ap.add_argument("--dry-run",     action="store_true",
                     help="Log jobs but do not execute commands")
+    ap.add_argument("--data-dir",    default="data/cache/futures",
+                    help="Parquet data directory (default: data/cache/futures)")
+    ap.add_argument("--nkd-parquet", default="global_index/data/NKD_continuous_1m_8y.parquet",
+                    help="NKD parquet path")
+    ap.add_argument("--regime-csv",  default="spy_daily_live.csv",
+                    help="SPY regime CSV (default: spy_daily_live.csv)")
     a = ap.parse_args()
 
-    sched = make_scheduler(port=a.port, dry_run=a.dry_run)
+    sched = make_scheduler(port=a.port, dry_run=a.dry_run,
+                           data_dir=a.data_dir, nkd_parquet=a.nkd_parquet,
+                           regime_csv=a.regime_csv)
 
     jobs = sched.get_jobs()
     log.info("Scheduler TZ: America/New_York (ET-native, DST auto)")
