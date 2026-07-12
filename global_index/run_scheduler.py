@@ -109,7 +109,8 @@ def main():
     log.info("Machine TZ: %s", __import__("time").tzname)
     log.info("Port: %d  dry-run: %s", a.port, a.dry_run)
     for j in jobs:
-        log.info("  job %-20s  next: %s", j.id, j.next_run_time)
+        _next = getattr(j, "next_run_time", "(start scheduler to compute)")
+        log.info("  job %-20s  next: %s", j.id, _next)
 
     log.info("Scheduler started. Ctrl-C to stop.")
     try:
