@@ -1011,9 +1011,9 @@ class FuturesRunner:
                     context: dict | None = None) -> None:
         """Append a structured event to self._events (bounded 500). Thread-safe only
         for single-threaded use (runner is single-threaded by design — J1)."""
-        from datetime import datetime as _dt
+        from datetime import datetime as _dt, timezone
         event: dict = {
-            "ts": _dt.now().isoformat(timespec="seconds"),
+            "ts": _dt.now(timezone.utc).isoformat(timespec="seconds"),
             "level": level,
             "category": category,
             "message": message,

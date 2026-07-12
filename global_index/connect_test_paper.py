@@ -156,7 +156,7 @@ def main() -> int:
     # ── DATA + P2: Market data + timezone checks ──────────────────────────────
     print("── DATA + P2: Market data fetch + timezone ──────────────")
 
-    through = pd.Timestamp.now().normalize() + pd.Timedelta(hours=16)  # today 16:00 ET
+    through = pd.Timestamp.now(tz="America/New_York").normalize().tz_localize(None) + pd.Timedelta(hours=16)  # today 16:00 ET
     df = pd.DataFrame()
     data_ok = False
 
@@ -238,7 +238,7 @@ def main() -> int:
         from global_index.broker import Order
         from global_index.signal_layer import CLUSTER_SWING
 
-        ref_day = pd.Timestamp.now().normalize()
+        ref_day = pd.Timestamp.now(tz="America/New_York").normalize().tz_localize(None)
         open_order = Order(
             inst=args.inst, action="OPEN", direction="LONG",
             contracts=1, cluster=CLUSTER_SWING,
@@ -305,7 +305,7 @@ def main() -> int:
         print("── EDGE CASES: A3 timeout / P3 crossing / A2 partial ────")
         from global_index.broker import Order
         from global_index.signal_layer import CLUSTER_SWING
-        ref_day = pd.Timestamp.now().normalize()
+        ref_day = pd.Timestamp.now(tz="America/New_York").normalize().tz_localize(None)
 
         # ── A3: entry timeout → CANCELLED ────────────────────────────────────
         # Set limit price guaranteed to miss (buy at $1 = never fills on MES ~$7500).

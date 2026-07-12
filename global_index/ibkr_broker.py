@@ -166,7 +166,7 @@ def _current_front_month(inst: str, today=None) -> "str | None":
     Walks ROLL_SCHEDULE: before first roll → use first front_month; after each roll → switch to nxt.
     Returns None if inst not in ROLL_SCHEDULE (caller falls back to unqualified contract).
     """
-    today_str = str(pd.Timestamp(today or pd.Timestamp.now()).date())
+    today_str = str(pd.Timestamp(today or pd.Timestamp.now(tz="America/New_York")).date())
     schedule = ROLL_SCHEDULE.get(inst, [])
     if not schedule:
         return None
