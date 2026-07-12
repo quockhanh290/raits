@@ -272,6 +272,21 @@ class FuturesRunner:
                                 )
                                 loaded_positions[:] = [
                                     p for p in loaded_positions if p is not _stp_cand]
+                            elif _stp_cand is not None and _stp_status == "NOT_FOUND" and broker_qty == 0:
+                                # TWS daily restart (17:00 ET) clears ib.trades() + ib.fills()
+                                # history. broker_qty==0 means the position is gone from IBKR —
+                                # the only automated path that closes it is the STP.
+                                # Inference: STP fired overnight, restart cleared the fill record.
+                                # Treat as confirmed STP exit (no halt), but warn operator to verify.
+                                logger.warning(
+                                    "B3 STP-INFER: %s %s IBKR ×0 + orderId=%s NOT_FOUND "
+                                    "— position gone, infer STP fired overnight "
+                                    "(TWS restart cleared fill history). "
+                                    "Position cleared from state. Verify in TWS executions.",
+                                    k[1], k[0], _stp_cand.stop_order_id,
+                                )
+                                loaded_positions[:] = [
+                                    p for p in loaded_positions if p is not _stp_cand]
                             elif _stp_cand is not None:
                                 logger.critical(
                                     "B3 MISMATCH: file has %s %s ×%d but IBKR shows ×%d "

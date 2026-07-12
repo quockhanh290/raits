@@ -647,17 +647,38 @@ class IBKRBroker(Broker):
 
         ib = self._require_connection()
         try:
-            ib.sleep(2.0)  # let initial account subscription data arrive
-            # Prefer BASE (account base currency), fall back to first NetLiquidation found
-            candidates = [av for av in ib.accountValues() if av.tag == "NetLiquidation"]
-            for av in candidates:
-                if av.currency == "BASE":
-                    return float(av.value)
-            for av in candidates:
-                if av.currency in ("USD", "CAD"):
-                    return float(av.value)
-            if candidates:
-                return float(candidates[0].value)
+            # Retry up to 4× with increasing delay: account subscription push from IB
+            # can arrive slowly (especially on first connect after a fast reconnect).
+            # equity=0 on attempt 1 is normal — this is "slow, retry" not "wrong, abort".
+            for _attempt in range(4):
+                ib.sleep(2.0 + _attempt)   # 2s, 3s, 4s, 5s — total ~14s max
+                candidates = [av for av in ib.accountValues()
+                              if av.tag == "NetLiquidation"]
+                _val: "float | None" = None
+                for av in candidates:
+                    if av.currency == "BASE":
+                        _val = float(av.value); break
+                if _val is None:
+                    for av in candidates:
+                        if av.currency in ("USD", "CAD"):
+                            _val = float(av.value); break
+                if _val is None and candidates:
+                    _val = float(candidates[0].value)
+                if _val is not None and _val > 0:
+                    return _val
+                if _val == 0.0 and _attempt < 3:
+                    log.warning(
+                        "get_equity: attempt %d returned 0 — "
+                        "account subscription settling, retrying...", _attempt + 1,
+                    )
+            # Exhausted retries
+            if _val is not None:
+                if _val == 0.0:
+                    raise IBKRConnectionError(
+                        "get_equity: NetLiquidation=0 after 4 attempts "
+                        "(~14s) — check account subscription / paper balance"
+                    )
+                return _val
             raise IBKRConnectionError("NetLiquidation not found in IBKR account values")
         except IBKRConnectionError:
             raise
@@ -703,7 +724,19 @@ class IBKRBroker(Broker):
             stp_order.tif = "GTC"
 
             trade = ib.placeOrder(contract, stp_order)
-            ib.sleep(0.5)  # let IBKR assign orderId before reading it
+            # Retry until IBKR assigns a non-zero orderId.
+            # ib_insync may not have the orderId synchronously on slow TWS farm connections.
+            # 10 × 0.3s = 3s max; typical fast path exits on attempt 1-2.
+            for _n in range(10):
+                ib.sleep(0.3)
+                if trade.order.orderId and trade.order.orderId != 0:
+                    break
+            else:
+                log.warning(
+                    "place_stop: orderId still 0 after 3s for %s %s — "
+                    "get_order_status may return NOT_FOUND until orderId propagates",
+                    inst, direction,
+                )
             order_id = str(trade.order.orderId)
             log.info(
                 "place_stop: placed %s %s STP ×%d @ %.4f orderId=%s cluster=%s",
@@ -774,6 +807,18 @@ class IBKRBroker(Broker):
             for fill in ib.fills():
                 if getattr(fill.execution, "orderId", None) == order_id_int:
                     return "FILLED"
+
+            # Check open/active orders — GTC STPs survive TWS daily restart (17:00 ET)
+            # and are resubmitted by IB; they appear here even when ib.trades() is cleared.
+            # This distinguishes "STP still live (GTC resubmitted)" from "STP filled/gone".
+            for t in ib.openTrades():
+                if t.order.orderId == order_id_int:
+                    s = t.orderStatus.status
+                    if s == "Filled":
+                        return "FILLED"
+                    if s in ("Cancelled", "ApiCancelled", "Inactive"):
+                        return "CANCELLED"
+                    return "PENDING"   # Submitted / PreSubmitted = live GTC on exchange
 
             return "NOT_FOUND"
 
