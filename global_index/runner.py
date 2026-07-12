@@ -398,6 +398,32 @@ class FuturesRunner:
         self._stop_path = Path(stop_path) if stop_path else None
         self._max_contracts = int(max_contracts_per_order)
 
+        # C1: cumulative signed slippage (persisted next to positions_path as slip_stats.json)
+        self._slip_stats_path = (
+            Path(positions_path).parent / "slip_stats.json" if positions_path else None
+        )
+        self._slip_open_sum: float = 0.0
+        self._slip_open_n: int = 0
+        self._slip_close_sum: float = 0.0
+        self._slip_close_n: int = 0
+        if self._slip_stats_path is not None and self._slip_stats_path.exists():
+            try:
+                with open(self._slip_stats_path, encoding="utf-8") as _f:
+                    _ss = json.load(_f)
+                self._slip_open_sum = float(_ss.get("open_sum", 0.0))
+                self._slip_open_n   = int(_ss.get("open_n", 0))
+                self._slip_close_sum = float(_ss.get("close_sum", 0.0))
+                self._slip_close_n   = int(_ss.get("close_n", 0))
+                logger.debug(
+                    "C1: loaded slip_stats — OPEN mean=%+.4f N=%d  CLOSE mean=%+.4f N=%d",
+                    self._slip_open_sum / self._slip_open_n if self._slip_open_n else 0.0,
+                    self._slip_open_n,
+                    self._slip_close_sum / self._slip_close_n if self._slip_close_n else 0.0,
+                    self._slip_close_n,
+                )
+            except Exception as _exc:
+                logger.warning("C1: could not load slip_stats.json: %s", _exc)
+
         self.broker = broker
         self.guard = guard
         self.contracts = contracts_by_inst
@@ -431,6 +457,24 @@ class FuturesRunner:
             f"Runner started: loaded {len(self.state.open_positions)} position(s) "
             f"from {'persisted file' if self._positions_path and self.state.open_positions else 'fresh state'}",
         )
+
+    # ── C1: slip stats persistence ──────────────────────────────────────────
+
+    def _persist_slip_stats(self) -> None:
+        if self._slip_stats_path is None:
+            return
+        try:
+            _tmp = self._slip_stats_path.with_suffix(".tmp")
+            with open(_tmp, "w", encoding="utf-8") as _f:
+                json.dump({
+                    "open_sum":  self._slip_open_sum,
+                    "open_n":    self._slip_open_n,
+                    "close_sum": self._slip_close_sum,
+                    "close_n":   self._slip_close_n,
+                }, _f)
+            os.replace(str(_tmp), str(self._slip_stats_path))
+        except Exception as _exc:
+            logger.warning("C1: could not persist slip_stats.json: %s", _exc)
 
     # ── B1: atomic state persistence ────────────────────────────────────────
 
@@ -871,10 +915,15 @@ class FuturesRunner:
                 if p.stop_price is not None:
                     _slip_c = (p.stop_price - _f.avg_price) if p.direction == "LONG" \
                               else (_f.avg_price - p.stop_price)
+                    self._slip_close_sum += _slip_c
+                    self._slip_close_n   += 1
+                    self._persist_slip_stats()
                     logger.info(
-                        "C1 CLOSE: %s %s avg=%+.4f stop_ref=%.4f slip=%+.4f (%s)",
+                        "C1 CLOSE: %s %s avg=%+.4f stop_ref=%.4f slip=%+.4f (%s)"
+                        " | close_mean=%+.4f N=%d",
                         p.inst, p.direction, _f.avg_price, p.stop_price, _slip_c,
                         "ADVERSE" if _slip_c > 0 else "favorable",
+                        self._slip_close_sum / self._slip_close_n, self._slip_close_n,
                     )
                 else:
                     logger.info(
@@ -994,10 +1043,15 @@ class FuturesRunner:
             if _open_fill.status in ("FILLED", "PARTIAL") and _exp_entry and _open_fill.avg_price > 0:
                 _slip_o = (_open_fill.avg_price - _exp_entry) if t["direction"] == "LONG" \
                           else (_exp_entry - _open_fill.avg_price)
+                self._slip_open_sum += _slip_o
+                self._slip_open_n   += 1
+                self._persist_slip_stats()
                 logger.info(
-                    "C1 OPEN: %s %s avg=%.4f expected=%.4f slip=%+.4f (%s)",
+                    "C1 OPEN: %s %s avg=%.4f expected=%.4f slip=%+.4f (%s)"
+                    " | open_mean=%+.4f N=%d",
                     t["inst"], t["direction"], _open_fill.avg_price, _exp_entry, _slip_o,
                     "ADVERSE" if _slip_o > 0 else "favorable",
+                    self._slip_open_sum / self._slip_open_n, self._slip_open_n,
                 )
             elif _open_fill.status == "FAILED":
                 logger.error(
