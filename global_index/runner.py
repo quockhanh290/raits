@@ -862,6 +862,25 @@ class FuturesRunner:
             _f = self.broker.send_order(Order(
                 p.inst, "CLOSE", p.direction, p.contracts, p.cluster, day,
                 exit_day=day, pnl_sized=p.pnl_sized))
+            # C1: fill quality — signed slippage (positive = adverse).
+            # LONG CLOSE (selling): lower fill = adverse → slip = stop_ref - avg.
+            # SHORT CLOSE (buying): higher fill = adverse → slip = avg - stop_ref.
+            # stop_price = entry chandelier level (fixed stop, not ratcheted yet).
+            # No stop_ref → market exit, log fill price only (no adverse/favorable).
+            if _f.status in ("FILLED", "PARTIAL") and _f.avg_price > 0:
+                if p.stop_price is not None:
+                    _slip_c = (p.stop_price - _f.avg_price) if p.direction == "LONG" \
+                              else (_f.avg_price - p.stop_price)
+                    logger.info(
+                        "C1 CLOSE: %s %s avg=%+.4f stop_ref=%.4f slip=%+.4f (%s)",
+                        p.inst, p.direction, _f.avg_price, p.stop_price, _slip_c,
+                        "ADVERSE" if _slip_c > 0 else "favorable",
+                    )
+                else:
+                    logger.info(
+                        "C1 CLOSE: %s %s avg=%.4f (market exit, no stop reference)",
+                        p.inst, p.direction, _f.avg_price,
+                    )
             # I4.8: if CLOSE fails, restore position for retry next session.
             # decide_day already removed p from open_positions; add it back with
             # exit_pending=True so _retry_pending_exits() picks it up tomorrow.
@@ -966,6 +985,25 @@ class FuturesRunner:
             _open_fill = self.broker.send_order(Order(
                 t["inst"], "OPEN", t["direction"], n, t["cluster"], day,
                 exit_day=t.get("exit"), pnl_sized=t.get("pnl_sized", 0.0)))
+
+            # C1: fill quality — signed slippage (positive = adverse).
+            # LONG OPEN (buying): higher fill = adverse → slip = avg - expected.
+            # SHORT OPEN (selling): lower fill = adverse → slip = expected - avg.
+            # Dấu quan trọng cho bias hệ thống: %+.4f giữ dấu.
+            _exp_entry = t.get("entry")
+            if _open_fill.status in ("FILLED", "PARTIAL") and _exp_entry and _open_fill.avg_price > 0:
+                _slip_o = (_open_fill.avg_price - _exp_entry) if t["direction"] == "LONG" \
+                          else (_exp_entry - _open_fill.avg_price)
+                logger.info(
+                    "C1 OPEN: %s %s avg=%.4f expected=%.4f slip=%+.4f (%s)",
+                    t["inst"], t["direction"], _open_fill.avg_price, _exp_entry, _slip_o,
+                    "ADVERSE" if _slip_o > 0 else "favorable",
+                )
+            elif _open_fill.status == "FAILED":
+                logger.error(
+                    "C1 OPEN FAILED: %s %s — %s",
+                    t["inst"], t["direction"], _open_fill.error_msg or "no detail",
+                )
 
             # STP: place GTC stop order immediately after successful OPEN fill.
             # Provides overnight exit protection when chandelier fires outside 14:05–15:55 window.
