@@ -150,6 +150,29 @@ Nếu không đủ 3 điều kiện → giữ model cũ. Decode-forward (model f
 
 ---
 
+---
+
+## L13 — Fail-safe cần kiểm tất cả điều kiện, không chỉ một (2026-07-13)
+
+**Case: Pre-flight fail-safe — chuỗi 4 lớp:**
+
+1. **Flag in-memory** (`_preflight_ok` dict): restart scheduler giữa 13:45–14:05 → flag mất → flag=None. Ban đầu xử: "skip" (đúng nhưng skip oan khi data thật fresh).
+
+2. **Branch 3 loophole** (commit 030de83, ngay sau xóa): thêm `_parquet_is_fresh()` để recover restart. Nhưng chỉ kiểm parquet — không kiểm `spy_daily_live.csv`. Scenario: process crash sau `update_ibkr_daily` xong, trước `update_spy_csv` xong → `_preflight_ok` không được set → flag=None → Branch 3 thấy parquet fresh → chạy live_day với **regime labels cũ** (spy_csv stale). Signal sai → trade sai.
+
+3. **Fix loophole** (commit 90a7000): xóa Branch 3. Fail-closed: flag=None → skip. Chỉ chạy khi flag=True (cả hai bước xác nhận xong trong cùng process). Trade-off có ý thức: skip oan nếu restart trong 20-min window (hiếm, không nguy hiểm) vs chạy sai nếu loophole. Chọn fail-closed.
+
+4. **Exit code bug** (commit 8351fd6): `update_ibkr_daily` exits 0 dù instruments trong `failed` list (Gateway down, 0 bars returned). Pre-flight thấy `returncode=0` → `ibkr_ok=True` → live_day chạy trên parquet stale. Fix: `sys.exit(1)` khi `failed` non-empty. Phân biệt: `new_only.empty` ("already up to date", không failure) vs `new_bars.empty` ("0 bars from IBKR", failure → exit 1).
+
+**Lesson chung:**
+- Fail-safe với N điều kiện cần phải kiểm TẤT CẢ N. Kiểm 1/N = loophole (Branch 3 kiểm parquet, không spy_csv).
+- Mỗi lớp fix lộ lớp tiếp: splice → pre-flight → Branch 3 loophole → exit code. Đây là bình thường khi chạy thật lần đầu.
+- **Dừng khi fail-closed đủ an toàn, không đào edge-của-edge.** Khi logic đã fail-closed (chỉ chạy khi CHẮC fresh, skip mọi trường hợp khác), không cần optimize "skip oan rất hiếm". Restart trong 20-min window = chấp nhận trade-off.
+
+**Fix pattern:** Trước khi viết fail-safe: liệt kê tất cả điều kiện cần thiết để "safe to run". Fail-safe phải kiểm TẤT CẢ, không chỉ một. Sau đó chọn fail-closed (skip nếu không chắc) thay vì heuristic guess.
+
+---
+
 ## Tổng hợp — Class of mistakes
 
 | Class | Lessons |
@@ -163,3 +186,4 @@ Nếu không đủ 3 điều kiện → giữ model cũ. Decode-forward (model f
 | Verification scope | L10 (reconcile = consistency, not correctness) |
 | Model update | L11 (data mới ≠ model sai — đo trước khi refit) |
 | Live interface | L12 (bug fetch/broker chỉ lộ khi chạy thật — splice/dtype/exchange) |
+| Fail-safe design | L13 (kiểm tất cả N điều kiện; fail-closed khi đủ an toàn, không chase edge-of-edge) |

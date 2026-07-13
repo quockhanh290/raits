@@ -326,6 +326,24 @@ _Cập nhật: 2026-07-07_
 | **Data repair** | Truncate parquet → backup → delete `_ibkr_splice_offsets.json` → re-fetch "7 D". Kết quả: gap=0.00 all 5, frozen 23/23 intact, entry 53124 exact. |
 | **Nguồn** | `global_index/update_ibkr_daily.py:120-142` (`_apply_splice_offset`); committed 2026-07-13. |
 
+### I5.9 — update_ibkr_daily exits 0 khi instrument fail fetch
+| Trường | Nội dung |
+|---|---|
+| **Trạng thái** | FIXED (2026-07-13, commit 8351fd6) |
+| **Root cause** | Khi IBKR trả 0 bars (Gateway down, maintenance), instrument vào `failed` list nhưng script vẫn `exit 0`. Pre-flight không phát hiện failure (`returncode=0` → `ibkr_ok=True` → `_preflight_ok[today]=True`). live_day chạy trên parquet stale. |
+| **Phân biệt** | `new_bars.empty` (IBKR trả 0 bars) → `failed.append` → **BUG: exit 0, phải exit 1**. `new_only.empty` (parquet đã có bars mới rồi) → "already up to date" → **ĐÚNG: exit 0, không failure**. |
+| **Fix** | `sys.exit(1)` sau `print(f"COMPLETED WITH ERRORS: {failed}")`. Pre-flight `ibkr_ok=False` → `_preflight_ok[today]=False` → live_day skip. |
+| **Nguồn** | `global_index/update_ibkr_daily.py:320-325` (exit block); committed 8351fd6. |
+
+### I5.10 — Pre-flight fail-safe: chuỗi fix (in-memory flag → Branch 3 loophole)
+| Trường | Nội dung |
+|---|---|
+| **Trạng thái** | FIXED, fail-closed (commits 0f91fc9 → 030de83 → 90a7000) |
+| **Root cause** | `_preflight_ok` in-memory: restart scheduler giữa 13:45-14:05 → flag=None → live_day skip oan. Attempt fix: Branch 3 `_parquet_is_fresh()` — check parquet date >= today. **Loophole**: chỉ kiểm parquet, không kiểm spy_csv. Crash sau ibkr_daily xong trước spy_csv → parquet fresh, spy stale → Branch 3 chạy live_day với regime labels cũ. |
+| **Chuỗi fix** | (1) `0f91fc9`: thêm pre-flight 13:45 với fail-safe. (2) `030de83`: Branch 3 (parquet-only check). (3) `90a7000`: xóa Branch 3 → fail-closed: chỉ chạy khi flag=True (cả hai bước confirmed). Restart → flag=None → skip. Trade-off có ý thức: skip oan (hiếm, 20-min window) vs run sai (không bao giờ). |
+| **Trạng thái cuối** | 2 branch: flag=True→run; flag=False/None→skip. Không còn loophole. |
+| **Nguồn** | `global_index/run_scheduler.py:53-57` (comment), `139-171` (job_live_day); `L13` trong LESSONS.md. |
+
 ---
 
 ## NHÓM 6 — DOCUMENTATION (session này)
@@ -383,6 +401,8 @@ _Cập nhật: 2026-07-07_
 | I5.6 | Live signal stability qua quarterly roll | Data | VERIFIED STABLE |
 | I5.7 | MYM exchange CME→CBOT (0 bars fetched) | Wire | FIXED |
 | I5.8 | History invariant dtype false positive (int64/float64) | Wire | FIXED |
+| I5.9 | update_ibkr_daily exit 0 khi instrument fail (Gateway down) | Wire | FIXED |
+| I5.10 | Pre-flight fail-safe chain: flag in-memory → Branch 3 loophole | Wire | FIXED (fail-closed) |
 | I1.3 | Splice anchor wrong: iloc[0] fetched ≠ first-new-bar splice | Data | FIXED (+808 repair) |
 | I6.1 | SYSTEM_MODEL + VISUALIZE docs | Docs | DONE |
 | I6.2 | CROSS_SYSTEM_FINDINGS docs | Docs | DONE |

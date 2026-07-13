@@ -159,7 +159,7 @@ Status: IN PROGRESS
 ### PENDING (Option C — user must run)
 - [x] **VERIFY PASS**: python -X utf8 global_index/verify_concat_desired.py --data-dir data\cache\futures\frozen_sim --regime-csv spy_daily_live.csv --n 30
       30/30 Scenario A + B both PASS. "concat(parquet+live) → desired_position() == backtest" CONFIRMED.
-- [ ] CRON: update Windows Task Scheduler — every 5 min 14:05-15:55 ET (replaces single 16:00 run)
+- [x] CRON: update Windows Task Scheduler — every 5 min 14:05-15:55 ET (replaces single 16:00 run)
       Morning exits still work (desired_position returns None → exits generated on any run)
 - [ ] LIVE verify: --print-signals after market opens → check entries fire at 14:05 not 16:00
 - [ ] STRESS_MID Phase C2: add 10:20 ET morning cron with stress_bars_1015 populated
@@ -400,14 +400,63 @@ Status: OFFLINE DONE — chỉ chờ market day
 
 #### Đường đi đầy đủ → [docs/futures/PAPER_ROUTE.md](docs/futures/PAPER_ROUTE.md)
 
-#### P0b — thứ Hai 2026-07-14, 14:05-15:55 ET
-```
+#### SESSION 2026-07-13 — Commits + Trạng thái
+
+**5 commits session này:**
+- `ba83e74` — splice anchor fix + MYM exchange CBOT + dtype guard + LESSONS/ISSUES_LOG/PAPER_ROUTE docs
+- `0f91fc9` — pre-flight scheduler (update_ibkr_daily → update_spy_csv → fail-safe flag)
+- `030de83` — Branch 3 parquet freshness fallback (ngay sau xóa)
+- `90a7000` — xóa Branch 3 (loophole parquet-only bỏ spy_csv) → fail-closed 2-branch
+- `8351fd6` — update_ibkr_daily `sys.exit(1)` khi instruments fail fetch
+
+**Uncommitted (không cần commit):**
+- `TASK.md` — living doc (cập nhật liên tục, không commit từng lần)
+- `global_index/dashboard.html` — UI update, không ảnh hưởng logic
+- `data/`, `global_index/data/` — parquet data (gitignored)
+- `monitor/` — monitoring scripts, scope riêng
+
+#### P0b — 2026-07-13 (thứ Hai — Calm, no entry)
+
+**⚠️ P0b-A DONE / P0b-B ⏳ — đừng coi hôm nay = P0b đầy đủ:**
+- **P0b-A (gate + logic)** ✅ DONE: gate (Calm→no entry) + offline logic (desired_basket=backtest 53124) verified
+- **P0b-B (live path 4-field)** ⏳ CHỜ: chưa có entry thật → chưa so `--print-signals` vs `desired_basket()`. P0c.
+
+**Bugs fixed (update_ibkr_daily.py, commit ba83e74):**
+- [x] MYM exchange CME→CBOT — root cause CBOT exchange, chỉ lộ khi fetch thật
+- [x] Dtype guard false positive — `equals()` dtype-strict, cast float64 fix
+- [x] Splice anchor: `new_bars.index > last_existing` thay vì `iloc[0]` (first-fetched = 18:00 Sunday)
+- [x] update_ibkr_daily exit(1) khi failed — pre-flight phát hiện đúng (commit 8351fd6)
+
+**VIỆC 1 — Parquet catch-up:** ✓ (initial run; splice bug found + fixed mid-session)
+**VIỆC 2 — Gate verify:** ✓ regime=Calm, 0 entries, 0 exits (live Gateway)
+**VIỆC 3 — Logic verify (offline):** ✓ MYM entry=53124 MATCH post-fix, gap=0.00, frozen 23/23
+
+**Splice offsets (sau repair):** MES=+11.5 / MNQ=+183.0 / MYM=−57.0 / M2K=+7.2 / MNKD=+1065.0  
+**Sidecar `global_index/data/_splice_cuts_confirmed.json`:** GIỮ (audit trail splice boundary, không xóa)
+
+**⚠️ MYM đặc biệt (P0c):** vừa fix exchange CBOT + splice offset (−57 vs +751). Kiểm scale MYM cẩn thận khi có entry.
+
+#### P0c — chờ ngày Normal/Stress (target: tuần này)
+```powershell
+# Mỗi sáng trước 13:45 ET:
+python C:\Users\quock\AppData\Local\Temp\claude\d--raits\50653392-7b8f-489d-83ae-66e0aa548b58\scratchpad\check_next_entry.py
+# Nếu có entry → 14:05 ET chạy:
 python -m global_index.run_live_day --data-dir data/cache/futures --nkd-parquet global_index/data/NKD_continuous_1m_8y.parquet --regime-csv spy_daily_live.csv --port 4002 --print-signals
 ```
-Verify: inst/direction/entry/stop KHỚP deploy_sim cùng ngày cùng regime. P&L lệch = slippage (2 tick spread + MAX_HOLD drift ±$24 OK).
+So sánh inst/direction/entry/stop vs `desired_basket()` offline cùng cutoff. Lệch > 1 tick → DỪNG.
+
+**Pre-flight scheduler — DONE + fail-closed (commits 0f91fc9 + 90a7000 + 8351fd6):**
+- Logic: `flag=True` (cả ibkr_daily + spy_csv xong) → run. `flag=False/None` → skip
+- `update_ibkr_daily` exit 1 nếu bất kỳ instrument nào fail (Gateway down, 0 bars)
+- Không có loophole: không guess từ parquet-only, không chạy khi không chắc
+
+**⚠️ Scheduler — giới hạn máy cá nhân:**
+- CHỈ chạy khi process sống. Sleep/reboot → không tự phục hồi
+- Cần sống lúc 09:31 ET (maxhold) và 13:45 ET (pre-flight)
+- **Routine sáng:** (1) Check scheduler còn sống → nếu không: `pythonw -m global_index.run_scheduler --port 4002` TRƯỚC 13:45 ET; (2) `check_next_entry.py`
 
 #### Thứ tự sau P0b
-P0b sạch → P1 (dry-run scheduler 1-2 ngày) → P2 (order thật, theo dõi đêm đầu STP-VERIFY/find_execution) → C1 đo slippage vs 2-tick baseline → sau nhiều tháng ổn: VPS/ops → live 1 micro.
+P0c (live path 4-field, chờ Normal/Stress) → P1 (dry-run scheduler 1-2 ngày liên tục) → P2 (order thật, theo dõi đêm đầu) → C1 slippage vs 2-tick → nhiều tháng → VPS/ops → live 1 micro.
 
 ### Next steps (IBKR ACCOUNT APPROVED → PAPER)
 

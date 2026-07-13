@@ -20,7 +20,7 @@ Hỏng → DỪNG, điều tra, sửa, chạy lại. Không vội tuần tự.
 
 ---
 
-## Trạng thái hiện tại (2026-07-13, P0b done)
+## Trạng thái hiện tại (2026-07-13, P0b gate/logic done — live path ⏳)
 
 | Hạng mục | Trạng thái |
 |----------|-----------|
@@ -33,31 +33,28 @@ Hỏng → DỪNG, điều tra, sửa, chạy lại. Không vội tuần tự.
 | B2 cron | PASS — ET-native 14:05/09:31, APScheduler 3.11.3, DST đúng |
 | Account | CLEAN — broker []+file []+production key đúng+P0a không WARN |
 | INVARIANTS | baseline 1.66/$40,919 \| floor 1.57 \| vault 2.77/3.39 \| STP residual -$573 |
-| P0b (Calm day) | DONE 2026-07-13 — gate ✅ (Calm→no entry) logic ✅ (desired=backtest 53124) data ✅ (splice fix) |
 | Splice fix | DONE 2026-07-13 — 3 bugs (anchor/dtype/MYM exchange), gap=0.00 all 5, frozen 23/23 |
-| Pre-flight scheduler | DONE 2026-07-13 — update_ibkr_daily→spy_csv→run_live_day, blocking, fail-safe |
+| Pre-flight scheduler | DONE 2026-07-13 — update_ibkr_daily→spy_csv→run_live_day, fail-closed 2-branch |
+| **P0b gate+logic** | **DONE 2026-07-13** — gate ✅ (Calm→no entry) logic ✅ (desired=backtest 53124) |
+| **P0b live path** | **⏳ CHỜ Normal/Stress** — chưa verify --print-signals có entry thật |
 
-**P0b live path (4-field verify với entry thật) CHỜ ngày Normal/Stress.**
+⚠️ **Phân biệt quan trọng:** P0b gate/logic (offline + Calm day) đã xong. P0b live path (run_live_day == desired_basket VỚI entry thật) **chưa chạy** — Calm → no entry → không thể verify. Đây là việc của P0c, chờ regime đổi.
+
+⚠️ **MYM đặc biệt:** vừa fix exchange CBOT + splice offset (−57 vs +751 cũ). Khi P0c có MYM entry, kiểm tra scale đặc biệt cẩn thận.
 
 ---
 
-## P0b — SIGNAL PATH ✓ DONE (Calm day 2026-07-13)
+## P0b — SIGNAL PATH (Calm day 2026-07-13)
 
-**Kết quả:**
-- Gate verify: regime=Calm → 0 entries, 0 exits ✓
-- Logic verify (offline): desired_basket() = backtest_swing_tf() → MYM SHORT entry=53124 MATCH ✓
-- Data: splice fix confirmed (gap=0.00 all 5, frozen 23/23, entry 53932→53124 = −808 exact) ✓
-- Live path 4-field verify (inst/direction/entry/stop với entry thật): **CHỜ ngày Normal/Stress** ⏳
+### P0b-A: Gate + Logic ✅ DONE
 
-**Lệnh khi có entry (Normal/Stress day):**
-```
-python -m global_index.run_live_day \
-  --data-dir data/cache/futures \
-  --nkd-parquet global_index/data/NKD_continuous_1m_8y.parquet \
-  --regime-csv spy_daily_live.csv \
-  --port 4002 --print-signals
-```
-So sánh inst/direction/entry/stop vs `desired_basket()` offline cùng ngày.
+- Gate: regime=Calm → 0 entries, 0 exits ✓ (live path, Gateway thật)
+- Logic: `desired_basket()` = `backtest_swing_tf()` offline → MYM SHORT entry=53124 MATCH ✓
+- Data: splice fix (gap=0.00 all 5, frozen 23/23, entry 53932→53124 = −808 exact) ✓
+
+### P0b-B: Live Path 4-field ⏳ CHỜ Normal/Stress
+
+Calm regime → no entry → không thể so `--print-signals` vs `desired_basket()`. = P0c.
 
 ---
 
@@ -77,21 +74,52 @@ Nếu có entry → chạy `--print-signals` lúc 14:05 ET và so sánh.
 
 ---
 
+## SCHEDULER — VẬN HÀNH (quan trọng, đọc trước khi chạy)
+
+```powershell
+cd d:\raits
+pythonw -m global_index.run_scheduler --port 4002   # background, không block terminal
+# Hoặc block (để xem log):
+python -m global_index.run_scheduler --port 4002
+```
+
+**3 jobs (tự động, mon-fri ET):**
+- `09:31 ET` — MAX_HOLD exit (đóng vị thế qua đêm quá ngưỡng)
+- `13:45 ET` — Pre-flight: `update_ibkr_daily` → `update_spy_csv` (blocking, 2 bước)
+- `14:05 ET` — `run_live_day` (chỉ nếu pre-flight OK → flag=True)
+
+**Fail-safe (fail-closed):**
+- Pre-flight fail bất kỳ bước nào → flag=False → live_day skip ngày đó
+- Scheduler restart → flag=None → live_day skip (không đoán data fresh)
+- `update_ibkr_daily` exit 1 nếu bất kỳ instrument nào không fetch được bars
+- Kết quả: không bao giờ trade trên data không chắc chắn fresh
+
+**⚠️ Giới hạn máy cá nhân:**
+- Scheduler CHỈ chạy khi process sống. Sleep/reboot/crash → không tự phục hồi (chưa có systemd).
+- Cần máy sống lúc job fire (09:31 ET và 13:45 ET). Không cần sống cả đêm (STP giữ tầng sàn).
+- Restart scheduler sau reboot: `pythonw -m global_index.run_scheduler --port 4002` TRƯỚC 13:45 ET.
+
+**Routine sáng (mỗi ngày trading):**
+1. Check scheduler còn sống (nếu reboot qua đêm → khởi động lại trước 13:45)
+2. `python <check_next_entry.py>` → xem regime hôm nay + có P0c không
+
+**Polygon API key:** Truyền qua `--polygon-api-key KEY` hoặc env var `POLYGON_API_KEY`. Nếu thiếu → update_spy_csv fail → live_day skip.
+
+---
+
 ## P1 — TIMING TỰ ĐỘNG (1-2 ngày sau P0c)
 
-**Mục đích:** Cron fire đúng 14:05 ET tự động không chạy tay.
+**Mục đích:** Xác nhận cron fire đúng 14:05 ET tự động không chạy tay.
 
 **Lệnh:**
 ```
 cd d:\raits
-python -m global_index.run_scheduler --port 4002 --dry-run
-# Để background (không block):
 pythonw -m global_index.run_scheduler --port 4002 --dry-run
 ```
 
 **CỬA:**
-- Cron fire đúng 14:05 ET (log hiện `[LIVE_DAY] dry-run`) 1-2 ngày liên tục
-- `next_run_time` = 14:05 ET (không phải 14:05 giờ máy)
+- Pre-flight log `[PRE-FLIGHT] OK` lúc 13:45 ET ≥ 2 ngày liên tục
+- Live_day log `[LIVE_DAY] dry-run` lúc 14:05 ET đúng giờ
 - `job_maxhold` fire 09:31 ET đúng (nếu có MAX_HOLD position qua đêm)
 
 **Rủi ro:** Scheduler sai giờ → fire sai bar → entry tại giá sai.
