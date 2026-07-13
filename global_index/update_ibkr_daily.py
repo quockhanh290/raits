@@ -320,6 +320,8 @@ def main() -> None:
     print(f"\n{'='*72}")
     if failed:
         print(f"COMPLETED WITH ERRORS: {failed}")
+        print("=" * 72)
+        sys.exit(1)   # pre-flight detects failure via returncode != 0
     else:
         print(f"ALL {len(jobs)} INSTRUMENTS UPDATED")
         print("\nNext: python -m global_index.run_live_day ...")
