@@ -4,12 +4,22 @@ global_index/run_scheduler.py — TZ-independent APScheduler cron
 Thay thế Windows Task Scheduler thủ công. Chạy 24/7 (process hoặc Windows
 Service), tự convert ET↔machine-TZ và tự handle US DST.
 
-Hai jobs:
-  09:31 ET Mon-Fri → run_maxhold_exit  (MAX_HOLD close at RTH open)
-  14:05 ET Mon-Fri → run_live_day      (daily signal + entry/exit)
+Ba jobs (thứ tự mỗi ngày Mon-Fri):
+  09:31 ET → run_maxhold_exit    (MAX_HOLD close at RTH open)
+  13:45 ET → PRE-FLIGHT          (update_ibkr_daily → update_spy_csv, blocking)
+  14:05 ET → run_live_day        (daily signal + entry/exit, CHỈ nếu pre-flight OK)
+
+Pre-flight fail-safe:
+  Nếu update_ibkr_daily hoặc update_spy_csv thất bại (Gateway rớt, guard abort,
+  API key thiếu), run_live_day bị SKIP ngày đó — không trade trên data stale.
+  Flag _preflight_ok[date] chỉ set True khi cả hai bước thành công.
 
 Machine TZ-independent: VN (UTC+7), MST (UTC-7), ET, cloud — đều đúng.
 APScheduler timezone="America/New_York" là ET-native, DST tự động.
+
+Polygon API key cho update_spy_csv:
+  Truyền qua --polygon-api-key hoặc env var POLYGON_API_KEY.
+  Nếu thiếu → update_spy_csv fail (returncode 1) → pre-flight fail → live_day skip.
 
 Usage:
     cd d:\\raits
@@ -23,6 +33,7 @@ Requirements:
 from __future__ import annotations
 import argparse
 import logging
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -39,23 +50,31 @@ logging.basicConfig(
 )
 log = logging.getLogger("run_scheduler")
 
+# Pre-flight state: keyed by date string (e.g. "2026-07-14").
+# Set True only when BOTH update_ibkr_daily AND update_spy_csv succeed.
+# job_live_day checks this before running — fail-safe by default (missing = skip).
+_preflight_ok: dict = {}
 
-def _run(args: list[str], label: str, dry_run: bool) -> None:
+
+def _run(args: list[str], label: str, dry_run: bool) -> bool:
+    """Run subprocess, return True on success (returncode==0)."""
     log.info("[%s] %s", label, " ".join(args))
     if dry_run:
-        log.info("[%s] dry-run — command NOT executed", label)
-        return
+        log.info("[%s] dry-run — command NOT executed (treating as success)", label)
+        return True
     result = subprocess.run(args, cwd=str(_CWD))
-    if result.returncode != 0:
-        log.error("[%s] exited with code %d", label, result.returncode)
-    else:
+    if result.returncode == 0:
         log.info("[%s] completed OK", label)
+        return True
+    log.error("[%s] exited with code %d", label, result.returncode)
+    return False
 
 
 def make_scheduler(port: int, dry_run: bool,
                    data_dir: str = "data/cache/futures",
                    nkd_parquet: str = "global_index/data/NKD_continuous_1m_8y.parquet",
-                   regime_csv: str = "spy_daily_live.csv"):
+                   regime_csv: str = "spy_daily_live.csv",
+                   polygon_api_key: str = ""):
     try:
         from apscheduler.schedulers.blocking import BlockingScheduler
     except ImportError:
@@ -72,10 +91,58 @@ def make_scheduler(port: int, dry_run: bool,
               "--port", str(port)],
              label="MAX_HOLD_EXIT", dry_run=dry_run)
 
-    # ── 14:05 ET Mon-Fri: daily signal run ───────────────────────────────────
+    # ── 13:45 ET Mon-Fri: pre-flight (update parquet + spy CSV) ─────────────
+    # Runs BEFORE 14:05 run_live_day. Typical duration: ~20s for 5 instruments.
+    # 20-min margin is sufficient. Fail-safe: any failure → live_day skipped today.
+    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=13, minute=45,
+                         id="preflight", name="Pre-flight update 13:45 ET")
+    def job_preflight():
+        from datetime import date as _date
+        today = _date.today().isoformat()
+        log.info("[PRE-FLIGHT] Starting: update_ibkr_daily → update_spy_csv (%s)", today)
+
+        ibkr_ok = _run(
+            [sys.executable, "-m", "global_index.update_ibkr_daily", "--port", str(port)],
+            label="IBKR_UPDATE", dry_run=dry_run,
+        )
+        if not ibkr_ok:
+            _preflight_ok[today] = False
+            log.error(
+                "[PRE-FLIGHT] update_ibkr_daily FAILED — "
+                "run_live_day WILL BE SKIPPED today (%s). Fix Gateway and re-run manually if needed.",
+                today,
+            )
+            return
+
+        spy_cmd = [sys.executable, "-m", "global_index.update_spy_csv", "--csv", regime_csv]
+        if polygon_api_key:
+            spy_cmd += ["--api-key", polygon_api_key]
+        spy_ok = _run(spy_cmd, label="SPY_UPDATE", dry_run=dry_run)
+        if not spy_ok:
+            _preflight_ok[today] = False
+            log.error(
+                "[PRE-FLIGHT] update_spy_csv FAILED — "
+                "run_live_day WILL BE SKIPPED today (%s). Check POLYGON_API_KEY.",
+                today,
+            )
+            return
+
+        _preflight_ok[today] = True
+        log.info("[PRE-FLIGHT] OK — parquet + spy CSV fresh. run_live_day cleared for 14:05.")
+
+    # ── 14:05 ET Mon-Fri: daily signal run (only if pre-flight OK) ───────────
     @sched.scheduled_job("cron", day_of_week="mon-fri", hour=14, minute=5,
                          id="live_day", name="Daily run 14:05 ET")
     def job_live_day():
+        from datetime import date as _date
+        today = _date.today().isoformat()
+        if not _preflight_ok.get(today):
+            log.error(
+                "[LIVE_DAY] SKIPPED — pre-flight did not succeed for %s. "
+                "Not trading on stale data. Run update_ibkr_daily manually to recover.",
+                today,
+            )
+            return
         _run([sys.executable, "-m", "global_index.run_live_day",
               "--data-dir",     data_dir,
               "--nkd-parquet",  nkd_parquet,
@@ -88,30 +155,36 @@ def make_scheduler(port: int, dry_run: bool,
 
 def main():
     ap = argparse.ArgumentParser(description="TZ-independent APScheduler cron for RAITS")
-    ap.add_argument("--port",        type=int, default=4002,
+    ap.add_argument("--port",             type=int, default=4002,
                     help="IB Gateway port (default: 4002 paper)")
-    ap.add_argument("--dry-run",     action="store_true",
-                    help="Log jobs but do not execute commands")
-    ap.add_argument("--data-dir",    default="data/cache/futures",
+    ap.add_argument("--dry-run",          action="store_true",
+                    help="Log jobs but do not execute commands (pre-flight treated as success)")
+    ap.add_argument("--data-dir",         default="data/cache/futures",
                     help="Parquet data directory (default: data/cache/futures)")
-    ap.add_argument("--nkd-parquet", default="global_index/data/NKD_continuous_1m_8y.parquet",
+    ap.add_argument("--nkd-parquet",      default="global_index/data/NKD_continuous_1m_8y.parquet",
                     help="NKD parquet path")
-    ap.add_argument("--regime-csv",  default="spy_daily_live.csv",
+    ap.add_argument("--regime-csv",       default="spy_daily_live.csv",
                     help="SPY regime CSV (default: spy_daily_live.csv)")
+    ap.add_argument("--polygon-api-key",  default=os.environ.get("POLYGON_API_KEY", ""),
+                    help="Polygon.io API key for update_spy_csv "
+                         "(fallback: POLYGON_API_KEY env var)")
     a = ap.parse_args()
 
-    sched = make_scheduler(port=a.port, dry_run=a.dry_run,
-                           data_dir=a.data_dir, nkd_parquet=a.nkd_parquet,
-                           regime_csv=a.regime_csv)
+    sched = make_scheduler(
+        port=a.port, dry_run=a.dry_run,
+        data_dir=a.data_dir, nkd_parquet=a.nkd_parquet,
+        regime_csv=a.regime_csv, polygon_api_key=a.polygon_api_key,
+    )
 
     jobs = sched.get_jobs()
     log.info("Scheduler TZ: America/New_York (ET-native, DST auto)")
-    log.info("Machine TZ: %s", __import__("time").tzname)
+    log.info("Machine TZ:  %s", __import__("time").tzname)
     log.info("Port: %d  dry-run: %s", a.port, a.dry_run)
+    log.info("Jobs (%d):", len(jobs))
     for j in jobs:
         _next = getattr(j, "next_run_time", "(start scheduler to compute)")
-        log.info("  job %-20s  next: %s", j.id, _next)
-
+        log.info("  %-20s  next: %s", j.id, _next)
+    log.info("Pre-flight fail-safe: update fail → live_day skipped (no stale-data trades)")
     log.info("Scheduler started. Ctrl-C to stop.")
     try:
         sched.start()
