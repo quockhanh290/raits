@@ -157,8 +157,8 @@ Status: IN PROGRESS
 - [x] Verify script written: global_index/verify_concat_desired.py (checklist a, PENDING run)
 
 ### PENDING (Option C — user must run)
-- [ ] VERIFY: python global_index/verify_concat_desired.py --data-dir data\cache\futures\frozen_sim
-      Must see: "RESULT: PASS" (Scenario A + B both pass) before trusting live signals
+- [x] **VERIFY PASS**: python -X utf8 global_index/verify_concat_desired.py --data-dir data\cache\futures\frozen_sim --regime-csv spy_daily_live.csv --n 30
+      30/30 Scenario A + B both PASS. "concat(parquet+live) → desired_position() == backtest" CONFIRMED.
 - [ ] CRON: update Windows Task Scheduler — every 5 min 14:05-15:55 ET (replaces single 16:00 run)
       Morning exits still work (desired_position returns None → exits generated on any run)
 - [ ] LIVE verify: --print-signals after market opens → check entries fire at 14:05 not 16:00
@@ -362,6 +362,51 @@ Status: IN PROGRESS
       KHÔNG cần reset thủ công; halt tự nhả ở cron N+1 sau khi operator sửa live_positions.json.
 - [x] docs/futures/OPERATIONS.md: runbook mới — B3 (4 bước), D5 STOP_FILE, E1 PID lock, circuit breaker, log monitoring table.
 
+### Completed (Live-path bug fixes — sessions 2026-07-11/12)
+- [x] `_persist_state` typo fixed (run_maxhold_exit called `_persist_positions` → AttributeError on first MAX_HOLD exit). Commit: 4cec39e
+- [x] Fix 1: `get_order_status` + `ib.openTrades()` — GTC STP survive TWS 17:00 restart. Commit: 42e1fc6
+- [x] Fix 3: `get_equity` retry 4×(2–5s) = ~14s — equity=0 on connect = subscription settling, not error. Commit: 42e1fc6
+- [x] Fix 4: `place_stop` orderId retry 10×0.3s — ib_insync async assign. Commit: 42e1fc6
+- [x] Fix 2 (STP-VERIFY): `runner.py` B3 STP-INFER → VERIFY. NOT_FOUND+qty==0 → `find_execution()` (reqExecutions server-side, 2-day lookback); True=clean state, False=HALT. Commit: 9db2f93
+- [x] `get_positions()` retry-until-stable (4 reads × 2s, max 8s) — sleep cố định không verify settle. Commit: 9db2f93
+- [x] B3 EMPTY-WARN: file-có-position + IBKR-empty → WARNING banner; mismatch loop HALT trừ STP-VERIFY confirmed. Commit: 9db2f93
+- [x] C1 fill quality logging + running mean: signed slippage OPEN + CLOSE (LONG/SHORT direction-aware). runner.py:865-883, 989-1005. ADVERSE/favorable labeled, %+.4f preserves sign. Running mean persisted cross-session in slip_stats.json (atomic write via .tmp→os.replace).
+- [x] _strip_tz fix: `_concat_live` + `_concat_nkd_live` — frozen parquet (tz-aware US/Eastern from load_parquet) concat with live bars (tz-naive ET from fetch_bars) caused TypeError in sort_index(). Fix: _strip_tz() helper strips tz before concat; MAX_HOLD searchsorted in _validated_core.py:257-266 verified safe for naive ET.
+- [x] **B1 PASS**: `verify_concat_desired.py` 30/30 PASS — Scenario A (full-day concat) + Scenario B (partial-to-fire). "Live == backtest by construction" VERIFIED. Runtime ~10-15 min (label_regimes expanding-window HMM + _swing_cache 8y 1-min data × 4 instruments — not a hang, normal runtime).
+- [x] **B2 PASS**: run_scheduler.py ET-native confirmed. Missing required args bug fixed (make_scheduler now accepts data_dir/nkd_parquet/regime_csv with defaults, wired via CLI). APScheduler 4.x next_run_time AttributeError fixed (getattr fallback).
+- [x] **P0a PASS**: Plumbing verified on Gateway 4002 — equity/TZ/positions/fetch/HMM all OK.
+
+### Key decision — B4 NKD (paper scope)
+**Option B: swing-only first, NKD sau cert.**
+- Paper phase bắt đầu với **MES/MNQ/MYM/M2K** (swing + stress). NKD thêm sau khi CME bundle + Rule 576 cert xong.
+- **Hệ quả benchmark**: paper swing-only ≠ full backtest ($53,021 baseline). NKD chiếm ~645/(645+2706-645)≈25% tổng positions trong IS. So sánh paper P&L vs **swing-only IS subset** (chạy deploy_sim --exclude-nkd hoặc extract từ trade log là MES/MNQ/MYM/M2K + STRESS_MID).
+- Paper metrics cần so vs swing-only baseline (không so 53k full system).
+- Sau cert: add NKD, benchmark lại vs full $53,021.
+
+### SESSION WRAP-UP (2026-07-11/12) — Chờ P0b thứ Hai
+Status: OFFLINE DONE — chỉ chờ market day
+
+#### Đã xong session này
+- [x] C1 fill monitoring: signed slippage OPEN+CLOSE (adverse/favorable) + running mean persist cross-session (slip_stats.json). Committed.
+- [x] _strip_tz: fix TZ mismatch concat frozen(tz-aware US/Eastern) vs live(tz-naive ET) → TypeError. MAX_HOLD searchsorted có nhánh naive, oracle 26/26 sau fix. Committed.
+- [x] B1 verify_concat: 30/30 (3 runs độc lập) SAU _strip_tz fix — valid trên code hiện tại.
+- [x] B2 cron: dry-run verify 14:05/09:31 ET — 3 cột ET/UTC/MDT cùng thời điểm, DST đúng, mon-fri. APScheduler 3.11.3.
+- [x] P0a plumbing PASS: connect/equity>0/positions retry-stable/fetch 2760+2740 bar/HMM decode thật.
+- [x] B5 account clean: broker empty + file positions:[] + production đọc đúng key + P0a không WARN — 4 nguồn đồng ý. Script verify bug (open_positions→bool(dict)) fixed, production đúng.
+- [x] B2 TZ verify: CronTrigger.get_next_fire_time() — live_day=14:05 EDT/18:05 UTC/12:05 MDT, maxhold=09:31 EDT — cả 2 OK.
+
+#### Trạng thái offline
+ĐÓNG. Không còn bug đào offline. Bug tiếp lộ TRONG P0b/P2 khi chạy thật.
+
+#### P0b — thứ Hai 2026-07-14, 14:05-15:55 ET
+```
+python -m global_index.run_live_day --data-dir data/cache/futures --nkd-parquet global_index/data/NKD_continuous_1m_8y.parquet --regime-csv spy_daily_live.csv --port 4002 --print-signals
+```
+Verify: inst/direction/entry/stop KHỚP deploy_sim cùng ngày cùng regime. P&L lệch = slippage (2 tick spread + MAX_HOLD drift ±$24 OK).
+
+#### Thứ tự sau P0b
+P0b sạch → P1 (dry-run scheduler 1-2 ngày) → P2 (order thật, theo dõi đêm đầu STP-VERIFY/find_execution) → C1 đo slippage vs 2-tick baseline → sau nhiều tháng ổn: VPS/ops → live 1 micro.
+
 ### Next steps (IBKR ACCOUNT APPROVED → PAPER)
 
 **Thứ tự implement:**
@@ -402,7 +447,7 @@ Status: IN PROGRESS
       Fit_A floor trên frozen: $51,459 / Calmar=2.69 (thay thế stale 2.38). floor/baseline=87.6% ✓
 - [x] [D3] INVARIANTS.md updated: baseline=$53,021/Calmar=3.07, floor=2.69, vault floors re-checked (3.33/2.99 > 2.69 ✓)
       ISSUES_LOG I5.5 → RESOLVED. SCRATCHPAD updated. frozen/live split documented.
-- [ ] Confirm NKD trong CME bundle + Rule 576 cert
+- [ ] **B4 [DECISION: Option B]** Confirm NKD CME bundle + Rule 576 cert → add NKD sau cert. Paper phase 1 = swing-only (MES/MNQ/MYM/M2K + STRESS_MID). So sánh paper P&L vs swing-only IS subset, KHÔNG full $53,021.
 - [ ] runner.dump_state(): điền Group B (slippage, fill quality, paper-vs-backtest, health)
 - [ ] update_spy_csv timing: run trước runner, không intra-session (I5.4)
 
