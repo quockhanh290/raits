@@ -1,5 +1,25 @@
 # Futures — STATUS
-_Cập nhật: 2026-07-08. Source of truth cho trạng thái futures subsystem._
+_Cập nhật: 2026-07-12. Source of truth cho trạng thái futures subsystem._
+
+**Đường đi paper → live: [PAPER_ROUTE.md](PAPER_ROUTE.md)**
+Bước tiếp theo: **P0b** (thứ Hai 14:05 ET) — xem PAPER_ROUTE.md § P0b.
+
+---
+
+## SESSION WRAP-UP — 2026-07-12 (offline xong, chờ P0b)
+
+| Hạng mục | Trạng thái |
+|----------|-----------|
+| P0a plumbing | PASS (code cuối — after all session commits) |
+| B1 verify_concat | PASS 30/30 (3 runs) |
+| B2 cron ET-native | PASS (APScheduler 3.11.3, 14:05/09:31 ET verified) |
+| Account clean | PASS (broker []+file []+4 nguồu đồng ý) |
+| C1 fill monitoring | DONE (signed slippage + running mean persist slip_stats.json) |
+| _strip_tz fix | DONE (concat frozen/live TZ mismatch) |
+| INVARIANTS | baseline 1.66/$40,919 \| floor 1.57 \| vault 2.77/3.39 \| STP -$573 |
+| Git state | CLEAN (f0d9097) |
+
+**Tất cả offline đóng.** Bug tiếp lộ trong P0b/P2 khi chạy thật.
 
 ---
 

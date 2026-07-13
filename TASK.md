@@ -398,6 +398,8 @@ Status: OFFLINE DONE — chỉ chờ market day
 #### Trạng thái offline
 ĐÓNG. Không còn bug đào offline. Bug tiếp lộ TRONG P0b/P2 khi chạy thật.
 
+#### Đường đi đầy đủ → [docs/futures/PAPER_ROUTE.md](docs/futures/PAPER_ROUTE.md)
+
 #### P0b — thứ Hai 2026-07-14, 14:05-15:55 ET
 ```
 python -m global_index.run_live_day --data-dir data/cache/futures --nkd-parquet global_index/data/NKD_continuous_1m_8y.parquet --regime-csv spy_daily_live.csv --port 4002 --print-signals
