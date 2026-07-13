@@ -52,8 +52,33 @@ log = logging.getLogger("run_scheduler")
 
 # Pre-flight state: keyed by date string (e.g. "2026-07-14").
 # Set True only when BOTH update_ibkr_daily AND update_spy_csv succeed.
-# job_live_day checks this before running — fail-safe by default (missing = skip).
+# WARNING: in-memory only — lost on scheduler restart. job_live_day uses 3-branch
+# logic: flag=True → proceed; flag=False → skip (definitive); flag missing →
+# fall back to parquet freshness check (source of truth, survives restart).
 _preflight_ok: dict = {}
+
+
+def _parquet_is_fresh(data_dir: str) -> tuple[bool, str]:
+    """
+    Check whether the MES parquet has bars from today (ET date).
+    Returns (is_fresh, reason_msg).
+
+    Use as fallback when _preflight_ok flag is absent (scheduler restarted
+    between 13:45 and 14:05). Parquet persists across restarts; flag does not.
+    """
+    import pandas as pd
+    from datetime import date as _date
+    today_et = _date.today()
+    p = _CWD / data_dir / "ES_continuous_1m_8y.parquet"
+    if not p.exists():
+        return False, f"MES parquet not found: {p}"
+    df = pd.read_parquet(p, columns=["close"])
+    if df.index.tz is not None:
+        df.index = df.index.tz_localize(None)
+    last_bar = df.index[-1]
+    if last_bar.date() < today_et:
+        return False, f"MES last bar {last_bar} is from {last_bar.date()}, not today {today_et} — data stale"
+    return True, f"MES last bar {last_bar} ✓"
 
 
 def _run(args: list[str], label: str, dry_run: bool) -> bool:
@@ -136,13 +161,41 @@ def make_scheduler(port: int, dry_run: bool,
     def job_live_day():
         from datetime import date as _date
         today = _date.today().isoformat()
-        if not _preflight_ok.get(today):
+        flag = _preflight_ok.get(today)   # True / False / None (missing)
+
+        if flag is True:
+            # Normal path: pre-flight ran and succeeded in this process.
+            pass
+
+        elif flag is False:
+            # Pre-flight ran and explicitly failed (Gateway down, guard abort, etc.).
+            # Definitive failure — do not trade on stale data.
             log.error(
-                "[LIVE_DAY] SKIPPED — pre-flight did not succeed for %s. "
-                "Not trading on stale data. Run update_ibkr_daily manually to recover.",
+                "[LIVE_DAY] SKIPPED — pre-flight ran but FAILED for %s. "
+                "Fix Gateway / API key and run update_ibkr_daily manually to recover.",
                 today,
             )
             return
+
+        else:
+            # flag is None: pre-flight job never ran in this process (scheduler
+            # restarted between 13:45 and 14:05, or started after 13:45).
+            # Fall back to parquet freshness — the source of truth that survives restart.
+            fresh, reason = _parquet_is_fresh(data_dir)
+            if fresh:
+                log.warning(
+                    "[LIVE_DAY] pre-flight flag missing for %s (scheduler restart?). "
+                    "Parquet freshness check: %s — proceeding.",
+                    today, reason,
+                )
+            else:
+                log.error(
+                    "[LIVE_DAY] SKIPPED — pre-flight flag missing AND parquet stale for %s. "
+                    "Reason: %s. Run update_ibkr_daily manually to recover.",
+                    today, reason,
+                )
+                return
+
         _run([sys.executable, "-m", "global_index.run_live_day",
               "--data-dir",     data_dir,
               "--nkd-parquet",  nkd_parquet,
