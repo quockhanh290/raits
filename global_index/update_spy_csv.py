@@ -107,6 +107,8 @@ def verify_regime_labels(snap_path: Path, new_csv: Path,
 
     import pandas as _pd
     cutoff = _pd.Timestamp(check_end)
+    old_labels = _pd.Series(old_labels)
+    new_labels = _pd.Series(new_labels)
     common = old_labels.index.intersection(new_labels.index)
     common = common[common <= cutoff]
 

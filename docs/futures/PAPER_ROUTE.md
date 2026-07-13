@@ -20,7 +20,7 @@ Hỏng → DỪNG, điều tra, sửa, chạy lại. Không vội tuần tự.
 
 ---
 
-## Trạng thái hiện tại (2026-07-12, offline xong)
+## Trạng thái hiện tại (2026-07-13, P0b done)
 
 | Hạng mục | Trạng thái |
 |----------|-----------|
@@ -33,49 +33,51 @@ Hỏng → DỪNG, điều tra, sửa, chạy lại. Không vội tuần tự.
 | B2 cron | PASS — ET-native 14:05/09:31, APScheduler 3.11.3, DST đúng |
 | Account | CLEAN — broker []+file []+production key đúng+P0a không WARN |
 | INVARIANTS | baseline 1.66/$40,919 \| floor 1.57 \| vault 2.77/3.39 \| STP residual -$573 |
+| P0b (Calm day) | DONE 2026-07-13 — gate ✅ (Calm→no entry) logic ✅ (desired=backtest 53124) data ✅ (splice fix) |
+| Splice fix | DONE 2026-07-13 — 3 bugs (anchor/dtype/MYM exchange), gap=0.00 all 5, frozen 23/23 |
+| Pre-flight scheduler | DONE 2026-07-13 — update_ibkr_daily→spy_csv→run_live_day, blocking, fail-safe |
 
-**Tất cả offline đóng. Bug tiếp lộ TRONG P0b/P2 khi chạy thật.**
+**P0b live path (4-field verify với entry thật) CHỜ ngày Normal/Stress.**
 
 ---
 
-## P0b — SIGNAL PATH ⬅ BƯỚC TIẾP THEO (thứ Hai 2026-07-13+)
+## P0b — SIGNAL PATH ✓ DONE (Calm day 2026-07-13)
 
-**Mục đích:** Verify signal fire đúng trong window 14:05-15:55 ET — không chỉ "có chạy".
+**Kết quả:**
+- Gate verify: regime=Calm → 0 entries, 0 exits ✓
+- Logic verify (offline): desired_basket() = backtest_swing_tf() → MYM SHORT entry=53124 MATCH ✓
+- Data: splice fix confirmed (gap=0.00 all 5, frozen 23/23, entry 53932→53124 = −808 exact) ✓
+- Live path 4-field verify (inst/direction/entry/stop với entry thật): **CHỜ ngày Normal/Stress** ⏳
 
-**Lệnh:**
+**Lệnh khi có entry (Normal/Stress day):**
 ```
-cd d:\raits
 python -m global_index.run_live_day \
   --data-dir data/cache/futures \
   --nkd-parquet global_index/data/NKD_continuous_1m_8y.parquet \
   --regime-csv spy_daily_live.csv \
-  --port 4002 \
-  --print-signals
+  --port 4002 --print-signals
 ```
-
-**Chuẩn bị trước khi chạy:**
-```
-# deploy_sim cùng ngày cùng CSV để so sánh:
-python global_index/deploy_sim.py --regime-csv spy_daily_live.csv --end <ngày hôm nay>
-# Ghi lại: regime hôm nay là gì, inst/direction/entry/stop nào backtest expect
-```
-
-**CỬA:** So deploy_sim CÙNG ngày CÙNG `spy_daily_live.csv`:
-- `inst/direction/entry/stop` KHỚP → PASS
-- Lệch (inst sai, stop khác) → signal bug → DỪNG điều tra
-- "Có signal" ≠ "signal đúng" — must compare field-by-field
-
-**Chấp nhận sai lệch:**
-- P&L lệch = slippage (2-tick spread + MAX_HOLD drift ±$24 OK)
-- entries=0 ngày cold-start OK nếu backtest cũng không có entry hôm đó
-
-**Rủi ro:**
-- Regime CSV khác giữa hai lần chạy → lệch giả (dùng cùng file)
-- "entries > 0" không đủ: phải verify từng field
+So sánh inst/direction/entry/stop vs `desired_basket()` offline cùng ngày.
 
 ---
 
-## P1 — TIMING TỰ ĐỘNG (1-2 ngày sau P0b)
+## P0c — LIVE PATH 4-FIELD VERIFY ⬅ BƯỚC TIẾP THEO (ngày Normal/Stress đầu tiên)
+
+**Mục đích:** Verify live path `run_live_day → generate_today_signals → entries` ra đúng entry thật so với `desired_basket()` offline. P0b đã verify logic offline; P0c verify cùng logic trên data live.
+
+**Check hàng sáng** (trước khi biết có entry không):
+```powershell
+python C:\Users\quock\AppData\Local\Temp\claude\d--raits\50653392-7b8f-489d-83ae-66e0aa548b58\scratchpad\check_next_entry.py
+```
+Nếu có entry → chạy `--print-signals` lúc 14:05 ET và so sánh.
+
+**CỬA:** `--print-signals` output KHỚP `desired_basket()` offline cùng cutoff:
+- inst, direction, entry, stop → 4 trường MATCH
+- Lệch entry > 1 tick → data scale sai hoặc signal bug → DỪNG
+
+---
+
+## P1 — TIMING TỰ ĐỘNG (1-2 ngày sau P0c)
 
 **Mục đích:** Cron fire đúng 14:05 ET tự động không chạy tay.
 

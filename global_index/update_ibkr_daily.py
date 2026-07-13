@@ -60,12 +60,13 @@ log = logging.getLogger("update_ibkr_daily")
 # ── Instruments: (runner_name, ibkr_symbol, parquet_path) ────────────────────
 def _build_jobs(data_dir: Path, nkd_path: Path) -> list[dict]:
     jobs = []
+    _EXCHANGE = {"MYM": "CBOT"}  # MYM (Micro Dow) is on CBOT, not CME
     for name, cfg in BASKET.items():
         jobs.append(dict(
             name=name,
             ibkr_symbol=name,          # MES/MNQ/MYM/M2K — IBKR ContFuture symbol
             parquet=data_dir / data_filename(cfg),
-            exchange="CME",
+            exchange=_EXCHANGE.get(name, "CME"),
         ))
     # NKD (MNKD uses same IBKR symbol "NKD" as the full contract — same price)
     jobs.append(dict(
@@ -116,14 +117,22 @@ def _load_parquet(path: Path) -> pd.DataFrame:
     return df
 
 
-def _apply_splice_offset(new_bars: pd.DataFrame, old_last_close: float) -> pd.DataFrame:
+def _apply_splice_offset(new_bars: pd.DataFrame, old_last_close: float,
+                         last_existing: "pd.Timestamp") -> tuple:
     """
-    Shift new_bars OHLC so that new_bars.open[0] aligns with old_last_close.
-    This is the one-time correction at the Databento→IBKR splice boundary.
-    The offset = (old_last_close - new_bars.open[0]) is stored and reused
-    so subsequent daily appends don't re-apply it.
+    Shift new_bars OHLC so that the FIRST NEW BAR (after last_existing) aligns
+    with old_last_close. Uses the splice-point bar, not the first fetched bar,
+    to avoid embedding real market movement from the overlap window into the offset.
+
+    Bug note: original code used new_bars.open[0] (first fetched bar, often hours
+    before last_existing) instead of new_bars_after_last.open[0] (actual splice bar).
+    If the market moved during the overlap, the wrong anchor embeds that move as a
+    permanent step-change in the series.
     """
-    offset = old_last_close - float(new_bars["open"].iloc[0])
+    new_after = new_bars[new_bars.index > last_existing]
+    if new_after.empty:
+        return new_bars, 0.0
+    offset = old_last_close - float(new_after["open"].iloc[0])
     if abs(offset) < 1e-6:
         return new_bars, 0.0
     out = new_bars.copy()
@@ -236,7 +245,8 @@ def main() -> None:
                 if name not in splice_offsets:
                     # First time: compute and store offset
                     old_last_close = float(existing["close"].iloc[-1])
-                    new_bars_adj, offset = _apply_splice_offset(new_bars, old_last_close)
+                    new_bars_adj, offset = _apply_splice_offset(new_bars, old_last_close,
+                                                               last_existing)
                     if abs(offset) > 0.01:
                         log.info("  %s: splice offset applied: %+.4f "
                                  "(Databento diff → IBKR ratio alignment, one-time)",
@@ -271,13 +281,18 @@ def main() -> None:
                 # History invariant: existing bars must be UNCHANGED after append.
                 # new_only contains only bars AFTER last_existing → no overlap.
                 # This guard catches any future logic bug that modifies history.
+                # Use float64 cast before equals(): parquet may store volume as int64
+                # while IBKR returns float64; concat upcast causes dtype-only false positive
+                # (equals() is dtype-strict; values are identical when Rows with diff=[]).
                 check_n   = min(200, len(existing))
                 old_tail  = existing[keep_cols].tail(check_n)
                 new_tail  = updated[keep_cols].reindex(old_tail.index)
-                if not old_tail.equals(new_tail):
+                old_f     = old_tail.astype("float64")
+                new_f     = new_tail.astype("float64")
+                if not old_f.equals(new_f):
+                    diff_rows = old_f.index[~old_f.eq(new_f).all(axis=1)].tolist()[:5]
                     log.error("  %s: HISTORY INVARIANT VIOLATED — existing bars changed!", name)
-                    log.error("       Rows with diff: %s",
-                              old_tail.index[~old_tail.eq(new_tail).all(axis=1)].tolist()[:5])
+                    log.error("       Rows with diff: %s", diff_rows)
                     log.error("  → NOT saving parquet. Investigate before proceeding.")
                     failed.append(name)
                     continue

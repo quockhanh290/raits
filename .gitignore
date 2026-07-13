@@ -127,6 +127,7 @@ $RECYCLE.BIN/
 .env.*.local
 secrets.py
 config_private.py
+
 *.key
 *.pem
 credentials.json

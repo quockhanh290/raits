@@ -134,6 +134,22 @@ Nếu không đủ 3 điều kiện → giữ model cũ. Decode-forward (model f
 
 ---
 
+## L12 — Bug fetch/broker interface chỉ lộ khi chạy thật
+
+**Cases (2026-07-13 — first real `update_ibkr_daily` run):**
+
+1. **Splice anchor sai** (`_apply_splice_offset`): dùng `new_bars["open"].iloc[0]` = bar đầu tiên FETCH (18:00 Sunday, 6h trước splice thật 00:00 Monday). Globex move +808 pts trong window 6h đó → embedded vào offset → toàn bộ parquet post-splice shift +808 vĩnh viễn. Fix: `new_bars[new_bars.index > last_existing]["open"].iloc[0]` — bar đầu tiên SAU splice point thật. Confirm: gap=0.00 by construction, entry 53932→53124 (−808 exact).
+
+2. **Dtype guard false positive**: `old_tail.equals(new_tail)` dtype-strict. Parquet stores volume int64, IBKR trả float64, concat upcast → `equals()` False dù values identical (`diff=[]`). Fix: cast cả hai `.astype("float64")` trước `equals()`. Precision safe: float64 exact tới 2^53 >> max volume.
+
+3. **MYM exchange CBOT**: hardcode `exchange="CME"` cho tất cả instruments. MYM (Micro E-mini Dow Jones) là CBOT, không CME → IBKR reject "No security definition" → 0 bars. Fix: `_EXCHANGE = {"MYM": "CBOT"}` dict trong `_build_jobs()`.
+
+**Lesson chung:** Ba bug đều tồn tại từ trước nhưng **không lộ trong backtest** (backtest đọc parquet sẵn, không fetch). Chỉ lộ khi `update_ibkr_daily` chạy thật với Gateway live. Offline test đủ cho logic — không đủ cho broker/data API interface.
+
+**Fix pattern:** Code path chỉ chạy với service thật (IBKR, Polygon) → integration test với service thật sớm nhất có thể. Không assume offline test coverage đủ cho live interface. P0b dry-run tối thiểu trước khi dùng thật.
+
+---
+
 ## Tổng hợp — Class of mistakes
 
 | Class | Lessons |
@@ -146,3 +162,4 @@ Nếu không đủ 3 điều kiện → giữ model cũ. Decode-forward (model f
 | Metric interpretation | L9 (contamination through path-dependent metrics) |
 | Verification scope | L10 (reconcile = consistency, not correctness) |
 | Model update | L11 (data mới ≠ model sai — đo trước khi refit) |
+| Live interface | L12 (bug fetch/broker chỉ lộ khi chạy thật — splice/dtype/exchange) |

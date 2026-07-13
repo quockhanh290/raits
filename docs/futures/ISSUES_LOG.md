@@ -298,6 +298,34 @@ _Cập nhật: 2026-07-07_
 | **Risk còn lại** | Chỉ xảy ra khi chạy lại `update_futures_data.py` (Databento re-fetch) không có frozen copy → xem I5.5. |
 | **Nguồn** | `global_index/update_ibkr_daily.py` lines 119-133 (`_apply_splice_offset`), 236-253 (stored offset logic); phân tích 2026-07-09. |
 
+### I5.7 — MYM exchange CME→CBOT (update_ibkr_daily)
+| Trường | Nội dung |
+|---|---|
+| **Trạng thái** | FIXED (2026-07-13) |
+| **Root cause** | `_build_jobs()` hardcode `exchange="CME"` cho tất cả instruments. MYM (Micro E-mini Dow Jones) là CBOT, không CME → IBKR reject "No security definition" → 0 bars fetched. Chỉ lộ khi fetch thật với Gateway. |
+| **Impact** | MYM không có bars mới từ ngày wire update_ibkr_daily. |
+| **Fix** | `_EXCHANGE = {"MYM": "CBOT"}` dict trong `_build_jobs()`; các instrument khác default CME. |
+| **Nguồn** | `global_index/update_ibkr_daily.py:63-70` (`_build_jobs`); committed 2026-07-13. |
+
+### I5.8 — History invariant guard dtype false positive
+| Trường | Nội dung |
+|---|---|
+| **Trạng thái** | FIXED (2026-07-13) |
+| **Root cause** | `old_tail.equals(new_tail)` là dtype-strict. Parquet lưu volume int64, IBKR trả float64; `pd.concat` upcast → `equals()` False dù values identical. Log: "HISTORY INVARIANT VIOLATED — Rows with diff: []" (empty list = không có row nào thật sự khác). |
+| **Impact** | Guard báo VIOLATED trên mọi append → không save parquet → false abort. |
+| **Fix** | Cast cả hai về float64 trước `equals()`. Precision safe: float64 exact tới 2^53 ≈ 9×10^15, đủ cho volume (max ~10^9). |
+| **Nguồn** | `global_index/update_ibkr_daily.py:287-294`; committed 2026-07-13. |
+
+### I1.3 — Splice anchor sai: first-fetched bar ≠ first-new bar
+| Trường | Nội dung |
+|---|---|
+| **Trạng thái** | FIXED (2026-07-13) |
+| **Root cause** | `_apply_splice_offset` dùng `new_bars["open"].iloc[0]` = bar đầu tiên FETCHED (18:00 Sunday, 6h trước splice thật 00:00 Monday). Nếu market move đáng kể trong window đó (MYM: +808 pts Globex 18:00→00:00), toàn bộ move đó embedded vào splice offset như delta giả giữa Databento và IBKR. |
+| **Impact đo** | MYM stored offset: +751 (wrong) vs correct: −57. Gap: +808 pts. Toàn bộ parquet từ 07/07 00:00 shift +808 pts vĩnh viễn. Entry từ backtest: 53932 (wrong scale) vs 53124 (correct, −808 exact). `_concat_live` mixed scale (07/07-07/11 = IBKR+751, 07/12+ = IBKR raw) → chandelier stop +808 sai. |
+| **Fix** | `new_after = new_bars[new_bars.index > last_existing]` → lấy bar đầu tiên SAU splice point thật. Caller truyền `last_existing`. |
+| **Data repair** | Truncate parquet → backup → delete `_ibkr_splice_offsets.json` → re-fetch "7 D". Kết quả: gap=0.00 all 5, frozen 23/23 intact, entry 53124 exact. |
+| **Nguồn** | `global_index/update_ibkr_daily.py:120-142` (`_apply_splice_offset`); committed 2026-07-13. |
+
 ---
 
 ## NHÓM 6 — DOCUMENTATION (session này)
@@ -353,5 +381,8 @@ _Cập nhật: 2026-07-07_
 | I5.4 | update_spy_csv timing look-ahead | Wire | OPEN |
 | I5.5 | Databento re-fetch contamination (A5 overlap replacement → $236 drift) | Data | RESOLVED ($53,021 / Calmar 3.07) |
 | I5.6 | Live signal stability qua quarterly roll | Data | VERIFIED STABLE |
+| I5.7 | MYM exchange CME→CBOT (0 bars fetched) | Wire | FIXED |
+| I5.8 | History invariant dtype false positive (int64/float64) | Wire | FIXED |
+| I1.3 | Splice anchor wrong: iloc[0] fetched ≠ first-new-bar splice | Data | FIXED (+808 repair) |
 | I6.1 | SYSTEM_MODEL + VISUALIZE docs | Docs | DONE |
 | I6.2 | CROSS_SYSTEM_FINDINGS docs | Docs | DONE |
