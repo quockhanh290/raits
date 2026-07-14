@@ -339,6 +339,7 @@ def main():
         positions_path=a.positions_path,
         lock_path=a.lock_path,
         live_state_path=a.live_state_path,
+        regime_fn=_regime,
     )
 
     # ── run_day(today) ───────────────────────────────────────────────────────

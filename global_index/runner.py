@@ -161,7 +161,8 @@ class FuturesRunner:
 
     def __init__(self, broker, guard, contracts_by_inst, signal_fn, breaker,
                  hmm_stale_guard=None, positions_path=None, lock_path=None,
-                 live_state_path=None, stop_path=None, max_contracts_per_order=10):
+                 live_state_path=None, stop_path=None, max_contracts_per_order=10,
+                 regime_fn=None):
         """signal_fn(day, bars_by_inst, held) -> (entry_candidates, exit_positions)
         wraps signal_layer.generate_today_signals with the engines/labels/costs bound.
         Injecting it keeps the runner testable without real engines.
@@ -185,6 +186,9 @@ class FuturesRunner:
         lock_path (optional, str|Path): path for PID lockfile (E1 fix). Pass None
         (default) for offline/test use. In production set to e.g. Path("runner.pid")
         to prevent duplicate runner instances from submitting double orders to IBKR."""
+
+        self._regime_fn = regime_fn
+        self._last_regime: str = "Unknown"
 
         # E1: acquire PID lock first — refuse second instance before any state is set up
         self._lock_path = Path(lock_path) if lock_path else None
@@ -802,6 +806,14 @@ class FuturesRunner:
             )
             entry_candidates, exit_positions = [], []
 
+        # Observability: capture regime for dump_state (no logic effect)
+        if self._regime_fn is not None:
+            try:
+                _r = self._regime_fn(day)
+                self._last_regime = str(_r) if _r else "Unknown"
+            except Exception:
+                pass
+
         # J2: _SWING_CACHE in _validated_core.py keys by id(df). fetch_bars returns a
         # new slice (new object) each call → cache never hits across days but entries
         # accumulate indefinitely. Clear after signal generation to bound memory in
@@ -1328,7 +1340,7 @@ class FuturesRunner:
             "drawdown_dollars": snap_dd_dollars,
             "max_dd_dollars": snap_dd_dollars,
             "breaker_level": snap_breaker_level,
-            "regime": "Unknown",
+            "regime": self._last_regime,
             "open_positions": open_pos_snap,
             "cluster_exposure": cluster_exposure,
             "decision": {
