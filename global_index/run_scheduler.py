@@ -75,7 +75,8 @@ def make_scheduler(port: int, dry_run: bool,
                    data_dir: str = "data/cache/futures",
                    nkd_parquet: str = "global_index/data/NKD_continuous_1m_8y.parquet",
                    regime_csv: str = "spy_daily_live.csv",
-                   polygon_api_key: str = ""):
+                   polygon_api_key: str = "",
+                   live_state_path: str = "global_index/live_state_data.js"):
     try:
         from apscheduler.schedulers.blocking import BlockingScheduler
     except ImportError:
@@ -171,10 +172,11 @@ def make_scheduler(port: int, dry_run: bool,
             return
 
         _run([sys.executable, "-m", "global_index.run_live_day",
-              "--data-dir",     data_dir,
-              "--nkd-parquet",  nkd_parquet,
-              "--regime-csv",   regime_csv,
-              "--port",         str(port)],
+              "--data-dir",        data_dir,
+              "--nkd-parquet",     nkd_parquet,
+              "--regime-csv",      regime_csv,
+              "--live-state-path", live_state_path,
+              "--port",            str(port)],
              label="LIVE_DAY", dry_run=dry_run)
 
     return sched
@@ -195,12 +197,15 @@ def main():
     ap.add_argument("--polygon-api-key",  default=os.environ.get("POLYGON_API_KEY", ""),
                     help="Polygon.io API key for update_spy_csv "
                          "(fallback: POLYGON_API_KEY env var)")
+    ap.add_argument("--live-state-path",  default="global_index/live_state_data.js",
+                    help="Path to write live_state_data.js for dashboard (default: global_index/live_state_data.js)")
     a = ap.parse_args()
 
     sched = make_scheduler(
         port=a.port, dry_run=a.dry_run,
         data_dir=a.data_dir, nkd_parquet=a.nkd_parquet,
         regime_csv=a.regime_csv, polygon_api_key=a.polygon_api_key,
+        live_state_path=a.live_state_path,
     )
 
     jobs = sched.get_jobs()
