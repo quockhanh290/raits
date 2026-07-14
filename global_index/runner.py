@@ -942,6 +942,12 @@ class FuturesRunner:
                         "C1 CLOSE: %s %s avg=%.4f (market exit, no stop reference)",
                         p.inst, p.direction, _f.avg_price,
                     )
+                self._emit_event(
+                    "INFO", "EXEC",
+                    f"CLOSE {p.inst} {p.direction} ×{p.contracts} @{_f.avg_price:.4f}",
+                    {"inst": p.inst, "direction": p.direction,
+                     "contracts": p.contracts, "price": _f.avg_price, "cluster": p.cluster},
+                )
             # I4.8: if CLOSE fails, restore position for retry next session.
             # decide_day already removed p from open_positions; add it back with
             # exit_pending=True so _retry_pending_exits() picks it up tomorrow.
@@ -1071,6 +1077,14 @@ class FuturesRunner:
                     t["inst"], t["direction"], _open_fill.error_msg or "no detail",
                 )
 
+            if _open_fill.status in ("FILLED", "PARTIAL"):
+                self._emit_event(
+                    "INFO", "EXEC",
+                    f"OPEN {t['inst']} {t['direction']} ×{n} @{_open_fill.avg_price:.4f}",
+                    {"inst": t["inst"], "direction": t["direction"],
+                     "contracts": n, "price": _open_fill.avg_price, "cluster": t["cluster"]},
+                )
+
             # STP: place GTC stop order immediately after successful OPEN fill.
             # Provides overnight exit protection when chandelier fires outside 14:05–15:55 window.
             # Only for multi-day entries (same-day STRESS_MID entries close within hours — no STP needed).
@@ -1092,6 +1106,12 @@ class FuturesRunner:
                         logger.info(
                             "STP: placed %s %s stop @ %.4f orderId=%s cluster=%s",
                             t["inst"], t["direction"], t["stop"], _stp_id, t["cluster"],
+                        )
+                        self._emit_event(
+                            "INFO", "ORDER",
+                            f"STP placed {t['inst']} {t['direction']} @{t['stop']:.4f}",
+                            {"inst": t["inst"], "direction": t["direction"],
+                             "stop": t["stop"], "order_id": _stp_id, "cluster": t["cluster"]},
                         )
                     else:
                         logger.error(
