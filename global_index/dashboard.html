@@ -381,6 +381,40 @@ header::before {
 .rej-item { color: var(--muted); }
 .rej-item b { color: var(--amber); }
 
+/* ── IBKR LIVE PANEL (Loại 1) ── */
+.ibkr-account-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px;
+}
+.ibkr-stat { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; }
+.ibkr-stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; display: block; }
+.ibkr-stat-value { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono', monospace; display: block; margin-top: 3px; }
+.ibkr-banner {
+  padding: 8px 14px; border-radius: 4px; margin-bottom: 14px;
+  font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+  display: flex; align-items: center; gap: 10px;
+}
+.ibkr-banner.ok    { background: rgba(46,160,67,.08);  color: var(--green); border: 1px solid rgba(46,160,67,.22); }
+.ibkr-banner.warn  { background: rgba(192,128,0,.08);  color: var(--amber); border: 1px solid rgba(192,128,0,.22); }
+.ibkr-banner.error { background: rgba(218,54,51,.08);  color: var(--red);   border: 1px solid rgba(218,54,51,.25); }
+.ibkr-sub-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted);
+  font-weight: 700; margin: 14px 0 8px;
+}
+.ibkr-pnl-note { font-size: 10px; color: var(--dim); margin-left: 8px; font-weight: 400; }
+
+/* ── SNAPSHOT DIVIDER (Loại 2/3 boundary) ── */
+#snapshot-divider {
+  padding: 6px 24px; display: flex; align-items: center; gap: 12px;
+  background: rgba(8,10,14,0.9); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+}
+.snap-badge {
+  padding: 2px 8px; border-radius: 3px; font-weight: 700; letter-spacing: .7px;
+  text-transform: uppercase; white-space: nowrap;
+  background: rgba(90,100,114,0.12); color: var(--muted);
+  border: 1px solid rgba(90,100,114,0.22);
+}
+
 /* ── ERROR ── */
 #errorBanner { margin: 40px auto; max-width: 600px; }
 #error-banner {
@@ -608,10 +642,83 @@ header::before {
     <span class="ops-item-label">Regime Lock</span>
     <span class="ops-item-val na" id="opsUrVal">N/A — needs runner</span>
   </div>
+  <div class="ops-item">
+    <div class="ops-dot na" id="opsIbkrDot"></div>
+    <span class="ops-item-label">IBKR Live</span>
+    <span class="ops-item-val na" id="opsIbkrVal">backend offline</span>
+  </div>
 </div>
 
 <div class="main-layout">
 <div class="main-col">
+
+<!-- ══ IBKR LIVE (Loại 1 — real-time, polled every 8s) ═════════════ -->
+<section id="ibkr-section" class="section" style="background:var(--card)">
+  <div class="section-title">
+    IBKR Live Account
+    <span class="ibkr-pnl-note">entry $ = avgCost proxy (not exact fill)</span>
+    <span class="ibkr-pnl-note" id="ibkrLastTs" style="margin-left:16px;color:var(--dim)">— waiting for backend...</span>
+  </div>
+
+  <div id="ibkrBanner" class="ibkr-banner warn">
+    <span>⊘</span><span>Backend offline — start: <code>python monitor/start_backend.py</code></span>
+  </div>
+
+  <!-- Account stats row -->
+  <div class="ibkr-account-grid">
+    <div class="ibkr-stat">
+      <span class="ibkr-stat-label">Net Liquidation</span>
+      <span class="ibkr-stat-value" id="ibkrEquity" style="color:var(--blue)">—</span>
+    </div>
+    <div class="ibkr-stat">
+      <span class="ibkr-stat-label">Total Unrealized P&amp;L</span>
+      <span class="ibkr-stat-value" id="ibkrUnreal">—</span>
+    </div>
+    <div class="ibkr-stat">
+      <span class="ibkr-stat-label">Open Positions</span>
+      <span class="ibkr-stat-value" id="ibkrPosCount" style="color:var(--text)">—</span>
+    </div>
+  </div>
+
+  <!-- Positions table -->
+  <div class="ibkr-sub-label">Positions (live from IBKR)</div>
+  <div class="table-scroll-sm">
+    <table class="trade-table">
+      <thead><tr>
+        <th>Inst</th><th>Type</th>
+        <th style="text-align:right">Qty</th>
+        <th style="text-align:right">AvgCost (proxy)</th>
+        <th style="text-align:right">Mkt Price</th>
+        <th style="text-align:right">Mkt Value</th>
+        <th style="text-align:right">Unrealized P&amp;L</th>
+        <th style="text-align:right">Realized P&amp;L</th>
+      </tr></thead>
+      <tbody id="ibkrPosBody"><tr><td colspan="8" class="no-data">— waiting —</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- Open orders / STP -->
+  <div class="ibkr-sub-label">Open Orders (STP GTC + pending)</div>
+  <div class="table-scroll-sm">
+    <table class="trade-table">
+      <thead><tr>
+        <th>Inst</th><th>Type</th><th>Action</th>
+        <th style="text-align:right">Qty</th>
+        <th style="text-align:right">Lmt/Stop $</th>
+        <th>TIF</th><th>Status</th><th>Order ID</th>
+      </tr></thead>
+      <tbody id="ibkrOrdersBody"><tr><td colspan="8" class="no-data">— waiting —</td></tr></tbody>
+    </table>
+  </div>
+</section>
+<!-- ══ END IBKR LIVE ═══════════════════════════════════════════════ -->
+
+<!-- SNAPSHOT DIVIDER — loại 2/3 (runner data, not real-time) -->
+<div id="snapshot-divider">
+  <span class="snap-badge">SNAPSHOT</span>
+  <span style="color:var(--dim)">Regime · chart · positions below = runner state, not real-time</span>
+  <span id="snapshotAsOf" style="color:var(--muted);margin-left:auto">as of —</span>
+</div>
 
 <!-- DD SECTION (3-col: big pct | badge | gauge) -->
 <section id="dd-section">
@@ -1138,6 +1245,8 @@ function updateDayView() {
   const meta = data.meta;
   if (!snap || !meta) return;
   renderHeader(snap, meta);
+  const soEl = document.getElementById('snapshotAsOf');
+  if (soEl) soEl.textContent = 'as of ' + snap.date + (mode === 'live' ? ' 14:05 ET' : ' (replay)');
   renderDD(snap, meta);
   renderMetricsBar(snap);
   renderOpsStatus(snap);
@@ -1932,6 +2041,172 @@ function setPlaySpeed(v) {
     playTimer = setInterval(_playStep, playSpeed);
   }
 }
+
+// ── IBKR LIVE POLLING (Loại 1) ────────────────────────────────────────────
+const IBKR_API = 'http://127.0.0.1:5001';
+let _ibkrTimer = null;
+
+function _fmt$(v) {
+  if (v == null) return '—';
+  const abs = Math.abs(v);
+  const s = abs >= 1000
+    ? '$' + abs.toLocaleString('en-US', { maximumFractionDigits: 0 })
+    : '$' + abs.toFixed(2);
+  return v < 0 ? '-' + s : (v > 0 ? '+' + s : s);
+}
+function _pnlClass(v) { return v == null ? '' : v >= 0 ? 'pnl-pos' : 'pnl-neg'; }
+
+function _ibkrSetBanner(state, msg) {
+  const b = document.getElementById('ibkrBanner');
+  if (!b) return;
+  b.className = 'ibkr-banner ' + state;
+  const icon = state === 'ok' ? '✓' : state === 'warn' ? '⊘' : '✗';
+  b.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
+}
+
+function _ibkrUpdateOps(connected) {
+  const dot = document.getElementById('opsIbkrDot');
+  const val = document.getElementById('opsIbkrVal');
+  if (!dot || !val) return;
+  if (connected) {
+    dot.className = 'ops-dot ok';
+    val.className = 'ops-item-val ok';
+    val.textContent = 'Connected';
+  } else {
+    dot.className = 'ops-dot halt';
+    val.className = 'ops-item-val halt';
+    val.textContent = 'Disconnected';
+  }
+}
+
+async function fetchLiveIBKR() {
+  try {
+    const resp = await fetch(IBKR_API + '/api/all', { signal: AbortSignal.timeout(6000) });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const d = await resp.json();
+
+    // timestamp
+    const ts = document.getElementById('ibkrLastTs');
+    if (ts && d.last_update) ts.textContent = 'updated ' + d.last_update.slice(11);
+
+    if (!d.connected) {
+      _ibkrSetBanner('warn', 'IBKR disconnected — Gateway offline or restarting (17:00 ET restart is normal)');
+      _ibkrUpdateOps(false);
+      // Keep last data displayed — stale is better than blank during 17:00 ET restart
+      const ts2 = document.getElementById('ibkrLastTs');
+      if (ts2 && d.last_update) ts2.textContent = '⚠ stale as of ' + d.last_update.slice(11);
+      const grid = document.querySelector('.ibkr-account-grid');
+      if (grid) grid.style.opacity = '0.4';
+      return;
+    }
+
+    _ibkrSetBanner('ok', 'IBKR connected · paper 4002 · client_id 99 (read-only)');
+    _ibkrUpdateOps(true);
+    // Restore opacity on reconnect
+    const grid = document.querySelector('.ibkr-account-grid');
+    if (grid) grid.style.opacity = '';
+
+    // Account stats
+    const eq = document.getElementById('ibkrEquity');
+    const un = document.getElementById('ibkrUnreal');
+    const pc = document.getElementById('ibkrPosCount');
+    if (eq) { eq.textContent = d.equity != null ? '$' + Math.round(d.equity).toLocaleString('en-US') : '—'; }
+    if (un) {
+      const v = d.unrealized_pnl;
+      un.textContent = v != null ? _fmt$(v) : '—';
+      un.className = 'ibkr-stat-value ' + _pnlClass(v);
+    }
+    if (pc) pc.textContent = (d.positions || []).length.toString();
+
+    // Positions table
+    const posBody = document.getElementById('ibkrPosBody');
+    if (posBody) {
+      const rows = (d.positions || []);
+      if (!rows.length) {
+        posBody.innerHTML = '<tr><td colspan="8" class="no-data">— no positions (account flat) —</td></tr>';
+      } else {
+        posBody.innerHTML = rows.map(p => {
+          const dir = p.position > 0 ? 'LONG' : 'SHORT';
+          const dirCls = dir === 'LONG' ? 'dir-long' : 'dir-short';
+          const up = _fmt$(p.unrealized_pnl);
+          const rp = _fmt$(p.realized_pnl);
+          const ac = p.avg_cost != null ? p.avg_cost.toFixed(2) : '—';
+          const mp = p.market_price != null ? p.market_price.toFixed(2) : '—';
+          const mv = p.market_value != null ? '$' + Math.round(Math.abs(p.market_value)).toLocaleString('en-US') : '—';
+          return `<tr>
+            <td><b>${p.inst}</b></td>
+            <td style="color:var(--muted);font-size:11px">${p.sec_type}</td>
+            <td style="text-align:right" class="${dirCls}">${Math.abs(p.position)}</td>
+            <td style="text-align:right">${ac}</td>
+            <td style="text-align:right;color:var(--muted)">${mp}</td>
+            <td style="text-align:right;color:var(--muted)">${mv}</td>
+            <td style="text-align:right" class="${_pnlClass(p.unrealized_pnl)}">${up}</td>
+            <td style="text-align:right;color:var(--muted)">${rp}</td>
+          </tr>`;
+        }).join('');
+      }
+    }
+
+    // Orders table
+    const ordBody = document.getElementById('ibkrOrdersBody');
+    if (ordBody) {
+      const rows = (d.orders || []);
+      if (!rows.length) {
+        ordBody.innerHTML = '<tr><td colspan="8" class="no-data">— no open orders —</td></tr>';
+      } else {
+        ordBody.innerHTML = rows.map(o => {
+          const price = o.type === 'STP' ? o.aux_price : (o.lmt_price ?? o.aux_price);
+          const priceStr = price != null ? price.toFixed(2) : '—';
+          const statusCls = o.status === 'Filled' ? 'pnl-pos' : o.status === 'Cancelled' ? 'neg' : '';
+          return `<tr>
+            <td><b>${o.inst}</b></td>
+            <td style="color:var(--blue)">${o.type}</td>
+            <td>${o.action}</td>
+            <td style="text-align:right">${o.qty ?? '—'}</td>
+            <td style="text-align:right">${priceStr}</td>
+            <td style="color:var(--muted);font-size:11px">${o.tif || '—'}</td>
+            <td class="${statusCls}">${o.status}</td>
+            <td style="color:var(--dim);font-size:11px">${o.order_id ?? '—'}</td>
+          </tr>`;
+        }).join('');
+      }
+    }
+
+  } catch (err) {
+    // Backend not running or network error — clear data (state unknown)
+    const isTimeout = err.name === 'TimeoutError' || err.name === 'AbortError';
+    const msg = isTimeout ? 'Request timeout' : (err.message || 'fetch failed');
+    _ibkrSetBanner('error', `Backend offline (${msg}) — start: python monitor/start_backend.py`);
+    const ts = document.getElementById('ibkrLastTs');
+    if (ts) ts.textContent = '— backend offline';
+    const dot = document.getElementById('opsIbkrDot');
+    const val = document.getElementById('opsIbkrVal');
+    if (dot) { dot.className = 'ops-dot na'; }
+    if (val) { val.className = 'ops-item-val na'; val.textContent = 'backend offline'; }
+    _ibkrClearData(); // clear stale numbers — backend dead means unknown state
+  }
+}
+
+function _ibkrClearData() {
+  const fields = ['ibkrEquity', 'ibkrUnreal', 'ibkrPosCount'];
+  fields.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '—'; });
+  const pb = document.getElementById('ibkrPosBody');
+  if (pb) pb.innerHTML = '<tr><td colspan="8" class="no-data">— IBKR disconnected —</td></tr>';
+  const ob = document.getElementById('ibkrOrdersBody');
+  if (ob) ob.innerHTML = '<tr><td colspan="8" class="no-data">— IBKR disconnected —</td></tr>';
+}
+
+function startIBKRPolling() {
+  fetchLiveIBKR(); // immediate first fetch
+  if (_ibkrTimer) clearInterval(_ibkrTimer);
+  _ibkrTimer = setInterval(fetchLiveIBKR, 8000); // poll every 8s
+}
+
+// Auto-start polling on page load (works in both replay and live mode)
+window.addEventListener('DOMContentLoaded', () => {
+  // Slight delay so main data init runs first
+  setTimeout(startIBKRPolling, 500);
+});
 
 // ── HEALTH ────────────────────────────────────────────────────────────────
 function updateHealth(h) {
