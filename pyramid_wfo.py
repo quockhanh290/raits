@@ -70,15 +70,21 @@ def run():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir",   default="data/cache/futures")
     ap.add_argument("--regime-csv", default="spy_daily_live.csv")
+    ap.add_argument("--risk-split", default="A", choices=["A", "B"],
+                    help="A = total-risk-constant (w=1/max_units); B = risk-grows (w=1, leverage)")
     a = ap.parse_args()
+    RS = a.risk_split
 
     from futures.swing_tf import load_basket, basket_labels, costs_for_basket
     from futures._validated_core import backtest_swing_tf
     from futures.swing_tf_pyramid import backtest_swing_tf_pyramid
     from futures.basket import BASKET
 
+    _rs_desc = {"A": "total-risk-constant (w=1/max_units)",
+                "B": "risk-grows (w=1, leverage)"}[RS]
     print("=" * 74)
     print("PYRAMID WFO — GATE + max_units sweep (IS-only < %s, causal engine)" % VAULT_START)
+    print("SWEEP %s — %s" % (RS, _rs_desc))
     print("=" * 74)
     print("params: ema=%d mult=%.1f max_hold=%d | slippage=%.0f-tick | Rổ4 %s"
           % (EMA, MULT, MAXHOLD, SLIPPAGE_TICKS, list(BASKET)))
@@ -103,7 +109,7 @@ def run():
                                  chandelier_atr_mult=MULT, max_hold_days=MAXHOLD)
         pyr1 = backtest_swing_tf_pyramid(df, labels, costs[name], ema_period=EMA,
                                          chandelier_atr_mult=MULT, max_hold_days=MAXHOLD,
-                                         max_units=1)
+                                         max_units=1, risk_split=RS)
         mism = []
         if len(base) != len(pyr1):
             mism.append("COUNT base=%d pyr=%d" % (len(base), len(pyr1)))
@@ -143,7 +149,8 @@ def run():
     for mu in SWEEP:
         tbi = {name: backtest_swing_tf_pyramid(dfs[name], labels, costs[name],
                                                ema_period=EMA, chandelier_atr_mult=MULT,
-                                               max_hold_days=MAXHOLD, max_units=mu)
+                                               max_hold_days=MAXHOLD, max_units=mu,
+                                               risk_split=RS)
                for name in dfs}
         all_tr = [dict(day=pd.Timestamp(r["day"]), pnl=r["pnl"], units=r.get("units", 1))
                   for name in tbi for r in tbi[name]]
@@ -159,7 +166,9 @@ def run():
         fold_cal[mu] = cals
 
     # ── report table ────────────────────────────────────────────────────────
-    print("\nSTITCHED OOS (risk-normalized: w=1/max_units, so $ comparable across units)\n")
+    _tbl_note = {"A": "risk-normalized (w=1/max_units) → net$ comparable across units",
+                 "B": "risk-GROWS (w=1) → net$/MaxDD$ phình ×max_units = LEVERAGE, không edge"}[RS]
+    print("\nSTITCHED OOS — %s\n" % _tbl_note)
     hdr = ("max_units", "trades", "avg_u", "net$", "Calmar", "PF", "expect$", "MaxDD$", "WR%")
     print("  %-9s %7s %6s %10s %8s %6s %9s %9s %6s" % hdr)
     for mu in SWEEP:
@@ -176,6 +185,30 @@ def run():
         print("  max_units=%d  folds=%d  mean=%.2f  std=%.2f  vals=[%s]"
               % (mu, len(cals), (arr.mean() if len(arr) else 0.0), sd,
                  ", ".join(f"{c:.2f}" for c in cals)))
+
+    # ── MaxDD vs 15% hard cap (matters for risk-grows B) ──────────────────────
+    from futures.basket import RISK
+    HARD, TARGET = RISK["max_drawdown_pct"], RISK["target_drawdown_pct"]
+    base_dd = results[1]["maxdd"]
+    print("\nMaxDD vs %.0f%% HARD cap (baseline 1-unit ≡ production sizing target %.0f%%):"
+          % (HARD * 100, TARGET * 100))
+    print("  %-9s %10s %8s %12s %s" % ("max_units", "MaxDD$", "×base", "implied DD%", "vs 15% cap"))
+    cap_excluded = []
+    for mu in SWEEP:
+        dd = results[mu]["maxdd"]
+        ddx = dd / base_dd if base_dd > 0 else 1.0
+        implied = TARGET * ddx                       # 1-unit ~ target 10% → scale by DD multiple
+        breach = implied > HARD
+        if breach:
+            cap_excluded.append(mu)
+        print("  %-9d %10s %7.2fx %11.1f%% %s" % (
+            mu, f"{dd:,.0f}", ddx, implied * 100,
+            "✗ BREACH → loại deploy" if breach else "✓ ok"))
+    if cap_excluded:
+        print("  → max_units %s VƯỢT 15%% hard cap → LOẠI khỏi deploy (risk-grows leverage)."
+              % cap_excluded)
+    else:
+        print("  → không max_units nào vượt cap (risk-constant giữ DD ~phẳng).")
 
     # ── verdict: best + marginal/noise flag ───────────────────────────────────
     base_cal = results[1]["calmar"]

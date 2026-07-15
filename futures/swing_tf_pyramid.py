@@ -42,17 +42,25 @@ NO_ADD_AFTER_FRAC = 0.6      # không add sau 60% max_hold (day 3/5)
 
 def backtest_swing_tf_pyramid(df, labels, cost, *, ema_period=30,
                               chandelier_atr_mult=2.5, max_hold_days=5,
-                              max_units=1, entry_days=None, gap_fill=True,
-                              return_open=False):
+                              max_units=1, risk_split="A", entry_days=None,
+                              gap_fill=True, return_open=False):
     """Variant pyramid của _validated_core.backtest_swing_tf.
 
-    max_units=1  → CHÍNH XÁC baseline causal (add block bị bỏ, w=1).
-    max_units>1  → thêm tối đa (max_units-1) unit theo design #2/#3/#5.
+    max_units=1  → CHÍNH XÁC baseline causal (add block bị bỏ, w=1) — cả A và B.
+    max_units>1  → thêm tối đa (max_units-1) unit theo design #3/#5.
 
-    P&L (design #2, weight w=1/max_units mỗi unit):
+    risk_split:
+        "A" total-risk-constant (design #2): mỗi unit w = 1/max_units. Pyramid đầy
+            = cùng gross risk với baseline 1-unit.
+        "B" risk-grows: mỗi unit FULL 1% → w = 1.0. Pyramid đầy = max_units × risk
+            (leverage). $ tuyệt đối phình theo max_units — KHÔNG phải edge.
+    Vì A và B có CÙNG fills (chỉ khác weight), B_pnl = max_units × A_pnl mỗi trade →
+    Calmar/PF/WR B == A (scale-invariant); chỉ net$/MaxDD$ phình ×max_units.
+
+    P&L (weight w mỗi unit):
         pnl = w * n_filled * ((exit - avg_entry) * PV - round_turn_cost)   [LONG]
         pnl = w * n_filled * ((avg_entry - exit) * PV - round_turn_cost)   [SHORT]
-    → max_units=1: w=1, n=1, avg=entry → pnl = (exit-entry)*PV - cost = baseline.
+    → max_units=1: w=1, n=1, avg=entry → pnl = (exit-entry)*PV - cost = baseline (A và B).
     """
     from raits.strategies.trend_follow import TrendFollowStrategy
     from futures._validated_core import _swing_cache, atr14, ET
@@ -62,7 +70,7 @@ def backtest_swing_tf_pyramid(df, labels, cost, *, ema_period=30,
     c = _swing_cache(df)
     datr, days, hl, b5, ts = c["datr"], c["days"], c["hl"], c["b5"], c.get("ts", {})
     mult = chandelier_atr_mult
-    w = 1.0 / max_units                       # design #2: total-risk-constant
+    w = 1.0 if risk_split == "B" else 1.0 / max_units   # design #2 (A) vs risk-grows (B)
     add_cutoff = max_hold_days * NO_ADD_AFTER_FRAC
     PV = cost.point_value
     rt = cost.round_turn_cost()
