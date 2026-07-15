@@ -485,6 +485,21 @@ Status: OFFLINE DONE — chỉ chờ market day
 - PIPELINE_FLOW.md = "bên trong run_day() hoạt động thế nào" (step-by-step runner logic)
 - DAILY_UPDATE_RUNBOOK.md = "data safety" (frozen/live ranh giới, backup, rollback, anti-patterns)
 
+#### SESSION 2026-07-15 — Pyramiding research ĐÓNG (NO-GO) — quay lại P0c
+
+**Câu hỏi:** pyramiding/scale-in trên SwingTF (max_units sweep {1,2,3,4}) có add edge không?
+**Verdict: NO-GO** — max_units=1 (không pyramid) tối ưu. Đóng câu hỏi, KHÔNG build vào production.
+- [x] Variant TÁCH: `futures/swing_tf_pyramid.py` + `pyramid_wfo.py` (không đụng production/vault/paper)
+- [x] GATE pass: max_units=1 == `_validated_core.backtest_swing_tf` trade-for-trade EXACT (4 instr)
+- [x] Sweep A (risk-constant): Calmar monotonic worse 1.13→0.60→0.23→0.20; expectancy $18→$3.5
+- [x] Sweep B (risk-grows): Calmar IDENTICAL A ($ cao thuần leverage); MaxDD mu≥2 vượt 15% cap → loại deploy
+- [x] Commits RIÊNG: `5910401` (A) / `40758e7` (B); doc LESSONS L16; memory `project_pyramiding_results`
+- [x] Vault UNTOUCHED (IS-only, vault_start=2023-01-01 hardcode)
+- Lý do: adds vào +kN muộn/cao → dilute; WR ~17% high-payoff → loãng payoff. Chi tiết: LESSONS.md L16.
+- **⚠️ Scope:** NO-GO cho pyramid-kiểu-này + strategy này + window này; không general mọi nơi.
+
+**→ Quay lại P0c** (chờ Normal/Stress verify cutoff I5.11 + live 4-field). Pyramid không đổi lộ trình paper.
+
 #### P0c — chờ ngày Normal/Stress (target: tuần này)
 ```powershell
 # Mỗi sáng trước 13:45 ET:

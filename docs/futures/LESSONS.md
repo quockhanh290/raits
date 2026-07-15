@@ -1,6 +1,6 @@
 # Futures — LESSONS
 _Bài học meta từ quá trình build. Không phải convention — là lỗi thật đã gặp._
-_Cập nhật: 2026-07-07_
+_Cập nhật: 2026-07-15_
 
 > **Mục đích:** Tránh lặp lại cùng class of mistake. Mỗi lesson = 1 case thật đã xảy ra.
 
@@ -205,6 +205,28 @@ Sai. Bất kỳ sửa nào trong runner.py, dù observability-only, đều có t
 
 ---
 
+## L16 — Pyramiding NO-GO: "cải tiến" hấp dẫn thường không add edge (đo mới biết) (2026-07-15)
+
+**Case: thử pyramiding/scale-in trên SwingTF (max_units sweep {1,2,3,4}).**
+
+**Verdict: NO-GO** — max_units=1 (không pyramid) tối ưu. Pyramiding không add edge dưới mọi risk mode.
+
+**Bằng chứng (variant TÁCH, IS-only 2019-2022 stitched OOS, Rổ4, 2-tick, causal, ema30/mult2.5 freeze):**
+- **Sweep A (risk-constant, w=1/max_units):** Calmar monotonic worse `1.13→0.60→0.23→0.20`; expectancy $18.0→$3.5.
+- **Sweep B (risk-grows, w=1):** Calmar **IDENTICAL A** (B_pnl = mu×A_pnl → equity scale ×const → metric risk-adjusted invariant) → $ tuyệt đối cao ở units cao là **thuần LEVERAGE, không edge**. net$ còn KHÔNG tăng (18.6k→14.4k) vì per-unit expectancy decay > tốc độ leverage cộng.
+- **B MaxDD vượt 15% hard cap** ở mu≥2 (18.6%/36.3%/43.5%) → loại deploy độc lập với verdict Calmar (vốn đã âm).
+- **GATE pass:** max_units=1 == `_validated_core.backtest_swing_tf` trade-for-trade EXACT (MES/MNQ/MYM/M2K) → nền tin được, sweep hợp lệ.
+
+**Lý do cơ chế (không bug):** adds vào +kN (muộn/cao hơn trong move đã kéo dài) → dilute entry gốc mạnh; strategy WR ~17% high-payoff → adds làm loãng payoff. Per-unit expectancy giảm nhanh hơn tốc độ units cộng.
+
+**⚠️ SCOPE (không over-generalize):** kết luận cho pyramid-kiểu-này (add +0.5/1.0/1.5N, freeze rules, N=daily ATR14 fixed at entry) + strategy này (SwingTF WR thấp) + IS window này (2019-2022). KHÔNG phải "pyramiding vô dụng mọi nơi" — trigger levels / add-fill rules / strategy khác có thể khác.
+
+**Con trỏ:** `futures/swing_tf_pyramid.py` + `pyramid_wfo.py`; commit `5910401` (A) / `40758e7` (B); reproduce: `python pyramid_wfo.py [--risk-split A|B]`. Vault UNTOUCHED (IS-only). Memory: `project_pyramiding_results`.
+
+**Bài học meta — pattern NO-GO:** pyramid nối tiếp chuỗi "cải tiến" hấp dẫn bị đo là NO-GO/no-edge sau khi test đúng design (vd equity cross-sectional NO-GO; ORB / STRESS_ORB flip no-edge). **Kỳ vọng đúng: phần lớn ý tưởng mới KHÔNG add edge.** Quy trình: ý tưởng → variant **TÁCH** → WFO IS-only (+ vault nếu qua IS) → phần lớn fail; chỉ cái vượt noise floor mới giữ. Đo **TRƯỚC**, không build vào production trước khi qua gate. GATE reconcile (variant==baseline exact ở điểm neutral) là điều kiện tiên quyết trước khi tin số sweep.
+
+---
+
 ## Tổng hợp — Class of mistakes
 
 | Class | Lessons |
@@ -221,3 +243,4 @@ Sai. Bất kỳ sửa nào trong runner.py, dù observability-only, đều có t
 | Fail-safe design | L13 (kiểm tất cả N điều kiện; fail-closed khi đủ an toàn, không chase edge-of-edge) |
 | Data-write safety | L14 (backup → gate → verify exact match; truncate = destructive, phải reversible) |
 | Observability + verification | L15 (reconcile gate dù "chỉ thêm log"; ✅ = chạy thật, không "code có"; subprocess phải pass đủ args) |
+| Research discipline | L16 (pyramid NO-GO; "cải tiến" hấp dẫn thường không add edge — variant tách, đo IS-only trước, GATE reconcile, expect most fail) |
