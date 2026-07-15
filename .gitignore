@@ -186,3 +186,9 @@ wfo_results/
 # ============================================
 live_positions.json
 global_index/live_state_data.js
+
+# ============================================
+# Parquet data cache (2.3GB — rebuild from Polygon/Databento, never commit)
+# ============================================
+data/
+global_index/data/
