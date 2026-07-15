@@ -173,6 +173,38 @@ Nếu không đủ 3 điều kiện → giữ model cũ. Decode-forward (model f
 
 ---
 
+## L14 — Data-write nguy: backup → gate → verify từng bước (2026-07-13)
+
+**Case: Splice anchor fix — truncate parquet phải reversible.**
+
+Splice anchor bug: `iloc[0]` (18:00 Sunday bar) thay vì first-new-bar (00:00 Monday). Offset sai → entry 53932 thay vì 53124 (−808 mixed-scale). Fix đúng: truncate parquet về điểm sạch → re-fetch từ đúng anchor.
+
+**Pattern nguy hiểm:** Truncate file là destructive. Nếu re-fetch lỗi, data mất hoàn toàn. Áp dụng 3 lớp:
+1. **Backup trước khi truncate**: `cp parquet_file parquet_file.bak` (reversible).
+2. **Gate trước khi write**: verify new bars không empty, offset gap=0.00, frozen rows unchanged (23/23).
+3. **Verify sau khi write**: confirm bằng số khớp exact — entry 53124 = 53932−808 exact, gap=0.00 by construction, sidecar `_splice_cuts_confirmed.json` giữ audit trail.
+
+**"Đo trước khi tin"**: Không commit data-write khi chỉ "có vẻ đúng". Phải có số confirm trước (entry match exact, gap=0, frozen unchanged).
+
+---
+
+## L15 — Observability-only vẫn cần reconcile gate; ✅ = chạy, không "code có" (2026-07-13/14)
+
+**Case: runner.py thêm _emit_event + regime_fn — tưởng "chỉ thêm log" nên không cần gate.**
+
+Sai. Bất kỳ sửa nào trong runner.py, dù observability-only, đều có thể vô tình:
+- Thay đổi control flow (return sớm, exception bị catch sai)
+- Thêm side effect (state mutation trong emit)
+- Làm chậm vòng lặp → timeout → fill bị miss
+
+**Gate cứng**: reconcile_gd0 + reconcile_stress PASS sau MỖI sửa. Tách 2 commit (regime / events) để isolate: nếu reconcile fail, biết ngay cái nào vỡ. Không gộp "cho nhanh".
+
+**"✅ = chạy, không 'code có'"**: Deliverables dashboard bị đánh ✅ "đã có từ trước" nhưng chưa chạy verify → bài học đắt. Sau đó phải chạy browser test thật (equity tick, offline banner, opacity dim). Events OPEN/CLOSE/STP: code done + reconcile PASS, nhưng fire chưa verify → ghi "fire ⏳ P2" chứ không ✅.
+
+**Scheduler cũng phải pass đủ args**: dump_state là no-op khi scheduler không truyền `--live-state-path` → regime không bao giờ lên dashboard dù runner code đúng. Bug ẩn ở layer subprocess, không phải logic.
+
+---
+
 ## Tổng hợp — Class of mistakes
 
 | Class | Lessons |
@@ -187,3 +219,5 @@ Nếu không đủ 3 điều kiện → giữ model cũ. Decode-forward (model f
 | Model update | L11 (data mới ≠ model sai — đo trước khi refit) |
 | Live interface | L12 (bug fetch/broker chỉ lộ khi chạy thật — splice/dtype/exchange) |
 | Fail-safe design | L13 (kiểm tất cả N điều kiện; fail-closed khi đủ an toàn, không chase edge-of-edge) |
+| Data-write safety | L14 (backup → gate → verify exact match; truncate = destructive, phải reversible) |
+| Observability + verification | L15 (reconcile gate dù "chỉ thêm log"; ✅ = chạy thật, không "code có"; subprocess phải pass đủ args) |

@@ -1,24 +1,26 @@
 # Futures — PIPELINE FLOW
 _Trace thật từ runner.run_day(). Thứ tự CHÍNH XÁC trong code, không phải thiết kế lý tưởng._
-_Cập nhật: 2026-07-06. Chi tiết file: xem [SCRIPT_INVENTORY.md](SCRIPT_INVENTORY.md)._
+_Cập nhật: 2026-07-14. Chi tiết file: xem [SCRIPT_INVENTORY.md](SCRIPT_INVENTORY.md). Xem thêm: [DAILY_FLOW.md](DAILY_FLOW.md) (timeline lệnh) · [DAILY_UPDATE_RUNBOOK.md](DAILY_UPDATE_RUNBOOK.md) (data safety)._
 
 ---
 
 ## Sơ đồ bước — mỗi ngày trading
 
 ```
-PRE-DAY (trước run_day, chạy riêng):
-  update_spy_csv.py → spy_daily.csv     (G1 freshness gate)
-  fetch.py          → futures parquet   (nếu data cũ)
+PRE-DAY (13:45 ET, scheduler tự động):
+  update_ibkr_daily.py → futures parquet (4 instruments MES/MNQ/MYM/M2K + NKD = 5 total, append daily bars)
+  update_spy_csv.py    → spy_daily_live.csv  (Polygon adjusted close, 30d overlap)
+  [G1 freshness gate: HMMStaleGuard chưa wire trong production — xem I5.12]
   ── (annual) ──
   refreeze.py       → models/PRODUCTION.pkl
 
-CONSTRUCTION (một lần khi khởi động, không phải mỗi ngày):
-  label_regimes(spy_daily.csv, fit_end=2024-12-31)
-  → RegimeLabels dict {date → "Calm"/"Normal"/"Stress"}   ← HMM walk-forward tính một lần
+CONSTRUCTION (MỖI NGÀY — run_live_day.py là run-and-exit subprocess, label_regimes gọi trong main()):
+  label_regimes(spy_daily_live.csv, fit_end=2024-12-31)
+  → RegimeLabels dict {date → "Calm"/"Normal"/"Stress"}   ← HMM model frozen (fit_end=2024-12-31)
   SwingTFEngine(basket), StressMidEngine(basket), CircuitBreaker
   → bound vào signal_fn (closure)
-  → FuturesRunner(broker, signal_fn, guard, breaker, hmm_stale_guard)
+  → FuturesRunner(broker, signal_fn, guard, breaker, hmm_stale_guard=None)
+  [G1 HMMStaleGuard chưa wire: hmm_stale_guard=None trong production — xem I5.12]
 
 ────────────────────────────────────────────────
 RUN_DAY(day):
@@ -33,7 +35,8 @@ RUN_DAY(day):
   └── Exits KHÔNG bị ảnh hưởng
 
 [1-DATA] Fetch bars qua broker
-  └── runner.py: bars = {inst: broker.fetch_bars(inst, through=day)}
+  └── runner.py: bars = {inst: broker.fetch_bars(inst, through=day+23:59)}
+  [through=day+23:59, KHÔNG through=day — LIVE_RUNNER_AUDIT Mismatch B fix, runner.py:745]
   └── broker.py / ibkr_broker.py: IBKRBroker._fetch_raw() [TODO: live]
   In : danh sách instruments (open positions + contracts)
   Out: dict {inst → DataFrame(OHLCV, tz-aware)}
@@ -62,14 +65,16 @@ RUN_DAY(day):
   E3/D5: discard entry_candidates nếu clock skew / STOP_FILE
 
 [2b-GUARD] HMM Stale Guard (AFTER signal — entries đã compute, giờ mới gate)
+  ⚠️ CHƯA WIRE TRONG PRODUCTION (I5.12): hmm_stale_guard=None → bước này bị SKIP.
+  Freshness hiện chỉ dựa pre-flight flag (update_ibkr_daily + update_spy_csv success).
+  Thiết kế (khi wire):
   └── runner.py: entries_allowed = hmm_stale_guard.check_day(day)
-  └── hmm_stale_guard.py: đọc spy_daily.csv last_date
+  └── hmm_stale_guard.py: đọc spy_daily_live.csv last_date
       G1 SOFT (>2 bday stale): WARN, vẫn trade
       G1 HARD (>5 bday stale): regime_unreliable=True → entry_candidates = []
       G2 SOFT (>12 month model age): WARN only
       G2 HARD (>18 month model age): ALERT, WARN only (không halt)
-  └── notify.py: gửi notification khi G1/G2 transition
-  In : day, spy_daily.csv last_date
+  In : day, spy_daily_live.csv last_date
   Out: entries_allowed bool (False → entry_candidates = [])
   Guards: C2 (exception → entries_allowed=False, conservative block)
 
@@ -113,9 +118,9 @@ RUN_DAY(day):
 
 [6-PERSIST] B1 Atomic state persist
   └── runner.py: _persist_state()
-  └── write positions.json.tmp → os.replace → positions.json
+  └── write live_positions.json.tmp → os.replace → live_positions.json
   In : state.open_positions, breaker.peak_equity, breaker.day_start_equity, cur_day
-  Out: positions.json (crash-safe, atomic)
+  Out: live_positions.json (crash-safe, atomic)
 
 [7-DASH] Dashboard dump (no-op nếu live_state_path=None)
   └── runner.py: dump_state(day)
@@ -134,7 +139,7 @@ RUN_DAY(day):
                         ┌─────────────────────────────────────────────────────┐
   PRE-DAY               │           CONSTRUCTION (một lần)                    │
                         │                                                     │
-  spy_daily.csv ────────┼──► label_regimes() ──► RegimeLabels dict           │
+  spy_daily_live.csv ───┼──► label_regimes() ──► RegimeLabels dict           │
   (Polygon, daily)      │    (fit_end=2024-12-31, walk-forward HMM)           │
                         │         │                                           │
                         │         ▼                                           │
@@ -150,17 +155,14 @@ RUN_DAY(day):
                         │         signal_fn=signal_fn,                        │
                         │         guard=MultiClusterGuard,                    │
                         │         breaker=CircuitBreaker(account),            │
-                        │         hmm_stale_guard=HMMStaleGuard)              │
+                        │         hmm_stale_guard=None)  ← CHƯA WIRE (I5.12) │
                         └─────────────────────────────────────────────────────┘
 
   EVERY DAY:
 
-  spy_daily.csv ──────► hmm_stale_guard.check_day()
-  (last_date check)           │
-                              ▼
-                         entries_allowed (bool)
+  [G1 HMMStaleGuard: CHƯA WIRE — bước này không chạy trong production (I5.12)]
 
-  IBKRBroker ──────────► broker.fetch_bars(insts, through=day)
+  IBKRBroker ──────────► broker.fetch_bars(insts, through=day+23:59)
   (IBKR TWS API)              │
                               ▼
                          bars = {inst: DataFrame(OHLCV)}
@@ -202,7 +204,7 @@ RUN_DAY(day):
             [IBKRBroker.send_order]   [F3: fat-finger check first]
                     │
                     ▼
-            positions.json  ◄── _persist_state() (atomic .tmp + replace)
+            live_positions.json  ◄── _persist_state() (atomic .tmp + replace)
             (peak_equity,
              open_positions,
              cur_day)
@@ -231,11 +233,11 @@ RUN_DAY(day):
 
 **G1 gate đặt SAU signal_fn** — signal tính hết rồi mới check stale. Đây là ý đồ thiết kế: exits không bị ảnh hưởng (exit_day-based), nên signal_fn phải chạy để có exit_positions. Entries thì bị discard nếu G1 block.
 
-**Regime labels tính TRƯỚC run_day (một lần khi khởi động)** — `label_regimes()` không chạy mỗi ngày. Nó tính walk-forward labels cho toàn bộ history đến fit_end tại construction. Mỗi ngày `signal_fn` chỉ lookup `labels.get(day)`. Đây là lý do update_spy_csv.py không làm regime "cập nhật" trực tiếp — nó chỉ giữ G1 freshness gate xanh. Để regime thật sự cập nhật sau khi có SPY data mới: phải re-run label_regimes (xảy ra khi runner restart).
+**Regime labels tính MỖI NGÀY trong construction block** — `run_live_day.py` là run-and-exit subprocess, spawn mỗi ngày 14:05. `label_regimes()` gọi trong `main()` nên chạy lại mỗi lần spawn. Nó tính walk-forward labels cho toàn bộ spy_daily_live.csv với model frozen (fit_end=2024-12-31). Mỗi ngày `signal_fn` chỉ lookup `labels.get(day)` trong run_day. `update_spy_csv.py` cập nhật file source — ngày mới có label ngay khi run_live_day.py spawn lại.
 
 **CLOSE trước OPEN** — runner gửi CLOSE trước OPEN (step 5). Quan trọng cho exposure cap: đóng vị thế trước khi mở mới tránh tạm thời double-count trong guard.
 
-**Breaker state persist qua restart (B1)** — `peak_equity` lưu trong positions.json. Khi restart, `breaker.peak_equity` được restore. Không có điều này: restart → peak reset → DD=0% → runner "quên" đang trong drawdown.
+**Breaker state persist qua restart (B1)** — `peak_equity` lưu trong live_positions.json. Khi restart, `breaker.peak_equity` được restore. Không có điều này: restart → peak reset → DD=0% → runner "quên" đang trong drawdown.
 
 **NKD contracts cố định = 1** — không scale cùng n_contracts Rổ4. Hardcoded trong `contracts_by[NKD] = 1` ở construction. Budget 2% × $50k = $1,000 chỉ đủ 1 MNKD.
 

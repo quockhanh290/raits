@@ -37,6 +37,7 @@ Hỏng → DỪNG, điều tra, sửa, chạy lại. Không vội tuần tự.
 | Pre-flight scheduler | DONE 2026-07-13 — update_ibkr_daily→spy_csv→run_live_day, fail-closed 2-branch |
 | **P0b gate+logic** | **DONE 2026-07-13** — gate ✅ (Calm→no entry) logic ✅ (desired=backtest 53124) |
 | **P0b live path** | **⏳ CHỜ Normal/Stress** — chưa verify --print-signals có entry thật |
+| **Monitor/Dashboard** | **DONE 2026-07-13/14** — xem section bên dưới |
 
 ⚠️ **Phân biệt quan trọng:** P0b gate/logic (offline + Calm day) đã xong. P0b live path (run_live_day == desired_basket VỚI entry thật) **chưa chạy** — Calm → no entry → không thể verify. Đây là việc của P0c, chờ regime đổi.
 
@@ -58,19 +59,48 @@ Calm regime → no entry → không thể so `--print-signals` vs `desired_baske
 
 ---
 
+## MONITOR/DASHBOARD — Trạng thái (2026-07-13/14)
+
+### Loại 1 — IBKR real-time (commits f753b43, 50bd59e) ✅ VERIFIED
+- Account equity, unrealized PnL, positions, open orders — 8s refresh
+- ibkr_reader.py: equity CAD fix (BASE>USD>any) + reqAllOpenOrders() cho tất cả clientId
+- Stale on disconnect: giữ data + dim + timestamp; clear chỉ khi backend offline
+- Verified browser: equity $994,294, MESU6 position, STP order, SNAPSHOT divider
+
+### Loại 2 — Regime (commits 68ab035, 7e8a690) ✅ VERIFIED END-TO-END
+- runner.py: regime_fn param → dump_state hiện regime thật (không "Unknown")
+- run_scheduler.py: `--live-state-path global_index/live_state_data.js` truyền vào run_live_day
+- End-to-end: --dry-run → live_state_data.js `"regime": "Calm"` → dashboard hiện Calm ✓
+- Reconcile GĐ0+STRESS PASS (diff $0.00) sau cả regime + events commits
+
+### Loại 2/3 — Events OPEN/CLOSE/STP (commit f139fa5) ⏳ CODE DONE — FIRE ⏳ P2
+- Code done + reconcile PASS — NHƯNG --print-signals không order → events chưa fire
+- Verify fire đúng format/chỗ: chờ P2 (order thật)
+- Bound 500 events đã có trong runner.py
+
+### Control (start/stop runner) — CHƯA LÀM
+- Bước riêng sau P2 — process control cẩn thận, không rush
+
+---
+
 ## P0c — LIVE PATH 4-FIELD VERIFY ⬅ BƯỚC TIẾP THEO (ngày Normal/Stress đầu tiên)
 
 **Mục đích:** Verify live path `run_live_day → generate_today_signals → entries` ra đúng entry thật so với `desired_basket()` offline. P0b đã verify logic offline; P0c verify cùng logic trên data live.
 
 **Check hàng sáng** (trước khi biết có entry không):
 ```powershell
-python C:\Users\quock\AppData\Local\Temp\claude\d--raits\50653392-7b8f-489d-83ae-66e0aa548b58\scratchpad\check_next_entry.py
+python global_index\check_next_entry.py
 ```
 Nếu có entry → chạy `--print-signals` lúc 14:05 ET và so sánh.
 
 **CỬA:** `--print-signals` output KHỚP `desired_basket()` offline cùng cutoff:
 - inst, direction, entry, stop → 4 trường MATCH
 - Lệch entry > 1 tick → data scale sai hoặc signal bug → DỪNG
+
+**⚠️ Same-input requirement (I5.11 fix):** `--print-signals` đã sửa `through=today+23:59` (match run_day).
+Nhưng IBKR cap tại now → preview 14:10 ET và desired_basket 14:30 ET dùng bars khác nhau.
+Để 4-field exact: chạy `--print-signals` **và** `desired_basket()` offline **sát nhau** (cùng now ± 2 phút),
+hoặc dùng bars từ lần preview làm input cho desired_basket (nếu muốn identical).
 
 ---
 

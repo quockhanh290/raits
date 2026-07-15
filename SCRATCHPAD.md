@@ -1,5 +1,17 @@
 ## Gotchas
 
+- **IBKR paper account: ALL bars EMPTY — code=162 subscription thiếu** (2026-07-14):
+  `--print-signals` kết nối OK nhưng `reqHistoricalData(..., whatToShow="TRADES", barSizeSetting="1 min")`
+  → ALL 5 instruments (MES/MNQ/MYM/M2K/MNKD) = ✗ EMPTY. Terminal in 2 warnings `code=162
+  "API historical data query cancelled: reqId"` cho 2 req; 3 req còn lại EMPTY không warning (bars=[]).
+  **Root cause**: Paper account mặc định chỉ có 15-min delayed data. `whatToShow="TRADES"` historical
+  intraday 1-min bars cho CME futures yêu cầu active Level 1 real-time subscription, paper không có.
+  Code 162 KHÔNG nằm trong `_IBKR_INFORMATIONAL` nên log WARNING — đúng behavior, chỉ thiếu subscription.
+  **Fix trước P2**: Subscribe CME US Micro Futures (+ CME Nikkei cho NKD) trong IB Account Management
+  (paper account). Verify bằng lệnh: `ib.reqHistoricalData(MES_202609_contract, durationStr="1 D",
+  whatToShow="TRADES", ...)` → phải trả bars > 0.
+  **Fallback**: Link paper account với real account → mirror market data subscriptions.
+
 - **Futures liquidity concentrates at 09:00-11:00 + 15:00 ET, not overnight** (2026-07-09):
   Measured avg per-min volume by hour across full 23h session (ES/NQ/YM/RTY, frozen_sim).
   09:00/10:00/15:00 ET are top-3 for all 4 instruments; 18:00-08:00 ET (bulk of Globex

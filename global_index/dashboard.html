@@ -503,6 +503,8 @@ header::before {
 .log-filter-btn.active { background: rgba(91,157,255,.10); color: var(--blue); border-color: rgba(91,157,255,.30); }
 .log-filter-btn.btn-crit { }
 .log-filter-btn.btn-crit.active { background: rgba(218,54,51,.12); color: var(--red); border-color: rgba(218,54,51,.35); }
+.log-filter-btn.btn-exec.active { background: rgba(91,157,255,.18); color: var(--blue); border-color: rgba(91,157,255,.50); font-weight: 700; }
+.log-filter-btn.btn-roll.active { background: rgba(192,128,0,.12); color: var(--amber); border-color: rgba(192,128,0,.35); }
 .log-sep { width: 1px; height: 18px; background: var(--border); display: inline-block; margin: 0 4px; flex-shrink: 0; align-self: center; }
 .log-count { font-size: 11px; color: var(--muted); margin-left: auto; font-family: 'JetBrains Mono', monospace; }
 .log-scroll {
@@ -657,7 +659,7 @@ header::before {
   <div class="section-title">
     IBKR Live Account
     <span class="ibkr-pnl-note">entry $ = avgCost proxy (not exact fill)</span>
-    <span class="ibkr-pnl-note" id="ibkrLastTs" style="margin-left:16px;color:var(--dim)">— waiting for backend...</span>
+    <span class="ibkr-pnl-note" id="ibkrLastTs" style="margin-left:16px;color:var(--dim)">[IBKR live @—] backend offline</span>
   </div>
 
   <div id="ibkrBanner" class="ibkr-banner warn">
@@ -713,10 +715,17 @@ header::before {
 </section>
 <!-- ══ END IBKR LIVE ═══════════════════════════════════════════════ -->
 
+<!-- RECONCILE PLACEHOLDER — future P2 live reconcile panel -->
+<div id="reconcile-placeholder" style="padding:9px 24px;display:flex;align-items:center;gap:10px;background:rgba(90,100,114,0.06);border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--dim)">
+  <span style="font-size:14px">⟳</span>
+  <span>Reconcile IBKR↔runner: awaiting live run (P2)</span>
+  <span style="margin-left:auto;font-size:11px;color:var(--dim)">[compares live positions vs runner live_positions.json]</span>
+</div>
+
 <!-- SNAPSHOT DIVIDER — loại 2/3 (runner data, not real-time) -->
 <div id="snapshot-divider">
   <span class="snap-badge">SNAPSHOT</span>
-  <span style="color:var(--dim)">Regime · chart · positions below = runner state, not real-time</span>
+  <span style="color:var(--dim)">[snapshot @14:05] — Regime · chart · positions = runner state at EOD (not real-time)</span>
   <span id="snapshotAsOf" style="color:var(--muted);margin-left:auto">as of —</span>
 </div>
 
@@ -766,7 +775,7 @@ header::before {
 
 <!-- OPEN POSITIONS + CLUSTER EXPOSURE -->
 <section class="section" id="positions-section">
-  <div class="section-title">Open Positions &amp; Cluster Exposure</div>
+  <div class="section-title">Open Positions &amp; Cluster Exposure <span style="font-size:10px;color:var(--dim);font-weight:400;margin-left:8px">[snapshot @14:05]</span></div>
   <div id="positions-split">
     <div>
       <table class="trade-table" id="openPosTable">
@@ -945,18 +954,19 @@ header::before {
 
 <!-- OPERATIONAL LOG -->
 <section class="section" id="log-section">
-  <div class="section-title">Operational Log &amp; Events — <span id="logTotal">0</span></div>
+  <div class="section-title">Operational Log &amp; Events — <span id="logTotal">0</span> <span style="font-size:10px;color:var(--dim);font-weight:400;margin-left:8px">[event @UTC ts]</span></div>
   <div class="log-controls">
     <button class="log-filter-btn active" id="logBtnALL"      onclick="setLogFilter('ALL')">ALL</button>
     <button class="log-filter-btn btn-crit" id="logBtnCRITICAL" onclick="setLogFilter('CRITICAL')">CRITICAL</button>
     <button class="log-filter-btn" id="logBtnWARN"   onclick="setLogFilter('WARN')">WARN</button>
     <button class="log-filter-btn" id="logBtnINFO"   onclick="setLogFilter('INFO')">INFO</button>
     <span class="log-sep"></span>
-    <button class="log-filter-btn" id="logBtnGUARD"  onclick="setLogFilter('GUARD')">GUARD</button>
-    <button class="log-filter-btn" id="logBtnSTATE"  onclick="setLogFilter('STATE')">STATE</button>
-    <button class="log-filter-btn" id="logBtnSIGNAL" onclick="setLogFilter('SIGNAL')">SIGNAL</button>
-    <button class="log-filter-btn" id="logBtnFEED"   onclick="setLogFilter('FEED')">FEED</button>
-    <button class="log-filter-btn" id="logBtnORDER"  onclick="setLogFilter('ORDER')">ORDER</button>
+    <button class="log-filter-btn" id="logBtnGUARD"    onclick="setLogFilter('GUARD')">GUARD</button>
+    <button class="log-filter-btn" id="logBtnSTATE"    onclick="setLogFilter('STATE')">STATE</button>
+    <button class="log-filter-btn btn-exec" id="logBtnEXEC"     onclick="setLogFilter('EXEC')">EXEC</button>
+    <button class="log-filter-btn" id="logBtnSIGNAL"   onclick="setLogFilter('SIGNAL')">SIGNAL</button>
+    <button class="log-filter-btn" id="logBtnORDER"    onclick="setLogFilter('ORDER')">ORDER</button>
+    <button class="log-filter-btn btn-roll" id="logBtnROLLOVER" onclick="setLogFilter('ROLLOVER')">ROLLOVER</button>
     <span class="log-count" id="logCount">0 events</span>
   </div>
   <div class="log-scroll" id="logScroll">
@@ -1890,7 +1900,7 @@ function renderOpsStatus(snap) {
 // ── LOG ───────────────────────────────────────────────────────────────────
 let logFilter = 'ALL';
 const LOG_LEVEL_ORD = { CRITICAL: 0, ALERT: 1, WARN: 2, INFO: 3 };
-const LOG_CAT_FILTERS = ['GUARD','STATE','SIGNAL','FEED','ORDER'];
+const LOG_CAT_FILTERS = ['GUARD','STATE','EXEC','SIGNAL','ORDER','ROLLOVER'];
 
 function setLogFilter(f) {
   logFilter = f;
@@ -1937,7 +1947,7 @@ function renderLog() {
   if (!allEvents.length) {
     scroll.innerHTML = '<div class="log-empty">' +
       (mode === 'live'
-        ? 'No events yet — runner has not written any events to live_state'
+        ? 'Live: no events — scheduler in dry-run (P0c/P1). Events appear from real run (P2).'
         : selectedIdx === 0
           ? 'No events yet — play forward to see regime changes and breaker halts'
           : 'No guard events in this period') +
@@ -1945,7 +1955,11 @@ function renderLog() {
     return;
   }
   if (!events.length) {
-    scroll.innerHTML = '<div class="log-empty">No events match this filter</div>';
+    scroll.innerHTML = '<div class="log-empty">' +
+      (LOG_CAT_FILTERS.includes(logFilter)
+        ? 'No [' + logFilter + '] events yet — awaiting live run'
+        : 'No events match this filter') +
+      '</div>';
     return;
   }
 

@@ -267,9 +267,14 @@ def main():
         _ps_broker.connect()
         time.sleep(15)  # wait for IB Gateway farm connections to stabilize (2103/2104 flicker)
         try:
-            # Fetch bars for all instruments
-            _ps_insts = list(contracts_by.keys())
-            _ps_bars  = {i: _ps_broker.fetch_bars(i, through=today) for i in _ps_insts}
+            # Fetch bars for all instruments.
+            # _ps_through matches run_day _through (day+23:59) so signal_fn gets the same
+            # live bars as the order path — IBKR caps at now, giving bars up to ~fetch time.
+            # Bug history: originally through=today (midnight) — omitted when LIVE_RUNNER_AUDIT
+            # changed signal_fn B→C (Option C needs live intraday bars; midnight cuts them all).
+            _ps_insts   = list(contracts_by.keys())
+            _ps_through = today + pd.Timedelta(hours=23, minutes=59)
+            _ps_bars    = {i: _ps_broker.fetch_bars(i, through=_ps_through) for i in _ps_insts}
 
             # Load held positions from live_positions.json (if exists)
             _ps_held: list = []

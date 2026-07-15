@@ -1,8 +1,10 @@
 # Daily Update Runbook — Futures Paper Trading
 
-_Cập nhật: 2026-07-12_
+_Cập nhật: 2026-07-14. Xem thêm: [DAILY_FLOW.md](DAILY_FLOW.md) (command timeline) · [PIPELINE_FLOW.md](PIPELINE_FLOW.md) (nội bộ run_day)._
 
 > **Bài học:** Futures thiếu backup frozen → baseline $52,936 không tái tạo. Rule #1: frozen = ĐÓNG BĂNG, backup external, không đụng.
+>
+> **Baseline numbers:** $52,936 = baseline CŨ trước look-ahead fix (2026-07-10), KHÔNG reproduce. $40,919 = baseline HIỆN TẠI (post look-ahead fix, frozen_sim, n=1, 2-tick slippage). Dùng $40,919 làm chuẩn.
 
 ---
 
@@ -16,7 +18,7 @@ FROZEN (đóng băng, không bao giờ update)     LIVE (append-only hằng ngà
 NKD_frozen_*.parquet
 frozen_sim/            (shim, deploy_sim)
 frozen_2025_sim/       (shim, deploy_sim)
-spy_daily.csv          (frozen/sacred)
+spy_daily.csv          (frozen/sacred — default cho reconcile scripts + refreeze; KHÔNG dùng cho live)
 ```
 
 **Code load đúng nguồn:**

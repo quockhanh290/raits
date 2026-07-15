@@ -436,10 +436,59 @@ Status: OFFLINE DONE — chỉ chờ market day
 
 **⚠️ MYM đặc biệt (P0c):** vừa fix exchange CBOT + splice offset (−57 vs +751). Kiểm scale MYM cẩn thận khi có entry.
 
+#### SESSION 2026-07-13/14 — Monitor/Dashboard (commits f753b43, 50bd59e, 68ab035, f139fa5, 7e8a690)
+
+**Backend + ibkr_reader.py:**
+- [x] TEST 3 (clientId simultaneous 99+1): PASS — bars 1741 each (HMDS race condition explained)
+- [x] TEST 4 (position + order parse): PASS — equity/positions/orders all fields correct
+- [x] ibkr_reader.py Fix 1: equity=None on CAD account → collect all currencies, prefer BASE>USD>any
+- [x] ibkr_reader.py Fix 2: orders=[] → `reqAllOpenOrders()` + sleep(1.0) before `openTrades()`
+- [x] place_stop tif=GTC verified from code: ibkr_broker.py:749 explicit, not IBKR default
+
+**Dashboard bước 2a (commit 50bd59e — verified running, không chỉ code):**
+- [x] DL1–5: IBKR panel auto-refresh /api/all every 8s, SNAPSHOT divider, stale behavior
+- [x] Stale on disconnect: giữ data + dim opacity 0.4 + "⚠ stale as of HH:MM"; clear chỉ khi backend offline
+- [x] Verified browser: equity $994,294, MESU6 position, STP order, SNAPSHOT divider showing
+
+**Dashboard bước 2b — runner.py observability (commits 68ab035 + f139fa5 + 7e8a690):**
+- [x] regime_fn param → dump_state hiện regime thật (không "Unknown"); fallback "Unknown" nếu None
+- [x] OPEN/CLOSE/STP events sau fill confirm; bound 500 đã có
+- [x] scheduler: thêm `--live-state-path global_index/live_state_data.js` vào run_live_day call
+- [x] Reconcile GĐ0+STRESS PASS sau cả 2 bước (diff $0.00)
+- [x] End-to-end verify: --dry-run → live_state_data.js `"regime": "Calm"` → dashboard hiện Calm ✓
+
+**Dashboard trạng thái cuối:**
+- Loại 1 (account/equity/position/STP): ✅ real-time, 8s refresh, verified running
+- Loại 2 regime: ✅ populate + end-to-end verified (Calm hiện đúng)
+- Loại 2/3 signal/events: code done, reconcile PASS — fire ⏳ P2 (cần order thật)
+- Control (start/stop): CHƯA — bước riêng sau P2
+
+**LESSONS:**
+- L11: "Code có" ≠ "chạy đúng" — DL2/3/4 đánh ✅ trước khi verify, phải chạy browser test
+- L12: Sửa runner dù observability-only → PHẢI reconcile (gate cứng). Tách 2 commit để isolate failure.
+- L13: scheduler cũng phải truyền đủ args cho subprocess — thiếu --live-state-path → dump_state no-op mãi
+
+#### SESSION 2026-07-14 — Docs consolidation (DONE)
+
+**A1-A6 verified từ code, 5 sửa PIPELINE_FLOW.md, cross-link 3 docs:**
+- [x] A1 WRONG: `CONSTRUCTION (một lần khi khởi động)` → `label_regimes()` chạy TỪNG NGÀY (run-and-exit subprocess). Đã sửa dòng 17 + 236 PIPELINE_FLOW.md
+- [x] A2: `positions.json` trong ASCII art (dòng 207) → `live_positions.json`. Dòng 240 tương tự.
+- [x] A3: "5 instruments + NKD" → "4 instruments MES/MNQ/MYM/M2K + NKD = 5 total"
+- [x] A4: deploy_sim docstring dùng `spy_daily.csv` (stale); RUNBOOK baseline verify dùng `spy_daily_live.csv`. Không có mâu thuẫn — deploy_sim nhận bất kỳ arg `--regime-csv`.
+- [x] A5: $52,936 = original baseline bị mất (RUNBOOK intro). $40,919 = deploy_sim frozen_sim baseline hiện tại (RUNBOOK "Expected: net=$40,919"). Khác scope, không mâu thuẫn.
+- [x] A6: G1 chưa wire — xác nhận lại (hmm_stale_guard=None, I5.12).
+- [x] Cross-links thêm vào cả 3 docs (PIPELINE_FLOW ↔ DAILY_FLOW ↔ DAILY_UPDATE_RUNBOOK)
+- [x] Date update: DAILY_UPDATE_RUNBOOK 2026-07-12 → 2026-07-14
+
+**Single source of truth phân công:**
+- DAILY_FLOW.md = "khi nào / cái gì chạy" (command timeline, phase P0c/P1/P2)
+- PIPELINE_FLOW.md = "bên trong run_day() hoạt động thế nào" (step-by-step runner logic)
+- DAILY_UPDATE_RUNBOOK.md = "data safety" (frozen/live ranh giới, backup, rollback, anti-patterns)
+
 #### P0c — chờ ngày Normal/Stress (target: tuần này)
 ```powershell
 # Mỗi sáng trước 13:45 ET:
-python C:\Users\quock\AppData\Local\Temp\claude\d--raits\50653392-7b8f-489d-83ae-66e0aa548b58\scratchpad\check_next_entry.py
+python global_index\check_next_entry.py
 # Nếu có entry → 14:05 ET chạy:
 python -m global_index.run_live_day --data-dir data/cache/futures --nkd-parquet global_index/data/NKD_continuous_1m_8y.parquet --regime-csv spy_daily_live.csv --port 4002 --print-signals
 ```

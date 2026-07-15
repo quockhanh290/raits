@@ -344,6 +344,28 @@ _Cập nhật: 2026-07-07_
 | **Trạng thái cuối** | 2 branch: flag=True→run; flag=False/None→skip. Không còn loophole. |
 | **Nguồn** | `global_index/run_scheduler.py:53-57` (comment), `139-171` (job_live_day); `L13` trong LESSONS.md. |
 
+### I5.11 — --print-signals cutoff midnight: không bars 14:00-15:55 (bỏ sót khi LIVE_RUNNER_AUDIT)
+| Trường | Nội dung |
+|---|---|
+| **Trạng thái** | CODE-COMPLETE / CHƯA VERIFIED (chờ P0c chạy bars thật) |
+| **Root cause** | `--print-signals` dùng `fetch_bars(through=today)` where `today = normalize() = midnight`. Commit gốc 5f0cc7f5 viết khi signal_fn là Option B (pre-computed timeline lookup, bars ít quan trọng). LIVE_RUNNER_AUDIT đổi signal_fn sang Option C (`generate_today_signals` dùng live bars), đồng thời fix runner.py `_through = day+23:59` (Mismatch B). Nhưng `--print-signals through=today` không được sửa theo → midnight cắt toàn bộ bars RTH hôm nay. Hệ quả: `backtest_swing_tf` entry scan window `between_time("14:00","15:55")` cho today = EMPTY → không fire entry nào cho hôm nay, dù chạy lúc 14:10 hay 15:00. |
+| **Impact** | P0b-B gate sai assumption: "4-field exact so `--print-signals` vs `desired_basket()`" không valid vì hai path dùng khác cutoff → khác bars → khác signal. P0c verify không thể thực hiện trước fix. |
+| **Fix** | `run_live_day.py:272–273`: thêm `_ps_through = today + pd.Timedelta(hours=23, minutes=59)`, đổi `fetch_bars(through=_ps_through)`. Match `runner.py _through = day+23:59`. Sau fix IBKR cap `endDateTime` tại now → bars đến ~14:05 ET. |
+| **Verify** | CODE-COMPLETE 2026-07-14. Chưa ✅ — cần P0c chạy `--print-signals` sau 14:10 ET, confirm output hiện `bars: MES✓Nb ... (N>0 bars hôm nay)` và có entry (nếu regime + signal fire). Bug data-fetch chỉ lộ khi fetch thật. |
+| **Bài học** | Đổi signal_fn cần live bars → phải sửa MỌI `through` cutoff (run_day VÀ --print-signals), không chỉ run_day. Cùng pattern splice anchor/dtype: fix một chỗ, grep chỗ tương tự ngay. Khi LIVE_RUNNER_AUDIT viết "fix Mismatch B: through=day+23:59" → phải grep tất cả `through=today` để catch các chỗ dùng midnight cũ. |
+| **Nguồn** | `global_index/run_live_day.py:270–275` (fix); `docs/futures/LIVE_RUNNER_AUDIT.md` (Mismatch B context); git blame :272 → 5f0cc7f5 (gốc) + f6dd232 (TZ refactor, không fix cutoff) |
+
+### I5.12 — G1 HMMStaleGuard chưa wire vào production (freshness gate tắt)
+| Trường | Nội dung |
+|---|---|
+| **Trạng thái** | OPEN — PENDING wire trước live tiền thật (không gấp bằng P0c/P1/P2) |
+| **Root cause** | `run_live_day.py` không import, không khởi tạo `HMMStaleGuard`. `FuturesRunner` nhận `hmm_stale_guard=None` (default). `runner.py:853` check `if self._hmm_stale_guard is not None` → G1 + G2 không bao giờ chạy trong production. Docstring `update_spy_csv.py:4–6` và `hmm_stale_guard.py:24` vẫn ghi `spy_daily.csv` (outdated, file thật là `spy_daily_live.csv`). |
+| **Impact** | Freshness hiện chỉ dựa pre-flight flag (update_ibkr_daily + update_spy_csv returncode=0 → _preflight_ok=True). Không có G1 backup: nếu pre-flight chạy nhưng CSV fetch partial/corrupt, G1 không bắt được. Không có G2 model-age alert. |
+| **Fix khi wire** | (1) Import `HMMStaleGuard` trong `run_live_day.py`. (2) Khởi tạo `stale_guard = HMMStaleGuard(regime_csv=a.regime_csv, fit_end=HMM_FIT_END)`. (3) Truyền `hmm_stale_guard=stale_guard` vào `FuturesRunner(...)`. (4) Fix docstring `update_spy_csv.py:4–6` và `hmm_stale_guard.py:24`: `spy_daily.csv` → `spy_daily_live.csv`. |
+| **Bài học** | Guard code tồn tại nhưng chưa plug in. Cần verify từng safety mechanism thật sự chạy, không chỉ tồn tại trong codebase. |
+| **Ưu tiên** | TRƯỚC live tiền thật. Paper phase: pre-flight flag đủ tạm (fail-closed). Không gấp hơn P0c/P1/P2. |
+| **Nguồn** | `global_index/hmm_stale_guard.py:82` (class); `global_index/run_live_day.py` (không có import); `runner.py:163,435,853` (hmm_stale_guard=None default) |
+
 ---
 
 ## NHÓM 6 — DOCUMENTATION (session này)
@@ -403,6 +425,8 @@ _Cập nhật: 2026-07-07_
 | I5.8 | History invariant dtype false positive (int64/float64) | Wire | FIXED |
 | I5.9 | update_ibkr_daily exit 0 khi instrument fail (Gateway down) | Wire | FIXED |
 | I5.10 | Pre-flight fail-safe chain: flag in-memory → Branch 3 loophole | Wire | FIXED (fail-closed) |
+| I5.11 | --print-signals cutoff midnight → no bars 14:00-15:55 (bỏ sót LIVE_RUNNER_AUDIT B→C) | Wire | CODE-COMPLETE / chờ P0c verify |
+| I5.12 | G1 HMMStaleGuard chưa wire vào production (hmm_stale_guard=None) | Wire | OPEN — PENDING trước live |
 | I1.3 | Splice anchor wrong: iloc[0] fetched ≠ first-new-bar splice | Data | FIXED (+808 repair) |
 | I6.1 | SYSTEM_MODEL + VISUALIZE docs | Docs | DONE |
 | I6.2 | CROSS_SYSTEM_FINDINGS docs | Docs | DONE |
