@@ -254,12 +254,13 @@ _Cập nhật: 2026-07-07_
 | **Design** | Entry unfilled → SKIP (không chase). Exit → MARKET order (không LIMIT). Retry logic với block 265s worst-case. |
 | **Nguồn** | DECISIONS.md "Entry unfilled → SKIP", "Exit → MARKET order"; ASSUMPTIONS.md (fill timeout, fill rate) |
 
-### I5.2 — Rollover (C2) — wire pending
+### I5.2 — Rollover (C2) — code done, IBKR-gated
 | Trường | Nội dung |
 |---|---|
-| **Trạng thái** | SKELETON DONE (get_roll_event ✓, ROLL_SCHEDULE 2026 ✓), `_handle_rollover()` raises NotImplementedError |
-| **Nuances** | (1) Roll slippage cost ~$40/năm; (2) OpenPos cần `contract_month` field (chưa có); (3) timing vs session — chốt sau IBKR. |
-| **Nguồn** | OPEN_QUESTIONS.md "C2 Rollover" |
+| **Trạng thái** | CODE-COMPLETE — chờ paper/P2 để verify với real IBKR fills |
+| **Code verify (2026-07-16)** | `ibkr_broker.py:891-1044` — `_handle_rollover()` đã implement đầy đủ: CLOSE front-month, OPEN next-month, 3 nhánh Fill outcome. `runner.py:626-700` — `_handle_rollover_if_needed()`: SUCCESS/CLOSE-fail/OPEN-fail-FLAT logic verified. `test_rollover.py` RO1-RO6 viết và sẵn sàng chạy. ROLL_SCHEDULE 2026 verify RO5 (11 parametrized cases MES/MNQ/MYM/M2K/NKD). |
+| **Gaps còn lại** | Xem I5.13 (persist OPEN-fail), I5.15 (contract_month TBD), I5.16 (real fills pending). |
+| **Nguồn** | `global_index/ibkr_broker.py:891-1044`; `global_index/runner.py:626-700`; `global_index/test_rollover.py`; I5.13/I5.15/I5.16 |
 
 ### I5.3 — Kill switch D5 / Fat-finger F3
 | Trường | Nội dung |
@@ -355,16 +356,52 @@ _Cập nhật: 2026-07-07_
 | **Bài học** | Đổi signal_fn cần live bars → phải sửa MỌI `through` cutoff (run_day VÀ --print-signals), không chỉ run_day. Cùng pattern splice anchor/dtype: fix một chỗ, grep chỗ tương tự ngay. Khi LIVE_RUNNER_AUDIT viết "fix Mismatch B: through=day+23:59" → phải grep tất cả `through=today` để catch các chỗ dùng midnight cũ. |
 | **Nguồn** | `global_index/run_live_day.py:270–275` (fix); `docs/futures/LIVE_RUNNER_AUDIT.md` (Mismatch B context); git blame :272 → 5f0cc7f5 (gốc) + f6dd232 (TZ refactor, không fix cutoff) |
 
-### I5.12 — G1 HMMStaleGuard chưa wire vào production (freshness gate tắt)
+### I5.12 — G1 HMMStaleGuard wire vào production
 | Trường | Nội dung |
 |---|---|
-| **Trạng thái** | OPEN — PENDING wire trước live tiền thật (không gấp bằng P0c/P1/P2) |
-| **Root cause** | `run_live_day.py` không import, không khởi tạo `HMMStaleGuard`. `FuturesRunner` nhận `hmm_stale_guard=None` (default). `runner.py:853` check `if self._hmm_stale_guard is not None` → G1 + G2 không bao giờ chạy trong production. Docstring `update_spy_csv.py:4–6` và `hmm_stale_guard.py:24` vẫn ghi `spy_daily.csv` (outdated, file thật là `spy_daily_live.csv`). |
-| **Impact** | Freshness hiện chỉ dựa pre-flight flag (update_ibkr_daily + update_spy_csv returncode=0 → _preflight_ok=True). Không có G1 backup: nếu pre-flight chạy nhưng CSV fetch partial/corrupt, G1 không bắt được. Không có G2 model-age alert. |
-| **Fix khi wire** | (1) Import `HMMStaleGuard` trong `run_live_day.py`. (2) Khởi tạo `stale_guard = HMMStaleGuard(regime_csv=a.regime_csv, fit_end=HMM_FIT_END)`. (3) Truyền `hmm_stale_guard=stale_guard` vào `FuturesRunner(...)`. (4) Fix docstring `update_spy_csv.py:4–6` và `hmm_stale_guard.py:24`: `spy_daily.csv` → `spy_daily_live.csv`. |
-| **Bài học** | Guard code tồn tại nhưng chưa plug in. Cần verify từng safety mechanism thật sự chạy, không chỉ tồn tại trong codebase. |
-| **Ưu tiên** | TRƯỚC live tiền thật. Paper phase: pre-flight flag đủ tạm (fail-closed). Không gấp hơn P0c/P1/P2. |
-| **Nguồn** | `global_index/hmm_stale_guard.py:82` (class); `global_index/run_live_day.py` (không có import); `runner.py:163,435,853` (hmm_stale_guard=None default) |
+| **Trạng thái** | DONE (2026-07-16) |
+| **Fix thực hiện** | (1) `run_live_day.py:77` — import `HMMStaleGuard`. (2) `run_live_day.py:338-350` — `FuturesRunner(..., hmm_stale_guard=HMMStaleGuard(regime_csv=a.regime_csv, fit_end=HMM_FIT_END))`. Dùng `a.regime_csv` (không hardcode) — `run_scheduler.py:195` default `spy_daily_live.csv`. (3) Docstring `hmm_stale_guard.py:24`: `spy_daily.csv` → `spy_daily_live.csv`. (4) `run_live_day.py:26,102-103` — usage + argparser help. |
+| **Verify** | `test_hmm_stale.py` 42/42 PASS. Production path đọc `spy_daily_live.csv` thật: gap=0 ngày 2026-07-16, không block oan. |
+| **Nguồn** | `global_index/run_live_day.py:77,338-350`; `global_index/hmm_stale_guard.py:24`; `global_index/test_hmm_stale.py` (42 PASS) |
+
+### I5.13 — Persist gap rollover OPEN-fail: crash-window state nói dối
+| Trường | Nội dung |
+|---|---|
+| **Trạng thái** | FIXED (2026-07-16) — reconcile required (đụng runner) |
+| **Root cause** | `_handle_rollover_if_needed()`: nhánh OPEN-fail dùng `to_remove` deferred list → xóa state memory nhưng persist chỉ ở cuối `run_day()`. Crash-window: JSON còn position, IBKR FLAT → state nói dối lúc critical nhất. |
+| **Fix** | Xóa `to_remove = []` pattern. OPEN-fail branch: xóa trực tiếp `self.state.open_positions` (memory) + `self._persist_state()` ngay + `continue`. `_persist_state()` early-return khi `_pos_path=None` (tests không bị ảnh hưởng). Logic đúng GIỮ NGUYÊN: CRITICAL emit / no-retry / "manual intervention" log. |
+| **Persist giữa không xung đột cuối** | `_persist_state()` là atomic write (`.tmp` + `os.replace`). Persist giữa ghi state hiện tại (flat) → cuối run_day persist lại (state cuối) → idempotent, không mất data. |
+| **Verify** | `test_rollover.py` RO3b: OPEN-fail → JSON file empty ngay (không chờ cuối run_day). PENDING: reconcile_gd0 + reconcile_stress (bắt buộc, đụng runner). |
+| **Nguồn** | `global_index/runner.py:668-683` (fix); `global_index/test_rollover.py` RO3b |
+
+### I5.14 — Persist gap _retry_pending_exits (LOW — idempotent)
+| Trường | Nội dung |
+|---|---|
+| **Trạng thái** | OPEN — LOW, fix chung với I5.13 |
+| **Root cause** | `runner.py:517-562` `_retry_pending_exits()`: sau retry thành công, xóa position khỏi `self.state.open_positions` (line 546-548) nhưng KHÔNG gọi `_persist_state()`. Persist chỉ xảy ra cuối `run_day()`. |
+| **Crash-window gap** | Crash sau retry nhưng trước cuối run_day: JSON vẫn có `exit_pending=True` → restart: _retry_pending_exits chạy lại → gửi CLOSE lần 2. |
+| **Tại sao LOW** | CLOSE retry là idempotent: IBKRBroker gửi CLOSE lần 2 cho position đã đóng → broker reject/return status "not found" → fill.status="FAILED" → exit_pending stays True → retry lần 3 ngày sau. Không tạo duplicate position. Worse-case: một CLOSE reject thêm, sau đó position tự clear vì không tồn tại trong IBKR. |
+| **Fix đề xuất** | Thêm `self._persist_state()` cuối vòng lặp retry (sau khi xóa position thành công) hoặc sau toàn bộ vòng lặp. Fix chung với I5.13. |
+| **Nguồn** | `global_index/runner.py:517-562` (`_retry_pending_exits`); I5.13 |
+
+### I5.15 — contract_month OpenPos: SUCCESS roll không update field (DOCUMENTED — chấp nhận)
+| Trường | Nội dung |
+|---|---|
+| **Trạng thái** | DOCUMENTED — chấp nhận, không sửa trước live |
+| **Chi tiết** | `runner.py:685-697` SUCCESS branch: chỉ log slippage, không update `contract_month` trên OpenPos. Docstring ibkr_broker.py:906-911: "only the contract_month field (TBD in OpenPos) changes" — TBD acknowledged. OpenPos field `contract_month` chưa tồn tại. |
+| **Tại sao chấp nhận** | Exit logic dùng `exit_day` và `pnl_sized` (không dùng contract_month). Sau roll, runner state không track contract cụ thể nhưng IBKR đã mở next-month — đủ để exit đúng. Operator inspect JSON không thấy contract_month nhưng không gây confusion functional. |
+| **Nếu cần sau** | Thêm `contract_month: str | None = None` vào OpenPos, update trong SUCCESS branch. Low priority. |
+| **Nguồn** | `global_index/runner.py:685-697`; `global_index/ibkr_broker.py:906-911`; `global_index/live_decision.py` (OpenPos) |
+
+### I5.16 — PENDING Gateway: MAX_HOLD CLI live / rollover real fills / STP overnight
+| Trường | Nội dung |
+|---|---|
+| **Trạng thái** | PENDING — chờ paper/P2, không làm trước live tiền thật |
+| **MAX_HOLD CLI live** | `run_maxhold_exit.py:96` — script gọi `broker.connect()` TRƯỚC dry-run gate. Không thể offline test CLI path không có Gateway. Logic verify offline xong (MH1-MH6 PASS). Cần: paper Gateway + real position (hold ≥ 5d) để test CLI end-to-end. |
+| **Rollover real fills** | `ibkr_broker.py:917-1044` live path dùng `ib.qualifyContracts + placeOrder`. Chưa chạy với real IBKR. Verify: (a) contract month mapping đúng (first paper roll event MES 2026-09-11), (b) fill timeout params (EXIT_FILL_TIMEOUT_SECS, ENTRY_FILL_TIMEOUT_SECS) thực tế, (c) roll slippage đo được. |
+| **STP overnight survive** | GTC stop `outsideRth=True` (ibkr_broker.py:715-777): chưa verify qua TWS restart. Test cần: place stop trên paper, restart TWS, kiểm stop còn active. |
+| **Thời điểm** | Paper phase P2. Không phải blocker cho P0c/P1. MAX_HOLD logic offline verified (test_maxhold.py MH1-MH6). |
+| **Nguồn** | `global_index/run_maxhold_exit.py:96`; `global_index/ibkr_broker.py:715-777,917-1044`; `global_index/test_maxhold.py`, `global_index/test_rollover.py` |
 
 ---
 
@@ -416,7 +453,7 @@ _Cập nhật: 2026-07-07_
 | F2 | real_risk() deploy_sim NaN no raise | Sweep | LOW / diagnostic only |
 | F3 | Reconcile consistency limit | Sweep | KNOWN LIMITATION |
 | I5.1 | Fill handling design | Wire | PENDING IBKR |
-| I5.2 | Rollover C2 wire | Wire | PENDING IBKR |
+| I5.2 | Rollover C2 wire | Wire | CODE-COMPLETE / IBKR-gated |
 | I5.3 | Kill-switch D5 / Fat-finger F3 | Wire | PENDING VERIFY |
 | I5.4 | update_spy_csv timing look-ahead | Wire | OPEN |
 | I5.5 | Databento re-fetch contamination (A5 overlap replacement → $236 drift) | Data | RESOLVED ($53,021 / Calmar 3.07) |
@@ -426,7 +463,11 @@ _Cập nhật: 2026-07-07_
 | I5.9 | update_ibkr_daily exit 0 khi instrument fail (Gateway down) | Wire | FIXED |
 | I5.10 | Pre-flight fail-safe chain: flag in-memory → Branch 3 loophole | Wire | FIXED (fail-closed) |
 | I5.11 | --print-signals cutoff midnight → no bars 14:00-15:55 (bỏ sót LIVE_RUNNER_AUDIT B→C) | Wire | CODE-COMPLETE / chờ P0c verify |
-| I5.12 | G1 HMMStaleGuard chưa wire vào production (hmm_stale_guard=None) | Wire | OPEN — PENDING trước live |
+| I5.12 | G1 HMMStaleGuard wire vào production | Wire | DONE (2026-07-16) |
+| I5.13 | Persist gap rollover OPEN-fail: crash-window state nói dối | Wire | FIXED (2026-07-16) — reconcile pending |
+| I5.14 | Persist gap _retry_pending_exits (idempotent) | Wire | OPEN — LOW, fix chung I5.13 |
+| I5.15 | contract_month OpenPos SUCCESS roll không update | Wire | DOCUMENTED — chấp nhận |
+| I5.16 | PENDING Gateway: MAX_HOLD CLI / rollover real fills / STP overnight | Wire | PENDING paper/P2 |
 | I1.3 | Splice anchor wrong: iloc[0] fetched ≠ first-new-bar splice | Data | FIXED (+808 repair) |
 | I6.1 | SYSTEM_MODEL + VISUALIZE docs | Docs | DONE |
 | I6.2 | CROSS_SYSTEM_FINDINGS docs | Docs | DONE |

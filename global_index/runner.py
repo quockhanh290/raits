@@ -644,7 +644,6 @@ class FuturesRunner:
         if _roll_fn is None:
             return  # MockBroker — rollover not applicable offline
 
-        to_remove = []
         for pos in list(self.state.open_positions):
             result = _roll_fn(pos.inst, day, pos.direction, pos.contracts, pos.cluster)
             if result is None:
@@ -679,7 +678,12 @@ class FuturesRunner:
                     f"AFTER CLOSE — position FLAT in IBKR. Removed from state. "
                     f"{open_fill.error_msg}",
                 )
-                to_remove.append(pos)
+                # I5.13: persist immediately — front-month closed, OPEN failed, irreversible.
+                # JSON must reflect flat truth before any crash-window; operator needs
+                # accurate state now (B3 on restart catches JSON-vs-IBKR mismatch, but
+                # a stale JSON "has position" confuses manual recovery when IBKR is flat).
+                self.state.open_positions = [p for p in self.state.open_positions if p is not pos]
+                self._persist_state()
                 continue
 
             # Full success — log slippage
@@ -695,9 +699,6 @@ class FuturesRunner:
                 f"close@{close_fill.avg_price:.2f} → open@{open_fill.avg_price:.2f}  "
                 f"slippage={roll_slippage:.2f}",
             )
-
-        for pos in to_remove:
-            self.state.open_positions = [p for p in self.state.open_positions if p is not pos]
 
     # ── main daily loop ──────────────────────────────────────────────────────
 
