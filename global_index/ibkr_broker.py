@@ -910,9 +910,9 @@ class IBKRBroker(Broker):
           contract_month field (TBD in OpenPos) changes.  P&L accounting is based
           on risk_dollars and exit_day — not contract price — so no adjustment needed.
 
-        NOT YET IMPLEMENTED — pending IBKR account + get_roll_event() verification.
-        Implement after send_order live path is working and first paper run confirms
-        contract month mapping is correct.
+        Code implemented. Not yet tested against live IBKR — verify contract month
+        mapping on first real paper roll event. Offline (MockBroker) path returns
+        synthetic fills and is unit-testable without a live Gateway connection.
         """
         roll = get_roll_event(inst, today)
         if roll is None:
