@@ -500,6 +500,24 @@ Status: OFFLINE DONE — chỉ chờ market day
 
 **→ Quay lại P0c** (chờ Normal/Stress verify cutoff I5.11 + live 4-field). Pyramid không đổi lộ trình paper.
 
+#### SESSION 2026-07-16 — Execution prep (không cần Normal/Stress)
+
+**Items đã xong (không đụng order, giữ scheduler dry-run):**
+- [x] **G1 wired vào run_live_day.py** (I5.12 DONE):
+      `HMMStaleGuard(regime_csv=a.regime_csv, fit_end=HMM_FIT_END)` → FuturesRunner ctor
+      Dùng `a.regime_csv` (= `spy_daily_live.csv` từ scheduler) — KHÔNG frozen `spy_daily.csv`
+      Help text + usage docstring cũng cập nhật; hmm_stale_guard.py wire example sửa spy_daily_live.csv
+- [x] **test_hmm_stale.py**: 42/42 ALL PASS (G1/G2/G3 logic + runner integration + baseline + no-harm)
+- [x] **False-positive check**: gap=0 bday → `entries_ok=True`, `regime_unreliable=False` → G1 không block oan ngày fresh
+      G2 MODEL AGE URGENT expected (model 19 tháng = 2024-12-31 → 2026-07-16) — warn only, không halt
+- [x] **test_stp.py**: 9/9 ALL PASS (STP1–STP8, MockBroker — live verify chờ P2 có position thật)
+- [x] **Docstring fix _handle_rollover**: "NOT YET IMPLEMENTED" → "Code implemented. Not yet tested against live IBKR"
+      Commit riêng (doc only, không đổi hành vi)
+- [x] **MAX_HOLD exit logic**: verify qua MockBroker — hold≥5d CLOSED, hold<5d kept. Script thật cần Gateway nên test qua FuturesRunner trực tiếp.
+- [x] **Scheduler giữ dry-run**: KHÔNG bật non-dry-run — chờ G1 wire verify + 4-field verify (P0c) xong
+
+**⚠️ G2 MODEL AGE URGENT hiện tại:** 19 tháng (fit_end=2024-12-31). Warn-only, KHÔNG halt. Nhắc nhở re-freeze — lên kế hoạch sau paper.
+
 #### P0c — chờ ngày Normal/Stress (target: tuần này)
 ```powershell
 # Mỗi sáng trước 13:45 ET:
