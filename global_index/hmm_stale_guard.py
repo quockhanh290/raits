@@ -21,7 +21,7 @@ G2: Model age — fit_end too old. Warn only (no halt) because an old model stil
 G3: Re-freeze data coverage — futures/refreeze.py (not here).
 
 Wire into FuturesRunner:
-    stale_guard = HMMStaleGuard(regime_csv="spy_daily.csv", fit_end="2024-12-31")
+    stale_guard = HMMStaleGuard(regime_csv="spy_daily_live.csv", fit_end="2024-12-31")
     runner = FuturesRunner(..., hmm_stale_guard=stale_guard)
 
 runner.run_day() calls stale_guard.check_day(day) each day. If regime_unreliable,

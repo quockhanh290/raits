@@ -23,7 +23,7 @@ Usage:
     python -m global_index.run_live_day \\
         --data-dir data\\cache\\futures \\
         --nkd-parquet global_index/data/NKD_continuous_1m_8y.parquet \\
-        --regime-csv spy_daily.csv \\
+        --regime-csv spy_daily_live.csv \\
         [--port 4002] \\
         [--client-id 1] \\
         [--positions-path live_positions.json] \\
@@ -74,6 +74,7 @@ from global_index.net_exposure_multi import MultiClusterGuard
 from global_index.signal_layer import generate_today_signals
 from global_index.ibkr_broker import IBKRBroker
 from global_index.runner import FuturesRunner, _openpos_from_dict
+from global_index.hmm_stale_guard import HMMStaleGuard
 
 # ── Production constants: from basket.py ────────────────────────────────────
 ACCOUNT     = float(RISK["account"])    # $50,000
@@ -99,7 +100,7 @@ def main():
     ap.add_argument("--nkd-parquet",     required=True,
                     help="NKD continuous 1m parquet file")
     ap.add_argument("--regime-csv",      required=True,
-                    help="spy_daily.csv for HMM labels")
+                    help="spy_daily_live.csv — HMM labels + G1 staleness guard")
     ap.add_argument("--port",            type=int, default=4002,
                     help="IB Gateway port (default: 4002 paper)")
     ap.add_argument("--client-id",       type=int, default=1,
@@ -345,6 +346,7 @@ def main():
         lock_path=a.lock_path,
         live_state_path=a.live_state_path,
         regime_fn=_regime,
+        hmm_stale_guard=HMMStaleGuard(regime_csv=a.regime_csv, fit_end=HMM_FIT_END),
     )
 
     # ── run_day(today) ───────────────────────────────────────────────────────
