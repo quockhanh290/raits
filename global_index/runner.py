@@ -229,6 +229,12 @@ class FuturesRunner:
         # survive on disk or it resets to base every five minutes.
         loaded_system_equity = None
         loaded_last_broker_equity = None
+        # Epoch = the date the system ledger started counting. Without it, "net P&L
+        # -$6" reads as "paper is flat" when the broker is thousands away from where
+        # paper began — the ledger legitimately starts at its own epoch, but nothing
+        # said so on screen.
+        loaded_system_epoch = None
+        loaded_paper_start = None
         if self._positions_path is not None and self._positions_path.exists():
             try:
                 with open(self._positions_path, encoding="utf-8") as f:
@@ -256,6 +262,13 @@ class FuturesRunner:
                         loaded_system_equity = float(bkr["system_equity"])
                     if bkr.get("last_broker_equity") is not None:
                         loaded_last_broker_equity = float(bkr["last_broker_equity"])
+                    if bkr.get("system_epoch"):
+                        loaded_system_epoch = str(bkr["system_epoch"])
+                    # Operator-recorded, never inferred: what the broker account held
+                    # when paper trading began. The system ledger cannot derive it —
+                    # it starts at ACCOUNT and knows nothing before its own epoch.
+                    if isinstance(bkr.get("paper_start"), dict):
+                        loaded_paper_start = dict(bkr["paper_start"])
                     # Files written before the system-equity fix carry a peak_equity
                     # taken from the broker balance ($995k on paper). Restoring it would
                     # keep the breaker on the wrong scale forever, so drop it and let the
@@ -553,6 +566,8 @@ class FuturesRunner:
         self._last_broker_equity = (loaded_last_broker_equity
                                     if loaded_last_broker_equity is not None
                                     else broker.get_equity())
+        self._system_epoch = loaded_system_epoch
+        self._paper_start = loaded_paper_start
         self.state = DecisionState(
             equity=_sys_eq,
             open_positions=loaded_positions,
@@ -636,6 +651,10 @@ class FuturesRunner:
         # minutes.
         breaker_data["system_equity"] = self.state.equity
         breaker_data["last_broker_equity"] = self._last_broker_equity
+        if self._system_epoch:
+            breaker_data["system_epoch"] = self._system_epoch
+        if self._paper_start:
+            breaker_data["paper_start"] = self._paper_start
         payload = {"schema_version": 1, "positions": positions_data, "breaker": breaker_data}
         try:
             tmp = self._positions_path.with_suffix(".tmp")
@@ -847,6 +866,13 @@ class FuturesRunner:
 
         _spy_last_date_override: inject spy_last_date directly into HMMStaleGuard.check_day
         (skips CSV read). For offline testing only — not used in production."""
+        # Stamp the ledger's epoch on first use so the dashboard can say what the
+        # net P&L is measured from. Set once, then carried in the state file.
+        if self._system_epoch is None:
+            self._system_epoch = str(pd.Timestamp(day).date())
+            logger.info("Ledger epoch set to %s — net P&L is measured from here, "
+                        "not from the start of paper trading", self._system_epoch)
+
         self._emit_event(
             "INFO", "STATE",
             f"Day started: {pd.Timestamp(day).date()}, "
@@ -1558,6 +1584,14 @@ class FuturesRunner:
             "n_contracts":      1,
             "final_equity":     cur_eq,
             "net_pnl":          cur_eq - account,
+            # What the two numbers are measured from. The ledger starts at its own
+            # epoch, so net_pnl is NOT P&L since paper trading began; broker_equity is
+            # the raw account, which moves on FX and commissions the ledger never sees.
+            # Labelling them is the whole point — an unlabelled -$6 next to a broker
+            # thousands from its starting balance reads as "flat".
+            "system_epoch":     self._system_epoch,
+            "broker_equity":    self.broker.get_equity(),
+            "paper_start":      self._paper_start,
             "max_dd_dollars":   snap_dd_dollars,
             "max_dd_pct":       snap_dd_pct,
             "total_days":       1,

@@ -70,6 +70,8 @@ header::before {
 
 .hstat { display: flex; flex-direction: column; gap: 3px; }
 .hstat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+.hstat-note { text-transform: none; letter-spacing: 0; opacity: .65; font-size: 10px; }
+.hstat-sub { display: block; font-size: 10px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
 .hstat-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--text); }
 .hstat-value.sm { font-size: 14px; }
 .hstat-value.lg { font-size: 30px; line-height: 1.05; font-weight: 700; }
@@ -577,16 +579,23 @@ header::before {
     <span id="headerDate" class="hstat-value sm">—</span>
   </div>
   <div class="hstat">
-    <span class="hstat-label">Equity</span>
+    <span class="hstat-label">Equity <span class="hstat-note">system ledger</span></span>
     <span id="headerEquity" class="hstat-value xl">—</span>
+    <span id="headerEquityEpoch" class="hstat-sub"></span>
   </div>
   <div class="hstat">
     <span class="hstat-label">Net P&amp;L</span>
     <span id="headerNet" class="hstat-value lg pos">—</span>
+    <span id="headerNetEpoch" class="hstat-sub"></span>
   </div>
   <div class="hstat">
-    <span class="hstat-label">Today P&amp;L</span>
+    <span class="hstat-label">Today P&amp;L <span class="hstat-note">realized</span></span>
     <span id="headerToday" class="hstat-value xl">—</span>
+  </div>
+  <div class="hstat" id="hstatBroker" style="display:none">
+    <span class="hstat-label">Broker <span class="hstat-note">net liq</span></span>
+    <span id="headerBroker" class="hstat-value lg">—</span>
+    <span id="headerBrokerSub" class="hstat-sub"></span>
   </div>
   <div class="hstat">
     <span class="hstat-label">Regime</span>
@@ -1288,6 +1297,38 @@ function renderHeader(snap, meta) {
   const todayEl = document.getElementById('headerToday');
   todayEl.textContent = (today >= 0 ? '+$' : '-$') + Math.abs(today).toLocaleString('en-US',{maximumFractionDigits:0});
   todayEl.className = 'hstat-value xl ' + (today >= 0 ? 'pos' : 'neg');
+
+  // Say what these are measured FROM. The ledger starts at its own epoch, so net
+  // P&L is not P&L since paper trading began — without the label a small figure
+  // next to a broker balance thousands away from its start reads as "flat".
+  const epoch = meta.system_epoch;
+  const epochTxt = epoch ? 'since ' + epoch : '';
+  document.getElementById('headerEquityEpoch').textContent =
+    'base $' + meta.account.toLocaleString('en-US',{maximumFractionDigits:0});
+  document.getElementById('headerNetEpoch').textContent = epochTxt;
+
+  // Broker net liquidation is the raw account: different scale, and it moves on FX
+  // and commissions the system ledger never sees. Shown apart, never merged.
+  const bEl  = document.getElementById('hstatBroker');
+  const brok = meta.broker_equity;
+  if (brok == null) { bEl.style.display = 'none'; }
+  else {
+    bEl.style.display = '';
+    document.getElementById('headerBroker').textContent =
+      '$' + brok.toLocaleString('en-US',{maximumFractionDigits:0});
+    const ps = meta.paper_start;
+    const sub = document.getElementById('headerBrokerSub');
+    if (ps && ps.equity != null) {
+      const d = brok - ps.equity;
+      sub.textContent = (d >= 0 ? '+$' : '-$')
+        + Math.abs(d).toLocaleString('en-US',{maximumFractionDigits:0})
+        + ' since paper start' + (ps.date ? ' ' + ps.date : '');
+      sub.style.color = d >= 0 ? 'var(--green)' : 'var(--red)';
+    } else {
+      sub.textContent = 'paper start not recorded';
+      sub.style.color = '';
+    }
+  }
 
   const regEl = document.getElementById('headerRegime');
   regEl.textContent = snap.regime;
