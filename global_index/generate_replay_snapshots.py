@@ -420,4 +420,17 @@ with open(OUT_PATH, "w", encoding="utf-8") as f:
 
 kb = OUT_PATH.stat().st_size / 1024
 print(f"Saved → {OUT_PATH}  ({kb:.0f} KB,  {len(snapshots)} snapshots)")
+
+# Compact date → equity curve for the live runner's paper-vs-backtest panel.
+# The full snapshot file is ~6 MB and every cron slot is a separate process; making
+# the runner parse that 22 times a day to read two numbers would be absurd.
+CURVE_PATH = OUT_PATH.with_name("backtest_curve.json")
+with open(CURVE_PATH, "w", encoding="utf-8") as f:
+    json.dump({
+        "account": ACCOUNT,
+        "generated": str(snapshots[-1]["date"]) if snapshots else None,
+        "equity": {s["date"]: round(s["equity"], 2) for s in snapshots},
+    }, f, separators=(",", ":"))
+print(f"Saved → {CURVE_PATH}  ({CURVE_PATH.stat().st_size/1024:.0f} KB) — "
+      f"backtest equity curve for live paper-vs-backtest")
 print("Open dashboard.html in browser (no server needed)")

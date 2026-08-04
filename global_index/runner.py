@@ -1129,6 +1129,8 @@ class FuturesRunner:
                     "fill_price": _f.avg_price,
                     "pnl_sized": p.pnl_sized,
                     "slip": _slip_c,
+                    "filled_qty": _f.filled_qty or p.contracts,
+                    "status": _f.status,
                     "regime": self._last_regime,
                 })
                 self._emit_event(
@@ -1285,6 +1287,10 @@ class FuturesRunner:
                     "expected_entry": _exp_entry,
                     "fill_price": _open_fill.avg_price,
                     "slip": _slip_o,
+                    # Ordered vs actually filled — the dashboard's fill-quality panel
+                    # cannot tell a partial from a full fill without both.
+                    "filled_qty": _open_fill.filled_qty or n,
+                    "status": _open_fill.status,
                     "regime": self._last_regime,
                 })
                 self._emit_event(
@@ -1486,6 +1492,124 @@ class FuturesRunner:
             logger.warning("running_metrics failed: %s", exc)
             return empty
 
+    def _fill_diagnostics(self, day) -> tuple:
+        """(slippage, fill_quality) for `day`, read back from the trade log.
+
+        These two panels were the other half of the "not yet written" group. The
+        runner already computes signed slippage per fill (C1) and knows ordered vs
+        filled quantity — it just never surfaced either, so execution quality was
+        invisible exactly where paper trading is supposed to measure it.
+
+        Ticks rather than dollars: slippage is only comparable across instruments in
+        ticks, and the backtest's assumption is stated in ticks (2/side).
+        """
+        slippage: list = []
+        fill_quality: list = []
+        if self._trade_log_path is None or not self._trade_log_path.exists() or day is None:
+            return slippage, fill_quality
+
+        key = str(pd.Timestamp(day).date())
+        try:
+            from global_index import specs as _specs
+            from futures.basket import BASKET as _BASKET
+        except Exception:
+            _specs, _BASKET = None, {}
+
+        def _tick(inst):
+            c = _BASKET.get(inst)
+            if c is not None and getattr(c, "tick", None):
+                return float(c.tick)
+            if _specs is not None and inst in getattr(_specs, "SPECS", {}):
+                return float(_specs.SPECS[inst].tick)
+            return None
+
+        try:
+            with open(self._trade_log_path, encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        r = json.loads(line)
+                    except Exception:
+                        continue          # a torn last line must not blank the panel
+                    if (r.get("exit_day") or r.get("entry_day")) != key:
+                        continue
+                    ordered = r.get("contracts")
+                    filled = r.get("filled_qty", ordered)
+                    if ordered:
+                        fill_quality.append({
+                            "inst": r.get("inst"), "type": r.get("type"),
+                            "ordered_qty": ordered, "filled_qty": filled,
+                            "partial": bool(filled is not None and filled < ordered),
+                            "status": r.get("status"),
+                        })
+                    slip = r.get("slip")
+                    if slip is None:
+                        continue
+                    tk = _tick(r.get("inst"))
+                    slippage.append({
+                        "inst": r.get("inst"), "type": r.get("type"),
+                        "expected_price": r.get("expected_entry") or r.get("expected_stop"),
+                        "actual_price": r.get("fill_price"),
+                        # signed: positive = adverse, matching the C1 convention
+                        "ticks": round(slip / tk, 2) if tk else None,
+                    })
+        except Exception as exc:
+            logger.warning("fill diagnostics unreadable (%s): %s", self._trade_log_path, exc)
+        return slippage, fill_quality
+
+    def _paper_vs_backtest(self, day, cur_eq: float, account: float) -> dict:
+        """Live P&L against the backtest's P&L over the SAME window.
+
+        Not equity against equity: the backtest curve has been compounding since 2018
+        and stands near $109k, while the paper ledger starts fresh at ACCOUNT on its
+        epoch. Comparing those levels would say nothing. Comparing what each made
+        between the epoch and today is the question paper trading exists to answer.
+
+        Reads backtest_curve.json (date → equity), written by
+        generate_replay_snapshots.py. Absent or not yet covering these dates → nulls.
+        """
+        out = {"expected_equity": None, "actual_equity": round(float(cur_eq), 2),
+               "divergence_pct": None, "epoch": self._system_epoch}
+        if self._live_state_path is None or day is None or not self._system_epoch:
+            return out
+        curve_path = self._live_state_path.with_name("backtest_curve.json")
+        if not curve_path.exists():
+            return out
+        try:
+            with open(curve_path, encoding="utf-8") as fh:
+                curve = json.load(fh).get("equity") or {}
+            if not curve:
+                return out
+            # Backtest marks are per session; fall back to the latest mark at or
+            # before each date so a paper day with no session still lines up.
+            def _asof(d):
+                ks = [k for k in curve if k <= d]
+                return curve[max(ks)] if ks else None
+
+            # The curve must actually reach this date. Without this guard _asof falls
+            # back to the last mark for BOTH ends, expected == account, and the panel
+            # reports the backtest as flat when the truth is that it has no data here
+            # — a stale snapshot file would quietly become a "no divergence" verdict.
+            _key = str(pd.Timestamp(day).date())
+            _last = max(curve)
+            if _last < _key:
+                out["stale_through"] = _last
+                logger.info("paper_vs_backtest: backtest curve ends %s, before %s — "
+                            "re-run generate_replay_snapshots to compare", _last, _key)
+                return out
+
+            bt_now, bt_epoch = _asof(_key), _asof(self._system_epoch)
+            if bt_now is None or bt_epoch is None:
+                return out
+            expected = float(account) + (float(bt_now) - float(bt_epoch))
+            out["expected_equity"] = round(expected, 2)
+            out["divergence_pct"] = round((float(cur_eq) - expected) / float(account), 6)
+        except Exception as exc:
+            logger.warning("paper_vs_backtest failed: %s", exc)
+        return out
+
     # ── Live state snapshot ──────────────────────────────────────────────────
 
     def _build_operational_status(self, day) -> dict:
@@ -1640,6 +1764,7 @@ class FuturesRunner:
                 {"in_memory": ops_status["positions"]["count"]},
             )
 
+        _slip_diag, _fill_diag = self._fill_diagnostics(day)
         snap = {
             "date": str(today_ts.date()) if today_ts else None,
             "equity": cur_eq,
@@ -1662,6 +1787,9 @@ class FuturesRunner:
             "cluster_stats":      {},
             "running_metrics":    self._running_metrics(
                 self._record_paper_day(day, cur_eq)),
+            "slippage":           _slip_diag,
+            "fill_quality":       _fill_diag,
+            "paper_vs_backtest":  self._paper_vs_backtest(day, cur_eq, account),
             "operational_status": ops_status,
         }
 

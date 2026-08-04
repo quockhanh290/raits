@@ -140,5 +140,96 @@ def test_pm8_dump_state_publishes_running_metrics(tmp_path):
     assert rm["max_dd"] is not None, "three marks is enough for a drawdown"
 
 
+
+# ── fill diagnostics + paper vs backtest ─────────────────────────────────────
+
+def _trade_log(tmp_path, rows):
+    p = tmp_path / "trade_log.jsonl"
+    p.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    return p
+
+
+def _runner_tl(tmp_path, log_path):
+    r = _runner(tmp_path)
+    r._trade_log_path = log_path
+    return r
+
+
+def test_pm9_slippage_reported_in_ticks(tmp_path):
+    """Ticks, not dollars — the backtest states its assumption as 2 ticks/side."""
+    log = _trade_log(tmp_path, [
+        {"type": "OPEN", "inst": "MES", "contracts": 1, "entry_day": "2026-08-06",
+         "expected_entry": 7600.0, "fill_price": 7600.5, "slip": 0.5, "filled_qty": 1,
+         "status": "FILLED"},
+    ])
+    slip, fq = _runner_tl(tmp_path, log)._fill_diagnostics(pd.Timestamp("2026-08-06"))
+    assert len(slip) == 1
+    assert slip[0]["inst"] == "MES"
+    assert slip[0]["ticks"] == pytest.approx(2.0)      # MES tick 0.25 → 0.5/0.25
+    assert slip[0]["expected_price"] == 7600.0
+
+
+def test_pm10_partial_fill_is_flagged(tmp_path):
+    log = _trade_log(tmp_path, [
+        {"type": "OPEN", "inst": "MES", "contracts": 3, "entry_day": "2026-08-06",
+         "filled_qty": 2, "status": "PARTIAL", "slip": None},
+        {"type": "OPEN", "inst": "MYM", "contracts": 1, "entry_day": "2026-08-06",
+         "filled_qty": 1, "status": "FILLED", "slip": None},
+    ])
+    _, fq = _runner_tl(tmp_path, log)._fill_diagnostics(pd.Timestamp("2026-08-06"))
+    by = {f["inst"]: f for f in fq}
+    assert by["MES"]["partial"] is True and by["MES"]["filled_qty"] == 2
+    assert by["MYM"]["partial"] is False
+
+
+def test_pm11_other_days_excluded_and_torn_line_survives(tmp_path):
+    p = tmp_path / "trade_log.jsonl"
+    p.write_text(
+        json.dumps({"type": "OPEN", "inst": "MES", "contracts": 1,
+                    "entry_day": "2026-08-05", "slip": 0.25}) + "\n"
+        + json.dumps({"type": "OPEN", "inst": "MYM", "contracts": 1,
+                      "entry_day": "2026-08-06", "slip": 0.5}) + "\n"
+        + '{"type": "OPEN", "inst": "M2K"',        # torn final write
+        encoding="utf-8")
+    slip, _ = _runner_tl(tmp_path, p)._fill_diagnostics(pd.Timestamp("2026-08-06"))
+    assert [s["inst"] for s in slip] == ["MYM"], "only today's rows, torn line ignored"
+
+
+def test_pm12_paper_vs_backtest_compares_the_same_window(tmp_path):
+    """Not equity vs equity: the backtest has compounded since 2018 while the paper
+    ledger starts at ACCOUNT. Only the delta over the shared window is comparable."""
+    r = _runner(tmp_path)
+    r._system_epoch = "2026-08-04"
+    (tmp_path / "backtest_curve.json").write_text(json.dumps({
+        "account": ACCOUNT,
+        "equity": {"2026-08-04": 109000.0, "2026-08-05": 109300.0, "2026-08-06": 109500.0},
+    }), encoding="utf-8")
+    out = r._paper_vs_backtest(pd.Timestamp("2026-08-06"), 50_400.0, ACCOUNT)
+    # backtest made 500 over the window → expected 50,500; paper made 400
+    assert out["expected_equity"] == pytest.approx(50_500.0)
+    assert out["actual_equity"] == pytest.approx(50_400.0)
+    assert out["divergence_pct"] == pytest.approx(-100.0 / ACCOUNT)
+
+
+def test_pm13_curve_not_reaching_today_reports_stale_not_flat(tmp_path):
+    """A stale curve must not read as 'backtest went nowhere, no divergence'."""
+    r = _runner(tmp_path)
+    r._system_epoch = "2026-08-04"
+    (tmp_path / "backtest_curve.json").write_text(json.dumps({
+        "account": ACCOUNT, "equity": {"2026-07-30": 109049.19},
+    }), encoding="utf-8")
+    out = r._paper_vs_backtest(pd.Timestamp("2026-08-06"), 50_400.0, ACCOUNT)
+    assert out["expected_equity"] is None
+    assert out["divergence_pct"] is None
+    assert out["stale_through"] == "2026-07-30"
+
+
+def test_pm14_missing_curve_is_null_not_zero(tmp_path):
+    r = _runner(tmp_path)
+    r._system_epoch = "2026-08-04"
+    out = r._paper_vs_backtest(pd.Timestamp("2026-08-06"), 50_400.0, ACCOUNT)
+    assert out["expected_equity"] is None and out["divergence_pct"] is None
+    assert out["actual_equity"] == pytest.approx(50_400.0)
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
