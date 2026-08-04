@@ -178,7 +178,8 @@ class FuturesRunner:
 
     def __init__(self, broker, guard, contracts_by_inst, signal_fn, breaker,
                  hmm_stale_guard=None, positions_path=None, lock_path=None,
-                 live_state_path=None, stop_path=None, max_contracts_per_order=10,
+                 live_state_path=None, paper_history_path=None,
+                 stop_path=None, max_contracts_per_order=10,
                  regime_fn=None, trade_log_path=None):
         """signal_fn(day, bars_by_inst, held) -> (entry_candidates, exit_positions)
         wraps signal_layer.generate_today_signals with the engines/labels/costs bound.
@@ -512,6 +513,14 @@ class FuturesRunner:
         self._events: list = []
         self._last_breaker_level: str = "OK"
         self._live_state_path = Path(live_state_path) if live_state_path else None
+        # Accumulated daily equity marks — the live equity curve the metrics bar
+        # needs. Defaults next to the state file so the two travel together.
+        if paper_history_path:
+            self._paper_history_path = Path(paper_history_path)
+        elif self._live_state_path is not None:
+            self._paper_history_path = self._live_state_path.with_name("paper_history.json")
+        else:
+            self._paper_history_path = None
 
         # D5: kill-switch (STOP_FILE) + F3: fat-finger cap
         self._stop_path = Path(stop_path) if stop_path else None
@@ -1399,6 +1408,84 @@ class FuturesRunner:
         if len(self._events) > 500:
             self._events = self._events[-500:]
 
+    # ── Paper equity history ─────────────────────────────────────────────────
+
+    def _record_paper_day(self, day, equity: float) -> dict:
+        """Upsert one end-of-day system-equity mark and return the whole series.
+
+        Live mode holds a single snapshot per run and every slot is a separate
+        process, so without this there is no equity curve at all — which is why the
+        dashboard's Calmar/Sharpe/MaxDD/Return bar rendered as dashes. The 22 slots
+        in a day all write the same date; last write wins, so the closing mark is
+        what survives.
+
+        Keyed by date, not appended, so re-running a day cannot double-count it.
+        """
+        if self._paper_history_path is None or day is None:
+            return {}
+        key = str(pd.Timestamp(day).date())
+        hist: dict = {}
+        if self._paper_history_path.exists():
+            try:
+                with open(self._paper_history_path, encoding="utf-8") as fh:
+                    hist = json.load(fh)
+            except Exception as exc:
+                logger.warning("paper history unreadable (%s) — starting fresh: %s",
+                               self._paper_history_path, exc)
+                hist = {}
+        days = hist.get("days") or {}
+        days[key] = round(float(equity), 2)
+        hist = {
+            "epoch": self._system_epoch,
+            "account": float(self.state.breaker.account) if self.state.breaker else None,
+            "days": days,
+        }
+        try:
+            self._paper_history_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self._paper_history_path.with_suffix(".tmp")
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(hist, fh, indent=2, sort_keys=True)
+            os.replace(tmp, self._paper_history_path)
+        except Exception as exc:
+            logger.error("could not persist paper history to %s: %s — the metrics bar "
+                         "will stay empty", self._paper_history_path, exc)
+        return hist
+
+    def _running_metrics(self, hist: dict) -> dict:
+        """Calmar / Sharpe / MaxDD / return from the live equity curve.
+
+        Daily P&L is the day-over-day change in system equity, with the first day
+        measured from ACCOUNT, so the series sums to exactly (equity - account).
+        Uses deploy_sim.metrics — same formulas as the backtest, so a live Calmar can
+        be compared with the 1.65 floor rather than to something computed differently.
+        Imported lazily to keep deploy_sim off the live path's import cost.
+
+        Fewer than two days returns nulls: Calmar over one point is not a number
+        worth showing, and the dashboard already renders nulls as dashes.
+        """
+        empty = {"calmar": None, "sharpe": None, "max_dd": None, "total_return": None}
+        days = (hist or {}).get("days") or {}
+        account = (hist or {}).get("account")
+        if len(days) < 2 or not account:
+            return empty
+        try:
+            from global_index.deploy_sim import metrics as _metrics
+            eq = pd.Series({pd.Timestamp(d): v for d, v in days.items()}).sort_index()
+            daily = eq.diff()
+            daily.iloc[0] = eq.iloc[0] - float(account)
+            m = _metrics(daily)
+            import math
+            # calmar is inf when drawdown is still zero — a real state early in paper,
+            # and not something to print as a number.
+            _f = lambda v: (None if v is None or not math.isfinite(float(v))
+                            else round(float(v), 4))
+            return {"calmar": _f(m["calmar"]), "sharpe": _f(m["sharpe"]),
+                    "max_dd": round(float(m["maxdd"]), 2),
+                    "total_return": round(float(m["pnl"]) / float(account), 6)}
+        except Exception as exc:
+            logger.warning("running_metrics failed: %s", exc)
+            return empty
+
     # ── Live state snapshot ──────────────────────────────────────────────────
 
     def _build_operational_status(self, day) -> dict:
@@ -1573,6 +1660,8 @@ class FuturesRunner:
             "per_cluster_pnl":   {cl: 0.0 for cl in _cl_keys},
             "regime_attribution": {},
             "cluster_stats":      {},
+            "running_metrics":    self._running_metrics(
+                self._record_paper_day(day, cur_eq)),
             "operational_status": ops_status,
         }
 
