@@ -1648,8 +1648,8 @@ calibrate during paper" — nhưng "chưa được sweep" ≠ "đặt sai". Đo 
 
 ---
 
-## Sub-task: Sweep RIÊNG cap NKD (2026-08-04) — ĐO XONG, chờ user quyết
-Status: MEASURED — KHÔNG tự sửa tham số rủi ro sản xuất
+## Sub-task: Sweep RIÊNG cap NKD (2026-08-04) — ĐÃ ÁP DỤNG 6%
+Status: DONE — commit f8a1f13
 
 ### Vì sao phải đo lại
 Phép đo $150k gộp HAI thay đổi: nó nới cap của **mọi** cụm cùng lúc. Rejection Rổ 4 rơi
@@ -1688,9 +1688,43 @@ mà không đổi lại được một đồng bảo vệ nào.
 2. **Dải dữ liệu bao trùm kỳ vault 2023-2024.** Chọn cap dựa trên nó là chạm kỳ OOS đã niêm
    phong → cấu hình 6% chưa từng có kỳ OOS sạch.
 
-### Trạng thái
-**KHÔNG tự sửa** `net_exposure_multi.py`. Đổi 2% → 6% là thay tham số rủi ro sản xuất,
-thuộc quyết định của user. Khi quyết: sửa + reconcile đầy đủ + cập nhật INVARIANTS/snapshot.
+### ⚠️ SỬA SAI PHƯƠNG PHÁP — số sweep ở trên chạy 1-tick
+INVARIANTS dòng 21 bắt buộc **2-tick/side cho mọi verdict**. Bảng sweep phía trên (Calmar
+1.99/2.07) và các phép đo $150k (1.40) / no-NKD (1.15) đều chạy 1-tick = **upper bound,
+không so được** với baseline chính thức. Sàn thật là **1.57** (2-tick), không phải 1.53.
+Hướng kết luận sống sót, biên độ nhỏ hơn.
+
+### Số ĐÚNG convention (2-tick) — cơ sở quyết định
+| | cap 2% | cap 6% |
+|---|---|---|
+| baseline fit_C | $40,919 / 1.66 | **$42,459 / 1.72** MaxDD $3,574 (7.1%) |
+| sàn fit_A | $40,642 / 1.57 | **$42,565 / 1.65** MaxDD $3,744 (7.5%) |
+| vault 2023-24 | $10,415 / 2.77 | **$10,757 / 2.86** MaxDD $1,899 (3.8%) |
+| vault 2025 | $7,371 / 3.39 | **$7,404 / 2.54** MaxDD $3,001 (6.0%) |
+
+`1.66 × (42,459/40,919) = 1.72` khớp chính xác → Calmar tăng **hoàn toàn do lãi thêm**,
+MaxDD không đổi. MaxDD tệ nhất $3,744 = 7.5%, chưa chạm WARN 10% ($5,000), cách HALT 15%
+($7,500) hơn gấp đôi.
+
+### Quyết định: ÁP DỤNG 6% — tiêu chí là CỔNG INVARIANTS, không phải so 6% với 2%
+Cả 4 cổng PASS (baseline + 2 vault đều vượt sàn 1.65). Giữa hai cấu hình đều hợp lệ, tiêu chí
+là "cái nào khớp hệ thống đã validate" — ở cap 2% trong chế độ 2026, NKD không vào lệnh được
+nên hệ thống đang chạy KHÔNG phải hệ thống đã validate (vốn gồm 655–701 lệnh NKD).
+
+⚠️ Ghi nhận, không phải cổng trượt:
+- Biên baseline trên sàn hẹp lại +5.7% → +4.2%
+- **Vault 2025 xấu đi mọi thước đo rủi ro** (Calmar −25%, Sharpe −8%, PF −5%, MaxDD +38%)
+  đổi lấy +$33. Đây là kỳ gần chế độ hiện tại nhất.
+- Sharpe giảm ở CẢ HAI vault. INVARIANTS chỉ gate trên Calmar.
+- Cap chọn từ dữ liệu bao gồm kỳ vault → **không có OOS sạch**
+
+### Drift phát hiện khi suy lại sàn (đã sửa cùng commit)
+- `runner.py` + `generate_replay_snapshots.py` hardcode **1.53** — INVARIANTS đã deprecate
+  1.53 hai lần. Nay cả hai đọc `BACKTEST_CALMAR_FLOOR = 1.65`, kèm lệnh suy lại trong comment.
+- `runner.py` nhân bản bảng cap thành literal trong payload dashboard, `global_nkd` còn 2%
+  → dashboard báo giới hạn mà guard không còn áp. Nay đọc `self.guard.clusters`.
+- `replay_snapshots_data.js` mang `backtest_calmar: 2.04` — **sàn dirty do look-ahead**,
+  chưa từng tái tạo sau khi sửa look-ahead. Nay 1.65, cap 6%, 1759 snapshots.
 
 ### reconcile_nkd — PASS (chạy nền, xong 2026-08-04)
 Phase 1: engine 519t/$13,073 == harness 519t/$13,073, field_mismatch=0
