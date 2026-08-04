@@ -20,7 +20,7 @@ Hỏng → DỪNG, điều tra, sửa, chạy lại. Không vội tuần tự.
 
 ---
 
-## Trạng thái hiện tại (2026-07-13, P0b gate/logic done — live path ⏳)
+## Trạng thái hiện tại (2026-07-30, P0c DONE — tiếp theo P1)
 
 | Hạng mục | Trạng thái |
 |----------|-----------|
@@ -36,12 +36,8 @@ Hỏng → DỪNG, điều tra, sửa, chạy lại. Không vội tuần tự.
 | Splice fix | DONE 2026-07-13 — 3 bugs (anchor/dtype/MYM exchange), gap=0.00 all 5, frozen 23/23 |
 | Pre-flight scheduler | DONE 2026-07-13 — update_ibkr_daily→spy_csv→run_live_day, fail-closed 2-branch |
 | **P0b gate+logic** | **DONE 2026-07-13** — gate ✅ (Calm→no entry) logic ✅ (desired=backtest 53124) |
-| **P0b live path** | **⏳ CHỜ Normal/Stress** — chưa verify --print-signals có entry thật |
+| **P0c live path** | **✅ DONE 2026-07-28/30** — NKD PASS + MYM/M2K PASS (xem section bên dưới) |
 | **Monitor/Dashboard** | **DONE 2026-07-13/14** — xem section bên dưới |
-
-⚠️ **Phân biệt quan trọng:** P0b gate/logic (offline + Calm day) đã xong. P0b live path (run_live_day == desired_basket VỚI entry thật) **chưa chạy** — Calm → no entry → không thể verify. Đây là việc của P0c, chờ regime đổi.
-
-⚠️ **MYM đặc biệt:** vừa fix exchange CBOT + splice offset (−57 vs +751 cũ). Khi P0c có MYM entry, kiểm tra scale đặc biệt cẩn thận.
 
 ---
 
@@ -83,24 +79,47 @@ Calm regime → no entry → không thể so `--print-signals` vs `desired_baske
 
 ---
 
-## P0c — LIVE PATH 4-FIELD VERIFY ⬅ BƯỚC TIẾP THEO (ngày Normal/Stress đầu tiên)
+## P0c — LIVE PATH 4-FIELD VERIFY ✅ DONE 2026-07-28/30
 
-**Mục đích:** Verify live path `run_live_day → generate_today_signals → entries` ra đúng entry thật so với `desired_basket()` offline. P0b đã verify logic offline; P0c verify cùng logic trên data live.
+**Mục đích:** Verify live path `run_live_day → generate_today_signals → entries` ra đúng entry thật so với `desired_basket()` offline.
 
-**Check hàng sáng** (trước khi biết có entry không):
+### Kết quả
+
+| Instrument | Ngày | --print-signals | desired_basket() offline | Kết quả |
+|------------|------|-----------------|--------------------------|---------|
+| MNKD | 2026-07-28 | LONG entry=62720.00 stop=62601.43 | LONG entry=62720.00 stop=62601.43 | **PASS** ✅ |
+| MYM | 2026-07-30 | LONG entry=52310.00 stop=52234.25 | LONG entry=52310.00 stop=52234.25 | **PASS** ✅ |
+| M2K | 2026-07-30 | LONG entry=2949.20 stop=2944.78 | LONG entry=2949.20 stop=2944.78 | **PASS** ✅ |
+| MES, MNQ | 2026-07-30 | None | None | **Consistent** ✅ |
+
+### Bài học từ P0c
+
+**1. Verify cần IBKR live bars (không thể dùng frozen parquet alone)**
+
+Frozen parquet cắt tại ~13:45 ET; NKD signal fire trong cửa sổ 13:45–15:35 ET từ bars IBKR live.
+Verify ban đầu dùng parquet-only → `desired_position()` = None hoặc sai direction.
+Fix: `p0c_verify_mnkd.py` và `p0c_verify_swing.py` đều connect IBKR → `fetch_bars()` trước khi gọi engine.
+
+**2. desired_position() = full backtest replay từ đầu**
+
+Mỗi lần gọi `desired_position()` chạy lại toàn bộ backtest trên data concat.
+Thêm bars (live window) có thể làm trade cũ close → trade mới open → direction đổi.
+Không phải bug — đây là cơ chế đúng. Lý do cần bars live cùng cutoff với --print-signals.
+
+**3. p0c_overnight.py auto-verify**
+
+Khi `_has_swing_entry(output)` = True, job_print_signals() tự gọi `p0c_verify_swing.py`.
+Luồng hoàn chỉnh: --print-signals → detect ENTRY → verify → save block cùng 1 file p0c_signals_MMDD.txt.
+
+### Verify scripts (để dùng lại nếu cần)
+
 ```powershell
-python global_index\check_next_entry.py
+# NKD verify (khi có MNKD signal):
+python p0c_verify_mnkd.py --port 4002 --client-id 91
+
+# Swing verify (khi có MES/MNQ/MYM/M2K signal):
+python p0c_verify_swing.py --port 4002 --client-id 92
 ```
-Nếu có entry → chạy `--print-signals` lúc 14:05 ET và so sánh.
-
-**CỬA:** `--print-signals` output KHỚP `desired_basket()` offline cùng cutoff:
-- inst, direction, entry, stop → 4 trường MATCH
-- Lệch entry > 1 tick → data scale sai hoặc signal bug → DỪNG
-
-**⚠️ Same-input requirement (I5.11 fix):** `--print-signals` đã sửa `through=today+23:59` (match run_day).
-Nhưng IBKR cap tại now → preview 14:10 ET và desired_basket 14:30 ET dùng bars khác nhau.
-Để 4-field exact: chạy `--print-signals` **và** `desired_basket()` offline **sát nhau** (cùng now ± 2 phút),
-hoặc dùng bars từ lần preview làm input cho desired_basket (nếu muốn identical).
 
 ---
 
@@ -113,10 +132,12 @@ pythonw -m global_index.run_scheduler --port 4002   # background, không block t
 python -m global_index.run_scheduler --port 4002
 ```
 
-**3 jobs (tự động, mon-fri ET):**
+**25 slots (tự động, mon-fri ET):**
 - `09:31 ET` — MAX_HOLD exit (đóng vị thế qua đêm quá ngưỡng)
 - `13:45 ET` — Pre-flight: `update_ibkr_daily` → `update_spy_csv` (blocking, 2 bước)
-- `14:05 ET` — `run_live_day` (chỉ nếu pre-flight OK → flag=True)
+- `14:05 ET` — `run_live_day` initial slot (chỉ nếu pre-flight OK)
+- `14:10–15:55 ET` — Continuous runner, mỗi 5 phút (22 slots) — TF entry capture
+  _Lý do: 14:05 chỉ có 1 bar → 0% same-day TF capture. Xem run_scheduler.py docstring._
 
 **Fail-safe (fail-closed):**
 - Pre-flight fail bất kỳ bước nào → flag=False → live_day skip ngày đó
@@ -131,32 +152,24 @@ python -m global_index.run_scheduler --port 4002
 
 **Routine sáng (mỗi ngày trading):**
 1. Check scheduler còn sống (nếu reboot qua đêm → khởi động lại trước 13:45)
-2. `python <check_next_entry.py>` → xem regime hôm nay + có P0c không
+2. `python global_index\check_next_entry.py` → xem regime hôm nay
 
 **Polygon API key:** Truyền qua `--polygon-api-key KEY` hoặc env var `POLYGON_API_KEY`. Nếu thiếu → update_spy_csv fail → live_day skip.
 
 ---
 
-## P1 — TIMING TỰ ĐỘNG (1-2 ngày sau P0c)
+## P1 — TIMING TỰ ĐỘNG ✅ DONE 2026-07-30
 
-**Mục đích:** Xác nhận cron fire đúng 14:05 ET tự động không chạy tay.
+**Cách verify:** Start scheduler --dry-run, đọc startup log, kill. Không cần chờ cả ngày.
 
-**Lệnh:**
 ```
-cd d:\raits
-pythonw -m global_index.run_scheduler --port 4002 --dry-run
+Jobs (25): maxhold_exit(09:31) + preflight(13:45) + live_day(14:05) + continuous 14:10→15:55
+Scheduler TZ: America/New_York ✅  Port: 4002 ✅  dry-run: True ✅  Không lỗi.
 ```
-
-**CỬA:**
-- Pre-flight log `[PRE-FLIGHT] OK` lúc 13:45 ET ≥ 2 ngày liên tục
-- Live_day log `[LIVE_DAY] dry-run` lúc 14:05 ET đúng giờ
-- `job_maxhold` fire 09:31 ET đúng (nếu có MAX_HOLD position qua đêm)
-
-**Rủi ro:** Scheduler sai giờ → fire sai bar → entry tại giá sai.
 
 ---
 
-## P2 — ORDER THẬT (bước lớn — nhiều unknown-unknowns)
+## P2 — ORDER THẬT ⬅ BƯỚC TIẾP THEO (bước lớn — nhiều unknown-unknowns)
 
 **Mục đích:** Lần đầu gửi order thật. Order path chưa chạy lần nào — bug chỉ lộ đây.
 

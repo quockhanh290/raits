@@ -71,9 +71,11 @@ from global_index._core import load_parquet as gi_load, FuturesCost as GIFC
 from global_index import specs as gi_specs
 from global_index.regime import RegimeLabels
 from global_index.net_exposure_multi import MultiClusterGuard
-from global_index.signal_layer import generate_today_signals
+from global_index.signal_layer import (generate_today_signals, CLUSTER_SWING,
+                                       CLUSTER_NKD, CLUSTER_STRESS)
 from global_index.ibkr_broker import IBKRBroker
-from global_index.runner import FuturesRunner, _openpos_from_dict
+from global_index.runner import (FuturesRunner, _openpos_from_dict,
+                                 _acquire_lock, RunnerLockError)
 from global_index.hmm_stale_guard import HMMStaleGuard
 
 # ── Production constants: from basket.py ────────────────────────────────────
@@ -87,10 +89,19 @@ NKD_MULT_PARAM = SWING_TF_PARAM.get("chandelier_atr_mult", 2.5)
 # ── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s  %(levelname)-7s  %(name)s — %(message)s",
+    format="%(asctime)s  %(levelname)-7s  %(name)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
+_LOG_FILE_DAY = Path.cwd() / f"live_day_{__import__('datetime').date.today().strftime('%m%d')}.log"
+_fh_day = logging.FileHandler(_LOG_FILE_DAY, mode="a", encoding="utf-8")
+_fh_day.setLevel(logging.INFO)
+_fh_day.setFormatter(logging.Formatter(
+    "%(asctime)s  %(levelname)-7s  %(name)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+))
+logging.getLogger().addHandler(_fh_day)
 log = logging.getLogger("run_live_day")
+log.info("Log file: %s", _LOG_FILE_DAY)
 
 
 def main():
@@ -116,7 +127,27 @@ def main():
     ap.add_argument("--live-state-path", default=None,
                     help="Path to write live_state_data.js for dashboard live mode "
                          "(e.g. global_index/live_state_data.js). Omit to skip dashboard update.")
+    ap.add_argument("--clusters",        default="all",
+                    help="Comma-separated clusters allowed to trade this run: "
+                         "swing,nkd,stress or 'all' (default). Clusters left out do "
+                         "NOT exit their open positions — they are marked unchanged. "
+                         "Used by the NKD night slots (01:10-02:55 ET = the JST "
+                         "14:00-15:55 entry window) so NKD can be evaluated inside "
+                         "its own window without touching live Rổ 4 positions.")
     a = ap.parse_args()
+
+    _CLUSTER_ALIASES = {"swing": CLUSTER_SWING, "nkd": CLUSTER_NKD,
+                        "stress": CLUSTER_STRESS}
+    if a.clusters.strip().lower() == "all":
+        _active_clusters = None
+    else:
+        _names = [s.strip().lower() for s in a.clusters.split(",") if s.strip()]
+        _unknown = [n for n in _names if n not in _CLUSTER_ALIASES]
+        if _unknown:
+            sys.exit(f"--clusters: unknown name(s) {_unknown}; "
+                     f"valid: {sorted(_CLUSTER_ALIASES)} or 'all'")
+        _active_clusters = {_CLUSTER_ALIASES[n] for n in _names}
+        log.info("[sig]  --clusters=%s → active: %s", a.clusters, sorted(_active_clusters))
 
     today = pd.Timestamp.now(tz="America/New_York").normalize().tz_localize(None)
     print("=" * 72)
@@ -213,11 +244,44 @@ def main():
         merged = pd.concat([_strip_tz(frozen_df), live_df])
         return merged[~merged.index.duplicated(keep="last")].sort_index()
 
+    def _to_session_naive(live_et_df):
+        """Move ET-naive IBKR bars onto the NKD session wall clock (JST), tz-naive.
+
+        The frozen half is JST-naive: line 166 tz_converts the parquet to
+        c_nkd.session_tz and _strip_tz then drops the tz. IBKR bars arrive ET-naive.
+        Concatenating the two directly puts two different wall clocks on one index —
+        JST = ET + 13h in summer, so a bar labelled 03:00 is 14:00 ET the previous day
+        on the frozen side and 03:00 ET on the live side.
+
+        Measured 2026-08-03: 1050 of 1590 live bars collided with frozen labels and
+        silently overwrote them (concat keeps "last"), with ~900-1000 point price
+        errors. That corrupts exactly the recent window desired_position() decides on.
+
+        JST is the clock the NKD backtest was validated against — between_time(
+        "14:00", "15:55") in _validated_core selects 14:00-15:55 JST for this
+        instrument — so the live half is converted to match, never the reverse.
+        """
+        idx = live_et_df.index
+        try:
+            aware = idx.tz_localize("America/New_York",
+                                    ambiguous="infer", nonexistent="shift_forward")
+        except Exception:   # pytz.AmbiguousTimeError is not a ValueError subclass
+            # DST fall-back hour with too few bars for "infer" to order them.
+            # ambiguous=True picks DST (the earlier pass) — a 1h label error confined
+            # to that hour, versus the 13h error this whole function exists to remove.
+            log.warning("NKD live bars: ambiguous DST hour — assuming DST for tz_localize")
+            aware = idx.tz_localize("America/New_York",
+                                    ambiguous=True, nonexistent="shift_forward")
+        out = live_et_df.copy()
+        out.index = aware.tz_convert(c_nkd.session_tz).tz_localize(None)
+        return out.sort_index()
+
     def _concat_nkd_live(frozen_nkd_df, live_nkd_et):
-        """Merge frozen NKD parquet + IBKR NKD bars (both tz-naive ET after strip)."""
+        """Merge frozen NKD parquet + IBKR NKD bars, both on the JST session clock."""
         if live_nkd_et is None or live_nkd_et.empty:
             return _strip_tz(frozen_nkd_df)
-        merged = pd.concat([_strip_tz(frozen_nkd_df), live_nkd_et])
+        merged = pd.concat([_strip_tz(frozen_nkd_df),
+                            _to_session_naive(live_nkd_et)])
         return merged[~merged.index.duplicated(keep="last")].sort_index()
 
     # ── signal_fn — Option C ─────────────────────────────────────────────────
@@ -259,6 +323,7 @@ def main():
                 point_values=pv,
                 contracts_by_inst=contracts_by,
                 today=day_ts,
+                active_clusters=_active_clusters,
             )
 
     # ── --print-signals: connect + fetch + compute signals, no orders ──────────
@@ -311,9 +376,13 @@ def main():
                 for c in _ps_entries:
                     _exp = f"  exp_pnl=${c.get('pnl_sized', 0):+.0f}" if c.get("pnl_sized") else ""
                     _exit = str(c.get("exit", "?").date()) if c.get("exit") else "?"
+                    _entry_px = c.get("entry")
+                    _stop_px  = c.get("stop")
+                    _px = (f"  entry={_entry_px:.2f}  stop={_stop_px:.2f}"
+                           if _entry_px is not None else "")
                     print(f"  ENTRY  {c.get('inst'):<5} {c.get('direction'):<5} "
                           f"×{c.get('contracts', 1)}  cluster={c.get('cluster')}"
-                          f"  exit={_exit}{_exp}")
+                          f"  exit={_exit}{_px}{_exp}")
             if _ps_exits:
                 print()
                 for p in _ps_exits:
@@ -328,6 +397,21 @@ def main():
             log.info("[ibkr] Disconnected.")
         return
 
+    # ── E1 lock BEFORE connecting ────────────────────────────────────────────
+    # FuturesRunner takes this lock too, but only after the broker is already
+    # connected. Cron slots are 5 minutes apart and a run takes ~5.5, so the
+    # overlapping process used to connect on the same clientId — colliding with the
+    # run still in flight — and only then die on the lock. Taking it here means an
+    # overlapping run exits before it touches IBKR at all.
+    if a.lock_path:
+        try:
+            _acquire_lock(Path(a.lock_path))
+        except RunnerLockError as exc:
+            log.warning("[lock] %s — this slot is a no-op (previous run still in "
+                        "flight). Not an error: the STATE model is idempotent, the "
+                        "next slot picks up.", exc)
+            return
+
     # ── Connect IBKRBroker ───────────────────────────────────────────────────
     log.info("[ibkr] Connecting IBKRBroker → 127.0.0.1:%d clientId=%d ...",
              a.port, a.client_id)
@@ -336,6 +420,7 @@ def main():
     log.info("       Connected.")
 
     # ── Wire runner ──────────────────────────────────────────────────────────
+    _trade_log = str(Path.cwd() / "trade_log.jsonl")
     runner = FuturesRunner(
         broker=broker,
         guard=MultiClusterGuard(account=ACCOUNT),
@@ -347,6 +432,7 @@ def main():
         live_state_path=a.live_state_path,
         regime_fn=_regime,
         hmm_stale_guard=HMMStaleGuard(regime_csv=a.regime_csv, fit_end=HMM_FIT_END),
+        trade_log_path=_trade_log,
     )
 
     # ── run_day(today) ───────────────────────────────────────────────────────
@@ -355,9 +441,23 @@ def main():
         decision = runner.run_day(today)
         log.info("[run]  run_day complete.")
         if decision is not None:
-            log.info("       entries=%d  exits=%d",
+            # rejected_details must be surfaced: without it "entries=0" conflates
+            # "no signal today" with "signal fired but the cluster cap refused it".
+            # decide_day already records inst/direction/cluster/risk_sized/reason —
+            # dropping it on the floor is what made the 2026-08-04 NKD night window
+            # look silent when it was actually producing a candidate every slot.
+            _rej = getattr(decision, "rejected_details", []) or []
+            log.info("       entries=%d  exits=%d  rejected=%d",
                      len(getattr(decision, "entries", []) or []),
-                     len(getattr(decision, "exits", []) or []))
+                     len(getattr(decision, "exits", []) or []),
+                     len(_rej))
+            for _r in _rej:
+                log.warning(
+                    "       REJECTED %s %s (%s) risk_sized=$%.2f — %s",
+                    _r.get("direction"), _r.get("inst"), _r.get("cluster"),
+                    _r.get("risk_sized", 0.0),
+                    _r.get("detail") or _r.get("reason") or "no reason recorded",
+                )
     except Exception:
         log.exception("[run]  run_day raised — disconnecting before re-raise")
         raise

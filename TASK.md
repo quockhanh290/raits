@@ -159,9 +159,16 @@ Status: IN PROGRESS
 ### PENDING (Option C — user must run)
 - [x] **VERIFY PASS**: python -X utf8 global_index/verify_concat_desired.py --data-dir data\cache\futures\frozen_sim --regime-csv spy_daily_live.csv --n 30
       30/30 Scenario A + B both PASS. "concat(parquet+live) → desired_position() == backtest" CONFIRMED.
-- [x] CRON: update Windows Task Scheduler — every 5 min 14:05-15:55 ET (replaces single 16:00 run)
-      Morning exits still work (desired_position returns None → exits generated on any run)
-- [ ] LIVE verify: --print-signals after market opens → check entries fire at 14:05 not 16:00
+- [x] CRON: continuous runner 14:10–15:55 ET (every 5 min) — IMPLEMENTED in run_scheduler.py 2026-07-22
+      Root cause: backtest_swing_tf needs ≥2 bars in TF window; at 14:05 only 1 bar exists →
+      0 loop iterations → 0% same-day TF entry capture at initial slot alone.
+      Without fix: TF entries only via rollover path (D+1 14:05), overnight gap median $14 std $276
+      vs 2-tick backtest assumption → slippage 10–30× larger than model.
+      Fix: _live_day_body() extracted as shared body; _CONT_SLOTS loop adds 22 jobs (14:10→15:55).
+      Pre-flight gate applied to all slots — if 13:45 update fails, entire window skipped.
+      Capture rate: 14:10→22%, 14:30→50%, 15:55→100% (measured: check_resumebar_timing.py).
+      Ref: check_resumebar_timing.py, check_rollover_gap.py (analysis scripts).
+- [x] LIVE verify (P0c) ✅ DONE 2026-07-28/30 — xem SESSION bên dưới
 - [ ] STRESS_MID Phase C2: add 10:20 ET morning cron with stress_bars_1015 populated
 
 ### Completed (Offline bug fixes — 2026-07-08)
@@ -518,14 +525,42 @@ Status: OFFLINE DONE — chỉ chờ market day
 
 **⚠️ G2 MODEL AGE URGENT hiện tại:** 19 tháng (fit_end=2024-12-31). Warn-only, KHÔNG halt. Nhắc nhở re-freeze — lên kế hoạch sau paper.
 
-#### P0c — chờ ngày Normal/Stress (target: tuần này)
-```powershell
-# Mỗi sáng trước 13:45 ET:
-python global_index\check_next_entry.py
-# Nếu có entry → 14:05 ET chạy:
-python -m global_index.run_live_day --data-dir data/cache/futures --nkd-parquet global_index/data/NKD_continuous_1m_8y.parquet --regime-csv spy_daily_live.csv --port 4002 --print-signals
+#### P0c — ✅ DONE 2026-07-28/30
+
+**Kết quả:**
+
+| Instrument | Ngày | Direction | Entry | Stop | Kết quả |
+|------------|------|-----------|-------|------|---------|
+| MNKD (NKD) | 2026-07-28 | LONG | 62720.00 | 62601.43 | ✅ PASS |
+| MYM (Swing) | 2026-07-30 | LONG | 52310.00 | 52234.25 | ✅ PASS |
+| M2K (Swing) | 2026-07-30 | LONG | 2949.20 | 2944.78 | ✅ PASS |
+| MES, MNQ | 2026-07-30 | (None) | — | — | ✅ Consistent (None cả hai path) |
+
+**Phát hiện quan trọng trong P0c:**
+1. **P0c cần IBKR live bars** — frozen parquet đến ~13:45 ET; NKD signal fire trong cửa sổ 13:45-15:35 ET (live từ IBKR). Verify offline-only → None hoặc wrong direction. Fix: thêm IBKR connect + `fetch_bars()` vào cả 2 verify scripts.
+2. **desired_position() = full backtest replay** — thêm bars có thể đổi last open trade (trade cũ close → trade mới open). Lý do ban đầu MNKD ra SHORT 63630 từ parquet, nhưng live path thấy LONG 62720.
+3. **NKD frozen parquet tz** — tz_convert(Asia/Tokyo) → _strip_tz → JST-naive. Live bars IBKR = ET-naive. concat hoạt động trong thực tế (không overlap).
+4. **HMM non-determinism** — label_regimes() re-fit mỗi lần → borderline days có thể flip regime giữa các lần chạy. Pre-existing, deferred.
+
+**Files được tạo:**
+- `d:\raits\p0c_verify_mnkd.py` — verify NKD: IBKR connect + fetch MNKD + desired_position()
+- `d:\raits\p0c_verify_swing.py` — verify Swing: IBKR connect + fetch 4 instr + desired_basket()
+- `d:\raits\p0c_overnight.py` — tự động chạy --print-signals 14:05-15:55 ET + auto-run p0c_verify_swing.py khi detect ENTRY; startup_check(); Polygon key auto-load
+
+**p0c_overnight.py auto-verify flow:**
 ```
-So sánh inst/direction/entry/stop vs `desired_basket()` offline cùng cutoff. Lệch > 1 tick → DỪNG.
+job_print_signals() → _run_capture(--print-signals)
+  → _has_swing_entry(output)? → YES
+    → _run_capture(p0c_verify_swing.py --port 4002 --client-id 92)
+    → save block to p0c_signals_MMDD.txt
+```
+
+**Bug fixes trong P0c sessions:**
+- `p0c_verify_swing.py`: UnicodeEncodeError khi run làm subprocess từ p0c_overnight.py (stdout cp1252 + tiếng Việt "Rổ 4"). Fix: `sys.stdout.reconfigure(encoding="utf-8")` wrapped try/except.
+- `p0c_overnight.py`: Polygon key từ `config_private.py` (Python variable, không phải OS env). Fix: module-level auto-load vào `os.environ["POLYGON_API_KEY"]`.
+- startup_check(): 4 checks (Polygon key / NKD parquet + spy_csv + p0c_verify_swing.py / swing parquets / IBKR reachable via client_id=99).
+
+**⚠️ IBKR slot overlap** (chưa fix): P0C_1440/1450 fail do --print-signals chạy ~8 phút, interval 5 phút → 2 jobs overlap, cùng client_id=1. Transient, các slot sau recover. Fix sau nếu cần: tăng interval lên 10 phút hoặc dùng client_id riêng mỗi slot.
 
 **Pre-flight scheduler — DONE + fail-closed (commits 0f91fc9 + 90a7000 + 8351fd6):**
 - Logic: `flag=True` (cả ibkr_daily + spy_csv xong) → run. `flag=False/None` → skip
@@ -537,8 +572,15 @@ So sánh inst/direction/entry/stop vs `desired_basket()` offline cùng cutoff. L
 - Cần sống lúc 09:31 ET (maxhold) và 13:45 ET (pre-flight)
 - **Routine sáng:** (1) Check scheduler còn sống → nếu không: `pythonw -m global_index.run_scheduler --port 4002` TRƯỚC 13:45 ET; (2) `check_next_entry.py`
 
-#### Thứ tự sau P0b
-P0c (live path 4-field, chờ Normal/Stress) → P1 (dry-run scheduler 1-2 ngày liên tục) → P2 (order thật, theo dõi đêm đầu) → C1 slippage vs 2-tick → nhiều tháng → VPS/ops → live 1 micro.
+#### Thứ tự tiếp theo
+~~P0c~~ ✅ DONE → **P1** (dry-run scheduler 1-2 ngày liên tục, không cần verify tay) → P2 (order thật, theo dõi đêm đầu) → C1 slippage vs 2-tick → nhiều tháng → VPS/ops → live 1 micro.
+
+**P1 ✅ DONE 2026-07-30** — 30 giây, start + đọc log + kill:
+```
+25 jobs: maxhold_exit(09:31) + preflight(13:45) + live_day(14:05) + continuous 14:10→15:55
+Scheduler TZ: America/New_York ✅  Port: 4002 ✅  dry-run: True ✅  Không lỗi.
+```
+→ **P2 là bước tiếp theo** (bật scheduler không --dry-run, order thật)
 
 ### Next steps (IBKR ACCOUNT APPROVED → PAPER)
 
@@ -1009,3 +1051,649 @@ Gate 2 to escalate).
 
 ### Files touched (read-only investigation, no production files modified)
 None — orb_futures/, futures/, docs/futures/ all read-only this session.
+
+---
+
+## Sub-task: Opening Imbalance Filter for ORB (research) — 2026-08-03
+Status: DONE — verdict MONITOR (no production change)
+
+### Context
+Hypothesis: does opening auction order imbalance predict direction/quality of the
+existing ORB / STRESS_ORB_STK SHORT setup, independent of the already-validated
+gates? Follows the catalyst-study method exactly (3-layer test), same event
+population, same outcome metric — so results are directly comparable.
+All code in `orb_stocks/imbalance_research/` — production untouched.
+
+### Completed
+- [x] **Step 1 coverage — GO.** Pre-committed thresholds set before first fetch.
+      155/155 events usable on the `full` window (100%), 151/155 on `late` (97.4%),
+      82 dates, both years clear. Tick-rule classification quality high
+      (unclassified volume 0.0% median / 1.0% p90).
+- [x] **Entitlement finding — hypothesis had to change.** Official NYSE/Nasdaq
+      auction imbalance: ABSENT (404). Polygon NBBO quotes: **403 NOT_AUTHORIZED**
+      → canonical Lee-Ready NOT constructible (needs quote midpoint). Only the
+      TICK RULE remains. Measured object = pre-open signed order flow, NOT the
+      auction imbalance. The original hypothesis remains untested.
+- [x] **Step 2 features + confound — CLEAN.** Test variable chosen from the data
+      (direction, not magnitude: magnitude fails the skew screen on `full`).
+      `imb_ratio_vol` vs `gap_pct` spearman **+0.028**; vs pre-market volume rank
+      **-0.016**. Raw sign-agreement 74% is pure base rate (98% down-gap × 75%
+      sell-side → 74% chance); **Cohen's κ = +0.013**. Requirement #2 satisfied —
+      this is NOT H1-H3 restated.
+- [x] **Step 3 three-layer test.** Primary cell pre-committed (`late` × pct_return).
+      naive p=0.157 → cluster p=0.100 → **within-date p=0.0267**, direction
+      consistent. aligned n=110 +0.253% (WR56%) vs against n=34 -0.094% (WR47%).
+      ICC=0.368, design effect 1.329, effective n=108.3.
+      NOTE: opposite pattern to the catalyst study (there naive was strong and
+      within-date killed it). Legitimate — high ICC means conditioning on date
+      removes between-day noise — but see the sample-size caveat below.
+- [x] **METHOD BUG FOUND + FIXED: `cluster_bootstrap.py` permutation is not centred.**
+      It tests `|perm| >= |obs|` against zero, but non-mixed-date events contribute
+      a fixed offset, so the null is centred at +0.123%, not 0.
+      Uncentred p=0.0129 vs centred p=0.0267 — **overstated ~2x**.
+      Fixed in `bootstrap_imbalance.py::layer3` (reports both).
+      Catalyst verdict NOT overturned (p=0.524, far from threshold), but the bug
+      is still live in `orb_stocks/cluster_bootstrap.py` for any future reuse.
+- [x] **Step 3b robustness — this is what downgraded the verdict.**
+      Leave-one-ticker-out: **QCOM (5 ev) → p=0.102**, **NVDA (10 ev) → p=0.065**
+      (14 other tickers hold). Leave-one-date-out: 1/23 breaks it.
+      Winsorise ±2sd: p 0.027→0.033 (PASSES — not tail-driven).
+      Year split: **2022 p=0.020 (n=116) vs 2021 p=0.528 (n=28, 4 mixed dates)**.
+- [x] **FINDINGS.md written** — full report, coverage, effective n, 3-layer results,
+      robustness, revisit conditions.
+
+### Verdict: MONITOR
+Fails the pre-committed concentration rule (2 tickers break p<0.05) and the effect
+is 2022-only. Not dead: direction consistent across all 3 layers, survives
+winsorising, confound-clean, mechanism sensible (shorting into confirmed pre-open
+selling). 2021 is *unconfirmed*, not contradictory — 4 mixed dates has no power.
+
+### Key finding — why 5 events swing the p-value
+The deciding test does NOT run on 144 events. Only **mixed dates** (both arms
+present) have label freedom: **23 dates / 63 events (35 aligned, 28 against)**.
+QCOM contributes 2 of the 28 against-events at -0.593%. The design-effect
+"effective n=108.3" describes the full population, NOT the conditional test.
+**Binding constraint for any revisit is mixed-date count, not event count.**
+
+### Against promoting further
+`full`-window cells point the OPPOSITE direction (-0.10%). Defensible (4am-8am
+tape is noise) but not confirmation. With 4 cells examined, a Bonferroni read of
+the primary gives 0.0267×4 ≈ 0.107 — no correction formally required since the
+primary was pre-committed, stated so the number is not oversold.
+
+### Revisit conditions
+- [ ] More mixed dates (the binding power constraint, currently 23)
+- [ ] 2023+ / OOS Stress data — is the 2022-only pattern regime- or sample-specific?
+- [ ] NBBO quotes (plan upgrade) → real quote-based Lee-Ready; tick rule is strictly
+      weaker, so current estimate is more likely a floor than a ceiling
+- [ ] Official auction imbalance data — the hypothesis as written is still untested
+- [ ] True all-days within-ticker baseline (~650 fetch-days) to enable z-score variants
+
+### Files added (all research-only, production untouched)
+orb_stocks/imbalance_research/: check_imbalance_coverage.py, build_imbalance_features.py,
+bootstrap_imbalance.py, robustness_imbalance.py, FINDINGS.md,
+imbalance_coverage.parquet, imbalance_features.parquet, imbalance_test_results.parquet
+
+### POWER FIX — extended event index (2026-08-03, zero data cost)
+- [x] **Root cause of the small sample found: an inherited window, not a data limit.**
+      The 2021-04 start came from the catalyst study, where Polygon NEWS history
+      begins ~2021-04. **The imbalance study uses no news** — that constraint never
+      applied. Measured, not assumed:
+        stress_orb_stk_sim.t_v3 : 237 trades / 121 dates, 2018-02-02 .. 2022-12-27
+        window_debug_5min.pkl   : 75 tickers, 2017-01-03 .. 2024-12-31, NO gap
+        Stress days             : 283 (2018:38 2019:25 2020:60 2021:47 2022:113)
+- [x] `build_extended_event_index.py` — rebuilds over 2018-05-01..2022-12-31 using
+      the committed sim unmodified (imported, not re-implemented) and the SAME
+      outcome definition + |pct|>25% corrupt-bar gate as the catalyst study.
+      Start = Databento imbalance history floor; 6 events / 2 dates before it
+      dropped and reported.
+
+      | metric | old | extended |
+      |---|---|---|
+      | clean events | 154 | **267** (x1.73) |
+      | dates | 81 | **150** |
+      | dates with >=2 events (mixed-date CEILING) | 45 | **72** (x1.60) |
+      | years | 2 | **5** (2018-2022) |
+      | tickers | 31 | 35 |
+
+      Expected mixed dates ~36 (51% split rate observed) vs 23 now.
+      Also directly attacks the "2022-only" robustness failure: adds 2018 (20 ev),
+      2019 (24 ev), 2020 (56 ev).
+
+### Databento — verified available, costed
+- [x] `imbalance` IS a Databento schema (verified from installed SDK 0.80.0).
+      `ImbalanceMsg` carries side, total_imbalance_qty, paired_qty, unpaired_qty,
+      ref_price, ind_match_price, cont_book_clr_price, auction_type/time/status.
+      This is the real NYSE/Nasdaq NOII — the input Polygon 404'd on.
+- [x] `check_databento_imbalance.py` — metadata-only probe (no data downloaded).
+      XNAS.ITCH   imbalance YES, history 2018-05-01..2026-08-03
+      XNYS.PILLAR imbalance YES, history 2018-05-01..2026-08-03
+      ARCX.PILLAR imbalance YES but NOT a listing venue for our pool -> skip ($48)
+      BATS.PITCH / EDGX.PITCH: no imbalance schema
+- [x] **Cost measured (date-sliced, linear, no per-request minimum):**
+      extended 150 event dates x 35 tickers = **$6.07** (XNAS $4.11 + XNYS $1.96)
+      vs full-window 2021-04..2022-12 = $16.70. Budget $37 -> ~$30.93 left.
+
+### PENDING — user decision (spends real credit)
+- [ ] Approve Databento fetch scope, then fetch + rebuild features + re-run
+      bootstrap_imbalance.py / robustness_imbalance.py on the extended index
+
+---
+
+## Sub-task: B4 naked-position guard (2026-08-03)
+Status: PART 2 DONE — PART 1 BLOCKED chờ stop level
+
+### Bối cảnh — phát hiện khi check holding từ IBKR
+3 vị thế mở thật (MES LONG / MYM LONG / M2K SHORT, cluster roska4_swing, entry_day 2026-08-03)
+đang **không có STP nào**. `openTrades()` = 0, file lưu `stop_price: null, stop_order_id: null`.
+
+Root cause traced: `send_order` đọc ra `status=Cancelled` cho cả 3 lệnh ĐÃ FILL
+(reqExecutions có execId/permId, `ib.trades()` = Filled). Gate `status in (FILLED, PARTIAL)`
+ở runner.py chặn khối STP → không đặt stop, không log, **không báo động** (log lỗi nằm trong
+chính gate đó). B3 lần chạy sau chỉ so inst/direction/contracts → báo "match", không ai biết.
+
+### Completed — Phần 2 (guard)
+- [x] `broker.py`: `Broker.has_working_stop(inst)` — concrete, mặc định raise NotImplementedError
+      (broker không trả lời được thì B4 chỉ cảnh báo, không đặt mù). MockBroker → False.
+- [x] `ibkr_broker.py`: `has_working_stop()` — `reqAllOpenOrders()` + `openTrades()`,
+      lọc symbol + orderType STP/STP LMT + status chưa terminal. reqAllOpenOrders trước để
+      thấy cả order của clientId khác / process trước.
+- [x] `runner.py`: khối B4 sau vòng ORPHAN của B3 + `self._b4_naked_stops`.
+      Vị thế khớp cả 2 phía nhưng `stop_order_id is None` → đặt bù nếu biết `stop_price`
+      VÀ chắc chắn chưa có stop đang chạy; ngược lại CRITICAL "B4 NAKED".
+      **Không halt entries** — state chắc chắn (2 phía khớp), chặn lệnh mới không cứu được
+      vị thế đang mở, và exits vẫn phải chạy.
+- [x] `test_stp.py`: +5 test B4.1–B4.5 (đặt bù / chống trùng STP / stop_price=None chỉ cảnh báo
+      / broker không verify được thì không đặt / no-harm khi đã có stop)
+
+### Verify — ALL PASS
+- [x] test_stp 14/14 (9 cũ + 5 mới) | test_ibkr_injection 14/14 | hmm_stale+operational+event_playback 51/51
+- [x] reconcile_gd0 PASS — MES 427t/$5,833 | MNQ 425t/$11,570 | MYM 440t/$6,778 | M2K 428t/$2,554 MATCH
+- [x] reconcile_stress PASS — 265 Stress days, 108 enter/match, 157 skip, 0 mismatches
+
+### Completed — Phần 1 (xử lý 3 vị thế trần) 2026-08-03
+- [x] Stop level lấy từ `p0c_verify_swing.py`: MES 7627.38 / MYM 53290.39 / M2K 2989.90
+- [x] Validate vs market + minTick trước khi gửi (LONG round DOWN, SHORT round UP — luôn ra xa
+      market, để làm tròn tick không bao giờ kéo stop lại gần và kích hoạt sớm)
+- [x] MES SELL STP @ 7,627.25 GTC orderId=9  | MYM SELL STP @ 53,290.00 GTC orderId=10
+      → PreSubmitted, verify lại từ IBKR OK; ghi stop_price + stop_order_id vào live_positions.json
+- [x] M2K REFUSE: stop 2,989.90 < market 2,994.10 → SHORT thì BUY STP phải nằm TRÊN giá.
+      Stop đã bị xuyên. Quyết định (user): đóng market. Fill BOT 1 @ 2,993.20.
+      Lỗ thật $26.00 vs $9.50 nếu STP đã tồn tại → **thiếu stop tốn $16.50 trên riêng lệnh này**.
+      Đã xoá khỏi live_positions.json; reconcile MATCH (2 vị thế còn lại).
+- [x] MNQ: engine báo LONG entry today nhưng không có vị thế và không có lệnh trong log.
+      KHÔNG mở — đây là hiệu ứng P0c #2 (desired_basket replay lúc 19:43 ET nhiều bar hơn lúc
+      15:55 ET → rổ khác). Mở tay = bịa lệnh.
+
+### Completed — Phần 3 (root cause + vá gốc) 2026-08-03
+- [x] **ROOT CAUSE xác nhận** (ib_insync 0.9.86 `wrapper.py:1097`): `warningCodes` hardcode
+      {110,165,202,399,404,434,492,10167} ∪ [2100,2200). Code **10349** là warning của IBKR
+      nhưng không nằm trong đó → ib_insync vào nhánh error → `trade.orderStatus.status =
+      Cancelled` phía client. IBKR không huỷ; lệnh vẫn khớp. Trade log: PendingSubmit
+      00:57:51.327 → Cancelled 00:57:51.345 (18ms) → Filled @2993.20. Runner poll 0.1s → trúng.
+      Trigger: `outsideRth=True` + `tif` để trống → IBKR lấy preset ghi đè DAY + phát 10349.
+      ⚠️ 10349 ĐÃ có trong `_IBKR_INFORMATIONAL` nhưng set đó chỉ hạ log ở `_on_ibkr_error`,
+      chạy SAU khi status đã bị đổi — dập tiếng ồn ở sai tầng.
+- [x] `ibkr_broker.py` fix 1: `tif="DAY"` explicit ở `send_order` + cả 2 chân `_handle_rollover`
+- [x] `ibkr_broker.py` fix 2: `_verified_status(ib, trade)` + `CANCEL_VERIFY_SECS=5.0`.
+      Cancelled/ApiCancelled/Inactive mà `filled==0` → re-poll 5s → `trade.fills` phán
+      (execution report chỉ tồn tại nếu khớp thật). Áp cho send_order + 2 chân rollover.
+- [x] `test_false_cancel.py` 7/7 — FC1 live case, FC2 orderStatus catch-up, FC3 huỷ thật vẫn
+      Cancelled (không "rửa" thành fill), FC4 fill sạch không trả phí delay, FC5 partial giữ qty,
+      FC6 weighted avg, FC7 Inactive
+- [x] VERIFY: test_ibkr_injection 14/14 | pytest 5 suite 72/72 | reconcile_gd0 PASS (4/4 MATCH)
+
+### ⏳ CHỜ VERIFY LIVE (lệnh thật đầu tiên sau fix)
+- [ ] Lệnh entry kế tiếp: kiểm log KHÔNG còn `"not filled — status=Cancelled"`, và nếu
+      `_verified_status` cứu được thì phải thấy WARNING `"trusting the execution report"`
+- [ ] Xác nhận STP được đặt tự động ngay sau fill (stop_price + stop_order_id ≠ null)
+
+### ~~BLOCKED~~ — Phần 1 (đặt STP cho 3 vị thế hiện tại) — DONE, giữ để tham chiếu
+- [ ] Cần stop level: `python -X utf8 p0c_verify_swing.py --port 4002 --client-id 92`
+      ⚠️ B4 KHÔNG tự cứu được 3 vị thế này: `stop_price` cũng `None` (gate không mở nên không
+      field nào được set) → B4 chỉ CẢNH BÁO ở lần khởi động runner kế tiếp, phải đặt tay.
+      Sanity-check trước khi gửi: LONG cần stop < giá thị trường, SHORT cần stop > .
+
+### Next steps
+- [ ] Cân nhắc bracket order cho entry: stop nằm sẵn trên server IBKR từ lúc submit, không phụ
+      thuộc đọc status → xoá hẳn khoảng trần giữa fill và lúc đặt STP. `_verified_status` chỉ
+      thu hẹp khoảng đó, không xoá được.
+- [ ] Rà các đường khác cũng đọc `orderStatus.status` trực tiếp (`get_order_status` dùng cho B3)
+      — cùng lớp lỗi, chưa vá.
+- [ ] Slippage OPEN của 3 lệnh 2026-08-03 không được ghi (gate chặn) → slip_stats thiếu 3 mẫu
+
+### Key decisions
+- B4 không halt entries: khác B3 (state uncertainty → halt). Ở đây state chắc chắn, chỉ thiếu
+  bảo vệ; halt không giảm rủi ro của vị thế đang mở mà lại dừng cả hệ thống.
+- Không đặt STP bù một cách mù: hai STP cùng contract cùng fire → đóng 2 lần → lật chiều.
+  Không verify được thì cảnh báo, không đoán.
+
+### Files touched
+global_index/broker.py, global_index/ibkr_broker.py, global_index/runner.py,
+global_index/test_stp.py, SCRATCHPAD.md
+
+---
+
+## Sub-task: Order-flow feasibility + intraday pressure probe — 2026-08-03
+Status: DONE — orderflow branch CLOSED; data bug found (worth more than the probe)
+
+### Route taken (each step killed the next by measurement, not opinion)
+- [x] **Orderflow as SIGNAL filter — rejected on HORIZON.** Measured holds:
+      STRESS_MID 152min | STRESS_ORB 158 | GF_SHORT 180 | ORB 350 | PE_SHORT 1825 |
+      TREND_FOLLOW 6925 (88% overnight, 61% MAX_HOLD). Orderflow is seconds-to-minutes.
+      Nothing in the system trades at that horizon. (User caught this before I did.)
+- [x] **Orderflow for EXECUTION — rejected on measured value.** `execution_ceiling.py`:
+      entry-side prize vs bar VWAP = **+$1,219** over 1,292 trades / 6 years = $0.94/trade.
+      Exit side -$7,877 (model already fills better than VWAP). Pre-committed rule was
+      <$1,000 -> close. Not worth $63-278 data + build.
+- [x] **Data availability mapped (Databento, metadata only — $0 spent):**
+      CME futures orderflow: mbp-10 $435/yr/instrument, 4-instrument 5yr ~$8,700 — out.
+      Stocks, ORB-window slice, 150 days: tbbo $26 / mbo $119 / mbp-10 $174.
+      **DBEQ.BASIC is NOT consolidated** — only 4 small venues (NYSE Texas, NYSE
+      National, IEX, MIAX Pearl). No consolidated equity feed exists before 2023-03-28.
+      Live runtime (5-min cron) cannot execute sub-minute regardless.
+- [x] **5-min pressure probe — DEAD.** `intraday_pressure/probe_5min_pressure.py`.
+      4.28M bar-obs, 37 tickers, 2017-2024, day-clustered CIs, pre-committed hurdle
+      $0.034 gross at h>=10min. **0 of 20 cells cleared.**
+
+### THE ACTUAL FINDING — corrupt META block
+- [x] The probe's apparent edge (mean +5.894c vs median +0.500c) was **100% data corruption**.
+      Top 0.1% of obs = **533% of total profit**; 814 of top 856 were META with a median
+      "move" of **2,154% of price in 10 minutes**.
+- [x] **META: 5,157 corrupt 5-min bars over 148 trading days, 2021-06-30 .. 2022-01-28.**
+      Close ~$12-16 instead of ~$300-380. ONLY META, no other ticker.
+      In `window_debug_5min.pkl` -> feeds window_debug, stress_orb_stk_sim, event index.
+- [x] **Baseline impact NEGLIGIBLE**: 1 trade (GF_SHORT, entry $12.62), **-$34 of $33,550**.
+      Corrupt prices made META fail the strategies' own filters rather than fire fake trades.
+- [x] **Gate weakness exposed**: `|pct_return|>25%` is a RATIO test, so it MISSES two-sided
+      corruption (entry ~$14 -> exit ~$14 looks normal). Caught 1 of 4 corrupt META events.
+      **3 corrupt events survive into the 267-event clean population AND into the 144-event
+      primary cell of the auction-imbalance study.**
+
+### Next steps
+- [ ] **Add a price-LEVEL sanity gate** (entry_px vs ticker rolling daily median, >50% dev)
+      alongside the existing ratio gate
+- [ ] **Re-run the auction-imbalance study after the gate fix** — it was already MONITOR and
+      already fragile to 5 events (QCOM), so 3 corrupt events are not obviously ignorable
+- [ ] Optional: investigate SAFETY_MODE (-$78.94/trade) and CIRCUIT_BREAKER (-$23.73/trade)
+      exit fills modelled BETTER than VWAP — direction is backwards for forced liquidation
+
+### Files added (research only, production untouched)
+intraday_pressure/probe_5min_pressure.py, intraday_pressure/FINDINGS.md,
+intraday_pressure/pressure_probe.parquet,
+orb_stocks/imbalance_research/execution_ceiling.py (+ .parquet),
+orb_stocks/imbalance_research/check_databento_imbalance.py
+
+---
+
+## Sub-task: NKD timezone + cluster gate + night slots (2026-08-03)
+Status: CODE DONE — chờ verify live phiên JST 04/08
+
+### Bug 1 — trộn múi giờ frozen/live (ĐÃ VÁ)
+`run_live_day.py:166` tz_convert parquet NKD sang Asia/Tokyo, `_strip_tz` bỏ tz → nửa frozen
+là **JST-naive**. Bar IBKR về là **ET-naive**. `_concat_nkd_live` ghép thẳng → một index hai
+đồng hồ. JST = ET + 13h (hè) / 14h (đông).
+
+**Đo thật 2026-08-03:** 1050/1590 bar live trùng nhãn với bar frozen và ghi đè (`keep="last"`),
+sai giá ~900–1000 điểm. Ví dụ nhãn `2026-08-03 03:00`: frozen 64,700.00 (03:00 JST) vs
+live 63,785.00 (03:00 ET). Hỏng đúng cửa sổ gần nhất mà `desired_position()` dùng để quyết định.
+
+- [x] `_to_session_naive()` — đưa bar live về đồng hồ JST trước khi concat. Qua tz thật
+      (không hardcode offset) vì JST−ET đổi theo DST. Fallback `ambiguous=True` cho giờ lặp DST.
+- [x] `test_nkd_tz.py` 8/8 — có test đối chứng dựng lại đường cũ để chứng minh không tautology
+- [x] Docstring cũ ghi "(both tz-naive ET after strip)" — SAI với nửa frozen, đã sửa
+- [x] **Data trên đĩa KHÔNG hỏng**: `update_ibkr_daily.py:104-119` chuẩn hoá cả bar fetch lẫn
+      parquet về ET-naive trước khi splice. Corruption chỉ sống trong RAM một lần chạy. Không
+      phải rebuild gì.
+- ⚠️ **Kết quả P0c MNKD 2026-07-28 VÔ HIỆU** — cả hai vế so sánh dùng chung concat hỏng nên
+      chúng khớp nhau. L10 lần nữa: consistency ≠ correctness. Phải verify lại.
+
+### Bug 2 — NKD không bao giờ chạy trong cửa sổ của nó (ĐÃ VÁ)
+`between_time("14:00","15:55")` áp trên đồng hồ của từng instrument. NKD `session_tz=Asia/Tokyo`
+→ cửa sổ thật là **14:00–15:55 JST = 01:00–02:55 ET**. Scheduler chỉ có slot 09:31/13:45/14:05/
+14:10→15:55 ET. `run_live_day` là subprocess chạy-rồi-thoát, nên **từ 15:55 ET tới 09:31 ET hôm
+sau không có process nào tồn tại** — cửa sổ NKD nằm trọn trong khoảng chết.
+
+Dữ liệu thì đủ lúc 14:05 ET (đo được: 116/116 bar cửa sổ JST, `entry_day` khớp `today_norm`),
+nhưng vào lệnh thì trễ **11 tiếng** so với bar tín hiệu. Tham chiếu quy mô: Option C audit đo
+lệch 13–105 phút = **−$9,112 (−20.2%)**.
+
+- [x] `signal_layer.generate_today_signals(active_clusters=...)` — mặc định `None` = tất cả
+      (mọi caller cũ không đổi hành vi)
+- [x] `_mark_held_unchanged()` — cluster bị gate thì vị thế đang giữ được đánh dấu "y nguyên",
+      KHÔNG bỏ trống. Bỏ trống = `diff_desired_vs_held` L110-112 đóng sạch. Dùng lại đúng cơ
+      chế nhánh C4 đã có; dedupe luôn 2 chỗ C4 copy-paste.
+- [x] ATR chỉ tính cho cluster đang active (slot đêm 5 phút/lần, không trả phí resample 8 năm)
+- [x] `run_live_day.py --clusters swing,nkd,stress|all`
+- [x] `run_scheduler.py`: 22 slot `NKD_NIGHT_0110..0255` (01:10–02:55 ET, mỗi 5 phút),
+      `--clusters nkd`. Bắt đầu 01:10 không phải 01:00 vì `backtest_swing_tf` cần ≥2 bar —
+      cùng lý do Rổ 4 bắt đầu 14:10.
+- [x] `_prev_bday()` + `prev_preflight=True`: slot đêm chạy TRƯỚC pre-flight 13:45 của chính
+      ngày đó → flag hôm nay luôn None → fail-closed sẽ skip vĩnh viễn. Dùng flag của ngày làm
+      việc trước (13:45 ET hôm trước, ~11h trước đó = bản cập nhật mới nhất tồn tại lúc 01:10).
+- [x] Slot 14:05–15:55 giữ NKD active → exit NKD vẫn chạy ban ngày
+- [x] **Pre-flight flag persist ra đĩa** (`global_index/preflight_state.json`, atomic write,
+      giữ 7 ngày). `_preflight_ok` vốn chỉ nằm trong RAM — sống được khi mọi consumer chạy
+      14:05–15:55 cùng đời process với pre-flight 13:45. Slot đêm đọc flag của NGÀY TRƯỚC nên
+      dict rỗng sau mỗi lần restart ⇒ fail-closed vĩnh viễn: feature trông như đã wire nhưng
+      không bao giờ bắn. Persist là ghi lại sự kiện đã xảy ra, không phải đoán — entry vẫn key
+      theo ngày nên file cũ không thể cấp phép cho ngày nó không nêu tên.
+- [x] Seed `preflight_state.json` = {"2026-08-03": true} — chép từ log đã verify:
+      `scheduler_0803.log:91  [PRE-FLIGHT] OK — parquet + spy CSV fresh`
+- [x] `test_cluster_gate.py` 7/7 — GATE2 là test đối chứng chứng minh key vắng mặt thật sự
+      gây exit; GATE6 chứng minh engine bị gate không hề được gọi
+
+### Verify
+- [x] pytest 87/87 (cluster_gate 7 + nkd_tz 8 + false_cancel 7 + stp 14 + hmm_stale 42 + ...)
+- [x] test_ibkr_injection 14/14
+- [x] scheduler đăng ký 47 job, tz America/New_York; 01:10 ET = 14:10 JST = 12:10 VN;
+      02:55 ET = 15:55 JST = 13:55 VN — khớp đúng cửa sổ
+- [x] reconcile_gd0 PASS (MES 427t/$5,833 | MNQ 425t/$11,570 | MYM 440t/$6,778 | M2K 428t/$2,554)
+- [x] reconcile_stress PASS (265 Stress days, 108 enter/match, 157 skip, 0 mismatch)
+- [ ] reconcile_nkd — đang chạy nền
+- ⚠️ `test_rollover.py::test_ro6_maxhold_then_rollover_no_conflict` FAIL — **hỏng sẵn ở HEAD**
+      (verify bằng git worktree tại HEAD, cùng lỗi B3 MISMATCH). Không phải do session này.
+      Chưa điều tra.
+
+### Đã sửa — chồng job giữa các slot (2026-08-03)
+Slot cách 5 phút, một lần chạy mất ~5,5 phút (đo: connect 12:35:16 → disconnect 12:40:44)
+⇒ 2 process cùng lúc, cùng `clientId=1`, đụng nhau ở IBKR. Đây là lỗi P0C_1440/1450 trong
+TASK cũ, ghi "chưa fix".
+
+Hai lỗ, sửa cả hai:
+- [x] **PID lock đứng sai chỗ**: `run_live_day.py` gọi `broker.connect()` TRƯỚC khi
+      `FuturesRunner.__init__` giành E1 lock. Process chồng lấn kịp connect (đụng clientId)
+      rồi mới chết vì lock. Fix: giành lock ngay trước connect → thoát trước khi chạm IBKR.
+- [x] `_acquire_lock` cho phép **cùng PID** giành lại (run_live_day khoá sớm, FuturesRunner
+      khoá lần nữa) — nếu không thì mọi lần chạy đều tự abort trên lock của chính mình.
+- [x] **Mutex tầng scheduler** `_slot_lock` trong `_live_day_body` → không spawn process thừa
+      ngay từ đầu. `max_instances` KHÔNG dùng được: APScheduler áp per job id, mà mỗi slot là
+      một job riêng. Mutex phủ mọi slot, cả ngày lẫn đêm, và cả slot thêm sau này.
+- [x] Skip là đúng chứ không mất gì: `diff_desired_vs_held` idempotent (vị thế đang giữ →
+      `cur != None` → không vào lại), slot kế làm đúng phần việc đó.
+- [x] `test_slot_overlap.py` 6/6 — có test khẳng định skip phải **tức thì** (<0.10s), không
+      phải xếp hàng rồi chạy đúp; và test guard không bị kẹt sau khi body raise.
+
+### Next steps
+- [ ] Verify live slot đêm đầu tiên (04/08, 12:10–13:55 giờ VN): NKD có được đánh giá trong
+      cửa sổ không, MES/MYM có bị đụng không (phải KHÔNG)
+- [ ] Verify lại P0c MNKD trên dữ liệu sạch
+- [ ] `test_ro6` hỏng sẵn — điều tra riêng
+- [ ] Đo $ thật của khoảng lệch 11h (kiểu Option C audit) để biết slot đêm đáng giá bao nhiêu
+
+### Files touched
+global_index/signal_layer.py, global_index/run_live_day.py, global_index/run_scheduler.py,
+global_index/test_cluster_gate.py, global_index/test_nkd_tz.py
+
+---
+
+## Sub-task: Cluster cap bị bóp theo mức chỉ số (chẩn đoán, 2026-08-04)
+Status: DIAGNOSED — chờ quyết định, KHÔNG tự sửa
+
+### Triệu chứng
+Slot đêm NKD chạy đúng, sinh candidate hợp lệ mỗi lần, nhưng `entries=0` mọi slot.
+`desired_position()` → LONG entry=63,575.00 stop=63,478.39 entry_day=2026-08-04, guard entry_day PASS.
+Bị chặn ở `MultiClusterGuard.admits` — gross 5.87% > cap 2.0%.
+
+### Số đo
+| | |
+|---|---|
+| NKD daily ATR14 (04/08) | 2,346.07 điểm |
+| `risk_sized` = 1 × 2.5 × 2346.07 × 0.5 | $2,932.59 |
+| % của ACCOUNT $50,000 | 5.87% (cap `global_nkd` 2%) |
+| % của equity thật $995,344 | 0.29% |
+| Account cần để 1 MNKD lọt sleeve 2% | $146,630 |
+
+Lịch sử `risk_sized` (median/năm) và tỉ lệ vượt cap $1,000:
+2018 $414/0% · 2019 $350/0% · 2021 $578/0% · 2023 $572/0% ·
+2024 $841/27.6% · 2025 $881/33.0% · **2026 $2,061/94.1%**
+
+Phân rã 2019→2026: index level ×2.85 · ATR %giá ×2.06 · ATR điểm ×5.90 (tích của hai).
+
+### Rổ 4 cũng đang bị bóp (chậm hơn)
+`risk_sized` cả 4 mã cùng chiều, % của ACCOUNT $50,000 (cap gross 5%):
+2017 1.7% · 2019 3.1% · 2023 5.5% · **2026 10.8%** → chỉ còn chỗ cho ~2/4 mã.
+
+### Nguồn gốc con số 2%
+- `net_exposure_multi.py` docstring: *"roska4_stress and global_nkd (2%) remain
+  ESTIMATES — calibrate during paper trading"* → **chưa bao giờ được sweep**.
+- `DECISIONS.md:77`: neo vào giả định *"1 MNKD ATR risk ≈ $437"* = **percentile 22.6%**
+  của toàn bộ lịch sử, lấy từ giai đoạn yên nhất 2018–2019. Thực tế hôm nay gấp 6.7×.
+
+### Kết luận — KHÔNG phải lỗi cap
+`risk_sized` là đô-la thật đang chịu rủi ro; chặn ở 2% tài khoản là quản trị rủi ro ĐÚNG.
+Vấn đề là **độ hạt**: 1 hợp đồng micro Nikkei giờ rủi ro nhiều hơn cả sleeve, và không có
+hợp đồng nào nhỏ hơn MNKD. Nguyên nhân gốc: **cơ sở sizing $50,000 đứng yên trong khi thị
+trường tăng 2–3×**, nên sức chứa hệ thống co lại đều theo năm. Đây là câu hỏi QUY MÔ VỐN,
+không phải câu hỏi hàng rào rủi ro.
+
+⚠️ **Đã suýt sai**: đề xuất ban đầu "neo cap theo notional/ATR% thay vì $ tuyệt đối" là SAI —
+nó chỉ cho lọt một lệnh rủi ro 5.87% tài khoản, tức tăng rủi ro thật dưới danh nghĩa sửa cấu
+trúc. Đã rút lại trước khi implement.
+
+### Ba lựa chọn (quyết định của user, chưa làm gì)
+1. Nâng sleeve (NKD ≥6%, swing ~11%) — tăng rủi ro thật trên nền $50k; trần DD 15% dùng chung
+   toàn tài khoản nên PHẢI đo, không đoán.
+2. Nâng cơ sở sizing khỏi $50,000 — chính là câu hỏi scaling treo sẵn trong SCALING_ANALYSIS.md
+   (ngưỡng n=2 ≈ $55,784, trần n=1 là cố ý). Equity thật $995k thừa sức.
+3. Chấp nhận NKD ngủ đông tới khi biến động Nikkei hạ (mất ~25% số vị thế trong IS).
+
+### Nếu đổi cap thì phải chạy lại gì
+- **KHÔNG cần**: reconcile gd0/stress/nkd/swing_desired — so ở mức từng mã, cap không tham gia.
+- **Cần**: `deploy_sim`. Nhưng cap chỉ tác động ở tầng `replay()` (deploy_sim.py:59-94), còn
+  `backtest_basket`/`backtest_swing_tf` (line 179/183/194) độc lập với cap → sweep N giá trị cap
+  chỉ cần MỘT lần backtest rồi gọi `replay()` N lần. deploy_sim hiện không cache tầng 1 nên
+  script sweep phải tự giữ `all_trades`.
+- **Cập nhật theo**: `backtest_calmar = 1.53` hardcode trong runner.py + generate_replay_snapshots.py
+  (sàn degradation), INVARIANTS.md, snapshot.
+- ⚠️ **Chi phí thật không phải CPU**: vault OOS 2023–2024 (+$7,404, Sharpe 0.88) đã niêm phong
+  VỚI cap 2%. Đổi cap = hệ thống đang chạy không còn là hệ thống đã validate OOS.
+- ⚠️ Sweep cap trên chính dữ liệu IS rồi chọn Calmar cao nhất = curve fitting, cùng loại sai lầm
+  đã cấm với ema/orb_range/bb_std. Docstring nói "calibrate during paper trading" — bằng quan sát
+  paper, không phải fit lại trên backtest cũ.
+
+### Files touched
+(chẩn đoán, không sửa code) — TASK.md, SCRATCHPAD.md
+
+---
+
+## Sub-task: Mẫu số rủi ro không nhất quán — phanh cắt lỗ mất tác dụng (2026-08-04)
+Status: DONE — đã sửa, verify offline + LIVE
+
+### Bug
+Hai hàng rào rủi ro đo trên hai tài khoản khác nhau trong cùng một hệ thống:
+
+| Luật | Đo trên | Ngưỡng thật |
+|---|---|---|
+| "không lỗ quá 15%" (CircuitBreaker) | equity broker **$995,344** | ≈ $149,000 |
+| "NKD không quá 2%" (MultiClusterGuard) | hằng số **$50,000** | $1,000 |
+| `net_pnl` dashboard | `cur_eq - account` = 995,275 − 50,000 | **$945,275 lãi ảo** |
+
+Phân kỳ nằm đúng một chỗ:
+- `deploy_sim`: `equity = account` ($50k) → `equity += pnl_sized` → `breaker.update(equity)` ✅
+- `runner`: `equity = broker.get_equity()` (L504) → H4 `state.equity = _h4_eq` (L1112) →
+  `breaker.update(state.equity)` (L1114) ❌ — ghi đè bằng số tuyệt đối của broker
+
+`MultiClusterGuard.account` là field cố định 50_000.0, **không có cơ chế cập nhật** →
+guard giữ nền $50k trong khi breaker nhảy lên $995k.
+
+H4 sinh ra có lý do đúng (bắt lãi lỗ nội ngày STRESS_MID cho HALT_DAY) — sai ở chỗ lấy
+**giá trị tuyệt đối** thay vì **phần chênh lệch**.
+
+### SIM (chạy trước khi sửa) — scratchpad/sim_breaker_base.py
+Cùng một đường lãi lỗ bằng đô-la, hai mẫu số:
+
+| kịch bản | lỗ | designed ($50k) | live ($995k) |
+|---|---|---|---|
+| MaxDD backtest fit_C | $2,789 | HALT_DAY 5.6% | OK 0.3% |
+| hard_dd → HALT | $7,500 | **HALT** 15.0% | OK 0.8% |
+| mất 60% tài khoản | $30,000 | HALT 60.0% | OK 3.0% |
+| **mất TOÀN BỘ $50,000** | $50,000 | HALT 100% | **HALT_DAY 5.0%** |
+
+Mức lỗ đầu tiên khiến phanh bật: designed HALT_DAY=$2,000 / HALT=$7,500 —
+live HALT_DAY=$40,000 / HALT=$149,500. **Lỏng 20×; phanh cứng thực tế không tồn tại.**
+
+### Vì sao $995k không phải là vốn
+Đó là số IBKR nạp sẵn cho tài khoản paper, không phải vốn phân bổ cho chiến lược.
+Hệ thống giao dịch 1 hợp đồng micro, thiết kế + backtest cho $50,000. Lấy equity broker
+làm nền nghĩa là hàng rào rủi ro co giãn theo một con số ngẫu nhiên của broker.
+
+⚠️ Tỉ số (Calmar/Sharpe) KHÔNG bị ảnh hưởng — tử và mẫu cùng co giãn nên bất biến theo
+quy mô. Chỉ các **ngưỡng tuyệt đối** hỏng: DD halt, HALT_DAY, net_pnl.
+
+### Hướng sửa
+Hệ thống tự giữ sổ: `system_equity` bắt đầu ở ACCOUNT, cộng dồn lãi lỗ. Equity broker chỉ
+dùng lấy **delta** (giữ nguyên mục đích H4) và để đối chiếu — không làm nền tính rủi ro.
+Vì mỗi slot là process chạy-rồi-thoát nên `system_equity` + `last_broker_equity` phải được
+persist qua live_positions.json.
+⚠️ `peak_equity` đang persist = $995,582 — số rác, phải reset về nền hệ thống.
+
+### Liên quan: cap NKD (sub-task trên) — TÁCH BẠCH
+Sửa bug này **không** làm NKD lọt cap. Ở nền $50,000, 1 hợp đồng micro Nikkei vẫn chiếm
+5.87% > 2%. Đó là kết luận đúng, không phải bug. Hai chuyện khác nhau:
+- **Bug** (mục này): mẫu số mâu thuẫn → sửa, không cân nhắc.
+- **Quyết định**: $50,000 có còn đủ cho Nikkei ở mức 64,000 không → thuộc về user.
+
+### Phân tách chu kỳ vs cấu trúc (trả lời "phải nâng vốn mãi sao")
+- Biến động Nikkei hiện 3.64% vs trung bình 2018-2025 **1.64%** → gấp **2.23×**, phần này
+  HỒI QUY. Ở mức bình thường: risk_sized $1,318, account cần $65,891 (không phải $146,629).
+- Phần cấu trúc (chỉ số tăng) được bù bằng **chính lợi nhuận hệ thống**:
+  nền $50,000 đóng băng → NKD 2.64% (chặn); nền $50,000 + lãi IS $41,266 = $91,266 →
+  NKD 1.44% (**lọt**). Không cần bơm vốn ngoài — cần cho nền vốn cộng dồn.
+- ⚠️ **"Nâng nền vốn" ≠ "nâng số hợp đồng"**: nâng n làm danh mục TẬP TRUNG hơn (đã bác bỏ
+  có cơ sở, MaxDD n=2 vượt trần 15%); nâng nền cho sleeve làm danh mục ĐA DẠNG hơn (vẫn 1
+  hợp đồng/mã, chỉ là nhiều mã lọt hơn). Hai cái ngược hướng nhau về rủi ro, chỉ cái thứ
+  nhất từng được đo.
+
+### Đã sửa (runner.py)
+- [x] `state.equity` khởi tạo từ `breaker.account` ($50k) thay vì `broker.get_equity()`
+- [x] H4 áp **delta** broker (`_h4_delta = _h4_eq - self._last_broker_equity`) thay vì gán
+      giá trị tuyệt đối → giữ nguyên mục đích H4 (bắt lãi lỗ nội ngày cho HALT_DAY)
+- [x] `breaker.status()` / `final_equity` / `cur_eq` (dump_state, live_state) đổi sang
+      `self.state.equity` — hết `net_pnl` ảo $945,275
+- [x] Persist `system_equity` + `last_broker_equity` vào live_positions.json (mỗi slot là
+      process riêng; thiếu thì equity reset mỗi 5 phút và H4 book lại cùng khoản lãi lỗ)
+- [x] Tự loại `peak_equity` cũ ghi theo thang broker (>5× base) → breaker re-peak từ nền hệ thống
+
+### Verify
+- [x] `test_equity_base.py` 9/9 — EQ2 phanh cứng bắn ở $7,500; EQ3 mất hết vốn = DD 100%;
+      EQ4/EQ5 H4 book delta và KHÔNG book lại; EQ6 HALT_DAY vẫn tới được; EQ7 sổ sống qua
+      restart; EQ8 loại peak cũ; EQ9 **giữ** peak hợp lệ ghi theo thang hệ thống
+- [x] pytest 108/108 · test_ibkr_injection 14/14
+- [x] **run_smoke_test: diff $0.00** — runner == deploy_sim trade-for-trade
+      (taken swing 1799/1799 · stress 316/316 · nkd 655/655 · breaker ref=0 run=0)
+- [x] **LIVE verified 2026-08-04 00:50–00:56**: migration tự chạy trong slot đêm,
+      `discarding persisted peak_equity=$995,607.16` → `system equity=$50,000` →
+      `H4: broker delta -5.53 → 49,994.47`. HALT nay bắn ở **$7,500** (trước: $149,337).
+      22/22 slot đêm completed OK, không traceback.
+
+### Files touched
+global_index/runner.py, global_index/test_equity_base.py, TASK.md, SCRATCHPAD.md
+
+---
+
+## Sub-task: Đo nền vốn $150k — KẾT LUẬN GIỮ NGUYÊN $50,000 (2026-08-04)
+Status: DONE — đã đo, bác bỏ việc nâng nền vốn
+
+### Câu hỏi
+Paper trade cần chạm được mọi nhánh, nhưng ở nền $50,000 cụm NKD bị cap chặn 94% số ngày
+năm 2026 → đường thực thi NKD không bao giờ được chạy thật. Nâng nền vốn có phải là cách?
+
+### Tiêu chí chọn (KHÔNG phải "Calmar cao nhất")
+Tỉ lệ ngày bị cap chặn năm 2026 phải khớp thời kỳ đã validate (2018-24 @ $50k):
+
+| vốn | NKD 2018-24 | NKD 2026 | Rổ4 2018-24 | Rổ4 2026 |
+|---|---|---|---|---|
+| $50,000 | 5.5% | **94.1%** | 60.3% | **100.0%** |
+| $100,000 | 0.5% | 53.9% | 6.3% | 64.1% |
+| $125,000 | 0.0% | 30.9% | 1.7% | 28.1% |
+| $150,000 | 0.0% | **5.9%** | 0.9% | **1.3%** |
+
+⚠️ **Không có nền vốn nào phục hồi được cả hai cụm**: NKD cần $150k (5.9%≈5.5%), Rổ 4 cần
+$100k (64.1%≈60.3%). Nikkei tăng mạnh hơn chỉ số Mỹ nên hai cụm trôi khác tốc độ.
+
+### Đo thật — deploy_sim (frozen_sim, spy_daily.csv, end 2024-12-31, n=1)
+| | $50,000 | $150,000 |
+|---|---|---|
+| net | $46,683 | $55,720 (+19%) |
+| **Calmar** | **1.99** | **1.40** (−30%) |
+| Sharpe | 1.90 | 1.60 |
+| PF | 1.57 | 1.51 |
+| MaxDD | $3,390 | **$5,767 (+70%)** |
+| swing taken/rej | 1799 / 697 | **2488 / 8** |
+| nkd taken/rej | 655 / 46 | **701 / 0** |
+
+### KẾT LUẬN — GIỮ $50,000
+**Calmar 1.40 < sàn degradation 1.53** (hardcode trong runner.py +
+generate_replay_snapshots.py) → cấu hình $150k **trượt chính cửa chất lượng của hệ thống**.
+
+MaxDD phình 70% trong khi lợi nhuận chỉ tăng 19%. Khi rejection rơi 697→8, hệ thống nhận gần
+như mọi tín hiệu kể cả loại `entry_priority_key` xếp hạng thấp, và giữ cả 4 chỉ số tương quan
+cùng lúc — đúng thứ làm DD phình.
+
+**Cap KHÔNG phải chướng ngại vật, nó đang làm việc thật.** Docstring ghi 2% là "ESTIMATE,
+calibrate during paper" — nhưng "chưa được sweep" ≠ "đặt sai". Đo xong thì nới ra là hỏng.
+
+### Hệ quả cho paper phase
+- NKD không vào lệnh = **hành vi đúng**, không phải bug
+- Muốn kiểm đường thực thi NKD → làm **riêng** như P0c (đặt tay 1 lệnh MNKD ngoài luồng
+  chiến lược, ghi rõ là kiểm plumbing, không tính vào P&L paper). KHÔNG bóp méo hệ thống
+  để tiện test.
+- Tiền lệ đêm nay: chính vì đặt STP tay cho MES/MYM mà phát hiện `send_order` đọc sai trạng
+  thái — thứ chờ hệ thống tự làm thì không bao giờ lộ.
+
+### Câu hỏi còn mở (không cấp bách)
+- Rổ 4 bị chặn 100% số ngày năm 2026 (vs 60.3% thời validate) — chặt hơn hẳn thiết kế.
+  Chưa đo tác động. Nếu muốn xét thì phải sweep riêng cap `roska4_swing`, không phải nền vốn.
+
+---
+
+## Sub-task: Sweep RIÊNG cap NKD (2026-08-04) — ĐO XONG, chờ user quyết
+Status: MEASURED — KHÔNG tự sửa tham số rủi ro sản xuất
+
+### Vì sao phải đo lại
+Phép đo $150k gộp HAI thay đổi: nó nới cap của **mọi** cụm cùng lúc. Rejection Rổ 4 rơi
+697 → 8, và chính chỗ đó làm MaxDD phình $3,390 → $5,767. Chưa ai thử nới RIÊNG cap NKD.
+
+### Kết quả — scratchpad/sweep_nkd_cap.py
+Rổ 4 giữ nguyên 5%/4.4% (swept optimum). Chỉ đổi `global_nkd`. Nền vốn $50,000 không đổi.
+
+| nkd cap | $cap | net$ | Calmar | Sharpe | MaxDD$ | swing t/r | nkd t/r |
+|---|---|---|---|---|---|---|---|
+| **2% (hiện tại)** | 1,000 | 46,683 | 1.99 | 1.90 | **3,390** | 1799/697 | 655/46 |
+| 3% | 1,500 | 47,078 | 2.01 | 1.87 | 3,390 | 1799/697 | 686/15 |
+| 4% | 2,000 | 48,091 | 2.05 | 1.90 | 3,390 | 1799/697 | 695/6 |
+| **6%** | 3,000 | **48,453** | **2.07** | 1.90 | **3,390** | 1799/697 | **701/0** |
+| 8% | 4,000 | 48,453 | 2.07 | 1.90 | 3,390 | 1799/697 | 701/0 |
+| 12% | 6,000 | 48,453 | 2.07 | 1.90 | 3,390 | 1799/697 | 701/0 |
+
+**MaxDD đứng yên $3,390 qua MỌI mức cap.** Calmar tăng 1.99 → 2.07. Sharpe không đổi.
+Rejection Rổ 4 giữ nguyên 697 — cụm swing không bị đụng.
+
+→ Xác nhận bằng số lập luận gốc trong docstring `net_exposure_multi.py`: NKD lệch múi giờ
+~13h, tương quan chéo +0.225, **không tham gia vào đợt sụt tệ nhất**. Cap 2% chỉ chặn lệnh
+mà không đổi lại được một đồng bảo vệ nào.
+
+### Vì sao 6% KHÔNG phải curve fitting
+1. Không chọn cực đại — từ 6% trở đi mọi số **bão hoà** (701/0, y hệt ở 8% và 12%).
+   6% là chỗ ràng buộc NGỪNG CẮN, không phải chỗ tối ưu.
+2. MaxDD bất biến → không có đánh đổi rủi ro/lợi nhuận nào để tối ưu.
+3. Tiêu chí là "để cụm giao dịch đúng tín hiệu của nó", không phải "tìm số cho Calmar đẹp".
+
+### ⚠️ Hai cảnh báo trước khi đổi
+1. **Biên rất mỏng cho chế độ hiện tại.** Sweep chạy trên 2018-2024 khi `risk_sized` NKD là
+   $350-900. Hôm nay **$2,846** — ở cap 6% ($3,000) lọt nhưng chỉ dư 5%. Vol nhích là chặn
+   lại. Muốn NKD chạy ổn định trong chế độ 2026 thì cần cao hơn 6%, mà cao hơn thì **không
+   còn được sweep này chống lưng** (in-sample đã bão hoà từ 6%).
+2. **Dải dữ liệu bao trùm kỳ vault 2023-2024.** Chọn cap dựa trên nó là chạm kỳ OOS đã niêm
+   phong → cấu hình 6% chưa từng có kỳ OOS sạch.
+
+### Trạng thái
+**KHÔNG tự sửa** `net_exposure_multi.py`. Đổi 2% → 6% là thay tham số rủi ro sản xuất,
+thuộc quyết định của user. Khi quyết: sửa + reconcile đầy đủ + cập nhật INVARIANTS/snapshot.
+
+### reconcile_nkd — PASS (chạy nền, xong 2026-08-04)
+Phase 1: engine 519t/$13,073 == harness 519t/$13,073, field_mismatch=0
+Phase 2: cả 519 trade, entry state OK + exit state OK
+VERDICT PASS — chạy trên frozen parquet thuần nên KHÔNG bị ảnh hưởng bởi bug trộn tz đã sửa,
+đúng như dự đoán "cap/tz không làm mất hiệu lực reconcile".

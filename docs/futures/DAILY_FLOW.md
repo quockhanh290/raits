@@ -11,8 +11,11 @@ _Cập nhật: 2026-07-14. Xem thêm: [PIPELINE_FLOW.md](PIPELINE_FLOW.md) (nộ
 SÁNG (trước 09:31)   MANUAL: start scheduler (nếu reboot đêm qua), check_next_entry
 09:31 ET  Mon-Fri    AUTO:  MAX_HOLD exit → close position ≥5 ngày → persist state
 13:45 ET  Mon-Fri    AUTO:  Pre-flight chain (blocking): update_ibkr_daily → update_spy_csv
-14:05 ET  Mon-Fri    AUTO:  run_live_day (chỉ nếu pre-flight OK) → signal → order → persist → dump_state
-15:55 ET             (cửa sổ entry đóng — không có job, engine không fire entry sau giờ này)
+14:05 ET  Mon-Fri    AUTO:  run_live_day (initial slot — chỉ nếu pre-flight OK)
+14:10 ET  ┐
+14:15 ET  │ AUTO:  Continuous runner (mỗi 5 phút) — TF entry capture
+...        │         Xem lý do: module docstring run_scheduler.py
+15:55 ET  ┘ AUTO:  Slot cuối — 100% TF entries trong window có thể fire
 ĐÊM (sau 17:00 ET)   Không process nào chạy. STP GTC nằm trên sàn IBKR.
 HÔM SAU 09:31 ET     Vòng lặp lặp lại.
 ```
@@ -134,25 +137,30 @@ _preflight_ok[today]:
 
 ---
 
-## 3. JOB 14:05 ET — RUN_LIVE_DAY
+## 3. JOBS 14:05–15:55 ET — RUN_LIVE_DAY (23 slots)
 
-**Nguồn:** `run_scheduler.py:136–180`
+**Nguồn:** `run_scheduler.py` — `_live_day_body()` + `job_live_day()` + `_CONT_SLOTS` loop
+
+**Initial slot (14:05):** registered với `@sched.scheduled_job`, gọi `_live_day_body("LIVE_DAY_1405", first_slot=True)`.
+
+**Continuous runner (14:10–15:55, mỗi 5 phút):** 22 slots đăng ký qua `sched.add_job()` trong vòng lặp `_CONT_SLOTS`. Tất cả gọi `_live_day_body(slot_id)` — cùng pre-flight gate, cùng command.
+
+**Lý do continuous runner:** tại 14:05 chỉ có 1 bar trong TF window → 0% same-day entry capture. Xem module docstring `run_scheduler.py` để biết full analysis.
 
 ```python
-@sched.scheduled_job("cron", day_of_week="mon-fri", hour=14, minute=5, ...)
-def job_live_day():
-    # kiểm tra flag (True/False/None)
-    ...
-    _run([sys.executable, "-m", "global_index.run_live_day",
-          "--data-dir",        data_dir,
-          "--nkd-parquet",     nkd_parquet,
-          "--regime-csv",      regime_csv,
-          "--live-state-path", live_state_path,
-          "--port",            str(port)],
-         label="LIVE_DAY", dry_run=dry_run)
+# Tất cả 23 slots gọi cùng command (qua _live_day_body):
+_run([sys.executable, "-m", "global_index.run_live_day",
+      "--data-dir",        data_dir,
+      "--nkd-parquet",     nkd_parquet,
+      "--regime-csv",      regime_csv,
+      "--live-state-path", live_state_path,
+      "--port",            str(port)],
+     label=slot_id, dry_run=dry_run)
 ```
 
-> ⚠️ **Scheduler KHÔNG truyền `--print-signals`** → run_live_day vào **nhánh full run (order)**.
+**Pre-flight gate:** tất cả slots check `_preflight_ok[today]`. First slot (14:05) log ERROR khi fail; slots sau log WARNING/DEBUG (tránh spam 22 lần).
+
+> ⚠️ **Scheduler KHÔNG truyền `--print-signals`** → tất cả slots vào **nhánh full run (order)**.
 > P0c (verify --print-signals) phải chạy tay, không qua scheduler.
 
 ### 3A. Nhánh FULL RUN (scheduler, P2+)
@@ -284,8 +292,9 @@ Bảo vệ vị thế overnight: **STP GTC** đặt trên sàn IBKR sau fill OPE
 □ Nếu reboot đêm qua → start lại TRƯỚC 13:45 ET
 □ python global_index\check_next_entry.py → regime hôm nay? có entry không?
 □ 13:45: xem log scheduler [PRE-FLIGHT] OK
-□ 14:05: xem log scheduler [LIVE_DAY] completed OK
-□ Nếu Normal/Stress + entry → P0c: chạy --print-signals SAT 14:05, so desired_basket ±2 phút
+□ 14:05: xem log scheduler [LIVE_DAY_1405] completed OK
+□ 14:10–15:55: continuous runner log [LIVE_DAY_14xx] (Normal/Stress: chờ slot capture entry)
+□ [P0c DONE 2026-07-30] Nếu cần re-verify: chạy p0c_verify_swing.py --port 4002 (hoặc p0c_verify_mnkd.py cho NKD)
 ```
 
 ---
@@ -294,7 +303,7 @@ Bảo vệ vị thế overnight: **STP GTC** đặt trên sàn IBKR sau fill OPE
 
 | File | Dùng khi |
 |------|---------|
-| `run_scheduler.py:85–182` | Xem jobs: giờ, command, args thật |
+| `run_scheduler.py` — `_live_day_body`, `_CONT_SLOTS` | Xem 23 slots (14:05–15:55), pre-flight gate, lý do continuous runner |
 | `run_maxhold_exit.py:64–142` | MAX_HOLD exit logic + clientId=2 |
 | `update_ibkr_daily.py:145+` | IBKR parquet append, fail-exit |
 | `update_spy_csv.py:206+` | Polygon fetch, overlap 30d, regime verify |

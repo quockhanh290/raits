@@ -4,22 +4,45 @@ global_index/run_scheduler.py — TZ-independent APScheduler cron
 Thay thế Windows Task Scheduler thủ công. Chạy 24/7 (process hoặc Windows
 Service), tự convert ET↔machine-TZ và tự handle US DST.
 
-Ba jobs (thứ tự mỗi ngày Mon-Fri):
+Jobs mỗi ngày Mon-Fri (thứ tự):
   09:31 ET → run_maxhold_exit    (MAX_HOLD close at RTH open)
   13:45 ET → PRE-FLIGHT          (update_ibkr_daily → update_spy_csv, blocking)
-  14:05 ET → run_live_day        (daily signal + entry/exit, CHỈ nếu pre-flight OK)
+  14:05 ET → run_live_day        (initial signal run — xem continuous runner bên dưới)
+  14:10 ET  ┐
+  14:15 ET  │ Continuous runner — TF entry capture (xem lý do bên dưới)
+  ...        │ Mỗi 5 phút đến 15:55 ET (22 slots)
+  15:55 ET  ┘
 
-Pre-flight fail-safe:
+── Continuous runner (14:10–15:55) — lý do tồn tại ─────────────────────────
+  backtest_swing_tf() cần ≥2 bars trong window 14:00–15:55 ET để generate signal
+  (loop: for n in range(1, len(idx))). Tại 14:05 ET, IBKR chỉ trả bars đến
+  ~14:04 → resample_5m cho 1 bar → 0 iterations → desired_position() = None
+  → 0% same-day TF entry capture tại slot đầu tiên.
+
+  Nếu chỉ fire 1 lần lúc 14:05, TF entries chỉ được execute qua rollover path
+  (force_entries, D+1 14:05) với slippage overnight thực tế: median $14, std $276
+  — gấp 10–30× so với 2-tick assumption trong backtest.
+
+  Chạy mỗi 5 phút giải quyết: signal được generate trong vòng 5 phút sau khi
+  resume bar đóng (same-day, same-guard passes), slippage ≈ 2-tick assumption.
+
+  STATE model (diff_desired_vs_held) idempotent: position đã held → cur ≠ None
+  → skip re-entry. Mỗi run là run-and-exit process riêng → không có concurrency.
+
+  Đo lường (check_resumebar_timing.py, 2017 trades, 4 instruments):
+    Single fire 14:05 → 0%  |  +14:10 → 22%  |  +14:30 → 50%  |  +15:55 → 100%
+
+── Pre-flight fail-safe ─────────────────────────────────────────────────────
   Nếu update_ibkr_daily hoặc update_spy_csv thất bại (Gateway rớt, guard abort,
-  API key thiếu), run_live_day bị SKIP ngày đó — không trade trên data stale.
-  Flag _preflight_ok[date] chỉ set True khi cả hai bước thành công.
+  API key thiếu), TẤT CẢ slots 14:05–15:55 bị SKIP ngày đó — không trade trên
+  data stale. Flag _preflight_ok[date] chỉ set True khi cả hai bước thành công.
 
 Machine TZ-independent: VN (UTC+7), MST (UTC-7), ET, cloud — đều đúng.
 APScheduler timezone="America/New_York" là ET-native, DST tự động.
 
 Polygon API key cho update_spy_csv:
   Truyền qua --polygon-api-key hoặc env var POLYGON_API_KEY.
-  Nếu thiếu → update_spy_csv fail (returncode 1) → pre-flight fail → live_day skip.
+  Nếu thiếu → update_spy_csv fail (returncode 1) → pre-flight fail → tất cả skip.
 
 Usage:
     cd d:\\raits
@@ -32,10 +55,12 @@ Requirements:
 """
 from __future__ import annotations
 import argparse
+import json
 import logging
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 _CWD = Path(__file__).parents[1]   # d:\raits
@@ -48,13 +73,84 @@ logging.basicConfig(
     format="%(asctime)s  %(levelname)-7s  %(name)s — %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
+_LOG_FILE = _CWD / f"scheduler_{__import__('datetime').date.today().strftime('%m%d')}.log"
+_fh = logging.FileHandler(_LOG_FILE, encoding="utf-8")
+_fh.setLevel(logging.INFO)
+_fh.setFormatter(logging.Formatter(
+    "%(asctime)s  %(levelname)-7s  %(name)s — %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+))
+logging.getLogger().addHandler(_fh)
 log = logging.getLogger("run_scheduler")
+log.info("Log file: %s", _LOG_FILE)
 
 # Pre-flight state: keyed by date string (e.g. "2026-07-14").
 # Set True only when BOTH update_ibkr_daily AND update_spy_csv succeed.
-# In-memory — lost on scheduler restart. job_live_day only runs when flag=True.
 # flag missing (None) or False → always skip (fail-closed, no data-freshness guess).
+#
+# Persisted to disk. It used to be in-memory only, which was survivable while every
+# consumer ran at 14:05-15:55 ET — the same process lifetime as the 13:45 pre-flight.
+# The NKD night slots (01:10-02:55 ET) read the PREVIOUS business day's flag, so a
+# memory-only dict would be empty at every scheduler restart and the night slots would
+# fail-closed forever — a feature that looks wired but can never fire.
+#
+# Persisting is a record of something that happened, not a guess: entries stay keyed
+# by date, so a stale file cannot authorise a day it does not name.
 _preflight_ok: dict = {}
+_PREFLIGHT_STATE = Path("global_index/preflight_state.json")
+_PREFLIGHT_KEEP = 7          # days retained; keeps the file from growing without bound
+
+# Serialises run_live_day across ALL slots — see _live_day_body. BlockingScheduler
+# dispatches jobs on a thread pool, so a threading.Lock is the right primitive.
+_slot_lock = threading.Lock()
+
+# Slots whose fail-closed skip has already been reported, keyed by (date, slot).
+# Keeps the "no pre-flight record" banner loud once and quiet afterwards.
+_skip_warned: set = set()
+
+
+def _et_today():
+    """ET calendar date — the trading date every job is scheduled against.
+
+    NOT date.today(): that is the machine's local date. APScheduler fires on ET, so
+    on any machine west of ET the night slots (01:10-02:55 ET) land on the PREVIOUS
+    local date — measured 2026-08-03 on Mountain time, 01:10 ET Aug 4 = 23:10 MDT
+    Aug 3, so prev_bday() asked for Jul 31 instead of Aug 3, found no flag and
+    skipped the whole window. The day slots never exposed this because 13:45 and
+    14:05 ET fall on the same local date in MDT.
+    """
+    from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo
+    return _dt.now(ZoneInfo("America/New_York")).date()
+
+
+def _load_preflight_state() -> None:
+    if not _PREFLIGHT_STATE.exists():
+        return
+    try:
+        with open(_PREFLIGHT_STATE, encoding="utf-8") as fh:
+            _preflight_ok.update({k: bool(v) for k, v in json.load(fh).items()})
+        log.info("[PRE-FLIGHT] restored %d day(s) of state from %s",
+                 len(_preflight_ok), _PREFLIGHT_STATE)
+    except Exception as exc:
+        log.warning("[PRE-FLIGHT] could not read %s (%s) — starting empty (fail-closed)",
+                    _PREFLIGHT_STATE, exc)
+
+
+def _save_preflight_state() -> None:
+    """Atomic write: a torn file would read as 'no record' and skip every slot."""
+    try:
+        keep = dict(sorted(_preflight_ok.items())[-_PREFLIGHT_KEEP:])
+        _preflight_ok.clear()
+        _preflight_ok.update(keep)
+        _PREFLIGHT_STATE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _PREFLIGHT_STATE.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(keep, fh, indent=2)
+        os.replace(tmp, _PREFLIGHT_STATE)
+    except Exception as exc:
+        log.error("[PRE-FLIGHT] could not persist state to %s: %s — night slots will "
+                  "fail-closed after a restart", _PREFLIGHT_STATE, exc)
 
 
 def _run(args: list[str], label: str, dry_run: bool) -> bool:
@@ -99,9 +195,8 @@ def make_scheduler(port: int, dry_run: bool,
     @sched.scheduled_job("cron", day_of_week="mon-fri", hour=13, minute=45,
                          id="preflight", name="Pre-flight update 13:45 ET")
     def job_preflight():
-        from datetime import date as _date
-        today = _date.today().isoformat()
-        log.info("[PRE-FLIGHT] Starting: update_ibkr_daily → update_spy_csv (%s)", today)
+        today = _et_today().isoformat()
+        log.info("[PRE-FLIGHT] Starting: update_ibkr_daily -> update_spy_csv (%s)", today)
 
         ibkr_ok = _run(
             [sys.executable, "-m", "global_index.update_ibkr_daily", "--port", str(port)],
@@ -109,6 +204,7 @@ def make_scheduler(port: int, dry_run: bool,
         )
         if not ibkr_ok:
             _preflight_ok[today] = False
+            _save_preflight_state()
             log.error(
                 "[PRE-FLIGHT] update_ibkr_daily FAILED — "
                 "run_live_day WILL BE SKIPPED today (%s). Fix Gateway and re-run manually if needed.",
@@ -122,6 +218,7 @@ def make_scheduler(port: int, dry_run: bool,
         spy_ok = _run(spy_cmd, label="SPY_UPDATE", dry_run=dry_run)
         if not spy_ok:
             _preflight_ok[today] = False
+            _save_preflight_state()
             log.error(
                 "[PRE-FLIGHT] update_spy_csv FAILED — "
                 "run_live_day WILL BE SKIPPED today (%s). Check POLYGON_API_KEY.",
@@ -130,45 +227,105 @@ def make_scheduler(port: int, dry_run: bool,
             return
 
         _preflight_ok[today] = True
+        _save_preflight_state()
         log.info("[PRE-FLIGHT] OK — parquet + spy CSV fresh. run_live_day cleared for 14:05.")
 
-    # ── 14:05 ET Mon-Fri: daily signal run (only if pre-flight OK) ───────────
-    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=14, minute=5,
-                         id="live_day", name="Daily run 14:05 ET")
-    def job_live_day():
-        from datetime import date as _date
-        today = _date.today().isoformat()
-        flag = _preflight_ok.get(today)   # True / False / None (missing)
+    def _prev_bday(d):
+        """Previous weekday. Night NKD slots run before their own day's pre-flight."""
+        from datetime import timedelta as _td
+        x = d - _td(days=1)
+        while x.weekday() >= 5:      # 5=Sat 6=Sun
+            x -= _td(days=1)
+        return x
+
+    def _live_day_body(slot_id: str, *, first_slot: bool = False,
+                       clusters: str = "all", prev_preflight: bool = False) -> None:
+        """Serialise slots: never two run_live_day processes at once.
+
+        Slots are 5 minutes apart and a run takes ~5.5 (measured 2026-08-03:
+        connect 12:35:16 → disconnect 12:40:44), so firings overlap. Both children
+        connect on clientId=1 and collide at IBKR — the P0C_1440/1450 failures.
+
+        max_instances would not help: APScheduler applies it per job id, and each
+        slot is its own job. A scheduler-process mutex covers every slot, day and
+        night, and any slot added later.
+
+        Skipping is the correct outcome, not a loss. diff_desired_vs_held is
+        idempotent — a held position yields cur != None and no re-entry — so the
+        next slot does whatever this one would have.
+        """
+        if not _slot_lock.acquire(blocking=False):
+            log.warning("[%s] SKIPPED — previous run_live_day still in flight. "
+                        "Slots are 5 min apart, a run takes ~5.5 min; overlapping "
+                        "children collide on IBKR clientId. Next slot picks it up.",
+                        slot_id)
+            return
+        try:
+            _live_day_body_inner(slot_id, first_slot=first_slot,
+                                 clusters=clusters, prev_preflight=prev_preflight)
+        finally:
+            _slot_lock.release()
+
+    # ── Shared runner body (all 14:05–15:55 slots) ───────────────────────────
+    def _live_day_body_inner(slot_id: str, *, first_slot: bool = False,
+                             clusters: str = "all", prev_preflight: bool = False) -> None:
+        """Run run_live_day for one slot, guarded by pre-flight flag.
+
+        first_slot=True (14:05) logs at ERROR on failure; subsequent slots log
+        at WARNING/DEBUG to avoid repeating the same alert 22 times.
+
+        clusters: forwarded to run_live_day --clusters. The night NKD slots pass
+        "nkd" so Rổ 4 positions are marked unchanged rather than exited.
+
+        prev_preflight: the night slots (01:10-02:55 ET) run BEFORE that day's own
+        13:45 ET pre-flight, so today's flag is always None and fail-closed would
+        skip them forever. They check the previous business day's pre-flight instead
+        — that run (13:45 ET the day before, ~11h earlier) is the freshest data
+        update that exists at 01:10 ET, and run_live_day fetches live IBKR bars on
+        top of it anyway.
+        """
+        _t = _et_today()
+        today = (_prev_bday(_t) if prev_preflight else _t).isoformat()
+        flag = _preflight_ok.get(today)
 
         if flag is True:
-            # Normal path: pre-flight ran and succeeded in this process.
-            pass
+            pass  # pre-flight succeeded in this process lifetime
 
         elif flag is False:
-            # Pre-flight ran and explicitly failed (Gateway down, guard abort, etc.).
-            # Definitive failure — do not trade on stale data.
-            log.error(
-                "[LIVE_DAY] SKIPPED — pre-flight ran but FAILED for %s. "
-                "Fix Gateway / API key and run update_ibkr_daily manually to recover.",
-                today,
-            )
+            # Pre-flight ran and explicitly failed. Only the first slot errors;
+            # subsequent slots warn (operator already saw the 14:05 ERROR).
+            if first_slot:
+                log.error(
+                    "[%s] SKIPPED — pre-flight ran but FAILED for %s. "
+                    "Fix Gateway / API key and run update_ibkr_daily manually to recover.",
+                    slot_id, today,
+                )
+            else:
+                log.warning("[%s] SKIPPED — pre-flight failed for %s.", slot_id, today)
             return
 
         else:
-            # flag is None: no pre-flight record (scheduler restart, crash, or started
-            # after 13:45). Cannot verify both ibkr_daily AND spy_csv are fresh.
-            # Fail-closed: skip rather than risk trading on partially-stale data.
-            # Recover manually: restart scheduler before 13:45, OR run
-            #   python -m global_index.update_ibkr_daily
-            #   python -m global_index.update_spy_csv
-            # and wait for tomorrow's 13:45 pre-flight to re-enable normally.
-            log.error(
-                "[LIVE_DAY] SKIPPED — no pre-flight record for %s "
-                "(scheduler restart or missed 13:45 job). "
-                "Cannot confirm ibkr_daily + spy_csv both fresh. "
-                "Restart scheduler before 13:45 or run updates manually.",
-                today,
-            )
+            # flag is None: no pre-flight record (scheduler restart or missed 13:45).
+            # Cannot verify ibkr_daily + spy_csv are both fresh. Fail-closed.
+            # Recover: restart scheduler before 13:45, OR run updates manually.
+            #
+            # Loud once per (date, slot family), quiet after. This branch used to log
+            # at DEBUG for every non-first slot, and logging is configured at INFO —
+            # so on 2026-08-03 the entire NKD night window was skipped without
+            # emitting a single line. A window that trades nothing must say so.
+            _fam = slot_id.rsplit("_", 1)[0]          # LIVE_DAY / NKD_NIGHT
+            if first_slot or (today, _fam) not in _skip_warned:
+                _skip_warned.add((today, _fam))
+                log.error(
+                    "[%s] SKIPPED — no pre-flight record for %s "
+                    "(scheduler restart or missed 13:45 job). "
+                    "Cannot confirm ibkr_daily + spy_csv both fresh. "
+                    "Restart scheduler before 13:45 or run updates manually. "
+                    "Further %s slots today will log this at DEBUG only.",
+                    slot_id, today, _fam,
+                )
+            else:
+                log.debug("[%s] SKIPPED — no pre-flight record for %s.", slot_id, today)
             return
 
         _run([sys.executable, "-m", "global_index.run_live_day",
@@ -176,8 +333,56 @@ def make_scheduler(port: int, dry_run: bool,
               "--nkd-parquet",     nkd_parquet,
               "--regime-csv",      regime_csv,
               "--live-state-path", live_state_path,
+              "--clusters",        clusters,
               "--port",            str(port)],
-             label="LIVE_DAY", dry_run=dry_run)
+             label=slot_id, dry_run=dry_run)
+
+    # ── 14:05 ET Mon-Fri: initial signal run ─────────────────────────────────
+    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=14, minute=5,
+                         id="live_day", name="Daily run 14:05 ET")
+    def job_live_day():
+        _live_day_body("LIVE_DAY_1405", first_slot=True)
+
+    # ── 14:10–15:55 ET Mon-Fri: continuous runner (every 5 min) ──────────────
+    # See module docstring for full rationale.
+    # Capture rate: 14:10→22%, 14:30→50%, 15:55→100% (vs 0% at 14:05 alone).
+    _CONT_SLOTS = (
+        [(14, m) for m in range(10, 60, 5)] +   # 14:10 → 14:55 (10 slots)
+        [(15, m) for m in range(0,  60, 5)]      # 15:00 → 15:55 (12 slots)
+    )
+    for _h, _m in _CONT_SLOTS:
+        _slot_id = f"LIVE_DAY_{_h:02d}{_m:02d}"
+        sched.add_job(
+            lambda sid=_slot_id: _live_day_body(sid),
+            "cron", day_of_week="mon-fri", hour=_h, minute=_m,
+            id=_slot_id.lower(),
+            name=f"Continuous run {_h:02d}:{_m:02d} ET",
+        )
+
+    # ── 01:10–02:55 ET Mon-Fri: NKD night slots ──────────────────────────────
+    # NKD's entry window is between_time("14:00","15:55") on its session clock,
+    # and specs.MNKD.session_tz is Asia/Tokyo → 14:00-15:55 JST = 01:00-02:55 ET.
+    # The 14:05-15:55 ET slots see that window only after it has been closed for
+    # ~11 hours, so an NKD entry there fills 11h away from its signal bar. For
+    # scale: the Option C audit measured -$9,112 (-20.2%) from a 13-105 minute gap.
+    #
+    # Start at 01:10, not 01:00 — backtest_swing_tf needs >=2 bars inside the
+    # window, exactly why Rổ 4 starts at 14:10 rather than 14:05.
+    #
+    # --clusters nkd: Rổ 4 positions are marked unchanged, never exited. Without
+    # it, every night slot would close them (signal_layer.py:110-112).
+    # The 14:05-15:55 slots keep NKD active so its exits still run during the day.
+    _NKD_SLOTS = ([(1, m) for m in range(10, 60, 5)] +    # 01:10 → 01:55
+                  [(2, m) for m in range(0,  60, 5)])      # 02:00 → 02:55
+    for _h, _m in _NKD_SLOTS:
+        _slot_id = f"NKD_NIGHT_{_h:02d}{_m:02d}"
+        sched.add_job(
+            lambda sid=_slot_id: _live_day_body(sid, clusters="nkd",
+                                                prev_preflight=True),
+            "cron", day_of_week="mon-fri", hour=_h, minute=_m,
+            id=_slot_id.lower(),
+            name=f"NKD night run {_h:02d}:{_m:02d} ET",
+        )
 
     return sched
 
@@ -199,7 +404,31 @@ def main():
                          "(fallback: POLYGON_API_KEY env var)")
     ap.add_argument("--live-state-path",  default="global_index/live_state_data.js",
                     help="Path to write live_state_data.js for dashboard (default: global_index/live_state_data.js)")
+    ap.add_argument("--assume-preflight-ok", action="store_true",
+                    help="Mark today's pre-flight as passed on startup (use after manual update_ibkr_daily + update_spy_csv)")
     a = ap.parse_args()
+
+    if not a.polygon_api_key:
+        try:
+            import importlib.util as _ilu
+            _spec = _ilu.spec_from_file_location("config_private", _CWD / "config_private.py")
+            _cp = _ilu.module_from_spec(_spec)
+            _spec.loader.exec_module(_cp)
+            a.polygon_api_key = getattr(_cp, "POLYGON_API_KEY", "")
+            if a.polygon_api_key:
+                log.info("Polygon API key loaded from config_private.py")
+        except Exception as _e:
+            log.warning("Could not load POLYGON_API_KEY from config_private.py: %s", _e)
+
+    # Restore persisted pre-flight state BEFORE any flag is set, so a restart does
+    # not blank out yesterday's record — the NKD night slots read it.
+    _load_preflight_state()
+
+    if a.assume_preflight_ok:
+        from datetime import date as _d
+        _preflight_ok[_et_today().isoformat()] = True
+        _save_preflight_state()
+        log.warning("--assume-preflight-ok: pre-flight flag set for ET date %s — skipping 13:45 gate", _et_today())
 
     sched = make_scheduler(
         port=a.port, dry_run=a.dry_run,
@@ -216,7 +445,7 @@ def main():
     for j in jobs:
         _next = getattr(j, "next_run_time", "(start scheduler to compute)")
         log.info("  %-20s  next: %s", j.id, _next)
-    log.info("Pre-flight fail-safe: update fail → live_day skipped (no stale-data trades)")
+    log.info("Pre-flight fail-safe: update fail -> live_day skipped (no stale-data trades)")
     log.info("Scheduler started. Ctrl-C to stop.")
     try:
         sched.start()

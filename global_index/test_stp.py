@@ -19,7 +19,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from global_index.broker import Fill, MockBroker
+from global_index.broker import BrokerPosition, Fill, MockBroker
 from global_index.live_decision import OpenPos
 from global_index.net_exposure_multi import ClusterBudget, MultiClusterGuard  # noqa: F401
 from global_index.runner import FuturesRunner, _openpos_from_dict, _openpos_to_dict
@@ -305,6 +305,97 @@ def test_stp8_cancel_called_on_close(tmp_path):
         f"cancel_order({placed_id!r}) not called on CLOSE; "
         f"cancel_calls={broker.cancel_calls}"
     )
+
+
+# ── B4: naked-position check (open at broker, no stop order) ─────────────────
+
+def _naked_broker(stop_working=False, working_raises=None):
+    """MockBroker holding one MES LONG at the broker, for B4 tests."""
+    b = _RecordingMockBroker({}, ACCOUNT)
+    b._positions = [BrokerPosition("MES", "LONG", 1, CLUSTER, DAY1, None, 0.0)]
+    if working_raises is not None:
+        b.has_working_stop = lambda _inst: (_ for _ in ()).throw(working_raises)
+    else:
+        b.has_working_stop = lambda _inst: stop_working
+    return b
+
+
+def _naked_file(tmp_path, stop_price=None, stop_order_id=None):
+    pos_file = tmp_path / "pos.json"
+    pos_file.write_text(json.dumps({
+        "schema_version": 1,
+        "positions": [{
+            "inst": "MES", "direction": "LONG", "contracts": 1,
+            "risk_dollars": 500.0, "cluster": CLUSTER,
+            "entry_day": "2024-03-11", "exit_day": None,
+            "pnl_sized": 0.0, "exit_pending": False,
+            "stop_price": stop_price, "stop_order_id": stop_order_id,
+        }],
+        "breaker": {},
+    }))
+    return pos_file
+
+
+def _make_runner(broker, pos_file):
+    return FuturesRunner(
+        broker=broker, guard=_make_guard(),
+        contracts_by_inst={"MES": 1},
+        signal_fn=lambda d, b, h: ([], []),
+        breaker=CircuitBreaker(account=ACCOUNT),
+        positions_path=pos_file,
+    )
+
+
+def test_b4_1_replaces_stop_when_level_known_and_none_working(tmp_path):
+    """stop_price known + no working stop at broker → re-place, record orderId."""
+    broker = _naked_broker(stop_working=False)
+    runner = _make_runner(broker, _naked_file(tmp_path, stop_price=4950.0))
+
+    assert len(broker.stp_calls) == 1, "B4 must re-place the missing stop"
+    assert broker.stp_calls[0]["stop_price"] == 4950.0
+    assert runner.state.open_positions[0].stop_order_id == broker.stp_calls[0]["order_id"]
+    assert not runner._b3_halt_entries, "B4 must not halt entries"
+
+
+def test_b4_2_no_duplicate_when_stop_already_working(tmp_path):
+    """A stop is already live at the broker → must NOT stack a second one."""
+    broker = _naked_broker(stop_working=True)
+    runner = _make_runner(broker, _naked_file(tmp_path, stop_price=4950.0))
+
+    assert broker.stp_calls == [], "duplicate STP would double-close and flip the position"
+    assert runner._b4_naked_stops == [("MES", CLUSTER)]
+
+
+def test_b4_3_alerts_when_stop_price_unknown(tmp_path):
+    """The live 2026-08-03 case: OPEN misread as Cancelled → both fields None.
+    Level is unknown, so B4 can only alert — never guess a stop level."""
+    broker = _naked_broker(stop_working=False)
+    runner = _make_runner(broker, _naked_file(tmp_path, stop_price=None))
+
+    assert broker.stp_calls == [], "no level known → must not place"
+    assert runner._b4_naked_stops == [("MES", CLUSTER)]
+    assert not runner._b3_halt_entries, "naked position is not a state mismatch"
+    assert len(runner.state.open_positions) == 1, "position must stay in state"
+
+
+def test_b4_4_no_place_when_broker_cannot_report_working_stops(tmp_path):
+    """Broker can't answer has_working_stop → alert, don't place blind."""
+    broker = _naked_broker(working_raises=NotImplementedError())
+    runner = _make_runner(broker, _naked_file(tmp_path, stop_price=4950.0))
+
+    assert broker.stp_calls == [], "unverifiable → duplicate-stop risk → must not place"
+    assert runner._b4_naked_stops == [("MES", CLUSTER)]
+
+
+def test_b4_5_noharm_position_with_stop_is_not_naked(tmp_path):
+    """Position already carrying a stop_order_id → B4 stays silent."""
+    broker = _naked_broker(stop_working=False)
+    runner = _make_runner(broker, _naked_file(tmp_path, stop_price=4950.0,
+                                              stop_order_id="ibkr-111"))
+
+    assert broker.stp_calls == [], "already protected — nothing to do"
+    assert runner._b4_naked_stops == []
+    assert not runner._b3_halt_entries
 
 
 # ── run ───────────────────────────────────────────────────────────────────────

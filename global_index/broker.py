@@ -86,6 +86,17 @@ class Broker(ABC):
     def get_order_status(self, order_id: str) -> str:
         """Returns 'FILLED' | 'CANCELLED' | 'PENDING' | 'NOT_FOUND'."""
 
+    def has_working_stop(self, inst: str) -> bool:
+        """True if a live (working) stop order exists at the broker for `inst`.
+
+        Used by B4 to decide whether a position with no recorded stop_order_id can
+        safely have one re-placed. Deliberately NOT abstract: a broker that cannot
+        answer should raise NotImplementedError, and B4 then alerts instead of
+        placing — placing blind risks a duplicate stop, which would over-close the
+        position (and flip it) when both fire.
+        """
+        raise NotImplementedError
+
 
 class MockBroker(Broker):
     """Offline replay broker. fetch_bars serves historical bars up to `through`.
@@ -136,3 +147,8 @@ class MockBroker(Broker):
 
     def get_order_status(self, _order_id) -> str:
         return "PENDING"
+
+    def has_working_stop(self, _inst: str) -> bool:
+        # MockBroker's place_stop never fails, so a naked position cannot arise in
+        # verify mode. False keeps the B4 re-place path exercisable in tests.
+        return False

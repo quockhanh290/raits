@@ -92,7 +92,12 @@ def _acquire_lock(lock_path: Path) -> None:
     if lock_path.exists():
         try:
             pid = int(lock_path.read_text().strip())
-            if _pid_alive(pid):
+            if pid == os.getpid():
+                pass          # same process re-acquiring: run_live_day takes the lock
+                              # before connecting to IBKR, then FuturesRunner takes it
+                              # again. Treating that as a collision would make every
+                              # run abort on itself.
+            elif _pid_alive(pid):
                 raise RunnerLockError(
                     f"Runner already running (PID {pid}, lock={lock_path}). "
                     f"Delete {lock_path} manually if stale."
@@ -162,7 +167,7 @@ class FuturesRunner:
     def __init__(self, broker, guard, contracts_by_inst, signal_fn, breaker,
                  hmm_stale_guard=None, positions_path=None, lock_path=None,
                  live_state_path=None, stop_path=None, max_contracts_per_order=10,
-                 regime_fn=None):
+                 regime_fn=None, trade_log_path=None):
         """signal_fn(day, bars_by_inst, held) -> (entry_candidates, exit_positions)
         wraps signal_layer.generate_today_signals with the engines/labels/costs bound.
         Injecting it keeps the runner testable without real engines.
@@ -189,6 +194,7 @@ class FuturesRunner:
 
         self._regime_fn = regime_fn
         self._last_regime: str = "Unknown"
+        self._trade_log_path = Path(trade_log_path) if trade_log_path else None
 
         # E1: acquire PID lock first — refuse second instance before any state is set up
         self._lock_path = Path(lock_path) if lock_path else None
@@ -198,6 +204,8 @@ class FuturesRunner:
 
         # B3: halt new entries if broker/file mismatch detected on startup (set below)
         self._b3_halt_entries: bool = False
+        # B4: positions confirmed open at the broker but carrying no stop order (set below)
+        self._b4_naked_stops: list = []
 
         # B1: load persisted positions + breaker state if path is supplied and file exists
         self._positions_path = Path(positions_path) if positions_path else None
@@ -205,6 +213,10 @@ class FuturesRunner:
         loaded_peak_equity = None
         loaded_day_start_equity = None
         loaded_cur_day = None
+        # Each cron slot is a fresh run-and-exit process, so the system ledger has to
+        # survive on disk or it resets to base every five minutes.
+        loaded_system_equity = None
+        loaded_last_broker_equity = None
         if self._positions_path is not None and self._positions_path.exists():
             try:
                 with open(self._positions_path, encoding="utf-8") as f:
@@ -228,6 +240,25 @@ class FuturesRunner:
                         loaded_day_start_equity = float(bkr["day_start_equity"])
                     if bkr.get("cur_day"):
                         loaded_cur_day = pd.Timestamp(bkr["cur_day"])
+                    if bkr.get("system_equity") is not None:
+                        loaded_system_equity = float(bkr["system_equity"])
+                    if bkr.get("last_broker_equity") is not None:
+                        loaded_last_broker_equity = float(bkr["last_broker_equity"])
+                    # Files written before the system-equity fix carry a peak_equity
+                    # taken from the broker balance ($995k on paper). Restoring it would
+                    # keep the breaker on the wrong scale forever, so drop it and let the
+                    # breaker re-peak from system equity.
+                    if loaded_system_equity is None and loaded_peak_equity is not None \
+                            and breaker is not None \
+                            and loaded_peak_equity > breaker.account * 5:
+                        logger.warning(
+                            "B1: discarding persisted peak_equity=$%.2f — recorded against "
+                            "broker balance, not the $%.0f system base. Breaker will "
+                            "re-peak from system equity.",
+                            loaded_peak_equity, breaker.account,
+                        )
+                        loaded_peak_equity = None
+                        loaded_day_start_equity = None
                 logger.info(
                     "B1: loaded %d persisted position(s) from %s",
                     len(loaded_positions), self._positions_path,
@@ -353,6 +384,65 @@ class FuturesRunner:
                                 k[1], k[0], qty,
                             )
                             mismatches += 1
+                    # B4: naked-position check — position agrees on BOTH sides but has
+                    # no stop order. B3 above compares only inst/direction/contracts, so
+                    # an unprotected position passes it silently.
+                    #
+                    # Seen live 2026-08-03: send_order() misread three filled OPENs as
+                    # status="Cancelled", so the STP block in run_day() (gated on
+                    # FILLED/PARTIAL) never ran. Three positions carried overnight with
+                    # no stop and no alert — the failure log lives *inside* that same
+                    # gate, so nothing fired.
+                    #
+                    # Not a halt condition: state here is certain (both sides agree), and
+                    # blocking entries would not protect the position that is already
+                    # open. Alert loudly, re-place where provably safe, keep trading.
+                    naked = [p for p in loaded_positions
+                             if p.stop_order_id is None
+                             and broker_key.get((p.inst, p.direction), 0) > 0]
+                    self._b4_naked_stops = [(p.inst, p.cluster) for p in naked]
+                    for p in naked:
+                        # Only re-place when the level is known AND no stop is already
+                        # working at the broker. Either unknown → alert, never guess:
+                        # a duplicate STP would close the position twice and flip it.
+                        _can_replace = p.stop_price is not None
+                        if _can_replace:
+                            try:
+                                _can_replace = not broker.has_working_stop(p.inst)
+                            except (NotImplementedError, AttributeError):
+                                _can_replace = False
+                                logger.warning(
+                                    "B4: %s/%s — broker cannot report working stops; "
+                                    "not re-placing (duplicate-stop risk)", p.inst, p.cluster)
+                            except Exception as _e:
+                                _can_replace = False
+                                logger.error("B4: has_working_stop(%s) failed: %s", p.inst, _e)
+
+                        if _can_replace:
+                            try:
+                                _sid = broker.place_stop(p.inst, p.direction, p.contracts,
+                                                         p.stop_price, p.cluster)
+                            except Exception as _e:
+                                _sid = ""
+                                logger.error("B4: place_stop(%s/%s) raised: %s",
+                                             p.inst, p.cluster, _e)
+                            if _sid:
+                                p.stop_order_id = _sid
+                                logger.warning(
+                                    "B4 REPLACED: %s/%s was open with no stop order "
+                                    "— re-placed @ %.4f orderId=%s",
+                                    p.inst, p.cluster, p.stop_price, _sid,
+                                )
+                                continue
+
+                        logger.critical(
+                            "B4 NAKED: %s %s x%d (%s) open at IBKR with NO stop order "
+                            "(stop_price=%s). No overnight protection. OPERATOR: recompute "
+                            "the chandelier level (p0c_verify_swing.py) and place the STP "
+                            "manually in TWS, or close the position.",
+                            p.direction, p.inst, p.contracts, p.cluster, p.stop_price,
+                        )
+
                     if mismatches == 0:
                         logger.info("B3: broker/file positions match (%d position(s))", len(broker_pos))
                     else:
@@ -433,18 +523,40 @@ class FuturesRunner:
         self.contracts = contracts_by_inst
         self.signal_fn = signal_fn
         self._hmm_stale_guard = hmm_stale_guard
+        # SYSTEM equity, not broker equity. The broker balance is whatever the account
+        # happens to be funded with — on the paper account, $995k — while this system is
+        # designed, backtested and sized for RISK["account"] ($50,000) at one micro
+        # contract. Feeding the broker balance to the circuit breaker made every
+        # protective threshold 20x too far away: losing the ENTIRE $50,000 design capital
+        # registered as 5% drawdown, i.e. HALT_DAY instead of HALT, and the hard 15% stop
+        # would have needed a $149,300 loss. Measured in scratchpad/sim_breaker_base.py.
+        #
+        # deploy_sim is the reference and does this correctly: equity starts at `account`
+        # and accumulates realised P&L. The live path now matches, so breaker behaviour is
+        # the same in backtest and live. The broker is still read every cycle — but only
+        # for its DELTA (see H4) and for reconciliation, never as the risk denominator.
+        _sys_eq = (loaded_system_equity if loaded_system_equity is not None
+                   else float(breaker.account) if breaker is not None
+                   else broker.get_equity())
+        self._last_broker_equity = (loaded_last_broker_equity
+                                    if loaded_last_broker_equity is not None
+                                    else broker.get_equity())
         self.state = DecisionState(
-            equity=broker.get_equity(),
+            equity=_sys_eq,
             open_positions=loaded_positions,
             taken={c: 0 for c in guard.clusters},
             rejected={c: 0 for c in guard.clusters},
             breaker=breaker)
+        logger.info("B1: system equity=$%.2f (base=$%.0f) | broker=$%.2f — "
+                    "risk thresholds measured against SYSTEM equity",
+                    _sys_eq, float(breaker.account) if breaker is not None else 0.0,
+                    self._last_broker_equity)
 
         # Restore breaker state — prevents peak_equity resetting to current on restart.
         # Without restore: peak=current → DD=0% even when real DD is 12%+ → HALT blind.
         if breaker is not None and loaded_peak_equity is not None:
             breaker.peak_equity = loaded_peak_equity
-            _cur_eq = broker.get_equity()
+            _cur_eq = self.state.equity      # system equity — same scale as peak_equity
             _dd_pct = (loaded_peak_equity - _cur_eq) / loaded_peak_equity * 100
             logger.info(
                 "B1: restored breaker peak_equity=$%.2f (current=$%.2f, DD=%.1f%% — "
@@ -480,6 +592,16 @@ class FuturesRunner:
         except Exception as _exc:
             logger.warning("C1: could not persist slip_stats.json: %s", _exc)
 
+    def _append_trade(self, record: dict) -> None:
+        if self._trade_log_path is None:
+            return
+        record.setdefault("ts", pd.Timestamp.now("UTC").isoformat())
+        try:
+            with open(self._trade_log_path, "a", encoding="utf-8") as _f:
+                _f.write(json.dumps(record) + "\n")
+        except Exception as _exc:
+            logger.warning("trade_log: could not append to %s: %s", self._trade_log_path, _exc)
+
     # ── B1: atomic state persistence ────────────────────────────────────────
 
     def _persist_state(self) -> None:
@@ -496,6 +618,12 @@ class FuturesRunner:
                 breaker_data["day_start_equity"] = self.state.breaker._day_start_equity
         if self.state.cur_day is not None:
             breaker_data["cur_day"] = str(pd.Timestamp(self.state.cur_day).date())
+        # Every cron slot is a separate process, so the system ledger and the broker mark
+        # it was last reconciled against must both survive on disk. Without them, equity
+        # would reset to base each slot and H4 would re-book the same P&L every five
+        # minutes.
+        breaker_data["system_equity"] = self.state.equity
+        breaker_data["last_broker_equity"] = self._last_broker_equity
         payload = {"schema_version": 1, "positions": positions_data, "breaker": breaker_data}
         try:
             tmp = self._positions_path.with_suffix(".tmp")
@@ -925,6 +1053,7 @@ class FuturesRunner:
             # stop_price = entry chandelier level (fixed stop, not ratcheted yet).
             # No stop_ref → market exit, log fill price only (no adverse/favorable).
             if _f.status in ("FILLED", "PARTIAL") and _f.avg_price > 0:
+                _slip_c = None
                 if p.stop_price is not None:
                     _slip_c = (p.stop_price - _f.avg_price) if p.direction == "LONG" \
                               else (_f.avg_price - p.stop_price)
@@ -943,6 +1072,18 @@ class FuturesRunner:
                         "C1 CLOSE: %s %s avg=%.4f (market exit, no stop reference)",
                         p.inst, p.direction, _f.avg_price,
                     )
+                self._append_trade({
+                    "type": "CLOSE",
+                    "inst": p.inst, "cluster": p.cluster,
+                    "direction": p.direction, "contracts": p.contracts,
+                    "entry_day": str(p.entry_day.date()) if p.entry_day else None,
+                    "exit_day": str(day.date()) if hasattr(day, "date") else str(day),
+                    "expected_stop": p.stop_price,
+                    "fill_price": _f.avg_price,
+                    "pnl_sized": p.pnl_sized,
+                    "slip": _slip_c,
+                    "regime": self._last_regime,
+                })
                 self._emit_event(
                     "INFO", "EXEC",
                     f"CLOSE {p.inst} {p.direction} ×{p.contracts} @{_f.avg_price:.4f}",
@@ -1011,15 +1152,24 @@ class FuturesRunner:
                 t["inst"], "CLOSE", t["direction"], n, t["cluster"], day,
                 exit_day=day, pnl_sized=t.get("pnl_sized", 0.0)))
 
-        # H4: sync state.equity from broker after ALL closes (multi-day exits + same-day
-        # STRESS_MID). In live mode: captures real intraday pnl including STRESS_MID
-        # same-session result → HALT_DAY can fire if that trade lost ≥4%.
-        # In verify mode (MockBroker): both track the same ledger pnl → delta ≈ 0 → no-op.
+        # H4: fold the broker's realised P&L into system equity after ALL closes
+        # (multi-day exits + same-day STRESS_MID), so HALT_DAY can fire on a same-session
+        # loss the ledger has not booked yet.
+        #
+        # Applies the broker's DELTA, not its absolute balance. Assigning the balance made
+        # system equity jump to the account's funding level ($995k on paper) and put every
+        # breaker threshold on that scale — losing the whole $50,000 design capital then
+        # read as 5% drawdown. Delta keeps the real P&L while the base stays the system's.
+        # Verify mode (MockBroker): broker and ledger move together → delta ≈ 0 → no-op.
         _h4_eq = self.broker.get_equity()
-        if abs(_h4_eq - self.state.equity) > 0.01:
-            logger.info("H4: equity sync state=%.2f → broker=%.2f (delta=%.2f)",
-                        self.state.equity, _h4_eq, _h4_eq - self.state.equity)
-            self.state.equity = _h4_eq
+        _h4_delta = _h4_eq - self._last_broker_equity
+        self._last_broker_equity = _h4_eq
+        if abs(_h4_delta) > 0.01:
+            logger.info("H4: broker delta %+.2f → system equity %.2f → %.2f "
+                        "(broker balance %.2f, not used as base)",
+                        _h4_delta, self.state.equity,
+                        self.state.equity + _h4_delta, _h4_eq)
+            self.state.equity += _h4_delta
             if self.state.breaker is not None:
                 self.state.breaker.update(self.state.equity)
                 if not self.state.breaker.status(self.state.equity).get(
@@ -1059,6 +1209,7 @@ class FuturesRunner:
             # SHORT OPEN (selling): lower fill = adverse → slip = expected - avg.
             # Dấu quan trọng cho bias hệ thống: %+.4f giữ dấu.
             _exp_entry = t.get("entry")
+            _slip_o = None
             if _open_fill.status in ("FILLED", "PARTIAL") and _exp_entry and _open_fill.avg_price > 0:
                 _slip_o = (_open_fill.avg_price - _exp_entry) if t["direction"] == "LONG" \
                           else (_exp_entry - _open_fill.avg_price)
@@ -1079,6 +1230,16 @@ class FuturesRunner:
                 )
 
             if _open_fill.status in ("FILLED", "PARTIAL"):
+                self._append_trade({
+                    "type": "OPEN",
+                    "inst": t["inst"], "cluster": t["cluster"],
+                    "direction": t["direction"], "contracts": n,
+                    "entry_day": str(day.date()) if hasattr(day, "date") else str(day),
+                    "expected_entry": _exp_entry,
+                    "fill_price": _open_fill.avg_price,
+                    "slip": _slip_o,
+                    "regime": self._last_regime,
+                })
                 self._emit_event(
                     "INFO", "EXEC",
                     f"OPEN {t['inst']} {t['direction']} ×{n} @{_open_fill.avg_price:.4f}",
@@ -1130,7 +1291,7 @@ class FuturesRunner:
 
         # Detect breaker level transitions; emit once per level change
         if self.state.breaker is not None:
-            _br_st = self.state.breaker.status(self.broker.get_equity())
+            _br_st = self.state.breaker.status(self.state.equity)
             _new_lvl = _br_st["level"]
             if _new_lvl != self._last_breaker_level:
                 _dd_pct = round(_br_st["drawdown_pct"] * 100, 2)
@@ -1179,7 +1340,7 @@ class FuturesRunner:
                 realized[day] = realized.get(day, 0.0) + d.realized
         return (pd.Series(realized).sort_index() if realized else pd.Series(dtype=float),
                 dict(taken=self.state.taken, rejected=self.state.rejected,
-                     halted=self.state.halted, final_equity=self.broker.get_equity()))
+                     halted=self.state.halted, final_equity=self.state.equity))
 
     # ── Operational event log ────────────────────────────────────────────────
 
@@ -1204,7 +1365,7 @@ class FuturesRunner:
 
     def _build_operational_status(self, day) -> dict:
         """Build the 7-item operational_status dict from current runner state."""
-        cur_eq = self.broker.get_equity()
+        cur_eq = self.state.equity   # SYSTEM equity, not broker balance
         today_ts = pd.Timestamp(day).normalize() if day is not None else None
 
         # Runner
@@ -1300,7 +1461,7 @@ class FuturesRunner:
         Atomic write via .tmp → os.replace. No-op when live_state_path is None."""
         if self._live_state_path is None:
             return
-        cur_eq = self.broker.get_equity()
+        cur_eq = self.state.equity   # SYSTEM equity, not broker balance
         today_ts = pd.Timestamp(day).normalize() if day is not None else None
         br = self.state.breaker
         account = br.account if br else 50_000.0

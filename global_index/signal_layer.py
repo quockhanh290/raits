@@ -113,11 +113,32 @@ def diff_desired_vs_held(desired: dict, held: list):
     return entries, exits
 
 
+def _mark_held_unchanged(desired: dict, held, cluster: str) -> None:
+    """Tell diff_desired_vs_held that `cluster` is unchanged this run.
+
+    Silence is not neutral here. diff_desired_vs_held builds `desired_live_keys`
+    only from non-None signals and then exits every held position whose key is
+    missing (see L110-112). So a cluster that simply produces nothing — because it
+    was skipped, or because its engine raised — reads as "close everything".
+
+    A dummy carrying the position's own direction lands in desired_live_keys and
+    fails the direction-flip test, so the position passes through untouched.
+    entry/stop are 0.0: they are never read on this path (no entry is generated),
+    and a fake price would be worse than an obviously-unused one.
+    """
+    for p in held:
+        if p.cluster == cluster:
+            desired[(p.inst, cluster)] = {
+                "direction": p.direction, "entry": 0.0, "stop": 0.0,
+                "entry_day": p.entry_day,
+            }
+
+
 def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs,
                            nkd_engine, nkd_df, nkd_labels, nkd_cost, nkd_inst,
                            stress_engine, stress_bars_1015, today_regime,
                            held, point_values, contracts_by_inst,
-                           today):
+                           today, active_clusters=None):
     """Produce (entry_candidates, exit_positions) for today from all engines on
     data-through-now. STATE engines (swing, NKD) go through diff_desired_vs_held;
     STRESS_MID (event) is added as fresh entry candidates only.
@@ -148,6 +169,14 @@ def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs
     # conservative for late feed: if NKD bars are delayed, desired_position returns an
     # old entry_day that does not match today_norm → suppressed, matching reference behavior.
 
+    # Clusters allowed to produce signals this run. None = all (default; every
+    # existing caller keeps its behaviour). A cluster left out is NOT skipped
+    # silently — its held positions get a hold-dummy, see _mark_held_unchanged.
+    # Used by the NKD night slots (01:10-02:55 ET), which must evaluate NKD inside
+    # its own JST entry window without touching live Rổ 4 positions.
+    _active = ({CLUSTER_SWING, CLUSTER_NKD, CLUSTER_STRESS}
+               if active_clusters is None else set(active_clusters))
+
     held_by_key = {(p.inst, p.cluster): p for p in held}
     desired: dict = {}
     force_entries: list = []  # same-direction rollover: exit old + enter new
@@ -155,8 +184,14 @@ def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs
     # --- swing TF (Rổ 4) : STATE ---
     # C4: isolated try/except — swing failure skips swing entries; held positions
     # get "hold" dummy signals so diff does NOT generate spurious exits for them.
+    if CLUSTER_SWING not in _active:
+        _mark_held_unchanged(desired, held, CLUSTER_SWING)
     try:
-        for inst, sig in swing_engine.desired_basket(swing_dfs, swing_labels, swing_costs).items():
+        # Gated: the engine is never called (short-circuit) and the loop below is a
+        # no-op, so `desired` keeps only the hold-dummies marked just above.
+        for inst, sig in (
+                swing_engine.desired_basket(swing_dfs, swing_labels, swing_costs).items()
+                if CLUSTER_SWING in _active else ()):
             key = (inst, CLUSTER_SWING)
             if sig is None:
                 desired[key] = None
@@ -186,20 +221,21 @@ def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs
         force_entries[:] = [fe for fe in force_entries if fe[1] != CLUSTER_SWING]
         # Restore "hold" signal for each currently-held swing position so diff treats
         # them as unchanged (same entry_day → no rollover, same direction → no exit).
-        for p in held:
-            if p.cluster == CLUSTER_SWING:
-                desired[(p.inst, CLUSTER_SWING)] = {
-                    "direction": p.direction, "entry": 0.0, "stop": 0.0,
-                    "entry_day": p.entry_day,
-                }
+        _mark_held_unchanged(desired, held, CLUSTER_SWING)
 
     # --- NKD : STATE (same swing machinery, NKD params; gap_fill must match backtest) ---
     # C4: isolated try/except — NKD failure skips NKD entries; held NKD position preserved.
+    if CLUSTER_NKD not in _active:
+        _mark_held_unchanged(desired, held, CLUSTER_NKD)
     try:
         nkd_key = (nkd_inst, CLUSTER_NKD)
-        nkd_sig = nkd_engine.desired_position(nkd_df, nkd_labels, nkd_cost)
+        # Gated: engine not called, and `desired[nkd_key] = None` is skipped so it
+        # cannot clobber the hold-dummy marked above.
+        nkd_sig = (nkd_engine.desired_position(nkd_df, nkd_labels, nkd_cost)
+                   if CLUSTER_NKD in _active else None)
         if nkd_sig is None:
-            desired[nkd_key] = None
+            if CLUSTER_NKD in _active:
+                desired[nkd_key] = None
         else:
             new_ed = pd.Timestamp(nkd_sig["entry_day"]).normalize()
             cur = held_by_key.get(nkd_key)
@@ -221,20 +257,20 @@ def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs
         desired.pop((nkd_inst, CLUSTER_NKD), None)
         force_entries[:] = [fe for fe in force_entries if fe[1] != CLUSTER_NKD]
         # Restore "hold" signal for any currently-held NKD position.
-        for p in held:
-            if p.cluster == CLUSTER_NKD:
-                desired[(p.inst, CLUSTER_NKD)] = {
-                    "direction": p.direction, "entry": 0.0, "stop": 0.0,
-                    "entry_day": p.entry_day,
-                }
+        _mark_held_unchanged(desired, held, CLUSTER_NKD)
 
     # state-diff → entry/exit events for swing + NKD
     state_entries, exits = diff_desired_vs_held(desired, held)
     state_entries.extend(force_entries)
 
     # pre-compute daily ATR series — same as deploy_sim's  atr = {n: daily_atr_series(df) ...}
-    atr_swing = {inst: daily_atr_series(df) for inst, df in swing_dfs.items()}
-    atr_nkd   = daily_atr_series(nkd_df)
+    # Skipped for gated clusters: nothing reads the series (no candidates are built
+    # for them) and the night NKD slots run every 5 minutes, so a resample over the
+    # 8-year swing concat would be paid for nothing. STRESS_MID falls back to
+    # atr_swing, so swing ATR is kept whenever either cluster is active.
+    atr_swing = ({inst: daily_atr_series(df) for inst, df in swing_dfs.items()}
+                 if _active & {CLUSTER_SWING, CLUSTER_STRESS} else {})
+    atr_nkd   = daily_atr_series(nkd_df) if CLUSTER_NKD in _active else None
 
     candidates = []
     for inst, cluster, sig in state_entries:
@@ -252,7 +288,7 @@ def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs
     # C4: isolated try/except — stress is an event model (same-day entry+exit), no held
     # state across days, so failure here only suppresses new stress entries for today.
     try:
-        if stress_bars_1015 and today_regime == "Stress":
+        if CLUSTER_STRESS in _active and stress_bars_1015 and today_regime == "Stress":
             # derive today (tz-naive) for ATR lookup — stress entry is always today
             _any = next(iter(stress_bars_1015.values()))
             _ts = pd.Timestamp(_any.index[-1])

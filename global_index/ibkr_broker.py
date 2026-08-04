@@ -59,9 +59,9 @@ log = logging.getLogger(__name__)
 #            The current "%Y%m%d %H:%M:%S" format works and returns correct bars.
 #            Fix properly when IBKR removes implied-tz support (next API release).
 #   10147 — OrderId not found — can fire on cancel-after-fill race; harmless.
-#   202   — Order cancelled by API request — expected when send_order() cancels
-#            a timed-out entry; not an unexpected error.
-_IBKR_INFORMATIONAL: frozenset[int] = frozenset({10349, 2109, 2174, 10147, 202})
+#   202   — Order cancelled by API request — logged at WARNING (not debug) so
+#            broker-initiated cancellations surface alongside our own timeout cancels.
+_IBKR_INFORMATIONAL: frozenset[int] = frozenset({10349, 2109, 2174, 10147})
 
 # raits internal instrument name → IBKR Future symbol (where they differ).
 # "MNKD" is the raits mini-NKD identifier; IBKR uses "NKD" for the CME Nikkei/USD futures.
@@ -82,6 +82,11 @@ _IBKR_EXCHANGE: dict[str, str] = {
 # Measure actual fill times in first paper weeks and update if needed (A4).
 ENTRY_FILL_TIMEOUT_SECS: int = 30
 EXIT_FILL_TIMEOUT_SECS: int = 120
+
+# How long to re-poll a Trade that reports Cancelled with nothing filled, before
+# accepting that verdict. See _verified_status() for why a bare Cancelled is not
+# trustworthy. Short: this only runs on an already-terminal order.
+CANCEL_VERIFY_SECS: float = 5.0
 
 # ── C2: Rollover schedule ─────────────────────────────────────────────────────
 #
@@ -511,6 +516,16 @@ class IBKRBroker(Broker):
             # outsideRth=True lets IBKR execute outside regular trading hours (RTH 09:30–16:15).
             # Without this, IBKR's "DAY" order preset cancels orders placed after RTH close.
             ibkr_order.outsideRth = True
+            # TIF must be set explicitly. Left blank, IBKR applies the account order
+            # preset and emits code 10349 "Order TIF was set to DAY based on order
+            # preset". 10349 is a warning, but it is absent from ib_insync's hardcoded
+            # `warningCodes` set (wrapper.py:1097), so ib_insync treats it as an error
+            # and sets trade.orderStatus.status = Cancelled *client-side* while IBKR
+            # goes on to fill the order. Setting TIF removes the trigger; the fill
+            # verification in _verified_status() covers every other code that could do
+            # the same thing. Listing 10349 in _IBKR_INFORMATIONAL only quiets our own
+            # log line — ib_insync has already mutated the status by then.
+            ibkr_order.tif = "DAY"
             t0 = time.time()
             trade = ib.placeOrder(contract, ibkr_order)
             log.info(
@@ -547,9 +562,7 @@ class IBKRBroker(Broker):
                                 status="FAILED",
                                 error_msg=f"exit timeout after {timeout_secs}s")
 
-            status = trade.orderStatus.status
-            actual_filled = int(trade.orderStatus.filled or 0)
-            avg_price = float(trade.orderStatus.avgFillPrice or 0.0)
+            status, actual_filled, avg_price = self._verified_status(ib, trade)
 
             if status == "Filled":
                 # Partial fill: filled < ordered (rare for MARKET on liquid futures)
@@ -602,6 +615,53 @@ class IBKRBroker(Broker):
             return Fill(order.inst, order.action, order.direction,
                         order.contracts, order.cluster,
                         status=fail_status, error_msg=str(exc))
+
+    def _verified_status(self, ib, trade) -> "tuple[str, int, float]":
+        """Read (status, filled, avg_price) off a Trade, refusing to trust a bare
+        'Cancelled' that carries no fill.
+
+        ib_insync sets `trade.orderStatus.status = Cancelled` on ANY IBKR message whose
+        code is missing from its hardcoded `warningCodes` set (wrapper.py:1097) — pure
+        warnings included. The mutation is client-side only; the order keeps running at
+        IBKR. Confirmed live 2026-08-03: three OPEN orders were reported Cancelled 18ms
+        after submission (code 10349) and all three filled. Because the STP block in
+        runner.py is gated on fill status, the resulting positions were carried
+        overnight with no stop order and no alert.
+
+        On a Cancelled/Inactive reading with nothing filled, re-poll briefly and let
+        `trade.fills` decide: an execution report exists only if the order really
+        traded, so it outranks the local status flag.
+        """
+        status = trade.orderStatus.status
+        filled = int(trade.orderStatus.filled or 0)
+        avg = float(trade.orderStatus.avgFillPrice or 0.0)
+        if status not in ("Cancelled", "ApiCancelled", "Inactive") or filled:
+            return status, filled, avg
+
+        for _ in range(int(CANCEL_VERIFY_SECS / 0.25)):
+            ib.sleep(0.25)
+            if trade.fills or trade.orderStatus.status == "Filled":
+                break
+
+        status = trade.orderStatus.status
+        filled = int(trade.orderStatus.filled or 0)
+        avg = float(trade.orderStatus.avgFillPrice or 0.0)
+
+        if not filled and trade.fills:
+            # orderStatus never caught up — derive from the execution reports.
+            filled = int(sum(f.execution.shares for f in trade.fills))
+            if filled:
+                avg = sum(f.execution.shares * f.execution.price
+                          for f in trade.fills) / filled
+
+        if filled:
+            log.warning(
+                "send_order: orderId=%s reported status=%s but %d contract(s) executed "
+                "@ %.4f — trusting the execution report (ib_insync false-cancel)",
+                trade.order.orderId, status, filled, avg,
+            )
+            status = "Filled"
+        return status, filled, avg
 
     def get_positions(self) -> list:
         """Return current open positions from IBKR.
@@ -853,6 +913,36 @@ class IBKRBroker(Broker):
             log.error("get_order_status(orderId=%s) failed: %s", order_id, exc)
             return "NOT_FOUND"
 
+    def has_working_stop(self, inst: str) -> bool:
+        """True if a live stop order for `inst` is currently working at IBKR.
+
+        B4 calls this before re-placing a stop for a position whose stop_order_id is
+        missing, to avoid stacking a second STP on the same contract (both firing
+        would close the position twice and open the opposite side).
+
+        reqAllOpenOrders() is issued first so orders placed by *other* clientIds — or
+        by an earlier process — are visible; openTrades() alone only reflects orders
+        this session knows about. Matches on contract symbol (the same field
+        get_positions() reports as `inst`).
+        """
+        if self._raw_fetcher is not None:
+            return False  # offline / test mode
+
+        ib = self._require_connection()
+        ib.reqAllOpenOrders()
+        ib.sleep(1.0)
+        for t in ib.openTrades():
+            if t.contract.symbol != inst:
+                continue
+            if t.order.orderType not in ("STP", "STP LMT"):
+                continue
+            if t.orderStatus.status in ("Filled", "Cancelled", "ApiCancelled", "Inactive"):
+                continue
+            log.info("has_working_stop(%s): orderId=%s status=%s — already protected",
+                     inst, t.order.orderId, t.orderStatus.status)
+            return True
+        return False
+
     def find_execution(self, order_id: str) -> bool:
         """Check IB server-side execution history for a confirmed fill of order_id.
 
@@ -945,6 +1035,7 @@ class IBKRBroker(Broker):
         ib.qualifyContracts(front_contract)
         close_ibkr = ibi.MarketOrder(close_side, _contracts)
         close_ibkr.outsideRth = True
+        close_ibkr.tif = "DAY"   # see send_order: blank TIF triggers code 10349
         t0 = time.time()
         close_trade = ib.placeOrder(front_contract, close_ibkr)
         log.info("C2: placed CLOSE %s %s ×%d", close_side, front_month, _contracts)
@@ -969,8 +1060,7 @@ class IBKRBroker(Broker):
                      error_msg="skipped — close timed out"),
             )
 
-        close_st    = close_trade.orderStatus.status
-        close_price = float(close_trade.orderStatus.avgFillPrice or 0.0)
+        close_st, _close_qty, close_price = self._verified_status(ib, close_trade)
         close_fill  = Fill(inst, "CLOSE", _direction, _contracts, _cluster,
                            status="FILLED" if close_st == "Filled" else "FAILED",
                            avg_price=close_price,
@@ -996,6 +1086,7 @@ class IBKRBroker(Broker):
         ib.qualifyContracts(next_contract)
         open_ibkr = ibi.MarketOrder(open_side, _contracts)
         open_ibkr.outsideRth = True
+        open_ibkr.tif = "DAY"   # see send_order: blank TIF triggers code 10349
         t0 = time.time()
         open_trade = ib.placeOrder(next_contract, open_ibkr)
         log.info("C2: placed OPEN %s %s ×%d", open_side, next_month, _contracts)
@@ -1019,8 +1110,7 @@ class IBKRBroker(Broker):
                      error_msg=f"roll-open timeout {ENTRY_FILL_TIMEOUT_SECS}s — position flat"),
             )
 
-        open_st    = open_trade.orderStatus.status
-        open_price = float(open_trade.orderStatus.avgFillPrice or 0.0)
+        open_st, _open_qty, open_price = self._verified_status(ib, open_trade)
         open_fill  = Fill(inst, "OPEN", _direction, _contracts, _cluster,
                           status="FILLED" if open_st == "Filled" else "FAILED",
                           avg_price=open_price,
