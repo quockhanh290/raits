@@ -34,6 +34,7 @@ from global_index.live_decision import decide_day, DecisionState
 from global_index.signal_layer import (ROSKA4_MULT, NKD_MULT, _asof_naive,
                                         CLUSTER_SWING, CLUSTER_STRESS, CLUSTER_NKD)
 from global_index.deploy_sim import size_combined, metrics, replay
+from global_index.runner import BACKTEST_CALMAR_FLOOR
 
 DATA_DIR    = r"D:\raits\data\cache\futures"
 REGIME_CSV  = r"D:\raits\spy_daily.csv"
@@ -43,7 +44,9 @@ ACCOUNT           = 50_000.0
 SLIPPAGE          = 2.0
 # IS Calmar reference: deploy_sim 2-tick slippage, full period 2018-2024.
 # Update to _final_rm["calmar"] printed at end of run after any engine/data/period change.
-_BACKTEST_CALMAR  = 1.53    # fit_A degradation floor, frozen_2024, causal (look-ahead fixed), 2-tick; confirmed 2026-07-10
+_BACKTEST_CALMAR  = BACKTEST_CALMAR_FLOOR   # fit_A degradation floor — single source
+# of truth is INVARIANTS.md, mirrored in runner.py. Was hardcoded 1.53 here long after
+# INVARIANTS had deprecated it twice (bar-0 exit, then global_nkd cap 2%). Now 1.65.
 
 print("Loading data…")
 dfs    = {n: load_parquet(str(Path(DATA_DIR) / data_filename(c))) for n, c in BASKET.items()}

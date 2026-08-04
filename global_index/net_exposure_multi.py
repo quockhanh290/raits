@@ -21,8 +21,38 @@ account and a global risk-off still draws every equity cluster down the same day
 (deploy_sim; pre-NKD context was $5,185→$5,232 — stale, superseded by fit_C) —
 so the account DD cap is not threatened — but that is empirical, not structural. Keep DD combined.
 
-Cluster caps: roska4_swing (5%/4.4%) is the swept optimum; roska4_stress and
-global_nkd (2%) remain ESTIMATES — calibrate during paper trading.
+Cluster caps: roska4_swing (5%/4.4%) is the swept optimum. roska4_stress (2.5%)
+remains an ESTIMATE — calibrate during paper trading.
+
+global_nkd was 2%, an estimate anchored in DECISIONS.md to "1 MNKD ATR risk ≈ $437".
+That figure is the 22.6th percentile of 2018-2026 risk_sized and was drawn from the
+quietest stretch of the sample; by 2026 the Nikkei had risen from ~21,000 to ~64,000
+and NKD's daily ATR with it, so 94.1% of days exceeded the $1,000 sleeve and the
+cluster stopped trading altogether. Swept 2026-08-04 (scratchpad/sweep_nkd_cap.py,
+NKD cap only, roska4_swing held at 5%/4.4%, account $50,000):
+
+    cap    net$     Calmar  Sharpe  MaxDD$   swing t/r    nkd t/r
+    2%     46,683   1.99    1.90    3,390    1799/697     655/46
+    4%     48,091   2.05    1.90    3,390    1799/697     695/6
+    6%     48,453   2.07    1.90    3,390    1799/697     701/0
+    12%    48,453   2.07    1.90    3,390    1799/697     701/0
+
+MaxDD is invariant across the whole sweep — NKD never participates in the worst
+drawdown, which is the timezone-lag / +0.225 cross-correlation argument above
+holding empirically. The 2% cap was suppressing trades and buying no protection.
+
+6% is where the constraint stops binding (701/0, identical at 8% and 12%), not a
+tuned optimum — there is no maximum to overfit to and no risk/return curve to ride.
+The alternative was measured and rejected: with NKD dead the system is Rổ-4-only at
+Calmar 1.15, BELOW the 1.53 degradation floor, and MaxDD is worse ($3,732 vs $3,390)
+because the diversifier is gone. Raising the account base instead was also rejected
+— $150,000 loosens every cluster at once, swing rejections collapse 697→8 and Calmar
+falls to 1.40.
+
+Caveats on the record: the sweep saturates at 6% on 2018-2024 data where NKD
+risk_sized ran $350-900. At 2026 volatility it is ~$2,850, so 6% ($3,000) clears by
+only ~5% and a further vol rise re-blocks the cluster. And the sweep window covers
+the sealed 2023-2024 vault period, so this cap has no clean OOS.
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
@@ -53,7 +83,9 @@ class ClusterBudget:
 DEFAULT_CLUSTERS = {
     "roska4_swing":  ClusterBudget("roska4_swing",  max_gross_pct=0.05,  max_net_pct=0.044),
     "roska4_stress": ClusterBudget("roska4_stress", max_gross_pct=0.025, max_net_pct=None),
-    "global_nkd":    ClusterBudget("global_nkd",    max_gross_pct=0.02,  max_net_pct=0.02),
+    # 2% → 6% (2026-08-04): saturation point of the NKD-only sweep, see module
+    # docstring. MaxDD unchanged at $3,390 across the whole sweep.
+    "global_nkd":    ClusterBudget("global_nkd",    max_gross_pct=0.06,  max_net_pct=0.06),
 }
 
 # Entry priority when several same-cluster entries compete for budget on one day.

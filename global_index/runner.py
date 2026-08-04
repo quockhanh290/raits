@@ -59,6 +59,18 @@ from global_index.broker import Order
 from global_index.live_decision import decide_day, DecisionState, OpenPos
 
 
+# fit_A degradation floor — the Calmar the live system is measured against. Single
+# source of truth is INVARIANTS.md; keep this and generate_replay_snapshots.py in
+# step with it. Re-derive after ANY change to engine, data, period or cluster caps:
+#   deploy_sim --data-dir data/cache/futures/frozen_sim \
+#     --nkd-parquet global_index/data/NKD_frozen_2024.parquet \
+#     --regime-csv spy_daily_live.csv --end 2024-12-31 \
+#     --hmm-fit-end 2022-12-31 --n-contracts 1 --slippage-ticks 2
+# 1.65 (2026-08-04, global_nkd 6%). Superseded 1.57 (nkd cap 2%) and 1.53 (bar-0
+# exit) — 1.53 was still hardcoded here long after INVARIANTS had deprecated it.
+BACKTEST_CALMAR_FLOOR: float = 1.65
+
+
 # ── E1: PID lockfile helpers ────────────────────────────────────────────────
 
 class RunnerLockError(RuntimeError):
@@ -1549,13 +1561,19 @@ class FuturesRunner:
             "max_dd_dollars":   snap_dd_dollars,
             "max_dd_pct":       snap_dd_pct,
             "total_days":       1,
+            # Read the live guard rather than restating the caps. The literals here
+            # had already drifted: global_nkd stayed at 2% after the sleeve moved to
+            # 6%, so the dashboard would have reported a limit the guard no longer
+            # enforced.
             "clusters": {
-                "roska4_swing":  {"max_gross_pct": 0.05,  "max_net_pct": 0.044},
-                "roska4_stress": {"max_gross_pct": 0.025, "max_net_pct": None},
-                "global_nkd":    {"max_gross_pct": 0.02,  "max_net_pct": 0.02},
+                name: {"max_gross_pct": cb.max_gross_pct,
+                       "max_net_pct": cb.max_net_pct}
+                for name, cb in self.guard.clusters.items()
             },
             "breaker_events":    [],
-            "backtest_calmar":   1.53,
+            # fit_A degradation floor — must match INVARIANTS.md. Was 1.53, which
+            # INVARIANTS had already deprecated twice (bar-0 exit, then nkd cap 2%).
+            "backtest_calmar":   BACKTEST_CALMAR_FLOOR,
             "operational_status": ops_status,
             "events":            list(self._events),
             "runner_health": {
