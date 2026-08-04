@@ -99,6 +99,7 @@ log.info("Log file: %s", _LOG_FILE)
 _preflight_ok: dict = {}
 _PREFLIGHT_STATE = Path("global_index/preflight_state.json")
 _PREFLIGHT_KEEP = 7          # days retained; keeps the file from growing without bound
+_FAIL_TAIL_LINES = 25        # child output echoed on failure — enough for the traceback
 
 # Serialises run_live_day across ALL slots — see _live_day_body. BlockingScheduler
 # dispatches jobs on a thread pool, so a threading.Lock is the right primitive.
@@ -159,11 +160,26 @@ def _run(args: list[str], label: str, dry_run: bool) -> bool:
     if dry_run:
         log.info("[%s] dry-run — command NOT executed (treating as success)", label)
         return True
-    result = subprocess.run(args, cwd=str(_CWD))
+    # Capture the child's output so a failure says WHY. Uncaptured, it went to
+    # whatever console the scheduler was launched from and was gone: on 2026-08-04
+    # the 13:45 pre-flight failed on MES and skipped the entire trading day, and the
+    # log held nothing but "exited with code 1". A re-run later succeeded, so the
+    # cause is still unknown.
+    result = subprocess.run(args, cwd=str(_CWD), capture_output=True,
+                            text=True, errors="replace")
     if result.returncode == 0:
         log.info("[%s] completed OK", label)
         return True
+
     log.error("[%s] exited with code %d", label, result.returncode)
+    for stream, name in ((result.stdout, "stdout"), (result.stderr, "stderr")):
+        lines = [ln for ln in (stream or "").splitlines() if ln.strip()]
+        if not lines:
+            continue
+        # Tail only — these children print a lot on success and the failure is at
+        # the end. Enough to identify the instrument and the exception.
+        for ln in lines[-_FAIL_TAIL_LINES:]:
+            log.error("[%s] %s: %s", label, name, ln)
     return False
 
 
