@@ -1731,3 +1731,53 @@ Phase 1: engine 519t/$13,073 == harness 519t/$13,073, field_mismatch=0
 Phase 2: cả 519 trade, entry state OK + exit state OK
 VERDICT PASS — chạy trên frozen parquet thuần nên KHÔNG bị ảnh hưởng bởi bug trộn tz đã sửa,
 đúng như dự đoán "cap/tz không làm mất hiệu lực reconcile".
+
+---
+
+## Sub-task: Sweep RIÊNG cap roska4_swing (2026-08-04) — XÁC NHẬN GIỮ 5%/4.4%
+Status: DONE — đo xong, KHÔNG đổi
+
+### Câu hỏi
+Rổ 4 bị cap chặn 100% số ngày năm 2026 (vs 60.3% thời validate) — hiện chỉ giữ được
+MES+MYM ($2,123 = 4.25%), còn $377 trống trong khi mã rẻ nhất cần ~$700. Cùng cơ chế
+đã giết NKD. Có phải nới cap không?
+
+### Đo — scratchpad/sweep_swing_cap.py
+2-tick + spy_daily_live.csv (ĐÚNG convention INVARIANTS lần này). `global_nkd` giữ 6%.
+Tỉ lệ gross/net giữ nguyên 5/4.4. **Self-check: dòng 5.0% tái lập chính xác baseline
+$42,459 / Calmar 1.72** → script đúng.
+
+| swing cap | net$ | Calmar | Sharpe | MaxDD$ | swing t/r |
+|---|---|---|---|---|---|
+| 4.0% | 37,952 | 1.71 | 1.69 | 3,201 | 1522/974 |
+| **5.0% (hiện tại)** | **42,459** | **1.72** | 1.67 | 3,574 | 1799/697 |
+| 6.0% | 41,928 | 1.42 ✗ | 1.49 | 4,281 | 2032/464 |
+| 8.0% | 47,673 | 1.26 ✗ | 1.51 | 5,479 | 2287/209 |
+| 10.0% | 49,656 | 1.25 ✗ | 1.47 | 5,729 | 2406/90 |
+| 12.0% | 50,113 | 1.17 ✗ | 1.44 | 6,217 | 2461/35 |
+| 15.0% | 48,813 | 1.14 ✗ | 1.40 | 6,217 | 2488/8 |
+
+✗ = trượt sàn 1.65
+
+### KẾT LUẬN: GIỮ 5%/4.4%
+**5% là đỉnh thật** — 4% cho 1.71, 6% rơi xuống 1.42. Mọi mức trên 5% trượt sàn, kể cả
+nới đúng 1 điểm phần trăm. Sweep gốc được XÁC NHẬN, không phải lật ngược.
+
+### Đối lập hoàn toàn với NKD — lý do cách chữa không đối xứng
+| | global_nkd | roska4_swing |
+|---|---|---|
+| MaxDD khi nới cap | **bất biến** $3,390 | **tăng đều** $3,201→$6,217 |
+| Calmar | tăng rồi bão hoà | **đỉnh đúng ở giá trị hiện tại** |
+| Bản chất cap | chặn lệnh, không đổi lại gì | **đang gánh việc thật** |
+| Nguồn gốc số | ESTIMATE chưa sweep | swept optimum |
+
+### Khép luôn câu hỏi vốn CHO RỔ 4
+Nâng vốn giữ cap 5% = nới cap bằng đô-la: $150,000 × 5% = $7,500 = đúng dòng 15% ở nền
+$50k → **Calmar 1.14**. Tức là với Rổ 4, **nhiều vốn hơn làm hiệu suất điều chỉnh rủi ro
+XẤU ĐI**. Phân phối chỗ không phải khiếm khuyết — cap đang chọn lệnh tốt hơn qua
+`entry_priority_key` và hạn chế phơi nhiễm tương quan.
+
+→ **"Rổ 4 chỉ giữ 2 trong 4 mã" là thiết kế chạy đúng, không phải chỗ cần sửa.**
+
+Cũng xác nhận suy luận loại trừ trước đó (MaxDD phình trong phép đo $150k đến từ phía
+Rổ 4) — giờ là đo trực tiếp, không còn là suy luận.
