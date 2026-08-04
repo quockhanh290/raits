@@ -100,6 +100,18 @@ def _reader_thread(port: int, client_id: int, poll_interval: int) -> None:
             except Exception as e:
                 logger.warning(f"portfolio error: {e}")
 
+            # Total unrealized = sum of the rows the panel actually renders.
+            #
+            # Not the account tag. IBKR reports it as "$LEDGER-UnrealizedPnL", which the
+            # tag match above never hit (it looks for "UnrealizedPnL"), so the dashboard
+            # showed a dash. Matching the real tag would still be wrong here: on this
+            # CAD-based account $LEDGER-UnrealizedPnL/BASE is CAD 1,016.48 while the
+            # position rows are USD and sum to 722.72, so the total would not equal the
+            # column beneath it. Summing the rows cannot disagree with them.
+            if positions:
+                _u = [p["unrealized_pnl"] for p in positions if p["unrealized_pnl"] is not None]
+                unrealized_pnl = round(sum(_u), 2) if _u else None
+
             # ── Open trades (STP GTC, pending) ───────────────────────────
             # reqAllOpenOrders fetches orders from ALL clients (clientId 0 = TWS UI,
             # clientId 1 = runner). Without this, openTrades() returns only clientId 99's own.
