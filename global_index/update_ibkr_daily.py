@@ -101,19 +101,80 @@ def _fetch_contfuture(ib, ibkr_symbol: str, exchange: str,
     df = df.set_index("date")
     df.index = pd.to_datetime(df.index)
     # P2: ib_insync formatDate=1 returns tz-aware US/Central for CME.
-    # Convert to ET naive for consistency with existing parquet.
+    #
+    # Store UTC-naive, NOT ET. The parquet's 8 years of Databento history are
+    # UTC-naive and _validated_core.load_parquet reads the file with
+    # pd.to_datetime(idx, utc=True) — it treats every value as UTC. Writing ET here
+    # put two conventions in one file: from the first IBKR append (2026-07-06) every
+    # bar was read four hours early, so between_time("14:00","15:55") selected the
+    # 18:00-19:55 ET Globex evening instead of the US afternoon.
+    #
+    # It also corrupted the splice itself. The anchor compares the parquet's last bar
+    # against the first new bar; with the old bar's UTC value read as ET, those two
+    # were four hours apart, and that four hours of price movement was frozen into a
+    # permanent offset — the +11.50 on MES, +183.00 on MNQ, -57.00 on MYM. Their
+    # mixed signs give them away: real back-adjustment across a rollover moves
+    # correlated index futures the same way.
     if df.index.tz is not None:
-        df.index = df.index.tz_convert("America/New_York").tz_localize(None)
+        df.index = df.index.tz_convert("UTC").tz_localize(None)
     df.columns = [c.lower() for c in df.columns]
     keep = [c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]
     return df[keep].sort_index()
 
 
+def assert_utc_convention(df: "pd.DataFrame", label: str, sample_days: int = 5) -> None:
+    """Fail loudly if the index is not on the UTC clock.
+
+    CME index futures halt 17:00-18:00 ET daily, which is hour 21 in UTC (22 under
+    EST). If the most recent sessions show their gap at hour 17 instead, the bars are
+    ET-labelled and the file has two conventions in it.
+
+    This exists because that is exactly what happened and nothing noticed for a
+    month: from 2026-07-06 the appends were ET while the history was UTC, and every
+    downstream reader silently shifted the new data four hours. The frozen backtests
+    kept passing the whole time — they read a different file. One check on the halt
+    position would have caught it the first day.
+    """
+    if df is None or df.empty:
+        return
+    idx = pd.to_datetime(df.index)
+    if getattr(idx, "tz", None) is not None:
+        raise ValueError(f"{label}: index is tz-aware; expected UTC-naive")
+    days = sorted({t.date() for t in idx})[-sample_days:]
+    verdicts = []
+    for d in days:
+        hrs = {t.hour for t in idx if t.date() == d}
+        if len(hrs) < 20:
+            continue                      # half day, holiday or partial — no signal
+        if 21 not in hrs or 22 not in hrs:
+            verdicts.append(("UTC", d))
+        elif 17 not in hrs:
+            verdicts.append(("ET", d))
+    et = [d for conv, d in verdicts if conv == "ET"]
+    if et:
+        raise ValueError(
+            f"{label}: bars appear ET-labelled, not UTC — the daily halt shows at "
+            f"hour 17 on {et}. Expected the gap at hour 21 (17:00 ET in UTC). "
+            f"Mixing conventions in one file shifts every downstream read by 4h; "
+            f"see the 2026-07-06 incident in SCRATCHPAD.md."
+        )
+
+
 def _load_parquet(path: Path) -> pd.DataFrame:
-    """Load parquet; normalize index to ET naive."""
+    """Load parquet as UTC-naive — the file's canonical convention.
+
+    The docstring used to promise "normalize index to ET naive" and the guard below
+    only fires for a tz-AWARE index. The stored index is naive, so the branch never
+    ran and UTC values were handed back to be treated as ET. The promise and the
+    behaviour disagreed, and nothing checked.
+
+    A tz-aware index (should not occur) is converted to UTC rather than dropped, so
+    the return type is one convention either way.
+    """
     df = pd.read_parquet(path)
+    df.index = pd.to_datetime(df.index)
     if df.index.tz is not None:
-        df.index = df.index.tz_convert("America/New_York").tz_localize(None)
+        df.index = df.index.tz_convert("UTC").tz_localize(None)
     return df
 
 
@@ -296,6 +357,11 @@ def main() -> None:
                     log.error("  → NOT saving parquet. Investigate before proceeding.")
                     failed.append(name)
                     continue
+
+                # Never write a file whose convention has drifted. Cheaper to fail
+                # the update than to discover a month later that every downstream
+                # read was four hours off.
+                assert_utc_convention(updated, name)
 
                 parquet_path.parent.mkdir(parents=True, exist_ok=True)
                 updated.to_parquet(parquet_path)
