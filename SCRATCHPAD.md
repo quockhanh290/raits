@@ -1,5 +1,21 @@
 ## Gotchas
 
+- **Parquet back-adjusted vs bar live front-month — hai THANG GIÁ khác nhau trong một chuỗi**
+  (2026-08-04): `update_ibkr_daily` dựng parquet từ ContFuture + splice offset (liền mạch qua
+  rollover — thang mà EMA/ATR/chandelier cần). `fetch_bars` trả **front-month thô** (thang lệnh
+  khớp). `_concat_live` ghép với `keep="last"` → bar live **ghi đè** lịch sử thật → chuỗi có
+  bậc nhảy ngay chỗ tính tín hiệu.
+  Đo cùng mốc `2026-08-04 15:24`: MES **+12.25** · MNQ **+88.75** · MYM **−39.00** · M2K **+9.20**.
+  **Hậu quả 2026-08-03**: live mở MES @7,634.75 trong khi replay parquet thuần **không có vị thế
+  MES ở BẤT KỲ mốc cắt nào** (15:10 = đúng phút đặt lệnh, 15:55, 23:59, cả hôm sau). Lệnh sinh ra
+  từ chỗ gãy, không phải từ chiến lược. MYM cùng ngày thì lại KHỚP backtest → khó phát hiện.
+  ⚠️ **Sửa phải đủ hai nửa.** Nửa 1: `_splice_live` chỉ nối bar SAU parquet + dịch theo anchor của
+  `update_ibkr_daily`. Nửa 2: `to_candidate(price_offset=)` quy entry/stop về thang thô. Thiếu nửa
+  2 thì stop LONG ra 7,639.50 trong khi giá 7,635 → **kích hoạt ngay khi đặt**. Nửa vời tệ hơn
+  không sửa.
+  ⚠️ **P0c swing verification bị vô hiệu** — `p0c_verify_swing.py` gọi cùng hàm concat nên tái tạo
+  đúng chuỗi hỏng rồi báo "khớp". L10 lần thứ ba.
+
 - **Phanh cắt lỗ đo trên equity broker ($995k) trong khi sleeve đo trên $50k — phanh cứng
   không tồn tại** (2026-08-04): `deploy_sim` cho `equity = account` rồi cộng dồn lãi lỗ, nên
   breaker thấy equity CỦA HỆ THỐNG. `runner` thì `equity = broker.get_equity()` (L504) và H4

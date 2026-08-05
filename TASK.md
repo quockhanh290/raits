@@ -1781,3 +1781,48 @@ XẤU ĐI**. Phân phối chỗ không phải khiếm khuyết — cap đang ch�
 
 Cũng xác nhận suy luận loại trừ trước đó (MaxDD phình trong phép đo $150k đến từ phía
 Rổ 4) — giờ là đo trực tiếp, không còn là suy luận.
+
+---
+
+## Sub-task: Bug THANG GIÁ live vs parquet (2026-08-04) — ĐÃ SỬA
+Status: DONE — commit 03cc53d
+
+### Phát hiện thế nào
+Truy câu hỏi "stop loss đã adjust chưa" → phát hiện `desired_basket` trả None cho MES/MYM
+(backtest đã đóng, live vẫn giữ vì slot hôm nay bị skip) → soi tiếp thì thấy lệnh MES live
+**không có lệnh tương ứng nào trong backtest**.
+
+Replay MES ở 4 mốc cắt (15:10 = đúng phút đặt lệnh / 15:55 / 23:59 / hôm sau):
+`desired_position` trả **None ở mọi mốc**. Lệnh live không đến từ engine.
+
+### Nguyên nhân — đo trực tiếp cùng mốc 2026-08-04 15:24
+| inst | parquet | IBKR live | chênh |
+|---|---|---|---|
+| MES | 7,792.25 | 7,780.00 | **+12.25** |
+| MNQ | 30,011.50 | 29,922.75 | **+88.75** |
+| MYM | 54,316.00 | 54,355.00 | **−39.00** |
+| M2K | 3,058.90 | 3,049.70 | **+9.20** |
+
+Parquet = ContFuture + splice offset (back-adjusted). `fetch_bars` = front-month thô.
+`_concat_live` ghép `keep="last"` → live ghi đè parquet → bậc nhảy 12–89 điểm ngay cửa sổ
+tín hiệu. MNQ 88.75 điểm = 0.30%, thừa sức tạo breakout/EMA-cross giả.
+
+### Sửa — hai nửa, nửa 2 BẮT BUỘC
+- [x] `_splice_live` thay `_concat_live`: chỉ nối bar SAU parquet (hết ghi đè lịch sử), dịch
+      theo đúng anchor `update_ibkr_daily` (`last_close − first_new_open`), **trả offset ra**
+- [x] `to_candidate(price_offset=)`: quy entry/stop về thang thô tại đúng chỗ giá tín hiệu
+      thành giá lệnh. Thiếu → stop LONG 7,639.50 vs giá 7,635 → **kích hoạt tức thì**
+- [x] `_splice_nkd_live`: đổi đồng hồ JST TRƯỚC rồi mới splice (sai thứ tự thì neo sai bar).
+      NKD có khoảng cách thang lớn nhất rổ (+1065.0 tại splice 2026-07-06)
+- [x] `price_offsets` mặc định rỗng → mọi caller cũ không đổi hành vi
+
+### Verify
+- [x] `test_price_scale.py` 8/8 — PS2 chống ghi đè lịch sử · PS4 anchor là bar splice không
+      phải trung bình overlap · PS6 stop không vượt lên trên giá
+- [x] pytest 130/130 · injection 14/14 · signal_layer self-test PASS
+- [x] reconcile_gd0 PASS · run_smoke_test diff $0.00, cluster counts không đổi
+
+### ⚠️ Hệ quả với các verify cũ
+`p0c_verify_swing.py` dùng **cùng hàm concat** nên tái tạo đúng chuỗi hỏng rồi báo "khớp".
+Kết quả P0c swing (MYM/M2K 2026-07-30 ✅) **bị vô hiệu** — phải verify lại sau khi sửa.
+Cùng số phận với P0c MNKD đã vô hiệu vì bug múi giờ. L10 lần thứ ba trong một phiên.
