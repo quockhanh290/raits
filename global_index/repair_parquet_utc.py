@@ -59,23 +59,40 @@ JOIN_TOLERANCE = 0.02    # 2% — a real gap at the join is possible, a scale er
 def _front_month(ib, symbol: str, exchange: str):
     import ib_insync as ibi
     from global_index.ibkr_broker import _current_front_month
-    month = _current_front_month(symbol if symbol != "NKD" else "MNKD")
-    c = ibi.Future(symbol, lastTradeDateOrContractMonth=month, exchange=exchange)
+    # ROLL_SCHEDULE is keyed by the IBKR symbol — "NKD", not the raits name "MNKD".
+    # Passing the raits name returned None, the contract went out with no month, and
+    # IBKR rejected it as ambiguous across fifteen listed expiries.
+    month = _current_front_month(symbol)
+    if not month:
+        raise ValueError(f"{symbol}: no front month in ROLL_SCHEDULE — refusing to "
+                         f"send an unqualified contract")
+    c = ibi.Future(symbol, lastTradeDateOrContractMonth=month,
+                   exchange=exchange, currency="USD")
     ib.qualifyContracts(c)
+    if not getattr(c, "localSymbol", ""):
+        raise ValueError(f"{symbol} {month}: qualifyContracts returned no localSymbol")
     return c
 
 
-def _fetch_day(ib, contract, end_utc: pd.Timestamp):
-    """One session ending at end_utc, returned UTC-naive.
+def _fetch_window(ib, contract, end_utc: pd.Timestamp, duration: str = "1 W"):
+    """One week ending at end_utc, returned UTC-naive.
+
+    Weekly, not daily. A "1 D" request whose endDateTime lands mid-session returns a
+    truncated window — 409 bars against the session's 1380 — and stepping day by day
+    that way loses most of the data. A week-long window covers whole sessions, and
+    overlapping requests are deduplicated by the caller.
 
     endDateTime uses the yyyymmdd-hh:mm:ss form, which IBKR reads as UTC. The
     'yyyymmdd hh:mm:ss US/Eastern' form is rejected by this Gateway (error 10314).
+
+    Verified to return the full 1380-bar session with its gap at hour 21 UTC — the
+    17:00-18:00 ET CME halt — matching the Databento history's convention exactly.
     """
     import ib_insync as ibi
     bars = ib.reqHistoricalData(
         contract, endDateTime=end_utc.strftime("%Y%m%d-%H:%M:%S"),
-        durationStr="1 D", barSizeSetting="1 min", whatToShow="TRADES",
-        useRTH=False, formatDate=1, timeout=120)
+        durationStr=duration, barSizeSetting="1 min", whatToShow="TRADES",
+        useRTH=False, formatDate=1, timeout=180)
     if not bars:
         return pd.DataFrame()
     d = ibi.util.df(bars).set_index("date")
@@ -107,18 +124,24 @@ def repair(name: str, path: str, symbol: str, exchange: str, ib, apply: bool) ->
     contract = _front_month(ib, symbol, exchange)
     start = head.index[-1]
     end = pd.Timestamp.utcnow().replace(tzinfo=None)
-    days = pd.date_range(start.normalize(), end.normalize() + pd.Timedelta(days=1), freq="D")
-    print(f"  refetching   : {len(days)} sessions from {contract.localSymbol}")
+    # Weekly windows stepping forward, each overlapping the last so nothing falls
+    # between them; duplicates are dropped after.
+    marks = list(pd.date_range(start + pd.Timedelta(days=6), end + pd.Timedelta(days=7),
+                               freq="7D"))
+    print(f"  refetching   : {len(marks)} weekly windows from {contract.localSymbol}")
 
     got = []
-    for i, d in enumerate(days):
+    for i, mk in enumerate(marks):
         try:
-            b = _fetch_day(ib, contract, d + pd.Timedelta(hours=23, minutes=59, seconds=59))
+            b = _fetch_window(ib, contract, min(mk, end))
             if not b.empty:
                 got.append(b)
+                print(f"    week to {min(mk, end).date()}: {len(b):>6,} bars")
+            else:
+                print(f"    week to {min(mk, end).date()}: empty")
         except Exception as exc:
-            print(f"    {d.date()}: FAILED {exc}")
-        if i < len(days) - 1:
+            print(f"    week to {min(mk, end).date()}: FAILED {exc}")
+        if i < len(marks) - 1:
             time.sleep(REQUEST_GAP_S)
 
     if not got:
