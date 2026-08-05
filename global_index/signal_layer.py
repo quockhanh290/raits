@@ -66,18 +66,32 @@ def _asof_naive(atr_s: "pd.Series", ts) -> float:
 
 
 def to_candidate(inst, direction, entry, stop, cluster, contracts, point_value,
-                 daily_atr, mult):
+                 daily_atr, mult, price_offset=0.0):
     """Build an entry_candidate dict in the exact shape decide_day expects.
     risk_sized = daily_ATR × mult × pv × contracts  (deploy_sim real_risk formula).
     entry/stop kept in dict for order execution; risk_sized drives guard cap.
-    Raises ValueError if risk_sized is not finite-positive (NaN bypasses cap guard)."""
+    Raises ValueError if risk_sized is not finite-positive (NaN bypasses cap guard).
+
+    price_offset converts entry/stop from the back-adjusted scale the indicators run
+    on to the raw front-month scale orders are filled at. This is the seam between
+    the two: everything upstream is adjusted, everything downstream is tradeable.
+
+    The history is back-adjusted so it stays continuous across contract rollovers —
+    that is what EMA/ATR/chandelier must see. The broker fills at the raw front-month
+    price. Both are correct; sending an adjusted level to IBKR is not. Measured
+    2026-08-04, the two scales stood 12.25 (MES) to 88.75 (MNQ) points apart, so a
+    LONG stop computed in adjusted space would have been placed ABOVE the market and
+    triggered on arrival.
+    """
     risk_sized = int(contracts) * float(mult) * float(daily_atr) * float(point_value)
     if not (risk_sized > 0):   # catches NaN and zero; propagates to C4 try/except
         raise ValueError(
             f"to_candidate({inst}): risk_sized={risk_sized!r} — "
             f"daily_atr={daily_atr!r} must be finite and positive")
+    _off = float(price_offset or 0.0)
     return dict(inst=inst, direction=direction, cluster=cluster,
-                risk_sized=risk_sized, entry=float(entry), stop=float(stop))
+                risk_sized=risk_sized,
+                entry=float(entry) - _off, stop=float(stop) - _off)
 
 
 def diff_desired_vs_held(desired: dict, held: list):
@@ -138,7 +152,7 @@ def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs
                            nkd_engine, nkd_df, nkd_labels, nkd_cost, nkd_inst,
                            stress_engine, stress_bars_1015, today_regime,
                            held, point_values, contracts_by_inst,
-                           today, active_clusters=None):
+                           today, active_clusters=None, price_offsets=None):
     """Produce (entry_candidates, exit_positions) for today from all engines on
     data-through-now. STATE engines (swing, NKD) go through diff_desired_vs_held;
     STRESS_MID (event) is added as fresh entry candidates only.
@@ -176,6 +190,11 @@ def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs
     # its own JST entry window without touching live Rổ 4 positions.
     _active = ({CLUSTER_SWING, CLUSTER_NKD, CLUSTER_STRESS}
                if active_clusters is None else set(active_clusters))
+
+    # Per-instrument back-adjustment applied to the live bars, undone when signal
+    # levels become order prices. See to_candidate. Empty = no adjustment (offline
+    # replays and every existing caller), so behaviour is unchanged without it.
+    _offsets = dict(price_offsets or {})
 
     held_by_key = {(p.inst, p.cluster): p for p in held}
     desired: dict = {}
@@ -282,7 +301,7 @@ def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs
         candidates.append(to_candidate(
             inst, sig["direction"], sig["entry"], sig["stop"],
             cluster, contracts_by_inst.get(inst, 1), point_values[inst],
-            daily_atr=av, mult=mult))
+            daily_atr=av, mult=mult, price_offset=_offsets.get(inst, 0.0)))
 
     # --- STRESS_MID : EVENT (only at 10:15, only in Stress regime) ---
     # C4: isolated try/except — stress is an event model (same-day entry+exit), no held
@@ -302,6 +321,8 @@ def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs
                 if s:
                     atr_s = atr_swing.get(inst, daily_atr_series(bars))
                     av = _asof_naive(atr_s, today_naive)
+                    # stress_bars_1015 come straight from the broker, already raw
+                    # scale — no adjustment applied, so none to undo.
                     candidates.append(to_candidate(
                         inst, s["direction"], s["entry"], s["stop"],
                         CLUSTER_STRESS, contracts_by_inst.get(inst, 1), point_values[inst],

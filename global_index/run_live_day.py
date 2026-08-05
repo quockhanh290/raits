@@ -237,12 +237,43 @@ def main():
             df.index = df.index.tz_localize(None)
         return df
 
-    def _concat_live(frozen_df, live_df):
-        """Merge frozen parquet + live IBKR bars; live bars win on duplicate timestamps."""
+    def _splice_live(frozen_df, live_df):
+        """Append live bars onto the parquet's price scale. Returns (df, offset).
+
+        The parquet is back-adjusted: update_ibkr_daily fetches ContFuture and shifts
+        each batch so the series stays continuous across contract rollovers, which is
+        what EMA/ATR/chandelier need. fetch_bars returns the RAW front-month contract.
+        The two are not the same scale — measured 2026-08-04 at the same timestamp:
+        MES 12.25, MNQ 88.75, MYM -39.00, M2K 9.20 points apart.
+
+        The old version concatenated them and let live win on duplicate timestamps, so
+        the recent end of the series stepped by that amount — right where the signal is
+        computed. On 2026-08-03 the live path opened MES at 7,634.75 while a replay of
+        the parquet alone held no MES position at any cutoff, including the minute the
+        order went in.
+
+        Fixed two ways: take only bars AFTER the parquet ends (no overwriting real
+        history), and shift them by the same anchor update_ibkr_daily uses —
+        parquet's last close minus the first new bar's open.
+
+        The offset is returned, not swallowed: signal levels come out in adjusted
+        space and have to be converted back before they become order prices. See
+        signal_layer.to_candidate.
+        """
+        frozen = _strip_tz(frozen_df)
         if live_df is None or live_df.empty:
-            return _strip_tz(frozen_df)
-        merged = pd.concat([_strip_tz(frozen_df), live_df])
-        return merged[~merged.index.duplicated(keep="last")].sort_index()
+            return frozen, 0.0
+        after = live_df[live_df.index > frozen.index[-1]]
+        if after.empty:
+            return frozen, 0.0
+        offset = float(frozen["close"].iloc[-1]) - float(after["open"].iloc[0])
+        adj = after
+        if abs(offset) > 1e-9:
+            adj = after.copy()
+            for col in ("open", "high", "low", "close"):
+                if col in adj.columns:
+                    adj[col] = adj[col] + offset
+        return pd.concat([frozen, adj]).sort_index(), offset
 
     def _to_session_naive(live_et_df):
         """Move ET-naive IBKR bars onto the NKD session wall clock (JST), tz-naive.
@@ -276,13 +307,17 @@ def main():
         out.index = aware.tz_convert(c_nkd.session_tz).tz_localize(None)
         return out.sort_index()
 
-    def _concat_nkd_live(frozen_nkd_df, live_nkd_et):
-        """Merge frozen NKD parquet + IBKR NKD bars, both on the JST session clock."""
+    def _splice_nkd_live(frozen_nkd_df, live_nkd_et):
+        """NKD: put the live bars on the JST clock first, then splice as for the rest.
+
+        NKD carries the largest scale gap of the basket — TASK.md recorded +1065.0 at
+        the 2026-07-06 splice — so it needs the price adjustment at least as much as
+        Rổ 4. The clock conversion has to happen first or the anchor bar is picked
+        from the wrong moment.
+        """
         if live_nkd_et is None or live_nkd_et.empty:
-            return _strip_tz(frozen_nkd_df)
-        merged = pd.concat([_strip_tz(frozen_nkd_df),
-                            _to_session_naive(live_nkd_et)])
-        return merged[~merged.index.duplicated(keep="last")].sort_index()
+            return _strip_tz(frozen_nkd_df), 0.0
+        return _splice_live(frozen_nkd_df, _to_session_naive(live_nkd_et))
 
     # ── signal_fn — Option C ─────────────────────────────────────────────────
     # Calls generate_today_signals() with concat(frozen_parquet + live_IBKR_bars).
@@ -299,12 +334,16 @@ def main():
         def signal_fn(day, bars, held):
             day_ts = pd.Timestamp(day).normalize()
 
-            # concat frozen parquet + live bars from IBKR (Mismatch A+B fix)
-            concat_swing = {
-                inst: _concat_live(dfs[inst], bars.get(inst))
-                for inst in dfs
-            }
-            concat_nkd = _concat_nkd_live(ndf, bars.get(NKD_INST))
+            # Splice live bars onto the parquet's back-adjusted scale (Mismatch A+B
+            # fix, plus the price-scale fix). Offsets are kept so signal levels can be
+            # converted back to raw before they become order prices.
+            concat_swing, _offsets = {}, {}
+            for inst in dfs:
+                concat_swing[inst], _offsets[inst] = _splice_live(dfs[inst], bars.get(inst))
+            concat_nkd, _offsets[NKD_INST] = _splice_nkd_live(ndf, bars.get(NKD_INST))
+            _nz = {k: round(v, 2) for k, v in _offsets.items() if abs(v) > 1e-9}
+            if _nz:
+                log.info("[sig]  live-bar price offsets (adjusted - raw): %s", _nz)
 
             return generate_today_signals(
                 swing_engine=swing_engine,
@@ -324,6 +363,7 @@ def main():
                 contracts_by_inst=contracts_by,
                 today=day_ts,
                 active_clusters=_active_clusters,
+                price_offsets=_offsets,
             )
 
     # ── --print-signals: connect + fetch + compute signals, no orders ──────────
