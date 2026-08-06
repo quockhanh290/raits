@@ -1181,7 +1181,8 @@ imbalance_coverage.parquet, imbalance_features.parquet, imbalance_test_results.p
 ---
 
 ## Sub-task: STP không tồn tại ở IBKR dù runner báo đã đặt (2026-08-05)
-Status: F0–F6 DONE (đã gate đầy đủ) — bracket order CHƯA LÀM — việc tay TWS CHƯA XONG
+Status: F0–F6 + nắn tick DONE (đã gate đầy đủ, 6 commit) — vị thế sống đã sửa xong và
+xác minh — **bracket order CHƯA LÀM** là việc còn lại duy nhất của sub-task này
 
 ### Triệu chứng
 Dashboard chỉ hiện 2 STP, đều là lệnh cũ. `live_positions.json` có 3 vị thế với
@@ -1255,10 +1256,50 @@ pytest 8 suite **80 passed** · test_ibkr_injection **14/14** ·
 lỗi có sẵn không đổi: test_operational_fixes 7 FAIL, test_event_playback 9 FAIL,
 test_rollover 1 FAIL — giống hệt HEAD.
 
+### ROOT CAUSE THẬT tìm được khi chạy repair trên tài khoản sống (2026-08-06)
+**IBKR code 110 — giá không đúng bước giá.** Mức chandelier là số liên tục, không mức nào
+nằm trên lưới tick: 7758.86 (MES tick 0.25) · 54708.68 (MYM tick 1.0) · 3038.44 (M2K tick 0.1).
+IBKR từ chối cả ba hôm 05/08; `place_stop` đọc lại orderId của chính mình nên ghi "placed".
+Đây là câu trả lời cho câu hỏi mà 3 commit trước chưa trả lời được: stop **chưa bao giờ được nhận**.
+F1 đã tự chứng minh giá trị — nó báo cú từ chối thay vì giấu.
+
+- [x] `_round_stop_to_tick(inst, direction, price)` — nắn về lưới tick, **hướng ra xa thị trường**
+      (LONG làm tròn xuống, SHORT làm tròn lên). Tròn về phía thị trường sẽ thắt stop chặt hơn
+      mức đã sizing, và ở gần giá có thể đẩy xuyên qua → nổ ngay. Inst lạ → giữ nguyên.
+- [x] Log `place_stop` in **giá đã gửi**, không phải giá yêu cầu.
+
+### Ba lỗi cùng họ, phát hiện khi DÙNG công cụ trên tài khoản sống (không phải khi đọc code)
+- [x] `get_working_stops` + `has_working_stop` dùng danh sách **loại trừ** → lệnh kẹt ở
+      `PendingSubmit` (hình dạng của lệnh bị từ chối) được tính là đang bảo vệ. B4 và F5 đều
+      đọc hai hàm này. Nay yêu cầu `PreSubmitted`/`Submitted`.
+- [x] `cancel_order` trả `True` ngay sau `cancelOrder` mà không kiểm lệnh đã rời sổ.
+      MYM #10 bị "hủy" 2 lần, báo thành công 2 lần, vẫn sống. Nay poll trạng thái terminal,
+      thất bại → `False` + hướng dẫn dùng TWS. **Kết luận: hủy chéo client bị từ chối.**
+- [x] `classify` gọi OK cho vị thế vừa có stop đúng chiều vừa có stop sai chiều → công cụ in
+      "every position protected" trong khi một stop nhân đôi vị thế đang sống. Nay báo `HAZARD`.
+
+### Công cụ
+- [x] `check_open_orders.py` — chẩn đoán, read-only, exit 1 nếu có khe hở. Verdict:
+      OK / HAZARD / WRONG-WAY / NAKED / ORPHAN.
+- [x] `repair_stops.py` — sửa; dry-run mặc định, `--execute` mới gửi. Đi qua
+      `IBKRBroker.place_stop`/`cancel_order` nên mỗi lần sửa cũng là một lần nghiệm thu F1.
+      Hai từ chối không ghi đè được: stop sai phía thị trường, và stop trùng trên cùng contract.
+
+### Trạng thái sống sau khi sửa (2026-08-06 ~01:30 local)
+MES SELL #9 @7627.25 · MYM BUY #12 @54709.00 · M2K BUY #14 @3038.50 — cả ba đúng chiều.
+- [x] **MYM SELL #10 @53290 ĐÃ HỦY.** Không cần TWS, không cần restart: IBKR chỉ nhận lệnh
+      hủy từ **chính clientId đã đặt**. Thử từ 1/77/82 đều bị từ chối im lặng; nối lại bằng
+      `--client-id 93` (id đã đặt nó) thì hủy được ngay lần đầu.
+      `cancel_order` nay in `clientId` chủ trong thông báo lỗi để lần sau biết đường chạy.
+- [ ] **Scheduler đang TẮT** (đã dừng PID 4960 để chạy repair). Bật lại:
+      `python -m global_index.run_scheduler --port 4002`
+- MES giữ stop 7627.25 thay vì 7758.86 (rộng hơn 131 điểm) — quyết định giữ nguyên,
+      vì thay nghĩa là có một khoảng không stop, và 7758.86 chỉ cách giá ~3 điểm.
+
 ### Next steps
 - [ ] **Bracket order** (khảo sát xong, chưa làm) — xem Key decisions.
-- [ ] Verify live phiên kế: log phải có `place_stop: accepted ... status=PreSubmitted`;
-      `check_open_orders.py` phải thấy đủ STP khớp số vị thế.
+- [ ] Verify live phiên kế: log phải có `place_stop: accepted ... status=PreSubmitted`
+      (và dòng `stop X → Y (tick Z)` nếu có nắn); `check_open_orders.py` exit 0.
 
 ### Key decisions
 - **Bracket khả thi**: `stop_price` là mức cố định lúc entry, **không ratchet**
@@ -1272,11 +1313,14 @@ test_rollover 1 FAIL — giống hệt HEAD.
 - Chưa xác minh được (cần phiên live): IBKR có nhận parent MKT trong bracket không; child STP
   còn sống hay tự hủy khi ta đóng vị thế bằng lệnh MKT riêng.
 
-### Việc tay còn treo
-- [ ] Hủy order 10 (`SELL MYM STP @53290`) trong TWS — sẽ nhân đôi short nếu fire.
-- [ ] Quyết order 9 (`SELL MES STP @7627.25`) — đúng hướng nhưng rộng hơn mức tính 7758.86.
-- [ ] M2K SHORT không có stop.
-- [ ] Sau khi dọn: set `stop_order_id` về `null` trong `live_positions.json` cho khớp thực tế.
+### Việc tay — ĐÃ XỬ LÝ XONG bằng repair_stops.py (2026-08-06 ~01:30 local)
+- [x] Hủy order 10 (`SELL MYM STP @53290`) — **không cần TWS**: nối bằng `--client-id 93`
+      (id đã đặt nó). Thử từ 1/77/82 đều bị từ chối im lặng.
+- [x] MYM có BUY STP #12 @54709.00 · M2K có BUY STP #14 @3038.50 — đặt được sau khi vá tick.
+- [x] `stop_order_id` trong `live_positions.json` cập nhật theo (backup `.json.bak`).
+- [x] Order 9 (`SELL MES @7627.25`): **quyết định giữ nguyên**. Đúng chiều, có bảo vệ.
+      Thay nó nghĩa là có một khoảng không stop, và mức đúng 7758.86 chỉ cách giá ~3 điểm
+      nên nhiều khả năng bị quét ngay. Rủi ro rộng hơn dự tính 131 điểm — đã biết, có giới hạn.
 
 ### Lỗi có sẵn phát hiện lúc chạy gate (KHÔNG do phiên này, đã kiểm bằng stash)
 - `test_rollover.py::test_ro6_maxhold_then_rollover_no_conflict` đỏ y hệt trên HEAD.
@@ -1284,7 +1328,87 @@ test_rollover 1 FAIL — giống hệt HEAD.
   trước và sau thay đổi.
 
 ### Files touched
-global_index/runner.py, global_index/test_stp.py, global_index/test_maxhold.py, TASK.md
+`global_index/`: runner.py · ibkr_broker.py · broker.py · check_open_orders.py (mới) ·
+repair_stops.py (mới) · test_stp_accept.py (mới) · test_stp.py · test_maxhold.py
+Gốc: TASK.md · SCRATCHPAD.md
+
+### Commits
+```
+03df38c fix(stp): a failed cancel names the clientId that can actually do it
+6a39c58 fix(stp): round stop prices to the tick grid — the actual cause of the naked positions
+eb5309f feat(stp): repair tool, and fix instrument-name lookup for NKD stops
+80d2bae test(stp): replace an acceptance criterion that could never fail
+c40b136 fix(stp): detect naked positions from broker truth, not from a local field
+fdfad29 fix(stp): place_stop confirms IBKR accepted the order instead of its own id
+```
+
+---
+
+## Sub-task: Slot NKD đêm không chạy — ROOT CAUSE xác định (2026-08-06)
+Status: ĐIỀU TRA XONG — CHƯA VÁ
+
+### Triệu chứng
+0/22 slot NKD đêm (01:10–02:55 ET) chạy đêm 05→06. **Không một dòng log nào** sau 16:00 ET
+hôm trước, kể cả misfire. Tiến trình vẫn sống (PID 4960, 4 luồng Wait, CPU 2.4s/15h).
+Job có đăng ký đủ vào đúng instance đang chạy (09:26:19), cờ pre-flight 05/08 = true,
+thứ Năm là ngày làm việc. Suy giảm: 08-03 chạy 22 slot → 08-04 chạy 4 → 08-05 chạy 0.
+
+### ROOT CAUSE
+`threading.Event.wait(timeout)` trên Windows đếm bằng đồng hồ **không chạy khi máy ngủ**.
+`BlockingScheduler` chờ **một lần dài** tới job kế (14:00:28 → 23:10:00 = ~9h10m), nên mỗi
+giây máy ngủ đẩy lùi hạn chờ đúng một giây — **kể cả khi máy đã thức lại từ lâu**.
+
+**Kiểm chứng định lượng (đêm 04→05, có số đối chứng độc lập):**
+- Tổng ngủ trong khoảng chờ: **1:27:37** (Power-Troubleshooter)
+- Dự đoán thức: 23:10:00 + 1:27:37 = **00:37:37**
+- APScheduler thực tế xử lý job: **00:37:22** → lệch **15 giây**
+
+**Áp cho đêm 05→06:** ngủ 19:10:56–22:02:23 (2h51m27s) + 23:20:50–00:03:11 (42m21s)
+→ hạn 23:10 bị đẩy tới **02:43:48**, sau khi cửa sổ đêm đóng lúc 00:55.
+
+⚠️ Giấc ngủ lúc **19:10 chiều** — thời điểm không có job nào — đã vô hiệu hóa **toàn bộ**
+cửa sổ đêm 4 tiếng sau đó. Không cảnh báo nào vì không có gì hỏng; nó chỉ đang chờ.
+
+### Giả thuyết đã bị bác bỏ dọc đường
+- ~~Job không đăng ký~~ — có đủ 22 job lúc 09:26:19.
+- ~~Cờ pre-flight chặn~~ — cờ 05/08 = true, và slot bị chặn sẽ LOG "SKIPPED" (đêm 04 có log đó).
+- ~~Máy ngủ suốt cửa sổ~~ — máy thức ở 23:10, 23:15 và 00:05–00:55.
+- ~~Đo bằng `Kernel-Power 42/107`~~ — nguồn này chỉ ghi 11 giây trong khi thực tế 3h33m.
+  Nguồn đúng: **`Microsoft-Windows-Power-Troubleshooter`** (Sleep/Wake Time, UTC).
+
+### Next steps — ba việc, CHƯA LÀM, chờ quyết định
+
+**(b) Nửa môi trường — BẮT BUỘC, làm trước, rẻ nhất**
+- [ ] Đặt máy không ngủ khi chạy pin: `powercfg /setdcvalueindex SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 0`
+      rồi `powercfg /setactive SCHEME_CURRENT`. Hiện DC = 0x258 (600s), AC = 0 (không bao giờ).
+- [ ] Kiểm tra lại: `powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE`
+- ⚠️ Không bản vá code nào chạy được job khi máy đang ngủ. Phiên ngủ 23:20–00:03 trùng cửa sổ
+      đêm → mất 8 slot bất kể vá gì. Đây là máy cá nhân nên là quyết định của user, không tự đổi.
+
+**(a) Nửa code — biến "im lặng 10 tiếng" thành "trễ vài phút, có log"**
+- [ ] Heartbeat job trong `make_scheduler()`: cron mỗi 1–5 phút, chỉ `log.debug`. Mục đích duy
+      nhất là chặn trần `wait_seconds` của `BlockingScheduler._main_loop`, để sau khi máy thức
+      scheduler đánh giá lại trong vài phút thay vì vài giờ.
+- [ ] `misfire_grace_time` cho slot NKD đêm: đủ cho trễ vài phút vẫn chạy
+      (`diff_desired_vs_held` idempotent — xem docstring `_live_day_body`), nhưng KHÔNG cho slot
+      trễ hàng giờ chạy khi cửa sổ đã đóng. Mặc định APScheduler = 1s → hiện đang bỏ hẳn.
+- [ ] Cảnh báo khi phát hiện trượt: nếu `now - scheduled_time > ngưỡng`, log WARNING kèm số giây.
+      Không có cái này thì lần sau vẫn không ai biết.
+- [ ] Test + gate reconcile như thường lệ (sửa `run_scheduler.py`, không đụng runner/engine).
+
+**(c) Cân nhắc thay kiến trúc — chỉ sau khi (a)+(b) chạy ổn vài đêm**
+- [ ] Windows Task Scheduler với *"wake the computer to run this task"*. Đây là cơ chế **duy
+      nhất** khiến máy TỰ THỨC để chạy job — APScheduler không làm được dù vá thế nào.
+      Đánh đổi: mất mutex `_slot_lock` trong tiến trình, phải thay bằng lock trên file/mutex OS.
+
+### Việc vận hành đang treo
+- [ ] **Scheduler đang TẮT** — tôi dừng PID 4960 lúc ~00:50 để chạy repair_stops.
+      Bật lại trong terminal của user (không phải qua tool, kẻo thành tiến trình con):
+      `python -m global_index.run_scheduler --port 4002`
+
+### Files touched
+global_index/run_scheduler.py (chưa sửa), TASK.md, SCRATCHPAD.md
+
 
 ---
 
@@ -1942,3 +2066,203 @@ tín hiệu. MNQ 88.75 điểm = 0.30%, thừa sức tạo breakout/EMA-cross gi
 `p0c_verify_swing.py` dùng **cùng hàm concat** nên tái tạo đúng chuỗi hỏng rồi báo "khớp".
 Kết quả P0c swing (MYM/M2K 2026-07-30 ✅) **bị vô hiệu** — phải verify lại sau khi sửa.
 Cùng số phận với P0c MNKD đã vô hiệu vì bug múi giờ. L10 lần thứ ba trong một phiên.
+
+---
+
+## Sub-task: Sweep chandelier_atr_mult (2026-08-05) — GIỮ 2.5
+Status: DONE — đo xong, KHÔNG đổi
+
+### Câu hỏi
+Chandelier chiếm 79.5% số lệnh thoát, trung bình −$48.84; MAX_HOLD 15.1% nhưng
++$398.60 — toàn bộ lãi nằm ở MAX_HOLD. Stop chỉ ratchet lên trên entry 1.6% số lần,
+98.4% thoát dưới giá vào. Đo MFE: **mọi** lệnh chandelier đều từng có lãi (median
+$64.50, p90 $267.40) rồi trả lại hết. Siết dải trượt để giữ phần đó có đáng không?
+
+### Đo — scratchpad/sweep_chand.sh (deploy_sim CLI, không phải harness tự viết)
+2-tick + frozen_sim + spy_daily_live.csv + end 2024-12-31 + n=1. `--nkd-mult` giữ 2.5.
+**Self-check: dòng 2.5 tái lập chính xác baseline $42,459 / Calmar 1.72.**
+
+| mult | net$ | Calmar | Sharpe | PF | MaxDD$ | swing t/r |
+|---|---|---|---|---|---|---|
+| 1.0 | 49,845 | 1.16 ✗ | 1.43 | 1.44 | 6,217 (12.4%) | 2469/27 |
+| 1.5 | 48,118 | 1.27 ✗ | 1.51 | 1.45 | 5,478 (11.0%) | 2310/186 |
+| 2.0 | 43,469 | 1.46 ✗ | 1.52 | 1.44 | 4,315 (8.6%) | 2079/417 |
+| **2.5 (hiện tại)** | **42,459** | **1.72** | 1.67 | 1.48 | 3,574 (7.1%) | 1799/697 |
+| 3.0 | 37,868 | 1.50 ✗ | 1.65 | 1.48 | 3,653 (7.3%) | 1578/918 |
+| 3.5 | 36,684 | 1.96 | 1.76 | 1.53 | 2,702 (5.4%) | 1402/1094 |
+| 4.0 | 31,805 | 1.84 | 1.66 | 1.50 | 2,500 (5.0%) | 1270/1226 |
+| 5.0 | 24,644 | 1.56 ✗ | 1.60 | 1.45 | 2,287 (4.6%) | 1093/1403 |
+
+✗ = trượt sàn 1.65
+
+### KẾT LUẬN: GIỮ 2.5 — không arm nào ứng cử được, KHÔNG chạy vault
+- **net$ và MaxDD đơn điệu** theo mult (đường biên đánh đổi sạch). **Calmar/Sharpe/PF
+  nhấp nhô**: 1.46 → 1.72 → **1.50** → 1.96 → 1.84. Hai arm cạnh nhau lệch 0.46 →
+  nhiễu của chính thước đo cỡ ±0.2, vì mẫu số MaxDD là **một sự kiện đơn lẻ**.
+- 3.5 hơn ở 3/4 chỉ số nhưng chênh Calmar nằm trong nhiễu đó, còn net$ thua rõ 14%.
+  Chọn 3.5 = nhặt số đẹp từ mẫu số nhiễu → curve fitting. Vault để **xác nhận** ứng
+  viên, không phải để **tìm** ứng viên → không chạy.
+
+### ⚠️ Nhiễu hai chiều — sweep này KHÔNG cô lập được "khoảng trượt"
+`mult` vừa đặt khoảng stop **vừa là mẫu số risk$ mỗi lệnh** (`mult × ATR × point_value`).
+Nới stop → mỗi lệnh đắt hơn trong ngân sách cụm → gate đá ra từ **27 lên 1,403** lệnh
+(56% tín hiệu). Phần net$ giảm khi nới stop có phần đáng kể chỉ do **ít lệnh được vào**.
+Rủi ro mỗi lệnh giảm nhưng rủi ro **danh mục** tăng (nhiều vị thế đồng thời) → MaxDD 12.4%.
+
+**Muốn thu phần lãi đang trả lại thì phải TÁCH tham số làm hai** — một hệ số cho stop
+ban đầu (định risk$/sizing) + một hệ số riêng cho dải trượt. Đó là sửa thiết kế engine,
+phải qua OOS cả hai vault, KHÔNG phải một sweep.
+
+---
+
+## Sub-task: Đọc log scheduler 2026-08-05 — 3 phát hiện
+Status: phiên chạy sạch; 3 việc chưa xử
+
+### Phiên hôm nay OK
+14:10 ET đóng MES+MYM (MAX_HOLD), fill thuận lợi (MES tốt hơn stop 144.25đ, MYM 1412đ).
+Equity 49,994 → **51,851** (+$1,857). 14:40 ET vào MES LONG / MYM SHORT / M2K SHORT,
+**cả ba đặt được stop ngay** (orderId 62/66/70) — khác hôm qua.
+
+### 1. `maxhold_exit` 09:31 ET KHÔNG chạy hôm nay
+Scheduler tắt 02:55 ET (hết slot NKD đêm), sáng bật lại **09:43 ET** — sau cron 12 phút,
+job im lặng bỏ qua. Hai lệnh MAX_HOLD vẫn thoát nhưng qua `run_live_day` lúc **14:10 ET**,
+**muộn hơn quy ước backtest 4h40** (mốc 09:30 ET mà INVARIANTS đã cố định).
+Gốc: scheduler bật tay mỗi sáng; bật sau 07:31 giờ máy → mất job, **không cảnh báo**.
+
+### 2. 11 slot bị SKIP — đúng thiết kế nhưng mất một nửa nhịp
+Mỗi lần chạy 5.5 phút, slot cách 5 phút → cứ một slot chạy thì slot kế bị bỏ.
+Nhịp thực **10 phút, không phải 5**.
+
+### 3. G2 HARD lặp mỗi lần chạy
+`model 20 months old (fit_end=2024-12-31) — re-freeze immediately` — mức HARD, xuất hiện
+ở **mọi** lần chạy, hệ thống vẫn giao dịch. Guard đang bị vô hiệu hoá trên thực tế.
+
+---
+
+## Sub-task: Chi phí skip slot + cắt cửa sổ replay (2026-08-05)
+Status: ĐO XONG — chưa triển khai
+
+### Skip KHÔNG mất tín hiệu (trace code)
+`desired_position()` chạy lại **toàn bộ backtest trên dữ liệu-đến-hiện-tại**
+(swing_tf.py:47) → idempotent, slot sau tái tạo đúng mục tiêu. Stop là `ibi.StopOrder`
+GTC **nằm sẵn ở IBKR** (ibkr_broker.py:807) → kích hoạt liên tục, không cần scheduler.
+CHANDELIER = 79.5% số lần thoát → **nằm ngoài tầm ảnh hưởng của skip**.
+
+### Phần bị ảnh hưởng: giá vào lệnh (MarketOrder, ibkr_broker.py:514)
+Đo trên 2,493 lệnh vào 2018-2024 (scratchpad/slot_delay_cost.py):
+
+| độ trễ | tổng | tb/lệnh | % bị thiệt | p90 xấu |
+|---|---|---|---|---|
+| 5 phút | $2,769 | $1.11 | 53.7% | $28.50 |
+| 10 phút | $5,132 | $2.06 | 53.3% | $36.25 |
+| 15 phút | $8,440 | $3.39 | 53.1% | $42.50 |
+
+Trễ 5 phút **không tránh được** (runtime 5.5 phút). Phần **do skip**:
+**$5,132 − $2,769 = $2,363 / 7 năm ≈ $338/năm**. 53% bị thiệt = gần như tung đồng xu;
+median $2.00 = đúng một tick. Thật nhưng nhỏ.
+
+### Giãn slot 5→6 phút KHÔNG giải quyết
+Hiện tại (lưới thực 10 phút): trễ luân phiên 5.4 / 10.4 → **tb 7.9 phút**.
+Slot 6 phút (không bỏ slot nào): 5.5 + chờ tb 3.0 → **tb 8.0 phút**. Bằng nhau —
+**runtime 5.5 phút mới chi phối**, không phải khoảng cách slot.
+
+### Runtime đi đâu (từ log)
+parquet 1s · **fit lại HMM 13s** (n_init=10, model frozen ≤2024-12-31, không bao giờ đổi) ·
+IBKR+reconcile 4s · **`run_day` 5 phút 03** · đặt lệnh 8s.
+`run_day` = `backtest_swing_tf` phát lại **8 năm × 4 instrument**, gọi `TrendFollowStrategy`
+từng bar (_validated_core.py:236) — 3,910 dòng log/lần chạy.
+
+### Cắt cửa sổ — ĐO ĐƯỢC (scratchpad/warmup_confirm.py)
+So `desired_position` bản cắt vs bản đầy đủ, 41 mốc as-of × 4 instrument:
+
+| W (phiên) | phép so | khớp | lệch |
+|---|---|---|---|
+| 20 | 164 | 163 | 1 (MYM 2021-02-04) |
+| **60** | 164 | **164** | **0** |
+| 120 | 164 | 164 | 0 |
+
+Tốc độ 1 instrument: đầy đủ (2,488 phiên) **86.0s** · W=60 **1.49s** · W=120 **4.62s**
+→ 4 instrument ở W=120 ≈ **18.5s** (vs 344s). `run_day` xuống dưới 1 phút → hết skip,
+độ trễ tb 7.9 → ~3 phút.
+
+### Cơ chế — vì sao cần ~60 phiên (đọc từ code, không phải mò)
+Toàn bộ phụ thuộc lịch sử của engine nằm ở ĐÚNG HAI chỗ:
+- `datr = daily_atr_series(df)` (_validated_core.py:209, dùng ở :290) — ATR ngày cho dải
+  chandelier, làm trơn kiểu Wilder → cần ~56 phiên để hội tụ
+- `pos` — vị thế đang mở, tối đa **5 ngày** (MAX_HOLD)
+
+EMA + ATR sinh tín hiệu vào lệnh tính TRONG MỘT NGÀY trên bar 5 phút
+(`hist = bars5.loc[:idx[n]]`, `bars5 = b5[day]`, :344-348) → **không cần lịch sử**.
+`hl`/`b5`/`ts` độc lập theo ngày (`groupby`, :219). Vòng lặp carry đúng một biến: `pos`.
+
+→ Nhu cầu thật ~60 phiên. Đo thực nghiệm ra đúng vậy (20 lệch, 60 khớp).
+**Cơ chế và số đo trùng nhau.** Chọn **250 phiên (1 năm) = dư 4 lần.**
+
+| N phiên | 4 instrument | run_day |
+|---|---|---|
+| hiện tại (2,488) | 331s | 5m03 |
+| 250 | ~33s | **~1m07** |
+
+### Các phương án đã cân nhắc và LOẠI
+| cách | thời gian | cache đĩa | vì sao loại |
+|---|---|---|---|
+| cache prep ra đĩa | 198s | **489 MB** | chỉ cắt 42%, biên còn 1 phút; 489 MB phải huỷ đúng lúc |
+| checkpoint + replay hôm nay | ~1s | ~1 MB | chính xác nhất nhưng **đổi luồng chạy** `_validated_core.py` + state lưu trữ |
+| **cắt 250 phiên ở tầng gọi** | **~33s** | **không** | ĐƯỢC CHỌN — stateless, không đụng engine |
+| giãn slot 5→6 phút | — | — | tb 8.0 phút vs 7.9 hiện tại; runtime mới chi phối |
+
+Đo phụ trợ: prep 34.67s (42%) / loop 48.11s (58%) / cache 122 MB per instrument;
+ghi đĩa 0.70s, nạp 1.52s. Tức cache prep LÀ net win nhưng không đủ biên.
+
+---
+
+## 🎯 KẾ HOẠCH — cắt cửa sổ replay (chốt 2026-08-06)
+Status: TODO — chưa sửa dòng code nào
+
+### Nguyên tắc quyết định mọi thứ
+**Chỉ sửa đường live. KHÔNG đụng `_validated_core.py`.**
+Cắt `df` trong `run_live_day` TRƯỚC khi gọi `desired_basket`. Engine không đổi một dòng
+→ baseline $42,459 / Calmar 1.72 / sàn 1.65 / cả hai vault **không đổi theo cấu tạo**,
+không cần chứng minh. Chỉ còn một câu hỏi: vị thế mong muốn trên 250 phiên có giống hệt
+trên toàn lịch sử không?
+
+### Bước 1 — hoàn thiện phép đo (CHƯA sửa code)
+Test hiện tại (`scratchpad/warmup_confirm.py`) có 4 lỗ hổng, phải vá hết:
+- [ ] So cả **`stop`** — hiện chỉ so (chiều, giá vào, ngày vào). `desired_position` trả cả
+      `stop` và đó là số đi ra sàn thành lệnh STP. Phải chạy `desired_position` bản ĐẦY ĐỦ
+      tại từng mốc (không đọc tắt từ trade list baseline như hiện nay)
+- [ ] **Mọi phiên** as-of, không lấy mẫu 41 mốc/instrument
+- [ ] Phủ **MNKD** (engine khác + lịch JST) — chưa đo dòng nào
+- [ ] Chạy trên **parquet live 2025-2026** (gồm vùng repair), không chỉ frozen 2018-2024
+
+**CỔNG: 0 lệch ở W=250. Không đạt → DỪNG, không có bước 2.**
+
+### Bước 2 — sửa code, MỘT chỗ
+- [ ] `run_live_day`: cắt df còn 250 phiên trước khi gọi `desired_basket`
+- [ ] `_validated_core.py` KHÔNG đụng
+
+### Bước 3 — no-harm (script có sẵn, không xây mới)
+- [ ] `deploy_sim` = $42,459 / Calmar 1.72
+- [ ] `run_smoke_test` diff $0.00
+- [ ] reconcile_gd0 · reconcile_stress · reconcile_nkd · reconcile_swing_desired
+- [ ] pytest 130/130 · injection 14/14
+Kỳ vọng pass hiển nhiên vì engine không đổi — chạy để bắt trường hợp đụng nhầm.
+
+### Bước 4 — chạy song song một phiên live
+- [ ] Mỗi slot tính CẢ HAI đường (đầy đủ + cắt), log nếu lệch.
+      Không tốn thêm gì vì hiện vẫn đang mất 5.5 phút/slot.
+
+### Bước 5 — bật
+- [ ] Xác nhận log hết dòng SKIP
+
+### KHÔNG nằm trong kế hoạch này (độc lập, làm riêng)
+- [ ] **`maxhold_exit` 09:31 ET không chạy** — **ƯU TIÊN CAO HƠN**: lệch quy ước backtest
+      4h40 so với chỉ $338/năm của việc skip slot. Sửa nhanh hơn, giá trị lớn hơn.
+- [ ] **G2 HARD** lặp mỗi lần chạy — guard đang vô hiệu hoá trên thực tế
+- [ ] **Khoá `_swing_cache` = `id(df)`** — lỗi thật, nhưng **KHÔNG chặn** kế hoạch này
+      (cắt ở tầng gọi → mỗi slot vẫn chỉ một DataFrame/instrument, giữ sống suốt tiến trình).
+      ⚠️ Đảo lại phán đoán trước đó trong file này ("PHẢI sửa TRƯỚC") — sai, vì lúc đó tôi
+      giả định cắt cửa sổ sẽ sinh DataFrame tạm liên tục như trong script thí nghiệm.
+
+### Thứ tự đề nghị
+`maxhold_exit` → Bước 1 → Bước 2-5. Bước 1 tốn ~1-2h chạy máy, bước 2 ~30 phút.

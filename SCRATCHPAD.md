@@ -1,5 +1,56 @@
 ## Gotchas
 
+- **Máy ngủ làm scheduler chết câm trong nhiều giờ SAU KHI đã thức lại** (2026-08-06, đo được):
+  `Event.wait(timeout)` của Python trên Windows đếm bằng đồng hồ **không chạy khi máy ngủ**.
+  APScheduler `BlockingScheduler` chờ một lần dài tới job kế, nên **mỗi giây ngủ đẩy lùi hạn
+  chờ đúng một giây** — kể cả khi máy đã thức lại từ lâu.
+  **Đo đêm 04→05 (có đối chứng độc lập):** tổng ngủ 1:27:37 → dự đoán thức 23:10:00+1:27:37
+  = 00:37:37; APScheduler thực tế xử lý job lúc **00:37:22**. Lệch 15 giây.
+  **Đêm 05→06:** ngủ 19:10:56–22:02:23 (2h51m) + 23:20:50–00:03:11 (42m) → hạn 23:10 bị đẩy
+  tới **02:43**, sau khi cửa sổ NKD đêm (23:10–00:55 local) đã đóng. **0/22 slot chạy,
+  0 dòng log, tiến trình vẫn sống và "khỏe".** Suy giảm 08-03: 22 slot → 08-04: 4 → 08-05: 0.
+  ⚠️ Giấc ngủ **buổi chiều** (19:10, lúc không có job nào) vẫn vô hiệu hóa **toàn bộ cửa sổ
+  đêm** 4 tiếng sau. Không có cảnh báo nào vì không có gì "hỏng" — nó chỉ đang chờ.
+  ⚠️ Cặp sự kiện `Kernel-Power 42/107` KHÔNG đủ tin: đêm đó nó chỉ ghi 11 giây (hai lần chợp)
+  trong khi thực tế ngủ 3h33m. Nguồn đúng là **`Microsoft-Windows-Power-Troubleshooter`**
+  (ghi thẳng `Sleep Time` / `Wake Time`, giờ UTC) hoặc `Kernel-Power 130/131` ResumeCount.
+  **L16: process còn sống + CPU thấp + log im ≠ khỏe. Với scheduler, "im lặng" và "chết" nhìn
+  giống hệt nhau — phải có heartbeat mới phân biệt được.**
+
+- **IBKR chỉ cho clientId ĐÃ ĐẶT lệnh được hủy nó** (2026-08-06, đo trực tiếp): MYM STP #10
+  từ chối hủy khi thử từ clientId 1 (runner), 77 và 82 — im lặng, không error, lệnh vẫn
+  `PreSubmitted`. Nối lại bằng **clientId 93** (id đã đặt nó) thì hủy được ngay lần đầu.
+  ⚠️ Hệ quả vận hành: runner luôn dùng `clientId=1` nên stop do nó đặt thì nó hủy được.
+  Nhưng lệnh còn sót từ phiên dùng clientId khác (thử nghiệm tay, script cũ) thì **không
+  công cụ nào hủy được ngoài chính id đó hoặc TWS**. `repair_stops.py --client-id <id>`.
+  `t.order.clientId` cho biết id chủ — `cancel_order` nay in nó trong thông báo lỗi.
+
+- **Giá stop phải nằm trên lưới tick, nếu không IBKR từ chối bằng code 110** (2026-08-06):
+  "The price does not conform to the minimum price variation for this contract".
+  Mức chandelier là số liên tục nên hầu như không bao giờ trên lưới: 7758.86 (MES tick 0.25),
+  54708.68 (MYM tick 1.0), 3038.44 (M2K tick 0.1) — **cả ba bị từ chối**. Đây là nguyên nhân
+  gốc của vụ 3 vị thế trần đêm 05/08, không phải disconnect hay Gateway restart.
+  ⚠️ Nắn tròn phải **ra xa thị trường** (LONG xuống, SHORT lên). Tròn về phía thị trường
+  thắt stop chặt hơn mức đã sizing, và ở gần giá có thể đẩy xuyên qua → nổ ngay khi đặt.
+
+- **`PendingSubmit` KHÔNG phải bằng chứng lệnh tồn tại ở IBKR** (2026-08-06): đó là status
+  ib_insync tự đặt tại `ib.py:673` trước khi IBKR nói gì, và **lệnh bị từ chối nằm y nguyên
+  ở đó**. Mọi bộ lọc "đang hoạt động" phải dùng danh sách **bao gồm**
+  (`PreSubmitted`/`Submitted`), không phải danh sách loại trừ.
+  Tôi đã viết lại đúng lỗi này trong bước VERIFY của công cụ vừa dựng để bắt nó — công cụ in
+  "every position protected" ngay sau khi IBKR từ chối cả hai stop.
+  **L15: dùng danh sách bao gồm cho "còn sống", loại trừ cho "đã chết". Nhầm chiều là mặc định
+  fail-open, và fail-open ở đây nghĩa là vị thế trần được báo là an toàn.**
+
+- **`cancelOrder` là một yêu cầu, không phải kết quả** (2026-08-06): gọi xong rồi trả `True`
+  khiến #10 được báo "cancelled" hai lần trong khi vẫn sống. Phải poll tới trạng thái terminal
+  (`Cancelled`/`ApiCancelled`/`Filled`/`Inactive`) rồi mới kết luận.
+
+- **Vị thế có thể vừa được bảo vệ vừa đang gặp nguy** (2026-08-06): MYM cùng lúc có BUY #12
+  (đúng chiều) và SELL #10 (sai chiều, sót lại từ vị thế LONG cũ). Kiểm tra kiểu "có tồn tại
+  một stop đúng chiều không" báo OK và bỏ qua quả mìn. Phải quét **mọi** lệnh trên contract,
+  không dừng ở lệnh đúng đầu tiên.
+
 - **Một phép kiểm tra không thể đỏ thì không kiểm tra gì cả** (2026-08-05): tiêu chí nghiệm thu
   của lần vá STP 03/08 là `stop_price + stop_order_id ≠ null`. Nhưng `place_stop` trả về
   orderId do **ib_insync tự đúc** (`ib.py:654` — `orderId = order.orderId or self.client.getReqId()`,
@@ -651,3 +702,100 @@ All strategies have LOWER actual Kelly fraction than hardcoded values:
   follow-up on evidence. Reopening needs: DBEQ.BASIC is only 4 small venues (NOT
   consolidated); no consolidated equity feed exists before 2023-03-28; the live
   runtime (5-min cron) cannot execute sub-minute anyway.
+
+## Gotchas (2026-08-05)
+
+- **`_swing_cache` khoá bằng `id(df)`** (`futures/_validated_core.py:206`). `id()` là địa
+  chỉ bộ nhớ; DataFrame tạm bị thu hồi thì cái kế có thể rơi đúng địa chỉ đó → trúng cache
+  của **khung dữ liệu khác**, KHÔNG báo lỗi. Production an toàn *do cách dùng* (giữ df
+  sống suốt tiến trình), không phải do thiết kế. Bất kỳ script nào tạo df tạm rồi thả —
+  sweep, thí nghiệm cắt cửa sổ — đều nhận kết quả rác trông rất hợp lý.
+  **Dấu hiệu nhận biết: thời gian chạy KHÔNG đơn điệu theo kích thước dữ liệu.** Cửa sổ
+  120 phiên chạy 0.58s trong khi 60 phiên mất 1.50s = một cú trúng cache.
+  Cách chữa tạm trong script: `vc._SWING_CACHE.clear()` trước mỗi lần gọi.
+
+- **`spy_daily_live.csv` bị scheduler ghi lại lúc 13:45 ET mỗi ngày.** Mọi phân tích dùng
+  nó chỉ tái lập được cho tới lần pre-flight kế tiếp. Hai bảng chạy cách nhau vài giờ
+  trong cùng một phiên làm việc có thể không so sánh được với nhau. Ghi lại giờ chạy.
+
+- **`deploy_sim` in "Rổ" trong banner → cp1252 khi stdout ghi ra file.** Tính xong toàn bộ
+  rồi mới chết ở dòng `print` cuối. `PYTHONIOENCODING=utf-8` là bắt buộc khi redirect.
+
+- **PowerShell 5.1 biến stderr của native exe thành lỗi chí mạng** khi có
+  `$ErrorActionPreference="Stop"` + `2>&1`. `hmmlearn` in cảnh báo hội tụ ra stderr →
+  giết cả vòng lặp sweep. Dùng Bash loop, hoặc bỏ `2>&1`.
+
+- **Đừng ném stderr vào `/dev/null` trong script chạy dài.** Làm thế một lần và mất trọn
+  một vòng sweep trước khi nhìn thấy lỗi. Cho stderr một file riêng.
+
+- **`grep` không có `--line-buffered` sẽ nuốt tiến độ** khi pipe ra file — script in
+  "instrument X xong" mà không thấy gì suốt cả tiếng, không phân biệt được với treo máy.
+
+- **`sorted(set(index.normalize()))` trên index tz-aware qua DST** cho ra thứ tự không
+  khớp mảng mà `searchsorted` đang dò → lát cắt rơi vào vùng lịch sử khác. Dùng
+  `np.unique(values, return_index=True)` để ranh giới phiên và mảng dò không thể mâu thuẫn.
+
+- **Cắt DataFrame lớn bằng boolean mask trong vòng lặp = kẹt bộ nhớ, không phải nặng CPU.**
+  ~1,000 lần mask trên 2.4M dòng chạy 3 tiếng ở 8% CPU. `searchsorted` + `iloc` cho view.
+  Tải CPU thấp trong lúc chạy tính toán = dấu hiệu sai thiết kế, không phải máy chậm.
+
+## Lessons (2026-08-05)
+
+- **Một lát cắt sai vẫn trả về con số trông hợp lý.** Ba vòng thí nghiệm cắt cửa sổ đều
+  ra bảng đẹp trước khi lộ ra là rác. Thứ phát hiện được chúng không phải là nhìn kỹ hơn
+  mà là **những giá trị bất khả thi** (lát cắt kết thúc 2018 trả về vị thế vào ngày 2024)
+  và **quan hệ không đơn điệu** (cửa sổ lớn hơn chạy nhanh hơn). Mọi thí nghiệm cắt dữ
+  liệu phải mang theo assertion tự kiểm — ở đây là "lát cắt kết thúc đúng ngày as-of".
+
+- **Calmar nhiễu ±0.2 ở quy mô sweep này** vì mẫu số MaxDD là một sự kiện đơn lẻ. Hai arm
+  cạnh nhau lệch 0.46 (mult 3.0 = 1.50, mult 3.5 = 1.96). Đọc sweep theo đại lượng đơn
+  điệu (net$, MaxDD) trước; các tỉ số chỉ dùng để loại, không dùng để chọn.
+
+- **Tham số dùng cho hai việc thì sweep nó không cô lập được gì.** `chandelier_atr_mult`
+  vừa đặt khoảng stop vừa là mẫu số risk$ → nới stop làm gate đá ra 27 → 1,403 lệnh.
+  Kiểm điều này bằng cách nhìn số lệnh taken/rejected mỗi arm TRƯỚC khi diễn giải net$.
+
+- **Không kill tiến trình theo tên.** `Stop-Process -Name python` giết luôn scheduler
+  production (và cả shell của chính tool). Dùng task ID của việc mình khởi động.
+
+## Rejected approaches (2026-08-05)
+
+- **Nới/siết `chandelier_atr_mult` khỏi 2.5 — TỪ CHỐI.** Không arm nào vừa lãi hơn vừa
+  Calmar cao hơn. 3.5 hơn ở 3/4 chỉ số nhưng chênh nằm trong nhiễu của thước đo, net$
+  thua 14%. Xem TASK.md.
+
+- **Giãn slot scheduler 5→6 phút — TỪ CHỐI, đã tính.** Độ trễ trung bình 8.0 phút so với
+  7.9 phút hiện tại. Runtime 5.5 phút mới chi phối, không phải khoảng cách slot. Chỉ làm
+  hết dòng WARNING chứ không lấy lại được tiền.
+
+## Rejected approaches (2026-08-06) — tăng tốc run_day
+
+Đo trước khi chọn: prep 34.67s (42%) / vòng lặp replay 48.11s (58%) / cache 122 MB per
+instrument; ghi đĩa 0.70s, nạp 1.52s. `run_day` hiện 5m03, slot cách 5 phút → skip một nửa.
+
+- **Cache prep ra đĩa — LOẠI.** Giống hệt theo cấu tạo (`_swing_cache(df)` là hàm thuần)
+  và LÀ net win thật (33.15s/instrument), nhưng chỉ cắt 42% → còn ~4 phút, biên 1 phút
+  trên hạn 5 phút. Và đẻ ra 489 MB trạng thái phải huỷ đúng lúc mỗi khi parquet đổi
+  (append hằng ngày + repair). Không đáng.
+
+- **Checkpoint + chỉ replay hôm nay — LOẠI (chưa cần).** Chính xác tuyệt đối về mặt nhân
+  quả, ~1s, cache ~1 MB. Nhưng **đổi luồng chạy** `_validated_core.py` (bỏ qua ngày, nạp
+  `pos` từ ngoài) nên "tác động bằng không" chỉ là kỳ vọng, không phải cấu tạo — yếu hơn
+  hẳn so với sửa khoá cache. Cần shadow mode để bảo chứng. Đuổi theo 1s trong khi 33s đã
+  dư sức giải quyết = tối ưu quá đà.
+
+- **Giãn slot 5→6 phút — LOẠI, đã tính.** Trễ tb 8.0 phút vs 7.9 hiện tại. Runtime 5.5
+  phút mới chi phối, không phải khoảng cách slot.
+
+→ CHỌN: **cắt còn 250 phiên ở tầng gọi** (`run_live_day`), ~33s, stateless, không đụng
+engine. Chi tiết + cổng kiểm: TASK.md mục "KẾ HOẠCH — cắt cửa sổ replay".
+
+## Cơ chế: engine phụ thuộc lịch sử ở đúng hai chỗ (2026-08-06)
+
+Đọc `backtest_swing_tf`: vòng lặp `for day in days:` carry ĐÚNG một biến `pos` (dict 7 số).
+EMA + ATR sinh tín hiệu tính TRONG MỘT NGÀY trên bar 5 phút (`hist = bars5.loc[:idx[n]]`,
+`bars5 = b5[day]`) → **không cần lịch sử**. `hl`/`b5`/`ts` độc lập theo ngày.
+Chỉ còn: `datr` (ATR ngày, Wilder → ~56 phiên hội tụ) + `pos` (tối đa 5 ngày, MAX_HOLD).
+
+→ Nhu cầu warmup thật ~60 phiên. Trùng khớp số đo (W=20 lệch, W=60 khớp). Khi cơ chế và
+số đo hội tụ thì mới được coi là hiểu; một trong hai thôi thì chưa.
