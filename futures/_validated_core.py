@@ -200,9 +200,16 @@ def daily_atr_series(df: pd.DataFrame, period: int = 14) -> pd.Series:
 
 _SWING_CACHE = {}
 
-def _swing_cache(df):
+def _swing_cache(df, datr=None):
     """Precompute per-df: daily ATR, day list, per-day high/low/open arrays (1m),
     per-day 5m frames. Keyed by id(df) so WFO reuses across param/fold calls.
+
+    datr: daily ATR for this instrument's FULL history. Everything else in here
+    is derived per-day and so survives slicing, but the chandelier band reads a
+    daily ATR that is Wilder-smoothed and therefore needs history a slice does
+    not carry. A caller that replays only recent days computes it once on the
+    unsliced frame and passes it in. None keeps the original behaviour — derive
+    it from df — so callers that pass nothing are unaffected.
 
     The entry holds a reference to df, and that reference is what makes the key
     sound: two live objects cannot share an address, so while the entry exists
@@ -212,11 +219,15 @@ def _swing_cache(df):
     cache; runner.py does so after each run_day (J2), which is what bounds
     retention here.
     """
-    k = id(df)
+    # datr is part of the identity: the same frame replayed against a different
+    # ATR history is a different precompute, and serving the first one's entry
+    # would be the id(df) bug again in a new place.
+    k = (id(df), id(datr) if datr is not None else None)
     hit = _SWING_CACHE.get(k)
     if hit is not None:
-        return hit[1]
-    datr = daily_atr_series(df)
+        return hit[2]
+    if datr is None:
+        datr = daily_atr_series(df)
     # real time-gaps: a bar preceded by a break > threshold (maintenance ~60m, weekend,
     # or RTH overnight) is where an overnight PRICE gap can occur. Continuous 1m bars
     # (24h data) have ~1m spacing → no gap flagged except the daily maintenance break.
@@ -236,20 +247,25 @@ def _swing_cache(df):
         day_ts[key] = g.index      # 1m bar timestamps — for entry_time/exit_time capture only
     days = sorted(day_hl.keys())
     cache = dict(datr=datr, days=days, hl=day_hl, b5=day_b5, ts=day_ts)
-    _SWING_CACHE[k] = (df, cache)
+    _SWING_CACHE[k] = (df, datr, cache)
     return cache
 
 def backtest_swing_tf(df, labels, cost, *, ema_period=20, chandelier_atr_mult=3.0,
-                      max_hold_days=5, entry_days=None, gap_fill=True, return_open=False):
+                      max_hold_days=5, entry_days=None, gap_fill=True, return_open=False,
+                      datr=None):
     """Cross-day swing TF backtest (vectorized holding). gap_fill=True models a
     stop that GAPS THROUGH: if the bar that triggers the stop OPENED beyond the
     stop, fill at the (worse) open price, not the stop — realistic for overnight
-    gaps. gap_fill=False = optimistic (always fill at stop, like the RAITS engine)."""
+    gaps. gap_fill=False = optimistic (always fill at stop, like the RAITS engine).
+
+    datr: daily ATR for the instrument's full history, for callers that pass a
+    sliced df. See _swing_cache. None = derive it from df, i.e. the behaviour
+    every existing caller already gets."""
     from raits.strategies.trend_follow import TrendFollowStrategy
     s = TrendFollowStrategy({**TrendFollowStrategy().config, "ema_period": ema_period,
                              "chandelier_atr_mult": chandelier_atr_mult})
     allowed = set(s.config["allowed_regimes"])
-    c = _swing_cache(df)
+    c = _swing_cache(df, datr)
     datr, days, hl, b5, ts = c["datr"], c["days"], c["hl"], c["b5"], c.get("ts", {})
     mult = chandelier_atr_mult
     trades = []
