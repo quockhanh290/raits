@@ -190,6 +190,41 @@ def test_mh6_retry_pending_clears(tmp_path):
     )
 
 
+# ── MH7 ───────────────────────────────────────────────────────────────────────
+
+class _FalseCancelBroker(MockBroker):
+    """cancel_order returns False — how IBKRBroker actually reports failure.
+
+    MH4 covers the raising case. This is the one that happened live on 2026-08-05:
+    no exception, just False, and the runner logged 'cancelled' anyway.
+    """
+    def cancel_order(self, _oid):
+        return False
+
+    def place_stop(self, inst, _d, _c, _sp, _cl):
+        return f"stp-{inst}"
+
+
+def test_mh7_orphan_alert_when_cancel_returns_false(tmp_path):
+    """A stop left working after MAX_HOLD close must be reported, not assumed gone."""
+    broker = _FalseCancelBroker({}, ACCOUNT)
+    runner = _make_runner(broker, pos_path=tmp_path / "pos.json")
+    _inject(runner, entry_day=DAY0, stop_order_id="stp-xyz")
+
+    closed = runner.run_maxhold_exit(DAY5, max_hold_days=5)
+
+    assert ("MES", CLUSTER) in closed, "Position must still be closed"
+    orphan = [e for e in runner._events
+              if e["level"] == "CRITICAL" and e["category"] == "ORDER"]
+    assert orphan, (
+        "cancel_order returned False but no CRITICAL/ORDER event was emitted — "
+        f"orphan stop 'stp-xyz' is invisible. events={runner._events}"
+    )
+    assert "stp-xyz" in orphan[0]["message"], (
+        f"orphan alert must name the order id; got {orphan[0]['message']!r}"
+    )
+
+
 # ── run ───────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":

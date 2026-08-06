@@ -86,6 +86,20 @@ class Broker(ABC):
     def get_order_status(self, order_id: str) -> str:
         """Returns 'FILLED' | 'CANCELLED' | 'PENDING' | 'NOT_FOUND'."""
 
+    def get_working_stops(self) -> "dict | None":
+        """{inst: order_id} for every stop currently working at the broker.
+
+        None means "this broker cannot answer" — callers must not read that as
+        "no stops exist". The distinction matters: B4 uses a populated dict to
+        overrule a locally recorded stop_order_id, and must fall back to the
+        recorded field when the broker is silent rather than declaring every
+        position naked.
+
+        One round trip for all instruments, unlike has_working_stop() which costs
+        a query each — B4 runs on every 5-minute slot.
+        """
+        raise NotImplementedError
+
     def has_working_stop(self, inst: str) -> bool:
         """True if a live (working) stop order exists at the broker for `inst`.
 
@@ -152,3 +166,9 @@ class MockBroker(Broker):
         # MockBroker's place_stop never fails, so a naked position cannot arise in
         # verify mode. False keeps the B4 re-place path exercisable in tests.
         return False
+
+    def get_working_stops(self) -> "dict | None":
+        # None, not {} — MockBroker keeps no order book, so it cannot testify that a
+        # position is unprotected. Returning {} would make B4 call every position naked
+        # during reconcile and change verify-mode behaviour.
+        return None

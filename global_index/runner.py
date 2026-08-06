@@ -423,9 +423,24 @@ class FuturesRunner:
                     # Not a halt condition: state here is certain (both sides agree), and
                     # blocking entries would not protect the position that is already
                     # open. Alert loudly, re-place where provably safe, keep trading.
+                    # A recorded stop_order_id is NOT evidence of a working stop.
+                    # place_stop used to mint the id client-side, so on 2026-08-05
+                    # three naked positions carried ids 62/66/70 and this guard —
+                    # written for exactly that failure — stayed silent. Ask the broker.
+                    # None from get_working_stops means "cannot say": fall back to the
+                    # recorded field rather than calling every position naked (MockBroker
+                    # answers None, which keeps reconcile behaviour unchanged).
+                    try:
+                        _working = broker.get_working_stops()
+                    except (NotImplementedError, AttributeError):
+                        _working = None
+                    except Exception as _e:
+                        _working = None
+                        logger.error("B4: get_working_stops() failed: %s", _e)
                     naked = [p for p in loaded_positions
-                             if p.stop_order_id is None
-                             and broker_key.get((p.inst, p.direction), 0) > 0]
+                             if broker_key.get((p.inst, p.direction), 0) > 0
+                             and (p.stop_order_id is None
+                                  or (_working is not None and p.inst not in _working))]
                     self._b4_naked_stops = [(p.inst, p.cluster) for p in naked]
                     for p in naked:
                         # Only re-place when the level is known AND no stop is already
@@ -760,17 +775,16 @@ class FuturesRunner:
             if _f.status != "FAILED":
                 if p.stop_order_id is not None:
                     try:
-                        self.broker.cancel_order(p.stop_order_id)
-                        logger.info(
-                            "MAX_HOLD_EXIT: cancelled GTC stop orderId=%s for %s/%s",
-                            p.stop_order_id, p.inst, p.cluster,
-                        )
+                        # Returns False on failure; it does not raise. See
+                        # _report_stop_cancel.
+                        _cancelled = self.broker.cancel_order(p.stop_order_id)
                     except Exception as _e:
+                        _cancelled = False
                         logger.error(
-                            "MAX_HOLD_EXIT: cancel_order(%s) FAILED for %s/%s — "
-                            "cancel manually in TWS: %s",
+                            "MAX_HOLD_EXIT: cancel_order(%s) raised for %s/%s: %s",
                             p.stop_order_id, p.inst, p.cluster, _e,
                         )
+                    self._report_stop_cancel(_cancelled, p)
                 self.state.open_positions = [
                     x for x in self.state.open_positions if x is not p
                 ]
@@ -1161,16 +1175,18 @@ class FuturesRunner:
                 # create an unintended position after the LONG/SHORT is gone.
                 if p.stop_order_id is not None:
                     try:
-                        self.broker.cancel_order(p.stop_order_id)
-                        logger.info(
-                            "STP: cancelled GTC stop orderId=%s for closed %s/%s",
-                            p.stop_order_id, p.inst, p.cluster,
-                        )
+                        # cancel_order reports failure by RETURNING False, not by
+                        # raising — so the except below never fired and this logged
+                        # "cancelled" unconditionally. Live 2026-08-05: stops 9 and 10
+                        # stayed working at IBKR for days while the log said otherwise.
+                        _cancelled = self.broker.cancel_order(p.stop_order_id)
                     except Exception as _e:
+                        _cancelled = False
                         logger.error(
-                            "STP: cancel_order(%s) FAILED for %s/%s — cancel manually in TWS: %s",
+                            "STP: cancel_order(%s) raised for %s/%s: %s",
                             p.stop_order_id, p.inst, p.cluster, _e,
                         )
+                    self._report_stop_cancel(_cancelled, p)
 
         # Split entries: same-day (e.g. STRESS_MID OPEN+CLOSE in one session) execute
         # BEFORE H4 equity sync so their pnl is included in the HALT_DAY check.
@@ -1377,10 +1393,50 @@ class FuturesRunner:
 
         # B1: persist positions + breaker state after decide_day updates both
         self._persist_state()
+        # B5: last look before the session ends — every open position must have a stop
+        # that the BROKER confirms. B4 only runs at startup, so without this a stop that
+        # never reached IBKR goes unnoticed until the next slot, or overnight once the
+        # scheduler is done for the day (live 2026-08-05: found by hand that evening).
+        self._audit_working_stops()
         # Write live state to dashboard file (no-op if live_state_path is None)
         self.dump_state(day)
 
         return decision
+
+    def _audit_working_stops(self) -> None:
+        """CRITICAL for any open position the broker holds no working stop for.
+
+        Silent when the broker cannot report (returns None) — MockBroker keeps no order
+        book, so verify/reconcile runs are unaffected. Never raises: this runs after
+        orders are placed and persisted, and an observability failure must not take the
+        session down with it.
+        """
+        try:
+            working = self.broker.get_working_stops()
+        except (NotImplementedError, AttributeError):
+            return
+        except Exception as exc:
+            logger.error("B5: get_working_stops() failed: %s", exc)
+            return
+        if working is None:
+            return
+        for p in self.state.open_positions:
+            if p.inst in working:
+                continue
+            logger.critical(
+                "STP UNPROTECTED: %s %s x%d (%s) is open with no working stop at the "
+                "broker (recorded stop_order_id=%s, stop_price=%s). OPERATOR: place the "
+                "STP manually in TWS or close the position.",
+                p.direction, p.inst, p.contracts, p.cluster,
+                p.stop_order_id, p.stop_price,
+            )
+            self._emit_event(
+                "CRITICAL", "ORDER",
+                f"STP UNPROTECTED: {p.inst} {p.direction} x{p.contracts} ({p.cluster}) "
+                f"open with no working stop at broker",
+                {"inst": p.inst, "direction": p.direction, "cluster": p.cluster,
+                 "stop_order_id": p.stop_order_id, "stop_price": p.stop_price},
+            )
 
     def run_history(self, days):
         """Replay a sequence of days through the broker. Returns realized-pnl series +
@@ -1396,6 +1452,31 @@ class FuturesRunner:
                      halted=self.state.halted, final_equity=self.state.equity))
 
     # ── Operational event log ────────────────────────────────────────────────
+
+    def _report_stop_cancel(self, cancelled: bool, p) -> None:
+        """Log the outcome of cancelling a position's GTC stop — the real outcome.
+
+        A stop that survives its position is not a bookkeeping detail: it is a live
+        order that will open a NEW position in the opposite direction when it fires.
+        Live 2026-08-05 carried two of these (orderId 9 and 10), one of which would
+        have doubled a short rather than closing it.
+        """
+        if cancelled:
+            logger.info("STP: cancelled GTC stop orderId=%s for closed %s/%s",
+                        p.stop_order_id, p.inst, p.cluster)
+            return
+        logger.critical(
+            "STP ORPHAN: cancel_order(%s) returned False for %s/%s — the stop is "
+            "still working at the broker and will open an unintended position when "
+            "it fires. OPERATOR: cancel orderId=%s manually in TWS.",
+            p.stop_order_id, p.inst, p.cluster, p.stop_order_id,
+        )
+        self._emit_event(
+            "CRITICAL", "ORDER",
+            f"STP ORPHAN: {p.inst}/{p.cluster} stop orderId={p.stop_order_id} "
+            f"NOT cancelled — still live at broker, cancel manually in TWS",
+            {"inst": p.inst, "cluster": p.cluster, "order_id": p.stop_order_id},
+        )
 
     def _emit_event(self, level: str, category: str, message: str,
                     context: dict | None = None) -> None:
