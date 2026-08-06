@@ -32,7 +32,12 @@ from global_index.ibkr_broker import _IBKR_TO_RAITS
 # MYM stop against a SHORT MYM position, left over from an earlier LONG.
 PROTECTIVE_SIDE = {"LONG": "SELL", "SHORT": "BUY"}
 
-DEAD_STATUS = ("Filled", "Cancelled", "ApiCancelled", "Inactive")
+# Only these mean IBKR is holding the order and it will fire. PendingSubmit is NOT
+# one of them: it is ib_insync's own initial status (ib.py:673), and an order IBKR has
+# rejected can sit there indefinitely. Counting it as protection is how a verify step
+# reported "every position protected" moments after IBKR refused both stops
+# (live 2026-08-06, code 110).
+LIVE_STATUS = ("PreSubmitted", "Submitted")
 
 
 def load_positions(path: Path, quiet: bool = False) -> list[dict]:
@@ -57,7 +62,7 @@ def working_stops(ib) -> dict:
     out: dict = {}
     for t in ib.openTrades():
         o, s = t.order, t.orderStatus
-        if o.orderType not in ("STP", "STP LMT") or s.status in DEAD_STATUS:
+        if o.orderType not in ("STP", "STP LMT") or s.status not in LIVE_STATUS:
             continue
         sym = t.contract.symbol
         inst = _IBKR_TO_RAITS.get(sym, sym)
@@ -75,6 +80,12 @@ def classify(positions: list[dict], stops: dict) -> list[tuple]:
         matching = [c for c in candidates if c[0] == want]
         if matching:
             rows.append(("OK", inst, direction, matching[0]))
+            # Being protected does not make a wrong-side stop harmless. It is still
+            # live, and firing it opens size in the direction the position already
+            # holds. Live 2026-08-06 held both and the tool called it PASS.
+            for c in candidates:
+                if c[0] != want:
+                    rows.append(("HAZARD", inst, direction, c))
         elif candidates:
             rows.append(("WRONG-WAY", inst, direction, candidates))
         else:
@@ -129,6 +140,11 @@ def main() -> int:
                 print(f"  WRONG-WAY {inst:<6} {direction:<5} → needs "
                       f"{PROTECTIVE_SIDE.get(direction)} STP; broker has {wrong} — "
                       f"would ADD to the position, not close it")
+            elif verdict == "HAZARD":
+                action, oid, px = detail
+                print(f"  HAZARD    {inst:<6} {direction:<5} → {action} STP "
+                      f"orderId={oid} @ {px:.2f} is on the WRONG side and still live — "
+                      f"firing it would ADD to the position. Cancel it.")
             elif verdict == "NAKED":
                 print(f"  NAKED     {inst:<6} {direction:<5} → no working stop "
                       f"(intended level {detail})")

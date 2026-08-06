@@ -153,8 +153,9 @@ def test_sa6_inactive_reports_the_reason():
 
 
 class _CancelTrade:
-    def __init__(self, order_id, done=False):
+    def __init__(self, order_id, done=False, status="PreSubmitted"):
         self.order = type("O", (), {"orderId": order_id})()
+        self.orderStatus = _Status(status)
         self._done = done
 
     def isDone(self):
@@ -180,7 +181,13 @@ class _CancelIB:
         return list(self._cross) if self.req_all_called else []
 
     def cancelOrder(self, order):
+        # A broker that honours the cancel — the normal case. Tests that model a
+        # refusal override this.
         self.cancelled.append(order.orderId)
+        for t in self._cross:
+            if t.order.orderId == order.orderId:
+                t._done = True
+                t.orderStatus = _Status("Cancelled")
 
     def sleep(self, _secs):
         pass
@@ -204,6 +211,31 @@ def test_ca1_cancels_order_from_earlier_session():
     )
     assert ok is True
     assert 9 in fake.cancelled
+
+
+def test_ca4_cancel_that_does_not_take_effect_returns_false():
+    """cancelOrder is a request, not a result.
+
+    Live 2026-08-06: MYM's wrong-side stop #10 was "cancelled" twice, reported True
+    both times, and stayed PreSubmitted at the broker throughout — plausibly because
+    it belongs to another clientId. Returning True there tells the caller a live,
+    dangerous order is gone.
+    """
+    fake = _CancelIB([_CancelTrade(10)])
+    fake.cancelOrder = lambda order: None      # accepted, but nothing changes
+    assert _cancel_broker(fake).cancel_order("10") is False, (
+        "the order is still open after the cancel request — that is not success"
+    )
+
+
+def test_ca5_cancel_that_takes_effect_returns_true():
+    trade = _CancelTrade(10)
+    fake = _CancelIB([trade])
+
+    def _cancel(order):
+        trade._done = True                     # broker acknowledges: order is done
+    fake.cancelOrder = _cancel
+    assert _cancel_broker(fake).cancel_order("10") is True
 
 
 def test_ca2_genuinely_absent_order_returns_false():
@@ -305,6 +337,101 @@ def test_ws3_non_stop_and_dead_orders_excluded():
 def test_ws4_has_working_stop_also_speaks_runner_names():
     fake = _StopsIB([_StopTrade("NKD", 71)])
     assert _cancel_broker(fake).has_working_stop("MNKD") is True
+
+
+def test_ws5_pendingsubmit_is_not_a_working_stop():
+    """An order IBKR refused can sit at PendingSubmit forever.
+
+    Excluding only the dead statuses lets it count as protection, which is how B4 and
+    the end-of-session audit would both report a naked position as covered — live
+    2026-08-06, after IBKR rejected two stops with code 110.
+    """
+    fake = _StopsIB([_StopTrade("M2K", 14, status="PendingSubmit")])
+    assert _cancel_broker(fake).get_working_stops() == {}, (
+        "PendingSubmit is not confirmation that IBKR holds the order"
+    )
+
+
+def test_ws6_has_working_stop_ignores_pendingsubmit_too():
+    fake = _StopsIB([_StopTrade("M2K", 14, status="PendingSubmit")])
+    assert _cancel_broker(fake).has_working_stop("M2K") is False
+
+
+# ── stop prices must land on the contract's tick grid ────────────────────────
+#
+# IBKR rejects an off-tick price with code 110, "The price does not conform to the
+# minimum price variation for this contract". This is what actually killed the stops on
+# 2026-08-05: the chandelier levels 7758.86 (MES, tick 0.25), 54708.68 (MYM, tick 1.0)
+# and 3038.44 (M2K, tick 0.1) are all off-grid, so IBKR refused all three — and
+# place_stop reported success because it never looked.
+#
+# Rounding is away from the market, never toward it: a LONG stop sits below market and
+# rounds down, a SHORT stop sits above and rounds up. Rounding the other way would
+# tighten a stop the sizing never agreed to, and could push it through the market.
+
+
+def _rt(inst, direction, price):
+    broker = IBKRBroker(_raw_fetcher=lambda i, t: None)
+    return broker._round_stop_to_tick(inst, direction, price)
+
+
+def test_tk1_mym_short_rounds_up_to_whole_point():
+    """MYM tick is 1.0; 54708.68 is off-grid and was refused live."""
+    assert _rt("MYM", "SHORT", 54708.68) == pytest.approx(54709.0)
+
+
+def test_tk2_m2k_short_rounds_up_to_tenth():
+    assert _rt("M2K", "SHORT", 3038.44) == pytest.approx(3038.5)
+
+
+def test_tk3_mes_long_rounds_down_to_quarter():
+    """LONG stops sit below market — round down, so the stop never tightens."""
+    assert _rt("MES", "LONG", 7758.86) == pytest.approx(7758.75)
+
+
+def test_tk4_short_long_round_opposite_ways():
+    """Same off-grid price, opposite directions, opposite rounding."""
+    assert _rt("MES", "LONG", 5000.10) == pytest.approx(5000.00)
+    assert _rt("MES", "SHORT", 5000.10) == pytest.approx(5000.25)
+
+
+def test_tk5_on_grid_price_is_unchanged():
+    assert _rt("MES", "LONG", 5000.25) == pytest.approx(5000.25)
+    assert _rt("MYM", "SHORT", 54709.0) == pytest.approx(54709.0)
+
+
+def test_tk6_unknown_instrument_passes_through():
+    """No tick on record → send what we were given rather than invent a grid."""
+    assert _rt("ZZZ", "LONG", 123.456) == pytest.approx(123.456)
+
+
+# ── a correct stop does not cancel out a dangerous one ───────────────────────
+#
+# Live 2026-08-06: MYM ended up holding BUY #12 (correct) and SELL #10 (left over from
+# an earlier LONG, never successfully cancelled). classify reported OK because a
+# protective stop existed, and the tool printed "PASS — every position protected"
+# while a stop that would double the short sat live at the broker.
+
+
+def test_cl1_wrong_side_stop_is_reported_even_when_protected():
+    from global_index.check_open_orders import classify
+
+    positions = [{"inst": "MYM", "direction": "SHORT", "stop_price": 54709.0}]
+    stops = {"MYM": [("BUY", 12, 54709.0), ("SELL", 10, 53290.0)]}
+
+    verdicts = {r[0] for r in classify(positions, stops)}
+    assert "HAZARD" in verdicts, (
+        "a live SELL stop under a SHORT position would add to it — that must be "
+        f"reported even though a correct BUY stop also exists. got {verdicts}"
+    )
+
+
+def test_cl2_clean_position_is_just_ok():
+    from global_index.check_open_orders import classify
+
+    positions = [{"inst": "MYM", "direction": "SHORT", "stop_price": 54709.0}]
+    stops = {"MYM": [("BUY", 12, 54709.0)]}
+    assert [r[0] for r in classify(positions, stops)] == ["OK"]
 
 
 if __name__ == "__main__":

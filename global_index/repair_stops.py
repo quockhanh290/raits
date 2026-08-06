@@ -134,7 +134,11 @@ def main() -> int:
                 # none at all, and the recorded level may be the stale one. Say it,
                 # let the operator decide.
                 want = by_inst[inst].get("stop_price")
-                if want is not None and abs(float(want) - px) > 1e-9:
+                # Ignore sub-tick differences: place_stop snaps to the tick grid on
+                # purpose, and warning about that on every position would drown the
+                # case this line exists for — a stop at a genuinely different level.
+                tick = IBKRBroker._tick_size(inst) or 0.0
+                if want is not None and abs(float(want) - px) > tick + 1e-9:
                     # LONG stops sit below market, so a lower one risks more; SHORT
                     # stops sit above, so a higher one risks more.
                     wider = (px < float(want)) if direction == "LONG" else (px > float(want))
@@ -142,6 +146,13 @@ def main() -> int:
                           f"{float(want):.2f}; risk is "
                           f"{'WIDER' if wider else 'tighter'} than sized for. "
                           f"Replace manually if that matters.")
+            elif verdict == "HAZARD":
+                # Position is already protected; this extra stop is on the wrong side
+                # and must go. Cancel only — never place, or we stack a duplicate.
+                action, oid, px = detail
+                plan.append(("cancel", inst,
+                             (oid, f"wrong-side {action} STP @ {px:.2f} alongside a "
+                                   f"correct one")))
             elif verdict == "ORPHAN":
                 action, oid, px = detail
                 plan.append(("cancel", inst, (oid, f"orphan {action} STP @ {px:.2f}")))

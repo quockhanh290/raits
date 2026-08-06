@@ -809,7 +809,14 @@ class IBKRBroker(Broker):
             ib.qualifyContracts(contract)
 
             ibkr_action = "SELL" if direction == "LONG" else "BUY"
-            stp_order = ibi.StopOrder(ibkr_action, contracts, stop_price)
+            # Chandelier levels are continuous; IBKR only accepts prices on the tick
+            # grid and rejects anything else with code 110.
+            tick_price = self._round_stop_to_tick(inst, direction, stop_price)
+            if tick_price != stop_price:
+                log.info("place_stop: %s %s stop %.4f → %.4f (tick %s)",
+                         inst, direction, stop_price, tick_price,
+                         self._tick_size(inst))
+            stp_order = ibi.StopOrder(ibkr_action, contracts, tick_price)
             stp_order.outsideRth = True
             stp_order.tif = "GTC"
 
@@ -820,12 +827,12 @@ class IBKRBroker(Broker):
                 log.error(
                     "place_stop: %s %s STP ×%d @ %.4f NOT ACCEPTED by IBKR — "
                     "status=%s orderId=%s (client-side id, no order exists) %s",
-                    direction, inst, contracts, stop_price, status, order_id, reason,
+                    direction, inst, contracts, tick_price, status, order_id, reason,
                 )
                 return ""
             log.info(
                 "place_stop: accepted %s %s STP ×%d @ %.4f orderId=%s status=%s cluster=%s",
-                direction, inst, contracts, stop_price, order_id, status, cluster,
+                direction, inst, contracts, tick_price, order_id, status, cluster,
             )
             return order_id
 
@@ -841,6 +848,52 @@ class IBKRBroker(Broker):
     _STP_LIVE_STATUS = ("PreSubmitted", "Submitted")
     _STP_DEAD_STATUS = ("Cancelled", "ApiCancelled", "Inactive", "Filled")
     STP_ACCEPT_SECS = 5.0
+
+    @staticmethod
+    def _tick_size(inst: str) -> "float | None":
+        """Minimum price variation for `inst`, or None if not on record."""
+        try:
+            from futures.basket import BASKET as _BASKET
+            c = _BASKET.get(inst)
+            if c is not None and getattr(c, "tick", None):
+                return float(c.tick)
+        except Exception:
+            pass
+        try:
+            from global_index import specs as _specs
+            s = getattr(_specs, "SPECS", {}).get(inst)
+            if s is not None and getattr(s, "tick", None):
+                return float(s.tick)
+        except Exception:
+            pass
+        return None
+
+    def _round_stop_to_tick(self, inst: str, direction: str, price: float) -> float:
+        """Snap a stop price onto the contract's tick grid, away from the market.
+
+        IBKR rejects an off-grid price outright with code 110, "The price does not
+        conform to the minimum price variation for this contract". That is what killed
+        the stops on 2026-08-05: the chandelier levels 7758.86 (MES, tick 0.25),
+        54708.68 (MYM, tick 1.0) and 3038.44 (M2K, tick 0.1) were all off-grid, IBKR
+        refused all three, and place_stop reported success because it never checked.
+
+        Direction decides which way to round. A LONG stop sits below the market and
+        rounds down; a SHORT stop sits above and rounds up. Always away from the
+        market: rounding toward it would tighten a stop the position was not sized for,
+        and on a near-market level could push it through and fire on arrival.
+
+        Unknown instrument → returned unchanged. Inventing a grid would be a guess, and
+        IBKR will reject it loudly, which is the better failure.
+        """
+        tick = self._tick_size(inst)
+        if not tick:
+            return price
+        import math
+        steps = price / tick
+        snapped = (math.floor(steps) if direction == "LONG" else math.ceil(steps)) * tick
+        # tick sizes like 0.1 are not exact in binary; round to the tick's own precision
+        decimals = max(0, -int(math.floor(math.log10(tick)))) + 2
+        return round(snapped, decimals)
 
     def _await_stop_accepted(self, ib, trade) -> "tuple[bool, str, str]":
         """Wait until a freshly placed stop reaches a status IBKR actually reported.
@@ -894,10 +947,25 @@ class IBKRBroker(Broker):
                     "(checked across all clients)", order_id,
                 )
                 return False
-            ib.cancelOrder(matching[0].order)
-            ib.sleep(1.0)
-            log.info("cancel_order: cancelled orderId=%s", order_id)
-            return True
+            trade = matching[0]
+            ib.cancelOrder(trade.order)
+            # cancelOrder is a request. Confirm the order actually left the book before
+            # calling it cancelled — live 2026-08-06 a wrong-side MYM stop was
+            # "cancelled" twice, reported success both times, and stayed PreSubmitted
+            # throughout (it belonged to another clientId). Reporting success there
+            # tells the caller a live, dangerous order is gone.
+            for _ in range(10):
+                ib.sleep(0.5)
+                if trade.isDone() or getattr(trade.orderStatus, "status", "") in (
+                        "Cancelled", "ApiCancelled", "Filled", "Inactive"):
+                    log.info("cancel_order: cancelled orderId=%s", order_id)
+                    return True
+            log.error(
+                "cancel_order: orderId=%s STILL OPEN 5s after cancelOrder — status=%s. "
+                "Cross-client cancels can be refused; cancel it in TWS.",
+                order_id, getattr(trade.orderStatus, "status", "?"),
+            )
+            return False
 
         except IBKRConnectionError:
             raise
@@ -989,7 +1057,7 @@ class IBKRBroker(Broker):
                 continue
             if t.order.orderType not in ("STP", "STP LMT"):
                 continue
-            if t.orderStatus.status in ("Filled", "Cancelled", "ApiCancelled", "Inactive"):
+            if t.orderStatus.status not in self._STP_LIVE_STATUS:
                 continue
             log.info("has_working_stop(%s): orderId=%s status=%s — already protected",
                      inst, t.order.orderId, t.orderStatus.status)
@@ -1015,7 +1083,7 @@ class IBKRBroker(Broker):
         for t in ib.openTrades():
             if t.order.orderType not in ("STP", "STP LMT"):
                 continue
-            if t.orderStatus.status in ("Filled", "Cancelled", "ApiCancelled", "Inactive"):
+            if t.orderStatus.status not in self._STP_LIVE_STATUS:
                 continue
             sym = t.contract.symbol
             working[_IBKR_TO_RAITS.get(sym, sym)] = str(t.order.orderId)
