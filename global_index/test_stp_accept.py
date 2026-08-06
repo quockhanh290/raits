@@ -258,5 +258,54 @@ def test_gs2_absent_order_still_not_found():
     assert _cancel_broker(_StatusIB([])).get_order_status("9") == "NOT_FOUND"
 
 
+# ── working-stop lookups must speak the runner's instrument names ────────────
+#
+# The runner calls everything by its internal name; IBKR knows MNKD as NKD
+# (_RAITS_TO_IBKR). A lookup keyed on the IBKR symbol never matches "MNKD", so an
+# NKD position would read as unprotected on every slot — B4 re-placing a stop that
+# is already working is exactly the duplicate-STP case that closes a position twice.
+
+
+class _StopTrade:
+    def __init__(self, symbol, order_id, order_type="STP", status="PreSubmitted"):
+        self.contract = type("C", (), {"symbol": symbol})()
+        self.order = type("O", (), {"orderId": order_id, "orderType": order_type})()
+        self.orderStatus = _Status(status)
+
+
+class _StopsIB(_CancelIB):
+    def openTrades(self):
+        return list(self._cross)          # reqAllOpenOrders already asserted elsewhere
+
+
+def test_ws1_nkd_stop_is_keyed_by_runner_name():
+    """IBKR reports NKD; the runner asks about MNKD."""
+    fake = _StopsIB([_StopTrade("NKD", 71)])
+    working = _cancel_broker(fake).get_working_stops()
+
+    assert working == {"MNKD": "71"}, (
+        f"stop must be keyed by the runner's instrument name, got {working}"
+    )
+
+
+def test_ws2_plain_symbols_pass_through():
+    fake = _StopsIB([_StopTrade("MES", 62), _StopTrade("M2K", 70)])
+    assert _cancel_broker(fake).get_working_stops() == {"MES": "62", "M2K": "70"}
+
+
+def test_ws3_non_stop_and_dead_orders_excluded():
+    fake = _StopsIB([
+        _StopTrade("MES", 1, order_type="MKT"),
+        _StopTrade("MYM", 2, status="Cancelled"),
+        _StopTrade("M2K", 3),
+    ])
+    assert _cancel_broker(fake).get_working_stops() == {"M2K": "3"}
+
+
+def test_ws4_has_working_stop_also_speaks_runner_names():
+    fake = _StopsIB([_StopTrade("NKD", 71)])
+    assert _cancel_broker(fake).has_working_stop("MNKD") is True
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

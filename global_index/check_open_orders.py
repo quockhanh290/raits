@@ -25,21 +25,66 @@ _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from global_index.ibkr_broker import _IBKR_TO_RAITS
+
 # LONG is protected by a SELL stop, SHORT by a BUY stop. A stop on the wrong side does
 # not close the position — it doubles it. Live 2026-08-05 carried exactly that: a SELL
 # MYM stop against a SHORT MYM position, left over from an earlier LONG.
-_PROTECTIVE_SIDE = {"LONG": "SELL", "SHORT": "BUY"}
+PROTECTIVE_SIDE = {"LONG": "SELL", "SHORT": "BUY"}
 
-_DEAD_STATUS = ("Filled", "Cancelled", "ApiCancelled", "Inactive")
+DEAD_STATUS = ("Filled", "Cancelled", "ApiCancelled", "Inactive")
 
 
-def _load_positions(path: Path) -> list[dict]:
+def load_positions(path: Path, quiet: bool = False) -> list[dict]:
     if not path.exists():
-        print(f"  (no {path.name} — treating as flat)")
+        if not quiet:
+            print(f"  (no {path.name} — treating as flat)")
         return []
     with open(path, encoding="utf-8") as fh:
         data = json.load(fh)
     return data.get("positions", []) if isinstance(data, dict) else list(data)
+
+
+def working_stops(ib) -> dict:
+    """{runner_inst: [(action, order_id, stop_price), ...]} for live stops, all clients.
+
+    Shared with repair_stops.py deliberately: two copies of this scan would be two
+    chances to disagree about what "protected" means, which is the failure mode this
+    whole tool exists to catch.
+    """
+    ib.reqAllOpenOrders()
+    ib.sleep(2.0)
+    out: dict = {}
+    for t in ib.openTrades():
+        o, s = t.order, t.orderStatus
+        if o.orderType not in ("STP", "STP LMT") or s.status in DEAD_STATUS:
+            continue
+        sym = t.contract.symbol
+        inst = _IBKR_TO_RAITS.get(sym, sym)
+        out.setdefault(inst, []).append((o.action, o.orderId, float(o.auxPrice)))
+    return out
+
+
+def classify(positions: list[dict], stops: dict) -> list[tuple]:
+    """[(verdict, inst, direction, detail)] — verdict in OK/WRONG-WAY/NAKED/ORPHAN."""
+    rows = []
+    for p in positions:
+        inst, direction = p.get("inst"), p.get("direction")
+        want = PROTECTIVE_SIDE.get(direction)
+        candidates = stops.get(inst, [])
+        matching = [c for c in candidates if c[0] == want]
+        if matching:
+            rows.append(("OK", inst, direction, matching[0]))
+        elif candidates:
+            rows.append(("WRONG-WAY", inst, direction, candidates))
+        else:
+            rows.append(("NAKED", inst, direction, p.get("stop_price")))
+    held = {p.get("inst") for p in positions}
+    for inst, candidates in stops.items():
+        if inst not in held:
+            for c in candidates:
+                rows.append(("ORPHAN", inst, None, c))
+    return rows
 
 
 def main() -> int:
@@ -57,64 +102,46 @@ def main() -> int:
     ib.connect(a.host, a.port, clientId=a.client_id, timeout=15)
     print(f"connected  {a.host}:{a.port}  clientId={a.client_id}\n")
     try:
-        # Orders from other clientIds are only delivered after this request.
-        ib.reqAllOpenOrders()
-        ib.sleep(2.0)
-        trades = ib.openTrades()
+        stops = working_stops(ib)
+        positions = load_positions(Path(a.positions_path))
 
-        print(f"{'ordId':>7} {'client':>6} {'symbol':<10} {'type':<5} {'act':<5} "
-              f"{'qty':>4} {'stop':>12} {'tif':<4} {'status'}")
+        print(f"{'inst':<7} {'action':<7} {'ordId':>7} {'stop':>12}")
         print("-" * 78)
-        stops: dict[str, list] = {}
-        for t in trades:
-            o, c, s = t.order, t.contract, t.orderStatus
-            print(f"{o.orderId:>7} {getattr(o, 'clientId', -1):>6} "
-                  f"{(c.localSymbol or c.symbol):<10} {o.orderType:<5} {o.action:<5} "
-                  f"{float(o.totalQuantity):>4.0f} {float(o.auxPrice):>12.2f} "
-                  f"{o.tif:<4} {s.status}")
-            if o.orderType in ("STP", "STP LMT") and s.status not in _DEAD_STATUS:
-                stops.setdefault(c.symbol, []).append((o.action, o.orderId, o.auxPrice))
-        if not trades:
-            print("  (no open orders)")
+        if not stops:
+            print("  (no working stop orders)")
+        for inst, candidates in sorted(stops.items()):
+            for action, oid, px in candidates:
+                print(f"{inst:<7} {action:<7} {oid:>7} {px:>12.2f}")
 
-        positions = _load_positions(Path(a.positions_path))
         print(f"\npositions in {Path(a.positions_path).name}: {len(positions)}")
         print("-" * 78)
 
         gaps = 0
-        for p in positions:
-            inst, direction = p.get("inst"), p.get("direction")
-            want = _PROTECTIVE_SIDE.get(direction)
-            candidates = stops.get(inst, [])
-            matching = [c for c in candidates if c[0] == want]
-            if matching:
-                action, oid, px = matching[0]
+        for verdict, inst, direction, detail in classify(positions, stops):
+            if verdict == "OK":
+                action, oid, px = detail
                 print(f"  OK        {inst:<6} {direction:<5} → {action} STP "
                       f"orderId={oid} @ {px:.2f}")
                 continue
             gaps += 1
-            if candidates:
-                wrong = ", ".join(f"{c[0]} #{c[1]} @{c[2]:.2f}" for c in candidates)
-                print(f"  WRONG-WAY {inst:<6} {direction:<5} → needs {want} STP; "
-                      f"broker has {wrong} — would ADD to the position, not close it")
-            else:
+            if verdict == "WRONG-WAY":
+                wrong = ", ".join(f"{c[0]} #{c[1]} @{c[2]:.2f}" for c in detail)
+                print(f"  WRONG-WAY {inst:<6} {direction:<5} → needs "
+                      f"{PROTECTIVE_SIDE.get(direction)} STP; broker has {wrong} — "
+                      f"would ADD to the position, not close it")
+            elif verdict == "NAKED":
                 print(f"  NAKED     {inst:<6} {direction:<5} → no working stop "
-                      f"(file records stop_order_id={p.get('stop_order_id')!r})")
-
-        # A stop with no position behind it will open a new one when it fires.
-        held = {p.get("inst") for p in positions}
-        for inst, candidates in stops.items():
-            if inst not in held:
-                gaps += 1
-                for action, oid, px in candidates:
-                    print(f"  ORPHAN    {inst:<6} {'':<5} → {action} STP orderId={oid} "
-                          f"@ {px:.2f} with no position — cancel it")
+                      f"(intended level {detail})")
+            else:  # ORPHAN — will open a new position if it fires
+                action, oid, px = detail
+                print(f"  ORPHAN    {inst:<6} {'':<5} → {action} STP orderId={oid} "
+                      f"@ {px:.2f} with no position — cancel it")
 
         print("-" * 78)
         if gaps == 0:
             print(f"PASS — {len(positions)} position(s), every one protected on the right side")
         else:
-            print(f"FAIL — {gaps} gap(s). Fix in TWS before the next session.")
+            print(f"FAIL — {gaps} gap(s). Run repair_stops.py, or fix in TWS.")
         return 1 if gaps else 0
     finally:
         ib.disconnect()

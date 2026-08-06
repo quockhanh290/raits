@@ -75,6 +75,11 @@ _IBKR_EXCHANGE: dict[str, str] = {
     "MYM": "CBOT",
 }
 
+# IBKR symbol → runner name. Order lookups read contract.symbol but every caller asks
+# by the runner's name, so NKD must come back as MNKD or an NKD position reads as
+# unprotected on every slot and B4 stacks a duplicate stop on it.
+_IBKR_TO_RAITS: dict[str, str] = {v: k for k, v in _RAITS_TO_IBKR.items()}
+
 # ── Order fill timeouts ────────────────────────────────────────────────────────
 # Design constraint [1]: ENTRY timeout 30s → cancel → Fill(status='CANCELLED').
 # EXIT uses MARKET order; no protocol timeout per design [2] but we add a safety
@@ -979,7 +984,8 @@ class IBKRBroker(Broker):
         ib.reqAllOpenOrders()
         ib.sleep(1.0)
         for t in ib.openTrades():
-            if t.contract.symbol != inst:
+            _sym = t.contract.symbol
+            if _IBKR_TO_RAITS.get(_sym, _sym) != inst:
                 continue
             if t.order.orderType not in ("STP", "STP LMT"):
                 continue
@@ -1011,7 +1017,8 @@ class IBKRBroker(Broker):
                 continue
             if t.orderStatus.status in ("Filled", "Cancelled", "ApiCancelled", "Inactive"):
                 continue
-            working[t.contract.symbol] = str(t.order.orderId)
+            sym = t.contract.symbol
+            working[_IBKR_TO_RAITS.get(sym, sym)] = str(t.order.orderId)
         return working
 
     def find_execution(self, order_id: str) -> bool:
