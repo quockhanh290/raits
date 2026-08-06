@@ -809,23 +809,18 @@ class IBKRBroker(Broker):
             stp_order.tif = "GTC"
 
             trade = ib.placeOrder(contract, stp_order)
-            # Retry until IBKR assigns a non-zero orderId.
-            # ib_insync may not have the orderId synchronously on slow TWS farm connections.
-            # 10 × 0.3s = 3s max; typical fast path exits on attempt 1-2.
-            for _n in range(10):
-                ib.sleep(0.3)
-                if trade.order.orderId and trade.order.orderId != 0:
-                    break
-            else:
-                log.warning(
-                    "place_stop: orderId still 0 after 3s for %s %s — "
-                    "get_order_status may return NOT_FOUND until orderId propagates",
-                    inst, direction,
-                )
+            accepted, status, reason = self._await_stop_accepted(ib, trade)
             order_id = str(trade.order.orderId)
+            if not accepted:
+                log.error(
+                    "place_stop: %s %s STP ×%d @ %.4f NOT ACCEPTED by IBKR — "
+                    "status=%s orderId=%s (client-side id, no order exists) %s",
+                    direction, inst, contracts, stop_price, status, order_id, reason,
+                )
+                return ""
             log.info(
-                "place_stop: placed %s %s STP ×%d @ %.4f orderId=%s cluster=%s",
-                direction, inst, contracts, stop_price, order_id, cluster,
+                "place_stop: accepted %s %s STP ×%d @ %.4f orderId=%s status=%s cluster=%s",
+                direction, inst, contracts, stop_price, order_id, status, cluster,
             )
             return order_id
 
@@ -836,6 +831,41 @@ class IBKRBroker(Broker):
                       direction, inst, contracts, stop_price, exc)
             return ""
 
+    # Statuses that mean IBKR holds the order. PendingSubmit is NOT one of them:
+    # ib_insync sets it locally in placeOrder (ib.py:673) before IBKR says anything.
+    _STP_LIVE_STATUS = ("PreSubmitted", "Submitted")
+    _STP_DEAD_STATUS = ("Cancelled", "ApiCancelled", "Inactive", "Filled")
+    STP_ACCEPT_SECS = 5.0
+
+    def _await_stop_accepted(self, ib, trade) -> "tuple[bool, str, str]":
+        """Wait until a freshly placed stop reaches a status IBKR actually reported.
+
+        Returns (accepted, last_status, reason).
+
+        The previous guard read `trade.order.orderId`, which ib_insync allocates
+        client-side in placeOrder (`ib.py:654`: orderId = order.orderId or
+        self.client.getReqId(), assigned at :671 before the call returns). It is
+        therefore always non-zero and never evidence of anything. Live 2026-08-05:
+        three stops logged with ids 62/66/70 did not exist at IBKR — absent from both
+        reqAllOpenOrders and reqCompletedOrders — and three positions went unprotected
+        overnight while the log and live_positions.json both said they were covered.
+
+        Only a status IBKR sends back counts. Anything else — still PendingSubmit at
+        timeout, or a rejection — returns False so the caller reports failure and B4
+        can see a naked position instead of a fabricated id.
+        """
+        status, reason = "", ""
+        polls = max(1, int(self.STP_ACCEPT_SECS / 0.2))
+        for _ in range(polls):
+            ib.sleep(0.2)
+            status = getattr(trade.orderStatus, "status", "") or ""
+            if status in self._STP_LIVE_STATUS or status in self._STP_DEAD_STATUS:
+                break
+        log_entries = getattr(trade, "log", None) or []
+        if log_entries:
+            reason = getattr(log_entries[-1], "message", "") or ""
+        return (status in self._STP_LIVE_STATUS), status, reason
+
     def cancel_order(self, order_id: str) -> bool:
         """Cancel an open order by IBKR orderId. Returns True on success, False otherwise."""
         if self._raw_fetcher is not None:
@@ -844,10 +874,20 @@ class IBKRBroker(Broker):
         ib = self._require_connection()
         try:
             order_id_int = int(order_id)
-            matching = [t for t in ib.trades()
+            # reqAllOpenOrders first, exactly as has_working_stop does. ib.trades() is
+            # session-local, and the runner reconnects fresh every 5-minute slot — so a
+            # stop placed on an earlier day is never in it. Scanning trades() alone
+            # reported "not found" for orders that were live at IBKR for days
+            # (live 2026-08-05: orderIds 9 and 10, still PreSubmitted).
+            ib.reqAllOpenOrders()
+            ib.sleep(1.0)  # allow order events to populate the cache
+            matching = [t for t in ib.openTrades()
                         if t.order.orderId == order_id_int and not t.isDone()]
             if not matching:
-                log.warning("cancel_order: orderId=%s not found in open trades", order_id)
+                log.warning(
+                    "cancel_order: orderId=%s not found among open orders at the broker "
+                    "(checked across all clients)", order_id,
+                )
                 return False
             ib.cancelOrder(matching[0].order)
             ib.sleep(1.0)
@@ -896,6 +936,13 @@ class IBKRBroker(Broker):
             # Check open/active orders — GTC STPs survive TWS daily restart (17:00 ET)
             # and are resubmitted by IB; they appear here even when ib.trades() is cleared.
             # This distinguishes "STP still live (GTC resubmitted)" from "STP filled/gone".
+            #
+            # reqAllOpenOrders first: openTrades() carries orders from other clientIds —
+            # or from this runner's own earlier process — only after that request. Without
+            # it a stop placed yesterday reads NOT_FOUND, which B3 escalates to CRITICAL
+            # and a halt. Same blind spot as cancel_order had.
+            ib.reqAllOpenOrders()
+            ib.sleep(1.0)
             for t in ib.openTrades():
                 if t.order.orderId == order_id_int:
                     s = t.orderStatus.status
@@ -942,6 +989,30 @@ class IBKRBroker(Broker):
                      inst, t.order.orderId, t.orderStatus.status)
             return True
         return False
+
+    def get_working_stops(self) -> "dict | None":
+        """{inst: orderId} for every stop working at IBKR, across all clients.
+
+        One reqAllOpenOrders round trip covers every position, so B4 and the
+        end-of-session check can afford to run it on each 5-minute slot.
+
+        Returns None only when this broker is offline (test mode), never {} — the
+        caller must be able to tell "nothing working" from "cannot say".
+        """
+        if self._raw_fetcher is not None:
+            return None  # offline / test mode — cannot testify
+
+        ib = self._require_connection()
+        ib.reqAllOpenOrders()
+        ib.sleep(1.0)
+        working: dict = {}
+        for t in ib.openTrades():
+            if t.order.orderType not in ("STP", "STP LMT"):
+                continue
+            if t.orderStatus.status in ("Filled", "Cancelled", "ApiCancelled", "Inactive"):
+                continue
+            working[t.contract.symbol] = str(t.order.orderId)
+        return working
 
     def find_execution(self, order_id: str) -> bool:
         """Check IB server-side execution history for a confirmed fill of order_id.
