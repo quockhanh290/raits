@@ -1,5 +1,21 @@
 ## Gotchas
 
+- **`ib.openTrades()` là CACHE, không phải sự thật ở broker** (2026-08-06, bắt được nhờ theo
+  dõi một cú khớp thật): nó đọc `wrapper.trades` — dict tích lũy, **không bao giờ xoá mục**.
+  IBKR chỉ đẩy cập nhật trạng thái cho client **sở hữu** lệnh, nên lệnh của client khác khi
+  khớp thì bản sao trong cache **không bao giờ** chuyển sang done và nằm lại vĩnh viễn.
+  Docstring của chính `reqAllOpenOrders()` cảnh báo: *"the orders of other clients will not
+  be kept in sync"* — và nó **trả về** danh sách đúng. Dùng giá trị trả về, đừng gọi rồi đọc
+  `openTrades()`.
+  **Đo được:** stop M2K #14 khớp 08:11; backend dashboard (tiến trình sống lâu) vẫn báo
+  `PreSubmitted` lúc 08:27. Công cụ chạy-rồi-thoát đọc đúng chỉ vì mỗi lần chạy cache trống —
+  **lỗi ẩn hoàn toàn khỏi test và khỏi script ngắn**, chỉ lộ ở tiến trình sống lâu.
+  ⚠️ Hậu quả nặng nhất: vị thế **không có stop** hiển thị **như đang được bảo vệ**.
+  Đã vá 5 chỗ: `ibkr_reader` + `get_working_stops`/`has_working_stop`/`cancel_order`/
+  `get_order_status`. `verify_account_clean` còn tệ hơn — gọi `openTrades()` mà không
+  `reqAllOpenOrders()` nên không thấy lệnh client khác → **false clean**.
+  Bỏ luôn `ib.sleep()` sau `reqAllOpenOrders()`: lệnh này đã block chờ future.
+
 - **Máy ngủ làm scheduler chết câm trong nhiều giờ SAU KHI đã thức lại** (2026-08-06, đo được):
   `Event.wait(timeout)` của Python trên Windows đếm bằng đồng hồ **không chạy khi máy ngủ**.
   APScheduler `BlockingScheduler` chờ một lần dài tới job kế, nên **mỗi giây ngủ đẩy lùi hạn
@@ -799,3 +815,41 @@ Chỉ còn: `datr` (ATR ngày, Wilder → ~56 phiên hội tụ) + `pos` (tối 
 
 → Nhu cầu warmup thật ~60 phiên. Trùng khớp số đo (W=20 lệch, W=60 khớp). Khi cơ chế và
 số đo hội tụ thì mới được coi là hiểu; một trong hai thôi thì chưa.
+
+## Gotchas — múi giờ trong code phân tích (2026-08-05/06)
+
+Ba lỗi cùng một khuôn trong một phiên, tất cả đều ở code phân tích của tôi chứ không
+phải engine, và tất cả đều trả về **con số trông hợp lý**:
+
+1. `sorted(set(index.normalize()))` trên index tz-aware qua DST → thứ tự không khớp mảng
+   `searchsorted` đang dò → lát cắt rơi vào vùng lịch sử khác.
+2. `index.normalize().values` trên index **Asia/Tokyo** → `.values` quy UTC trước; nửa đêm
+   JST = 15:00 UTC hôm trước → **mọi** phiên bị gán nhãn sớm một ngày. ET không dính vì nửa
+   đêm ET (04:00/05:00 UTC) nằm trong cùng ngày UTC — đã kiểm 0/2,987 phiên lệch.
+3. Cắt DataFrame bằng boolean mask trong vòng lặp → kẹt bộ nhớ (3 giờ ở 8% CPU).
+
+**Quy tắc rút ra:** khi cần nhãn ngày phiên, làm ĐÚNG CÁCH ENGINE LÀM —
+`pd.Timestamp(d).tz_localize(None)` (giữ giờ địa phương), KHÔNG đi qua `.values`
+(quy UTC). Kiểm bằng cách so hai cách trên toàn bộ index, đếm số phiên lệch.
+
+**Và:** một ca lệch có thể tố cáo cả nhóm "OK" bên cạnh nó là vô nghĩa. MNKD báo 1/3 lệch;
+đào ra thì 2 ca "OK" kia cũng đang so hai cửa sổ lệch nhau, tức không kiểm được gì.
+Đừng đọc "14/15" là "gần đạt".
+
+## Lessons (2026-08-06)
+
+- **Đo độ phủ, đừng đếm dấu OK.** Thêm cột "checkpoint này có vị thế mở không" vào
+  `verify_resume.py`: checkpoint trống + không lệnh nào sau đó = đường seed `pos` chưa
+  bao giờ được đi qua. Một màn hình toàn OK có thể là một màn hình chưa kiểm gì.
+
+- **Giữ tham chiếu mạnh hơn hash.** Sửa khoá cache `id(df)`: giữ `df` trong entry khiến
+  `id()` hợp lệ THEO CẤU TẠO (hai object sống không thể chung địa chỉ — bảo đảm của
+  CPython), chi phí chạy bằng không. Hash nội dung tốn 0.54s/lời gọi và chỉ là xác suất.
+
+- **Tham số mới vào hàm có cache = phải vào khoá cache.** Thêm `datr=` mà quên đưa vào
+  khoá là tái lập đúng lỗi vừa vá, ở chỗ mới. Kiểm trực tiếp: cùng df + hai `datr` khác
+  phải ra hai kết quả khác và hai entry cache.
+
+- **State mang qua vòng lặp phải copy.** `pos = dict(resume_pos)` — vòng lặp ratchet
+  `pos["stop"]` tại chỗ; thiếu copy thì gọi lần hai từ cùng checkpoint ra kết quả khác
+  lần một, và lỗi này chỉ lộ khi có ai đó gọi lại.

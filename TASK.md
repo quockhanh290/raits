@@ -2216,53 +2216,93 @@ ghi đĩa 0.70s, nạp 1.52s. Tức cache prep LÀ net win nhưng không đủ b
 
 ---
 
-## 🎯 KẾ HOẠCH — cắt cửa sổ replay (chốt 2026-08-06)
-Status: TODO — chưa sửa dòng code nào
+## 🎯 Sub-task: Checkpoint replay — Bước 1-3+5 DONE, Bước 4+6 còn lại
+Status: IN PROGRESS — engine xong, chưa nối vào production
 
-### Nguyên tắc quyết định mọi thứ
-**Chỉ sửa đường live. KHÔNG đụng `_validated_core.py`.**
-Cắt `df` trong `run_live_day` TRƯỚC khi gọi `desired_basket`. Engine không đổi một dòng
-→ baseline $42,459 / Calmar 1.72 / sàn 1.65 / cả hai vault **không đổi theo cấu tạo**,
-không cần chứng minh. Chỉ còn một câu hỏi: vị thế mong muốn trên 250 phiên có giống hệt
-trên toàn lịch sử không?
+### Vì sao chọn checkpoint thay vì cắt cửa sổ
+Đọc `backtest_swing_tf`: vòng lặp `for day in days:` carry ĐÚNG một biến `pos`.
+EMA + ATR sinh tín hiệu tính TRONG MỘT NGÀY trên bar 5 phút (`hist = bars5.loc[:idx[n]]`,
+:344-348) → không cần lịch sử. `hl`/`b5`/`ts` độc lập theo ngày (`groupby`, :219).
+Chỉ còn `datr` (ATR ngày, Wilder) cần lịch sử — mà tính lại chỉ tốn **0.18s**.
 
-### Bước 1 — hoàn thiện phép đo (CHƯA sửa code)
-Test hiện tại (`scratchpad/warmup_confirm.py`) có 4 lỗ hổng, phải vá hết:
-- [ ] So cả **`stop`** — hiện chỉ so (chiều, giá vào, ngày vào). `desired_position` trả cả
-      `stop` và đó là số đi ra sàn thành lệnh STP. Phải chạy `desired_position` bản ĐẦY ĐỦ
-      tại từng mốc (không đọc tắt từ trade list baseline như hiện nay)
-- [ ] **Mọi phiên** as-of, không lấy mẫu 41 mốc/instrument
-- [ ] Phủ **MNKD** (engine khác + lịch JST) — chưa đo dòng nào
-- [ ] Chạy trên **parquet live 2025-2026** (gồm vùng repair), không chỉ frozen 2018-2024
+→ Seed `pos` + cấp `datr` = **chính xác tuyệt đối**, không phải xấp xỉ như cắt cửa sổ.
 
-**CỔNG: 0 lệch ở W=250. Không đạt → DỪNG, không có bước 2.**
+| cách | 4 instrument | cache đĩa | chính xác |
+|---|---|---|---|
+| hiện tại | 331s | — | — |
+| cache prep ra đĩa | 198s | 489 MB | giống hệt, nhưng biên chỉ 1 phút |
+| cắt cửa sổ W=120 | 18.5s | không | **xấp xỉ** |
+| **checkpoint** | **~5s** | **~0** | **chính xác** |
 
-### Bước 2 — sửa code, MỘT chỗ
-- [ ] `run_live_day`: cắt df còn 250 phiên trước khi gọi `desired_basket`
-- [ ] `_validated_core.py` KHÔNG đụng
+Đo phụ trợ: prep 34.67s / loop 48.11s / `daily_atr_series` 0.18s / hash toàn df 0.54s /
+nạp parquet 0.35s / pickle cache 122 MB (ghi 0.70s, nạp 1.52s).
 
-### Bước 3 — no-harm (script có sẵn, không xây mới)
-- [ ] `deploy_sim` = $42,459 / Calmar 1.72
-- [ ] `run_smoke_test` diff $0.00
-- [ ] reconcile_gd0 · reconcile_stress · reconcile_nkd · reconcile_swing_desired
-- [ ] pytest 130/130 · injection 14/14
-Kỳ vọng pass hiển nhiên vì engine không đổi — chạy để bắt trường hợp đụng nhầm.
+### Bước 1 ✅ `0bd07c4` — vá khoá `_swing_cache`
+`id(df)` = địa chỉ bộ nhớ; df tạm bị thu hồi → df kế trúng cache của khung khác, IM LẶNG.
+Fix: entry giữ tham chiếu `(df, cache)` — hai object sống không thể chung địa chỉ, đó là
+bảo đảm của CPython chứ không phải xác suất. **Không dùng hash nội dung** (0.54s/lời gọi,
+WFO gọi hàng trăm lần = đúng cái cache sinh ra để tránh).
+⚠️ `df = df.assign(...)` gán đè → phải đổi tên `dfg`, nếu không giữ nhầm bản copy.
+Regression: 41 mốc trên lát cắt tạm, cache-hoạt-động == cache-xoá, **có cả `stop`**.
 
-### Bước 4 — chạy song song một phiên live
-- [ ] Mỗi slot tính CẢ HAI đường (đầy đủ + cắt), log nếu lệch.
-      Không tốn thêm gì vì hiện vẫn đang mất 5.5 phút/slot.
+### Bước 2 ✅ `c09f69d` — `datr=` injectable
+`_swing_cache(df, datr=None)` + `backtest_swing_tf(..., datr=None)`.
+Khoá thành `(id(df), id(datr))`, entry giữ cả hai tham chiếu — nếu không thì cùng df với
+`datr` khác sẽ nhận entry cũ = tái lập lỗi Bước 1 ở chỗ mới.
+Kiểm: datr=None vs inject → 615 lệnh giống hệt · cùng df hai datr khác → 615 vs 462 + 2
+entry cache · caller cũ gọi 2 lần → cache 1→1 (WFO không mất hiệu năng).
 
-### Bước 5 — bật
-- [ ] Xác nhận log hết dòng SKIP
+### Bước 3 ✅ `7c5e828` — `resume_pos=` + `resume_after_day=`
+`pos = dict(resume_pos)` — **copy**, vì vòng lặp ratchet `pos["stop"]`/`["extreme"]` tại chỗ.
+Thiếu copy → gọi lần 2 từ cùng checkpoint ra kết quả khác lần 1.
+Frozen: 10/10 checkpoint (MES+MNQ, 2018-2023) khớp tuyệt đối, pos cuối trùng, lặp lại ổn định.
 
-### KHÔNG nằm trong kế hoạch này (độc lập, làm riêng)
-- [ ] **`maxhold_exit` 09:31 ET không chạy** — **ƯU TIÊN CAO HƠN**: lệch quy ước backtest
-      4h40 so với chỉ $338/năm của việc skip slot. Sửa nhanh hơn, giá trị lớn hơn.
-- [ ] **G2 HARD** lặp mỗi lần chạy — guard đang vô hiệu hoá trên thực tế
-- [ ] **Khoá `_swing_cache` = `id(df)`** — lỗi thật, nhưng **KHÔNG chặn** kế hoạch này
-      (cắt ở tầng gọi → mỗi slot vẫn chỉ một DataFrame/instrument, giữ sống suốt tiến trình).
-      ⚠️ Đảo lại phán đoán trước đó trong file này ("PHẢI sửa TRƯỚC") — sai, vì lúc đó tôi
-      giả định cắt cửa sổ sẽ sinh DataFrame tạm liên tục như trong script thí nghiệm.
+⚠️ **Lead-in**: khung phải bắt đầu ≥1 phiên TRƯỚC ngày replay đầu tiên. `_swing_cache` ép
+bar đầu khung thành "không gap" (`is_gap_full[0] = False`); cắt đúng ngày resume thì bar
+đầu ngày đó mất cờ gap → lệnh đáng lẽ thoát GAP (fill giá mở, xấu hơn) thành CHANDELIER.
+**Đọc từ code, CHƯA quan sát được**: 10 checkpoint chạy thêm arm không-lead-in đều KHÔNG
+lệch. Cần stop chạm đúng bar đầu của đúng ngày đầu — 10 mẫu không tới. Giữ lead-in là bảo
+hiểm rẻ cho cơ chế có thật, không phải nhu cầu đã đo được.
 
-### Thứ tự đề nghị
-`maxhold_exit` → Bước 1 → Bước 2-5. Bước 1 tốn ~1-2h chạy máy, bước 2 ~30 phút.
+### Bước 5 ✅ `fe093a5` — `global_index/verify_resume.py`
+Chạy trên **parquet live** (2017→2026-08-06, gồm vùng repair), so **toàn bộ vị thế có `stop`**:
+- MES/MNQ/MYM/M2K: **24/24** (lùi 2,4,6,8,15,25 phiên)
+- MNKD: **14/14** (lùi 1..30 phiên) — engine khác, lịch JST, nhãn regime riêng
+- Cộng 10 checkpoint frozen ở Bước 3 → **60 điểm so sánh, 0 lệch**
+- Mốc lùi 2-8 phiên (vùng production dùng) hầu hết **có vị thế mở** → đường seed thật sự được đi qua
+
+⚠️ **Lỗi trong script kiểm, không phải engine**: `_sessions` dùng `index.normalize().values`
+→ quy UTC trước; nửa đêm JST = 15:00 UTC hôm trước → **mọi** phiên MNKD bị gán nhãn sớm 1 ngày.
+Hệ quả không chỉ 1 ca báo lệch mà 2 ca "OK" cũng vô nghĩa (so cửa sổ lệch nhau).
+Fix: `normalize().tz_localize(None)` giữ giờ địa phương, đúng cách engine làm.
+ET **không dính**: 0/2,987 phiên lệch, đã kiểm cả mốc DST.
+→ Thêm cột `có-vị-thế`/`trống` vào output: màn hình toàn OK có thể che việc đường seed
+chưa bao giờ được đi qua.
+
+### Bước 4 ⏳ CHƯA LÀM — nối vào `run_live_day`
+- [ ] Đọc/ghi checkpoint `{last_day, pos, key}` mỗi instrument
+- [ ] Khoá = hash df **tính đến ngày cuối** (không phải toàn df — nếu không, append hôm nay
+      tự vô hiệu hoá checkpoint mỗi ngày)
+- [ ] Không khớp → replay đầy đủ. Checkpoint là **tối ưu hoá thuần tuý**: hỏng thì chậm, không sai
+- [ ] Cắt df từ ngày cuối (lead-in) + `resume_after_day` loại nó khỏi replay
+
+⚠️ Hình thức triển khai ĐẦU TIÊN là **chạy song song** (tính cả hai đường, đối chiếu) →
+`run_live_day` **chậm hơn** 5.5→8-10 phút, mỗi 3 slot bỏ 2. Chưa có lợi ích tốc độ nào cho
+tới khi quan sát sạch rồi mới tắt đường cũ. Đừng deploy sát giờ phiên.
+
+### Bước 6 ⏳ Bộ reconcile sau Bước 4
+deploy_sim $42,459/1.72 · smoke diff $0.00 · 4 reconcile · pytest 208 · injection 14 · refreeze 68
+(Ba lần chạy sau Bước 1/2/3 đều cho **cùng một bộ số**, không chỉ "pass".)
+`test_ro6` fail — đã chứng minh có sẵn ở HEAD bằng cách stash rồi chạy lại.
+
+### Trạng thái production HIỆN TẠI
+**Runner vẫn nạp kiểu cũ.** Grep `resume_pos|resume_after_day|datr=` trong `global_index/`
+và `futures/swing_tf.py` → rỗng. Ba commit chỉ MỞ CỬA trên engine, không ai bước qua.
+Đó là lý do dừng ở bất kỳ bước nào cũng an toàn.
+
+### Tồn đọng khác (độc lập)
+- [ ] `maxhold_exit` 09:31 ET không chạy nếu scheduler bật muộn — lỡ 2 ngày liên tiếp
+      (08-05 bật 09:43, 08-06 bật 10:35). Chưa tốn tiền vì vị thế mới hold 1d.
+      **Hạn chót thật: thứ Hai 2026-08-10** (vị thế 08-05 + 5 ngày). Cần catch-up khi khởi động.
+- [ ] G2 HARD lặp mỗi lần chạy, hệ thống vẫn giao dịch — guard vô hiệu trên thực tế
+- [ ] `futures/swing_tf_harness.py` + bản copy ở root vẫn còn lỗi khoá `id(df)`
