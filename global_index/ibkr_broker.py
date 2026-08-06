@@ -960,10 +960,16 @@ class IBKRBroker(Broker):
                         "Cancelled", "ApiCancelled", "Filled", "Inactive"):
                     log.info("cancel_order: cancelled orderId=%s", order_id)
                     return True
+            # IBKR only honours a cancel from the clientId that placed the order
+            # (confirmed live 2026-08-06: MYM #10 refused cancels from clientIds 1, 77
+            # and 82, then cancelled first try from 93, the id that placed it). Naming
+            # the owner turns this from "it failed" into an instruction.
+            owner = getattr(trade.order, "clientId", None)
             log.error(
-                "cancel_order: orderId=%s STILL OPEN 5s after cancelOrder — status=%s. "
-                "Cross-client cancels can be refused; cancel it in TWS.",
-                order_id, getattr(trade.orderStatus, "status", "?"),
+                "cancel_order: orderId=%s STILL OPEN 5s after cancelOrder — status=%s, "
+                "placed by clientId=%s. IBKR only accepts a cancel from the originating "
+                "client: reconnect with clientId=%s, or cancel it in TWS.",
+                order_id, getattr(trade.orderStatus, "status", "?"), owner, owner,
             )
             return False
 

@@ -228,6 +228,25 @@ def test_ca4_cancel_that_does_not_take_effect_returns_false():
     )
 
 
+def test_ca6_failed_cancel_names_the_owning_client(caplog):
+    """IBKR only lets the originating clientId cancel an order.
+
+    Confirmed live 2026-08-06: MYM #10 refused every cancel from clientIds 1, 77 and 82,
+    then cancelled first try from 93, the id that placed it. The operator's next move is
+    to reconnect as that client, so the failure has to say which one it was.
+    """
+    trade = _CancelTrade(10)
+    trade.order.clientId = 93
+    fake = _CancelIB([trade])
+    fake.cancelOrder = lambda order: None      # refused
+
+    with caplog.at_level("ERROR"):
+        assert _cancel_broker(fake).cancel_order("10") is False
+    assert "93" in caplog.text, (
+        f"failure must name the clientId that owns the order; got {caplog.text!r}"
+    )
+
+
 def test_ca5_cancel_that_takes_effect_returns_true():
     trade = _CancelTrade(10)
     fake = _CancelIB([trade])
