@@ -1180,6 +1180,114 @@ imbalance_coverage.parquet, imbalance_features.parquet, imbalance_test_results.p
 
 ---
 
+## Sub-task: STP không tồn tại ở IBKR dù runner báo đã đặt (2026-08-05)
+Status: F0–F6 DONE (đã gate đầy đủ) — bracket order CHƯA LÀM — việc tay TWS CHƯA XONG
+
+### Triệu chứng
+Dashboard chỉ hiện 2 STP, đều là lệnh cũ. `live_positions.json` có 3 vị thế với
+`stop_order_id` 62/66/70; IBKR không có lệnh nào trong số đó.
+
+### Điều tra (client 88 read-only, `check_open_orders.py` + `check_completed_orders.py`)
+- `/api/all` + CORS + dashboard: **không lỗi**. Panel hiển thị trung thực.
+- 62/66/70 **không có trong open orders, cũng không có trong completed orders**
+  → chưa từng vào sổ lệnh IBKR.
+- 9/10 (clientId 93) vẫn PreSubmitted GTC — stop mồ côi từ phiên cũ. Order 10 là
+  `SELL MYM` trong khi vị thế MYM đang SHORT → nếu fire sẽ **nhân đôi short**, không phải đóng.
+- Log 12:40:25-28 ghi `place_stop: placed ... orderId=62/66/70`; 12:40:30 disconnect.
+
+### ROOT CAUSE — ba lỗi cùng một lớp: gọi broker rồi không kiểm kết quả
+1. **`place_stop` không xác minh gì.** Vòng `for _n in range(10): if trade.order.orderId != 0`
+   (commit 42e1fc6, 12/07) kiểm một giá trị do ib_insync tự gán tại `ib.py:654/671`
+   TRƯỚC khi hàm return → **điều kiện không thể sai**, nhánh `else` là code chết.
+   Comment "ib_insync may not have the orderId synchronously" sai với 0.9.86.
+2. **`cancel_order` dùng `ib.trades()`** — chỉ thấy lệnh phiên hiện tại, mà runner nối lại
+   mới mỗi slot 5 phút → lệnh phiên trước luôn "not found". `has_working_stop` cùng file đã
+   fix bằng `reqAllOpenOrders()`; `cancel_order` thì chưa.
+3. **Call site vứt giá trị trả về** — `cancel_order` trả False chứ không raise, nên
+   `try/except` không bắt được và log "cancelled" vô điều kiện.
+
+### Vì sao các lần sửa trước không chặn được
+- 42e1fc6 (12/07) nhắm triệu chứng khác (orderId=0 gây B3 NOT_FOUND giả), không nhằm xác minh.
+- Fix 03/08 (`_verified_status`) chỉ áp cho `send_order` + 2 chân rollover. Next steps của
+  chính phiên đó đã ghi "Rà các đường khác cũng đọc orderStatus.status — cùng lớp lỗi, chưa vá".
+- **Tiêu chí nghiệm thu không thể đỏ**: "stop_order_id ≠ null" luôn đúng vì `place_stop`
+  trả ID vô điều kiện. Xem mục ⏳ CHỜ VERIFY LIVE ở trên — đã thay tiêu chí.
+- B4 (lưới an toàn) không nổ vì điều kiện là `stop_order_id is None`; **ID giả vô hiệu hóa nó**.
+
+### Completed
+- [x] **F3**: `_report_stop_cancel()` + sửa 2 call site (`run_day` CLOSE, `run_maxhold_exit`).
+      Hủy thất bại → `logger.critical` + event CRITICAL/ORDER nêu đích danh orderId.
+- [x] **F0**: thay tiêu chí nghiệm thu STP — phải hỏi IBKR (`check_open_orders.py`), không hỏi file.
+- [x] TDD: `test_stp.py::test_stp9_orphan_alert_when_cancel_fails` +
+      `test_maxhold.py::test_mh7_orphan_alert_when_cancel_returns_false`. Đỏ trước, xanh sau.
+      (MH4 đã có nhưng chỉ phủ trường hợp `cancel_order` **raise**, không phủ trả `False`.)
+- [x] GATE: reconcile_gd0 PASS 4/4 MATCH · reconcile_stress PASS 0 mismatch ·
+      test_stp+test_maxhold 22/22 · test_ibkr_injection 14/14 · pytest suite 73 passed.
+
+- [x] **F1** `place_stop` → `_await_stop_accepted(ib, trade)`: chờ status ∈
+      (PreSubmitted, Submitted), timeout 5s (25×0.2s). PendingSubmit KHÔNG tính là nhận
+      (đó là status ib_insync tự đặt ở `ib.py:673`). Thất bại → log status +
+      `trade.log[-1].message` + return `''` → nhánh ALERT của runner sống lại, và
+      `stop_order_id` giữ `None` nên B4 thấy được. Log đổi "placed" → **"accepted"**, kèm status.
+- [x] **F2** `cancel_order`: `reqAllOpenOrders()` + `sleep(1.0)` rồi quét `openTrades()`
+      thay vì `ib.trades()`.
+- [x] **F4** `Broker.get_working_stops() -> dict | None` (non-abstract, khuôn `has_working_stop`).
+      IBKRBroker: một round-trip `reqAllOpenOrders` cho mọi inst. MockBroker: **None**
+      (không phải `{}` — nó không có sổ lệnh nên không thể làm chứng; trả `{}` sẽ khiến B4
+      gọi mọi vị thế là naked và đổi hành vi verify mode). Điều kiện B4 nay là
+      `stop_order_id is None OR (working is not None AND inst not in working)`.
+- [x] **F5** `_audit_working_stops()` gọi cuối `run_day`, sau `_persist_state`, trước
+      `dump_state`. Vị thế mở mà broker không có stop → CRITICAL + event CRITICAL/ORDER.
+      Im lặng khi broker trả None. Không raise (chạy sau khi lệnh đã khớp).
+- [x] **F6** rà xong: **`get_order_status` có cùng khe hở** — quét `trades()`→`fills()`→
+      `openTrades()` mà không `reqAllOpenOrders()` trước. B3 dùng hàm này; NOT_FOUND sai
+      → CRITICAL + halt entries. Đã vá. `find_execution` (dùng `reqExecutions` server-side)
+      và 2 chân `_handle_rollover` (đã dùng `_verified_status` từ 03/08) — sạch.
+
+### Test thêm (đỏ trước, xanh sau)
+- `test_stp_accept.py` MỚI — 11 test: SA1–SA6 (`_await_stop_accepted`),
+  CA1–CA3 (`cancel_order` cross-session), GS1–GS2 (`get_order_status` cross-session)
+- `test_stp.py` — B4.6/B4.7 (ID giả vs broker làm chứng), STP10/11/12 (quét cuối phiên)
+
+### GATE sau F1–F6 (chạy lại đầy đủ)
+reconcile_gd0 **PASS** 4/4 MATCH · reconcile_stress **PASS** 0 mismatch ·
+pytest 8 suite **80 passed** · test_ibkr_injection **14/14** ·
+lỗi có sẵn không đổi: test_operational_fixes 7 FAIL, test_event_playback 9 FAIL,
+test_rollover 1 FAIL — giống hệt HEAD.
+
+### Next steps
+- [ ] **Bracket order** (khảo sát xong, chưa làm) — xem Key decisions.
+- [ ] Verify live phiên kế: log phải có `place_stop: accepted ... status=PreSubmitted`;
+      `check_open_orders.py` phải thấy đủ STP khớp số vị thế.
+
+### Key decisions
+- **Bracket khả thi**: `stop_price` là mức cố định lúc entry, **không ratchet**
+  (runner.py:1099 + :1307 ghi rõ "not ratcheted yet") → không cần modify STP hằng ngày,
+  tức trở ngại lớn nhất của bracket không tồn tại. Dựng tay bằng
+  `MarketOrder(transmit=False)` + `StopOrder(parentId, transmit=True, tif=GTC, outsideRth=True)`;
+  KHÔNG dùng `ib.bracketOrder()` vì nó ép parent LMT và bắt buộc chân take-profit (ib.py:572-613).
+- **Bracket KHÔNG thay thế F1/F2/F4/F5.** Nó xoá khoảng hở giữa fill và lúc đặt STP, nhưng
+  vẫn cần: xác minh bracket được nhận (F1), hủy STP khi thoát bằng lệnh riêng (F2/F3),
+  và lưới phát hiện vị thế trần (F4/F5). Vì vậy F1/F2/F4/F5 làm trước, bracket là bước sau.
+- Chưa xác minh được (cần phiên live): IBKR có nhận parent MKT trong bracket không; child STP
+  còn sống hay tự hủy khi ta đóng vị thế bằng lệnh MKT riêng.
+
+### Việc tay còn treo
+- [ ] Hủy order 10 (`SELL MYM STP @53290`) trong TWS — sẽ nhân đôi short nếu fire.
+- [ ] Quyết order 9 (`SELL MES STP @7627.25`) — đúng hướng nhưng rộng hơn mức tính 7758.86.
+- [ ] M2K SHORT không có stop.
+- [ ] Sau khi dọn: set `stop_order_id` về `null` trong `live_positions.json` cho khớp thực tế.
+
+### Lỗi có sẵn phát hiện lúc chạy gate (KHÔNG do phiên này, đã kiểm bằng stash)
+- `test_rollover.py::test_ro6_maxhold_then_rollover_no_conflict` đỏ y hệt trên HEAD.
+- `test_operational_fixes.py` 7 FAIL, `test_event_playback.py` 9 FAIL — số lượng giống hệt
+  trước và sau thay đổi.
+
+### Files touched
+global_index/runner.py, global_index/test_stp.py, global_index/test_maxhold.py, TASK.md
+
+---
+
 ## Sub-task: B4 naked-position guard (2026-08-03)
 Status: PART 2 DONE — PART 1 BLOCKED chờ stop level
 
@@ -1246,7 +1354,15 @@ chính gate đó). B3 lần chạy sau chỉ so inst/direction/contracts → bá
 ### ⏳ CHỜ VERIFY LIVE (lệnh thật đầu tiên sau fix)
 - [ ] Lệnh entry kế tiếp: kiểm log KHÔNG còn `"not filled — status=Cancelled"`, và nếu
       `_verified_status` cứu được thì phải thấy WARNING `"trusting the execution report"`
-- [ ] Xác nhận STP được đặt tự động ngay sau fill (stop_price + stop_order_id ≠ null)
+- [x] ~~Xác nhận STP được đặt tự động ngay sau fill (stop_price + stop_order_id ≠ null)~~
+      ❌ **TIÊU CHÍ NÀY SAI — ĐÃ THAY.** `place_stop` trả về orderId do ib_insync tự đúc
+      (`ib.py:654` `orderId = order.orderId or self.client.getReqId()`), vô điều kiện.
+      `stop_order_id` KHÔNG BAO GIỜ null → tiêu chí luôn pass, kể cả khi IBKR không có
+      lệnh nào. Nó đã "pass" ngày 2026-08-05 trong khi 3 vị thế trần trụi qua đêm.
+      **Quy tắc rút ra: nghiệm thu STP phải hỏi IBKR, không hỏi file của chính mình.**
+- [ ] THAY BẰNG: sau lệnh entry kế tiếp, chạy `check_open_orders.py` (clientId 88, read-only)
+      → số STP đang mở phải bằng số vị thế multi-day, khớp cả inst lẫn hướng
+      (LONG→SELL STP, SHORT→BUY STP). Log phải có `place_stop: accepted ... status=PreSubmitted`.
 
 ### ~~BLOCKED~~ — Phần 1 (đặt STP cho 3 vị thế hiện tại) — DONE, giữ để tham chiếu
 - [ ] Cần stop level: `python -X utf8 p0c_verify_swing.py --port 4002 --client-id 92`

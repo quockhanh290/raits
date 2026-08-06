@@ -1,5 +1,31 @@
 ## Gotchas
 
+- **Một phép kiểm tra không thể đỏ thì không kiểm tra gì cả** (2026-08-05): tiêu chí nghiệm thu
+  của lần vá STP 03/08 là `stop_price + stop_order_id ≠ null`. Nhưng `place_stop` trả về
+  orderId do **ib_insync tự đúc** (`ib.py:654` — `orderId = order.orderId or self.client.getReqId()`,
+  gán trước khi hàm return), vô điều kiện. Nên `stop_order_id` không bao giờ null →
+  **tiêu chí luôn pass, kể cả khi IBKR không có lệnh nào**. Nó đã "pass" ngày 05/08 trong khi
+  3 vị thế nằm trần qua đêm.
+  ⚠️ Cùng cơ chế làm chết vòng retry trong `place_stop`: `for _n in range(10): if trade.order.orderId != 0`
+  — điều kiện không thể sai, nhánh `else` không bao giờ chạy. Code **trông như** có kiểm tra,
+  nên 3 tuần không ai nhìn lại.
+  **Quy tắc**: nghiệm thu trạng thái broker phải hỏi broker (`check_open_orders.py`, clientId
+  riêng, read-only), không được hỏi file do chính mình ghi ra.
+
+- **`cancel_order` báo lỗi bằng `return False`, không raise** (2026-08-05): hai call site trong
+  `runner.py` bọc `try/except` rồi log "cancelled" vô điều kiện → `except` không bao giờ chạy.
+  Stop mồ côi tích lại nhiều ngày ở IBKR trong khi log nói đã hủy. Một trong số đó (`SELL MYM`
+  cho vị thế **SHORT** MYM) nếu fire sẽ **nhân đôi short** chứ không đóng vị thế.
+  Nguyên nhân sâu hơn: `cancel_order` quét `ib.trades()` — chỉ chứa lệnh của **phiên hiện tại**,
+  mà runner nối lại mới mỗi slot 5 phút → lệnh phiên trước luôn "not found".
+  `has_working_stop` cùng file đã vá bằng `reqAllOpenOrders()`; `cancel_order` bị bỏ sót.
+  **L14: khi vá một hàm dùng `ib.trades()`, grep hết các hàm khác cũng dùng nó trong cùng file.**
+
+- **Lưới an toàn keyed vào state cục bộ thì bị state cục bộ sai vô hiệu hóa** (2026-08-05):
+  B4 phát hiện vị thế trần bằng `p.stop_order_id is None`. `place_stop` bịa ra ID → điều kiện
+  False → B4 im lặng đúng lúc cần nó nhất. Điều kiện phát hiện phải dựa trên **sự thật phía
+  broker**, không dựa trên trường mà chính đường lỗi đó ghi ra.
+
 - **Parquet back-adjusted vs bar live front-month — hai THANG GIÁ khác nhau trong một chuỗi**
   (2026-08-04): `update_ibkr_daily` dựng parquet từ ContFuture + splice offset (liền mạch qua
   rollover — thang mà EMA/ATR/chandelier cần). `fetch_bars` trả **front-month thô** (thang lệnh
