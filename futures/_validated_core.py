@@ -252,7 +252,7 @@ def _swing_cache(df, datr=None):
 
 def backtest_swing_tf(df, labels, cost, *, ema_period=20, chandelier_atr_mult=3.0,
                       max_hold_days=5, entry_days=None, gap_fill=True, return_open=False,
-                      datr=None):
+                      datr=None, resume_pos=None, resume_after_day=None):
     """Cross-day swing TF backtest (vectorized holding). gap_fill=True models a
     stop that GAPS THROUGH: if the bar that triggers the stop OPENED beyond the
     stop, fill at the (worse) open price, not the stop — realistic for overnight
@@ -260,7 +260,22 @@ def backtest_swing_tf(df, labels, cost, *, ema_period=20, chandelier_atr_mult=3.
 
     datr: daily ATR for the instrument's full history, for callers that pass a
     sliced df. See _swing_cache. None = derive it from df, i.e. the behaviour
-    every existing caller already gets."""
+    every existing caller already gets.
+
+    resume_pos / resume_after_day: replay only what has not been replayed yet.
+    The day loop carries exactly one thing across days — the open position — so
+    seeding it and skipping days already covered reproduces a full replay
+    exactly, given datr for the full history. `trades` then holds only the
+    trades that CLOSED after resume_after_day; ones that closed earlier belong
+    to the run that produced the checkpoint.
+
+    The frame must still START at least one session before the first day to be
+    replayed. _swing_cache flags overnight gaps from each bar's spacing to the
+    bar before it, and forces the very first bar of the frame to "no gap"
+    because nothing precedes it. Cut the frame exactly at the resume day and
+    that day's first bar loses its gap flag, turning a GAP exit (filled at the
+    open, worse) into a CHANDELIER one (filled at the stop). Pass the lead-in
+    session and let resume_after_day exclude it from the replay."""
     from raits.strategies.trend_follow import TrendFollowStrategy
     s = TrendFollowStrategy({**TrendFollowStrategy().config, "ema_period": ema_period,
                              "chandelier_atr_mult": chandelier_atr_mult})
@@ -269,9 +284,18 @@ def backtest_swing_tf(df, labels, cost, *, ema_period=20, chandelier_atr_mult=3.
     datr, days, hl, b5, ts = c["datr"], c["days"], c["hl"], c["b5"], c.get("ts", {})
     mult = chandelier_atr_mult
     trades = []
-    pos = None
+    # Copied: the loop ratchets pos["stop"] and pos["extreme"] in place, so
+    # replaying from the same checkpoint twice would otherwise give two
+    # different answers — the second run starting from the first run's leftovers.
+    pos = dict(resume_pos) if resume_pos is not None else None
+    _replayed_through = (pd.Timestamp(resume_after_day).normalize()
+                         if resume_after_day is not None else None)
 
     for day in days:
+        # Present in the frame so the next day's gap flags are right, but already
+        # accounted for by the checkpoint — see the docstring.
+        if _replayed_through is not None and day <= _replayed_through:
+            continue
         exit_ts_today = None  # causal: set if exit fires within session; entry scan filters to bars after
         if pos is not None:
             hold = (day - pos["entry_day"]).days
