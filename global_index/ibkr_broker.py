@@ -937,9 +937,12 @@ class IBKRBroker(Broker):
             # stop placed on an earlier day is never in it. Scanning trades() alone
             # reported "not found" for orders that were live at IBKR for days
             # (live 2026-08-05: orderIds 9 and 10, still PreSubmitted).
-            ib.reqAllOpenOrders()
-            ib.sleep(1.0)  # allow order events to populate the cache
-            matching = [t for t in ib.openTrades()
+            # Use what reqAllOpenOrders RETURNS, not ib.openTrades(). openTrades reads
+            # wrapper.trades, an accumulating cache that never evicts: IBKR pushes status
+            # updates only to the client that owns an order, so a cross-client order that
+            # fills is never marked done and lingers there forever (live 2026-08-06: a
+            # filled M2K stop still read PreSubmitted 16 minutes later).
+            matching = [t for t in ib.reqAllOpenOrders()
                         if t.order.orderId == order_id_int and not t.isDone()]
             if not matching:
                 log.warning(
@@ -1020,9 +1023,7 @@ class IBKRBroker(Broker):
             # or from this runner's own earlier process — only after that request. Without
             # it a stop placed yesterday reads NOT_FOUND, which B3 escalates to CRITICAL
             # and a halt. Same blind spot as cancel_order had.
-            ib.reqAllOpenOrders()
-            ib.sleep(1.0)
-            for t in ib.openTrades():
+            for t in ib.reqAllOpenOrders():
                 if t.order.orderId == order_id_int:
                     s = t.orderStatus.status
                     if s == "Filled":
@@ -1055,9 +1056,7 @@ class IBKRBroker(Broker):
             return False  # offline / test mode
 
         ib = self._require_connection()
-        ib.reqAllOpenOrders()
-        ib.sleep(1.0)
-        for t in ib.openTrades():
+        for t in ib.reqAllOpenOrders():
             _sym = t.contract.symbol
             if _IBKR_TO_RAITS.get(_sym, _sym) != inst:
                 continue
@@ -1083,10 +1082,8 @@ class IBKRBroker(Broker):
             return None  # offline / test mode — cannot testify
 
         ib = self._require_connection()
-        ib.reqAllOpenOrders()
-        ib.sleep(1.0)
         working: dict = {}
-        for t in ib.openTrades():
+        for t in ib.reqAllOpenOrders():
             if t.order.orderType not in ("STP", "STP LMT"):
                 continue
             if t.orderStatus.status not in self._STP_LIVE_STATUS:

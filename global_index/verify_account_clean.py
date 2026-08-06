@@ -85,9 +85,12 @@ def main():
     positions_clean = (stable_positions == [])
 
     # ── 4. open orders / openTrades ───────────────────────────────
-    print("\n[4] openTrades() — pending + GTC orders ...")
-    ib.sleep(1.0)
-    trades = ib.openTrades()
+    print("\n[4] reqAllOpenOrders() — pending + GTC orders, all clients ...")
+    # openTrades() shows only this client's orders, and reads a cache that never evicts
+    # ones IBKR has stopped reporting. Both directions are wrong for a clean-account
+    # check: it would miss a live stop placed by another client (false clean) and keep
+    # showing a filled one (false dirty). reqAllOpenOrders returns the current truth.
+    trades = ib.reqAllOpenOrders()
     open_orders = []
     for t in trades:
         sym   = t.contract.symbol if t.contract else "?"

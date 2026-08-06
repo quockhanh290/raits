@@ -163,11 +163,20 @@ class _CancelTrade:
 
 
 class _CancelIB:
-    """trades() is session-local and empty; the order only appears in openTrades()
-    once reqAllOpenOrders() has been issued — mirroring IBKR's actual behaviour."""
+    """Models the two views ib_insync gives of open orders, which disagree.
 
-    def __init__(self, cross_session_trades):
+    reqAllOpenOrders() returns what IBKR reports as open right now. openTrades()
+    reads wrapper.trades — an accumulating cache. IBKR pushes status updates only to
+    the client that OWNS an order, so a cross-client order that fills is never
+    updated there and lingers forever. Live 2026-08-06: a filled M2K stop still read
+    PreSubmitted in the dashboard backend 16 minutes later.
+
+    `stale` holds entries that only the cache still believes in.
+    """
+
+    def __init__(self, cross_session_trades, stale=()):
         self._cross = cross_session_trades
+        self._stale = list(stale)
         self.req_all_called = 0
         self.cancelled: list = []
 
@@ -176,9 +185,10 @@ class _CancelIB:
 
     def reqAllOpenOrders(self):
         self.req_all_called += 1
+        return list(self._cross)          # authoritative, per call
 
     def openTrades(self):
-        return list(self._cross) if self.req_all_called else []
+        return list(self._cross) + self._stale   # cache — never evicts
 
     def cancelOrder(self, order):
         # A broker that honours the cancel — the normal case. Tests that model a
@@ -325,8 +335,7 @@ class _StopTrade:
 
 
 class _StopsIB(_CancelIB):
-    def openTrades(self):
-        return list(self._cross)          # reqAllOpenOrders already asserted elsewhere
+    pass
 
 
 def test_ws1_nkd_stop_is_keyed_by_runner_name():
@@ -422,6 +431,54 @@ def test_tk5_on_grid_price_is_unchanged():
 def test_tk6_unknown_instrument_passes_through():
     """No tick on record → send what we were given rather than invent a grid."""
     assert _rt("ZZZ", "LONG", 123.456) == pytest.approx(123.456)
+
+
+# ── the cache is not the broker: stale entries must not read as working ──────
+#
+# ib_insync keeps every trade it has ever seen in wrapper.trades, and openTrades()
+# filters that cache by status. IBKR only pushes status updates to the client that
+# owns an order, so a cross-client order that fills is never marked done and stays in
+# openTrades() forever. reqAllOpenOrders() RETURNS the authoritative list — its own
+# docstring warns that other clients' orders "will not be kept in sync".
+#
+# Live 2026-08-06: M2K stop #14 filled at 08:11 and the dashboard backend still showed
+# it PreSubmitted at 08:27. A naked position would have rendered as protected.
+
+
+def test_ws7_stale_cached_stop_is_not_working():
+    live = _StopTrade("MES", 9)
+    stale = _StopTrade("M2K", 14)        # filled at IBKR; only the cache still has it
+    working = _cancel_broker(_StopsIB([live], stale=[stale])).get_working_stops()
+
+    assert working == {"MES": "9"}, (
+        f"openTrades() keeps filled cross-client orders forever — the authoritative "
+        f"list is what reqAllOpenOrders returns. got {working}"
+    )
+
+
+def test_ws8_has_working_stop_ignores_the_stale_cache():
+    live = _StopTrade("MES", 9)
+    stale = _StopTrade("M2K", 14)
+    broker = _cancel_broker(_StopsIB([live], stale=[stale]))
+    assert broker.has_working_stop("M2K") is False
+    assert broker.has_working_stop("MES") is True
+
+
+def test_gs3_stale_cached_order_reads_not_found():
+    """B3 asks this to tell 'stop still live' from 'stop gone'. A cached ghost would
+    answer PENDING and stall the reconcile it exists to resolve."""
+    live = _StatusTrade(9, "PreSubmitted")
+    stale = _StatusTrade(14, "PreSubmitted")
+    broker = _cancel_broker(_StatusIB([live], stale=[stale]))
+    assert broker.get_order_status("14") == "NOT_FOUND"
+    assert broker.get_order_status("9") == "PENDING"
+
+
+def test_ca7_cannot_cancel_an_order_that_only_the_cache_believes_in():
+    stale = _CancelTrade(14)
+    fake = _CancelIB([], stale=[stale])
+    assert _cancel_broker(fake).cancel_order("14") is False
+    assert fake.cancelled == [], "must not send a cancel for an order IBKR no longer has"
 
 
 # ── a correct stop does not cancel out a dangerous one ───────────────────────

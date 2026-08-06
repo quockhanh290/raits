@@ -115,11 +115,17 @@ def _reader_thread(port: int, client_id: int, poll_interval: int) -> None:
             # ── Open trades (STP GTC, pending) ───────────────────────────
             # reqAllOpenOrders fetches orders from ALL clients (clientId 0 = TWS UI,
             # clientId 1 = runner). Without this, openTrades() returns only clientId 99's own.
+            #
+            # Use what it RETURNS, not ib.openTrades(). openTrades() reads wrapper.trades,
+            # a cache that accumulates and never evicts. IBKR pushes status updates only to
+            # the client that OWNS an order, so a cross-client order that fills is never
+            # marked done and stays there forever — this reader is a long-lived process, so
+            # the ghost never clears. Live 2026-08-06: M2K stop #14 filled at 08:11 and this
+            # panel still showed it PreSubmitted at 08:27. A naked position would render as
+            # protected, which is the one thing this panel must never do.
             orders: list[dict] = []
             try:
-                ib.reqAllOpenOrders()
-                ib.sleep(1.0)  # allow order events to populate cache
-                for t in ib.openTrades():
+                for t in ib.reqAllOpenOrders():
                     c = t.contract
                     o = t.order
                     s = t.orderStatus

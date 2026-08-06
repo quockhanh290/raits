@@ -57,10 +57,11 @@ def working_stops(ib) -> dict:
     chances to disagree about what "protected" means, which is the failure mode this
     whole tool exists to catch.
     """
-    ib.reqAllOpenOrders()
-    ib.sleep(2.0)
+    # reqAllOpenOrders RETURNS the authoritative list. ib.openTrades() reads an
+    # accumulating cache that never evicts orders IBKR stops reporting, so a filled
+    # cross-client stop lingers there indefinitely.
     out: dict = {}
-    for t in ib.openTrades():
+    for t in ib.reqAllOpenOrders():
         o, s = t.order, t.orderStatus
         if o.orderType not in ("STP", "STP LMT") or s.status not in LIVE_STATUS:
             continue
