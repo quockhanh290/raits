@@ -202,10 +202,20 @@ _SWING_CACHE = {}
 
 def _swing_cache(df):
     """Precompute per-df: daily ATR, day list, per-day high/low/open arrays (1m),
-    per-day 5m frames. Keyed by id(df) so WFO reuses across param/fold calls."""
+    per-day 5m frames. Keyed by id(df) so WFO reuses across param/fold calls.
+
+    The entry holds a reference to df, and that reference is what makes the key
+    sound: two live objects cannot share an address, so while the entry exists
+    its id cannot be handed to a different frame. Without it a freed frame's
+    address is recycled and one frame's bars are served to another — no error,
+    just wrong numbers. Callers that build frames in a loop must still clear the
+    cache; runner.py does so after each run_day (J2), which is what bounds
+    retention here.
+    """
     k = id(df)
-    if k in _SWING_CACHE:
-        return _SWING_CACHE[k]
+    hit = _SWING_CACHE.get(k)
+    if hit is not None:
+        return hit[1]
     datr = daily_atr_series(df)
     # real time-gaps: a bar preceded by a break > threshold (maintenance ~60m, weekend,
     # or RTH overnight) is where an overnight PRICE gap can occur. Continuous 1m bars
@@ -214,9 +224,11 @@ def _swing_cache(df):
     deltas = df.index.to_series().diff().dt.total_seconds().to_numpy() / 60.0
     is_gap_full = deltas > GAP_MIN          # True where a real time-break precedes the bar
     is_gap_full[0] = False
-    df = df.assign(_isgap=is_gap_full)
+    # Bound to a new name: rebinding df here would drop the caller's frame from
+    # this scope, and it is that frame the entry below must keep alive.
+    dfg = df.assign(_isgap=is_gap_full)
     day_hl, day_b5, day_ts = {}, {}, {}
-    for d, g in df.groupby(df.index.normalize()):
+    for d, g in dfg.groupby(dfg.index.normalize()):
         key = pd.Timestamp(d).tz_localize(None).normalize()
         day_hl[key] = (g["high"].to_numpy(), g["low"].to_numpy(),
                        g["open"].to_numpy(), g["_isgap"].to_numpy())
@@ -224,7 +236,7 @@ def _swing_cache(df):
         day_ts[key] = g.index      # 1m bar timestamps — for entry_time/exit_time capture only
     days = sorted(day_hl.keys())
     cache = dict(datr=datr, days=days, hl=day_hl, b5=day_b5, ts=day_ts)
-    _SWING_CACHE[k] = cache
+    _SWING_CACHE[k] = (df, cache)
     return cache
 
 def backtest_swing_tf(df, labels, cost, *, ema_period=20, chandelier_atr_mult=3.0,
