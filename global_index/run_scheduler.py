@@ -116,6 +116,23 @@ log.info("Log file: %s", _LOG_FILE)
 # by date, so a stale file cannot authorise a day it does not name.
 _preflight_ok: dict = {}
 _PREFLIGHT_STATE = Path("global_index/preflight_state.json")
+
+# Which days the 09:31 MAX_HOLD exit actually ran, so a scheduler started later can
+# tell "already done" from "never happened".
+#
+# APScheduler computes the next fire time at startup: start at 09:43 and today's
+# 09:31 is not late, it does not exist. No misfire, no error, nothing logged.
+# That happened on 2026-08-05 (started 09:43) and 2026-08-06 (10:35). Neither cost
+# anything only because no position had reached 5 days yet.
+#
+# It matters more than the silence suggests: MAX_HOLD exits are 15% of trades and
+# average +$398.60 while chandelier exits are 79.5% and average -$48.84 — the whole
+# edge leaves through this job. Backtest exits it at the 09:30 ET bar (INVARIANTS,
+# the fix that moved baseline $41,266 → $40,919); missing the slot pushes the real
+# exit to ~14:10 via run_live_day, 4h40 later than the convention every recorded
+# number was produced under.
+_maxhold_done: dict = {}
+_MAXHOLD_STATE = Path("global_index/maxhold_state.json")
 _PREFLIGHT_KEEP = 7          # days retained; keeps the file from growing without bound
 _FAIL_TAIL_LINES = 25        # child output echoed on failure — enough for the traceback
 
@@ -200,6 +217,33 @@ def _load_preflight_state() -> None:
     except Exception as exc:
         log.warning("[PRE-FLIGHT] could not read %s (%s) — starting empty (fail-closed)",
                     _PREFLIGHT_STATE, exc)
+
+
+def _load_maxhold_state() -> None:
+    if not _MAXHOLD_STATE.exists():
+        return
+    try:
+        with open(_MAXHOLD_STATE, encoding="utf-8") as fh:
+            _maxhold_done.update({k: bool(v) for k, v in json.load(fh).items()})
+    except Exception as exc:
+        log.warning("[MAXHOLD] could not read %s (%s) — will treat today as not run",
+                    _MAXHOLD_STATE, exc)
+
+
+def _save_maxhold_state() -> None:
+    """Atomic. A torn file reads as 'not run', which re-runs a job that is
+    idempotent — the safe direction to fail in."""
+    try:
+        keep = dict(sorted(_maxhold_done.items())[-_PREFLIGHT_KEEP:])
+        _maxhold_done.clear()
+        _maxhold_done.update(keep)
+        _MAXHOLD_STATE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _MAXHOLD_STATE.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(keep, fh, indent=2)
+        os.replace(tmp, _MAXHOLD_STATE)
+    except Exception as exc:
+        log.error("[MAXHOLD] could not persist state to %s: %s", _MAXHOLD_STATE, exc)
 
 
 def _save_preflight_state() -> None:
@@ -291,11 +335,19 @@ def make_scheduler(port: int, dry_run: bool,
     # ── 09:31 ET Mon-Fri: MAX_HOLD exit at RTH open ──────────────────────────
     @sched.scheduled_job("cron", day_of_week="mon-fri", hour=9, minute=31,
                          id="maxhold_exit", name="MAX_HOLD exit 09:31 ET")
-    def job_maxhold():
-        _run([sys.executable, "-m", "global_index.run_maxhold_exit",
-              "--positions-path", "live_positions.json",
-              "--port", str(port)],
-             label="MAX_HOLD_EXIT", dry_run=dry_run)
+    def job_maxhold(label: str = "MAX_HOLD_EXIT"):
+        ok = _run([sys.executable, "-m", "global_index.run_maxhold_exit",
+                   "--positions-path", "live_positions.json",
+                   "--port", str(port)],
+                  label=label, dry_run=dry_run)
+        # Only a real run counts. _run returns True under --dry-run without
+        # executing anything, so recording it would mark the day done when nothing
+        # closed — and the next real scheduler would skip the catch-up. A dry-run
+        # that disables the safeguard it is testing is worse than no safeguard.
+        if ok and not dry_run:
+            _maxhold_done[_et_today().isoformat()] = True
+            _save_maxhold_state()
+        return ok
 
     # ── 13:45 ET Mon-Fri: pre-flight (update parquet + spy CSV) ─────────────
     # Runs BEFORE 14:05 run_live_day. Typical duration: ~20s for 5 instruments.
@@ -516,6 +568,51 @@ def make_scheduler(port: int, dry_run: bool,
     return sched
 
 
+def _catch_up_maxhold(sched) -> None:
+    """Run today's 09:31 MAX_HOLD exit if the scheduler came up after it.
+
+    APScheduler schedules the NEXT occurrence at startup, so a scheduler started
+    at 09:43 does not have a late 09:31 job — it has no 09:31 job at all. Nothing
+    misfires, nothing is logged, and the positions that carry the system's entire
+    edge exit hours later through run_live_day instead.
+
+    Re-running is safe: run_maxhold_exit closes positions at hold >= max_hold_days
+    and does nothing when there are none, and it reads live_positions.json plus the
+    broker rather than the parquet, so it does not depend on the 13:45 pre-flight.
+    The state file only avoids a pointless duplicate on every restart.
+
+    Takes no dry_run of its own: it calls the same closure the cron calls, which
+    already captured it. A second copy of that flag is a second thing to keep in
+    step.
+    """
+    from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo
+
+    now = _dt.now(ZoneInfo("America/New_York"))
+    today = now.date().isoformat()
+    if now.weekday() >= 5:
+        return
+    if now.hour * 60 + now.minute < 9 * 60 + 31:
+        return                                  # the cron will fire it normally
+    if _maxhold_done.get(today):
+        log.info("[MAXHOLD] da chay hom nay (%s) — bo qua catch-up", today)
+        return
+
+    job = sched.get_job("maxhold_exit")
+    if job is None:
+        log.error("[MAXHOLD] khong tim thay job maxhold_exit — khong catch-up duoc")
+        return
+
+    log.warning("[MAXHOLD] CATCH-UP: khoi dong luc %s ET, sau moc 09:31, va job hom "
+                "nay chua chay. Chay ngay bay gio.", now.strftime("%H:%M"))
+    ok = job.func(label="MAX_HOLD_EXIT_CATCHUP")
+    if not ok:
+        log.critical("[MAXHOLD] CATCH-UP THAT BAI — vi the du 5 ngay co the chua duoc "
+                     "dong. Kiem live_positions.json va chay tay: python -m "
+                     "global_index.run_maxhold_exit --positions-path "
+                     "live_positions.json --port <port>")
+
+
 def main():
     ap = argparse.ArgumentParser(description="TZ-independent APScheduler cron for RAITS")
     ap.add_argument("--port",             type=int, default=4002,
@@ -556,6 +653,7 @@ def main():
     # Restore persisted pre-flight state BEFORE any flag is set, so a restart does
     # not blank out yesterday's record — the NKD night slots read it.
     _load_preflight_state()
+    _load_maxhold_state()
 
     if a.assume_preflight_ok:
         from datetime import date as _d
@@ -580,6 +678,8 @@ def main():
         _next = getattr(j, "next_run_time", "(start scheduler to compute)")
         log.info("  %-20s  next: %s", j.id, _next)
     log.info("Pre-flight fail-safe: update fail -> live_day skipped (no stale-data trades)")
+    _catch_up_maxhold(sched)
+
     log.info("Scheduler started. Ctrl-C to stop.")
     try:
         sched.start()
