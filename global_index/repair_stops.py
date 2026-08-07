@@ -75,6 +75,32 @@ def _side_is_sane(direction: str, stop: float, market: float) -> tuple[bool, str
     return True, ""
 
 
+def id_corrections(positions: list[dict], stops: dict) -> dict:
+    """{inst: order_id} where the recorded stop_order_id disagrees with reality.
+
+    A position that is already protected still needs its recorded id kept true.
+    Live 2026-08-05: MES carried the fabricated id 62 and a real working stop #9. The
+    repair skipped it as already protected and left 62 on file, so when MES closed the
+    next day the runner cancelled a ghost, raised STP ORPHAN naming 62, and left #9
+    working with no position behind it — an order that would have opened a short.
+
+    Only a stop on the protective side counts. Recording a wrong-side one would tell
+    the runner that a position-doubling order is its protection.
+    """
+    out: dict = {}
+    for p in positions:
+        inst, direction = p.get("inst"), p.get("direction")
+        want = PROTECTIVE_SIDE.get(direction)
+        matching = [c for c in stops.get(inst, []) if c[0] == want]
+        if not matching:
+            continue
+        true_id = str(matching[0][1])
+        recorded = p.get("stop_order_id")
+        if recorded is None or str(recorded) != true_id:
+            out[inst] = true_id
+    return out
+
+
 def _write_positions(path: Path, new_ids: dict) -> None:
     """Persist the new stop_order_ids, keeping the rest of the file untouched.
 
@@ -164,14 +190,30 @@ def main() -> int:
             else:  # NAKED
                 plan.append(("place", inst, by_inst[inst]))
 
-        if not plan:
+        # A position can be fully protected and still carry a wrong recorded id. Left
+        # alone it makes the runner cancel a ghost on exit and orphan the real stop, so
+        # correct it whether or not there is anything else to repair.
+        drift = id_corrections(positions, stops)
+        if drift:
+            print("\nRECORDED ID DRIFT (file says one thing, broker holds another)")
+            print("-" * 78)
+            for inst, true_id in drift.items():
+                print(f"  {inst:<6} stop_order_id "
+                      f"{by_inst[inst].get('stop_order_id')!r} → {true_id!r}")
+
+        if not plan and not drift:
             print("\nnothing to repair — every position is protected")
             return 0
 
+        new_ids: dict = dict(drift)
+        remaining = 0
+        if not a.execute and drift:
+            print("\n  (dry run — ids not written)")
+
         print("\nPLAN")
         print("-" * 78)
-        new_ids: dict = {}
-        remaining = 0
+        if not plan:
+            print("  (no orders to send)")
         for kind, inst, payload in plan:
             if kind == "cancel":
                 oid, why = payload
@@ -216,7 +258,7 @@ def main() -> int:
 
         if not a.execute:
             print("-" * 78)
-            print("dry run — re-run with --execute to send the above")
+            print("dry run — re-run with --execute to apply the above")
             return 1
 
         if new_ids:

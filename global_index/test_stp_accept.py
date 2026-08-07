@@ -510,5 +510,48 @@ def test_cl2_clean_position_is_just_ok():
     assert [r[0] for r in classify(positions, stops)] == ["OK"]
 
 
+# ── a skipped position still needs its recorded order id corrected ───────────
+#
+# repair_stops left stop_order_id alone whenever a position was already protected.
+# On 2026-08-05 MES carried the fabricated id 62 and a real working stop #9; the
+# repair skipped it, so 62 stayed on file. When MES closed on 2026-08-06 the runner
+# dutifully tried to cancel 62, failed, raised STP ORPHAN naming 62 — and #9 was left
+# working with no position behind it, which is the order that would have opened a
+# short if MES had fallen far enough.
+
+
+def test_id1_records_the_stop_that_is_actually_working():
+    from global_index.repair_stops import id_corrections
+
+    positions = [{"inst": "MES", "direction": "LONG", "stop_order_id": "62"}]
+    stops = {"MES": [("SELL", 9, 7627.25)]}
+    assert id_corrections(positions, stops) == {"MES": "9"}
+
+
+def test_id2_silent_when_the_recorded_id_is_already_right():
+    from global_index.repair_stops import id_corrections
+
+    positions = [{"inst": "MYM", "direction": "SHORT", "stop_order_id": "12"}]
+    stops = {"MYM": [("BUY", 12, 54709.0)]}
+    assert id_corrections(positions, stops) == {}
+
+
+def test_id3_never_records_a_wrong_side_stop_as_protection():
+    """Recording it would make the runner treat a position-doubling order as its stop."""
+    from global_index.repair_stops import id_corrections
+
+    positions = [{"inst": "MYM", "direction": "SHORT", "stop_order_id": None}]
+    stops = {"MYM": [("SELL", 10, 53290.0)]}
+    assert id_corrections(positions, stops) == {}
+
+
+def test_id4_fills_in_a_missing_id():
+    from global_index.repair_stops import id_corrections
+
+    positions = [{"inst": "M2K", "direction": "SHORT", "stop_order_id": None}]
+    stops = {"M2K": [("BUY", 100, 3020.10)]}
+    assert id_corrections(positions, stops) == {"M2K": "100"}
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
