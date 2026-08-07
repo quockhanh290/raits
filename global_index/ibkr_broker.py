@@ -1069,6 +1069,49 @@ class IBKRBroker(Broker):
             return True
         return False
 
+    def unprotected_positions(self) -> "list | None":
+        """Open positions with no stop working on THEIR OWN contract.
+
+        get_working_stops and has_working_stop both match on the instrument symbol,
+        which answers "is there a stop for MES" rather than "is this position
+        protected". Those differ the moment a position and a stop sit on different
+        expiries — after a rollover, most obviously, where _handle_rollover moves the
+        position to the next contract and the old contract's STP is left working. The
+        symbol-level check then reports the new position as protected while the only
+        live stop belongs to a contract that is no longer held.
+
+        Matching on (symbol, lastTradeDateOrContractMonth) is done here because this
+        is where the IBKR contract objects are; nothing above needs a new field.
+
+        Returns None offline — cannot testify rather than testifying falsely.
+        Each entry: {"inst", "expiry", "qty", "stop_expiries"}.
+        """
+        if self._raw_fetcher is not None:
+            return None
+
+        ib = self._require_connection()
+        stops: dict = {}
+        for t in ib.reqAllOpenOrders():
+            if t.order.orderType not in ("STP", "STP LMT"):
+                continue
+            if t.orderStatus.status not in self._STP_LIVE_STATUS:
+                continue
+            sym = _IBKR_TO_RAITS.get(t.contract.symbol, t.contract.symbol)
+            stops.setdefault(sym, set()).add(t.contract.lastTradeDateOrContractMonth)
+
+        out = []
+        for p in ib.positions():
+            if not p.position:
+                continue
+            sym = _IBKR_TO_RAITS.get(p.contract.symbol, p.contract.symbol)
+            exp = p.contract.lastTradeDateOrContractMonth
+            have = stops.get(sym, set())
+            if exp in have:
+                continue
+            out.append({"inst": sym, "expiry": exp, "qty": int(p.position),
+                        "stop_expiries": sorted(have)})
+        return out
+
     def get_working_stops(self) -> "dict | None":
         """{inst: orderId} for every stop working at IBKR, across all clients.
 
@@ -1092,20 +1135,28 @@ class IBKRBroker(Broker):
             working[_IBKR_TO_RAITS.get(sym, sym)] = str(t.order.orderId)
         return working
 
-    def find_execution(self, order_id: str) -> bool:
-        """Check IB server-side execution history for a confirmed fill of order_id.
+    def find_execution(self, order_id: str) -> "dict | None":
+        """The execution record for order_id, or None.
 
-        Uses ib.reqExecutions() — queries IB's *persistent* server history and
-        survives TWS daily restart (unlike ib.fills() which is session-only / cleared
-        at 17:00 ET). Looks back 2 days so that STPs fired during yesterday's regular
-        session (before the 17:00 ET trading-day boundary) are also caught.
+        Uses ib.reqExecutions() — IB's server-side history, which survives the TWS daily
+        restart (unlike ib.fills(), session-only, cleared at 17:00 ET). Two-day lookback
+        covers a STP fired during yesterday's session plus overnight fills.
 
-        Returns True only when a matching fill record is found.
-        Returns False on not-found OR any error — callers must treat False conservatively
+        Returns the fill's price, size, time and permId. It used to return a bare True
+        and drop all of it, which is how the exit price of every stop-triggered close
+        went unrecorded: the runner sends no order when a stop fires, so nothing else
+        writes one, and this is the single moment the record is in hand. Measured
+        2026-08-07: reqExecutions served a fill on the day it happened and had forgotten
+        it by the next, so the data is only available here, once.
+
+        permId is included because it is IBKR's stable global identifier. orderId
+        repeats across clients — the ambiguity behind the #62-vs-#9 mix-up.
+
+        Falsy (None) on not-found OR any error — callers must treat that conservatively
         (halt the strategy, not silently infer a clean exit).
         """
         if self._raw_fetcher is not None:
-            return False   # test mode — caller uses get_order_status() FILLED path
+            return None    # test mode — caller uses get_order_status() FILLED path
         ib = self._require_connection()
         try:
             import ib_insync as ibi
@@ -1118,12 +1169,20 @@ class IBKRBroker(Broker):
             order_id_int = int(order_id)
             fills = ib.reqExecutions(ibi.ExecutionFilter(time=lookback))
             for fill in fills:
-                if getattr(fill.execution, "orderId", None) == order_id_int:
-                    return True
-            return False
+                ex = fill.execution
+                if getattr(ex, "orderId", None) != order_id_int:
+                    continue
+                return {
+                    "order_id": order_id_int,
+                    "perm_id":  getattr(ex, "permId", None),
+                    "price":    float(getattr(ex, "price", 0.0) or 0.0),
+                    "shares":   float(getattr(ex, "shares", 0.0) or 0.0),
+                    "time":     str(getattr(ex, "time", "") or ""),
+                }
+            return None
         except Exception as exc:
             log.warning("find_execution(orderId=%s) failed: %s", order_id, exc)
-            return False
+            return None
 
     # ── C2: Rollover ──────────────────────────────────────────────────────────
 

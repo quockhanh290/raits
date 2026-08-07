@@ -369,6 +369,7 @@ class FuturesRunner:
                                         k[1], k[0], _stp_cand.stop_order_id,
                                         _stp_cand.stop_price or 0.0,
                                     )
+                                    self._record_stop_exit(_stp_cand, _fill_verified)
                                     loaded_positions[:] = [
                                         p for p in loaded_positions if p is not _stp_cand]
                                 else:
@@ -643,6 +644,61 @@ class FuturesRunner:
         except Exception as _exc:
             logger.warning("C1: could not persist slip_stats.json: %s", _exc)
 
+    def _record_stop_exit(self, pos, fill: dict) -> None:
+        """Write the CLOSE record for a stop that fired at the broker.
+
+        Nothing else writes one. The runner sends no order when a stop triggers, so the
+        send_order path that logs every other fill never runs, and chandelier stops are
+        79.5% of exits — this is the exit price for most trades.
+
+        It has to happen here because this is the only moment both halves exist: IBKR
+        has just handed back the fill (price, size, time, permId) and the runner is
+        holding the position it belongs to (cluster, direction, entry_day, contracts),
+        which IBKR knows nothing about. Measured 2026-08-07: reqExecutions served a fill
+        on the day it happened and had forgotten it by the next.
+
+        exit_day comes from the fill's own timestamp, not from now: a stop that fired
+        overnight is noticed the next morning, and dating it to the reconcile would put
+        the trade on the wrong day.
+
+        Never raises. This runs inside startup reconcile; losing a log line must not
+        stop the runner from clearing state and trading.
+        """
+        try:
+            _t = str(fill.get("time") or "")
+            _exit_day = None
+            if _t:
+                try:
+                    _exit_day = str(pd.Timestamp(_t).date())
+                except Exception:
+                    _exit_day = _t[:10] or None
+            self._append_trade({
+                "type": "CLOSE",
+                "inst": pos.inst,
+                "cluster": pos.cluster,
+                "direction": pos.direction,
+                "contracts": pos.contracts,
+                "entry_day": str(pd.Timestamp(pos.entry_day).date()) if pos.entry_day else None,
+                "exit_day": _exit_day,
+                "exit_reason": "STP",
+                "expected_stop": pos.stop_price,
+                "fill_price": fill.get("price"),
+                "filled_qty": fill.get("shares"),
+                "order_id": fill.get("order_id"),
+                "perm_id": fill.get("perm_id"),
+                "status": "FILLED",
+                "source": "B3_STP_VERIFY",
+            })
+            logger.info(
+                "B3 STP-VERIFY: recorded stop exit %s/%s @ %.4f (permId=%s) — "
+                "nothing else writes a trade record for a stop fill",
+                pos.inst, pos.cluster, float(fill.get("price") or 0.0), fill.get("perm_id"),
+            )
+        except Exception as exc:
+            logger.error("could not record stop exit for %s/%s: %s — the exit price is "
+                         "lost once IBKR drops it from reqExecutions",
+                         pos.inst, pos.cluster, exc)
+
     def _append_trade(self, record: dict) -> None:
         if self._trade_log_path is None:
             return
@@ -881,6 +937,66 @@ class FuturesRunner:
                 f"close@{close_fill.avg_price:.2f} → open@{open_fill.avg_price:.2f}  "
                 f"slippage={roll_slippage:.2f}",
             )
+
+            # The position now lives on the next contract; the stop protecting it does
+            # not. Left alone the old STP keeps working on a contract that is no longer
+            # held — and an orphaned stop is not merely useless: a SELL STP with no long
+            # behind it fills into a short nobody asked for, on an expiring contract.
+            if pos.stop_order_id:
+                try:
+                    _ok = self.broker.cancel_order(pos.stop_order_id)
+                except Exception as _e:
+                    _ok = False
+                    logger.error("C2: cancel_order(%s) raised for %s: %s",
+                                 pos.stop_order_id, pos.inst, _e)
+                if _ok:
+                    logger.info("C2: cancelled old-contract stop orderId=%s for %s",
+                                pos.stop_order_id, pos.inst)
+                else:
+                    logger.critical(
+                        "C2: could NOT cancel old-contract stop orderId=%s for %s. It "
+                        "may still be working on the expiring contract and can fill "
+                        "into an unwanted position. OPERATOR: cancel it in TWS.",
+                        pos.stop_order_id, pos.inst,
+                    )
+                pos.stop_order_id = None
+
+            # The recorded level belongs to the old contract's price scale. The two
+            # fills just measured what the two contracts differ by, so shifting the
+            # stop by that keeps the same distance to price on the new scale — a
+            # measured spread rather than a quoted one.
+            if pos.stop_price is None:
+                logger.critical(
+                    "C2: %s %s rolled with no recorded stop level — the new contract "
+                    "is UNPROTECTED and no level is known to re-place. OPERATOR: "
+                    "recompute the chandelier level and place the STP in TWS.",
+                    pos.inst, pos.direction,
+                )
+            else:
+                _shift = open_fill.avg_price - close_fill.avg_price
+                _new_stop = pos.stop_price + _shift
+                try:
+                    _sid = self.broker.place_stop(pos.inst, pos.direction,
+                                                  pos.contracts, _new_stop, pos.cluster)
+                except Exception as _e:
+                    _sid = ""
+                    logger.error("C2: place_stop after roll raised for %s: %s",
+                                 pos.inst, _e)
+                if _sid:
+                    pos.stop_price = _new_stop
+                    pos.stop_order_id = _sid
+                    logger.info(
+                        "C2: stop rolled %s: %.4f → %.4f (shift %+.4f) orderId=%s",
+                        pos.inst, _new_stop - _shift, _new_stop, _shift, _sid,
+                    )
+                else:
+                    logger.critical(
+                        "C2: %s %s rolled to the new contract but the replacement STP "
+                        "was NOT accepted (wanted %.4f). Position is UNPROTECTED. "
+                        "OPERATOR: place it in TWS or close the position.",
+                        pos.inst, pos.direction, _new_stop,
+                    )
+            self._persist_state()
 
     # ── main daily loop ──────────────────────────────────────────────────────
 
@@ -1411,6 +1527,36 @@ class FuturesRunner:
         orders are placed and persisted, and an observability failure must not take the
         session down with it.
         """
+        # Prefer the contract-aware check. p.inst in working only asks whether a stop
+        # exists for the symbol, which says nothing about the expiry the position is
+        # actually on — after a rollover the old contract's STP keeps that answer True
+        # while the new position carries nothing. Brokers without the method (MockBroker,
+        # offline) fall through to the symbol check, which is what ran before.
+        try:
+            precise = self.broker.unprotected_positions()
+        except (NotImplementedError, AttributeError):
+            precise = None
+        except Exception as exc:
+            logger.error("B5: unprotected_positions() failed: %s", exc)
+            precise = None
+
+        if precise is not None:
+            for u in precise:
+                logger.critical(
+                    "STP UNPROTECTED: %s x%+d on contract %s has no stop working on "
+                    "that contract (stops seen on: %s). OPERATOR: place the STP "
+                    "manually in TWS or close the position.",
+                    u["inst"], u["qty"], u["expiry"],
+                    ", ".join(u["stop_expiries"]) or "none",
+                )
+                self._emit_event(
+                    "CRITICAL", "ORDER",
+                    f"STP UNPROTECTED: {u['inst']} x{u['qty']:+d} on {u['expiry']} "
+                    f"has no stop on that contract",
+                    dict(u),
+                )
+            return
+
         try:
             working = self.broker.get_working_stops()
         except (NotImplementedError, AttributeError):
