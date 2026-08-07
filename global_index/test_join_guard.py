@@ -22,7 +22,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from global_index.update_ibkr_daily import JOIN_JUMP_MAX_PCT
+from global_index.update_ibkr_daily import JOIN_JUMP_MAX_PCT, _split_entry
 
 # (inst, last close, p99.9 of |Δ| over ~400k 1-min bars, Sep→Dec spread) — 2026-08-07
 MEASURED = [
@@ -37,9 +37,34 @@ def _pct(move: float, price: float) -> float:
     return abs(move) / price * 100
 
 
+# ── the roll signal is the contract, not the price ─────────────────────────────
+#
+# qualifyContracts resolves a ContFuture to the expiry it tracks, so a roll arrives
+# as 'MESU6' becoming 'MESZ6'. Exact, and it needs no threshold. The price check
+# below stayed, with a different job: identity cannot see a corrupt bar or a fetch
+# that returned the wrong contract by hand.
+
+def test_legacy_sidecar_entry_reads_as_unknown_contract():
+    """Entries used to be a bare float. Unknown must not read as unchanged, or the
+    first append after upgrading would compare against nothing and call it a match."""
+    assert _split_entry(11.5) == (11.5, "")
+
+
+def test_new_sidecar_entry_carries_the_contract():
+    assert _split_entry({"offset": 11.5, "contract": "MESU6"}) == (11.5, "MESU6")
+
+
+def test_missing_entry_does_not_raise():
+    """splice_offsets.get(name) is None for an instrument seen for the first time,
+    and it is read before the not-in-sidecar branch. Crashed here on first run."""
+    assert _split_entry(None) == (0.0, "")
+
+
 @pytest.mark.parametrize("inst,price,p999,spread", MEASURED)
-def test_roll_spread_is_refused(inst, price, p999, spread):
-    """Every roll must trip it, or the guard has no purpose."""
+def test_roll_spread_would_also_trip_the_price_check(inst, price, p999, spread):
+    """Belt and braces only. If the contract comparison is ever unavailable — a
+    legacy sidecar entry, a qualify that returns no localSymbol — the price check
+    still catches a roll on its own."""
     assert _pct(spread, price) > JOIN_JUMP_MAX_PCT, inst
 
 

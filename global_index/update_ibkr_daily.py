@@ -104,12 +104,35 @@ def _build_jobs(data_dir: Path, nkd_path: Path) -> list[dict]:
     return jobs
 
 
+def _split_entry(entry) -> "tuple[float, str]":
+    """(offset, contract) from a splice-offsets sidecar entry.
+
+    Entries used to be a bare float. A legacy one yields an empty contract, which
+    reads as "unknown" rather than "unchanged": the first append after upgrading
+    records what it used without claiming to know what came before it.
+    """
+    if entry is None:
+        return 0.0, ""          # instrument not in the sidecar yet
+    if isinstance(entry, dict):
+        return float(entry.get("offset", 0.0)), str(entry.get("contract", ""))
+    return float(entry), ""
+
+
 def _fetch_contfuture(ib, ibkr_symbol: str, exchange: str,
-                      duration: str = "3 D") -> pd.DataFrame:
-    """Fetch 1m bars from IBKR ContFuture (ratio back-adjusted continuous)."""
+                      duration: str = "3 D") -> "tuple[pd.DataFrame, str]":
+    """Fetch 1m bars from IBKR ContFuture, with the contract they came from.
+
+    qualifyContracts resolves a ContFuture to the expiry it currently tracks and
+    fills in localSymbol — 'MESU6' today, 'MESZ6' after the September roll. That is
+    the roll, stated outright, and comparing it against what the previous append
+    used identifies one exactly. Inferring it from the size of a price jump does
+    not: the largest one-minute move of the past year is bigger than the roll
+    spread on every instrument in the basket.
+    """
     import ib_insync as ibi  # type: ignore
     contract = ibi.ContFuture(ibkr_symbol, exchange=exchange)
     ib.qualifyContracts(contract)
+    resolved = contract.localSymbol or contract.lastTradeDateOrContractMonth or ""
     bars = ib.reqHistoricalData(
         contract,
         endDateTime="",             # "" = now
@@ -120,10 +143,10 @@ def _fetch_contfuture(ib, ibkr_symbol: str, exchange: str,
         formatDate=1,
     )
     if not bars:
-        return pd.DataFrame()
+        return pd.DataFrame(), resolved
     df = ibi.util.df(bars)
     if df is None or df.empty:
-        return pd.DataFrame()
+        return pd.DataFrame(), resolved
     df = df.set_index("date")
     df.index = pd.to_datetime(df.index)
     # P2: ib_insync formatDate=1 returns tz-aware US/Central for CME.
@@ -145,7 +168,7 @@ def _fetch_contfuture(ib, ibkr_symbol: str, exchange: str,
         df.index = df.index.tz_convert("UTC").tz_localize(None)
     df.columns = [c.lower() for c in df.columns]
     keep = [c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]
-    return df[keep].sort_index()
+    return df[keep].sort_index(), resolved
 
 
 def assert_utc_convention(df: "pd.DataFrame", label: str, sample_days: int = 5) -> None:
@@ -307,8 +330,8 @@ def main() -> None:
             log.info("[%s] Fetching ContFuture bars (duration=%s) ...", name, a.duration)
 
             try:
-                new_bars = _fetch_contfuture(ib, j["ibkr_symbol"], j["exchange"],
-                                             duration=a.duration)
+                new_bars, fetched_contract = _fetch_contfuture(
+                    ib, j["ibkr_symbol"], j["exchange"], duration=a.duration)
                 ib.sleep(0.5)  # pacing: IBKR allows ~50 requests/10min
 
                 if new_bars.empty:
@@ -329,6 +352,7 @@ def main() -> None:
                 log.info("  %s: existing parquet last bar: %s", name, last_existing)
 
                 # Apply one-time splice offset (Databento diff → IBKR ratio alignment)
+                stored_offset, stored_contract = _split_entry(splice_offsets.get(name))
                 if name not in splice_offsets:
                     # First time: compute and store offset
                     old_last_close = float(existing["close"].iloc[-1])
@@ -338,11 +362,11 @@ def main() -> None:
                         log.info("  %s: splice offset applied: %+.4f "
                                  "(Databento diff → IBKR ratio alignment, one-time)",
                                  name, offset)
-                    splice_offsets[name] = offset
+                    splice_offsets[name] = {"offset": offset,
+                                            "contract": fetched_contract}
                     offsets_dirty = True
                 else:
                     # Subsequent runs: apply stored offset to maintain consistency
-                    stored_offset = splice_offsets[name]
                     new_bars_adj = new_bars.copy()
                     if abs(stored_offset) > 0.01:
                         for col in ["open", "high", "low", "close"]:
@@ -395,24 +419,59 @@ def main() -> None:
                 _first_open = float(new_only["open"].iloc[0])
                 _jump = _first_open - _last_close
                 _jump_pct = abs(_jump) / _last_close * 100 if _last_close else 0.0
-                log.info("  %s: join %.4f → %.4f  (%+.4f, %.3f%%)",
-                         name, _last_close, _first_open, _jump, _jump_pct)
+                log.info("  %s: join %.4f → %.4f  (%+.4f, %.3f%%)  contract %s",
+                         name, _last_close, _first_open, _jump, _jump_pct,
+                         fetched_contract or "(unknown)")
+
+                # Did the CONTRACT change? That is the roll, and IBKR says it
+                # outright — no inference from the size of the move, which cannot
+                # work anyway (see JOIN_JUMP_MAX_PCT).
+                if stored_contract and fetched_contract and stored_contract != fetched_contract:
+                    log.error(
+                        "  %s: CONTRACT ROLLED %s -> %s — refusing to append.",
+                        name, stored_contract, fetched_contract)
+                    log.error(
+                        "       The stored offset (%+.4f) aligns the parquet to %s; bars "
+                        "from %s sit on a different price level. Join was %+.4f (%.3f%%).",
+                        stored_offset, stored_contract, fetched_contract, _jump, _jump_pct)
+                    log.error(
+                        "       Appending would put that step into the series: the day's "
+                        "true range absorbs it, daily ATR is Wilder-smoothed so the "
+                        "chandelier band stays wide for ~56 sessions, and an open "
+                        "position's extreme ratchets its stop to a level that never traded.")
+                    log.error(
+                        "       OPERATOR: re-anchor %s in %s — offset %+.4f -> %+.4f "
+                        "(old minus the join), contract -> %s — then re-run.",
+                        name, a.splice_offsets, stored_offset,
+                        stored_offset - _jump, fetched_contract)
+                    failed.append(name)
+                    continue
+
+                # No roll, so a jump this size is not a change of contract: it is bad
+                # data — the wrong contract fetched by hand, a corrupt bar, a feed
+                # glitch. Loose on purpose, since identity already covers rolls and
+                # this only has to sit above anything a real market does.
                 if _jump_pct > JOIN_JUMP_MAX_PCT:
                     log.error(
-                        "  %s: JOIN JUMP %.3f%% > %.2f%% — refusing to append.\n"
+                        "  %s: JOIN JUMP %.3f%% > %.2f%% with NO contract change (%s) "
+                        "— refusing to append.\n"
                         "       parquet last close %.4f -> first new open %.4f (%+.4f)\n"
-                        "       Most likely a contract roll: the appended bars are on a\n"
-                        "       different contract's price level and the stored splice\n"
-                        "       offset no longer aligns them.\n"
-                        "       OPERATOR: confirm it is a roll (all instruments jump the\n"
-                        "       same direction by a similar %%), then re-anchor the offset\n"
-                        "       for %s in %s and re-run. If it is NOT a roll, the fetch\n"
-                        "       returned the wrong contract or bad bars — do not append.",
+                        "       Not a roll, so this is a data problem: wrong contract,\n"
+                        "       corrupt bar, or a feed glitch. Do not append.",
                         name, _jump_pct, JOIN_JUMP_MAX_PCT,
-                        _last_close, _first_open, _jump, name, a.splice_offsets,
+                        fetched_contract or "unknown",
+                        _last_close, _first_open, _jump,
                     )
                     failed.append(name)
                     continue
+
+                # Record what this append used, so the next one has something to
+                # compare against. Legacy entries carry no contract; this fills it in
+                # on the first run without pretending to know what came before.
+                if fetched_contract and fetched_contract != stored_contract:
+                    splice_offsets[name] = {"offset": stored_offset,
+                                            "contract": fetched_contract}
+                    offsets_dirty = True
 
                 # Concat + sort + dedup
                 keep_cols = [c for c in ["open", "high", "low", "close", "volume"]
