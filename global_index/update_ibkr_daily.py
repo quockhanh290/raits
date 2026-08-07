@@ -57,6 +57,32 @@ logging.basicConfig(
 )
 log = logging.getLogger("update_ibkr_daily")
 
+# Largest price change, as a percentage, allowed between the parquet's last bar and
+# the first bar appended after it. Above this the append is refused — see the join
+# check in main() for why stopping beats re-anchoring.
+#
+# Measured on the last ~400k one-minute bars of each instrument (2026-08-07),
+# against the Sep/Dec calendar spread quoted by IBKR the same day, both as a
+# percentage of the instrument's price:
+#
+#   inst   p99.9 of |Δ| 1-min   roll spread
+#   MES    0.152%   (11.75)     0.862%   ( 66.75)
+#   MNQ    0.211%   (62.50)     1.006%   (298.25)
+#   MYM    0.154%   (83.00)     0.741%   (400.00)
+#   M2K    0.232%   ( 7.00)     0.779%   ( 23.50)
+#
+# 0.35% is the only value that clears every p99.9 by 1.5x AND sits 2.0x below every
+# roll spread; the window is 0.348-0.370%. That it is this narrow is the finding:
+# the worst ordinary minute (0.232%) and the smallest roll (0.741%) are only 3.2x
+# apart, so there is not much room on either side. Re-measure before moving it.
+#
+# It has to be a fraction rather than a number of points — MYM trades near 54,000
+# and M2K near 3,000 — and it cannot be set from magnitude alone: the largest
+# one-minute move of the year is BIGGER than the roll spread on all four instruments
+# (MES 118.50 against 66.75). What separates a roll from a violent minute is not size
+# but rarity, and the join is one specific minute a day rather than all 400k of them.
+JOIN_JUMP_MAX_PCT: float = 0.35
+
 # ── Instruments: (runner_name, ibkr_symbol, parquet_path) ────────────────────
 def _build_jobs(data_dir: Path, nkd_path: Path) -> list[dict]:
     jobs = []
@@ -332,6 +358,61 @@ def main() -> None:
 
                 log.info("  %s: appending %d new bars (%s → %s)",
                          name, len(new_only), new_only.index[0], new_only.index[-1])
+
+                # The join must be a market move, not a change of contract.
+                #
+                # IBKR ContFuture is ratio back-adjusted to whichever contract is
+                # current, so its history is continuous but the bars we fetch are the
+                # live contract's actual prices. We only ever append, so the first
+                # append after a roll carries the next contract's price level while
+                # everything before it carries the previous one's — and the splice
+                # offset is computed once and never revisited. Measured 2026-08-07,
+                # Sep vs Dec: +66.75 MES, +298.25 MNQ, +400.00 MYM, +23.50 M2K,
+                # 0.74-1.01% of price and all the same sign.
+                #
+                # A jump like that is not a market event. It inflates the day's true
+                # range, and daily ATR is Wilder-smoothed, so one fake bar widens the
+                # chandelier band for ~56 sessions; an open position's recorded extreme
+                # jumps with it and ratchets the stop to a level that never traded.
+                #
+                # The threshold is a fraction of price, not a number of points: the
+                # four instruments differ by two orders of magnitude in absolute price.
+                # It cannot be set from the size of the move alone — the largest
+                # one-minute move of the past year EXCEEDS the roll spread on every
+                # instrument (MES 118.50 vs 66.75, M2K 59.50 vs 23.50). What separates
+                # them is how ordinary they are: p99.9 of one-minute moves is
+                # 0.17-0.27% of price against 0.82-1.15% for a roll. 0.40% sits at
+                # least 1.5x above every p99.9 and 2.0x below every roll spread, and
+                # the join is one specific minute a day rather than all 400k of them.
+                #
+                # Stop rather than re-anchor. A jump can also mean bad data — the wrong
+                # contract fetched, a corrupt bar — and adjusting automatically would
+                # smooth a data error into a series that looks clean. Rolls happen four
+                # times a year; losing one session is cheaper than corrupting the
+                # history every backtest is measured against. exit(1) fails the
+                # pre-flight, which skips the day's slots (fail-closed, already wired).
+                _last_close = float(existing["close"].iloc[-1])
+                _first_open = float(new_only["open"].iloc[0])
+                _jump = _first_open - _last_close
+                _jump_pct = abs(_jump) / _last_close * 100 if _last_close else 0.0
+                log.info("  %s: join %.4f → %.4f  (%+.4f, %.3f%%)",
+                         name, _last_close, _first_open, _jump, _jump_pct)
+                if _jump_pct > JOIN_JUMP_MAX_PCT:
+                    log.error(
+                        "  %s: JOIN JUMP %.3f%% > %.2f%% — refusing to append.\n"
+                        "       parquet last close %.4f -> first new open %.4f (%+.4f)\n"
+                        "       Most likely a contract roll: the appended bars are on a\n"
+                        "       different contract's price level and the stored splice\n"
+                        "       offset no longer aligns them.\n"
+                        "       OPERATOR: confirm it is a roll (all instruments jump the\n"
+                        "       same direction by a similar %%), then re-anchor the offset\n"
+                        "       for %s in %s and re-run. If it is NOT a roll, the fetch\n"
+                        "       returned the wrong contract or bad bars — do not append.",
+                        name, _jump_pct, JOIN_JUMP_MAX_PCT,
+                        _last_close, _first_open, _jump, name, a.splice_offsets,
+                    )
+                    failed.append(name)
+                    continue
 
                 # Concat + sort + dedup
                 keep_cols = [c for c in ["open", "high", "low", "close", "volume"]
