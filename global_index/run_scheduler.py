@@ -74,8 +74,26 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 _LOG_FILE = _CWD / f"scheduler_{__import__('datetime').date.today().strftime('%m%d')}.log"
+class HeartbeatNoiseFilter(logging.Filter):
+    """Drop APScheduler's dispatch chatter for the heartbeat job only.
+
+    APScheduler logs every dispatch at INFO, so one beat a minute is 2880 lines a day
+    of "Heartbeat 60s ... executed successfully". Measured at 22% of the log within
+    hours of switching it on, with the slot events sandwiched between them. A log
+    nobody reads is the condition that let the original stall run three nights, so a
+    watchdog that buries the log defeats its own purpose.
+
+    Only the dispatch lines go. The hourly "[HEARTBEAT] alive" beat and the STALLED
+    warning come from run_scheduler's own logger and carry no job repr, so they pass.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "Heartbeat 60s" not in record.getMessage()
+
+
 _fh = logging.FileHandler(_LOG_FILE, encoding="utf-8")
 _fh.setLevel(logging.INFO)
+_fh.addFilter(HeartbeatNoiseFilter())
 _fh.setFormatter(logging.Formatter(
     "%(asctime)s  %(levelname)-7s  %(name)s — %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -252,7 +270,13 @@ def make_scheduler(port: int, dry_run: bool,
         gap = heartbeat_gap(_last_beat["t"], now)
         _last_beat["t"] = now
         if gap is None:
-            log.debug("[HEARTBEAT] ok")
+            # One INFO line an hour, not one a minute. Enough that "the log has been
+            # quiet" stops being ambiguous — the state this whole fix exists to remove —
+            # without the 2880 lines a day that would make the log unreadable.
+            if now.minute == 0:
+                log.info("[HEARTBEAT] alive")
+            else:
+                log.debug("[HEARTBEAT] ok")
             return
         log.warning(
             "[HEARTBEAT] STALLED %.0fs (expected ~%ds). The scheduler's wait timer does "

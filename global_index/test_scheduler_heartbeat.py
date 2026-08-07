@@ -120,5 +120,47 @@ def test_hb8_every_live_day_slot_shares_the_same_grace():
     )
 
 
+# ── the heartbeat must not bury what it was added to reveal ──────────────────
+#
+# APScheduler logs every dispatch at INFO. One beat a minute is 2880 lines a day of
+# "Heartbeat 60s ... executed successfully" — measured at 22% of the log within hours
+# of switching it on, with slot events sandwiched between them. A log nobody reads is
+# the condition that let the original stall run for three nights.
+
+
+def _rec(msg):
+    import logging
+    return logging.LogRecord("apscheduler.executors.default", logging.INFO,
+                             __file__, 1, msg, None, None)
+
+
+def test_hb9_heartbeat_dispatch_chatter_is_dropped():
+    from global_index.run_scheduler import HeartbeatNoiseFilter
+
+    f = HeartbeatNoiseFilter()
+    assert not f.filter(_rec(
+        'Job "Heartbeat 60s (trigger: cron[minute=\'*\'], next run at: '
+        '2026-08-07 02:25:00 EDT)" executed successfully'))
+
+
+def test_hb10_real_slot_dispatches_still_get_through():
+    """These lines are the record that a slot fired — the thing being protected."""
+    from global_index.run_scheduler import HeartbeatNoiseFilter
+
+    f = HeartbeatNoiseFilter()
+    assert f.filter(_rec(
+        'Running job "NKD night run 02:20 ET (trigger: cron[hour=\'2\', '
+        'minute=\'20\'])" (scheduled at 2026-08-07 02:20:00-04:00)'))
+    assert f.filter(_rec('[NKD_NIGHT_0220] completed OK'))
+
+
+def test_hb11_stall_warnings_are_never_filtered():
+    """The one message the heartbeat exists to produce."""
+    from global_index.run_scheduler import HeartbeatNoiseFilter
+
+    f = HeartbeatNoiseFilter()
+    assert f.filter(_rec("[HEARTBEAT] STALLED 10287s (expected ~60s)."))
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
