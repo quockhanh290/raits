@@ -40,10 +40,10 @@ def _make_guard():
     }, account=ACCOUNT)
 
 
-def _inject(runner, inst="MES", direction="LONG"):
+def _inject(runner, inst="MES", direction="LONG", entry_day=None):
     p = OpenPos(
         inst=inst, direction=direction, contracts=1, risk_dollars=500.0,
-        cluster=CLUSTER, entry_day=ENTRY_DAY,
+        cluster=CLUSTER, entry_day=entry_day or ENTRY_DAY,
         stop_price=None, stop_order_id=None,
     )
     runner.state.open_positions.append(p)
@@ -230,8 +230,13 @@ def test_ro6_maxhold_then_rollover_no_conflict(tmp_path):
         breaker=CircuitBreaker(account=ACCOUNT),
         positions_path=pos_file,
     )
-    _inject(runner1)
-    runner1.run_maxhold_exit(ROLL_DAY, max_hold_days=5)
+    # Old enough to actually hit MAX_HOLD on the roll day. The shared ENTRY_DAY is
+    # 2026-06-10 and ROLL_DAY is 2026-06-12, so hold is 2 days and run_maxhold_exit
+    # correctly leaves the position open — this test then asserted the state was
+    # empty and failed on its own premise rather than on anything in the runner.
+    _inject(runner1, entry_day=ROLL_DAY - pd.Timedelta(days=7))
+    closed = runner1.run_maxhold_exit(ROLL_DAY, max_hold_days=5)
+    assert closed, "premise: 09:31 must actually close the position"
 
     # 14:05 cron: fresh runner with rollover broker
     broker2 = _RollBroker({}, ACCOUNT)

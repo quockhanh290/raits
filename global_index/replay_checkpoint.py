@@ -145,6 +145,9 @@ def _bootstrap():
     ap.add_argument("--bootstrap", action="store_true")
     ap.add_argument("--data-dir", default="data/cache/futures")
     ap.add_argument("--regime-csv", default="spy_daily_live.csv")
+    ap.add_argument("--nkd-parquet",
+                    default="global_index/data/NKD_continuous_1m_8y.parquet")
+    ap.add_argument("--nkd-ema", type=int, default=10)
     ap.add_argument("--path", default=DEFAULT_PATH)
     ap.add_argument("--slippage-ticks", type=float, default=2.0)
     a = ap.parse_args()
@@ -174,6 +177,39 @@ def _bootstrap():
             f"{pos['dir']} entry={pos['entry']:.2f} stop={pos['stop']:.2f}"
         print(f"  {inst:5s} last_day={last.date()}  {held}", flush=True)
         del df
+
+    # MNKD: its own engine parameters, a Tokyo session clock and lagged SPY
+    # labels. Left out, the live shadow would report "no checkpoint" for it on
+    # every run — the instrument whose timezone handling has broken twice would
+    # be the one never exercised.
+    from global_index._core import load_parquet as gi_load, FuturesCost as GIFC
+    from global_index import specs as gi_specs
+    from global_index.regime import RegimeLabels
+
+    cn = gi_specs.SPECS["MNKD"]
+    spy = pd.Series(label_regimes(benchmark_daily(a.regime_csv), "2018-01-01", 3,
+                                  REGIME["hmm_fit_end"]))
+    idx = pd.DatetimeIndex(spy.index)
+    spy.index = (idx.tz_localize(None) if idx.tz is not None else idx).normalize()
+    ndf = gi_load(a.nkd_parquet)
+    ndf.index = ndf.index.tz_convert(cn.session_tz)
+    nkw = dict(ema_period=a.nkd_ema, chandelier_atr_mult=SWING_TF_PARAM["chandelier_atr_mult"],
+               max_hold_days=SWING_TF_PARAM["max_hold_days"])
+    ncost = GIFC(point_value=cn.point_value, tick=cn.tick,
+                 commission_rt=cn.commission_rt, slippage_ticks_per_side=a.slippage_ticks)
+    nsess = sorted(set(ndf.index.normalize().tz_localize(None)))
+    nlast = nsess[-2]
+    ncut = nlast + pd.Timedelta(days=1)
+    if ndf.index.tz is not None:
+        ncut = ncut.tz_localize(ndf.index.tz)
+    _, npos = backtest_swing_tf(ndf[ndf.index < ncut],
+                                RegimeLabels(spy.sort_index(), lag_days=1),
+                                ncost, return_open=True, **nkw)
+    entries["MNKD"] = make_entry(ndf, nlast, npos)
+    held = "khong co vi the" if npos is None else \
+        f"{npos['dir']} entry={npos['entry']:.2f} stop={npos['stop']:.2f}"
+    print(f"  {'MNKD':5s} last_day={nlast.date()}  {held}", flush=True)
+
     save(entries, a.path)
     print(f"\nda ghi {len(entries)} instrument -> {a.path}")
 

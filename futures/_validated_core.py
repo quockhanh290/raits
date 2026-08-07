@@ -199,6 +199,18 @@ def daily_atr_series(df: pd.DataFrame, period: int = 14) -> pd.Series:
     return atr.dropna()
 
 _SWING_CACHE = {}
+# Each entry pins its frame plus ~120MB of per-day structures, so the dict has to
+# be bounded: reconcile_nkd builds a frame per trade and would otherwise retain
+# every one of them. Eviction is safe — dropping an entry drops the frame with
+# it, and a key that is no longer present cannot be hit by a later frame that
+# lands on the recycled address.
+#
+# Sized for the worst live case: five instruments, each keyed twice because the
+# same frame is replayed once with an injected datr and once without, so ten
+# entries are in play at the peak. A smaller bound would evict frames that are
+# about to be used again and rebuild their prep every time — bounded memory
+# bought with repeated work.
+_SWING_CACHE_MAX = 16
 
 def _swing_cache(df, datr=None):
     """Precompute per-df: daily ATR, day list, per-day high/low/open arrays (1m),
@@ -247,6 +259,8 @@ def _swing_cache(df, datr=None):
         day_ts[key] = g.index      # 1m bar timestamps — for entry_time/exit_time capture only
     days = sorted(day_hl.keys())
     cache = dict(datr=datr, days=days, hl=day_hl, b5=day_b5, ts=day_ts)
+    while len(_SWING_CACHE) >= _SWING_CACHE_MAX:
+        _SWING_CACHE.pop(next(iter(_SWING_CACHE)))     # oldest insertion first
     _SWING_CACHE[k] = (df, datr, cache)
     return cache
 
