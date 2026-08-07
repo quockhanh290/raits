@@ -77,6 +77,8 @@ from global_index.ibkr_broker import IBKRBroker
 from global_index.runner import (FuturesRunner, _openpos_from_dict,
                                  _acquire_lock, RunnerLockError)
 from global_index.hmm_stale_guard import HMMStaleGuard
+from global_index import replay_checkpoint as ckpt
+from global_index.replay_checkpoint import DEFAULT_PATH as CHECKPOINT_PATH
 
 # ── Production constants: from basket.py ────────────────────────────────────
 ACCOUNT     = float(RISK["account"])    # $50,000
@@ -127,6 +129,12 @@ def main():
     ap.add_argument("--live-state-path", default=None,
                     help="Path to write live_state_data.js for dashboard live mode "
                          "(e.g. global_index/live_state_data.js). Omit to skip dashboard update.")
+    ap.add_argument("--shadow-resume",   action="store_true",
+                    help="also derive the swing target from a checkpoint and log it "
+                         "for comparison. Does NOT trade off it — the full replay "
+                         "still decides. Adds ~5s to a ~5.5min run.")
+    ap.add_argument("--checkpoint-path", default=CHECKPOINT_PATH,
+                    help="replay checkpoint written by --shadow-resume")
     ap.add_argument("--clusters",        default="all",
                     help="Comma-separated clusters allowed to trade this run: "
                          "swing,nkd,stress or 'all' (default). Clusters left out do "
@@ -331,6 +339,81 @@ def main():
         def signal_fn(day, _bars, held):
             return [], []
     else:
+        def _shadow(concat_swing, raw_dfs):
+            """Derive the swing targets from a checkpoint and log them alongside.
+
+            Nothing trades off this. The full replay still decides; this only
+            accumulates live-data evidence that the two agree, on the spliced
+            frames the live path actually sees — which an offline check cannot
+            reproduce, because they carry IBKR bars that are never persisted.
+
+            Costs about a second per instrument against a ~5.5 minute run, so it
+            does not change how many slots get skipped. Any failure is caught and
+            logged: a comparison must never be able to stop a trading run.
+            """
+            from futures._validated_core import daily_atr_series, backtest_swing_tf
+            kw = dict(ema_period=swing_engine.ema_period,
+                      chandelier_atr_mult=swing_engine.chandelier_atr_mult,
+                      max_hold_days=swing_engine.max_hold_days)
+            entries = ckpt.load(a.checkpoint_path)
+            updated = dict(entries)
+            for inst, df in concat_swing.items():
+                # Validity is checked against the PARQUET, not the spliced frame.
+                # The checkpoint describes the parquet's history, and splicing
+                # leaves that history the same length but not the same hash —
+                # measured, mechanism not established. Since the spliced frame's
+                # history comes from this parquet, the parquet is both the right
+                # thing to fingerprint and the one that stays stable.
+                raw = raw_dfs[inst]
+                u = ckpt.usable(entries.get(inst, {}), raw)
+                if u is None:
+                    _e = entries.get(inst, {})
+                    _ld = _e.get("last_day")
+                    log.info("[shadow] %s: khong co checkpoint dung duoc — bo qua. "
+                             "luu=%s tinh=%s (chay `python -m "
+                             "global_index.replay_checkpoint --bootstrap`)", inst,
+                             _e.get("fingerprint", "(khong co)"),
+                             ckpt.fingerprint(raw, _ld) if _ld else "?")
+                    continue
+                last_day, pos = u
+                tz = df.index.tz
+                start = pd.Timestamp(last_day)
+                if tz is not None:
+                    start = start.tz_localize(tz)
+                # From last_day itself, not the day after: _swing_cache reads gap
+                # flags from each bar's spacing to the one before it and forces the
+                # frame's first bar to "no gap", so last_day rides along as a
+                # lead-in and resume_after_day keeps it out of the replay.
+                sub = df[df.index >= start]
+                datr = daily_atr_series(df)
+                _, want = backtest_swing_tf(sub, swing_labels, costs_2t[inst],
+                                            datr=datr, resume_pos=pos,
+                                            resume_after_day=last_day,
+                                            return_open=True, **kw)
+                log.info("[shadow] %s: tu checkpoint %s -> %s", inst, last_day.date(),
+                         "khong vi the" if want is None else
+                         f"{want['dir']} entry={want['entry']:.2f} "
+                         f"stop={want['stop']:.2f} vao={pd.Timestamp(want['entry_day']).date()}")
+
+                # Advance the checkpoint to the last COMPLETE session. Today is
+                # still trading, so a checkpoint taken there would describe a
+                # partial day and be wrong for tomorrow.
+                sess = sorted(set(df.index.normalize().tz_localize(None)))
+                if len(sess) >= 2 and sess[-2] > last_day:
+                    new_day = sess[-2]
+                    end = new_day + pd.Timedelta(days=1)
+                    if tz is not None:
+                        end = end.tz_localize(tz)
+                    _, pos_new = backtest_swing_tf(
+                        sub[sub.index < end], swing_labels, costs_2t[inst],
+                        datr=datr, resume_pos=pos, resume_after_day=last_day,
+                        return_open=True, **kw)
+                    updated[inst] = ckpt.make_entry(raw, new_day, pos_new)
+                    log.info("[shadow] %s: checkpoint tien %s -> %s",
+                             inst, last_day.date(), new_day.date())
+            if updated != entries:
+                ckpt.save(updated, a.checkpoint_path)
+
         def signal_fn(day, bars, held):
             day_ts = pd.Timestamp(day).normalize()
 
@@ -344,6 +427,13 @@ def main():
             _nz = {k: round(v, 2) for k, v in _offsets.items() if abs(v) > 1e-9}
             if _nz:
                 log.info("[sig]  live-bar price offsets (adjusted - raw): %s", _nz)
+
+            if a.shadow_resume:
+                try:
+                    _shadow(concat_swing, dfs)
+                except Exception:
+                    # A comparison must never be able to stop a trading run.
+                    log.exception("[shadow] loi — bo qua, khong anh huong giao dich")
 
             return generate_today_signals(
                 swing_engine=swing_engine,
