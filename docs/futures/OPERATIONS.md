@@ -211,3 +211,92 @@ Mở file, xóa entry MES LONG khỏi `positions` array. Giữ `breaker` block.
 | `STP: place_stop FAILED` | GTC stop order không đặt được | Đặt STP thủ công trong TWS cho position đó |
 | `B3 STP EXIT` | STP fill đêm qua — position auto-cleared | Không cần can thiệp (INFO) |
 | `B3 MISMATCH ... stop orderId` | STP có thể đã fill, Gateway restart xóa history | Check TWS Trade Log, xóa pos nếu xác nhận fill |
+
+---
+
+## Khởi động scheduler hằng ngày
+
+```powershell
+pythonw -m global_index.run_scheduler --port 4002 [--shadow-resume]
+```
+
+**Phải sống trước 13:45 ET** (pre-flight). Nếu không, mọi slot trong ngày bị bỏ qua —
+fail-closed, không đoán từ parquet.
+
+### ⚠️ Bật sau 09:31 ET = mất `maxhold_exit` hôm đó, KHÔNG có cảnh báo
+
+APScheduler tính lần bắn kế tiếp lúc khởi động. Bật lúc 09:43 thì mốc 09:31 hôm nay
+**không trễ — nó không tồn tại**, lần kế là 09:31 ngày mai. Không log, không notify.
+
+Hệ quả: vị thế đủ 5 ngày sẽ thoát qua `run_live_day` lúc ~14:10 ET thay vì 09:30 ET,
+tức **muộn hơn quy ước backtest 4h40**. Đã xảy ra 2 ngày liên tiếp (08-05 bật 09:43,
+08-06 bật 10:35); không tốn tiền vì hôm đó chưa vị thế nào đủ 5 ngày.
+
+**Kiểm mỗi sáng:** vị thế nào có `hold >= 4` trong `live_positions.json`? Nếu có, bảo
+đảm scheduler sống trước 09:31 ET, hoặc chạy tay:
+```powershell
+python -m global_index.run_maxhold_exit --positions-path live_positions.json --port 4002
+```
+Script này idempotent (đóng vị thế `hold >= 5`, chạy lại khi đã đóng thì không làm gì)
+và **không cần parquet tươi** — nó đọc `live_positions.json` + broker, nên không phụ
+thuộc pre-flight 13:45.
+
+---
+
+## Checkpoint replay + shadow
+
+`run_live_day` phát lại 2018→nay, 4 instrument, **mỗi slot**, chỉ để biết hiện nên giữ
+vị thế gì — mất 5 phút 03 trong tổng 5,5 phút mỗi lần chạy. Engine có thể resume từ vị
+thế cuối ngày hôm trước thay vì làm lại (`futures/_validated_core.backtest_swing_tf`,
+tham số `resume_pos` / `resume_after_day` / `datr`).
+
+### Hai cờ, chi phí lệch nhau 15 lần
+
+| cờ | làm gì | tốn |
+|---|---|---|
+| `--shadow-resume` | tính đường resume, ghi log, đẩy checkpoint | **~30 giây** |
+| `--shadow-verify` | **thêm** replay đầy đủ để tự đối chiếu | **~7,5 phút** |
+
+**`--shadow-verify` chỉ bật ở slot cuối ngày (15:55 ET).** Nó phải chạy đúng cái replay
+đầy đủ mà việc này sinh ra để tránh. Bật ở mọi slot thì `run_live_day` lên ~13 phút →
+bỏ 2 trong 3 slot thay vì 1 trong 2 → **độ trễ vào lệnh tệ hơn hiện tại, bằng tiền thật**.
+Một lần mỗi ngày là đủ: nếu hai đường lệch thì lệch cả ngày, không lệch riêng một slot.
+Ở slot 15:55 phiên đã đóng, chạy quá sang 16:08 cũng không có lệnh nào chờ.
+
+### Khởi tạo checkpoint (một lần, hoặc sau khi sửa parquet)
+
+```powershell
+python -m global_index.replay_checkpoint --bootstrap
+```
+~10 phút, replay đầy đủ 5 instrument. Sau đó live chỉ resume và bước tới.
+
+### Checkpoint hỏng thì sao — không sao
+
+Mỗi entry mang fingerprint của lịch sử **tính đến `last_day`**. Parquet đổi → fingerprint
+lệch → tự bỏ qua, replay đầy đủ như cũ. **Chậm, không bao giờ sai.** Log ghi
+`khong co checkpoint dung duoc`. Chữa: chạy `--bootstrap` lại.
+
+Fingerprint cố ý **không** phủ phần sau `last_day`, để append hằng ngày lúc 13:45 không
+tự huỷ checkpoint mỗi chiều.
+
+### Đọc log shadow
+
+```
+[shadow] MES: tu checkpoint 2026-08-06 -> SHORT entry=7743.75 stop=7753.21 vao=2026-08-06
+[shadow] MES: checkpoint tien 2026-08-06 -> 2026-08-07
+[shadow] MES: DOI CHIEU KHOP — day du == resume        ← chỉ có ở slot 15:55
+```
+
+**`DOI CHIEU LECH` là CRITICAL** — hai đường bất đồng, dừng kế hoạch chuyển sang resume
+và điều tra trước khi làm gì tiếp.
+
+⚠️ Giá trong dòng `[shadow]` nằm trên **thang back-adjusted**, còn giá lệnh thật
+(`C1 OPEN`, `STP: placed`) trên **thang thô**. Chênh nhau đúng bằng offset splice in ở
+dòng `[sig] live-bar price offsets`. Ví dụ MES offset 10,75: shadow 7743.75 ↔ lệnh
+7733.00. **Chênh đúng bằng offset = khớp, không phải lệch.**
+
+### Trạng thái hiện tại
+
+Shadow **chưa quyết định gì** — đường replay đầy đủ vẫn là đường giao dịch. Chỉ sau vài
+phiên `DOI CHIEU KHOP` liên tiếp mới xét chuyển sang dùng resume thật; khi đó `run_day`
+xuống dưới 1 phút, hết bỏ slot, độ trễ vào lệnh từ ~7,9 xuống ~3,5 phút.

@@ -252,7 +252,8 @@ def make_scheduler(port: int, dry_run: bool,
                    nkd_parquet: str = "global_index/data/NKD_continuous_1m_8y.parquet",
                    regime_csv: str = "spy_daily_live.csv",
                    polygon_api_key: str = "",
-                   live_state_path: str = "global_index/live_state_data.js"):
+                   live_state_path: str = "global_index/live_state_data.js",
+                   shadow_resume: bool = False):
     try:
         from apscheduler.schedulers.blocking import BlockingScheduler
     except ImportError:
@@ -346,7 +347,8 @@ def make_scheduler(port: int, dry_run: bool,
         return x
 
     def _live_day_body(slot_id: str, *, first_slot: bool = False,
-                       clusters: str = "all", prev_preflight: bool = False) -> None:
+                       clusters: str = "all", prev_preflight: bool = False,
+                       verify: bool = False) -> None:
         """Serialise slots: never two run_live_day processes at once.
 
         Slots are 5 minutes apart and a run takes ~5.5 (measured 2026-08-03:
@@ -369,13 +371,15 @@ def make_scheduler(port: int, dry_run: bool,
             return
         try:
             _live_day_body_inner(slot_id, first_slot=first_slot,
-                                 clusters=clusters, prev_preflight=prev_preflight)
+                                 clusters=clusters, prev_preflight=prev_preflight,
+                                 verify=verify)
         finally:
             _slot_lock.release()
 
     # ── Shared runner body (all 14:05–15:55 slots) ───────────────────────────
     def _live_day_body_inner(slot_id: str, *, first_slot: bool = False,
-                             clusters: str = "all", prev_preflight: bool = False) -> None:
+                             clusters: str = "all", prev_preflight: bool = False,
+                             verify: bool = False) -> None:
         """Run run_live_day for one slot, guarded by pre-flight flag.
 
         first_slot=True (14:05) logs at ERROR on failure; subsequent slots log
@@ -441,7 +445,20 @@ def make_scheduler(port: int, dry_run: bool,
               "--regime-csv",      regime_csv,
               "--live-state-path", live_state_path,
               "--clusters",        clusters,
-              "--port",            str(port)],
+              "--port",            str(port)]
+             # Logs a checkpoint-resumed target beside the one that trades, so the
+             # two can be compared on live data. Decides nothing; see run_live_day
+             # --shadow-resume. Measured ~11s per instrument on the day's first slot
+             # (one replay for the target, one to advance the checkpoint) and ~5s
+             # after, against a ~5.5 min run — the skip pattern does not change.
+             + (["--shadow-resume"] if shadow_resume else [])
+             # --shadow-verify replays the frame in full to compare, which is the
+             # ~5 minutes the checkpoint exists to avoid. On every slot it would
+             # push a run past 13 min and skip two slots in three, making entry
+             # latency worse to prove it could be better. Once a day is enough:
+             # if the two paths disagree they disagree all day, and on the last
+             # slot the session is over so the extra minutes cost nothing.
+             + (["--shadow-verify"] if (shadow_resume and verify) else []),
              label=slot_id, dry_run=dry_run)
 
     # ── 14:05 ET Mon-Fri: initial signal run ─────────────────────────────────
@@ -458,10 +475,12 @@ def make_scheduler(port: int, dry_run: bool,
         [(14, m) for m in range(10, 60, 5)] +   # 14:10 → 14:55 (10 slots)
         [(15, m) for m in range(0,  60, 5)]      # 15:00 → 15:55 (12 slots)
     )
+    _LAST_SLOT = _CONT_SLOTS[-1]
     for _h, _m in _CONT_SLOTS:
         _slot_id = f"LIVE_DAY_{_h:02d}{_m:02d}"
+        _verify = ((_h, _m) == _LAST_SLOT)
         sched.add_job(
-            lambda sid=_slot_id: _live_day_body(sid),
+            lambda sid=_slot_id, v=_verify: _live_day_body(sid, verify=v),
             "cron", day_of_week="mon-fri", hour=_h, minute=_m,
             id=_slot_id.lower(),
             name=f"Continuous run {_h:02d}:{_m:02d} ET",
@@ -514,6 +533,10 @@ def main():
                          "(fallback: POLYGON_API_KEY env var)")
     ap.add_argument("--live-state-path",  default="global_index/live_state_data.js",
                     help="Path to write live_state_data.js for dashboard (default: global_index/live_state_data.js)")
+    ap.add_argument("--shadow-resume",    action="store_true",
+                    help="pass --shadow-resume to run_live_day: log a "
+                         "checkpoint-resumed target for comparison, without "
+                         "trading off it")
     ap.add_argument("--assume-preflight-ok", action="store_true",
                     help="Mark today's pre-flight as passed on startup (use after manual update_ibkr_daily + update_spy_csv)")
     a = ap.parse_args()
@@ -545,6 +568,7 @@ def main():
         data_dir=a.data_dir, nkd_parquet=a.nkd_parquet,
         regime_csv=a.regime_csv, polygon_api_key=a.polygon_api_key,
         live_state_path=a.live_state_path,
+        shadow_resume=a.shadow_resume,
     )
 
     jobs = sched.get_jobs()
