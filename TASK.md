@@ -1296,10 +1296,32 @@ MES SELL #9 @7627.25 · MYM BUY #12 @54709.00 · M2K BUY #14 @3038.50 — cả b
 - MES giữ stop 7627.25 thay vì 7758.86 (rộng hơn 131 điểm) — quyết định giữ nguyên,
       vì thay nghĩa là có một khoảng không stop, và 7758.86 chỉ cách giá ~3 điểm.
 
+### ✅ VERIFY LIVE ĐÃ QUA — phiên 2026-08-06 (tiêu chí F0 mới, hỏi IBKR chứ không hỏi file)
+Entry M2K SHORT lúc 12:30 local, đi trọn đường code đã vá:
+```
+12:30:16  place_stop: M2K SHORT stop 3020.0900 → 3020.1000 (tick 0.1)
+12:30:17  place_stop: accepted SHORT M2K STP ×1 @ 3020.1000 orderId=100 status=PreSubmitted
+```
+Nắn tick làm tròn **lên** cho SHORT (ra xa thị trường) + xác nhận trạng thái thật.
+Code cũ sẽ gửi 3020.09 → IBKR từ chối code 110 → ghi "placed" với id bịa.
+`check_open_orders.py` → **PASS**, 2/2 vị thế có stop đúng chiều.
+
+**Stop đầu tiên nổ thật (M2K, 08:11 local = 10:11 ET):** `reqExecutions` xác nhận
+`BOT 1 M2KU6 @ 3038.60` ordId=14 — stop đặt 3038.50, **trượt đúng 1 tick** (giả định
+backtest 2 tick/chiều). Vị thế đóng đúng, lỗ ≈ $28.6.
+
+### Hai lỗi nữa lộ ra khi theo dõi cú khớp đó (đã vá, xem commit)
+- **`ib.openTrades()` là cache tích lũy, không phải sự thật ở broker.** Backend dashboard
+  vẫn báo stop đã khớp là `PreSubmitted` **16 phút sau**. Chỉ tiến trình sống lâu mới dính →
+  vô hình với test và script ngắn. Đã đổi 5 chỗ sang dùng giá trị `reqAllOpenOrders()` trả về.
+  `verify_account_clean` còn gọi `openTrades()` mà không `reqAllOpenOrders()` → **false clean**.
+- **`repair_stops` không sửa `stop_order_id` khi SKIP.** Đây là thứ đã nuôi con ma: MES giữ
+  id bịa 62 bên cạnh stop thật #9. Lúc đóng MES hôm 06/08, runner hủy 62 → thất bại →
+  F3 báo CRITICAL đúng lúc **nhưng nêu sai lệnh**, và #9 nằm lại mồ côi (SELL STP không có
+  vị thế → sẽ MỞ short nếu nổ). Đã thêm `id_corrections()`; #9 hủy xong bằng `--client-id 93`.
+
 ### Next steps
 - [ ] **Bracket order** (khảo sát xong, chưa làm) — xem Key decisions.
-- [ ] Verify live phiên kế: log phải có `place_stop: accepted ... status=PreSubmitted`
-      (và dòng `stop X → Y (tick Z)` nếu có nắn); `check_open_orders.py` exit 0.
 
 ### Key decisions
 - **Bracket khả thi**: `stop_price` là mức cố định lúc entry, **không ratchet**
@@ -1334,6 +1356,8 @@ Gốc: TASK.md · SCRATCHPAD.md
 
 ### Commits
 ```
+dabd75c fix(stp): correct a recorded stop id even when the position needs no repair
+75a5aef fix(ibkr): read open orders from reqAllOpenOrders, not the ib_insync cache
 03df38c fix(stp): a failed cancel names the clientId that can actually do it
 6a39c58 fix(stp): round stop prices to the tick grid — the actual cause of the naked positions
 eb5309f feat(stp): repair tool, and fix instrument-name lookup for NKD stops
@@ -1345,7 +1369,8 @@ fdfad29 fix(stp): place_stop confirms IBKR accepted the order instead of its own
 ---
 
 ## Sub-task: Slot NKD đêm không chạy — ROOT CAUSE xác định (2026-08-06)
-Status: ĐIỀU TRA XONG — CHƯA VÁ
+Status: ROOT CAUSE XONG — nửa code DONE (ddae2f9) — **nửa môi trường (powercfg) CHƯA LÀM**
+— **scheduler cần khởi động lại để nhận code mới**
 
 ### Triệu chứng
 0/22 slot NKD đêm (01:10–02:55 ET) chạy đêm 05→06. **Không một dòng log nào** sau 16:00 ET
@@ -1376,7 +1401,42 @@ cửa sổ đêm 4 tiếng sau đó. Không cảnh báo nào vì không có gì 
 - ~~Đo bằng `Kernel-Power 42/107`~~ — nguồn này chỉ ghi 11 giây trong khi thực tế 3h33m.
   Nguồn đúng: **`Microsoft-Windows-Power-Troubleshooter`** (Sleep/Wake Time, UTC).
 
-### Next steps — ba việc, CHƯA LÀM, chờ quyết định
+### Completed — nửa code (commit ddae2f9)
+- [x] **Heartbeat mỗi phút, 7 ngày/tuần** (`id="heartbeat"`). Hai tác dụng:
+      (1) chặn trần `wait_seconds` xuống 60s → sau khi máy thức, scheduler đánh giá lại
+      trong vòng một phút thay vì hàng giờ;
+      (2) tự đo mình bằng **đồng hồ tường** (đồng hồ này CÓ chạy khi máy ngủ) → khoảng
+      cách giữa hai nhịp chính là thời gian đình trệ, log ra thành **con số** thay vì im lặng.
+      Chạy cả cuối tuần: đình trệ bắt đầu tối thứ Sáu phải thấy được trước slot thứ Hai.
+- [x] `heartbeat_gap(prev, now)` — hàm thuần, dung sai 30s cho cron drift. Kêu quá dễ thì
+      cảnh báo bị bỏ qua, đúng cách mà lỗi này sống sót 3 đêm.
+- [x] **`SLOT_MISFIRE_GRACE_SECS = 300`** cho **toàn bộ** 45 slot live-day + nkd-night.
+      Mặc định APScheduler là **1 giây** → slot trễ dù chỉ chút xíu là bị bỏ âm thầm.
+      300s vì: slot cách nhau 5 phút và `diff_desired_vs_held` idempotent → trễ vài phút
+      vẫn làm đúng việc của slot bị lỡ; quá đó thì slot kế đã lo, mà bắn muộn sẽ đưa lệnh
+      NKD vào cách bar tín hiệu hàng giờ.
+- [x] `test_scheduler_heartbeat.py` — 8 test (đỏ trước): phát hiện đình trệ, dung sai,
+      heartbeat có đăng ký, chạy cả 7 ngày, và **mọi slot dùng chung một chính sách grace**.
+- [x] GATE: reconcile_gd0 PASS 4/4 · test_ibkr_injection 14/14 · pytest 113 passed.
+
+### ✅ VERIFY LIVE ĐÊM 06→07 — CỬA SỔ NKD CHẠY ĐỦ
+Scheduler đã restart, heartbeat hoạt động. Slot đêm nổ **14 lần liên tiếp đúng giờ**
+(01:10 → 02:20 ET, mỗi slot cách nhau đúng 5 phút, tất cả `completed OK`).
+**Tất cả `entries=0 exits=0 rejected=0`** — cửa sổ chạy đúng, chỉ là không có tín hiệu NKD.
+Không phải "không chạy" như ba đêm trước; đây là "chạy và không có gì để làm".
+
+### Lỗi tự gây ra và đã sửa ngay (commit 73af8cd)
+Heartbeat khiến APScheduler log mỗi lần dispatch ở INFO → **2880 dòng/ngày**. Đo trên log
+thật chỉ vài giờ sau khi bật: **153/693 dòng = 22%**, và dòng slot thật bị kẹp giữa chúng.
+Một watchdog làm log không đọc được thì tự đánh bại chính nó — log không ai đọc chính là
+điều kiện đã để lỗi gốc sống ba đêm.
+- [x] `HeartbeatNoiseFilter` trên file handler: bỏ đúng dòng dispatch của heartbeat,
+      giữ nguyên dispatch của slot thật (đó là bằng chứng slot đã nổ) và giữ cảnh báo STALLED.
+- [x] Nhịp đổi sang **INFO mỗi giờ** (24 dòng/ngày) thay vì DEBUG mỗi phút. Đủ để
+      "log im lặng" thôi là trạng thái mơ hồ — đúng thứ cả bản vá này sinh ra để xoá.
+- [x] 3 test nữa (hb9–hb11): bỏ nhiễu, giữ dispatch slot, **không bao giờ** lọc STALLED.
+
+### Next steps — CHƯA LÀM
 
 **(b) Nửa môi trường — BẮT BUỘC, làm trước, rẻ nhất**
 - [ ] Đặt máy không ngủ khi chạy pin: `powercfg /setdcvalueindex SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 0`
@@ -1385,16 +1445,13 @@ cửa sổ đêm 4 tiếng sau đó. Không cảnh báo nào vì không có gì 
 - ⚠️ Không bản vá code nào chạy được job khi máy đang ngủ. Phiên ngủ 23:20–00:03 trùng cửa sổ
       đêm → mất 8 slot bất kể vá gì. Đây là máy cá nhân nên là quyết định của user, không tự đổi.
 
-**(a) Nửa code — biến "im lặng 10 tiếng" thành "trễ vài phút, có log"**
-- [ ] Heartbeat job trong `make_scheduler()`: cron mỗi 1–5 phút, chỉ `log.debug`. Mục đích duy
-      nhất là chặn trần `wait_seconds` của `BlockingScheduler._main_loop`, để sau khi máy thức
-      scheduler đánh giá lại trong vài phút thay vì vài giờ.
-- [ ] `misfire_grace_time` cho slot NKD đêm: đủ cho trễ vài phút vẫn chạy
-      (`diff_desired_vs_held` idempotent — xem docstring `_live_day_body`), nhưng KHÔNG cho slot
-      trễ hàng giờ chạy khi cửa sổ đã đóng. Mặc định APScheduler = 1s → hiện đang bỏ hẳn.
-- [ ] Cảnh báo khi phát hiện trượt: nếu `now - scheduled_time > ngưỡng`, log WARNING kèm số giây.
-      Không có cái này thì lần sau vẫn không ai biết.
-- [ ] Test + gate reconcile như thường lệ (sửa `run_scheduler.py`, không đụng runner/engine).
+**Quyết định còn treo: grace cho `preflight` và `maxhold_exit`**
+- [ ] Hai job này vẫn để mặc định 1 giây. Cửa sổ của chúng không rộng 5 phút như slot nên
+      giá trị đúng khác đi, và có hệ quả giao dịch:
+      `preflight` 13:45 ET fail-closed → lỡ nó là **cả ngày không giao dịch**; chạy trễ mà
+      vẫn trước 14:05 thì tốt hơn hẳn bỏ (grace hợp lý ~20 phút).
+      `maxhold_exit` 09:31 ET đóng vị thế tại RTH open; trễ 5 phút vẫn hơn không đóng.
+      Chưa tự quyết vì đây là ngữ nghĩa giao dịch, không phải hạ tầng.
 
 **(c) Cân nhắc thay kiến trúc — chỉ sau khi (a)+(b) chạy ổn vài đêm**
 - [ ] Windows Task Scheduler với *"wake the computer to run this task"*. Đây là cơ chế **duy
@@ -2306,3 +2363,124 @@ và `futures/swing_tf.py` → rỗng. Ba commit chỉ MỞ CỬA trên engine, k
       **Hạn chót thật: thứ Hai 2026-08-10** (vị thế 08-05 + 5 ngày). Cần catch-up khi khởi động.
 - [ ] G2 HARD lặp mỗi lần chạy, hệ thống vẫn giao dịch — guard vô hiệu trên thực tế
 - [ ] `futures/swing_tf_harness.py` + bản copy ở root vẫn còn lỗi khoá `id(df)`
+
+---
+
+## Sub-task: maxhold_exit catch-up (2026-08-07) — DONE `91dbc0e`
+Status: DONE
+
+### Lỗi
+APScheduler tính lần bắn KẾ TIẾP lúc khởi động. Bật lúc 09:43 thì mốc 09:31 hôm đó
+**không trễ — nó không tồn tại**. Không misfire, không lỗi, không log gì.
+Đã xảy ra 2 ngày liên tiếp: 08-05 (bật 09:43), 08-06 (bật 10:35).
+
+Không tốn tiền chỉ vì chưa vị thế nào đủ 5 ngày. Ba vị thế vào 08-05 → mốc **thứ Hai 08-10**.
+
+### Vì sao quan trọng hơn vẻ ngoài
+MAX_HOLD = 15% số lệnh, tb **+$398.60**; CHANDELIER = 79.5%, tb **−$48.84**.
+**Toàn bộ lợi nhuận thoát qua đúng job này.** Backtest thoát tại bar 09:30 ET
+(INVARIANTS, bản sửa đã đổi baseline $41,266→$40,919). Lỡ slot → thoát qua
+`run_live_day` ~14:10, **muộn hơn quy ước 4h40**.
+
+### Sửa
+`_catch_up_maxhold()` khi khởi động: ngày trong tuần + đã qua 09:31 ET + chưa ghi nhận
+→ chạy ngay. State `global_index/maxhold_state.json` keyed theo ngày (khuôn `_preflight_ok`).
+An toàn vì `run_maxhold_exit` idempotent và **không cần parquet tươi**.
+
+### ⚠️ Lỗi tự tạo rồi tự bắt — dry-run ghi nhận như chạy thật
+`_run` trả `True` khi `--dry-run` mà **không thực thi gì** → bản đầu ghi
+`{"2026-08-07": true}` → scheduler thật sau đó sẽ **bỏ qua catch-up**.
+Một buổi diễn tập vô hiệu hoá đúng cái nó diễn tập, âm thầm, ngay trước thứ Hai.
+Tìm ra bằng cách **kiểm file state sau khi chạy thử**, không phải bằng đọc lại code.
+Fix: `if ok and not dry_run`. Có test riêng cho ca này.
+
+### Verify
+`test_maxhold_catchup.py` 13 ca. Tách 2 tầng: quyết-định-có-gọi (job giả) vs
+ghi-nhận (**closure thật**) — với job giả thì "failure không được ghi" pass vì
+*không có gì ghi cả*. Phủ: biên 09:31, cuối tuần, ngày cũ, file hỏng (đọc = chưa chạy,
+hướng an toàn), thiếu job id (không được làm sập scheduler).
+pytest **241 passed**.
+
+### Chạy thật 2026-08-07 10:41 ET — PASS
+`[MAXHOLD] CATCH-UP` → `completed OK` → giữ nguyên MYM (hold=2d < 5), state ghi đúng.
+
+---
+
+## Sub-task: Rollover 2026-09-11 — 5 việc, CHƯA LÀM
+Status: TODO — hạn 11/9
+
+### Bối cảnh
+Append từ IBKR bắt đầu **06/7**. Hai lần roll năm nay (13/3, 12/6) đều **trước** đó.
+→ **Đường ống hiện tại chưa từng đi qua một lần roll nào.** Lần đầu: 11/9.
+
+### Spread đã đo (IBKR, 2026-08-07)
+| inst | T9 | T12 | spread | % | so bug thang giá đã sửa |
+|---|---|---|---|---|---|
+| MES | 7,747.25 | 7,814.00 | **+66.75** | 0.86% | 5.4× |
+| MNQ | 29,634.25 | 29,932.50 | **+298.25** | 1.01% | 3.4× |
+| MYM | 53,999.00 | 54,399.00 | **+400.00** | 0.74% | 10.3× |
+| M2K | 3,015.60 | 3,039.10 | **+23.50** | 0.78% | 2.6× |
+
+Cùng dấu, cùng biên độ → chi phí nắm giữ, không phải nhiễu. Bug thang giá nhỏ hơn
+đã gây vào **sai chiều M2K** hôm 04/8, thiệt hại ~$1,532.
+
+### Tầng dữ liệu — offset bị khoá vĩnh viễn
+```python
+if name not in splice_offsets:   # tính 1 lần
+else:                            # dùng lại mãi
+```
+`ContFuture` = **ratio back-adjust về hợp đồng hiện tại**; roll → hợp đồng tham chiếu
+đổi → bar mới trên thang mới, offset vẫn là hằng số cũ. Ta chỉ append, không fetch lại
+lịch sử → **bậc nhảy ~67 điểm ghép thẳng vào chuỗi MES**.
+
+**EMA KHÔNG bị ảnh hưởng** — nó tính trong 1 ngày trên bar 5 phút (`bars5 = b5[day]`,
+:344-348), mà roll rơi vào ranh giới phiên. Thứ trúng đòn là **`datr` (ATR ngày)**:
+vắt qua ngày, Wilder → nhiễm **~56 phiên** → dải chandelier nới rộng gần 3 tháng.
+Với vị thế mở: `extreme` nhảy theo → **stop ratchet lên mức chưa từng có thật**.
+
+**Chữa:** offset là back-adjustment **tích luỹ**, cộng `(close_cũ − open_mới)` mỗi lần
+roll. `_apply_splice_offset` đã làm đúng phép tính, chỉ đang bị khoá. Diff (Panama)
+là quy ước đúng vì engine tính hoàn toàn **theo điểm**.
+
+### Tầng bảo vệ — NGUY HIỂM NHẤT
+Nhánh thành công: *"position continues unchanged"*. **Không có `cancel_order` hay
+`place_stop` nào** trong cả `_handle_rollover` lẫn `_handle_rollover_if_needed`.
+
+1. Vị thế sang MESZ6 **không có stop**
+2. Lệnh SELL STP trên MESU6 **vẫn treo**
+3. Nếu chạm → khớp → **mở vị thế SHORT ma** trên hợp đồng sắp hết hạn
+4. `pos.stop_price` vẫn trên thang cũ, lệch đúng bằng spread
+
+**Không guard nào bắt được:**
+- B3 so vị thế file vs broker → sau roll đều có MES ×1 → khớp
+- B4 kiểm `stop_order_id is None or p.inst not in _working`; `stop_order_id` **không None**,
+  còn `has_working_stop` khớp theo **`t.contract.symbol`** = `"MES"`, **không phân biệt
+  tháng** → lệnh mồ côi MESU6 làm guard tin rằng MESZ6 được bảo vệ
+
+> Guard so **mã instrument** trong khi rủi ro nằm ở **tháng hợp đồng**.
+
+### 5 việc
+- [ ] 1. Guard bậc nhảy tại điểm nối → `exit(1)`, fail-closed, người xác nhận
+      (**dừng thay vì tự sửa**: roll 4 lần/năm; đổi 4 ngày giao dịch lấy việc không bao
+      giờ âm thầm nắn lỗi dữ liệu thành chuỗi đẹp)
+- [ ] 2. Neo lại offset tại roll (cộng dồn)
+- [ ] 3. Huỷ STP hợp đồng cũ ngay sau khi CLOSE khớp
+- [ ] 4. Quy đổi mức stop sang thang mới, đặt STP mới, cập nhật `pos`
+- [ ] 5. **`has_working_stop` so cả tháng hợp đồng** ← sửa *cái mù*, 1-4 chỉ sửa *sự cố*
+
+### Ranh giới hiểu biết
+- **Đọc từ code, chắc chắn:** offset bị khoá; không huỷ/đặt lại stop; `has_working_stop`
+  so theo symbol; B3/B4 không bắt được
+- **Đo được:** spread 0.74–1.01%
+- **Suy đoán, CHƯA quan sát:** bar append sau roll nhảy đúng bằng spread. Không kiểm được
+  bằng dữ liệu quá khứ — lịch sử `ContFuture` đã được IBKR chỉnh liền mạch; bậc nhảy chỉ
+  sinh từ *cách ta append*, nên chỉ lộ khi có roll thật giữa hai lần append
+- **Chưa trả lời được:** `ContFuture` roll theo lịch riêng IBKR (theo khối lượng), **có thể
+  không trùng** `ROLL_SCHEDULE` → vài ngày dữ liệu ở hợp đồng này, vị thế ở hợp đồng kia.
+  Đây là lý do việc 1 phải phát hiện **theo bậc nhảy giá**, không theo ngày trong lịch
+- **Chưa đo:** chi phí thật của việc thoát MAX_HOLD muộn 4h40
+
+### test_ro6 — đã sửa (`3127a57`)
+Lỗi ở **test**, không phải code: `ENTRY_DAY=06-10`, `ROLL_DAY=06-12` → hold=2 < 5 nên
+`run_maxhold_exit` **đúng khi không đóng**, còn test khẳng định đã đóng. Sửa: tiêm vị thế
+đủ già + `assert closed` để **tiền đề tự kiểm chính nó**. 18/18.

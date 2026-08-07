@@ -853,3 +853,57 @@ phải engine, và tất cả đều trả về **con số trông hợp lý**:
 - **State mang qua vòng lặp phải copy.** `pos = dict(resume_pos)` — vòng lặp ratchet
   `pos["stop"]` tại chỗ; thiếu copy thì gọi lần hai từ cùng checkpoint ra kết quả khác
   lần một, và lỗi này chỉ lộ khi có ai đó gọi lại.
+
+## Gotchas (2026-08-07)
+
+- **Dry-run ghi state như chạy thật.** `_run()` trả `True` khi `--dry-run` mà không
+  thực thi gì. Bất kỳ chỗ nào ghi "đã làm rồi" dựa trên giá trị trả về của nó sẽ ghi
+  nhầm. Đã xảy ra: một lần chạy thử ghi `{"2026-08-07": true}` vào `maxhold_state.json`,
+  suýt vô hiệu hoá đúng bản vá đang test, ngay trước ngày nó cần hoạt động.
+  **Quy tắc: `if ok and not dry_run`.** Và sau khi chạy thử một tính năng có ghi state,
+  **kiểm file state** — đọc lại code không phát hiện được.
+
+- **APScheduler không có khái niệm "job trễ" khi khởi động.** Nó tính lần bắn KẾ TIẾP.
+  Bật sau giờ cron → job hôm đó không tồn tại, không misfire, không log. Mọi job chạy
+  một lần/ngày đều cần catch-up lúc khởi động, không chỉ `maxhold_exit`.
+
+- **`has_working_stop` so theo `t.contract.symbol`, không phân biệt tháng hợp đồng.**
+  Sau rollover, lệnh STP mồ côi trên hợp đồng cũ khiến B4 tin rằng vị thế trên hợp đồng
+  mới đang được bảo vệ. Guard so **mã instrument** trong khi rủi ro nằm ở **tháng**.
+
+- **Lệnh STP mồ côi không chỉ vô dụng — nó mở được vị thế.** Vị thế LONG đóng nhưng
+  SELL STP còn treo; giá chạm → khớp → **mở SHORT mới** không ai yêu cầu, không có
+  trong state. Đóng vị thế mà không huỷ lệnh bảo vệ là tạo ra một cái bẫy.
+
+## Lessons (2026-08-07)
+
+- **Test có thể tự mâu thuẫn với tiền đề của nó.** `test_ro6` fail nhiều tuần: nó gọi
+  `run_maxhold_exit` với vị thế mới 2 ngày (`max_hold_days=5`) rồi khẳng định state phải
+  rỗng. Code đúng, test sai. **Cách chặn: assert tiền đề trước khi assert kết luận** —
+  `assert closed` ngay sau lời gọi, để lần sau ai đổi ngày thì test báo ở *nguyên nhân*
+  chứ không báo ở *triệu chứng*.
+
+- **Test dùng đồ giả có thể pass vì lý do sai.** "Failure không được ghi nhận" pass với
+  job giả vì *không có gì ghi cả* — việc ghi nằm trong closure thật. Khi tính chất cần
+  kiểm nằm ở một tầng khác tầng đang mock, phải chạm tới tầng đó.
+
+- **Kiểm tính chất *ngược* mới ra giá trị.** Cặp T3/T4 của fingerprint: append bar mới
+  → checkpoint **vẫn dùng được**; sửa 1 bar giữa lịch sử → **hỏng ngay**. Chỉ kiểm một
+  chiều thì không phân biệt được "hoạt động" với "luôn trả True".
+
+- **Cache giữ tham chiếu phải có giới hạn.** Giữ `df` trong entry khiến `id()` hợp lệ
+  theo cấu tạo, nhưng giữ **vô hạn** thì caller tạo khung trong vòng lặp sẽ phình bộ nhớ:
+  `reconcile_nkd` ghim 1,038 khung → **8.5 GB**, sau khi chặn ở 16 → **747 MB**.
+  Kích thước phải phủ đỉnh thật (5 instrument × 2 khoá do `datr` inject/không inject = 10).
+
+## Rejected approaches (2026-08-07)
+
+- **Tự động neo lại offset khi phát hiện bậc nhảy — TỪ CHỐI.** Roll 4 lần/năm; tự sửa
+  sẽ **âm thầm nắn một lỗi dữ liệu thành chuỗi trông liền mạch**. Chọn dừng + người xác
+  nhận: đổi 4 ngày giao dịch/năm lấy việc không bao giờ nắn nhầm. Dự án này đã trả giá
+  nhiều lần cho lỗi *im lặng*, chưa lần nào cho lỗi *ồn ào*.
+
+- **Đưa `--shadow-verify` lên CLI của scheduler — TỪ CHỐI.** Nó tốn một replay đầy đủ mỗi
+  instrument; bật cho cả 22 slot thì `run_live_day` lên ~13 phút, bỏ 2/3 slot — làm xấu
+  đúng cái đang đi sửa. Slot nào gánh nổi chi phí đó là **tính chất của lịch chạy**,
+  không phải lựa chọn để trên dòng lệnh.
