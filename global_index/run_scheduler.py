@@ -105,6 +105,52 @@ _FAIL_TAIL_LINES = 25        # child output echoed on failure — enough for the
 # dispatches jobs on a thread pool, so a threading.Lock is the right primitive.
 _slot_lock = threading.Lock()
 
+# ── Heartbeat: cap the wait, and measure the stall ────────────────────────────
+#
+# BlockingScheduler._main_loop does Event.wait(seconds_until_next_job). On Windows that
+# timeout counts on a clock that does NOT advance while the machine sleeps, so every
+# second asleep pushes the deadline back a second — long after the machine is awake.
+#
+# Measured 2026-08-06. Night of 04→05: 1:27:37 of sleep, predicted wake 23:10:00 +
+# 1:27:37 = 00:37:37, APScheduler actually ran at 00:37:22 — 15s out. Night of 05→06:
+# 2:51:27 + 0:42:21 of sleep pushed the 23:10 deadline to 02:43, past the end of the
+# NKD window at 00:55. Nothing ran and NOTHING WAS LOGGED: no misfire, no error, the
+# process idle and healthy. The night window degraded 22 slots → 4 → 0 over three
+# nights before anyone looked.
+#
+# A job every minute bounds that wait to 60s, so after a resume the scheduler
+# re-evaluates within a minute rather than hours. The beat also times ITSELF on the
+# wall clock, which does advance during sleep, so the gap between beats is the stall —
+# reported as a number instead of as silence.
+#
+# This does not make jobs run while the machine is asleep. Nothing can. Keep the box
+# awake (powercfg SUB_SLEEP STANDBYIDLE 0) — this only stops one sleep from disabling
+# every later job.
+HEARTBEAT_SECS = 60
+_HEARTBEAT_TOLERANCE = 30    # cron drift + a slow beat; below this it is not a stall
+_last_beat: dict = {"t": None}
+
+# How late a slot may be and still be worth running. APScheduler's default is 1 second,
+# which silently drops any slot that arrives even slightly behind — the state the night
+# window was in. Slots are 5 minutes apart and diff_desired_vs_held is idempotent, so a
+# slot a few minutes late does what the missed one would have. Past that the next slot
+# has already covered it, and firing a slot whose window has closed is worse than
+# skipping: an NKD entry would land hours from its signal bar.
+SLOT_MISFIRE_GRACE_SECS = 300
+
+
+def heartbeat_gap(prev, now) -> "float | None":
+    """Seconds lost since the previous beat, or None if the beat arrived on time.
+
+    prev is None on the first beat — nothing to compare against yet.
+    """
+    if prev is None:
+        return None
+    gap = (now - prev).total_seconds()
+    if gap <= HEARTBEAT_SECS + _HEARTBEAT_TOLERANCE:
+        return None
+    return gap
+
 # Slots whose fail-closed skip has already been reported, keyed by (date, slot).
 # Keeps the "no pre-flight record" banner loud once and quiet afterwards.
 _skip_warned: set = set()
@@ -195,6 +241,27 @@ def make_scheduler(port: int, dry_run: bool,
         sys.exit("apscheduler not installed: pip install apscheduler>=3.10")
 
     sched = BlockingScheduler(timezone="America/New_York")   # ET-native
+
+    # ── Every minute, all week: bound the wait and measure any stall ─────────
+    # Not day_of_week="mon-fri": a stall that starts on Friday evening has to be
+    # visible before Monday's first slot, not after it.
+    @sched.scheduled_job("cron", minute="*", id="heartbeat", name="Heartbeat 60s")
+    def job_heartbeat():
+        from datetime import datetime as _dt, timezone as _tz
+        now = _dt.now(_tz.utc)
+        gap = heartbeat_gap(_last_beat["t"], now)
+        _last_beat["t"] = now
+        if gap is None:
+            log.debug("[HEARTBEAT] ok")
+            return
+        log.warning(
+            "[HEARTBEAT] STALLED %.0fs (expected ~%ds). The scheduler's wait timer does "
+            "not advance while Windows sleeps, so every job due in that window was "
+            "missed and every later one was pushed back by the same amount. Check "
+            "Power-Troubleshooter events, and keep the machine awake "
+            "(powercfg /setdcvalueindex SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 0).",
+            gap, HEARTBEAT_SECS,
+        )
 
     # ── 09:31 ET Mon-Fri: MAX_HOLD exit at RTH open ──────────────────────────
     @sched.scheduled_job("cron", day_of_week="mon-fri", hour=9, minute=31,
@@ -355,7 +422,8 @@ def make_scheduler(port: int, dry_run: bool,
 
     # ── 14:05 ET Mon-Fri: initial signal run ─────────────────────────────────
     @sched.scheduled_job("cron", day_of_week="mon-fri", hour=14, minute=5,
-                         id="live_day", name="Daily run 14:05 ET")
+                         id="live_day", name="Daily run 14:05 ET",
+                         misfire_grace_time=SLOT_MISFIRE_GRACE_SECS)
     def job_live_day():
         _live_day_body("LIVE_DAY_1405", first_slot=True)
 
@@ -373,6 +441,7 @@ def make_scheduler(port: int, dry_run: bool,
             "cron", day_of_week="mon-fri", hour=_h, minute=_m,
             id=_slot_id.lower(),
             name=f"Continuous run {_h:02d}:{_m:02d} ET",
+            misfire_grace_time=SLOT_MISFIRE_GRACE_SECS,
         )
 
     # ── 01:10–02:55 ET Mon-Fri: NKD night slots ──────────────────────────────
@@ -398,6 +467,7 @@ def make_scheduler(port: int, dry_run: bool,
             "cron", day_of_week="mon-fri", hour=_h, minute=_m,
             id=_slot_id.lower(),
             name=f"NKD night run {_h:02d}:{_m:02d} ET",
+            misfire_grace_time=SLOT_MISFIRE_GRACE_SECS,
         )
 
     return sched
