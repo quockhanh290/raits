@@ -547,6 +547,74 @@ def test_stp12_session_end_quiet_when_broker_cannot_report(tmp_path):
     assert unprotected == [], "a broker that cannot testify must not trigger alarms"
 
 
+# ── STP13: a stop-triggered exit must leave a trade record ───────────────────
+#
+# When a stop fires, the runner sends no order — so nothing on the send_order path
+# writes a trade record, and the exit price of the trade is never captured. Chandelier
+# stops are 79.5% of exits, so this is most of them.
+#
+# B3's STP-VERIFY branch is the one place that both notices the exit and holds the fill:
+# it asks IBKR, gets price/size/time/permId back, and used to keep only "yes it filled".
+# Measured 2026-08-07: reqExecutions served that fill on the day and had forgotten it by
+# the next, so this is the only moment it can be recorded.
+
+
+class _StopFilledBroker(_RecordingMockBroker):
+    """IBKR holds no position; the recorded stop shows as gone but did execute."""
+
+    def __init__(self, bars, account, fill):
+        super().__init__(bars, account, stp_status="NOT_FOUND")
+        self._fill = fill
+
+    def find_execution(self, order_id):
+        return dict(self._fill) if str(order_id) == "ibkr-456" else None
+
+
+def test_stp13_stop_exit_is_written_to_the_trade_log(tmp_path):
+    pos_file = tmp_path / "pos.json"
+    pos_file.write_text(json.dumps({
+        "schema_version": 1,
+        "positions": [{
+            "inst": "MES", "direction": "LONG", "contracts": 1,
+            "risk_dollars": 500.0, "cluster": CLUSTER,
+            "entry_day": "2024-03-11", "exit_day": None,
+            "pnl_sized": 0.0, "exit_pending": False,
+            "stop_price": 4950.0, "stop_order_id": "ibkr-456",
+        }],
+        "breaker": {},
+    }))
+    log_path = tmp_path / "trade_log.jsonl"
+    broker = _StopFilledBroker({}, ACCOUNT, fill={
+        "order_id": 456, "perm_id": 375088794,
+        "price": 4948.75, "shares": 1, "time": "2024-03-12 14:31:02",
+    })
+
+    runner = FuturesRunner(
+        broker=broker, guard=_make_guard(),
+        contracts_by_inst={"MES": 1},
+        signal_fn=lambda d, b, h: ([], []),
+        breaker=CircuitBreaker(account=ACCOUNT),
+        positions_path=pos_file,
+        trade_log_path=log_path,
+    )
+
+    assert runner.state.open_positions == [], "position must be cleared"
+    assert log_path.exists(), (
+        "the stop fill was confirmed and then not recorded anywhere — nothing else "
+        "writes a trade record for a stop-triggered exit"
+    )
+    recs = [json.loads(l) for l in log_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    closes = [r for r in recs if r.get("type") == "CLOSE"]
+    assert len(closes) == 1, f"expected one CLOSE record, got {recs}"
+    c = closes[0]
+    assert c["fill_price"] == pytest.approx(4948.75), "the exit price is the point"
+    assert c["perm_id"] == 375088794, "permId is the stable key across clients"
+    # Joined with what only the runner knows — IBKR cannot supply any of these.
+    assert (c["inst"], c["cluster"], c["direction"]) == ("MES", CLUSTER, "LONG")
+    assert c["entry_day"] == "2024-03-11"
+    assert c["exit_reason"] == "STP", "must be distinguishable from a signal exit"
+
+
 # ── run ───────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":

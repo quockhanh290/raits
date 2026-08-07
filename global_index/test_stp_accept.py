@@ -553,5 +553,69 @@ def test_id4_fills_in_a_missing_id():
     assert id_corrections(positions, stops) == {"M2K": "100"}
 
 
+# ── the fill IBKR hands back must not be thrown away ─────────────────────────
+#
+# find_execution asked IBKR for the execution, matched the orderId, and returned True —
+# discarding price, shares, time and permId. Its one caller is B3's STP-VERIFY branch,
+# which runs at the moment a stop-out is detected and the record is still available:
+# reqExecutions served yesterday's fill on the day, and had forgotten it by the next.
+#
+# Chandelier stops are 79.5% of exits, so this is the exit price for most trades. It was
+# never written anywhere.
+
+
+class _Exec:
+    def __init__(self, order_id, price, shares, time, perm_id):
+        self.orderId, self.price, self.shares = order_id, price, shares
+        self.time, self.permId = time, perm_id
+
+
+class _FillRec2:
+    def __init__(self, execution):
+        self.execution = execution
+
+
+class _ExecIB:
+    def __init__(self, fills):
+        self._fills = fills
+
+    def reqExecutions(self, _filt=None):
+        return list(self._fills)
+
+
+def _exec_broker(fake_ib):
+    broker = IBKRBroker(_raw_fetcher=lambda i, t: None)
+    broker._raw_fetcher = None
+    broker._require_connection = lambda: fake_ib
+    return broker
+
+
+def test_fe1_returns_the_execution_detail_not_a_bare_true():
+    fake = _ExecIB([_FillRec2(_Exec(100, 3020.10, 1, "2026-08-07 11:20:20", 375088794))])
+    got = _exec_broker(fake).find_execution("100")
+
+    assert got, "a matched fill must stay truthy — B3 branches on it"
+    assert got["price"] == pytest.approx(3020.10), (
+        f"the exit price is the whole point and it was being dropped; got {got!r}"
+    )
+    assert got["shares"] == 1
+    assert got["perm_id"] == 375088794, "permId is the stable key; orderId repeats per client"
+    assert got["time"] == "2026-08-07 11:20:20"
+
+
+def test_fe2_no_match_is_still_falsy():
+    """B3 treats a falsy answer conservatively — that must not change."""
+    fake = _ExecIB([_FillRec2(_Exec(999, 1.0, 1, "t", 1))])
+    assert not _exec_broker(fake).find_execution("100")
+
+
+def test_fe3_an_error_is_falsy_not_an_exception():
+    """B3 runs this inside reconcile at startup; raising would take the slot down."""
+    class _Boom:
+        def reqExecutions(self, _f=None):
+            raise RuntimeError("gateway busy")
+    assert not _exec_broker(_Boom()).find_execution("100")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
