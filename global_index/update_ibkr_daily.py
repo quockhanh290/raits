@@ -105,6 +105,30 @@ ALIGN_MAX_DRIFT: float = 0.5
 # rather than passing quietly. A "3 D" fetch against a daily append shares ~2,500.
 ALIGN_MIN_OVERLAP: int = 500
 
+# Re-anchoring on a roll: the conditions under which the new offset is applied
+# instead of the day being refused.
+#
+# Stopping was the right call while a roll was inferred from the size of a price
+# jump, and while the offset was measured from a single pair of bars. Neither is
+# true now — qualifyContracts names the contract outright, and the shift is the
+# median over thousands of shared bars. What actually makes this safe is the
+# alignment check above: if a re-anchor is wrong, tomorrow's append refuses. A
+# mistake lives one day rather than sitting in the file for months, which is what
+# the 2026-08-05 offset step did.
+#
+# Every condition has to hold, or the day is refused exactly as before:
+#   - the contract changed (certainty about the cause)
+#   - enough shared bars for the median to mean anything
+#   - the difference is a clean level shift, not noise
+#   - its size is what carry between two expiries looks like
+#
+# Measured 2026-08-07: Sep/Dec spreads ran 0.74-1.01% of price across the basket.
+# The band is set wider than that in both directions — the spread moves with rates,
+# dividends and time to expiry, and a December roll is not an August one.
+REANCHOR_MAX_IQR_FRAC: float = 0.20   # IQR as a fraction of |median|
+REANCHOR_MIN_PCT: float = 0.20        # of price
+REANCHOR_MAX_PCT: float = 2.00
+
 # ── Instruments: (runner_name, ibkr_symbol, parquet_path) ────────────────────
 def _build_jobs(data_dir: Path, nkd_path: Path) -> list[dict]:
     jobs = []
@@ -430,10 +454,50 @@ def main() -> None:
                         # rebuild, which is the wrong diagnosis at exactly the moment
                         # the right one matters. The suggested offset is the same
                         # either way — the median over thousands of shared bars.
-                        if _rolled:
+                        # A roll is the one cause we can be certain of, so it is the
+                        # one case worth continuing through — but only when the
+                        # measurement corroborates it. Anything short of that falls
+                        # back to refusing, which is what every other path does.
+                        _px = float(existing["close"].iloc[-1]) or 1.0
+                        _shift_pct = abs(_med) / abs(_px) * 100
+                        _iqr_frac = (_iqr / abs(_med)) if _med else float("inf")
+                        _why = []
+                        if len(_ov) < ALIGN_MIN_OVERLAP:
+                            _why.append(f"only {len(_ov)} shared bars")
+                        if _iqr_frac > REANCHOR_MAX_IQR_FRAC:
+                            _why.append(f"IQR is {_iqr_frac:.0%} of the shift — not a "
+                                        f"clean level difference")
+                        if not (REANCHOR_MIN_PCT <= _shift_pct <= REANCHOR_MAX_PCT):
+                            _why.append(f"shift is {_shift_pct:.3f}% of price, outside "
+                                        f"{REANCHOR_MIN_PCT}-{REANCHOR_MAX_PCT}%")
+
+                        if _rolled and not _why:
+                            _new_off = stored_offset + _med
+                            for _c in ("open", "high", "low", "close"):
+                                if _c in new_bars_adj.columns:
+                                    new_bars_adj[_c] = new_bars_adj[_c] + _med
+                            splice_offsets[name] = {"offset": _new_off,
+                                                    "contract": fetched_contract}
+                            offsets_dirty = True
+                            log.warning(
+                                "  %s: CONTRACT ROLLED %s -> %s — re-anchored and "
+                                "continuing.", name, stored_contract, fetched_contract)
+                            log.warning(
+                                "       Shift %+.4f (%.3f%% of price) measured over %d "
+                                "shared bars, IQR %.4f (%.0f%% of the shift). Offset "
+                                "%+.4f -> %+.4f.",
+                                _med, _shift_pct, len(_ov), _iqr, _iqr_frac * 100,
+                                stored_offset, _new_off)
+                            log.warning(
+                                "       Tomorrow's alignment check verifies this. If the "
+                                "anchor was wrong it will refuse then — do not ignore an "
+                                "ALIGNMENT DRIFT the day after a roll.")
+                            # Fall through and append with the new offset applied.
+                        elif _rolled:
                             log.error(
-                                "  %s: CONTRACT ROLLED %s -> %s — refusing to append.",
-                                name, stored_contract, fetched_contract)
+                                "  %s: CONTRACT ROLLED %s -> %s — refusing to append "
+                                "(%s).", name, stored_contract, fetched_contract,
+                                "; ".join(_why))
                             log.error(
                                 "       Bars from %s sit on a different price level than "
                                 "the history, which was built against %s. Measured over "
@@ -470,8 +534,12 @@ def main() -> None:
                                 "means the two sources disagree bar by bar, which is a "
                                 "data problem, not an offset.",
                                 a.splice_offsets, stored_offset + _med)
-                        failed.append(name)
-                        continue
+
+                        # Re-anchored runs carry on with the corrected offset; every
+                        # other path here has already said why it is stopping.
+                        if not (_rolled and not _why):
+                            failed.append(name)
+                            continue
                 else:
                     log.warning("  %s: only %d shared bars — alignment unchecked",
                                 name, len(_ov))

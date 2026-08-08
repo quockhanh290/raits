@@ -300,3 +300,93 @@ dòng `[sig] live-bar price offsets`. Ví dụ MES offset 10,75: shadow 7743.75 
 Shadow **chưa quyết định gì** — đường replay đầy đủ vẫn là đường giao dịch. Chỉ sau vài
 phiên `DOI CHIEU KHOP` liên tiếp mới xét chuyển sang dùng resume thật; khi đó `run_day`
 xuống dưới 1 phút, hết bỏ slot, độ trễ vào lệnh từ ~7,9 xuống ~3,5 phút.
+
+---
+
+## Rollover hợp đồng — điều gì tự chạy, điều gì cần người
+
+Roll 4 lần/năm (`ROLL_SCHEDULE` trong `ibkr_broker.py`). Rổ 4: 11/9, 11/12.
+NKD sớm hơn một tuần: 4/9, 4/12.
+
+### Tầng dữ liệu — thường TỰ XỬ LÝ
+
+`update_ibkr_daily` phát hiện roll bằng **định danh hợp đồng** (`qualifyContracts`
+trả `MESU6` → `MESZ6`), không phải suy từ độ lớn biến động. Nếu đủ bốn điều kiện thì
+nó **tự neo lại offset và chạy tiếp**:
+
+1. Định danh hợp đồng đã đổi
+2. ≥ 500 bar chồng lấn giữa parquet và lần fetch
+3. IQR ≤ 20% mức dịch — dịch mức sạch, không phải nhiễu
+4. Mức dịch nằm trong 0,20%–2,00% giá — cỡ chi phí nắm giữ
+
+Log sẽ hiện:
+```
+MES: CONTRACT ROLLED MESU6 -> MESZ6 — re-anchored and continuing.
+     Shift -66.7500 (0.862% of price) over 3946 shared bars, IQR 1.7500 (3% of shift).
+     Offset +0.0000 -> -66.7500.
+     Tomorrow's alignment check verifies this.
+```
+
+⚠️ **Hôm sau phải kiểm log.** Nếu neo sai, `ALIGNMENT DRIFT` sẽ xuất hiện — **không
+được bỏ qua một ALIGNMENT DRIFT vào ngày sau roll.**
+
+### Khi guard CHẶN — quy trình
+
+Thiếu bất kỳ điều kiện nào → từ chối → `exit(1)` → pre-flight fail → **toàn bộ slot
+ngày đó skip**. Log nói rõ thiếu điều kiện nào.
+
+**Bước 1 — đọc log, xác định loại lỗi:**
+
+| thông báo | nghĩa là |
+|---|---|
+| `CONTRACT ROLLED ... refusing (IQR is N% of the shift)` | roll nhưng dữ liệu nhiễu — **không** neo tay, điều tra trước |
+| `CONTRACT ROLLED ... refusing (shift is N% of price, outside ...)` | roll nhưng mức dịch không giống carry — kiểm xem có phải roll thật |
+| `ALIGNMENT DRIFT` + IQR nhỏ | parquet bị dựng lại mà quên sidecar (**sự cố 05/8**) — log in sẵn offset đúng |
+| `ALIGNMENT DRIFT` + IQR lớn | hai nguồn lệch từng bar — lỗi dữ liệu, **không phải** lỗi offset |
+| `JOIN JUMP ... NO contract change` | bar hỏng / fetch nhầm hợp đồng |
+
+**Bước 2 — kiểm chéo giữa các mã.** Roll thật làm **mọi** chỉ số tương quan dịch cùng
+chiều, biên độ tương đương (%). Một mã lệch một mình = lỗi dữ liệu, không phải roll.
+
+**Bước 3 — sửa.** Với ca "quên sidecar", log đã in đúng con số cần đặt:
+```
+The offset that would align it is +11.5000
+```
+Sửa `global_index/data/_ibkr_splice_offsets.json` rồi chạy lại:
+```powershell
+python -m global_index.update_ibkr_daily --port 4002
+```
+Phải thấy `ALL 5 INSTRUMENTS UPDATED`. Nếu vẫn báo lỗi — **dừng, đừng ép**.
+
+**Bước 4 — chỉ khi bước 3 sạch**, bật lại scheduler để giao dịch trong ngày:
+```powershell
+pythonw -m global_index.run_scheduler --port 4002 --shadow-resume --assume-preflight-ok
+```
+
+⚠️ **`--assume-preflight-ok` bỏ qua toàn bộ cổng 13:45.** Nó chỉ hợp lệ khi bạn vừa
+tự chạy `update_ibkr_daily` thành công. Dùng nó để "cho chạy tiếp" khi chưa sửa gì là
+biến một ngày mất thành một ngày **giao dịch trên dữ liệu hỏng**.
+
+Ngân sách thời gian: pre-flight 13:45 ET, phiên 14:05 ET → **20 phút**, trong đó
+`update_ibkr_daily` mất ~3,5 phút.
+
+### Tầng vị thế — tự xử lý
+
+Khi roll, `_handle_rollover` đóng hợp đồng cũ và mở hợp đồng mới, rồi runner **huỷ
+lệnh STP cũ và đặt lại trên hợp đồng mới**, mức stop dịch theo chênh lệch **đã khớp
+thật** (`giá mở mới − giá đóng cũ`). Lệnh STP mồ côi trên hợp đồng cũ nguy hiểm hơn là
+không có stop: nó có thể khớp và **mở một vị thế mới không ai yêu cầu**.
+
+Cần chú ý trong log:
+```
+C2: cancelled old-contract stop orderId=... for MES
+C2: stop rolled MES: 7700.0000 -> 7766.7500 (shift +66.7500) orderId=...
+```
+Bất kỳ dòng `C2: ... UNPROTECTED` hoặc `could NOT cancel` nào đều là **CRITICAL** —
+vào TWS xử lý tay.
+
+### Chưa từng chạy qua roll thật
+
+Toàn bộ phần trên kiểm bằng dữ liệu dựng lại và bằng sự cố offset 05/8. **Lần roll
+đầu tiên dưới đường ống này là 11/9/2026.** Hôm đó nên có người theo dõi log
+13:45–14:05 ET thay vì tin hoàn toàn vào tự động.
