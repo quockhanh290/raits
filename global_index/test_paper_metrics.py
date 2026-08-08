@@ -135,7 +135,9 @@ def test_pm8_dump_state_publishes_running_metrics(tmp_path):
     r.dump_state(pd.Timestamp("2026-08-06"))
     raw = (tmp_path / "live.js").read_text(encoding="utf-8")
     d = json.loads(raw[raw.find("{"):raw.rfind("}") + 1])
-    rm = d["snapshots"][0]["running_metrics"]
+    # The payload now carries one snapshot per day of the curve, today's last, so the
+    # dashboard's slider has something to scrub. The live figures are on the last one.
+    rm = d["snapshots"][-1]["running_metrics"]
     assert set(rm) == {"calmar", "sharpe", "max_dd", "total_return"}
     assert rm["max_dd"] is not None, "three marks is enough for a drawdown"
 

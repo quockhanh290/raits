@@ -2028,6 +2028,70 @@ class FuturesRunner:
             ) if self._hmm_stale_guard else False,
         }
 
+    def _history_snapshots(self, today_snap: dict) -> list:
+        """The full snapshot list: one per day of the equity curve, today's last.
+
+        A single snapshot is why the dashboard's Closed Trades, Daily P&L, Per-Cluster
+        P&L, Regime Attribution, Cluster Statistics and Holding Distribution were blank
+        in live mode. The panels walk snapshots and stamp each exit with its snapshot's
+        date, so one snapshot means one point on the equity chart and every trade dated
+        today.
+
+        Rebuilt each call from trade_log.jsonl and paper_history.json, both of which
+        already exist and are already reconciled against IBKR's statement. No third
+        store, so nothing new can drift out of step with them.
+
+        Today's snapshot keeps the live fields the history cannot supply — open
+        positions, cluster exposure, regime, breaker level — and takes its trades and
+        analytics from the same history so the two cannot disagree.
+
+        Never raises. Losing the dashboard's history must not take a trading slot down;
+        the single snapshot is a correct, if bare, fallback.
+        """
+        try:
+            from global_index.live_history import build_snapshots
+
+            records = []
+            if self._trade_log_path is not None and self._trade_log_path.exists():
+                for line in self._trade_log_path.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        records.append(json.loads(line))
+                    except Exception:
+                        continue          # a torn last line must not blank the history
+            history = {}
+            if self._paper_history_path is not None and self._paper_history_path.exists():
+                with open(self._paper_history_path, encoding="utf-8") as fh:
+                    history = json.load(fh)
+
+            snaps = build_snapshots(records, history)
+            if not snaps:
+                return [today_snap]
+
+            # Metrics as at each day, so scrubbing the slider back shows what the book
+            # looked like then rather than dashes. Same _running_metrics the live
+            # snapshot uses — one formula, fed a truncated curve.
+            _all_days = (history or {}).get("days") or {}
+            for _s in snaps:
+                _upto = {d: v for d, v in _all_days.items() if d <= _s["date"]}
+                _s["running_metrics"] = self._running_metrics(
+                    {**history, "days": _upto})
+
+            today = today_snap.get("date")
+            merged = [s for s in snaps if s.get("date") != today]
+            hist_today = next((s for s in snaps if s.get("date") == today), None)
+            if hist_today is not None:
+                today_snap = {**today_snap, **{k: v for k, v in hist_today.items()
+                                               if k not in ("equity",)}}
+            merged.append(today_snap)
+            return merged
+        except Exception as exc:
+            logger.warning("dashboard history unavailable (%s) — falling back to the "
+                           "current snapshot only", exc)
+            return [today_snap]
+
     def dump_state(self, day) -> None:
         """Write live_state_data.js (window.LIVE_DATA) for dashboard live mode.
         Atomic write via .tmp → os.replace. No-op when live_state_path is None."""
@@ -2159,7 +2223,7 @@ class FuturesRunner:
         live_data = {
             "runner_health": meta["runner_health"],
             "meta":          meta,
-            "snapshots":     [snap],
+            "snapshots":     self._history_snapshots(snap),
         }
 
         try:

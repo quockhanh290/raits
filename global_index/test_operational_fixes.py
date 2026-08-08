@@ -361,7 +361,11 @@ def test_ratchet_not_in_openpos():
     fields = {f.name for f in dataclasses.fields(OpenPos)}
     check("T7.1 no 'stop' field in OpenPos", "stop" not in fields,
           f"fields={fields}")
-    check("T7.2 no 'entry_price' field in OpenPos", "entry_price" not in fields)
+    # entry_price is deliberate as of 97e0f7c. Live pnl_sized arrives as 0.0 — the
+    # backtest fills it from its ledger, a broker does not — so a close cannot be valued
+    # without the price the position filled at. decide_day never reads it.
+    check("T7.2 OpenPos carries entry_price for live P&L", "entry_price" in fields,
+          f"fields={fields}")
     from global_index.runner import _openpos_to_dict, _openpos_from_dict
     import pandas as pd
     pos = OpenPos("MES", "LONG", 1, 250.0, "roska4_swing",
