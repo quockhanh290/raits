@@ -95,6 +95,22 @@ def decide_day(day, state: DecisionState, entry_candidates, guard, contracts_by_
     state.open_positions = still
 
     # 2. circuit breaker (per-day)
+    #
+    # start_day runs AFTER the exits above, so the baseline it captures already includes
+    # them. A loss realised in the first call of a day therefore sets that day's
+    # baseline below itself and can never trip HALT_DAY from there — the -4% brake
+    # measures from "after the day's first closes", not from yesterday's close.
+    #
+    # Live runs ~22 slots a day and only the first re-baselines, so every close from the
+    # second slot onward does count. What falls outside is the first batch, which is also
+    # the largest: the 14:05 signal exits, and anything run_maxhold_exit closed at 09:31.
+    #
+    # DELIBERATE, decided 2026-08-08. This ordering is deploy_sim.replay's, and changing
+    # it would move the brake in the backtest too — every baseline figure (Calmar floor
+    # 1.65, Max DD, halted counts) would have to be rebuilt. The cost outweighs a benefit
+    # that is not clearly there. Recorded here because the names say otherwise:
+    # `_day_start_equity` and `start_day` read as "equity at the start of the day", and
+    # that is not what they hold.
     allow = True
     if state.breaker is not None:
         if state.cur_day is None or day != state.cur_day:

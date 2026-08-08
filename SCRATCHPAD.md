@@ -1,5 +1,22 @@
 ## Gotchas
 
+- **Phanh ngày đo từ SAU đợt đóng đầu tiên, không phải từ cuối hôm trước** (2026-08-08,
+  quyết định: GIỮ NGUYÊN + ghi rõ). `decide_day` ghi exits **rồi mới** gọi `start_day`,
+  nên mốc ngày đã bao gồm chúng:
+  ```
+  cuối hôm qua 50,000 → lệnh đóng −2,500 → equity 47,500 → start_day(47,500)
+  daily_loss = 0%   (thực tế ngày đó mất 5%)
+  ```
+  Live chạy ~22 slot/ngày và chỉ slot đầu đặt lại mốc, nên mọi lệnh đóng **từ slot 2 trở
+  đi đều được tính**. Cái nằm ngoài là đợt đầu — cũng là đợt lớn nhất: thoát theo tín hiệu
+  lúc 14:05, và những gì `run_maxhold_exit` đã đóng lúc 09:31.
+  ⚠️ **Tên gọi nói khác hành vi**: `_day_start_equity` / `start_day` đọc như "equity đầu
+  ngày", mà nó không giữ cái đó. Đã ghi comment tại `live_decision.decide_day`.
+  **Không sửa** vì đây là thứ tự của `deploy_sim.replay` — đổi là đổi phanh trong cả
+  backtest, phải dựng lại toàn bộ baseline (Calmar floor 1.65, Max DD, số lệnh halt).
+  **L19: khi tên biến và hành vi lệch nhau mà không sửa được, ghi comment tại chỗ ra
+  quyết định — không phải trong doc mà người đọc code sẽ không mở.**
+
 - **Sổ cái sleeve bám NetLiquidation của cả tài khoản, không phải P&L giao dịch**
   (2026-08-07, đo bằng statement IBKR): H4 làm `state.equity += broker.get_equity() delta`.
   Chứng minh: broker `997,756.40 − 997,395.69 = +360.71`, sổ cái `52,212.33 − 51,851.62
@@ -981,3 +998,42 @@ phải engine, và tất cả đều trả về **con số trông hợp lý**:
 
 - **Log scheduler bị lẫn output pytest** — `run_scheduler.py` gắn FileHandler vào root
   logger ngay khi import, mà test có import nó. Gây nhiễu cho người đọc log. CHƯA SỬA.
+
+- **Checkpoint tự huỷ mỗi ngày — shadow phiên 08-07 thu về số 0.** Fingerprint phủ lịch sử
+  "tính đến `last_day`", tưởng là an toàn vì không phủ phần sau. Nhưng append 13:45 ET
+  bổ sung **đuôi của ngày hôm trước** (13:46→23:59 ET), nên phần "tính đến last_day" vẫn
+  lớn lên. Lệch **554 bar** trên MES/MNQ/MYM/M2K = đúng số bar 13:46→23:59 ET ngày 08-06. Gốc rễ là **chọn ngày theo khung đã ghép** (có bar live → đủ ngày
+  hôm qua) trong khi **fingerprint tính trên parquet** (chưa đủ). Sửa: `advance_day()` đọc
+  session từ parquet và lùi 1 ngày so với session cuối. Bài học: khi hai nguồn dữ liệu
+  cùng mô tả "lịch sử", phải dùng **cùng một nguồn** cho cả chọn mốc lẫn băm.
+
+- **Guard im lặng vẫn là guard hỏng.** Checkpoint từ chối đúng như thiết kế nên không có
+  log ERROR nào; nhìn qua tưởng bình thường. Chỉ lộ ra khi đi đọc log để tìm `DOI CHIEU`.
+  Cái gì "từ chối an toàn" thì phải đếm số lần từ chối, không thì nó chết âm thầm.
+
+- **MNKD sống sót không phải may — do lệch múi giờ, và nó cho điều kiện tổng quát.**
+  Fingerprint MNKD cắt theo giờ **Tokyo**, tức 00:00 JST = **15:00 UTC**, nằm TRƯỚC mốc
+  append (13:45 ET = 17:45 UTC) → lịch sử đã cố định. Rổ 4 cắt 00:00 **ET** = 04:00 UTC
+  hôm sau, nằm SAU mốc append → còn bị điền tiếp. Điều kiện: **mốc cắt phải nằm trước ranh giới append**. Lấy session áp
+  chót *trên chính khung của dữ liệu* thoả cả hai mà không cần phân biệt mã nào.
+  **Mắc lỗi này HAI lần trong một buổi:** đo MNKD bằng khung UTC (nó chạy Tokyo) → "chênh
+  477, dư 166 không giải thích được"; rồi đo Rổ 4 cũng bằng khung UTC (engine chạy ET) →
+  "314" trong khi log ghi 554. Hai loader khác nhau: `futures._validated_core.load_parquet`
+  → **ET tz-aware**; `global_index.update_ibkr_daily._load_parquet` → **UTC**. Cách bắt:
+  tìm mốc cắt cho ra **đúng** số dòng đã lưu, thay vì tìm cách giải thích phần chênh.
+
+## Gotchas (2026-08-08)
+
+- **Live chạy luật thoát KHÁC backtest, ở mọi lệnh.** `place_stop` đưa STP lên sàn ngay
+  sau khi khớp (GTC, outsideRth) → có hiệu lực từ giây đầu. `backtest_swing_tf` kiểm stop
+  trong khối `if pos is not None`, chạy TRƯỚC khối vào lệnh trong cùng vòng lặp ngày → vị
+  thế mở hôm nay mãi **hôm sau** mới bị xét. Cửa sổ lệch ≈ 14:00→23:59 ET ngày vào lệnh.
+  Đo (measure_sameday_stop.py, 2018→2024, 3.044 lệnh): **60,8% lệnh chạm stop ban đầu
+  ngay trong ngày vào**; mô phỏng live thoát tại stop → **+$46.916 thành −$14.046**.
+  Xác nhận độc lập: `hold_days` không có giá trị 0 nào trong toàn bộ trade log.
+  Tự kiểm đơn điệu (nới stop ×0.5→×8) đạt ở cả 4 mã.
+
+- **Vòng lặp mở-đóng MES 08-07 KHÔNG phải lỗi dữ liệu.** Kéo giá thật từ IBKR: ET 14:59
+  close = 7764.50 = đúng entry tín hiệu trên thang thô → quy đổi offset đúng tuyệt đối.
+  Giá vượt stop lúc 15:01 (2 phút sau bar tín hiệu), lệnh gửi 15:10:41. Nguyên nhân là
+  **độ trễ vào lệnh** (run_day 5m13 + slot cách 10 phút), không phải parquet.

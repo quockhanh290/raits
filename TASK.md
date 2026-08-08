@@ -1369,7 +1369,154 @@ fdfad29 fix(stp): place_stop confirms IBKR accepted the order instead of its own
 ---
 
 ## Sub-task: Sổ cái sleeve đo sai — bám net-liq tài khoản thay vì P&L giao dịch
-Status: ROOT CAUSE ĐO ĐƯỢC — **CHƯA SỬA** — thiết kế đã chốt, chờ thực thi
+Status: **DONE** (97e0f7c) — đã rebase về epoch mới $50,000 ngày 2026-08-07
+
+### Kết quả
+- [x] Bỏ H4 khỏi đường sổ cái. `equity = ACCOUNT + Σ realized P&L của lệnh sleeve`,
+      **realized-only** đúng quy ước `deploy_sim.replay:77`.
+- [x] `OpenPos.entry_price` + lưu xuống file. Live `pnl_sized` về 0.0 nên không có giá vào
+      thì không định giá được lệnh đóng.
+- [x] **Bốn** đường đóng đều ghi sổ: signal exit · max hold · retry · stop nổ ở broker.
+      `run_maxhold_exit` **chưa bao giờ** cộng P&L vào sổ cái.
+- [x] Vị thế không có `entry_price` → CRITICAL + bỏ qua, không ghi bừa số 0.
+
+### Phát hiện: verify mode cũng sai, và không gate nào bắt được
+`decide_day` cộng `pnl_sized`, rồi H4 cộng tiếp delta broker cho **cùng một lệnh** →
+`state.equity = ACCOUNT + 2 × realized`. Sống sót vì `verify_runner_real.py` chỉ so
+`broker.get_equity()` (con số MockBroker giữ, vốn đúng), **không bao giờ so
+`runner.state.equity`** — tức con số circuit breaker đọc.
+- [x] Gate nay kiểm cả hai. Chạy 3072 lệnh thật: `Sleeve ledger $109,820.69 =
+      expected $109,820.69 PASS`.
+**L18: gate kiểm con số dễ lấy, không kiểm con số được dùng để ra quyết định — thì nó
+không kiểm gì cả.**
+
+### Verify mode nguyên vẹn — ba lớp độc lập
+1. `MockBroker` không set `avg_price` (chỉ IBKRBroker set) → nhánh định giá live không chạy
+2. `signal_layer` không set `pnl_sized` → live `decide_day` cộng 0 → không đếm hai lần
+3. H4 trong verify vốn là no-op → xoá không đổi gì
+GATE: reconcile_gd0 4/4 MATCH · reconcile_stress 0 mismatch · verify_runner_real ALL PASS
+· pytest 134 · injection 14/14.
+
+### Rebase — QUYẾT ĐỊNH: epoch mới từ $50,000 (2026-08-07)
+Lý do: mọi lệnh 08-03→08-07 do code có lỗi đã biết sinh ra (stop chưa từng tới IBKR,
+stop nổ ngay khi đặt, exit không ai ghi, sổ cái đếm nhầm). Đo degradation-vs-backtest
+trên mẫu đó là **đo lỗi, không đo chiến lược**. Cùng mốc $50k với backtest nên Calmar/DD
+so trực tiếp được.
+- [x] `system_equity` / `peak_equity` / `day_start_equity` = 50,000.00
+- [x] `system_epoch` = null → runner tự đóng dấu ngày chạy thật đầu tiên
+- [x] `last_broker_equity`, `cur_day` gỡ bỏ → tự khởi tạo lại
+- [x] `entry_price` MYM SHORT = **54631.00** (từ statement) — không có thì lệnh đóng ra CRITICAL
+- [x] **Gỡ vị thế MES SHORT ma** — stop #196 đã khớp ở broker 08-07 14:01 local, runner
+      chưa kịp đối chiếu. Để lại thì B3 thứ Hai thấy IBKR trống vs file có, hỏi
+      `reqExecutions` (khi đó đã quên fill thứ Sáu) → **HALT entries**.
+- [x] Xác minh sau rebase: `check_open_orders.py` → PASS, 1 vị thế, stop đúng chiều.
+- Backup: `live_positions.json.prerebase.bak`
+- **KHÔNG reset tài khoản paper**: thứ mà reset để sửa (nhiễm bẩn CAD/lãi/FX) đã sửa bằng
+  code; reset sẽ phá nguồn đối chiếu độc lập (statement) vừa dựng được, mà không sửa thêm gì.
+
+### ⚠️ HỆ QUẢ AN TOÀN CHƯA GIẢI QUYẾT — bỏ H4 đã gỡ mất phanh trong ngày
+`test_operational_fixes` T29.1/T29.2/T31.3/T31.4 **đỏ sau 97e0f7c**, và chúng nói đúng.
+
+T29 mô phỏng: IBKR báo equity đã mất 4.2% trong ngày vì các fill mà sổ cái runner
+**chưa kịp ghi**. H4 cũ đồng bộ khoản đó vào `state.equity` → `daily_loss ≥ 4%` →
+**HALT_DAY** → chặn mọi lệnh vào mới. Bỏ H4 thì cơ chế đó biến mất:
+**lỗ chưa thực hiện trong ngày không còn kích hoạt HALT_DAY nữa** — phanh chỉ nổ khi
+có lệnh ĐÓNG.
+
+Hai điều cùng đúng, và đó là chỗ khó:
+- H4 cũ đo **cả tài khoản** (CAD ~$997k) → HALT_DAY có thể nổ vì FX hoặc lãi tiền gửi.
+  Đó không phải bảo vệ, đó là nhiễu. Bỏ là đúng.
+- Nhưng nó ĐỒNG THỜI là phanh duy nhất đọc sự thật từ broker trong ngày. Gỡ đi là mất thật.
+- Quy ước realized-only khớp `deploy_sim.replay` — backtest cũng chỉ HALT_DAY trên realized.
+  Nên live nay **khớp backtest hơn trước**, đổi lại là ít bảo vệ hơn trước.
+
+### ✅ ĐÃ CHỌN: (b) realized-only ở mọi chỗ — lý do, và cái phải nhớ
+
+**Vì sao phanh nhận-biết-unrealized không thêm được gì:** breaker **chỉ gác cửa vào lệnh**
+(`allow_new_entries`), nó không đóng vị thế. Xét mọi tình huống lỗ chưa thực hiện lớn:
+- **Thị trường đang giao dịch** → stop kích hoạt và khớp trong vài giây (kể cả ở giá tệ
+  hơn nhiều). Lỗ thành realized → vào sổ trong ≤5 phút → **phanh hiện tại bắt được**.
+- **Thị trường ngừng** (limit-down, halt, cuối tuần, nghỉ 17:00–18:00 ET) → stop không
+  khớp được và lỗ phình lên, nhưng **cũng không vào lệnh mới được** → phanh không có việc.
+
+⚠️ **Cái phải nhớ — `risk_dollars` là ƯỚC LƯỢNG lỗ, KHÔNG phải trần lỗ.**
+Stop là lệnh *kích hoạt*, không phải lệnh giới hạn: SHORT 7778 / stop 7790, giá nhảy lên
+7900 → khớp ở **7900**, lỗ `$610` thay vì `$60` — **gấp 10× `risk_dollars`**. Nên "cap
+cluster 9.5%" là trần của rủi ro *dự tính*, không phải của lỗ *thực tế*. Vài cú gap liên
+tiếp đi xuống qua 15% — và cái đó phanh hiện tại BẮT ĐƯỢC vì đã realized.
+→ Muốn bảo vệ thật cho phần này thì hướng đúng là **đo slippage thoát thực tế so với mức
+stop** (C1 đã ghi sẵn trường `slip` trong trade_log), không phải thêm một phanh gác cùng
+một cái cửa.
+
+⚠️ **Toàn bộ lập luận đứng trên giả định: stop TỒN TẠI và đặt ĐÚNG PHÍA.**
+Ba ngày 08-05→08-07 giả định đó sai. Khi stop hụt thì cap vẫn cho vào lệnh mà lỗ không
+còn trần. Nghĩa là F1 (xác minh IBKR nhận thật) · F5 (quét cuối phiên) · B4 (đối chiếu
+đầu slot) **không phải chuyện sổ sách — chúng là lớp kiểm soát rủi ro chính**. Một stop
+đặt hụt không phải lỗi ghi log, nó là mất trần lỗ. Không được nới các guard này.
+
+### Đã làm (eba58ca)
+- [x] `test_equity_base.py` eq4/eq5/eq6 viết lại theo quy ước mới, 9/9 xanh.
+      eq4 **đảo chiều** (sổ cái phải BỎ QUA biến động broker); eq5 trước đó **pass vô
+      nghĩa** (không còn gì làm equity dịch chuyển nên "không ghi hai lần" đúng tự động);
+      eq6 giữ nguyên tính chất, khoản lỗ nay đến từ lệnh đóng thật.
+
+### ⚠️ PHÁT HIỆN MỚI — phanh ngày mù với lệnh đóng ĐẦU TIÊN trong ngày
+Lộ ra khi viết lại T29 (commit 19070df). `decide_day` ghi exits **rồi mới** đặt mốc ngày:
+```python
+for p in state.open_positions:            # 1. ghi exits  → equity 47,500
+    if p.exit_day == day: state.equity += p.pnl_sized
+if day != state.cur_day:                  # 2. RỒI mới đặt mốc
+    state.breaker.start_day(state.equity)     # ← mốc = 47,500, không phải 50,000
+```
+→ **Lỗ hiện thực hoá ở sự kiện đầu tiên của một ngày tự đặt mốc ngày xuống dưới chính
+nó**, `daily_loss = 0`, HALT_DAY không nổ. Phanh ngày chỉ thấy khoản lỗ realized **sau**
+lệnh đóng đầu tiên trong ngày.
+
+`decide_day` sao chép đúng thứ tự `deploy_sim.replay` → **backtest cũng vậy**. Không phải
+do thay đổi sổ cái gây ra; nó vô hình suốt thời gian H4 cấp chuyển động từ bên ngoài.
+
+Câu hỏi cần trả lời (CHƯA):
+- [ ] Có chủ ý không? Nếu mốc ngày phải là equity **cuối ngày hôm trước** thì `start_day`
+      phải gọi TRƯỚC vòng exits — nhưng đổi thứ tự này **đụng `decide_day`, tức đụng
+      đường khớp trade-for-trade với `deploy_sim`**. Phải gate bằng reconcile.
+- [ ] Nếu là chủ ý: HALT_DAY thực chất chỉ gác các lệnh đóng thứ 2 trở đi trong ngày —
+      nên ghi rõ vào tài liệu rủi ro, đừng để ai tưởng nó gác cả ngày.
+
+### Còn lại của (b)
+- [ ] `test_operational_fixes.py` **T29.1/T29.2/T31.3/T31.4** — chưa viết lại. Chúng kiểm
+      một tính chất khác eq6: entry đã được `decide_day` **duyệt** rồi bị chặn **lại** ở
+      cuối `run_day` sau khi equity đổi. Khối kiểm tra đó **vẫn còn** (runner.py:1436) và
+      nay đọc `state.equity` do `_book_realised` làm dịch chuyển.
+      Cách viết lại: signal vừa ĐÓNG một lệnh lỗ ≥4% vừa MỞ lệnh mới trong cùng ngày →
+      close ghi lỗ → khối cuối `run_day` phải chặn entry đó.
+- [ ] ⚠️ **Khối chặn đang gác bằng sai điều kiện**: nó nằm trong `if abs(_h4_delta) > 0.01:`
+      — tức gác bằng **delta broker** trong khi thứ nó đọc là **sổ cái**. Thực tế vẫn chạy
+      (mọi fill đều làm net-liq dịch chuyển), nhưng điều kiện nên đổi sang "sổ cái vừa đổi".
+
+**Ba hướng đã cân nhắc (giữ để tham chiếu):**
+- [ ] **(a) Khôi phục phanh, đo đúng sleeve.** Thêm method broker trả tổng
+      `unrealizedPnL + realizedPnL` của **riêng vị thế ta** (IBKR có sẵn per-position,
+      `/api/all` đang trả). Dùng cho **kiểm tra breaker trong ngày**, KHÔNG ghi vào sổ cái.
+      Tách bạch: `state.equity` realized-only cho báo cáo/so backtest; phanh có thêm
+      mark-to-market của sleeve. Đúng nhất, tốn công nhất.
+- [ ] **(b) Chấp nhận realized-only ở mọi chỗ.** Khớp backtest tuyệt đối. Đổi lại: một vị
+      thế lỗ nặng trong ngày không chặn được lệnh vào mới cho tới khi nó đóng.
+      Cập nhật T29/T31 theo quy ước mới.
+- [ ] **(c) Hoàn tác phần bỏ H4**, giữ lại phần còn lại của 97e0f7c. Quay về nhiễu FX/lãi.
+
+⚠️ **KHÔNG sửa T29/T31 cho xanh trước khi chọn.** Chúng đang mã hoá một cơ chế bảo vệ
+thật; viết lại để pass là xoá bằng chứng thay vì ra quyết định.
+
+Hiện tại scheduler ĐANG TẮT nên không có rủi ro sống.
+
+### Không tính vào đánh giá — giai đoạn chạy rà 2026-08-03 → 08-07
+Giữ trong `trade_log` + statement làm hồ sơ, nhưng **loại khỏi mẫu đánh giá**:
+realized +$1,136.25, trong đó có 5 vòng MES ngày 08-07 stop nổ sau 1–2 giây
+(lỗi offset khi append parquet — user đang sửa riêng) và 3 vị thế 08-03 qua đêm trần trụi.
+
+---
+
+## Sub-task: Sổ cái sleeve — bối cảnh gốc (giữ để tham chiếu)
 
 ### Triệu chứng
 Sổ cái báo `net_pnl = +$2,212.33`; giao dịch thật làm ra `+$1,136.25`. `sharpe = 12.07`.
@@ -2661,6 +2808,58 @@ theo dõi log 13:45–14:05 ET hôm đó.
 
 ---
 
+## Sub-task: Checkpoint tự vô hiệu mỗi ngày (2026-08-07) — ĐÃ SỬA
+Status: DONE
+
+### Triệu chứng
+Phiên 08-07 chạy `--shadow-resume` cả phiên nhưng **thu về gần như số 0**: bốn mã Rổ 4
+báo `khong co checkpoint dung duoc` ở **mọi slot**. Chỉ MNKD chạy và có `DOI CHIEU KHOP`.
+Không có ERROR nào — guard từ chối đúng thiết kế, nên nhìn qua tưởng bình thường.
+
+### Nguyên nhân
+Nhánh đẩy checkpoint chọn ngày theo **khung đã ghép** (parquet + bar live IBKR) — khung
+này đã đủ ngày hôm qua nên neo vào hôm qua. Nhưng fingerprint băm trên **parquet**, mà
+parquet chưa đủ: append chạy 13:45 ET nên ngày mới nhất luôn dừng giữa chừng, và **lần
+append hôm sau mới điền nốt 13:46→23:59 ET của ngày đã bị neo**. Lịch sử "tính đến
+`last_day`" tiếp tục lớn lên → fingerprint tự hỏng sau đúng một ngày, mãi mãi.
+
+Đo được **554 bar** chênh trên MES/MNQ (553 MYM, 552 M2K) = đúng số bar 13:46→23:59 ET
+ngày 08-06, và **khớp chính xác con số trong log phiên**. Phụ: `nay == log-phiên` tuyệt
+đối → `fix_offset_step` chỉ đổi giá, không đổi số dòng.
+
+### Vì sao MNKD sống sót — cho điều kiện tổng quát
+| | ngày đóng lúc | so mốc append 13:45 ET | |
+|---|---|---|---|
+| Rổ 4 (khung ET) | 00:00 ET | **sau** | còn bị điền tiếp → hỏng |
+| MNKD (khung Tokyo) | 00:00 JST = 15:00 UTC | **trước** | đã cố định → an toàn |
+
+**Điều kiện: mốc cắt phải nằm trước ranh giới append.** Lấy session áp chót *trên chính
+khung của dữ liệu* thoả cả hai mà không phải phân biệt mã nào.
+
+### Đã làm
+- [x] `replay_checkpoint.advance_day()` — tách thành hàm, đọc session **từ parquet**, lùi
+      một ngày so với session cuối. Khung ghép không còn tham gia vào quyết định.
+- [x] `run_live_day.py` gọi hàm đó thay logic inline
+- [x] `test_advance_day.py` — 11 ca, gồm ca chốt thẳng tính chất: bar do append hôm sau
+      thêm vào **không được** đụng lịch sử tính đến ngày đã chọn; và ca Tokyo giải thích
+      MNKD
+- [x] Bootstrap lại cả 5 mã. Kiểm: `usable=True` toàn bộ, mốc cắt đều đóng trên đĩa
+      (MES/MNQ/MYM/M2K `last_day=2026-08-06`; MNKD `2026-08-07`)
+- [x] OPERATIONS.md — cơ chế + quy tắc "ghi lại parquet thì phải `--bootstrap` lại"
+
+### Bẫy đã mắc HAI lần trong một buổi (ghi để khỏi lặp)
+Hai loader trả **hai khung khác nhau**: `futures._validated_core.load_parquet` → **ET
+tz-aware**; `global_index.update_ibkr_daily._load_parquet` → **UTC**. Đếm bar bằng loader
+này rồi so với fingerprint sinh bởi loader kia ra số vô nghĩa — lần đầu ra "chênh 477, dư
+166 không giải thích được" (MNKD), lần sau ra "314" thay vì 554 (Rổ 4). **Cách bắt: tìm
+mốc cắt cho ra ĐÚNG số dòng đã lưu, thay vì tìm cách giải thích phần chênh.**
+
+### Files touched
+global_index/replay_checkpoint.py, global_index/run_live_day.py,
+global_index/test_advance_day.py, docs/futures/OPERATIONS.md, SCRATCHPAD.md
+
+---
+
 # ⏰ THỨ HAI 2026-08-10 — ba việc, theo thứ tự giờ
 
 ## 09:31 ET — mốc MAX_HOLD đầu tiên mà catch-up phải đỡ
@@ -2697,6 +2896,10 @@ Slot cuối chạy `--shadow-verify`. Tìm trong `live_day_0810.log`:
 `DOI CHIEU LECH` = **CRITICAL**, dừng kế hoạch chuyển sang resume.
 
 ⚠️ Nhớ bật scheduler với `--shadow-resume`, không có cờ thì không thu được gì.
+
+⚠️ Phiên 08-07 chỉ MNKD có dòng đối chiếu (xem sub-task checkpoint ở trên). Thứ Hai
+**phải thấy đủ 5 mã**. Nếu vẫn còn `khong co checkpoint dung duoc` thì bản sửa chưa ăn —
+điều tra trước khi kết luận gì về resume.
 
 ---
 

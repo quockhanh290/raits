@@ -1064,36 +1064,44 @@ def test_persist_fail_event():
 # since crossed -4% must not still open new risk. Only the route the loss takes changes.
 
 def test_halt_day_blocks_entries_after_realised_loss():
-    print("\nT29: brake blocks multi-day entries after a realised loss crosses -4%")
+    print()
+    print("T29: brake blocks multi-day entries after a realised loss crosses -4%")
     account = 50_000.0
     day = pd.Timestamp("2024-06-17")
-    nxt = day + pd.Timedelta(days=1)
 
-    def _close_then_open(d, bars, held):
-        if d == day:
-            # Opens a position that closes tomorrow for -$2,500 (5% of $50k).
+    # Live runs ~22 slots a day and only the first re-baselines the breaker. decide_day
+    # books exits BEFORE calling start_day (deliberate — see live_decision), so a loss
+    # in the first slot sets the day's baseline below itself. This models the case the
+    # brake is actually for: the baseline is set in slot 1, the loss lands in slot 2.
+    state = {"slot": 0}
+
+    def _signal(d, bars, held):
+        state["slot"] += 1
+        if state["slot"] == 1:
             return [{"inst": "MES", "direction": "LONG", "cluster": "roska4_swing",
                      "risk_sized": 250.0, "entry": 5000.0, "stop": 4980.0,
-                     "exit": nxt, "pnl_sized": -2_500.0}], []
-        # Same day as that close, the signal wants a new multi-day position.
-        return [{"inst": "MNQ", "direction": "LONG", "cluster": "roska4_swing",
-                 "risk_sized": 250.0, "entry": 5000.0, "stop": 4980.0,
-                 "exit": nxt + pd.Timedelta(days=3)}], []
+                     "exit": day + pd.Timedelta(days=9)}], []
+        if state["slot"] == 2:
+            # The stop level moved against us: close it, and the signal wants a new one.
+            held[0].pnl_sized = -2_500.0        # 5% of $50k
+            return [{"inst": "MNQ", "direction": "LONG", "cluster": "roska4_swing",
+                     "risk_sized": 250.0, "entry": 5000.0, "stop": 4980.0,
+                     "exit": day + pd.Timedelta(days=9)}], [held[0]]
+        return [], []
 
     broker = MockBroker({}, account)
     runner = FuturesRunner(
         broker=broker, guard=_make_guard(), contracts_by_inst={"MES": 1, "MNQ": 1},
-        signal_fn=_close_then_open, breaker=CircuitBreaker(account=account),
+        signal_fn=_signal, breaker=CircuitBreaker(account=account),
     )
-    runner.run_day(day)
-    runner.state.breaker.start_day(account)   # baseline before the loss lands
-    runner.run_day(nxt)
+    runner.run_day(day)          # slot 1: opens MES, baseline set at $50,000
+    runner.run_day(day)          # slot 2: MES closes -2,500, MNQ entry requested
 
     mnq_opens = [f for f in broker.fills if f.action == "OPEN" and f.inst == "MNQ"]
     blocked = [e for e in runner._events
                if e.get("category") == "GUARD" and "blocked" in e.get("message", "")]
 
-    check("T29.1 no new multi-day entry after the day crosses -4%",
+    check("T29.1 no new multi-day entry once the day is past -4%",
           len(mnq_opens) == 0,
           f"MNQ opens: {len(mnq_opens)}, equity={runner.state.equity:,.2f}")
     check("T29.2 the block is reported, not silent",
@@ -1102,7 +1110,6 @@ def test_halt_day_blocks_entries_after_realised_loss():
     check("T29.3 the loss reached the ledger",
           abs(runner.state.equity - (account - 2_500)) < 1.0,
           f"equity={runner.state.equity:,.2f}")
-
 
 # ─── T30: exit_pending persists + restores across runner restart ──────────────
 
