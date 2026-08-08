@@ -1368,6 +1368,75 @@ fdfad29 fix(stp): place_stop confirms IBKR accepted the order instead of its own
 
 ---
 
+## Sub-task: Sổ cái sleeve đo sai — bám net-liq tài khoản thay vì P&L giao dịch
+Status: ROOT CAUSE ĐO ĐƯỢC — **CHƯA SỬA** — thiết kế đã chốt, chờ thực thi
+
+### Triệu chứng
+Sổ cái báo `net_pnl = +$2,212.33`; giao dịch thật làm ra `+$1,136.25`. `sharpe = 12.07`.
+
+### ROOT CAUSE (số học, kiểm được)
+[runner.py:1353](global_index/runner.py#L1353) — H4: `self.state.equity += _h4_delta`, với
+`_h4_delta = broker.get_equity() - _last_broker_equity`, tức **biến động NetLiquidation
+của CẢ tài khoản**.
+```
+broker : 997,756.40 − 997,395.69 = +360.71
+sổ cái :  52,212.33 −  51,851.62 = +360.71   ← giống hệt, 1:1
+```
+Tài khoản gốc **CAD**, quy mô ~$997k = **20× sleeve $50k**. Statement 7 ngày liệt kê thẳng
+các khoản không phải giao dịch cùng chảy vào:
+```
+Credit Interest  +1,374.32 CAD   ← lãi tiền gửi 1 tháng, CÙNG CỠ toàn bộ P&L giao dịch
+Debit Interest      −19.45
+Adjustment           −6.56       ← FX Translations P&L
+```
+⚠️ Calmar / Sharpe / Max DD / degradation-vs-backtest **và ngưỡng circuit breaker** đều
+tính trên đường cong này.
+
+### Quy ước phải theo — không phải lựa chọn
+`deploy_sim.replay:77` — `equity += t["pnl_sized"]` rồi `breaker.update(equity)`.
+Backtest là **realized-only, không mark-to-market**. Toàn bộ baseline IS (floor 1.65)
+sinh ra dưới quy ước đó. Sổ cái live phải trùng, nếu không thì:
+(a) so paper vs backtest là so hai đại lượng khác nhau;
+(b) phanh nổ theo điều kiện khác điều kiện nó được kiểm định.
+→ **`equity = ACCOUNT + Σ realized P&L của lệnh sleeve`**. Unrealized hiện riêng trên
+dashboard, KHÔNG vào mẫu số rủi ro.
+
+### Thiết kế — 5 phần, PHẢI hạ cánh trọn gói
+Làm nửa vời = closes cộng `pnl_sized` **và** H4 cộng broker delta → **đếm hai lần** đúng
+con số phanh đang dùng.
+
+- [ ] **1. `OpenPos.entry_price: float | None = None`** ([live_decision.py:37](global_index/live_decision.py#L37))
+      + `_openpos_to_dict` / `_openpos_from_dict` mang theo (dùng `.get` → tương thích ngược
+      với file cũ; vị thế cũ có `entry_price=None` và không tính được P&L → phải log CRITICAL,
+      không được lặng lẽ tính bằng 0).
+- [ ] **2. Ghi giá vào khi OPEN khớp** — `Fill.avg_price` đã có sẵn và IBKRBroker đã set.
+- [ ] **3. Tính realized khi CLOSE**, `pnl = (exit − entry) × point_value × contracts ×
+      (+1 LONG / −1 SHORT)`, gán vào `p.pnl_sized`. **Hai đường, cả hai đều phải làm**:
+      lệnh đóng chủ động, và **stop nổ** (nhánh B3 STP-VERIFY — nay đã có giá nhờ dcd1b6e).
+      Đường cộng equity đã sẵn sàng, không cần đổi: runner.py:788, live_decision.py:88 và :127.
+- [ ] **4. Bỏ H4** ([runner.py:1345-1353](global_index/runner.py#L1345)). Verify mode không
+      ảnh hưởng: MockBroker cho delta ≈ 0 nên đây là no-op ở đó → reconcile không đổi.
+      Giữ lại `breaker.update()` + chặn entry sau khi equity đổi, chỉ đổi nguồn của delta.
+- [ ] **5. Rebase (một lần, cần user duyệt)** — equity và `peak_equity` hiện xây trên số
+      nhiễm bẩn. Thật: `50,000 + 1,136.25 = 51,136.25`; đang lưu `52,212.33`, peak `51,892.58`.
+      Chuyển thẳng sẽ tạo drawdown giả ~1.46%. Dựng lại cả hai từ chuỗi realized đã đối chiếu
+      (`reconcile_statement.py` cho đủ số).
+
+### Test bắt buộc (đỏ trước)
+- Broker trả `avg_price` ở OPEN/CLOSE **và** `get_equity()` nhảy một khoản tuỳ ý (giả lập lãi
+  tiền gửi) → sau open+close, `equity == ACCOUNT + P&L giao dịch`, **không** dính khoản nhảy đó.
+  Đây là test định nghĩa cả thay đổi.
+- Stop-exit cũng phải cộng equity (không chỉ xoá vị thế khỏi state).
+- Vị thế cũ `entry_price=None` → CRITICAL, không âm thầm coi P&L = 0.
+- GATE: reconcile_gd0 + reconcile_stress phải **không đổi** (chứng minh verify mode nguyên vẹn).
+
+### Vì sao chưa làm trong phiên 2026-08-07
+Chạm đường tiền ở 4 chỗ / 2 module + đổi schema + cần migration. Bản vá nửa chừng đếm equity
+hai lần, mà đó là mẫu số của circuit breaker, trên tài khoản đang chạy thật qua đêm.
+Ghi lại để phiên sau thực thi trọn gói và gate đầy đủ.
+
+---
+
 ## Sub-task: Slot NKD đêm không chạy — ROOT CAUSE xác định (2026-08-06)
 Status: ROOT CAUSE XONG — nửa code DONE (ddae2f9) — **nửa môi trường (powercfg) CHƯA LÀM**
 — **scheduler cần khởi động lại để nhận code mới**
@@ -2484,3 +2553,108 @@ Nhánh thành công: *"position continues unchanged"*. **Không có `cancel_orde
 Lỗi ở **test**, không phải code: `ENTRY_DAY=06-10`, `ROLL_DAY=06-12` → hold=2 < 5 nên
 `run_maxhold_exit` **đúng khi không đóng**, còn test khẳng định đã đóng. Sửa: tiêm vị thế
 đủ già + `assert closed` để **tiền đề tự kiểm chính nó**. 18/18.
+
+---
+
+## 🚨 Sự cố: bậc thang offset trong parquet (2026-08-05 → 08-07) — ĐÃ SỬA `3953dba`
+Status: DONE
+
+### Chuyện gì xảy ra
+Repair 04/8 ghi lại đuôi parquet ở **thang thô IBKR** (log: *"no offset applied"*, join
+gap 0.003–0.043%), nhưng sidecar **giữ nguyên offset cũ**. Từ lần append 05/8,
+`update_ibkr_daily` lại cộng offset đó vào mọi bar mới.
+
+→ **Bậc thang trong cả 5 chuỗi giá tại 2026-08-05**, bằng đúng offset lưu:
+
+| inst | bậc thang | điểm chuyển (UTC) |
+|---|---|---|
+| MES | +11.50 | 05/8 06:13 |
+| MNQ | +183.00 | 05/8 06:14 |
+| MYM | −57.00 | 05/8 06:17 |
+| M2K | +7.20 | 05/8 06:20 |
+| MNKD | +1065.00 | 05/8 06:50 |
+
+Trước điểm chuyển: ~10,150 bar/mã khớp IBKR **median 0.0000, IQR 0.0000**.
+
+### Bằng chứng — đối chiếu giá THẬT, không phải chuỗi IBKR khác
+- **Lệnh khớp thật**: M2K BOT @ **3020.10** lúc 07/8 11:20:20 UTC. Parquet bar đó ghi
+  O=3026.90 H=3027.30 L=3026.90 C=3027.00 → **giá khớp nằm NGOÀI High-Low**
+- **ContFuture == hợp đồng thật**: M2KU6 vs ContFuture khớp 0.0000 trên 2,760 bar
+- **parquet vs hợp đồng thật**: median +7.2000 trên 2,568 bar
+
+Sau sửa: bar đó đọc O=3019.70 **H=3020.10** L=3019.70 C=3019.80 — giá khớp = High.
+
+### Ảnh hưởng đo được — nhỏ hơn kích thước gợi ý
+| | MES | MNQ |
+|---|---|---|
+| ATR ngày | 0.00 | **−6.93** (1.0%) |
+| Dải chandelier | 0.00 | **−17.32 điểm** |
+| Vị thế mong muốn | không đổi | không đổi |
+
+**Giá lệnh chưa bao giờ sai** — `_splice_live` đo chênh parquet↔live rồi `to_candidate`
+trừ ra. Xác nhận sau khi sửa: offset live tụt từ 10.75/184.75/−54.00/8.00/1065.00
+xuống **−1.25/0.75/1.00/0.40/5.00** (cỡ 1 tick).
+
+### ⚠️ Vì sao sống được 3 ngày
+**Cơ chế bù trừ hoạt động tốt sẽ CHE lỗi ở tầng dưới nó.** Giá lệnh luôn đúng nên mọi
+chỉ dấu vận hành bình thường. Không guard nào bắt:
+- `assert_utc_convention` → kiểm nhãn giờ
+- History invariant → kiểm bar cũ không bị ghi đè; ở đây bar cũ **không** bị đụng
+- Join check → so 2 bar đều nằm **sau** bậc thang
+
+### Sửa: `global_index/fix_offset_step.py`
+Đo bậc thang bằng median trên vùng chồng lấn, trừ khỏi bar từ điểm chuyển, **đặt sidecar
+về 0** (repair đã căn về thang thô). Backup: `_backup_20260807_195345_pre_offset_fix`.
+
+Nghiệm thu: cả 5 mã median **0.0000**, IQR **0.0000** trên ~13,600 bar, kể cả vùng 05/8.
+
+### Hai chỗ tôi đã nói SAI trong quá trình
+- **"ATR Wilder → nhiễm ~56 phiên"** — SAI. `daily_atr_series` là `tr.rolling(14).mean()`,
+  trung bình trượt **đơn giản 14 ngày**, nhiễm 14 phiên rồi rơi hẳn. Đã viết câu sai này
+  vào nhiều comment/commit.
+- **Lần đo ảnh hưởng đầu** cắt tại 00:00 ngày 05/8 trong khi điểm chuyển ở **giữa phiên**
+  → báo "không ảnh hưởng" cho MNQ, sai.
+
+---
+
+## Sub-task: Rollover 2026-09-11 — 6 việc, ĐÃ XONG
+Status: DONE (code) — **chưa chạy qua roll thật**
+
+| # | việc | commit |
+|---|---|---|
+| 1 | Guard bậc nhảy giá (bar hỏng) | `fbe7abf` |
+| 1b | **Phát hiện roll bằng ĐỊNH DANH hợp đồng** | `26581d8` |
+| 2 | **Kiểm căn chỉnh hằng ngày** parquet ↔ IBKR | `5fd8b6d` |
+| 2b | Roll được gọi đúng tên, không đổ cho sidecar | `e5cdba6` |
+| 2c | **Tự neo lại khi đủ 4 điều kiện** + runbook | `25443d2` |
+| 3 | Huỷ STP hợp đồng cũ khi roll | `b955e64` |
+| 4 | Đặt STP mới, dịch theo spread **đã khớp thật** | `b955e64` |
+| 5 | B5 so cả **tháng hợp đồng**, không chỉ mã | `b955e64` |
+
+### Vì sao không dùng bậc nhảy giá để phát hiện roll
+**Biến động 1 phút lớn nhất trong năm LỚN HƠN spread roll ở cả 4 mã** (MES 118.50 vs
+66.75). Tách được hai loại không phải bằng **độ lớn** mà bằng **độ hiếm** — nhưng cửa sổ
+ngưỡng chỉ 0.348–0.370%, quá hẹp. `qualifyContracts` trả `localSymbol` (`MESU6`) nên
+phát hiện **chính xác tuyệt đối**, không cần ngưỡng.
+
+→ Bậc nhảy giá đổi vai: từ **bộ dò roll** thành **lưới bắt dữ liệu hỏng**.
+
+### Điều kiện tự neo lại (thiếu 1 trong 4 → từ chối)
+1. Định danh hợp đồng đã đổi · 2. ≥500 bar chồng lấn · 3. IQR ≤20% mức dịch ·
+4. Mức dịch trong 0.20–2.00% giá (đo được: spread 0.74–1.01%)
+
+**Lưới đỡ:** neo sai → kiểm căn chỉnh **hôm sau** chặn. Sai lầm sống 1 ngày, không phải
+3 ngày như sự cố offset.
+
+**Tính chất an toàn đáng chú ý:** sự cố 05/8 (+11.50 = 0.148% giá) **không bị tự neo lại
+ngay cả khi gán nhầm hợp đồng** — quá nhỏ so với carry. Nhưng M2K (+7.20 = 0.239%) thì
+lọt qua cổng độ lớn; **chỉ điều kiện định danh chặn được nó** → đó là lý do điều kiện 1
+là bắt buộc chứ không phải tham khảo.
+
+### Đã bỏ có chủ ý
+Kiểm chéo "các mã cùng dịch một chiều" — cần 2 lượt qua vòng lặp, trong khi điều kiện
+3+4 đã phủ đúng kiểu hỏng đó. Log in đủ 5 mã để người đọc tự thấy.
+
+### CHƯA kiểm chứng
+Không thứ gì chạy qua roll thật. Lần đầu **11/9/2026** — runbook ghi rõ nên có người
+theo dõi log 13:45–14:05 ET hôm đó.

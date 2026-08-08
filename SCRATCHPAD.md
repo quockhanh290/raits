@@ -1,5 +1,33 @@
 ## Gotchas
 
+- **Sổ cái sleeve bám NetLiquidation của cả tài khoản, không phải P&L giao dịch**
+  (2026-08-07, đo bằng statement IBKR): H4 làm `state.equity += broker.get_equity() delta`.
+  Chứng minh: broker `997,756.40 − 997,395.69 = +360.71`, sổ cái `52,212.33 − 51,851.62
+  = +360.71` — **giống hệt 1:1**.
+  Tài khoản gốc **CAD ~$997k = 20× sleeve $50k**. Statement 7 ngày cho thấy khoản chảy vào:
+  `Credit Interest +1,374.32` (lãi tiền gửi 1 tháng) · `Debit Interest −19.45` ·
+  `FX Translations P&L −6.56`. **Lãi tiền gửi một tháng cùng cỡ với TOÀN BỘ P&L giao dịch**
+  (+$1,160.75 USD). Nhiễu và tín hiệu cùng bậc độ lớn.
+  ⚠️ Đường cong này nuôi Calmar/Sharpe/MaxDD/degradation **và ngưỡng circuit breaker**.
+  **L17: quy ước phải trùng backtest.** `deploy_sim.replay:77` là `equity += t["pnl_sized"]`
+  — **realized-only, không mark-to-market**. Sổ cái live lệch quy ước thì paper-vs-backtest
+  là so hai đại lượng khác nhau, và phanh nổ theo điều kiện khác điều kiện nó được kiểm định.
+
+- **`Quantity` trong statement IBKR ĐÃ mang dấu; statement xếp NGÀY MỚI NHẤT TRƯỚC**
+  (2026-08-07): đảo dấu lần nữa → mọi short thành long, P&L ra đúng 0. Ghép theo thứ tự file
+  → lệnh đóng đến trước lệnh mở → mọi trade ngược: `entry_day` sau `exit_day`, LONG báo
+  thành SHORT, P&L đảo dấu (in ra `MES SHORT 2026-08-05 → 2026-08-03`).
+  Sort theo ngày phải **ổn định**: thứ tự trong cùng một ngày là thứ quyết định fill nào
+  đóng cái gì (08-05 MES bán 7771.50 đóng long cũ *rồi* mua 7767.00 mở long mới).
+
+- **Đối chiếu phải dùng nguồn mình không tự viết ra** (2026-08-07): `trade_log` do runner ghi
+  nên chỉ đúng bằng mức runner đúng. Ba lỗi khác nhau trong một tuần làm nó sai ba kiểu, và
+  **không lỗi nào nhìn thấy được từ bên trong**: 08-03 fill đọc nhầm thành Cancelled (mất giá,
+  mất luôn cả một lệnh M2K không ai biết), 08-05 và 08-06 stop nổ không ai ghi.
+  Statement IBKR là bản ghi duy nhất runner không phải tác giả → `reconcile_statement.py`.
+  Kết quả: thật ra **+$1,160.75** chứ không phải −$200; hai lệnh thắng lớn nhất nằm đúng
+  chỗ dữ liệu bị mất.
+
 - **`ib.openTrades()` là CACHE, không phải sự thật ở broker** (2026-08-06, bắt được nhờ theo
   dõi một cú khớp thật): nó đọc `wrapper.trades` — dict tích lũy, **không bao giờ xoá mục**.
   IBKR chỉ đẩy cập nhật trạng thái cho client **sở hữu** lệnh, nên lệnh của client khác khi
@@ -907,3 +935,49 @@ phải engine, và tất cả đều trả về **con số trông hợp lý**:
   instrument; bật cho cả 22 slot thì `run_live_day` lên ~13 phút, bỏ 2/3 slot — làm xấu
   đúng cái đang đi sửa. Slot nào gánh nổi chi phí đó là **tính chất của lịch chạy**,
   không phải lựa chọn để trên dòng lệnh.
+
+## Lessons (2026-08-07, sự cố bậc thang offset)
+
+- **Cơ chế bù trừ hoạt động tốt sẽ CHE lỗi ở tầng dưới nó.** Parquet ghi sai giá 3 ngày
+  nhưng `_splice_live` đo chênh rồi `to_candidate` trừ ra, nên **giá lệnh luôn đúng** và
+  mọi chỉ dấu vận hành bình thường. Muốn thấy lỗi tầng dữ liệu phải **đo thẳng tầng dữ
+  liệu**, không suy từ việc "lệnh vẫn khớp đúng".
+
+- **Đối chiếu với GIÁ THẬT, không phải với một chuỗi khác của cùng nguồn.** Tôi kết luận
+  dựa trên `ContFuture` mà chưa kiểm nó có bằng hợp đồng đang giao dịch không (may là
+  bằng). Bằng chứng dứt điểm là **lệnh khớp thật**: giá fill nằm ngoài High-Low của bar
+  → không thể chối cãi.
+
+- **Guard bắt sự kiện rời rạc không thay được bất biến liên tục.** Ba guard đã có
+  (`assert_utc_convention`, history invariant, join check) đều bắt **sự kiện**. Không cái
+  nào hỏi "hai nguồn có còn mô tả cùng một thị trường không". Bất biến đó là thứ bắt được
+  lỗi này.
+
+- **Ranh giới sai làm phép đo ảnh hưởng vô nghĩa.** Lần đầu tôi cắt tại 00:00 ngày 05/8
+  trong khi điểm chuyển ở **giữa phiên** (06:13 UTC) → báo "không ảnh hưởng", sai. Tìm
+  điểm chuyển thật trước, rồi mới đo.
+
+- **Đọc code trước khi mô tả cơ chế.** Tôi lặp lại "ATR Wilder → nhiễm ~56 phiên" nhiều
+  lần trong comment và commit. Code là `tr.rolling(14).mean()` — trung bình trượt đơn
+  giản, nhiễm **14 phiên** rồi rơi hẳn.
+
+- **Xét lại lập luận khi tiền đề thay đổi.** Tôi phản đối "tự sửa offset" vì (a) không
+  chắc là roll, (b) neo bằng 1 cặp bar, (c) sai thì sai mãi. Sau đó cả ba đều được giải
+  quyết (định danh hợp đồng / median 4000 bar / kiểm căn chỉnh hôm sau) nhưng tôi vẫn giữ
+  kết luận cũ cho tới khi bị hỏi lại.
+
+- **Độ lớn không phân biệt được roll với biến động thật.** Biến động 1 phút lớn nhất năm
+  qua LỚN HƠN spread roll ở cả 4 mã. Khi có **tín hiệu trực tiếp** (`localSymbol` từ
+  `qualifyContracts`) thì đừng suy gián tiếp từ giá.
+
+## Gotchas (2026-08-07)
+
+- **`git stash -u` cất luôn việc chưa commit của người khác.** Tôi dùng nó để kiểm 2 test
+  fail có phải lỗi mình không — nó cất cả phần sleeve ledger user đang làm dở. Pop lại
+  được, nhưng **phải `git status` trước khi stash**.
+
+- **`--dry-run` của `update_ibkr_daily` thoát sớm**, không chạy tới phần kiểm căn chỉnh.
+  Muốn thử guard phải chạy thật trên **bản sao** parquet.
+
+- **Log scheduler bị lẫn output pytest** — `run_scheduler.py` gắn FileHandler vào root
+  logger ngay khi import, mà test có import nó. Gây nhiễu cho người đọc log. CHƯA SỬA.
