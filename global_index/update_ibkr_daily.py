@@ -422,21 +422,54 @@ def main() -> None:
                     _iqr = float(_d.quantile(0.75) - _d.quantile(0.25))
                     log.info("  %s: alignment over %d shared bars — median %+.4f, "
                              "IQR %.4f", name, len(_ov), _med, _iqr)
-                    if abs(_med) > ALIGN_MAX_DRIFT:
-                        log.error(
-                            "  %s: ALIGNMENT DRIFT %+.4f — refusing to append.",
-                            name, _med)
-                        log.error(
-                            "       %d shared bars, IQR %.4f. Stored offset %+.4f is no "
-                            "longer the one that lines this file up with IBKR; writing "
-                            "new bars with it would put a step of %+.4f into the series.",
-                            len(_ov), _iqr, stored_offset, -_med)
-                        log.error(
-                            "       A tight IQR means a clean level difference — usually "
-                            "the parquet was rebuilt without updating %s. The offset that "
-                            "would align it is %+.4f. A wide IQR means the two sources "
-                            "disagree bar by bar, which is a data problem, not an offset.",
-                            a.splice_offsets, stored_offset + _med)
+                    _rolled = bool(stored_contract and fetched_contract
+                                   and stored_contract != fetched_contract)
+                    if abs(_med) > ALIGN_MAX_DRIFT or _rolled:
+                        # A roll makes both of these fire, so it has to be named
+                        # first: the alignment message would otherwise blame a
+                        # rebuild, which is the wrong diagnosis at exactly the moment
+                        # the right one matters. The suggested offset is the same
+                        # either way — the median over thousands of shared bars.
+                        if _rolled:
+                            log.error(
+                                "  %s: CONTRACT ROLLED %s -> %s — refusing to append.",
+                                name, stored_contract, fetched_contract)
+                            log.error(
+                                "       Bars from %s sit on a different price level than "
+                                "the history, which was built against %s. Measured over "
+                                "%d shared bars: %+.4f (IQR %.4f).",
+                                fetched_contract, stored_contract, len(_ov), _med, _iqr)
+                            log.error(
+                                "       Appending would put that step into the series: "
+                                "the day's true range absorbs it and daily ATR is a "
+                                "14-period mean, so the chandelier band stays wrong for "
+                                "14 sessions, and an open position's extreme ratchets "
+                                "its stop to a level that never traded.")
+                            log.error(
+                                "       OPERATOR: in %s set %s offset %+.4f -> %+.4f and "
+                                "contract -> %s, then re-run. Confirm first that every "
+                                "instrument moved the same way — correlated index "
+                                "futures roll together.",
+                                a.splice_offsets, name, stored_offset,
+                                stored_offset + _med, fetched_contract)
+                        else:
+                            log.error(
+                                "  %s: ALIGNMENT DRIFT %+.4f — refusing to append.",
+                                name, _med)
+                            log.error(
+                                "       %d shared bars, IQR %.4f, contract unchanged "
+                                "(%s). Stored offset %+.4f is no longer the one that "
+                                "lines this file up with IBKR; writing new bars with it "
+                                "would put a step of %+.4f into the series.",
+                                len(_ov), _iqr, fetched_contract or "unknown",
+                                stored_offset, -_med)
+                            log.error(
+                                "       A tight IQR means a clean level difference — "
+                                "usually the parquet was rebuilt without updating %s. "
+                                "The offset that would align it is %+.4f. A wide IQR "
+                                "means the two sources disagree bar by bar, which is a "
+                                "data problem, not an offset.",
+                                a.splice_offsets, stored_offset + _med)
                         failed.append(name)
                         continue
                 else:
@@ -493,31 +526,8 @@ def main() -> None:
                          name, _last_close, _first_open, _jump, _jump_pct,
                          fetched_contract or "(unknown)")
 
-                # Did the CONTRACT change? That is the roll, and IBKR says it
-                # outright — no inference from the size of the move, which cannot
-                # work anyway (see JOIN_JUMP_MAX_PCT).
-                if stored_contract and fetched_contract and stored_contract != fetched_contract:
-                    log.error(
-                        "  %s: CONTRACT ROLLED %s -> %s — refusing to append.",
-                        name, stored_contract, fetched_contract)
-                    log.error(
-                        "       The stored offset (%+.4f) aligns the parquet to %s; bars "
-                        "from %s sit on a different price level. Join was %+.4f (%.3f%%).",
-                        stored_offset, stored_contract, fetched_contract, _jump, _jump_pct)
-                    log.error(
-                        "       Appending would put that step into the series: the day's "
-                        "true range absorbs it, daily ATR is Wilder-smoothed so the "
-                        "chandelier band stays wide for ~56 sessions, and an open "
-                        "position's extreme ratchets its stop to a level that never traded.")
-                    log.error(
-                        "       OPERATOR: re-anchor %s in %s — offset %+.4f -> %+.4f "
-                        "(old minus the join), contract -> %s — then re-run.",
-                        name, a.splice_offsets, stored_offset,
-                        stored_offset - _jump, fetched_contract)
-                    failed.append(name)
-                    continue
-
-                # No roll, so a jump this size is not a change of contract: it is bad
+                # The contract check above already ruled out a roll, so a jump this
+                # size is bad
                 # data — the wrong contract fetched by hand, a corrupt bar, a feed
                 # glitch. Loose on purpose, since identity already covers rolls and
                 # this only has to sit above anything a real market does.
