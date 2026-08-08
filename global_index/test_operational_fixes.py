@@ -1153,21 +1153,17 @@ def test_stress_mid_2pass_halt_day():
     account = 50_000.0
 
     class _StressMidLossBroker(MockBroker):
-        """After any CLOSE: pretend IBKRBroker reports a real intraday loss > 4%."""
-        def __init__(self):
-            super().__init__({}, account=account)
-            self._closed = False
+        """Fills carry a price, the way IBKRBroker's do.
 
+        This used to fake the loss by reporting a lower account balance, which worked
+        while the runner copied that balance into its ledger. The ledger is the sleeve's
+        own realised P&L now, so the loss has to arrive the way a real one does: a short
+        opened at 5000 and covered at 5500 loses (5000-5500) x $5 = -$2,500, 5% of $50k.
+        """
         def send_order(self, order):
             f = super().send_order(order)
-            if order.action == "CLOSE":
-                self._closed = True
+            f.avg_price = 5000.0 if order.action == "OPEN" else 5500.0
             return f
-
-        def get_equity(self) -> float:
-            if self._closed:
-                return 47_900.0   # 4.2% below $50k → HALT_DAY
-            return self._equity   # before first close: nominal $50k
 
     # Signal: MES same-day (STRESS_MID, exit=day, no pnl_sized = live mode)
     #         MNQ multi-day swing entry
@@ -1181,7 +1177,7 @@ def test_stress_mid_2pass_halt_day():
              "risk_sized": 250.0, "entry": 5000.0, "stop": 4980.0},
         ], []
 
-    broker = _StressMidLossBroker()
+    broker = _StressMidLossBroker({}, account)
     guard = MultiClusterGuard(clusters={
         "roska4_swing":  ClusterBudget("roska4_swing",  max_gross_pct=0.05, max_net_pct=0.044),
         "roska4_stress": ClusterBudget("roska4_stress", max_gross_pct=0.025, max_net_pct=None),

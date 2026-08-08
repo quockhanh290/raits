@@ -1404,12 +1404,25 @@ class FuturesRunner:
                     {"inst": t["inst"], "ordered": n, "max": self._max_contracts},
                 )
                 continue
-            self.broker.send_order(Order(
+            _sd_open = self.broker.send_order(Order(
                 t["inst"], "OPEN", t["direction"], n, t["cluster"], day,
                 exit_day=t.get("exit"), pnl_sized=t.get("pnl_sized", 0.0)))
-            self.broker.send_order(Order(
+            _sd_close = self.broker.send_order(Order(
                 t["inst"], "CLOSE", t["direction"], n, t["cluster"], day,
                 exit_day=day, pnl_sized=t.get("pnl_sized", 0.0)))
+            # A same-day trade never becomes an OpenPos, so it misses the exits loop
+            # that books every other close. decide_day added its pnl_sized, which is
+            # the ledger's own figure in verify mode and 0.0 in live — leaving a whole
+            # cluster (STRESS_MID) contributing nothing to the sleeve ledger, and so
+            # nothing to the daily brake either.
+            if _sd_open.avg_price > 0 and _sd_close.avg_price > 0:
+                _sd_pos = OpenPos(
+                    inst=t["inst"], direction=t["direction"], contracts=n,
+                    risk_dollars=t.get("risk_sized", 0.0), cluster=t["cluster"],
+                    entry_day=day, entry_price=_sd_open.avg_price)
+                self._book_realised(
+                    _sd_pos, _sd_close.avg_price,
+                    _sd_close.filled_qty or n, why="same-day")
 
         # H4: fold the broker's realised P&L into system equity after ALL closes
         # (multi-day exits + same-day STRESS_MID), so HALT_DAY can fire on a same-session
