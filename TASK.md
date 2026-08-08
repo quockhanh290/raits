@@ -2658,3 +2658,53 @@ Kiểm chéo "các mã cùng dịch một chiều" — cần 2 lượt qua vòng
 ### CHƯA kiểm chứng
 Không thứ gì chạy qua roll thật. Lần đầu **11/9/2026** — runbook ghi rõ nên có người
 theo dõi log 13:45–14:05 ET hôm đó.
+
+---
+
+# ⏰ THỨ HAI 2026-08-10 — ba việc, theo thứ tự giờ
+
+## 09:31 ET — mốc MAX_HOLD đầu tiên mà catch-up phải đỡ
+MYM SHORT vào **05/8** → thứ Hai tròn 5 ngày. Đây là lần đầu bản vá `91dbc0e` gặp
+tình huống thật.
+
+- Bật scheduler **trước 09:31 ET**, hoặc để catch-up tự chạy nếu bật muộn
+- Kiểm log: `[MAXHOLD] CATCH-UP` (nếu bật muộn) hoặc job 09:31 chạy bình thường
+- Xác nhận MYM đã đóng. Nếu chưa, chạy tay:
+  `python -m global_index.run_maxhold_exit --positions-path live_positions.json --port 4002`
+
+## ~10:00 ET — bài tập rollover thật (`abeec34`)
+Mắt xích **duy nhất** của rollover chưa chạm IBKR thật: trình tự đóng-mở-huỷ-đặt.
+
+```powershell
+cd d:\raits
+Get-Process pythonw,python | Where-Object { $_.CommandLine -like "*run_scheduler*" } | Stop-Process
+python -m global_index.exercise_rollover_live            # kiem dieu kien
+python -m global_index.exercise_rollover_live --apply    # chi khi buoc tren "checks passed"
+pythonw -m global_index.run_scheduler --port 4002 --shadow-resume   # BAT LAI TRUOC 13:45 ET
+```
+
+Dùng **MNQ** (hệ thống không giữ mã này). Script tự từ chối nếu scheduler còn chạy,
+thị trường đóng, hoặc MNQ đã có vị thế/lệnh. Dọn dẹp trong `finally`.
+
+**Ba câu nó trả lời:** vị thế có sang hợp đồng mới không · **stop cũ có bị huỷ không**
+(nếu không → có thể khớp và **mở vị thế ma**) · hợp đồng mới có stop không.
+
+## 15:55 ET — dòng đối chiếu shadow đầu tiên
+Slot cuối chạy `--shadow-verify`. Tìm trong `live_day_0810.log`:
+```
+[shadow] MES: DOI CHIEU KHOP — day du == resume
+```
+`DOI CHIEU LECH` = **CRITICAL**, dừng kế hoạch chuyển sang resume.
+
+⚠️ Nhớ bật scheduler với `--shadow-resume`, không có cờ thì không thu được gì.
+
+---
+
+## Tồn đọng khác (không gấp)
+- [ ] `G2 HARD` báo mỗi lần chạy, hệ thống vẫn giao dịch — guard vô hiệu trên thực tế
+- [ ] `run_scheduler.py` gắn FileHandler vào root logger lúc import → output pytest lẫn
+      vào log scheduler production
+- [ ] Chuyển đường giao dịch sang resume sau vài phiên `DOI CHIEU KHOP` — **đây mới là
+      lúc có lợi ích tốc độ** (run_day 5m03 → dưới 1 phút, hết bỏ slot)
+- [ ] `futures/swing_tf_harness.py` + bản copy ở root vẫn còn lỗi khoá `id(df)`
+- [ ] Đo chi phí thật của việc thoát MAX_HOLD muộn 4h40 (đã xếp ưu tiên mà chưa đo)
