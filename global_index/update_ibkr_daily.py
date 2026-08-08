@@ -83,6 +83,28 @@ log = logging.getLogger("update_ibkr_daily")
 # but rarity, and the join is one specific minute a day rather than all 400k of them.
 JOIN_JUMP_MAX_PCT: float = 0.35
 
+# Alignment check: how far the stored history may sit from a fresh IBKR fetch over
+# the bars they share, before an append is refused.
+#
+# In normal operation this is not "small", it is exactly zero — the stored bars ARE
+# the fetched bars from earlier runs, plus a constant offset that is applied to both
+# sides of the comparison. Measured across all five instruments after the 2026-08-07
+# correction: median 0.0000, IQR 0.0000 over ~13,600 shared bars each.
+#
+# So the threshold only has to sit above floating-point noise and below the smallest
+# offset error worth stopping the day for. 0.5 point clears one tick on every
+# instrument except NKD (5.0), and is 0.017% of price on the cheapest (M2K near
+# 3,000). The error it was written for was +7.20 on M2K and +1065.00 on MNKD.
+#
+# A drift of exactly the stored offset means the parquet was rebuilt without
+# updating the sidecar. A wide IQR alongside it means the two sources disagree bar
+# by bar, which is a data problem rather than an offset one.
+ALIGN_MAX_DRIFT: float = 0.5
+
+# Below this many shared bars the median is not worth trusting, and the run says so
+# rather than passing quietly. A "3 D" fetch against a daily append shares ~2,500.
+ALIGN_MIN_OVERLAP: int = 500
+
 # ── Instruments: (runner_name, ibkr_symbol, parquet_path) ────────────────────
 def _build_jobs(data_dir: Path, nkd_path: Path) -> list[dict]:
     jobs = []
@@ -372,6 +394,54 @@ def main() -> None:
                         for col in ["open", "high", "low", "close"]:
                             if col in new_bars_adj.columns:
                                 new_bars_adj[col] = new_bars_adj[col] + stored_offset
+
+                # Does the offset we are about to apply still align this file with
+                # IBKR? The fetch covers more days than the parquet is missing, so a
+                # couple of thousand bars have a counterpart on both sides. Comparing
+                # the ADJUSTED fetch against what is already stored asks the only
+                # question that matters — not "are the new bars right", which is
+                # circular since they came from this same fetch, but "is the offset
+                # still the right one to write them with".
+                #
+                # This is the check that was missing on 2026-08-05. repair_parquet_utc
+                # had rebuilt the tails at IBKR's own level the day before while the
+                # sidecar kept its pre-repair values, so the stored history aligned at
+                # 0 while the offset said +11.50 (MES) through +1065.00 (MNKD). Every
+                # append after that wrote the difference into the series, and it went
+                # three days unnoticed: assert_utc_convention checks timestamps, the
+                # history invariant checks that old bars are untouched, and the join
+                # check compares two bars that are both on the new level. None of them
+                # look at whether the file still agrees with the source.
+                #
+                # The median is over thousands of bars, so one bad print cannot move
+                # it, and the IQR says whether it is a clean level difference or noise.
+                _ov = existing.index.intersection(new_bars_adj.index)
+                if len(_ov) >= ALIGN_MIN_OVERLAP:
+                    _d = existing.loc[_ov, "close"] - new_bars_adj.loc[_ov, "close"]
+                    _med = float(_d.median())
+                    _iqr = float(_d.quantile(0.75) - _d.quantile(0.25))
+                    log.info("  %s: alignment over %d shared bars — median %+.4f, "
+                             "IQR %.4f", name, len(_ov), _med, _iqr)
+                    if abs(_med) > ALIGN_MAX_DRIFT:
+                        log.error(
+                            "  %s: ALIGNMENT DRIFT %+.4f — refusing to append.",
+                            name, _med)
+                        log.error(
+                            "       %d shared bars, IQR %.4f. Stored offset %+.4f is no "
+                            "longer the one that lines this file up with IBKR; writing "
+                            "new bars with it would put a step of %+.4f into the series.",
+                            len(_ov), _iqr, stored_offset, -_med)
+                        log.error(
+                            "       A tight IQR means a clean level difference — usually "
+                            "the parquet was rebuilt without updating %s. The offset that "
+                            "would align it is %+.4f. A wide IQR means the two sources "
+                            "disagree bar by bar, which is a data problem, not an offset.",
+                            a.splice_offsets, stored_offset + _med)
+                        failed.append(name)
+                        continue
+                else:
+                    log.warning("  %s: only %d shared bars — alignment unchecked",
+                                name, len(_ov))
 
                 # Keep only NEW bars (after existing last bar)
                 new_only = new_bars_adj[new_bars_adj.index > last_existing]
