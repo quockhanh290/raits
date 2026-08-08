@@ -616,8 +616,17 @@ def main() -> None:
                 # Record what this append used, so the next one has something to
                 # compare against. Legacy entries carry no contract; this fills it in
                 # on the first run without pretending to know what came before.
-                if fetched_contract and fetched_contract != stored_contract:
-                    splice_offsets[name] = {"offset": stored_offset,
+                #
+                # Reads the entry back rather than reusing stored_offset, which was
+                # captured before the roll branch ran. Writing the stale value here
+                # silently undid a re-anchor: the bars went in shifted, the sidecar
+                # kept the old offset, and the next append would have rebuilt the step
+                # the re-anchor had just removed — the same shape as the 2026-08-05
+                # incident. The run reported success either way; only the state file
+                # showed it.
+                _cur_off, _cur_con = _split_entry(splice_offsets.get(name))
+                if fetched_contract and fetched_contract != _cur_con:
+                    splice_offsets[name] = {"offset": _cur_off,
                                             "contract": fetched_contract}
                     offsets_dirty = True
 
