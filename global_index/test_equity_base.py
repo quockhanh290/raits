@@ -89,37 +89,98 @@ def test_eq3_losing_all_design_capital_is_not_a_five_percent_dip(tmp_path):
     assert r.state.breaker.status(0.0)["drawdown_pct"] == pytest.approx(1.0)
 
 
-# ── H4 delta ──────────────────────────────────────────────────────────────────
+# ── the ledger is the sleeve's, not the account's ─────────────────────────────
+#
+# H4 used to move state.equity by the delta of the whole account's NetLiquidation.
+# Measured live 2026-08-07: broker 997,756.40 − 997,395.69 = +360.71 and the ledger
+# 52,212.33 − 51,851.62 = +360.71, identical. On a CAD account of ~$997k — twenty times
+# the sleeve — that swept in a monthly interest credit of +1,374.32, the same size as a
+# whole week of trading P&L, straight into the number the breaker reads.
+#
+# As of 97e0f7c the ledger is ACCOUNT plus the realised P&L of sleeve trades, matching
+# deploy_sim.replay (`equity += t["pnl_sized"]`), which is the convention every figure
+# in the IS baseline was produced under. These tests keep asking the same questions —
+# does real P&L reach the ledger, is it booked once, does HALT_DAY still fire — through
+# the mechanism that now delivers it.
 
-def test_eq4_h4_books_broker_delta_not_balance(tmp_path):
-    """H4 must still capture real P&L — just as a delta."""
+
+def _closing_signal(pnl):
+    """A signal that opens on DAY and closes the next day for `pnl`.
+
+    Verify-mode shape: the candidate carries its own exit and pnl_sized, which is how
+    deploy_sim hands the runner a realised result.
+    """
+    def _fn(day, bars, held):
+        if day == DAY:
+            return [dict(inst="MES", direction="LONG", cluster=CLUSTER,
+                         risk_sized=500.0, entry=5000.0, stop=4950.0,
+                         exit=DAY + pd.Timedelta(days=1), pnl_sized=pnl)], []
+        return [], []
+    return _fn
+
+
+def _closing_runner(broker, tmp_path, pnl, breaker=None):
+    return FuturesRunner(
+        broker=broker, guard=_guard(), contracts_by_inst={"MES": 1},
+        signal_fn=_closing_signal(pnl),
+        breaker=breaker if breaker is not None else CircuitBreaker(account=ACCOUNT),
+        positions_path=tmp_path / "pos.json",
+    )
+
+
+def test_eq4_ledger_ignores_a_broker_move_that_is_not_a_sleeve_trade(tmp_path):
+    """Interest, FX and anything else in the account must not reach the strategy.
+
+    This is the inverse of what it used to assert. The account really can move by
+    $1,200 for reasons the sleeve had no part in — the week measured carried +1,374.32
+    of CAD interest on one line.
+    """
     b = _RichBroker()
     r = _runner(b, tmp_path)
-    b.set_equity(PAPER - 1_200)              # a $1,200 realised loss at the broker
+    b.set_equity(PAPER - 1_200)
     r.run_day(DAY)
-    assert r.state.equity == pytest.approx(ACCOUNT - 1_200), (
-        f"system equity must move by the broker delta, got {r.state.equity:,.2f}")
+    assert r.state.equity == pytest.approx(ACCOUNT), (
+        f"the ledger moved with the account balance, got {r.state.equity:,.2f}")
 
 
-def test_eq5_h4_does_not_rebook_the_same_pnl(tmp_path):
-    """Slots run every 5 min; a stale mark would re-apply the same loss each time."""
-    b = _RichBroker()
-    r = _runner(b, tmp_path)
-    b.set_equity(PAPER - 1_000)
-    r.run_day(DAY)
-    first = r.state.equity
-    r.run_day(DAY + pd.Timedelta(days=1))    # broker unchanged
-    assert r.state.equity == pytest.approx(first), "P&L booked twice"
+def test_eq5_a_realised_close_is_booked_once_not_once_per_slot(tmp_path):
+    """Slots run every five minutes and each is a separate process.
+
+    The old version drove this through a stale broker mark. It now passes trivially
+    under any implementation that never moves the ledger, so it is re-pointed at the
+    mechanism that does: a closed trade must land once.
+    """
+    r = _closing_runner(_RichBroker(), tmp_path, pnl=-1_000.0)
+    r.run_day(DAY)                                   # opens
+    r.run_day(DAY + pd.Timedelta(days=1))            # closes → -1,000 booked
+    once = r.state.equity
+    assert once == pytest.approx(ACCOUNT - 1_000), f"got {once:,.2f}"
+
+    r.run_day(DAY + pd.Timedelta(days=2))            # nothing left to close
+    assert r.state.equity == pytest.approx(once), "P&L booked twice"
 
 
 def test_eq6_halt_day_still_reachable(tmp_path):
-    """HALT_DAY at -4% of $50k = $2,000 — the reason H4 reads the broker at all."""
-    b = _RichBroker()
-    r = _runner(b, tmp_path)
-    r.state.breaker.start_day(ACCOUNT)
-    b.set_equity(PAPER - 2_500)
+    """HALT_DAY at -4% of $50k = $2,000. The brake must still be reachable.
+
+    It arrives as a realised close now rather than a jump in the account balance —
+    which is also how deploy_sim reaches it, so live and backtest trip on the same
+    event. Unrealised moves no longer trip it: see TASK.md for why that changes no
+    outcome, given the breaker only gates new entries.
+    """
+    breaker = CircuitBreaker(account=ACCOUNT)
+    r = _closing_runner(_RichBroker(), tmp_path, pnl=-2_500.0, breaker=breaker)
     r.run_day(DAY)
+    r.run_day(DAY + pd.Timedelta(days=1))
+    assert r.state.equity == pytest.approx(ACCOUNT - 2_500), "the loss must reach the ledger"
+
+    # decide_day books exits and only then calls start_day, so the day it re-baselines
+    # against already includes them — the ordering deploy_sim uses, and not something
+    # this change introduced. Re-state the baseline to pin what is under test here: a
+    # realised $2,500 against a $50,000 day trips the brake.
+    r.state.breaker.start_day(ACCOUNT)
     assert r.state.breaker.status(r.state.equity)["level"] == "HALT_DAY"
+    assert not r.state.breaker.status(r.state.equity)["allow_new_entries"]
 
 
 # ── persistence across the run-and-exit boundary ──────────────────────────────
