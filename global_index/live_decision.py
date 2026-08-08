@@ -48,6 +48,10 @@ class OpenPos:
     exit_pending: bool = False  # True when CLOSE failed; _retry_pending_exits() retries next day
     stop_price: float | None = None      # STP: entry chandelier stop level (GTC stop order placed at this price)
     stop_order_id: str | None = None     # STP: IBKR orderId for the active GTC stop order
+    # Live only: the price this position actually filled at. Realised P&L cannot be
+    # computed without it, and in live pnl_sized arrives as 0.0 — the backtest fills it
+    # from its ledger, the broker does not. decide_day never reads this.
+    entry_price: float | None = None
 
     def as_position(self) -> Position:
         return Position(self.inst, self.direction, self.contracts,

@@ -150,6 +150,7 @@ def _openpos_to_dict(p: OpenPos) -> dict:
         "exit_pending":   p.exit_pending,
         "stop_price":     p.stop_price,
         "stop_order_id":  p.stop_order_id,
+        "entry_price":    p.entry_price,
     }
 
 
@@ -169,6 +170,7 @@ def _openpos_from_dict(d: dict) -> OpenPos:
         exit_pending=bool(d.get("exit_pending", False)),
         stop_price=float(d["stop_price"]) if d.get("stop_price") is not None else None,
         stop_order_id=d.get("stop_order_id"),
+        entry_price=float(d["entry_price"]) if d.get("entry_price") is not None else None,
     )
 
 
@@ -208,6 +210,10 @@ class FuturesRunner:
         self._regime_fn = regime_fn
         self._last_regime: str = "Unknown"
         self._trade_log_path = Path(trade_log_path) if trade_log_path else None
+        # Initialised before anything can emit. B3's reconcile runs inside __init__ and
+        # can report an unpriceable close, which happens well before the operational-log
+        # section further down.
+        self._events: list = []
 
         # E1: acquire PID lock first — refuse second instance before any state is set up
         self._lock_path = Path(lock_path) if lock_path else None
@@ -369,6 +375,10 @@ class FuturesRunner:
                                         k[1], k[0], _stp_cand.stop_order_id,
                                         _stp_cand.stop_price or 0.0,
                                     )
+                                    self._book_realised(
+                                        _stp_cand, _fill_verified.get("price"),
+                                        int(_fill_verified.get("shares") or 0) or None,
+                                        why="stop")
                                     self._record_stop_exit(_stp_cand, _fill_verified)
                                     loaded_positions[:] = [
                                         p for p in loaded_positions if p is not _stp_cand]
@@ -525,8 +535,8 @@ class FuturesRunner:
                         )
                 loaded_positions = _valid
 
-        # Operational event log + live state path
-        self._events: list = []
+        # Operational event log + live state path (_events initialised at the top of
+        # __init__ — B3 can emit before this point)
         self._last_breaker_level: str = "OK"
         self._live_state_path = Path(live_state_path) if live_state_path else None
         # Accumulated daily equity marks — the live equity curve the metrics bar
@@ -643,6 +653,62 @@ class FuturesRunner:
             os.replace(str(_tmp), str(self._slip_stats_path))
         except Exception as _exc:
             logger.warning("C1: could not persist slip_stats.json: %s", _exc)
+
+    def _book_realised(self, pos, exit_price: float, contracts: int | None = None,
+                       *, why: str) -> float:
+        """Add a live close's realised P&L to the sleeve ledger. Returns what it added.
+
+        The ledger is the sleeve's own P&L and nothing else. It used to be moved by H4,
+        which added the delta of the WHOLE account's NetLiquidation — measured
+        2026-08-07, broker 997,756.40 − 997,395.69 = +360.71 against ledger
+        52,212.33 − 51,851.62 = +360.71, identical. On a CAD account of ~$997k, twenty
+        times the sleeve, that swept in a monthly interest credit of +1,374.32, the same
+        size as the entire realised trading P&L for the week.
+
+        Realised only, no mark-to-market, because deploy_sim.replay is
+        `equity += t["pnl_sized"]` and every number in the IS baseline came from that.
+        A live ledger on a different convention makes paper-vs-backtest a comparison of
+        two different quantities and fires the breaker under conditions it was never
+        validated against.
+
+        A position with no entry_price cannot be valued. Booking zero would understate
+        the move and leave the breaker reading an equity that never happened, so it is
+        reported and skipped.
+        """
+        n = int(contracts or pos.contracts or 0)
+        if pos.entry_price is None or not exit_price or n <= 0:
+            logger.critical(
+                "UNPRICEABLE CLOSE: %s/%s %s x%s (%s) — entry_price=%s exit=%s. Realised "
+                "P&L not booked; the sleeve ledger is now short by this trade. Recover "
+                "the fills with reconcile_statement.py and rebase.",
+                pos.inst, pos.cluster, pos.direction, n, why, pos.entry_price, exit_price,
+            )
+            self._emit_event(
+                "CRITICAL", "STATE",
+                f"UNPRICEABLE CLOSE: {pos.inst}/{pos.cluster} — realised P&L not booked",
+                {"inst": pos.inst, "cluster": pos.cluster,
+                 "entry_price": pos.entry_price, "exit_price": exit_price},
+            )
+            return 0.0
+
+        from global_index.statement import point_value
+        pv = point_value(pos.inst)
+        if not pv:
+            logger.critical("UNPRICEABLE CLOSE: no point value on record for %s", pos.inst)
+            return 0.0
+
+        pnl = ((float(exit_price) - float(pos.entry_price)) * pv * n
+               * (1 if pos.direction == "LONG" else -1))
+        pos.pnl_sized = pnl
+        self.state.equity += pnl
+        if self.state.breaker is not None:
+            self.state.breaker.update(self.state.equity)
+        logger.info(
+            "LEDGER: %s %s x%d %s %.4f → %.4f = %+.2f (%s) | sleeve equity %.2f",
+            pos.inst, pos.direction, n, pos.cluster,
+            pos.entry_price, exit_price, pnl, why, self.state.equity,
+        )
+        return pnl
 
     def _record_stop_exit(self, pos, fill: dict) -> None:
         """Write the CLOSE record for a stop that fired at the broker.
@@ -785,7 +851,13 @@ class FuturesRunner:
                 self.state.open_positions = [
                     x for x in self.state.open_positions if x is not p
                 ]
-                self.state.equity += p.pnl_sized  # verify mode: ledger pnl; live: H4 sync later
+                # Verify mode books the ledger's pnl_sized; live has 0.0 there and is
+                # valued from the fill instead (MockBroker leaves avg_price at 0.0, so
+                # only one of these two ever fires).
+                self.state.equity += p.pnl_sized
+                if _f.avg_price > 0:
+                    self._book_realised(p, _f.avg_price, _f.filled_qty or p.contracts,
+                                        why="retry exit")
                 logger.info(
                     "_retry: CLOSE success %s/%s — exit_pending cleared", p.inst, p.cluster,
                 )
@@ -841,6 +913,10 @@ class FuturesRunner:
                             p.stop_order_id, p.inst, p.cluster, _e,
                         )
                     self._report_stop_cancel(_cancelled, p)
+                self.state.equity += p.pnl_sized
+                if _f.avg_price > 0:
+                    self._book_realised(p, _f.avg_price, _f.filled_qty or p.contracts,
+                                        why="max hold")
                 self.state.open_positions = [
                     x for x in self.state.open_positions if x is not p
                 ]
@@ -1230,6 +1306,8 @@ class FuturesRunner:
             # stop_price = entry chandelier level (fixed stop, not ratcheted yet).
             # No stop_ref → market exit, log fill price only (no adverse/favorable).
             if _f.status in ("FILLED", "PARTIAL") and _f.avg_price > 0:
+                self._book_realised(p, _f.avg_price, _f.filled_qty or p.contracts,
+                                    why="signal exit")
                 _slip_c = None
                 if p.stop_price is not None:
                     _slip_c = (p.stop_price - _f.avg_price) if p.direction == "LONG" \
@@ -1350,7 +1428,11 @@ class FuturesRunner:
                         "(broker balance %.2f, not used as base)",
                         _h4_delta, self.state.equity,
                         self.state.equity + _h4_delta, _h4_eq)
-            self.state.equity += _h4_delta
+            # The delta is NOT added to the ledger any more: it is the whole account's
+            # NetLiquidation, which carries interest, FX and everything else in a CAD
+            # account twenty times the size of the sleeve. Realised P&L is booked per
+            # close in _book_realised. Kept as a log line because a large unexplained
+            # move is still worth seeing, and the breaker is still refreshed below.
             if self.state.breaker is not None:
                 self.state.breaker.update(self.state.equity)
                 if not self.state.breaker.status(self.state.equity).get(
@@ -1389,6 +1471,20 @@ class FuturesRunner:
             # LONG OPEN (buying): higher fill = adverse → slip = avg - expected.
             # SHORT OPEN (selling): lower fill = adverse → slip = expected - avg.
             # Dấu quan trọng cho bias hệ thống: %+.4f giữ dấu.
+            # Realised P&L needs the price this actually filled at. In live pnl_sized
+            # arrives as 0.0 — the backtest fills it from its ledger, a broker does not —
+            # so without this the close has nothing to value itself against. Recorded on
+            # every open, not just the ones that get a stop.
+            if _open_fill.status in ("FILLED", "PARTIAL") and _open_fill.avg_price > 0:
+                _opened = next(
+                    (p for p in self.state.open_positions
+                     if p.inst == t["inst"] and p.cluster == t["cluster"]
+                     and p.entry_price is None),
+                    None,
+                )
+                if _opened is not None:
+                    _opened.entry_price = float(_open_fill.avg_price)
+
             _exp_entry = t.get("entry")
             _slip_o = None
             if _open_fill.status in ("FILLED", "PARTIAL") and _exp_entry and _open_fill.avg_price > 0:

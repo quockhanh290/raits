@@ -369,14 +369,25 @@ def main():
     beq      = broker.get_equity()
     lc_ok    = opens == closes and len(residual) == 0
     eq_ok    = abs(beq - (ACCOUNT + runner_net)) < 1.0
+
+    # The runner's OWN ledger, which is what the circuit breaker reads. Checking only
+    # broker equity left this unexamined, and it was wrong: decide_day added pnl_sized
+    # and H4 then added the broker's delta for the same trade, so state.equity carried
+    # twice the realised P&L. Nothing caught it because MockBroker's number — the one
+    # tested above — was right all along.
+    seq      = runner.state.equity
+    seq_ok   = abs(seq - (ACCOUNT + runner_net)) < 1.0
     print(f"\nLifecycle:")
     print(f"  OPEN fills:     {opens}")
     print(f"  CLOSE fills:    {closes}  {'PASS' if opens == closes else 'FAIL (OPEN != CLOSE)'}")
     print(f"  Residual pos:   {len(residual)}  {'PASS' if len(residual) == 0 else 'FAIL'}")
     print(f"  Broker equity:  ${beq:,.2f}  (expected ${ACCOUNT + runner_net:,.2f})  "
           f"{'PASS' if eq_ok else 'FAIL'}")
+    print(f"  Sleeve ledger:  ${seq:,.2f}  (expected ${ACCOUNT + runner_net:,.2f})  "
+          f"{'PASS' if seq_ok else 'FAIL — this is what the breaker reads'}")
 
-    all_pass = pnl_ok and taken_ok and rej_ok and halt_ok and lc_ok and eq_ok
+    all_pass = (pnl_ok and taken_ok and rej_ok and halt_ok and lc_ok and eq_ok
+                and seq_ok)
     print(f"\n{'='*72}")
     print("OVERALL: " + (
         "ALL PASS — runner + MockBroker + real_signal_fn == deploy_sim fit_C"
