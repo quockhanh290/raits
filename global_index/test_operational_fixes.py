@@ -1052,51 +1052,56 @@ def test_persist_fail_event():
 
 
 
-# ─── T29: H4 HALT_DAY fires after equity sync (intraday brake) ───────────────
+# ─── T29: the brake still blocks entries after a realised loss ───────────────
+#
+# This used to drive the loss by having the broker report an equity the runner had not
+# synced, which H4 then folded into state.equity. As of 97e0f7c the ledger is ACCOUNT
+# plus realised sleeve P&L — H4 moved the whole account's NetLiquidation, interest and
+# FX included, on an account twenty times the sleeve.
+#
+# The property under test is unchanged and still matters: decide_day admits entries
+# against the equity it sees BEFORE this run's closes are booked, so a day that has
+# since crossed -4% must not still open new risk. Only the route the loss takes changes.
 
-def test_h4_halt_day_fires_after_equity_sync():
-    print("\nT29: H4: HALT_DAY fires after equity sync post-close (intraday brake)")
+def test_halt_day_blocks_entries_after_realised_loss():
+    print("\nT29: brake blocks multi-day entries after a realised loss crosses -4%")
     account = 50_000.0
-    # $47,900 = 4.2% daily loss from $50k; exceeds the 4% HALT_DAY threshold
-    live_equity = 47_900.0
+    day = pd.Timestamp("2024-06-17")
+    nxt = day + pd.Timedelta(days=1)
 
-    class _LiveLossBroker(MockBroker):
-        """Simulates IBKRBroker reporting a real intraday loss the runner did not track.
-        First get_equity() call (construction) returns nominal account so state.equity
-        starts at $50k. All subsequent calls return live_equity ($47,900), mimicking
-        IBKRBroker knowing about fills the runner hasn't synced yet (H4 scenario)."""
-        def __init__(self):
-            super().__init__({}, account=account)
-            self._calls = 0
+    def _close_then_open(d, bars, held):
+        if d == day:
+            # Opens a position that closes tomorrow for -$2,500 (5% of $50k).
+            return [{"inst": "MES", "direction": "LONG", "cluster": "roska4_swing",
+                     "risk_sized": 250.0, "entry": 5000.0, "stop": 4980.0,
+                     "exit": nxt, "pnl_sized": -2_500.0}], []
+        # Same day as that close, the signal wants a new multi-day position.
+        return [{"inst": "MNQ", "direction": "LONG", "cluster": "roska4_swing",
+                 "risk_sized": 250.0, "entry": 5000.0, "stop": 4980.0,
+                 "exit": nxt + pd.Timedelta(days=3)}], []
 
-        def get_equity(self) -> float:
-            self._calls += 1
-            if self._calls == 1:
-                return self._equity   # construction: state initialized at $50k
-            return live_equity        # subsequent: IBKR reports real intraday loss
-
-    broker = _LiveLossBroker()
-    guard = _make_guard()
-    breaker = CircuitBreaker(account=account)
-
+    broker = MockBroker({}, account)
     runner = FuturesRunner(
-        broker=broker, guard=guard, contracts_by_inst={"MES": 1},
-        signal_fn=_one_entry_signal, breaker=breaker,
+        broker=broker, guard=_make_guard(), contracts_by_inst={"MES": 1, "MNQ": 1},
+        signal_fn=_close_then_open, breaker=CircuitBreaker(account=account),
     )
-    # After construction: state.equity = $50k (first call). broker now returns $47,900.
-    # decide_day admits the entry (breaker OK at $50k). H4 fix syncs equity after
-    # CLOSE loop → daily_loss = (50k-47.9k)/50k = 4.2% ≥ 4% → HALT_DAY → entries cleared.
-    runner.run_day(pd.Timestamp("2024-06-17"))
+    runner.run_day(day)
+    runner.state.breaker.start_day(account)   # baseline before the loss lands
+    runner.run_day(nxt)
 
-    open_fills = [f for f in broker.fills if f.action == "OPEN"]
-    halt_day_events = [e for e in runner._events
-                       if "HALT_DAY" in e.get("message", "")]
-    check("T29.1 H4: no OPEN orders sent when daily loss ≥ 4%",
-          len(open_fills) == 0,
-          f"OPEN fills: {len(open_fills)}, all actions: {[f.action for f in broker.fills]}")
-    check("T29.2 H4: HALT_DAY event emitted",
-          len(halt_day_events) >= 1,
+    mnq_opens = [f for f in broker.fills if f.action == "OPEN" and f.inst == "MNQ"]
+    blocked = [e for e in runner._events
+               if e.get("category") == "GUARD" and "blocked" in e.get("message", "")]
+
+    check("T29.1 no new multi-day entry after the day crosses -4%",
+          len(mnq_opens) == 0,
+          f"MNQ opens: {len(mnq_opens)}, equity={runner.state.equity:,.2f}")
+    check("T29.2 the block is reported, not silent",
+          len(blocked) >= 1,
           f"events: {[e['message'] for e in runner._events]}")
+    check("T29.3 the loss reached the ledger",
+          abs(runner.state.equity - (account - 2_500)) < 1.0,
+          f"equity={runner.state.equity:,.2f}")
 
 
 # ─── T30: exit_pending persists + restores across runner restart ──────────────
@@ -1236,7 +1241,7 @@ if __name__ == "__main__":
     test_breaker_halt_event_emitted()
     test_dump_state_writes_file()
     test_persist_fail_event()
-    test_h4_halt_day_fires_after_equity_sync()
+    test_halt_day_blocks_entries_after_realised_loss()
     test_exit_pending_persist_restore()
     test_stress_mid_2pass_halt_day()
 

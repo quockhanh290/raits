@@ -1423,26 +1423,43 @@ class FuturesRunner:
         _h4_eq = self.broker.get_equity()
         _h4_delta = _h4_eq - self._last_broker_equity
         self._last_broker_equity = _h4_eq
+        # The delta is NOT added to the ledger any more: it is the whole account's
+        # NetLiquidation, which carries interest, FX and everything else in a CAD account
+        # twenty times the size of the sleeve. Realised P&L is booked per close in
+        # _book_realised. The line stays because a large unexplained move in the account
+        # is still worth seeing.
         if abs(_h4_delta) > 0.01:
-            logger.info("H4: broker delta %+.2f → system equity %.2f → %.2f "
-                        "(broker balance %.2f, not used as base)",
-                        _h4_delta, self.state.equity,
-                        self.state.equity + _h4_delta, _h4_eq)
-            # The delta is NOT added to the ledger any more: it is the whole account's
-            # NetLiquidation, which carries interest, FX and everything else in a CAD
-            # account twenty times the size of the sleeve. Realised P&L is booked per
-            # close in _book_realised. Kept as a log line because a large unexplained
-            # move is still worth seeing, and the breaker is still refreshed below.
-            if self.state.breaker is not None:
-                self.state.breaker.update(self.state.equity)
-                if not self.state.breaker.status(self.state.equity).get(
-                        "allow_new_entries", True):
-                    logger.warning(
-                        "H4: %s after equity sync — blocking %d multi-day entries",
-                        self.state.breaker.status(self.state.equity)["level"],
-                        len(_multiday),
-                    )
-                    _multiday.clear()
+            logger.info("H4: broker delta %+.2f (balance %.2f) — logged, not booked; "
+                        "sleeve ledger stands at %.2f",
+                        _h4_delta, _h4_eq, self.state.equity)
+
+        # Re-check the brake before the multi-day entries go out. decide_day admitted
+        # them against the equity it saw BEFORE this run's closes were booked, so a day
+        # that has since crossed -4% must not still open new risk.
+        #
+        # Deliberately not gated on the broker delta. That gate was correct while this
+        # block read the broker; it now reads the ledger, and the two can move for
+        # different reasons — a ledger that changed while the account happened not to
+        # would have skipped the check entirely.
+        if self.state.breaker is not None and _multiday:
+            self.state.breaker.update(self.state.equity)
+            if not self.state.breaker.status(self.state.equity).get(
+                    "allow_new_entries", True):
+                logger.warning(
+                    "%s after realised P&L — blocking %d multi-day entries "
+                    "(sleeve equity %.2f)",
+                    self.state.breaker.status(self.state.equity)["level"],
+                    len(_multiday), self.state.equity,
+                )
+                self._emit_event(
+                    "CRITICAL", "GUARD",
+                    f"{self.state.breaker.status(self.state.equity)['level']}: "
+                    f"{len(_multiday)} multi-day entr"
+                    f"{'y' if len(_multiday) == 1 else 'ies'} blocked after realised P&L",
+                    {"level": self.state.breaker.status(self.state.equity)["level"],
+                     "blocked": len(_multiday), "equity": round(self.state.equity, 2)},
+                )
+                _multiday.clear()
 
         # Pass 2: multi-day entries — OPEN only (exit on a future day)
         for t in _multiday:
