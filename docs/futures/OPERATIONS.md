@@ -273,7 +273,31 @@ gấp 7 lần ở Rổ 4) chứng minh đây không phải kiểu "hoãn càng l
 Cơ chế hợp lý: 00:00–09:31 ET là phiên Globex đêm, thanh khoản mỏng; stop hẹp (~1/22 dải
 chandelier) bị quét rồi giá hồi trước giờ mở cửa Mỹ.
 
+**Bền tới đâu** (`model_gap_robustness.py` — tách theo năm + so trên vault; KHÔNG chạy WFO
+vì WFO là để CHỌN tham số, mà ở đây không chọn gì, 09:31 là thứ hệ thống làm sẵn):
+
+| | Rổ 4 | MNKD |
+|---|---|---|
+| live thắng | **9/9 năm** | 7/9 (thua 2020 −$170, 2022 −$492) |
+| năm lớn nhất | 2022 = 37% tổng chênh | 2026 = 35% |
+| IS (trước 2023) | +$25.674 | **+$324** ← ~bằng 0 |
+| VAULT 2023–24 (OOS) | +$8.520 | +$4.888 |
+| sau vault (2025+) | +$12.016 | +$6.064 |
+
+Rổ 4 dương ở cả ba giai đoạn, không năm nào áp đảo → **kết luận vững**.
+MNKD lợi thế **chỉ từ 2023**; trong mẫu IS gần như không có. Mạnh ngoài mẫu yếu trong mẫu
+là hướng ngược với overfit (không có gì được fit), nhưng gợi ý một thay đổi chế độ chứ
+không phải quy luật xuyên suốt → **với MNKD chỉ nói "khe hở không gây hại", đừng dựa vào
+con số**.
+
 ⚠️ Thêm một job đặt STP lúc ~00:05 ET để "khớp engine" sẽ **làm xấu đi**, không cải thiện.
+
+⚠️ **09:31 KHÔNG phải mốc được thiết kế** — nó là giờ chạy job `MAX_HOLD` (chọn để khớp
+mốc thoát 09:30 RTH của backtest), còn B4 đặt STP ở đó chỉ vì `run_maxhold_exit` dựng
+`FuturesRunner`. Hai quyết định không liên quan nhau. Đã đo và nó tốt hơn ranh giới ngày,
+nhưng mới có **ba điểm** (00:00 / 09:31 / không bao giờ) — **không đủ để nói 09:31 tối
+ưu**. Đổi giờ job MAX_HOLD, hoặc sửa nó thôi không dựng `FuturesRunner`, sẽ dời giờ đặt
+STP theo mà không có gì báo.
 
 ⚠️ Điều này cũng nói rằng **luật của engine không phải chỗ tối ưu** — nhưng đó là phát
 hiện về CHIẾN LƯỢC, phải qua WFO. Không được chỉnh mốc theo đỉnh backtest: ta giữ 09:31 vì
