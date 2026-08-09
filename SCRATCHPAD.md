@@ -1024,14 +1024,122 @@ phải engine, và tất cả đều trả về **con số trông hợp lý**:
 
 ## Gotchas (2026-08-08)
 
-- **Live chạy luật thoát KHÁC backtest, ở mọi lệnh.** `place_stop` đưa STP lên sàn ngay
-  sau khi khớp (GTC, outsideRth) → có hiệu lực từ giây đầu. `backtest_swing_tf` kiểm stop
-  trong khối `if pos is not None`, chạy TRƯỚC khối vào lệnh trong cùng vòng lặp ngày → vị
-  thế mở hôm nay mãi **hôm sau** mới bị xét. Cửa sổ lệch ≈ 14:00→23:59 ET ngày vào lệnh.
-  Đo (measure_sameday_stop.py, 2018→2024, 3.044 lệnh): **60,8% lệnh chạm stop ban đầu
-  ngay trong ngày vào**; mô phỏng live thoát tại stop → **+$46.916 thành −$14.046**.
-  Xác nhận độc lập: `hold_days` không có giá trị 0 nào trong toàn bộ trade log.
-  Tự kiểm đơn điệu (nới stop ×0.5→×8) đạt ở cả 4 mã.
+- **Live chạy luật thoát KHÁC backtest, ở mọi lệnh — và đó là lỗi của LIVE, không phải
+  backtest.** `place_stop` đưa STP lên sàn 0–1 giây sau khi khớp (GTC, outsideRth).
+  `backtest_swing_tf` kiểm stop trong khối `if pos is not None`, chạy TRƯỚC khối vào lệnh
+  trong cùng vòng lặp ngày → vị thế mở hôm nay mãi **hôm sau** mới bị xét. Cửa sổ lệch
+  ≈ 14:00→23:59 ET ngày vào lệnh.
+
+  Quét độ trễ kích hoạt STP (model_sameday_stop.py, có cổng đối chiếu trade-for-trade với
+  engine, 4/4 mã KHỚP):
+
+  | kích hoạt sau | lệnh | P&L | thắng | lỗ tạm sâu nhất khi trần (tv/p95/max) |
+  |---|---|---|---|---|
+  | 0h (live) | 3736 | **−$10.832** | 11% | — |
+  | 1h | 3307 | +$19.906 | 13% | $31/$160/$1.351 |
+  | 2h | 3141 | +$20.816 | 14% | $39/$208/$1.351 |
+  | 4h | 3114 | +$34.112 | 15% | $41/$224/$1.372 |
+  | 8h | 3047 | +$46.767 | 16% | $48/$271/$1.890 |
+  | sang ngày (=backtest) | 3044 | +$47.166 | 16% | 0 |
+
+  **Đường cong tăng đều rồi bão hoà, KHÔNG phẳng-rồi-nhảy-ở-nửa-đêm** → "cho lệnh chỗ thở"
+  là cơ chế thị trường thật, không phải hiệu ứng nhóm bar theo ngày lịch. 8h lấy 99,2%
+  edge. Stop vận hành hẹp bằng **1/22** dải chandelier danh nghĩa (mult×ATR ngày) ở cả 4
+  mã — nên nó không sống nổi qua quãng nhiễu sau điểm vào.
+
+  **Kết luận:** không cần sửa engine hay chạy lại WFO. Cần **hoãn đặt STP**. Nhưng phải
+  sửa CẢ **guard B4** — nó tự đặt lại stop cho mọi vị thế `stop_order_id is None` ở mỗi
+  lần chạy, nên bỏ mỗi dòng `place_stop` lúc vào lệnh thì độ trễ chỉ còn ~5 phút. B4 phải
+  biết cửa sổ trần là có chủ đích.
+
+  **Độ trễ vào lệnh là thứ yếu — hoãn STP mới là tất cả** (model_entry_latency.py, cùng
+  cổng đối chiếu, 4/4 KHỚP). Độ trễ tính từ lúc bar 5 phút ĐÓNG (đo thật trên MES 08-07:
+  bar 14:55–14:59, lệnh gửi 15:10:41 → trễ ~10,7 phút, giá tệ hơn 12 điểm):
+
+  | kích hoạt STP | trễ 0p | trễ 5p | trễ 10p | trễ 15p |
+  |---|---|---|---|---|
+  | STP ngay (0h) | −$10.832 | −$9.358 | −$6.467 | −$7.044 |
+  | STP sau 8h | +$46.767 | +$43.788 | +$43.868 | +$42.822 |
+  | STP sang ngày | +$47.166 | +$44.183 | +$44.232 | +$43.060 |
+
+  - Hoãn STP đáng **~$53k**; cắt độ trễ 15→0 phút đáng **~$4,1k**. Tỉ lệ **13:1**.
+  - Hoãn STP **một mình là đủ**: dương ở MỌI mức trễ, kể cả 15 phút (= cadence hiện tại).
+  - Bật resume một mình **vô ích**: dòng "STP ngay" âm ở cả bốn ô.
+  - 8h ≈ sang ngày (99,2–99,4%) ở mọi mức trễ → điểm bão hoà vững, không phụ thuộc độ trễ.
+  - Trễ 10p nhỉnh hơn trễ 5p (~$50–100 trên $44k) là **nhiễu**, đừng đọc thành xu hướng.
+
+  **MNKD đo riêng — cùng mẫu, và mốc bão hoà KHÔNG suy ra được từ Rổ 4**
+  (model_sameday_stop_nkd.py, cổng đối chiếu 865=865 KHỚP; ema=10, đồng hồ JST, nhãn
+  SPY trễ 1 ngày):
+
+  | kích hoạt STP | lệnh | P&L | thắng | stop-D0 |
+  |---|---|---|---|---|
+  | 0h (live cũ) | 1352 | **−$10.854** | 6% | 1143 (**85%** số lệnh) |
+  | 1h | 1097 | −$2.719 | 7% | 883 |
+  | 4h | 925 | +$10.478 | 11% | 651 |
+  | 8h | 892 | +$19.082 | 13% | 530 |
+  | sang ngày | 865 | **+$22.294** | 15% | 0 |
+
+  ⚠ **8h chỉ đạt 86% edge của MNKD**, trong khi Rổ 4 đạt 99,2%. Nếu chọn điểm vận hành
+  8h theo số của Rổ 4 thì mất 14% edge MNKD. Chọn "sang ngày" đúng cho cả hai sleeve —
+  và đây là lý do phải đo từng sleeve chứ không suy ra.
+
+  ⚠ Chưa tính độ trễ vào lệnh vào bảng trên (làm mọi cột xấu đi). $1.890 là lỗ *tạm thời*
+  sâu nhất quan sát được trong 6 năm (có COVID 2020), không phải chặn trên của rủi ro.
+
+- **Stop ratchet: sai lệch thứ tư, tác động bằng NHIỄU.** Backtest siết stop cuối mỗi
+  ngày (`max(stop, run_full[-1] − mult×ATR)`) và siết tiếp trong ngày qua `stop_prev`.
+  Live gán `stop_price` **một lần** lúc vào lệnh (runner.py:1635) và sau rollover (1093);
+  không có `cancel_order` nào để dời stop — chú thích trong runner nói thẳng "ratchet
+  updates are not yet implemented". Đo (`model_ratchet.py`, cổng đối chiếu 4/4 KHỚP):
+
+  | | lệnh | P&L | lý do thoát |
+  |---|---|---|---|
+  | backtest ratchet | 3.044 | +$47.166 | CHANDELIER=2421 · GAP=165 · MAX_HOLD=458 |
+  | live cố định | 3.040 | +$47.298 | CHANDELIER=2412 · GAP=165 · MAX_HOLD=463 |
+
+  Chênh **+$132 (0,3%)**, chỉ **9/3.044 lệnh** thoát khác. **KHÔNG cần sửa.** Ai định dựng
+  cancel/replace để dời stop theo ratchet: công đó đổi lấy −$132.
+
+- **STRESS_MID nếu nối code hiện tại ≈ 91% luật đã kiểm định** (1 slot sáng 10:20, không
+  slot xen giữa): vào trễ 10 phút + thoát ~14:10 + mất target → **+$12.850** vs +$14.151.
+  Thoát 14:10 thay vì 14:00 lại TỐT hơn ~$1.520 — tình cờ có lợi trong mẫu này, không phải
+  thiết kế, đừng dựa vào.
+
+  ⚠ **Tôi đưa ba con số cho cùng câu hỏi này: 95% → 80% → 91%.** 95% chỉ tính mất target;
+  80% tính thêm độ trễ vào lệnh nhưng cột thoát là RÁC (`d = bars.between_time("09:30",
+  "14:00")` cắt sẵn nên `exit_extra_min` không làm gì); 91% là lần đầu cả ba nguồn đều
+  thật sự được đo. **Bắt được cột rác nhờ hai tham số khác nhau ra số trùng khít từng
+  đồng** — bất khả thi, đúng loại self-check đã ghi ở bài học lát cắt.
+
+- **STRESS_MID: NỐI VÀ THEO DÕI** (quyết định của user; kết luận "KHÔNG NỐI" của tôi đã bị bác — p=0,112 là **thiếu bằng chứng**, không phải bằng chứng phủ định). `TASK.md:154` ghi
+  "DEFERRED Phase C2 — needs 10:20 ET morning cron", khiến việc nối trông như một việc
+  kỹ thuật dang dở. Đo ra thì cửa ải là **edge**: ngay ở luật đã kiểm định, sleeve chỉ
+  cho **+$14.151 / 474 lệnh / 8 năm / 4 mã ≈ $1.770/năm**, kèm bootstrap **p=0,112**.
+
+  Luật thoát của adapter có BA đường (stop / target 2R / đóng 14:00); live hiện thực một.
+  Đo `model_stress_exits.py` (cổng đối chiếu adapter từng lệnh, 4/4 KHỚP):
+
+  | nhánh | P&L | lý do thoát |
+  |---|---|---|
+  | A đã kiểm định | +$14.151 | eod=214 (45%) · stop=167 (35%) · target=93 (20%) |
+  | B mất target, giữ tới 14:00 | +$13.376 | eod=304 · stop=170 |
+  | C live thật, đóng sau 5 phút | **−$450** | stop=**1** |
+  | C sau 30 phút | +$5.460 | stop=37 |
+  | C sau 120 phút | +$8.378 | stop=119 |
+
+  **Tôi đoán sai lỗi nào đắt.** Tưởng mất `target` là nghiêm trọng — thực ra chỉ −$775
+  (5%), vì chỉ 20% lệnh thoát bằng target và không chốt ở đó thì phần lớn vẫn lãi lúc
+  14:00. Thứ giết sleeve là **đóng sớm**: ở nhịp slot 5 phút, stop kịp kích hoạt đúng
+  **1 lần trên 474 lệnh**. Cùng hình dạng với vụ STP — edge nằm ở chỗ để lệnh chạy.
+
+  Hai lỗi (ghi nhận, KHÔNG phải việc phải làm): `to_candidate` vứt bỏ `target`;
+  `_mark_held_unchanged` không gọi cho cluster stress nên `diff_desired_vs_held` đóng vị
+  thế ở lần chạy kế tiếp.
+
+  ⚠ `reconcile_stress.py` chỉ phủ quyết định VÀO lệnh (entry/stop/target khớp adapter,
+  112 ngày Stress, 0 lệch) và chạy mặc định trên **MES**. Đường THOÁT không có phép đối
+  chiếu tương đương — đó là chỗ cả hai lỗi nằm.
 
 - **Vòng lặp mở-đóng MES 08-07 KHÔNG phải lỗi dữ liệu.** Kéo giá thật từ IBKR: ET 14:59
   close = 7764.50 = đúng entry tín hiệu trên thang thô → quy đổi offset đúng tuyệt đối.

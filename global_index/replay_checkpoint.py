@@ -107,6 +107,46 @@ def make_entry(df: pd.DataFrame, last_day, pos) -> dict:
             "pos": _pos_to_json(pos)}
 
 
+def advance_day(raw: pd.DataFrame, run_day, last_day):
+    """The newest day a checkpoint may be moved to, or None to leave it alone.
+
+    Read off the PARQUET, never off the spliced frame the live path replays. The
+    two disagree about where history ends, and that disagreement is the bug this
+    exists to prevent: the spliced frame carries live IBKR bars, so it holds
+    yesterday complete, while the parquet does not. Appends run once a day at
+    13:45 ET, so the parquet's newest date always stops mid-day and the NEXT
+    append fills in the rest of it — 13:46 to 23:59 ET of a date that may already
+    be checkpointed.
+
+    Advancing on the spliced frame therefore writes a fingerprint over a day the
+    parquet only half holds, and tomorrow's append changes it. That is not
+    hypothetical: on 2026-08-07 every slot rejected the checkpoint for all four
+    Rổ 4 instruments, 554 rows short, and the session gathered no evidence at all.
+
+    Stopping one day short of the parquet's own final session gives a day nothing
+    will add to. It also keeps pos meaning what it claims: the position at the end
+    of last_day, which a half-held day cannot produce. A day present only in live
+    bars is not eligible — there is no history on disk to fingerprint it against.
+
+    Sessions are read off `raw`'s own index, whatever clock it carries, and that is
+    load-bearing — the frames do not share one. Rổ 4 arrives tz-aware ET, so a day
+    closes at 00:00 ET, after the 13:45 ET append. MNKD arrives tz-aware Tokyo, so
+    its day closes at 00:00 JST = 15:00 UTC, BEFORE that append; its history up to
+    last_day was already fixed, and it was the one instrument whose checkpoint
+    survived 2026-08-07. The general condition is that the cutoff must fall before
+    the append boundary, and taking the parquet's second-to-last session on the
+    parquet's own clock satisfies it for both clocks without special-casing either.
+    """
+    run_day = pd.Timestamp(run_day).normalize()
+    psess = sorted(set(raw.index.normalize().tz_localize(None)))
+    done = [d for d in psess[:-1] if d < run_day]
+    if not done:
+        return None
+    if last_day is not None and done[-1] <= pd.Timestamp(last_day).normalize():
+        return None
+    return done[-1]
+
+
 def usable(entry: dict, df: pd.DataFrame):
     """(last_day, pos) if this entry still describes df's history, else None.
 

@@ -2,13 +2,20 @@
 global_index/test_stp.py — STP (stop order) placement + B3 STP-exit detection tests
 
 Tests:
-  STP1: place_stop() called after multi-day OPEN fill — orderId stored in OpenPos
+  STP1: STP HOÃN sang phiên sau ở ngày vào lệnh (mức stop vẫn được ghi lại)
+  STP1b: sang ngày, B4 đặt STP — cửa sổ tự hết hạn, không cần job mới
   STP2: stop_price + stop_order_id serialised to / from JSON (cold-start round-trip)
   STP3: place_stop() NOT called for same-day entries (STRESS_MID)
   STP4: place_stop() NOT called when OPEN fill is CANCELLED
   STP5: B3 STP EXIT — IBKR shows 0 but stop_order_id is FILLED → auto-clear, no halt
   STP6: B3 MISMATCH with stop_order_id NOT_FOUND → CRITICAL + halt (with STP hint)
   STP7: B3 MISMATCH without stop_order_id → original CRITICAL behavior unchanged
+  STP10: B5 IM trong cửa sổ hoãn có chủ đích
+  STP10b: B5 vẫn KÊU khi stop mất thật, sau khi cửa sổ đã qua
+
+Vì sao STP1 đổi: live cũ đặt STP 0–1 giây sau khi khớp, còn engine chỉ xét stop từ ngày
+hôm sau. Đó là hai luật thoát khác nhau, và khoảng cách không nhỏ — đo 2018–2026 trên
+Rổ 4: đặt ngay −$10.832, đặt sang ngày +$47.166 (model_sameday_stop.py).
 """
 import json
 import sys
@@ -101,30 +108,69 @@ def _sameday_signal(day, bars, held):
     return [], []
 
 
-# ── STP1: place_stop called after multi-day OPEN ─────────────────────────────
 
-def test_stp1_place_stop_called_after_multiday_open(tmp_path):
-    broker = _RecordingMockBroker({}, ACCOUNT)
-    runner = FuturesRunner(
+def _runner_on(broker, tmp_path, today, signal_fn=None):
+    """Runner mới cho một ngày cụ thể, dùng lại broker + file trạng thái.
+
+    B4 chạy trong __init__, nên đây là cách duy nhất đi qua đường "hôm sau mới đặt
+    STP" mà không gọi thẳng vào ruột. Truyền today tường minh: mặc định là ngày ET
+    hiện tại, mà mọi ngày trong test đều nằm ở 2024.
+    """
+    return FuturesRunner(
         broker=broker, guard=_make_guard(),
         contracts_by_inst={"MES": 1},
-        signal_fn=_multi_day_signal,
+        signal_fn=signal_fn or _multi_day_signal,
         breaker=CircuitBreaker(account=ACCOUNT),
         positions_path=tmp_path / "pos.json",
+        today=today,
     )
+
+
+# ── STP1: STP hoãn sang phiên sau, rồi B4 đặt ────────────────────────────────
+
+def test_stp1_stp_is_deferred_on_the_entry_day(tmp_path):
+    """Không đặt STP ngay lúc khớp — nhưng PHẢI ghi lại mức stop.
+
+    Live cũ đặt STP 0–1 giây sau khi khớp. Engine chỉ xét stop từ ngày hôm sau (khối
+    thoát chạy trước khối vào lệnh trong cùng vòng lặp ngày), nên đó là một luật thoát
+    chặt hơn hẳn luật đã kiểm định. Đo 2018–2026 trên Rổ 4: đặt ngay −$10.832, đặt sang
+    ngày +$47.166.
+
+    `stop_price` vẫn phải được ghi: thiếu nó thì B4 không đặt được hôm sau ("chỉ đặt lại
+    khi đã biết mức"), và vị thế trần suốt đời thay vì đúng một phiên.
+    """
+    broker = _RecordingMockBroker({}, ACCOUNT)
+    runner = _runner_on(broker, tmp_path, DAY1)
     runner.run_day(DAY1)
 
-    assert len(broker.stp_calls) == 1, f"Expected 1 place_stop call, got {broker.stp_calls}"
-    c = broker.stp_calls[0]
-    assert c["inst"] == "MES"
-    assert c["direction"] == "LONG"
-    assert c["stop_price"] == 4950.0
-    assert c["cluster"] == CLUSTER
+    assert broker.stp_calls == [], (
+        f"STP phải hoãn sang phiên sau, nhưng đã gửi lên broker: {broker.stp_calls}")
 
-    # stop_price + stop_order_id stored in OpenPos
     pos = runner.state.open_positions[0]
-    assert pos.stop_price == 4950.0
-    assert pos.stop_order_id == "stp-MES-0"
+    assert pos.stop_price == 4950.0, "mức stop phải được ghi lại dù chưa đặt lệnh"
+    assert pos.stop_order_id is None
+
+    deferred = [e for e in runner._events
+                if e.get("context", {}).get("deferred") is True]
+    assert deferred, f"việc hoãn phải nói ra, không im lặng. events={runner._events}"
+
+
+def test_stp1b_stp_is_placed_once_the_entry_day_has_passed(tmp_path):
+    """Cửa sổ tự hết hạn: sang ngày, B4 đặt stop. Không có job mới nào cả.
+
+    Đây là nửa còn lại của bản sửa và là nửa dễ quên. Bỏ nửa này thì "hoãn" thành
+    "không bao giờ đặt".
+    """
+    broker = _RecordingMockBroker({}, ACCOUNT)
+    _runner_on(broker, tmp_path, DAY1).run_day(DAY1)
+    assert broker.stp_calls == []
+
+    _runner_on(broker, tmp_path, DAY2)      # B4 chạy ngay trong __init__
+
+    assert len(broker.stp_calls) == 1, (
+        f"B4 phải đặt STP ở ngày kế tiếp, stp_calls={broker.stp_calls}")
+    c = broker.stp_calls[0]
+    assert (c["inst"], c["direction"], c["stop_price"], c["cluster"]) ==            ("MES", "LONG", 4950.0, CLUSTER)
 
 
 # ── STP2: round-trip JSON serialisation ──────────────────────────────────────
@@ -284,21 +330,16 @@ def test_stp8_cancel_called_on_close(tmp_path):
     cancel_order(stop_order_id) must be called so the orphan stop cannot
     create an unintended position after the LONG/SHORT is gone."""
     broker = _RecordingMockBroker({}, ACCOUNT)
-    runner = FuturesRunner(
-        broker=broker, guard=_make_guard(),
-        contracts_by_inst={"MES": 1},
-        signal_fn=_multi_day_signal,
-        breaker=CircuitBreaker(account=ACCOUNT),
-        positions_path=tmp_path / "pos.json",
-    )
 
-    # DAY1: entry → STP placed, stop_order_id stored
-    runner.run_day(DAY1)
-    assert len(broker.stp_calls) == 1, "STP must be placed on DAY1"
+    # DAY1: vào lệnh — STP hoãn, chưa có gì để huỷ
+    _runner_on(broker, tmp_path, DAY1).run_day(DAY1)
+    assert broker.stp_calls == [], "STP phải hoãn ở ngày vào lệnh"
+
+    # DAY2: B4 đặt STP lúc dựng runner, rồi phiên đó đóng vị thế → phải huỷ
+    runner = _runner_on(broker, tmp_path, DAY2)
+    assert len(broker.stp_calls) == 1, "B4 phải đặt STP ở ngày kế tiếp"
     placed_id = broker.stp_calls[0]["order_id"]
-    assert runner.state.open_positions[0].stop_order_id == placed_id
 
-    # DAY2: exit → cancel_order must be called with the stop_order_id
     runner.run_day(DAY2)
     assert runner.state.open_positions == [], "Position must be closed on DAY2"
     assert placed_id in broker.cancel_calls, (
@@ -323,15 +364,10 @@ def test_stp9_orphan_alert_when_cancel_fails(tmp_path):
     """A stop that could not be cancelled is still live at the broker and will fire
     against a position that no longer exists. The runner must say so."""
     broker = _CancelFailsBroker({}, ACCOUNT)
-    runner = FuturesRunner(
-        broker=broker, guard=_make_guard(),
-        contracts_by_inst={"MES": 1},
-        signal_fn=_multi_day_signal,
-        breaker=CircuitBreaker(account=ACCOUNT),
-        positions_path=tmp_path / "pos.json",
-    )
+    _runner_on(broker, tmp_path, DAY1).run_day(DAY1)
 
-    runner.run_day(DAY1)
+    runner = _runner_on(broker, tmp_path, DAY2)     # B4 đặt STP ở ngày kế tiếp
+    assert broker.stp_calls, "B4 phải đặt STP trước khi test việc huỷ"
     placed_id = broker.stp_calls[0]["order_id"]
 
     runner.run_day(DAY2)
@@ -485,19 +521,60 @@ def test_b4_7_working_stop_at_broker_is_not_naked(tmp_path):
 # The runner already knows the answer before it disconnects; it just never asked.
 
 
-def test_stp10_session_end_flags_position_with_no_working_stop(tmp_path):
-    """After entries, before disconnect: every open position must have a live stop."""
-    broker = _RecordingMockBroker({}, ACCOUNT)
-    broker.get_working_stops = lambda: {}     # broker: nothing is working
-    runner = FuturesRunner(
-        broker=broker, guard=_make_guard(),
-        contracts_by_inst={"MES": 1},
-        signal_fn=_multi_day_signal,
-        breaker=CircuitBreaker(account=ACCOUNT),
-        positions_path=tmp_path / "pos.json",
-    )
+class _StopFailsBroker(_RecordingMockBroker):
+    """place_stop báo thất bại kiểu IBKRBroker — trả chuỗi rỗng, không ném lỗi.
+    Dùng để dựng một vị thế thật sự không có stop SAU khi cửa sổ hoãn đã qua."""
 
+    def place_stop(self, inst, direction, contracts, stop_price, cluster):
+        super().place_stop(inst, direction, contracts, stop_price, cluster)
+        return ""
+
+    def get_working_stops(self):
+        return {}                              # broker: không có stop nào đang chạy
+
+
+def _hold_signal(day, bars, held):
+    """Mở ở DAY1 rồi GIỮ — để B5 có vị thế mở mà xét ở DAY2."""
+    if day == DAY1:
+        return [dict(inst="MES", direction="LONG", cluster=CLUSTER,
+                     risk_sized=500.0, entry=5000.0, stop=4950.0,
+                     exit=None, pnl_sized=150.0)], []
+    return [], []
+
+
+def test_stp10_session_end_stays_quiet_during_the_deliberate_window(tmp_path):
+    """Ngày vào lệnh: không có STP là ĐÚNG, nên B5 phải im.
+
+    Báo CRITICAL mỗi phiên cho một chuyện cố ý sẽ dạy người vận hành bỏ qua đúng cái
+    cảnh báo có nghĩa. Đây là nửa 'không được kêu' của B5.
+    """
+    broker = _StopFailsBroker({}, ACCOUNT)
+    runner = _runner_on(broker, tmp_path, DAY1, signal_fn=_hold_signal)
     runner.run_day(DAY1)
+
+    assert runner.state.open_positions, "phải có vị thế mở thì test mới có nghĩa"
+    unprotected = [e for e in runner._events
+                   if e["level"] == "CRITICAL" and "UNPROTECTED" in e["message"]]
+    assert not unprotected, (
+        "vị thế đang trong cửa sổ hoãn CÓ CHỦ ĐÍCH mà B5 vẫn kêu CRITICAL — "
+        f"cảnh báo sẽ bị nhờn. events={runner._events}")
+
+
+def test_stp10b_session_end_flags_position_with_no_working_stop(tmp_path):
+    """After entries, before disconnect: every open position must have a live stop.
+
+    Bản gốc chạy trên ngày vào lệnh, mà giờ ngày đó không có stop là đúng. Nội dung
+    test thì vẫn nguyên giá trị — nó bắt stop MẤT THẬT — nên chỉ dời sang sau cửa sổ:
+    B4 thử đặt ở DAY2 và thất bại, vị thế trần thật, B5 phải nói ra.
+    """
+    broker = _StopFailsBroker({}, ACCOUNT)
+    _runner_on(broker, tmp_path, DAY1, signal_fn=_hold_signal).run_day(DAY1)
+
+    runner = _runner_on(broker, tmp_path, DAY2, signal_fn=_hold_signal)
+    assert broker.stp_calls, "B4 phải THỬ đặt stop ở ngày kế tiếp"
+    assert runner.state.open_positions[0].stop_order_id is None, "và đã thất bại"
+
+    runner.run_day(DAY2)
 
     assert runner.state.open_positions, "position must be open for this test to mean anything"
     unprotected = [e for e in runner._events
@@ -619,3 +696,164 @@ def test_stp13_stop_exit_is_written_to_the_trade_log(tmp_path):
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+# ── STP11: cửa sổ hoãn theo TỪNG SLEEVE ──────────────────────────────────────
+#
+# Sáu test ở trên đều chạy MES/roska4_swing. Bản sửa lại đụng tới cả ba sleeve, và
+# hai sleeve còn lại rẽ theo hai hướng NGƯỢC NHAU — nên không sleeve nào được suy ra
+# từ sleeve kia.
+
+NKD_CLUSTER, STRESS_CLUSTER = "global_nkd", "roska4_stress"
+
+
+def _nkd_hold_signal(day, bars, held):
+    """MNKD mở ở DAY1 rồi giữ. Cùng engine với Rổ 4 (backtest_swing_tf), khác tham số
+    (ema=10) và khác đồng hồ phiên (JST) — nên cùng ngữ nghĩa stop, và phải hoãn."""
+    if day == DAY1:
+        return [dict(inst="MNKD", direction="LONG", cluster=NKD_CLUSTER,
+                     risk_sized=400.0, entry=38000.0, stop=37600.0,
+                     exit=None, pnl_sized=120.0)], []
+    return [], []
+
+
+def _stress_hold_signal(day, bars, held):
+    """STRESS_MID mở rồi giữ — trạng thái BẤT THƯỜNG, vì nó là mô hình vào-ra trong
+    phiên. Dựng ra để chốt nhánh phòng thủ: nếu một vị thế stress lỡ sống sót thì nó
+    phải được đặt stop NGAY, không thừa hưởng luật đo trên engine khác."""
+    if day == DAY1:
+        return [dict(inst="MES", direction="LONG", cluster=STRESS_CLUSTER,
+                     risk_sized=300.0, entry=5000.0, stop=4950.0,
+                     exit=None, pnl_sized=80.0)], []
+    return [], []
+
+
+def test_stp11_nkd_is_deferred_like_swing(tmp_path):
+    """MNKD chạy cùng backtest_swing_tf nên thừa hưởng cùng luật stop-từ-hôm-sau.
+
+    ĐỘ LỚN bằng tiền cho MNKD đo riêng (model_sameday_stop_nkd.py) — Rổ 4 không suy ra
+    được vì khác ema, khác đồng hồ phiên, khác nhãn chế độ.
+    """
+    broker = _RecordingMockBroker({}, ACCOUNT)
+    runner = FuturesRunner(
+        broker=broker, guard=_make_guard(),
+        contracts_by_inst={"MNKD": 1},
+        signal_fn=_nkd_hold_signal,
+        breaker=CircuitBreaker(account=ACCOUNT),
+        positions_path=tmp_path / "pos.json", today=DAY1,
+    )
+    runner.run_day(DAY1)
+
+    assert broker.stp_calls == [], f"MNKD phải hoãn STP, đã gửi: {broker.stp_calls}"
+    pos = runner.state.open_positions[0]
+    assert pos.cluster == NKD_CLUSTER
+    assert pos.stop_price == 37600.0, "mức stop vẫn phải được ghi để B4 đặt hôm sau"
+    assert pos.stop_order_id is None
+
+
+def test_stp11b_nkd_gets_its_stop_the_next_day(tmp_path):
+    broker = _RecordingMockBroker({}, ACCOUNT)
+    FuturesRunner(
+        broker=broker, guard=_make_guard(), contracts_by_inst={"MNKD": 1},
+        signal_fn=_nkd_hold_signal, breaker=CircuitBreaker(account=ACCOUNT),
+        positions_path=tmp_path / "pos.json", today=DAY1,
+    ).run_day(DAY1)
+
+    FuturesRunner(
+        broker=broker, guard=_make_guard(), contracts_by_inst={"MNKD": 1},
+        signal_fn=_nkd_hold_signal, breaker=CircuitBreaker(account=ACCOUNT),
+        positions_path=tmp_path / "pos.json", today=DAY2,
+    )
+    assert len(broker.stp_calls) == 1, f"B4 phải đặt STP cho MNKD, {broker.stp_calls}"
+    assert broker.stp_calls[0]["inst"] == "MNKD"
+    assert broker.stp_calls[0]["stop_price"] == 37600.0
+
+
+def test_stp11c_stress_is_not_deferred(tmp_path):
+    """Hướng NGƯỢC LẠI với hai test trên, và đó là lý do phải test riêng.
+
+    ⚠ Test này kiểm một đường HIỆN KHÔNG CHẠY trong production. STRESS_MID chưa được
+    nối: run_live_day truyền stress_bars_1015={} và scheduler không có slot ~10:15 ET,
+    nên nhánh vào lệnh stress không bao giờ chạy. Đừng đọc test này thành "stress đang
+    được bảo vệ" — hiện không có vị thế stress nào để mà bảo vệ.
+
+    Lý do vẫn phải chốt: candidate stress KHÔNG có trường "exit", nên decide_day giữ nó
+    lại như mọi vị thế khác (`if newp.exit_day == day` là False) và nó SẼ tới khối STP
+    ngay khi sleeve được bật. Khi đó nó phải được đặt stop NGAY, không thừa hưởng luật
+    hoãn vốn đo trên engine swing.
+    """
+    broker = _RecordingMockBroker({}, ACCOUNT)
+    runner = FuturesRunner(
+        broker=broker, guard=_make_guard(), contracts_by_inst={"MES": 1},
+        signal_fn=_stress_hold_signal, breaker=CircuitBreaker(account=ACCOUNT),
+        positions_path=tmp_path / "pos.json", today=DAY1,
+    )
+    runner.run_day(DAY1)
+
+    assert len(broker.stp_calls) == 1, (
+        f"stress KHÔNG được hoãn — nó không chạy engine swing. {broker.stp_calls}")
+    assert broker.stp_calls[0]["cluster"] == STRESS_CLUSTER
+    assert runner.state.open_positions[0].stop_order_id is not None
+
+# ── STP12: cả 5 instrument, không chỉ 1 mã đại diện mỗi cluster ──────────────
+
+_ALL_FIVE = [("MES", CLUSTER, 5000.0, 4950.0),
+             ("MNQ", CLUSTER, 17000.0, 16900.0),
+             ("MYM", CLUSTER, 38000.0, 37800.0),
+             ("M2K", CLUSTER, 2000.0, 1980.0),
+             ("MNKD", NKD_CLUSTER, 38000.0, 37600.0)]
+
+
+@pytest.mark.parametrize("inst,cluster,entry,stop", _ALL_FIVE)
+def test_stp12_every_live_instrument_defers(tmp_path, inst, cluster, entry, stop):
+    """`_stop_deferred` chỉ đọc cluster, không đọc tên mã — nên về lập luận thì MES đại
+    diện được cho MNQ/MYM/M2K. Chốt bằng assertion vì lập luận là thứ trượt được: chỉ
+    cần một chỗ nào đó rẽ nhánh theo instrument (point value, tick, sizing) là đủ hỏng,
+    và sẽ hỏng âm thầm — vị thế có STP đặt ngay lúc khớp, đúng cấu hình lỗ.
+    """
+    broker = _RecordingMockBroker({}, ACCOUNT)
+
+    def _sig(day, bars, held):
+        if day == DAY1:
+            return [dict(inst=inst, direction="LONG", cluster=cluster,
+                         risk_sized=400.0, entry=entry, stop=stop,
+                         exit=None, pnl_sized=100.0)], []
+        return [], []
+
+    runner = FuturesRunner(
+        broker=broker, guard=_make_guard(), contracts_by_inst={inst: 1},
+        signal_fn=_sig, breaker=CircuitBreaker(account=ACCOUNT),
+        positions_path=tmp_path / "pos.json", today=DAY1,
+    )
+    runner.run_day(DAY1)
+
+    assert broker.stp_calls == [], f"{inst} phải hoãn STP, đã gửi: {broker.stp_calls}"
+    pos = runner.state.open_positions[0]
+    assert pos.inst == inst and pos.cluster == cluster
+    assert pos.stop_price == stop, "mức stop vẫn phải ghi để B4 đặt hôm sau"
+    assert pos.stop_order_id is None
+
+
+@pytest.mark.parametrize("inst,cluster,entry,stop", _ALL_FIVE)
+def test_stp12b_every_live_instrument_gets_its_stop_next_day(tmp_path, inst, cluster,
+                                                             entry, stop):
+    """Nửa còn lại: hoãn mà không bao giờ đặt thì tệ hơn hẳn đặt ngay."""
+    broker = _RecordingMockBroker({}, ACCOUNT)
+
+    def _sig(day, bars, held):
+        if day == DAY1:
+            return [dict(inst=inst, direction="LONG", cluster=cluster,
+                         risk_sized=400.0, entry=entry, stop=stop,
+                         exit=None, pnl_sized=100.0)], []
+        return [], []
+
+    kw = dict(broker=broker, guard=_make_guard(), contracts_by_inst={inst: 1},
+              signal_fn=_sig, breaker=CircuitBreaker(account=ACCOUNT),
+              positions_path=tmp_path / "pos.json")
+    FuturesRunner(today=DAY1, **kw).run_day(DAY1)
+    assert broker.stp_calls == []
+
+    FuturesRunner(today=DAY2, **kw)          # B4 chạy trong __init__
+    assert len(broker.stp_calls) == 1, f"{inst}: B4 phải đặt STP, {broker.stp_calls}"
+    assert broker.stp_calls[0]["inst"] == inst
+    assert broker.stp_calls[0]["stop_price"] == stop
+

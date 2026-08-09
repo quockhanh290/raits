@@ -169,7 +169,9 @@ Status: IN PROGRESS
       Capture rate: 14:10→22%, 14:30→50%, 15:55→100% (measured: check_resumebar_timing.py).
       Ref: check_resumebar_timing.py, check_rollover_gap.py (analysis scripts).
 - [x] LIVE verify (P0c) ✅ DONE 2026-07-28/30 — xem SESSION bên dưới
-- [ ] STRESS_MID Phase C2: add 10:20 ET morning cron with stress_bars_1015 populated
+- [~] ~~STRESS_MID Phase C2: add 10:20 ET morning cron~~ → **KHÔNG NỐI** (quyết định
+      2026-08-08). Đây KHÔNG phải việc kỹ thuật còn dang dở — xem sub-task
+      "STRESS_MID — quyết định KHÔNG NỐI" bên dưới trước khi làm bất cứ gì với nó.
 
 ### Completed (Offline bug fixes — 2026-07-08)
 - [x] Fill.status + filled_qty + avg_price + error_msg (broker.py) — backwards-compat defaults; MockBroker → status="FILLED"
@@ -1365,6 +1367,29 @@ eb5309f feat(stp): repair tool, and fix instrument-name lookup for NKD stops
 c40b136 fix(stp): detect naked positions from broker truth, not from a local field
 fdfad29 fix(stp): place_stop confirms IBKR accepted the order instead of its own id
 ```
+
+---
+
+## Sub-task: STRESS_MID — lệnh đóng same-day thất bại thì không ai thấy (2026-08-08)
+Status: PHÁT HIỆN, **CHƯA SỬA** — có sẵn từ trước, không do phiên này gây ra
+
+STRESS_MID mở và đóng trong cùng một `decide_day`, nên nó **không bao giờ thành `OpenPos`**
+và **không được đặt stop** (STP3 khẳng định: `place_stop` không gọi cho lệnh same-day).
+Khối same-day trong `run_day` gửi OPEN rồi CLOSE **không kiểm status**:
+
+- CLOSE thất bại → `avg_price = 0` → không ghi sổ (đúng, guard mới chặn)
+- Nhưng vị thế **đang mở thật ở broker**, mà runner không theo dõi gì cả
+- `_audit_working_stops` (F5) duyệt `state.open_positions` → **không thấy nó**
+- Không có `exit_pending`, không có retry — khác hẳn đường multi-day vốn có I4.8
+
+→ **Vị thế qua đêm, không stop, vô hình với mọi guard trừ B3 ở slot kế tiếp** (bắt được
+dưới dạng ORPHAN → CRITICAL + halt, tức phát hiện muộn và phản ứng là dừng chứ không
+phải bảo vệ).
+
+Cần quyết:
+- [ ] Same-day CLOSE thất bại thì nên: giữ thành `OpenPos` có `exit_pending=True` để
+      retry như đường multi-day, và đặt stop bảo vệ? Hay đóng lại ngay bằng lệnh khác?
+- [ ] F5 có nên quét cả vị thế broker báo mà file không có, thay vì chỉ `state.open_positions`?
 
 ---
 
@@ -2857,6 +2882,149 @@ mốc cắt cho ra ĐÚNG số dòng đã lưu, thay vì tìm cách giải thíc
 ### Files touched
 global_index/replay_checkpoint.py, global_index/run_live_day.py,
 global_index/test_advance_day.py, docs/futures/OPERATIONS.md, SCRATCHPAD.md
+
+---
+
+## Sub-task: STP đặt ngay lúc khớp — live chạy sai luật (2026-08-08)
+Status: ĐÃ ĐO XONG, CHỜ QUYẾT ĐỊNH ĐIỂM VẬN HÀNH
+
+### Phát hiện
+`place_stop` đưa STP lên sàn **0–1 giây** sau khi khớp. `backtest_swing_tf` chỉ xét stop
+**từ ngày hôm sau** (khối thoát chạy trước khối vào lệnh trong cùng vòng lặp ngày). Live
+đang thực thi một luật thoát **chưa từng được kiểm định**, chặt hơn hẳn bản đã validate.
+
+### Đo (model_sameday_stop.py — cổng đối chiếu trade-for-trade với engine, 4/4 mã KHỚP)
+| kích hoạt STP sau | lệnh | P&L | thắng | lỗ tạm sâu nhất khi trần (tv/p95/max) |
+|---|---|---|---|---|
+| **0h (live hiện tại)** | 3.736 | **−$10.832** | 11% | — |
+| 1h | 3.307 | +$19.906 | 13% | $31/$160/$1.351 |
+| 2h | 3.141 | +$20.816 | 14% | $39/$208/$1.351 |
+| 4h | 3.114 | +$34.112 | 15% | $41/$224/$1.372 |
+| **8h** | 3.047 | **+$46.767** | 16% | $48/$271/$1.890 |
+| sang ngày (= backtest) | 3.044 | +$47.166 | 16% | 0 |
+
+Đường cong **tăng đều rồi bão hoà** → chỗ thở là cơ chế thật, không phải hiệu ứng nhóm
+bar theo ngày lịch. 8h lấy **99,2%** edge. Stop vận hành hẹp bằng **1/22** dải chandelier
+danh nghĩa ở cả 4 mã.
+
+### Kết luận
+KHÔNG cần sửa engine, KHÔNG cần chạy lại WFO. Cần **hoãn đặt STP**.
+
+### Phải sửa hai chỗ, không phải một
+1. `runner.py` — bỏ `place_stop` ngay sau OPEN fill
+2. **`runner.py` guard B4** — nó tự đặt lại stop cho mọi vị thế `stop_order_id is None` ở
+   MỖI lần chạy. Chỉ sửa (1) thì độ trễ còn ~5 phút, vẫn nằm ở cột tệ nhất. B4 phải biết
+   cửa sổ trần là **có chủ đích**, chỉ báo động khi thiếu stop SAU cửa sổ.
+
+### Chờ quyết định
+Điểm vận hành chọn theo **rủi ro qua đêm chấp nhận được**, KHÔNG theo đỉnh P&L (chọn theo
+đỉnh là curve fitting). Slot đêm 01:10 ET đã có sẵn — cách lệnh vào 14:00–15:55 ET hơn 9
+tiếng, nằm sau điểm bão hoà.
+
+  **Độ trễ vào lệnh là thứ yếu — hoãn STP mới là tất cả** (model_entry_latency.py, cùng
+  cổng đối chiếu, 4/4 KHỚP). Độ trễ tính từ lúc bar 5 phút ĐÓNG (đo thật trên MES 08-07:
+  bar 14:55–14:59, lệnh gửi 15:10:41 → trễ ~10,7 phút, giá tệ hơn 12 điểm):
+
+  | kích hoạt STP | trễ 0p | trễ 5p | trễ 10p | trễ 15p |
+  |---|---|---|---|---|
+  | STP ngay (0h) | −$10.832 | −$9.358 | −$6.467 | −$7.044 |
+  | STP sau 8h | +$46.767 | +$43.788 | +$43.868 | +$42.822 |
+  | STP sang ngày | +$47.166 | +$44.183 | +$44.232 | +$43.060 |
+
+  - Hoãn STP đáng **~$53k**; cắt độ trễ 15→0 phút đáng **~$4,1k**. Tỉ lệ **13:1**.
+  - Hoãn STP **một mình là đủ**: dương ở MỌI mức trễ, kể cả 15 phút (= cadence hiện tại).
+  - Bật resume một mình **vô ích**: dòng "STP ngay" âm ở cả bốn ô.
+  - 8h ≈ sang ngày (99,2–99,4%) ở mọi mức trễ → điểm bão hoà vững, không phụ thuộc độ trễ.
+  - Trễ 10p nhỉnh hơn trễ 5p (~$50–100 trên $44k) là **nhiễu**, đừng đọc thành xu hướng.
+
+  **MNKD đo riêng — cùng mẫu, và mốc bão hoà KHÔNG suy ra được từ Rổ 4**
+  (model_sameday_stop_nkd.py, cổng đối chiếu 865=865 KHỚP; ema=10, đồng hồ JST, nhãn
+  SPY trễ 1 ngày):
+
+  | kích hoạt STP | lệnh | P&L | thắng | stop-D0 |
+  |---|---|---|---|---|
+  | 0h (live cũ) | 1352 | **−$10.854** | 6% | 1143 (**85%** số lệnh) |
+  | 1h | 1097 | −$2.719 | 7% | 883 |
+  | 4h | 925 | +$10.478 | 11% | 651 |
+  | 8h | 892 | +$19.082 | 13% | 530 |
+  | sang ngày | 865 | **+$22.294** | 15% | 0 |
+
+  ⚠ **8h chỉ đạt 86% edge của MNKD**, trong khi Rổ 4 đạt 99,2%. Nếu chọn điểm vận hành
+  8h theo số của Rổ 4 thì mất 14% edge MNKD. Chọn "sang ngày" đúng cho cả hai sleeve —
+  và đây là lý do phải đo từng sleeve chứ không suy ra.
+
+- **STRESS_MID chưa được nối vào live — và có 2 lỗi tiềm ẩn cùng họ với lỗi STP.**
+  `run_live_day.py:488` truyền `stress_bars_1015={}` cứng, scheduler không có slot
+  ~10:15 ET → nhánh vào lệnh stress không bao giờ chạy. Không có vị thế thì không có stop.
+
+  Khi bật lên sẽ vướng hai chỗ, **đều là live chạy khác backtest**:
+  1. `to_candidate` chỉ giữ `entry` + `stop`, **vứt bỏ `target`** (2R) mà
+     `stress_mid.entry_signal` trả về → không có lệnh chốt lời nào được đặt.
+  2. `_mark_held_unchanged` được gọi cho swing và NKD, **không bao giờ cho stress** →
+     khoá `(inst, "roska4_stress")` không nằm trong `desired`, nên
+     `diff_desired_vs_held` đưa nó vào `exits` ở **mọi lần chạy kế tiếp**. Backtest giữ
+     10:15→14:00; live sẽ đóng ở slot ngay sau, tức vài phút.
+
+  **Hai điều tôi từng nói sai và đã đính chính:** (a) "stress vào-ra trong cùng run_day
+  nên không tới được khối STP" — SAI, candidate stress không có trường `exit` nên
+  `decide_day` GIỮ nó lại (`if newp.exit_day == day` là False); test STP3 pass chỉ vì
+  tín hiệu giả trong test tự đặt `exit=DAY1`. (b) Lý do thật là **sleeve chưa được nối**.
+
+### Chưa đo
+- Độ trễ vào lệnh chưa nằm trong bảng (làm mọi cột xấu đi)
+- $1.890 là lỗ *tạm thời* sâu nhất quan sát được 6 năm (có COVID 2020), không phải chặn trên
+
+### Files added
+measure_sameday_stop.py, model_sameday_stop.py
+
+---
+
+## Sub-task: STRESS_MID — NỐI VÀ THEO DÕI (2026-08-08)
+Status: QUYẾT ĐỊNH ĐÃ CHỐT — nối, chưa thực thi (cần cron 10:20 ET)
+
+### Quyết định
+**Nối vào và theo dõi.** p=0,112 nghĩa là **chưa đủ bằng chứng**, KHÔNG phải đã chứng minh
+không có edge — ước lượng điểm vẫn dương (474 lệnh, thắng 49%), và sleeve phủ khoảng giữa
+phiên trong chế độ Stress mà không sleeve nào khác chạm tới. Paper là chỗ để theo dõi thứ
+chưa chắc, rủi ro bằng không.
+
+(Bản ghi trước đó của tôi ghi "KHÔNG NỐI" — đó là kết luận của tôi, đã bị bác. Giữ lại ghi
+chú này để không ai đọc nhầm lịch sử.)
+
+### Nối code hiện tại ≈ 91% luật đã kiểm định
+`model_stress_exits.py` (cổng đối chiếu adapter từng lệnh, 4/4 KHỚP), giả định **một slot
+sáng 10:20 ET, không có slot xen giữa**:
+
+| | P&L | % |
+|---|---|---|
+| A — luật đã kiểm định (stop/target/14:00) | +$14.151 | 100% |
+| **D — live thật: vào trễ 10p, thoát ~14:10, mất target** | **+$12.850** | **91%** |
+| C — nếu có slot xen giữa buổi sáng (5 phút) | −$450 | 0% |
+
+Ba nguồn lệch: mất `target` 2R (−5%), giá vào trễ ~10 phút (−15%), thoát ~14:10 thay vì
+14:00 (**+$1.520**, tình cờ có lợi trong mẫu này — không phải thiết kế, đừng dựa vào).
+
+### BẤT BIẾN BẮT BUỘC khi dựng cron
+**Không được có slot nào gọi `run_live_day` giữa 10:20 và 14:05 ET.** Job 09:31
+(`run_maxhold_exit`) và 13:45 (pre-flight) không gọi `generate_today_signals` nên an toàn.
+Thêm bất kỳ slot nào xen giữa → `diff_desired_vs_held` đóng vị thế stress ngay lần chạy kế
+tiếp → sleeve tụt từ +$12.850 xuống **−$450**, im lặng, không guard nào kêu.
+`_mark_held_unchanged` KHÔNG gọi cho cluster stress — và **không được** thêm vào như một
+bản vá, vì khi đó không gì đóng vị thế nữa và nó qua đêm.
+
+### Việc phải làm khi thực thi
+- [ ] Cron 10:20 ET chạy `run_live_day` với `stress_bars_1015` được nạp
+- [ ] Ghi bất biến "không slot nào giữa 10:20 và 14:05" vào `docs/futures/OPERATIONS.md`
+- [ ] (tuỳ chọn, +5%) `to_candidate` giữ `target` và đặt lệnh chốt lời
+
+### Kỳ vọng về "theo dõi"
+474 lệnh / 8 năm / 4 mã ≈ **59 lệnh/năm toàn rổ**, chỉ trong chế độ Stress — dồn cục vào
+2018, 2020, 2021, 2022. **Một năm êm có thể không có lệnh nào.** Đây là chuyện nhiều năm,
+không phải nhiều tháng; đừng kỳ vọng vài phiên paper trả lời được câu hỏi edge. Và khi so
+kết quả paper với backtest, nhớ hai bên đang chạy hai luật khác nhau (91%).
+
+### Files added
+model_stress_exits.py, model_ratchet.py
 
 ---
 

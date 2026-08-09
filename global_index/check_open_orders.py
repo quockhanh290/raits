@@ -71,8 +71,46 @@ def working_stops(ib) -> dict:
     return out
 
 
-def classify(positions: list[dict], stops: dict) -> list[tuple]:
-    """[(verdict, inst, direction, detail)] — verdict in OK/WRONG-WAY/NAKED/ORPHAN."""
+def _deferred(p: dict, today) -> bool:
+    """True while a position is inside its DELIBERATE stop-free window.
+
+    The runner no longer places the STP at the fill for swing/NKD — the validated
+    engine only tests the stop from the day AFTER entry, and placing it at once is a
+    stricter rule that costs the whole edge (measured 2018-2026: -$10,832 placed at
+    fill vs +$47,166 placed the next session). See runner._stop_deferred.
+
+    Without this, classify calls every fresh position NAKED, main() prints FAIL and
+    points the operator at repair_stops.py — which would place the very stop the
+    runner deliberately withheld, silently undoing the fix. The report is the more
+    dangerous half: a daily false NAKED teaches the operator to ignore the word, and
+    then a genuinely unprotected position goes unnoticed.
+
+    The cluster set is IMPORTED, never copied. Two copies drift, and the drift would
+    show up as one tool protecting a position the other leaves naked.
+    """
+    from global_index.runner import _DEFERRED_STOP_CLUSTERS
+    if p.get("cluster") not in _DEFERRED_STOP_CLUSTERS:
+        return False
+    ed = p.get("entry_day")
+    if not ed:
+        return False              # unknown entry day → treat as naked, never guess
+    try:
+        import pandas as pd
+        return pd.Timestamp(ed).normalize() == pd.Timestamp(today).normalize()
+    except Exception:
+        return False
+
+
+def classify(positions: list[dict], stops: dict, today=None) -> list[tuple]:
+    """[(verdict, inst, direction, detail)] — OK/WRONG-WAY/HAZARD/DEFERRED/NAKED/ORPHAN.
+
+    today: session date in ET. None reads it from the clock — in ET, not the host's,
+    which sits 11 hours ahead and names the previous session for most of the day.
+    """
+    if today is None:
+        import pandas as pd
+        from global_index.runner import ET_TZ
+        today = pd.Timestamp.now(tz=ET_TZ).normalize().tz_localize(None)
     rows = []
     for p in positions:
         inst, direction = p.get("inst"), p.get("direction")
@@ -89,6 +127,8 @@ def classify(positions: list[dict], stops: dict) -> list[tuple]:
                     rows.append(("HAZARD", inst, direction, c))
         elif candidates:
             rows.append(("WRONG-WAY", inst, direction, candidates))
+        elif _deferred(p, today):
+            rows.append(("DEFERRED", inst, direction, p.get("stop_price")))
         else:
             rows.append(("NAKED", inst, direction, p.get("stop_price")))
     held = {p.get("inst") for p in positions}
@@ -134,6 +174,15 @@ def main() -> int:
                 action, oid, px = detail
                 print(f"  OK        {inst:<6} {direction:<5} → {action} STP "
                       f"orderId={oid} @ {px:.2f}")
+                continue
+            if verdict == "DEFERRED":
+                # Not a gap: the runner withheld this stop on purpose and B4 places it
+                # on the first run of the next session. Counting it would print FAIL
+                # every day a position opens and send the operator to repair_stops.py,
+                # which would undo the fix.
+                print(f"  DEFERRED  {inst:<6} {direction:<5} → chua co stop, dang trong "
+                      f"cua so hoan CO CHU DICH (muc {detail}); B4 dat o phien sau. "
+                      f"KHONG chay repair_stops cho dong nay.")
                 continue
             gaps += 1
             if verdict == "WRONG-WAY":

@@ -426,14 +426,11 @@ def main():
                         log.error("[shadow] %s: DOI CHIEU LECH — day du=%s resume=%s",
                                   name, _fmt(full), _fmt(want))
 
-                # Advance to the latest session strictly BEFORE the day being run.
-                # Anchoring on the run day rather than on the frame's last session
-                # says what is meant: today is still trading, so a checkpoint taken
-                # there would describe a partial day and be wrong tomorrow.
-                sess = sorted(set(df.index.normalize().tz_localize(None)))
-                done = [d for d in sess if d < run_day]
-                if done and done[-1] > last_day:
-                    new_day = done[-1]
+                # Which day the checkpoint may move to is decided by advance_day,
+                # against the parquet rather than this spliced frame — see the note
+                # there. Getting it wrong is what made 2026-08-07 gather nothing.
+                new_day = ckpt.advance_day(raw, run_day, last_day)
+                if new_day is not None:
                     end = new_day + pd.Timedelta(days=1)
                     if tz is not None:
                         end = end.tz_localize(tz)
@@ -605,6 +602,11 @@ def main():
         regime_fn=_regime,
         hmm_stale_guard=HMMStaleGuard(regime_csv=a.regime_csv, fit_end=HMM_FIT_END),
         trade_log_path=_trade_log,
+        # B4 runs at construction, before run_day, so it needs the session date from
+        # here to tell a deliberately deferred stop from a missing one. Same ET value
+        # run_day is given — never the host clock, which is 11 hours ahead and names
+        # the previous session for most of the working day.
+        today=today,
     )
 
     # ── run_day(today) ───────────────────────────────────────────────────────

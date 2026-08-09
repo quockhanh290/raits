@@ -197,6 +197,53 @@ Mở file, xóa entry MES LONG khỏi `positions` array. Giữ `breaker` block.
 
 ---
 
+## STP hoãn sang phiên sau — vị thế KHÔNG có stop trong đêm đầu là ĐÚNG
+
+### Luật
+Vị thế **swing (Rổ 4) và MNKD** mở trong ngày **không được đặt STP ngay**. B4 đặt ở
+**lần chạy đầu tiên của phiên kế tiếp**. Đây là chủ đích, không phải lỗi.
+
+Lý do: `backtest_swing_tf` chỉ xét stop **từ ngày hôm sau** (khối thoát chạy trước khối
+vào lệnh trong cùng vòng lặp ngày). Đặt STP ngay lúc khớp là một luật thoát **chặt hơn
+luật đã kiểm định**, và nó ăn hết edge:
+
+| | Rổ 4 | MNKD |
+|---|---|---|
+| STP đặt ngay lúc khớp | **−$10.832** | **−$10.854** |
+| STP đặt sang phiên sau | **+$47.166** | **+$22.294** |
+
+STRESS_MID **không** hoãn — adapter của nó xét stop ngay từ bar vào lệnh.
+
+### Đọc log
+```
+[STP HOAN] MES SHORT @ 7769.03 — dat vao phien sau, dung luat da kiem dinh
+B4: MES/roska4_swing chua co STP — dang trong cua so hoan CO CHU DICH (vao ngay 2026-08-10)
+```
+Sáng hôm sau phải thấy `B4 REPLACED` hoặc `place_stop: accepted` cho đúng mã đó. **Không
+thấy** = cửa sổ không đóng lại → vị thế trần vô thời hạn → xử lý tay.
+
+### ⚠️ KHÔNG chạy `repair_stops.py --execute` cho vị thế đang trong cửa sổ
+`check_open_orders.py` báo dòng đó là **`DEFERRED`**, không phải `NAKED`, và **vẫn `PASS`**:
+
+```
+DEFERRED  MES    SHORT → chua co stop, dang trong cua so hoan CO CHU DICH (muc 7769.03);
+                         B4 dat o phien sau. KHONG chay repair_stops cho dong nay.
+```
+
+Thấy `NAKED` mới là bất thường — nghĩa là cửa sổ đã qua mà stop vẫn thiếu. `repair_stops`
+tự bỏ qua `DEFERRED`, nhưng đừng ép nó bằng tay: đặt stop trong cửa sổ là quay lại đúng
+cấu hình **−$10.832**.
+
+### Rủi ro đã đo của quãng không có stop
+Mức lỗ tạm sâu nhất trong quãng trần: trung vị **$48**, p95 **$271**, xấu nhất 6 năm (có
+COVID 2020) **$1.890** mỗi hợp đồng. Đó là tệ nhất **quan sát được**, không phải chặn trên.
+
+### Mức stop là CỐ ĐỊNH, không trail
+Live gửi mức chandelier tính lúc vào lệnh và giữ nguyên suốt đời lệnh (backtest thì siết
+dần). Đo được: chênh **+$132 (0,3%)**, chỉ 9/3.044 lệnh thoát khác — **không cần sửa**.
+
+---
+
 ## Log monitoring — Các pattern CRITICAL cần chú ý
 
 | Pattern | Ý nghĩa | Hành động |
@@ -279,11 +326,36 @@ lệch → tự bỏ qua, replay đầy đủ như cũ. **Chậm, không bao gi�
 Fingerprint cố ý **không** phủ phần sau `last_day`, để append hằng ngày lúc 13:45 không
 tự huỷ checkpoint mỗi chiều.
 
+⚠️ **Bấy nhiêu là chưa đủ, và phiên 2026-08-07 đã chứng minh.** Append lúc 13:45 ET bổ
+sung cả **phần đuôi của ngày hôm trước** — 13:46→23:59 ET. Nếu checkpoint đã neo vào ngày
+đó khi parquet mới có nửa ngày, thì phần lịch sử "tính đến `last_day`" vẫn lớn lên và
+fingerprint tự hỏng sau đúng một ngày. Cả phiên 08-07, bốn mã Rổ 4 đều báo
+`khong co checkpoint dung duoc`, lệch **554 bar** = đúng số bar 13:46→23:59 ET ngày 08-06;
+**phiên đó không thu được bằng chứng nào**.
+
+MNKD thì không sao, và lý do cho điều kiện tổng quát: khung của nó là **Tokyo**, ngày đóng
+lúc 00:00 JST = **15:00 UTC**, tức **trước** mốc append (13:45 ET = 17:45 UTC). Rổ 4 khung
+**ET**, ngày đóng 00:00 ET = 04:00 UTC hôm sau, tức **sau** mốc append. Điều kiện là **mốc
+cắt phải nằm trước ranh giới append**, và lấy session áp chót *trên chính khung của dữ
+liệu* thoả cả hai mà không phải phân biệt mã nào.
+
+⚠️ Khi tự kiểm bằng script: `futures._validated_core.load_parquet` trả khung **ET tz-aware**,
+còn `global_index.update_ibkr_daily._load_parquet` trả khung **UTC**. Đếm bar bằng loader
+này rồi so với fingerprint sinh bởi loader kia sẽ ra số vô nghĩa (đã mắc: 314 thay vì 554).
+
+Vì vậy `replay_checkpoint.advance_day()` chọn ngày **theo parquet**, không theo khung đã
+ghép (khung ghép có bar live nên đã đủ ngày hôm qua, parquet thì chưa), và luôn **lùi một
+ngày so với session cuối của parquet**. Hệ quả cần biết khi đọc log: slot đêm chạy trước
+13:45 ET sẽ chọn ngày sớm hơn slot chiều — **đúng như thiết kế**.
+
+Sau **bất kỳ** lần ghi lại parquet (ví dụ `fix_offset_step.py`, backfill, rebuild) phải
+chạy lại `--bootstrap`, nếu không shadow sẽ im lặng không thu được gì.
+
 ### Đọc log shadow
 
 ```
 [shadow] MES: tu checkpoint 2026-08-06 -> SHORT entry=7743.75 stop=7753.21 vao=2026-08-06
-[shadow] MES: checkpoint tien 2026-08-06 -> 2026-08-07
+[shadow] MES: checkpoint tien 2026-08-05 -> 2026-08-06   ← luôn lùi 1 ngày so với parquet
 [shadow] MES: DOI CHIEU KHOP — day du == resume        ← chỉ có ở slot 15:55
 ```
 

@@ -791,7 +791,7 @@ header::before {
         <thead><tr>
           <th>Inst</th><th>Cluster</th><th>Dir</th>
           <th>Entry Date</th><th>Entry Time</th><th>Entry $</th>
-          <th>Days Held</th><th>Risk $</th>
+          <th>Days Held</th><th>Risk $</th><th>Stop</th>
         </tr></thead>
         <tbody id="openPosBody"></tbody>
       </table>
@@ -1380,13 +1380,37 @@ function renderDD(snap, meta) {
     `All-time max <b>$${snap.max_dd_dollars.toLocaleString('en-US',{maximumFractionDigits:0})}</b>`;
 }
 
+// Since the deferral fix a position with no STP means one of two opposite things:
+// it is inside its deliberate stop-free window — swing/NKD on the entry day, because
+// the validated engine only tests the stop from the day AFTER, and placing it at the
+// fill measured -$10,832 against +$47,166 — or it is genuinely unprotected.
+//
+// Four states, not three. A replay snapshot carries no stop fields at all, and showing
+// those as NAKED would paint every historical position red: absent data is not an
+// absent stop. That distinction is the whole point — a panel that cries wolf daily
+// teaches the operator to ignore the one day it matters.
+function stopCell(p) {
+  if (p.stop_order_id === undefined && p.stop_deferred === undefined)
+    return '<span style="color:var(--dim)">—</span>';
+  if (p.stop_order_id)
+    return `<span style="color:var(--green)">#${p.stop_order_id}`
+         + (p.stop_price != null
+              ? ` @ ${p.stop_price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`
+              : '') + '</span>';
+  if (p.stop_deferred)
+    return `<span style="color:var(--amber)" title="STP hoãn sang phiên sau — engine chỉ`
+         + ` xét stop từ ngày hôm sau">deferred`
+         + (p.stop_price != null ? ` @ ${p.stop_price.toFixed(2)}` : '') + '</span>';
+  return '<span style="color:var(--red);font-weight:600">NAKED</span>';
+}
+
 // ── RENDER OPEN POSITIONS ─────────────────────────────────────────────────
 function renderOpenPositions(snap, meta) {
   // Open positions table
   const tbody = document.getElementById('openPosBody');
   const pos = snap.open_positions || [];
   if (!pos.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="no-data">— flat —</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="no-data">— flat —</td></tr>';
   } else {
     tbody.innerHTML = pos.map(p => {
       const et = p.entry_time ? p.entry_time.slice(11,16) : '—';
@@ -1400,6 +1424,7 @@ function renderOpenPositions(snap, meta) {
         <td style="text-align:right">${ep}</td>
         <td style="text-align:right;color:var(--muted)">${p.days_held}d</td>
         <td style="text-align:right;color:var(--amber)">$${p.risk_sized.toLocaleString('en-US',{maximumFractionDigits:0})}</td>
+        <td style="font-size:11px">${stopCell(p)}</td>
       </tr>`;
     }).join('');
   }

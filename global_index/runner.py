@@ -58,6 +58,17 @@ import pandas as pd
 from global_index.broker import Order
 from global_index.live_decision import decide_day, DecisionState, OpenPos
 
+# Engine day keys are ET. Every "which day is it" question in this file must be
+# answered in ET, never on the host clock — the machine running this sits 11 hours
+# ahead, so a local date silently names the wrong session for most of the day.
+ET_TZ = "America/New_York"
+
+# Clusters whose engine defers the stop to the next session — see _stop_deferred.
+# Swing and NKD both run backtest_swing_tf and inherit its semantics. Stress is an
+# event model that opens and closes inside one session; it is not covered by the
+# measurement and is deliberately left alone.
+_DEFERRED_STOP_CLUSTERS = frozenset({"roska4_swing", "global_nkd"})
+
 
 # fit_A degradation floor — the Calmar the live system is measured against. Single
 # source of truth is INVARIANTS.md; keep this and generate_replay_snapshots.py in
@@ -182,7 +193,7 @@ class FuturesRunner:
                  hmm_stale_guard=None, positions_path=None, lock_path=None,
                  live_state_path=None, paper_history_path=None,
                  stop_path=None, max_contracts_per_order=10,
-                 regime_fn=None, trade_log_path=None):
+                 regime_fn=None, trade_log_path=None, today=None):
         """signal_fn(day, bars_by_inst, held) -> (entry_candidates, exit_positions)
         wraps signal_layer.generate_today_signals with the engines/labels/costs bound.
         Injecting it keeps the runner testable without real engines.
@@ -225,6 +236,11 @@ class FuturesRunner:
         self._b3_halt_entries: bool = False
         # B4: positions confirmed open at the broker but carrying no stop order (set below)
         self._b4_naked_stops: list = []
+        # The stop-free window is DELIBERATE — see _stop_deferred. Anchored in ET
+        # because the engine's day keys are ET: at 09:00 in Hanoi it is 22:00 ET the
+        # previous day, so a local-clock "today" would place stops a day early.
+        self._today = (pd.Timestamp(today).normalize() if today is not None
+                       else pd.Timestamp.now(tz=ET_TZ).normalize().tz_localize(None))
 
         # B1: load persisted positions + breaker state if path is supplied and file exists
         self._positions_path = Path(positions_path) if positions_path else None
@@ -448,8 +464,23 @@ class FuturesRunner:
                     except Exception as _e:
                         _working = None
                         logger.error("B4: get_working_stops() failed: %s", _e)
+                    # A position still inside its deliberate stop-free window is NOT
+                    # naked — see _stop_deferred. Without this line B4 re-places the stop
+                    # on the next slot, the window shrinks to ~5 minutes, and the fix
+                    # above achieves nothing. The exclusion lapses on its own the moment
+                    # the entry day passes, so the same loop is what finally places the
+                    # stop: no new job, and a genuinely lost stop is still caught.
+                    _deferred = [p for p in loaded_positions if self._stop_deferred(p)]
+                    for p in _deferred:
+                        logger.info(
+                            "B4: %s/%s chua co STP — dang trong cua so hoan CO CHU DICH "
+                            "(vao ngay %s). Se dat o lan chay dau tien ngay ke tiep.",
+                            p.inst, p.cluster,
+                            pd.Timestamp(p.entry_day).date() if p.entry_day else "?",
+                        )
                     naked = [p for p in loaded_positions
                              if broker_key.get((p.inst, p.direction), 0) > 0
+                             and not self._stop_deferred(p)
                              and (p.stop_order_id is None
                                   or (_working is not None and p.inst not in _working))]
                     self._b4_naked_stops = [(p.inst, p.cluster) for p in naked]
@@ -1558,11 +1589,37 @@ class FuturesRunner:
                      "contracts": n, "price": _open_fill.avg_price, "cluster": t["cluster"]},
                 )
 
-            # STP: place GTC stop order immediately after successful OPEN fill.
-            # Provides overnight exit protection when chandelier fires outside 14:05–15:55 window.
-            # Only for multi-day entries (same-day STRESS_MID entries close within hours — no STP needed).
-            # Note: stop_price = entry chandelier level; ratchet updates are not yet implemented
-            # (planned for a future phase — paper phase uses fixed entry-stop only).
+            # STP: GTC stop for overnight protection once the position is a day old.
+            # It used to go out 0-1 seconds after the fill; that is a stricter exit rule
+            # than the validated one and it costs the whole edge — see _stop_deferred for
+            # the measurement. Swing and NKD now defer to the next session; STRESS_MID
+            # still gets its stop at the fill, being a same-session model.
+            # Note: stop_price = entry chandelier level; ratchet updates are not yet
+            # implemented (planned for a future phase — paper phase uses fixed entry-stop).
+            #
+            # STRESS_MID does not reach here today, but not for the reason the old
+            # comment gave. Its candidates carry no "exit" key, so decide_day appends
+            # them to open_positions like any other — they would reach this block. What
+            # stops them is that the sleeve is not wired: run_live_day passes
+            # stress_bars_1015={} and the scheduler has no ~10:15 ET slot, so the entry
+            # branch never runs. Keeping stress out of the deferral set is right on the
+            # rule, not just on the sleeve: StressMidAdapter tests the stop from the
+            # entry bar onward ("exit first stop/target hit, else 14:00 close"), with no
+            # next-day deferral anywhere in it. An immediate STP IS its validated rule.
+            #
+            # Wiring it will need more than a slot. The adapter has THREE exits and live
+            # implements one:
+            #   stop    — immediate STP, matches
+            #   target  — entry - 2R; to_candidate keeps only entry and stop, so no
+            #             order is ever placed for it
+            #   14:00   — replaced by "closed on the next run": _mark_held_unchanged is
+            #             never called for the stress cluster, so diff_desired_vs_held
+            #             finds the key missing from `desired` and exits it. Minutes
+            #             instead of the modelled 10:15-to-14:00 hold.
+            # Same family of bug as the one this deferral fixes, costing nothing so far
+            # only because the sleeve is off. reconcile_stress covers the ENTRY decision
+            # (entry/stop/target agree with the adapter, 0 mismatches over 112 Stress
+            # days) — the exit path has no equivalent check.
             if _open_fill.status in ("FILLED", "PARTIAL") and t.get("stop") is not None:
                 _stp_pos = next(
                     (p for p in self.state.open_positions
@@ -1571,9 +1628,30 @@ class FuturesRunner:
                     None,
                 )
                 if _stp_pos is not None:
+                    # The level is recorded EITHER WAY. Deferring only delays the order;
+                    # without stop_price on file, B4 cannot place it tomorrow ("only
+                    # re-place when the level is known") and the position would run
+                    # naked for its whole life instead of one session.
+                    _stp_pos.stop_price = float(t["stop"])
+
+                if _stp_pos is not None and self._stop_deferred(_stp_pos, day):
+                    logger.info(
+                        "STP HOAN: %s %s @ %.4f cluster=%s — dat vao phien sau, dung "
+                        "luat da kiem dinh (dat ngay: -$10,832 / dat sang ngay: "
+                        "+$47,166 tren 2018-2026). B4 se dat o lan chay dau tien cua "
+                        "ngay ke tiep.",
+                        t["inst"], t["direction"], t["stop"], t["cluster"],
+                    )
+                    self._emit_event(
+                        "INFO", "ORDER",
+                        f"STP hoan sang phien sau {t['inst']} {t['direction']} "
+                        f"@{t['stop']:.4f}",
+                        {"inst": t["inst"], "direction": t["direction"],
+                         "stop": t["stop"], "cluster": t["cluster"], "deferred": True},
+                    )
+                elif _stp_pos is not None:
                     _stp_id = self.broker.place_stop(
                         t["inst"], t["direction"], n, t["stop"], t["cluster"])
-                    _stp_pos.stop_price = float(t["stop"])
                     _stp_pos.stop_order_id = _stp_id if _stp_id else None
                     if _stp_id:
                         logger.info(
@@ -1639,13 +1717,54 @@ class FuturesRunner:
         # that the BROKER confirms. B4 only runs at startup, so without this a stop that
         # never reached IBKR goes unnoticed until the next slot, or overnight once the
         # scheduler is done for the day (live 2026-08-05: found by hand that evening).
-        self._audit_working_stops()
+        self._audit_working_stops(day)
         # Write live state to dashboard file (no-op if live_state_path is None)
         self.dump_state(day)
 
         return decision
 
-    def _audit_working_stops(self) -> None:
+    def _stop_deferred(self, p, today=None) -> bool:
+        """True while a position is inside its DELIBERATE stop-free window.
+
+        backtest_swing_tf checks the stop inside `if pos is not None`, which runs
+        BEFORE the entry block in the same day iteration — so a position opened today
+        is first tested for its stop tomorrow. Live used to place the STP 0-1 seconds
+        after the fill, which is a different and much stricter rule than the one that
+        was validated, and the difference is not small.
+
+        Measured over 2018-2026 on Rổ 4 (model_sameday_stop.py / model_entry_latency.py,
+        both gated on reproducing the engine trade-for-trade):
+
+            STP placed at fill      -$10,832      60.8% of trades stopped on entry day
+            STP from the next day   +$47,166      the rule the backtest actually runs
+
+        Sweeping the activation delay gives a smooth rising curve that saturates around
+        8 hours at 99% of the full figure — so this is a real market effect (noise
+        around the entry needs time to settle), not an artifact of grouping bars by
+        calendar day. The operative stop sits about 1/22 of the nominal chandelier band
+        (mult x daily ATR) on all four instruments, which is why it cannot survive that
+        noise. The choice here is the next session, matching the backtest exactly.
+
+        The window is why B4 and B5 must ask this before calling a position naked: they
+        exist to stop unprotected positions, and the validated rule requires exactly one
+        such window per trade. Left unaware, B4 re-places the stop on the very next slot
+        and the delay collapses to ~5 minutes — the worst column in the table.
+
+        NKD runs the same engine and inherits the same semantics, so it is included; the
+        DOLLAR magnitude for NKD has not been measured, only Rổ 4. STRESS_MID is a
+        same-session event model and is excluded.
+        """
+        if p.cluster not in _DEFERRED_STOP_CLUSTERS:
+            return False
+        if p.entry_day is None:
+            return False       # unknown entry day → protect it, never guess
+        ref = pd.Timestamp(today).normalize() if today is not None else self._today
+        # Equality, not >=. An entry_day in the FUTURE is corrupt state, and >= would
+        # defer it forever — a position left naked indefinitely. Every uncertain case
+        # in here resolves towards placing the stop.
+        return pd.Timestamp(p.entry_day).normalize() == ref
+
+    def _audit_working_stops(self, today=None) -> None:
         """CRITICAL for any open position the broker holds no working stop for.
 
         Silent when the broker cannot report (returns None) — MockBroker keeps no order
@@ -1666,8 +1785,19 @@ class FuturesRunner:
             logger.error("B5: unprotected_positions() failed: %s", exc)
             precise = None
 
+        # Positions inside the deliberate window are expected to have no stop; reporting
+        # them CRITICAL every session would train the operator to ignore the one alert
+        # that means a stop actually went missing.
+        _defer_insts = {p.inst for p in self.state.open_positions
+                        if self._stop_deferred(p, today)}
+        if _defer_insts:
+            logger.info("B5: bo qua %s — trong cua so hoan STP co chu dich",
+                        ", ".join(sorted(_defer_insts)))
+
         if precise is not None:
             for u in precise:
+                if u["inst"] in _defer_insts:
+                    continue
                 logger.critical(
                     "STP UNPROTECTED: %s x%+d on contract %s has no stop working on "
                     "that contract (stops seen on: %s). OPERATOR: place the STP "
@@ -1693,7 +1823,7 @@ class FuturesRunner:
         if working is None:
             return
         for p in self.state.open_positions:
-            if p.inst in working:
+            if p.inst in working or self._stop_deferred(p, today):
                 continue
             logger.critical(
                 "STP UNPROTECTED: %s %s x%d (%s) is open with no working stop at the "
@@ -2159,8 +2289,21 @@ class FuturesRunner:
                 "days_held": days_held,
                 "risk_sized": p.risk_dollars,
                 "entry_day": str(pd.Timestamp(p.entry_day).date()) if p.entry_day else None,
-                "entry_price": None,
+                "entry_price": p.entry_price,
                 "entry_time": None,
+                # Since the deferral fix, "no stop" means one of two opposite things:
+                # inside the deliberate stop-free window, or genuinely unprotected. The
+                # panel cannot tell them apart unless both travel, and a display that
+                # cannot tell them apart teaches the operator to ignore the alarm — the
+                # same trap check_open_orders had to be fixed for.
+                #
+                # stop_deferred asks the runner's own predicate rather than deriving it
+                # from entry_day and cluster again. A second copy of that rule would
+                # drift, and the drift would read as one surface calling a position safe
+                # while another calls it naked.
+                "stop_price": p.stop_price,
+                "stop_order_id": p.stop_order_id,
+                "stop_deferred": self._stop_deferred(p),
             })
 
         # Cluster gross/net exposure (simplified — risk_dollars / account)

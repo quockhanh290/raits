@@ -187,8 +187,23 @@ def main() -> int:
                     plan.append(("cancel", inst,
                                  (oid, f"wrong-side {action} STP @ {px:.2f}")))
                 plan.append(("place", inst, by_inst[inst]))
-            else:  # NAKED
+            elif verdict == "DEFERRED":
+                # The runner withheld this stop on purpose — swing/NKD positions get
+                # theirs on the first run of the NEXT session, because the validated
+                # engine only tests the stop from the day after entry. Placing it here
+                # restores the rule that measured -$10,832 instead of +$47,166.
+                # See runner._stop_deferred and check_open_orders._deferred.
+                print(f"  {inst:<6} bo qua — dang trong cua so hoan CO CHU DICH, "
+                      f"B4 se dat o phien sau")
+            elif verdict == "NAKED":
                 plan.append(("place", inst, by_inst[inst]))
+            else:
+                # Never fall through to "place". A verdict added to classify() later
+                # would otherwise inherit the most destructive action in this file by
+                # default — which is exactly how DEFERRED would have silently undone
+                # the deferral had this stayed `else: # NAKED`.
+                print(f"  {inst:<6} verdict {verdict!r} khong biet xu ly — bo qua, "
+                      f"khong tu dong lam gi")
 
         # A position can be fully protected and still carry a wrong recorded id. Left
         # alone it makes the runner cancel a ghost on exit and orphan the real stop, so
