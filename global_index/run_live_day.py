@@ -137,6 +137,13 @@ def main():
                     help="with --shadow-resume, also replay the same frame in full "
                          "and assert the two agree. Costs a full replay per "
                          "instrument — meant for the last slot of the day.")
+    ap.add_argument("--stress-entry",    action="store_true",
+                    help="STRESS_MID: build stress_bars_1015 from today's live bars so "
+                         "the 10:15 ET entry can fire. OFF by default and it must stay "
+                         "off for the afternoon slots — those run hours after 10:15, so "
+                         "they would act on a stale signal at a price that has moved. "
+                         "Only the ~10:20 ET cron passes it, together with "
+                         "--clusters stress.")
     ap.add_argument("--checkpoint-path", default=CHECKPOINT_PATH,
                     help="replay checkpoint written by --shadow-resume")
     ap.add_argument("--clusters",        default="all",
@@ -445,6 +452,41 @@ def main():
             if updated != entries:
                 ckpt.save(updated, a.checkpoint_path)
 
+        def _stress_bars(bars, day_ts):
+            """5-min bars of TODAY up to 10:15 ET, per instrument — or {} when off.
+
+            {} is the old behaviour and stays the default: STRESS_MID must fire from
+            the ~10:20 ET cron only. The afternoon slots run hours later, so letting
+            them build this dict would enter on a 10:15 signal at a 14:05 price — the
+            same stale-signal shape that cost the swing sleeve its edge.
+
+            Truncated at 10:15 rather than handed the whole day. entry_signal slices
+            to 09:30-10:15 itself so the decision would be identical either way, but a
+            frame that physically cannot see past the decision point is the difference
+            between "no lookahead" and "no lookahead as long as nobody edits the
+            slicing".
+
+            Raw broker scale, no splice offset — the adapter's levels are compared
+            against raw prices and become order prices directly.
+            """
+            if not a.stress_entry:
+                return {}
+            from futures._validated_core import resample_5m
+            cut = day_ts + pd.Timedelta(hours=10, minutes=15)
+            out = {}
+            for inst, df in (bars or {}).items():
+                if inst == NKD_INST or df is None or df.empty:
+                    continue
+                idx = df.index
+                idx = idx.tz_localize(None) if idx.tz is not None else idx
+                today_only = df[(idx >= day_ts) & (idx <= cut)]
+                if len(today_only) < 5:
+                    continue
+                out[inst] = resample_5m(today_only)
+            log.info("[stress] bars 09:30-10:15 cho %d ma: %s",
+                     len(out), ", ".join(sorted(out)) or "(khong co)")
+            return out
+
         def signal_fn(day, bars, held):
             day_ts = pd.Timestamp(day).normalize()
 
@@ -485,7 +527,7 @@ def main():
                 nkd_cost=ncost_2t,
                 nkd_inst=NKD_INST,
                 stress_engine=stress_engine,
-                stress_bars_1015={},   # STRESS_MID deferred to Phase C2 morning cron
+                stress_bars_1015=_stress_bars(bars, day_ts),
                 today_regime=_regime(day_ts),
                 held=held,
                 point_values=pv,

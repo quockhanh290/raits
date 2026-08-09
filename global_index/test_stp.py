@@ -857,3 +857,119 @@ def test_stp12b_every_live_instrument_gets_its_stop_next_day(tmp_path, inst, clu
     assert broker.stp_calls[0]["inst"] == inst
     assert broker.stp_calls[0]["stop_price"] == stop
 
+# ── STP13: lối thoát PHỔ BIẾN nhất phải được ghi sổ ──────────────────────────
+#
+# Nhánh `_stp_status == "FILLED"` từng chỉ dọn vị thế rồi thôi, trong khi nhánh dự
+# phòng NOT_FOUND (hiếm hơn nhiều) mới gọi _book_realised + _record_stop_exit. Ngược
+# đời: stop báo FILLED là đường thoát THƯỜNG GẶP — chandelier chiếm ~79,5% số lệnh
+# thoát — nên sổ mà circuit breaker đọc không nhúc nhích cho phần lớn giao dịch.
+# Đo trên trade_log.jsonl thật: 13 OPEN, 6 CLOSE.
+
+
+class _FillReportingBroker(_RecordingMockBroker):
+    """Báo STP đã khớp, và trả được giá khớp thật qua reqExecutions."""
+
+    def __init__(self, bars, account, price=4948.25, shares=1):
+        super().__init__(bars, account, stp_status="FILLED")
+        self._exec = {"price": price, "shares": shares,
+                      "time": "2024-03-12 09:31:00", "permId": 777}
+
+    def find_execution(self, order_id):
+        return dict(self._exec)
+
+
+class _AmnesiacBroker(_RecordingMockBroker):
+    """Báo FILLED nhưng đã quên bản ghi khớp — reqExecutions chỉ nhớ ~2 ngày."""
+
+    def __init__(self, bars, account):
+        super().__init__(bars, account, stp_status="FILLED")
+
+    def find_execution(self, order_id):
+        return None
+
+
+def _persisted(tmp_path, stop_price=4950.0, entry_price=5000.0):
+    f = tmp_path / "pos.json"
+    f.write_text(json.dumps({
+        "schema_version": 1,
+        "positions": [{
+            "inst": "MES", "direction": "LONG", "contracts": 1,
+            "risk_dollars": 500.0, "cluster": CLUSTER,
+            "entry_day": "2024-03-11", "exit_day": None,
+            "pnl_sized": 0.0, "exit_pending": False,
+            "entry_price": entry_price,
+            "stop_price": stop_price, "stop_order_id": "ibkr-456",
+        }],
+        "breaker": {},
+    }))
+    return f
+
+
+def _runner_with(broker, pos_file, log_path):
+    return FuturesRunner(
+        broker=broker, guard=_make_guard(), contracts_by_inst={"MES": 1},
+        signal_fn=lambda d, b, h: ([], []),
+        breaker=CircuitBreaker(account=ACCOUNT),
+        positions_path=pos_file, trade_log_path=log_path, today=DAY2,
+    )
+
+
+def _closes(log_path):
+    if not Path(log_path).exists():
+        return []
+    return [json.loads(l) for l in Path(log_path).read_text(encoding="utf-8").splitlines()
+            if l.strip() and json.loads(l).get("type") == "CLOSE"]
+
+
+def test_stp13_a_filled_stop_writes_the_close_record(tmp_path):
+    """Không có gì khác ghi bản ghi này: runner không gửi lệnh nào khi stop tự khớp,
+    nên đường send_order — vốn log mọi fill khác — không bao giờ chạy."""
+    log_path = tmp_path / "trades.jsonl"
+    runner = _runner_with(_FillReportingBroker({}, ACCOUNT), _persisted(tmp_path), log_path)
+
+    assert runner.state.open_positions == [], "vị thế phải được dọn"
+    rows = _closes(log_path)
+    assert len(rows) == 1, f"phải có đúng 1 bản ghi CLOSE, có {len(rows)}"
+    assert rows[0]["inst"] == "MES"
+
+
+def test_stp13b_the_actual_fill_price_is_used_not_the_placed_level(tmp_path):
+    """Giá khớp thật (4948.25) khác mức đã đặt (4950.00) — chênh 1.75 điểm chính là
+    trượt giá của lệnh dừng. Ghi mức đã đặt thay vì giá khớp sẽ xoá mất đúng con số
+    cần đo, và luôn theo hướng có lợi."""
+    log_path = tmp_path / "trades.jsonl"
+    _runner_with(_FillReportingBroker({}, ACCOUNT, price=4948.25),
+                 _persisted(tmp_path, stop_price=4950.0), log_path)
+    row = _closes(log_path)[0]
+    # Bản ghi giữ CẢ HAI vế — và đó chính là phép đo trượt giá lệnh dừng:
+    # fill_price - expected_stop. Ghi mỗi mức đã đặt sẽ xoá mất con số này, và
+    # luôn xoá theo hướng có lợi.
+    assert row["fill_price"] == pytest.approx(4948.25), f"giá khớp thật: {row}"
+    assert row["expected_stop"] == pytest.approx(4950.0), f"mức đã đặt: {row}"
+    assert row["fill_price"] - row["expected_stop"] == pytest.approx(-1.75)
+    assert row["source"] == "B3_STP_EXIT", "phải ghi đúng nhánh đã phát hiện"
+
+
+def test_stp13c_the_ledger_moves_on_a_stop_exit(tmp_path):
+    """Sổ sleeve là equity mà circuit breaker đọc. Không ghi = breaker canh một mức
+    vốn chưa từng tồn tại, đúng điều docstring của _book_realised cảnh báo."""
+    b = _FillReportingBroker({}, ACCOUNT, price=4948.25)
+    runner = _runner_with(b, _persisted(tmp_path), tmp_path / "t.jsonl")
+    # LONG 5000 → 4948.25 = lỗ 51.75 điểm; dấu ÂM là điều phải thấy
+    assert runner.state.equity < ACCOUNT, (
+        f"sổ phải giảm sau khi stop khớp lỗ; equity={runner.state.equity}")
+
+
+def test_stp13d_a_forgotten_fill_is_booked_but_labelled_an_estimate(tmp_path, caplog):
+    """reqExecutions chỉ nhớ ~2 ngày. IBKR nói FILLED nên vị thế CHẮC CHẮN đã đóng —
+    bỏ qua sẽ làm sổ sai theo chiều ngược lại. Ghi theo mức đã đặt, nhưng phải NÓI
+    rằng đó là ước lượng: một xấp xỉ im lặng là cách sổ trôi mà không ai biết."""
+    import logging
+    log_path = tmp_path / "t.jsonl"
+    with caplog.at_level(logging.WARNING):
+        runner = _runner_with(_AmnesiacBroker({}, ACCOUNT), _persisted(tmp_path), log_path)
+    assert runner.state.open_positions == []
+    assert runner.state.equity < ACCOUNT, "vẫn phải ghi sổ, không được bỏ qua"
+    assert any("UOC LUONG" in r.message or "UOC LUONG" in str(r.msg)
+               for r in caplog.records),         "phải cảnh báo rằng con số là ước lượng, không phải giá khớp thật"
+

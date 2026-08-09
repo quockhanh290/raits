@@ -106,6 +106,11 @@ def main():
             signal_fn=lambda d, b, h: ([], []),
             breaker=CircuitBreaker(account=ACCOUNT),
             positions_path=pos_path,
+            # B4 runs inside __init__, so this job is what places a deferred STP —
+            # 09:31 ET the morning after entry, not the 14:05 slot. Pass the session
+            # date explicitly: the runner would otherwise read its own clock, and two
+            # notions of "today" inside one run is how the window gets misjudged.
+            today=today,
         )
 
         open_count = len(runner.state.open_positions)

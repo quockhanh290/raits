@@ -3012,9 +3012,14 @@ tiếp → sleeve tụt từ +$12.850 xuống **−$450**, im lặng, không gua
 `_mark_held_unchanged` KHÔNG gọi cho cluster stress — và **không được** thêm vào như một
 bản vá, vì khi đó không gì đóng vị thế nữa và nó qua đêm.
 
-### Việc phải làm khi thực thi
-- [ ] Cron 10:20 ET chạy `run_live_day` với `stress_bars_1015` được nạp
-- [ ] Ghi bất biến "không slot nào giữa 10:20 và 14:05" vào `docs/futures/OPERATIONS.md`
+### Việc phải làm khi thực thi — ĐÃ XONG 2026-08-09
+- [x] `run_live_day --stress-entry`: dựng `stress_bars_1015` từ bar live, cắt tại 10:15,
+      resample 5 phút. **Mặc định TẮT** — slot chiều chạy sau 4 tiếng, bật ngầm sẽ vào
+      lệnh bằng tín hiệu cũ ở giá đã trôi
+- [x] Cron **10:20 ET** `stress_mid`, `--clusters stress --stress-entry`,
+      `prev_preflight=True` (job 13:45 chưa chạy lúc đó — cùng cơ chế slot đêm NKD)
+- [x] Bất biến ghi vào `OPERATIONS.md` **và** chốt bằng test
+      `test_stress_slot_invariant.py` (quét toàn bộ 49 job của scheduler)
 - [ ] (tuỳ chọn, +5%) `to_candidate` giữ `target` và đặt lệnh chốt lời
 
 ### Kỳ vọng về "theo dõi"

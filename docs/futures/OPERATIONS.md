@@ -219,8 +219,17 @@ STRESS_MID **không** hoãn — adapter của nó xét stop ngay từ bar vào l
 [STP HOAN] MES SHORT @ 7769.03 — dat vao phien sau, dung luat da kiem dinh
 B4: MES/roska4_swing chua co STP — dang trong cua so hoan CO CHU DICH (vao ngay 2026-08-10)
 ```
-Sáng hôm sau phải thấy `B4 REPLACED` hoặc `place_stop: accepted` cho đúng mã đó. **Không
-thấy** = cửa sổ không đóng lại → vị thế trần vô thời hạn → xử lý tay.
+
+**Stop được đặt lúc 09:31 ET sáng hôm sau**, không phải 14:05. Job `maxhold_exit` dựng
+`FuturesRunner`, mà B4 chạy ngay trong `__init__` — nên nó là chỗ đặt STP hoãn, sớm hơn
+slot giao dịch ~4,5 tiếng. Sáng hôm sau tìm trong log của job đó:
+```
+B4 REPLACED: MES/roska4_swing was open with no stop order — re-placed @ 7769.0300
+```
+**Không thấy** = cửa sổ không đóng lại → vị thế trần vô thời hạn → xử lý tay ngay.
+
+⚠️ Hệ quả: nếu ai đó sửa `run_maxhold_exit.py` thôi không dựng `FuturesRunner` nữa, việc
+đặt STP hoãn lùi về slot 14:05 — vẫn cùng ngày, nhưng thêm 4,5 tiếng không có bảo vệ.
 
 ### ⚠️ KHÔNG chạy `repair_stops.py --execute` cho vị thế đang trong cửa sổ
 `check_open_orders.py` báo dòng đó là **`DEFERRED`**, không phải `NAKED`, và **vẫn `PASS`**:
@@ -241,6 +250,51 @@ COVID 2020) **$1.890** mỗi hợp đồng. Đó là tệ nhất **quan sát đ�
 ### Mức stop là CỐ ĐỊNH, không trail
 Live gửi mức chandelier tính lúc vào lệnh và giữ nguyên suốt đời lệnh (backtest thì siết
 dần). Đo được: chênh **+$132 (0,3%)**, chỉ 9/3.044 lệnh thoát khác — **không cần sửa**.
+
+---
+
+## STRESS_MID — slot 10:20 ET và bất biến bắt buộc
+
+### Chạy khi nào
+| giờ ET | job | làm gì |
+|---|---|---|
+| **10:20** | `stress_mid` | vào lệnh STRESS_MID từ bar 09:30–10:15, `--clusters stress --stress-entry` |
+| **14:05** | `live_day` | `diff_desired_vs_held` **đóng** vị thế stress (gần mốc 14:00 của adapter) |
+
+Sleeve chỉ vào lệnh trong chế độ **Stress** — ~59 lệnh/năm toàn rổ, dồn vào các năm biến
+động. **Một năm êm có thể không có lệnh nào**; im lặng không phải là hỏng.
+
+`prev_preflight=True` vì job 13:45 chưa chạy lúc 10:20 — dùng bản cập nhật dữ liệu của
+ngày làm việc trước, cùng cơ chế slot đêm NKD.
+
+### 🔴 BẤT BIẾN — KHÔNG thêm slot nào gọi `run_live_day` giữa 10:20 và 14:05 ET
+`_mark_held_unchanged` **không** được gọi cho cluster stress, nên `diff_desired_vs_held`
+đóng vị thế ở **lần chạy kế tiếp**, bất kể lần đó là khi nào. Với lịch hiện tại lần đó là
+14:05 — và đó là lý do sleeve giữ được **~91%** luật đã kiểm định.
+
+| | P&L |
+|---|---|
+| luật đã kiểm định (stop/target/14:00) | +$14.151 |
+| live hiện tại (đóng ở slot 14:05) | **+$12.850** |
+| nếu có slot xen giữa buổi sáng | **−$450** |
+
+Vi phạm bất biến này **không phát ra tín hiệu nào** — không log đỏ, không guard. Đã chốt
+bằng test `test_stress_slot_invariant.py`; nó quét toàn bộ job của scheduler.
+
+⚠️ **Đừng sửa bằng cách thêm `_mark_held_unchanged` cho stress** — khi đó không gì đóng vị
+thế nữa và nó qua đêm. Muốn bỏ bất biến thì phải cho stress một luật thoát tường minh
+trước.
+
+### Ba sai lệch so với backtest, đã đo
+| | ảnh hưởng |
+|---|---|
+| `to_candidate` vứt bỏ `target` 2R → không có lệnh chốt lời | −5% |
+| giá vào trễ ~10 phút (bar đóng +5, `run_day` +5) | −15% |
+| thoát ~14:10 thay vì 14:00 | +$1.520 (tình cờ có lợi, không phải thiết kế) |
+
+Nên **đừng so P&L paper của sleeve này với số backtest rồi kết luận về edge** — hai bên
+chạy hai luật khác nhau. Sleeve vốn ở mức **p=0,112**: chưa đủ bằng chứng, không phải đã
+chứng minh không có edge. Đang chạy để theo dõi, và theo dõi ở đây là chuyện nhiều năm.
 
 ---
 

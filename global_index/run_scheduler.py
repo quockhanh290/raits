@@ -349,6 +349,32 @@ def make_scheduler(port: int, dry_run: bool,
             _save_maxhold_state()
         return ok
 
+    # ── 10:20 ET Mon-Fri: STRESS_MID entry ───────────────────────────────────
+    # Sleeve vào lệnh tại đóng cửa bar 10:15 ET. Chạy 10:20 để bar đó đã đóng hẳn.
+    #
+    # prev_preflight=True vì cùng lý do slot đêm NKD dùng: job 13:45 chưa chạy lúc
+    # 10:20, nên cờ của hôm nay luôn None và fail-closed sẽ bỏ qua vĩnh viễn. Bản
+    # cập nhật dữ liệu mới nhất tồn tại ở thời điểm này là 13:45 hôm trước.
+    #
+    # ⚠️ BẤT BIẾN — KHÔNG được thêm slot nào gọi run_live_day giữa 10:20 và 14:05 ET.
+    # `_mark_held_unchanged` không gọi cho cluster stress, nên `diff_desired_vs_held`
+    # thấy khoá (inst, roska4_stress) vắng trong `desired` và đóng vị thế ở LẦN CHẠY
+    # KẾ TIẾP. Với lịch hiện tại lần đó là 14:05 — gần đúng mốc 14:00 của adapter, và
+    # đó là lý do sleeve giữ được ~91% luật đã kiểm định. Thêm một slot xen giữa thì
+    # vị thế bị đóng sau vài phút: +$12.850 tụt xuống −$450, im lặng, không guard nào
+    # kêu. Job 09:31 (run_maxhold_exit) và 13:45 (pre-flight) KHÔNG gọi
+    # generate_today_signals nên an toàn.
+    #
+    # Sửa bằng cách thêm `_mark_held_unchanged` cho stress là SAI: khi đó không gì
+    # đóng vị thế nữa và nó qua đêm. Stress cần một luật thoát tường minh, không phải
+    # nhánh dự phòng của diff.
+    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=10, minute=20,
+                         id="stress_mid", name="STRESS_MID entry 10:20 ET",
+                         misfire_grace_time=SLOT_MISFIRE_GRACE_SECS)
+    def job_stress_mid():
+        _live_day_body("STRESS_MID_1020", clusters="stress",
+                       prev_preflight=True, stress_entry=True)
+
     # ── 13:45 ET Mon-Fri: pre-flight (update parquet + spy CSV) ─────────────
     # Runs BEFORE 14:05 run_live_day. Typical duration: ~20s for 5 instruments.
     # 20-min margin is sufficient. Fail-safe: any failure → live_day skipped today.
@@ -400,7 +426,7 @@ def make_scheduler(port: int, dry_run: bool,
 
     def _live_day_body(slot_id: str, *, first_slot: bool = False,
                        clusters: str = "all", prev_preflight: bool = False,
-                       verify: bool = False) -> None:
+                       verify: bool = False, stress_entry: bool = False) -> None:
         """Serialise slots: never two run_live_day processes at once.
 
         Slots are 5 minutes apart and a run takes ~5.5 (measured 2026-08-03:
@@ -424,14 +450,14 @@ def make_scheduler(port: int, dry_run: bool,
         try:
             _live_day_body_inner(slot_id, first_slot=first_slot,
                                  clusters=clusters, prev_preflight=prev_preflight,
-                                 verify=verify)
+                                 verify=verify, stress_entry=stress_entry)
         finally:
             _slot_lock.release()
 
     # ── Shared runner body (all 14:05–15:55 slots) ───────────────────────────
     def _live_day_body_inner(slot_id: str, *, first_slot: bool = False,
                              clusters: str = "all", prev_preflight: bool = False,
-                             verify: bool = False) -> None:
+                             verify: bool = False, stress_entry: bool = False) -> None:
         """Run run_live_day for one slot, guarded by pre-flight flag.
 
         first_slot=True (14:05) logs at ERROR on failure; subsequent slots log
@@ -510,7 +536,11 @@ def make_scheduler(port: int, dry_run: bool,
              # latency worse to prove it could be better. Once a day is enough:
              # if the two paths disagree they disagree all day, and on the last
              # slot the session is over so the extra minutes cost nothing.
-             + (["--shadow-verify"] if (shadow_resume and verify) else []),
+             + (["--shadow-verify"] if (shadow_resume and verify) else [])
+             # STRESS_MID vào lệnh lúc 10:15 ET. Cờ này CHỈ slot sáng được truyền —
+             # slot chiều chạy sau đó ~4 tiếng, dùng cùng tín hiệu sẽ vào ở giá đã
+             # trôi, đúng hình dạng đã làm hỏng sleeve swing.
+             + (["--stress-entry"] if stress_entry else []),
              label=slot_id, dry_run=dry_run)
 
     # ── 14:05 ET Mon-Fri: initial signal run ─────────────────────────────────

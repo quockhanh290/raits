@@ -244,6 +244,14 @@ class FuturesRunner:
 
         # B1: load persisted positions + breaker state if path is supplied and file exists
         self._positions_path = Path(positions_path) if positions_path else None
+        # Stop exits found during B3 cannot be booked where they are found: B3 runs
+        # here in __init__ and self.state is not built until much later, so calling
+        # _book_realised at the discovery site raises AttributeError — which the
+        # broad `except Exception` around the cross-check swallows as "B3: cross-check
+        # failed", losing the booking with a message that says nothing about money.
+        # That is why the NOT_FOUND branch's booking never actually ran either.
+        # Queue them, drain after self.state exists.
+        _pending_stop_exits: list = []
         loaded_positions: list = []
         loaded_peak_equity = None
         loaded_day_start_equity = None
@@ -361,12 +369,49 @@ class FuturesRunner:
 
                             if _stp_status == "FILLED":
                                 # STP triggered overnight — clean up state, no halt needed.
-                                logger.info(
-                                    "B3 STP EXIT: %s %s stop orderId=%s filled overnight "
-                                    "— position cleared (stop_price=%.4f)",
-                                    k[1], k[0], _stp_cand.stop_order_id,
-                                    _stp_cand.stop_price or 0.0,
-                                )
+                                #
+                                # This branch used to clear the position and nothing else,
+                                # while the rarer NOT_FOUND fallback below booked the P&L
+                                # and wrote the CLOSE record. That is backwards: a stop
+                                # reporting FILLED is the COMMON exit — chandelier stops
+                                # are ~79.5% of exits — so the ledger the circuit breaker
+                                # reads never moved for most trades, and the trade log
+                                # showed 13 OPEN against 6 CLOSE. _book_realised's own
+                                # docstring warns about exactly that: an equity that never
+                                # happened, with the breaker sizing risk against it.
+                                _stp_fill = None
+                                try:
+                                    _stp_fill = broker.find_execution(_stp_cand.stop_order_id)
+                                except Exception as _e:
+                                    logger.error("B3 STP EXIT: find_execution(%s) raised: %s",
+                                                 _stp_cand.stop_order_id, _e)
+                                if _stp_fill:
+                                    _stp_fill["_src"] = "B3_STP_EXIT"
+                                    _pending_stop_exits.append((_stp_cand, _stp_fill))
+                                    logger.info(
+                                        "B3 STP EXIT: %s %s stop orderId=%s filled @ %.4f "
+                                        "(dat @ %.4f, truot %.4f) — da ghi so",
+                                        k[1], k[0], _stp_cand.stop_order_id,
+                                        float(_stp_fill.get("price") or 0.0),
+                                        _stp_cand.stop_price or 0.0,
+                                        (float(_stp_fill.get("price") or 0.0)
+                                         - (_stp_cand.stop_price or 0.0)),
+                                    )
+                                else:
+                                    # IBKR says FILLED, so the position IS closed; leaving
+                                    # the ledger untouched is wrong in the other direction.
+                                    # Book at the level that was placed and SAY it is an
+                                    # estimate — a silent approximation is how a ledger
+                                    # drifts without anyone noticing.
+                                    _pending_stop_exits.append((_stp_cand, None))
+                                    logger.warning(
+                                        "B3 STP EXIT: %s %s stop orderId=%s FILLED nhung "
+                                        "khong lay duoc gia khop (reqExecutions quen sau "
+                                        "~2 ngay). Ghi so theo muc DA DAT %.4f — la UOC "
+                                        "LUONG, khong phai gia khop that.",
+                                        k[1], k[0], _stp_cand.stop_order_id,
+                                        _stp_cand.stop_price or 0.0,
+                                    )
                                 loaded_positions[:] = [
                                     p for p in loaded_positions if p is not _stp_cand]
                             elif _stp_cand is not None and _stp_status == "NOT_FOUND" and broker_qty == 0:
@@ -391,11 +436,7 @@ class FuturesRunner:
                                         k[1], k[0], _stp_cand.stop_order_id,
                                         _stp_cand.stop_price or 0.0,
                                     )
-                                    self._book_realised(
-                                        _stp_cand, _fill_verified.get("price"),
-                                        int(_fill_verified.get("shares") or 0) or None,
-                                        why="stop")
-                                    self._record_stop_exit(_stp_cand, _fill_verified)
+                                    _pending_stop_exits.append((_stp_cand, _fill_verified))
                                     loaded_positions[:] = [
                                         p for p in loaded_positions if p is not _stp_cand]
                                 else:
@@ -640,6 +681,26 @@ class FuturesRunner:
             taken={c: 0 for c in guard.clusters},
             rejected={c: 0 for c in guard.clusters},
             breaker=breaker)
+        # Drain the stop exits B3 found. Here, not there: self.state is what
+        # _book_realised moves, and it did not exist while B3 was running.
+        for _sp, _sf in _pending_stop_exits:
+            try:
+                if _sf:
+                    self._book_realised(_sp, _sf.get("price"),
+                                        int(_sf.get("shares") or 0) or None, why="stop")
+                    self._record_stop_exit(_sp, _sf, source=_sf.get("_src")
+                                           or "B3_STP_VERIFY")
+                else:
+                    # IBKR said FILLED but the fill record is gone; the position IS
+                    # closed, so booking the placed level beats leaving the ledger
+                    # stale. Already logged as an estimate at the discovery site.
+                    self._book_realised(_sp, _sp.stop_price, why="stop")
+            except Exception as _e:
+                logger.error(
+                    "B3: khong ghi so duoc lenh stop %s/%s (%s) — SO SLEECH LECH so voi "
+                    "thuc te, breaker dang doc equity sai. Kiem tay.",
+                    _sp.inst, _sp.cluster, _e)
+
         logger.info("B1: system equity=$%.2f (base=$%.0f) | broker=$%.2f — "
                     "risk thresholds measured against SYSTEM equity",
                     _sys_eq, float(breaker.account) if breaker is not None else 0.0,
@@ -741,7 +802,7 @@ class FuturesRunner:
         )
         return pnl
 
-    def _record_stop_exit(self, pos, fill: dict) -> None:
+    def _record_stop_exit(self, pos, fill: dict, source: str = "B3_STP_VERIFY") -> None:
         """Write the CLOSE record for a stop that fired at the broker.
 
         Nothing else writes one. The runner sends no order when a stop triggers, so the
@@ -784,7 +845,7 @@ class FuturesRunner:
                 "order_id": fill.get("order_id"),
                 "perm_id": fill.get("perm_id"),
                 "status": "FILLED",
-                "source": "B3_STP_VERIFY",
+                "source": source,
             })
             logger.info(
                 "B3 STP-VERIFY: recorded stop exit %s/%s @ %.4f (permId=%s) — "
