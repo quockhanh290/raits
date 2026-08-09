@@ -38,7 +38,8 @@ def run_loop(df, labels, cost, *, strat, ema_period, mult, max_hold_days,
              cache, same_day_stop: bool, stop_slip_ticks: float, gap_fill=True,
              activate_after_h: float = 0.0, mae=None,
              entry_latency_min: float = 0.0, skipped=None,
-             ratchet: bool = True):
+             ratchet: bool = True,
+             stop_active_hour: float | None = None, mae_full=None):
     """Vòng lặp ngày của engine, chép lại, thêm một nhánh tuỳ chọn: stop có hiệu lực
     ngay trong ngày vào lệnh. same_day_stop=False phải cho ra ĐÚNG output engine."""
     from futures._validated_core import atr14, ET
@@ -52,6 +53,8 @@ def run_loop(df, labels, cost, *, strat, ema_period, mult, max_hold_days,
     trades, pos, n_sameday = [], None, 0
 
     def _close(pos, day, ex, reason, hold, exit_ts):
+        if mae_full is not None and "_mae" in pos:
+            mae_full.append(pos["_mae"] * cost.point_value)
         pts = (ex - pos["entry"]) if pos["dir"] == "LONG" else (pos["entry"] - ex)
         trades.append(dict(day=pos["entry_day"].date(), exit_day=day.date(),
                            regime=pos["regime"], direction=pos["dir"],
@@ -102,6 +105,23 @@ def run_loop(df, labels, cost, *, strat, ema_period, mult, max_hold_days,
                             np.minimum(run_prev + mult * da, pos["stop"]))
                             if ratchet else np.full(len(high), pos["stop"]))
                         hit = np.where(high >= stop_prev)[0]
+
+                    # STP chua len san: engine coi nhu co stop tu ranh gioi ngay cua no,
+                    # live thi mai 09:31 ET B4 moi dat. Bo cac hit truoc moc do, va don
+                    # muc lo tam sau nhat trong quang trần đó.
+                    if pos.get("_act") is not None:
+                        _dts = ts.get(day)
+                        if _dts is not None and len(_dts):
+                            _naive = _dts.tz_localize(None) if _dts.tz is not None else _dts
+                            _before = np.asarray(_naive < pos["_act"])
+                            if _before.any():
+                                _w = np.where(_before)[0]
+                                _adv = ((pos["entry"] - low[_w].min()) if pos["dir"] == "LONG"
+                                        else (high[_w].max() - pos["entry"]))
+                                pos["_mae"] = max(pos["_mae"], float(_adv))
+                                hit = hit[hit >= int(_before.sum())]
+                            if not _before.all():
+                                pos["_act"] = None      # da len san, tu day tro di binh thuong
                     if len(hit):
                         i = hit[0]; stp = float(stop_prev[i])
                         gapped = gap_fill and bool(isg[i]) and (
@@ -166,10 +186,27 @@ def run_loop(df, labels, cost, *, strat, ema_period, mult, max_hold_days,
                     pos = dict(dir=sig["direction"], entry=_px,
                                entry_day=day, regime=reg,
                                extreme=_px, stop=sig["initial_stop"],
-                               entry_time=_ft)
+                               entry_time=_ft, _mae=0.0,
+                               _act=(day + pd.Timedelta(days=1)
+                                     + pd.Timedelta(hours=stop_active_hour)
+                                     if stop_active_hour is not None else None))
                     break
             if pos is None:
                 break
+
+            if mae_full is not None and pos.get("_act") is not None:
+                _h, _l, _o, _g = hl[day]
+                _dts = ts.get(day)
+                if _dts is not None and len(_dts):
+                    _naive = _dts.tz_localize(None) if _dts.tz is not None else _dts
+                    _ent = pos["entry_time"]
+                    _ent = _ent.tz_localize(None) if _ent.tzinfo is not None else _ent
+                    _aft = np.asarray(_naive > _ent)
+                    if _aft.any():
+                        _w = np.where(_aft)[0]
+                        _adv = ((pos["entry"] - _l[_w].min()) if pos["dir"] == "LONG"
+                                else (_h[_w].max() - pos["entry"]))
+                        pos["_mae"] = max(pos["_mae"], float(_adv))
 
             if not same_day_stop:
                 break

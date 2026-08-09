@@ -1087,6 +1087,29 @@ phải engine, và tất cả đều trả về **con số trông hợp lý**:
   ⚠ Chưa tính độ trễ vào lệnh vào bảng trên (làm mọi cột xấu đi). $1.890 là lỗ *tạm thời*
   sâu nhất quan sát được trong 6 năm (có COVID 2020), không phải chặn trên của rủi ro.
 
+- **Khe hở kích hoạt stop: live MUỘN hơn engine — và muộn lại TỐT HƠN.** Engine bật stop
+  từ ranh giới ngày của nó; live mãi 09:31 ET (B4 chạy trong `__init__` của
+  `run_maxhold_exit`) mới đặt. Khe hở: Rổ 4 **9,5h**, MNKD **~22,5h**.
+
+  | STP lên sàn | Rổ 4 P&L / MaxDD | MNKD P&L / MaxDD |
+  |---|---|---|
+  | engine (ranh giới ngày) | +$47.166 / $8.234 | +$22.294 / $2.122 |
+  | **live (09:31 ET)** | **+$93.375 / $7.144** | **+$33.571 / $1.920** |
+  | không có stop | −$46.369 / $60.138 | +$7.486 / $5.870 |
+
+  **Phép phân định là nhánh không-stop** — nếu P&L tăng đơn điệu tới đó thì phép đo hỏng
+  (hoặc stop chỉ là drag). Nó KHÔNG tăng: Rổ 4 lỗ $46k, MaxDD gấp 7,3 lần. Nên có điểm
+  tối ưu ở giữa và mốc live nằm gần nó, tốt hơn engine **trên cả hai trục**.
+
+  **Tôi đã đọc sai chính phép đo cũ của mình.** Quét độ trễ trước đó cho thấy "bão hoà từ
+  8h", tôi hiểu thành bão hoà trên cả đời lệnh. Sai: mọi nhánh cũ đều để khối thoát của
+  engine chạy bình thường **từ D+1 00:00**, nên chúng chỉ khác nhau ở phần đuôi ngày D.
+  Quãng 00:00–09:31 ngày D+1 chưa nhánh nào chạm tới.
+
+  ⚠️ Hệ quả vận hành: **đừng thêm job đặt STP lúc ~00:05 ET để "khớp engine"** — sẽ làm
+  xấu đi. Và điều này nói luật engine không tối ưu, nhưng đó là phát hiện về CHIẾN LƯỢC,
+  phải qua WFO; giữ 09:31 vì hệ thống đang làm sẵn, KHÔNG phải vì nó là đỉnh backtest.
+
 - **Stop ratchet: sai lệch thứ tư, tác động bằng NHIỄU.** Backtest siết stop cuối mỗi
   ngày (`max(stop, run_full[-1] − mult×ATR)`) và siết tiếp trong ngày qua `stop_prev`.
   Live gán `stop_price` **một lần** lúc vào lệnh (runner.py:1635) và sau rollover (1093);

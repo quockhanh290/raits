@@ -244,8 +244,40 @@ tự bỏ qua `DEFERRED`, nhưng đừng ép nó bằng tay: đặt stop trong c
 cấu hình **−$10.832**.
 
 ### Rủi ro đã đo của quãng không có stop
-Mức lỗ tạm sâu nhất trong quãng trần: trung vị **$48**, p95 **$271**, xấu nhất 6 năm (có
-COVID 2020) **$1.890** mỗi hợp đồng. Đó là tệ nhất **quan sát được**, không phải chặn trên.
+Đo trên **toàn bộ** quãng trần — từ lúc khớp tới lúc B4 đặt STP lúc 09:31 ET hôm sau, vắt
+qua ranh giới ngày:
+
+| | trung vị | p95 | xấu nhất |
+|---|---|---|---|
+| Rổ 4 (quãng trần ~9,5–19h) | $73 | **$379** | $1.563 |
+| MNKD (~22,5h) | $115 | **$463** | $1.665 |
+
+(Con số p95 $271 báo trước đó chỉ tính trong ngày vào lệnh, chưa vắt qua đêm — thiếu.)
+Đây là tệ nhất **quan sát được**, không phải chặn trên.
+
+### 🔴 09:31 ET là mốc ĐÃ ĐO, không phải chỗ chưa ai để ý — ĐỪNG "sửa" cho khớp engine
+Engine bật stop từ ranh giới ngày của nó (Rổ 4: 00:00 ET; MNKD: 00:00 JST). Live bật lúc
+09:31 ET. Nhìn qua thì đó là một khe hở cần bịt. **Đo rồi thì ngược lại**
+(`model_stop_activation_gap.py`, cổng đối chiếu từng lệnh):
+
+| STP lên sàn | Rổ 4 P&L / MaxDD | MNKD P&L / MaxDD |
+|---|---|---|
+| engine (ranh giới ngày) | +$47.166 / $8.234 | +$22.294 / $2.122 |
+| **live (09:31 ET)** | **+$93.375 / $7.144** | **+$33.571 / $1.920** |
+| không có stop | −$46.369 / $60.138 | +$7.486 / $5.870 |
+
+Mốc live **tốt hơn trên cả hai trục** ở cả hai sleeve. Nhánh không-stop (lỗ nặng, MaxDD
+gấp 7 lần ở Rổ 4) chứng minh đây không phải kiểu "hoãn càng lâu càng lãi" — có điểm tối
+ưu ở giữa và 09:31 nằm gần nó.
+
+Cơ chế hợp lý: 00:00–09:31 ET là phiên Globex đêm, thanh khoản mỏng; stop hẹp (~1/22 dải
+chandelier) bị quét rồi giá hồi trước giờ mở cửa Mỹ.
+
+⚠️ Thêm một job đặt STP lúc ~00:05 ET để "khớp engine" sẽ **làm xấu đi**, không cải thiện.
+
+⚠️ Điều này cũng nói rằng **luật của engine không phải chỗ tối ưu** — nhưng đó là phát
+hiện về CHIẾN LƯỢC, phải qua WFO. Không được chỉnh mốc theo đỉnh backtest: ta giữ 09:31 vì
+đó là thứ hệ thống đang làm sẵn, không phải vì nó là đỉnh.
 
 ### Mức stop là CỐ ĐỊNH, không trail
 Live gửi mức chandelier tính lúc vào lệnh và giữ nguyên suốt đời lệnh (backtest thì siết
