@@ -142,20 +142,70 @@ def test_b4_is_not_cluster_filtered(tmp_path):
         "vi the roska4_swing phai duoc dat stop du run dang gate sang nkd")
 
 
-def test_the_first_runner_building_job_is_0110_et():
-    """Giờ đặt STP = giờ của job dựng runner sớm nhất. Hiện là slot đêm NKD 01:10 ET.
+def test_no_job_can_arm_a_sleeve_before_its_arm_time():
+    """Thay cho hai test cũ, vốn khẳng định "giờ đặt STP = job dựng runner SỚM NHẤT".
 
-    Test này là thứ lẽ ra đã chặn hai lần đoán sai của tôi. Nếu ai bỏ slot đêm (ví dụ
-    gỡ NKD khỏi hệ thống), giờ đặt của Rổ 4 tự lùi về 09:31 — một sleeve đổi hành vi
-    vì một sleeve khác bị gỡ."""
-    times = [(_hhmm(j), j.id) for j in _jobs()
-             if j.id not in _NO_RUNNER and _hhmm(j) is not None]
-    assert times, "khong doc duoc gio cua job nao — test rong"
-    earliest, jid = min(times)
-    assert earliest == (PLACEMENT_HOUR, PLACEMENT_MIN), (
-        f"job dung runner som nhat la {jid} luc {earliest} — gio dat STP hoan da DOI. "
-        f"Do duoc: 01:10 cho +$49.885 (~= engine), 09:31 cho +$92.666. Doi gio nay la "
-        f"doi hanh vi he thong o muc $42.781, phai la quyet dinh co chu dich.")
+    Tiền đề đó đúng cho tới `_ARM_BY_CLUSTER`: hồi đó vị từ chỉ so `entry_day == today`,
+    nên vị thế được đặt stop ở job đầu tiên của ngày kế tiếp — tình cờ là slot đêm 01:10.
+    Giờ thì `_stop_deferred` mới là thứ quyết định, và nó khai theo ĐỒNG HỒ CỦA SLEEVE.
+
+    Bất biến mà hai test kia thực sự bảo vệ vẫn còn giá trị và mạnh hơn ở dạng này: **thêm
+    một job vào lịch không được vũ trang sleeve nào sớm hơn giờ của chính nó**. Đó là điều
+    khiến việc thêm lượt quét sửa stop trở nên an toàn — nếu không, mỗi job mới lại là một
+    lần đổi hành vi hệ thống trong im lặng.
+
+    Kiểm trên lịch THẬT, cả hai mùa, vì chênh ET↔JST đổi theo DST.
+    """
+    from global_index.runner import _ARM_BY_CLUSTER, ET_TZ, FuturesRunner
+    r = FuturesRunner.__new__(FuturesRunner)
+
+    class _P:
+        def __init__(self, cluster, entry_day):
+            self.cluster, self.entry_day = cluster, pd.Timestamp(entry_day)
+            self.inst, self.direction, self.contracts = "X", "LONG", 1
+
+    slots = sorted({_hhmm(j) for j in _jobs()
+                    if j.id not in _NO_RUNNER and _hhmm(j) is not None})
+    assert slots, "khong doc duoc gio cua job nao — test rong"
+
+    for entry in ("2026-08-10", "2026-01-12"):        # EDT và EST
+        d1 = pd.Timestamp(entry) + pd.Timedelta(days=1)
+        for cluster, (tz, hh, mm) in _ARM_BY_CLUSTER.items():
+            arm = (pd.Timestamp(f"{(d1).date()} {hh:02d}:{mm:02d}", tz=tz)
+                   .tz_convert(ET_TZ).tz_localize(None))
+            for sh, sm in slots:
+                now = d1 + pd.Timedelta(hours=sh, minutes=sm)
+                armed = not r._stop_deferred(_P(cluster, entry), now=now)
+                assert armed == (now >= arm), (
+                    f"{cluster} vao {entry}: slot {sh:02d}:{sm:02d} "
+                    f"{'DAT' if armed else 'HOAN'} nhung gio vu trang la "
+                    f"{arm.strftime('%H:%M')} ET")
+
+
+def test_the_night_sweep_arms_nkd_earlier_in_winter_and_that_is_correct():
+    """Ghi lại một thay đổi hành vi THẬT do lượt quét 00:20 gây ra, để nó không bị phát
+    hiện lại như một điều bất ngờ.
+
+    Mùa hè: 14:00 JST = 01:00 ET, nên 00:20 còn trong cửa sổ hoãn — không đổi gì.
+    Mùa đông: 14:00 JST = 00:00 ET, nên 00:20 ĐẶT được stop, sớm hơn 01:10 trước đây.
+
+    Đó là đi VỀ PHÍA luật chứ không rời xa: 00:20 ET mùa đông là 14:20 JST (20 phút sau
+    mốc), còn 01:10 ET là 15:10 JST (70 phút sau). Rổ 4 không đổi ở cả hai mùa."""
+    from global_index.runner import FuturesRunner
+    r = FuturesRunner.__new__(FuturesRunner)
+
+    class _P:
+        def __init__(self, cluster, entry_day):
+            self.cluster, self.entry_day = cluster, pd.Timestamp(entry_day)
+            self.inst = "MNKD"
+
+    at0020 = lambda e: pd.Timestamp(e) + pd.Timedelta(days=1, minutes=20)
+    assert r._stop_deferred(_P("global_nkd", "2026-08-10"),
+                            now=at0020("2026-08-10")) is True, "he: 00:20 phai con hoan"
+    assert r._stop_deferred(_P("global_nkd", "2026-01-12"),
+                            now=at0020("2026-01-12")) is False, "dong: 00:20 phai dat duoc"
+    assert r._stop_deferred(_P("roska4_swing", "2026-01-12"),
+                            now=at0020("2026-01-12")) is True, "Ro 4 khong duoc doi"
 
 
 def test_maxhold_is_the_fallback_that_builds_a_runner():
@@ -169,13 +219,17 @@ def test_maxhold_is_the_fallback_that_builds_a_runner():
     assert any(_hhmm(j) == (9, 31) for j in _jobs() if j.id == "maxhold_exit")
 
 
-def test_no_job_between_placement_and_the_trading_window_is_assumed():
-    """Chốt lại rằng giờ đặt là MỘT giá trị xác định, không phải "job nào chạy trước thì
-    đặt" một cách ngẫu nhiên: mọi job dựng runner khác đều phải MUỘN hơn 01:10."""
-    times = sorted({_hhmm(j) for j in _jobs()
-                    if j.id not in _NO_RUNNER and _hhmm(j) is not None})
-    assert times[0] == (PLACEMENT_HOUR, PLACEMENT_MIN)
-    assert all(t > (PLACEMENT_HOUR, PLACEMENT_MIN) for t in times[1:])
+# `test_no_job_between_placement_and_the_trading_window_is_assumed` đã bị BỎ ở đây.
+#
+# Nó khẳng định mọi job dựng runner đều phải muộn hơn 01:10, để giờ đặt STP là "một giá trị
+# xác định, không phải job nào chạy trước thì đặt". Tiền đề đó chết cùng `_ARM_BY_CLUSTER`:
+# giờ đặt không còn do thứ tự job quyết định mà do vị từ `_stop_deferred`, khai theo đồng hồ
+# của từng sleeve. Lượt quét sửa stop 00:20 làm nó đỏ, và nó đỏ vì đã lỗi thời chứ không
+# phải vì có gì hỏng.
+#
+# Bất biến nó thực sự bảo vệ — thêm job mới không được đổi giờ vũ trang của sleeve nào —
+# nằm ở `test_no_job_can_arm_a_sleeve_before_its_arm_time` phía trên, kiểm trên lịch thật và
+# cả hai mùa DST, tức mạnh hơn bản cũ.
 
 
 if __name__ == "__main__":
