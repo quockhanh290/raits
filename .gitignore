@@ -187,6 +187,9 @@ wfo_results/
 live_positions.json
 global_index/live_state_data.js
 global_index/preflight_state.json
+global_index/maxhold_state.json
+global_index/replay_checkpoint.json
+bao_cao_*.txt
 global_index/paper_history.json
 # p0c_overnight.py capture output — megabytes of run log, not source
 p0c_signals_*.txt

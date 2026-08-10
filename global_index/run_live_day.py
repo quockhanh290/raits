@@ -36,6 +36,7 @@ Usage:
 """
 from __future__ import annotations
 import argparse, json, logging, sys, time
+from datetime import date as _date
 from pathlib import Path
 
 # ── [1] CWD guard — must be d:\raits before anything else ──────────────────
@@ -94,16 +95,44 @@ logging.basicConfig(
     format="%(asctime)s  %(levelname)-7s  %(name)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-_LOG_FILE_DAY = Path.cwd() / f"live_day_{__import__('datetime').date.today().strftime('%m%d')}.log"
-_fh_day = logging.FileHandler(_LOG_FILE_DAY, mode="a", encoding="utf-8")
-_fh_day.setLevel(logging.INFO)
-_fh_day.setFormatter(logging.Formatter(
-    "%(asctime)s  %(levelname)-7s  %(name)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-))
-logging.getLogger().addHandler(_fh_day)
 log = logging.getLogger("run_live_day")
-log.info("Log file: %s", _LOG_FILE_DAY)
+
+
+def attach_file_log() -> None:
+    """Attach the day log. Called from __main__, NOT at import.
+
+    Attaching at import puts the handler on the ROOT logger, so any process that
+    merely imports this module starts writing the whole application's logging into
+    the operator's file. run_scheduler had the identical bug and pytest filled
+    scheduler_0810.log with 1,215 lines of injected-failure CRITICALs.
+
+    This file escaped only because no test imports run_live_day yet. That is a
+    property of today's test suite, not of the code, so it is fixed the same way.
+
+    No date roll here: each slot is a fresh run-and-exit process, so the name is
+    already computed per run. The scheduler is the long-lived one — see
+    run_scheduler.DailyFileHandler.
+    """
+    # pytest KHÔNG được ghi vào log production. `run_scheduler`/`run_live_day` gắn handler
+    # vào root logger, nên bất kỳ test nào chạy tới đây sẽ đổ log kịch bản vào đúng file mà
+    # người vận hành đọc — ngày 2026-08-10 file chứa vị thế MES không ai giữ, id `stp-xyz`,
+    # `_RecordingMockBroker`, ngày 2024-06-17. Đọc lướt tưởng hệ thống hỏng nặng.
+    #
+    # Lọc lúc đọc chỉ bắt được cái đã thấy. Chặn ở đây là dứt điểm và đúng chỗ: một dòng log
+    # kịch bản không có lý do gì tồn tại trong file production.
+    import os
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return None
+
+    path = Path.cwd() / f"live_day_{_date.today().strftime('%m%d')}.log"
+    fh = logging.FileHandler(path, mode="a", encoding="utf-8")
+    fh.setLevel(logging.INFO)
+    fh.setFormatter(logging.Formatter(
+        "%(asctime)s  %(levelname)-7s  %(name)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    logging.getLogger().addHandler(fh)
+    log.info("Log file: %s", path)
 
 
 def main():
@@ -401,9 +430,10 @@ def main():
                 # lead-in and resume_after_day keeps it out of the replay.
                 sub = df[df.index >= start]
                 datr = daily_atr_series(df)
-                _, want = backtest_swing_tf(sub, labels_, cost_, datr=datr,
-                                            resume_pos=pos, resume_after_day=last_day,
-                                            return_open=True, **kw)
+                _tr_want, want = backtest_swing_tf(
+                    sub, labels_, cost_, datr=datr,
+                    resume_pos=pos, resume_after_day=last_day,
+                    return_open=True, **kw)
                 def _fmt(p):
                     return ("khong vi the" if p is None else
                             f"{p['dir']} entry={p['entry']:.2f} stop={p['stop']:.2f} "
@@ -425,13 +455,47 @@ def main():
                             round(float(p["stop"]), 4),
                             str(pd.Timestamp(p["entry_day"]).date()))
 
-                    _, full = backtest_swing_tf(df, labels_, cost_,
-                                                return_open=True, **kw)
-                    if _ident(full) == _ident(want):
-                        log.info("[shadow] %s: DOI CHIEU KHOP — day du == resume", name)
+                    def _tident(t):
+                        return (str(pd.Timestamp(t["day"]).date()),
+                                str(pd.Timestamp(t["exit_day"]).date()),
+                                t["direction"], round(float(t["pnl"]), 4))
+
+                    _tr_full, full = backtest_swing_tf(df, labels_, cost_,
+                                                       return_open=True, **kw)
+
+                    # Compare the TRADES, not only the open position. Two paths that
+                    # traded entirely differently but both ended flat used to compare
+                    # None == None and log KHOP — the same "a screen of OK hides that
+                    # the seed path was never walked" failure verify_resume was fixed
+                    # for, still live here.
+                    #
+                    # Sliced by exit_day, not entry day: a position open at the
+                    # checkpoint is seeded via resume_pos and emitted with its
+                    # ORIGINAL entry day, which is before last_day. Filtering the full
+                    # side on entry day would drop that trade there but keep it here
+                    # and report a divergence that does not exist.
+                    _a = [_tident(t) for t in _tr_full
+                          if pd.Timestamp(t["exit_day"]) > pd.Timestamp(last_day)]
+                    _b = [_tident(t) for t in _tr_want]
+
+                    if _ident(full) == _ident(want) and _a == _b:
+                        # Say WHAT matched. "KHOP" alone is unfalsifiable: 0 trades and
+                        # no open position on both sides reads identically to a real
+                        # agreement, and that is the case that proves nothing.
+                        log.info("[shadow] %s: DOI CHIEU KHOP — %d lenh + %s (tu %s)",
+                                 name, len(_b), _fmt(want), last_day.date())
                     else:
-                        log.error("[shadow] %s: DOI CHIEU LECH — day du=%s resume=%s",
-                                  name, _fmt(full), _fmt(want))
+                        _first = next((i for i, (x, y) in
+                                       enumerate(zip(_a, _b)) if x != y), None)
+                        if _first is None and len(_a) != len(_b):
+                            _first = min(len(_a), len(_b))
+                        log.error(
+                            "[shadow] %s: DOI CHIEU LECH — vi the: day du=%s resume=%s "
+                            "| lenh: %d vs %d, lech dau tien o #%s: %s vs %s",
+                            name, _fmt(full), _fmt(want), len(_a), len(_b),
+                            _first,
+                            _a[_first] if _first is not None and _first < len(_a) else "(het)",
+                            _b[_first] if _first is not None and _first < len(_b) else "(het)")
 
                 # Which day the checkpoint may move to is decided by advance_day,
                 # against the parquet rather than this spliced frame — see the note
@@ -649,6 +713,10 @@ def main():
         # run_day is given — never the host clock, which is 11 hours ahead and names
         # the previous session for most of the working day.
         today=today,
+        # Gio vu trang stop la RIENG tung sleeve (14:00 ET swing / 01:00 ET NKD), nen
+        # runner can moc THOI GIAN, khong chi ngay. Lay theo ET — may chay di truoc 11
+        # tieng, gio may se goi sai phien trong phan lon ngay lam viec.
+        now=pd.Timestamp.now(tz="America/New_York").tz_localize(None),
     )
 
     # ── run_day(today) ───────────────────────────────────────────────────────
@@ -690,4 +758,5 @@ def main():
 
 
 if __name__ == "__main__":
+    attach_file_log()
     main()

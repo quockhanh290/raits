@@ -61,6 +61,7 @@ import os
 import subprocess
 import sys
 import threading
+from datetime import date as _date
 from pathlib import Path
 
 _CWD = Path(__file__).parents[1]   # d:\raits
@@ -73,7 +74,53 @@ logging.basicConfig(
     format="%(asctime)s  %(levelname)-7s  %(name)s — %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-_LOG_FILE = _CWD / f"scheduler_{__import__('datetime').date.today().strftime('%m%d')}.log"
+_LOG_PREFIX = "scheduler_"
+
+
+class DailyFileHandler(logging.FileHandler):
+    """scheduler_<today>.log, reopened when the calendar day changes.
+
+    The name used to be computed once at import. The scheduler runs for days, so a
+    process started 2026-08-09 kept writing 08-10 into scheduler_0809.log: the NKD
+    night slots and the 09:31 MAX_HOLD exit were all recorded, under a filename that
+    said they belonged to the day before. Nothing was lost, but looking for last
+    night's slots in last night's file found an empty one — and "the log is empty"
+    is indistinguishable from "the window never ran", which is the exact failure the
+    heartbeat exists to catch.
+
+    Rolls on the HOST date, matching the timestamps in the lines themselves. Not the
+    ET session date: a file whose name disagrees with its own contents is the thing
+    being fixed.
+    """
+
+    def __init__(self, directory, prefix: str):
+        self._dir = Path(directory)
+        self._prefix = prefix
+        self._day = _date.today()
+        # delay=True: nothing is created until something is actually logged, so an
+        # import that never logs leaves no file behind.
+        super().__init__(self._path_for(self._day), mode="a",
+                         encoding="utf-8", delay=True)
+
+    def _path_for(self, day) -> str:
+        return str(self._dir / f"{self._prefix}{day.strftime('%m%d')}.log")
+
+    def emit(self, record: logging.LogRecord) -> None:
+        today = _date.today()
+        if today != self._day:
+            self._day = today
+            # Closed by hand rather than self.close(): Handler.close() also drops the
+            # handler from logging's shutdown list, so the last lines of the day would
+            # not be flushed at exit.
+            if self.stream is not None:
+                try:
+                    self.stream.close()
+                finally:
+                    self.stream = None
+            self.baseFilename = self._path_for(today)
+        super().emit(record)
+
+
 class HeartbeatNoiseFilter(logging.Filter):
     """Drop APScheduler's dispatch chatter for the heartbeat job only.
 
@@ -91,16 +138,43 @@ class HeartbeatNoiseFilter(logging.Filter):
         return "Heartbeat 60s" not in record.getMessage()
 
 
-_fh = logging.FileHandler(_LOG_FILE, encoding="utf-8")
-_fh.setLevel(logging.INFO)
-_fh.addFilter(HeartbeatNoiseFilter())
-_fh.setFormatter(logging.Formatter(
-    "%(asctime)s  %(levelname)-7s  %(name)s — %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-))
-logging.getLogger().addHandler(_fh)
 log = logging.getLogger("run_scheduler")
-log.info("Log file: %s", _LOG_FILE)
+
+
+def attach_file_log() -> DailyFileHandler:
+    """Attach the operator's log file. Called from main(), NOT at import.
+
+    It used to run at import, on the ROOT logger. Every process that imported this
+    module therefore redirected the whole application's logging into the operator's
+    alert file — including pytest. The 2026-08-10 full-suite run put 1,215 lines into
+    scheduler_0810.log, among them CRITICAL "position is UNPROTECTED" and "Roll OPEN
+    FAILED ... position is FLAT IN IBKR" from injected-failure fixtures, with not one
+    real scheduler line in the file.
+
+    That is the failure this codebase keeps guarding against from the other side: a
+    log full of fake CRITICALs teaches the operator to skim past the real one.
+    """
+    # pytest KHÔNG được ghi vào log production. `run_scheduler`/`run_live_day` gắn handler
+    # vào root logger, nên bất kỳ test nào chạy tới đây sẽ đổ log kịch bản vào đúng file mà
+    # người vận hành đọc — ngày 2026-08-10 file chứa vị thế MES không ai giữ, id `stp-xyz`,
+    # `_RecordingMockBroker`, ngày 2024-06-17. Đọc lướt tưởng hệ thống hỏng nặng.
+    #
+    # Lọc lúc đọc chỉ bắt được cái đã thấy. Chặn ở đây là dứt điểm và đúng chỗ: một dòng log
+    # kịch bản không có lý do gì tồn tại trong file production.
+    import os
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return None
+
+    fh = DailyFileHandler(_CWD, _LOG_PREFIX)
+    fh.setLevel(logging.INFO)
+    fh.addFilter(HeartbeatNoiseFilter())
+    fh.setFormatter(logging.Formatter(
+        "%(asctime)s  %(levelname)-7s  %(name)s — %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    logging.getLogger().addHandler(fh)
+    log.info("Log file: %s (rolls at midnight)", fh.baseFilename)
+    return fh
 
 # Pre-flight state: keyed by date string (e.g. "2026-07-14").
 # Set True only when BOTH update_ibkr_daily AND update_spy_csv succeed.
@@ -276,6 +350,25 @@ def _run(args: list[str], label: str, dry_run: bool) -> bool:
     result = subprocess.run(args, cwd=str(_CWD), capture_output=True,
                             text=True, errors="replace")
     if result.returncode == 0:
+        # Mã thoát 0 KHÔNG có nghĩa là không có gì hỏng. 2026-08-10: MAX_HOLD đóng MYM
+        # thành công (nên thoát 0) nhưng `cancel_order(12)` thất bại, và runner đã kêu
+        # CRITICAL "STP ORPHAN ... will open an unintended position when it fires".
+        # Dòng đó nằm trong output của tiến trình con, bị bắt ở đây rồi vứt đi vì
+        # returncode == 0. Lệnh BUY STP mồ côi treo trên sàn suốt buổi và không log nào
+        # nhắc tới nó — phát hiện được chỉ vì có người đi hỏi thẳng IBKR.
+        #
+        # Lọc theo mức độ, không theo mã thoát: một tiến trình con đã kêu CRITICAL/ERROR
+        # thì không bao giờ được im lặng, dù nó kết thúc "thành công". Chỉ lấy các dòng đó
+        # nên không làm ngập log — các child in rất nhiều khi chạy trơn.
+        _loud = [ln for stream in (result.stdout, result.stderr)
+                 for ln in (stream or "").splitlines()
+                 if "CRITICAL" in ln or "ERROR" in ln]
+        if _loud:
+            log.error("[%s] thoat OK nhung da ghi %d dong CRITICAL/ERROR — KHONG bo qua:",
+                      label, len(_loud))
+            for ln in _loud[-_FAIL_TAIL_LINES:]:
+                log.error("[%s] %s", label, ln.strip())
+            return True
         log.info("[%s] completed OK", label)
         return True
 
@@ -368,12 +461,33 @@ def make_scheduler(port: int, dry_run: bool,
     # Sửa bằng cách thêm `_mark_held_unchanged` cho stress là SAI: khi đó không gì
     # đóng vị thế nữa và nó qua đêm. Stress cần một luật thoát tường minh, không phải
     # nhánh dự phòng của diff.
-    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=10, minute=20,
-                         id="stress_mid", name="STRESS_MID entry 10:20 ET",
-                         misfire_grace_time=SLOT_MISFIRE_GRACE_SECS)
-    def job_stress_mid():
-        _live_day_body("STRESS_MID_1020", clusters="stress",
-                       prev_preflight=True, stress_entry=True)
+    # 🔴 TAT — KHONG dang ky job nay. Xem docs/futures/OPERATIONS.md muc "STRESS_MID:
+    # tai sao cron 10:20 bi tat".
+    #
+    # STRESS_MID dung DUNG BON MA cua Ro 4 va LUON SHORT. Tang broker khong phan biet
+    # duoc hai vi the cung ma khac cluster:
+    #
+    #   1. BU TRU RONG. get_positions() tra vi the RONG co dau cho moi hop dong. MES
+    #      swing LONG 1 + MES stress SHORT 1 => IBKR bao net 0. File co hai vi the,
+    #      broker khong co dong nao -> B3 MISMATCH -> HALT toan bo entry.
+    #      `held_stress` chi chan khi da co vi the STRESS cung ma, khong chan khi co
+    #      vi the SWING.
+    #
+    #   2. STOP KHONG PHAN BIET DUOC VI THE. Cung chieu thi khong bu tru, nhung
+    #      has_working_stop(inst) khoa theo SYMBOL: stress dat stop truoc => B4 tu choi
+    #      dat stop cho swing ("tranh xep chong"), va unprotected_positions() thay co
+    #      stop tren expiry do nen bao AN TOAN. Mot hop dong tran vinh vien, im lang.
+    #
+    # Bat lai chi sau khi tang theo doi stop khoa theo VI THE thay vi theo MA, va sau
+    # khi quyet duoc chuyen bu tru rong. Co --stress-entry cua run_live_day van con,
+    # de chay tay khi kiem thu.
+    if False:   # noqa: SIM108 — giu code de bat lai, xem ghi chu tren
+        @sched.scheduled_job("cron", day_of_week="mon-fri", hour=10, minute=20,
+                             id="stress_mid", name="STRESS_MID entry 10:20 ET",
+                             misfire_grace_time=SLOT_MISFIRE_GRACE_SECS)
+        def job_stress_mid():
+            _live_day_body("STRESS_MID_1020", clusters="stress",
+                           prev_preflight=True, stress_entry=True)
 
     # ── 13:45 ET Mon-Fri: pre-flight (update parquet + spy CSV) ─────────────
     # Runs BEFORE 14:05 run_live_day. Typical duration: ~20s for 5 instruments.
@@ -569,6 +683,54 @@ def make_scheduler(port: int, dry_run: bool,
             misfire_grace_time=SLOT_MISFIRE_GRACE_SECS,
         )
 
+    # ── Quét sửa stop trong ba khoảng trống ──────────────────────────────────
+    # Lịch slot ở trên được dựng cho việc VÀO LỆNH: 14:00-15:55 ET (Rổ 4), 14:00-15:55 JST
+    # (NKD, = 01:10-02:55 ET), cộng 09:31 cho MAX_HOLD. Việc SỬA CHỮA stop chỉ đi ké chúng,
+    # nên nó thừa hưởng ba khoảng trống mà không ai chọn:
+    #
+    #     15:55 -> 01:10   9h15   <- tệ nhất, và đúng cái đêm stop sinh ra để bảo vệ
+    #     02:55 -> 09:31   6h36
+    #     09:31 -> 14:05   4h34
+    #
+    # run_stop_repair dựng runner với signal_fn rỗng: không entry, không exit, chỉ B1-B5.
+    # `_stop_deferred` vẫn chặn, nên một lần chạy lúc 20:00 ET KHÔNG vũ trang sớm vị thế
+    # Rổ 4 mở cùng ngày — job này chỉ chạm vế sửa chữa của B4.
+    #
+    # Chỉ đặt trong ba khoảng trống, không chen vào cửa sổ vào lệnh: mỗi lần chạy là thêm
+    # một lượt B3, tức thêm cơ hội halt entry vì mismatch giả. Ngoài cửa sổ thì halt không
+    # tốn gì (`_b3_halt_entries` không ghi xuống đĩa và mỗi lần chạy là tiến trình riêng).
+    # Cứ ~2 tiếng một lượt, ở phút :20 — BỎ QUA lượt nào rơi vào cửa sổ vào lệnh.
+    #
+    # Trong hai cửa sổ đó (01:00-02:55 và 14:00-15:55 ET) đã có slot chạy mỗi 5 phút, mà
+    # mỗi slot đều dựng runner nên B4/B5 vẫn chạy — thêm một lượt quét vào giữa chỉ là một
+    # lượt B3 thừa, tức một cơ hội thừa dính mismatch giả và halt entry đúng lúc cửa sổ
+    # đang làm việc của nó.
+    #
+    # Bỏ 02:20 và 14:20 để lại hai khoảng 4 tiếng trên giấy, nhưng khoảng thật sự không ai
+    # nhìn thì ngắn hơn nhiều vì cửa sổ nằm giữa chúng:
+    #     00:20 -> 01:10 (50p)  ·  02:55 -> 04:20 (1h25)
+    #     12:20 -> 14:05 (1h45) ·  15:55 -> 16:20 (25p)
+    #
+    # Trước đó tôi để 19 lượt mỗi tiếng (lấy "lấp kín khoảng trống" làm mục tiêu thay vì
+    # "giảm thời gian không ai nhìn"), rồi cắt xuống 3. Cả hai đều là lập luận suông. Mốc
+    # 2 tiếng là do người vận hành chốt.
+    _ENTRY_WINDOWS = [((1, 0), (2, 55)), ((14, 0), (15, 55))]
+    _REPAIR_SLOTS = [
+        (h, 20) for h in range(0, 24, 2)
+        if not any(lo <= (h, 20) <= hi for lo, hi in _ENTRY_WINDOWS)
+    ]
+    for _h, _m in _REPAIR_SLOTS:
+        sched.add_job(
+            lambda lbl=f"STOP_REPAIR_{_h:02d}{_m:02d}": _run(
+                [sys.executable, "-m", "global_index.run_stop_repair",
+                 "--positions-path", "live_positions.json", "--port", str(port)],
+                label=lbl, dry_run=dry_run),
+            "cron", day_of_week="mon-fri", hour=_h, minute=_m,
+            id=f"stop_repair_{_h:02d}{_m:02d}",
+            name=f"Stop repair sweep {_h:02d}:{_m:02d} ET",
+            misfire_grace_time=SLOT_MISFIRE_GRACE_SECS,
+        )
+
     # ── 01:10–02:55 ET Mon-Fri: NKD night slots ──────────────────────────────
     # NKD's entry window is between_time("14:00","15:55") on its session clock,
     # and specs.MNKD.session_tz is Asia/Tokyo → 14:00-15:55 JST = 01:00-02:55 ET.
@@ -584,16 +746,89 @@ def make_scheduler(port: int, dry_run: bool,
     # The 14:05-15:55 slots keep NKD active so its exits still run during the day.
     _NKD_SLOTS = ([(1, m) for m in range(10, 60, 5)] +    # 01:10 → 01:55
                   [(2, m) for m in range(0,  60, 5)])      # 02:00 → 02:55
+
+    # The last night slot also runs --shadow-verify, for the same reason the day's
+    # 15:55 slot does: by then NKD's entry window is closed, so the ~5 min full
+    # replay cannot cost an entry.
+    #
+    # Without this the night path was never compared at all. MNKD *is* verified on
+    # the 15:55 ET slot, but that is a different frame — the night run passes
+    # --clusters nkd and splices live bars through _splice_nkd_live, and it is the
+    # night run that actually places NKD orders. verify_resume covers MNKD 14/14
+    # offline, so the engine's resume is settled; what was untested is resume on
+    # the night slot's live-spliced frame.
+    _NKD_LAST = _NKD_SLOTS[-1]
     for _h, _m in _NKD_SLOTS:
         _slot_id = f"NKD_NIGHT_{_h:02d}{_m:02d}"
         sched.add_job(
-            lambda sid=_slot_id: _live_day_body(sid, clusters="nkd",
-                                                prev_preflight=True),
+            lambda sid=_slot_id, v=((_h, _m) == _NKD_LAST): _live_day_body(
+                sid, clusters="nkd", prev_preflight=True, verify=v),
             "cron", day_of_week="mon-fri", hour=_h, minute=_m,
             id=_slot_id.lower(),
             name=f"NKD night run {_h:02d}:{_m:02d} ET",
             misfire_grace_time=SLOT_MISFIRE_GRACE_SECS,
         )
+
+    # ── Báo cáo phiên: chạy KHI VIỆC CUỐI CÙNG TRONG NGÀY XONG ───────────────
+    # Không hẹn giờ cố định. Bản đầu tôi đặt cron 16:00, rồi 23:50 — cả hai đều là ĐOÁN:
+    # 16:00 bỏ trắng 8 việc chạy sau đó (tới 23:20), còn 23:50 vẫn ra trước nếu lượt quét
+    # 23:20 chạy quá 30 phút. Báo cáo đọc log theo NGÀY LỊCH, nên phần bị bỏ sót không bao
+    # giờ được bản hôm sau phủ — nó chỉ đọc dòng mang ngày hôm sau.
+    #
+    # APScheduler không có sự kiện "đã chạy hết", nhưng nó có sự kiện "một việc vừa xong".
+    # Nên: xác định việc có giờ muộn nhất trong ngày, rồi bám vào sự kiện của chính nó.
+    # Việc cuối là gì thì TÍNH RA từ lịch, không viết cứng — thêm một việc muộn hơn thì
+    # báo cáo tự dời theo, không phải nhớ sửa ở hai chỗ.
+    #
+    # Nghe cả EXECUTED lẫn ERROR: một việc cuối bị lỗi thì càng cần báo cáo, không phải
+    # càng ít.
+    _fixed = []
+    for _j in sched.get_jobs():
+        if _j.id == "heartbeat":
+            continue
+        _f = {str(x.name): str(x) for x in _j.trigger.fields}
+        try:
+            _fixed.append((int(_f["hour"]), int(_f["minute"]), _j.id))
+        except (KeyError, ValueError):
+            continue
+    _LAST_JOB_ID = sorted(_fixed)[-1][2] if _fixed else None
+    _report_done: dict = {}
+
+    def _emit_report(why: str) -> None:
+        _d = _et_today().isoformat()
+        if _report_done.get(_d):
+            return
+        _report_done[_d] = True
+        log.info("[SESSION_REPORT] dung %s — viec cuoi cung trong ngay da xong", why)
+        _run([sys.executable, "-m", "global_index.session_report",
+              "--out", f"bao_cao_{_et_today().strftime('%m%d')}.txt"],
+             label="SESSION_REPORT", dry_run=dry_run)
+
+    if _LAST_JOB_ID:
+        from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
+
+        def _on_job_done(event) -> None:
+            if event.job_id == _LAST_JOB_ID:
+                _emit_report(_LAST_JOB_ID)
+
+        sched.add_listener(_on_job_done, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
+        log.info("Bao cao phien se chay ngay sau viec cuoi cung trong ngay: %s",
+                 _LAST_JOB_ID)
+
+        # Lưới an toàn. Nếu việc cuối KHÔNG chạy — scheduler lên sau giờ của nó, hoặc nó
+        # bị lỡ — thì sự kiện không bao giờ tới và ngày đó không có báo cáo nào. Đúng loại
+        # im lặng mà báo cáo sinh ra để chống, nên nó không được tự dính vào.
+        # Cron này chỉ chạy khi cờ trong ngày chưa được đặt, tức chỉ khi đường chính hỏng.
+        @sched.scheduled_job("cron", day_of_week="mon-fri", hour=23, minute=55,
+                             id="session_report_fallback",
+                             name="Bao cao phien (luoi an toan 23:55 ET)",
+                             misfire_grace_time=SLOT_MISFIRE_GRACE_SECS)
+        def job_report_fallback():
+            if _report_done.get(_et_today().isoformat()):
+                return
+            log.warning("[SESSION_REPORT] viec cuoi (%s) khong chay — dung luoi an toan",
+                        _LAST_JOB_ID)
+            _emit_report("luoi an toan 23:55")
 
     return sched
 
@@ -667,6 +902,7 @@ def main():
     ap.add_argument("--assume-preflight-ok", action="store_true",
                     help="Mark today's pre-flight as passed on startup (use after manual update_ibkr_daily + update_spy_csv)")
     a = ap.parse_args()
+    attach_file_log()
 
     if not a.polygon_api_key:
         try:

@@ -34,6 +34,17 @@ from global_index.run_scheduler import make_scheduler
 # preflight chỉ cập nhật parquet + spy csv; heartbeat chỉ ghi log.
 _HARMLESS = {"heartbeat", "maxhold_exit", "preflight"}
 
+# Các job quét sửa stop (run_stop_repair) cũng vô hại với bất biến này, và lý do phải nêu
+# rõ vì chúng nằm ĐÚNG trong khoảng 10:20-14:05: run_stop_repair dựng runner với
+# `signal_fn=lambda d, b, h: ([], [])` và KHÔNG gọi `run_day`. `diff_desired_vs_held` chỉ
+# chạy bên trong `run_day`, nên không có đường nào để nó thấy khoá stress vắng trong
+# `desired` và đóng vị thế. Toàn bộ tác dụng của job là B1-B5 trong `__init__`.
+#
+# Nếu ai đó cho run_stop_repair gọi run_day, dòng miễn trừ này thành sai và bất biến mất
+# tác dụng — nên nó được kiểm riêng ở test_stop_repair_slots.py.
+def _harmless(job_id: str) -> bool:
+    return job_id in _HARMLESS or job_id.startswith("stop_repair")
+
 STRESS_H, STRESS_M = 10, 20
 AFTERNOON_H, AFTERNOON_M = 14, 5
 
@@ -55,10 +66,28 @@ def _hhmm(job):
         return None
 
 
-def test_the_stress_slot_exists_at_1020_et():
-    j = [x for x in _jobs() if x.id == "stress_mid"]
-    assert j, "khong tim thay job stress_mid"
-    assert _hhmm(j[0]) == (STRESS_H, STRESS_M)
+def test_the_stress_slot_is_disabled():
+    """Cron 10:20 DA TAT (2026-08-10) — xem run_scheduler, khoi `if False`.
+
+    Ly do khong phai lich chay ma la TANG BROKER: STRESS_MID dung dung bon ma cua Ro 4
+    va LUON SHORT, trong khi get_positions() tra vi the RONG. MES swing LONG + MES
+    stress SHORT => IBKR bao net 0 => B3 MISMATCH => halt. Va cung chieu thi
+    has_working_stop(inst) khoa theo symbol nen vi the thu hai khong bao gio duoc dat
+    stop, con unprotected_positions() lai bao an toan.
+
+    Test nay giu cho cron khong bi bat lai truoc khi tang do duoc sua."""
+    assert not [x for x in _jobs() if x.id == "stress_mid"], (
+        "cron stress_mid da duoc bat lai — tang theo doi stop van khoa theo MA, "
+        "chua theo VI THE. Xem OPERATIONS.md muc 'STRESS_MID: tai sao cron 10:20 bi tat'")
+
+
+def test_the_invariant_still_holds_for_when_stress_returns():
+    """Bat bien 10:20-14:05 van con gia tri: no la dieu kien de sleeve giu ~91% luat
+    da kiem dinh khi duoc bat lai."""
+    offenders = [(j.id, _hhmm(j)) for j in _jobs()
+                 if not _harmless(j.id) and _hhmm(j) is not None
+                 and (STRESS_H, STRESS_M) < _hhmm(j) < (AFTERNOON_H, AFTERNOON_M)]
+    assert not offenders, offenders
 
 
 def test_nothing_calls_run_live_day_between_1020_and_1405():
@@ -66,7 +95,7 @@ def test_nothing_calls_run_live_day_between_1020_and_1405():
     và kéo sleeve từ +$12.850 xuống −$450 mà không phát ra tín hiệu nào."""
     offenders = []
     for job in _jobs():
-        if job.id in _HARMLESS or job.id == "stress_mid":
+        if _harmless(job.id) or job.id == "stress_mid":
             continue
         hm = _hhmm(job)
         if hm is None:
