@@ -2588,6 +2588,26 @@ chưa bao giờ được đi qua.
 `run_live_day` **chậm hơn** 5.5→8-10 phút, mỗi 3 slot bỏ 2. Chưa có lợi ích tốc độ nào cho
 tới khi quan sát sạch rồi mới tắt đường cũ. Đừng deploy sát giờ phiên.
 
+#### Đối chiếu song song: phiên đêm NKD bị bỏ sót (2026-08-10) — ĐÃ SỬA
+Cờ bật đối chiếu là `--shadow-verify`, và scheduler chỉ truyền nó ở slot cuối ngày
+(`_verify = ((_h, _m) == _LAST_SLOT)` → 15:55 ET). 22 slot đêm gọi
+`_live_day_body(sid, clusters="nkd", prev_preflight=True)` — `verify` để mặc định `False`.
+
+Log 08-03→08-10 có **đúng 6 dòng đối chiếu, 6 KHỚP, 0 LỆCH**, tất cả trong ngày 08-07;
+MNKD có mặt 2 dòng. Mọi slot đêm chỉ in kết quả resume, không có gì đứng cạnh để so.
+
+MNKD *có* được so ở 15:55 ET, nhưng đó là **khung khác**: slot đêm chạy `--clusters nkd`
+và ghép bar live qua `_splice_nkd_live`, và chính slot đêm mới đặt lệnh NKD.
+`verify_resume` phủ MNKD 14/14 offline → resume ở tầng engine đã chắc; cái chưa kiểm
+hẹp hơn: resume trên **khung đêm đã splice bar live**.
+
+Sửa: slot NKD cuối (02:55 ET) truyền `verify=True`, đúng lập luận đã viết cho slot cuối
+ngày — cửa sổ vào lệnh NKD đã đóng nên 5 phút replay không cướp fill nào.
+`global_index/test_scheduler_shadow_verify.py` 6 test; sv1/sv2/sv3 đã **chứng minh đỏ**
+trên code cũ trước khi khôi phục bản sửa. Test đọc **câu lệnh dựng ra**, không đọc source
+text — lỗi nằm ở đường nối giữa `add_job` và câu lệnh, đúng chỗ mà kiểm source sẽ đọc lướt qua.
+Không đụng `runner.py`/engine → không kích hoạt gate reconcile (L12).
+
 ### Bước 6 ⏳ Bộ reconcile sau Bước 4
 deploy_sim $42,459/1.72 · smoke diff $0.00 · 4 reconcile · pytest 208 · injection 14 · refreeze 68
 (Ba lần chạy sau Bước 1/2/3 đều cho **cùng một bộ số**, không chỉ "pass".)
@@ -3101,7 +3121,14 @@ global_index/test_stop_placement_time.py
 
 # ⏰ THỨ HAI 2026-08-10 — ba việc, theo thứ tự giờ
 
-## 09:31 ET — mốc MAX_HOLD đầu tiên mà catch-up phải đỡ
+## 09:31 ET — mốc MAX_HOLD đầu tiên mà catch-up phải đỡ — **XONG, có phát hiện**
+> MYM đã đóng · `maxhold_state` ghi `2026-08-10: true` · catch-up kiểm rồi bỏ qua (đúng).
+> NHƯNG `cancel_order('12')` thất bại IM LẶNG → STP mồ côi treo tới ~10:30 ET; phát hiện
+> bằng cách hỏi thẳng IBKR (sổ/state/log đều sạch), huỷ được sau khi nối lại đúng clientId
+> 81 (`code=202`). Gốc: `run_live_day` đặt bằng id 1 còn `run_maxhold_exit` huỷ bằng id 2 —
+> **mọi lần MAX_HOLD đóng vị thế đều để lại STP mồ côi**. Đã vá (cả hai về id 1); vì mỗi job
+> là subprocess nên bản vá CÓ HIỆU LỰC NGAY, không cần khởi động lại scheduler.
+
 MYM SHORT vào **05/8** → thứ Hai tròn 5 ngày. Đây là lần đầu bản vá `91dbc0e` gặp
 tình huống thật.
 
@@ -3110,7 +3137,19 @@ tình huống thật.
 - Xác nhận MYM đã đóng. Nếu chưa, chạy tay:
   `python -m global_index.run_maxhold_exit --positions-path live_positions.json --port 4002`
 
-## ~10:00 ET — bài tập rollover thật (`abeec34`)
+## ~10:00 ET — bài tập rollover thật (`abeec34`) — **HOÃN SANG THỨ BA 11/08**
+> Chốt 10/08 lúc ~11:00 ET: hoãn để giảm số biến động trong một ngày đã thay đổi nhiều.
+> Roll THẬT là 2026-09-11, còn một tháng — không gấp. Nhưng phải làm TRƯỚC ngày đó, và
+> tốt nhất trước khi ba bản vá `_roll_stop` (ghi mức trước khi đặt · tôn trọng cửa sổ hoãn ·
+> tách hàm) phải chạy thật lần đầu vào đúng ngày roll.
+>
+> Việc này đằng nào cũng đòi dừng scheduler, nên gộp luôn lần khởi động lại để nạp: 10 lượt
+> quét (thay 19), listener báo cáo cuối ngày.
+>
+> Phạm vi nó KHÔNG phủ: script chạy một tiến trình một clientId (61), vừa đặt vừa huỷ trong
+> cùng kết nối, nên không phát hiện được lỗi clientId chéo tiến trình. Với rollover thì không
+> sao — C2 chạy trong `run_live_day`, cũng cùng clientId 1.
+
 Mắt xích **duy nhất** của rollover chưa chạm IBKR thật: trình tự đóng-mở-huỷ-đặt.
 
 ```powershell
@@ -3146,7 +3185,153 @@ Slot cuối chạy `--shadow-verify`. Tìm trong `live_day_0810.log`:
 - [ ] `G2 HARD` báo mỗi lần chạy, hệ thống vẫn giao dịch — guard vô hiệu trên thực tế
 - [ ] `run_scheduler.py` gắn FileHandler vào root logger lúc import → output pytest lẫn
       vào log scheduler production
-- [ ] Chuyển đường giao dịch sang resume sau vài phiên `DOI CHIEU KHOP` — **đây mới là
-      lúc có lợi ích tốc độ** (run_day 5m03 → dưới 1 phút, hết bỏ slot)
+- [ ] Chuyển đường giao dịch sang resume — **đây mới là lúc có lợi ích tốc độ**
+      (run_day 5m03 → dưới 1 phút, hết bỏ slot).
+      Điều kiện: **5 phiên LIÊN TIẾP đủ 5 mã KHỚP, không mã nào LỆCH**. Ngưỡng 5 là phán
+      đoán chứ không phải kết quả đo — đổi bằng `--resume-streak`.
+      **Tiến độ hiện tại: 1/5** (07/08 đủ 5 mã). `session_report` có mục riêng theo dõi,
+      tự đếm từ log mọi ngày, nên không phải nhớ.
+      Lưu ý: một phiên **thiếu mã** không tính là đạt — 07/08 slot 15:55 chỉ sinh dòng cho
+      MNKD; bốn mã kia không phải "khớp ngầm" mà là chưa được hỏi. Một mã LỆCH đưa chuỗi
+      **về 0**, không phải trừ một.
 - [ ] `futures/swing_tf_harness.py` + bản copy ở root vẫn còn lỗi khoá `id(df)`
 - [ ] Đo chi phí thật của việc thoát MAX_HOLD muộn 4h40 (đã xếp ưu tiên mà chưa đo)
+
+---
+## Sub-task: STRESS_MID cron TẮT — stop khoá theo MÃ thay vì theo VỊ THẾ (2026-08-10)
+Status: BLOCKED (đã tắt cron, chờ sửa tầng theo dõi)
+
+### Completed
+- [x] Tắt cron `stress_mid` 10:20 ET (`run_scheduler.py`, khối `if False` + chú thích lý do)
+- [x] `test_stress_slot_invariant.py` đảo chiều: khẳng định cron ĐANG TẮT, giữ bất biến
+      10:20–14:05 cho lúc bật lại (5 test pass)
+- [x] Truy hết tầng: B3 `file_key` **có cộng dồn** (đúng, cùng chiều OK); `has_working_stop`,
+      `get_working_stops`, `unprotected_positions` đều khoá theo **mã**, không theo vị thế
+- [x] `cancel_order(p.stop_order_id)`, rollover, `exit_keys` — theo vị thế, KHÔNG hỏng
+- [x] Ghi `docs/futures/OPERATIONS.md` mục "STRESS_MID: tại sao cron 10:20 bị TẮT" + SCRATCHPAD
+
+### Hai lỗi đã ghi nhận
+1. **Bù trừ ròng.** `get_positions()`/`ib.positions()` trả vị thế ròng có dấu. Swing LONG +
+   stress SHORT cùng mã → net 0 → B3 MISMATCH → halt entry, và `unprotected_positions()`
+   bỏ qua cả hai (`if not p.position: continue`) nên phép kiểm bảo vệ không thấy chúng.
+   `held_stress` chỉ chặn vị thế STRESS thứ hai, không chặn vị thế SWING cùng mã.
+2. **Stop không phân biệt được vị thế.** Cùng chiều thì không bù trừ, nhưng
+   `has_working_stop(inst)` khoá theo symbol → B4 từ chối đặt stop cho vị thế thứ hai; và
+   `unprotected_positions()` kiểm `if exp in have` (sự tồn tại, không phải số lượng) nên
+   báo an toàn. Một hợp đồng trần vĩnh viễn, không guard nào kêu.
+
+3. **`repair_stops.py` ghi id sai vào sổ.** `by_inst = {p["inst"]: p}` (dòng 150) — một vị
+   thế đè cái kia; `p["stop_order_id"] = new_ids[p["inst"]]` (dòng 113–114) — đóng cùng một
+   order id lên mọi vị thế của mã đó. Nặng hơn hai lỗi trên: nó làm hỏng DỮ LIỆU mà tầng
+   đang chạy đúng (`cancel_order(p.stop_order_id)`) dựa vào — đóng vị thế A sẽ huỷ stop của
+   vị thế B.
+
+### Đã sửa (2026-08-10) — câu hỏi "có stop cho MÃ này" → "VỊ THẾ này có được phủ"
+- [x] `check_open_orders.classify`: mỗi STP được **một** vị thế nhận (bỏ `matching[0]`);
+      thêm `Stop` NamedTuple mang `qty`; thêm verdict `PARTIAL` (phủ thiếu, KHÔNG tự vá);
+      stop thừa đúng chiều giờ hiện ra là HAZARD; stop của vị thế ngược chiều cùng mã
+      KHÔNG còn bị báo HAZARD nhầm
+- [x] `repair_stops`: bỏ hẳn `by_inst`; `classify` trả luôn vị thế nó xét; `_key` =
+      `(inst, cluster)`; `id_corrections` + `_write_positions` ghi id theo từng vị thế
+- [x] `unprotected_positions`: cộng **số hợp đồng** theo `(mã, expiry, bên)` rồi so với vị
+      thế — thay cho `if exp in have`; và giờ mới xét BÊN (trước đây SELL stop được tính là
+      bảo vệ cho SHORT)
+- [x] `has_working_stop(inst, direction=None, contracts=None)` — dạng cũ giữ nguyên nghĩa,
+      dạng mới đếm độ phủ đúng bên; B4 gọi dạng mới
+- [x] `get_working_stops` → `{inst: [orderId,…]}` (trước đây ghi đè, nhớ mỗi một id);
+      B4 + B5 hỏi *"id vị thế này ghi nhận còn sống không"* thay vì `p.inst in working`
+- [x] `PROTECTIVE_SIDE` chuyển về `ibkr_broker` làm nguồn duy nhất, CLI import lại
+- [x] B5: chỉ tắt cảnh báo khi **mọi** vị thế trên mã đó đang hoãn (trước: một vị thế hoãn
+      làm câm cảnh báo cho vị thế khác cùng mã đã thật sự mất stop)
+- [x] B4: tách `STP ID DRIFT` (WARNING, đã được phủ nhưng id trong sổ trỏ vào lệnh chết)
+      khỏi `B4 NAKED` (CRITICAL) — phép kiểm cũ im lặng ở ca này, còn phép kiểm mới nếu
+      không tách sẽ hô NAKED vào vị thế đang được bảo vệ, mỗi slot một lần
+- [x] Test: `test_stop_per_position.py` (13 mới), `test_unprotected_positions.py` (+5 ca
+      bên/độ phủ), `test_stp.py`/`test_stp_accept.py`/`test_deferred_verdict.py` cập nhật
+
+### 🔴 SỰ CỐ ĐANG MỞ (2026-08-10): STP mồ côi #12 trên MYM
+Status: CẦN NGƯỜI XỬ LÝ
+
+- MAX_HOLD 09:31 đóng MYM xong nhưng `cancel_order('12')` THẤT BẠI. Xác nhận bằng truy vấn
+  IBKR: `get_working_stops()` → `{'MYM': ['12']}`, `get_positions()` → chỉ MNKD.
+- BUY STP treo ~54708.68 không có vị thế phía sau → chạm giá sẽ MỞ một lệnh LONG.
+- Cảnh báo runner đã kêu nhưng `_run` nuốt vì `returncode == 0`. ĐÃ VÁ (`_run` giờ ghi ra
+  dòng CRITICAL/ERROR kể cả khi thoát 0; `test_run_echoes_critical.py`, 6 test).
+- [x] **ĐÃ HUỶ #12** bằng `repair_stops --client-id 81 --execute` → `code=202 Order Canceled`
+- [x] **NGUYÊN NHÂN GỐC — lỗi hệ thống**: IBKR chỉ nhận huỷ từ clientId đã đặt lệnh, nhưng
+      `run_live_day` đặt bằng id 1 còn `run_maxhold_exit` huỷ bằng id 2 và `repair_stops`
+      bằng 86 ⇒ **mọi lần MAX_HOLD đóng vị thế đều để lại STP mồ côi** (15% số lệnh), và cả
+      đường huỷ của `repair_stops` chưa bao giờ chạy được. Đã đưa maxhold + stop_repair về
+      id 1; `repair_stops` in ra lệnh chạy lại kèm id chủ. `test_stop_client_id.py` (5)
+- [x] `repair_stops` VERIFY không còn đếm DEFERRED là gap
+- [ ] (cũ) HUỶ #12: dừng scheduler → `python -X utf8 global_index/repair_stops.py` (xem báo
+      cáo ORPHAN) → thêm `--execute` → khởi động lại scheduler (lần khởi động này cũng làm
+      cron STRESS_MID tắt thật và nạp 19 slot quét-sửa)
+
+### Khung thời gian đặt stop — ĐÃ XÁC NHẬN LÀ CHỦ ĐÍCH (2026-08-10)
+- [x] Ghi `docs/futures/OPERATIONS.md` mục "Khung thời gian đặt lệnh — CÓ CHỦ ĐÍCH":
+      cả Rổ 4 và NKD đều vũ trang stop 14h sau khi sang ngày mới, đo trên đồng hồ phiên của
+      chính sleeve (14:05 ET / 01:10 ET); khai bằng múi giờ nên DST không làm trôi
+- [x] Giải thích vì sao B4 không lọc cluster là ĐÚNG: nó gộp hai việc — vũ trang lần đầu
+      (theo sleeve, `_stop_deferred` quyết định) và sửa chữa vị thế mất stop (không theo
+      sleeve). Lọc theo cluster giết vế hai; bỏ `_stop_deferred` giết vế một
+- [x] XÁC NHẬN bằng vị từ thật trên đúng lịch slot — và câu hỏi ban đầu chỉ đúng MỘT NỬA:
+      vị thế MỚI thì 01:10 chỉ NKD / 14:05 chỉ Rổ 4; vị thế CŨ thì slot nào cũng chạm cả hai
+      (đường sửa chữa). `B4 REPLACED` lúc 1h sáng cho Rổ 4 = guard làm việc, không phải rò
+- [x] `test_slot_arms_which_sleeve.py` (8 mới, kèm ca DST) + memory `project_stop_arm_design`
+
+### Lượt soi lại stop (2026-08-10) — 3 lỗ hổng nữa, ở rollover
+- [x] C2 ghi mức stop chỉ khi lệnh được nhận → bị từ chối thì mức hợp đồng CŨ ở lại sổ, B4
+      đặt mức đó lên thang giá hợp đồng MỚI phiên sau. Sửa: ghi mức TRƯỚC khi đặt
+- [x] C2 vũ trang stop sớm — đặt ngay bất kể cửa sổ hoãn. Roll không dời `entry_day` nên
+      cửa sổ không đổi. Sửa: C2 tôn trọng `_stop_deferred`
+- [x] `classify` có thể nhận nhầm stop của hợp đồng đã chết khi C2 huỷ hụt (hai STP cùng
+      chiều khác expiry). Sửa: nhận `stop_order_id` mình ghi TRƯỚC, và chỉ khi đúng chiều
+- [x] Tách `_roll_stop` khỏi `_handle_rollover` để test gọi được code thật — bản test đầu
+      chép lại logic vào helper rồi assert lên nó
+- [x] `test_stop_rollover_gaps.py` (9 mới); `test_rollover_stop.py` (9 cũ) vẫn xanh
+- [x] VÁ `has_working_stop` mù expiry: B4 hỏi thêm `unprotected_positions()`, bất đồng thì
+      bên khớp `(mã, expiry, bên)` thắng; `None` thì KHÔNG ghi đè (test_b4_8/9/10)
+- [x] VÁ khoảng trống sửa chữa: `run_stop_repair.py` + 19 slot ở ba lỗ (15:55→01:10 9h15,
+      02:55→09:31 6h36, 09:31→14:05 4h34). signal_fn rỗng, không gọi run_day/run_maxhold_exit;
+      `_stop_deferred` vẫn chặn nên không vũ trang sớm. `test_stop_repair_slots.py` (9)
+- [x] BẰNG CHỨNG THẬT ĐẦU TIÊN: `run_stop_repair --dry-run` (chỉ đọc) chạy
+      `unprotected_positions()` bản mới trên IBKR thật → "TRẦN: MNKD x+1 hợp đồng 20260910
+      (phủ 0)" đúng như cửa sổ hoãn quy định; MYM vắng mặt ⇒ stop #12 phủ đúng hợp đồng/bên/số
+
+
+### RÚT LẠI — luật một-vị-thế-mỗi-mã (không khớp thiết kế)
+Tôi đã siết `signal_layer` + `verify_runner_real` thành "một vị thế mỗi mã trên mọi cluster"
+để chặn bù trừ ròng, rồi **hoàn nguyên cả hai**. `deploy_sim.py:180-218` chạy
+`StressMidEngine().backtest_basket()` ĐỘC LẬP với swing rồi nối hai danh sách lệnh — sim đã
+kiểm định CHO PHÉP stress nằm cùng mã với swing. Siết luật đó = live chạy luật backtest chưa
+kiểm (đúng hình dạng đã mất $53k ở chuyện stop), và phá `verify_runner_real.py` vốn có nhiệm
+vụ "reproduces deploy_sim fit_C trade-for-trade".
+
+### Next steps — bù trừ ròng CHƯA GIẢI, là điều kiện tiên quyết bật cron
+**ĐÃ CHỌN (2026-08-10): (1) subaccount riêng.** Đường duy nhất không đụng tới con số đã
+kiểm định — hai đường kia đều đòi đo lại. Chưa triển khai.
+- [x] **(1) Subaccount riêng cho stress** — CHỌN — bù trừ ròng biến mất vì hai sleeve không chung
+      sổ ở IBKR. KHÔNG đụng chiến lược, KHÔNG cần đo lại. Giá: thêm việc vận hành + một
+      kết nối nữa
+- [~] (2) Nhận luật một-vị-thế-mỗi-mã rồi ĐO LẠI — BỎ `deploy_sim --include-stress` với ràng
+      buộc đó. Giá: Rổ 4 giữ vị thế phần lớn số ngày (4 mã mở đồng thời 45–47%) nên nhiều
+      khả năng phần lớn lệnh stress bị cắt — +$12.850 sẽ khác hẳn, có thể không còn đáng bật
+- [~] (3) Cho stress dùng mã khác — BỎ (ES/NQ full-size hoặc ngoài Rổ 4) — hết chồng lấn.
+      Giá: phải đo lại + đổi bậc rủi ro
+- [ ] Triển khai subaccount: mở subaccount IBKR, quyết cách runner định tuyến order theo
+      cluster (account field trên order? hay tiến trình riêng + clientId riêng?), tách
+      `live_positions.json` hay giữ chung một sổ
+- [ ] Sau khi subaccount chạy: bật cron + sửa `test_the_stress_slot_is_disabled`
+
+### Key decisions
+- Tắt cron chứ không vá vội trước thứ Hai: cả ba tầng đều fail theo hướng "báo an toàn",
+  nên vá một chỗ mà sót chỗ khác thì tệ hơn là không bật
+- Giữ cờ `--stress-entry` của `run_live_day` để chạy tay khi kiểm thử — chạy tay có người
+  nhìn, cron thì không
+- Bảng giờ ET: dòng "STRESS thoát 14:00" là SAI — 14:00 là trần. Đo được stop 35% ·
+  target 20% · eod 45%, tức 55% thoát sớm hơn. Live thoát ở slot 14:05 (~14:10)
+
+### Files touched
+global_index/run_scheduler.py, global_index/test_stress_slot_invariant.py,
+docs/futures/OPERATIONS.md, SCRATCHPAD.md

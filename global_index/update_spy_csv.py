@@ -178,8 +178,23 @@ def fetch_spy_close(api_key: str, from_date: date, to_date: date) -> pd.DataFram
     label at the boundary.  Always use adjusted=True.
 
     Source: Polygon.io (polygon-api-client already installed; key in config_private.py).
-    Alternative: IBKRBroker.fetch_bars("SPY", through=to_date) reshaped to daily,
-    but IBKR historical data is split-adjusted only — DO NOT use for this CSV.
+    Về IBKR làm nguồn thay thế — chính xác hơn bản trước của chú thích này:
+    IBKR KHÔNG chỉ điều chỉnh chia tách. `whatToShow="TRADES"` thì đúng là chỉ điều chỉnh
+    chia tách, và đó là giá trị `ibkr_broker.fetch_bars` đang cố định — nhưng `whatToShow=
+    "ADJUSTED_LAST"` trả dữ liệu điều chỉnh cả cổ tức. Nên đây là lựa chọn tham số, không
+    phải giới hạn năng lực; bản cũ viết "split-adjusted only — DO NOT use" dễ khiến người
+    đọc kết luận nhầm là không làm được.
+
+    Điều KHÔNG đổi: không được nối nguồn mới vào giữa chuỗi này. File là một chuỗi liên tục
+    từ 2017 và nó quyết định nhãn chế độ, tức quyết định sleeve nào được vào lệnh. Cổng phải
+    qua trước khi đổi nguồn không phải "so giá" mà là: gán lại nhãn chế độ trên cả hai chuỗi
+    ở cửa sổ chồng lấn và đếm số ngày BỊ LẬT NHÃN. Lệch 0,3-0,4% sát ranh giới là đủ lật một
+    nhãn — cùng lý do `adjusted=True` là bắt buộc. Lật ngày nào thì đổi nguồn = đổi luật vào
+    lệnh mà không ai khai.
+
+    Dùng IBKR làm ĐỐI CHỨNG song song thì có giá trị ngay và không có rủi ro đó: kêu khi hai
+    nguồn lệch quá ngưỡng. Cách đó sẽ bắt được lỗi 16% nói trên ngay ngày đầu thay vì sau 8
+    năm. `fetch_bars` hiện dựng hợp đồng tương lai, nên vẫn cần thêm nhánh Stock trước.
     """
     from polygon import RESTClient
     client = RESTClient(api_key)

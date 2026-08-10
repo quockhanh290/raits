@@ -214,6 +214,225 @@ luật đã kiểm định**, và nó ăn hết edge:
 
 STRESS_MID **không** hoãn — adapter của nó xét stop ngay từ bar vào lệnh.
 
+## clientId — mọi tiến trình chạm STP phải dùng CHUNG một id
+
+**IBKR chỉ nhận lệnh huỷ từ chính clientId đã đặt lệnh.** `ibkr_broker.cancel_order` đã biết
+điều này từ 2026-08-06 (*"MYM #10 refused cancels from clientIds 1, 77 and 82, then cancelled
+first try from 93, the id that placed it"*) — nhưng kiến trúc thì chưa:
+
+| tiến trình | clientId cũ | việc | hệ quả |
+|---|---|---|---|
+| `run_live_day` | 1 | runner **đặt** STP; C2 huỷ khi roll | cùng tiến trình, cùng id → OK |
+| `run_maxhold_exit` | **2** | **huỷ** STP khi đóng vị thế | **không bao giờ thành công** |
+| `repair_stops` | 86 | **huỷ** ORPHAN / WRONG-WAY / HAZARD | **không bao giờ thành công** với STP do runner đặt |
+
+Hệ quả không phải một cảnh báo bị bỏ lỡ mà là **mỗi lần MAX_HOLD đóng vị thế lại để lại một
+STP mồ côi**, và MAX_HOLD chiếm 15% số lệnh. Lệnh mồ côi khi khớp không vô hại — nó **MỞ một
+vị thế ngược chiều** mà không ai đặt.
+
+**Đã sửa:** `run_maxhold_exit` và `run_stop_repair` chuyển về clientId **1**, trùng runner.
+Việc tránh đụng độ được xử bằng **lịch** chứ không bằng id: 09:31 và các slot quét sửa ở phút
+:20 đều không giao với slot nào. Công cụ **chỉ đọc** (`check_open_orders`, id 88) giữ id
+riêng — ép nó về 1 sẽ đá runner ra khỏi Gateway khi scheduler đang sống.
+
+`repair_stops` (id 86) là công cụ tay và phải huỷ được lệnh do **bất kỳ** id nào đặt, nên nó
+không thể có một id đúng cố định. Khi huỷ hụt nó in ra đúng lệnh chạy lại:
+
+    python -X utf8 global_index/repair_stops.py --client-id N --execute
+
+với `N` là id lấy từ dòng `placed by clientId=N` mà `cancel_order` ghi ra.
+
+Ghim bằng `test_stop_client_id.py` (5).
+
+### Sự cố 2026-08-10 — STP mồ côi #12 trên MYM
+
+09:31 MAX_HOLD đóng MYM. CLOSE thành công → `run_maxhold_exit` thoát 0. `cancel_order('12')`
+thất bại (sai chủ: #12 do clientId 81 đặt). Runner kêu CRITICAL `STP ORPHAN`, nhưng `_run`
+bắt output của tiến trình con **rồi vứt đi** vì `returncode == 0` — log chỉ còn `completed
+OK`. Lệnh BUY STP treo ở 54709.00 suốt buổi, không vị thế nào phía sau.
+
+Sổ sạch, `maxhold_state` sạch, log sạch. Chỉ lộ ra khi hỏi thẳng IBKR:
+`get_working_stops()` → `{'MYM': ['12']}` trong khi `get_positions()` → chỉ MNKD.
+
+Xử lý: `repair_stops --client-id 81 --execute` → huỷ được ngay lần đầu (`code=202 Order
+Canceled`), xác nhận chẩn đoán sai-chủ.
+
+Hai bản vá kèm theo:
+* `_run` nay quét output tìm dòng `CRITICAL`/`ERROR` **kể cả khi thoát 0** và ghi chúng ra
+  (vẫn trả True). Lọc theo **mức độ**, không theo **mã thoát**: mã thoát chỉ nói việc chính
+  đã xong, không nói mọi việc phụ đều ổn. `test_run_echoes_critical.py` (6).
+* Khối VERIFY của `repair_stops` không còn đếm `DEFERRED` là thiếu sót — trước đó một lần sửa
+  thành công vẫn in `FAIL — 1 gap(s) remain` chỉ vì có vị thế đang trong cửa sổ hoãn.
+
+### Khung thời gian đặt lệnh — CÓ CHỦ ĐÍCH
+
+**Luật một câu: cả Rổ 4 và NKD đều chỉ vũ trang stop 14 giờ sau khi sang ngày mới, đo trên
+đồng hồ phiên của chính sleeve đó.** Một hằng số duy nhất, rơi vào hai giờ ET khác nhau vì
+hai sleeve chạy hai đồng hồ:
+
+| sleeve | giờ vũ trang | quy ra ET | slot đầu tiên ≥ giờ đó |
+|---|---|---|---|
+| `roska4_swing` | 14:00 America/New_York ngày N+1 | 14:00 ET | **14:05 ET** |
+| `global_nkd` | 14:00 Asia/Tokyo ngày N+1 | 01:00 ET (hè) · 00:00 ET (đông) | **01:10 ET** |
+| `roska4_stress` | không hoãn — adapter xét stop ngay từ bar vào lệnh | — | — |
+
+Khai bằng **múi giờ**, không phải giờ ET cố định: chênh ET↔JST đổi theo DST (hè 13h, đông
+14h), nên "01:00 ET" đúng mùa hè nhưng thành 15:00 JST mùa đông. Bảng `_ARM_BY_CLUSTER`
+trong `runner.py` giữ cặp `(tz, hh, mm)`, không giữ giờ ET.
+
+14h không phải đỉnh của một bảng số: hai phép walk-forward **độc lập** (Rổ 4 và MNKD — hai
+đồng hồ, hai bộ dữ liệu) đều hội tụ về nó, chọn h\* trên các năm trước rồi đánh giá trên năm
+giữ lại. Rổ 4 h\*=14h ở 6/7 năm, MNKD 7/7.
+
+#### Vì sao B4 không lọc theo cluster — và tại sao điều đó là đúng
+
+B4 chạy trong `FuturesRunner.__init__`, tức **mọi job dựng một runner đều chạy nó**, trên
+**toàn bộ** vị thế trong sổ. Các job dựng runner: 22 slot đêm (01:10–02:55), 09:31 MAX_HOLD,
+và 23 slot ngày (14:05–15:55). Cờ `--clusters` của job **không** giới hạn B4 — nó chỉ giới
+hạn `generate_today_signals`, tức việc *sinh tín hiệu*.
+
+Nghe qua thì như một lỗ hổng. Thực ra là hai việc khác nhau bị gộp vào một khối, và tách
+chúng ra bằng cờ cluster sẽ hỏng cả hai:
+
+* **Vũ trang lần đầu** — đặt cái stop đã được cố tình hoãn. Việc này PHẢI theo sleeve, và cái
+  quyết định nó là vị từ `_stop_deferred`, không phải cờ job. Vị thế Rổ 4 mở hôm qua đi qua
+  22 slot đêm mà không được đặt stop, vì `_stop_deferred` trả True cho tới 14:00 ET.
+* **Sửa chữa** — đặt lại stop cho vị thế đã qua cửa sổ hoãn mà mất stop (bị từ chối, bị huỷ
+  tay, id trỏ vào lệnh chết). Việc này KHÔNG được theo sleeve: một vị thế Rổ 4 mất stop lúc
+  nửa đêm mà phải chờ tới 14:05 là 13 tiếng trần không vì lý do gì.
+
+Nếu lọc B4 theo cluster thì vế thứ hai chết: slot đêm `--clusters nkd` sẽ bỏ qua một vị thế
+Rổ 4 đang trần. Nếu bỏ `_stop_deferred` thì vế thứ nhất chết: slot đêm vũ trang Rổ 4 sớm 13
+tiếng — đúng lỗi đã có, đo được chênh +$41.505 → +$116.530 ngoài mẫu.
+
+#### Xác nhận: slot nào đặt stop cho sleeve nào
+
+Chạy vị từ thật trên toàn bộ lịch slot:
+
+| | slot đêm 01:10 | slot 14:05 |
+|---|---|---|
+| vị thế **mới** (vào lệnh ngày N, xét ngày N+1) | **chỉ NKD** | **chỉ Rổ 4** |
+| vị thế **cũ** (đã qua cửa sổ hoãn) | cả hai, kể cả Rổ 4 | cả hai |
+
+Nên câu "slot đêm chỉ đặt stop cho NKD" đúng cho **vũ trang**, không đúng cho **sửa chữa** —
+và sự khác nhau đó là chủ đích, không phải rò rỉ. Hệ quả vận hành: thấy dòng
+`B4 REPLACED: MES/roska4_swing` lúc 1 giờ sáng thì **không phải** giờ vũ trang bị rò; đó là
+guard sửa chữa đang làm việc của nó, và nó có nghĩa là vị thế đó đã mất stop từ trước.
+
+Bất biến này được ghim bằng test: `test_arm_time_per_sleeve.py` (giờ vũ trang theo sleeve,
+kèm ca DST) và `test_slot_arms_which_sleeve.py` (bảng trên, chạy trên đúng lịch slot).
+
+### Ba lỗ hổng tìm ra ở lượt soi lại (2026-08-10)
+
+Lượt sửa trước soi câu hỏi *"stop này thuộc vị thế nào"*. Ba cái dưới đây thuộc câu hỏi
+khác — *"chuyện gì xảy ra khi hợp đồng đổi tháng"* — nên lượt trước không chạm tới.
+
+**1. Rollover ghi mức stop chỉ khi lệnh được nhận.** `pos.stop_price = _new_stop` nằm trong
+nhánh `if _sid:`. Lệnh bị từ chối thì mức của hợp đồng **cũ** ở lại trên sổ, và B4 — vốn chỉ
+đặt khi "đã biết mức" — sẽ đặt mức cũ đó lên thang giá hợp đồng **mới** ở phiên sau. Sai
+đúng bằng khoảng chênh hai hợp đồng, và không có gì kêu. Sửa: ghi mức **trước** khi đặt, giữ
+nguyên dù lệnh có được nhận hay không.
+
+**2. Rollover vũ trang stop sớm.** C2 đặt stop mới ngay, bất kể cửa sổ hoãn. Vị thế vào lệnh
+phiên trước rồi hợp đồng đổi tháng vào sáng hôm sau sẽ được vũ trang trước giờ — đúng một vị
+thế, chỉ vì hợp đồng của nó tình cờ roll. Roll không dời `entry_day` nên cửa sổ không đổi.
+Sửa: C2 tôn trọng `_stop_deferred`, chỉ ghi mức và để B4 đặt đúng giờ vũ trang của sleeve.
+
+**3. `classify` có thể nhận nhầm stop của hợp đồng đã chết.** Khi C2 huỷ **hụt** (nó ghi
+CRITICAL rồi chạy tiếp), hai STP cùng chiều cùng mã khác tháng đáo hạn cùng sống. Nhận theo
+chiều + kích thước sẽ trao cho vị thế cái đến trước trong danh sách — có thể là cái của hợp
+đồng đã chết — rồi báo stop **thật** là thừa, và `repair_stops` sẽ huỷ đúng cái đang bảo vệ.
+`live_positions.json` không ghi expiry, nên định danh duy nhất có trên sổ là `stop_order_id`.
+Sửa: nhận **lệnh mình ghi trước**, phần thiếu mới lấy tiếp theo chiều — và chỉ nhận id đã ghi
+nếu nó đúng chiều bảo vệ.
+
+`_roll_stop` được tách khỏi `_handle_rollover` để test gọi thẳng được. Bản test đầu tiên tôi
+viết đã chép lại nhánh giá của C2 vào chính helper rồi assert lên nó — tức chỉ chứng minh bản
+chép đúng với chính nó. Test: `test_stop_rollover_gaps.py` (9).
+
+### Quét sửa stop trong ba khoảng trống (2026-08-10)
+
+Việc sửa chữa của B4 cho tới nay chỉ **đi ké** các slot dựng runner, mà lịch slot được dựng
+cho việc **vào lệnh**. Đo khoảng trống giữa chúng:
+
+| khoảng | không có job nào |
+|---|---|
+| **15:55 → 01:10** | **9h15** — và đúng cái đêm stop sinh ra để bảo vệ |
+| 02:55 → 09:31 | 6h36 |
+| 09:31 → 14:05 | 4h34 |
+
+Không ai chọn con số 9h15; nó là hệ quả. `run_stop_repair.py` lấp bằng **một lượt quét mỗi
+~2 tiếng**, ở phút :20, **bỏ qua** lượt nào rơi vào cửa sổ vào lệnh (01:00–02:55 và
+14:00–15:55 ET) — 10 lượt/ngày. Job dựng runner với `signal_fn` rỗng, **không** gọi `run_day`,
+**không** gọi `run_maxhold_exit`; toàn bộ tác dụng nằm ở B1–B5 trong `__init__`.
+
+Bỏ hai lượt trong cửa sổ để lại hai khoảng 4 tiếng trên giấy, nhưng khoảng **thật sự** không
+ai nhìn ngắn hơn nhiều, vì trong cửa sổ đã có slot chạy mỗi 5 phút và mỗi slot đều dựng
+runner: `00:20→01:10` (50p) · `02:55→04:20` (1h25) · `12:20→14:05` (1h45) · `15:55→16:20` (25p).
+
+Số lượt này đã đi qua ba bản. Đầu tiên 19 lượt mỗi tiếng — sai vì lấy *"lấp kín khoảng
+trống"* làm mục tiêu thay cho *"giảm thời gian không ai nhìn"*. Rồi cắt xuống 3. Cả hai đều
+là lập luận suông, không phải số liệu: **mọi lần vị thế thật sự mất stop đều do bug đã sửa**
+(order id sinh phía client 05/08, clientId sai khi huỷ 10/08), nên hiện không còn nguyên nhân
+sống nào để lượt quét phòng. Mốc 2 tiếng là do người vận hành chốt, và nó là quyết định đúng
+loại: đây là chi phí quan sát trong giai đoạn code stop mới chưa tự chứng minh, không phải
+hạ tầng vĩnh viễn.
+
+Một cái giá phải ghi rõ: `run_stop_repair` **ghi `live_positions.json`**. Đó là đường code
+mới sửa file trạng thái lúc không ai nhìn — nếu vài phiên tới thấy nó không bắt được gì, bỏ
+job đi là lựa chọn hợp lý chứ không phải thất bại.
+
+Nó **không** đụng vế vũ trang: `_stop_deferred` vẫn chặn, nên một lần chạy lúc 20:00 ET
+không vũ trang sớm vị thế Rổ 4 mở cùng ngày. Nó chỉ chạm vế sửa chữa.
+
+Giá phải trả đã cân: mỗi lần chạy là một lượt B3 nữa, tức thêm cơ hội halt entry vì mismatch
+giả. Ba khoảng trống đều nằm **ngoài** cả hai cửa sổ vào lệnh nên halt ở đó không tốn gì, và
+`_b3_halt_entries` không ghi xuống đĩa còn mỗi lần chạy là tiến trình riêng — halt không
+theo sang slot giao dịch. Chạy như job **trong** scheduler nên dùng chung `_slot_lock`,
+không tranh chấp `live_positions.json` (khác `repair_stops.py`, vốn đòi dừng scheduler).
+
+Ghim bằng `test_stop_repair_slots.py` (9): không slot nào rơi vào cửa sổ vào lệnh hay trùng
+09:31; cả ba lỗ đều được phủ; và hai điều kiện khiến việc miễn trừ khỏi bất biến STRESS_MID
+là hợp lệ — `signal_fn` còn rỗng và `run_day` còn không được gọi.
+
+### `has_working_stop` mù tháng đáo hạn — ĐÃ VÁ
+
+Nó khớp theo **symbol**. Kịch bản để nó trả lời sai: roll + huỷ hụt + đặt mới bị từ chối —
+khi đó stop của hợp đồng cũ vẫn sống, B4 thấy "đã được phủ" và ghi `STP ID DRIFT` (WARNING)
+trong khi vị thế thật sự trần.
+
+**Đã vá:** B4 hỏi thêm `unprotected_positions()` (khớp `(mã, expiry, bên)`, cộng số hợp
+đồng). Hai bên bất đồng thì bên này thắng và vị thế được coi là NAKED. `None` — broker không
+trả lời được, ví dụ MockBroker — thì **không ghi đè**, hành vi cũ giữ nguyên; nếu không, mọi
+broker không trả lời được sẽ bị hiểu thành "đang báo trần".
+
+Ghim bằng `test_stp.py::test_b4_8/9/10`: ghi đè khi bất đồng, không ghi đè khi `None`, không
+ghi đè khi hai bên đồng ý (chặn chiều hỏng ngược — đặt stop chồng lên vị thế đã có stop).
+
+### Mốc gốc h=0 của backtest — để khỏi phải truy lại
+
+`_validated_core.py` gom bar bằng `dfg.groupby(dfg.index.normalize())`, tức "ngày" là ngày
+lịch **theo múi giờ của chính khung dữ liệu**; khối thoát rồi quét
+`np.where(low <= stop_prev)[0]` từ **index 0**. Nên backtest vũ trang stop tại **bar đầu
+tiên của ngày lịch kế tiếp**:
+
+| sleeve | khung dữ liệu | h=0 của backtest |
+|---|---|---|
+| Rổ 4 | ET tz-aware | **00:00 ET** |
+| MNKD | Asia/Tokyo | **00:00 JST** |
+
+Đây là gốc toạ độ mà mọi con số trong bản quét giờ vũ trang được đo từ đó — không phải mốc
+phải chạy theo. Giờ vũ trang thực tế (`_ARM_BY_CLUSTER`: 14:00 theo đồng hồ của từng sleeve)
+là **lệch có chủ đích và đã đo**: quét nhiều mốc, tách theo năm, kiểm trên vault, walk-forward
+chọn h\* trên các năm trước rồi đánh giá trên năm giữ lại (h\*=14h, Rổ 4 6/7 năm, MNKD 7/7).
+
+Lưu ý một chuyện dễ hiểu nhầm: **cổng reconcile không nhìn thấy độ lệch này**.
+`verify_runner_real` chạy `FuturesRunner + MockBroker`, mà `MockBroker.place_stop` chỉ trả
+`f"mock-stp-{inst}"` và không mô phỏng khớp lệnh — lệnh đến từ timeline dựng sẵn. Nên
+reconcile khớp fit_C **không** là bằng chứng gì về giờ vũ trang, và nó không phủ chuyện đó
+cũng không phải lỗ hổng. Bằng chứng cho giờ vũ trang nằm ở `model_sameday_stop.py` /
+`model_activation_sweep.py`, đều gated trên việc tái tạo engine trade-for-trade.
+
 ### Đọc log
 ```
 [STP HOAN] MES SHORT @ 7769.03 — dat vao phien sau, dung luat da kiem dinh
@@ -498,3 +717,123 @@ vào TWS xử lý tay.
 Toàn bộ phần trên kiểm bằng dữ liệu dựng lại và bằng sự cố offset 05/8. **Lần roll
 đầu tiên dưới đường ống này là 11/9/2026.** Hôm đó nên có người theo dõi log
 13:45–14:05 ET thay vì tin hoàn toàn vào tự động.
+
+---
+
+## STRESS_MID: tại sao cron 10:20 bị TẮT (2026-08-10)
+
+Job `stress_mid` đã được nối vào `run_scheduler.py` rồi **tắt lại trong cùng ngày**, trước
+khi nó chạy lần nào. Lý do không nằm ở sleeve — nó nằm ở tầng theo dõi vị thế, và nó cũng
+là lý do đáng ghi lại nhất: sleeve đúng luật vẫn có thể làm hỏng những sleeve khác.
+
+STRESS_MID dùng **đúng bốn mã của Rổ 4** (MES/MNQ/MYM/M2K) và **luôn SHORT**. Toàn bộ tầng
+broker lại khoá theo **MÃ**, không theo **VỊ THẾ**. Ba hệ quả, xếp theo mức độ:
+
+**1 — Bù trừ ròng làm mù cả hai vị thế.** `get_positions()` và `ib.positions()` trả vị thế
+**ròng có dấu** cho mỗi hợp đồng. MES swing LONG 1 + MES stress SHORT 1 → IBKR báo net 0.
+
+- `runner.py` B3 dựng `file_key[(inst, direction)]` *có cộng dồn* — cùng chiều thì khớp
+  đúng — nhưng ngược chiều thì file có hai khoá, broker không có khoá nào → **MISMATCH →
+  HALT toàn bộ entry**.
+- `unprotected_positions()` lặp `for p in ib.positions()` với `if not p.position: continue`
+  → cả hai vị thế **biến mất khỏi phép kiểm bảo vệ**. Không phải báo nhầm là an toàn — là
+  không nhìn thấy chúng nữa.
+- `held_stress` trong runner chỉ chặn khi đã có vị thế **STRESS** cùng mã; nó không chặn
+  khi đang có vị thế **SWING** cùng mã. Nên tình huống trên vào được.
+
+**2 — Cùng chiều: một hợp đồng trần vĩnh viễn, im lặng.** Không bù trừ, nhưng:
+
+- `has_working_stop(inst)` khoá theo **symbol**. Stress đặt stop trước → B4 tính
+  `_can_replace = not has_working_stop(p.inst)` = False → **từ chối đặt stop cho swing**,
+  đúng theo ý định "tránh xếp chồng STP", chỉ là ý định đó giả định một vị thế một mã.
+- `unprotected_positions()` kiểm `if exp in have` — **sự tồn tại**, không phải **số lượng**.
+  Một STP cho 1 hợp đồng phủ cả hai vị thế trên giấy tờ.
+- `get_working_stops()` trả `{inst: orderId}` — một order id cho mỗi mã, nên B5 cũng bỏ qua.
+
+**3 — `repair_stops.py` ghi bằng chứng SAI vào sổ.** Đây là cái nặng nhất, vì ba chỗ trên
+chỉ là phép kiểm bỏ sót, còn chỗ này làm hỏng dữ liệu mà những tầng *đang chạy đúng* dựa vào:
+
+- dòng 150 `by_inst = {p.get("inst"): p for p in positions}` — hai vị thế cùng mã thì **một
+  cái đè cái kia, im lặng**. Kế hoạch `("place", inst, by_inst[inst])` sẽ đặt stop bằng
+  `stop_price` và `direction` của cái thắng cuộc đua dict.
+- dòng 113–114 `p["stop_order_id"] = new_ids[p["inst"]]` — vòng lặp đóng **cùng một order id
+  lên MỌI vị thế của mã đó**. File ghi hai vị thế "đã có stop", thực tế một order phủ một vị
+  thế.
+
+Hệ quả kéo dài: `cancel_order(p.stop_order_id)` là một trong số ít chỗ *đang* làm đúng
+(theo vị thế) — nhưng nó tin vào id trong sổ. Đóng vị thế A sẽ huỷ đúng cái stop đang bảo vệ
+vị thế B. Chính docstring của `_persist` đã cảnh báo "a stale id is not harmless"; nó chỉ
+chưa lường tới trường hợp id không cũ, mà là của người khác.
+
+**4 — Không guard nào kêu.** Cả ba đều fail theo hướng "báo an toàn". Đây là dạng hỏng
+giống hệt hố 17:00–18:00 và bug rò giờ vũ trang: hệ thống chạy, log xanh, tiền đi.
+
+### Đã sửa (2026-08-10)
+
+Câu hỏi sai — *"có stop nào cho mã này không?"* — đã được đổi thành *"vị thế NÀY có được
+phủ không?"* ở cả năm chỗ:
+
+| chỗ | trước | sau |
+|---|---|---|
+| `check_open_orders.classify` | `matching[0]` — một STP phủ mọi vị thế cùng mã | mỗi STP được **một** vị thế nhận; thêm verdict `PARTIAL` |
+| `repair_stops` | `{p["inst"]: p}` đè vị thế; một order id đóng lên mọi vị thế | khoá `(inst, cluster)`; id lấy từ `classify`, ghi theo từng vị thế |
+| `unprotected_positions` | `if exp in have` — sự tồn tại, không xét bên | cộng **số hợp đồng** theo `(mã, expiry, bên)` rồi so với vị thế |
+| `has_working_stop` | boolean theo symbol | nhận thêm `direction`/`contracts`, đếm độ phủ đúng bên (dạng cũ vẫn giữ) |
+| `get_working_stops` + B4/B5 | `{inst: orderId}` — ghi đè, hỏi `p.inst in working` | `{inst: [orderId,…]}`; hỏi *"id mà vị thế này ghi nhận còn sống không"* |
+
+Kèm hai chỗ phụ: `PROTECTIVE_SIDE` chuyển về `ibkr_broker` làm **nguồn duy nhất** (trước đó
+chỉ CLI tool có, nên tầng broker không hề xét bên); và B5 chỉ tắt cảnh báo khi **mọi** vị
+thế trên mã đó đang trong cửa sổ hoãn — trước đây một vị thế hoãn làm câm cảnh báo cho vị
+thế khác cùng mã đã thật sự mất stop.
+
+Thêm một chỗ B4 phải tách bạch: vị thế **được phủ nhưng id ghi trong sổ không trỏ vào lệnh
+nào đang sống** giờ ra `B4 STP ID DRIFT` (WARNING) chứ không ra `B4 NAKED` (CRITICAL). Phép
+kiểm cũ (`p.inst in working`) im lặng ở ca này — chính sự im lặng đó để MES mang id bịa 62
+bên cạnh stop thật #9 ngày 2026-08-05 cho tới khi đóng vị thế thì huỷ nhầm một con ma và bỏ
+lại lệnh thật không có vị thế phía sau. Nhưng hô NAKED vào một vị thế đang được bảo vệ thì
+lại là kiểu cảnh báo giả hằng ngày làm người ta thôi đọc chữ NAKED.
+
+Test: `test_stop_per_position.py` (13), `test_unprotected_positions.py` (15, thêm 5 ca
+bên/độ phủ), cùng cập nhật `test_stp.py` / `test_stp_accept.py` / `test_deferred_verdict.py`.
+
+### CHƯA giải: bù trừ ròng
+
+Không sửa được ở tầng broker — tài khoản thật sự không giữ gì để mà kiểm.
+
+Tôi đã thử chặn ở `signal_layer` bằng luật *một vị thế mỗi mã, tính trên mọi cluster*, rồi
+**rút lại**. Lý do: `deploy_sim.py:180-218` chạy `StressMidEngine().backtest_basket()` ĐỘC
+LẬP với swing rồi nối hai danh sách lệnh — nó không bao giờ hỏi swing đang giữ gì. Tức là
+sim đã kiểm định **cho phép** stress nằm cùng mã với swing. Siết luật đó là cho live chạy
+một luật backtest chưa kiểm, đúng hình dạng đã làm mất $53k ở chuyện đặt stop; và nó còn phá
+`verify_runner_real.py`, file tự khai nhiệm vụ là *"proves the full live path reproduces
+deploy_sim fit_C trade-for-trade"*.
+
+Nên đây là **điều kiện tiên quyết để bật STRESS_MID**, không phải giấy phép lặng lẽ đổi
+chiến lược. Ba đường đi — **đã chọn (1)** ngày 2026-08-10, chưa triển khai:
+
+1. **← ĐÃ CHỌN. Tài khoản/subaccount riêng cho sleeve stress** — bù trừ ròng biến mất vì hai sleeve
+   không còn chung sổ ở IBKR. Không đụng tới chiến lược, không cần đo lại. Tốn công vận
+   hành và một kết nối nữa.
+2. **Nhận luật một-vị-thế-mỗi-mã rồi ĐO LẠI** `deploy_sim --include-stress` với ràng buộc
+   đó. Rổ 4 giữ vị thế trên phần lớn số ngày (4 mã mở đồng thời 45–47% số ngày) nên nhiều
+   khả năng phần lớn lệnh stress bị cắt — con số +$12.850 sẽ khác hẳn, và có thể sleeve
+   không còn đáng bật.
+3. **Cho stress dùng mã KHÁC** (ES/NQ full-size, hoặc mã ngoài Rổ 4) — hết chồng lấn hợp
+   đồng. Cũng phải đo lại, và đổi cả bậc rủi ro.
+
+### Cron vẫn TẮT
+
+Tầng theo dõi stop đã sạch, nhưng bù trừ ròng thì chưa — và nó là cái chặn entry
+(B3 MISMATCH) chứ không chỉ làm mù phép kiểm. Bật cron trước khi chọn một trong ba đường
+trên là bật một sleeve chắc chắn sẽ làm dừng entry của toàn hệ ngay hôm nó vào lệnh trùng mã.
+
+`test_stress_slot_invariant.py::test_the_stress_slot_is_disabled` giữ cron tắt cho tới lúc
+đó. Cờ `--stress-entry` của `run_live_day` vẫn còn để chạy tay khi kiểm thử — chạy tay thì
+có người nhìn, cron thì không.
+
+### Cùng gốc: STRESS_MID không thoát đúng 14:00
+
+Bảng giờ ET có dòng "STRESS — thoát 14:00"; nói vậy là thiếu. 14:00 là **trần**, không phải
+mốc thoát: `StressMidAdapter` thoát ở cái nào đến trước trong stop / target, nếu không có
+thì mới lấy bar cuối ≤ 14:00. Tỉ lệ đo được: **stop 35% · target 20% · eod 45%** — 55% số
+lệnh thoát sớm hơn 14:00. Live thoát ở slot 14:05 (thực tế ~14:10), không phải 14:00.

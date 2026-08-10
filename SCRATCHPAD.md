@@ -1168,3 +1168,102 @@ phải engine, và tất cả đều trả về **con số trông hợp lý**:
   close = 7764.50 = đúng entry tín hiệu trên thang thô → quy đổi offset đúng tuyệt đối.
   Giá vượt stop lúc 15:01 (2 phút sau bar tín hiệu), lệnh gửi 15:10:41. Nguyên nhân là
   **độ trễ vào lệnh** (run_day 5m13 + slot cách 10 phút), không phải parquet.
+
+## Gotchas (2026-08-10) — tầng theo dõi vị thế khoá theo MÃ, không theo VỊ THẾ
+
+Phát hiện khi nối STRESS_MID, đã **tắt cron** trước khi nó chạy lần nào (`run_scheduler.py`,
+khối `if False`). Chi tiết đầy đủ ở `docs/futures/OPERATIONS.md` mục "STRESS_MID: tại sao
+cron 10:20 bị TẮT". Ba chỗ, cùng một gốc:
+
+- `has_working_stop(inst)` — boolean theo **symbol**. Vị thế thứ hai trên cùng mã sẽ bị B4
+  từ chối đặt stop, đúng theo code, sai theo ý.
+- `get_working_stops()` → `{inst: orderId}` — một id mỗi mã, B5 bỏ qua vị thế thứ hai.
+- `unprotected_positions()` — `if exp in have: continue`. Kiểm **sự tồn tại**, không kiểm
+  **số lượng**. Docstring của chính nó đã nêu vấn đề symbol-level và sửa cho trường hợp
+  expiry (rollover), nhưng dừng lại ở đó.
+
+- `repair_stops.py` — hai chỗ, và là chỗ duy nhất **ghi** chứ không chỉ đọc: `by_inst =
+  {p["inst"]: p}` (một vị thế đè cái kia), và `p["stop_order_id"] = new_ids[p["inst"]]`
+  (đóng một order id lên mọi vị thế cùng mã). Ba lỗi trên là kiểm bỏ sót; cái này làm hỏng
+  sổ, nên tầng ĐANG chạy đúng — `cancel_order(p.stop_order_id)` — sẽ huỷ stop của vị thế kia.
+
+Và nặng hơn cả ba: `get_positions()` / `ib.positions()` trả **vị thế ròng có dấu**. Hai
+cluster ngược chiều cùng mã (swing LONG + stress SHORT) → net 0 → `if not p.position:
+continue` → **cả hai vị thế biến mất khỏi phép kiểm bảo vệ**, và B3 báo MISMATCH → halt.
+
+Điều đáng nhớ, không phải chi tiết: **B3 cộng dồn đúng** (`file_key[k] += p.contracts`), nên
+đọc lướt sẽ tưởng cả tầng đã lo chuyện nhiều vị thế. Chỉ có một tầng lo. Ba tầng còn lại
+mượn giả định "một vị thế một mã" mà không tầng nào khai nó ra thành điều kiện.
+
+Hiện tại vô hại vì engine cố định một vị thế mỗi mã. Nó thành hại ngay khi (a) có sleeve
+thứ hai dùng chung mã — chính là STRESS_MID, hoặc (b) scale nhiều vị thế trên một mã.
+Pyramiding đã bị bác (L16) nên (b) chưa nằm trên lịch; (a) thì vừa suýt vào.
+
+## Lessons (2026-08-10)
+
+- **Sleeve đúng luật vẫn làm hỏng sleeve khác.** STRESS_MID tự nó đã kiểm định xong
+  (+$12.850 với luật live). Cái hỏng nằm ở chỗ nó **dùng chung mã** với Rổ 4 — một thuộc
+  tính không xuất hiện trong bất kỳ backtest nào của nó, vì backtest không có tầng broker.
+  Trước khi bật một sleeve, phải hỏi nó **chạm vào mã nào của ai**, không chỉ hỏi nó lãi
+  bao nhiêu.
+- **Ba guard cùng fail theo hướng "an toàn" thì bằng không guard.** B4, B5,
+  `unprotected_positions` đều báo đã được bảo vệ khi thực ra không. Cùng dạng với hố
+  17:00–18:00 và bug rò giờ vũ trang: hệ thống chạy, log xanh, tiền đi.
+- **Bản vá an toàn vẫn có thể là bản vá SAI.** Tôi siết `signal_layer` thành "một vị thế
+  mỗi mã" để chặn bù trừ ròng. Đúng về an toàn, sai về nguyên tắc: `deploy_sim` chạy stress
+  ĐỘC LẬP với swing rồi nối hai danh sách lệnh, nên sim đã kiểm định CHO PHÉP chồng lấn.
+  Siết = live chạy luật backtest chưa kiểm — đúng hình dạng đã mất $53k. Và nó phá luôn
+  `verify_runner_real.py`, file có nhiệm vụ tái tạo fit_C trade-for-trade.
+  **Kiểm tra bắt buộc trước khi thêm bất kỳ ràng buộc nào vào đường sinh tín hiệu: mở
+  `deploy_sim` ra xem sim có ràng buộc đó không.** Một hiểm hoạ vận hành có thật không tự
+  cho phép đổi chiến lược — nó là điều kiện tiên quyết, để user quyết.
+- **Soi lại lần hai tìm ra thứ lần một không thể tìm.** Lượt đầu soi câu hỏi "stop này thuộc
+  vị thế nào" và tìm được 5 chỗ. Lượt hai soi "chuyện gì xảy ra khi hợp đồng đổi tháng" và
+  tìm thêm 3 chỗ — không chồng lấn chỗ nào. Rà theo MỘT câu hỏi thì chỉ thấy đúng họ lỗi của
+  câu hỏi đó; muốn hết thì phải đổi câu hỏi, không phải đọc lại kỹ hơn.
+- **Test chép lại logic là test rỗng.** Tôi viết ba test cho C2 bằng cách dựng lại nhánh giá
+  của nó trong chính helper của test rồi assert lên helper — chúng xanh và chứng minh đúng
+  một điều: bản chép khớp với chính nó. Bắt được vì tự hỏi "test này gọi hàm nào". Cách sửa
+  là tách `_roll_stop` ra khỏi `_handle_rollover` để gọi thẳng được; logic khó test là logic
+  chưa được test.
+- **`return` giữa một hàm có `_persist_state()` ở cuối.** Bản vá đầu của tôi dùng early
+  return, và nó bỏ qua đúng dòng ghi sổ — mức stop vừa dịch sẽ mất. Trước khi thêm `return`
+  vào giữa hàm, đọc phần đuôi hàm.
+- **Câu hỏi "có đúng thiết kế không" đáng hỏi mỗi lần.** User hỏi đúng một câu đó và nó lật
+  lại một thay đổi tôi vừa viết xong kèm 6 test xanh. Test xanh chỉ chứng minh code làm đúng
+  điều tôi bảo nó làm.
+- **"Sau này nếu scale" thường đã là "bây giờ".** User nêu chuyện stop-theo-vị-thế như một
+  lo ngại tương lai. Truy ra thì cái cron nối trong cùng ngày hôm đó đã kích hoạt nó rồi.
+
+## Sự cố (2026-08-10) — STP mồ côi #12 trên MYM, cảnh báo bị ống dẫn nuốt
+
+**Cái xảy ra.** 09:31 MAX_HOLD đóng vị thế MYM (đủ 5 ngày). Lệnh CLOSE thành công nên
+`run_maxhold_exit` thoát mã 0. Nhưng `cancel_order('12')` THẤT BẠI, và runner đã kêu đúng
+lúc đó: `STP ORPHAN: cancel_order(12) returned False ... will open an unintended position
+when it fires`. Lệnh BUY STP treo ở ~54708.68 với KHÔNG có vị thế nào phía sau — chạm giá
+là mở một lệnh LONG không ai đặt.
+
+**Vì sao không ai biết.** `_run` trong `run_scheduler` bắt stdout/stderr của tiến trình con
+rồi **vứt đi** khi `returncode == 0`, ghi vào log đúng một dòng `completed OK`. Guard bắn
+đúng; ống dẫn ném nó đi.
+
+**Phát hiện thế nào.** Không phải từ log. Sổ (`live_positions.json`) sạch, `maxhold_state`
+ghi `true`, log không có gì. Chỉ lộ ra khi đi hỏi thẳng IBKR:
+`get_working_stops()` → `{'MYM': ['12']}` trong khi `get_positions()` → chỉ có MNKD.
+
+**Đã vá.** `_run` giờ quét output tìm dòng `CRITICAL`/`ERROR` **kể cả khi thoát 0** và ghi
+chúng ra, vẫn trả True. `test_run_echoes_critical.py` (6).
+
+### Bài học
+
+- **Mã thoát 0 chỉ nói việc CHÍNH đã xong, không nói mọi việc phụ đều ổn.** MAX_HOLD có hai
+  việc — đóng vị thế và huỷ stop. Việc một thành công quyết định mã thoát; việc hai thất bại
+  không để lại dấu vết nào. Lọc log phải theo **mức độ**, không theo **mã thoát**.
+- **Sổ sạch + state file sạch + log sạch vẫn có thể là một tài khoản có lệnh mồ côi.** Ba
+  nguồn đó đều là thứ hệ thống tự nói về mình. Chỉ có broker mới nói được cái đang thật sự
+  treo trên sàn. Cùng dạng với bài học 2026-08-05 (tiêu chí `stop_order_id != null` không
+  bao giờ fail được).
+- **Bằng chứng thật rẻ hơn tôi tưởng.** Cả buổi tôi nói "chưa chạm broker được, phải chờ
+  phiên sau". Thực ra một truy vấn chỉ-đọc 30 giây đã phát hiện một lệnh mồ côi đang sống,
+  và đồng thời chạy được `unprotected_positions()` bản mới trên dữ liệu thật. **Hỏi broker
+  trước khi kết luận là phải chờ.**
