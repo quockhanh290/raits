@@ -43,12 +43,15 @@ def _pos(cluster, entry_day, stop_order_id=None, stop_price=4950.0, entry_price=
                    stop_order_id=stop_order_id, entry_price=entry_price)
 
 
-def _snapshot(tmp_path, position, today):
+def _snapshot(tmp_path, position, today, now=None):
     r = FuturesRunner(
         broker=MockBroker({}, ACCOUNT), guard=_guard(), contracts_by_inst={"MES": 1},
         signal_fn=lambda d, b, h: ([], []), breaker=CircuitBreaker(account=ACCOUNT),
         positions_path=tmp_path / "pos.json", live_state_path=tmp_path / "live.js",
         today=today,
+        # Gio vu trang la rieng tung sleeve (14:00 ET swing / 01:00 ET NKD), nen phai
+        # noi ro moc thoi gian; mac dinh nua dem = truoc ca hai gio.
+        now=now,
     )
     r.state.open_positions = [position]
     r.dump_state(today)
@@ -69,8 +72,11 @@ def test_ds1_a_swing_position_opened_today_is_marked_deferred(tmp_path):
 
 
 def test_ds2_the_window_closes_the_next_day(tmp_path):
-    """B4 has placed the stop by now; nothing should still read as deferred."""
-    p = _snapshot(tmp_path, _pos("roska4_swing", DAY1, stop_order_id="stp-1"), today=DAY2)
+    """Sau 14:05 ET — gio vu trang cua swing — B4 da dat, khong con doc la deferred.
+
+    Truoc day chi can sang ngay la du; gio phai qua dung gio cua SLEEVE do."""
+    p = _snapshot(tmp_path, _pos("roska4_swing", DAY1, stop_order_id="stp-1"),
+                  today=DAY2, now=DAY2 + pd.Timedelta(hours=14, minutes=5))
     assert p["stop_deferred"] is False
     assert p["stop_order_id"] == "stp-1"
 

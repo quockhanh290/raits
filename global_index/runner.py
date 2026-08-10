@@ -69,6 +69,30 @@ ET_TZ = "America/New_York"
 # measurement and is deliberately left alone.
 _DEFERRED_STOP_CLUSTERS = frozenset({"roska4_swing", "global_nkd"})
 
+# Gio vu trang stop: 14 gio sau ranh gioi ngay phien CUA CHINH SLEEVE DO.
+#
+# Mot hang so duy nhat, nhung moi sleeve mot dong ho — nen phai khai bang MUI GIO, khong
+# phai bang gio ET co dinh:
+#
+#   roska4_swing  14:00 America/New_York
+#   global_nkd    14:00 Asia/Tokyo
+#
+# Vi sao khong dung gio ET co dinh cho NKD: chenh lech ET<->JST DOI THEO DST (he 13h,
+# dong 14h). Khai "01:00 ET" thi mua he dung 14:00 JST nhung mua dong thanh 15:00 JST —
+# troi mot tieng khoi luat, moi nam hai lan, khong co gi bao.
+#
+# Con so 14h khong phai dinh cua mot bang: hai phep walk-forward DOC LAP (Ro 4 va MNKD,
+# hai dong ho, hai bo du lieu) deu hoi tu ve no — Ro 4 h*=14h 6/7 nam, MNKD 7/7.
+#
+#   Ro 4  o 1,17h (truoc day): +$41.505 ngoai mau   |  o 14h: +$116.530
+#   MNKD  o 14,17h (hien tai): +$35.458 ngoai mau   |  DA DUNG, khong doi
+#
+# KHONG vu trang tai ranh gioi phien. Nghi CME 17:00-18:00 ET: vu trang o 17-18h lam ty
+# le thoat GAP vot tu 6% len 40% va P&L sup tu +$128.863 xuong -$1.091. Nghi NKD
+# 06:00-08:45 JST co ho tuong tu. Ca 14:00 ET lan 14:00 JST deu giua phien.
+_ARM_BY_CLUSTER = {"roska4_swing": ("America/New_York", 14, 0),
+                   "global_nkd":   ("Asia/Tokyo", 14, 0)}
+
 
 # fit_A degradation floor — the Calmar the live system is measured against. Single
 # source of truth is INVARIANTS.md; keep this and generate_replay_snapshots.py in
@@ -193,7 +217,7 @@ class FuturesRunner:
                  hmm_stale_guard=None, positions_path=None, lock_path=None,
                  live_state_path=None, paper_history_path=None,
                  stop_path=None, max_contracts_per_order=10,
-                 regime_fn=None, trade_log_path=None, today=None):
+                 regime_fn=None, trade_log_path=None, today=None, now=None):
         """signal_fn(day, bars_by_inst, held) -> (entry_candidates, exit_positions)
         wraps signal_layer.generate_today_signals with the engines/labels/costs bound.
         Injecting it keeps the runner testable without real engines.
@@ -239,8 +263,17 @@ class FuturesRunner:
         # The stop-free window is DELIBERATE — see _stop_deferred. Anchored in ET
         # because the engine's day keys are ET: at 09:00 in Hanoi it is 22:00 ET the
         # previous day, so a local-clock "today" would place stops a day early.
+        # `now` la moc thoi gian ET; `today` chi la ngay phien. Truyen `today` ma
+        # khong truyen `now` nghia la "coi nhu la ngay do" — lay nua dem ngay do, KHONG
+        # lay dong ho that. Tron hai thu se lam hanh vi phu thuoc gio chay.
+        if now is not None:
+            self._now = pd.Timestamp(now)
+        elif today is not None:
+            self._now = pd.Timestamp(today).normalize()
+        else:
+            self._now = pd.Timestamp.now(tz=ET_TZ).tz_localize(None)
         self._today = (pd.Timestamp(today).normalize() if today is not None
-                       else pd.Timestamp.now(tz=ET_TZ).normalize().tz_localize(None))
+                       else self._now.normalize())
 
         # B1: load persisted positions + breaker state if path is supplied and file exists
         self._positions_path = Path(positions_path) if positions_path else None
@@ -511,6 +544,24 @@ class FuturesRunner:
                     # above achieves nothing. The exclusion lapses on its own the moment
                     # the entry day passes, so the same loop is what finally places the
                     # stop: no new job, and a genuinely lost stop is still caught.
+                    # The expiry-aware authority. has_working_stop matches on SYMBOL, so
+                    # after a roll whose cancel failed it counts the dead contract's STP as
+                    # protection for the position on the new contract — B4 then reports
+                    # "covered" (STP ID DRIFT, a warning) about a position that is bare.
+                    # unprotected_positions matches on (symbol, expiry, side) and sums
+                    # contracts, so where the two disagree this one is right.
+                    # None means the broker cannot say; then nothing is overridden and the
+                    # symbol-level answer stands, which is what ran before.
+                    try:
+                        _unprot = broker.unprotected_positions()
+                    except (NotImplementedError, AttributeError):
+                        _unprot = None
+                    except Exception as _e:
+                        _unprot = None
+                        logger.error("B4: unprotected_positions() failed: %s", _e)
+                    _unprot_insts = (None if _unprot is None
+                                     else {u["inst"] for u in _unprot})
+
                     _deferred = [p for p in loaded_positions if self._stop_deferred(p)]
                     for p in _deferred:
                         logger.info(
@@ -519,29 +570,67 @@ class FuturesRunner:
                             p.inst, p.cluster,
                             pd.Timestamp(p.entry_day).date() if p.entry_day else "?",
                         )
+                    # "Is the order THIS position recorded still working" — not "does a
+                    # stop exist on this symbol". The symbol form marks a position
+                    # protected by a stop belonging to another position on the same
+                    # contract; the id form cannot. See OPERATIONS.md, "STRESS_MID".
+                    _live_ids = (None if _working is None
+                                 else {str(i) for v in _working.values() for i in v})
                     naked = [p for p in loaded_positions
                              if broker_key.get((p.inst, p.direction), 0) > 0
                              and not self._stop_deferred(p)
                              and (p.stop_order_id is None
-                                  or (_working is not None and p.inst not in _working))]
+                                  or (_live_ids is not None
+                                      and str(p.stop_order_id) not in _live_ids))]
                     self._b4_naked_stops = [(p.inst, p.cluster) for p in naked]
                     for p in naked:
-                        # Only re-place when the level is known AND no stop is already
-                        # working at the broker. Either unknown → alert, never guess:
-                        # a duplicate STP would close the position twice and flip it.
-                        _can_replace = p.stop_price is not None
-                        if _can_replace:
-                            try:
-                                _can_replace = not broker.has_working_stop(p.inst)
-                            except (NotImplementedError, AttributeError):
-                                _can_replace = False
-                                logger.warning(
-                                    "B4: %s/%s — broker cannot report working stops; "
-                                    "not re-placing (duplicate-stop risk)", p.inst, p.cluster)
-                            except Exception as _e:
-                                _can_replace = False
-                                logger.error("B4: has_working_stop(%s) failed: %s", p.inst, _e)
+                        # Only re-place when the level is known AND this position is not
+                        # already covered at the broker. Either unknown → alert, never
+                        # guess: a duplicate STP would close the position twice and flip it.
+                        _covered = None            # None = broker cannot say
+                        try:
+                            _covered = broker.has_working_stop(
+                                p.inst, p.direction, p.contracts)
+                        except (NotImplementedError, AttributeError):
+                            logger.warning(
+                                "B4: %s/%s — broker cannot report working stops; "
+                                "not re-placing (duplicate-stop risk)", p.inst, p.cluster)
+                        except Exception as _e:
+                            logger.error("B4: has_working_stop(%s) failed: %s", p.inst, _e)
 
+                        if _covered and _unprot_insts is not None and p.inst in _unprot_insts:
+                            # Symbol-level says covered, contract-level says bare. Trust the
+                            # contract: the stop it found belongs to another expiry.
+                            logger.warning(
+                                "B4: %s/%s — has_working_stop says covered but "
+                                "unprotected_positions reports the contract bare (stop is on "
+                                "another expiry). Treating as NAKED.", p.inst, p.cluster)
+                            _covered = False
+
+                        if _covered:
+                            # Covered, but by an order this position does not name. That
+                            # is drift, not nakedness, and the difference has to survive
+                            # into the log: shouting NAKED at a protected position every
+                            # slot is how the word stops being read, and the next alert
+                            # that means it goes unnoticed.
+                            #
+                            # Worth its own line rather than silence — the old check
+                            # (`p.inst in working`) said nothing here, and that silence is
+                            # what let MES carry the fabricated id 62 beside working stop
+                            # #9 on 2026-08-05 until the close cancelled a ghost and
+                            # orphaned the live order.
+                            logger.warning(
+                                "B4 STP ID DRIFT: %s %s x%d (%s) IS covered at the broker, "
+                                "but the recorded stop_order_id=%s names no working order. "
+                                "Not re-placing (that would stack a duplicate). OPERATOR: "
+                                "run repair_stops.py to correct the recorded id — on close "
+                                "the runner would otherwise cancel a ghost and leave the "
+                                "real stop working with no position behind it.",
+                                p.direction, p.inst, p.contracts, p.cluster, p.stop_order_id,
+                            )
+                            continue
+
+                        _can_replace = p.stop_price is not None and _covered is False
                         if _can_replace:
                             try:
                                 _sid = broker.place_stop(p.inst, p.direction, p.contracts,
@@ -1129,41 +1218,7 @@ class FuturesRunner:
                     )
                 pos.stop_order_id = None
 
-            # The recorded level belongs to the old contract's price scale. The two
-            # fills just measured what the two contracts differ by, so shifting the
-            # stop by that keeps the same distance to price on the new scale — a
-            # measured spread rather than a quoted one.
-            if pos.stop_price is None:
-                logger.critical(
-                    "C2: %s %s rolled with no recorded stop level — the new contract "
-                    "is UNPROTECTED and no level is known to re-place. OPERATOR: "
-                    "recompute the chandelier level and place the STP in TWS.",
-                    pos.inst, pos.direction,
-                )
-            else:
-                _shift = open_fill.avg_price - close_fill.avg_price
-                _new_stop = pos.stop_price + _shift
-                try:
-                    _sid = self.broker.place_stop(pos.inst, pos.direction,
-                                                  pos.contracts, _new_stop, pos.cluster)
-                except Exception as _e:
-                    _sid = ""
-                    logger.error("C2: place_stop after roll raised for %s: %s",
-                                 pos.inst, _e)
-                if _sid:
-                    pos.stop_price = _new_stop
-                    pos.stop_order_id = _sid
-                    logger.info(
-                        "C2: stop rolled %s: %.4f → %.4f (shift %+.4f) orderId=%s",
-                        pos.inst, _new_stop - _shift, _new_stop, _shift, _sid,
-                    )
-                else:
-                    logger.critical(
-                        "C2: %s %s rolled to the new contract but the replacement STP "
-                        "was NOT accepted (wanted %.4f). Position is UNPROTECTED. "
-                        "OPERATOR: place it in TWS or close the position.",
-                        pos.inst, pos.direction, _new_stop,
-                    )
+            self._roll_stop(pos, open_fill.avg_price - close_fill.avg_price)
             self._persist_state()
 
     # ── main daily loop ──────────────────────────────────────────────────────
@@ -1695,7 +1750,7 @@ class FuturesRunner:
                     # naked for its whole life instead of one session.
                     _stp_pos.stop_price = float(t["stop"])
 
-                if _stp_pos is not None and self._stop_deferred(_stp_pos, day):
+                if _stp_pos is not None and self._stop_deferred(_stp_pos):
                     logger.info(
                         "STP HOAN: %s %s @ %.4f cluster=%s — dat vao phien sau, dung "
                         "luat da kiem dinh (dat ngay: -$10,832 / dat sang ngay: "
@@ -1784,7 +1839,72 @@ class FuturesRunner:
 
         return decision
 
-    def _stop_deferred(self, p, today=None) -> bool:
+    def _roll_stop(self, pos, shift: float) -> None:
+        """Move a position's stop onto the contract it just rolled into.
+
+        Split out of _handle_rollover so it can be driven directly. It was inline, and a
+        test could only reach it by staging a whole rollover — so the two defects below
+        went unnoticed, and a test written against a hand-copied version of the logic
+        would only have proved the copy right.
+
+        The recorded level belongs to the OLD contract's price scale. The two fills just
+        measured what the contracts differ by, so shifting by that keeps the same distance
+        to price on the new scale — a measured spread rather than a quoted one.
+        """
+        if pos.stop_price is None:
+            logger.critical(
+                "C2: %s %s rolled with no recorded stop level — the new contract "
+                "is UNPROTECTED and no level is known to re-place. OPERATOR: "
+                "recompute the chandelier level and place the STP in TWS.",
+                pos.inst, pos.direction,
+            )
+            return
+
+        _new_stop = pos.stop_price + shift
+        # Record the shifted level BEFORE trying to place it, and keep it whatever
+        # happens. It used to be written only when the order was accepted, so a refused
+        # STP left the OLD contract's level on file — and B4, whose whole rule is "only
+        # re-place when the level is known", would then place that stale level on the new
+        # contract's price scale the next session. The two contracts differ by exactly the
+        # shift just measured, so the wrong level is wrong by that much, quietly.
+        pos.stop_price = _new_stop
+
+        if self._stop_deferred(pos):
+            # Rolled while still inside its deliberate stop-free window: entered the
+            # previous session and the arm time has not come round yet. The roll does not
+            # move entry_day, so the window is unchanged and the level is now recorded —
+            # B4 places it at the arm time like any other deferred position. Placing here
+            # would arm this one position early for no reason other than that its contract
+            # happened to roll.
+            pos.stop_order_id = None
+            logger.info(
+                "C2: %s stop level rolled to %.4f but NOT placed — vi the dang trong "
+                "cua so hoan CO CHU DICH (vao ngay %s). B4 se dat dung gio vu trang "
+                "cua sleeve.",
+                pos.inst, _new_stop,
+                pd.Timestamp(pos.entry_day).date() if pos.entry_day else "?",
+            )
+            return
+
+        try:
+            _sid = self.broker.place_stop(pos.inst, pos.direction, pos.contracts,
+                                          _new_stop, pos.cluster)
+        except Exception as _e:
+            _sid = ""
+            logger.error("C2: place_stop after roll raised for %s: %s", pos.inst, _e)
+        if _sid:
+            pos.stop_order_id = _sid
+            logger.info("C2: stop rolled %s: %.4f → %.4f (shift %+.4f) orderId=%s",
+                        pos.inst, _new_stop - shift, _new_stop, shift, _sid)
+        else:
+            logger.critical(
+                "C2: %s %s rolled to the new contract but the replacement STP was NOT "
+                "accepted (wanted %.4f). Position is UNPROTECTED. OPERATOR: place it "
+                "in TWS or close the position.",
+                pos.inst, pos.direction, _new_stop,
+            )
+
+    def _stop_deferred(self, p, now=None) -> bool:
         """True while a position is inside its DELIBERATE stop-free window.
 
         backtest_swing_tf checks the stop inside `if pos is not None`, which runs
@@ -1815,15 +1935,28 @@ class FuturesRunner:
         DOLLAR magnitude for NKD has not been measured, only Rổ 4. STRESS_MID is a
         same-session event model and is excluded.
         """
-        if p.cluster not in _DEFERRED_STOP_CLUSTERS:
-            return False
+        arm = _ARM_BY_CLUSTER.get(p.cluster)
+        if arm is None:
+            return False       # cluster khong thuoc dien hoan (STRESS_MID)
         if p.entry_day is None:
-            return False       # unknown entry day → protect it, never guess
-        ref = pd.Timestamp(today).normalize() if today is not None else self._today
-        # Equality, not >=. An entry_day in the FUTURE is corrupt state, and >= would
-        # defer it forever — a position left naked indefinitely. Every uncertain case
-        # in here resolves towards placing the stop.
-        return pd.Timestamp(p.entry_day).normalize() == ref
+            return False       # khong ro ngay vao → bao ve, khong doan
+
+        # Gio vu trang cua CHINH cluster nay, khong phai cua cluster khac. Truoc day vi
+        # tu chi so `entry_day == today`, nen ca hai sleeve deu duoc dat stop o job dau
+        # tien cua ngay ke tiep — tinh co la 01:10 ET, dung cho NKD (14h JST) nhung sai
+        # cho Ro 4 (moi 1,17h sau ranh gioi ngay ET).
+        # Dung gio dia phuong cua sleeve roi doi sang ET — khong cong gio ET truc tiep.
+        _tz, _hh, _mm = arm
+        _d = (pd.Timestamp(p.entry_day).normalize() + pd.Timedelta(days=1)).date()
+        arm_at = (pd.Timestamp(f"{_d} {_hh:02d}:{_mm:02d}", tz=_tz)
+                  .tz_convert(ET_TZ).tz_localize(None))
+        ref = pd.Timestamp(now) if now is not None else self._now
+
+        # Ngay vao lenh o TUONG LAI la trang thai hong, khong phai cua so. Hoan tiep se
+        # de mot vi the tran vo thoi han — hong nang hon cai dang di sua.
+        if pd.Timestamp(p.entry_day).normalize() > ref.normalize():
+            return False
+        return ref < arm_at
 
     def _audit_working_stops(self, today=None) -> None:
         """CRITICAL for any open position the broker holds no working stop for.
@@ -1849,8 +1982,16 @@ class FuturesRunner:
         # Positions inside the deliberate window are expected to have no stop; reporting
         # them CRITICAL every session would train the operator to ignore the one alert
         # that means a stop actually went missing.
-        _defer_insts = {p.inst for p in self.state.open_positions
-                        if self._stop_deferred(p, today)}
+        # Suppress only where EVERY position on the instrument is inside its window.
+        # The set used to be "any deferred position's instrument", so one fresh stress
+        # entry would silence the alert for a swing position on the same contract that
+        # had genuinely lost its stop — the alert being suppressed by the very situation
+        # that makes it worth having.
+        _by_inst: dict = {}
+        for p in self.state.open_positions:
+            _by_inst.setdefault(p.inst, []).append(p)
+        _defer_insts = {i for i, ps in _by_inst.items()
+                        if all(self._stop_deferred(x) for x in ps)}
         if _defer_insts:
             logger.info("B5: bo qua %s — trong cua so hoan STP co chu dich",
                         ", ".join(sorted(_defer_insts)))
@@ -1883,8 +2024,9 @@ class FuturesRunner:
             return
         if working is None:
             return
+        _live_ids = {str(i) for v in working.values() for i in v}
         for p in self.state.open_positions:
-            if p.inst in working or self._stop_deferred(p, today):
+            if str(p.stop_order_id) in _live_ids or self._stop_deferred(p):
                 continue
             logger.critical(
                 "STP UNPROTECTED: %s %s x%d (%s) is open with no working stop at the "

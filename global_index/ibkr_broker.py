@@ -81,6 +81,17 @@ _IBKR_EXCHANGE: dict[str, str] = {
 _IBKR_TO_RAITS: dict[str, str] = {v: k for k, v in _RAITS_TO_IBKR.items()}
 
 
+# LONG is protected by a SELL stop, SHORT by a BUY stop. A stop on the wrong side does
+# not close the position — it doubles it. Live 2026-08-05 carried exactly that: a SELL
+# MYM stop against a SHORT MYM position, left over from an earlier LONG.
+#
+# Declared here, imported by check_open_orders/repair_stops. It used to live only in the
+# CLI tool, so the broker's own checks had no notion of side at all and counted any stop
+# on the contract as protection. Two copies of this mapping would be two chances to
+# disagree about what "protected" means — the exact failure these tools exist to catch.
+PROTECTIVE_SIDE = {"LONG": "SELL", "SHORT": "BUY"}
+
+
 def _to_runner(symbol: str) -> str:
     """Translate an IBKR contract symbol into the runner's vocabulary.
 
@@ -866,6 +877,7 @@ class IBKRBroker(Broker):
     # Statuses that mean IBKR holds the order. PendingSubmit is NOT one of them:
     # ib_insync sets it locally in placeOrder (ib.py:673) before IBKR says anything.
     _STP_LIVE_STATUS = ("PreSubmitted", "Submitted")
+    _PROTECTIVE_SIDE = PROTECTIVE_SIDE
     _STP_DEAD_STATUS = ("Cancelled", "ApiCancelled", "Inactive", "Filled")
     STP_ACCEPT_SECS = 5.0
 
@@ -1060,8 +1072,9 @@ class IBKRBroker(Broker):
             log.error("get_order_status(orderId=%s) failed: %s", order_id, exc)
             return "NOT_FOUND"
 
-    def has_working_stop(self, inst: str) -> bool:
-        """True if a live stop order for `inst` is currently working at IBKR.
+    def has_working_stop(self, inst: str, direction: "str | None" = None,
+                         contracts: "int | None" = None) -> bool:
+        """True if this position is already covered by live stops at IBKR.
 
         B4 calls this before re-placing a stop for a position whose stop_order_id is
         missing, to avoid stacking a second STP on the same contract (both firing
@@ -1069,12 +1082,25 @@ class IBKRBroker(Broker):
 
         reqAllOpenOrders() is issued first so orders placed by *other* clientIds — or
         by an earlier process — are visible; openTrades() alone only reflects orders
-        this session knows about. Matches on contract symbol (the same field
-        get_positions() reports as `inst`).
+        this session knows about.
+
+        With `inst` alone the answer is "does ANY stop exist on this symbol", which is
+        what this method used to ask and what makes it wrong for two positions sharing a
+        contract: the first one's stop makes B4 refuse to place the second one's, and
+        `unprotected_positions` reports the symbol as covered. Passing `direction` and
+        `contracts` narrows it to this position's own protective side and its own size.
+
+        Side matters on its own: a SELL stop does not protect a SHORT, it doubles it.
+        The symbol-level form cannot tell the difference, which is why the sharper form
+        exists rather than the old one being tightened in place — the loose answer is
+        still the right one for callers that only want "is anything working here".
         """
         if self._raw_fetcher is not None:
             return False  # offline / test mode
 
+        want = self._PROTECTIVE_SIDE.get(direction) if direction else None
+        need = int(contracts or 0)
+        covered = 0
         ib = self._require_connection()
         for t in ib.reqAllOpenOrders():
             if _to_runner(t.contract.symbol) != inst:
@@ -1083,40 +1109,72 @@ class IBKRBroker(Broker):
                 continue
             if t.orderStatus.status not in self._STP_LIVE_STATUS:
                 continue
-            log.info("has_working_stop(%s): orderId=%s status=%s — already protected",
-                     inst, t.order.orderId, t.orderStatus.status)
-            return True
+            if want is None:
+                log.info("has_working_stop(%s): orderId=%s status=%s — already protected",
+                         inst, t.order.orderId, t.orderStatus.status)
+                return True
+            if getattr(t.order, "action", None) != want:
+                continue
+            covered += int(getattr(t.order, "totalQuantity", 0) or 0)
+            if covered >= need:
+                log.info("has_working_stop(%s %s x%d): covered %d — already protected",
+                         inst, direction, need, covered)
+                return True
+        if want is not None and 0 < covered < need:
+            # Partly covered is not covered. Say so — B4 will not stack a top-up (it
+            # cannot know why the shortfall exists), and a silent "False" here would
+            # read as "no stop at all" in the alert.
+            log.warning("has_working_stop(%s %s x%d): only %d contract(s) covered",
+                        inst, direction, need, covered)
         return False
 
     def unprotected_positions(self) -> "list | None":
-        """Open positions with no stop working on THEIR OWN contract.
+        """Open positions whose OWN contract is not fully covered by stops on THEIR side.
 
-        get_working_stops and has_working_stop both match on the instrument symbol,
-        which answers "is there a stop for MES" rather than "is this position
-        protected". Those differ the moment a position and a stop sit on different
-        expiries — after a rollover, most obviously, where _handle_rollover moves the
-        position to the next contract and the old contract's STP is left working. The
-        symbol-level check then reports the new position as protected while the only
-        live stop belongs to a contract that is no longer held.
+        get_working_stops and the symbol-only form of has_working_stop both match on the
+        instrument symbol, which answers "is there a stop for MES" rather than "is this
+        position protected". Those differ in three ways, and this method is where each is
+        resolved:
 
-        Matching on (symbol, lastTradeDateOrContractMonth) is done here because this
-        is where the IBKR contract objects are; nothing above needs a new field.
+          * different expiry — after a rollover, _handle_rollover moves the position to
+            the next contract and the old contract's STP is left working. Matching on
+            (symbol, expiry) is done here because this is where the IBKR contract objects
+            are; nothing above needs a new field.
+          * wrong side — a SELL stop against a SHORT does not close it, it doubles it.
+            This used to filter on order type and status only, so any live stop on the
+            contract counted as protection regardless of direction.
+          * short size — this used to test `exp in have`, the EXISTENCE of a stop. A
+            1-lot stop under a 2-lot position satisfied that. Contracts are now summed
+            and compared against the position.
 
         Returns None offline — cannot testify rather than testifying falsely.
-        Each entry: {"inst", "expiry", "qty", "stop_expiries"}.
+        Each entry: {"inst", "expiry", "qty", "covered", "stop_expiries"}.
+
+        KNOWN BLIND SPOT — netting. ib.positions() reports the NET position per contract,
+        so two sleeves holding opposite sides of the same contract (swing LONG 1 + stress
+        SHORT 1) net to zero and BOTH disappear from this scan at `if not p.position`.
+        No broker-side check can see them; the account genuinely holds nothing. The book
+        is the only witness, which is why B3 compares the file against the net and why
+        two clusters must not hold opposing sides of one contract. See OPERATIONS.md,
+        "STRESS_MID: tại sao cron 10:20 bị TẮT".
         """
         if self._raw_fetcher is not None:
             return None
 
         ib = self._require_connection()
-        stops: dict = {}
+        covered: dict = {}      # (sym, expiry, action) -> contracts working
+        anywhere: dict = {}     # sym -> expiries carrying a live stop, for the report
         for t in ib.reqAllOpenOrders():
             if t.order.orderType not in ("STP", "STP LMT"):
                 continue
             if t.orderStatus.status not in self._STP_LIVE_STATUS:
                 continue
             sym = _to_runner(t.contract.symbol)
-            stops.setdefault(sym, set()).add(t.contract.lastTradeDateOrContractMonth)
+            exp = t.contract.lastTradeDateOrContractMonth
+            act = getattr(t.order, "action", None)
+            qty = int(getattr(t.order, "totalQuantity", 0) or 0)
+            covered[(sym, exp, act)] = covered.get((sym, exp, act), 0) + qty
+            anywhere.setdefault(sym, set()).add(exp)
 
         out = []
         for p in ib.positions():
@@ -1124,18 +1182,25 @@ class IBKRBroker(Broker):
                 continue
             sym = _to_runner(p.contract.symbol)
             exp = p.contract.lastTradeDateOrContractMonth
-            have = stops.get(sym, set())
-            if exp in have:
+            qty = int(p.position)
+            want = self._PROTECTIVE_SIDE["LONG" if qty > 0 else "SHORT"]
+            have = covered.get((sym, exp, want), 0)
+            if have >= abs(qty):
                 continue
-            out.append({"inst": sym, "expiry": exp, "qty": int(p.position),
-                        "stop_expiries": sorted(have)})
+            out.append({"inst": sym, "expiry": exp, "qty": qty, "covered": have,
+                        "stop_expiries": sorted(anywhere.get(sym, set()))})
         return out
 
     def get_working_stops(self) -> "dict | None":
-        """{inst: orderId} for every stop working at IBKR, across all clients.
+        """{inst: [orderId, ...]} for every stop working at IBKR, across all clients.
 
         One reqAllOpenOrders round trip covers every position, so B4 and the
         end-of-session check can afford to run it on each 5-minute slot.
+
+        A LIST per instrument, not one id. `working[inst] = orderId` overwrote, so with
+        two stops on one contract the dict remembered only the last — and the caller,
+        asking `p.inst in working`, was answered about an order belonging to someone
+        else. The id is what makes the answer checkable per position.
 
         Returns None only when this broker is offline (test mode), never {} — the
         caller must be able to tell "nothing working" from "cannot say".
@@ -1150,7 +1215,8 @@ class IBKRBroker(Broker):
                 continue
             if t.orderStatus.status not in self._STP_LIVE_STATUS:
                 continue
-            working[_to_runner(t.contract.symbol)] = str(t.order.orderId)
+            working.setdefault(_to_runner(t.contract.symbol), []).append(
+                str(t.order.orderId))
         return working
 
     def find_execution(self, order_id: str) -> "dict | None":

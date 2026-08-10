@@ -123,6 +123,10 @@ def _runner_on(broker, tmp_path, today, signal_fn=None):
         breaker=CircuitBreaker(account=ACCOUNT),
         positions_path=tmp_path / "pos.json",
         today=today,
+        # Gio vu trang gio la RIENG tung sleeve (14:00 ET cho swing, 01:00 ET cho NKD),
+        # nen `today` mot minh khong con du — phai noi ro moc thoi gian. 14:05 la slot
+        # giao dich dau tien, tuc da qua ca hai gio.
+        now=pd.Timestamp(today) + pd.Timedelta(hours=14, minutes=5),
     )
 
 
@@ -391,9 +395,13 @@ def _naked_broker(stop_working=False, working_raises=None):
     b = _RecordingMockBroker({}, ACCOUNT)
     b._positions = [BrokerPosition("MES", "LONG", 1, CLUSTER, DAY1, None, 0.0)]
     if working_raises is not None:
-        b.has_working_stop = lambda _inst: (_ for _ in ()).throw(working_raises)
+        b.has_working_stop = lambda _inst, _dir=None, _n=None: (
+            (_ for _ in ()).throw(working_raises))
     else:
-        b.has_working_stop = lambda _inst: stop_working
+        # B4 now asks the per-position form (inst, direction, contracts); the fake must
+        # accept it or the call raises TypeError, B4 declines to place, and the test
+        # passes for the wrong reason.
+        b.has_working_stop = lambda _inst, _dir=None, _n=None: stop_working
     return b
 
 
@@ -486,7 +494,7 @@ def test_b4_5_noharm_position_with_stop_is_not_naked(tmp_path):
 def _reporting_broker(working: dict):
     """MockBroker that CAN report working stops (unlike plain MockBroker → None)."""
     b = _naked_broker(stop_working=bool(working))
-    b.get_working_stops = lambda: dict(working)
+    b.get_working_stops = lambda: {k: list(v) for k, v in working.items()}
     return b
 
 
@@ -503,9 +511,50 @@ def test_b4_6_fabricated_stop_id_with_no_working_stop_is_naked(tmp_path):
     assert len(broker.stp_calls) == 1, "level is known and nothing is working → re-place"
 
 
+def test_b4_8_expiry_aware_check_overrides_the_symbol_level_one(tmp_path):
+    """has_working_stop khớp theo SYMBOL. Sau một lần roll mà cancel thất bại, stop của hợp
+    đồng ĐÃ CHẾT vẫn sống trên cùng mã, nên nó trả True cho một vị thế đang trần — và B4 sẽ
+    ghi `STP ID DRIFT` (cảnh báo) thay vì đặt lại stop.
+
+    `unprotected_positions` khớp theo (mã, expiry, bên) và cộng số hợp đồng, nên khi hai bên
+    bất đồng thì nó là bên đúng. Test này ghim thứ tự ưu tiên đó."""
+    broker = _naked_broker(stop_working=True)          # symbol-level: "da duoc phu"
+    broker.unprotected_positions = lambda: [
+        {"inst": "MES", "expiry": "20261218", "qty": 1, "covered": 0,
+         "stop_expiries": ["20260918"]}]                # contract-level: TRAN
+    runner = _make_runner(broker, _naked_file(tmp_path, stop_price=4950.0))
+
+    assert len(broker.stp_calls) == 1, (
+        "B4 phai tin unprotected_positions va dat lai stop; tin has_working_stop se de vi "
+        "the tran voi mot dong WARNING noi rang no da duoc bao ve")
+
+
+def test_b4_9_no_override_when_the_broker_cannot_answer(tmp_path):
+    """`unprotected_positions` trả None nghĩa là "không kết luận được" (MockBroker, offline).
+    Khi đó KHÔNG được ghi đè — phải giữ nguyên hành vi cũ, nếu không mọi broker không trả lời
+    được sẽ bị coi như đang báo trần."""
+    broker = _naked_broker(stop_working=True)
+    broker.unprotected_positions = lambda: None
+    runner = _make_runner(broker, _naked_file(tmp_path, stop_price=4950.0))
+
+    assert broker.stp_calls == [], "None la 'khong biet', khong phai 'tran'"
+
+
+def test_b4_10_no_override_when_the_contract_check_agrees(tmp_path):
+    """Hai bên cùng nói đã được phủ → không đặt gì. Chặn chiều hỏng ngược lại: một bản sửa
+    quá tay sẽ đặt stop chồng lên vị thế vốn đã có stop."""
+    broker = _naked_broker(stop_working=True)
+    broker.unprotected_positions = lambda: []
+    runner = _make_runner(broker, _naked_file(tmp_path, stop_price=4950.0))
+
+    assert broker.stp_calls == []
+
+
 def test_b4_7_working_stop_at_broker_is_not_naked(tmp_path):
     """Broker confirms a stop is working → B4 silent, no duplicate placed."""
-    broker = _reporting_broker({"MES": "62"})
+    # The id must be the one the position recorded: B4 asks "is MY stop still working",
+    # so a stop belonging to another position on the same contract no longer counts.
+    broker = _reporting_broker({"MES": ["62"]})
     runner = _make_runner(broker, _naked_file(tmp_path, stop_price=4950.0,
                                               stop_order_id="62"))
 
@@ -531,6 +580,9 @@ class _StopFailsBroker(_RecordingMockBroker):
 
     def get_working_stops(self):
         return {}                              # broker: không có stop nào đang chạy
+
+    def has_working_stop(self, _inst, direction=None, contracts=None):
+        return False
 
 
 def _hold_signal(day, bars, held):
@@ -590,7 +642,9 @@ def test_stp10b_session_end_flags_position_with_no_working_stop(tmp_path):
 def test_stp11_session_end_silent_when_stop_is_working(tmp_path):
     """Broker confirms the stop → no alert. Guards against crying wolf every slot."""
     broker = _RecordingMockBroker({}, ACCOUNT)
-    broker.get_working_stops = lambda: {"MES": "stp-MES-0"}
+    # {inst: [orderId, ...]} and the check is now "is the id THIS position recorded
+    # still working", so the fake must name the id the runner actually stored.
+    broker.get_working_stops = lambda: {"MES": ["stp-MES-0"]}
     runner = FuturesRunner(
         broker=broker, guard=_make_guard(),
         contracts_by_inst={"MES": 1},
@@ -740,6 +794,7 @@ def test_stp11_nkd_is_deferred_like_swing(tmp_path):
         signal_fn=_nkd_hold_signal,
         breaker=CircuitBreaker(account=ACCOUNT),
         positions_path=tmp_path / "pos.json", today=DAY1,
+        now=DAY1 + pd.Timedelta(hours=14, minutes=5),
     )
     runner.run_day(DAY1)
 
@@ -756,12 +811,14 @@ def test_stp11b_nkd_gets_its_stop_the_next_day(tmp_path):
         broker=broker, guard=_make_guard(), contracts_by_inst={"MNKD": 1},
         signal_fn=_nkd_hold_signal, breaker=CircuitBreaker(account=ACCOUNT),
         positions_path=tmp_path / "pos.json", today=DAY1,
+        now=DAY1 + pd.Timedelta(hours=14, minutes=5),
     ).run_day(DAY1)
 
     FuturesRunner(
         broker=broker, guard=_make_guard(), contracts_by_inst={"MNKD": 1},
         signal_fn=_nkd_hold_signal, breaker=CircuitBreaker(account=ACCOUNT),
         positions_path=tmp_path / "pos.json", today=DAY2,
+        now=DAY2 + pd.Timedelta(hours=14, minutes=5),
     )
     assert len(broker.stp_calls) == 1, f"B4 phải đặt STP cho MNKD, {broker.stp_calls}"
     assert broker.stp_calls[0]["inst"] == "MNKD"
@@ -786,6 +843,7 @@ def test_stp11c_stress_is_not_deferred(tmp_path):
         broker=broker, guard=_make_guard(), contracts_by_inst={"MES": 1},
         signal_fn=_stress_hold_signal, breaker=CircuitBreaker(account=ACCOUNT),
         positions_path=tmp_path / "pos.json", today=DAY1,
+        now=DAY1 + pd.Timedelta(hours=14, minutes=5),
     )
     runner.run_day(DAY1)
 
@@ -823,6 +881,7 @@ def test_stp12_every_live_instrument_defers(tmp_path, inst, cluster, entry, stop
         broker=broker, guard=_make_guard(), contracts_by_inst={inst: 1},
         signal_fn=_sig, breaker=CircuitBreaker(account=ACCOUNT),
         positions_path=tmp_path / "pos.json", today=DAY1,
+        now=DAY1 + pd.Timedelta(hours=14, minutes=5),
     )
     runner.run_day(DAY1)
 
@@ -849,10 +908,12 @@ def test_stp12b_every_live_instrument_gets_its_stop_next_day(tmp_path, inst, clu
     kw = dict(broker=broker, guard=_make_guard(), contracts_by_inst={inst: 1},
               signal_fn=_sig, breaker=CircuitBreaker(account=ACCOUNT),
               positions_path=tmp_path / "pos.json")
-    FuturesRunner(today=DAY1, **kw).run_day(DAY1)
+    FuturesRunner(today=DAY1, now=DAY1 + pd.Timedelta(hours=14, minutes=5),
+                  **kw).run_day(DAY1)
     assert broker.stp_calls == []
 
-    FuturesRunner(today=DAY2, **kw)          # B4 chạy trong __init__
+    FuturesRunner(today=DAY2, now=DAY2 + pd.Timedelta(hours=14, minutes=5),
+                  **kw)                        # B4 chạy trong __init__
     assert len(broker.stp_calls) == 1, f"{inst}: B4 phải đặt STP, {broker.stp_calls}"
     assert broker.stp_calls[0]["inst"] == inst
     assert broker.stp_calls[0]["stop_price"] == stop

@@ -1,16 +1,13 @@
-"""Cửa sổ không-có-stop là CÓ CHỦ ĐÍCH — ai được hưởng, ai không, và khi nào nó hết.
+"""Cửa sổ hoãn STP được neo theo ĐỒNG HỒ NÀO — và vì sao đó là chỗ dễ sai nhất.
 
-Live đặt STP 0–1 giây sau khi khớp. `backtest_swing_tf` kiểm stop trong khối
-`if pos is not None`, chạy trước khối vào lệnh cùng vòng lặp ngày, nên vị thế mở hôm nay
-mãi hôm sau mới bị xét. Đo trên 2018–2026 (model_sameday_stop.py, có cổng đối chiếu
-trade-for-trade với engine): đặt ngay **−$10.832**, đặt sang ngày **+$47.166**.
+Luật *khi nào* vũ trang nằm ở `test_arm_time_per_sleeve.py` (mỗi sleeve một giờ riêng,
+14h sau ranh giới ngày phiên của chính nó). File này chỉ giữ phần **múi giờ**, vì nó là
+loại lỗi đã xảy ra bốn lần trong một phiên làm việc và không lần nào tự báo.
 
-Ba guard cùng phải hiểu cửa sổ này — chỗ đặt lệnh, B4, B5. Bỏ sót B4 là hỏng cả bản sửa:
-nó tự đặt lại stop ở mỗi lần chạy, cửa sổ co còn ~5 phút, và bảng đo nói mốc đó vẫn âm.
-
-Điều kiện biên quan trọng nhất ở đây là **múi giờ**. Máy chạy hệ thống đi trước ET 11
-tiếng, nên `Timestamp.now()` theo giờ máy gọi sai phiên trong phần lớn ngày làm việc —
-và gọi sai theo hướng nguy hiểm: đặt stop sớm một ngày, tức quay về đúng cấu hình lỗ.
+Trước đây file này còn chốt "cửa sổ đúng một ngày lịch". Luật đó đã bị thay: nó khiến CẢ
+HAI sleeve được đặt stop ở job đầu tiên của ngày kế tiếp — tình cờ là slot đêm 01:10 ET,
+đúng cho NKD (14h JST) nhưng sai cho Rổ 4 (mới 1,17h sau ranh giới ngày ET, đo được
++$41.505 thay vì +$116.530 ngoài mẫu). Các ca đó đã chuyển sang file mới.
 """
 from __future__ import annotations
 
@@ -24,107 +21,68 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from global_index.runner import ET_TZ, FuturesRunner
 
-SWING, NKD, STRESS = "roska4_swing", "global_nkd", "roska4_stress"
-TODAY = pd.Timestamp("2026-08-10")
+SWING = "roska4_swing"
 
 
 class _P:
-    def __init__(self, cluster, entry_day, inst="MES"):
-        self.cluster, self.inst = cluster, inst
-        self.entry_day = None if entry_day is None else pd.Timestamp(entry_day)
+    def __init__(self, entry_day):
+        self.cluster, self.inst = SWING, "MES"
+        self.entry_day = pd.Timestamp(entry_day)
         self.direction, self.contracts = "SHORT", 1
         self.stop_price, self.stop_order_id = 7769.03, None
 
 
-def _runner(today=TODAY):
-    r = FuturesRunner.__new__(FuturesRunner)
-    r._today = pd.Timestamp(today).normalize()
-    return r
-
-
-def test_entered_today_is_deferred():
-    """Trường hợp chính: vào lệnh chiều nay thì chưa đặt STP."""
-    assert _runner()._stop_deferred(_P(SWING, TODAY)) is True
-
-
-def test_entered_yesterday_is_protected():
-    """Cửa sổ hết hạn TỰ NÓ khi sang ngày — không cần job mới, chính B4 đặt stop."""
-    assert _runner()._stop_deferred(_P(SWING, TODAY - pd.Timedelta(days=1))) is False
-
-
-def test_the_window_is_exactly_one_calendar_day():
-    """Sang ngày lịch là hết, khớp đúng luật engine dùng. Nếu chỗ này nới ra thì live
-    chạy một luật khác backtest lần nữa, chỉ theo chiều ngược lại."""
-    r = _runner()
-    assert r._stop_deferred(_P(SWING, TODAY)) is True
-    assert r._stop_deferred(_P(SWING, TODAY - pd.Timedelta(days=1))) is False
-
-
-def test_nkd_is_included():
-    """NKD chạy CÙNG backtest_swing_tf nên thừa hưởng đúng ngữ nghĩa đó. Độ lớn bằng
-    tiền cho NKD thì CHƯA đo — mới chỉ đo Rổ 4 — nhưng sai lệch luật thì y hệt."""
-    assert _runner()._stop_deferred(_P(NKD, TODAY, inst="MNKD")) is True
-
-
-def test_stress_is_not_deferred():
-    """STRESS_MID vào và ra trong cùng phiên, không chạy qua engine swing. Phép đo
-    không phủ nó, nên không đụng tới: STP vẫn đặt ngay lúc khớp."""
-    assert _runner()._stop_deferred(_P(STRESS, TODAY)) is False
-
-
-def test_unknown_entry_day_is_protected():
-    """Không biết vào ngày nào thì bảo vệ, không đoán. Hoãn nhầm nghĩa là để một vị thế
-    trần vô thời hạn — hỏng nặng hơn hẳn so với đặt stop sớm."""
-    assert _runner()._stop_deferred(_P(SWING, None)) is False
-
-
-def test_a_stale_entry_day_far_in_the_past_is_protected():
-    """Vị thế cũ mang qua nhiều ngày phải có stop, không được rơi vào cửa sổ."""
-    assert _runner()._stop_deferred(_P(SWING, "2026-07-01")) is False
-
-
-def test_explicit_today_overrides_the_stored_one():
-    """B5 nhận `day` từ run_day; B4 chạy lúc dựng runner nên dùng giá trị đã lưu. Hai
-    đường phải cho cùng câu trả lời trên cùng một ngày."""
-    r = _runner(TODAY + pd.Timedelta(days=5))
-    p = _P(SWING, TODAY)
-    assert r._stop_deferred(p) is False           # theo _today đã lưu (đã qua cửa sổ)
-    assert r._stop_deferred(p, TODAY) is True     # theo ngày truyền vào
-
-
-def test_an_entry_day_in_the_future_is_protected():
-    """Trạng thái hỏng, không phải cửa sổ. Bản đầu tôi viết `>=` nên ngày vào ở tương
-    lai bị hoãn MÃI MÃI — vị thế trần vô thời hạn, tệ hơn hẳn cái đang đi sửa. Mọi
-    trường hợp không chắc trong hàm này đều phải nghiêng về việc ĐẶT stop."""
-    assert _runner()._stop_deferred(_P(SWING, TODAY + pd.Timedelta(days=1))) is False
-
-
 def test_host_clock_would_name_the_wrong_session():
-    """Điều kiện biên đắt nhất, nên nêu thẳng thành số.
+    """Máy chạy hệ thống đi trước ET 11 tiếng. 09:00 sáng ở đó là 22:00 ET NGÀY HÔM
+    TRƯỚC — nên một mốc lấy theo giờ máy gọi sai phiên trong phần lớn ngày làm việc.
 
-    Máy chạy hệ thống đi trước ET 11 tiếng. 09:00 sáng ở đây là 22:00 ET NGÀY HÔM TRƯỚC.
-    Lấy ngày theo giờ máy thì một vị thế vào chiều qua (giờ ET) bị coi là 'vào hôm nay'
-    → hoãn thêm một ngày; còn buổi tối thì ngược lại, đặt stop sớm một ngày và rơi lại
-    vào đúng cấu hình −$10.832. Neo theo ET là bắt buộc, không phải tuỳ chọn.
+    Sai theo hướng nguy hiểm: vũ trang stop sớm một ngày, tức quay lại đúng cấu hình đã
+    đo là kém nhất.
     """
     et = pd.Timestamp("2026-08-10 22:00", tz=ET_TZ)
     host = et.tz_convert("Asia/Ho_Chi_Minh")
-    assert host.normalize().tz_localize(None) != et.normalize().tz_localize(None)
-    # ngày ET là 08-10; giờ máy đã sang 08-11
     assert et.normalize().tz_localize(None) == pd.Timestamp("2026-08-10")
     assert host.normalize().tz_localize(None) == pd.Timestamp("2026-08-11")
 
-    r = _runner(pd.Timestamp("2026-08-10"))          # đúng: neo ET
-    assert r._stop_deferred(_P(SWING, "2026-08-10")) is True
-    r_bad = _runner(pd.Timestamp("2026-08-11"))      # sai: neo giờ máy
-    assert r_bad._stop_deferred(_P(SWING, "2026-08-10")) is False   # đặt stop sớm 1 ngày
-
-
-def test_default_today_is_read_in_et():
-    """Không truyền `today` thì mặc định phải là ngày ET, không phải ngày máy."""
     r = FuturesRunner.__new__(FuturesRunner)
-    r._today = pd.Timestamp.now(tz=ET_TZ).normalize().tz_localize(None)
-    assert r._today == pd.Timestamp.now(tz=ET_TZ).normalize().tz_localize(None)
+    p = _P("2026-08-10")
+
+    # neo ET: 22:00 ET ngày vào lệnh — chưa tới 14:00 ET hôm sau
+    r._now = pd.Timestamp("2026-08-10 22:00")
+    assert r._stop_deferred(p) is True
+
+    # neo giờ máy: đã sang 2026-08-11, và nếu ai đó lấy nửa đêm ngày đó thì vẫn hoãn,
+    # nhưng lấy 14:05 "hôm nay" theo giờ máy thì vũ trang sớm nguyên một phiên
+    r_bad = FuturesRunner.__new__(FuturesRunner)
+    r_bad._now = pd.Timestamp("2026-08-11 14:05")
+    assert r_bad._stop_deferred(p) is False        # đã vũ trang — đúng theo ET là hôm sau
+
+
+def test_default_now_is_read_in_et():
+    """Không truyền gì thì mốc mặc định phải là giờ ET, không phải giờ máy."""
+    r = FuturesRunner.__new__(FuturesRunner)
+    r._now = pd.Timestamp.now(tz=ET_TZ).tz_localize(None)
+    delta = abs((r._now - pd.Timestamp.now(tz=ET_TZ).tz_localize(None)).total_seconds())
+    assert delta < 5
+
+
+def test_passing_today_without_now_is_deterministic():
+    """`today` một mình nghĩa là "coi như là ngày đó" — lấy nửa đêm ngày đó, KHÔNG lấy
+    đồng hồ thật. Trộn hai thứ sẽ làm test đỏ hay xanh tuỳ giờ chạy."""
+    import json
+    from futures.circuit_breaker import CircuitBreaker
+    from global_index.broker import MockBroker
+    from global_index.net_exposure_multi import ClusterBudget, MultiClusterGuard
+
+    g = MultiClusterGuard(clusters={SWING: ClusterBudget(SWING, max_gross_pct=0.05,
+                                                         max_net_pct=0.044)},
+                          account=50_000.0)
+    r = FuturesRunner(broker=MockBroker({}, 50_000.0), guard=g,
+                      contracts_by_inst={"MES": 1},
+                      signal_fn=lambda d, b, h: ([], []),
+                      breaker=CircuitBreaker(account=50_000.0),
+                      today=pd.Timestamp("2024-03-12"))
+    assert r._now == pd.Timestamp("2024-03-12")
 
 
 if __name__ == "__main__":

@@ -313,6 +313,18 @@ def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs
             _ts = pd.Timestamp(_any.index[-1])
             today_naive = _ts.tz_localize(None).normalize() if _ts.tzinfo else _ts.normalize()
 
+            # Luật ở đây PHẢI giữ nguyên như deploy_sim: sim đã kiểm định chạy
+            # StressMidEngine().backtest_basket() ĐỘC LẬP với swing rồi nối hai danh sách
+            # lệnh (deploy_sim.py:180-218) — nó không bao giờ hỏi swing đang giữ gì. Nên
+            # stress ĐƯỢC PHÉP nằm cùng mã với swing, và vị từ này chỉ chặn vị thế stress
+            # thứ hai.
+            #
+            # Tôi từng siết nó thành "một vị thế mỗi mã trên mọi cluster" để chặn chuyện
+            # bù trừ ròng (xem OPERATIONS.md, mục "STRESS_MID"). Siết như vậy là ĐÚNG về
+            # an toàn nhưng SAI về nguyên tắc: nó cho live chạy một luật backtest chưa
+            # kiểm, đúng hình dạng đã làm mất $53k ở chuyện đặt stop. Chuyện bù trừ ròng
+            # là ĐIỀU KIỆN TIÊN QUYẾT để bật STRESS_MID, không phải giấy phép lặng lẽ đổi
+            # chiến lược — và cron 10:20 đang TẮT nên nhánh này hiện không chạy tới.
             held_stress = {(p.inst, p.cluster) for p in held}
             for inst, bars in stress_bars_1015.items():
                 if (inst, CLUSTER_STRESS) in held_stress:

@@ -100,14 +100,25 @@ class Broker(ABC):
         """
         raise NotImplementedError
 
-    def has_working_stop(self, inst: str) -> bool:
-        """True if a live (working) stop order exists at the broker for `inst`.
+    def has_working_stop(self, inst: str, direction: "str | None" = None,
+                         contracts: "int | None" = None) -> bool:
+        """True if THIS position is already covered by live stop orders at the broker.
 
         Used by B4 to decide whether a position with no recorded stop_order_id can
         safely have one re-placed. Deliberately NOT abstract: a broker that cannot
         answer should raise NotImplementedError, and B4 then alerts instead of
         placing — placing blind risks a duplicate stop, which would over-close the
         position (and flip it) when both fire.
+
+        With `inst` alone it answers the old, weaker question — "is there ANY stop on
+        this symbol". That answer is wrong as soon as two sleeves hold the same
+        contract: the first position's stop makes B4 refuse to place the second's, and
+        one contract then rides unprotected with nothing logged (OPERATIONS.md,
+        "STRESS_MID: tại sao cron 10:20 bị TẮT"). Pass `direction` and `contracts` and
+        it asks whether this position's own size is covered on its own side.
+
+        The wider signature is optional on purpose: every existing caller keeps working,
+        so nothing silently changes meaning at a site that was not reviewed.
         """
         raise NotImplementedError
 
@@ -162,7 +173,8 @@ class MockBroker(Broker):
     def get_order_status(self, _order_id) -> str:
         return "PENDING"
 
-    def has_working_stop(self, _inst: str) -> bool:
+    def has_working_stop(self, _inst: str, direction: "str | None" = None,
+                         contracts: "int | None" = None) -> bool:
         # MockBroker's place_stop never fails, so a naked position cannot arise in
         # verify mode. False keeps the B4 re-place path exercisable in tests.
         return False

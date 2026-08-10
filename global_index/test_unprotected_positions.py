@@ -44,15 +44,21 @@ class _Status:
 
 
 class _Order:
-    def __init__(self, order_type):
+    def __init__(self, order_type, action="SELL", qty=1):
         self.orderType = order_type
         self.orderId = 1
+        # action and totalQuantity are not decoration: a SELL stop under a SHORT doubles
+        # the position, and a 1-lot stop under a 2-lot position leaves one contract
+        # naked. Both used to be invisible here because the fixture did not carry them.
+        self.action = action
+        self.totalQuantity = qty
 
 
 class _Trade:
-    def __init__(self, symbol, expiry, order_type="STP", status="PreSubmitted"):
+    def __init__(self, symbol, expiry, order_type="STP", status="PreSubmitted",
+                 action="SELL", qty=1):
         self.contract = _C(symbol, expiry)
-        self.order = _Order(order_type)
+        self.order = _Order(order_type, action, qty)
         self.orderStatus = _Status(status)
 
 
@@ -79,14 +85,14 @@ SEP, DEC = "20260918", "20261218"
 
 def test_stop_on_the_same_contract_is_protected():
     """The live shape on 2026-08-07: one short, one stop, same expiry."""
-    b = _broker([_Pos("MYM", SEP, -1)], [_Trade("MYM", SEP)])
+    b = _broker([_Pos("MYM", SEP, -1)], [_Trade("MYM", SEP, action="BUY")])
     assert b.unprotected_positions() == []
 
 
 def test_stop_on_the_previous_contract_is_not_protection():
     """The case after a roll. B4 would call this protected because a MYM stop
     exists; the position it belongs to was closed when the roll moved to December."""
-    b = _broker([_Pos("MYM", DEC, -1)], [_Trade("MYM", SEP)])
+    b = _broker([_Pos("MYM", DEC, -1)], [_Trade("MYM", SEP, action="BUY")])
     out = b.unprotected_positions()
     assert len(out) == 1
     assert out[0]["inst"] == "MYM"
@@ -113,7 +119,8 @@ def test_a_stop_without_a_position_is_ignored():
 
 
 def test_a_dead_order_does_not_count_as_protection():
-    b = _broker([_Pos("MES", SEP, 1)], [_Trade("MES", SEP, status="Cancelled")])
+    b = _broker([_Pos("MES", SEP, 1)],
+                [_Trade("MES", SEP, status="Cancelled")])
     assert [u["inst"] for u in b.unprotected_positions()] == ["MES"]
 
 
@@ -141,9 +148,49 @@ def test_offline_says_it_cannot_tell():
 def test_one_unprotected_among_several_is_found():
     b = _broker(
         [_Pos("MES", SEP, 1), _Pos("MYM", DEC, -1), _Pos("M2K", SEP, 1)],
-        [_Trade("MES", SEP), _Trade("MYM", SEP), _Trade("M2K", SEP)],
+        [_Trade("MES", SEP), _Trade("MYM", SEP, action="BUY"), _Trade("M2K", SEP)],
     )
     assert [u["inst"] for u in b.unprotected_positions()] == ["MYM"]
+
+
+# ── bên và độ phủ: hai chiều mà phép kiểm cũ không có ────────────────────────
+
+def test_a_wrong_side_stop_is_not_protection():
+    """Một STP SELL nằm dưới vị thế SHORT không đóng vị thế — nó NHÂN ĐÔI. Bản cũ chỉ lọc
+    theo loại lệnh và trạng thái nên nó được tính là bảo vệ, và cấu hình đó đã từng có
+    thật trên tài khoản (2026-08-05, MYM)."""
+    b = _broker([_Pos("MYM", SEP, -1)], [_Trade("MYM", SEP, action="SELL")])
+    assert [u["inst"] for u in b.unprotected_positions()] == ["MYM"]
+
+
+def test_a_stop_smaller_than_the_position_leaves_it_uncovered():
+    """`if exp in have` cũ kiểm SỰ TỒN TẠI. Một STP 1 hợp đồng dưới vị thế 2 hợp đồng
+    thoả mãn nó, và hợp đồng thứ hai chạy trần."""
+    b = _broker([_Pos("MES", SEP, 2)], [_Trade("MES", SEP, qty=1)])
+    out = b.unprotected_positions()
+    assert len(out) == 1 and out[0]["covered"] == 1 and out[0]["qty"] == 2
+
+
+def test_stops_on_the_same_side_add_up():
+    """Hai STP nhỏ phủ đủ một vị thế lớn thì vị thế đó ĐÃ được bảo vệ — nếu không, B5 sẽ
+    kêu mỗi ngày với một tài khoản hoàn toàn lành."""
+    b = _broker([_Pos("MES", SEP, 2)],
+                [_Trade("MES", SEP, qty=1), _Trade("MES", SEP, qty=1)])
+    assert b.unprotected_positions() == []
+
+
+def test_a_wrong_side_stop_does_not_top_up_coverage():
+    """Cộng dồn phải theo TỪNG BÊN. Một SELL 1 + một BUY 1 dưới vị thế LONG 2 không phải
+    là phủ đủ — cái BUY sẽ mở thêm chứ không đóng."""
+    b = _broker([_Pos("MES", SEP, 2)],
+                [_Trade("MES", SEP, qty=1), _Trade("MES", SEP, qty=1, action="BUY")])
+    out = b.unprotected_positions()
+    assert len(out) == 1 and out[0]["covered"] == 1
+
+
+def test_a_short_is_covered_by_a_buy_stop():
+    b = _broker([_Pos("MES", SEP, -2)], [_Trade("MES", SEP, qty=2, action="BUY")])
+    assert b.unprotected_positions() == []
 
 
 if __name__ == "__main__":

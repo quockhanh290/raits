@@ -75,8 +75,18 @@ def _side_is_sane(direction: str, stop: float, market: float) -> tuple[bool, str
     return True, ""
 
 
-def id_corrections(positions: list[dict], stops: dict) -> dict:
-    """{inst: order_id} where the recorded stop_order_id disagrees with reality.
+def _key(p: dict) -> tuple:
+    """Position identity: (inst, cluster) — the same key the runner uses.
+
+    Not `inst`. Two sleeves can hold the same contract, and keying stop bookkeeping by
+    instrument then writes one order id onto both positions. `runner.py` already keys
+    its own book this way (`held_by_key`, `exit_keys`); this file was the odd one out.
+    """
+    return (p.get("inst"), p.get("cluster"))
+
+
+def id_corrections(positions: list[dict], stops: dict, today=None) -> dict:
+    """{(inst, cluster): order_id} where the recorded stop_order_id disagrees with reality.
 
     A position that is already protected still needs its recorded id kept true.
     Live 2026-08-05: MES carried the fabricated id 62 and a real working stop #9. The
@@ -84,20 +94,20 @@ def id_corrections(positions: list[dict], stops: dict) -> dict:
     next day the runner cancelled a ghost, raised STP ORPHAN naming 62, and left #9
     working with no position behind it — an order that would have opened a short.
 
-    Only a stop on the protective side counts. Recording a wrong-side one would tell
-    the runner that a position-doubling order is its protection.
+    The id now comes from `classify`, which assigns each stop to ONE position. Reading
+    `stops.get(inst)` directly — as this did — hands the same order id to every position
+    on the symbol, which is worse than a stale id: `cancel_order(p.stop_order_id)` is one
+    of the few checks that IS per-position, and it would then cancel the stop protecting
+    the other position on the way out of this one.
     """
     out: dict = {}
-    for p in positions:
-        inst, direction = p.get("inst"), p.get("direction")
-        want = PROTECTIVE_SIDE.get(direction)
-        matching = [c for c in stops.get(inst, []) if c[0] == want]
-        if not matching:
+    for verdict, _inst, _direction, detail, pos in classify(positions, stops, today=today):
+        if verdict != "OK" or pos is None:
             continue
-        true_id = str(matching[0][1])
-        recorded = p.get("stop_order_id")
+        true_id = str(detail.order_id)
+        recorded = pos.get("stop_order_id")
         if recorded is None or str(recorded) != true_id:
-            out[inst] = true_id
+            out[_key(pos)] = true_id
     return out
 
 
@@ -106,12 +116,19 @@ def _write_positions(path: Path, new_ids: dict) -> None:
 
     A stale id is not harmless: on close, cancel_order would fail against the dead id
     and raise a false orphan alert, while the stop actually working stays uncancelled.
+
+    Keyed by (inst, cluster). It used to match on `inst` alone, so this loop stamped ONE
+    order id onto EVERY position holding that contract — a false record written into the
+    ledger the working checks trust. That is a heavier failure than the missed checks it
+    sat next to: those merely fail to notice a gap, this one manufactures evidence that
+    there is none.
     """
     with open(path, encoding="utf-8") as fh:
         data = json.load(fh)
     for p in data.get("positions", []):
-        if p.get("inst") in new_ids:
-            p["stop_order_id"] = new_ids[p["inst"]]
+        k = _key(p)
+        if k in new_ids:
+            p["stop_order_id"] = new_ids[k]
     backup = path.with_suffix(".json.bak")
     shutil.copy2(path, backup)
     tmp = path.with_suffix(".json.tmp")
@@ -147,19 +164,23 @@ def main() -> int:
         ib = broker._ib          # ops tool: the raw handle is needed for the price feed
         stops = working_stops(ib)
         prices = _market_prices(ib)
-        by_inst = {p.get("inst"): p for p in positions}
+        # No {inst: position} lookup here. `classify` hands back the position it judged,
+        # so a second position on the same contract cannot be shadowed by the first —
+        # which is what a dict keyed on `inst` did, silently, while this file went on to
+        # place the survivor's level and stamp its order id onto both.
+        by_key = {_key(p): p for p in positions}
 
         plan: list[tuple] = []   # (kind, inst, payload)
-        for verdict, inst, direction, detail in classify(positions, stops):
+        for verdict, inst, direction, detail, pos in classify(positions, stops):
             if verdict == "OK":
-                action, oid, px = detail
+                action, oid, px = detail.action, detail.order_id, detail.price
                 print(f"  SKIP      {inst:<6} {direction:<5} already protected: "
-                      f"{action} STP #{oid} @ {px:.2f}")
+                      f"{action} STP #{oid} @ {px:.2f} x{detail.qty}")
                 # Protected is not the same as protected at the intended level. Not
                 # repaired automatically: replacing a working stop means a window with
                 # none at all, and the recorded level may be the stale one. Say it,
                 # let the operator decide.
-                want = by_inst[inst].get("stop_price")
+                want = pos.get("stop_price")
                 # Ignore sub-tick differences: place_stop snaps to the tick grid on
                 # purpose, and warning about that on every position would drown the
                 # case this line exists for — a stop at a genuinely different level.
@@ -173,20 +194,32 @@ def main() -> int:
                           f"{'WIDER' if wider else 'tighter'} than sized for. "
                           f"Replace manually if that matters.")
             elif verdict == "HAZARD":
-                # Position is already protected; this extra stop is on the wrong side
-                # and must go. Cancel only — never place, or we stack a duplicate.
-                action, oid, px = detail
+                # An unclaimed stop on an instrument that IS held — either the wrong side,
+                # or a surplus correct-side one no position needs. Cancel only, never
+                # place: the positions here already have what they claimed.
                 plan.append(("cancel", inst,
-                             (oid, f"wrong-side {action} STP @ {px:.2f} alongside a "
-                                   f"correct one")))
+                             (detail.order_id,
+                              f"unclaimed {detail.action} STP @ {detail.price:.2f} "
+                              f"x{detail.qty} on a held instrument")))
             elif verdict == "ORPHAN":
-                action, oid, px = detail
-                plan.append(("cancel", inst, (oid, f"orphan {action} STP @ {px:.2f}")))
+                plan.append(("cancel", inst,
+                             (detail.order_id, f"orphan {detail.action} STP "
+                                               f"@ {detail.price:.2f} x{detail.qty}")))
             elif verdict == "WRONG-WAY":
-                for action, oid, px in detail:
+                for c in detail:
                     plan.append(("cancel", inst,
-                                 (oid, f"wrong-side {action} STP @ {px:.2f}")))
-                plan.append(("place", inst, by_inst[inst]))
+                                 (c.order_id,
+                                  f"wrong-side {c.action} STP @ {c.price:.2f}")))
+                plan.append(("place", inst, pos))
+            elif verdict == "PARTIAL":
+                # Covered, but not for its full size. NOT auto-repaired: topping up means
+                # deciding why the shortfall exists, and every explanation implies a
+                # different fix. A stop that shrank means contracts moved somewhere this
+                # tool cannot see; placing the difference would paper over that.
+                mine, got, need = detail
+                ids = ", ".join(f"#{c.order_id} x{c.qty}" for c in mine)
+                print(f"  REPORT    {inst:<6} {direction:<5} stop chi phu {got}/{need} "
+                      f"hop dong ({ids}) — khong tu dong va, xem vi sao thieu truoc")
             elif verdict == "DEFERRED":
                 # The runner withheld this stop on purpose — swing/NKD positions get
                 # theirs on the first run of the NEXT session, because the validated
@@ -196,7 +229,7 @@ def main() -> int:
                 print(f"  {inst:<6} bo qua — dang trong cua so hoan CO CHU DICH, "
                       f"B4 se dat o phien sau")
             elif verdict == "NAKED":
-                plan.append(("place", inst, by_inst[inst]))
+                plan.append(("place", inst, pos))
             else:
                 # Never fall through to "place". A verdict added to classify() later
                 # would otherwise inherit the most destructive action in this file by
@@ -212,9 +245,10 @@ def main() -> int:
         if drift:
             print("\nRECORDED ID DRIFT (file says one thing, broker holds another)")
             print("-" * 78)
-            for inst, true_id in drift.items():
-                print(f"  {inst:<6} stop_order_id "
-                      f"{by_inst[inst].get('stop_order_id')!r} → {true_id!r}")
+            for k, true_id in drift.items():
+                _i, _c = k
+                print(f"  {_i:<6} [{_c}] stop_order_id "
+                      f"{by_key[k].get('stop_order_id')!r} → {true_id!r}")
 
         if not plan and not drift:
             print("\nnothing to repair — every position is protected")
@@ -239,7 +273,14 @@ def main() -> int:
                     print(f"            → cancelled")
                 else:
                     remaining += 1
-                    print(f"            → FAILED, still live — cancel #{oid} in TWS")
+                    # Nguyên nhân gần như luôn là sai chủ: IBKR chỉ nhận lệnh huỷ từ chính
+                    # clientId đã đặt lệnh. cancel_order đã ghi ra id chủ sở hữu trong log;
+                    # đưa luôn lệnh chạy lại để người vận hành không phải tự ghép.
+                    print(f"            → FAILED, still live. Gan nhu chac chan la SAI CHU: "
+                          f"IBKR chi nhan lenh huy tu clientId da dat lenh. Xem dong "
+                          f"'placed by clientId=N' o tren roi chay lai:")
+                    print(f"              python -X utf8 global_index/repair_stops.py "
+                          f"--client-id N --execute")
                 continue
 
             p = payload
@@ -265,7 +306,7 @@ def main() -> int:
             oid = broker.place_stop(inst, direction, contracts, float(stop),
                                     p.get("cluster") or "")
             if oid:
-                new_ids[inst] = oid
+                new_ids[_key(p)] = oid
                 print(f"            → accepted, orderId={oid}")
             else:
                 remaining += 1
@@ -283,9 +324,16 @@ def main() -> int:
         print("-" * 78)
         after = working_stops(ib)
         gaps = 0
-        for verdict, inst, direction, _ in classify(positions, after):
+        for verdict, inst, direction, _d, _p in classify(positions, after):
             if verdict == "OK":
                 print(f"  OK        {inst:<6} {direction}")
+            elif verdict == "DEFERRED":
+                # KHÔNG phải gap. check_open_orders.main() đã loại DEFERRED khỏi bộ đếm từ
+                # đầu; khối VERIFY này thì chưa, nên một lần sửa thành công vẫn in "FAIL —
+                # 1 gap(s) remain" chỉ vì có một vị thế đang trong cửa sổ hoãn có chủ đích.
+                # Đúng loại cảnh báo giả mà chính verdict DEFERRED sinh ra để dập.
+                print(f"  DEFERRED  {inst:<6} {direction} — cua so hoan CO CHU DICH, "
+                      f"khong phai thieu sot")
             else:
                 gaps += 1
                 print(f"  {verdict:<9} {inst:<6} {direction} — still unresolved")

@@ -23,7 +23,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from global_index.check_open_orders import classify
+from global_index.check_open_orders import Stop, classify
 from global_index.runner import _DEFERRED_STOP_CLUSTERS
 
 TODAY = pd.Timestamp("2026-08-10")
@@ -67,14 +67,14 @@ def test_unknown_entry_day_is_naked():
 
 def test_a_working_stop_still_reads_OK_during_the_window():
     """Có stop rồi thì DEFERRED không được che mất — thứ tự nhánh phải đúng."""
-    stops = {"MES": [("BUY", 12, 7769.25)]}
+    stops = {"MES": [Stop("BUY", 12, 7769.25, 1)]}
     assert _verdicts([_pos()], stops) == ["OK"]
 
 
 def test_wrong_side_stop_during_the_window_is_still_reported():
     """Cửa sổ hoãn nói về việc CHƯA có stop. Một stop sai chiều thì vẫn nguy hiểm
     y như cũ và không được im lặng chỉ vì lệnh mới mở."""
-    stops = {"MES": [("SELL", 12, 7769.25)]}          # SHORT cần BUY STP
+    stops = {"MES": [Stop("SELL", 12, 7769.25, 1)]}   # SHORT cần BUY STP
     assert _verdicts([_pos()], stops) == ["WRONG-WAY"]
 
 

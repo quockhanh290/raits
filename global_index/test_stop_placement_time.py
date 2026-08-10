@@ -116,7 +116,8 @@ def test_the_stop_is_placed_by_init_not_by_run_day(tmp_path):
     FuturesRunner(broker=b, guard=_guard(), contracts_by_inst={"MES": 1},
                   signal_fn=lambda d, x, h: ([], []),
                   breaker=CircuitBreaker(account=50_000.0),
-                  positions_path=_state_file(tmp_path), today=DAY2)
+                  positions_path=_state_file(tmp_path), today=DAY2,
+                  now=DAY2 + pd.Timedelta(hours=14, minutes=5))
     assert len(b.stp_calls) == 1, (
         f"B4 phải đặt STP ngay trong __init__, chưa gọi run_day. {b.stp_calls}")
     assert b.stp_calls[0]["stop_price"] == 4950.0
@@ -135,7 +136,8 @@ def test_b4_is_not_cluster_filtered(tmp_path):
     FuturesRunner(broker=b, guard=_guard(), contracts_by_inst={"MES": 1},
                   signal_fn=lambda d, x, h: ([], []),
                   breaker=CircuitBreaker(account=50_000.0),
-                  positions_path=_state_file(tmp_path), today=DAY2)
+                  positions_path=_state_file(tmp_path), today=DAY2,
+                  now=DAY2 + pd.Timedelta(hours=14, minutes=5))
     assert [c["inst"] for c in b.stp_calls] == ["MES"], (
         "vi the roska4_swing phai duoc dat stop du run dang gate sang nkd")
 

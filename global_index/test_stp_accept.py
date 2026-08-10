@@ -35,6 +35,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from global_index.check_open_orders import Stop
 from global_index.ibkr_broker import IBKRBroker
 
 
@@ -343,14 +344,16 @@ def test_ws1_nkd_stop_is_keyed_by_runner_name():
     fake = _StopsIB([_StopTrade("NKD", 71)])
     working = _cancel_broker(fake).get_working_stops()
 
-    assert working == {"MNKD": "71"}, (
+    assert working == {"MNKD": ["71"]}, (
         f"stop must be keyed by the runner's instrument name, got {working}"
     )
 
 
 def test_ws2_plain_symbols_pass_through():
     fake = _StopsIB([_StopTrade("MES", 62), _StopTrade("M2K", 70)])
-    assert _cancel_broker(fake).get_working_stops() == {"MES": "62", "M2K": "70"}
+    # A LIST per instrument: one id per symbol silently dropped a second stop on the
+    # same contract, and the caller was then told about someone else's order.
+    assert _cancel_broker(fake).get_working_stops() == {"MES": ["62"], "M2K": ["70"]}
 
 
 def test_ws3_non_stop_and_dead_orders_excluded():
@@ -359,7 +362,7 @@ def test_ws3_non_stop_and_dead_orders_excluded():
         _StopTrade("MYM", 2, status="Cancelled"),
         _StopTrade("M2K", 3),
     ])
-    assert _cancel_broker(fake).get_working_stops() == {"M2K": "3"}
+    assert _cancel_broker(fake).get_working_stops() == {"M2K": ["3"]}
 
 
 def test_ws4_has_working_stop_also_speaks_runner_names():
@@ -450,7 +453,7 @@ def test_ws7_stale_cached_stop_is_not_working():
     stale = _StopTrade("M2K", 14)        # filled at IBKR; only the cache still has it
     working = _cancel_broker(_StopsIB([live], stale=[stale])).get_working_stops()
 
-    assert working == {"MES": "9"}, (
+    assert working == {"MES": ["9"]}, (
         f"openTrades() keeps filled cross-client orders forever — the authoritative "
         f"list is what reqAllOpenOrders returns. got {working}"
     )
@@ -493,7 +496,7 @@ def test_cl1_wrong_side_stop_is_reported_even_when_protected():
     from global_index.check_open_orders import classify
 
     positions = [{"inst": "MYM", "direction": "SHORT", "stop_price": 54709.0}]
-    stops = {"MYM": [("BUY", 12, 54709.0), ("SELL", 10, 53290.0)]}
+    stops = {"MYM": [Stop("BUY", 12, 54709.0, 1), Stop("SELL", 10, 53290.0, 1)]}
 
     verdicts = {r[0] for r in classify(positions, stops)}
     assert "HAZARD" in verdicts, (
@@ -506,7 +509,7 @@ def test_cl2_clean_position_is_just_ok():
     from global_index.check_open_orders import classify
 
     positions = [{"inst": "MYM", "direction": "SHORT", "stop_price": 54709.0}]
-    stops = {"MYM": [("BUY", 12, 54709.0)]}
+    stops = {"MYM": [Stop("BUY", 12, 54709.0, 1)]}
     assert [r[0] for r in classify(positions, stops)] == ["OK"]
 
 
@@ -524,15 +527,17 @@ def test_id1_records_the_stop_that_is_actually_working():
     from global_index.repair_stops import id_corrections
 
     positions = [{"inst": "MES", "direction": "LONG", "stop_order_id": "62"}]
-    stops = {"MES": [("SELL", 9, 7627.25)]}
-    assert id_corrections(positions, stops) == {"MES": "9"}
+    stops = {"MES": [Stop("SELL", 9, 7627.25, 1)]}
+    # Keyed by (inst, cluster) — the runner's own position key. Keying by inst alone is
+    # what stamped one order id onto every position holding the contract.
+    assert id_corrections(positions, stops) == {("MES", None): "9"}
 
 
 def test_id2_silent_when_the_recorded_id_is_already_right():
     from global_index.repair_stops import id_corrections
 
     positions = [{"inst": "MYM", "direction": "SHORT", "stop_order_id": "12"}]
-    stops = {"MYM": [("BUY", 12, 54709.0)]}
+    stops = {"MYM": [Stop("BUY", 12, 54709.0, 1)]}
     assert id_corrections(positions, stops) == {}
 
 
@@ -541,7 +546,7 @@ def test_id3_never_records_a_wrong_side_stop_as_protection():
     from global_index.repair_stops import id_corrections
 
     positions = [{"inst": "MYM", "direction": "SHORT", "stop_order_id": None}]
-    stops = {"MYM": [("SELL", 10, 53290.0)]}
+    stops = {"MYM": [Stop("SELL", 10, 53290.0, 1)]}
     assert id_corrections(positions, stops) == {}
 
 
@@ -549,8 +554,8 @@ def test_id4_fills_in_a_missing_id():
     from global_index.repair_stops import id_corrections
 
     positions = [{"inst": "M2K", "direction": "SHORT", "stop_order_id": None}]
-    stops = {"M2K": [("BUY", 100, 3020.10)]}
-    assert id_corrections(positions, stops) == {"M2K": "100"}
+    stops = {"M2K": [Stop("BUY", 100, 3020.10, 1)]}
+    assert id_corrections(positions, stops) == {("M2K", None): "100"}
 
 
 # ── the fill IBKR hands back must not be thrown away ─────────────────────────

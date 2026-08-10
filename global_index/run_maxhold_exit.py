@@ -71,8 +71,17 @@ def main():
                     help="JSON state file (same as run_live_day.py, default: live_positions.json)")
     ap.add_argument("--port",           type=int, default=4002,
                     help="IB Gateway port (default: 4002 paper)")
-    ap.add_argument("--client-id",      type=int, default=2,
-                    help="IBKR client ID (default: 2 — distinct from 14:05 runner's ID=1)")
+    # 1, KHÔNG phải 2. Job này huỷ STP do runner (clientId 1) đặt, và IBKR chỉ nhận lệnh
+    # huỷ từ chính clientId đã đặt lệnh. Với id=2 thì `cancel_order` KHÔNG BAO GIỜ thành
+    # công: mỗi lần MAX_HOLD đóng vị thế lại để lại một STP mồ côi, và một STP mồ côi khi
+    # khớp sẽ MỞ vị thế ngược chiều. Xảy ra thật 2026-08-10 với MYM #12.
+    #
+    # Id riêng vốn để tránh đụng độ, nhưng 09:31 không trùng slot nào (live_day 14:05-15:55,
+    # NKD 01:10-02:55, quét sửa ở phút :20 và không có slot 09:20), nên dùng chung là an toàn.
+    ap.add_argument("--client-id",      type=int, default=1,
+                    help="BAT BUOC trùng clientId của run_live_day (1). IBKR chỉ nhận lệnh huỷ "
+                         "từ chính clientId đã đặt lệnh, nên một id khác KHÔNG BAO GIỜ huỷ "
+                         "được STP do runner đặt — xem OPERATIONS.md muc 'clientId'.")
     ap.add_argument("--dry-run",        action="store_true",
                     help="Connect + check positions but emit no orders")
     a = ap.parse_args()
@@ -111,6 +120,7 @@ def main():
             # date explicitly: the runner would otherwise read its own clock, and two
             # notions of "today" inside one run is how the window gets misjudged.
             today=today,
+            now=pd.Timestamp.now(tz="America/New_York").tz_localize(None),
         )
 
         open_count = len(runner.state.open_positions)
