@@ -255,104 +255,30 @@ qua ranh giới ngày:
 (Con số p95 $271 báo trước đó chỉ tính trong ngày vào lệnh, chưa vắt qua đêm — thiếu.)
 Đây là tệ nhất **quan sát được**, không phải chặn trên.
 
-### 🔴 09:31 ET là mốc ĐÃ ĐO, không phải chỗ chưa ai để ý — ĐỪNG "sửa" cho khớp engine
-Engine bật stop từ ranh giới ngày của nó (Rổ 4: 00:00 ET; MNKD: 00:00 JST). Live bật lúc
-09:31 ET. Nhìn qua thì đó là một khe hở cần bịt. **Đo rồi thì ngược lại**
-(`model_stop_activation_gap.py`, cổng đối chiếu từng lệnh):
+### 🔴 STP hoãn được đặt lúc 01:10 ET — và mốc đó là hệ quả phụ, không ai thiết kế
 
-| STP lên sàn | Rổ 4 P&L / MaxDD | MNKD P&L / MaxDD |
-|---|---|---|
-| engine (ranh giới ngày) | +$47.166 / $8.234 | +$22.294 / $2.122 |
-| **live (09:31 ET)** | **+$93.375 / $7.144** | **+$33.571 / $1.920** |
-| không có stop | −$46.369 / $60.138 | +$7.486 / $5.870 |
+B4 đặt STP, mà B4 chạy trong `FuturesRunner.__init__` → việc đặt xảy ra ở **job nào dựng
+runner đầu tiên trong ngày**. Hiện là **slot đêm NKD 01:10 ET**. `--clusters nkd` chỉ chặn
+việc SINH LỆNH, không chặn B3/B4 — nên slot đêm vẫn đặt stop cho **cả Rổ 4**.
 
-Mốc live **tốt hơn trên cả hai trục** ở cả hai sleeve. Nhánh không-stop (lỗ nặng, MaxDD
-gấp 7 lần ở Rổ 4) chứng minh đây không phải kiểu "hoãn càng lâu càng lãi" — có điểm tối
-ưu ở giữa và 09:31 nằm gần nó.
+Dự phòng: nếu slot đêm trượt (thiếu bản ghi pre-flight ngày trước) thì job MAX_HOLD
+**09:31 ET** đặt. Vào lệnh thứ Sáu thì phải đợi thứ Hai — slot đêm chỉ Mon–Fri.
 
-Cơ chế hợp lý: 00:00–09:31 ET là phiên Globex đêm, thanh khoản mỏng; stop hẹp (~1/22 dải
-chandelier) bị quét rồi giá hồi trước giờ mở cửa Mỹ.
+⚠️ Nếu bỏ NKD khỏi hệ thống, giờ đặt của **Rổ 4** tự lùi về 09:31 — một sleeve đổi hành vi
+vì sleeve khác bị gỡ. Đã chốt bằng `test_stop_placement_time.py`.
 
-**Bền tới đâu** (`model_gap_robustness.py` — tách theo năm + so trên vault; KHÔNG chạy WFO
-vì WFO là để CHỌN tham số, mà ở đây không chọn gì, 09:31 là thứ hệ thống làm sẵn):
+### Khe hở so với engine: ~1,2 tiếng, không đáng kể
+Engine xét stop từ ranh giới ngày; live đặt lúc 01:10 ET. Đo (`model_stop_activation_gap.py`):
 
 | | Rổ 4 | MNKD |
 |---|---|---|
-| live thắng | **9/9 năm** | 7/9 (thua 2020 −$170, 2022 −$492) |
-| năm lớn nhất | 2022 = 37% tổng chênh | 2026 = 35% |
-| IS (trước 2023) | +$25.674 | **+$324** ← ~bằng 0 |
-| VAULT 2023–24 (OOS) | +$8.520 | +$4.888 |
-| sau vault (2025+) | +$12.016 | +$6.064 |
+| engine (ranh giới ngày) | +$47.166 / MaxDD $8.234 | +$22.294 / $2.122 |
+| **live thật (01:10 ET)** | **+$49.895 / $8.234** | **+$25.791 / $2.055** |
 
-Rổ 4 dương ở cả ba giai đoạn, không năm nào áp đảo → **kết luận vững**.
-MNKD lợi thế **chỉ từ 2023**; trong mẫu IS gần như không có. Mạnh ngoài mẫu yếu trong mẫu
-là hướng ngược với overfit (không có gì được fit), nhưng gợi ý một thay đổi chế độ chứ
-không phải quy luật xuyên suốt → **với MNKD chỉ nói "khe hở không gây hại", đừng dựa vào
-con số**.
+Chênh 5,8% với MaxDD y hệt → **khe hở không gây hại, không cần bịt**.
 
-⚠️ Thêm một job đặt STP lúc ~00:05 ET để "khớp engine" sẽ **làm xấu đi**, không cải thiện.
-
-⚠️ **09:31 KHÔNG phải mốc được thiết kế** — nó là giờ chạy job `MAX_HOLD` (chọn để khớp
-mốc thoát 09:30 RTH của backtest), còn B4 đặt STP ở đó chỉ vì `run_maxhold_exit` dựng
-`FuturesRunner`. Hai quyết định không liên quan nhau. Đã đo và nó tốt hơn ranh giới ngày,
-nhưng mới có **ba điểm** (00:00 / 09:31 / không bao giờ) — **không đủ để nói 09:31 tối
-ưu**. Đổi giờ job MAX_HOLD, hoặc sửa nó thôi không dựng `FuturesRunner`, sẽ dời giờ đặt
-STP theo mà không có gì báo.
-
-⚠️ Điều này cũng nói rằng **luật của engine không phải chỗ tối ưu** — nhưng đó là phát
-hiện về CHIẾN LƯỢC, phải qua WFO. Không được chỉnh mốc theo đỉnh backtest: ta giữ 09:31 vì
-đó là thứ hệ thống đang làm sẵn, không phải vì nó là đỉnh.
-
-### Mức stop là CỐ ĐỊNH, không trail
-Live gửi mức chandelier tính lúc vào lệnh và giữ nguyên suốt đời lệnh (backtest thì siết
-dần). Đo được: chênh **+$132 (0,3%)**, chỉ 9/3.044 lệnh thoát khác — **không cần sửa**.
-
----
-
-## STRESS_MID — slot 10:20 ET và bất biến bắt buộc
-
-### Chạy khi nào
-| giờ ET | job | làm gì |
-|---|---|---|
-| **10:20** | `stress_mid` | vào lệnh STRESS_MID từ bar 09:30–10:15, `--clusters stress --stress-entry` |
-| **14:05** | `live_day` | `diff_desired_vs_held` **đóng** vị thế stress (gần mốc 14:00 của adapter) |
-
-Sleeve chỉ vào lệnh trong chế độ **Stress** — ~59 lệnh/năm toàn rổ, dồn vào các năm biến
-động. **Một năm êm có thể không có lệnh nào**; im lặng không phải là hỏng.
-
-`prev_preflight=True` vì job 13:45 chưa chạy lúc 10:20 — dùng bản cập nhật dữ liệu của
-ngày làm việc trước, cùng cơ chế slot đêm NKD.
-
-### 🔴 BẤT BIẾN — KHÔNG thêm slot nào gọi `run_live_day` giữa 10:20 và 14:05 ET
-`_mark_held_unchanged` **không** được gọi cho cluster stress, nên `diff_desired_vs_held`
-đóng vị thế ở **lần chạy kế tiếp**, bất kể lần đó là khi nào. Với lịch hiện tại lần đó là
-14:05 — và đó là lý do sleeve giữ được **~91%** luật đã kiểm định.
-
-| | P&L |
-|---|---|
-| luật đã kiểm định (stop/target/14:00) | +$14.151 |
-| live hiện tại (đóng ở slot 14:05) | **+$12.850** |
-| nếu có slot xen giữa buổi sáng | **−$450** |
-
-Vi phạm bất biến này **không phát ra tín hiệu nào** — không log đỏ, không guard. Đã chốt
-bằng test `test_stress_slot_invariant.py`; nó quét toàn bộ job của scheduler.
-
-⚠️ **Đừng sửa bằng cách thêm `_mark_held_unchanged` cho stress** — khi đó không gì đóng vị
-thế nữa và nó qua đêm. Muốn bỏ bất biến thì phải cho stress một luật thoát tường minh
-trước.
-
-### Ba sai lệch so với backtest, đã đo
-| | ảnh hưởng |
-|---|---|
-| `to_candidate` vứt bỏ `target` 2R → không có lệnh chốt lời | −5% |
-| giá vào trễ ~10 phút (bar đóng +5, `run_day` +5) | −15% |
-| thoát ~14:10 thay vì 14:00 | +$1.520 (tình cờ có lợi, không phải thiết kế) |
-
-Nên **đừng so P&L paper của sleeve này với số backtest rồi kết luận về edge** — hai bên
-chạy hai luật khác nhau. Sleeve vốn ở mức **p=0,112**: chưa đủ bằng chứng, không phải đã
-chứng minh không có edge. Đang chạy để theo dõi, và theo dõi ở đây là chuyện nhiều năm.
-
----
+⚠️ Bản ghi trước đó của tài liệu này nêu +$93.375 — đó là mốc **09:31**, chỉ xảy ra khi
+slot đêm trượt. Sai vì đọc code mà không kiểm job nào chạy trước. Đã sửa.
 
 ## Log monitoring — Các pattern CRITICAL cần chú ý
 

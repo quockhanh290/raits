@@ -34,12 +34,51 @@ import numpy as np
 import pandas as pd
 
 
+def build_sig_cache(cache, labels, strat, ema_period, allowed):
+    """{ngay: (bar_ts, sig)} — tin hieu vao lenh DAU TIEN cua moi ngay, khong loc.
+
+    Chay mot lan cho moi ma roi dung lai cho moi nhanh: quet lai generate_signal tren
+    tung bar 5 phut suot 8 nam cho MOI nhanh la ly do moi lan do truoc day mat 10-20
+    phut.
+
+    Chi hop le cho ngay CHUA CO THOAT — `avgv` lay theo vi tri trong cua so da loc, nen
+    sau mot lan thoat cua so bi cat va tin hieu khac di. run_loop tu quay ve quet day du
+    cho nhung ngay do.
+    """
+    from futures._validated_core import atr14
+
+    out = {}
+    for day in cache["days"]:
+        reg = labels.get(day)
+        if reg not in allowed:
+            continue
+        bars5 = cache["b5"][day]
+        win = bars5.between_time("14:00", "15:55")
+        idx = list(win.index)
+        for k in range(1, len(idx)):
+            hist = bars5.loc[:idx[k]]
+            if len(hist) < max(ema_period, 14) + 1:
+                continue
+            ema = strat.calculate_ema(hist, ema_period)
+            atr = atr14(hist)
+            avgv = float(win["volume"].iloc[max(0, k - 11):k - 1].mean())
+            if np.isnan(atr) or np.isnan(avgv):
+                continue
+            sig = strat.generate_signal(win.loc[idx[k - 1]], win.loc[idx[k]],
+                                        ema, atr, reg, avgv)
+            if sig:
+                out[day] = (idx[k], sig)
+                break
+    return out
+
+
 def run_loop(df, labels, cost, *, strat, ema_period, mult, max_hold_days,
              cache, same_day_stop: bool, stop_slip_ticks: float, gap_fill=True,
              activate_after_h: float = 0.0, mae=None,
              entry_latency_min: float = 0.0, skipped=None,
              ratchet: bool = True,
-             stop_active_hour: float | None = None, mae_full=None):
+             stop_active_hour: float | None = None, mae_full=None,
+             sig_cache=None, stop_width_mult: float = 1.0):
     """Vòng lặp ngày của engine, chép lại, thêm một nhánh tuỳ chọn: stop có hiệu lực
     ngay trong ngày vào lệnh. same_day_stop=False phải cho ra ĐÚNG output engine."""
     from futures._validated_core import atr14, ET
@@ -49,6 +88,19 @@ def run_loop(df, labels, cost, *, strat, ema_period, mult, max_hold_days,
     allowed = set(strat.config["allowed_regimes"])
     tick = float(getattr(cost, "tick", 0.25) or 0.25)
     slip = stop_slip_ticks * tick
+
+    def _widen(sig):
+        """Nhan do rong stop len stop_width_mult, GIU NGUYEN sizing.
+
+        `mult` khong dung duoc lam bien do rong: no vua dat initial_stop (entry -+
+        mult*ATR5), vua la mau so sizing (risk_sized = contracts*mult*ATR_ngay*pv),
+        vua la dai trail. Quet `mult` doi ca ba cung luc — do la ly do sweep
+        chandelier_atr_mult hoi 08-05 khong ket luan duoc gi.
+        """
+        if stop_width_mult == 1.0:
+            return float(sig["initial_stop"])
+        ep = float(sig["entry_price"])
+        return ep - stop_width_mult * (ep - float(sig["initial_stop"]))
 
     trades, pos, n_sameday = [], None, 0
 
@@ -156,6 +208,37 @@ def run_loop(df, labels, cost, *, strat, ema_period, mult, max_hold_days,
                 if len(win) < 2:
                     break
             idx = list(win.index)
+
+            # Cache tin hieu: chi dung khi HOM NAY CHUA CO THOAT. `avgv` lay theo VI TRI
+            # trong `win` da loc, nen sau mot lan thoat cua so bi cat va tin hieu khac
+            # di — cache mot bang chung cho ca hai truong hop se sai am tham. Ngay co
+            # thoat quay ve quet day du (thieu so).
+            if sig_cache is not None and exit_ts_today is None:
+                _hit = sig_cache.get(day)
+                if _hit is None:
+                    break
+                _ts, sig = _hit
+                _px, _ft = float(sig["entry_price"]), _ts
+                if entry_latency_min > 0:
+                    _day_ts2 = ts.get(day)
+                    _fill_at = _ts + pd.Timedelta(minutes=5 + entry_latency_min)
+                    if _day_ts2 is None:
+                        break
+                    _j = int(_day_ts2.searchsorted(_fill_at))
+                    if _j >= len(hl[day][2]):
+                        if skipped is not None:
+                            skipped.append(1)
+                        break
+                    _px, _ft = float(hl[day][2][_j]), _day_ts2[_j]
+                pos = dict(dir=sig["direction"], entry=_px, entry_day=day, regime=reg,
+                           extreme=_px, stop=_widen(sig), entry_time=_ft,
+                           _mae=0.0,
+                           _act=(day + pd.Timedelta(days=1)
+                                 + pd.Timedelta(hours=stop_active_hour)
+                                 if stop_active_hour is not None else None))
+                if not same_day_stop:
+                    break
+
             for k in range(1, len(idx)):
                 hist = bars5.loc[:idx[k]]
                 if len(hist) < max(ema_period, 14) + 1:
@@ -185,7 +268,7 @@ def run_loop(df, labels, cost, *, strat, ema_period, mult, max_hold_days,
                         _px, _ft = float(hl[day][2][_j]), _day_ts2[_j]
                     pos = dict(dir=sig["direction"], entry=_px,
                                entry_day=day, regime=reg,
-                               extreme=_px, stop=sig["initial_stop"],
+                               extreme=_px, stop=_widen(sig),
                                entry_time=_ft, _mae=0.0,
                                _act=(day + pd.Timedelta(days=1)
                                      + pd.Timedelta(hours=stop_active_hour)

@@ -3033,6 +3033,72 @@ model_stress_exits.py, model_ratchet.py
 
 ---
 
+## Sub-task: Khoảng ân hạn cho stop — GIẢ THUYẾT ĐÃ QUA 4 CỬA, KHÔNG ÁP DỤNG (2026-08-09)
+Status: ĐO XONG — ghi hồ sơ, KHÔNG đổi code
+
+### Câu hỏi
+Stop hoãn tới khi qua ngày vào lệnh; nhưng "qua ngày rồi thì đặt lúc mấy giờ" không nằm
+trong luật nào — nó là hệ quả phụ của job nào dựng `FuturesRunner` trước (hiện: slot đêm
+NKD 01:10 ET). Hoãn lâu hơn thì sao?
+
+### Kết quả (Rổ 4, `model_activation_sweep.py`, cổng đối chiếu từng lệnh)
+| kích hoạt sau | P&L | MaxDD | lỗ tạm khi trần (tv/p95/max) | >2× | năm thắng |
+|---|---|---|---|---|---|
+| 1,17h **(hiện tại)** | +$49.895 | $8.234 | $35/$259/$1.981 | 31% | 6/9 |
+| 9,52h | +$93.375 | $7.144 | $62/$370/$1.563 | 28% | 9/9 |
+| **16h** | **+$128.863** | $5.082 | $90/$561/$1.714 | 29% | 9/9 |
+| 36h | +$128.028 | $5.317 | $120/$708/$2.806 | 28% | 9/9 |
+| 72h | +$93.063 | $9.260 | $189/$1.013/$4.252 | 27% | 9/9 |
+| không bao giờ | **−$46.369** | $60.138 | $228/$1.200/$4.252 | 27% | 2/9 |
+
+MNKD cùng mẫu, đỉnh quanh 24–36h (+$34k–38k).
+
+### Bốn cửa — qua hết
+1. **Quét nhiều mốc**: vùng cao **rộng** 16–72h, không phải đỉnh nhọn
+2. **Tách năm**: 9/9 từ mốc 9,52h
+3. **IS / VAULT (OOS) / POST**: dương cả ba, cùng tăng theo độ trễ
+4. **Đối chứng cô lập — quan trọng nhất**: nới ĐỘ RỘNG stop (giữ nguyên sizing) cư xử
+   **ngược chiều**, đơn điệu xấu đi ở cả hai sleeve:
+
+   | ×độ rộng | Rổ 4 | MNKD |
+   |---|---|---|
+   | 1,0× | +$49.895 | +$25.791 |
+   | 2,0× | +$20.706 | +$16.380 |
+   | 6,0× | −$40.377 | +$13.794 |
+
+   → **Giả thuyết "hoãn = cách thô để nới stop" BỊ BÁC BỎ.** Cơ chế là *khoảng ân hạn*:
+   stop hẹp là ĐÚNG (giữ lỗ nhỏ), nó chỉ không nên được vũ trang ngay sau khi vào lệnh.
+   Nới stop phá hỏng chính cái làm nó tốt.
+
+### VÌ SAO VẪN KHÔNG ÁP DỤNG
+Bốn kênh rủi ro, **hai chưa đo được**:
+
+1. Phơi nhiễm trực tiếp — **đã đo**, p95 $561 ở 16h, chấp nhận được
+2. **Đuôi không bị chặn** — không stop thì lỗ chỉ bị chặn bởi MAX_HOLD 5 ngày. $4.252 là
+   xấu nhất *quan sát được* 6 năm, không phải chặn trên. Chuỗi limit-move không có trong mẫu
+3. **Breaker mù** — `_book_realised`: *"Realised only, no mark-to-market"*. Trần DD 15% và
+   phanh −4%/ngày đọc equity **đã thực hiện**, nên lỗ tạm đóng góp **số 0**. Thay đổi này
+   kéo thời gian phanh mù từ ~1 ngày lên **~3 ngày**. Đó là lý do "MaxDD giảm $8.234 →
+   $5.082" gây hiểu nhầm: rủi ro chuyển từ *đã thực hiện* sang *chưa thực hiện* — đẹp lên
+   vì đi vào chỗ không đo
+4. **Phơi nhiễm đồng thời toàn danh mục — CHƯA ĐO, lỗ hổng lớn nhất**. MAE đo *theo từng
+   lệnh*, nhưng Rổ 4 là 4 hợp đồng chỉ số Mỹ tương quan cao: một cú sốc vĩ mô đánh cả bốn
+   cùng lúc, cả bốn đang trần. Phơi nhiễm đồng thời có thể gần 4×$561 và tương quan, không
+   bù trừ. Thêm margin IBKR tính trên lỗ chưa thực hiện → margin call / thanh lý cưỡng bức,
+   hệ thống không mô hình hoá ở đâu cả
+
+### Nếu sau này làm tiếp — tối thiểu
+- [ ] Đo phơi nhiễm **đồng thời toàn danh mục**, không phải per-trade
+- [ ] Sửa breaker để nhìn cả lỗ chưa thực hiện, nếu không là **tháo phanh đổi lấy P&L backtest**
+- [ ] WFO với luật mới; vault test hiện tại không còn mô tả hệ thống nếu đổi giờ kích hoạt
+- [ ] Bề mặt nhiễu **±$25k** trong vùng cao → không chọn được một giá trị cụ thể
+
+### Files added
+model_activation_sweep.py, model_stop_activation_gap.py, model_gap_robustness.py,
+global_index/test_stop_placement_time.py
+
+---
+
 # ⏰ THỨ HAI 2026-08-10 — ba việc, theo thứ tự giờ
 
 ## 09:31 ET — mốc MAX_HOLD đầu tiên mà catch-up phải đỡ
