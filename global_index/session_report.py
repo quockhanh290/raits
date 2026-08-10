@@ -384,8 +384,11 @@ def build(day: str, root: Path, resume_streak: int = RESUME_STREAK_NEEDED):
         missing.append(f"{hh:02d}:{mm:02d}  {jid}")
 
     try:
+        # Đọc từ `root`, KHÔNG phải _ROOT cố định. Production thì hai cái trùng nhau
+        # (--root mặc định là _ROOT), nhưng chốt cứng _ROOT làm hàm không kiểm được: một
+        # bản dựng thử sẽ in vị thế THẬT ra giữa dữ liệu giả.
         positions = json.loads(
-            (_ROOT / "live_positions.json").read_text(encoding="utf-8")).get("positions", [])
+            (root / "live_positions.json").read_text(encoding="utf-8")).get("positions", [])
     except Exception:
         positions = []
 
