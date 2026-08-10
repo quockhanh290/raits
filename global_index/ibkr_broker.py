@@ -80,6 +80,26 @@ _IBKR_EXCHANGE: dict[str, str] = {
 # unprotected on every slot and B4 stacks a duplicate stop on it.
 _IBKR_TO_RAITS: dict[str, str] = {v: k for k, v in _RAITS_TO_IBKR.items()}
 
+
+def _to_runner(symbol: str) -> str:
+    """Translate an IBKR contract symbol into the runner's vocabulary.
+
+    IBKR calls the Nikkei contract NKD; the runner calls it MNKD. Every other
+    instrument agrees, so a site that forgets to translate is invisible until an NKD
+    position exists — which is how six sites were found one at a time, the last of them
+    on 2026-08-10 when get_positions reported the live NKD position under a name
+    live_positions.json did not use. B3 counted that one position twice, as missing and
+    as an orphan, and halted every entry.
+
+    The rule is not "remember the mapping at each call". It is that nothing leaves this
+    class speaking IBKR's vocabulary, and test_symbol_boundary reads this file to check
+    it, so a seventh site cannot be added quietly.
+
+    Unknown symbols pass through: dropping or guessing one would be worse than showing
+    a name nobody recognises.
+    """
+    return _IBKR_TO_RAITS.get(symbol, symbol)
+
 # ── Order fill timeouts ────────────────────────────────────────────────────────
 # Design constraint [1]: ENTRY timeout 30s → cancel → Fill(status='CANCELLED').
 # EXIT uses MARKET order; no protocol timeout per design [2] but we add a safety
@@ -694,7 +714,7 @@ class IBKRBroker(Broker):
                 if qty == 0:
                     continue
                 result.append(BrokerPosition(
-                    inst=pos.contract.symbol,
+                    inst=_to_runner(pos.contract.symbol),
                     direction="LONG" if qty > 0 else "SHORT",
                     contracts=int(abs(qty)),
                     cluster="UNKNOWN",   # IBKR has no cluster concept; B3 ignores
@@ -1057,8 +1077,7 @@ class IBKRBroker(Broker):
 
         ib = self._require_connection()
         for t in ib.reqAllOpenOrders():
-            _sym = t.contract.symbol
-            if _IBKR_TO_RAITS.get(_sym, _sym) != inst:
+            if _to_runner(t.contract.symbol) != inst:
                 continue
             if t.order.orderType not in ("STP", "STP LMT"):
                 continue
@@ -1096,14 +1115,14 @@ class IBKRBroker(Broker):
                 continue
             if t.orderStatus.status not in self._STP_LIVE_STATUS:
                 continue
-            sym = _IBKR_TO_RAITS.get(t.contract.symbol, t.contract.symbol)
+            sym = _to_runner(t.contract.symbol)
             stops.setdefault(sym, set()).add(t.contract.lastTradeDateOrContractMonth)
 
         out = []
         for p in ib.positions():
             if not p.position:
                 continue
-            sym = _IBKR_TO_RAITS.get(p.contract.symbol, p.contract.symbol)
+            sym = _to_runner(p.contract.symbol)
             exp = p.contract.lastTradeDateOrContractMonth
             have = stops.get(sym, set())
             if exp in have:
@@ -1131,8 +1150,7 @@ class IBKRBroker(Broker):
                 continue
             if t.orderStatus.status not in self._STP_LIVE_STATUS:
                 continue
-            sym = t.contract.symbol
-            working[_IBKR_TO_RAITS.get(sym, sym)] = str(t.order.orderId)
+            working[_to_runner(t.contract.symbol)] = str(t.order.orderId)
         return working
 
     def find_execution(self, order_id: str) -> "dict | None":
