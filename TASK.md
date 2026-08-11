@@ -3119,6 +3119,62 @@ global_index/test_stop_placement_time.py
 
 ---
 
+# 🎯 KHỞI ĐIỂM CHO SESSION MỚI — monitoring & scaling (ghi 2026-08-11)
+
+Hai chủ đề, bàn trong session riêng. **Monitoring trước, scaling sau** — scaling nhân lên
+mọi lỗ hổng quan sát đang có, và hôm 10/08 vừa chứng minh: một lệnh stop mồ côi sống nguyên
+buổi với MỘT vị thế; với bốn sleeve thì vừa vô hình gấp bốn vừa khó gỡ hơn.
+
+**Chưa bàn khi hai mắt xích này chưa đóng** (đều trong vài tiếng, không phải vài ngày):
+- 11/08 ~14:05 ET — B4 ĐẶT stop thật cho 3 vị thế Rổ 4 (lần đầu code stop mới chạm IBKR
+  trên đường đặt lệnh, không phải chỉ đọc)
+- Bài tập rollover MNQ — trình tự đóng-mở-huỷ-đặt chưa chạy thật lần nào
+
+## A. Monitoring — hiện trạng
+
+**Đã có (10/08):** báo cáo phiên tự chạy sau việc cuối trong ngày, phân biệt sự cố ĐÃ KẾT
+THÚC với đang xảy ra, tiến độ chuyển resume; quét sửa stop mỗi ~2h; `_run` không còn nuốt
+CRITICAL của tiến trình con thoát mã 0; pytest hết ghi vào log production.
+
+**Ba mặt hiển thị, chưa có ranh giới rõ:**
+| | trả lời câu gì | ai làm |
+|---|---|---|
+| dashboard (`live_state_data.js`) | P&L, đường bao rủi ro, trạng thái tiến trình | người khác |
+| báo cáo phiên (`session_report.py`) | hôm nay xảy ra gì, cần làm gì | phiên 10/08 |
+| (thiếu) | **NGAY BÂY GIỜ có gì hỏng không** | chưa ai |
+
+**Câu hỏi còn mở:**
+- Báo cáo là **kéo, không phải đẩy**. Hỏng lúc 20:00 thì sáng mới biết. Ngưỡng nào đáng
+  đánh thức người? (paper thì chấp nhận được, tiền thật thì không)
+- Chưa có khái niệm **"đã biết, đang hoãn"** → G2 HARD sẽ hiện như sự cố mới mỗi sáng
+- Bảng `_KNOWN` phải nuôi: lỗi mới rơi vào khoảng trống thì không được diễn giải
+
+**Dữ liệu dashboard đang có — dùng làm căn cứ, đừng bàn chay:**
+`runner_health{last_heartbeat, ibkr_connected}` · `meta{account, hard_dd_pct .15,
+target_dd_pct .10, daily_loss_pct .04, n_contracts 1, final_equity, net_pnl, system_epoch,
+broker_equity, paper_start, max_dd_dollars, max_dd_pct, total_days, clusters, breaker_events,
+backtest_calmar, operational_status{runner.alive,pid,last_run_day}, events}` ·
+`snapshots[]{date, equity, decision{realized_today,entries,exits}, per_cluster_pnl,
+regime_attribution, cluster_stats, holding_distribution, running_metrics}`
+
+## B. Scaling — bốn trục, mỗi trục một chặn cứng khác nhau
+
+Chặn cứng chung phát hiện 10/08: engine ngầm giả định **một vị thế mỗi mã**, và bốn tầng
+riêng biệt dựa vào giả định đó mà không tầng nào khai ra.
+
+| trục | chặn cứng |
+|---|---|
+| thêm hợp đồng mỗi vị thế | mọi số `deploy_sim` đo ở **1 micro** → phải đo lại ở cỡ đích; sizing/DD/breaker đổi theo |
+| thêm sleeve dùng chung mã | **bù trừ ròng** — đã chốt hướng subaccount riêng, CHƯA triển khai |
+| thêm mã mới | dữ liệu, sizing, ngân sách `MultiClusterGuard` |
+| pyramiding | **ĐÃ BÁC** (L16) — không mở lại |
+
+Lưu ý về con số: `broker_equity` ~$996k (tài khoản paper) vs `final_equity` $50k (nền hệ
+thống). Hai thang khác nhau, và đã gây một lỗi thật (B1 loại peak_equity ghi theo số dư
+broker). Mọi bàn luận scaling phải nói rõ đang dùng thang nào.
+
+---
+
 # ✅ KẾT PHIÊN THỨ HAI 2026-08-10 — tổng kết
 
 **Phiên chạy tốt.** Mở 3 vị thế Rổ 4 (MYM SHORT @53.969 · MES SHORT @7.773 · M2K LONG
