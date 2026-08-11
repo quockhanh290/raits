@@ -189,6 +189,12 @@ global_index/live_state_data.js
 global_index/preflight_state.json
 global_index/maxhold_state.json
 global_index/replay_checkpoint.json
+# Dữ liệu runtime, cùng loại với các file trạng thái ở trên: đổi mỗi phiên nên
+# theo dõi trong git chỉ tạo nhiễu, và một bản commit hôm nay là bản SAI vào ngày mai.
+# live_history.py ghi mỗi lần khớp lệnh
+trade_log.jsonl
+# runner.py ghi cạnh file vị thế (trượt giá tích luỹ)
+slip_stats.json
 bao_cao_*.txt
 global_index/paper_history.json
 # p0c_overnight.py capture output — megabytes of run log, not source
