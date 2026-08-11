@@ -423,15 +423,35 @@ def collect_session_report(day: str, root: Path, resume_streak: int = RESUME_STR
     for t, _lvl, ln in lines:
         for key, sev, title, mean, act in _KNOWN:
             if key in ln:
-                e = found.setdefault(title, [sev, mean, act, 0, t])
+                e = found.setdefault(title, [sev, mean, act, 0, t, t])
                 e[3] += 1
+                e[5] = t          # lần cuối — xem chú thích ở `ended` bên dưới
                 break
-    issues = [
-        {"title": title, "severity": sev, "severity_label": _NHAN[sev],
-         "mean": mean, "action": act, "count": n, "first": first}
-        for title, (sev, mean, act, n, first) in
-        sorted(found.items(), key=lambda kv: (_RANK[kv[1][0]], -kv[1][3]))
-    ]
+    # Một sự cố NGỪNG TÁI DIỄN từ lâu khác hẳn một sự cố đang xảy ra, nhưng bản đầu chỉ
+    # ghi "lần đầu lúc ..." nên hai thứ đó trông y hệt nhau. Hậu quả thật: sự cố tên NKD
+    # ngày 10/08 được sửa lúc 01:50 ET, mà báo cáo cuối ngày vẫn xếp nó đầu bảng mức CHẶN
+    # GIAO DỊCH kèm lời khuyên "mở TWS đối chiếu rồi khởi động lại scheduler" — đúng nếu
+    # chuyện đang diễn ra, thừa và gây nhiễu khi nó đã xong 20 tiếng trước.
+    #
+    # Ngưỡng 90 phút: đủ dài để một sự cố còn sống vẫn tái diễn ít nhất một lần (slot chạy
+    # mỗi 5 phút trong cửa sổ, lượt quét mỗi 2 tiếng ngoài cửa sổ), đủ ngắn để không gọi
+    # một chuyện vừa xảy ra là "đã xong".
+    _QUIET_MIN = 90
+
+    def _mins(hhmmss: str) -> int:
+        h, m, _s = hhmmss.split(":")
+        return int(h) * 60 + int(m)
+
+    _end = _mins(lines[-1][0])
+    issues = []
+    for title, (sev, mean, act, n, first, last) in sorted(
+            found.items(), key=lambda kv: (_RANK[kv[1][0]], -kv[1][3])):
+        quiet = _end - _mins(last)
+        issues.append({
+            "title": title, "severity": sev, "severity_label": _NHAN[sev],
+            "mean": mean, "action": act, "count": n, "first": first, "last": last,
+            "ended": quiet >= _QUIET_MIN, "quiet_minutes": max(0, quiet),
+        })
 
     good = {}
     for _t, _lvl, ln in lines:
@@ -558,7 +578,15 @@ def render_text(report: dict) -> str:
     for issue in report["issues"]:
         L.append("")
         L.append(f"  [{issue['severity_label']}]  {issue['title']}")
-        L.append(f"  lần đầu lúc {issue['first']}, ghi nhận {issue['count']} lần")
+        _when = (f"  lần đầu {issue['first']}, lần cuối {issue['last']}, "
+                 f"{issue['count']} lần")
+        if issue.get("ended"):
+            _q = issue["quiet_minutes"]
+            L.append(_when + f" — KHÔNG tái diễn {_q // 60}h{_q % 60:02d} gần đây")
+            L += _wrap("Nhiều khả năng đã được xử lý trong phiên. Việc bên dưới chỉ cần "
+                       "làm nếu nó tái diễn.", "    ")
+        else:
+            L.append(_when)
         L += _wrap(issue["mean"], "    ")
         if issue["action"]:
             L.append("    → Cần làm:")
@@ -656,31 +684,66 @@ def _html_path_for(day: str, out: str | None, root: Path) -> Path:
 def render_html(report: dict) -> str:
     day = report["day"]
     sev_class = {CHAN: "blocker", NANG: "serious", VUA: "info"}
+    status_key = "blocker" if report.get("blockers") else ("serious" if report.get("serious") else "ok")
+    status = "CHẶN GIAO DỊCH" if report.get("blockers") else ("CÓ VẤN ĐỀ NẶNG" if report.get("serious") else "BÌNH THƯỜNG")
+    status_line = (
+        "Hệ thống đã dừng vào lệnh mới; xử lý trước khi mở phiên sau."
+        if status_key == "blocker" else
+        "Phiên có lỗi nặng cần xử lý, nhưng không có cờ chặn giao dịch."
+        if status_key == "serious" else
+        "Không thấy vấn đề cần can thiệp trong phạm vi báo cáo."
+    )
+
     issue_cards = []
     for issue in report.get("issues", []):
         cls = sev_class.get(issue["severity"], "info")
         issue_cards.append(f"""
         <article class="issue {cls}">
           <div class="issue-head"><span>{_esc(issue['severity_label'])}</span><strong>{_esc(issue['title'])}</strong></div>
-          <p class="muted">lần đầu lúc {_esc(issue['first'])}, ghi nhận {_esc(issue['count'])} lần</p>
+          <p class="muted">lần đầu {_esc(issue['first'])} · lần cuối {_esc(issue['last'])} · {_esc(issue['count'])} lần{
+            (" · <b>không tái diễn %dh%02d gần đây</b>" % (issue["quiet_minutes"] // 60,
+                                                          issue["quiet_minutes"] % 60))
+            if issue.get("ended") else ""}</p>
           <h3>nghĩa là gì</h3><p>{_esc(issue['mean'])}</p>
           <h3>cần làm gì</h3><p>{_esc(issue['action'])}</p>
         </article>""")
     if not issue_cards:
         issue_cards.append('<p class="empty">Không phát hiện vấn đề nào.</p>')
 
-    timeline_bits = []
+    def _minute(hhmm: str) -> int:
+        h, m = [int(x) for x in hhmm.split(":")]
+        return h * 60 + m
+
+    def _dur_label(minutes: int) -> str:
+        h, m = divmod(minutes, 60)
+        if h and m:
+            return f"{h}h{m:02d}"
+        if h:
+            return f"{h}h"
+        return f"{m}p"
+
+    timeline_jobs, timeline_gaps = [], []
     for item in report.get("timeline", []):
         if item["kind"] == "gap":
-            timeline_bits.append(
-                f'<div class="gap" style="--span:{min(item["minutes"], 180)}">'
-                f'<span>{_esc(item["start"])}–{_esc(item["end"])}</span><b>{item["minutes"]} phút trống</b></div>')
+            start = _minute(item["start"])
+            minutes = item["minutes"]
+            timeline_gaps.append(
+                f'<div class="gapbar" style="--start:{start};--dur:{minutes};--left:{start / 14.4:.3f}%;--width:{minutes / 14.4:.3f}%">'
+                f'<span>{_esc(item["start"])}–{_esc(item["end"])} · {_dur_label(minutes)}</span></div>')
         else:
+            minute = _minute(item["time"])
             cls = "miss" if item["missing"] else "ok"
-            label = "không thấy log" if item["missing"] else "đã chạy"
-            timeline_bits.append(
-                f'<div class="job {cls}"><time>{_esc(item["time"])}</time>'
-                f'<strong>{_esc(item["id"])}</strong><span>{label}</span></div>')
+            label_cls = " label" if item["missing"] or not (
+                item["id"].startswith("live_day") or item["id"].startswith("nkd_night")
+            ) else ""
+            timeline_jobs.append(
+                f'<div class="jobmark {cls}{label_cls}" title="{_esc(item["time"])} {_esc(item["id"])}" style="--minute:{minute};--left:{minute / 14.4:.3f}%">'
+                f'<span class="dot"></span><time>{_esc(item["time"])}</time><strong>{_esc(item["id"])}</strong></div>')
+
+    ticks = "".join(
+        f'<span class="tick" style="--minute:{h * 60};--left:{(h * 60) / 14.4:.3f}%"><b>{h:02d}:00</b></span>'
+        for h in range(0, 25, 3)
+    )
 
     if report.get("skipped_past_missing"):
         missing_html = '<p class="note">Ngày quá khứ: bỏ qua danh sách việc-không-chạy vì lịch hiện tại không phải bằng chứng cho lịch ngày đó.</p>'
@@ -725,7 +788,6 @@ def render_html(report: dict) -> str:
     todo_html = "".join(f"<li>{_esc(t)}</li>" for t in report.get("todo", [])) or "<li>Không có việc gì cần làm.</li>"
     source = report.get("source", {})
     issue_count = len(report.get("issues", []))
-    status = "CHẶN GIAO DỊCH" if report.get("blockers") else ("CẦN XỬ LÝ" if report.get("serious") else "BÌNH THƯỜNG")
 
     return f"""<!doctype html>
 <html lang="vi">
@@ -734,40 +796,41 @@ def render_html(report: dict) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Báo cáo phiên {day}</title>
 <style>
-*{{box-sizing:border-box}} body{{margin:0;background:#f5f6f8;color:#111827;font:15px/1.5 Arial,sans-serif}}
-main{{max-width:1180px;margin:0 auto;padding:28px}} header{{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;margin-bottom:24px}}
-h1{{font-size:34px;margin:0;letter-spacing:0}} h2{{font-size:20px;margin:28px 0 12px}} h3{{font-size:13px;text-transform:uppercase;margin:12px 0 4px;color:#4b5563}}
-.pill{{display:inline-block;border-radius:999px;padding:6px 10px;background:#111827;color:white;font-weight:700}}
-.cards{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}} .metric,.issue,.position,.panel{{background:white;border:1px solid #d8dde6;border-radius:8px;padding:14px}}
-.metric b{{display:block;font-size:24px}} .muted,.empty,.note{{color:#5b6472}} .note{{background:#fff8e6;border:1px solid #f0d48a;border-radius:8px;padding:12px}}
-.timeline{{display:flex;gap:6px;align-items:stretch;overflow-x:auto;padding:8px;background:white;border:1px solid #d8dde6;border-radius:8px}}
-.job,.gap{{min-width:120px;border-radius:6px;padding:8px;border:1px solid #d8dde6}} .job.ok{{border-left:5px solid #168a49}} .job.miss{{border-left:5px solid #c42828;background:#fff1f1}}
-.job time,.gap span{{display:block;font-weight:700}} .job strong{{display:block;font-size:12px;white-space:nowrap}} .job span,.gap b{{font-size:12px;color:#4b5563}} .gap{{min-width:calc(var(--span)*2px);background:#eef1f5;border-style:dashed}}
-.issues{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}} .issue.blocker{{border-top:5px solid #991b1b}} .issue.serious{{border-top:5px solid #b45309}} .issue.info{{border-top:5px solid #2563eb}}
-.issue-head span{{display:block;font-size:12px;font-weight:700;color:#4b5563}} .issue-head strong{{font-size:17px}}
-.normal{{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;list-style:none;padding:0}} .normal li{{background:white;border:1px solid #d8dde6;border-radius:8px;padding:10px}} .normal b{{font-size:20px;margin-right:8px}}
-.bar{{display:grid;grid-template-columns:repeat({resume["needed"]},1fr);gap:6px;max-width:420px}} .bar i{{height:16px;border-radius:4px;background:#d8dde6}} .bar i:nth-child(-n+{fill}){{background:#168a49}}
-table{{width:100%;border-collapse:collapse;background:white;border:1px solid #d8dde6;border-radius:8px;overflow:hidden}} th,td{{padding:8px;border-bottom:1px solid #e5e7eb;text-align:left}} td b{{display:block}} td span{{font-size:12px}} td.khop{{background:#ecfdf3}} td.lech{{background:#fee2e2}} td.missing{{background:#f3f4f6;color:#6b7280}}
-.positions{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}} .position span{{display:block;margin-top:4px}}
-ol{{background:white;border:1px solid #d8dde6;border-radius:8px;padding:16px 16px 16px 34px}}
-@media(max-width:820px){{main{{padding:16px}} header{{display:block}} .cards,.issues,.normal,.positions{{grid-template-columns:1fr}} h1{{font-size:28px}}}}
+:root{{--bg:#fbfaf7;--ink:#171717;--muted:#68635c;--soft:#e9e3d8;--line:#cfc7bb;--blocker:#b91c1c;--serious:#b45309;--info:#2563eb;--ok:#19733d;--panel:#fffefa}}
+*{{box-sizing:border-box}} body{{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}}
+main{{max-width:1120px;margin:0 auto;padding:22px 18px 42px}} h1{{font-size:clamp(32px,5vw,58px);line-height:.95;margin:0 0 10px;letter-spacing:0}} h2{{font-size:18px;margin:34px 0 10px}} h3{{font-size:12px;text-transform:uppercase;margin:14px 0 4px;color:var(--muted);letter-spacing:.08em}}
+.hero{{padding:24px 0 22px;border-bottom:6px solid var(--line)}} .hero.blocker{{border-color:var(--blocker)}} .hero.serious{{border-color:var(--serious)}} .hero.ok{{border-color:var(--ok)}} .status{{font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}} .hero.blocker .status{{color:var(--blocker)}} .hero.serious .status{{color:var(--serious)}} .hero.ok .status{{color:var(--ok)}} .lead{{max-width:760px;font-size:19px;margin:0;color:var(--ink)}} .muted,.empty,.note{{color:var(--muted)}} .note{{background:color-mix(in srgb,var(--serious) 10%,transparent);padding:12px 14px;border-radius:6px}}
+.metrics{{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin:20px 0 0}} .metric span{{display:block;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}} .metric b{{display:block;font-size:26px;line-height:1.1;margin-top:2px}}
+.todo{{font-size:16px;margin:0;padding:0 0 0 24px;max-width:900px}} .todo li{{margin:10px 0;padding-left:4px}} .todo li::marker{{font-weight:900;color:var(--blocker)}}
+.timeline-wrap{{padding:4px 0 8px}} .timeline-head{{display:flex;justify-content:space-between;gap:14px;align-items:baseline;margin-bottom:10px}} .legend{{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:12px}} .legend i{{display:inline-block;width:10px;height:10px;border-radius:999px;margin-right:5px}} .legend .miss i{{background:var(--blocker)}} .legend .ok i{{background:var(--ok)}}
+.timeline{{position:relative;height:310px;margin-top:8px;border-radius:2px;background:linear-gradient(to right,transparent,transparent),linear-gradient(to bottom,transparent 54px,var(--line) 54px,var(--line) 56px,transparent 56px)}} .trade-window{{position:absolute;left:var(--left);width:var(--width);top:38px;height:205px;background:color-mix(in srgb,var(--info) 9%,transparent);border-radius:2px}} .trade-window b{{position:absolute;top:8px;left:8px;font-size:12px;color:var(--muted);font-weight:700}}
+.tick{{position:absolute;left:var(--left);top:250px;width:1px;height:16px;background:var(--line)}} .tick b{{position:absolute;top:20px;transform:translateX(-50%);font-size:11px;color:var(--muted);font-weight:600}}
+.gapbar{{position:absolute;left:var(--left);width:var(--width);top:66px;height:22px;background:color-mix(in srgb,var(--ink) 10%,transparent);border-radius:3px}} .gapbar span{{position:absolute;left:4px;top:25px;white-space:nowrap;font-size:11px;color:var(--muted)}}
+.jobmark{{position:absolute;left:var(--left);top:132px;min-width:0;transform:translateX(-50%);text-align:center}} .jobmark .dot{{display:block;width:11px;height:11px;margin:0 auto 6px;border-radius:999px;background:var(--ok);box-shadow:0 0 0 5px color-mix(in srgb,var(--ok) 15%,transparent)}} .jobmark.miss .dot{{background:var(--blocker);box-shadow:0 0 0 6px color-mix(in srgb,var(--blocker) 18%,transparent)}} .jobmark time,.jobmark strong{{display:none}} .jobmark.label time,.jobmark.label strong,.jobmark.miss time,.jobmark.miss strong{{display:block}} .jobmark time{{font-size:11px;font-weight:800}} .jobmark strong{{max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:650;color:var(--muted)}}
+.issues{{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}} .issue{{padding-top:10px}} .issue.blocker{{border-top:4px solid var(--blocker)}} .issue.serious{{border-top:4px solid var(--serious)}} .issue.info{{border-top:4px solid var(--info)}} .issue-head span{{display:block;font-size:11px;font-weight:900;color:var(--muted);letter-spacing:.08em}} .issue-head strong{{font-size:18px;line-height:1.2}} .issue p{{margin:6px 0 0}}
+.panel{{background:var(--panel);padding:14px 0}} .missing-jobs ul{{margin:0;padding-left:22px}} .normal{{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 24px;list-style:none;padding:0;margin:0}} .normal li{{display:flex;gap:10px;align-items:baseline}} .normal b{{font-size:22px;min-width:42px}}
+.bar{{display:grid;grid-template-columns:repeat({resume["needed"]},1fr);gap:7px;max-width:360px;margin:8px 0 16px}} .bar i{{height:14px;border-radius:99px;background:var(--soft)}} .bar i:nth-child(-n+{fill}){{background:var(--ok)}}
+table{{width:100%;border-collapse:collapse;background:transparent}} th,td{{padding:8px 6px;border-bottom:1px solid color-mix(in srgb,var(--line) 65%,transparent);text-align:left}} td b{{display:block}} td span{{font-size:12px}} td.khop{{color:var(--ok)}} td.lech{{color:var(--blocker);font-weight:800}} td.missing{{color:var(--muted)}}
+.positions{{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}} .position{{padding-top:10px;border-top:3px solid var(--line)}} .position strong{{font-size:18px}} .position span{{display:block;margin-top:4px;color:var(--muted)}}
+@media(max-width:760px){{main{{padding:18px 14px 34px}} .metrics,.issues,.normal,.positions{{grid-template-columns:1fr}} .metrics{{gap:10px}} .hero{{padding-top:12px}} .lead{{font-size:17px}} .timeline-head{{display:block}} .timeline{{height:1240px;margin-left:54px;background:linear-gradient(to right,var(--line) 0,var(--line) 2px,transparent 2px)}} .trade-window{{left:-20px!important;width:42px!important;top:calc(38px + var(--start)*.76px);height:calc(var(--dur)*.76px)}} .trade-window b{{writing-mode:vertical-rl;top:8px;left:10px}} .tick{{left:0!important;top:calc(38px + var(--minute)*.76px);width:12px;height:1px}} .tick b{{top:-9px;left:-34px;transform:none}} .gapbar{{left:10px!important;width:22px!important;top:calc(38px + var(--start)*.76px);height:calc(var(--dur)*.76px)}} .gapbar span{{left:30px;top:4px}} .jobmark{{left:0!important;top:calc(38px + var(--minute)*.76px);transform:translate(-50%,-50%);text-align:left}} .jobmark .dot{{margin:0}} .jobmark time{{position:absolute;left:18px;top:-14px}} .jobmark strong{{position:absolute;left:18px;top:1px;max-width:180px}}}}
+@media(prefers-color-scheme:dark){{:root{{--bg:#11100e;--ink:#f4efe8;--muted:#aaa29a;--soft:#2a2724;--line:#49433d;--panel:#151412;--blocker:#ff6b6b;--serious:#f2a93b;--info:#78a6ff;--ok:#62c983}}}}
 </style>
 </head>
 <body><main>
-<header><div><h1>Báo cáo phiên {day}</h1><p class="muted">Mọi giờ trong báo cáo là giờ ET. HTML tự chứa, đọc cùng dữ liệu với bản text.</p></div><span class="pill">{_esc(status)}</span></header>
-<section class="cards">
+<header class="hero {status_key}"><span class="status">{_esc(status)}</span><h1>{day}</h1><p class="lead">{_esc(status_line)}</p>
+<section class="metrics">
 <div class="metric"><span>Việc theo lịch</span><b>{report.get("jobs_ran", 0)}/{report.get("jobs_due", 0)}</b></div>
 <div class="metric"><span>Vấn đề</span><b>{issue_count}</b></div>
 <div class="metric"><span>Đang giữ</span><b>{report.get("current_position_count", 0)}</b></div>
 <div class="metric"><span>Nguồn</span><b>{source.get("line_count", 0)}</b><span class="muted">{_esc(source.get("first_time", ""))}–{_esc(source.get("last_time", ""))}; bỏ {source.get("dropped", 0)} dòng test</span></div>
-</section>
-<h2>Dòng thời gian trong ngày</h2><section class="timeline">{''.join(timeline_bits)}</section>
+</section></header>
+<h2>Việc cần làm</h2><ol class="todo">{todo_html}</ol>
+<h2>Dòng thời gian trong ngày</h2><section class="timeline-wrap"><div class="timeline-head"><p class="muted">Trục 24 giờ ET, vị trí theo đúng phút trong ngày.</p><div class="legend"><span class="ok"><i></i>đã chạy</span><span class="miss"><i></i>không thấy log</span></div></div><div class="timeline"><div class="trade-window" style="--start:60;--dur:115;--left:4.167%;--width:7.986%"><b>cửa sổ đêm</b></div><div class="trade-window" style="--start:840;--dur:115;--left:58.333%;--width:7.986%"><b>cửa sổ ngày</b></div>{ticks}{''.join(timeline_gaps)}{''.join(timeline_jobs)}</div></section>
 <h2>Vấn đề</h2><section class="issues">{''.join(issue_cards)}</section>
 <h2>Việc theo lịch không chạy</h2><section class="panel missing-jobs">{missing_html}</section>
 <h2>Diễn ra bình thường</h2><ul class="normal">{normal_html}</ul>
 <h2>Chuyển sang resume</h2><section class="panel"><p>Tiến độ: <b>{resume["streak"]}/{resume["needed"]}</b> phiên liên tiếp đạt</p><div class="bar">{cells}</div><table><thead><tr><th>ngày</th>{''.join(f'<th>{i}</th>' for i in SHADOW_INSTS)}<th>kết luận</th></tr></thead><tbody>{''.join(grid_rows)}</tbody></table></section>
 <h2>Vị thế đang giữ</h2><section class="positions">{pos_html}</section>
-<h2>Việc cần làm</h2><ol>{todo_html}</ol>
 </main></body></html>"""
 
 
@@ -792,8 +855,9 @@ def build(day: str, root: Path, resume_streak: int = RESUME_STREAK_NEEDED):
     for t, _lvl, ln in lines:
         for key, sev, title, mean, act in _KNOWN:
             if key in ln:
-                e = found.setdefault(title, [sev, mean, act, 0, t])
+                e = found.setdefault(title, [sev, mean, act, 0, t, t])
                 e[3] += 1
+                e[5] = t          # lần cuối — xem chú thích ở `ended` bên dưới
                 break
 
     good = {}
@@ -962,6 +1026,8 @@ def main() -> int:
     ap.add_argument("--date", default=None, help="YYYY-MM-DD; mặc định hôm nay theo ET")
     ap.add_argument("--root", default=str(_ROOT), help="thư mục chứa log")
     ap.add_argument("--out", default=None, help="ghi ra file thay vì in")
+    ap.add_argument("--html", action="store_true",
+                    help="ghi thêm bản HTML tự chứa")
     ap.add_argument("--resume-streak", type=int, default=RESUME_STREAK_NEEDED,
                     help=f"số phiên sạch liên tiếp cần có trước khi chuyển sang resume "
                          f"(mặc định {RESUME_STREAK_NEEDED}; là phán đoán, không phải "
@@ -977,7 +1043,9 @@ def main() -> int:
         except Exception:
             day = str(_date.today())
 
-    text, need = build(day, Path(a.root), resume_streak=a.resume_streak)
+    root = Path(a.root)
+    report = collect_session_report(day, root, resume_streak=a.resume_streak)
+    text, need = render_text(report), report["need"]
     if a.out:
         # utf-8-SIG, không phải utf-8 trần. Windows đoán bảng mã theo code page của console
         # khi không có BOM, nên `type bao_cao_0810.txt` in ra "BÃO CÃO PHIÃŠN" thay vì
@@ -989,6 +1057,10 @@ def main() -> int:
         print(f"đã ghi {a.out}")
     else:
         print(text)
+    if a.html:
+        html_path = _html_path_for(day, a.out, root)
+        html_path.write_text(render_html(report), encoding="utf-8")
+        print(f"đã ghi {html_path}")
     return 1 if need else 0
 
 

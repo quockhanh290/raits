@@ -248,5 +248,48 @@ def test_the_report_file_is_written_with_a_bom(tmp_path, monkeypatch):
     assert "BÁO CÁO PHIÊN" in out.read_text(encoding="utf-8-sig")
 
 
+# ── sự cố ĐÃ KẾT THÚC khác sự cố đang xảy ra ─────────────────────────────────
+
+def _log(tmp_path, *rows):
+    (tmp_path / "live_day_0810.log").write_text(
+        "".join(f"2026-08-10 {t}  CRITICAL  runner - {m}\n" for t, m in rows),
+        encoding="utf-8")
+
+
+def test_an_issue_that_stopped_recurring_is_marked_ended(tmp_path):
+    """Sự cố tên NKD ngày 10/08 được sửa lúc 01:50 ET, nhưng báo cáo cuối ngày vẫn xếp nó
+    đầu bảng mức CHẶN GIAO DỊCH kèm "mở TWS đối chiếu rồi khởi động lại scheduler" — lời
+    khuyên đúng nếu chuyện đang diễn ra, thừa và gây nhiễu khi nó đã xong từ lâu.
+
+    Bản đầu chỉ ghi "lần đầu lúc ...", nên một sự cố đã kết thúc và một sự cố đang sống
+    trông y hệt nhau."""
+    from global_index.session_report import collect_session_report
+    _log(tmp_path, ("01:00:00", "B3: 1 mismatch(es) HALTED"),
+                   ("14:00:00", "moc cuoi phien"))
+    issues = collect_session_report("2026-08-10", tmp_path)["issues"]
+    assert issues and issues[0]["ended"] is True
+    assert issues[0]["quiet_minutes"] >= 90
+
+
+def test_an_issue_still_recurring_is_not_marked_ended(tmp_path):
+    """Nửa còn lại. Gọi nhầm một sự cố đang sống là "đã xong" thì tệ hơn hẳn chiều ngược
+    lại — nó bảo người vận hành bỏ qua đúng thứ cần xử."""
+    from global_index.session_report import collect_session_report
+    _log(tmp_path, ("01:00:00", "B3: 1 mismatch(es) HALTED"),
+                   ("13:40:00", "B3: 1 mismatch(es) HALTED"),
+                   ("14:00:00", "moc cuoi phien"))
+    issues = collect_session_report("2026-08-10", tmp_path)["issues"]
+    assert issues and issues[0]["ended"] is False
+
+
+def test_both_first_and_last_are_reported(tmp_path):
+    """Chỉ có "lần đầu" thì không suy ra được sự cố kéo dài bao lâu."""
+    from global_index.session_report import collect_session_report, render_text
+    _log(tmp_path, ("01:00:00", "B3: 1 mismatch(es) HALTED"),
+                   ("02:30:00", "B3: 1 mismatch(es) HALTED"))
+    txt = render_text(collect_session_report("2026-08-10", tmp_path))
+    assert "lần đầu" in txt and "lần cuối" in txt
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
