@@ -3143,6 +3143,25 @@ CRITICAL của tiến trình con thoát mã 0; pytest hết ghi vào log product
 | báo cáo phiên (`session_report.py`) | hôm nay xảy ra gì, cần làm gì | phiên 10/08 |
 | (thiếu) | **NGAY BÂY GIỜ có gì hỏng không** | chưa ai |
 
+**RÀNG BUỘC CỨNG cho toàn bộ việc monitoring: KHÔNG đụng engine.**
+Mọi thứ làm ra chỉ được **quan sát**, không được đổi hệ giao dịch hành xử ra sao.
+
+CẤM sửa: `futures/**` · `global_index/runner.py` · `signal_layer.py` · `ibkr_broker.py` ·
+`net_exposure_multi.py` · `run_live_day.py` · `run_maxhold_exit.py` · `run_scheduler.py`
+(lịch job là hành vi hệ thống, không phải quan sát).
+
+ĐƯỢC sửa: `session_report.py` · `dashboard.html` · `dash/**` · `monitor/**` · module mới
+thuần đọc.
+
+Ba hệ quả phải nhớ:
+1. **Chỉ đọc, không ghi.** Không phát lệnh IBKR, không ghi `live_positions.json`, không ghi
+   file trạng thái nào. Lưu ý `run_stop_repair.py` (làm 10/08) KHÔNG phải mẫu để noi theo —
+   nó dựng `FuturesRunner` nên có GHI sổ; đó là công cụ vận hành, không phải giám sát.
+2. **Thiếu dữ liệu thì BÁO CÁO, không tự thêm.** Nếu giám sát cần thứ engine chưa phát ra,
+   ghi lại thành một mục để quyết riêng — đừng sửa engine để lấy nó.
+3. Nối IBKR chỉ để ĐỌC thì được (`get_positions`, `get_working_stops`,
+   `unprotected_positions`), và phải dùng clientId riêng, không trùng 1/2/3.
+
 **Câu hỏi còn mở:**
 - Báo cáo là **kéo, không phải đẩy**. Hỏng lúc 20:00 thì sáng mới biết. Ngưỡng nào đáng
   đánh thức người? (paper thì chấp nhận được, tiền thật thì không)
