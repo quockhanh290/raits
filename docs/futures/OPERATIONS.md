@@ -214,6 +214,64 @@ luật đã kiểm định**, và nó ăn hết edge:
 
 STRESS_MID **không** hoãn — adapter của nó xét stop ngay từ bar vào lệnh.
 
+## Báo cáo phiên — thứ đọc mỗi sáng
+
+`global_index/session_report.py`. **Tự chạy khi việc cuối cùng trong ngày xong**, ghi
+`bao_cao_MMDD.txt` ở thư mục gốc. Chạy tay lúc nào cũng được:
+
+    cd d:aits
+    python -m global_index.session_report                  # hôm nay
+    python -m global_index.session_report --date 2026-08-07
+    python -m global_index.session_report --out bao_cao.txt
+
+Mã thoát **0** = không có gì phải làm, **1** = có. Dùng làm cổng được.
+
+### Cách nó chạy — không phải cron
+
+Bám sự kiện `EVENT_JOB_EXECUTED | EVENT_JOB_ERROR` của **việc có giờ muộn nhất**, và việc
+đó **tính ra từ lịch** chứ không viết cứng — thêm một việc muộn hơn thì báo cáo tự dời theo.
+Kèm lưới an toàn cron 23:55 chỉ bắn khi cờ trong ngày chưa được đặt, tức chỉ khi việc cuối
+không chạy nên sự kiện không bao giờ tới.
+
+Hai lần đầu tôi đặt cron 16:00 rồi 23:50, cả hai đều sai cùng một kiểu: **lấy một con số
+thay cho một điều kiện**. 16:00 bỏ trắng 8 việc chạy sau đó; 23:50 vẫn ra trước nếu lượt
+quét 23:20 chạy quá 30 phút. Bất biến "báo cáo phải là việc cuối" ghim ở
+`test_session_report_slot.py`.
+
+### Đọc gì trong đó
+
+| mục | nói gì |
+|---|---|
+| TÓM TẮT | một đoạn: có chặn giao dịch không, bao nhiêu việc theo lịch đã chạy, đang giữ mấy vị thế |
+| VẤN ĐỀ | mỗi vấn đề ba câu — là chuyện gì · nghĩa gì với tiền và vị thế · cần làm gì (copy được câu lệnh) |
+| VIỆC THEO LỊCH ĐÃ KHÔNG CHẠY | phần log **không tự nói ra được**: không chạy thì không có dòng nào |
+| DIỄN RA BÌNH THƯỜNG | `STP HOAN`, "cửa sổ hoãn"… — nói ra để không bị sửa nhầm |
+| CHUYỂN SANG RESUME | đếm phiên đủ 5 mã KHỚP liên tiếp; thiếu mã KHÔNG tính đạt, một mã LỆCH đưa chuỗi **về 0** |
+| ĐANG GIỮ GÌ | từng vị thế, và với vị thế chưa có stop thì nói **giờ nào** nó sẽ được vũ trang |
+
+Mức độ: `CHẶN GIAO DỊCH` > `NẶNG` > `CẦN BIẾT`. Xếp theo mức, không theo số lần.
+
+### Ba cái bẫy nó đã xử — biết để tin được nó
+
+**Đồng hồ.** Log ghi giờ **MÁY** (hiện là MST, ET = máy + 2h); báo cáo đổi sang ET trước khi
+so với lịch job. Bẫy nặng không phải độ lệch 2 tiếng mà là **ranh giới ngày**: cửa sổ đêm
+NKD 01:10–02:55 ET là 23:10–00:55 giờ máy, vắt qua nửa đêm của máy. Bản chưa đổi báo 7 slot
+`nkd_night_01xx` là "không chạy" trong khi chúng chạy bình thường.
+
+**Ngày quá khứ.** `--date` một ngày cũ thì báo cáo **không** in vị thế hiện tại (sổ chỉ giữ
+trạng thái hiện tại, in ra sẽ thành "ngày 07/08 đang giữ vị thế vào lệnh ngày 10/08") và
+**không** điểm danh theo lịch hiện tại (lịch đổi theo thời gian).
+
+**Log cũ lẫn dòng pytest.** Đã chặn từ gốc, nhưng file cũ vẫn còn; bộ lọc **đếm và báo** số
+dòng đã bỏ chứ không bỏ im lặng. Báo cáo trước ngày 10/08 vì thế vẫn nhiễu — đừng đọc phần
+VẤN ĐỀ của chúng như tường thuật thật.
+
+### Nuôi bảng nhận diện
+
+Mỗi loại sự cố là một dòng trong `_KNOWN` (khoá tìm trong log · mức · tiêu đề · nghĩa là gì
+· cần làm gì). Lỗi mới sẽ rơi vào khoảng trống và **không được diễn giải** — gặp thì thêm
+một dòng. Phần đắt là câu "nghĩa là gì": log không bao giờ nói ra nó.
+
 ## clientId — mọi tiến trình chạm STP phải dùng CHUNG một id
 
 **IBKR chỉ nhận lệnh huỷ từ chính clientId đã đặt lệnh.** `ibkr_broker.cancel_order` đã biết

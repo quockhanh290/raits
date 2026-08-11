@@ -3145,8 +3145,8 @@ không còn gì để vũ trang. Ba vị thế đang giữ đều là Rổ 4, v�
       đường ĐẶT LỆNH, không phải chỉ đọc. Tìm 3 dòng `STP: placed ... orderId=`
 - [ ] **Thứ Ba** — bài tập rollover MNQ (`exercise_rollover_live`). Scheduler TẮT, bật lại
       kèm `--shadow-resume` TRƯỚC 13:45 ET
-- [ ] **Full suite trên cây cuối** — 475/475 là TRƯỚC hai commit cuối (sửa múi giờ + thay
-      test); sau đó mới chạy 35 test nhắm. Đang chạy nền lúc kết phiên
+- [x] **Full suite trên cây cuối (HEAD ca07d43): 477/477, 0 đỏ.** Hai test nhiều hơn lần
+      475 là hai ca múi giờ thêm ở commit cuối.
 
 ---
 
