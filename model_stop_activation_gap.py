@@ -22,6 +22,8 @@ from __future__ import annotations
 import argparse
 import statistics as st
 import sys
+
+import pandas as pd
 from pathlib import Path
 
 if str(Path.cwd()) not in sys.path:
@@ -81,12 +83,35 @@ def main() -> int:
     ncost = GIFC(point_value=c.point_value, tick=c.tick, commission_rt=c.commission_rt,
                  slippage_ticks_per_side=1.0)
 
+    # MOT moc ET duy nhat, code tu quy doi sang dong ho cua tung khung.
+    # Tu quy doi bang tay la cach da tao ra loi 09:31/22:52: 01:10 ET va 14:10 JST
+    # LA CUNG MOT KHOANH KHAC, viet thanh hai so roi go vao hai cho thi lech luc nao
+    # khong biet.
+    #
+    # Va gio dat STP khong phai MOT gia tri: binh thuong 01:10 ET (slot dem NKD dau
+    # tien dung FuturesRunner -> B4 chay trong __init__); neu slot dem bi bo (khong co
+    # ban ghi pre-flight ngay truoc) thi 09:31 ET (job MAX_HOLD). Vao lenh thu Sau thi
+    # phai doi thu Hai — slot dem chi chay Mon-Fri. Do mot moc la mo ta mot he thong
+    # don gian hon thuc te, nen KEP HAI DAU.
+    ET_TIMES = [("01:10 ET  slot dem NKD (thuong)", 1, 10),
+                ("09:31 ET  job MAX_HOLD (khi slot dem truot)", 9, 31)]
+
+    def _hours_after_local_midnight(frame_tz, h_et, m_et):
+        """01:10 ET la may gio sau nua dem TREN DONG HO CUA KHUNG DO."""
+        t = pd.Timestamp("2026-06-15", tz="America/New_York") + pd.Timedelta(hours=h_et,
+                                                                             minutes=m_et)
+        if frame_tz is None:
+            loc = t.tz_convert("America/New_York")
+        else:
+            loc = t.tz_convert(frame_tz)
+        return loc.hour + loc.minute / 60.0
+
     GROUPS = [
-        ("Rổ 4", dfs, labels, costs, SWING_TF_PARAM["ema_period"], 9.52),
-        ("MNKD", {"MNKD": ndf}, nlab, {"MNKD": ncost}, 10, 22.52),
+        ("Rổ 4", dfs, labels, costs, SWING_TF_PARAM["ema_period"], None),
+        ("MNKD", {"MNKD": ndf}, nlab, {"MNKD": ncost}, 10, c.session_tz),
     ]
 
-    for name, frames, labs, cst, ema, live_hour in GROUPS:
+    for name, frames, labs, cst, ema, frame_tz in GROUPS:
         strat = TrendFollowStrategy({**TrendFollowStrategy().config,
                                      "ema_period": ema, "chandelier_atr_mult": mult})
         caches = {}
@@ -114,13 +139,15 @@ def main() -> int:
             return 1
 
         print()
-        print(f"  {'STP len san luc':<34} | {'lenh':>6} | {'P&L':>11} | "
-              f"{'MaxDD':>10} | lo tam sau nhat quang tran (tv / p95 / max)")
-        print("  " + "-" * 116)
-        for lbl, h in (("engine: ranh gioi ngay (D+1 00:00)", None),
-                       (f"live:   D+1 {int(live_hour):02d}:{int(round((live_hour%1)*60)):02d}",
-                        live_hour),
-                       ("KHONG CO STOP (chi MAX_HOLD 5d)", 10_000.0)):
+        print(f"  {'STP len san luc':<46} | {'lenh':>6} | {'P&L':>11} | "
+              f"{'MaxDD':>10} | lo tam quang tran (tv/p95/max)")
+        print("  " + "-" * 124)
+        _arms = [("engine: ranh gioi ngay cua khung", None)]
+        for _lbl, _h, _m in ET_TIMES:
+            _hr = _hours_after_local_midnight(frame_tz, _h, _m)
+            _arms.append((f"live: {_lbl} (={_hr:.2f}h)", _hr))
+        _arms.append(("KHONG CO STOP (chi MAX_HOLD 5d)", 10_000.0))
+        for lbl, h in _arms:
             tn = 0
             allt: list = []
             mae: list = []
@@ -132,7 +159,7 @@ def main() -> int:
                 tn += len(m)
                 allt.extend(m)
             tp = sum(t["pnl"] for t in allt)
-            print(f"  {lbl:<34} | {tn:>6} | ${tp:>+10,.0f} | ${_maxdd(allt):>9,.0f} | "
+            print(f"  {lbl:<46} | {tn:>6} | ${tp:>+10,.0f} | ${_maxdd(allt):>9,.0f} | "
                   f"{_fmt(mae)}")
     print()
     return 0

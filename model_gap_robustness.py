@@ -76,8 +76,8 @@ def main() -> int:
                  commission_rt=c.commission_rt, slippage_ticks_per_side=1.0)
 
     GROUPS = [
-        ("Ro 4", dfs, labels, costs, SWING_TF_PARAM["ema_period"], 9.52),
-        ("MNKD", {"MNKD": ndf}, nlab, {"MNKD": ncost}, 10, 22.52),
+        ("Ro 4", dfs, labels, costs, SWING_TF_PARAM["ema_period"], 1.17),
+        ("MNKD", {"MNKD": ndf}, nlab, {"MNKD": ncost}, 10, 14.17),
     ]
 
     for name, frames, labs, cst, ema, live_hour in GROUPS:

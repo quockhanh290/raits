@@ -78,7 +78,8 @@ def run_loop(df, labels, cost, *, strat, ema_period, mult, max_hold_days,
              entry_latency_min: float = 0.0, skipped=None,
              ratchet: bool = True,
              stop_active_hour: float | None = None, mae_full=None,
-             sig_cache=None, stop_width_mult: float = 1.0):
+             sig_cache=None, stop_width_mult: float = 1.0,
+             disaster_mult: float | None = None):
     """Vòng lặp ngày của engine, chép lại, thêm một nhánh tuỳ chọn: stop có hiệu lực
     ngay trong ngày vào lệnh. same_day_stop=False phải cho ra ĐÚNG output engine."""
     from futures._validated_core import atr14, ET
@@ -161,6 +162,17 @@ def run_loop(df, labels, cost, *, strat, ema_period, mult, max_hold_days,
                     # STP chua len san: engine coi nhu co stop tu ranh gioi ngay cua no,
                     # live thi mai 09:31 ET B4 moi dat. Bo cac hit truoc moc do, va don
                     # muc lo tam sau nhat trong quang trần đó.
+                    # tang tham hoa: khong bi mask boi _act, va lay cai nao den TRUOC
+                    _dis_i = None
+                    if disaster_mult is not None:
+                        _dis = (pos["entry"] - disaster_mult * abs(pos["entry"] - pos["stop0"])
+                                if pos["dir"] == "LONG" else
+                                pos["entry"] + disaster_mult * abs(pos["stop0"] - pos["entry"]))
+                        _h2 = (np.where(low <= _dis)[0] if pos["dir"] == "LONG"
+                               else np.where(high >= _dis)[0])
+                        if len(_h2):
+                            _dis_i = int(_h2[0])
+
                     if pos.get("_act") is not None:
                         _dts = ts.get(day)
                         if _dts is not None and len(_dts):
@@ -174,7 +186,14 @@ def run_loop(df, labels, cost, *, strat, ema_period, mult, max_hold_days,
                                 hit = hit[hit >= int(_before.sum())]
                             if not _before.all():
                                 pos["_act"] = None      # da len san, tu day tro di binh thuong
-                    if len(hit):
+                    if _dis_i is not None and (not len(hit) or _dis_i < hit[0]):
+                        _ts_e = ts.get(day)
+                        _close(pos, day, _dis, "DISASTER",
+                               (day - pos["entry_day"]).days,
+                               _ts_e[_dis_i] if _ts_e is not None else None)
+                        pos, exit_ts_today = None, (_ts_e[_dis_i] if _ts_e is not None
+                                                    else None)
+                    elif len(hit):
                         i = hit[0]; stp = float(stop_prev[i])
                         gapped = gap_fill and bool(isg[i]) and (
                             (pos["dir"] == "LONG" and float(opn[i]) < stp) or
@@ -231,7 +250,7 @@ def run_loop(df, labels, cost, *, strat, ema_period, mult, max_hold_days,
                         break
                     _px, _ft = float(hl[day][2][_j]), _day_ts2[_j]
                 pos = dict(dir=sig["direction"], entry=_px, entry_day=day, regime=reg,
-                           extreme=_px, stop=_widen(sig), entry_time=_ft,
+                           extreme=_px, stop=_widen(sig), stop0=_widen(sig), entry_time=_ft,
                            _mae=0.0,
                            _act=(day + pd.Timedelta(days=1)
                                  + pd.Timedelta(hours=stop_active_hour)
@@ -268,7 +287,7 @@ def run_loop(df, labels, cost, *, strat, ema_period, mult, max_hold_days,
                         _px, _ft = float(hl[day][2][_j]), _day_ts2[_j]
                     pos = dict(dir=sig["direction"], entry=_px,
                                entry_day=day, regime=reg,
-                               extreme=_px, stop=_widen(sig),
+                               extreme=_px, stop=_widen(sig), stop0=_widen(sig),
                                entry_time=_ft, _mae=0.0,
                                _act=(day + pd.Timedelta(days=1)
                                      + pd.Timedelta(hours=stop_active_hour)
@@ -290,6 +309,28 @@ def run_loop(df, labels, cost, *, strat, ema_period, mult, max_hold_days,
                         _adv = ((pos["entry"] - _l[_w].min()) if pos["dir"] == "LONG"
                                 else (_h[_w].max() - pos["entry"]))
                         pos["_mae"] = max(pos["_mae"], float(_adv))
+
+            # Tang THAM HOA: muc rong, vu trang NGAY tu bar ke tiep. Khong thay the
+            # stop hep — no chi cat nhung lenh chay k lan khoang cach stop, tuc dung
+            # phan duoi ma khoang an han dang phoi ra. Nho no, vi the KHONG BAO GIO
+            # tran: B4/B5 giu nguyen ngu nghia, breaker nhin thay duoc phan lon.
+            if disaster_mult is not None and pos is not None:
+                _dh, _dl, _do, _dg = hl[day]
+                _dts = ts.get(day)
+                if _dts is not None and len(_dts):
+                    _dis = (pos["entry"] - disaster_mult * abs(pos["entry"] - pos["stop"])
+                            if pos["dir"] == "LONG" else
+                            pos["entry"] + disaster_mult * abs(pos["stop"] - pos["entry"]))
+                    _aft = np.asarray(_dts > pos["entry_time"])
+                    if _aft.any():
+                        _w = np.where(_aft)[0]
+                        _h2 = (_w[_dl[_w] <= _dis] if pos["dir"] == "LONG"
+                               else _w[_dh[_w] >= _dis])
+                        if len(_h2):
+                            _i = int(_h2[0])
+                            _close(pos, day, _dis, "DISASTER", 0, _dts[_i])
+                            pos, exit_ts_today = None, _dts[_i]
+                            continue
 
             if not same_day_stop:
                 break
