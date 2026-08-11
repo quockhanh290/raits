@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAITS Live Charts</title>
+  <link rel="stylesheet" href="shared/live.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="../live_state_data.js"></script>
+  <script src="shared/live.js" defer></script>
+</head>
+<body class="chartpage">
+  <main class="shell">
+    <header class="spread">
+      <div>
+        <h1>RAITS Live Equity</h1>
+        <div class="micro">System equity <b data-system-equity></b> · max DD <span data-max-dd></span> · broker equity <span data-broker-equity></span></div>
+      </div>
+      <nav class="variant-nav"><a href="../dashboard_live.html">Cards</a><a href="terminal.html">Terminal</a><a href="chart-forward.html" aria-current="page">Charts</a><a href="phone.html">Phone</a></nav>
+    </header>
+    <section class="chart-hero">
+      <p class="title">Equity / Drawdown Lead</p>
+      <div class="chart-box"><canvas data-equity-chart></canvas><div data-sparkline></div></div>
+    </section>
+    <section class="under">
+      <div class="panel">
+        <p class="title">Open Positions</p>
+        <table>
+          <thead><tr><th>Inst</th><th>Cluster</th><th>Side</th><th>Entry Day</th><th class="num">Entry</th><th class="num">Held</th><th class="num">Risk</th><th>Stop</th></tr></thead>
+          <tbody data-positions></tbody>
+        </table>
+      </div>
+      <aside>
+        <div class="panel"><p class="title">Cluster P&amp;L</p><div data-cluster-pnl></div></div>
+        <div class="panel" style="margin-top:16px"><p class="title">Exposure</p><div data-clusters></div></div>
+      </aside>
+    </section>
+  </main>
+</body>
+</html>

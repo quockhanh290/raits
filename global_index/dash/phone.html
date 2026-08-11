@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAITS Phone Glance</title>
+  <link rel="stylesheet" href="shared/live.css">
+  <script src="../live_state_data.js"></script>
+  <script src="shared/live.js" defer></script>
+</head>
+<body class="phone">
+  <main class="shell">
+    <header class="phone-card">
+      <div class="spread"><b>RAITS Live</b><span data-live-date></span></div>
+      <div class="big" data-system-equity></div>
+      <div class="spread micro"><span>system on <span data-design-capital></span></span><b data-net-pnl></b></div>
+    </header>
+    <section class="metrics">
+      <div class="phone-card metric"><span>Breaker</span><b data-breaker></b></div>
+      <div class="phone-card metric"><span>Open</span><b data-open-count></b></div>
+      <div class="phone-card metric"><span>Calmar floor</span><b data-calmar></b></div>
+      <div class="phone-card metric"><span>Regime</span><b data-regime></b></div>
+    </section>
+    <section class="phone-card">
+      <p class="title">Stops First</p>
+      <table>
+        <thead><tr><th>Inst</th><th>Cluster</th><th>Side</th><th>Entry Day</th><th class="num">Entry</th><th class="num">Held</th><th class="num">Risk</th><th>Stop</th></tr></thead>
+        <tbody data-positions></tbody>
+      </table>
+    </section>
+    <section class="phone-card">
+      <p class="title">Exposure</p>
+      <div class="cluster-grid" data-clusters></div>
+    </section>
+    <section class="phone-card">
+      <p class="title">Activity</p>
+      <div data-decisions></div>
+    </section>
+    <nav class="variant-nav"><a href="../dashboard_live.html">Cards</a><a href="terminal.html">Terminal</a><a href="chart-forward.html">Charts</a><a href="index.html">Index</a></nav>
+  </main>
+</body>
+</html>

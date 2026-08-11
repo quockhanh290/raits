@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAITS Live Terminal</title>
+  <link rel="stylesheet" href="shared/live.css">
+  <script src="../live_state_data.js"></script>
+  <script src="shared/live.js" defer></script>
+</head>
+<body class="terminal">
+  <main class="shell">
+    <header class="spread">
+      <div>
+        <h1>RAITS / LIVE OPS</h1>
+        <div class="micro">DATE <span data-live-date></span> · DESIGN <span data-design-capital></span> · CALMAR FLOOR <span data-calmar></span></div>
+      </div>
+      <nav class="variant-nav"><a href="../dashboard_live.html">Cards</a><a href="terminal.html" aria-current="page">Terminal</a><a href="chart-forward.html">Charts</a><a href="phone.html">Phone</a></nav>
+    </header>
+    <div class="ops-grid">
+      <section class="left-stack">
+        <div class="panel health-grid" data-health></div>
+        <div class="panel table-wrap">
+          <p class="title">Positions / Stop State</p>
+          <table>
+            <thead><tr><th>Inst</th><th>Cluster</th><th>Side</th><th>Entry Day</th><th class="num">Entry</th><th class="num">Held</th><th class="num">Risk</th><th>Stop</th></tr></thead>
+            <tbody data-positions></tbody>
+          </table>
+        </div>
+        <div class="cluster-grid" data-clusters></div>
+      </section>
+      <aside class="right-stack">
+        <div class="panel spread">
+          <div class="metric"><span>System equity</span><b data-system-equity></b></div>
+          <div class="metric"><span>Broker equity</span><b data-broker-equity></b></div>
+          <div class="metric"><span>P&amp;L</span><b data-net-pnl></b></div>
+        </div>
+        <div class="panel"><p class="title">Activity</p><div data-decisions></div></div>
+        <div class="panel"><p class="title">Log Tail</p><ul class="events" data-events></ul></div>
+      </aside>
+    </div>
+  </main>
+</body>
+</html>
