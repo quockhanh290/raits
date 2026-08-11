@@ -1267,3 +1267,29 @@ chúng ra, vẫn trả True. `test_run_echoes_critical.py` (6).
   phiên sau". Thực ra một truy vấn chỉ-đọc 30 giây đã phát hiện một lệnh mồ côi đang sống,
   và đồng thời chạy được `unprotected_positions()` bản mới trên dữ liệu thật. **Hỏi broker
   trước khi kết luận là phải chờ.**
+
+## Gotchas (2026-08-10, cuối phiên) — đồng hồ trong log
+
+**Log ghi giờ MÁY, không phải ET.** Máy hiện chạy MST nên ET = giờ log + 2. Mọi công cụ đọc
+log phải đổi trước khi so với lịch job (vốn khai bằng ET) — `session_report._to_et`.
+
+Hệ quả nặng hơn độ lệch 2 tiếng: **ranh giới ngày sai đúng chỗ quan trọng nhất.** Cửa sổ đêm
+NKD 01:10–02:55 ET là 23:10–00:55 giờ máy, tức vắt qua nửa đêm CỦA MÁY. Gom theo ngày của
+log thì báo cáo ngày D bỏ sót cửa sổ đêm của chính ngày D (nằm trong file ngày D−1) và gộp
+nhầm cửa sổ đêm ngày D+1. Đo được: 7 slot `nkd_night_01xx` hiện ra như "KHÔNG CHẠY" trong
+khi chúng chạy bình thường.
+
+Cách bắt: một công cụ báo "việc X không chạy" mà việc đó rơi vào khung 23:00–01:00 của bất kỳ
+đồng hồ nào — nghi ranh giới ngày trước khi nghi việc đó thật sự không chạy.
+
+## Lessons (2026-08-10, cuối phiên)
+
+- **Công cụ đọc log phải khai đồng hồ của nó.** Báo cáo ghi "mọi giờ là giờ ET" trong khi in
+  giờ máy — một câu sai nhưng không ai kiểm được nếu không tự đi so hai đồng hồ. Dòng khai
+  đó biến một lỗi im lặng thành lỗi kiểm được.
+- **Test của chính bản sửa lại rơi vào bẫy của bản sửa.** Fixture ghi `23:00` giờ máy, đổi
+  sang ET thành 01:00 ngày sau, nên bài test tự hỏng. Đó là cách rẻ nhất để biết phép đổi
+  thật sự có tác dụng.
+- **"Ổn chưa" phải trả lời bằng mắt xích còn thiếu, không bằng số test.** Cuối ngày có
+  475/475 và reconcile $0.00, nhưng code stop mới vẫn **chưa đặt một lệnh stop thật nào** —
+  và đó mới là câu trả lời đúng cho câu hỏi đó.

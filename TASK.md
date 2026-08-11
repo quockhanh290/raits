@@ -3119,6 +3119,37 @@ global_index/test_stop_placement_time.py
 
 ---
 
+# ✅ KẾT PHIÊN THỨ HAI 2026-08-10 — tổng kết
+
+**Phiên chạy tốt.** Mở 3 vị thế Rổ 4 (MYM SHORT @53.969 · MES SHORT @7.773 · M2K LONG
+@3.025,3), cả ba hoãn stop ĐÚNG luật, vũ trang **14:00 ET thứ Ba**. MNKD đóng trong ngày —
+đúng thiết kế, slot 14:05–15:55 giữ NKD hoạt động để lệnh thoát chạy được ban ngày.
+
+**Mốc 15:55 ĐẠT: `DOI CHIEU KHOP` đủ 5 mã** → tiến độ resume **2/5**.
+
+**3 lượt quét sửa stop chạy thật** (12:20 · 16:20 · 18:20 ET), đều `completed OK`, không lần
+nào kèm `thoat OK nhung da ghi`. Đường code mới nhất — và là đường duy nhất ngoài slot giao
+dịch ghi vào `live_positions.json` — đã có bằng chứng thật.
+
+**Sự cố tìm ra và đã xử:** STP mồ côi #12 trên MYM (huỷ được, `code=202`), gốc là lỗi hệ
+thống clientId — mọi lần MAX_HOLD đóng vị thế đều để lại lệnh mồ côi. Đã vá.
+
+## ⚠️ SỬA LẠI một điều tôi nói sai trong phiên
+Tôi ghi "thứ Ba 01:10 ET B4 đặt STP thật cho MNKD" — SAI. MNKD đã đóng hôm nay nên 01:10
+không còn gì để vũ trang. Ba vị thế đang giữ đều là Rổ 4, vũ trang 14:00 ET. **Lần đầu B4
+đặt stop thật bằng code mới là thứ Ba ~14:05 ET.**
+
+## Còn lại chưa có bằng chứng thật (2 mắt xích cuối)
+- [ ] **Thứ Ba ~14:05 ET** — B4 ĐẶT stop thật cho 3 vị thế Rổ 4. Lần đầu
+      `has_working_stop` dạng mới + `get_working_stops` dạng danh sách chạm IBKR trên
+      đường ĐẶT LỆNH, không phải chỉ đọc. Tìm 3 dòng `STP: placed ... orderId=`
+- [ ] **Thứ Ba** — bài tập rollover MNQ (`exercise_rollover_live`). Scheduler TẮT, bật lại
+      kèm `--shadow-resume` TRƯỚC 13:45 ET
+- [ ] **Full suite trên cây cuối** — 475/475 là TRƯỚC hai commit cuối (sửa múi giờ + thay
+      test); sau đó mới chạy 35 test nhắm. Đang chạy nền lúc kết phiên
+
+---
+
 # ⏰ THỨ HAI 2026-08-10 — ba việc, theo thứ tự giờ
 
 ## 09:31 ET — mốc MAX_HOLD đầu tiên mà catch-up phải đỡ — **XONG, có phát hiện**
