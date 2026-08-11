@@ -193,5 +193,23 @@ def test_the_night_window_lands_on_the_right_et_day():
     assert _to_et("2026-08-10", "23:10:00")[0] == et.date().isoformat()
 
 
+def test_the_report_file_is_written_with_a_bom(tmp_path, monkeypatch):
+    """Windows đoán bảng mã theo code page của console khi file không có BOM, nên
+    `type bao_cao_0810.txt` in ra "BÃO CÃO PHIÃŠN" thay vì "BÁO CÁO PHIÊN".
+
+    Một báo cáo không đọc được bằng cách mở thông thường thì coi như không tồn tại — lỗi
+    này không làm test nào đỏ, không làm log nào đỏ, chỉ làm bản báo cáo vô dụng đúng lúc
+    có người mở nó ra đọc."""
+    import sys as _sys
+
+    from global_index import session_report as sr
+    out = tmp_path / "bao_cao.txt"
+    monkeypatch.setattr(_sys, "argv", ["session_report", "--root", str(tmp_path),
+                                       "--out", str(out)])
+    sr.main()
+    assert out.read_bytes()[:3] == b"ï»¿", "thieu BOM UTF-8"
+    assert "BÁO CÁO PHIÊN" in out.read_text(encoding="utf-8-sig")
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))

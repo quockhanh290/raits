@@ -39,6 +39,7 @@ Mã thoát: 0 = không có gì phải làm, 1 = có.
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import re
 import sys
@@ -371,7 +372,410 @@ def _today_et() -> str:
         return str(_date.today())
 
 
+def _job_ran(jid: str, ran: set) -> bool:
+    return any(jid in r or jid.replace("_", "") in r.replace("_", "") for r in ran)
+
+
+def _job_had_log_near(lines, hh: int, mm: int) -> bool:
+    lo = f"{hh:02d}:{mm:02d}:00"
+    hi_h, hi_m = divmod(hh * 60 + mm + 5, 60)
+    return any(lo <= t < f"{hi_h % 24:02d}:{hi_m:02d}:00" for t, _l, _n in lines)
+
+
+def _resume_grid(hist: dict, rows: list) -> list:
+    out = []
+    for d, _n, verdict in rows[-10:]:
+        rec = hist.get(d, {"khop": set(), "lech": set()})
+        cells = []
+        for inst in SHADOW_INSTS:
+            if inst in rec["lech"]:
+                state = "lech"
+                label = "LỆCH"
+            elif inst in rec["khop"]:
+                state = "khop"
+                label = "KHỚP"
+            else:
+                state = "missing"
+                label = "thiếu"
+            cells.append({"inst": inst, "state": state, "label": label})
+        out.append({"date": d, "verdict": verdict, "cells": cells})
+    return out
+
+
+def collect_session_report(day: str, root: Path, resume_streak: int = RESUME_STREAK_NEEDED) -> dict:
+    """Thu thập dữ liệu báo cáo một lần, để text và HTML cùng đọc một nguồn."""
+    _is_today = (day == _today_et())
+    lines, dropped, files = read_lines(day, root)
+    report = {
+        "day": day,
+        "root": str(root),
+        "is_today": _is_today,
+        "lines": lines,
+        "dropped": dropped,
+        "files": files,
+        "empty": not lines,
+        "need": True,
+    }
+    if not lines:
+        return report
+
+    found = {}
+    for t, _lvl, ln in lines:
+        for key, sev, title, mean, act in _KNOWN:
+            if key in ln:
+                e = found.setdefault(title, [sev, mean, act, 0, t])
+                e[3] += 1
+                break
+    issues = [
+        {"title": title, "severity": sev, "severity_label": _NHAN[sev],
+         "mean": mean, "action": act, "count": n, "first": first}
+        for title, (sev, mean, act, n, first) in
+        sorted(found.items(), key=lambda kv: (_RANK[kv[1][0]], -kv[1][3]))
+    ]
+
+    good = {}
+    for _t, _lvl, ln in lines:
+        for key, desc in _GOOD:
+            if key in ln:
+                good[desc] = good.get(desc, 0) + 1
+                break
+    normal = [{"desc": desc, "count": n}
+              for desc, n in sorted(good.items(), key=lambda kv: -kv[1])]
+
+    exp, ran = expected_jobs(), _ran_labels(lines)
+    now_hhmm = lines[-1][0][:5]
+    due = 0
+    jobs = []
+    for hh, mm, jid in exp:
+        hhmm = f"{hh:02d}:{mm:02d}"
+        if hhmm > now_hhmm:
+            continue
+        due += 1
+        ran_by_label = _job_ran(jid, ran)
+        ran_by_window = _job_had_log_near(lines, hh, mm)
+        ran_ok = ran_by_label or ran_by_window
+        jobs.append({"time": hhmm, "id": jid, "ran": ran_ok,
+                     "missing": not ran_ok})
+    raw_missing = [f"{j['time']}  {j['id']}" for j in jobs if j["missing"]]
+    missing = raw_missing if _is_today else []
+    skipped_past_missing = bool(raw_missing and not _is_today)
+
+    positions = []
+    try:
+        # Đọc từ `root`, KHÔNG phải _ROOT cố định; chỉ dùng cho báo cáo hôm nay.
+        raw_positions = json.loads(
+            (root / "live_positions.json").read_text(encoding="utf-8")).get("positions", [])
+    except Exception:
+        raw_positions = []
+    if _is_today:
+        for pos in raw_positions:
+            p = dict(pos)
+            p["arm_note"] = _arm_note(pos) if pos.get("stop_order_id") is None else ""
+            positions.append(p)
+
+    hist = shadow_history(root)
+    streak, rows = resume_progress(hist, day, resume_streak)
+    resume = {
+        "needed": resume_streak,
+        "streak": streak,
+        "rows": rows,
+        "grid": _resume_grid(hist, rows),
+    }
+
+    blockers = [i["title"] for i in issues if i["severity"] == CHAN]
+    serious = [i["title"] for i in issues if i["severity"] == NANG]
+    need = bool(blockers or serious or (raw_missing and _is_today))
+
+    timeline = []
+    last_min = None
+    for j in jobs:
+        hh, mm = [int(x) for x in j["time"].split(":")]
+        cur = hh * 60 + mm
+        if last_min is not None and cur - last_min > 30:
+            timeline.append({"kind": "gap", "minutes": cur - last_min,
+                             "start": f"{last_min // 60:02d}:{last_min % 60:02d}",
+                             "end": j["time"]})
+        timeline.append({"kind": "job", **j})
+        last_min = cur
+
+    report.update({
+        "need": need,
+        "issues": issues,
+        "blockers": blockers,
+        "serious": serious,
+        "normal": normal,
+        "jobs_due": due,
+        "jobs_ran": due - len(raw_missing),
+        "missing_jobs": missing,
+        "raw_missing_jobs": raw_missing,
+        "skipped_past_missing": skipped_past_missing,
+        "timeline": timeline,
+        "positions": positions,
+        "current_position_count": len(raw_positions) if _is_today else 0,
+        "source": {"line_count": len(lines), "first_time": lines[0][0],
+                   "last_time": lines[-1][0], "dropped": dropped},
+        "resume": resume,
+        "todo": list(dict.fromkeys(i["action"] for i in issues if i["action"])),
+    })
+    return report
+
+
+def render_text(report: dict) -> str:
+    day = report["day"]
+    L = [f"BÁO CÁO PHIÊN  —  {day}   (mọi giờ trong báo cáo là giờ ET)", "=" * 78]
+    if report.get("empty"):
+        L += ["", "Không có dòng log nào cho ngày này.",
+              "Nghĩa là scheduler không chạy, hoặc chạy ở thư mục khác.",
+              "→ Cần làm: kiểm tra tiến trình scheduler còn sống không."]
+        return "\n".join(L)
+
+    blockers = report["blockers"]
+    serious = report["serious"]
+    missing = list(report["missing_jobs"])
+    positions = list(report["positions"])
+    source = report["source"]
+
+    L += ["", "TÓM TẮT", "-" * 78]
+    if blockers:
+        L += _wrap("Phiên này có chuyện CHẶN GIAO DỊCH: " + "; ".join(blockers)
+                   + ". Hệ thống không vào lệnh mới cho tới khi được xử lý.", "  ")
+    elif serious:
+        L += _wrap(f"Phiên chạy được, nhưng có {len(serious)} vấn đề nặng cần xử lý "
+                   "trước phiên sau.", "  ")
+    elif missing:
+        L += _wrap(f"Không có sự cố, nhưng {len(missing)} việc theo lịch đã không chạy.", "  ")
+    else:
+        L.append("  Phiên chạy bình thường. Không có gì cần làm.")
+    L.append("")
+    L.append(f"  Việc theo lịch : {report['jobs_ran']}/{report['jobs_due']} đã tới giờ và có chạy")
+    L.append(f"  Đang giữ       : {report['current_position_count']} vị thế")
+    L.append(f"  Nguồn          : {source['line_count']} dòng log, {source['first_time']}–{source['last_time']}"
+             + (f", đã bỏ {source['dropped']} dòng do test cũ sinh ra" if source["dropped"] else ""))
+
+    L += ["", "VẤN ĐỀ", "-" * 78]
+    if not report["issues"]:
+        L.append("  Không phát hiện vấn đề nào.")
+    for issue in report["issues"]:
+        L.append("")
+        L.append(f"  [{issue['severity_label']}]  {issue['title']}")
+        L.append(f"  lần đầu lúc {issue['first']}, ghi nhận {issue['count']} lần")
+        L += _wrap(issue["mean"], "    ")
+        if issue["action"]:
+            L.append("    → Cần làm:")
+            L += _wrap(issue["action"], "       ")
+
+    if report["skipped_past_missing"]:
+        L += ["", "VIỆC THEO LỊCH — KHÔNG KIỂM ĐƯỢC CHO NGÀY QUÁ KHỨ", "-" * 78]
+        L += _wrap("Điểm danh đối chiếu với lịch job HIỆN TẠI, mà lịch thì đổi theo thời gian. "
+                   "Một việc 'không chạy' ngày hôm đó có thể đơn giản là chưa tồn tại. Bỏ qua "
+                   "phần này cho ngày quá khứ thay vì đưa ra một danh sách trông như sự cố.", "  ")
+    if missing:
+        L += ["", "VIỆC THEO LỊCH ĐÃ KHÔNG CHẠY", "-" * 78]
+        L += _wrap("Một việc không chạy thì không để lại dòng log nào — đây là phần log không tự "
+                   "nói ra được. Nguyên nhân hay gặp nhất: scheduler được khởi động MUỘN hơn giờ "
+                   "của việc đó; khi ấy việc đó không hề tồn tại trong lịch, chứ không phải chạy trễ.",
+                   "  ")
+        L.append("")
+        for m in missing:
+            L.append(f"     {m}")
+
+    if report["normal"]:
+        L += ["", "DIỄN RA BÌNH THƯỜNG", "-" * 78]
+        for item in report["normal"]:
+            L.append(f"    {item['count']:>5} lần   {item['desc']}")
+
+    resume = report["resume"]
+    L += ["", "CHUYỂN SANG RESUME — tiến độ đối chiếu", "-" * 78]
+    L += _wrap(f"Điều kiện: {resume['needed']} phiên LIÊN TIẾP có đủ {len(SHADOW_INSTS)} mã "
+               "KHỚP và không mã nào LỆCH. Một phiên thiếu mã không phải 'chưa đủ dữ liệu' — "
+               "nó là câu hỏi chưa được trả lời.", "  ")
+    L.append("")
+    L.append(f"  Hiện tại: {resume['streak']}/{resume['needed']} phiên liên tiếp đạt"
+             + ("  →  ĐỦ ĐIỀU KIỆN, có thể chuyển"
+                if resume["streak"] >= resume["needed"] else ""))
+    if not resume["rows"]:
+        L.append("")
+        L += _wrap("Chưa có phiên nào sinh dòng đối chiếu. Nhớ bật scheduler kèm --shadow-resume; "
+                   "không có cờ thì không thu được gì.", "  ")
+    else:
+        L.append("")
+        L.append(f"    {'ngày':<12} {'mã khớp':>8}   kết luận")
+        for d, n, verdict in resume["rows"][-10:]:
+            L.append(f"    {d:<12} {n}/{len(SHADOW_INSTS):<6}   {verdict}")
+    if 0 < resume["streak"] < resume["needed"]:
+        L.append("")
+        L += _wrap(f"Còn {resume['needed'] - resume['streak']} phiên sạch nữa. Một phiên LỆCH "
+                   "làm chuỗi về 0 — và LỆCH là CRITICAL, phải điều tra chứ không đếm tiếp.", "  ")
+
+    L += ["", "ĐANG GIỮ GÌ" if report["is_today"] else "ĐANG GIỮ GÌ (KHÔNG áp dụng)", "-" * 78]
+    if not report["is_today"]:
+        L += _wrap("`live_positions.json` chỉ chứa trạng thái HIỆN TẠI — nó không lưu vị thế của "
+                   "từng ngày. In nó ra ở đây sẽ thành 'ngày 07/08 đang giữ một vị thế vào lệnh "
+                   "ngày 10/08', tức một câu vô nghĩa nhưng đọc rất xuôi.", "  ")
+    if not positions and report["is_today"]:
+        L.append("  Không giữ vị thế nào.")
+    for pos in positions:
+        sid = pos.get("stop_order_id")
+        L.append("")
+        L.append(f"  {pos.get('inst')} {pos.get('direction')} {pos.get('contracts')} "
+                 f"hợp đồng   ({pos.get('cluster')})")
+        L.append(f"    vào lệnh {str(pos.get('entry_day'))[:10]} tại giá {pos.get('entry_price')}")
+        if sid is None:
+            L += _wrap(f"CHƯA có lệnh stop ở sàn; mức dự kiến {pos.get('stop_price')}. "
+                       + pos.get("arm_note", "")
+                       + " Nếu vị thế vừa mở phiên trước thì đây là cửa sổ hoãn CÓ CHỦ ĐÍCH — "
+                         "backtest cũ cũng chỉ xét stop từ ngày hôm sau, và đặt sớm hơn thì mất "
+                         "hết edge.", "    ")
+        else:
+            L.append(f"    stop đang đặt ở {pos.get('stop_price')}, số hiệu lệnh {sid}")
+
+    L += ["", "=" * 78]
+    if report["todo"]:
+        L.append("VIỆC CẦN LÀM")
+        for i, t in enumerate(report["todo"], 1):
+            L.append("")
+            L += _wrap(f"{i}. {t}", "  ")
+    elif report["need"]:
+        L.append("Không có việc sửa cụ thể, nhưng xem lại phần trên.")
+    else:
+        L.append("Không có việc gì cần làm.")
+    return "\n".join(L)
+
+
+def _esc(v) -> str:
+    return html.escape("" if v is None else str(v))
+
+
+def _html_path_for(day: str, out: str | None, root: Path) -> Path:
+    if out:
+        return Path(out).with_suffix(".html")
+    mmdd = day[5:7] + day[8:10]
+    return root / f"bao_cao_{mmdd}.html"
+
+
+def render_html(report: dict) -> str:
+    day = report["day"]
+    sev_class = {CHAN: "blocker", NANG: "serious", VUA: "info"}
+    issue_cards = []
+    for issue in report.get("issues", []):
+        cls = sev_class.get(issue["severity"], "info")
+        issue_cards.append(f"""
+        <article class="issue {cls}">
+          <div class="issue-head"><span>{_esc(issue['severity_label'])}</span><strong>{_esc(issue['title'])}</strong></div>
+          <p class="muted">lần đầu lúc {_esc(issue['first'])}, ghi nhận {_esc(issue['count'])} lần</p>
+          <h3>nghĩa là gì</h3><p>{_esc(issue['mean'])}</p>
+          <h3>cần làm gì</h3><p>{_esc(issue['action'])}</p>
+        </article>""")
+    if not issue_cards:
+        issue_cards.append('<p class="empty">Không phát hiện vấn đề nào.</p>')
+
+    timeline_bits = []
+    for item in report.get("timeline", []):
+        if item["kind"] == "gap":
+            timeline_bits.append(
+                f'<div class="gap" style="--span:{min(item["minutes"], 180)}">'
+                f'<span>{_esc(item["start"])}–{_esc(item["end"])}</span><b>{item["minutes"]} phút trống</b></div>')
+        else:
+            cls = "miss" if item["missing"] else "ok"
+            label = "không thấy log" if item["missing"] else "đã chạy"
+            timeline_bits.append(
+                f'<div class="job {cls}"><time>{_esc(item["time"])}</time>'
+                f'<strong>{_esc(item["id"])}</strong><span>{label}</span></div>')
+
+    if report.get("skipped_past_missing"):
+        missing_html = '<p class="note">Ngày quá khứ: bỏ qua danh sách việc-không-chạy vì lịch hiện tại không phải bằng chứng cho lịch ngày đó.</p>'
+    elif report.get("missing_jobs"):
+        missing_html = "<ul>" + "".join(f"<li>{_esc(x)}</li>" for x in report["missing_jobs"]) + "</ul>"
+    else:
+        missing_html = '<p class="empty">Không có việc theo lịch bị thiếu trong phạm vi kiểm được.</p>'
+
+    normal_html = "".join(
+        f'<li><b>{item["count"]}</b><span>{_esc(item["desc"])}</span></li>'
+        for item in report.get("normal", [])) or '<li><span>Không có mục bình thường nổi bật.</span></li>'
+
+    resume = report.get("resume", {"streak": 0, "needed": RESUME_STREAK_NEEDED, "grid": []})
+    cells = "".join("<i></i>" for _ in range(resume["needed"]))
+    fill = max(0, min(resume["streak"], resume["needed"]))
+    grid_rows = []
+    for row in resume.get("grid", []):
+        grid_rows.append("<tr><th>" + _esc(row["date"]) + "</th>" + "".join(
+            f'<td class="{c["state"]}"><b>{_esc(c["inst"])}</b><span>{_esc(c["label"])}</span></td>'
+            for c in row["cells"]) + f'<td>{_esc(row["verdict"])}</td></tr>')
+    if not grid_rows:
+        grid_rows.append('<tr><td colspan="7" class="empty">Chưa có phiên nào sinh dòng đối chiếu.</td></tr>')
+
+    pos_html = ""
+    if not report.get("is_today"):
+        pos_html = '<p class="note">Không áp dụng cho ngày quá khứ: live_positions.json chỉ là trạng thái hiện tại.</p>'
+    elif not report.get("positions"):
+        pos_html = '<p class="empty">Không giữ vị thế nào.</p>'
+    else:
+        for pos in report["positions"]:
+            stop = (f"stop {_esc(pos.get('stop_price'))}, lệnh {_esc(pos.get('stop_order_id'))}"
+                    if pos.get("stop_order_id") is not None
+                    else f"chưa có stop ở sàn; mức dự kiến {_esc(pos.get('stop_price'))}. {_esc(pos.get('arm_note'))}")
+            pos_html += f"""
+            <article class="position">
+              <strong>{_esc(pos.get('inst'))} {_esc(pos.get('direction'))}</strong>
+              <span>{_esc(pos.get('contracts'))} hợp đồng</span>
+              <span>vào {_esc(str(pos.get('entry_day'))[:10])} @ {_esc(pos.get('entry_price'))}</span>
+              <span>{stop}</span>
+            </article>"""
+
+    todo_html = "".join(f"<li>{_esc(t)}</li>" for t in report.get("todo", [])) or "<li>Không có việc gì cần làm.</li>"
+    source = report.get("source", {})
+    issue_count = len(report.get("issues", []))
+    status = "CHẶN GIAO DỊCH" if report.get("blockers") else ("CẦN XỬ LÝ" if report.get("serious") else "BÌNH THƯỜNG")
+
+    return f"""<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Báo cáo phiên {day}</title>
+<style>
+*{{box-sizing:border-box}} body{{margin:0;background:#f5f6f8;color:#111827;font:15px/1.5 Arial,sans-serif}}
+main{{max-width:1180px;margin:0 auto;padding:28px}} header{{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;margin-bottom:24px}}
+h1{{font-size:34px;margin:0;letter-spacing:0}} h2{{font-size:20px;margin:28px 0 12px}} h3{{font-size:13px;text-transform:uppercase;margin:12px 0 4px;color:#4b5563}}
+.pill{{display:inline-block;border-radius:999px;padding:6px 10px;background:#111827;color:white;font-weight:700}}
+.cards{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}} .metric,.issue,.position,.panel{{background:white;border:1px solid #d8dde6;border-radius:8px;padding:14px}}
+.metric b{{display:block;font-size:24px}} .muted,.empty,.note{{color:#5b6472}} .note{{background:#fff8e6;border:1px solid #f0d48a;border-radius:8px;padding:12px}}
+.timeline{{display:flex;gap:6px;align-items:stretch;overflow-x:auto;padding:8px;background:white;border:1px solid #d8dde6;border-radius:8px}}
+.job,.gap{{min-width:120px;border-radius:6px;padding:8px;border:1px solid #d8dde6}} .job.ok{{border-left:5px solid #168a49}} .job.miss{{border-left:5px solid #c42828;background:#fff1f1}}
+.job time,.gap span{{display:block;font-weight:700}} .job strong{{display:block;font-size:12px;white-space:nowrap}} .job span,.gap b{{font-size:12px;color:#4b5563}} .gap{{min-width:calc(var(--span)*2px);background:#eef1f5;border-style:dashed}}
+.issues{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}} .issue.blocker{{border-top:5px solid #991b1b}} .issue.serious{{border-top:5px solid #b45309}} .issue.info{{border-top:5px solid #2563eb}}
+.issue-head span{{display:block;font-size:12px;font-weight:700;color:#4b5563}} .issue-head strong{{font-size:17px}}
+.normal{{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;list-style:none;padding:0}} .normal li{{background:white;border:1px solid #d8dde6;border-radius:8px;padding:10px}} .normal b{{font-size:20px;margin-right:8px}}
+.bar{{display:grid;grid-template-columns:repeat({resume["needed"]},1fr);gap:6px;max-width:420px}} .bar i{{height:16px;border-radius:4px;background:#d8dde6}} .bar i:nth-child(-n+{fill}){{background:#168a49}}
+table{{width:100%;border-collapse:collapse;background:white;border:1px solid #d8dde6;border-radius:8px;overflow:hidden}} th,td{{padding:8px;border-bottom:1px solid #e5e7eb;text-align:left}} td b{{display:block}} td span{{font-size:12px}} td.khop{{background:#ecfdf3}} td.lech{{background:#fee2e2}} td.missing{{background:#f3f4f6;color:#6b7280}}
+.positions{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}} .position span{{display:block;margin-top:4px}}
+ol{{background:white;border:1px solid #d8dde6;border-radius:8px;padding:16px 16px 16px 34px}}
+@media(max-width:820px){{main{{padding:16px}} header{{display:block}} .cards,.issues,.normal,.positions{{grid-template-columns:1fr}} h1{{font-size:28px}}}}
+</style>
+</head>
+<body><main>
+<header><div><h1>Báo cáo phiên {day}</h1><p class="muted">Mọi giờ trong báo cáo là giờ ET. HTML tự chứa, đọc cùng dữ liệu với bản text.</p></div><span class="pill">{_esc(status)}</span></header>
+<section class="cards">
+<div class="metric"><span>Việc theo lịch</span><b>{report.get("jobs_ran", 0)}/{report.get("jobs_due", 0)}</b></div>
+<div class="metric"><span>Vấn đề</span><b>{issue_count}</b></div>
+<div class="metric"><span>Đang giữ</span><b>{report.get("current_position_count", 0)}</b></div>
+<div class="metric"><span>Nguồn</span><b>{source.get("line_count", 0)}</b><span class="muted">{_esc(source.get("first_time", ""))}–{_esc(source.get("last_time", ""))}; bỏ {source.get("dropped", 0)} dòng test</span></div>
+</section>
+<h2>Dòng thời gian trong ngày</h2><section class="timeline">{''.join(timeline_bits)}</section>
+<h2>Vấn đề</h2><section class="issues">{''.join(issue_cards)}</section>
+<h2>Việc theo lịch không chạy</h2><section class="panel missing-jobs">{missing_html}</section>
+<h2>Diễn ra bình thường</h2><ul class="normal">{normal_html}</ul>
+<h2>Chuyển sang resume</h2><section class="panel"><p>Tiến độ: <b>{resume["streak"]}/{resume["needed"]}</b> phiên liên tiếp đạt</p><div class="bar">{cells}</div><table><thead><tr><th>ngày</th>{''.join(f'<th>{i}</th>' for i in SHADOW_INSTS)}<th>kết luận</th></tr></thead><tbody>{''.join(grid_rows)}</tbody></table></section>
+<h2>Vị thế đang giữ</h2><section class="positions">{pos_html}</section>
+<h2>Việc cần làm</h2><ol>{todo_html}</ol>
+</main></body></html>"""
+
+
 def build(day: str, root: Path, resume_streak: int = RESUME_STREAK_NEEDED):
+    report = collect_session_report(day, root, resume_streak=resume_streak)
+    return render_text(report), report["need"]
+
+    # Kept unreachable only as historical reference for the previous text renderer.
     # Hai phần dưới đây đọc trạng thái HIỆN TẠI, không phải trạng thái của `day`. Với báo
     # cáo hôm nay thì trùng nhau; với ngày quá khứ thì chúng nói dối, và nói dối một cách
     # rất thuyết phục — bản đầu in "MNKD vào lệnh 2026-08-10" trong báo cáo ngày 07/08.
@@ -575,7 +979,13 @@ def main() -> int:
 
     text, need = build(day, Path(a.root), resume_streak=a.resume_streak)
     if a.out:
-        Path(a.out).write_text(text, encoding="utf-8")
+        # utf-8-SIG, không phải utf-8 trần. Windows đoán bảng mã theo code page của console
+        # khi không có BOM, nên `type bao_cao_0810.txt` in ra "BÃO CÃO PHIÃŠN" thay vì
+        # "BÁO CÁO PHIÊN". Một báo cáo không đọc được bằng cách mở thông thường thì coi như
+        # không tồn tại. BOM làm `type`, Notepad và Get-Content nhận đúng UTF-8.
+        #
+        # An toàn: file này chỉ để người đọc, không có gì phân tích nó.
+        Path(a.out).write_text(text, encoding="utf-8-sig")
         print(f"đã ghi {a.out}")
     else:
         print(text)
