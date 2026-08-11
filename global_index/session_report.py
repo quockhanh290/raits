@@ -55,6 +55,33 @@ except Exception:
     pass
 
 _TS = re.compile(r"^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})\s+(\w+)")
+
+
+def _to_et(day: str, hhmmss: str):
+    """Dấu thời gian trong log là giờ MÁY; báo cáo nói bằng giờ ET. Đổi cho khớp.
+
+    Máy hiện chạy MST (ET − 2h). Bản đầu lấy thẳng chuỗi trong log rồi ghi "mọi giờ là giờ
+    ET" — sai hai lần:
+
+      * mọi mốc lệch 2 tiếng;
+      * và nặng hơn, RANH GIỚI NGÀY sai đúng chỗ quan trọng nhất. Cửa sổ đêm NKD
+        01:10–02:55 ET là 23:10–00:55 giờ máy, vắt qua nửa đêm của máy. Gom theo ngày của
+        log thì báo cáo ngày D **bỏ sót** cửa sổ đêm của chính ngày D (nằm trong file ngày
+        D−1) và **gộp nhầm** cửa sổ đêm của ngày D+1 — nên các slot nkd_night_01xx hiện ra
+        như "không chạy" trong khi chúng chạy bình thường.
+
+    Lấy múi giờ từ hệ thống chứ không viết cứng: chuyển máy sang ET thì độ lệch thành 0 và
+    hàm này tự đúng.
+    """
+    import datetime as _dt
+    naive = _dt.datetime.fromisoformat(f"{day} {hhmmss}")
+    local = naive.astimezone()                      # gắn múi giờ của máy
+    try:
+        from zoneinfo import ZoneInfo
+        et = local.astimezone(ZoneInfo("America/New_York"))
+    except Exception:
+        return day, hhmmss
+    return et.date().isoformat(), et.strftime("%H:%M:%S")
 _MSG_DATE = re.compile("(20[0-9]{2})-([0-9]{2})-([0-9]{2})")
 
 # Dấu vết của dòng do test sinh ra, trong các file log cũ (trước khi chặn từ gốc).
@@ -196,6 +223,7 @@ def shadow_history(root: Path) -> dict:
                 sm = _SHADOW.search(ln)
                 if not sm:
                     continue
+                d = _to_et(d, m.group(2))[0]        # gom theo NGÀY ET, không phải ngày máy
                 rec = out.setdefault(d, {"khop": set(), "lech": set()})
                 rec["khop" if sm.group(2) == "KHOP" else "lech"].add(sm.group(1))
     return out
@@ -257,12 +285,15 @@ def read_lines(day: str, root: Path):
                 continue
             for ln in text.splitlines():
                 m = _TS.match(ln)
-                if not m or m.group(1) != day:
+                if not m:
+                    continue
+                _d, _t = _to_et(m.group(1), m.group(2))
+                if _d != day:
                     continue
                 if _is_test_line(ln, day):
                     dropped += 1
                     continue
-                kept.append((m.group(2), m.group(3), ln))
+                kept.append((_t, m.group(3), ln))
                 hit += 1
             if hit:
                 files.append((f.name, hit))

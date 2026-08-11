@@ -144,12 +144,53 @@ def test_a_past_date_does_not_flag_missing_jobs(tmp_path):
     một việc 'không chạy' có thể chỉ là chưa tồn tại — 19 lượt quét sửa thêm hôm 10/08 hiện
     ra như sự cố trong báo cáo ngày 07/08."""
     from global_index.session_report import build
+    # 10:00 giờ máy, KHÔNG phải 23:00. Dấu thời gian trong log là giờ máy và báo cáo đổi
+    # sang ET, nên một mốc sát nửa đêm sẽ rơi sang ngày ET kế tiếp và bài test tự hỏng —
+    # đúng cái bẫy mà phép đổi sinh ra để chống, gặp ngay trong chính fixture của nó.
     (tmp_path / "live_day_0807.log").write_text(
-        "2026-08-07 23:00:00  INFO     run_live_day - [LIVE_DAY_1405] completed OK\n",
+        "2026-08-07 10:00:00  INFO     run_live_day - [LIVE_DAY_1405] completed OK\n",
         encoding="utf-8")
     text, need = build("2026-08-07", tmp_path)
     assert "KHÔNG KIỂM ĐƯỢC CHO NGÀY QUÁ KHỨ" in text
     assert need is False, "danh sach viec 'khong chay' cua ngay qua khu khong duoc quyet ma thoat"
+
+
+# ── giờ trong log là giờ MÁY, báo cáo nói giờ ET ─────────────────────────────
+
+def test_log_timestamps_are_converted_to_et():
+    """Máy hiện chạy MST (ET − 2h) nhưng log ghi giờ máy, còn báo cáo tự khai "mọi giờ là
+    giờ ET". Bản đầu lấy thẳng chuỗi trong log — sai hai lần, và lần thứ hai nặng hơn."""
+    import datetime as _dt
+
+    from global_index.session_report import _to_et
+    d, t = _to_et("2026-08-10", "12:00:00")
+    off = (_dt.datetime.fromisoformat(f"{d} {t}")
+           - _dt.datetime.fromisoformat("2026-08-10 12:00:00"))
+    local = _dt.datetime(2026, 8, 10, 12).astimezone()
+    from zoneinfo import ZoneInfo
+    want = (local.astimezone(ZoneInfo("America/New_York")).replace(tzinfo=None)
+            - _dt.datetime(2026, 8, 10, 12))
+    assert off == want, "khong doi tu gio may sang gio ET"
+
+
+def test_the_night_window_lands_on_the_right_et_day():
+    """Lỗi nặng hơn: RANH GIỚI NGÀY. Cửa sổ đêm NKD 01:10-02:55 ET là 23:10-00:55 giờ máy
+    (MST), tức vắt qua nửa đêm CỦA MÁY. Gom theo ngày của log thì báo cáo ngày D bỏ sót
+    cửa sổ đêm của chính ngày D và gộp nhầm cửa sổ đêm ngày D+1 — nên nkd_night_01xx hiện
+    ra như 'không chạy' trong khi chúng chạy bình thường.
+
+    Test chỉ có nghĩa khi máy KHÔNG chạy giờ ET; trên máy ET thì độ lệch bằng 0 và không
+    có gì để kiểm."""
+    import datetime as _dt
+
+    from zoneinfo import ZoneInfo
+
+    from global_index.session_report import _to_et
+    probe = _dt.datetime(2026, 8, 10, 23, 10).astimezone()
+    et = probe.astimezone(ZoneInfo("America/New_York"))
+    if et.date() == probe.date():
+        pytest.skip("may dang chay gio ET — khong co ranh gioi ngay de kiem")
+    assert _to_et("2026-08-10", "23:10:00")[0] == et.date().isoformat()
 
 
 if __name__ == "__main__":
