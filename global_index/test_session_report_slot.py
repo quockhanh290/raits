@@ -155,6 +155,42 @@ def test_a_past_date_does_not_flag_missing_jobs(tmp_path):
     assert need is False, "danh sach viec 'khong chay' cua ngay qua khu khong duoc quyet ma thoat"
 
 
+def test_html_report_is_self_contained_and_uses_the_structured_report(tmp_path):
+    from global_index.session_report import collect_session_report, render_html
+
+    (tmp_path / "live_day_0810.log").write_text(
+        "2026-08-10 10:00:00  INFO     run_live_day - [LIVE_DAY_1405] completed OK\n"
+        "2026-08-10 10:01:00  ERROR    guard - B4 NAKED MES\n"
+        "2026-08-10 10:02:00  INFO     run_live_day - [shadow] MES: DOI CHIEU KHOP\n",
+        encoding="utf-8")
+    report = collect_session_report("2026-08-10", tmp_path)
+    page = render_html(report)
+    assert "<!doctype html>" in page
+    assert "<style>" in page
+    assert "http://" not in page and "https://" not in page
+    assert "Dòng thời gian trong ngày" in page
+    assert "Chuyển sang resume" in page
+
+
+def test_html_past_date_does_not_print_current_positions_or_missing_job_list(tmp_path):
+    from global_index.session_report import collect_session_report, render_html
+
+    (tmp_path / "live_day_0807.log").write_text(
+        "2026-08-07 10:00:00  INFO     run_live_day - [LIVE_DAY_1405] completed OK\n",
+        encoding="utf-8")
+    (tmp_path / "live_positions.json").write_text(
+        '{"positions":[{"inst":"MES","direction":"LONG","contracts":1,'
+        '"entry_day":"2026-08-10","entry_price":100,"stop_price":95,'
+        '"stop_order_id":null,"cluster":"roska4_swing"}]}',
+        encoding="utf-8")
+    report = collect_session_report("2026-08-07", tmp_path)
+    page = render_html(report)
+    missing_panel = page.split('class="panel missing-jobs"', 1)[1].split("</section>", 1)[0]
+    assert "entry_price" not in page
+    assert "2026-08-10" not in page
+    assert "<ul><li>" not in missing_panel
+
+
 # ── giờ trong log là giờ MÁY, báo cáo nói giờ ET ─────────────────────────────
 
 def test_log_timestamps_are_converted_to_et():
@@ -200,6 +236,7 @@ def test_the_report_file_is_written_with_a_bom(tmp_path, monkeypatch):
     Một báo cáo không đọc được bằng cách mở thông thường thì coi như không tồn tại — lỗi
     này không làm test nào đỏ, không làm log nào đỏ, chỉ làm bản báo cáo vô dụng đúng lúc
     có người mở nó ra đọc."""
+    import codecs
     import sys as _sys
 
     from global_index import session_report as sr
@@ -207,7 +244,7 @@ def test_the_report_file_is_written_with_a_bom(tmp_path, monkeypatch):
     monkeypatch.setattr(_sys, "argv", ["session_report", "--root", str(tmp_path),
                                        "--out", str(out)])
     sr.main()
-    assert out.read_bytes()[:3] == b"ï»¿", "thieu BOM UTF-8"
+    assert out.read_bytes()[:3] == codecs.BOM_UTF8, "thieu BOM UTF-8"
     assert "BÁO CÁO PHIÊN" in out.read_text(encoding="utf-8-sig")
 
 
