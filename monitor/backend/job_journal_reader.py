@@ -115,8 +115,18 @@ def _annotate_impact_and_action(jobs: list[dict[str, Any]]) -> None:
             )
         elif job["status"] == "missed":
             if job["job_type"] == "stop_repair":
-                job["impact"] = "The scheduled stop-repair inspection did not run; protection was not rechecked by this slot."
-                job["action"] = "Review current broker positions and working stops, then check scheduler health before the next slot."
+                if later_same_stream:
+                    job["lifecycle_status"] = "recovered"
+                    job["recovered_at"] = later_same_stream.get("ended_at") or later_same_stream.get("started_at")
+                    job["impact"] = (
+                        "The scheduled stop-repair inspection did not run at this slot; "
+                        f"inspection resumed when {later_same_stream['job_id']} completed."
+                    )
+                    job["action"] = "No immediate action. The missed slot remains in daily history; review only if a later sweep fails or broker protection is not reconciled."
+                else:
+                    job["lifecycle_status"] = "open"
+                    job["impact"] = "The scheduled stop-repair inspection did not run; protection was not rechecked by this slot."
+                    job["action"] = "Review current broker positions and working stops, then check scheduler health before the next slot."
             elif job["job_type"] in {"live_day", "nkd_night"}:
                 job["impact"] = "The scheduled decision run did not execute; this slot produced no decision or runner-state update."
                 job["action"] = "Check scheduler health and confirm the next expected decision slot runs."
