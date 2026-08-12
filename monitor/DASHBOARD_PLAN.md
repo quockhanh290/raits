@@ -238,3 +238,62 @@ Canvas API and has no CDN or external runtime dependency.
   breaker assertions reproduce in Part 2a before dashboard rendering because the
   old fixture now yields breaker OK/drawdown 0 rather than HALT/15%. This monitor
   session does not change the engine or that engine-facing fixture.
+
+## Observability backlog after daily reports
+
+This backlog covers useful evidence already emitted by logs but not yet surfaced
+consistently. Every item is read-only. Missing structured evidence remains an
+explicit telemetry gap; the dashboard must not infer it or change engine output.
+
+1. **IBKR/TWS connectivity lifecycle - complete (2026-08-12).** Pair broker and data-farm
+   transitions into incidents instead of showing one warning per code, then
+   group overlapping service lifecycles into one parent connectivity episode: TWS
+   `1100 -> 1101/1102`, market data `2103 -> 2104`, historical data
+   `2105 -> 2106`, and security-definition data `2157 -> 2158`. Each lifecycle
+   records incurred time, recovered time, duration, impact, action, and raw code
+   evidence. Now Monitor shows unresolved outages only; recovered outages remain
+   in Realtime Events and the Daily Report. Logs near midnight must be read from
+   both local-date files and filtered by ET session date. Push thresholds are a
+   separate pending policy decision: proposed starting point is no page on paper,
+   and on live only TWS outages over 120 seconds with open positions or data-farm
+   outages over five minutes.
+2. **B4 stop lifecycle and order-ID drift - complete (2026-08-12).** Distinguish a deliberate deferred
+   stop, initial arming, replacement, cancellation after close, and unexpected
+   broker order-ID changes. Realtime owns current protection; Reports owns the
+   full daily lifecycle.
+3. **Replay and HMM health - complete (2026-08-12).** Non-convergence is grouped
+   into one daily diagnostic with fit attempts, completed summaries, latest
+   best initialisation, model version, SPY label coverage, and Calm/Normal/Stress
+   fitted-state parameters. It remains separate from G2 model-age debt and does
+   not count as an incident when no documented gate failure is emitted. Realtime
+   shows fit status in Model Inputs and the expandable Event Journal; Reports
+   retains it in Session Context and the daily audit trail. Historical shows the
+   replay date range and snapshot count, while explicitly labeling generation as
+   manual/not freshness-gated because no expected-through contract exists.
+4. **Execution quality - complete within emitted telemetry (2026-08-12).** A
+   read-only, mtime-cached adapter reads `trade_log.jsonl`, tolerates a torn last
+   line, and reports ordered/filled quantity, actual fill, benchmark type, signed
+   adverse slippage in ticks, source, order ID, and stable permId when present.
+   OPEN fills use expected entry; real STP exits use the stop trigger. Signal
+   MARKET exits expose only distance to the protective stop and are excluded from
+   execution-slippage distributions because no decision-time expected price is
+   emitted. Realtime shows current-session exceptions only; Reports retains every
+   daily fill plus telemetry coverage; Historical overlays paper-fill
+   distributions through the selected date without mixing them into replay.
+   Commission and execution route remain explicit telemetry gaps (0 retained
+   fills currently emit either); monitoring does not substitute configured cost
+   assumptions for broker execution evidence.
+5. **Input-data quality.** Show frozen-input integrity, live-bar raw/adjusted
+   offsets, missing/duplicate bars, and coverage counts. Do not manufacture a
+   pass when a field is absent.
+6. **Paper fill quality.** Add broker-versus-ledger deltas, fill reconciliation,
+   and evidence for restart-night behavior. Current H4 aggregate evidence remains
+   report-only until its interpretation is pinned down.
+7. **Historical detail.** Expose holding-time distribution, cluster statistics,
+   regime attribution, and exit-path breakdown without loading replay data into
+   Realtime.
+8. **Signal funnel - blocked on telemetry.** Instrument- and cluster-level counts
+   from signal through sizing, rejection, submission, and fill need stable
+   instrument/decision identifiers. Existing signal log lines do not provide a
+   reliable join key, so this requires a separate engine-output decision and is
+   not implemented by monitoring code.

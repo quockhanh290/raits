@@ -3441,3 +3441,151 @@ kiểm định — hai đường kia đều đòi đo lại. Chưa triển khai.
 ### Files touched
 global_index/run_scheduler.py, global_index/test_stress_slot_invariant.py,
 docs/futures/OPERATIONS.md, SCRATCHPAD.md
+
+---
+## Sub-task: Sửa comparator paper_vs_backtest — nhãn regime dừng ở 2024-12-31 (2026-08-11)
+Status: IN PROGRESS (chờ gate Calmar)
+
+### Vấn đề
+Panel `paper_vs_backtest` trả `null` suốt 12 ngày. Nguyên nhân bề mặt là curve cũ
+(2026-07-30) — nhưng chạy lại KHÔNG đủ, vì comparator hỏng ở tầng dữ liệu:
+
+`generate_replay_snapshots.py` dùng `spy_daily.csv`, dừng ở **2024-12-31**. Hai cluster
+tra nhãn theo hai kiểu khác nhau:
+- swing/stress: `labels.get(day)` (dict thuần) → `None` sau 2024-12-31 → gate ở
+  `futures/_validated_core.py:402` chặn → **ngừng vào lệnh**
+- global_nkd: `RegimeLabels.get` → `self.reg.asof(target)` (`global_index/regime.py:58`)
+  → **nối giá trị cuối**, chạy tiếp tới 2026 trên nhãn ĐÓNG BĂNG ở 2024-12-31
+
+Hệ quả: cả đoạn 2025-2026 của `backtest_curve.json` là NKD một mình, trong khi live giao
+dịch cả Rổ 4 lẫn NKD. Panel so hai hệ khác nhau.
+
+### Completed
+- [x] Trace đủ chuỗi: `basket_labels` → `benchmark_daily` (đọc CSV thuần, không nối) →
+      `label_regimes` → gate dòng 402; đối chiếu với `RegimeLabels.asof`
+- [x] Xác nhận `spy_daily_live.csv` là tập cha đúng nghĩa: trùng khít 2012/2012 ngày chồng
+      lấn (lệch max 0.0), thêm 402 ngày tới 2026-08-11
+- [x] Đổi `generate_replay_snapshots.py:40` → `spy_daily_live.csv` + comment ghi cơ chế
+- [x] Sinh lại curve; backup bản cũ ở `global_index/backtest_curve.spydaily.bak`
+- [x] Gate 1 — không look-ahead: equity 2018-01-30 / 2022-12-30 / 2024-12-31 trùng khít
+      (98,430.51 giữ nguyên). Đúng như dự đoán: `hmm_fit_end` cắt ở 2024-12-31 và
+      `label_regimes` gán nhãn bằng cửa sổ mở rộng nên đoạn IS không thấy dữ liệu mới
+- [x] Gate 2 — cả 3 cluster giao dịch tới 2026 (swing 2026-08-11, nkd 2026-08-12,
+      stress 2026-04-01), không còn dừng ở 2025-01-02 / 2024-08-09
+
+- [x] Gate 3 — degradation đo bằng ĐÚNG quy ước của floor (`deploy_sim`, frozen, 2-tick,
+      `--end 2024-12-31`, no-stress). Cả hai lệnh tái lập chính xác số trong INVARIANTS:
+      baseline $42,459 / Calmar 1.72 / MaxDD $3,574 · floor fit_A $42,565 / 1.65 / $3,744.
+      `1.72 > 1.65` giữ nguyên → engine chưa trôi. `roska4_stress taken 0` ở cả hai xác nhận
+      quy ước no-stress
+
+- [x] Phương án 1 — khai rõ nhãn (đã làm 2026-08-11). `dashboard.html`: ô Calmar đổi nhãn
+      phụ `IS 1.65` → `floor 1.65 · quy ước khác`, thêm `CALMAR_NOTE` làm tooltip cho cả ô
+      giá trị lẫn nhãn phụ, ghi luôn "ngưỡng màu 2.0/1.0 là ngưỡng chung, KHÔNG phải floor".
+      Panel degradation đổi nhãn thành "Backtest Calmar (floor fit_A — frozen, no-stress)" +
+      "Paper Calmar (live, ít ngày)". `dash/analytics/`: `IS Baseline` → `Floor fit_A` +
+      cùng tooltip. Đã `node --check` cả JS rời lẫn khối inline của dashboard.html
+
+### Hoãn — làm khi tới phần dashboard cho paper trade
+- [ ] **Quy ước Calmar: gỡ `floor` khỏi thanh metric, chỉ để nó cạnh `paper_calmar` trong
+      panel degradation.** Đã chốt phương án C. Toàn bộ lý lẽ, bảng 7 ràng buộc, hai phương
+      án đã loại, và cái giá phải chấp nhận (`paper_calmar` sẽ `N/A` một thời gian vì
+      `system_epoch` = 2026-08-10) ghi ở **`monitor/DASHBOARD_PLAN.md` → mục "Calmar
+      convention"**. Hiện mới chỉ vá bằng nhãn (phương án 1), chưa sửa cấu trúc.
+      Ngưỡng màu 2.0/1.0 của thanh metric xem lại cùng lúc, đừng tách riêng
+
+### Key decisions
+- Comparator cũ hỏng theo HAI hướng cùng lúc, không phải một: thiếu Rổ 4 **và** phóng đại
+  NKD. P&L NKD sau 2024-12-31 rơi $12,851 → $4,636 (2.8 lần) khi thay nhãn đóng băng bằng
+  nhãn thật. Tổng curve mới THẤP hơn $3,138 dù đã cộng thêm swing +$4,992
+- Hai đường cong khớp số học: 98,430.51 + (12,851.40 − 193.90) = 111,088.01 (cũ);
+  98,430.51 + (4,635.85 + 4,992.01 − 108.76) = 107,949.61 (mới)
+- `per_cluster_pnl` trong snapshot là LUỸ KẾ lặp lại mỗi ngày — cộng dồn ra $9.9M trên tài
+  khoản $50k. Phải đo bằng biến thiên. Giá trị bất khả thi là thứ bắt được lát cắt sai
+- Loại trừ giả thuyết stop: việc hoãn stop tới phiên sau là để KHỚP backtest
+  (`runner.py:1907-1937`), không phải lệch khỏi nó. Backtest test stop TRƯỚC khối vào lệnh
+  trong cùng vòng lặp ngày (`_validated_core.py:314` vs `:400`)
+
+### Ghi nhận để quyết riêng (KHÔNG tự sửa — ràng buộc "không đụng engine")
+- `run_scheduler.py` CẤM sửa: `G2 HARD` bắn 35/35 lần chạy mỗi ngày làm bão hoà kênh cảnh
+  báo — một ERROR mới lạ sẽ chìm nghỉm. Cần quyết cách khử trùng lặp
+- Re-freeze HMM (fit_end 2024-12-31, đã 20 tháng) là việc engine, cần mở ràng buộc
+- Live gộp mọi exit thành `why="signal exit"`, không phân biệt CHANDELIER / MAX_HOLD như
+  backtest có `reason` → không quy trách nhiệm phân kỳ được. Cần engine phát ra nhãn này
+- `SLIPPAGE = 2.0` tick trong script vs đo được 28 / 8 / 7 / 6 tick trên 4 lệnh gần nhất
+  (N=15, chưa đủ kết luận)
+
+### Files touched
+global_index/generate_replay_snapshots.py (dòng 40 + comment)
+
+---
+## Sub-task: session_report — mã thoát bị hiểu nhầm thành job hỏng (2026-08-11)
+Status: DONE (còn 2 mục để quyết riêng)
+
+### Vấn đề
+Dashboard hiện SESSION_REPORT là **failed** mỗi ngày, dù báo cáo chạy xong và ghi file bình
+thường. Chuỗi nhân quả:
+
+- `session_report.main()` dùng mã thoát làm KÊNH PHÁN QUYẾT: `return 1 if need else 0`
+- `run_scheduler._run()` (dùng chung cho mọi job) hiểu mã ≠ 0 theo nghĩa SỨC KHOẺ:
+  `log.error("[%s] exited with code %d")`, rồi đổ tail stdout ra CŨNG ở mức ERROR — nên
+  dòng "chi tiết lỗi" lại chính là câu `đã ghi bao_cao_0811.txt`
+- `monitor/backend/job_journal_reader.py:99` bắt chuỗi `"exited with code"` → `failed`
+
+Báo cáo sinh ra để TÌM việc nên `need=True` gần như mọi ngày — đo 05/08–11/08: **6/6 ngày**
+`need=True`, exit=1. Đây là một dòng ERROR giả MỖI NGÀY, không phải sự cố lẻ.
+
+### Completed
+- [x] Bỏ mã thoát làm kênh phán quyết: `session_report.main()` luôn `return 0`, kèm comment
+      ghi đủ chuỗi nhân quả. Từ đây mã ≠ 0 chỉ còn một nghĩa: script thật sự vỡ
+- [x] Xác nhận KHÔNG mất thông tin: `monitor/backend/report_reader.read_report` gọi thẳng
+      `collect_session_report` trong tiến trình và trả về cả `need` lẫn `issues` — dashboard
+      đọc mức độ từ nội dung báo cáo, chưa từng cần mã thoát
+- [x] Blocker (CHẶN) cũng KHÔNG đẩy mã thoát lên: "hệ thống đã dừng vào lệnh" mà báo bằng
+      câu "exited with code 1" thì vẫn sai chữ. Mức độ thuộc về nội dung báo cáo
+- [x] Kiểm: exit=0, nội dung giữ nguyên (mục "VIỆC CẦN LÀM" vẫn còn cả 2 việc).
+      `test_session_report_slot` + `test_resume_progress` 28 pass, `test_dashboard_backend`
+      19 pass
+
+### Còn phải quyết
+- [ ] **Lịch sử vẫn đỏ.** Các dòng `exited with code 1` của những ngày trước vẫn nằm trong
+      log scheduler, nên dashboard vẫn hiện các lần chạy CŨ là failed. Không vá bằng cách
+      cho `job_journal_reader` bỏ qua "exited with code" của SESSION_REPORT — làm vậy sẽ che
+      luôn một lần vỡ THẬT sau này. Nếu muốn sạch thì phải giới hạn theo ngày cắt
+- [x] **Luật `cancel_order` bắt nhầm dòng INFO — ĐÃ SỬA.** Khoá trần `"cancel_order"` khớp
+      cả `cancel_order: cancelled orderId=N` (INFO, THÀNH CÔNG). Thay bằng hai khoá dạng
+      thất bại: `"STILL OPEN 5s after cancelOrder"` (sai clientId) và
+      `"cancel_order(orderId="` (exception, dấu ngoặc phân biệt với dạng hai chấm — và
+      KHÔNG đụng dòng `STP ORPHAN: cancel_order(62) returned False` vì dòng đó không có
+      chữ `orderId=` trong ngoặc).
+
+      `"not found among open orders"` CỐ Ý bỏ ra ngoài. Nó có ba nguyên nhân mà dòng log
+      không phân biệt được — lệnh đã xong / số hiệu là số ma / lệnh chưa từng được nhận —
+      và cả ba đều làm `cancel_order` trả `False` → runner kêu CRITICAL `STP ORPHAN` ngay
+      dòng sau, kèm đủ mã, cluster, orderId, việc cần làm. Bằng chứng live 06/08 12:10:29:
+      hai dòng cách nhau 0 giây, orderId 62 là số ma còn stop thật #9 vẫn treo. Giữ lại chỉ
+      là bản sao nghèo thông tin hơn của cùng một sự cố.
+
+      Đo trước/sau trên 6 ngày: 07/08 70→28, 08/08 15→6, 10/08 55→22 (giữ nguyên toàn bộ
+      dòng ERROR thật), 11/08 2→0 (hết báo nhầm). Sau khi sửa, `'Không huỷ được một lệnh ở
+      sàn'` vẫn nổi ở 07/08 và 10/08; 06/08 chuyển đúng về `STP ORPHAN` thay vì đếm hai lần.
+
+      **Đánh đổi đã biết:** ngày 05/08 giờ ra `need=False`. Hôm đó có hai dòng
+      `"not found in OPEN TRADES"` (orderId 9, 10) mà KHÔNG kèm STP ORPHAN, vì chính sự cố
+      05/08 mới sinh ra dòng CRITICAL đó. Cách viết cũ ấy đã tuyệt chủng trong code hiện
+      tại, nên chạy báo cáo cho 05/08 sẽ không nêu hai lệnh mồ côi đó nữa. Với code HIỆN
+      TẠI thì mọi `not found` đều kéo theo STP ORPHAN — không mất gì về sau
+- [ ] Còn phải quyết: `cancel_order` trả `False` cho CẢ trường hợp lành (lệnh đã khớp/đã
+      huỷ từ trước) nên runner kêu CRITICAL `STP ORPHAN` "vào TWS huỷ tay" cả khi không còn
+      gì để huỷ. Sửa đúng là cho `cancel_order` phân biệt "không thấy vì đã xong" với
+      "không thấy vì số ma" — nhưng nằm ở `ibkr_broker.py`/`runner.py`, thuộc diện CẤM
+- [ ] `run_scheduler.py` (CẤM sửa) — hai lỗi phải để quyết riêng:
+      (a) `_run` không phân biệt job dùng mã thoát làm phán quyết, và câu chữ
+      "exited with code N" đọc như crash;
+      (b) `subprocess.run(..., text=True)` thiếu `encoding="utf-8"` → giải mã bằng codec
+      locale (cp1252) trong khi con ghi UTF-8, bóp méo TOÀN BỘ output bắt được của mọi job,
+      kể cả các dòng CRITICAL/ERROR in lại ở dòng 370 — đúng thứ người ta bắt output để đọc.
+      Hôm nay không lộ chỉ vì các dòng đó tình cờ toàn ASCII
+
+### Files touched
+global_index/session_report.py

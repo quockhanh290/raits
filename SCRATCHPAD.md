@@ -1293,3 +1293,30 @@ Cách bắt: một công cụ báo "việc X không chạy" mà việc đó rơi
 - **"Ổn chưa" phải trả lời bằng mắt xích còn thiếu, không bằng số test.** Cuối ngày có
   475/475 và reconcile $0.00, nhưng code stop mới vẫn **chưa đặt một lệnh stop thật nào** —
   và đó mới là câu trả lời đúng cho câu hỏi đó.
+
+## Gotchas (2026-08-11)
+
+- **Cùng một codebase, hai kiểu tra nhãn, hai hành vi ngoài biên.** `labels.get(day)` (dict
+  thuần) trả `None` khi hết dữ liệu → engine bỏ qua ngày đó, im lặng nhưng ĐÚNG. Còn
+  `RegimeLabels.get` dùng `Series.asof` (`global_index/regime.py:58`) → **nối giá trị cuối
+  vô hạn**, nên NKD chạy suốt 2025-2026 trên nhãn regime đóng băng ở 2024-12-31 mà không
+  một dòng cảnh báo nào. `asof` không hỏng khi hết dữ liệu — nó đóng băng. Chỗ nào dùng
+  `asof` trên chuỗi có thể hết hạn, phải tự hỏi "nối tới bao giờ thì vô nghĩa".
+- **Hai lỗi ngược chiều trong cùng một con số.** Comparator vừa THIẾU Rổ 4 (không vào lệnh)
+  vừa PHÓNG ĐẠI NKD (nhãn đóng băng, 2.8 lần). Sửa xong, tổng lại THẤP hơn $3,138 dù đã
+  cộng thêm swing +$4,992. Nếu chỉ nhìn tổng thì tưởng bản sửa làm hệ tệ đi.
+- **Giá trị bất khả thi bắt được lát cắt sai.** Cộng dồn `per_cluster_pnl` ra $9.9M trên tài
+  khoản $50k — vì đó là LUỸ KẾ lặp lại mỗi ngày, phải đo bằng biến thiên. Con số vô lý là
+  thứ duy nhất cứu được, vì bản thân phép cộng chạy trơn tru.
+- **Đọc tĩnh có thể ra mâu thuẫn mà vẫn không tìm ra lối.** Suy ra "nhãn hết → curve phải
+  phẳng", nhưng curve vẫn có 271 giá trị khác nhau. Mâu thuẫn đó ĐÚNG là tín hiệu, nhưng
+  giả thuyết đầu tiên (CSV không sắp xếp) sai. Backup + chạy lại + diff rẻ hơn đọc tiếp.
+
+## Rejected approaches (2026-08-11)
+
+- **"Stop live khác backtest nên không so được"** — sai chiều. Việc hoãn stop tới phiên sau
+  chính là để KHỚP backtest: `backtest_swing_tf` test stop TRƯỚC khối vào lệnh trong cùng
+  vòng lặp ngày (`_validated_core.py:314` vs `:400`), nên vị thế mở ngày D lần đầu bị test
+  stop ngày D+1. Đo được: đặt ngay −$10,832 / hoãn +$47,166 (2018-2026).
+- **"Chạy lại generate_replay_snapshots là xong"** — chạy lại mà không sửa `REGIME_CSV` chỉ
+  tái tạo đúng cái comparator hỏng, và GHI ĐÈ bản duy nhất đang có. Backup trước.
