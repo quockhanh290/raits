@@ -24,12 +24,16 @@
       <div><span>Observed Days</span><b id="paperDays">--</b><small>target 60</small></div>
       <div><span>Regimes Seen</span><b id="regimesSeen">--</b><small>Normal + Stress</small></div>
       <div><span>Exit Coverage</span><b id="exitCoverage">--</b><small>3 paths</small></div>
-      <div><span>C1 Open Mean</span><b id="slippageMean">--</b><small id="closeSlippageMean">close mean --</small></div>
-      <div><span>C1 Samples</span><b id="slippageCount">--</b><small>open / close</small></div>
+      <div><span>C1 Open Mean</span><b id="slippageMean">--</b><small id="closeSlippageMean">stp close mean --</small></div>
+      <div><span>C1 Samples</span><b id="slippageCount">--</b><small>open / stp close</small></div>
     </section>
     <section class="ledger-band">
       <div class="section-heading"><div><p class="eyebrow">PRECOMMITTED GATES</p><h2>Evidence ledger</h2></div><p class="summary">Thresholds from docs/futures/PAPER_ROUTE.md</p></div>
       <div class="ledger" id="evidenceLedger"></div>
+    </section>
+    <section class="coverage-band">
+      <div class="section-heading"><div><p class="eyebrow">ADDITIONAL COVERAGE</p><h2>Paper observability</h2></div><p class="summary">Read-only evidence outside the seven gates</p></div>
+      <div class="coverage-grid" id="paperCoverage"></div>
     </section>
     <section class="gap-band">
       <div class="section-heading"><div><p class="eyebrow">NOT OBSERVABLE YET</p><h2>Evidence gaps</h2></div></div>
