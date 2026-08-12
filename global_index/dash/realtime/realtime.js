@@ -3,7 +3,7 @@
 
   const POLL_MS = 8000;
   const EVENT_JOURNAL_LIMIT = 24;
-  const state = { runner: null, runnerPositions: null, broker: null, schedule: null, sessionEvents: null, jobJournal: null, openIssues: null, selectedJobId: null, selectedIssueKey: null, selectedMonitorKey: null, selectedEventKey: null, journalView: 'jobs', issuesSectionOpen: null };
+  const state = { runner: null, runnerPositions: null, broker: null, schedule: null, sessionEvents: null, jobJournal: null, executionQuality: null, openIssues: null, selectedJobId: null, selectedIssueKey: null, selectedMonitorKey: null, selectedEventKey: null, journalView: 'jobs', issuesSectionOpen: null };
   const compactIssueMedia = window.matchMedia('(max-width: 680px)');
   const roots = ['MNKD', 'M2K', 'MNQ', 'MYM', 'MES'];
   const railTips = {
@@ -14,7 +14,8 @@
     'Position match': 'Compares current IBKR positions with persisted runner intent, including quantity when available.',
     'Risk breaker': 'Current circuit-breaker state. Drawdown magnitude is shown in the gauge above.',
     'Regime data': 'Freshness of the SPY regime input; the active regime is shown in the context row above.',
-    'Model health': 'Age and maintenance status of the fitted model. Known debt is separated from new incidents.'
+    'Model health': 'Age and maintenance status of the fitted model. Known debt is separated from new incidents.',
+    'HMM fit': 'Grouped daily fit evidence. A convergence warning is diagnostic when the fit still selects a best initialisation and emits its model summary.'
   };
 
   const $ = id => document.getElementById(id);
@@ -61,6 +62,44 @@
   const localTime = iso => iso ? new Date(iso).toLocaleString('en-CA', {
     timeZone: 'America/New_York', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
   }) + ' ET' : '--';
+
+  // ── Status-rail wall clock ───────────────────────────────────────────────
+  // The time it is NOW, which is a different thing from every other timestamp on this page:
+  // those describe when data was observed. The backend binds 127.0.0.1, so the only browser
+  // that can open this page runs on the machine the scheduler fires on — the browser clock
+  // IS the server clock and needs no round-trip. That stops being true the day this is
+  // served over the LAN, and then it has to anchor on server_now instead.
+  const ET_ZONE = 'America/New_York';
+  const CLOCK_ZONES = [
+    { label: 'JST', zone: 'Asia/Tokyo' },
+    { label: 'HAN', zone: 'Asia/Ho_Chi_Minh' },
+    { label: 'YYC', zone: 'America/Edmonton' }
+  ];
+  const zoneParts = (date, zone, withSeconds) => new Intl.DateTimeFormat('en-CA', {
+    timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    ...(withSeconds ? { second: '2-digit' } : {})
+  }).formatToParts(date).reduce((acc, part) => { acc[part.type] = part.value; return acc; }, {});
+  const zoneDayNumber = parts => Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)) / 86400000;
+  // Tokyo at 03:23 sitting beside New York at 14:23 reads as eleven hours earlier the same
+  // day unless the date shift is marked — and that is the NKD window, not a corner case.
+  // Plain +1/-1 rather than superscript: Courier New and Lucida Console are both in the font
+  // picker and neither carries U+207A, which would render as a box.
+  const dayShift = diff => diff ? ` <em class="day-shift">${diff > 0 ? '+' : '-'}${Math.abs(diff)}</em>` : '';
+
+  function renderRailClock() {
+    if (!$('railClockEt')) return;   // rail not painted yet on first load
+    const now = new Date();
+    const et = zoneParts(now, ET_ZONE, true);
+    const etDay = zoneDayNumber(et);
+    const abbrev = new Intl.DateTimeFormat('en-US', { timeZone: ET_ZONE, timeZoneName: 'short' })
+      .formatToParts(now).find(part => part.type === 'timeZoneName');
+    $('railClockEt').textContent = `ET ${et.hour}:${et.minute}:${et.second} ${abbrev ? abbrev.value : ''}`.trim();
+    $('railClockZones').innerHTML = CLOCK_ZONES.map(({ label, zone }) => {
+      const parts = zoneParts(now, zone, false);
+      return `${label} ${parts.hour}:${parts.minute}${dayShift(zoneDayNumber(parts) - etDay)}`;
+    }).join(' · ');
+  }
   const rootOf = symbol => {
     const clean = String(symbol || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (clean.startsWith('NKD') || clean.startsWith('MNKD')) return 'MNKD';
@@ -121,6 +160,13 @@
   const runnerOnly = () => runnerPositions().filter(pos =>
     !brokerPositions().some(live => rootOf(live.inst) === rootOf(pos.inst) && brokerDirection(live.position) === String(pos.direction).toUpperCase())
   );
+  const brokerPositionsMatchNow = () => brokerUsable()
+    && runnerOnly().length === 0
+    && brokerPositions().every(pos => {
+      const runner = runnerFor(pos);
+      const qty = runnerQuantity(runner);
+      return runner && qty != null && qty === Math.abs(Number(pos.position));
+    });
 
   async function fetchJson(url) {
     const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(6000) });
@@ -149,15 +195,19 @@
     const sessionDay = latestSnap()?.date;
     if (sessionDay) {
       try {
-        const [sessionEvents, jobJournal] = await Promise.all([
+        const [sessionEvents, jobJournal, executionQuality] = await Promise.all([
           fetchJson(`/api/v1/session-events/${encodeURIComponent(sessionDay)}`),
-          fetchJson(`/api/v1/job-journal/${encodeURIComponent(sessionDay)}`)
+          fetchJson(`/api/v1/job-journal/${encodeURIComponent(sessionDay)}`),
+          fetchJson(`/api/v1/execution-quality/${encodeURIComponent(sessionDay)}`)
+            .catch(error => ({ source: 'trade_log.jsonl', day: sessionDay, fills: [], exceptions: [], error: error?.message || 'execution-quality request failed' }))
         ]);
         state.sessionEvents = sessionEvents;
         state.jobJournal = jobJournal;
+        state.executionQuality = executionQuality;
       } catch (error) {
         state.sessionEvents = { source: 'live_log', day: sessionDay, events: [], error: error?.message || 'session-events request failed' };
         state.jobJournal = { source: 'scheduler_log', day: sessionDay, jobs: [], monitor_events: [], error: error?.message || 'job-journal request failed' };
+        state.executionQuality = { source: 'trade_log.jsonl', day: sessionDay, fills: [], exceptions: [], error: error?.message || 'execution-quality request failed' };
       }
     }
     $('fatalBanner').hidden = results.some(result => result.status === 'fulfilled');
@@ -185,9 +235,20 @@
     $('regimeInputDate').className = regimeStatus === 'OK' ? 'positive' : 'warning';
     const modelStatus = ops.model_age?.status;
     const modelMonths = ops.model_age?.months_old;
+    // Hai dòng phụ dưới Model age / HMM fit đã bỏ khỏi header — chúng lặp lại điều mà
+    // giá trị và màu đã nói, và đẩy cả thanh header cao thêm một dòng. Chi tiết không mất:
+    // chuyển sang title, hover vẫn đọc được.
     $('modelInputAge').textContent = modelStatus === 'OK' ? 'Current' : `${modelMonths ?? '?'} mo stale`;
     $('modelInputAge').className = modelStatus === 'OK' ? 'positive' : 'warning';
-    $('modelInputStatus').textContent = modelStatus === 'OK' ? 'Fit current' : 'Known debt / G2 HARD';
+    $('modelInputAge').title = modelStatus === 'OK' ? 'Fit current' : 'Known debt / G2 HARD';
+    const fitDiagnostic = [...(state.sessionEvents?.events || [])].reverse()
+      .find(event => event.kind === 'hmm_fit_diagnostic');
+    $('modelFitStatus').textContent = fitDiagnostic
+      ? `${fitDiagnostic.completed_fits}/${fitDiagnostic.attempts} complete` : 'Not observed';
+    $('modelFitStatus').className = fitDiagnostic?.completed_fits === fitDiagnostic?.attempts ? 'positive' : 'warning';
+    $('modelFitStatus').title = fitDiagnostic
+      ? `${fitDiagnostic.non_convergence_count || 0} warnings · no gate failure`
+      : 'No retained fit evidence';
     $('modelInputsZone').classList.toggle('watch', regimeStatus !== 'OK' || modelStatus !== 'OK');
     const rf = state.runner?.freshness || 'missing';
     const runnerText = rf === 'fresh' ? `Current · updated ${age(state.runner?.age_seconds)}`
@@ -282,14 +343,6 @@
     return `${slotLabel(evidence.slot_id)} · ${outcome}`;
   }
 
-  function scheduleJobLabel(jobId) {
-    if (jobId === 'PREFLIGHT') return 'Pre-flight';
-    if (String(jobId || '').startsWith('MAX_HOLD')) return 'Max Hold Exit';
-    const repair = String(jobId || '').match(/^STOP_REPAIR_(\d{2})(\d{2})$/);
-    if (repair) return 'Stop Repair';
-    if (jobId === 'SESSION_REPORT') return 'Session Report';
-    return slotLabel(jobId);
-  }
 
   function latestObservedJob() {
     return [...(state.jobJournal?.jobs || [])]
@@ -315,8 +368,11 @@
     const nextDecision = schedule?.next_decision_job;
     const latestScheduled = latestObservedJob();
     const latestDecision = latestDecisionJob();
+    // The scheduler's own job id, not a prettier synonym. Whatever this row names, the
+    // operator has to be able to grep it straight out of scheduler_MMDD.log — a dashboard
+    // vocabulary that exists nowhere else in the system is a translation step under pressure.
     const fact = (label, job, at, tone = 'next') => `<div class="schedule-fact ${tone}">
-      <span>${esc(label)}</span><div><b>${esc(job ? scheduleJobLabel(job.job_id) : 'Not observed')}</b><time>${esc(at ? etClock(at) : '--')}</time></div>
+      <span>${esc(label)}</span><div><b>${esc(job ? job.job_id : 'Not observed')}</b><time>${esc(at ? etClock(at) : '--')}</time></div>
     </div>`;
     $('nowScheduleFacts').innerHTML = [
       fact('Next job', nextScheduled, nextScheduled?.at),
@@ -378,8 +434,17 @@
         <strong>${stripIssueCount} issue${stripIssueCount === 1 ? '' : 's'} open</strong>
       </div>
       <div class="system-facts">
-        <span class="fact-scheduler has-tip tip-bottom ${stripScheduleBad ? 'bad' : stripSchedule?.evidence_available ? 'ok' : 'watch'}" tabindex="0" data-tooltip="ON SCHEDULE means scheduler evidence is available, no due slot is unresolved, and runner state is not late. It does not describe model or trading health."><i class="scheduler-live-dot"></i><small>Scheduler</small><b>${esc(stripScheduleBad ? 'attention' : stripSchedule?.evidence_available ? 'on schedule' : 'unknown')}</b></span>
+        <span class="rail-clock has-tip tip-bottom" tabindex="0" data-tooltip="Wall-clock time right now, not a data timestamp. ET is the zone every schedule constant in this system is written in; the second line is the same instant elsewhere, marked when that zone is on a different calendar date.">
+          <b id="railClockEt">--:--:--</b>
+          <span id="railClockZones">--</span>
+        </span>
       </div>`;
+    // The rail is rebuilt wholesale on every poll, which throws the clock nodes away with it.
+    // Repaint immediately or it sits on placeholder dashes until the next one-second tick.
+    renderRailClock();
+
+    $('journalSchedule').innerHTML = `
+      <span class="fact-scheduler has-tip tip-right ${stripScheduleBad ? 'bad' : stripSchedule?.evidence_available ? 'ok' : 'watch'}" tabindex="0" data-tooltip="ON SCHEDULE means scheduler evidence is available, no due slot is unresolved, and runner state is not late. It does not describe model or trading health."><i class="scheduler-live-dot"></i><small>Scheduler</small><b>${esc(stripScheduleBad ? 'attention' : stripSchedule?.evidence_available ? 'on schedule' : 'unknown')}</b></span>`;
   }
 
   function renderRailLegacy(snap) {
@@ -411,6 +476,8 @@
     const regimeDate = ops.regime_freshness?.last_spy_date
       ? sessionDate(ops.regime_freshness.last_spy_date).replace(/, \d{4}$/, '') : null;
     const modelMonths = ops.model_age?.months_old;
+    const fitDiagnostic = [...(state.sessionEvents?.events || [])].reverse()
+      .find(event => event.kind === 'hmm_fit_diagnostic');
     const groups = [
       ['Pipeline', [
         railItem('State updates', runnerFreshnessText(runnerFreshness, state.runner?.expected_next_at), runnerLevel),
@@ -424,7 +491,10 @@
       ]],
       ['Inputs', [
         railItem('Regime data', ops.regime_freshness?.status === 'OK' ? `Current${regimeDate ? ` · SPY ${regimeDate}` : ''}` : `${ops.regime_freshness?.bday_stale ?? '?'} business days stale`, ops.regime_freshness?.status === 'OK' ? 'ok' : 'watch'),
-        railItem('Model health', ops.model_age?.status === 'OK' ? 'Current' : `${modelMonths ?? '?'} months stale · known debt`, ops.model_age?.status === 'OK' ? 'ok' : 'debt')
+        railItem('Model health', ops.model_age?.status === 'OK' ? 'Current' : `${modelMonths ?? '?'} months stale · known debt`, ops.model_age?.status === 'OK' ? 'ok' : 'debt'),
+        railItem('HMM fit', fitDiagnostic
+          ? `${fitDiagnostic.completed_fits}/${fitDiagnostic.attempts} complete · ${fitDiagnostic.non_convergence_count || 0} warnings`
+          : 'No retained fit evidence', 'watch')
       ]]
     ];
     $('statusRail').innerHTML = groups.map(([title, items]) => `<section class="status-group"><span class="status-group-title">${esc(title)}</span><div class="status-group-items" style="--status-count:${items.length}">${items.join('')}</div></section>`).join('');
@@ -434,6 +504,12 @@
     const incidents = [];
     const gaps = [];
     const schedule = state.schedule;
+    const openConnectivity = (state.sessionEvents?.events || []).filter(event =>
+      event.kind === 'connectivity_outage' && event.status === 'open');
+    const openReconcile = (state.sessionEvents?.events || []).filter(event =>
+      event.kind === 'broker_reconcile_incident' && event.status === 'open');
+    const twsOutageOpen = openConnectivity.some(event =>
+      event.service === 'tws' || (event.affected_services || []).includes('tws'));
     const schedulerIncidents = Math.max((schedule?.incidents || []).length, (schedule?.unexplained_overdue || []).length);
     const schedulerHealth = $('schedulerHealth');
     if (schedulerHealth) {
@@ -446,6 +522,23 @@
       schedulerHealthClass = 'bad';
       schedulerHealthText = `${schedulerIncidents || 1} UNRESOLVED SCHEDULE INCIDENT`;
     }
+
+    openConnectivity.forEach(event => incidents.push({
+      key: `broker:connectivity:${(event.affected_services || [event.service]).join(',')}:${event.started_at || event.ts}`,
+      status: 'incident', component: 'broker', title: event.title || 'IBKR connectivity unavailable',
+      problem: event.problem || event.message,
+      impact: event.impact || 'The affected IBKR service may still be unavailable.',
+      action: event.action || 'Check IBKR/TWS connectivity and current broker state now.',
+      evidence: event.evidence || `IBKR code ${event.down_code || '--'}`
+    }));
+    if (!brokerPositionsMatchNow()) openReconcile.forEach(event => incidents.push({
+      key: `runner:reconcile:${event.started_at || event.ts}`,
+      status: 'incident', component: 'runner', title: event.title || 'Broker/runner positions do not reconcile',
+      problem: event.problem || event.message,
+      impact: event.impact || 'Current broker exposure cannot be inferred safely from runner state alone.',
+      action: event.action || 'Reconcile IBKR positions, working stops, and runner persisted positions now.',
+      evidence: event.evidence || 'B3 mismatch/orphan with no later match'
+    }));
     schedulerHealth.className = `scheduler-health ${schedulerHealthClass}`;
     $('schedulerHealthValue').textContent = schedulerHealthText;
     }
@@ -476,6 +569,11 @@
       brokerPositions().forEach(pos => {
         const runner = runnerFor(pos);
         const invalidStops = invalidStopsFor(pos);
+        const validStops = validStopsFor(pos);
+        const recordedStopId = runner?.stop_order_id;
+        const hasRecordedStopId = runner && Object.prototype.hasOwnProperty.call(runner, 'stop_order_id');
+        const stopIdDrift = hasRecordedStopId && !runner.stop_deferred && validStops.length
+          && !validStops.some(order => String(order.order_id) === String(recordedStopId));
         if (runner && !runner.stop_deferred && !stopsFor(pos).length) incidents.push({
           key: `broker:unprotected:${pos.inst}`, status: 'incident', component: 'broker', title: `${pos.inst} unprotected`,
           problem: 'The broker position has no working stop and runner intent does not mark protection as deferred.',
@@ -490,6 +588,14 @@
           action: 'Compare the order with the broker position and follow the approved stop-repair procedure.',
           evidence: `Observed ${order.action || '--'} x${order.qty ?? '--'} / ${order.status || '--'}; expected ${expectedStopAction(pos)} x${Math.abs(Number(pos.position))}`
         }));
+        if (stopIdDrift) incidents.push({
+          key: `runner:stop-id-drift:${pos.inst}:${recordedStopId ?? 'none'}`, status: 'incident', component: 'runner',
+          title: `${pos.inst} stop order ID drift`,
+          problem: `Runner state records stop ${recordedStopId == null ? 'ID none' : `#${recordedStopId}`}, but IBKR protection is ${validStops.map(order => `#${order.order_id}`).join(', ')}.`,
+          impact: 'The position is protected now, but a later close may cancel a ghost ID and leave the live stop orphaned.',
+          action: 'Reconcile the persisted stop ID with the live IBKR order using the approved repair workflow.',
+          evidence: `${pos.inst} runner ${recordedStopId == null ? 'ID none' : `#${recordedStopId}`} / IBKR ${validStops.map(order => `#${order.order_id}`).join(', ')}`
+        });
         if (!runner) incidents.push({
           key: `broker:only:${pos.inst}`, status: 'incident', component: 'broker', title: `${pos.inst} broker-only position`,
           problem: 'IBKR reports an open position with no matching runner position.',
@@ -518,7 +624,7 @@
     if (!state.schedule?.evidence_available) gaps.push({ key: 'gap:scheduler', status: 'unknown', component: 'scheduler', title: 'Scheduler evidence unavailable', problem: 'The monitor cannot read enough scheduler evidence to classify expected slots.', impact: 'A missing or failed job cannot be distinguished from absent telemetry.', action: 'Restore scheduler log visibility; do not infer that scheduled jobs succeeded.', evidence: state.schedule?.error || 'schedule evidence unavailable' });
     if (!state.runner || state.runner.freshness === 'missing' || state.runner.freshness === 'unknown') gaps.push({ key: 'gap:runner', status: 'unknown', component: 'runner', title: 'Runner state unknown', problem: 'The latest runner observation cannot be classified as fresh or expected.', impact: 'Runner-derived decisions and intent cannot be treated as current.', action: 'Check runner-state publication and schedule evidence before drawing conclusions.', evidence: state.runner?.error || state.runner?.freshness || 'runner source missing' });
     if (Number(state.runner?.event_history?.malformed_lines || 0) > 0) gaps.push({ key: 'gap:runner-event-log', status: 'unknown', component: 'runner', title: 'Runner event log has an invalid record', problem: 'The append-only JSONL contains one or more malformed records that the monitor cannot parse.', impact: 'Runner event history is incomplete from the malformed record onward; trading state is unaffected.', action: 'Preserve the file for diagnosis and repair or archive the incomplete tail before the next runner slot.', evidence: `${state.runner.event_history.malformed_lines} malformed record(s) / ${state.runner.event_history.error || 'parse failure'}` });
-    if (!brokerUsable()) gaps.push({ key: 'gap:broker', status: 'unknown', component: 'broker', title: 'Broker truth unavailable', problem: 'The read-only IBKR observation is disconnected, stale, or unavailable.', impact: 'Current positions, working stops, and reconciliation cannot be verified.', action: 'Restore the read-only IBKR connection; do not reconstruct broker truth from runner state.', evidence: state.broker?.error || `broker freshness ${state.broker?.freshness || 'unknown'}` });
+    if (!brokerUsable() && !twsOutageOpen) gaps.push({ key: 'gap:broker', status: 'unknown', component: 'broker', title: 'Broker truth unavailable', problem: 'The read-only IBKR observation is disconnected, stale, or unavailable.', impact: 'Current positions, working stops, and reconciliation cannot be verified.', action: 'Restore the read-only IBKR connection; do not reconstruct broker truth from runner state.', evidence: state.broker?.error || `broker freshness ${state.broker?.freshness || 'unknown'}` });
     if (brokerUsable()) brokerPositions().forEach(pos => {
       if (!runnerFor(pos)) return;
       const runner = runnerFor(pos);
@@ -606,6 +712,21 @@
     }));
   }
 
+  // Caption under the entry day. Each branch names a different reason the clock reading
+  // is absent, because "not emitted" was covering all of them and taught the reader that
+  // the field is simply dead. day_only is the honest one: a record exists but was
+  // reconstructed from the date after the fact (see entry_time_reader), so there is no
+  // fill time to show and midnight must not be presented as one.
+  function entryTimeCaption(runner) {
+    if (runner?.entry_time) return localTime(runner.entry_time);
+    switch (runner?.entry_time_precision) {
+      case 'day_only':       return 'fill time not recorded';
+      case 'price_mismatch': return 'trade log record does not match';
+      case 'no_record':      return 'no trade log record';
+      default:               return 'entry time not emitted';
+    }
+  }
+
   function renderPositions() {
     const grid = $('positionGrid');
     if (!brokerUsable()) {
@@ -647,7 +768,12 @@
       const progressLeft = Math.min(entryAt, lastAt);
       const progressWidth = Math.abs(lastAt - entryAt);
       let protection = { cls: 'unknown', text: 'Unknown' };
-      if (validStops.length) protection = { cls: 'ok', text: `Protected #${validStops[0].order_id ?? '--'}` };
+      const recordedStopId = runner?.stop_order_id;
+      const hasRecordedStopId = runner && Object.prototype.hasOwnProperty.call(runner, 'stop_order_id');
+      const stopIdDrift = hasRecordedStopId && !runner.stop_deferred && validStops.length
+        && !validStops.some(order => String(order.order_id) === String(recordedStopId));
+      if (stopIdDrift) protection = { cls: 'expected', text: 'Protected / ID drift' };
+      else if (validStops.length) protection = { cls: 'ok', text: `Protected #${validStops[0].order_id ?? '--'}` };
       else if (runner?.stop_deferred) protection = { cls: 'expected', text: 'Deferred by rule' };
       else if (stops.length) protection = { cls: 'bad', text: 'Invalid stop' };
       else if (runner) protection = { cls: 'bad', text: 'No valid stop' };
@@ -662,7 +788,7 @@
           <div class="price-track-labels"><span>stop ${price(liveStop ?? runner?.stop_price)}${runner?.stop_price != null && liveStop != null ? ` · plan ${price(runner.stop_price)}` : ''}${stopPct == null ? '' : ` · ${stopPct >= 0 ? '+' : ''}${stopPct.toFixed(2)}%`}</span><span>entry ${price(runner?.entry_price)}</span><span>last ${price(pos.market_price)}</span></div>
         </div>
         <div class="position-facts">
-          <div class="fact-opened"><span class="has-tip" tabindex="0" data-tooltip="Entry date and time recorded by the runner for this position.">Opened</span><b>${esc(runner?.entry_day || '--')}</b><small>${runner?.entry_time ? esc(localTime(runner.entry_time)) : 'entry time not emitted'}</small></div>
+          <div class="fact-opened"><span class="has-tip" tabindex="0" data-tooltip="Entry day from runner state. The fill time is recovered from the runner's own trade log, matched on instrument, cluster, entry day and fill price. IBKR cannot supply it: reqPositions carries no timestamp and reqExecutions serves the current day only.">Opened</span><b>${esc(runner?.entry_day || '--')}</b><small>${esc(entryTimeCaption(runner))}</small></div>
           <div class="fact-held"><span class="has-tip" tabindex="0" data-tooltip="Trading-day holding age recorded by the runner.">Held</span><b>${runner?.days_held ?? '--'}d</b></div>
           <div class="fact-risk"><span class="has-tip" tabindex="0" data-tooltip="Risk allocation recorded by the runner. This is not current profit or market value.">Risk budget</span><b>${dollars(runner?.risk_sized)}</b></div>
           <div class="fact-stop ${protection.cls}"><span class="has-tip tip-right" tabindex="0" data-tooltip="Observed IBKR stop type, action, quantity, order ID, status, and time in force.">Stop order</span><b>${order ? `${esc(order.type || '--')} ${esc(order.action || '--')} x${esc(order.qty ?? '--')}` : '--'}</b><small>${order ? `#${esc(order.order_id ?? '--')} · ${esc(order.status || '--')} · ${esc(order.tif || 'TIF not emitted')}` : 'No broker stop observed'}</small></div>
@@ -716,6 +842,8 @@
       $('decisionSummary').innerHTML = '<div><span>Evidence</span><b class="warning">Unknown</b></div>';
       ['decisionEntries', 'decisionCloses', 'decisionRejected'].forEach(id => { $(id).innerHTML = '<div class="decision-empty">No decision evidence emitted.</div>'; });
       ['decisionEntryCount', 'decisionCloseCount', 'decisionRejectedCount'].forEach(id => { $(id).textContent = '--'; });
+      $('executionExceptions').hidden = true;
+      $('executionExceptions').innerHTML = '';
       return;
     }
 
@@ -776,6 +904,14 @@
     if (halted) rejectedRows.push({ symbol: 'ENTRY GUARD', value: `${halted} halted`, valueClass: 'negative', detail: 'Circuit breaker prevented entry signals.', kind: 'halted' });
     $('decisionRejectedCount').textContent = String(rejectedRows.length);
     $('decisionRejected').innerHTML = rejectedRows.length ? rejectedRows.map(decisionRow).join('') : '<div class="decision-empty">No rejected or halted entries.</div>';
+    const execution = state.executionQuality;
+    const exceptions = execution?.day === snap?.date ? execution.exceptions || [] : [];
+    const executionBox = $('executionExceptions');
+    executionBox.hidden = exceptions.length === 0;
+    executionBox.innerHTML = exceptions.length ? `<div class="execution-exception-head"><span>Execution exceptions</span><b>${exceptions.length}</b></div>${exceptions.map(fill => {
+      const ticks = fill.signed_slippage_ticks == null ? 'not evaluable' : `${Number(fill.signed_slippage_ticks).toFixed(2)} ticks adverse`;
+      return `<div class="execution-exception-row"><strong>${esc(fill.inst)} ${esc(fill.type)}</strong><span>${esc(ticks)}</span><p>${esc((fill.exception_reasons || []).join(' / '))}</p></div>`;
+    }).join('')}` : '';
   }
 
   function easternDate(iso) {
@@ -807,16 +943,34 @@
         loggedExitSymbols.add(rootOf(event.inst));
         if (exit) message = `${message} / ${tradeMoney(exit.pnl)} / ${exitType(exit.exit_reason, 'SIGNAL').label}`;
       }
+      const lifecycle = ['connectivity_outage', 'broker_reconcile_incident', 'stop_repaired', 'stop_id_drift', 'stop_naked', 'hmm_fit_diagnostic'].includes(event.kind);
+      const reconciledNow = event.kind === 'broker_reconcile_incident'
+        && event.status === 'open' && brokerPositionsMatchNow();
+      const eventStatus = reconciledNow ? 'recovered' : lifecycle ? event.status || 'open' : 'info';
       rows.push({
         key: `operational:${event.kind}:${event.ts}:${event.sequence || 0}`,
         sortKey: event.ts || '', sequence: Number(event.sequence || 0), level: String(event.level || 'INFO').toLowerCase(),
-        tone: event.kind === 'stop_deferred' ? 'deferred'
-          : event.kind === 'stop_armed' || event.kind === 'market_close_filled' || event.kind === 'stop_filled' ? 'success'
+        tone: event.kind === 'hmm_fit_diagnostic' ? 'deferred'
+          : lifecycle ? (eventStatus === 'recovered' ? 'success' : 'incident')
+          : event.kind === 'stop_deferred' ? 'deferred'
+          : event.kind === 'stop_armed' || event.kind === 'stop_armed_after_deferral' || event.kind === 'market_close_filled' || event.kind === 'stop_filled' ? 'success'
           : event.kind === 'stop_cancelled_after_close' ? 'cleanup'
           : event.kind === 'market_close_submitted' ? 'action'
           : 'system',
-        category: `${event.category || 'LOG'} / ${String(event.kind || 'EVENT').replaceAll('_', ' ')}`,
-        time: localTime(event.ts), message, status: 'info', component: String(event.category || 'runner').toLowerCase()
+        category: event.kind === 'connectivity_outage' ? 'IBKR / CONNECTIVITY'
+          : event.kind === 'broker_reconcile_incident' ? 'BROKER / RECONCILE'
+          : `${event.category || 'LOG'} / ${String(event.kind || 'EVENT').replaceAll('_', ' ')}`,
+        time: localTime(event.ts), message, status: eventStatus,
+        component: lifecycle ? (event.component || 'runner') : String(event.category || 'runner').toLowerCase(),
+        title: reconciledNow ? 'Broker/runner position mismatch recovered' : event.title,
+        incurredAt: event.started_at || event.incurred_at,
+        recoveredAt: reconciledNow ? state.broker?.observed_at : event.recovered_at,
+        problem: event.problem, impact: event.impact,
+        action: reconciledNow ? 'No immediate action. Review if the mismatch recurs.' : event.action,
+        evidence: event.evidence,
+        resolution: reconciledNow
+          ? `Recovered by current read-only IBKR reconciliation at ${localTime(state.broker?.observed_at)}.`
+          : event.resolution
       });
     });
     const monitorEvents = state.jobJournal?.monitor_events || [];
@@ -872,7 +1026,7 @@
     (state.jobJournal?.jobs || []).filter(job => ['missed', 'failed'].includes(job.status)).forEach(job => {
       const diagnostics = (job.diagnostics || []).filter(message => !String(message).includes('G2 HARD'));
       const runnerError = diagnostics[diagnostics.length - 1];
-      const recovered = /Publication resumed at/i.test(job.impact || '');
+      const recovered = job.lifecycle_status === 'recovered' || /Publication resumed at/i.test(job.impact || '');
       const recoveryJob = recovered ? (state.jobJournal?.jobs || []).find(candidate =>
         String(candidate.started_at) > String(job.ended_at || job.started_at)
         && candidate.job_type === job.job_type
@@ -891,7 +1045,7 @@
         key: `job:${job.id}`, sortKey: job.ended_at || job.started_at || '', sequence: 0,
         level: recovered ? 'warn' : 'critical', tone: recovered ? 'cleanup' : 'incident',
         category: isDumpState ? 'STATE PUBLISH' : job.status === 'missed' ? 'MISSED SLOT' : 'JOB FAILURE',
-        time: localTime(job.started_at), incurredAt: job.started_at, recoveredAt: recoveryJob?.ended_at || null,
+        time: localTime(job.started_at), incurredAt: job.started_at, recoveredAt: job.recovered_at || recoveryJob?.ended_at || null,
         component, status: recovered ? 'recovered' : 'open', title,
         message: problem, problem, impact: job.impact, action: job.action,
         evidence: runnerError || job.reason || 'No detailed evidence emitted',
@@ -983,7 +1137,7 @@
   }
 
   function eventStatus(status) {
-    return ({ open: 'OPEN', recovered: 'RECOVERED', known_debt: 'KNOWN DEBT', info: 'INFO' })[status] || 'INFO';
+    return ({ open: 'OPEN', recovered: 'RECOVERED', known_debt: 'KNOWN DEBT', diagnostic: 'DIAGNOSTIC', info: 'INFO' })[status] || 'INFO';
   }
 
   function eventTone(kind) {
@@ -1000,6 +1154,8 @@
     if (counts.market_close_filled) parts.push(`${counts.market_close_filled} exit fill`);
     if (counts.stop_filled) parts.push(`${counts.stop_filled} stop fill`);
     if (counts.stop_armed) parts.push(`${counts.stop_armed} stop armed`);
+    if (counts.stop_repaired) parts.push(`${counts.stop_repaired} stop repaired`);
+    if (counts.stop_armed_after_deferral) parts.push(`${counts.stop_armed_after_deferral} stop armed after deferral`);
     if (counts.stop_deferred) parts.push(`${counts.stop_deferred} deferred`);
     if (counts.market_close_submitted) parts.push(`${counts.market_close_submitted} close submitted`);
     if (counts.preflight_passed) parts.push('input gate passed');
@@ -1016,7 +1172,7 @@
     const diagnostics = job.diagnostics || [];
     const nonG2 = diagnostics.filter(message => !String(message).includes('G2 HARD'));
     const g2Only = diagnostics.length > 0 && nonG2.length === 0;
-    const recovered = /Publication resumed at/i.test(job.impact || '');
+    const recovered = job.lifecycle_status === 'recovered' || /Publication resumed at/i.test(job.impact || '');
     const dumpState = nonG2.find(message => /dump_state|live_state_data/i.test(message));
     const component = job.status === 'missed' || job.status === 'skipped' || ['stop_repair', 'preflight', 'session_report', 'other'].includes(job.job_type) ? 'scheduler' : 'runner';
     let status = job.status;
@@ -1190,6 +1346,8 @@
     renderOpenIssues();
   });
   $('openIssuesShell').addEventListener('toggle', event => { state.issuesSectionOpen = event.currentTarget.open; });
+
+  window.setInterval(renderRailClock, 1000);
 
   poll();
   window.setInterval(poll, POLL_MS);

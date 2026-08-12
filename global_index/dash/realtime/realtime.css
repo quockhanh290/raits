@@ -55,22 +55,33 @@ button, input, select { font: inherit; }
 .font-control select:hover, .font-control select:focus-visible { color: var(--bright); border-color: var(--line-strong); }
 
 .overview-header { background: #090d11; border-bottom: 1px solid var(--line); }
-.header-dashboard { display: grid; grid-template-columns: 1.24fr .78fr 1.02fr 1fr .9fr; border-top: 1px solid rgba(32,43,52,.7); }
-.header-zone { min-width: 0; min-height: 172px; padding: 20px 28px 16px; }
+/* Cột 1 (Paper Equity) trước đây rộng 1.24fr cho một con số duy nhất, trong khi Exposure
+   chỉ được .9fr cho ba số. Đổi lại theo mật độ thông tin thật: equity hẹp hơn, exposure
+   bằng Risk. min-height giảm vì hai dòng phụ dưới Model age / HMM fit đã bỏ. */
+.header-dashboard { display: grid; grid-template-columns: .96fr .82fr 1.04fr 1fr 1fr; border-top: 1px solid rgba(32,43,52,.7); }
+.header-zone { min-width: 0; min-height: 152px; padding: 18px 26px 15px; }
 .header-zone + .header-zone { border-left: 1px solid var(--line); }
 .zone-title { display: block; margin-bottom: 13px; color: #60748b; text-transform: uppercase; font: 700 12px/1 var(--mono); }
-.equity-line { display: flex; align-items: baseline; gap: 18px; }
-.equity-line > b { color: var(--bright); font: 500 48px/1 var(--mono); white-space: nowrap; }
-.equity-line > strong { color: var(--green); font: 500 18px/1 var(--mono); white-space: nowrap; }
-.equity-zone > small { display: block; margin-top: 11px; color: #667b92; font: 12px/1.4 var(--mono); white-space: nowrap; }
+.equity-line { display: flex; align-items: baseline; gap: 13px; }
+.equity-line > b { color: var(--bright); font: 500 37px/1 var(--mono); white-space: nowrap; }
+.equity-line > strong { color: var(--green); font: 500 16px/1 var(--mono); white-space: nowrap; }
+.equity-zone > small { display: block; margin-top: 9px; color: #667b92; font: 11px/1.4 var(--mono); white-space: nowrap; }
 .equity-zone > small em { color: #7194c2; font-style: normal; }
 .equity-zone > small strong { color: #7891ad; font-weight: 500; }
 .zone-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; row-gap: 17px; }
 .zone-grid > div, .risk-facts > div { min-width: 0; display: grid; gap: 7px; }
 .zone-grid span, .risk-facts span { color: #667991; font: 500 11px/1.2 var(--mono); }
 .zone-grid b, .risk-facts b { color: #d4deea; font: 500 20px/1 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.exposure-zone .zone-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 18px; }
-.exposure-zone .zone-grid b { font-size: 21px; }
+/* Ba nhãn dài không đều nhau ("Positions" / "Working orders" / "Stops covered"). Mỗi ô là
+   một grid riêng, nên nhãn nào xuống hai dòng sẽ đẩy con số của nó tụt xuống — ba số nằm
+   ba cao độ khác nhau. subgrid cho cả ba ô dùng CHUNG hai hàng của lưới cha: nhãn hàng 1,
+   số hàng 2, luôn thẳng nhau dù nhãn có wrap hay không. Trình duyệt không hỗ trợ subgrid
+   thì @supports bỏ qua, giữ nguyên hành vi cũ chứ không vỡ. */
+.exposure-zone .zone-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto auto; column-gap: 18px; row-gap: 7px; align-items: end; }
+.exposure-zone .zone-grid b { font-size: 21px; font-variant-numeric: tabular-nums; }
+@supports (grid-template-rows: subgrid) {
+  .exposure-zone .zone-grid > div { grid-row: span 2; grid-template-rows: subgrid; row-gap: 0; }
+}
 .exposure-zone #sessionRegime { color: var(--green); }
 .exposure-zone #sessionRegime.stress { color: var(--red); }
 .exposure-zone #sessionRegime.unknown { color: var(--amber); }
@@ -88,14 +99,15 @@ button, input, select { font: inherit; }
 .model-inputs-zone { position: relative; }
 .model-inputs-zone.watch::after { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--amber); }
 .model-input-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 4px 10px; }
-.model-input-item + .model-input-item { margin-top: 8px; padding-top: 8px; border-top: 1px solid #1a1f26; }
+.model-input-item + .model-input-item { margin-top: 7px; padding-top: 7px; border-top: 1px solid #1a1f26; }
 .model-input-item > span { color: #667991; font: 500 11px/1.2 var(--mono); }
 .model-input-item b { font: 700 16px/1 var(--mono); white-space: nowrap; }
 .model-input-regime b { color: var(--green); }
 .model-input-regime b.stress { color: var(--red); }
 .model-input-regime b.unknown { color: var(--amber); }
 .model-input-spy b { color: var(--blue); }
-.model-input-age small { grid-column: 1 / -1; color: var(--dim); font: 10px/1.25 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Bỏ luật cho `.model-input-item small`: hai dòng phụ duy nhất dùng nó (Model age, HMM fit)
+   đã gỡ khỏi header, chi tiết chuyển sang title. Không còn phần tử nào khớp luật này. */
 .metrics.broker-stale .broker-derived, .metrics.runner-stale .runner-derived { opacity: .42; }
 .positive { color: var(--green) !important; }
 .negative { color: var(--red) !important; }
@@ -116,6 +128,17 @@ button, input, select { font: inherit; }
 .system-facts .ok b { color: var(--green); }
 .system-facts .watch b { color: var(--amber); }
 .system-facts .bad b { color: var(--red); }
+.system-facts > .rail-clock { flex-direction: column; align-items: flex-end; gap: 5px; text-align: right; }
+.rail-clock > b { color: var(--bright); font: 500 14px/1 var(--mono); }
+.rail-clock > span { color: #56697e; font: 500 11px/1 var(--mono); }
+.rail-clock .day-shift { color: #71849a; }
+.journal-schedule { margin: -2px 0 12px; color: #687c92; font: 11px/1.2 var(--mono); white-space: nowrap; }
+.journal-schedule > span { display: flex; align-items: baseline; gap: 7px; }
+.journal-schedule small { color: #56697e; text-transform: uppercase; }
+.journal-schedule b { color: #9ab0c5; font-weight: 600; }
+.journal-schedule .ok b { color: var(--green); }
+.journal-schedule .watch b { color: var(--amber); }
+.journal-schedule .bad b { color: var(--red); }
 .fact-scheduler { position: relative; }
 .scheduler-live-dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 7px currentColor; }
 .fact-scheduler.ok .scheduler-live-dot { display: block; color: var(--green); animation: scheduler-pulse 1.5s ease-in-out infinite; }
@@ -293,6 +316,10 @@ h2 { font-size: 21px; }
 .decision-row.rejected { border-left: 2px solid var(--amber); padding-left: 9px; }
 .decision-row.halted { border-left: 2px solid var(--red); padding-left: 9px; }
 .decision-empty { padding: 13px 0; color: var(--dim); font: 12px/1.4 var(--mono); }
+.execution-exceptions { margin-top: 16px; padding-top: 14px; border-top: 1px solid #1a1f26; }
+.execution-exception-head { display: flex; align-items: center; justify-content: space-between; color: var(--amber); text-transform: uppercase; font: 700 11px/1 var(--mono); }
+.execution-exception-row { margin-top: 10px; display: grid; grid-template-columns: minmax(90px,auto) auto minmax(0,1fr); gap: 10px; align-items: baseline; color: var(--text); font: 12px/1.35 var(--mono); }
+.execution-exception-row strong { color: var(--bright); }.execution-exception-row span { color: var(--amber); }.execution-exception-row p { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
 
 .table-wrap { width: 100%; overflow: auto; }
 .table-shell { padding: 0; overflow: auto; background: #0e1115; border: 1px solid #1d2229; border-radius: 8px; }
@@ -409,6 +436,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .event-status.open { color: var(--red); }
 .event-status.recovered { color: var(--green); }
 .event-status.known_debt { color: var(--violet); }
+.event-status.diagnostic { color: var(--amber); }
 .event-summary { margin-top: 5px; color: var(--muted); font: 12px/1.4 var(--mono); overflow-wrap: anywhere; }
 .event-detail { margin: 0 10px 12px 18px; padding: 0 10px 0 14px; background: rgba(0,0,0,.16); border-top: 1px solid var(--line); border-left: 1px solid var(--line-strong); }
 .event-detail > div { padding: 9px 0; border-bottom: 1px solid var(--line); }
@@ -444,12 +472,13 @@ tbody tr:last-child td { border-bottom: 0; }
   .module-nav { gap: 2px; }
   .module-nav a { padding-left: 11px; padding-right: 11px; }
   .header-live-context { gap: 14px; font-size: 11px; }
-  .header-dashboard { grid-template-columns: 1.16fr .76fr 1fr .95fr .84fr; }
-  .header-zone { min-height: 166px; padding: 19px 20px 15px; }
-  .equity-line { gap: 11px; }
-  .equity-line > b { font-size: 39px; }
-  .equity-line > strong { font-size: 15px; }
+  .header-dashboard { grid-template-columns: .92fr .8fr 1.02fr .98fr .98fr; }
+  .header-zone { min-height: 146px; padding: 17px 18px 14px; }
+  .equity-line { gap: 9px; }
+  .equity-line > b { font-size: 31px; }
+  .equity-line > strong { font-size: 14px; }
   .zone-grid { column-gap: 20px; }
+  .exposure-zone .zone-grid { column-gap: 12px; }
   .system-facts { gap: 16px; }
   .system-facts { gap: 12px; font-size: 10px; }
   .now-schedule-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }

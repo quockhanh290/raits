@@ -56,7 +56,10 @@
           <span>SPY data</span><b id="regimeInputDate">--</b>
         </div>
         <div class="model-input-item model-input-age">
-          <span>Model age</span><b id="modelInputAge">--</b><small id="modelInputStatus">Status unavailable</small>
+          <span>Model age</span><b id="modelInputAge">--</b>
+        </div>
+        <div class="model-input-item model-input-fit">
+          <span class="has-tip tip-bottom" tabindex="0" data-tooltip="Daily HMM fit evidence grouped from runner logs. Convergence warnings are diagnostic unless a documented decision gate fails.">HMM fit</span><b id="modelFitStatus">--</b>
         </div>
       </div>
 
@@ -151,6 +154,7 @@
                 <div class="decision-list" id="decisionRejected"></div>
               </section>
             </div>
+            <div class="execution-exceptions" id="executionExceptions" hidden></div>
           </div>
         </section>
 
@@ -174,6 +178,7 @@
             <h2 id="journalTitle">Job Journal</h2>
             <span class="source-note journal-source has-tip tip-right" id="journalSource" tabindex="0" data-tooltip="One row per scheduler execution. Click a job to inspect its stop, order, fill, and diagnostic evidence. Operational events outside a job remain standalone.">Session unavailable</span>
           </div>
+          <div class="journal-schedule" id="journalSchedule"></div>
           <div class="section-body journal-shell">
             <div class="journal-view-toggle" role="group" aria-label="Journal view">
               <button type="button" data-journal-view="jobs" aria-pressed="true">Jobs</button>
