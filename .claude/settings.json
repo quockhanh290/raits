@@ -6,7 +6,12 @@
       "Bash(git -C d:/raits rev-parse HEAD)",
       "PowerShell(\\(Get-ChildItem D:\\\\raits\\\\data\\\\ -Recurse -File | Measure-Object -Property Length -Sum\\).Sum / 1MB)",
       "Bash(PYTHONIOENCODING=utf-8 timeout 300 python -c ' *)",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(python -X utf8 global_index/repair_stops.py --client-id 69)",
+      "Bash(python -m pytest global_index/test_stp_accept.py global_index/test_stp.py global_index/test_maxhold.py global_index/test_false_cancel.py global_index/test_paper_metrics.py global_index/test_slot_overlap.py global_index/test_cluster_gate.py global_index/test_nkd_tz.py -q)",
+      "Bash(python -m pytest tests/test_build_panel.py -v -W error)",
+      "Bash(grep -av converging /tmp/mae.txt | tail -22)",
+      "Read(//tmp/**)"
     ]
   }
 }
