@@ -16,6 +16,8 @@ from monitor.backend import report_reader
 from monitor.backend.session_event_reader import read_session_events
 from monitor.backend.job_journal_reader import read_job_journal
 from monitor.backend.open_issue_reader import read_open_issues
+from monitor.backend.paper_evidence_reader import read_paper_evidence
+from monitor.backend.execution_quality_reader import read_execution_quality
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -146,6 +148,203 @@ def test_runner_event_reader_keeps_valid_history_and_reports_bad_tail(tmp_path: 
     assert history["complete"] is False
 
 
+def test_paper_evidence_uses_durable_artifacts_when_runner_slippage_is_empty(tmp_path: Path):
+    global_index = tmp_path / "global_index"
+    global_index.mkdir()
+    (global_index / "live_state_data.js").write_text(
+        'window.LIVE_DATA = {"meta":{"system_epoch":"2026-08-10"},'
+        '"snapshots":[{"date":"2026-08-11","slippage":[]}]}',
+        encoding="utf-8",
+    )
+    (global_index / "paper_history.json").write_text(
+        '{"epoch":"2026-08-10","account":50000,"days":{"2026-08-10":50100,"2026-08-11":50200}}',
+        encoding="utf-8",
+    )
+    (tmp_path / "trade_log.jsonl").write_text(
+        '{"type":"OPEN","inst":"MES","entry_day":"2026-08-10","expected_entry":10,'
+        '"fill_price":10.5,"slip":0.5,"contracts":1,"filled_qty":1,"status":"FILLED","regime":"Normal"}\n'
+        '{"type":"OPEN","inst":"MYM","entry_day":"2026-08-11","expected_entry":10,'
+        '"fill_price":12,"slip":-2,"contracts":1,"filled_qty":1,"status":"FILLED","regime":"Stress"}\n'
+        '{"type":"CLOSE","inst":"M2K","entry_day":"2026-08-10","exit_day":"2026-08-11",'
+        '"exit_reason":"STP","expected_stop":10,"fill_price":10.2,"slip":0.2,'
+        '"contracts":1,"filled_qty":1,"status":"FILLED","regime":"Stress"}\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "slip_stats.json").write_text(
+        '{"open_sum":-1.5,"open_n":2,"close_sum":0.2,"close_n":1}',
+        encoding="utf-8",
+    )
+    (tmp_path / "live_day_0811.log").write_text(
+        "2026-08-11 12:05:12 INFO global_index.runner - Runner started: loaded 1 position(s) from persisted file\n"
+        "2026-08-11 12:05:13 INFO global_index.runner - B3: broker/file positions match (1 position(s))\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "live_positions.json").write_text(
+        '{"positions":[{"inst":"MES","stop_order_id":"42"}]}',
+        encoding="utf-8",
+    )
+
+    result = read_paper_evidence(tmp_path)
+    gates = {gate["key"]: gate for gate in result["payload"]["gates"]}
+    coverage = {item["key"]: item for item in result["payload"]["coverage"]}
+
+    assert gates["paper_duration"]["metrics"]["observed"] == 2
+    assert gates["regime_coverage"]["status"] == "PASS"
+    assert gates["c1_slippage"]["status"] == "SPEC_GAP"
+    assert gates["c1_slippage"]["metrics"]["open_n"] == 2
+    assert gates["c1_slippage"]["metrics"]["close_n"] == 1
+    assert gates["c1_slippage"]["metrics"]["stp_close_n"] == 1
+    assert gates["b3_reconcile"]["status"] == "PASS"
+    assert coverage["fill_quality"]["metrics"]["fills"] == 3
+    assert coverage["current_protection"]["status"] == "OBSERVED"
+    assert coverage["sample_denominators"]["metrics"]["by_inst"] == {"M2K": 1, "MES": 1, "MYM": 1}
+    assert coverage["same_day_multi_day"]["metrics"] == {"multi_day": 1, "same_day": 0, "unknown": 0}
+
+
+def test_paper_evidence_counts_candidate_gap_log_lines(tmp_path: Path):
+    global_index = tmp_path / "global_index"
+    global_index.mkdir()
+    (global_index / "live_state_data.js").write_text(
+        'window.LIVE_DATA = {"meta":{"system_epoch":"2026-08-10"},"snapshots":[{"date":"2026-08-10"}]}',
+        encoding="utf-8",
+    )
+    (global_index / "paper_history.json").write_text(
+        '{"epoch":"2026-08-10","account":50000,"days":{"2026-08-10":50000}}',
+        encoding="utf-8",
+    )
+    (tmp_path / "live_day_0810.log").write_text(
+        "2026-08-10 05:10:00 INFO run_live_day - TWS Gateway disconnected before restart\n"
+        "2026-08-10 05:12:00 INFO run_live_day - manual override recorded by operator\n"
+        "2026-08-10 05:13:00 INFO global_index.runner - place_stop: accepted orderId=288\n"
+        "2026-08-10 05:14:00 ERROR global_index.runner - STP: place_stop FAILED for M2K\n",
+        encoding="utf-8",
+    )
+
+    payload = read_paper_evidence(tmp_path)["payload"]
+    gates = {gate["key"]: gate for gate in payload["gates"]}
+    coverage = {item["key"]: item for item in payload["coverage"]}
+
+    assert gates["tws_restart_nights"]["metrics"]["candidate_log_lines"] == 1
+    assert gates["tws_restart_nights"]["metrics"]["candidate_days"] == ["2026-08-10"]
+    assert gates["stp_verification"]["metrics"]["stp_accepted"] == 1
+    assert gates["stp_verification"]["metrics"]["stp_failed"] == 1
+    assert coverage["manual_intervention"]["metrics"]["candidate_log_lines"] == 1
+    assert coverage["manual_intervention"]["metrics"]["candidate_days"] == ["2026-08-10"]
+    assert payload["diagnostics"]["manual_intervention_candidate_lines"] == 1
+    assert payload["diagnostics"]["manual_intervention_candidate_days"] == ["2026-08-10"]
+    assert payload["diagnostics"]["tws_restart_candidate_lines"] == 1
+    assert payload["diagnostics"]["tws_restart_candidate_days"] == ["2026-08-10"]
+
+
+def test_paper_evidence_uses_monitor_paper_inputs_to_unblock_gaps(tmp_path: Path):
+    global_index = tmp_path / "global_index"
+    global_index.mkdir()
+    monitor = tmp_path / "monitor"
+    monitor.mkdir()
+    (global_index / "live_state_data.js").write_text(
+        'window.LIVE_DATA = {"meta":{"system_epoch":"2026-08-10"},"snapshots":[{"date":"2026-08-10"}]}',
+        encoding="utf-8",
+    )
+    (global_index / "paper_history.json").write_text(
+        '{"epoch":"2026-08-10","account":50000,"days":{"2026-08-10":50000}}',
+        encoding="utf-8",
+    )
+    (tmp_path / "trade_log.jsonl").write_text(
+        '{"type":"OPEN","inst":"MES","entry_day":"2026-08-10","slip":0.25,"regime":"Normal"}\n'
+        '{"type":"OPEN","inst":"MES","entry_day":"2026-08-10","slip":0.25,"regime":"Normal"}\n'
+        '{"type":"CLOSE","inst":"MES","entry_day":"2026-08-10","exit_day":"2026-08-10",'
+        '"exit_reason":"STP","slip":0.25,"regime":"Normal"}\n'
+        '{"type":"CLOSE","inst":"MES","entry_day":"2026-08-10","exit_day":"2026-08-10",'
+        '"exit_reason":"STP","slip":0.25,"regime":"Normal"}\n',
+        encoding="utf-8",
+    )
+    (monitor / "paper_inputs.json").write_text(
+        '{"c1_spec":{"min_n":2,"max_mean_ticks":2,"scope":"separate","close_scope":"stp_only","use_absolute":true},'
+        '"stp_verification":[{"date":"2026-08-10","verified":true,"false_halt":false,"double_stp":false}],'
+        '"tws_restart_spec":{"min_nights":1},'
+        '"tws_restart_nights":[{"night":"2026-08-10","restart_proven":true,"runner_resumed":true,"broker_verified":true}],'
+        '"manual_interventions":[{"ts":"2026-08-10T05:12:00Z","resolution_status":"resolved","post_action_verified":true}],'
+        '"roll_slippage":[{"date":"2026-08-10","ticks":1.5}]}',
+        encoding="utf-8",
+    )
+
+    payload = read_paper_evidence(tmp_path)["payload"]
+    gates = {gate["key"]: gate for gate in payload["gates"]}
+    coverage = {item["key"]: item for item in payload["coverage"]}
+
+    assert gates["c1_slippage"]["status"] == "PASS"
+    assert gates["stp_verification"]["status"] == "PASS"
+    assert gates["tws_restart_nights"]["status"] == "PASS"
+    assert coverage["manual_intervention"]["status"] == "OBSERVED"
+    assert coverage["roll_slippage"]["status"] == "OBSERVED"
+    assert payload["diagnostics"]["paper_inputs_error"] is None
+
+
+def test_paper_evidence_excludes_signal_close_from_c1_slippage(tmp_path: Path):
+    global_index = tmp_path / "global_index"
+    global_index.mkdir()
+    monitor = tmp_path / "monitor"
+    monitor.mkdir()
+    (global_index / "live_state_data.js").write_text(
+        'window.LIVE_DATA = {"meta":{"system_epoch":"2026-08-10"},"snapshots":[{"date":"2026-08-10"}]}',
+        encoding="utf-8",
+    )
+    (global_index / "paper_history.json").write_text(
+        '{"epoch":"2026-08-10","account":50000,"days":{"2026-08-10":50000}}',
+        encoding="utf-8",
+    )
+    (tmp_path / "trade_log.jsonl").write_text(
+        '{"type":"OPEN","inst":"MES","entry_day":"2026-08-10","slip":0.25,"regime":"Normal"}\n'
+        '{"type":"CLOSE","inst":"MES","entry_day":"2026-08-10","exit_day":"2026-08-10",'
+        '"expected_stop":7777.0,"fill_price":7753.75,"slip":-23.25,"regime":"Normal"}\n',
+        encoding="utf-8",
+    )
+    (monitor / "paper_inputs.json").write_text(
+        '{"c1_spec":{"min_n":1,"max_mean_ticks":5,"scope":"separate","close_scope":"stp_only","use_absolute":true}}',
+        encoding="utf-8",
+    )
+
+    gate = {gate["key"]: gate for gate in read_paper_evidence(tmp_path)["payload"]["gates"]}["c1_slippage"]
+
+    assert gate["metrics"]["open_n"] == 1
+    assert gate["metrics"]["stp_close_n"] == 0
+    assert gate["metrics"]["signal_close_with_stop_ref"] == 1
+    assert "signal/market CLOSE excluded 1" in gate["evidence"]
+
+
+def test_paper_evidence_payload_contract_is_stable(tmp_path: Path):
+    global_index = tmp_path / "global_index"
+    global_index.mkdir()
+    (global_index / "live_state_data.js").write_text(
+        'window.LIVE_DATA = {"meta":{"system_epoch":"2026-08-10"},'
+        '"snapshots":[{"date":"2026-08-10","paper_vs_backtest":{},'
+        '"operational_status":{"positions":{"persist_match":true}}}]}',
+        encoding="utf-8",
+    )
+    (global_index / "paper_history.json").write_text(
+        '{"epoch":"2026-08-10","account":50000,"days":{"2026-08-10":50000}}',
+        encoding="utf-8",
+    )
+
+    payload = read_paper_evidence(tmp_path)["payload"]
+
+    assert {"epoch", "gates", "coverage", "summary", "gaps", "diagnostics"} <= set(payload)
+    assert payload["gates"]
+    assert payload["coverage"]
+    for item in [*payload["gates"], *payload["coverage"]]:
+        assert {"key", "title", "status", "evidence", "sources", "metrics"} <= set(item)
+        assert isinstance(item["sources"], list)
+        for source in item["sources"]:
+            assert {"path", "process", "format", "cadence", "retention"} <= set(source)
+    assert {"days", "regimes", "exit_paths_complete", "c1_open_mean", "c1_close_mean", "c1_open_n", "c1_close_n"} <= set(payload["summary"])
+    assert {"history_error", "trade_log_error", "trade_log_malformed_lines", "slip_stats_error", "dropped_test_log_lines"} <= set(payload["diagnostics"])
+
+
+def test_paper_dashboard_allows_cold_evidence_scan():
+    source = (DASH / "paper" / "paper.js").read_text(encoding="utf-8")
+    assert "AbortSignal.timeout(30000)" in source
+
+
 def test_runner_positions_reader_projects_persisted_contracts(tmp_path: Path):
     path = tmp_path / "live_positions.json"
     path.write_text(
@@ -165,7 +364,9 @@ def test_report_api_omits_raw_log_lines(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(report_reader, "collect_session_report", lambda _day, _root: {
         "day": "2026-08-11", "lines": [("12:00", "INFO", "large raw line")], "issues": []
     })
-    assert "lines" not in report_reader.read_report("2026-08-11", tmp_path)
+    report = report_reader.read_report("2026-08-11", tmp_path)
+    assert "lines" not in report
+    assert "execution_quality" in report["daily"]
 
 
 def test_report_cache_signature_tracks_live_positions(tmp_path: Path):
@@ -173,6 +374,15 @@ def test_report_cache_signature_tracks_live_positions(tmp_path: Path):
     positions.write_text('{"positions": []}', encoding="utf-8")
     before = report_reader._signature(tmp_path)
     positions.write_text('{"positions": [{"inst": "MES"}]}', encoding="utf-8")
+    after = report_reader._signature(tmp_path)
+    assert before != after
+
+
+def test_report_cache_signature_tracks_trade_log(tmp_path: Path):
+    trades = tmp_path / "trade_log.jsonl"
+    trades.write_text('', encoding="utf-8")
+    before = report_reader._signature(tmp_path)
+    trades.write_text('{"type":"OPEN"}\n', encoding="utf-8")
     after = report_reader._signature(tmp_path)
     assert before != after
 
@@ -200,6 +410,49 @@ def test_ibkr_reader_default_client_id_is_99():
     assert inspect.signature(ibkr_reader.start).parameters["client_id"].default == 99
 
 
+def test_execution_quality_keeps_execution_slippage_separate_from_stop_distance(tmp_path: Path):
+    (tmp_path / "trade_log.jsonl").write_text(
+        '{"type":"OPEN","inst":"MES","cluster":"swing","direction":"LONG",'
+        '"contracts":1,"filled_qty":1,"entry_day":"2026-08-12","expected_entry":7000.0,'
+        '"fill_price":7000.75,"slip":0.75,"status":"FILLED","ts":"2026-08-12T14:10:00Z"}\n'
+        '{"type":"CLOSE","inst":"MES","cluster":"swing","direction":"LONG",'
+        '"contracts":1,"filled_qty":1,"entry_day":"2026-08-11","exit_day":"2026-08-12",'
+        '"expected_stop":6950.0,"fill_price":7010.0,"slip":-60.0,"status":"FILLED",'
+        '"ts":"2026-08-12T14:20:00Z"}\n',
+        encoding="utf-8",
+    )
+    result = read_execution_quality(tmp_path, "2026-08-12")
+    opened, signal_close = result["fills"]
+    assert opened["reference_type"] == "expected_entry"
+    assert opened["signed_slippage_ticks"] == 3.0
+    assert opened["exception"] is True
+    assert signal_close["reference_type"] == "protective_stop_reference"
+    assert signal_close["metric_type"] == "distance_to_stop"
+    assert signal_close["signed_slippage_ticks"] is None
+    assert signal_close["signed_distance_to_stop_ticks"] == -240.0
+    assert result["coverage"]["signal_close_expected_price_missing"] == 1
+    assert result["coverage"]["commission_emitted"] == 0
+    assert result["coverage"]["route_emitted"] == 0
+
+
+def test_execution_quality_computes_signed_stop_fill_slippage_and_ignores_torn_line(tmp_path: Path):
+    (tmp_path / "trade_log.jsonl").write_text(
+        '{"type":"CLOSE","inst":"MNKD","direction":"SHORT","contracts":1,"filled_qty":1,'
+        '"entry_day":"2026-08-11","exit_day":"2026-08-12","exit_reason":"STP",'
+        '"expected_stop":67000,"fill_price":67015,"status":"FILLED","perm_id":44}\n'
+        '{"type":"OPEN"',
+        encoding="utf-8",
+    )
+    result = read_execution_quality(tmp_path, "2026-08-12")
+    fill = result["fills"][0]
+    assert fill["reference_type"] == "stop_trigger"
+    assert fill["signed_slippage_points"] == 15.0
+    assert fill["signed_slippage_ticks"] == 3.0
+    assert fill["adverse"] is True
+    assert result["coverage"]["stable_execution_id_emitted"] == 1
+    assert result["coverage"]["malformed_lines"] == 1
+
+
 def test_static_dashboard_is_served():
     client = app.test_client()
     assert client.get("/").status_code == 200
@@ -207,7 +460,25 @@ def test_static_dashboard_is_served():
     assert client.get("/analytics").status_code == 200
     assert client.get("/paper").status_code == 200
     assert client.get("/reports").status_code == 200
+    assert client.get("/api/v1/paper-evidence").status_code == 200
+    assert client.get("/api/v1/execution-quality").status_code == 200
+    assert client.get("/api/v1/execution-quality/2026-08-12").status_code == 200
     assert client.post("/api/v1/broker").status_code == 405
+
+
+def test_header_clock_declares_four_iana_zones():
+    """A mistyped IANA zone makes Intl.DateTimeFormat throw RangeError, and that kills the
+    whole header render — not just the clock. Nothing else catches it before a browser."""
+    source = (DASH / "realtime" / "realtime.js").read_text(encoding="utf-8")
+    for zone in ("America/New_York", "Asia/Tokyo", "Asia/Ho_Chi_Minh", "America/Edmonton"):
+        assert zone in source, f"realtime.js no longer declares IANA zone {zone}"
+
+    # The clock markup is generated into the status rail, so its ids live in the script.
+    assert 'id="railClockEt"' in source
+    assert 'id="railClockZones"' in source
+
+    markup = (DASH / "realtime" / "index.html").read_text(encoding="utf-8")
+    assert 'id="journalSchedule"' in markup
 
 
 def test_session_events_extract_operational_timeline(tmp_path: Path):
@@ -225,6 +496,223 @@ def test_session_events_extract_operational_timeline(tmp_path: Path):
     ]
     assert result["events"][0]["ts"].endswith("18:05:14Z")
     assert [event["sequence"] for event in result["events"]] == [0, 1, 2, 3]
+
+
+def test_session_events_extract_entries_and_dedupe_rejections(tmp_path: Path):
+    log = tmp_path / "live_day_0810.log"
+    log.write_text(
+        "2026-08-10 12:40:56 INFO broker - send_order: placed OPEN SELL MES ×1 cluster=roska4_swing\n"
+        "2026-08-10 12:40:56 INFO broker - send_order: FILLED OPEN MES ×1 @ 7773.0000 (elapsed=0.3s)\n"
+        "2026-08-10 12:40:58 WARNING run_live_day - REJECTED SHORT MNQ (roska4_swing) risk_sized=$3340.54 â€” roska4_swing gross 8.4% > cap 5.0%\n"
+        "2026-08-10 12:50:58 WARNING run_live_day - REJECTED SHORT MNQ (roska4_swing) risk_sized=$3340.54 â€” roska4_swing gross 8.4% > cap 5.0%\n",
+        encoding="utf-8",
+    )
+    events = read_session_events("2026-08-10", tmp_path)["events"]
+    assert [event["kind"] for event in events] == [
+        "market_open_submitted", "market_open_filled", "entry_rejected"
+    ]
+    assert events[-1]["occurrences"] == 2
+    assert events[-1]["reason"] == "roska4_swing gross 8.4% > cap 5.0%"
+
+
+def test_session_events_extract_exit_reason_and_pnl(tmp_path: Path):
+    (tmp_path / "live_day_0811.log").write_text(
+        "2026-08-11 12:08:27 INFO runner - LEDGER: MYM SHORT x1 roska4_swing "
+        "53969.0000 → 53968.0000 = +0.50 (signal exit) | sleeve equity 50162.50\n",
+        encoding="utf-8",
+    )
+    event = read_session_events("2026-08-11", tmp_path)["events"][0]
+    assert event["kind"] == "trade_exit_decision"
+    assert event["exit_reason"] == "signal exit"
+    assert event["pnl"] == "+0.50"
+
+
+def test_session_events_pair_reconcile_problem_with_later_match(tmp_path: Path):
+    (tmp_path / "live_day_0810.log").write_text(
+        "2026-08-10 00:05:22 CRITICAL global_index.runner - B3 MISMATCH: file has LONG MNKD ×1 but IBKR shows ×0 — investigate before trading; file state will be used\n"
+        "2026-08-10 00:05:22 CRITICAL global_index.runner - B3 ORPHAN: IBKR has LONG NKD ×1 with no matching file entry — position opened outside this runner?\n"
+        "2026-08-10 00:10:21 CRITICAL global_index.runner - B3 MISMATCH: file has LONG MNKD ×1 but IBKR shows ×0 — investigate before trading; file state will be used\n"
+        "2026-08-10 12:05:20 INFO global_index.runner - B3: broker/file positions match (1 position(s))\n",
+        encoding="utf-8",
+    )
+    events = read_session_events("2026-08-10", tmp_path)["events"]
+    incident = next(event for event in events if event["kind"] == "broker_reconcile_incident")
+    assert incident["status"] == "recovered"
+    assert incident["occurrences"] == 3
+    assert incident["reconcile_types"] == ["mismatch", "orphan"]
+    assert incident["instruments"] == ["MNKD", "NKD"]
+    assert incident["recovered_at"].endswith("18:05:20Z")
+
+
+def test_session_events_extract_runner_stop_replacement(tmp_path: Path):
+    (tmp_path / "live_day_0811.log").write_text(
+        "2026-08-11 12:05:14 WARNING global_index.runner - B4 REPLACED: MYM/roska4_swing was open with no stop order — re-placed @ 54032.8900 orderId=284\n",
+        encoding="utf-8",
+    )
+    event = read_session_events("2026-08-11", tmp_path)["events"][0]
+    assert event["kind"] == "stop_repaired"
+    assert event["status"] == "recovered"
+    assert event["inst"] == "MYM"
+    assert event["order_id"] == "284"
+    assert event["price"] == "54032.8900"
+
+
+def test_session_event_lifecycle_normalization_is_idempotent(tmp_path: Path):
+    (tmp_path / "live_day_0811.log").write_text(
+        "2026-08-11 00:00:00 INFO runner - B4: MYM/roska4_swing chua co STP trong cua so hoan\n"
+        "2026-08-11 12:05:14 INFO broker - place_stop: accepted SHORT MYM STP ×1 @ 54033.0000 orderId=284 status=PreSubmitted cluster=roska4_swing\n"
+        "2026-08-11 12:05:14 WARNING runner - B4 REPLACED: MYM/roska4_swing was open with no stop order — re-placed @ 54032.8900 orderId=284\n",
+        encoding="utf-8",
+    )
+    first = read_session_events("2026-08-11", tmp_path)["events"]
+    second = read_session_events("2026-08-11", tmp_path)["events"]
+    assert first == second
+    assert [event["kind"] for event in second] == ["stop_deferred", "stop_armed_after_deferral"]
+
+
+def test_session_events_collapse_deferred_accept_and_b4_line_into_expected_arming(tmp_path: Path):
+    (tmp_path / "live_day_0811.log").write_text(
+        "2026-08-11 11:55:00 INFO runner - B4: MYM/roska4_swing chua co STP - dang trong cua so hoan CO CHU DICH\n"
+        "2026-08-11 12:05:14 INFO broker - place_stop: accepted SHORT MYM STP Ã—1 @ 54033.0000 orderId=284 status=PreSubmitted cluster=roska4_swing\n"
+        "2026-08-11 12:05:14 WARNING runner - B4 REPLACED: MYM/roska4_swing was open with no stop order â€” re-placed @ 54032.8900 orderId=284\n",
+        encoding="utf-8",
+    )
+    events = read_session_events("2026-08-11", tmp_path)["events"]
+    assert [event["kind"] for event in events] == ["stop_deferred", "stop_armed_after_deferral"]
+    armed = events[-1]
+    assert armed["status"] == "info"
+    assert armed["accepted_price"] == "54033.0000"
+    assert armed["order_id"] == "284"
+    assert "No incident" in armed["impact"]
+
+
+def test_session_events_expose_stop_id_drift_as_open_issue(tmp_path: Path):
+    (tmp_path / "live_day_0811.log").write_text(
+        "2026-08-11 12:05:14 WARNING runner - B4 STP ID DRIFT: LONG MES x1 (roska4_swing) IS covered at the broker, but the recorded stop_order_id=62 names no working order. Not re-placing.\n",
+        encoding="utf-8",
+    )
+    event = read_session_events("2026-08-11", tmp_path)["events"][0]
+    assert event["kind"] == "stop_id_drift"
+    assert event["status"] == "open"
+    assert event["recorded_order_id"] == "62"
+    assert "cancel a ghost ID" in event["impact"]
+
+
+def test_session_events_mark_naked_stop_recovered_by_later_accepted_stop(tmp_path: Path):
+    (tmp_path / "live_day_0811.log").write_text(
+        "2026-08-11 12:05:10 CRITICAL runner - B4 NAKED: LONG M2K x1 (roska4_swing) open at IBKR with NO stop order (stop_price=3020.24). No overnight protection.\n"
+        "2026-08-11 12:05:15 INFO broker - place_stop: accepted LONG M2K STP Ã—1 @ 3020.2000 orderId=288 status=PreSubmitted cluster=roska4_swing\n",
+        encoding="utf-8",
+    )
+    events = read_session_events("2026-08-11", tmp_path)["events"]
+    naked = next(event for event in events if event["kind"] == "stop_naked")
+    assert naked["status"] == "recovered"
+    assert naked["recovered_at"].endswith("18:05:15Z")
+
+
+def test_session_events_pair_tws_outage_across_et_local_date_boundary(tmp_path: Path):
+    (tmp_path / "live_day_0811.log").write_text(
+        "2026-08-11 23:50:29 WARNING broker - IBKR code=1100 reqId=-1: Connectivity between IBKR and Trader Workstation has been lost.\n"
+        "2026-08-11 23:50:51 WARNING broker - IBKR code=1102 reqId=-1: Connectivity between IBKR and Trader Workstation has been restored - data maintained.\n",
+        encoding="utf-8",
+    )
+    events = read_session_events("2026-08-12", tmp_path)["events"]
+    assert len(events) == 1
+    outage = events[0]
+    assert outage["kind"] == "connectivity_outage"
+    assert outage["service"] == "tws"
+    assert outage["status"] == "recovered"
+    assert outage["duration_seconds"] == 22
+    assert outage["started_at"].endswith("05:50:29Z")
+    assert outage["recovered_at"].endswith("05:50:51Z")
+    assert outage["down_code"] == "1100"
+    assert outage["recovery_code"] == "1102"
+
+
+def test_session_events_group_repeated_farm_down_codes_into_one_lifecycle(tmp_path: Path):
+    (tmp_path / "live_day_0812.log").write_text(
+        "2026-08-12 10:00:00 WARNING broker - IBKR code=2103 reqId=-1: Market data farm connection is broken:usfarm\n"
+        "2026-08-12 10:00:05 WARNING broker - IBKR code=2103 reqId=-1: Market data farm connection is broken:usfarm\n"
+        "2026-08-12 10:00:12 WARNING broker - IBKR code=2104 reqId=-1: Market data farm connection is OK:usfarm\n",
+        encoding="utf-8",
+    )
+    events = read_session_events("2026-08-12", tmp_path)["events"]
+    assert len(events) == 1
+    outage = events[0]
+    assert outage["service"] == "market_data"
+    assert outage["status"] == "recovered"
+    assert outage["duration_seconds"] == 12
+    assert outage["evidence"].count("2103:") == 2
+
+
+def test_session_events_keep_unrecovered_connectivity_outage_open(tmp_path: Path):
+    (tmp_path / "live_day_0812.log").write_text(
+        "2026-08-12 10:00:00 WARNING broker - IBKR code=2157 reqId=-1: Sec-def data farm connection is broken:secdefnj\n",
+        encoding="utf-8",
+    )
+    outage = read_session_events("2026-08-12", tmp_path)["events"][0]
+    assert outage["kind"] == "connectivity_outage"
+    assert outage["service"] == "security_definition"
+    assert outage["status"] == "open"
+    assert outage["recovered_at"] is None
+    assert "no matching IBKR recovery code" in outage["resolution"]
+
+
+def test_session_events_group_correlated_services_into_one_parent_episode(tmp_path: Path):
+    (tmp_path / "live_day_0811.log").write_text(
+        "2026-08-11 23:50:25 WARNING broker - IBKR code=2103 reqId=-1: Market data farm connection is broken:usfarm\n"
+        "2026-08-11 23:50:25 WARNING broker - IBKR code=2157 reqId=-1: Sec-def data farm connection is broken:secdefnj\n"
+        "2026-08-11 23:50:25 WARNING broker - IBKR code=2105 reqId=-1: HMDS data farm connection is broken:ushmds\n"
+        "2026-08-11 23:50:29 WARNING broker - IBKR code=1100 reqId=-1: Connectivity between IBKR and Trader Workstation has been lost.\n"
+        "2026-08-11 23:50:50 WARNING broker - IBKR code=2158 reqId=-1: Sec-def data farm connection is OK:secdefnj\n"
+        "2026-08-11 23:50:51 WARNING broker - IBKR code=2106 reqId=-1: HMDS data farm connection is OK:ushmds\n"
+        "2026-08-11 23:50:51 WARNING broker - IBKR code=2104 reqId=-1: Market data farm connection is OK:usfarm\n"
+        "2026-08-11 23:50:51 WARNING broker - IBKR code=1102 reqId=-1: Connectivity between IBKR and Trader Workstation has been restored - data maintained.\n",
+        encoding="utf-8",
+    )
+    events = read_session_events("2026-08-12", tmp_path)["events"]
+    assert len(events) == 1
+    episode = events[0]
+    assert episode["service"] == "multiple"
+    assert set(episode["affected_services"]) == {
+        "tws", "market_data", "historical_data", "security_definition"
+    }
+    assert episode["status"] == "recovered"
+    assert episode["duration_seconds"] == 26
+    assert len(episode["services"]) == 4
+    assert "1100 -> 1102" in episode["evidence"]
+
+
+def test_session_events_group_hmm_fit_diagnostics_without_opening_incident(tmp_path: Path):
+    (tmp_path / "live_day_0812.log").write_text(
+        "2026-08-12 00:00:01 INFO run_live_day - [hmm]  fit_C labels (hmm_fit_end=2024-12-31)...\n"
+        "2026-08-12 00:00:02 INFO engine - HMM fit started: 2012 price observations, covariance=diag, n_init=10\n"
+        "2026-08-12 00:00:04 WARNING hmmlearn - Model is not converging.  Current: 9945.82 is not greater than 9945.97. Delta is -0.15\n"
+        "2026-08-12 00:00:05 INFO engine - Best initialisation: log-prob=9945.43 (out of 10 tries)\n"
+        "2026-08-12 00:00:05 INFO engine - HMM Model Summary (version: fit_first)\n"
+        "2026-08-12 00:00:05 INFO engine - State 0 (Calm): mean=[0.001002 0.069346] var_trace=0.000690\n"
+        "2026-08-12 00:00:05 INFO engine - State 1 (Normal): mean=[0.000539 0.156819] var_trace=0.001742\n"
+        "2026-08-12 00:00:05 INFO engine - State 2 (Stress): mean=[-0.001482 0.353277] var_trace=0.038326\n"
+        "2026-08-12 00:00:09 INFO run_live_day - 2163 SPY label days\n"
+        "2026-08-12 00:05:02 INFO engine - HMM fit started: 2012 price observations, covariance=diag, n_init=10\n"
+        "2026-08-12 00:05:05 INFO engine - Best initialisation: log-prob=9946.12 (out of 10 tries)\n"
+        "2026-08-12 00:05:05 INFO engine - HMM Model Summary (version: fit_latest)\n",
+        encoding="utf-8",
+    )
+    events = read_session_events("2026-08-12", tmp_path)["events"]
+    assert len(events) == 1
+    diagnostic = events[0]
+    assert diagnostic["kind"] == "hmm_fit_diagnostic"
+    assert diagnostic["status"] == "diagnostic"
+    assert diagnostic["attempts"] == 2
+    assert diagnostic["completed_fits"] == 2
+    assert diagnostic["non_convergence_count"] == 1
+    assert diagnostic["fit_end"] == "2024-12-31"
+    assert diagnostic["model_version"] == "fit_latest"
+    assert diagnostic["spy_label_days"] == 2163
+    assert [state["label"] for state in diagnostic["states"]] == ["Calm", "Normal", "Stress"]
+    assert "no documented decision gate failure" in diagnostic["impact"]
+    assert "Fitted states: Calm" in diagnostic["evidence"]
 
 
 def test_job_journal_groups_events_and_known_debt(tmp_path: Path):
@@ -343,6 +831,26 @@ def test_job_journal_exposes_confirmed_missed_stop_repair(tmp_path: Path):
     assert job["status"] == "missed"
     assert job["started_at"].startswith("2026-08-12T04:20:00")
     assert job["reason"] == "scheduler missed slot by 372s"
+
+
+def test_missed_stop_repair_lifecycle_recovers_at_later_sweep(tmp_path: Path):
+    (tmp_path / "scheduler_0811.log").write_text(
+        "2026-08-11 22:26:12 WARNING apscheduler.executors.default - "
+        "Run time of job \"Stop repair sweep 00:20 ET (trigger: cron[hour='0', minute='20'])\" "
+        "was missed by 0:06:12.000000\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "scheduler_0812.log").write_text(
+        "2026-08-12 02:20:00 INFO run_scheduler - [STOP_REPAIR_0420] python run_stop_repair.py\n"
+        "2026-08-12 02:20:10 INFO run_scheduler - [STOP_REPAIR_0420] completed OK\n",
+        encoding="utf-8",
+    )
+    jobs = read_job_journal("2026-08-12", tmp_path)["jobs"]
+    missed = next(job for job in jobs if job["job_id"] == "STOP_REPAIR_0020")
+    assert missed["status"] == "missed"
+    assert missed["lifecycle_status"] == "recovered"
+    assert missed["recovered_at"].endswith("08:20:10Z")
+    assert "inspection resumed" in missed["impact"]
 
 
 def test_job_journal_exposes_confirmed_missed_nkd_job(tmp_path: Path):
@@ -561,6 +1069,9 @@ def test_frontend_modules_keep_data_boundaries():
     assert "/api/v1/runner-positions" in realtime_js
     assert "persistedRunnerFor" in realtime_js
     assert "eventStatus" in realtime_js
+    assert "stop_armed_after_deferral" in realtime_js
+    assert "Protected / ID drift" in realtime_js
+    assert "hasRecordedStopId" in realtime_js
     assert "event-trigger" in realtime_js
     assert "event_history?.events" in realtime_js
     assert "loggedRunnerEvents.length" in realtime_js
