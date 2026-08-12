@@ -155,11 +155,44 @@ _KNOWN = [
      "Đảo hợp đồng không đóng được chân cũ",
      "Vị thế vẫn nằm trên hợp đồng sắp đáo hạn.",
      "Đóng tay trước ngày đáo hạn."),
-    ("cancel_order", NANG,
+    # Khoá phải là dạng THẤT BẠI, không phải chữ "cancel_order" trần. Broker ghi chữ đó ở
+    # bốn tình huống và chỉ hai cái là hỏng:
+    #   cancel_order: cancelled orderId=N              INFO     — huỷ XONG
+    #   cancel_order: orderId=N not found among ...    WARNING  — xem ghi chú bên dưới
+    #   cancel_order: orderId=N STILL OPEN 5s ...      ERROR    — hỏng thật (sai clientId)
+    #   cancel_order(orderId=N) failed: ...            ERROR    — hỏng thật (exception)
+    # Khoá trần bắt cả dòng đầu. Đo theo mức log 05-11/08: từ 05 đến 10/08 luật bắt đúng
+    # thất bại thật, nhưng 11/08 — ngày đầu tiên SẠCH ở mặt này, chỉ có 2 dòng INFO báo huỷ
+    # thành công — vẫn bị xếp [NẶNG]. Một luật không phân biệt được "hôm nay ổn" với "hôm
+    # nay hỏng" thì không canh được gì.
+    #
+    # "not found among open orders" CỐ Ý không có mặt ở đây. Nó có ba nguyên nhân (lệnh đã
+    # xong / số hiệu là số ma / lệnh chưa từng được nhận) mà dòng log không phân biệt được,
+    # và cả ba đều làm cancel_order trả False → runner kêu CRITICAL "STP ORPHAN" ngay dòng
+    # sau, kèm đủ mã, cluster, orderId và việc cần làm (live 06/08 12:10:29: hai dòng cách
+    # nhau 0 giây, orderId 62 là số ma còn stop thật #9 vẫn treo). Bắt thêm ở đây chỉ tạo
+    # một bản sao nghèo thông tin hơn của cùng một sự cố, và đẩy "VIỆC CẦN LÀM" dài thêm
+    # một dòng trùng. Luật STP ORPHAN ở trên đã lo phần đó.
+    #
+    # Một ngoại lệ có thật, ghi ra để không ai tưởng là bỏ lọt: ngày 05/08 có hai dòng
+    # "not found in OPEN TRADES" (orderId 9 và 10) mà KHÔNG có STP ORPHAN đi kèm, vì hôm đó
+    # runner chưa có dòng CRITICAL này — chính sự cố 05/08 mới sinh ra nó. Cách viết cũ đó
+    # đã tuyệt chủng trong code hiện tại (nay là "not found among open orders at the
+    # broker"), nên chạy báo cáo cho ngày 05/08 sẽ không còn nêu hai lệnh mồ côi đó nữa.
+    # Chấp nhận: sự cố đó đã xử lý xong và được ghi lại ở docstring _log_stop_cancel trong
+    # runner.py. Với code HIỆN TẠI thì mọi "not found" đều kéo theo STP ORPHAN, không mất gì.
+    ("STILL OPEN 5s after cancelOrder", NANG,
      "Không huỷ được một lệnh ở sàn",
      "IBKR chỉ nhận lệnh huỷ từ đúng kết nối (clientId) đã đặt lệnh đó. Huỷ từ kết nối "
      "khác sẽ thất bại — và trước 10/08 nó thất bại trong im lặng.",
      "Lấy số clientId trong dòng log rồi huỷ lại từ đúng id đó, hoặc huỷ trong TWS."),
+    ("cancel_order(orderId=", NANG,
+     "Lệnh huỷ vỡ giữa chừng",
+     "Lời gọi huỷ ném exception chứ không phải bị sàn từ chối — mất kết nối, sai kiểu dữ "
+     "liệu, hoặc lỗi phía thư viện. Không biết được lệnh còn sống hay đã chết, nên phải "
+     "coi như nó CÒN SỐNG cho tới khi nhìn tận mắt.",
+     "Mở TWS xem lệnh đó còn không; còn thì huỷ tay. Đọc phần sau chữ 'failed:' trong log "
+     "để biết vỡ vì gì."),
     ("STP ID DRIFT", VUA,
      "Stop vẫn bảo vệ, nhưng sổ ghi sai số hiệu lệnh",
      "Vị thế vẫn an toàn — có stop thật đang chạy. Chỉ là số hiệu trong sổ không trỏ vào "
@@ -1032,6 +1065,23 @@ def main() -> int:
                     help=f"số phiên sạch liên tiếp cần có trước khi chuyển sang resume "
                          f"(mặc định {RESUME_STREAK_NEEDED}; là phán đoán, không phải "
                          f"kết quả đo)")
+    # Mã thoát KHÔNG còn là kênh phán quyết. Trước đây `return 1 if need else 0` nghĩa là
+    # "có việc cần làm", nhưng người duy nhất đọc nó là run_scheduler._run, và nó hiểu mã
+    # khác 0 theo nghĩa hoàn toàn khác: "tiến trình con chạy hỏng". Hậu quả dây chuyền:
+    #   run_scheduler._run  -> log.error("[SESSION_REPORT] exited with code 1")
+    #   job_journal_reader  -> bắt chuỗi "exited with code" -> đánh dấu job FAILED
+    #   dashboard           -> hiện một việc hỏng, trong khi báo cáo chạy xong và ghi file
+    # Báo cáo sinh ra để TÌM việc, nên need=True gần như mọi ngày (đo 05/08–11/08: 6/6
+    # ngày). Tức đây không phải sự cố lẻ mà là một dòng ERROR giả mỗi ngày, cộng vào đúng
+    # chỗ đang bị bão hoà cảnh báo.
+    #
+    # Không mất thông tin: monitor/backend/report_reader.read_report gọi thẳng
+    # collect_session_report và trả về cả `need` lẫn `issues`, nên dashboard đọc mức độ
+    # nghiêm trọng từ nội dung báo cáo chứ không cần mã thoát.
+    #
+    # Cả blocker (CHẶN) cũng không đẩy mã thoát lên: "hệ thống đã dừng vào lệnh" mà báo ra
+    # bằng câu "exited with code 1" thì vẫn là sai chữ. Mức độ thuộc về nội dung báo cáo.
+    # Từ đây mã khác 0 chỉ còn một nghĩa duy nhất: script thật sự vỡ (exception chưa bắt).
     a = ap.parse_args()
 
     if a.date:
@@ -1045,7 +1095,7 @@ def main() -> int:
 
     root = Path(a.root)
     report = collect_session_report(day, root, resume_streak=a.resume_streak)
-    text, need = render_text(report), report["need"]
+    text = render_text(report)
     if a.out:
         # utf-8-SIG, không phải utf-8 trần. Windows đoán bảng mã theo code page của console
         # khi không có BOM, nên `type bao_cao_0810.txt` in ra "BÃO CÃO PHIÃŠN" thay vì
@@ -1061,7 +1111,7 @@ def main() -> int:
         html_path = _html_path_for(day, a.out, root)
         html_path.write_text(render_html(report), encoding="utf-8")
         print(f"đã ghi {html_path}")
-    return 1 if need else 0
+    return 0
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ Uses client_id 99 (separate from runner's client_id 1) to avoid session conflict
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import logging
 import threading
 import time
@@ -147,7 +148,7 @@ def _reader_thread(port: int, client_id: int, poll_interval: int) -> None:
             _set({
                 "connected": True,
                 "error": None,
-                "last_update": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "last_update": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
                 "account": {"equity": equity, "unrealized_pnl": unrealized_pnl},
                 "positions": positions,
                 "orders": orders,

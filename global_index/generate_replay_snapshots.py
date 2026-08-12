@@ -37,7 +37,19 @@ from global_index.deploy_sim import size_combined, metrics, replay
 from global_index.runner import BACKTEST_CALMAR_FLOOR
 
 DATA_DIR    = r"D:\raits\data\cache\futures"
-REGIME_CSV  = r"D:\raits\spy_daily.csv"
+# spy_daily.csv dừng ở 2024-12-31, và hai cluster tra nhãn theo hai kiểu khác nhau:
+# swing/stress dùng `labels.get(day)` (dict thuần) → None sau 2024-12-31 → gate ở
+# _validated_core.py:402 chặn, ngừng vào lệnh; global_nkd dùng RegimeLabels.get →
+# `self.reg.asof(target)` (regime.py:58), nối giá trị cuối nên chạy tiếp tới 2026 trên
+# nhãn ĐÓNG BĂNG ở 2024-12-31. Hệ quả: cả đoạn 2025-2026 của backtest_curve.json là
+# NKD một mình (đo 2026-08-11: NKD +$12,851, swing -$194 đuôi đóng vị thế, stress $0),
+# trong khi live giao dịch cả Rổ 4 lẫn NKD → panel paper_vs_backtest so hai hệ khác nhau.
+# spy_daily_live.csv là tập cha đúng nghĩa: trùng khít 2012/2012 ngày chồng lấn (lệch
+# max 0.0), thêm 402 ngày. hmm_fit_end vẫn cắt ở 2024-12-31 và label_regimes gán nhãn
+# bằng cửa sổ mở rộng, nên đoạn 2017-2024 không nhìn thấy dữ liệu mới — không look-ahead.
+# Tự kiểm sau mỗi lần đổi: equity tại 2024-12-31 phải giữ 98,430.51.
+# Đây cũng là file mà mọi lệnh baseline chuẩn trong docs/futures/INVARIANTS.md dùng.
+REGIME_CSV  = r"D:\raits\spy_daily_live.csv"
 NKD_PAR     = r"D:\raits\global_index\data\NKD_continuous_1m_8y.parquet"
 OUT_PATH    = Path(__file__).parent / "replay_snapshots_data.js"
 ACCOUNT           = 50_000.0

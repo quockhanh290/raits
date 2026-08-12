@@ -30,7 +30,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   background: var(--bg); color: var(--text);
-  font-family: system-ui, -apple-system, sans-serif; font-size: 14px;
+  font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace; font-size: 16px;
   line-height: 1.5;
 }
 .mono { font-family: 'JetBrains Mono', monospace; }
@@ -41,8 +41,11 @@ body {
 
 /* ── HEADER ── */
 header {
-  display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
-  padding: 14px 24px;
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
   background: var(--card); border-bottom: 1px solid var(--border);
   position: relative;
 }
@@ -53,13 +56,13 @@ header::before {
   pointer-events: none;
 }
 .header-brand {
-  font-size: 14px; font-weight: 700; color: var(--blue);
+  font-size: 16px; font-weight: 700; color: var(--blue);
   letter-spacing: 1.6px; text-transform: uppercase; white-space: nowrap;
   font-family: 'JetBrains Mono', monospace;
 }
 .mode-badge {
   padding: 3px 10px; border-radius: 4px;
-  font-size: 12px; font-weight: 700; letter-spacing: 1px;
+  font-size: 14px; font-weight: 700; letter-spacing: 1px;
   text-transform: uppercase; white-space: nowrap;
   font-family: 'JetBrains Mono', monospace;
 }
@@ -69,15 +72,48 @@ header::before {
 .mode-paused   { background: rgba(90,100,114,0.10); color: var(--muted);  border: 1px solid rgba(90,100,114,0.22); }
 
 .hstat { display: flex; flex-direction: column; gap: 3px; }
-.hstat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
-.hstat-note { text-transform: none; letter-spacing: 0; opacity: .65; font-size: 10px; }
-.hstat-sub { display: block; font-size: 10px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
+.hstat-label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+.hstat-note { text-transform: none; letter-spacing: 0; opacity: .65; font-size: 12px; }
+.hstat-sub { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
 .hstat-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--text); }
-.hstat-value.sm { font-size: 14px; }
-.hstat-value.lg { font-size: 30px; line-height: 1.05; font-weight: 700; }
-.hstat-value.xl { font-size: 26px; line-height: 1.05; font-weight: 700; }
+.hstat-value.sm { font-size: 16px; }
+.hstat-value.lg { font-size: 32px; line-height: 1.05; font-weight: 700; }
+.hstat-value.xl { font-size: 28px; line-height: 1.05; font-weight: 700; }
+.context-strip {
+  display: grid;
+  grid-template-columns: 170px 170px minmax(220px, 1fr) minmax(190px, 1fr);
+  gap: 1px;
+  padding: 1px 24px 0;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.context-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 9px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.context-label {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  white-space: nowrap;
+}
+.context-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 #headerRegime {
-  font-size: 14px; font-weight: 600; font-family: 'JetBrains Mono', monospace;
+  font-size: 14px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
   display: flex; align-items: center; gap: 7px;
 }
 #headerRegime::before {
@@ -87,7 +123,7 @@ header::before {
   flex-shrink: 0; opacity: .9;
 }
 .mode-toggle {
-  margin-left: auto; padding: 6px 16px; font-size: 12px; border-radius: 4px;
+  margin-left: auto; padding: 6px 16px; font-size: 14px; border-radius: 4px;
   background: transparent; color: var(--muted);
   border: 1px solid var(--border); cursor: pointer; letter-spacing: .5px;
   transition: border-color .15s, color .15s;
@@ -96,17 +132,36 @@ header::before {
 
 /* ── METRICS BAR ── */
 #metrics-bar {
-  display: flex; align-items: center; gap: 28px; flex-wrap: wrap;
-  padding: 8px 24px; background: var(--panel);
+  display: grid;
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+  gap: 1px;
+  padding: 1px 24px 14px;
+  background: var(--card);
   border-bottom: 1px solid var(--border);
   font-family: 'JetBrains Mono', monospace;
 }
-.mbar-item { display: flex; align-items: baseline; gap: 8px; }
-.mbar-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
-.mbar-value { font-size: 16px; color: var(--text); font-weight: 600; }
+.mbar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.mbar-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; white-space: nowrap; }
+.mbar-value { font-size: 21px; color: var(--text); font-weight: 700; line-height: 1.05; }
 .mbar-value.go   { color: var(--green); }
 .mbar-value.warn { color: var(--amber); }
 .mbar-value.red  { color: var(--red); }
+.mbar-sub {
+  font-size: 12px;
+  color: var(--dim);
+  min-height: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* ── DD SECTION ── */
 #dd-section {
@@ -115,14 +170,14 @@ header::before {
   padding: 20px 24px; background: var(--card); border-bottom: 1px solid var(--border);
 }
 .dd-col-main { display: flex; flex-direction: column; gap: 4px; }
-.dd-sublabel { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; }
+.dd-sublabel { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; }
 .dd-pct {
-  font-size: 52px; font-weight: 700; line-height: 1;
+  font-size: 54px; font-weight: 700; line-height: 1;
   font-family: 'JetBrains Mono', monospace; letter-spacing: -1px;
 }
 .breaker-badge {
   padding: 6px 18px; border-radius: 4px;
-  font-size: 14px; font-weight: 700; letter-spacing: 1px;
+  font-size: 16px; font-weight: 700; letter-spacing: 1px;
   white-space: nowrap; text-align: center;
   font-family: 'JetBrains Mono', monospace;
 }
@@ -150,19 +205,19 @@ header::before {
 .dd-gauge-markers { position: relative; height: 16px; display: flex; align-items: center; }
 .dd-marker {
   position: absolute; transform: translateX(-50%);
-  font-size: 10.5px; color: var(--dim);
+  font-size: 12.5px; color: var(--dim);
   font-family: 'JetBrains Mono', monospace;
 }
 .dd-marker.warn { color: var(--amber); }
 .dd-marker.halt { color: var(--red); }
-.dd-stats { font-size: 12px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+.dd-stats { font-size: 14px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
 .dd-stats b { color: var(--text); font-weight: 600; }
 
 /* ── CHART ── */
 #chart-section { padding: 20px 24px; border-bottom: 1px solid var(--border); background: var(--bg); }
 .chart-legend {
   display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
-  margin-bottom: 10px; font-size: 11.5px; color: var(--dim);
+  margin-bottom: 10px; font-size: 13.5px; color: var(--dim);
   font-family: 'JetBrains Mono', monospace;
 }
 .cleg-item { display: flex; align-items: center; gap: 6px; }
@@ -196,7 +251,7 @@ header::before {
   box-shadow: 0 0 0 3px rgba(91,157,255,.20); cursor: pointer;
 }
 .play-btn {
-  padding: 4px 11px; font-size: 13px; border-radius: 4px; flex-shrink: 0; min-width: 34px;
+  padding: 4px 11px; font-size: 15px; border-radius: 4px; flex-shrink: 0; min-width: 34px;
   background: transparent; color: var(--blue);
   border: 1px solid rgba(91,157,255,0.35); cursor: pointer;
   font-family: 'JetBrains Mono', monospace; transition: background .12s;
@@ -205,31 +260,36 @@ header::before {
 .play-btn:active { background: rgba(91,157,255,0.20); }
 .speed-select {
   background: var(--panel); color: var(--muted); border: 1px solid var(--border);
-  padding: 3px 5px; border-radius: 4px; font-size: 11px; cursor: pointer; flex-shrink: 0;
+  padding: 3px 5px; border-radius: 4px; font-size: 13px; cursor: pointer; flex-shrink: 0;
   font-family: 'JetBrains Mono', monospace;
 }
 .speed-select:focus { border-color: var(--blue); outline: none; }
 #sliderLabel {
-  font-size: 12px; color: var(--muted); white-space: nowrap; min-width: 230px;
+  font-size: 14px; color: var(--muted); white-space: nowrap; min-width: 230px;
   font-family: 'JetBrains Mono', monospace;
 }
 
 /* ── SECTION WRAPPER ── */
 .section { padding: 22px 32px; border-bottom: 1px solid var(--border); background: var(--bg); }
 .section-title {
-  font-size: 11px; text-transform: uppercase; letter-spacing: .9px;
+  font-size: 13px; text-transform: uppercase; letter-spacing: .9px;
   color: var(--muted); margin-bottom: 14px; font-weight: 700;
 }
-.section-title span { color: var(--bright); font-size: 13px; }
+.section-title span { color: var(--bright); font-size: 15px; }
 
 /* ── TABLES ── */
-#positions-split { display: grid; grid-template-columns: 1fr 340px; gap: 24px; }
+#positions-split { margin-top: 4px; }
+#exposureCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
 .trade-table {
   width: 100%; border-collapse: collapse;
-  font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+  font-family: 'JetBrains Mono', monospace; font-size: 14.5px;
 }
 .trade-table th {
-  font-size: 10.5px; text-transform: uppercase; letter-spacing: .7px;
+  font-size: 12.5px; text-transform: uppercase; letter-spacing: .7px;
   color: var(--dim); padding: 6px 8px; text-align: left;
   border-bottom: 1px solid var(--border);
   background: var(--card);
@@ -245,7 +305,7 @@ header::before {
 .trade-table .pnl-neg { color: var(--red);   font-weight: 600; }
 .trade-table .dir-long  { color: var(--green); }
 .trade-table .dir-short { color: var(--red); }
-.no-data { font-size: 12px; color: var(--muted); padding: 10px 0; font-style: italic; }
+.no-data { font-size: 14px; color: var(--muted); padding: 10px 0; font-style: italic; }
 .table-scroll-lg {
   max-height: 360px; overflow-y: auto;
   border: 1px solid var(--border); border-radius: 8px;
@@ -260,10 +320,10 @@ header::before {
 /* ── CLUSTER EXPOSURE ── */
 .cluster-card {
   background: var(--card); border: 1px solid var(--border); border-radius: 8px;
-  padding: 14px; margin-bottom: 10px;
+  padding: 14px;
 }
 .cluster-title {
-  font-size: 11.5px; font-weight: 700; color: var(--blue);
+  font-size: 13.5px; font-weight: 700; color: var(--blue);
   margin-bottom: 10px; text-transform: uppercase; letter-spacing: .5px;
 }
 .exposure-bar-track {
@@ -272,12 +332,12 @@ header::before {
 .exposure-bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
 .exposure-bar-warn { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(192,128,0,0.5); }
 .exposure-label {
-  font-size: 11.5px; color: var(--muted); display: block; margin-top: 5px;
+  font-size: 13.5px; color: var(--muted); display: block; margin-top: 5px;
   font-family: 'JetBrains Mono', monospace;
 }
 .pos-row {
   display: grid; grid-template-columns: 42px 56px 30px 1fr;
-  align-items: center; font-size: 12.5px; padding: 4px 7px;
+  align-items: center; font-size: 14.5px; padding: 4px 7px;
   background: var(--panel); border-radius: 3px; margin-top: 3px;
   font-family: 'JetBrains Mono', monospace;
 }
@@ -286,25 +346,159 @@ header::before {
 .pos-dir.short { color: var(--red); }
 .pos-days { color: var(--muted); }
 .pos-risk { text-align: right; color: var(--amber); }
-.no-pos { font-size: 12px; color: var(--muted); padding: 5px 0; font-style: italic; }
+.no-pos { font-size: 14px; color: var(--muted); padding: 5px 0; font-style: italic; }
+
+/* -- POSITION CARDS -- */
+.position-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.position-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.position-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 14px 10px;
+  background: rgba(8,10,14,.42);
+  border-bottom: 1px solid rgba(30,37,45,.8);
+}
+.position-card-inst {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--bright);
+}
+.position-card-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--dim);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.position-card-body {
+  padding: 12px 14px 14px;
+  display: grid;
+  gap: 10px;
+}
+.position-card-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.position-card-kpi {
+  background: var(--panel);
+  padding: 8px 10px;
+  min-width: 0;
+}
+.position-card-kpi label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.position-card-kpi span {
+  display: block;
+  margin-top: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.position-stop-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+}
+.position-stop-label {
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.position-stop-state {
+  margin-left: auto;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  border: 1px solid rgba(90,100,114,.22);
+}
+.position-stop-state.protected { color: var(--green); border-color: rgba(46,160,67,.35); background: rgba(46,160,67,.08); }
+.position-stop-state.deferred  { color: var(--amber); border-color: rgba(192,128,0,.35); background: rgba(192,128,0,.08); }
+.position-stop-state.naked     { color: var(--red); border-color: rgba(218,54,51,.35); background: rgba(218,54,51,.08); }
+.position-stop-state.unknown   { color: var(--dim); }
+
+/* -- SESSION JOURNAL -- */
+.journal-section {
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.journal-scroll {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  max-height: 260px;
+  overflow-y: auto;
+}
+.journal-entry {
+  display: grid;
+  grid-template-columns: 72px 12px 1fr;
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(30,37,45,.55);
+  font-family: 'JetBrains Mono', monospace;
+}
+.journal-entry:last-child { border-bottom: none; }
+.journal-time { color: var(--dim); font-size: 12.5px; white-space: nowrap; }
+.journal-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-top: 5px;
+  background: var(--dim);
+}
+.journal-dot.good { background: var(--green); box-shadow: 0 0 5px rgba(46,160,67,.5); }
+.journal-dot.watch { background: var(--amber); box-shadow: 0 0 5px rgba(192,128,0,.45); }
+.journal-dot.bad { background: var(--red); box-shadow: 0 0 5px rgba(218,54,51,.45); }
+.journal-title { color: var(--text); font-size: 14px; line-height: 1.35; }
+.journal-detail { color: var(--dim); font-size: 12.5px; margin-top: 3px; line-height: 1.35; }
 
 /* ── SORT / FILTER BAR ── */
 .table-controls {
   display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
 }
-.table-controls label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; }
+.table-controls label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; }
 .table-controls select, .table-controls button {
   background: var(--panel); color: var(--text); border: 1px solid var(--border);
-  padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer;
+  padding: 4px 10px; border-radius: 4px; font-size: 14px; cursor: pointer;
   font-family: 'JetBrains Mono', monospace; transition: border-color .15s;
 }
 .table-controls select:focus, .table-controls button:hover { border-color: var(--blue); outline: none; }
 .sort-btn.active { color: var(--blue); border-color: var(--blue); }
-.trade-count { font-size: 12px; color: var(--muted); margin-left: auto; font-family: 'JetBrains Mono', monospace; }
+.trade-count { font-size: 14px; color: var(--muted); margin-left: auto; font-family: 'JetBrains Mono', monospace; }
 
 /* ── DECISIONS ── */
 .dec-section-label {
-  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px;
+  font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px;
   margin: 10px 0 4px;
 }
 .taken-label    { color: var(--green); }
@@ -313,7 +507,7 @@ header::before {
 .halted-label   { color: var(--red); }
 .dec-row {
   display: flex; gap: 12px; align-items: center;
-  font-size: 13px; padding: 5px 10px; border-radius: 0 4px 4px 0;
+  font-size: 15px; padding: 5px 10px; border-radius: 0 4px 4px 0;
   border-left: 3px solid transparent; margin: 3px 0;
   font-family: 'JetBrains Mono', monospace; line-height: 1.4;
 }
@@ -322,23 +516,23 @@ header::before {
 .dec-row.rejected { border-left-color: var(--amber); background: rgba(192,128,0,0.05); }
 .dec-row.halted   { border-left-color: var(--red);   background: rgba(218,54,51,0.05); color: var(--red); }
 .cl-label {
-  text-transform: uppercase; font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; font-size: 12.5px; font-weight: 700;
   letter-spacing: .5px; font-family: 'JetBrains Mono', monospace;
 }
-.dec-cluster { color: var(--muted); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
-.dec-risk    { color: var(--amber); font-size: 12.5px; }
+.dec-cluster { color: var(--muted); font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.dec-risk    { color: var(--amber); font-size: 14.5px; }
 .dec-pnl     { font-weight: 600; }
-.dec-from    { color: var(--muted); font-size: 11.5px; }
-.dec-reason  { color: var(--dim);   font-size: 11.5px; }
+.dec-from    { color: var(--muted); font-size: 13.5px; }
+.dec-reason  { color: var(--dim);   font-size: 13.5px; }
 
 /* ── ANALYTICS ── */
-.analytics-grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 16px; }
-.analytics-grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; margin-bottom: 16px; }
+.analytics-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+.analytics-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
 .an-card {
   background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px;
 }
 .an-card-title {
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px;
+  font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px;
   color: var(--muted); margin-bottom: 12px;
 }
 .an-row {
@@ -346,8 +540,8 @@ header::before {
   padding: 5px 0; border-bottom: 1px solid rgba(30,37,45,0.6);
 }
 .an-row:last-child { border-bottom: none; }
-.an-label { font-size: 12.5px; color: var(--muted); }
-.an-value { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.an-label { font-size: 14.5px; color: var(--muted); }
+.an-value { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600; color: var(--text); }
 .an-value.go   { color: var(--green); }
 .an-value.warn { color: var(--amber); }
 .an-value.red  { color: var(--red); }
@@ -359,7 +553,7 @@ header::before {
 .paper-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
 .status-pill {
   display: inline-block; padding: 3px 12px; border-radius: 20px;
-  font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+  font-size: 13px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
   font-family: 'JetBrains Mono', monospace;
 }
 .pill-na   { background: rgba(90,100,114,0.12); color: var(--muted); border: 1px solid rgba(90,100,114,0.22); }
@@ -370,51 +564,71 @@ header::before {
 /* ── HEALTH / GROUP B ── */
 .group-b-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-top: 12px; }
 .health-item { display: flex; flex-direction: column; gap: 3px; }
-.health-item label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; }
-.health-item span  { font-size: 12.5px; color: var(--text); font-family: 'JetBrains Mono', monospace; }
+.health-item label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; }
+.health-item span  { font-size: 14.5px; color: var(--text); font-family: 'JetBrains Mono', monospace; }
 
 /* ── REJECTED SUMMARY BAR ── */
 .rej-summary {
   display: flex; gap: 22px; flex-wrap: wrap;
   margin-bottom: 12px; padding: 10px 14px;
   background: rgba(192,128,0,0.06); border: 1px solid rgba(192,128,0,0.15); border-radius: 4px;
-  font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+  font-family: 'JetBrains Mono', monospace; font-size: 14.5px;
 }
 .rej-item { color: var(--muted); }
 .rej-item b { color: var(--amber); }
 
 /* ── IBKR LIVE PANEL (Loại 1) ── */
 .ibkr-account-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px;
 }
 .ibkr-stat { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; }
-.ibkr-stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; display: block; }
-.ibkr-stat-value { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono', monospace; display: block; margin-top: 3px; }
+.ibkr-stat-label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; display: block; }
+.ibkr-stat-value { font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono', monospace; display: block; margin-top: 3px; }
 .ibkr-banner {
   padding: 8px 14px; border-radius: 4px; margin-bottom: 14px;
-  font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+  font-family: 'JetBrains Mono', monospace; font-size: 14.5px;
   display: flex; align-items: center; gap: 10px;
 }
 .ibkr-banner.ok    { background: rgba(46,160,67,.08);  color: var(--green); border: 1px solid rgba(46,160,67,.22); }
 .ibkr-banner.warn  { background: rgba(192,128,0,.08);  color: var(--amber); border: 1px solid rgba(192,128,0,.22); }
 .ibkr-banner.error { background: rgba(218,54,51,.08);  color: var(--red);   border: 1px solid rgba(218,54,51,.25); }
 .ibkr-sub-label {
-  font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted);
+  font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted);
   font-weight: 700; margin: 14px 0 8px;
 }
-.ibkr-pnl-note { font-size: 10px; color: var(--dim); margin-left: 8px; font-weight: 400; }
-
-/* ── SNAPSHOT DIVIDER (Loại 2/3 boundary) ── */
-#snapshot-divider {
-  padding: 6px 24px; display: flex; align-items: center; gap: 12px;
-  background: rgba(8,10,14,0.9); border-bottom: 1px solid var(--border);
-  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+.ibkr-pnl-note { font-size: 12px; color: var(--dim); margin-left: 8px; font-weight: 400; }
+.raw-details {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  margin-top: 12px;
+  overflow: hidden;
 }
-.snap-badge {
-  padding: 2px 8px; border-radius: 3px; font-weight: 700; letter-spacing: .7px;
-  text-transform: uppercase; white-space: nowrap;
-  background: rgba(90,100,114,0.12); color: var(--muted);
-  border: 1px solid rgba(90,100,114,0.22);
+.raw-details summary {
+  cursor: pointer;
+  padding: 9px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--muted);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.raw-details[open] summary { border-bottom: 1px solid var(--border); color: var(--text); }
+.raw-details .table-scroll-sm,
+.raw-details .table-scroll-lg { border: 0; border-radius: 0; }
+.raw-details > .table-controls,
+.raw-details > .log-controls,
+.raw-details > .rej-summary {
+  margin: 10px 12px;
+}
+.raw-details > .log-scroll {
+  border-top: 1px solid var(--border);
+}
+.position-detail-grid {
+  margin-top: 12px;
+}
+.position-detail-grid summary {
+  width: fit-content;
 }
 
 /* ── ERROR ── */
@@ -431,14 +645,17 @@ header::before {
 
 /* ── OPERATIONAL STATUS BAR ── */
 #ops-status {
-  display: flex; gap: 8px; flex-wrap: wrap;
-  padding: 10px 24px; background: var(--card);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px 24px;
+  background: var(--card);
   border-bottom: 1px solid var(--border);
 }
 .ops-item {
   display: flex; align-items: center; gap: 8px;
   background: var(--panel); border: 1px solid var(--border);
-  border-radius: 6px; padding: 7px 12px; flex: 1 1 auto; min-width: 155px;
+  border-radius: 6px; padding: 7px 10px; min-width: 0;
   font-family: 'JetBrains Mono', monospace;
 }
 .ops-dot {
@@ -448,19 +665,120 @@ header::before {
 .ops-dot.warn { background: var(--amber); box-shadow: 0 0 5px 1px rgba(192,128,0,.45); }
 .ops-dot.halt { background: var(--red);   box-shadow: 0 0 5px 1px rgba(218,54,51,.45); animation: pulse 1.2s ease-in-out infinite; }
 .ops-dot.na   { background: var(--dim); }
-.ops-item-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; white-space: nowrap; }
-.ops-item-val   { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ops-item-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; white-space: nowrap; }
+.ops-item-val   { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ops-item-val.ok   { color: var(--green); }
 .ops-item-val.warn { color: var(--amber); }
 .ops-item-val.halt { color: var(--red);   }
 .ops-item-val.na   { color: var(--dim); font-style: italic; }
 
+/* -- NOW MONITOR -- */
+#now-monitor {
+  padding: 14px 24px 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.monitor-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.monitor-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .9px;
+  color: var(--muted);
+  font-weight: 700;
+}
+.monitor-summary {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--dim);
+}
+.monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 10px;
+}
+.monitor-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 8px;
+  padding: 12px 13px;
+  min-width: 0;
+}
+.monitor-card.ok { border-left-color: var(--green); }
+.monitor-card.watch { border-left-color: var(--amber); }
+.monitor-card.bad { border-left-color: var(--red); }
+.monitor-card.missing { border-left-color: var(--dim); }
+.monitor-card.debt { border-left-color: var(--purple); }
+.monitor-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.monitor-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dim);
+}
+.monitor-card.ok .monitor-dot { background: var(--green); box-shadow: 0 0 5px rgba(46,160,67,.45); }
+.monitor-card.watch .monitor-dot { background: var(--amber); box-shadow: 0 0 5px rgba(192,128,0,.42); }
+.monitor-card.bad .monitor-dot { background: var(--red); box-shadow: 0 0 5px rgba(218,54,51,.45); animation: pulse 1.2s ease-in-out infinite; }
+.monitor-card.debt .monitor-dot { background: var(--purple); box-shadow: 0 0 5px rgba(123,97,255,.38); }
+.monitor-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+}
+.monitor-state {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+.monitor-main {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.monitor-detail {
+  margin-top: 5px;
+  font-size: 13px;
+  color: var(--dim);
+  line-height: 1.35;
+}
+.monitor-card.ok .monitor-state { color: var(--green); }
+.monitor-card.watch .monitor-state { color: var(--amber); }
+.monitor-card.bad .monitor-state { color: var(--red); }
+.monitor-card.debt .monitor-state { color: var(--purple); }
+.monitor-break {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  padding-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--dim);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
 /* ── MAIN LAYOUT (sidebar log) ── */
 .main-layout {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: minmax(0, 1fr) 360px;
   align-items: start;
 }
+.main-col { min-width: 0; }
 .log-col {
   position: sticky;
   top: 0;
@@ -496,7 +814,7 @@ header::before {
   display: flex; align-items: center; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;
 }
 .log-filter-btn {
-  padding: 3px 9px; font-size: 11px; border-radius: 3px;
+  padding: 3px 9px; font-size: 13px; border-radius: 3px;
   background: transparent; color: var(--muted);
   border: 1px solid var(--border); cursor: pointer;
   font-family: 'JetBrains Mono', monospace; transition: all .12s;
@@ -508,7 +826,7 @@ header::before {
 .log-filter-btn.btn-exec.active { background: rgba(91,157,255,.18); color: var(--blue); border-color: rgba(91,157,255,.50); font-weight: 700; }
 .log-filter-btn.btn-roll.active { background: rgba(192,128,0,.12); color: var(--amber); border-color: rgba(192,128,0,.35); }
 .log-sep { width: 1px; height: 18px; background: var(--border); display: inline-block; margin: 0 4px; flex-shrink: 0; align-self: center; }
-.log-count { font-size: 11px; color: var(--muted); margin-left: auto; font-family: 'JetBrains Mono', monospace; }
+.log-count { font-size: 13px; color: var(--muted); margin-left: auto; font-family: 'JetBrains Mono', monospace; }
 .log-scroll {
   max-height: 360px; overflow-y: auto;
   border: 1px solid var(--border); border-radius: 8px;
@@ -519,7 +837,7 @@ header::before {
   grid-template-columns: 128px 76px 60px 1fr minmax(0,220px);
   align-items: center; gap: 10px;
   padding: 5px 12px; border-bottom: 1px solid rgba(30,37,45,0.5);
-  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  font-family: 'JetBrains Mono', monospace; font-size: 14px;
   border-left: 3px solid transparent;
 }
 .log-entry:last-child { border-bottom: none; }
@@ -527,11 +845,11 @@ header::before {
 .log-entry.lvl-CRITICAL { border-left-color: var(--red);   background: rgba(218,54,51,.065); }
 .log-entry.lvl-ALERT    { border-left-color: var(--red);   background: rgba(218,54,51,.04); }
 .log-entry.lvl-WARN     { border-left-color: var(--amber); background: rgba(192,128,0,.03); }
-.log-ts  { font-size: 11px; color: var(--dim); white-space: nowrap; }
+.log-ts  { font-size: 13px; color: var(--dim); white-space: nowrap; }
 .log-lbadge {
   display: inline-flex; align-items: center; justify-content: center;
   padding: 1px 6px; border-radius: 3px;
-  font-size: 10px; font-weight: 700; letter-spacing: .4px; white-space: nowrap;
+  font-size: 12px; font-weight: 700; letter-spacing: .4px; white-space: nowrap;
 }
 .log-lbadge.CRITICAL { background: rgba(218,54,51,.18); color: var(--red);   border: 1px solid rgba(218,54,51,.35); }
 .log-lbadge.ALERT    { background: rgba(218,54,51,.10); color: #e88;         border: 1px solid rgba(218,54,51,.22); }
@@ -540,7 +858,7 @@ header::before {
 .log-cbadge {
   display: inline-flex; align-items: center; justify-content: center;
   padding: 1px 5px; border-radius: 3px;
-  font-size: 10px; font-weight: 600; letter-spacing: .3px; white-space: nowrap;
+  font-size: 12px; font-weight: 600; letter-spacing: .3px; white-space: nowrap;
   color: var(--dim); border: 1px solid rgba(90,100,114,.18);
 }
 .log-msg { line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -548,23 +866,36 @@ header::before {
 .log-entry.lvl-ALERT    .log-msg { color: #e07070; }
 .log-entry.lvl-WARN     .log-msg { color: var(--text); }
 .log-entry.lvl-INFO     .log-msg { color: var(--muted); }
-.log-ctx { font-size: 10.5px; color: var(--dim); white-space: nowrap; text-align: right; overflow: hidden; text-overflow: ellipsis; }
-.log-empty { padding: 24px; text-align: center; color: var(--dim); font-style: italic; font-size: 12px; }
+.log-ctx { font-size: 12.5px; color: var(--dim); white-space: nowrap; text-align: right; overflow: hidden; text-overflow: ellipsis; }
+.log-empty { padding: 24px; text-align: center; color: var(--dim); font-style: italic; font-size: 14px; }
+
+@media (min-width: 1680px) {
+  #ops-status { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+}
 
 @media (max-width: 900px) {
+  header { grid-template-columns: 1fr auto; }
+  .context-strip { grid-template-columns: 1fr; padding: 1px 18px 0; }
+  #metrics-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 1px 18px 12px; }
   #positions-split { grid-template-columns: 1fr; }
-  .analytics-grid-3 { grid-template-columns: 1fr; }
-  .analytics-grid-2 { grid-template-columns: 1fr; }
-  .paper-grid { grid-template-columns: 1fr; }
+  .analytics-grid-3 { grid-template-columns: minmax(0, 1fr); }
+  .analytics-grid-2 { grid-template-columns: minmax(0, 1fr); }
+  .an-card { min-width: 0; overflow-x: auto; }
+  .paper-grid { grid-template-columns: minmax(0, 1fr); }
   #dd-section { grid-template-columns: auto auto; }
   #dd-section .dd-gauge-wrap { grid-column: 1 / -1; }
   .section { padding: 16px 18px; }
-  #ops-status { padding: 10px 18px; }
-  .main-layout { grid-template-columns: 1fr; }
+  #ops-status { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px 18px; }
+  .main-layout { grid-template-columns: minmax(0, 1fr); }
   .log-col { position: static; height: auto; border-left: none; border-top: 1px solid var(--border); }
   .log-col .log-scroll { max-height: 300px; }
   .log-entry { grid-template-columns: 100px 62px 54px 1fr; }
   .log-ctx { display: none; }
+}
+@media (max-width: 520px) {
+  #metrics-bar { grid-template-columns: 1fr; }
+  #ops-status { grid-template-columns: 1fr; }
+  .ibkr-account-grid { grid-template-columns: minmax(0, 1fr); }
 }
 </style>
 </head>
@@ -574,46 +905,50 @@ header::before {
 <header>
   <span class="header-brand">RAITS Futures Monitor</span>
   <span id="modeBadge" class="mode-badge mode-replay">REPLAY</span>
-  <div class="hstat">
-    <span class="hstat-label">Date</span>
-    <span id="headerDate" class="hstat-value sm">—</span>
-  </div>
-  <div class="hstat">
-    <span class="hstat-label">Equity <span class="hstat-note">system ledger</span></span>
-    <span id="headerEquity" class="hstat-value xl">—</span>
-    <span id="headerEquityEpoch" class="hstat-sub"></span>
-  </div>
-  <div class="hstat">
-    <span class="hstat-label">Net P&amp;L</span>
-    <span id="headerNet" class="hstat-value lg pos">—</span>
-    <span id="headerNetEpoch" class="hstat-sub"></span>
-  </div>
-  <div class="hstat">
-    <span class="hstat-label">Today P&amp;L <span class="hstat-note">realized</span></span>
-    <span id="headerToday" class="hstat-value xl">—</span>
-  </div>
-  <div class="hstat" id="hstatBroker" style="display:none">
-    <span class="hstat-label">Broker <span class="hstat-note">net liq</span></span>
-    <span id="headerBroker" class="hstat-value lg">—</span>
-    <span id="headerBrokerSub" class="hstat-sub"></span>
-  </div>
-  <div class="hstat">
-    <span class="hstat-label">Regime</span>
-    <span id="headerRegime">—</span>
-  </div>
   <button class="mode-toggle" id="modeToggle" onclick="toggleMode()">Try LIVE</button>
 </header>
 
+<!-- SESSION CONTEXT -->
+<div class="context-strip">
+  <div class="context-item">
+    <span class="context-label">Session</span>
+    <span id="headerDate" class="context-value">—</span>
+  </div>
+  <div class="context-item">
+    <span class="context-label">Regime</span>
+    <span id="headerRegime" class="context-value">—</span>
+  </div>
+  <div class="context-item">
+    <span class="context-label">Runner State</span>
+    <span id="snapshotAsOf" class="context-value">as of --</span>
+  </div>
+  <div class="context-item">
+    <span class="context-label">IBKR Poll</span>
+    <span id="ibkrPollAsOf" class="context-value">backend offline</span>
+  </div>
+</div>
+
 <!-- RUNNING METRICS BAR -->
 <div id="metrics-bar">
-  <div class="mbar-item"><span class="mbar-label">Calmar</span><span id="mbCalmar" class="mbar-value">—</span></div>
-  <div class="mbar-item"><span class="mbar-label">Sharpe</span><span id="mbSharpe" class="mbar-value">—</span></div>
-  <div class="mbar-item"><span class="mbar-label">Max DD</span><span id="mbMaxDD"  class="mbar-value">—</span></div>
-  <div class="mbar-item"><span class="mbar-label">Return</span><span id="mbReturn" class="mbar-value">—</span></div>
-  <div class="mbar-item" style="margin-left:auto">
-    <span class="mbar-label">IS Calmar (baseline)</span>
-    <span class="mbar-value" id="mbIsCalmar" style="color:var(--muted)">—</span>
+  <div class="mbar-item">
+    <span class="mbar-label">Equity</span>
+    <span id="headerEquity" class="mbar-value">—</span>
+    <span id="headerEquityEpoch" class="mbar-sub"></span>
   </div>
+  <div class="mbar-item">
+    <span class="mbar-label">Today P&amp;L</span>
+    <span id="headerToday" class="mbar-value">—</span>
+    <span class="mbar-sub">realized</span>
+  </div>
+  <div class="mbar-item">
+    <span class="mbar-label">Net P&amp;L</span>
+    <span id="headerNet" class="mbar-value">—</span>
+    <span id="headerNetEpoch" class="mbar-sub"></span>
+  </div>
+  <div class="mbar-item"><span class="mbar-label">Calmar</span><span id="mbCalmar" class="mbar-value">—</span><span id="mbIsCalmar" class="mbar-sub">floor —</span></div>
+  <div class="mbar-item"><span class="mbar-label">Sharpe</span><span id="mbSharpe" class="mbar-value">—</span><span class="mbar-sub">running</span></div>
+  <div class="mbar-item"><span class="mbar-label">Max DD</span><span id="mbMaxDD"  class="mbar-value">—</span><span class="mbar-sub">running</span></div>
+  <div class="mbar-item"><span class="mbar-label">Return</span><span id="mbReturn" class="mbar-value">—</span><span class="mbar-sub">system</span></div>
 </div>
 
 <!-- OPERATIONAL STATUS BAR -->
@@ -660,8 +995,39 @@ header::before {
   </div>
 </div>
 
+<!-- NOW MONITOR -->
+<section id="now-monitor">
+  <div class="monitor-head">
+    <div class="monitor-title">Now Monitor</div>
+    <div class="monitor-summary" id="monitorSummary">waiting for snapshot</div>
+  </div>
+  <div class="monitor-grid" id="monitorCards"></div>
+</section>
+
 <div class="main-layout">
 <div class="main-col">
+
+<!-- OPEN POSITIONS + CLUSTER EXPOSURE -->
+<section class="section" id="positions-section">
+  <div class="section-title">Position Cards &amp; Cluster Exposure <span style="font-size:12px;color:var(--dim);font-weight:400;margin-left:8px">[snapshot @14:05]</span></div>
+  <div id="positionCards" class="position-card-grid"></div>
+  <div id="positions-split">
+    <div id="exposureCards"></div>
+  </div>
+  <details class="raw-details position-detail-grid">
+    <summary>Runner snapshot rows</summary>
+    <div class="table-scroll-sm">
+      <table class="trade-table" id="openPosTable">
+        <thead><tr>
+          <th>Inst</th><th>Cluster</th><th>Dir</th>
+          <th>Entry Date</th><th>Entry Time</th><th>Entry $</th>
+          <th>Days Held</th><th>Risk $</th><th>Stop</th>
+        </tr></thead>
+        <tbody id="openPosBody"></tbody>
+      </table>
+    </div>
+  </details>
+</section>
 
 <!-- ══ IBKR LIVE (Loại 1 — real-time, polled every 8s) ═════════════ -->
 <section id="ibkr-section" class="section" style="background:var(--card)">
@@ -691,8 +1057,13 @@ header::before {
     </div>
   </div>
 
-  <!-- Positions table -->
-  <div class="ibkr-sub-label">Positions (live from IBKR)</div>
+  <div class="ibkr-sub-label">Live fields merged into Position Cards</div>
+  <div class="ibkr-banner ok" style="margin-bottom:0">
+    <span>â†’</span><span>IBKR market price, market value, and unrealized P&amp;L are shown on the cards below when a live position matches the runner snapshot.</span>
+  </div>
+
+  <details class="raw-details">
+    <summary>Raw IBKR positions</summary>
   <div class="table-scroll-sm">
     <table class="trade-table">
       <thead><tr>
@@ -707,6 +1078,8 @@ header::before {
       <tbody id="ibkrPosBody"><tr><td colspan="8" class="no-data">— waiting —</td></tr></tbody>
     </table>
   </div>
+
+  </details>
 
   <!-- Open orders / STP -->
   <div class="ibkr-sub-label">Open Orders (STP GTC + pending)</div>
@@ -723,20 +1096,6 @@ header::before {
   </div>
 </section>
 <!-- ══ END IBKR LIVE ═══════════════════════════════════════════════ -->
-
-<!-- RECONCILE PLACEHOLDER — future P2 live reconcile panel -->
-<div id="reconcile-placeholder" style="padding:9px 24px;display:flex;align-items:center;gap:10px;background:rgba(90,100,114,0.06);border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--dim)">
-  <span style="font-size:14px">⟳</span>
-  <span>Reconcile IBKR↔runner: awaiting live run (P2)</span>
-  <span style="margin-left:auto;font-size:11px;color:var(--dim)">[compares live positions vs runner live_positions.json]</span>
-</div>
-
-<!-- SNAPSHOT DIVIDER — loại 2/3 (runner data, not real-time) -->
-<div id="snapshot-divider">
-  <span class="snap-badge">SNAPSHOT</span>
-  <span style="color:var(--dim)">[snapshot @14:05] — Regime · chart · positions = runner state at EOD (not real-time)</span>
-  <span id="snapshotAsOf" style="color:var(--muted);margin-left:auto">as of —</span>
-</div>
 
 <!-- DD SECTION (3-col: big pct | badge | gauge) -->
 <section id="dd-section">
@@ -782,27 +1141,11 @@ header::before {
   </div>
 </section>
 
-<!-- OPEN POSITIONS + CLUSTER EXPOSURE -->
-<section class="section" id="positions-section">
-  <div class="section-title">Open Positions &amp; Cluster Exposure <span style="font-size:10px;color:var(--dim);font-weight:400;margin-left:8px">[snapshot @14:05]</span></div>
-  <div id="positions-split">
-    <div>
-      <table class="trade-table" id="openPosTable">
-        <thead><tr>
-          <th>Inst</th><th>Cluster</th><th>Dir</th>
-          <th>Entry Date</th><th>Entry Time</th><th>Entry $</th>
-          <th>Days Held</th><th>Risk $</th><th>Stop</th>
-        </tr></thead>
-        <tbody id="openPosBody"></tbody>
-      </table>
-    </div>
-    <div id="exposureCards"></div>
-  </div>
-</section>
-
 <!-- CLOSED TRADES (accumulated history) -->
 <section class="section" id="closed-section">
   <div class="section-title">Closed Trades — <span id="closedCount">0</span></div>
+  <details class="raw-details">
+    <summary>Closed trade history</summary>
   <div class="table-controls">
     <label>Cluster</label>
     <select id="filterCluster" onchange="applyFilters()">
@@ -835,11 +1178,14 @@ header::before {
       <tbody id="closedBody"></tbody>
     </table>
   </div>
+  </details>
 </section>
 
 <!-- REJECTED ENTRIES (accumulated) -->
 <section class="section" id="rejected-section">
   <div class="section-title">Rejected Entries — <span id="rejCount">0</span></div>
+  <details class="raw-details">
+    <summary>Rejected-entry history</summary>
   <div id="rejSummary" class="rej-summary"></div>
   <div class="table-scroll-sm">
     <table class="trade-table" id="rejTable">
@@ -850,6 +1196,7 @@ header::before {
       <tbody id="rejBody"></tbody>
     </table>
   </div>
+  </details>
 </section>
 
 <!-- TODAY'S DECISION -->
@@ -909,7 +1256,7 @@ header::before {
   </div>
 
   <div class="an-card" style="margin-top:16px">
-    <div class="an-card-title">Daily P&amp;L <span style="color:var(--dim);font-size:10px">— realized per day up to selected</span></div>
+    <div class="an-card-title">Daily P&amp;L <span style="color:var(--dim);font-size:12px">— realized per day up to selected</span></div>
     <div style="position:relative;height:140px"><canvas id="dailyPnlChart"></canvas></div>
   </div>
 </section>
@@ -917,19 +1264,21 @@ header::before {
 <!-- PAPER TRADING STATUS -->
 <section class="section" id="paper-section">
   <div class="section-title">Paper Trading Status</div>
+  <details class="raw-details">
+    <summary>Paper diagnostics</summary>
 
   <div class="paper-grid">
     <div class="an-card">
-      <div class="an-card-title">Performance Degradation <span style="color:var(--muted);font-size:9px">— go/no-go metric</span></div>
+      <div class="an-card-title">Performance Degradation <span style="color:var(--muted);font-size:11px">— go/no-go metric</span></div>
       <div id="anDegradation">
-        <div class="an-row"><span class="an-label">Backtest Calmar (IS baseline)</span><span class="an-value go" id="degBacktest">2.04</span></div>
-        <div class="an-row"><span class="an-label">Paper Calmar</span><span class="an-value" id="degPaper" style="color:var(--muted)">N/A — replay</span></div>
+        <div class="an-row"><span class="an-label" title="fit_A degradation floor — deploy_sim trên dữ liệu FROZEN, --end 2024-12-31, KHÔNG có stress, 2 tick/side, n_contracts=1. Không phải Calmar của curve trên thanh metric.">Backtest Calmar (floor fit_A — frozen, no-stress)</span><span class="an-value" id="degBacktest">--</span></div>
+        <div class="an-row"><span class="an-label" title="metrics() trên P&L thực của các ngày paper. Cùng HÀM tính với floor nhưng khác dữ liệu và khác kỳ — chỉ đọc được khi đã đủ số ngày paper.">Paper Calmar (live, ít ngày)</span><span class="an-value" id="degPaper" style="color:var(--muted)">N/A — replay</span></div>
         <div class="an-row"><span class="an-label">Degradation</span><span class="an-value" id="degPct" style="color:var(--muted)">N/A</span></div>
         <div class="an-row">
           <span class="an-label">Status</span>
           <span id="degStatus"><span class="status-pill pill-na">N/A — Replay Mode</span></span>
         </div>
-        <div style="margin-top:8px;font-size:10px;color:var(--muted)">
+        <div style="margin-top:8px;font-size:12px;color:var(--muted)">
           ≤20% degradation: normal · 20–45%: monitor · &gt;45%: red flag
         </div>
       </div>
@@ -946,7 +1295,7 @@ header::before {
   </div>
 
   <div class="an-card">
-    <div class="an-card-title">Group B — Paper-Only Diagnostics <span style="color:var(--muted);font-size:9px">(filled by runner.dump_state, null in replay)</span></div>
+    <div class="an-card-title">Group B — Paper-Only Diagnostics <span style="color:var(--muted);font-size:11px">(filled by runner.dump_state, null in replay)</span></div>
     <div class="group-b-grid" id="groupBGrid">
       <div class="health-item"><label>Paper vs Backtest</label><span style="color:var(--muted)">N/A — replay</span></div>
       <div class="health-item"><label>Slippage</label><span style="color:var(--muted)">N/A — replay</span></div>
@@ -956,31 +1305,43 @@ header::before {
       <div class="health-item"><label>IBKR Connection</label><span id="hConn">—</span></div>
     </div>
   </div>
+  </details>
 </section>
 
 </div><!-- /main-col -->
 <div class="log-col">
 
+<!-- SESSION JOURNAL -->
+<section class="section journal-section" id="journal-section">
+  <div class="section-title">Session Journal <span id="journalTotal">0</span></div>
+  <div class="journal-scroll" id="journalScroll">
+    <div class="log-empty">No journal entries yet</div>
+  </div>
+</section>
+
 <!-- OPERATIONAL LOG -->
 <section class="section" id="log-section">
-  <div class="section-title">Operational Log &amp; Events — <span id="logTotal">0</span> <span style="font-size:10px;color:var(--dim);font-weight:400;margin-left:8px">[event @UTC ts]</span></div>
-  <div class="log-controls">
-    <button class="log-filter-btn active" id="logBtnALL"      onclick="setLogFilter('ALL')">ALL</button>
-    <button class="log-filter-btn btn-crit" id="logBtnCRITICAL" onclick="setLogFilter('CRITICAL')">CRITICAL</button>
-    <button class="log-filter-btn" id="logBtnWARN"   onclick="setLogFilter('WARN')">WARN</button>
-    <button class="log-filter-btn" id="logBtnINFO"   onclick="setLogFilter('INFO')">INFO</button>
-    <span class="log-sep"></span>
-    <button class="log-filter-btn" id="logBtnGUARD"    onclick="setLogFilter('GUARD')">GUARD</button>
-    <button class="log-filter-btn" id="logBtnSTATE"    onclick="setLogFilter('STATE')">STATE</button>
-    <button class="log-filter-btn btn-exec" id="logBtnEXEC"     onclick="setLogFilter('EXEC')">EXEC</button>
-    <button class="log-filter-btn" id="logBtnSIGNAL"   onclick="setLogFilter('SIGNAL')">SIGNAL</button>
-    <button class="log-filter-btn" id="logBtnORDER"    onclick="setLogFilter('ORDER')">ORDER</button>
-    <button class="log-filter-btn btn-roll" id="logBtnROLLOVER" onclick="setLogFilter('ROLLOVER')">ROLLOVER</button>
-    <span class="log-count" id="logCount">0 events</span>
-  </div>
-  <div class="log-scroll" id="logScroll">
-    <div class="log-empty">No operational log — events appear in live mode when runner emits them</div>
-  </div>
+  <div class="section-title">Operational Log &amp; Events — <span id="logTotal">0</span> <span style="font-size:12px;color:var(--dim);font-weight:400;margin-left:8px">[event @UTC ts]</span></div>
+  <details class="raw-details">
+    <summary>Raw event stream</summary>
+    <div class="log-controls">
+      <button class="log-filter-btn active" id="logBtnALL"      onclick="setLogFilter('ALL')">ALL</button>
+      <button class="log-filter-btn btn-crit" id="logBtnCRITICAL" onclick="setLogFilter('CRITICAL')">CRITICAL</button>
+      <button class="log-filter-btn" id="logBtnWARN"   onclick="setLogFilter('WARN')">WARN</button>
+      <button class="log-filter-btn" id="logBtnINFO"   onclick="setLogFilter('INFO')">INFO</button>
+      <span class="log-sep"></span>
+      <button class="log-filter-btn" id="logBtnGUARD"    onclick="setLogFilter('GUARD')">GUARD</button>
+      <button class="log-filter-btn" id="logBtnSTATE"    onclick="setLogFilter('STATE')">STATE</button>
+      <button class="log-filter-btn btn-exec" id="logBtnEXEC"     onclick="setLogFilter('EXEC')">EXEC</button>
+      <button class="log-filter-btn" id="logBtnSIGNAL"   onclick="setLogFilter('SIGNAL')">SIGNAL</button>
+      <button class="log-filter-btn" id="logBtnORDER"    onclick="setLogFilter('ORDER')">ORDER</button>
+      <button class="log-filter-btn btn-roll" id="logBtnROLLOVER" onclick="setLogFilter('ROLLOVER')">ROLLOVER</button>
+      <span class="log-count" id="logCount">0 events</span>
+    </div>
+    <div class="log-scroll" id="logScroll">
+      <div class="log-empty">No operational log — events appear in live mode when runner emits them</div>
+    </div>
+  </details>
 </section>
 
 </div><!-- /log-col -->
@@ -1121,6 +1482,36 @@ function precompute(snaps) {
   syntheticEvents.sort((a, b) => a._idx - b._idx);
 }
 
+// Nhãn phụ dưới ô Calmar. KHÔNG được đọc là "Calmar hiện tại so với floor" — hai số
+// khác quy ước đo, xem CALMAR_NOTE. Trước 2026-08-11 khoảng cách là 2.30 vs 1.65 nên
+// không ai để ý; sau khi sửa nhãn regime (spy_daily.csv -> spy_daily_live.csv) curve về
+// 1.68 và ô này đọc thành "sắp thủng floor" — báo động giả.
+const CALMAR_NOTE = [
+  'HAI SỐ KHÁC QUY ƯỚC — không so trực tiếp được.',
+  '',
+  'Calmar (số lớn): curve của chính dashboard này — dữ liệu đầy đủ tới hiện tại,',
+  '  CÓ cluster stress, metrics() trên _daily_realized.',
+  'floor: fit_A degradation floor — deploy_sim trên dữ liệu FROZEN, --end 2024-12-31,',
+  '  KHÔNG có stress, 2 tick/side, n_contracts=1.',
+  '',
+  'Muốn so đúng cặp thì phải so floor với baseline chạy CÙNG quy ước đó',
+  '(deploy_sim frozen, --end 2024-12-31, no-stress) — xem docs/futures/INVARIANTS.md.',
+  '',
+  'Ngưỡng màu (2.0 / 1.0) là ngưỡng chung của ô này, KHÔNG phải floor.',
+].join('\n');
+
+function renderBaselineMetrics(meta) {
+  const bc = document.getElementById('mbIsCalmar');
+  if (!bc) return;
+  const hasFloor = meta && meta.backtest_calmar != null;
+  bc.textContent = hasFloor
+    ? 'floor ' + meta.backtest_calmar.toFixed(2) + ' · quy ước khác'
+    : 'floor --';
+  bc.title = CALMAR_NOTE;
+  const cal = document.getElementById('mbCalmar');
+  if (cal) cal.title = CALMAR_NOTE;
+}
+
 // ── MODE HANDLERS ────────────────────────────────────────────────────────
 function startReplay(raw) {
   stopPlay();
@@ -1131,8 +1522,7 @@ function startReplay(raw) {
   document.getElementById('slider-container').style.display = 'flex';
   const sl = document.getElementById('daySlider');
   sl.max = data.snapshots.length - 1; sl.value = selectedIdx;
-  const bc = document.getElementById('mbIsCalmar');
-  if (bc && data.meta.backtest_calmar != null) bc.textContent = data.meta.backtest_calmar.toFixed(2);
+  if (typeof renderBaselineMetrics === 'function') renderBaselineMetrics(data.meta);
   precompute(data.snapshots);
   buildChart();
   updateDayView();
@@ -1141,10 +1531,24 @@ function startReplay(raw) {
 
 function startLive(raw) {
   mode = 'live'; data = { meta: raw.meta, snapshots: raw.snapshots };
-  selectedIdx = 0;
+  // Newest, not oldest. This was `selectedIdx = 0` and the slider is hidden in live
+  // mode, so there was no way to reach any other day. It survived because live had
+  // only ever produced ONE snapshot — index 0 was also the last one. On 2026-08-11,
+  // the first day live carried a second snapshot, the dashboard silently fell back to
+  // 2026-08-10.
+  //
+  // Falling back is worse than it sounds: older snapshots are REBUILT FROM TRADE
+  // HISTORY, so they carry 8 keys where a live one carries 19. Missing are
+  // open_positions, regime, cluster_exposure, breaker_level, operational_status,
+  // drawdown_*, slippage, fill_quality, paper_vs_backtest — history knows what was
+  // realised, it cannot know what was being HELD. The page rendered them as blank
+  // with no error: four open positions and every stop level, gone from the screen
+  // while the system was holding them.
+  selectedIdx = Math.max(0, (data.snapshots || []).length - 1);
   document.getElementById('modeBadge').className = 'mode-badge mode-live';
   document.getElementById('modeBadge').textContent = '● LIVE';
   document.getElementById('slider-container').style.display = 'none';
+  if (typeof renderBaselineMetrics === 'function') renderBaselineMetrics(data.meta);
   precompute(data.snapshots);
   buildChart();
   updateDayView();
@@ -1265,11 +1669,13 @@ function updateDayView() {
   if (!snap || !meta) return;
   renderHeader(snap, meta);
   const soEl = document.getElementById('snapshotAsOf');
-  if (soEl) soEl.textContent = 'as of ' + snap.date + (mode === 'live' ? ' 14:05 ET' : ' (replay)');
+  if (soEl) soEl.textContent = 'runner as of ' + snap.date + (mode === 'live' ? ' 14:05 ET' : ' (replay)');
   renderDD(snap, meta);
   renderMetricsBar(snap);
   renderOpsStatus(snap);
+  renderNowMonitor(snap, meta);
   renderLog();
+  renderSessionJournal(snap);
   renderOpenPositions(snap, meta);
   renderClosedTrades();
   renderRejected();
@@ -1291,12 +1697,12 @@ function renderHeader(snap, meta) {
   const net = snap.equity - meta.account;
   const netEl = document.getElementById('headerNet');
   netEl.textContent = (net >= 0 ? '+$' : '-$') + Math.abs(net).toLocaleString('en-US',{maximumFractionDigits:0});
-  netEl.className = 'hstat-value lg ' + (net >= 0 ? 'pos' : 'neg');
+  netEl.className = 'mbar-value ' + (net >= 0 ? 'go' : 'red');
 
   const today = snap.decision?.realized_today ?? 0;
   const todayEl = document.getElementById('headerToday');
   todayEl.textContent = (today >= 0 ? '+$' : '-$') + Math.abs(today).toLocaleString('en-US',{maximumFractionDigits:0});
-  todayEl.className = 'hstat-value xl ' + (today >= 0 ? 'pos' : 'neg');
+  todayEl.className = 'mbar-value ' + (today >= 0 ? 'go' : 'red');
 
   // Say what these are measured FROM. The ledger starts at its own epoch, so net
   // P&L is not P&L since paper trading began — without the label a small figure
@@ -1306,29 +1712,6 @@ function renderHeader(snap, meta) {
   document.getElementById('headerEquityEpoch').textContent =
     'base $' + meta.account.toLocaleString('en-US',{maximumFractionDigits:0});
   document.getElementById('headerNetEpoch').textContent = epochTxt;
-
-  // Broker net liquidation is the raw account: different scale, and it moves on FX
-  // and commissions the system ledger never sees. Shown apart, never merged.
-  const bEl  = document.getElementById('hstatBroker');
-  const brok = meta.broker_equity;
-  if (brok == null) { bEl.style.display = 'none'; }
-  else {
-    bEl.style.display = '';
-    document.getElementById('headerBroker').textContent =
-      '$' + brok.toLocaleString('en-US',{maximumFractionDigits:0});
-    const ps = meta.paper_start;
-    const sub = document.getElementById('headerBrokerSub');
-    if (ps && ps.equity != null) {
-      const d = brok - ps.equity;
-      sub.textContent = (d >= 0 ? '+$' : '-$')
-        + Math.abs(d).toLocaleString('en-US',{maximumFractionDigits:0})
-        + ' since paper start' + (ps.date ? ' ' + ps.date : '');
-      sub.style.color = d >= 0 ? 'var(--green)' : 'var(--red)';
-    } else {
-      sub.textContent = 'paper start not recorded';
-      sub.style.color = '';
-    }
-  }
 
   const regEl = document.getElementById('headerRegime');
   regEl.textContent = snap.regime;
@@ -1405,8 +1788,115 @@ function stopCell(p) {
 }
 
 // ── RENDER OPEN POSITIONS ─────────────────────────────────────────────────
+function _stopState(p) {
+  if (p.stop_order_id === undefined && p.stop_deferred === undefined)
+    return { key: 'unknown', label: 'UNKNOWN', text: 'no stop fields in this snapshot' };
+  if (p.stop_order_id)
+    return { key: 'protected', label: 'PROTECTED', text: 'order #' + p.stop_order_id };
+  if (p.stop_deferred)
+    return { key: 'deferred', label: 'DEFERRED', text: 'intentional stop-free window' };
+  return { key: 'naked', label: 'NAKED', text: 'no stop order recorded' };
+}
+
+function _plainStopText(p) {
+  const s = _stopState(p);
+  const px = p.stop_price != null
+    ? ' @ ' + p.stop_price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
+    : '';
+  return s.text + px;
+}
+
+function _rootInst(inst) {
+  const s = String(inst || '').toUpperCase();
+  if (s.startsWith('MNKD') || s.startsWith('NKD')) return 'MNKD';
+  return s.replace(/[FGHJKMNQUVXZ]\d+$/,'');
+}
+
+function _liveForPosition(p) {
+  const live = (_lastIbkrData && _lastIbkrData.positions) || [];
+  const want = _rootInst(p.inst);
+  const dir = p.direction === 'LONG' ? 1 : p.direction === 'SHORT' ? -1 : 0;
+  return live.find(x => _rootInst(x.inst) === want && (!dir || Math.sign(x.position || 0) === dir))
+      || live.find(x => _rootInst(x.inst) === want)
+      || null;
+}
+
+function _isStopOrder(o) {
+  const type = String(o && (o.type || o.order_type || '')).toUpperCase();
+  return type.includes('STP') || type.includes('STOP');
+}
+
+function _workingStopOrders() {
+  const orders = (_lastIbkrData && _lastIbkrData.orders) || [];
+  return orders.filter(o => _isStopOrder(o));
+}
+
+function _stopForPosition(p) {
+  const want = _rootInst(p.inst);
+  return _workingStopOrders().filter(o => _rootInst(o.inst) === want);
+}
+
+function _orphanStopOrders(pos) {
+  const roots = new Set((pos || []).map(p => _rootInst(p.inst)));
+  return _workingStopOrders().filter(o => !roots.has(_rootInst(o.inst)));
+}
+
+function renderPositionCards(snap) {
+  const wrap = document.getElementById('positionCards');
+  if (!wrap) return;
+  const pos = snap.open_positions || [];
+  if (!pos.length) {
+    wrap.innerHTML = '<div class="no-data">-- flat --</div>';
+    return;
+  }
+  wrap.innerHTML = pos.map(p => {
+    const state = _stopState(p);
+    const live = _liveForPosition(p);
+    const dirCls = (p.direction || '').toLowerCase();
+    const entry = p.entry_price != null
+      ? p.entry_price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
+      : '--';
+    const last = live && live.market_price != null
+      ? live.market_price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
+      : '--';
+    const upl = live ? _fmt$(live.unrealized_pnl) : '--';
+    const value = live && live.market_value != null
+      ? '$' + Math.round(Math.abs(live.market_value)).toLocaleString('en-US')
+      : '--';
+    const risk = p.risk_sized != null
+      ? '$' + p.risk_sized.toLocaleString('en-US',{maximumFractionDigits:0})
+      : '--';
+    const days = p.days_held != null ? p.days_held + 'd' : '--';
+    const liveNote = live ? 'IBKR ' + (live.inst || p.inst) : 'IBKR not matched';
+    return `<article class="position-card">
+      <div class="position-card-head">
+        <div class="position-card-inst">${p.inst || '--'}</div>
+        <div class="position-card-meta">${CL_LABELS[p.cluster] || p.cluster || '--'}</div>
+        <span style="margin-left:auto" class="dir-${dirCls}">${p.direction || '--'}</span>
+      </div>
+      <div class="position-card-body">
+        <div class="position-card-kpis">
+          <div class="position-card-kpi"><label>Entry</label><span>${entry}</span></div>
+          <div class="position-card-kpi"><label>Last</label><span>${last}</span></div>
+          <div class="position-card-kpi"><label>UPL</label><span class="${live ? _pnlClass(live.unrealized_pnl) : ''}">${upl}</span></div>
+          <div class="position-card-kpi"><label>Value</label><span>${value}</span></div>
+          <div class="position-card-kpi"><label>Risk</label><span style="color:var(--amber)">${risk}</span></div>
+          <div class="position-card-kpi"><label>Held</label><span>${days}</span></div>
+        </div>
+        <div class="position-stop-row">
+          <span class="position-stop-label">Stop</span>
+          <span>${_plainStopText(p)}</span>
+          <span class="position-stop-state ${state.key}">${state.label}</span>
+        </div>
+        <div class="journal-detail">${liveNote} / runner ${p.inst || '--'}</div>
+      </div>
+    </article>`;
+  }).join('');
+}
+
 function renderOpenPositions(snap, meta) {
   // Open positions table
+  renderPositionCards(snap);
   const tbody = document.getElementById('openPosBody');
   const pos = snap.open_positions || [];
   if (!pos.length) {
@@ -1424,7 +1914,7 @@ function renderOpenPositions(snap, meta) {
         <td style="text-align:right">${ep}</td>
         <td style="text-align:right;color:var(--muted)">${p.days_held}d</td>
         <td style="text-align:right;color:var(--amber)">$${p.risk_sized.toLocaleString('en-US',{maximumFractionDigits:0})}</td>
-        <td style="font-size:11px">${stopCell(p)}</td>
+        <td style="font-size:13px">${stopCell(p)}</td>
       </tr>`;
     }).join('');
   }
@@ -1523,7 +2013,7 @@ function renderClosedTrades() {
       <td style="text-align:right;color:var(--muted)">${hd}</td>
       <td style="text-align:right;color:var(--amber)">${rs}</td>
       <td style="text-align:right" class="${pnlCls}">${pnlStr}</td>
-      <td style="font-size:10px;color:var(--muted)">${reason}</td>
+      <td style="font-size:12px;color:var(--muted)">${reason}</td>
     </tr>`;
   }).join('');
 }
@@ -1561,7 +2051,7 @@ function renderRejected() {
       <td class="dir-${(r.direction||'').toLowerCase()}">${r.direction||'—'}</td>
       <td class="cl-label" style="color:${CL_COLOR[r.cluster]||'#5A6472'}">${CL_LABELS[r.cluster]||r.cluster}</td>
       <td style="text-align:right;color:var(--amber)">$${(r.risk_sized||0).toLocaleString('en-US',{maximumFractionDigits:0})}</td>
-      <td style="color:${reasonColor};font-size:10px">${r.reason||'—'}</td>
+      <td style="color:${reasonColor};font-size:12px">${r.reason||'—'}</td>
       <td style="color:var(--muted)">${r.date||'—'}</td>
     </tr>`;
   }).join('');
@@ -1571,7 +2061,7 @@ function renderRejected() {
 function renderDecisions(snap) {
   document.getElementById('decisionsDate').textContent = snap.date;
   const dec = snap.decision;
-  let html = `<div style="margin-bottom:8px;font-size:12px;font-family:'JetBrains Mono',monospace">
+  let html = `<div style="margin-bottom:8px;font-size:14px;font-family:'JetBrains Mono',monospace">
     Regime: <span style="color:${REGIME_COLOR[snap.regime]||'#5A6472'}">${snap.regime}</span>
     &nbsp;·&nbsp; Realized:
     <span style="color:${(dec.realized_today||0)>=0?'var(--green)':'var(--red)'};font-weight:600">
@@ -1640,7 +2130,7 @@ function renderDecisions(snap) {
         <span class="dir-${(r.direction||'').toLowerCase()}">${r.direction}</span>
         <span class="dec-cluster">${CL_LABELS[r.cluster]||r.cluster}</span>
         <span class="dec-risk">$${(r.risk_sized||0).toLocaleString('en-US',{maximumFractionDigits:0})}</span>
-        <span style="color:${r.reason==='breaker_halt'?'var(--red)':'var(--amber)'};font-size:10px">${r.reason||''}</span>
+        <span style="color:${r.reason==='breaker_halt'?'var(--red)':'var(--amber)'};font-size:12px">${r.reason||''}</span>
       </div>`).join('');
   }
 
@@ -1718,7 +2208,7 @@ function renderAnalytics(snap, meta) {
   const wr30Cls = wr30 == null ? '' : wr30 >= 0.55 ? 'go' : wr30 >= 0.45 ? '' : 'red';
 
   document.getElementById('anRunMetrics').innerHTML = `
-    <div class="an-row"><span class="an-label">Calmar (floor 2.04)</span>
+    <div class="an-row"><span class="an-label">Calmar (IS baseline)</span>
       <span class="an-value ${calCls}">${calmar != null ? calmar.toFixed(2) : '—'}</span></div>
     <div class="an-row"><span class="an-label">Sharpe</span>
       <span class="an-value">${rm.sharpe != null ? rm.sharpe.toFixed(2) : '—'}</span></div>
@@ -1828,8 +2318,10 @@ function renderAnalytics(snap, meta) {
 function renderPaperStatus(snap) {
   // Degradation — backtest_calmar from meta (n_contracts IS run), fallback to snap
   const deg = snap.degradation || {};
-  const isCalmar = data.meta.backtest_calmar ?? deg.backtest_calmar ?? 2.04;
-  document.getElementById('degBacktest').textContent = isCalmar.toFixed(2);
+  const isCalmar = data.meta.backtest_calmar ?? deg.backtest_calmar;
+  const baselineEl = document.getElementById('degBacktest');
+  baselineEl.textContent = isCalmar == null ? 'N/A' : Number(isCalmar).toFixed(2);
+  baselineEl.classList.toggle('go', isCalmar != null);
   document.getElementById('degPaper').textContent = deg.paper_calmar != null ? deg.paper_calmar.toFixed(2) : 'N/A — replay';
   document.getElementById('degPaper').style.color = deg.paper_calmar != null ? 'var(--text)' : 'var(--muted)';
 
@@ -1872,6 +2364,160 @@ function _opsSet(dotId, valId, level, text) {
   dot.className = 'ops-dot ' + level;
   val.className = 'ops-item-val ' + level;
   val.textContent = text;
+}
+
+function _monitorCard(c) {
+  const detail = c.detail ? `<div class="monitor-detail">${_escHtml(c.detail)}</div>` : '';
+  return `<article class="monitor-card ${c.level}">
+    <div class="monitor-card-top">
+      <span class="monitor-dot"></span>
+      <span class="monitor-label">${_escHtml(c.label)}</span>
+      <span class="monitor-state">${_escHtml(c.state)}</span>
+    </div>
+    <div class="monitor-main">${_escHtml(c.main)}</div>
+    ${detail}
+  </article>`;
+}
+
+function _isKnownDebtEvent(e) {
+  const msg = String(e && e.message || '').toLowerCase();
+  return msg.includes('model age') || msg.includes('re-freeze') || msg.includes('refreeze');
+}
+
+function renderNowMonitor(snap, meta) {
+  const wrap = document.getElementById('monitorCards');
+  const summary = document.getElementById('monitorSummary');
+  if (!wrap || !snap) return;
+
+  const ops = (data.meta && data.meta.operational_status) ||
+              (snap && snap.operational_status) || null;
+  const cards = [];
+  const missingCards = [];
+  const events = (data.meta && data.meta.events) || [];
+  const actionableEvents = events.filter(e =>
+    (e.level === 'CRITICAL' || e.level === 'ALERT') && !_isKnownDebtEvent(e));
+
+  if (ops && ops.runner) {
+    const r = ops.runner;
+    const alive = r.alive !== false;
+    cards.push({
+      level: alive ? 'ok' : 'bad',
+      label: 'Process',
+      state: alive ? 'OK' : 'DOWN',
+      main: alive ? 'Runner alive' : 'Runner not alive',
+      detail: [r.pid ? 'PID ' + r.pid : '', r.last_run_day ? 'last run ' + r.last_run_day : ''].filter(Boolean).join(' / ')
+    });
+  } else {
+    cards.push({
+      level: 'missing',
+      label: 'Process',
+      state: 'Missing',
+      main: mode === 'live' ? 'runner status not emitted' : 'replay has no live process',
+      detail: 'Dashboard can only report this when operational_status.runner exists.'
+    });
+  }
+
+  const freshness = ops && ops.regime_freshness;
+  const model = ops && ops.model_age;
+  const staleText = freshness
+    ? `${freshness.status} / ${freshness.bday_stale ?? '?'}bd stale`
+    : 'regime freshness missing';
+  const modelText = model
+    ? `${model.status} / ${model.model_name || 'model'} ${model.months_old ?? '?'}mo`
+    : 'model age missing';
+  cards.push({
+    level: (!freshness || !model) ? 'missing'
+      : freshness.status !== 'OK' ? 'bad'
+      : model.status === 'OK' ? 'ok' : 'debt',
+    label: 'Data Guards',
+    state: (!freshness || !model) ? 'Missing' : (freshness.status !== 'OK' ? 'Block' : (model.status === 'OK' ? 'OK' : 'Known debt')),
+    main: staleText,
+    detail: modelText + (model && model.status !== 'OK' ? ' / keep out of new-incident lane' : '')
+  });
+
+  const pos = snap.open_positions || [];
+  const live = _lastIbkrData;
+  const hasLiveBroker = !!(live && live.connected);
+  const stopOrders = hasLiveBroker ? _workingStopOrders() : [];
+  const orphanStops = hasLiveBroker ? _orphanStopOrders(pos) : [];
+  const liveStopsForPositions = hasLiveBroker
+    ? pos.filter(p => _stopForPosition(p).length > 0).length
+    : null;
+  const stopKnown = pos.filter(p => p.stop_order_id !== undefined || p.stop_deferred !== undefined);
+  const protectedCount = pos.filter(p => p.stop_order_id).length;
+  const deferredCount = pos.filter(p => !p.stop_order_id && p.stop_deferred).length;
+  const naked = pos.filter(p => (p.stop_order_id !== undefined || p.stop_deferred !== undefined) && !p.stop_order_id && !p.stop_deferred);
+  const unknownStop = pos.length - stopKnown.length;
+  const protectionLevel = orphanStops.length || naked.length ? 'bad' : (unknownStop ? 'missing' : 'ok');
+  cards.push({
+    level: protectionLevel,
+    label: 'Protection',
+    state: orphanStops.length || naked.length ? 'Incident' : (unknownStop ? 'Unknown' : 'OK'),
+    main: `${pos.length} open / ${protectedCount} runner-protected / ${deferredCount} deferred`,
+    detail: orphanStops.length
+      ? 'ORPHAN STP: ' + orphanStops.map(o => o.inst + (o.order_id != null ? ' #' + o.order_id : '')).join(', ')
+      : naked.length
+      ? 'NAKED: ' + naked.map(p => p.inst).join(', ')
+      : unknownStop
+        ? unknownStop + ' position(s) lack stop telemetry in snapshot'
+        : hasLiveBroker
+          ? `${stopOrders.length} IBKR working stop(s), ${liveStopsForPositions}/${pos.length} position root(s) have a stop order`
+          : 'Deferred stop is treated as known planned state; IBKR stop-order data unavailable.'
+  });
+
+  if (!live) {
+    cards.push({
+      level: 'missing',
+      label: 'Broker Reconcile',
+      state: 'Unknown',
+      main: 'IBKR backend data missing',
+      detail: 'Position cards keep runner data; live Last/UPL/Value stay blank until backend responds.'
+    });
+  } else if (!live.connected) {
+    cards.push({
+      level: 'watch',
+      label: 'Broker Reconcile',
+      state: 'Stale',
+      main: 'IBKR disconnected',
+      detail: live.last_update ? 'last update ' + live.last_update : 'no live timestamp'
+    });
+  } else {
+    const matched = pos.filter(p => _liveForPosition(p)).length;
+    const liveCount = (live.positions || []).length;
+    const mismatch = matched !== pos.length || liveCount !== pos.length || orphanStops.length > 0;
+    cards.push({
+      level: orphanStops.length ? 'bad' : (mismatch ? 'watch' : 'ok'),
+      label: 'Broker Reconcile',
+      state: orphanStops.length ? 'Incident' : (mismatch ? 'Check' : 'OK'),
+      main: `${matched}/${pos.length} runner positions matched`,
+      detail: orphanStops.length
+        ? `${orphanStops.length} orphan stop order(s) / ${liveCount} IBKR position(s)`
+        : `${liveCount} IBKR position(s), ${(live.orders || []).length} open order(s)`
+    });
+  }
+
+  const latestActionable = actionableEvents[actionableEvents.length - 1];
+  missingCards.push({
+    level: latestActionable ? 'bad' : 'missing',
+    label: 'Scheduler / Child',
+    state: latestActionable ? latestActionable.level : 'Telemetry gap',
+    main: latestActionable ? latestActionable.message : 'scheduler timing and child exit status not emitted',
+    detail: latestActionable
+      ? (latestActionable.ts || '')
+      : 'Covers late scheduler and CRITICAL-swallowed-by-exit-0 incidents; dashboard must not invent this.'
+  });
+
+  const score = cards.reduce((acc, c) => {
+    acc[c.level] = (acc[c.level] || 0) + 1;
+    return acc;
+  }, {});
+  if (summary) {
+    summary.textContent = `${score.bad || 0} incident / ${score.watch || 0} watch / ${score.debt || 0} known debt / ${missingCards.length} telemetry gap`;
+  }
+  wrap.innerHTML = cards.map(_monitorCard).join('')
+    + (missingCards.length
+      ? `<div class="monitor-break">Missing Telemetry</div>${missingCards.map(_monitorCard).join('')}`
+      : '');
 }
 
 function renderOpsStatus(snap) {
@@ -1982,6 +2628,102 @@ function _logCtx(ctx) {
     if (typeof v === 'number') v = Math.round(v * 1000) / 1000;
     return k + ': ' + v;
   }).join(' · ');
+}
+
+function _escHtml(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function _eventTone(level) {
+  if (level === 'CRITICAL' || level === 'ALERT') return 'bad';
+  if (level === 'WARN') return 'watch';
+  return 'good';
+}
+
+function _journalTime(ts) {
+  if (!ts) return '--';
+  const clean = String(ts).replace('T', ' ');
+  return clean.length >= 16 ? clean.slice(11,16) : clean.slice(0,16);
+}
+
+function renderSessionJournal(snap) {
+  const total = document.getElementById('journalTotal');
+  const scroll = document.getElementById('journalScroll');
+  if (!scroll) return;
+
+  const rows = [];
+  const day = snap.date;
+  const eventSource = mode === 'live'
+    ? ((data.meta && data.meta.events) || [])
+    : syntheticEvents.filter(e => e._idx <= selectedIdx);
+
+  eventSource.forEach(e => {
+    const ts = e.ts || '';
+    if (mode === 'live' && day && ts.slice(0,10) && ts.slice(0,10) !== day) return;
+    rows.push({
+      ts,
+      tone: _eventTone(e.level || 'INFO'),
+      title: (e.level || 'INFO') + ' / ' + (e.category || 'EVENT'),
+      detail: e.message || ''
+    });
+  });
+
+  const dec = snap.decision || {};
+  (dec.entries || []).forEach(e => {
+    rows.push({
+      ts: (e.entry_time || (day + 'T14:05:00')),
+      tone: e.is_same_day ? 'watch' : 'good',
+      title: (e.is_same_day ? 'Same-day trade ' : 'Entered ') + (e.inst || ''),
+      detail: [e.direction, CL_LABELS[e.cluster] || e.cluster,
+        e.risk_sized != null ? 'risk $' + e.risk_sized.toLocaleString('en-US',{maximumFractionDigits:0}) : ''
+      ].filter(Boolean).join(' / ')
+    });
+  });
+  (dec.exits || []).forEach(e => {
+    rows.push({
+      ts: (e.exit_time || (day + 'T14:05:00')),
+      tone: (e.pnl || 0) >= 0 ? 'good' : 'watch',
+      title: 'Exited ' + (e.inst || ''),
+      detail: [e.direction, fmt$(e.pnl), EXIT_LABELS[e.exit_reason] || e.exit_reason].filter(Boolean).join(' / ')
+    });
+  });
+  (dec.rejected_detail || []).forEach(r => {
+    rows.push({
+      ts: day + 'T14:05:00',
+      tone: 'watch',
+      title: 'Rejected ' + (r.inst || ''),
+      detail: [r.direction, CL_LABELS[r.cluster] || r.cluster, r.reason].filter(Boolean).join(' / ')
+    });
+  });
+  if (dec.halted_today > 0) {
+    rows.push({
+      ts: day + 'T14:05:00',
+      tone: 'bad',
+      title: 'Entries halted',
+      detail: dec.halted_today + ' entry signal(s) halted by guard'
+    });
+  }
+
+  rows.sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
+  const shown = rows.slice(0, 18);
+  if (total) total.textContent = rows.length;
+  if (!shown.length) {
+    scroll.innerHTML = '<div class="log-empty">No journal entries for this session</div>';
+    return;
+  }
+  scroll.innerHTML = shown.map(r => `
+    <div class="journal-entry">
+      <div class="journal-time">${_escHtml(_journalTime(r.ts))}</div>
+      <div class="journal-dot ${r.tone}"></div>
+      <div>
+        <div class="journal-title">${_escHtml(r.title)}</div>
+        <div class="journal-detail">${_escHtml(r.detail)}</div>
+      </div>
+    </div>`).join('');
 }
 
 function renderLog() {
@@ -2125,6 +2867,7 @@ function setPlaySpeed(v) {
 // ── IBKR LIVE POLLING (Loại 1) ────────────────────────────────────────────
 const IBKR_API = 'http://127.0.0.1:5001';
 let _ibkrTimer = null;
+let _lastIbkrData = null;
 
 function _fmt$(v) {
   if (v == null) return '—';
@@ -2159,11 +2902,22 @@ function _ibkrUpdateOps(connected) {
   }
 }
 
+function _ibkrSetPollContext(text, level) {
+  const el = document.getElementById('ibkrPollAsOf');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = level === 'ok' ? 'var(--green)'
+    : level === 'warn' ? 'var(--amber)'
+    : level === 'error' ? 'var(--red)'
+    : 'var(--dim)';
+}
+
 async function fetchLiveIBKR() {
   try {
     const resp = await fetch(IBKR_API + '/api/all', { signal: AbortSignal.timeout(6000) });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const d = await resp.json();
+    _lastIbkrData = d;
 
     // timestamp
     const ts = document.getElementById('ibkrLastTs');
@@ -2175,6 +2929,7 @@ async function fetchLiveIBKR() {
       // Keep last data displayed — stale is better than blank during 17:00 ET restart
       const ts2 = document.getElementById('ibkrLastTs');
       if (ts2 && d.last_update) ts2.textContent = '⚠ stale as of ' + d.last_update.slice(11);
+      _ibkrSetPollContext(d.last_update ? 'stale as of ' + d.last_update.slice(11) : 'disconnected', 'warn');
       const grid = document.querySelector('.ibkr-account-grid');
       if (grid) grid.style.opacity = '0.4';
       return;
@@ -2182,6 +2937,7 @@ async function fetchLiveIBKR() {
 
     _ibkrSetBanner('ok', 'IBKR connected · paper 4002 · client_id 99 (read-only)');
     _ibkrUpdateOps(true);
+    _ibkrSetPollContext(d.last_update ? 'polled ' + d.last_update.slice(11) + ' / 8s' : 'polling / 8s', 'ok');
     // Restore opacity on reconnect
     const grid = document.querySelector('.ibkr-account-grid');
     if (grid) grid.style.opacity = '';
@@ -2215,7 +2971,7 @@ async function fetchLiveIBKR() {
           const mv = p.market_value != null ? '$' + Math.round(Math.abs(p.market_value)).toLocaleString('en-US') : '—';
           return `<tr>
             <td><b>${p.inst}</b></td>
-            <td style="color:var(--muted);font-size:11px">${p.sec_type}</td>
+            <td style="color:var(--muted);font-size:13px">${p.sec_type}</td>
             <td style="text-align:right" class="${dirCls}">${Math.abs(p.position)}</td>
             <td style="text-align:right">${ac}</td>
             <td style="text-align:right;color:var(--muted)">${mp}</td>
@@ -2244,12 +3000,17 @@ async function fetchLiveIBKR() {
             <td>${o.action}</td>
             <td style="text-align:right">${o.qty ?? '—'}</td>
             <td style="text-align:right">${priceStr}</td>
-            <td style="color:var(--muted);font-size:11px">${o.tif || '—'}</td>
+            <td style="color:var(--muted);font-size:13px">${o.tif || '—'}</td>
             <td class="${statusCls}">${o.status}</td>
-            <td style="color:var(--dim);font-size:11px">${o.order_id ?? '—'}</td>
+            <td style="color:var(--dim);font-size:13px">${o.order_id ?? '—'}</td>
           </tr>`;
         }).join('');
       }
+    }
+
+    if (data && data.snapshots && data.snapshots[selectedIdx]) {
+      renderPositionCards(data.snapshots[selectedIdx]);
+      renderNowMonitor(data.snapshots[selectedIdx], data.meta);
     }
 
   } catch (err) {
@@ -2259,6 +3020,7 @@ async function fetchLiveIBKR() {
     _ibkrSetBanner('error', `Backend offline (${msg}) — start: python monitor/start_backend.py`);
     const ts = document.getElementById('ibkrLastTs');
     if (ts) ts.textContent = '— backend offline';
+    _ibkrSetPollContext('backend offline', 'error');
     const dot = document.getElementById('opsIbkrDot');
     const val = document.getElementById('opsIbkrVal');
     if (dot) { dot.className = 'ops-dot na'; }
@@ -2268,12 +3030,16 @@ async function fetchLiveIBKR() {
 }
 
 function _ibkrClearData() {
+  _lastIbkrData = null;
   const fields = ['ibkrEquity', 'ibkrUnreal', 'ibkrPosCount'];
   fields.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '—'; });
   const pb = document.getElementById('ibkrPosBody');
   if (pb) pb.innerHTML = '<tr><td colspan="8" class="no-data">— IBKR disconnected —</td></tr>';
   const ob = document.getElementById('ibkrOrdersBody');
   if (ob) ob.innerHTML = '<tr><td colspan="8" class="no-data">— IBKR disconnected —</td></tr>';
+  if (data && data.snapshots && data.snapshots[selectedIdx]) {
+    renderNowMonitor(data.snapshots[selectedIdx], data.meta);
+  }
 }
 
 function startIBKRPolling() {

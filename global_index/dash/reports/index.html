@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAITS Session Reports</title>
+  <link rel="stylesheet" href="/dash/realtime/realtime.css">
+  <link rel="stylesheet" href="/dash/reports/reports.css">
+  <script src="/dash/reports/reports.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <a class="brand" href="/">RAITS FUTURES</a><span class="mode-badge">PAPER</span>
+    <nav class="module-nav" aria-label="Monitor modules">
+      <a href="/realtime">Realtime</a><a href="/analytics">Historical</a><a href="/paper">Paper</a><a href="/reports" aria-current="page">Reports</a>
+    </nav>
+  </header>
+  <main>
+    <section class="report-toolbar">
+      <div><p class="eyebrow">SESSION ARCHIVE</p><h1>Daily operational report</h1></div>
+      <label><span>Session date (ET)</span><input id="reportDate" type="date"></label>
+      <button id="loadReport" type="button">Load report</button>
+    </section>
+    <section class="report-summary">
+      <div class="report-verdict"><span>Verdict</span><b id="reportVerdict">LOADING</b><small id="reportScope">On-demand log scan</small></div>
+      <div><span>Scheduled Jobs</span><b id="jobsMetric">--</b></div>
+      <div><span>Issues</span><b id="issuesMetric">--</b></div>
+      <div><span>Open Positions</span><b id="positionsMetric">--</b><small id="positionsScope">today only</small></div>
+      <div><span>Log Lines</span><b id="linesMetric">--</b></div>
+    </section>
+    <section class="report-band">
+      <div class="section-heading"><div><p class="eyebrow">OPERATOR ACTIONS</p><h2>What needs attention</h2></div></div>
+      <div class="action-list" id="actionList"></div>
+    </section>
+    <section class="report-band">
+      <div class="section-heading"><div><p class="eyebrow">DETECTED IN LOGS</p><h2>Issues</h2></div></div>
+      <div class="issue-list" id="reportIssues"></div>
+    </section>
+    <section class="report-band">
+      <div class="section-heading"><div><p class="eyebrow">EXPECTED VS OBSERVED</p><h2>Job timeline</h2></div><p class="summary" id="timelineNote"></p></div>
+      <div class="job-timeline" id="jobTimeline"></div>
+    </section>
+    <section class="report-band" id="positionsBand">
+      <div class="section-heading"><div><p class="eyebrow">CURRENT STATE ONLY</p><h2>Positions held now</h2></div></div>
+      <div class="report-positions" id="reportPositions"></div>
+    </section>
+    <section class="report-band source-foot"><p id="reportSource">No report loaded</p></section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAITS Realtime Monitor</title>
+  <link rel="stylesheet" href="/dash/realtime/realtime.css">
+  <script src="/dash/realtime/realtime.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand-lockup">
+      <a class="brand" href="/">RAITS FUTURES</a>
+      <span class="mode-badge">PAPER</span>
+    </div>
+    <nav class="module-nav" aria-label="Monitor modules">
+      <a href="/realtime" aria-current="page">Realtime</a>
+      <a href="/analytics">Historical</a>
+      <a href="/paper">Paper</a>
+      <a href="/reports">Reports</a>
+    </nav>
+    <div class="header-live-context">
+      <b id="sessionDate">--</b>
+      <span class="broker-header-state"><i></i><b id="brokerContext">Loading</b></span>
+      <b id="runnerContext" hidden>Loading</b>
+      <b id="sessionRegime" hidden>--</b>
+    </div>
+  </header>
+
+  <main>
+    <div class="overview-header">
+    <section class="header-dashboard metrics" id="metrics" aria-label="Realtime account overview">
+      <div class="header-zone equity-zone runner-derived">
+        <span class="zone-title has-tip tip-bottom" tabindex="0" data-tooltip="Paper-trading system equity maintained by the runner ledger. This excludes the broker account's total liquidation value.">Paper Equity</span>
+        <div class="equity-line"><b id="metricEquity">--</b><strong id="performanceNet">--</strong></div>
+        <small><em id="performanceReturn">--</em> <span id="performanceScope">--</span> / base <strong id="performanceBase">--</strong></small>
+      </div>
+
+      <div class="header-zone performance-zone">
+        <span class="zone-title">Performance</span>
+        <div class="zone-grid">
+          <div class="broker-derived"><span class="has-tip tip-bottom" tabindex="0" data-tooltip="Unrealized P&amp;L reported by IBKR for currently open positions.">Open UPL</span><b id="metricUnrealized">--</b></div>
+          <div class="runner-derived"><span class="has-tip tip-bottom" tabindex="0" data-tooltip="Realized P&amp;L recorded by the runner for the current trading date.">Realized today</span><b id="metricRealized">--</b></div>
+          <div class="runner-derived"><span class="has-tip tip-bottom" tabindex="0" data-tooltip="Running annualized Sharpe ratio from paper-trading equity observations.">Sharpe</span><b id="performanceSharpe">--</b></div>
+          <div class="runner-derived"><span class="has-tip tip-bottom" tabindex="0" data-tooltip="Running live Calmar ratio. Missing history is shown as unavailable.">Calmar</span><b id="performanceCalmar">--</b></div>
+        </div>
+      </div>
+
+      <div class="header-zone risk-zone runner-derived">
+        <span class="zone-title">Risk</span>
+        <div class="metric-dd-value"><b id="metricDrawdown">--</b><em id="metricDrawdownAmount">--</em></div>
+        <div class="dd-gauge" role="meter" aria-label="Drawdown versus hard limit"><i id="metricDrawdownFill"></i></div>
+        <small><span id="metricDrawdownLimit">--</span><span>Peak <strong id="performanceMaxDd">--</strong></span></small>
+      </div>
+
+      <div class="header-zone exposure-zone">
+        <span class="zone-title">Exposure</span>
+        <div class="zone-grid">
+          <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="Number of open futures positions currently reported by IBKR.">Positions</span><b id="metricPositions">--</b></div>
+          <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="All currently working orders reported by IBKR, including protective stops.">Working orders</span><b id="metricStops">--</b></div>
+          <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="Broker positions with a valid working protective stop. Deferred protection remains legal but is not counted as covered.">Stops covered</span><b id="metricStopsCovered">--</b></div>
+          <div><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="Longest current holding age recorded by the runner, in trading days.">Held</span><b id="metricHeld">--</b></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="status-rail" id="statusRail" aria-label="Operational status"></section>
+    </div>
+
+    <div class="workspace">
+      <div class="primary-column">
+        <section class="now-monitor section-band" id="now-monitor">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">NOW MONITOR</p>
+              <h1>Current operational state</h1>
+            </div>
+            <div class="now-monitor-heading-status">
+              <div class="scheduler-health unknown" id="schedulerHealth"><span class="status-dot"></span><span><small>Scheduler</small><b id="schedulerHealthValue">Checking evidence</b></span></div>
+              <p class="summary" id="incidentSummary">Waiting for sources</p>
+            </div>
+          </div>
+          <div class="now-monitor-layout">
+            <div class="now-monitor-list" id="nowMonitorList" role="listbox" aria-label="Current operational issues"></div>
+            <div class="now-monitor-detail" id="nowMonitorDetail" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <section class="section-band open-issues-section">
+          <div class="section-heading compact">
+            <div>
+              <p class="eyebrow">ACCUMULATED UNRESOLVED EVIDENCE</p>
+              <h2>Open issues</h2>
+            </div>
+            <span class="source-note has-tip tip-right" id="openIssuesSource" tabindex="0" data-tooltip="Issues reconstructed from retained read-only scheduler evidence. Known debt remains open until positive resolution evidence exists.">Loading retained evidence</span>
+          </div>
+          <details class="open-issues-shell" id="openIssuesShell">
+            <summary id="openIssuesToggle">Open issue list</summary>
+            <div class="open-issues-layout">
+              <div class="open-issue-list" id="openIssueList" role="listbox" aria-label="Open issues"></div>
+              <div class="open-issue-detail" id="openIssueDetail" aria-live="polite"></div>
+            </div>
+          </details>
+        </section>
+
+        <section class="section-band positions-section">
+          <div class="section-heading compact">
+            <div>
+              <p class="eyebrow">BROKER TRUTH + RUNNER INTENT</p>
+              <h2>Open positions</h2>
+            </div>
+            <span class="source-note" id="positionSource">IBKR unavailable</span>
+          </div>
+          <div class="position-grid" id="positionGrid"></div>
+        </section>
+
+        <section class="section-band decision-section">
+          <div class="section-heading compact">
+            <div>
+              <p class="eyebrow">LATEST RUNNER SNAPSHOT</p>
+              <h2>Today's decision</h2>
+            </div>
+            <span class="source-note has-tip tip-right" id="decisionSource" tabindex="0" data-tooltip="Entries, closes, and rejected signals emitted in the decision block of the newest runner snapshot.">Session unavailable</span>
+          </div>
+          <div class="decision-summary" id="decisionSummary"></div>
+          <div class="decision-groups">
+            <section class="decision-group">
+              <div class="decision-group-head"><span>Entered</span><b id="decisionEntryCount">0</b></div>
+              <div class="decision-list" id="decisionEntries"></div>
+            </section>
+            <section class="decision-group">
+              <div class="decision-group-head"><span>Closed</span><b id="decisionCloseCount">0</b></div>
+              <div class="decision-list" id="decisionCloses"></div>
+            </section>
+            <section class="decision-group">
+              <div class="decision-group-head"><span>Rejected / Halted</span><b id="decisionRejectedCount">0</b></div>
+              <div class="decision-list" id="decisionRejected"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="section-band orders-section">
+          <div class="section-heading compact">
+            <div>
+              <p class="eyebrow">IBKR WORKING ORDERS</p>
+              <h2>Open orders</h2>
+            </div>
+            <span class="source-note" id="ordersSource">IBKR unavailable</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Contract</th><th>Type</th><th>Action</th><th class="num">Qty</th><th class="num">Stop</th><th>Status</th><th class="num">ID</th></tr></thead>
+              <tbody id="ordersBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <aside class="journal-column">
+        <section class="section-band journal-section">
+          <div class="section-heading compact">
+            <div>
+              <p class="eyebrow">SCHEDULER + OPERATIONAL EVIDENCE</p>
+              <h2 id="journalTitle">Job journal</h2>
+            </div>
+            <span class="source-note journal-source has-tip tip-right" id="journalSource" tabindex="0" data-tooltip="One row per scheduler execution. Click a job to inspect its stop, order, fill, and diagnostic evidence. Operational events outside a job remain standalone.">Session unavailable</span>
+          </div>
+          <div class="journal-view-toggle" role="group" aria-label="Journal view">
+            <button type="button" data-journal-view="jobs" aria-pressed="true">Jobs</button>
+            <button type="button" data-journal-view="events" aria-pressed="false">Events</button>
+          </div>
+          <ol class="journal" id="journal"></ol>
+        </section>
+        <section class="section-band source-section">
+          <p class="eyebrow">SOURCE CLOCKS</p>
+          <dl id="sourceClocks"></dl>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <div class="fatal-banner" id="fatalBanner" hidden>Monitor backend unavailable.</div>
+</body>
+</html>

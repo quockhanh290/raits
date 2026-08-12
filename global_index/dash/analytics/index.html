@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAITS Historical Analytics</title>
+  <link rel="stylesheet" href="/dash/realtime/realtime.css">
+  <link rel="stylesheet" href="/dash/analytics/analytics.css">
+  <script src="/replay_snapshots_data.js"></script>
+  <script src="/dash/analytics/analytics.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <a class="brand" href="/">RAITS FUTURES</a>
+    <span class="dataset-badge">REPLAY</span>
+    <nav class="module-nav" aria-label="Monitor modules">
+      <a href="/realtime">Realtime</a>
+      <a href="/analytics" aria-current="page">Historical</a>
+      <a href="/paper">Paper</a>
+      <a href="/reports">Reports</a>
+    </nav>
+  </header>
+
+  <main class="analytics-shell">
+    <section class="analysis-toolbar">
+      <div><span>Dataset</span><b>Backtest / Replay</b></div>
+      <div><span>Range</span><b id="rangeLabel">--</b></div>
+      <div><span>Selected</span><b id="selectedDate">--</b></div>
+      <label class="day-control"><span>Replay day</span><input id="daySlider" type="range" min="0" value="0"></label>
+    </section>
+
+    <section class="historical-metrics" aria-label="Historical metrics">
+      <div><span>Equity</span><b id="histEquity">--</b></div>
+      <div><span>Total Return</span><b id="histReturn">--</b></div>
+      <div><span>Calmar</span><b id="histCalmar">--</b><small id="calmarSource">running</small></div>
+      <div><span>Sharpe</span><b id="histSharpe">--</b></div>
+      <div><span>Max Drawdown</span><b id="histMaxDd">--</b></div>
+      <div><span>Floor fit_A</span><b id="histBaseline">--</b><small id="baselineSource">quy ước khác — không so trực tiếp</small></div>
+    </section>
+
+    <section class="chart-band">
+      <div class="chart-heading">
+        <div><p class="eyebrow">CUMULATIVE PERFORMANCE</p><h1>Equity and drawdown</h1></div>
+        <div class="legend"><span><i class="equity-key"></i>Equity</span><span><i class="dd-key"></i>Drawdown</span></div>
+      </div>
+      <div class="chart-frame"><canvas id="historyChart"></canvas></div>
+    </section>
+
+    <div class="analytics-grid">
+      <section class="analysis-panel">
+        <p class="eyebrow">THROUGH SELECTED DATE</p>
+        <h2>Cumulative cluster P&amp;L</h2>
+        <div class="rank-list" id="clusterPnl"></div>
+      </section>
+      <section class="analysis-panel">
+        <p class="eyebrow">THROUGH SELECTED DATE</p>
+        <h2>Cumulative regime P&amp;L</h2>
+        <div class="rank-list" id="regimePnl"></div>
+      </section>
+      <section class="analysis-panel">
+        <p class="eyebrow">THROUGH SELECTED DATE</p>
+        <h2>Median hold</h2>
+        <div class="rank-list" id="holdingProfile"></div>
+      </section>
+    </div>
+
+    <section class="trades-band">
+      <div class="chart-heading"><div><p class="eyebrow">OBSERVED THROUGH SELECTED DAY</p><h2>Recent closed trades</h2></div><span id="tradeCount" class="source-note">0 trades</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Exit</th><th>Instrument</th><th>Cluster</th><th>Side</th><th class="num">Entry</th><th class="num">Exit</th><th class="num">P&amp;L</th><th>Reason</th></tr></thead>
+          <tbody id="tradeBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <div class="fatal-banner" id="analyticsError" hidden>Historical replay unavailable.</div>
+</body>
+</html>

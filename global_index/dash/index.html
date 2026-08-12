@@ -3,19 +3,36 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RAITS Live Dashboard Variants</title>
-  <link rel="stylesheet" href="shared/live.css">
+  <title>RAITS Futures Monitor</title>
+  <link rel="stylesheet" href="/dash/realtime/realtime.css">
+  <style>
+    .module-shell { max-width: 1180px; margin: 0 auto; padding: 56px 24px; }
+    .module-shell h1 { font-size: 26px; }
+    .module-shell > p { max-width: 720px; margin: 10px 0 30px; color: var(--muted); font: 13px/1.6 var(--mono); }
+    .module-list { border-top: 1px solid var(--line); }
+    .module-link { min-height: 112px; padding: 18px 8px; display: grid; grid-template-columns: 165px minmax(0, 1fr) auto; align-items: center; gap: 24px; border-bottom: 1px solid var(--line); }
+    .module-link:hover { background: var(--surface); }
+    .module-link b { color: var(--bright); font: 700 16px/1.3 var(--mono); }
+    .module-link p { margin: 0; color: var(--muted); font: 13px/1.55 var(--mono); }
+    .module-link span { color: var(--blue); font: 700 18px/1 var(--mono); }
+    @media (max-width: 680px) { .module-shell { padding: 34px 16px; } .module-link { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; } .module-link p { grid-column: 1 / -1; } }
+  </style>
 </head>
 <body>
-  <main class="shell" style="max-width:900px;margin:0 auto">
-    <h1>RAITS Live Dashboard Variants</h1>
-    <p class="micro">All variants load live_state_data.js only. Replay snapshots are intentionally not loaded.</p>
-    <section class="panel" style="display:grid;gap:10px">
-      <a href="../dashboard_live.html"><b>Calm Cards</b><br><span class="micro">Primary dashboard with progressive disclosure and clear broker/system separation.</span></a>
-      <a href="terminal.html"><b>Dense Terminal</b><br><span class="micro">Single-screen operator board with health, stop state, exposure, activity, and log tail.</span></a>
-      <a href="chart-forward.html"><b>Chart Forward</b><br><span class="micro">Equity and drawdown lead the page; positions and cluster exposure sit below.</span></a>
-      <a href="phone.html"><b>Phone Glance</b><br><span class="micro">Narrow layout emphasizing equity, breaker, open count, and stop state.</span></a>
-    </section>
+  <header class="app-header">
+    <a class="brand" href="/">RAITS FUTURES</a>
+    <span class="mode-badge">PAPER</span>
+  </header>
+  <main class="module-shell">
+    <p class="eyebrow">MONITORING SURFACES</p>
+    <h1>Choose the question you need answered</h1>
+    <p>Realtime answers what is broken now. Historical explains performance. Paper tracks whether evidence is sufficient. Reports reconstruct one completed session.</p>
+    <nav class="module-list" aria-label="Dashboard modules">
+      <a class="module-link" href="/realtime"><b>Realtime Monitor</b><p>Broker truth, protection, scheduler evidence, incidents and the live event journal.</p><span aria-hidden="true">&gt;</span></a>
+      <a class="module-link" href="/analytics"><b>Historical Analytics</b><p>Replay-only equity, drawdown, attribution, holding profile and closed trades.</p><span aria-hidden="true">&gt;</span></a>
+      <a class="module-link" href="/paper"><b>Paper Evidence</b><p>Precommitted gates, observed samples and explicit gaps on the paper-to-live route.</p><span aria-hidden="true">&gt;</span></a>
+      <a class="module-link" href="/reports"><b>Session Reports</b><p>On-demand daily log reconstruction, scheduled jobs, issues and operator actions.</p><span aria-hidden="true">&gt;</span></a>
+    </nav>
   </main>
 </body>
 </html>

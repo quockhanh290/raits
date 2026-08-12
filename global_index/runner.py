@@ -249,6 +249,10 @@ class FuturesRunner:
         # can report an unpriceable close, which happens well before the operational-log
         # section further down.
         self._events: list = []
+        # Append-only telemetry is derived from the dashboard path so offline runners
+        # without live_state_path remain write-free. It is never read by the engine.
+        self._event_log_dir = Path(live_state_path).parent if live_state_path else None
+        self._event_log_disabled = False
 
         # E1: acquire PID lock first — refuse second instance before any state is set up
         self._lock_path = Path(lock_path) if lock_path else None
@@ -2099,6 +2103,46 @@ class FuturesRunner:
         self._events.append(event)
         if len(self._events) > 500:
             self._events = self._events[-500:]
+        self._append_event_log(event)
+
+    def _append_event_log(self, event: dict) -> None:
+        """Append one JSONL record without participating in trading state.
+
+        O_APPEND protects all prior records. A short/failed write disables this
+        telemetry channel for the current runner, but never escapes into the engine.
+        Readers treat an incomplete final line as a reported telemetry gap.
+        """
+        if self._event_log_dir is None or self._event_log_disabled:
+            return
+        try:
+            stamp = pd.Timestamp(event["ts"])
+            if stamp.tzinfo is None:
+                stamp = stamp.tz_localize("UTC")
+            day = stamp.tz_convert(ET_TZ).strftime("%Y%m%d")
+            path = self._event_log_dir / f"runner_events_{day}.jsonl"
+            if path.exists() and path.stat().st_size:
+                read_fd = os.open(path, os.O_RDONLY | (getattr(os, "O_BINARY", 0)))
+                try:
+                    os.lseek(read_fd, -1, os.SEEK_END)
+                    if os.read(read_fd, 1) != b"\n":
+                        raise OSError("event log has an incomplete final record")
+                finally:
+                    os.close(read_fd)
+            payload = (json.dumps(event, ensure_ascii=False, separators=(",", ":"),
+                                  default=str) + "\n").encode("utf-8")
+            flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+            if hasattr(os, "O_BINARY"):
+                flags |= os.O_BINARY
+            fd = os.open(path, flags, 0o600)
+            try:
+                written = os.write(fd, payload)
+                if written != len(payload):
+                    raise OSError(f"short event-log write: {written}/{len(payload)} bytes")
+            finally:
+                os.close(fd)
+        except Exception as exc:
+            self._event_log_disabled = True
+            logger.warning("event log disabled for this run after append failure: %s", exc)
 
     # ── Paper equity history ─────────────────────────────────────────────────
 

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAITS Paper Evidence</title>
+  <link rel="stylesheet" href="/dash/realtime/realtime.css">
+  <link rel="stylesheet" href="/dash/paper/paper.css">
+  <script src="/dash/paper/paper.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <a class="brand" href="/">RAITS FUTURES</a><span class="mode-badge">PAPER</span>
+    <nav class="module-nav" aria-label="Monitor modules">
+      <a href="/realtime">Realtime</a><a href="/analytics">Historical</a><a href="/paper" aria-current="page">Paper</a><a href="/reports">Reports</a>
+    </nav>
+  </header>
+  <main>
+    <section class="paper-hero">
+      <div><p class="eyebrow">PAPER TO LIVE EVIDENCE</p><h1>Readiness is evidence, not elapsed time</h1><p id="ledgerSource">Loading runner state</p></div>
+      <div class="readiness"><span>Overall status</span><b id="overallStatus">UNKNOWN</b><small id="overallReason">Waiting for observations</small></div>
+    </section>
+    <section class="paper-metrics">
+      <div><span>Observed Days</span><b id="paperDays">--</b><small>target 60</small></div>
+      <div><span>Regimes Seen</span><b id="regimesSeen">--</b><small>Normal + Stress</small></div>
+      <div><span>Exit Coverage</span><b id="exitCoverage">--</b><small>3 paths</small></div>
+      <div><span>C1 Open Mean</span><b id="slippageMean">--</b><small id="closeSlippageMean">close mean --</small></div>
+      <div><span>C1 Samples</span><b id="slippageCount">--</b><small>open / close</small></div>
+    </section>
+    <section class="ledger-band">
+      <div class="section-heading"><div><p class="eyebrow">PRECOMMITTED GATES</p><h2>Evidence ledger</h2></div><p class="summary">Thresholds from docs/futures/PAPER_ROUTE.md</p></div>
+      <div class="ledger" id="evidenceLedger"></div>
+    </section>
+    <section class="gap-band">
+      <div class="section-heading"><div><p class="eyebrow">NOT OBSERVABLE YET</p><h2>Evidence gaps</h2></div></div>
+      <div class="gap-list" id="evidenceGaps"></div>
+    </section>
+  </main>
+</body>
+</html>
