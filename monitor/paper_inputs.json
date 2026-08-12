@@ -1,0 +1,9 @@
+{
+  "c1_spec": {
+    "min_n": 100,
+    "max_mean_ticks": 5,
+    "scope": "separate",
+    "close_scope": "stp_only",
+    "use_absolute": true
+  }
+}

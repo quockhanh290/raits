@@ -1,0 +1,48 @@
+{
+  "c1_spec": {
+    "min_n": null,
+    "max_mean_ticks": 2,
+    "scope": "separate",
+    "close_scope": "stp_only",
+    "use_absolute": true
+  },
+  "stp_verification": [
+    {
+      "date": "YYYY-MM-DD",
+      "verified": true,
+      "false_halt": false,
+      "double_stp": false,
+      "evidence": "scheduler_*.log or live_day_*.log reference"
+    }
+  ],
+  "tws_restart_spec": {
+    "min_nights": null
+  },
+  "tws_restart_nights": [
+    {
+      "night": "YYYY-MM-DD",
+      "restart_proven": true,
+      "runner_resumed": true,
+      "broker_verified": true,
+      "evidence": "scheduler_*.log or live_day_*.log reference"
+    }
+  ],
+  "manual_interventions": [
+    {
+      "ts": "YYYY-MM-DDTHH:MM:SSZ",
+      "reason": "operator action reason",
+      "action": "operator action taken",
+      "resolution_status": "resolved",
+      "post_action_verified": true,
+      "evidence": "scheduler_*.log or live_day_*.log reference"
+    }
+  ],
+  "roll_slippage": [
+    {
+      "date": "YYYY-MM-DD",
+      "inst": "MES",
+      "ticks": 0,
+      "evidence": "scheduler_*.log or live_day_*.log reference"
+    }
+  ]
+}

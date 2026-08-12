@@ -36,6 +36,8 @@ from monitor.backend.schedule_status import get_schedule_status
 from monitor.backend.session_event_reader import read_session_events
 from monitor.backend.job_journal_reader import read_job_journal
 from monitor.backend.open_issue_reader import read_open_issues
+from monitor.backend.paper_evidence_reader import read_paper_evidence
+from monitor.backend.execution_quality_reader import read_execution_quality
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -226,6 +228,25 @@ def api_v1_job_journal(day: str):
 @app.get("/api/v1/open-issues")
 def api_v1_open_issues():
     return jsonify(read_open_issues(ROOT))
+
+
+@app.get("/api/v1/paper-evidence")
+def api_v1_paper_evidence():
+    return jsonify(read_paper_evidence(ROOT))
+
+
+@app.get("/api/v1/execution-quality/<day>")
+def api_v1_execution_quality(day: str):
+    try:
+        dt.date.fromisoformat(day)
+    except ValueError:
+        abort(400, description="date must use YYYY-MM-DD")
+    return jsonify(read_execution_quality(ROOT, day))
+
+
+@app.get("/api/v1/execution-quality")
+def api_v1_execution_quality_all():
+    return jsonify(read_execution_quality(ROOT))
 
 
 @app.get("/api/v1/reports/<day>")
