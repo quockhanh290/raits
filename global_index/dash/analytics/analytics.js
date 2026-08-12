@@ -8,6 +8,7 @@
     return;
   }
   const snapshots = data.snapshots;
+  let executionQuality = null;
   const CALMAR_NOTE = [
     'HAI SỐ KHÁC QUY ƯỚC — không so trực tiếp được.',
     '',
@@ -80,6 +81,32 @@
     </tr>`).join('') : '<tr><td colspan="8">No closed trades through selected day.</td></tr>';
   }
 
+  function renderExecutionHistory(selectedDay) {
+    const container = $('executionHistoryMetrics');
+    if (!executionQuality) {
+      container.innerHTML = '<div><span>Paper fills</span><b>--</b><small>source unavailable</small></div>';
+      $('executionHistoryNote').textContent = 'Paper execution evidence is unavailable; replay metrics above are unaffected.';
+      return;
+    }
+    const fills = (executionQuality.fills || []).filter(fill => fill.day && fill.day <= selectedDay);
+    const evaluable = fills.filter(fill => fill.signed_slippage_ticks != null);
+    const opens = evaluable.filter(fill => fill.type === 'OPEN');
+    const stops = evaluable.filter(fill => fill.reference_type === 'stop_trigger');
+    const mean = rows => rows.length ? rows.reduce((sum,fill)=>sum+Number(fill.signed_slippage_ticks),0)/rows.length : null;
+    const fmt = value => value == null ? '--' : `${value>=0?'+':''}${value.toFixed(2)}t`;
+    const over = evaluable.filter(fill => Number(fill.signed_slippage_ticks) > Number(executionQuality.assumption_ticks || 2)).length;
+    const signalCloseGap = fills.filter(fill => fill.reference_type === 'protective_stop_reference').length;
+    container.innerHTML = [
+      ['Paper fills',fills.length,'retained through selected date',''],
+      ['Evaluable',evaluable.length,'expected entry or stop trigger',''],
+      ['Mean slippage',fmt(mean(evaluable)),`${evaluable.filter(fill=>fill.adverse).length} adverse`,mean(evaluable)>2?'warning':''],
+      ['Open mean',fmt(mean(opens)),`${opens.length} fills`,mean(opens)>2?'warning':''],
+      ['Stop-fill mean',fmt(mean(stops)),`${stops.length} fills`,mean(stops)>2?'warning':''],
+      ['Above 2 ticks',over,`${signalCloseGap} signal closes not evaluable`,over?'warning':'']
+    ].map(([label,value,note,tone])=>`<div><span>${esc(label)}</span><b class="${tone}">${esc(value)}</b><small>${esc(note)}</small></div>`).join('');
+    $('executionHistoryNote').textContent = `Commission ${(executionQuality.coverage?.commission_emitted||0)}/${executionQuality.coverage?.fill_records||0} · route ${(executionQuality.coverage?.route_emitted||0)}/${executionQuality.coverage?.fill_records||0} · signal-close protective-stop distance is excluded from execution slippage.`;
+  }
+
   function drawChart() {
     const canvas = $('historyChart');
     const frame = canvas.parentElement;
@@ -125,9 +152,12 @@
     if (!snap) return;
     $('selectedDate').textContent = snap.date;
     $('rangeLabel').textContent = `${snapshots[0]?.date || '--'} -> ${snapshots[snapshots.length - 1]?.date || '--'}`;
+    $('snapshotCount').textContent = String(data.meta?.total_days ?? snapshots.length);
+    $('replayContract').className = 'warning';
     renderMetrics(snap);
     renderAttribution(snap);
     renderTrades();
+    renderExecutionHistory(snap.date);
     drawChart();
   }
 
@@ -137,4 +167,8 @@
   slider.addEventListener('input', event => { selected = Number(event.target.value); render(); });
   window.addEventListener('resize', drawChart);
   render();
+  fetch('/api/v1/execution-quality',{cache:'no-store'})
+    .then(response => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
+    .then(value => { executionQuality=value; renderExecutionHistory(snapshots[selected].date); })
+    .catch(() => { executionQuality={fills:[],coverage:{},error:'unavailable'}; renderExecutionHistory(snapshots[selected].date); });
 })();

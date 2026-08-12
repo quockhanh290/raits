@@ -24,7 +24,9 @@
   <main class="analytics-shell">
     <section class="analysis-toolbar">
       <div><span>Dataset</span><b>Backtest / Replay</b></div>
-      <div><span>Range</span><b id="rangeLabel">--</b></div>
+      <div><span>Coverage</span><b id="rangeLabel">--</b></div>
+      <div><span>Snapshots</span><b id="snapshotCount">--</b></div>
+      <div><span>Update contract</span><b id="replayContract" title="Replay generation is manual. No expected-through date or freshness gate is currently documented, so age alone must not create an incident.">Manual / not gated</b></div>
       <div><span>Selected</span><b id="selectedDate">--</b></div>
       <label class="day-control"><span>Replay day</span><input id="daySlider" type="range" min="0" value="0"></label>
     </section>
@@ -63,6 +65,12 @@
         <div class="rank-list" id="holdingProfile"></div>
       </section>
     </div>
+
+    <section class="execution-history-band">
+      <div class="chart-heading"><div><p class="eyebrow">PAPER EXECUTION OVERLAY</p><h2>Fill quality through selected date</h2></div><span id="executionHistorySource" class="source-note">trade_log.jsonl · separate from replay</span></div>
+      <div class="execution-history-metrics" id="executionHistoryMetrics"></div>
+      <p class="execution-history-note" id="executionHistoryNote">Loading retained paper fills.</p>
+    </section>
 
     <section class="trades-band">
       <div class="chart-heading"><div><p class="eyebrow">OBSERVED THROUGH SELECTED DAY</p><h2>Recent closed trades</h2></div><span id="tradeCount" class="source-note">0 trades</span></div>
