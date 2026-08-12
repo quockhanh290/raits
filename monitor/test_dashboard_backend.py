@@ -66,6 +66,20 @@ def test_gap_between_windows_is_not_expected_yet(monkeypatch, tmp_path: Path):
     assert status["active_window"] is False
     assert status["freshness"] == "not_expected_yet"
     assert status["expected_next_at"].endswith("18:05:00Z")
+    assert status["next_scheduled_job"]["job_id"] == "STOP_REPAIR_1220"
+    assert status["next_scheduled_job"]["at"].endswith("16:20:00Z")
+    assert status["next_decision_job"]["job_id"] == "PREFLIGHT"
+    assert status["next_decision_job"]["at"].endswith("17:45:00Z")
+
+
+def test_schedule_separates_operational_jobs_from_decision_pipeline(tmp_path: Path):
+    before_maxhold = dt.datetime(2026, 8, 11, 9, 0, tzinfo=ET)
+    status = schedule_status.get_schedule_status(tmp_path, now=before_maxhold)
+    assert status["next_scheduled_job"]["job_id"] == "MAX_HOLD_EXIT"
+    assert status["next_decision_job"]["job_id"] == "MAX_HOLD_EXIT"
+    assert status["next_decision_job"]["at"].endswith("13:31:00Z")
+    assert any(slot["id"] == "STOP_REPAIR_1020" for slot in schedule_status._scheduled_slots_for(before_maxhold.date()))
+    assert all(slot["id"] != "STOP_REPAIR_1020" for slot in schedule_status._pipeline_slots_for(before_maxhold.date()))
 
 
 def test_failed_slot_is_incident_while_state_remains_fresh(monkeypatch, tmp_path: Path):
@@ -230,6 +244,44 @@ def test_job_journal_groups_events_and_known_debt(tmp_path: Path):
     assert job["duration_seconds"] == 214
     assert job["event_counts"] == {"stop_armed": 1}
     assert job["diagnostics"] == ["G2 HARD: model 20 months old"]
+
+
+def test_job_journal_builds_sanitized_preflight_lifecycle(tmp_path: Path):
+    secret = "do-not-render-this-api-key"
+    (tmp_path / "scheduler_0811.log").write_text(
+        "2026-08-11 11:45:00 INFO run_scheduler - [PRE-FLIGHT] Starting: update_ibkr_daily -> update_spy_csv (2026-08-11)\n"
+        "2026-08-11 11:45:00 INFO run_scheduler - [IBKR_UPDATE] python -m global_index.update_ibkr_daily --port 4002\n"
+        "2026-08-11 11:47:06 INFO run_scheduler - [IBKR_UPDATE] completed OK\n"
+        f"2026-08-11 11:47:06 INFO run_scheduler - [SPY_UPDATE] python -m global_index.update_spy_csv --api-key {secret}\n"
+        "2026-08-11 11:47:28 INFO run_scheduler - [SPY_UPDATE] completed OK\n"
+        "2026-08-11 11:47:28 INFO run_scheduler - [PRE-FLIGHT] OK - inputs fresh\n",
+        encoding="utf-8",
+    )
+    result = read_job_journal("2026-08-11", tmp_path)
+    job = result["jobs"][0]
+    assert job["job_id"] == "PREFLIGHT"
+    assert job["job_type"] == "preflight"
+    assert job["status"] == "completed"
+    assert [event["kind"] for event in job["events"]] == [
+        "preflight_started", "preflight_ibkr_started", "preflight_ibkr_completed",
+        "preflight_spy_started", "preflight_spy_completed", "preflight_passed",
+    ]
+    assert secret not in str(result)
+
+
+def test_job_journal_makes_preflight_failure_actionable(tmp_path: Path):
+    (tmp_path / "scheduler_0811.log").write_text(
+        "2026-08-11 11:45:00 INFO run_scheduler - [PRE-FLIGHT] Starting: update_ibkr_daily -> update_spy_csv (2026-08-11)\n"
+        "2026-08-11 11:45:00 INFO run_scheduler - [IBKR_UPDATE] python -m global_index.update_ibkr_daily --port 4002\n"
+        "2026-08-11 11:46:59 ERROR run_scheduler - [IBKR_UPDATE] exited with code 1\n"
+        "2026-08-11 11:46:59 ERROR run_scheduler - [PRE-FLIGHT] update_ibkr_daily FAILED - live day skipped\n",
+        encoding="utf-8",
+    )
+    job = read_job_journal("2026-08-11", tmp_path)["jobs"][0]
+    assert job["status"] == "failed"
+    assert job["reason"] == "ibkr_update_failed"
+    assert "Live Day decision slots will be blocked" in job["impact"]
+    assert "confirm both data sources are fresh" in job["action"]
 
 
 def test_job_journal_keeps_stalled_scheduler_standalone(tmp_path: Path):
@@ -450,6 +502,7 @@ def test_open_issue_contract_identifies_component_and_specific_problem(tmp_path:
 def test_frontend_modules_keep_data_boundaries():
     realtime = (DASH / "realtime" / "index.html").read_text(encoding="utf-8")
     realtime_js = (DASH / "realtime" / "realtime.js").read_text(encoding="utf-8")
+    realtime_css = (DASH / "realtime" / "realtime.css").read_text(encoding="utf-8")
     paper = (DASH / "paper" / "index.html").read_text(encoding="utf-8")
     reports = (DASH / "reports" / "index.html").read_text(encoding="utf-8")
     analytics = (DASH / "analytics" / "index.html").read_text(encoding="utf-8")
@@ -466,8 +519,6 @@ def test_frontend_modules_keep_data_boundaries():
     assert "const equity = snap?.equity" in realtime_js
     assert "metricDrawdownFill" in realtime
     assert "metricDrawdownAmount" in realtime
-    assert "schedulerHealth" in realtime
-    assert "schedulerHealthValue" in realtime
     assert "schedule?.evidence_available" in realtime_js
     assert "Paper Equity" in realtime
     assert "Broker Equity" not in realtime
@@ -478,9 +529,25 @@ def test_frontend_modules_keep_data_boundaries():
     assert "performanceReturn" in realtime
     assert "performanceMaxDd" in realtime
     assert "metricStopsCovered" in realtime
-    assert "metricHeld" in realtime
+    assert "SPY data" in realtime
+    assert "next_scheduled_job" in realtime_js
+    assert "next_decision_job" in realtime_js
+    assert "latestObservedJob" in realtime_js
+    assert "latestDecisionJob" in realtime_js
+    assert "nowScheduleFacts" in realtime
+    assert 'id="nowMonitorLayout"' in realtime
+    assert "renderScheduleFacts()" in realtime_js
+    assert "No current incident or telemetry gap observed" not in realtime_js
+    assert "monitorClearIndicator" in realtime
+    assert "monitorClearIndicator" in realtime_js
     assert "Working orders" in realtime
     assert "system-conclusion" in realtime_js
+    assert "fontSelector" in realtime
+    assert "raits-dashboard-font" in realtime_js
+    assert "--font-ui" in realtime_css
+    assert "h1 { font-size: 25px; }" in realtime_css
+    assert "h2 { font-size: 21px; }" in realtime_css
+    assert "section-body" in realtime
     assert "exitType(exit.exit_reason, 'SIGNAL')" in realtime_js
     assert "/api/v1/session-events/" in realtime_js
     assert "/api/v1/job-journal/" in realtime_js

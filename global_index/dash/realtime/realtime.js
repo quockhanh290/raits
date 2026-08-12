@@ -18,6 +18,17 @@
   };
 
   const $ = id => document.getElementById(id);
+  const FONT_KEY = 'raits-dashboard-font';
+  const FONT_OPTIONS = new Set(['cascadia', 'consolas', 'jetbrains', 'ibm-plex', 'lucida', 'courier', 'system']);
+  const applyFont = value => {
+    const font = FONT_OPTIONS.has(value) ? value : 'cascadia';
+    document.documentElement.dataset.font = font;
+    if ($('fontSelector')) $('fontSelector').value = font;
+    return font;
+  };
+  let savedFont = 'cascadia';
+  try { savedFont = localStorage.getItem(FONT_KEY) || savedFont; } catch (_) { /* Browser storage is optional. */ }
+  applyFont(savedFont);
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   })[ch]);
@@ -165,6 +176,19 @@
     const regime = snap?.regime || 'Unknown';
     $('sessionRegime').textContent = regime;
     $('sessionRegime').className = /stress/i.test(regime) ? 'stress' : /unknown/i.test(regime) ? 'unknown' : '';
+    const ops = state.runner?.payload?.meta?.operational_status || snap?.operational_status || {};
+    const regimeStatus = ops.regime_freshness?.status;
+    const regimeDate = ops.regime_freshness?.last_spy_date;
+    $('regimeInputDate').textContent = regimeDate
+      ? sessionDate(regimeDate).replace(/, \d{4}$/, '')
+      : regimeStatus === 'OK' ? 'Current' : 'Unavailable';
+    $('regimeInputDate').className = regimeStatus === 'OK' ? 'positive' : 'warning';
+    const modelStatus = ops.model_age?.status;
+    const modelMonths = ops.model_age?.months_old;
+    $('modelInputAge').textContent = modelStatus === 'OK' ? 'Current' : `${modelMonths ?? '?'} mo stale`;
+    $('modelInputAge').className = modelStatus === 'OK' ? 'positive' : 'warning';
+    $('modelInputStatus').textContent = modelStatus === 'OK' ? 'Fit current' : 'Known debt / G2 HARD';
+    $('modelInputsZone').classList.toggle('watch', regimeStatus !== 'OK' || modelStatus !== 'OK');
     const rf = state.runner?.freshness || 'missing';
     const runnerText = rf === 'fresh' ? `Current · updated ${age(state.runner?.age_seconds)}`
       : rf === 'not_expected_yet' ? `On schedule · next ${etClock(state.runner?.expected_next_at)}`
@@ -212,9 +236,6 @@
       ? brokerPositions().filter(position => validStopsFor(position).length > 0).length
       : null;
     $('metricStopsCovered').textContent = coveredStops == null ? '--' : `${coveredStops} / ${brokerPositions().length}`;
-    const heldDays = runnerPositions().map(position => Number(position?.days_held)).filter(Number.isFinite);
-    $('metricHeld').textContent = heldDays.length ? `${Math.max(...heldDays)}d` : '--';
-
     const running = snap?.running_metrics || {};
     const performanceValue = (id, value, numeric = null) => {
       const element = $(id);
@@ -261,6 +282,50 @@
     return `${slotLabel(evidence.slot_id)} · ${outcome}`;
   }
 
+  function scheduleJobLabel(jobId) {
+    if (jobId === 'PREFLIGHT') return 'Pre-flight';
+    if (String(jobId || '').startsWith('MAX_HOLD')) return 'Max Hold Exit';
+    const repair = String(jobId || '').match(/^STOP_REPAIR_(\d{2})(\d{2})$/);
+    if (repair) return 'Stop Repair';
+    if (jobId === 'SESSION_REPORT') return 'Session Report';
+    return slotLabel(jobId);
+  }
+
+  function latestObservedJob() {
+    return [...(state.jobJournal?.jobs || [])]
+      .sort((a, b) => String(b.ended_at || b.started_at).localeCompare(String(a.ended_at || a.started_at)))[0] || null;
+  }
+
+  function latestDecisionJob() {
+    return [...(state.jobJournal?.jobs || [])]
+      .filter(job => /^(NKD_NIGHT_|LIVE_DAY_|MAX_HOLD|PREFLIGHT)/.test(String(job.job_id || '')))
+      .sort((a, b) => String(b.ended_at || b.started_at).localeCompare(String(a.ended_at || a.started_at)))[0] || null;
+  }
+
+  function pipelineJobTone(job) {
+    if (!job) return 'watch';
+    if (['failed', 'missed'].includes(job.status)) return 'bad';
+    if (job.status === 'completed_with_debt') return 'watch';
+    return 'ok';
+  }
+
+  function renderScheduleFacts() {
+    const schedule = state.schedule;
+    const nextScheduled = schedule?.next_scheduled_job;
+    const nextDecision = schedule?.next_decision_job;
+    const latestScheduled = latestObservedJob();
+    const latestDecision = latestDecisionJob();
+    const fact = (label, job, at, tone = 'next') => `<div class="schedule-fact ${tone}">
+      <span>${esc(label)}</span><div><b>${esc(job ? scheduleJobLabel(job.job_id) : 'Not observed')}</b><time>${esc(at ? etClock(at) : '--')}</time></div>
+    </div>`;
+    $('nowScheduleFacts').innerHTML = [
+      fact('Next job', nextScheduled, nextScheduled?.at),
+      fact('Next decision', nextDecision, nextDecision?.at),
+      fact('Latest job', latestScheduled, latestScheduled?.ended_at || latestScheduled?.started_at, pipelineJobTone(latestScheduled)),
+      fact('Latest decision', latestDecision, latestDecision?.ended_at || latestDecision?.started_at, pipelineJobTone(latestDecision)),
+    ].join('');
+  }
+
   function renderRail(snap) {
     const stripOps = state.runner?.payload?.meta?.operational_status || snap?.operational_status || {};
     const stripSchedule = state.schedule;
@@ -304,12 +369,8 @@
     if (!stripConditions.length && stripUnknown) stripConditions.push('some telemetry is unavailable');
     const stripStatus = stripConditions.length
       ? stripConditions.join(' / ')
-      : `systems nominal: scheduler on time, feeds live, ${brokerPositions().length ? 'positions protected' : 'no open positions'}`;
+      : `systems nominal: feeds live, ${brokerPositions().length ? 'positions protected' : 'no open positions'}`;
     const stripIssueCount = state.openIssues?.issues?.length || 0;
-    const stripRegimeDate = stripOps.regime_freshness?.last_spy_date
-      ? sessionDate(stripOps.regime_freshness.last_spy_date).replace(/, \d{4}$/, '') : null;
-    const stripModelMonths = stripOps.model_age?.months_old;
-    const stripModelText = stripOps.model_age?.status === 'OK' ? 'current' : `${stripModelMonths ?? '?'} mo stale`;
     $('statusRail').innerHTML = `
       <div class="system-conclusion ${stripLevel}">
         <span class="status-dot"></span>
@@ -317,11 +378,7 @@
         <strong>${stripIssueCount} issue${stripIssueCount === 1 ? '' : 's'} open</strong>
       </div>
       <div class="system-facts">
-        <span><small>Regime</small><b>${esc(`${snap?.regime || 'Unknown'}${stripRegimeDate ? ` / SPY ${stripRegimeDate}` : ''}`)}</b></span>
-        <span><small>Next run</small><b>${esc(etClock(stripSchedule?.expected_next_at))}</b></span>
-        <span><small>Latest job</small><b>${esc(jobEvidenceText(stripEvidence))}</b></span>
-        <span><small>Model age</small><b class="${stripOps.model_age?.status === 'OK' ? '' : 'warning'}">${esc(stripModelText)}</b></span>
-        <a href="#now-monitor">Details</a>
+        <span class="fact-scheduler has-tip tip-bottom ${stripScheduleBad ? 'bad' : stripSchedule?.evidence_available ? 'ok' : 'watch'}" tabindex="0" data-tooltip="ON SCHEDULE means scheduler evidence is available, no due slot is unresolved, and runner state is not late. It does not describe model or trading health."><i class="scheduler-live-dot"></i><small>Scheduler</small><b>${esc(stripScheduleBad ? 'attention' : stripSchedule?.evidence_available ? 'on schedule' : 'unknown')}</b></span>
       </div>`;
   }
 
@@ -379,6 +436,7 @@
     const schedule = state.schedule;
     const schedulerIncidents = Math.max((schedule?.incidents || []).length, (schedule?.unexplained_overdue || []).length);
     const schedulerHealth = $('schedulerHealth');
+    if (schedulerHealth) {
     let schedulerHealthClass = 'ok';
     let schedulerHealthText = schedule?.active_window ? `ACTIVE WINDOW · NEXT ${etClock(schedule?.expected_next_at)}` : `ON SCHEDULE · NEXT ${etClock(schedule?.expected_next_at)}`;
     if (!schedule?.evidence_available) {
@@ -390,6 +448,7 @@
     }
     schedulerHealth.className = `scheduler-health ${schedulerHealthClass}`;
     $('schedulerHealthValue').textContent = schedulerHealthText;
+    }
 
     (schedule?.incidents || []).forEach(item => incidents.push({
       key: `schedule:${item.slot_id}:${item.reason}`, status: 'incident', component: 'scheduler',
@@ -471,20 +530,25 @@
     const items = [...incidents, ...gaps];
     if (state.selectedMonitorKey && !items.some(item => item.key === state.selectedMonitorKey)) state.selectedMonitorKey = null;
     if (!state.selectedMonitorKey && items.length && !compactIssueMedia.matches) state.selectedMonitorKey = items[0].key;
+    $('nowMonitorLayout').hidden = !items.length;
     $('nowMonitorList').innerHTML = items.length ? items.map(item => {
       const selected = item.key === state.selectedMonitorKey;
       return `<div class="issue-list-item"><button class="issue-list-row ${esc(item.status)} ${selected ? 'selected' : ''}" type="button" role="option" aria-selected="${selected}" aria-expanded="${selected}" data-monitor-key="${esc(item.key)}">
         <span class="issue-badges"><span class="issue-origin ${esc(item.component)}">${esc(item.component)}</span><span class="issue-status">${esc(issueStatus(item.status))}</span></span>
         <span class="issue-list-copy"><b>${esc(item.title)}</b><small>${esc(item.problem)}</small></span>
       </button>${selected ? `<div class="now-mobile-detail ${esc(item.status)}">${monitorDetail(item)}</div>` : ''}</div>`;
-    }).join('') : '<div class="clear-state"><span class="status-dot"></span><b>Clear</b><span>No current incident or telemetry gap observed</span></div>';
+    }).join('') : '';
     const selected = items.find(item => item.key === state.selectedMonitorKey);
     $('nowMonitorDetail').innerHTML = selected ? `<article class="issue-detail-panel ${esc(selected.status)}">${monitorDetail(selected, true)}</article>` : '';
     document.querySelectorAll('[data-monitor-key]').forEach(button => button.addEventListener('click', () => {
       state.selectedMonitorKey = compactIssueMedia.matches && state.selectedMonitorKey === button.dataset.monitorKey ? null : button.dataset.monitorKey;
       renderMonitor(latestSnap());
     }));
-    $('incidentSummary').textContent = `${incidents.length} incident / ${gaps.length} telemetry gap`;
+    const incidentSummary = $('incidentSummary');
+    const clear = incidents.length === 0 && gaps.length === 0;
+    $('monitorClearIndicator').hidden = !clear;
+    incidentSummary.className = `summary incident-summary ${clear ? 'clear' : 'attention'}`;
+    incidentSummary.textContent = `${incidents.length} incident / ${gaps.length} telemetry gap`;
   }
 
   function monitorDetail(item, withHeader = false) {
@@ -609,10 +673,20 @@
 
   function renderOrders() {
     $('ordersSource').textContent = state.broker?.payload ? `${workingOrders().length} working / ${age(state.broker.age_seconds)}` : 'IBKR source unknown';
-    $('ordersBody').innerHTML = workingOrders().length ? workingOrders().map(order => `<tr>
-      <td>${esc(order.inst)}</td><td>${esc(order.type)}</td><td>${esc(order.action)}</td><td class="num">${esc(order.qty ?? '--')}</td>
-      <td class="num">${price(order.aux_price)}</td><td>${esc(order.status)}</td><td class="num">${esc(order.order_id ?? '--')}</td>
-    </tr>`).join('') : '<tr><td colspan="7">No working orders observed.</td></tr>';
+    $('ordersBody').innerHTML = workingOrders().length ? workingOrders().map(order => {
+      const action = String(order.action || '').toUpperCase();
+      const status = String(order.status || '').toUpperCase();
+      const statusClass = liveStopStatuses.has(status) ? 'order-live' : /CANCEL|INACTIVE/i.test(status) ? 'order-dead' : 'order-watch';
+      return `<tr>
+        <td class="order-contract">${esc(order.inst)}</td>
+        <td class="order-type">${esc(order.type)}</td>
+        <td class="order-action ${action === 'BUY' ? 'buy' : action === 'SELL' ? 'sell' : ''}">${esc(order.action)}</td>
+        <td class="num order-qty">${esc(order.qty ?? '--')}</td>
+        <td class="num order-stop">${price(order.aux_price)}</td>
+        <td class="order-status ${statusClass}">${esc(order.status)}</td>
+        <td class="num order-id">#${esc(order.order_id ?? '--')}</td>
+      </tr>`;
+    }).join('') : '<tr><td class="order-empty" colspan="7">No working orders observed.</td></tr>';
   }
 
   function mapCount(value) {
@@ -764,9 +838,11 @@
       if (event.kind !== 'scheduler_stalled') {
         rows.push({ key: `monitor:${event.kind}:${event.ts}`, sortKey: event.ts || '', sequence: 0,
           level: String(event.level || 'INFO').toLowerCase(),
-          tone: event.level === 'critical' ? 'incident' : event.level === 'warn' ? 'deferred' : 'system',
-          category: `MONITOR / ${eventLabel(event.kind)}`, time: localTime(event.ts), message: event.message || '',
-          status: event.level === 'critical' ? 'open' : 'info', component: 'scheduler' });
+          tone: event.level === 'critical' ? 'incident' : event.level === 'warn' ? 'deferred'
+            : /completed|passed/.test(event.kind) ? 'success' : 'system',
+          category: event.category ? `${event.category} / ${eventLabel(event.kind)}` : `MONITOR / ${eventLabel(event.kind)}`,
+          time: localTime(event.ts), message: event.message || '',
+          status: event.level === 'critical' ? 'open' : 'info', component: event.component || 'scheduler' });
         return;
       }
       const at = new Date(event.ts).getTime();
@@ -912,7 +988,8 @@
 
   function eventTone(kind) {
     if (kind === 'stop_deferred') return 'deferred';
-    if (['stop_armed', 'market_close_filled', 'stop_filled'].includes(kind)) return 'success';
+    if (['stop_armed', 'market_close_filled', 'stop_filled', 'preflight_ibkr_completed', 'preflight_spy_completed', 'preflight_passed'].includes(kind)) return 'success';
+    if (kind === 'preflight_failed' || /preflight_.*_failed/.test(kind)) return 'incident';
     if (kind === 'stop_cancelled_after_close') return 'cleanup';
     return 'action';
   }
@@ -925,6 +1002,7 @@
     if (counts.stop_armed) parts.push(`${counts.stop_armed} stop armed`);
     if (counts.stop_deferred) parts.push(`${counts.stop_deferred} deferred`);
     if (counts.market_close_submitted) parts.push(`${counts.market_close_submitted} close submitted`);
+    if (counts.preflight_passed) parts.push('input gate passed');
     if (job.diagnostics?.length) parts.push(`${job.diagnostics.length} diagnostic`);
     return parts.join(' · ') || (job.status === 'completed' ? 'No operational changes' : job.reason || 'No detail emitted');
   }
@@ -940,7 +1018,7 @@
     const g2Only = diagnostics.length > 0 && nonG2.length === 0;
     const recovered = /Publication resumed at/i.test(job.impact || '');
     const dumpState = nonG2.find(message => /dump_state|live_state_data/i.test(message));
-    const component = job.status === 'missed' || job.status === 'skipped' || job.job_type === 'stop_repair' || job.job_type === 'other' ? 'scheduler' : 'runner';
+    const component = job.status === 'missed' || job.status === 'skipped' || ['stop_repair', 'preflight', 'session_report', 'other'].includes(job.job_type) ? 'scheduler' : 'runner';
     let status = job.status;
     let problem;
     let resolution;
@@ -958,7 +1036,9 @@
       resolution = 'The slot remains missed; scheduler recovery does not recreate this execution.';
     } else if (job.status === 'failed') {
       status = 'open';
-      problem = dumpState ? 'The runner could not publish live_state_data.js.' : `The execution failed: ${nonG2[0] || job.reason || 'no detail emitted'}.`;
+      problem = job.job_type === 'preflight'
+        ? `The input gate failed: ${nonG2[0] || job.reason || 'no detail emitted'}.`
+        : dumpState ? 'The runner could not publish live_state_data.js.' : `The execution failed: ${nonG2[0] || job.reason || 'no detail emitted'}.`;
       resolution = 'Open: no positive recovery evidence is attached to this execution.';
     } else if (job.status === 'skipped') {
       problem = job.reason === 'mutex' ? 'The slot was skipped because the previous execution still held the mutex.' : `The scheduler skipped this slot: ${job.reason || 'reason not emitted'}.`;
@@ -1005,9 +1085,9 @@
     const jobs = journalJobs();
     if (state.selectedJobId && !jobs.some(job => job.id === state.selectedJobId)) state.selectedJobId = null;
     $('journalSource').textContent = snap?.date
-      ? `${state.jobJournal?.jobs?.length || 0} jobs / ${snap.date} / scheduler ${localTime(state.jobJournal?.observed_at)}`
+      ? `${state.jobJournal?.jobs?.length || 0} jobs / ${snap.date}`
       : 'session unavailable';
-    $('journalSource').dataset.tooltip = 'One row per scheduler execution. Click a job to inspect its operational evidence; Job View does not link into Event View.';
+    $('journalSource').dataset.tooltip = `Scheduler evidence observed ${localTime(state.jobJournal?.observed_at)}. One row per execution; click a job to inspect its operational evidence.`;
     const jobRows = jobs.map(job => {
       const selected = job.id === state.selectedJobId;
       const presentation = jobPresentation(job);
@@ -1032,9 +1112,9 @@
     const shown = rows.slice(0, EVENT_JOURNAL_LIMIT);
     const coverage = state.runner?.event_history?.coverage_started_at;
     $('journalSource').textContent = snap?.date
-      ? `${rows.length} events / ${snap.date} / runner log ${coverage ? `since ${localTime(coverage)}` : 'not available'}`
+      ? `${rows.length} events / ${snap.date}`
       : 'session unavailable';
-    $('journalSource').dataset.tooltip = 'Combines retained live-log and scheduler evidence with append-only runner JSONL. Runner-only events before the coverage timestamp cannot be recovered.';
+    $('journalSource').dataset.tooltip = `Combines retained scheduler and runner evidence. Runner JSONL coverage ${coverage ? `starts ${localTime(coverage)}` : 'is unavailable'}.`;
     if (state.selectedEventKey && !shown.some(row => row.key === state.selectedEventKey)) state.selectedEventKey = null;
     $('journal').innerHTML = shown.length
       ? shown.map(row => {
@@ -1084,6 +1164,7 @@
     renderContext(snap);
     renderMetrics(snap);
     renderRail(snap);
+    renderScheduleFacts();
     renderMonitor(snap);
     renderOpenIssues();
     renderPositions();
@@ -1097,6 +1178,10 @@
     state.journalView = button.dataset.journalView;
     renderJournal(latestSnap());
   }));
+  $('fontSelector').addEventListener('change', event => {
+    const font = applyFont(event.target.value);
+    try { localStorage.setItem(FONT_KEY, font); } catch (_) { /* Keep the live choice when storage is unavailable. */ }
+  });
   compactIssueMedia.addEventListener('change', event => {
     state.issuesSectionOpen = !event.matches;
     state.selectedIssueKey = event.matches ? null : (state.openIssues?.issues?.[0]?.key || null);

@@ -20,10 +20,21 @@
       <a href="/reports">Reports</a>
     </nav>
     <div class="header-live-context">
+      <label class="font-control has-tip tip-bottom" data-tooltip="Change the dashboard typeface. The choice is stored only in this browser.">
+        <span>Font</span>
+        <select id="fontSelector" aria-label="Dashboard font">
+          <option value="cascadia">Cascadia Mono</option>
+          <option value="consolas">Consolas</option>
+          <option value="jetbrains">JetBrains Mono</option>
+          <option value="ibm-plex">IBM Plex Mono</option>
+          <option value="lucida">Lucida Console</option>
+          <option value="courier">Courier New</option>
+          <option value="system">System UI</option>
+        </select>
+      </label>
       <b id="sessionDate">--</b>
       <span class="broker-header-state"><i></i><b id="brokerContext">Loading</b></span>
       <b id="runnerContext" hidden>Loading</b>
-      <b id="sessionRegime" hidden>--</b>
     </div>
   </header>
 
@@ -34,6 +45,19 @@
         <span class="zone-title has-tip tip-bottom" tabindex="0" data-tooltip="Paper-trading system equity maintained by the runner ledger. This excludes the broker account's total liquidation value.">Paper Equity</span>
         <div class="equity-line"><b id="metricEquity">--</b><strong id="performanceNet">--</strong></div>
         <small><em id="performanceReturn">--</em> <span id="performanceScope">--</span> / base <strong id="performanceBase">--</strong></small>
+      </div>
+
+      <div class="header-zone model-inputs-zone runner-derived" id="modelInputsZone">
+        <span class="zone-title has-tip tip-bottom" tabindex="0" data-tooltip="Regime, SPY source date, and fitted-model age used by the runner. Input freshness is separate from scheduler timing.">Model Inputs</span>
+        <div class="model-input-item model-input-regime">
+          <span>Regime</span><b id="sessionRegime">--</b>
+        </div>
+        <div class="model-input-item model-input-spy">
+          <span>SPY data</span><b id="regimeInputDate">--</b>
+        </div>
+        <div class="model-input-item model-input-age">
+          <span>Model age</span><b id="modelInputAge">--</b><small id="modelInputStatus">Status unavailable</small>
+        </div>
       </div>
 
       <div class="header-zone performance-zone">
@@ -59,7 +83,6 @@
           <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="Number of open futures positions currently reported by IBKR.">Positions</span><b id="metricPositions">--</b></div>
           <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="All currently working orders reported by IBKR, including protective stops.">Working orders</span><b id="metricStops">--</b></div>
           <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="Broker positions with a valid working protective stop. Deferred protection remains legal but is not counted as covered.">Stops covered</span><b id="metricStopsCovered">--</b></div>
-          <div><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="Longest current holding age recorded by the runner, in trading days.">Held</span><b id="metricHeld">--</b></div>
         </div>
       </div>
     </section>
@@ -71,27 +94,23 @@
       <div class="primary-column">
         <section class="now-monitor section-band" id="now-monitor">
           <div class="section-heading">
-            <div>
-              <p class="eyebrow">NOW MONITOR</p>
-              <h1>Current operational state</h1>
-            </div>
+            <div class="now-monitor-title"><h1>Now Monitor</h1><span class="monitor-clear-indicator" id="monitorClearIndicator" hidden><i class="status-dot"></i><b>CLEAR</b></span></div>
             <div class="now-monitor-heading-status">
-              <div class="scheduler-health unknown" id="schedulerHealth"><span class="status-dot"></span><span><small>Scheduler</small><b id="schedulerHealthValue">Checking evidence</b></span></div>
               <p class="summary" id="incidentSummary">Waiting for sources</p>
             </div>
           </div>
-          <div class="now-monitor-layout">
-            <div class="now-monitor-list" id="nowMonitorList" role="listbox" aria-label="Current operational issues"></div>
-            <div class="now-monitor-detail" id="nowMonitorDetail" aria-live="polite"></div>
+          <div class="section-body now-monitor-shell">
+            <div class="now-schedule-facts" id="nowScheduleFacts" aria-label="Scheduler job timeline"></div>
+            <div class="now-monitor-layout" id="nowMonitorLayout">
+              <div class="now-monitor-list" id="nowMonitorList" role="listbox" aria-label="Current operational issues"></div>
+              <div class="now-monitor-detail" id="nowMonitorDetail" aria-live="polite"></div>
+            </div>
           </div>
         </section>
 
         <section class="section-band open-issues-section">
           <div class="section-heading compact">
-            <div>
-              <p class="eyebrow">ACCUMULATED UNRESOLVED EVIDENCE</p>
-              <h2>Open issues</h2>
-            </div>
+            <h2>Open Issues</h2>
             <span class="source-note has-tip tip-right" id="openIssuesSource" tabindex="0" data-tooltip="Issues reconstructed from retained read-only scheduler evidence. Known debt remains open until positive resolution evidence exists.">Loading retained evidence</span>
           </div>
           <details class="open-issues-shell" id="openIssuesShell">
@@ -105,10 +124,7 @@
 
         <section class="section-band positions-section">
           <div class="section-heading compact">
-            <div>
-              <p class="eyebrow">BROKER TRUTH + RUNNER INTENT</p>
-              <h2>Open positions</h2>
-            </div>
+            <h2>Open Positions</h2>
             <span class="source-note" id="positionSource">IBKR unavailable</span>
           </div>
           <div class="position-grid" id="positionGrid"></div>
@@ -116,38 +132,34 @@
 
         <section class="section-band decision-section">
           <div class="section-heading compact">
-            <div>
-              <p class="eyebrow">LATEST RUNNER SNAPSHOT</p>
-              <h2>Today's decision</h2>
-            </div>
+            <h2>Today's Decision</h2>
             <span class="source-note has-tip tip-right" id="decisionSource" tabindex="0" data-tooltip="Entries, closes, and rejected signals emitted in the decision block of the newest runner snapshot.">Session unavailable</span>
           </div>
-          <div class="decision-summary" id="decisionSummary"></div>
-          <div class="decision-groups">
-            <section class="decision-group">
-              <div class="decision-group-head"><span>Entered</span><b id="decisionEntryCount">0</b></div>
-              <div class="decision-list" id="decisionEntries"></div>
-            </section>
-            <section class="decision-group">
-              <div class="decision-group-head"><span>Closed</span><b id="decisionCloseCount">0</b></div>
-              <div class="decision-list" id="decisionCloses"></div>
-            </section>
-            <section class="decision-group">
-              <div class="decision-group-head"><span>Rejected / Halted</span><b id="decisionRejectedCount">0</b></div>
-              <div class="decision-list" id="decisionRejected"></div>
-            </section>
+          <div class="section-body decision-shell">
+            <div class="decision-summary" id="decisionSummary"></div>
+            <div class="decision-groups">
+              <section class="decision-group">
+                <div class="decision-group-head"><span>Entered</span><b id="decisionEntryCount">0</b></div>
+                <div class="decision-list" id="decisionEntries"></div>
+              </section>
+              <section class="decision-group">
+                <div class="decision-group-head"><span>Closed</span><b id="decisionCloseCount">0</b></div>
+                <div class="decision-list" id="decisionCloses"></div>
+              </section>
+              <section class="decision-group">
+                <div class="decision-group-head"><span>Rejected / Halted</span><b id="decisionRejectedCount">0</b></div>
+                <div class="decision-list" id="decisionRejected"></div>
+              </section>
+            </div>
           </div>
         </section>
 
         <section class="section-band orders-section">
           <div class="section-heading compact">
-            <div>
-              <p class="eyebrow">IBKR WORKING ORDERS</p>
-              <h2>Open orders</h2>
-            </div>
+            <h2>Open Orders</h2>
             <span class="source-note" id="ordersSource">IBKR unavailable</span>
           </div>
-          <div class="table-wrap">
+          <div class="table-wrap section-body table-shell">
             <table>
               <thead><tr><th>Contract</th><th>Type</th><th>Action</th><th class="num">Qty</th><th class="num">Stop</th><th>Status</th><th class="num">ID</th></tr></thead>
               <tbody id="ordersBody"></tbody>
@@ -159,21 +171,20 @@
       <aside class="journal-column">
         <section class="section-band journal-section">
           <div class="section-heading compact">
-            <div>
-              <p class="eyebrow">SCHEDULER + OPERATIONAL EVIDENCE</p>
-              <h2 id="journalTitle">Job journal</h2>
-            </div>
+            <h2 id="journalTitle">Job Journal</h2>
             <span class="source-note journal-source has-tip tip-right" id="journalSource" tabindex="0" data-tooltip="One row per scheduler execution. Click a job to inspect its stop, order, fill, and diagnostic evidence. Operational events outside a job remain standalone.">Session unavailable</span>
           </div>
-          <div class="journal-view-toggle" role="group" aria-label="Journal view">
-            <button type="button" data-journal-view="jobs" aria-pressed="true">Jobs</button>
-            <button type="button" data-journal-view="events" aria-pressed="false">Events</button>
+          <div class="section-body journal-shell">
+            <div class="journal-view-toggle" role="group" aria-label="Journal view">
+              <button type="button" data-journal-view="jobs" aria-pressed="true">Jobs</button>
+              <button type="button" data-journal-view="events" aria-pressed="false">Events</button>
+            </div>
+            <ol class="journal" id="journal"></ol>
           </div>
-          <ol class="journal" id="journal"></ol>
         </section>
         <section class="section-band source-section">
-          <p class="eyebrow">SOURCE CLOCKS</p>
-          <dl id="sourceClocks"></dl>
+          <div class="section-heading compact"><h2>Source Clocks</h2></div>
+          <div class="section-body source-shell"><dl id="sourceClocks"></dl></div>
         </section>
       </aside>
     </div>

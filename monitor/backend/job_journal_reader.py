@@ -46,6 +46,10 @@ def _job_type(job_id: str) -> str:
         return "stop_repair"
     if job_id.startswith("MAX_HOLD"):
         return "max_hold"
+    if job_id == "PREFLIGHT":
+        return "preflight"
+    if job_id == "SESSION_REPORT":
+        return "session_report"
     return "other"
 
 
@@ -119,6 +123,9 @@ def _annotate_impact_and_action(jobs: list[dict[str, Any]]) -> None:
             else:
                 job["impact"] = "The scheduled job did not run; its intended check or output is absent for this slot."
                 job["action"] = "Review scheduler health and confirm the next expected run."
+        elif job["status"] == "failed" and job["job_type"] == "preflight":
+            job["impact"] = "The input gate failed; scheduled Live Day decision slots will be blocked until fresh IBKR and SPY data are confirmed."
+            job["action"] = "Fix the failed input update, rerun the required update manually, and confirm both data sources are fresh before Live Day."
         elif job["status"] == "failed":
             job["impact"] = "The job emitted an unclassified error; completion and operational effects cannot be confirmed from this evidence."
             job["action"] = "Review the diagnostics below and reconcile current broker state before taking operational action."
@@ -170,6 +177,68 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]]) ->
             _finish(job, timestamp, "missed", f"scheduler missed slot by {round(lag.total_seconds())}s")
             jobs.append(job)
             continue
+
+        upper = message.upper()
+        if "[PRE-FLIGHT]" in upper and "STARTING:" in upper:
+            job = _new_job("PREFLIGHT", timestamp)
+            job["events"].append({
+                "ts": timestamp, "kind": "preflight_started", "level": "INFO",
+                "category": "PREFLIGHT", "message": "Pre-flight input validation started.",
+            })
+            jobs.append(job)
+            active["PREFLIGHT"] = job
+            monitor_events.append({
+                "ts": timestamp, "kind": "preflight_started", "level": "info",
+                "category": "PREFLIGHT", "component": "scheduler",
+                "message": "IBKR and SPY input updates started.",
+            })
+            continue
+
+        preflight = active.get("PREFLIGHT")
+        stage = "ibkr" if "[IBKR_UPDATE]" in upper else "spy" if "[SPY_UPDATE]" in upper else None
+        if preflight and stage:
+            label = "IBKR market data" if stage == "ibkr" else "SPY regime data"
+            if "COMPLETED OK" in upper:
+                kind = f"preflight_{stage}_completed"
+                event = {"ts": timestamp, "kind": kind, "level": "INFO", "category": "PREFLIGHT", "message": f"{label} update completed."}
+                preflight["events"].append(event)
+                monitor_events.append({**event, "level": "info", "component": "scheduler"})
+            elif "EXITED WITH CODE" in upper:
+                code = re.search(r"exited with code\s+(\d+)", message, re.IGNORECASE)
+                detail = f"{label} update exited with code {code.group(1) if code else 'unknown'}."
+                preflight["events"].append({"ts": timestamp, "kind": f"preflight_{stage}_failed", "level": "ERROR", "category": "PREFLIGHT", "message": detail})
+                preflight["diagnostics"].append(detail)
+                preflight["status"] = "failed"
+                preflight["reason"] = f"{stage}_update_failed"
+            elif "PYTHON" in upper:
+                kind = f"preflight_{stage}_started"
+                event = {"ts": timestamp, "kind": kind, "level": "INFO", "category": "PREFLIGHT", "message": f"{label} update started."}
+                preflight["events"].append(event)
+                monitor_events.append({**event, "level": "info", "component": "scheduler"})
+            continue
+
+        if "[PRE-FLIGHT]" in upper and " OK " in f" {upper} ":
+            if preflight:
+                event = {"ts": timestamp, "kind": "preflight_passed", "level": "INFO", "category": "PREFLIGHT", "message": "IBKR and SPY inputs are fresh; Live Day gate cleared."}
+                preflight["events"].append(event)
+                monitor_events.append({**event, "level": "info", "component": "scheduler"})
+                _finish(preflight, timestamp, "completed")
+                active.pop("PREFLIGHT", None)
+            continue
+
+        if "[PRE-FLIGHT]" in upper and "FAILED" in upper:
+            if preflight is None:
+                preflight = _new_job("PREFLIGHT", timestamp)
+                jobs.append(preflight)
+            failed_stage = "IBKR market data" if "IBKR" in upper else "SPY regime data" if "SPY" in upper else "Input update"
+            detail = f"{failed_stage} update failed; Live Day gate remains closed."
+            if detail not in preflight["diagnostics"]:
+                preflight["diagnostics"].append(detail)
+            preflight["events"].append({"ts": timestamp, "kind": "preflight_failed", "level": "ERROR", "category": "PREFLIGHT", "message": detail})
+            _finish(preflight, timestamp, "failed", preflight.get("reason") or "input_update_failed")
+            active.pop("PREFLIGHT", None)
+            continue
+
         tagged = _JOB.match(message)
         if tagged:
             job_id, detail = tagged.group("job_id"), tagged.group("detail")
@@ -202,7 +271,6 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]]) ->
                     current["reason"] = "child_error"
                 continue
 
-        upper = message.upper()
         if "[HEARTBEAT] STALLED" in upper:
             monitor_events.append({"ts": timestamp, "kind": "scheduler_stalled", "level": "critical", "message": message})
             pending_stall_at = timestamp
@@ -212,7 +280,7 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]]) ->
                 "message": "Scheduler heartbeat resumed", "stalled_at": pending_stall_at,
             })
             pending_stall_at = None
-        elif "PRE-FLIGHT" in upper and ("SKIP" in upper or "FAIL" in upper):
+        elif "PRE-FLIGHT" in upper and "SKIP" in upper:
             monitor_events.append({"ts": timestamp, "kind": "preflight_skip", "level": "warn", "message": message})
         elif "SCHEDULER STARTED" in upper:
             monitor_events.append({"ts": timestamp, "kind": "scheduler_started", "level": "info", "message": "Scheduler started"})

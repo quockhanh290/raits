@@ -21,6 +21,14 @@ NKD_SLOTS = [(1, minute) for minute in range(10, 60, 5)] + [
     (2, minute) for minute in range(0, 60, 5)
 ]
 STATE_SLOTS = tuple(NKD_SLOTS + R4_SLOTS)
+PIPELINE_FIXED_SLOTS = (
+    ("MAX_HOLD_EXIT", 9, 31),
+    ("PREFLIGHT", 13, 45),
+)
+STOP_REPAIR_SLOTS = tuple(
+    (hour, 20) for hour in range(0, 24, 2)
+    if hour not in (2, 14)
+)
 
 _cache_lock = threading.Lock()
 _log_cache: dict[tuple[str, str, tuple[tuple[str, int, int], ...]], list[str]] = {}
@@ -53,11 +61,44 @@ def _slots_for(day: dt.date) -> list[dict[str, Any]]:
     return sorted(out, key=lambda item: item["at"])
 
 
+def _pipeline_slots_for(day: dt.date) -> list[dict[str, Any]]:
+    """Decision-producing slots and the gates that directly precede them."""
+    if not is_trading_day(day):
+        return []
+    slots = [
+        {"id": _slot_id(hour, minute), "at": dt.datetime.combine(day, dt.time(hour, minute), tzinfo=ET)}
+        for hour, minute in STATE_SLOTS
+    ]
+    slots.extend({
+        "id": job_id,
+        "at": dt.datetime.combine(day, dt.time(hour, minute), tzinfo=ET),
+    } for job_id, hour, minute in PIPELINE_FIXED_SLOTS)
+    return sorted(slots, key=lambda item: item["at"])
+
+
+def _scheduled_slots_for(day: dt.date) -> list[dict[str, Any]]:
+    """Timed operational jobs, excluding heartbeat and dependent session reports."""
+    slots = _pipeline_slots_for(day)
+    slots.extend({
+        "id": f"STOP_REPAIR_{hour:02d}{minute:02d}",
+        "at": dt.datetime.combine(day, dt.time(hour, minute), tzinfo=ET),
+    } for hour, minute in STOP_REPAIR_SLOTS if is_trading_day(day))
+    return sorted(slots, key=lambda item: item["at"])
+
+
 def _nearby_slots(now_et: dt.datetime) -> list[dict[str, Any]]:
     slots: list[dict[str, Any]] = []
     for offset in range(-7, 9):
         slots.extend(_slots_for(now_et.date() + dt.timedelta(days=offset)))
     return sorted(slots, key=lambda item: item["at"])
+
+
+def _next_job(now_et: dt.datetime, slots_for_day) -> dict[str, Any] | None:
+    for offset in range(0, 9):
+        for slot in slots_for_day(now_et.date() + dt.timedelta(days=offset)):
+            if slot["at"] > now_et:
+                return {"job_id": slot["id"], "at": _iso(slot["at"])}
+    return None
 
 
 def _log_signature(root: Path) -> tuple[tuple[str, int, int], ...]:
@@ -217,6 +258,8 @@ def get_schedule_status(
         "state_slot_count": len(STATE_SLOTS),
         "latest_expected_at": _iso(latest["at"]) if latest else None,
         "expected_next_at": _iso(next_slot["at"]) if next_slot else None,
+        "next_scheduled_job": _next_job(now_et, _scheduled_slots_for),
+        "next_decision_job": _next_job(now_et, _pipeline_slots_for),
         "freshness": freshness,
         "evidence_available": log_available,
         "evidence": latest_evidence,
