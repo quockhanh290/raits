@@ -3,48 +3,83 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RAITS Session Reports</title>
+  <title>RAITS Daily Reports</title>
   <link rel="stylesheet" href="/dash/realtime/realtime.css">
   <link rel="stylesheet" href="/dash/reports/reports.css">
   <script src="/dash/reports/reports.js" defer></script>
 </head>
 <body>
   <header class="app-header">
-    <a class="brand" href="/">RAITS FUTURES</a><span class="mode-badge">PAPER</span>
+    <div class="brand-lockup"><a class="brand" href="/">RAITS FUTURES</a><span class="mode-badge">PAPER</span></div>
     <nav class="module-nav" aria-label="Monitor modules">
       <a href="/realtime">Realtime</a><a href="/analytics">Historical</a><a href="/paper">Paper</a><a href="/reports" aria-current="page">Reports</a>
     </nav>
   </header>
-  <main>
+  <main class="report-page">
     <section class="report-toolbar">
-      <div><p class="eyebrow">SESSION ARCHIVE</p><h1>Daily operational report</h1></div>
+      <div><p class="eyebrow">DAILY OPERATIONS</p><h1>Session report</h1><p id="reportScope">On-demand evidence for one ET session</p></div>
       <label><span>Session date (ET)</span><input id="reportDate" type="date"></label>
       <button id="loadReport" type="button">Load report</button>
     </section>
+
     <section class="report-summary">
-      <div class="report-verdict"><span>Verdict</span><b id="reportVerdict">LOADING</b><small id="reportScope">On-demand log scan</small></div>
-      <div><span>Scheduled Jobs</span><b id="jobsMetric">--</b></div>
-      <div><span>Issues</span><b id="issuesMetric">--</b></div>
-      <div><span>Open Positions</span><b id="positionsMetric">--</b><small id="positionsScope">today only</small></div>
-      <div><span>Log Lines</span><b id="linesMetric">--</b></div>
+      <div class="report-verdict"><span>Session outcome</span><b id="reportVerdict">LOADING</b><small id="verdictScope">Reading daily evidence</small></div>
+      <div><span>Observed jobs</span><b id="jobsMetric">--</b><small id="jobsScope">from scheduler log</small></div>
+      <div><span>Incidents</span><b id="issuesMetric">--</b><small>open / occurred</small></div>
+      <div><span>Entries / exits</span><b id="tradesMetric">--</b><small>confirmed fills</small></div>
+      <div><span>Known debt</span><b id="debtMetric">--</b><small id="debtScope">grouped diagnostics</small></div>
     </section>
-    <section class="report-band">
-      <div class="section-heading"><div><p class="eyebrow">OPERATOR ACTIONS</p><h2>What needs attention</h2></div></div>
-      <div class="action-list" id="actionList"></div>
+
+    <section class="report-section">
+      <header><div><p class="eyebrow">SESSION CONTEXT</p><h2>Regime & decisions</h2></div><p id="decisionCoverage"></p></header>
+      <div class="report-box decision-report">
+        <div class="context-strip" id="contextStrip"></div>
+        <div class="decision-columns">
+          <div><header><span>Entries</span><b id="entryDecisionCount">0</b></header><div id="entryDecisions"></div></div>
+          <div><header><span>Exits</span><b id="exitDecisionCount">0</b></header><div id="exitDecisions"></div></div>
+          <div><header><span>Rejected</span><b id="rejectedDecisionCount">0</b></header><div id="rejectedDecisions"></div></div>
+        </div>
+      </div>
     </section>
-    <section class="report-band">
-      <div class="section-heading"><div><p class="eyebrow">DETECTED IN LOGS</p><h2>Issues</h2></div></div>
-      <div class="issue-list" id="reportIssues"></div>
+
+    <section class="report-section" id="attentionSection">
+      <header><div><p class="eyebrow">REQUIRES REVIEW</p><h2>Actions & incidents</h2></div><p id="attentionMeta"></p></header>
+      <div class="report-box" id="attentionList"></div>
     </section>
-    <section class="report-band">
-      <div class="section-heading"><div><p class="eyebrow">EXPECTED VS OBSERVED</p><h2>Job timeline</h2></div><p class="summary" id="timelineNote"></p></div>
-      <div class="job-timeline" id="jobTimeline"></div>
+
+    <section class="report-section">
+      <header><div><p class="eyebrow">CONFIRMED FROM LOG</p><h2>Trading activity</h2></div><p id="activityMeta"></p></header>
+      <div class="report-box activity-layout">
+        <div class="activity-metrics" id="activityMetrics"></div>
+        <div class="activity-side"><div class="reconcile-strip" id="brokerReconcile"></div><div class="activity-feed" id="activityFeed"></div></div>
+      </div>
     </section>
-    <section class="report-band" id="positionsBand">
-      <div class="section-heading"><div><p class="eyebrow">CURRENT STATE ONLY</p><h2>Positions held now</h2></div></div>
-      <div class="report-positions" id="reportPositions"></div>
+
+    <section class="report-section">
+      <header><div><p class="eyebrow">FILL EVIDENCE</p><h2>Execution quality</h2></div><p id="executionMeta"></p></header>
+      <div class="report-box execution-quality-box">
+        <div class="execution-summary" id="executionSummary"></div>
+        <div class="execution-coverage" id="executionCoverage"></div>
+        <div class="execution-table-wrap"><table class="execution-table"><thead><tr><th>Time / fill</th><th>Benchmark</th><th>Actual</th><th>Quality</th><th>Commission / route</th><th>Execution ID</th></tr></thead><tbody id="executionRows"></tbody></table></div>
+      </div>
     </section>
-    <section class="report-band source-foot"><p id="reportSource">No report loaded</p></section>
+
+    <section class="report-section">
+      <header><div><p class="eyebrow">DAILY AUDIT TRAIL</p><h2>Session journal</h2></div><div class="journal-toggle" role="group" aria-label="Journal view"><button type="button" data-view="jobs" aria-pressed="true">Jobs</button><button type="button" data-view="events" aria-pressed="false">Events</button></div></header>
+      <div class="report-box journal-box"><ul class="journal" id="journalList"></ul></div>
+    </section>
+
+    <section class="report-section" id="verificationSection">
+      <header><div><p class="eyebrow">MODEL VERIFICATION</p><h2>Shadow resume evidence</h2></div><p id="verificationMeta"></p></header>
+      <div class="report-box" id="verificationBody"></div>
+    </section>
+
+    <section class="report-section" id="positionsBand" hidden>
+      <header><div><p class="eyebrow">CURRENT STATE ONLY</p><h2>Positions held now</h2></div><p>Not a historical reconstruction</p></header>
+      <div class="report-box" id="reportPositions"></div>
+    </section>
+
+    <footer class="report-source" id="reportSource">No report loaded</footer>
   </main>
 </body>
 </html>
