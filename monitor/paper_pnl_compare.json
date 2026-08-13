@@ -1,0 +1,246 @@
+{
+  "source": "paper_pnl_compare",
+  "inputs": {
+    "paper_history": "global_index\\paper_history.json",
+    "backtest_curve": "global_index\\backtest_curve.json",
+    "replay_snapshots": "global_index\\replay_snapshots_data.js",
+    "trade_log": "trade_log.jsonl"
+  },
+  "convention": {
+    "epoch": "2026-08-10",
+    "account": 50000.0,
+    "curve_generated": "2026-08-12",
+    "formula_account_window": "account + (backtest_curve[date] - backtest_curve[epoch])",
+    "formula_trade_filter": "account + cumulative pnl for trades with entry_day >= epoch, realized on exit_day"
+  },
+  "daily": [
+    {
+      "date": "2026-08-10",
+      "actual_equity": 50162.0,
+      "expected_equity_account_window": 50000.0,
+      "expected_equity_actual_window": 50162.0,
+      "expected_equity_trade_filter": 50000.0,
+      "paper_trade_realized_cum": -110.0,
+      "backtest_trade_realized_cum": 0.0,
+      "account_window_diff": 162.0,
+      "trade_filter_realized_diff": -110.0,
+      "curve_status": "covered"
+    },
+    {
+      "date": "2026-08-11",
+      "actual_equity": 50228.75,
+      "expected_equity_account_window": 49881.29,
+      "expected_equity_actual_window": 50043.29,
+      "expected_equity_trade_filter": 49881.29,
+      "paper_trade_realized_cum": -43.25,
+      "backtest_trade_realized_cum": -118.71,
+      "account_window_diff": 347.46,
+      "trade_filter_realized_diff": 75.46,
+      "curve_status": "covered"
+    },
+    {
+      "date": "2026-08-12",
+      "actual_equity": 50228.75,
+      "expected_equity_account_window": 49836.85,
+      "expected_equity_actual_window": 49998.85,
+      "expected_equity_trade_filter": 49836.85,
+      "paper_trade_realized_cum": -43.25,
+      "backtest_trade_realized_cum": -163.15,
+      "account_window_diff": 391.9,
+      "trade_filter_realized_diff": 119.9,
+      "curve_status": "covered"
+    },
+    {
+      "date": "2026-08-13",
+      "actual_equity": 50228.75,
+      "expected_equity_account_window": null,
+      "expected_equity_actual_window": null,
+      "expected_equity_trade_filter": 49836.85,
+      "paper_trade_realized_cum": -43.25,
+      "backtest_trade_realized_cum": -163.15,
+      "account_window_diff": null,
+      "trade_filter_realized_diff": 119.9,
+      "curve_status": "stale_through:2026-08-12"
+    }
+  ],
+  "trade_filter": {
+    "backtest_closed_or_known_trades": 4,
+    "paper_closed_trades": 4,
+    "matched_trade_keys": 2,
+    "backtest_trades": [
+      {
+        "inst": "MNKD",
+        "cluster": "global_nkd",
+        "direction": "LONG",
+        "entry_day": "2026-08-10",
+        "exit_day": "2026-08-11",
+        "pnl": -54.34,
+        "exit_reason": "CHANDELIER",
+        "entry_price": 66955.0,
+        "exit_price": 66869.11
+      },
+      {
+        "inst": "MES",
+        "cluster": "roska4_swing",
+        "direction": "SHORT",
+        "entry_day": "2026-08-10",
+        "exit_day": "2026-08-11",
+        "pnl": -32.29,
+        "exit_reason": "CHANDELIER",
+        "entry_price": 7772.0,
+        "exit_price": 7777.21
+      },
+      {
+        "inst": "MYM",
+        "cluster": "roska4_swing",
+        "direction": "SHORT",
+        "entry_day": "2026-08-10",
+        "exit_day": "2026-08-11",
+        "pnl": -32.08,
+        "exit_reason": "CHANDELIER",
+        "entry_price": 53977.0,
+        "exit_price": 54034.68
+      },
+      {
+        "inst": "MNKD",
+        "cluster": "global_nkd",
+        "direction": "SHORT",
+        "entry_day": "2026-08-11",
+        "exit_day": "2026-08-12",
+        "pnl": -44.44,
+        "exit_reason": "CHANDELIER",
+        "entry_price": 67065.0,
+        "exit_price": 67131.07
+      }
+    ],
+    "paper_trades": [
+      {
+        "inst": "MNKD",
+        "cluster": "global_nkd",
+        "direction": "LONG",
+        "entry_day": "2026-08-10",
+        "exit_day": "2026-08-10",
+        "pnl": -110.0,
+        "exit_reason": null,
+        "source": null
+      },
+      {
+        "inst": "MYM",
+        "cluster": "roska4_swing",
+        "direction": "SHORT",
+        "entry_day": "2026-08-10",
+        "exit_day": "2026-08-11",
+        "pnl": 0.5,
+        "exit_reason": null,
+        "source": null
+      },
+      {
+        "inst": "MES",
+        "cluster": "roska4_swing",
+        "direction": "SHORT",
+        "entry_day": "2026-08-10",
+        "exit_day": "2026-08-11",
+        "pnl": 96.25,
+        "exit_reason": null,
+        "source": null
+      },
+      {
+        "inst": "MNKD",
+        "cluster": "global_nkd",
+        "direction": "SHORT",
+        "entry_day": "2026-08-11",
+        "exit_day": "2026-08-11",
+        "pnl": -30.0,
+        "exit_reason": null,
+        "source": null
+      }
+    ],
+    "paper_only_keys": [
+      "MNKD|global_nkd|LONG|2026-08-10|2026-08-10",
+      "MNKD|global_nkd|SHORT|2026-08-11|2026-08-11"
+    ],
+    "backtest_only_keys": [
+      "MNKD|global_nkd|LONG|2026-08-10|2026-08-11",
+      "MNKD|global_nkd|SHORT|2026-08-11|2026-08-12"
+    ],
+    "classified": {
+      "counts": {
+        "KNOWN_EXIT_TIMING_DRIFT": 2,
+        "MATCHED_SAME_DATES": 2
+      },
+      "unresolved": 0,
+      "rows": [
+        {
+          "classification": "KNOWN_EXIT_TIMING_DRIFT",
+          "reason": "same trade identity but paper/live exit day differs; known live path can defer stop/exit handling after the 14h/EOD decision",
+          "inst": "MNKD",
+          "cluster": "global_nkd",
+          "direction": "LONG",
+          "entry_day": "2026-08-10",
+          "paper_exit_day": "2026-08-10",
+          "backtest_exit_day": "2026-08-11",
+          "exit_day_delta": -1,
+          "paper_pnl": -110.0,
+          "backtest_pnl": -54.34,
+          "pnl_diff": -55.66,
+          "paper_exit_reason": null,
+          "backtest_exit_reason": "CHANDELIER"
+        },
+        {
+          "classification": "MATCHED_SAME_DATES",
+          "reason": "same instrument, cluster, direction, entry day, and exit day",
+          "inst": "MYM",
+          "cluster": "roska4_swing",
+          "direction": "SHORT",
+          "entry_day": "2026-08-10",
+          "paper_exit_day": "2026-08-11",
+          "backtest_exit_day": "2026-08-11",
+          "exit_day_delta": 0,
+          "paper_pnl": 0.5,
+          "backtest_pnl": -32.08,
+          "pnl_diff": 32.58,
+          "paper_exit_reason": null,
+          "backtest_exit_reason": "CHANDELIER"
+        },
+        {
+          "classification": "MATCHED_SAME_DATES",
+          "reason": "same instrument, cluster, direction, entry day, and exit day",
+          "inst": "MES",
+          "cluster": "roska4_swing",
+          "direction": "SHORT",
+          "entry_day": "2026-08-10",
+          "paper_exit_day": "2026-08-11",
+          "backtest_exit_day": "2026-08-11",
+          "exit_day_delta": 0,
+          "paper_pnl": 96.25,
+          "backtest_pnl": -32.29,
+          "pnl_diff": 128.54,
+          "paper_exit_reason": null,
+          "backtest_exit_reason": "CHANDELIER"
+        },
+        {
+          "classification": "KNOWN_EXIT_TIMING_DRIFT",
+          "reason": "same trade identity but paper/live exit day differs; known live path can defer stop/exit handling after the 14h/EOD decision",
+          "inst": "MNKD",
+          "cluster": "global_nkd",
+          "direction": "SHORT",
+          "entry_day": "2026-08-11",
+          "paper_exit_day": "2026-08-11",
+          "backtest_exit_day": "2026-08-12",
+          "exit_day_delta": -1,
+          "paper_pnl": -30.0,
+          "backtest_pnl": -44.44,
+          "pnl_diff": 14.44,
+          "paper_exit_reason": null,
+          "backtest_exit_reason": "CHANDELIER"
+        }
+      ]
+    }
+  },
+  "notes": [
+    "Do not compare raw backtest equity level to paper equity level; backtest has compounded since 2018.",
+    "paper_history and trade_log can diverge when the epoch starts with carried state or open-position marks.",
+    "A day beyond backtest_curve.generated must remain missing/stale, not flat-filled.",
+    "Exit-day mismatches with the same trade identity are classified separately because the paper/live path can defer stop/exit handling after the 14h/EOD decision."
+  ]
+}

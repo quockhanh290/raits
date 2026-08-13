@@ -194,6 +194,12 @@ def test_paper_evidence_uses_durable_artifacts_when_runner_slippage_is_empty(tmp
     assert gates["c1_slippage"]["metrics"]["open_n"] == 2
     assert gates["c1_slippage"]["metrics"]["close_n"] == 1
     assert gates["c1_slippage"]["metrics"]["stp_close_n"] == 1
+    assert gates["c1_slippage"]["metrics"]["trade_samples"]["total"] == 3
+    assert gates["c1_slippage"]["metrics"]["trade_samples"]["rows"][-1]["scope"] == "STP_CLOSE"
+    assert gates["c1_slippage"]["metrics"]["trade_samples"]["rows"][-1]["reference_type"] == "expected_stop"
+    assert gates["stp_verification"]["metrics"]["trade_details"]["total"] == 2
+    assert gates["stp_verification"]["metrics"]["trade_details"]["rows"][0]["scope"] == "OPEN_POSITION"
+    assert gates["stp_verification"]["metrics"]["trade_details"]["rows"][-1]["scope"] == "STP_CLOSE"
     assert gates["b3_reconcile"]["status"] == "PASS"
     assert coverage["fill_quality"]["metrics"]["fills"] == 3
     assert coverage["current_protection"]["status"] == "OBSERVED"
@@ -215,8 +221,16 @@ def test_paper_evidence_counts_candidate_gap_log_lines(tmp_path: Path):
     (tmp_path / "live_day_0810.log").write_text(
         "2026-08-10 05:10:00 INFO run_live_day - TWS Gateway disconnected before restart\n"
         "2026-08-10 05:12:00 INFO run_live_day - manual override recorded by operator\n"
-        "2026-08-10 05:13:00 INFO global_index.runner - place_stop: accepted orderId=288\n"
-        "2026-08-10 05:14:00 ERROR global_index.runner - STP: place_stop FAILED for M2K\n",
+        "2026-08-10 05:13:00 INFO global_index.runner - STP HOAN: M2K LONG @ 3020.2000 cluster=roska4_swing - dat vao phien sau\n"
+        "2026-08-10 05:14:00 INFO global_index.ibkr_broker - place_stop: accepted LONG M2K STP ×1 @ 3020.2000 orderId=288 status=PreSubmitted cluster=roska4_swing\n"
+        "2026-08-10 05:15:00 ERROR global_index.runner - STP: place_stop FAILED M2K LONG @ 3020.2000 cluster=roska4_swing - position open without overnight stop protection\n"
+        "2026-08-10 05:16:00 INFO global_index.runner - B4: M2K/roska4_swing chua co STP - dang trong cua so hoan CO CHU DICH (vao ngay 2026-08-10). Se dat o lan chay dau tien ngay ke tiep.\n",
+        encoding="utf-8",
+    )
+    monitor = tmp_path / "monitor"
+    monitor.mkdir()
+    (monitor / "paper_inputs.json").write_text(
+        '{"stp_placement_spec":{"min_accepted":2,"max_failed":0,"require_defer_rule":true}}',
         encoding="utf-8",
     )
 
@@ -228,6 +242,19 @@ def test_paper_evidence_counts_candidate_gap_log_lines(tmp_path: Path):
     assert gates["tws_restart_nights"]["metrics"]["candidate_days"] == ["2026-08-10"]
     assert gates["stp_verification"]["metrics"]["stp_accepted"] == 1
     assert gates["stp_verification"]["metrics"]["stp_failed"] == 1
+    assert gates["stp_verification"]["metrics"]["trade_details"]["total"] == 0
+    assert coverage["stp_placement"]["status"] == "PENDING"
+    assert coverage["stp_placement"]["metrics"]["accepted"] == 1
+    assert coverage["stp_placement"]["metrics"]["failed"] == 1
+    assert coverage["stp_placement"]["metrics"]["failed_matched_to_trade"] == 0
+    assert coverage["stp_placement"]["metrics"]["failed_unmatched_to_trade"] == 1
+    assert coverage["stp_placement"]["metrics"]["deferred"] == 1
+    assert coverage["stp_placement"]["metrics"]["defer_reminders"] == 1
+    assert coverage["stp_placement"]["metrics"]["placement_samples"]["total"] == 3
+    assert coverage["stp_placement"]["metrics"]["placement_samples"]["rows"][0]["kind"] == "DEFERRED"
+    assert coverage["stp_placement"]["metrics"]["placement_samples"]["rows"][1]["order_id"] == "288"
+    assert coverage["stp_placement"]["metrics"]["route_reconcile"]["unmatched_failed"][0]["match_status"] == "UNMATCHED_TO_PAPER_OPEN"
+    assert "immediate STP after OPEN" in coverage["stp_placement"]["metrics"]["backtest_divergence"]
     assert coverage["manual_intervention"]["metrics"]["candidate_log_lines"] == 1
     assert coverage["manual_intervention"]["metrics"]["candidate_days"] == ["2026-08-10"]
     assert payload["diagnostics"]["manual_intervention_candidate_lines"] == 1
@@ -260,11 +287,31 @@ def test_paper_evidence_uses_monitor_paper_inputs_to_unblock_gaps(tmp_path: Path
     )
     (monitor / "paper_inputs.json").write_text(
         '{"c1_spec":{"min_n":2,"max_mean_ticks":2,"scope":"separate","close_scope":"stp_only","use_absolute":true},'
+        '"fill_quality_spec":{"min_fills":4,"max_partial_rate":0,"max_failed_or_cancelled":0,'
+        '"require_complete_fields":false,"max_contracts_tested":1,"retest_when_contracts_gt":1},'
         '"stp_verification":[{"date":"2026-08-10","verified":true,"false_halt":false,"double_stp":false}],'
         '"tws_restart_spec":{"min_nights":1},'
         '"tws_restart_nights":[{"night":"2026-08-10","restart_proven":true,"runner_resumed":true,"broker_verified":true}],'
         '"manual_interventions":[{"ts":"2026-08-10T05:12:00Z","resolution_status":"resolved","post_action_verified":true}],'
-        '"roll_slippage":[{"date":"2026-08-10","ticks":1.5}]}',
+        '"roll_slippage":[{"date":"2026-08-10","ticks":1.5}],'
+        '"paper_vs_backtest":[{"date":"2026-08-10","actual_equity":50012,"expected_equity":50000,'
+        '"evidence":"reviewed daily compare"}]}',
+        encoding="utf-8",
+    )
+    (monitor / "paper_pnl_compare.json").write_text(
+        '{"convention":{"curve_generated":"2026-08-10"},'
+        '"daily":[{"date":"2026-08-10","actual_equity":50012,"account_window_diff":12,'
+        '"trade_filter_realized_diff":0,"curve_status":"covered"}],'
+        '"trade_filter":{"classified":{"counts":{"MATCHED_SAME_DATES":1,"KNOWN_EXIT_TIMING_DRIFT":1},'
+        '"unresolved":0,"rows":[{"classification":"MATCHED_SAME_DATES","inst":"MES","cluster":"swing",'
+        '"direction":"LONG","entry_day":"2026-08-10","paper_exit_day":"2026-08-10",'
+        '"backtest_exit_day":"2026-08-10","paper_pnl":12,"backtest_pnl":12,"pnl_diff":0,'
+        '"reason":"same instrument, cluster, direction, entry day, and exit day"},'
+        '{"classification":"KNOWN_EXIT_TIMING_DRIFT","inst":"MNKD","cluster":"global_nkd",'
+        '"direction":"LONG","entry_day":"2026-08-10","paper_exit_day":"2026-08-10",'
+        '"backtest_exit_day":"2026-08-11","exit_day_delta":-1,"paper_pnl":-110,'
+        '"backtest_pnl":-54.34,"pnl_diff":-55.66,'
+        '"reason":"same trade identity but paper/live exit day differs"}]}}}',
         encoding="utf-8",
     )
 
@@ -277,7 +324,43 @@ def test_paper_evidence_uses_monitor_paper_inputs_to_unblock_gaps(tmp_path: Path
     assert gates["tws_restart_nights"]["status"] == "PASS"
     assert coverage["manual_intervention"]["status"] == "OBSERVED"
     assert coverage["roll_slippage"]["status"] == "OBSERVED"
+    assert coverage["paper_vs_backtest"]["status"] == "OBSERVED"
+    assert coverage["paper_vs_backtest"]["metrics"]["source_kind"] == "paper_inputs"
+    assert coverage["paper_vs_backtest"]["metrics"]["latest"]["divergence_pct"] == pytest.approx(0.00024)
+    assert coverage["fill_quality"]["status"] == "PASS"
+    assert coverage["fill_quality"]["metrics"]["status_rules"]
+    assert coverage["fill_quality"]["metrics"]["max_contracts_tested"] == 1
+    assert "must be retested" in coverage["fill_quality"]["metrics"]["scale_note"]
+    assert coverage["fill_quality"]["metrics"]["trade_samples"]["total"] == 4
+    assert coverage["fill_quality"]["metrics"]["trade_samples"]["rows"][-1]["type"] == "CLOSE"
+    trade_compare = coverage["paper_vs_backtest"]["metrics"]["trade_compare"]
+    assert trade_compare["counts"]["KNOWN_EXIT_TIMING_DRIFT"] == 1
+    assert trade_compare["unresolved"] == 0
+    assert trade_compare["rows"][-1]["classification"] == "KNOWN_EXIT_TIMING_DRIFT"
     assert payload["diagnostics"]["paper_inputs_error"] is None
+    assert payload["diagnostics"]["paper_pnl_compare_error"] is None
+
+
+def test_paper_evidence_does_not_count_actual_only_paper_vs_backtest_as_observed(tmp_path: Path):
+    global_index = tmp_path / "global_index"
+    global_index.mkdir()
+    (global_index / "live_state_data.js").write_text(
+        'window.LIVE_DATA = {"meta":{"system_epoch":"2026-08-10"},'
+        '"snapshots":[{"date":"2026-08-10","paper_vs_backtest":{'
+        '"actual_equity":50228.75,"expected_equity":null,"divergence_pct":null}}]}',
+        encoding="utf-8",
+    )
+    (global_index / "paper_history.json").write_text(
+        '{"epoch":"2026-08-10","account":50000,"days":{"2026-08-10":50228.75}}',
+        encoding="utf-8",
+    )
+
+    payload = read_paper_evidence(tmp_path)["payload"]
+    coverage = {item["key"]: item for item in payload["coverage"]}
+
+    assert coverage["paper_vs_backtest"]["status"] == "NEEDS_DECISION"
+    assert coverage["paper_vs_backtest"]["metrics"]["source_kind"] == "live_state_incomplete"
+    assert "Paper P&L vs backtest source" in {gap["title"] for gap in payload["gaps"]}
 
 
 def test_paper_evidence_excludes_signal_close_from_c1_slippage(tmp_path: Path):
@@ -309,6 +392,8 @@ def test_paper_evidence_excludes_signal_close_from_c1_slippage(tmp_path: Path):
     assert gate["metrics"]["open_n"] == 1
     assert gate["metrics"]["stp_close_n"] == 0
     assert gate["metrics"]["signal_close_with_stop_ref"] == 1
+    assert gate["metrics"]["trade_samples"]["rows"][-1]["scope"] == "EXCLUDED_CLOSE"
+    assert gate["metrics"]["trade_samples"]["rows"][-1]["reference_type"] == "protective_stop_reference"
     assert "signal/market CLOSE excluded 1" in gate["evidence"]
 
 
@@ -343,6 +428,296 @@ def test_paper_evidence_payload_contract_is_stable(tmp_path: Path):
 def test_paper_dashboard_allows_cold_evidence_scan():
     source = (DASH / "paper" / "paper.js").read_text(encoding="utf-8")
     assert "AbortSignal.timeout(30000)" in source
+
+
+def test_paper_dashboard_exposes_c1_observed_detail():
+    source = (DASH / "paper" / "paper.js").read_text(encoding="utf-8")
+    css = (DASH / "paper" / "paper.css").read_text(encoding="utf-8")
+    html = (DASH / "paper" / "index.html").read_text(encoding="utf-8")
+
+    assert "if (value == null || value === '') return '--';" in source
+    assert "function updateC1Progress(gates, summary)" not in source
+    assert "function updateC1Panel(gates, summary)" in source
+    assert "sample gate incomplete" in source
+    assert "over limit now" in source
+    assert "function c1ReasonChip" in source
+    assert 'id="c1ProgressTitle"' in html
+    assert 'id="c1ProgressStatus"' in html
+    assert 'id="c1ProgressBars"' not in html
+    assert 'id="coverageProgressTitle"' in html
+    assert 'id="coverageProgressStatus"' in html
+    assert 'id="coverageActiveSpec"' in html
+    assert 'id="coverageMetricGroups"' in html
+    assert 'id="c1MetricGroups"' in html
+    assert 'id="c1ActiveSpec"' in html
+    assert 'id="c1StatusEyebrow"' in html
+    assert 'id="c1SampleCaption"' in html
+    assert 'id="stpProgressTitle"' in html
+    assert 'id="stpProgressStatus"' in html
+    assert 'id="stpActiveSpec"' in html
+    assert 'id="stpMetricGroups"' in html
+    assert 'id="b3ProgressTitle"' in html
+    assert 'id="b3ProgressStatus"' in html
+    assert 'id="b3ActiveSpec"' in html
+    assert 'id="b3MetricGroups"' in html
+    assert 'id="twsProgressTitle"' in html
+    assert 'id="twsProgressStatus"' in html
+    assert 'id="twsActiveSpec"' in html
+    assert 'id="twsMetricGroups"' in html
+    assert "function c1SampleMetric" in source
+    assert "function updateCoveragePanel" in source
+    assert "function coverageMoreInfo" in source
+    assert "function c1SpecPills" in source
+    assert "function c1MoreInfo" in source
+    assert "function updateSTPPanel" in source
+    assert "function stpMoreInfo" in source
+    assert "function stopTradeRows" in source
+    assert "function updateB3Panel" in source
+    assert "function b3MoreInfo" in source
+    assert "function updateTWSPanel" in source
+    assert "function twsMoreInfo" in source
+    assert "function groupedCoverage" in source
+    assert "function pnlCompareDetail" in source
+    assert "function pnlCompareRows" in source
+    assert "function renderCoverage" in source
+    assert "function fillQualityDetail" in source
+    assert "function fillTradeRows" in source
+    assert "function fillMetricCards" in source
+    assert "function stpPlacementDetail" in source
+    assert "function stpPlacementRows" in source
+    assert "function stpPlacementMetricCards" in source
+    assert "function stpRouteReconcileRows" in source
+    assert "function detailProgress" in source
+    assert "detail-metric-readout" in source
+    assert "no-progress" in source
+    assert "What This Measures" in source
+    assert "<th>type</th>" in source
+    assert "<th>fill</th>" in source
+    assert "<th>ref</th>" in source
+    assert "adverse" in source
+    assert "favorable" in source
+    assert "filled / order" in source
+    assert "function fmtPnl" in source
+    assert "type-chip" in source
+    assert "direction-chip" in source
+    assert "data-tooltip" in source
+    assert 'title="${esc(description)}"' not in source
+    assert "DETAIL PANEL" not in source
+    assert "Status Rules" in source
+    assert "Fill Trade Details" in source
+    assert "Max contracts" in source
+    assert "Backtest Divergence" in source
+    assert "Placement Evidence" in source
+    assert "Route Reconcile" in source
+    assert "B4 reminders" not in source
+    assert "immediate STP after OPEN" in source
+    assert "roska4_swing" in source
+    assert "Metric Definitions" not in source
+    assert "Pass Spec" not in source
+    assert "KNOWN_EXIT_TIMING_DRIFT" in source
+    assert "Trade-by-trade reasons" in source
+    assert "paper/live path defers a stop/exit after the 14h/EOD decision" in source
+    assert "function gapItem" in source
+    assert "Observed data" in source
+    assert "Active spec" in source
+    assert "Signal/market closes shown for diagnosis" in source
+    assert "Raw cumulative stats" in source
+    assert "Progress toward required entry sample count." in source
+    assert "Presented OPEN" in source
+    assert "Presented STP" in source
+    assert "More info" in source
+    assert "raw stats, trades, definition, sources" in source
+    assert "Purpose: audit the dashboard math." in source
+    assert "c1StatusEyebrow" in source
+    assert "Trade details" in source
+    assert "tradeRows(samples)" in source
+    assert "Slippage definition" in source
+    assert "slip ticks = slip points / tick size" in source
+    assert "expected_entry -> fill_price" in source
+    assert "expected_stop -> fill_price" in source
+    assert "evidenceLedger" not in html
+    assert "gateRow" not in source
+    assert "ledgerSource" not in html
+    assert "ledgerSource" not in source
+    assert 'id="paperSource"' in html
+    assert "ledger-detail" not in css
+    assert "audit-ledger" not in css
+    assert "coverage-panel" in css
+    assert "coverage-group" in css
+    assert "c1-panel" in css
+    assert "stp-panel" in css
+    assert "b3-panel" in css
+    assert "tws-panel" in css
+    assert "c1-metric-groups" in css
+    assert "c1-active-spec" in css
+    assert "c1-more-info" in css
+    assert "c1-more-grid" in css
+    assert "more-section" in css
+    assert "c1-eyebrow.pending" in css
+    assert "span.bad" in css
+    assert "span.watch" in css
+    assert "c1-spec-summary" not in css
+    assert "c1-metric.sample" in css
+    assert "trade-table" in css
+    assert "pnl-compare-table" in css
+    assert "coverage-master-detail" in css
+    assert "coverage-detail" in css
+    assert "coverage-item.active" in css
+    assert "detail-list" in css
+    assert "detail-metric-grid" in css
+    assert "detail-progress" in css
+    assert "detail-metric-readout" in css
+    assert ".detail-metric.no-progress" in css
+    assert "slip-label.bad" in css
+    assert "type-chip.open" in css
+    assert "direction-chip.short" in css
+    assert "pnl-value.ok" in css
+    assert ".has-tip::after" in css
+    assert ".has-tip.tip-bottom::after" in css
+    assert "fill-quality-table table" in css
+    assert "stp-placement-table table" in css
+    assert "stp-route-table table" in css
+    assert "divergence-list li.watch" in css
+    assert ".detail-list li { padding: 10px 12px;" in css
+    assert "fill-result.ok" in css
+    assert "definition-block" in css
+    assert "detail-note" in css
+    assert "STP-VERIFY" in source
+    assert "placement failed" in source
+    assert "structured check missing" in source
+    assert "Stop trade details" in source
+    assert "B3 RECONCILE" in html
+    assert "Any mismatch keeps B3 in breach until classified." in source
+    assert "cold-start sessions" in source
+    assert "TWS RESTART" in html
+    assert "Candidate lines" in source
+    assert "tws_restart_spec.min_nights" in source
+    assert "COVERAGE PROGRESS" in html
+    assert "Regime and exits" in source
+    assert "monitor interprets the documented word" in source
+    assert "Execution health" in source
+    assert "State and protection" in source
+    assert "Operator and sample context" in source
+    assert "ENGINE DECISION" in source
+
+
+def test_ops_launcher_centralizes_backend_and_scheduler_commands():
+    source = (ROOT / "monitor" / "ops.py").read_text(encoding="utf-8")
+
+    assert "monitor/start_backend.py" in source
+    assert "global_index.run_scheduler" in source
+    assert '"--shadow-resume"' in source
+    assert "flask" not in source.lower()
+    assert "netstat" in source
+    assert "taskkill" in source
+    assert "Stop-Process -Name" not in source
+
+
+def _ops_stub(monkeypatch, calls, *, schedulers, backends):
+    """Drive cmd_up without touching a single real process.
+
+    The stub honours the kill: ensure_single re-scans after taskkill on purpose, so a stub
+    that kept reporting dead pids would make the guard refuse and hide the real behaviour.
+    """
+    from monitor import ops
+
+    live = {"sched": list(schedulers) if schedulers is not None else None,
+            "backend": list(backends) if backends is not None else None}
+
+    def fake_scan(pattern):
+        found = live["sched"] if pattern == ops.SCHEDULER_PATTERN else live["backend"]
+        if found is None:
+            return ops.ProcessScan(ok=False, error="probe blew up")
+        return ops.ProcessScan(ok=True, processes=[
+            ops.RunningProcess(pid=pid, command="stub", started="2026-08-13 04:30:22")
+            for pid in found
+        ])
+
+    def fake_taskkill(pids):
+        calls.append(("taskkill", sorted(pids)))
+        for key in ("sched", "backend"):
+            if live[key] is not None:
+                live[key] = [pid for pid in live[key] if pid not in set(pids)]
+        return []
+
+    monkeypatch.setattr(ops, "scan_processes", fake_scan)
+    monkeypatch.setattr(ops, "_taskkill", fake_taskkill)
+    monkeypatch.setattr(ops, "_ops_log", lambda message: None)
+    monkeypatch.setattr(ops, "time", type("_t", (), {"sleep": staticmethod(lambda _s: None)})())
+    monkeypatch.setattr(
+        ops, "start_scheduler",
+        lambda port, *, shadow_resume, assume_preflight_ok:
+            calls.append(("start_scheduler", port, shadow_resume, assume_preflight_ok)) or 303,
+    )
+    monkeypatch.setattr(ops, "start_backend", lambda ibkr, api: calls.append(("start_backend", ibkr, api)) or 404)
+    monkeypatch.setattr(ops, "wait_backend", lambda port: {"connected": True})
+    return ops
+
+
+def test_ops_up_refuses_when_the_scheduler_is_already_duplicated(monkeypatch):
+    """The condition that produced the 2026-08-13 double MAX_HOLD run. Starting a third on
+    top of it is the one thing ops.py must never do."""
+    calls = []
+    ops = _ops_stub(monkeypatch, calls, schedulers=[29340, 35120], backends=[])
+    assert ops.main(["up"]) == 2
+    assert calls == []
+
+
+def test_ops_up_refuses_when_it_cannot_tell_what_is_running(monkeypatch):
+    calls = []
+    ops = _ops_stub(monkeypatch, calls, schedulers=None, backends=[])
+    assert ops.main(["up"]) == 2
+    assert calls == []
+
+
+def test_ops_up_leaves_one_healthy_scheduler_alone_and_replaces_the_backend(monkeypatch):
+    calls = []
+    ops = _ops_stub(monkeypatch, calls, schedulers=[29340], backends=[555])
+    assert ops.main(["up", "--yes"]) == 0
+    assert calls == [("taskkill", [555]), ("start_backend", 4002, 5002)]
+
+
+def test_ops_up_starts_a_scheduler_when_none_is_running(monkeypatch):
+    calls = []
+    ops = _ops_stub(monkeypatch, calls, schedulers=[], backends=[])
+    assert ops.main(["--ibkr-port", "4003", "--api-port", "5003", "up", "--yes"]) == 0
+    assert calls == [
+        ("start_scheduler", 4003, True, False),
+        ("start_backend", 4003, 5003),
+    ]
+
+
+def test_ops_restart_scheduler_stops_every_instance_before_starting_one(monkeypatch):
+    calls = []
+    ops = _ops_stub(monkeypatch, calls, schedulers=[29340, 35120], backends=[])
+    assert ops.main(["restart", "--scheduler", "--yes"]) == 0
+    assert calls[0] == ("taskkill", [29340, 35120])
+    assert ("start_scheduler", 4002, True, False) in calls
+
+
+def test_ops_startup_command_is_documented():
+    docs = "\n".join([
+        (ROOT / "docs" / "futures" / "DAILY_FLOW.md").read_text(encoding="utf-8"),
+        (ROOT / "docs" / "futures" / "OPERATIONS.md").read_text(encoding="utf-8"),
+        (ROOT / "monitor" / "DASHBOARD_PLAN.md").read_text(encoding="utf-8"),
+    ])
+
+    assert "python monitor\\ops.py up" in docs
+    assert "python monitor\\ops.py restart" in docs
+    assert "python monitor\\ops.py status" in docs
+    assert "python -m flask --app monitor.backend.app:app run" in docs
+    assert "broker truth unavailable" in docs
+
+
+def test_c1_scope_decision_is_documented():
+    docs = "\n".join([
+        (ROOT / "monitor" / "DASHBOARD_PLAN.md").read_text(encoding="utf-8"),
+        (ROOT / "docs" / "futures" / "PAPER_DASHBOARD_INPUT_VERIFY_PLAN.md").read_text(encoding="utf-8"),
+    ])
+    assert "close_scope=stp_only" in docs
+    assert "slip ticks = slip points / tick" in docs
+    assert "Signal/market CLOSE rows are excluded from C1" in docs
+    assert "Paper P&L vs backtest" in docs
 
 
 def test_runner_positions_reader_projects_persisted_contracts(tmp_path: Path):
@@ -772,6 +1147,94 @@ def test_job_journal_makes_preflight_failure_actionable(tmp_path: Path):
     assert "confirm both data sources are fresh" in job["action"]
 
 
+def test_duplicate_launch_is_one_job_not_a_wall_of_phantoms(tmp_path: Path):
+    """Live 2026-08-13: two scheduler processes fired MAX_HOLD in the same second. One was
+    refused by IBKR (clientId 1 already taken) and dumped a traceback; the other did the work.
+
+    Every traceback frame carries a Python install path, and the launch detector only asked
+    whether the line contained "python" — so each frame was read as a fresh launch. One slot
+    became nine jobs, one of them stuck "running", and the survivor's "completed OK" closed a
+    phantom built from a traceback line."""
+    (tmp_path / "scheduler_0811.log").write_text(
+        "2026-08-11 07:31:00 INFO run_scheduler - [MAX_HOLD_EXIT] C:\\Python311\\pythonw.exe -m global_index.run_maxhold_exit --port 4002\n"
+        "2026-08-11 07:31:00 INFO run_scheduler - [MAX_HOLD_EXIT] C:\\Python311\\pythonw.exe -m global_index.run_maxhold_exit --port 4002\n"
+        "2026-08-11 07:31:05 ERROR run_scheduler - [MAX_HOLD_EXIT] exited with code 1\n"
+        # A refused connection dumps ~30 frames. The exception is the LAST line, so a cap that
+        # trims from the end keeps only plumbing — the fixture has to be long enough to bite.
+        + "".join(
+            f"2026-08-11 07:31:05 ERROR run_scheduler - [MAX_HOLD_EXIT] stderr:   "
+            f"File \"C:\\Python311\\Lib\\site-packages\\ib_insync\\ib.py\", line {300 + n}, in _run\n"
+            for n in range(28)
+        )
+        + "2026-08-11 07:31:05 ERROR run_scheduler - [MAX_HOLD_EXIT] stderr: TimeoutError\n"
+        "2026-08-11 07:31:12 INFO run_scheduler - [MAX_HOLD_EXIT] completed OK\n",
+        encoding="utf-8",
+    )
+    jobs = [job for job in read_job_journal("2026-08-11", tmp_path)["jobs"]
+            if job["job_id"] == "MAX_HOLD_EXIT"]
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert job["launch_count"] == 2
+    assert job["status"] == "completed"
+    assert job["reason"] == "duplicate launch: 1 of 2 runs failed"
+    # The exception must survive the cap, and the dropped frames must be counted rather than
+    # silently discarded.
+    assert job["diagnostics"][-1] == "TimeoutError"
+    assert job["diagnostics_omitted"] == 17
+
+
+def test_single_failed_run_is_still_a_failure(tmp_path: Path):
+    """The duplicate handling must not swallow a genuine one-process failure."""
+    (tmp_path / "scheduler_0811.log").write_text(
+        "2026-08-11 07:31:00 INFO run_scheduler - [MAX_HOLD_EXIT] C:\\Python311\\pythonw.exe -m global_index.run_maxhold_exit --port 4002\n"
+        "2026-08-11 07:31:05 ERROR run_scheduler - [MAX_HOLD_EXIT] exited with code 1\n"
+        "2026-08-11 07:31:05 ERROR run_scheduler - [MAX_HOLD_EXIT] stderr: TimeoutError\n",
+        encoding="utf-8",
+    )
+    jobs = [job for job in read_job_journal("2026-08-11", tmp_path)["jobs"]
+            if job["job_id"] == "MAX_HOLD_EXIT"]
+    assert len(jobs) == 1
+    assert jobs[0]["status"] == "failed"
+    assert jobs[0]["launch_count"] == 1
+
+
+def test_preflight_banner_is_not_reported_as_a_skip(tmp_path: Path):
+    """run_scheduler:946 prints the fail-safe once at startup as a statement of policy. The
+    line carries both "Pre-flight" and "skipped", so a keyword match rendered every restart
+    as an amber PREFLIGHT SKIP — visually identical to the day the fail-safe really fires."""
+    (tmp_path / "scheduler_0811.log").write_text(
+        # Stamps are machine-local and the reader re-dates them to ET before filtering by day,
+        # so a late-evening stamp lands on the next ET date and drops out of this one.
+        "2026-08-11 11:40:41 INFO run_scheduler - Pre-flight fail-safe: update fail -> live_day skipped (no stale-data trades)\n"
+        "2026-08-11 11:40:41 INFO run_scheduler - Scheduler started. Ctrl-C to stop.\n",
+        encoding="utf-8",
+    )
+    events = read_job_journal("2026-08-11", tmp_path)["monitor_events"]
+    assert [event["kind"] for event in events] == ["preflight_policy", "scheduler_started"]
+    policy = events[0]
+    assert policy["level"] == "info"
+    assert policy["title"] == "Pre-flight fail-safe armed"
+    assert policy["message"].startswith("Startup notice, not an event")
+
+
+def test_real_preflight_failure_stays_a_job_not_a_monitor_notice(tmp_path: Path):
+    """A fail-safe that actually fires is already a failed PREFLIGHT job carrying impact and
+    action. It must not also appear as a monitor notice: one event, one card. The banner and
+    the firing are different objects, and this is what keeps them apart."""
+    (tmp_path / "scheduler_0811.log").write_text(
+        "2026-08-11 11:40:41 INFO run_scheduler - Pre-flight fail-safe: update fail -> live_day skipped (no stale-data trades)\n"
+        "2026-08-11 11:46:59 ERROR run_scheduler - [PRE-FLIGHT] update_spy_csv FAILED - "
+        "run_live_day WILL BE SKIPPED today (2026-08-11). Check POLYGON_API_KEY.\n",
+        encoding="utf-8",
+    )
+    result = read_job_journal("2026-08-11", tmp_path)
+    assert [event["kind"] for event in result["monitor_events"]] == ["preflight_policy"]
+    job = result["jobs"][0]
+    assert job["job_id"] == "PREFLIGHT"
+    assert job["status"] == "failed"
+    assert job["diagnostics"] == ["SPY regime data update failed; Live Day gate remains closed."]
+
+
 def test_job_journal_keeps_stalled_scheduler_standalone(tmp_path: Path):
     (tmp_path / "scheduler_0811.log").write_text(
         "2026-08-11 20:11:00 WARNING run_scheduler - [HEARTBEAT] STALLED 2280s; jobs were missed\n",
@@ -841,7 +1304,7 @@ def test_missed_stop_repair_lifecycle_recovers_at_later_sweep(tmp_path: Path):
         encoding="utf-8",
     )
     (tmp_path / "scheduler_0812.log").write_text(
-        "2026-08-12 02:20:00 INFO run_scheduler - [STOP_REPAIR_0420] python run_stop_repair.py\n"
+        "2026-08-12 02:20:00 INFO run_scheduler - [STOP_REPAIR_0420] C:\\Python311\\pythonw.exe -m global_index.run_stop_repair --port 4002\n"
         "2026-08-12 02:20:10 INFO run_scheduler - [STOP_REPAIR_0420] completed OK\n",
         encoding="utf-8",
     )

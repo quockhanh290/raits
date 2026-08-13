@@ -6,6 +6,22 @@
     "close_scope": "stp_only",
     "use_absolute": true
   },
+  "fill_quality_spec": {
+    "min_fills": 100,
+    "max_partial_rate": 0,
+    "max_failed_or_cancelled": 0,
+    "require_complete_fields": true,
+    "max_contracts_tested": 1,
+    "retest_when_contracts_gt": 1,
+    "evidence_note": "Retest fill quality before scaling above the largest contracts value covered by paper trade history."
+  },
+  "stp_placement_spec": {
+    "min_accepted": 100,
+    "max_failed": 0,
+    "require_defer_rule": true,
+    "defer_rule": "swing/NKD broker STP is intentionally deferred until 14 hours after the next session boundary in that sleeve's own timezone; roska4_swing first eligible trading slot is 14:05 ET, global_nkd follows 14:00 JST, and roska4_stress is not deferred.",
+    "backtest_divergence_note": "Validated backtest does not apply a protective stop to a new swing/NKD entry on the entry day. Immediate paper/live STP after OPEN is therefore a stricter, divergent live path."
+  },
   "stp_verification": [
     {
       "date": "YYYY-MM-DD",
@@ -43,6 +59,14 @@
       "inst": "MES",
       "ticks": 0,
       "evidence": "scheduler_*.log or live_day_*.log reference"
+    }
+  ],
+  "paper_vs_backtest": [
+    {
+      "date": "YYYY-MM-DD",
+      "actual_equity": 50000,
+      "expected_equity": 50000,
+      "evidence": "daily backtest compare artifact or reviewed session report reference"
     }
   ]
 }

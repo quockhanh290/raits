@@ -17,7 +17,7 @@
   </header>
   <main>
     <section class="paper-hero">
-      <div><p class="eyebrow">PAPER TO LIVE EVIDENCE</p><h1>Readiness is evidence, not elapsed time</h1><p id="ledgerSource">Loading runner state</p></div>
+      <div><p class="eyebrow">PAPER TO LIVE EVIDENCE</p><h1>Readiness is evidence, not elapsed time</h1><p id="paperSource">Loading runner state</p></div>
       <div class="readiness"><span>Overall status</span><b id="overallStatus">UNKNOWN</b><small id="overallReason">Waiting for observations</small></div>
     </section>
     <section class="paper-metrics">
@@ -25,11 +25,47 @@
       <div><span>Regimes Seen</span><b id="regimesSeen">--</b><small>Normal + Stress</small></div>
       <div><span>Exit Coverage</span><b id="exitCoverage">--</b><small>3 paths</small></div>
       <div><span>C1 Open Mean</span><b id="slippageMean">--</b><small id="closeSlippageMean">stp close mean --</small></div>
-      <div><span>C1 Samples</span><b id="slippageCount">--</b><small>open / stp close</small></div>
+      <div><span>C1 Samples</span><b id="slippageCount">--</b><small id="c1SampleCaption">open / stp close</small></div>
     </section>
-    <section class="ledger-band">
-      <div class="section-heading"><div><p class="eyebrow">PRECOMMITTED GATES</p><h2>Evidence ledger</h2></div><p class="summary">Thresholds from docs/futures/PAPER_ROUTE.md</p></div>
-      <div class="ledger" id="evidenceLedger"></div>
+    <section class="coverage-panel" aria-label="Coverage progress">
+      <div class="c1-panel-head">
+        <div><p class="eyebrow c1-eyebrow" id="coverageStatusEyebrow">COVERAGE PROGRESS</p><h2 id="coverageProgressTitle">--</h2><p id="coverageProgressReason">Waiting for paper evidence</p></div>
+        <span class="gate-state" id="coverageProgressStatus">UNKNOWN</span>
+      </div>
+      <div class="c1-active-spec" id="coverageActiveSpec">Active rule unavailable</div>
+      <div class="c1-metric-groups" id="coverageMetricGroups"></div>
+    </section>
+    <section class="c1-panel" aria-label="C1 slippage progress">
+      <div class="c1-panel-head">
+        <div><p class="eyebrow c1-eyebrow" id="c1StatusEyebrow">C1 SLIPPAGE</p><h2 id="c1ProgressTitle">--</h2><p id="c1ProgressReason">Waiting for paper evidence</p></div>
+        <span class="gate-state" id="c1ProgressStatus">UNKNOWN</span>
+      </div>
+      <div class="c1-active-spec" id="c1ActiveSpec">Active spec unavailable</div>
+      <div class="c1-metric-groups" id="c1MetricGroups"></div>
+    </section>
+    <section class="stp-panel" aria-label="STP verification progress">
+      <div class="c1-panel-head">
+        <div><p class="eyebrow c1-eyebrow" id="stpStatusEyebrow">STP VERIFICATION</p><h2 id="stpProgressTitle">--</h2><p id="stpProgressReason">Waiting for paper evidence</p></div>
+        <span class="gate-state" id="stpProgressStatus">UNKNOWN</span>
+      </div>
+      <div class="c1-active-spec" id="stpActiveSpec">Active rule unavailable</div>
+      <div class="c1-metric-groups" id="stpMetricGroups"></div>
+    </section>
+    <section class="b3-panel" aria-label="B3 reconcile progress">
+      <div class="c1-panel-head">
+        <div><p class="eyebrow c1-eyebrow" id="b3StatusEyebrow">B3 RECONCILE</p><h2 id="b3ProgressTitle">--</h2><p id="b3ProgressReason">Waiting for paper evidence</p></div>
+        <span class="gate-state" id="b3ProgressStatus">UNKNOWN</span>
+      </div>
+      <div class="c1-active-spec" id="b3ActiveSpec">Active rule unavailable</div>
+      <div class="c1-metric-groups" id="b3MetricGroups"></div>
+    </section>
+    <section class="tws-panel" aria-label="TWS restart progress">
+      <div class="c1-panel-head">
+        <div><p class="eyebrow c1-eyebrow" id="twsStatusEyebrow">TWS RESTART</p><h2 id="twsProgressTitle">--</h2><p id="twsProgressReason">Waiting for paper evidence</p></div>
+        <span class="gate-state" id="twsProgressStatus">UNKNOWN</span>
+      </div>
+      <div class="c1-active-spec" id="twsActiveSpec">Active rule unavailable</div>
+      <div class="c1-metric-groups" id="twsMetricGroups"></div>
     </section>
     <section class="coverage-band">
       <div class="section-heading"><div><p class="eyebrow">ADDITIONAL COVERAGE</p><h2>Paper observability</h2></div><p class="summary">Read-only evidence outside the seven gates</p></div>

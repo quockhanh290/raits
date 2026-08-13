@@ -5,5 +5,53 @@
     "scope": "separate",
     "close_scope": "stp_only",
     "use_absolute": true
-  }
+  },
+  "fill_quality_spec": {
+    "min_fills": 100,
+    "max_partial_rate": 0,
+    "max_failed_or_cancelled": 0,
+    "require_complete_fields": true,
+    "max_contracts_tested": 1,
+    "retest_when_contracts_gt": 1,
+    "evidence_note": "Current paper execution history is quantity/contracts=1 only; fill quality must be retested before scaling above 1 contract."
+  },
+  "stp_placement_spec": {
+    "min_accepted": 10,
+    "max_failed": 0,
+    "require_defer_rule": true,
+    "defer_rule": "swing/NKD broker STP is intentionally deferred until 14 hours after the next session boundary in that sleeve's own timezone; roska4_swing first eligible trading slot is 14:05 ET, global_nkd follows 14:00 JST, and roska4_stress is not deferred.",
+    "backtest_divergence_note": "Validated backtest does not apply a protective stop to a new swing/NKD entry on the entry day. Immediate paper/live STP after OPEN is therefore a stricter, divergent live path."
+  },
+  "stp_verification": [
+    {
+      "date": "2026-08-13",
+      "verified": true,
+      "false_halt": false,
+      "double_stp": false,
+      "evidence": "GET /api/v1/broker at 2026-08-13T09:31:06Z: IBKR fresh, M2KU6 LONG x1, working STP SELL x1 order_id=288 aux_price=3020.2; GET /api/v1/runner-positions: M2K LONG x1 stop_order_id=288 stop_price=3020.24"
+    }
+  ],
+  "tws_restart_spec": {
+    "min_nights": 10
+  },
+  "paper_vs_backtest": [
+    {
+      "date": "2026-08-10",
+      "actual_equity": 50162.0,
+      "expected_equity": 50000.0,
+      "evidence": "global_index/backtest_curve.json generated 2026-08-12 by python -m global_index.generate_replay_snapshots; paper actual from global_index/paper_history.json. Formula: expected = account + (bt[date] - bt[system_epoch]); bt[2026-08-10]=108112.76, bt_epoch=108112.76, account=50000.0"
+    },
+    {
+      "date": "2026-08-11",
+      "actual_equity": 50228.75,
+      "expected_equity": 49881.29,
+      "evidence": "global_index/backtest_curve.json generated 2026-08-12 by python -m global_index.generate_replay_snapshots; paper actual from global_index/paper_history.json. Formula: expected = account + (bt[date] - bt[system_epoch]); bt[2026-08-11]=107994.05, bt_epoch=108112.76, account=50000.0"
+    },
+    {
+      "date": "2026-08-12",
+      "actual_equity": 50228.75,
+      "expected_equity": 49836.85,
+      "evidence": "global_index/backtest_curve.json generated 2026-08-12 by python -m global_index.generate_replay_snapshots; paper actual from global_index/paper_history.json. Formula: expected = account + (bt[date] - bt[system_epoch]); bt[2026-08-12]=107949.61, bt_epoch=108112.76, account=50000.0"
+    }
+  ]
 }
