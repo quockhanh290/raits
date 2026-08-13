@@ -1089,3 +1089,99 @@ def test_frontend_modules_keep_data_boundaries():
     assert "renderEventJournal" in realtime_js
     assert "loggedExitSymbols" in realtime_js
     assert "easternDate(event.ts) === day" in realtime_js
+
+
+# ── entry time recovered from the runner's own trade log ─────────────────────────
+# runner.dump_state hardcodes entry_time=None (global_index/runner.py:2540), so the
+# realtime panel captioned every position "entry time not emitted". IBKR cannot close
+# the gap: reqPositions carries no timestamp and reqExecutions serves the current day
+# only. trade_log.jsonl already holds a ts per fill, forever.
+
+def _trade_log(tmp_path: Path, *records: dict) -> Path:
+    import json as _json
+    path = tmp_path / "trade_log.jsonl"
+    path.write_text("".join(_json.dumps(r) + "\n" for r in records), encoding="utf-8")
+    return path
+
+
+def _open_record(**overrides) -> dict:
+    record = {"type": "OPEN", "inst": "M2K", "cluster": "roska4_swing",
+              "direction": "LONG", "entry_day": "2026-08-10", "fill_price": 3025.3,
+              "ts": "2026-08-10T19:10:59.312296+00:00"}
+    record.update(overrides)
+    return record
+
+
+def _payload(**overrides) -> dict:
+    position = {"inst": "M2K", "cluster": "roska4_swing", "entry_day": "2026-08-10",
+                "entry_price": 3025.3, "entry_time": None}
+    position.update(overrides)
+    return {"snapshots": [{"date": "2026-08-12", "open_positions": [position]}]}
+
+
+def test_entry_time_recovered_from_trade_log(tmp_path: Path):
+    from monitor.backend.entry_time_reader import annotate_open_positions, read_entry_times
+    _trade_log(tmp_path, _open_record())
+    payload = _payload()
+    assert annotate_open_positions(payload, read_entry_times(tmp_path)["entries"]) == 1
+    position = payload["snapshots"][0]["open_positions"][0]
+    assert position["entry_time"] == "2026-08-10T19:10:59.312296+00:00"
+    assert position["entry_time_precision"] == "exact"
+    assert position["entry_time_source"] == "trade_log.jsonl"
+
+
+def test_entry_time_refuses_midnight_placeholder(tmp_path: Path):
+    """2026-08-03: send_order misread filled OPENs as cancelled and the records were
+    rebuilt from the date alone. Midnight there is a placeholder — showing it as the
+    moment of entry would be inventing evidence."""
+    from monitor.backend.entry_time_reader import annotate_open_positions, read_entry_times
+    _trade_log(tmp_path, _open_record(ts="2026-08-10T00:00:00+00:00"))
+    payload = _payload()
+    assert annotate_open_positions(payload, read_entry_times(tmp_path)["entries"]) == 0
+    position = payload["snapshots"][0]["open_positions"][0]
+    assert position["entry_time"] is None
+    assert position["entry_time_precision"] == "day_only"
+
+
+def test_entry_time_refuses_when_fill_price_disagrees(tmp_path: Path):
+    """(inst, cluster, entry_day) also matches a different trade opened the same
+    session on the same sleeve. A confidently wrong time is worse than none."""
+    from monitor.backend.entry_time_reader import annotate_open_positions, read_entry_times
+    _trade_log(tmp_path, _open_record(fill_price=2988.0))
+    payload = _payload()
+    assert annotate_open_positions(payload, read_entry_times(tmp_path)["entries"]) == 0
+    position = payload["snapshots"][0]["open_positions"][0]
+    assert position["entry_time"] is None
+    assert position["entry_time_precision"] == "price_mismatch"
+
+
+def test_entry_time_marks_missing_record(tmp_path: Path):
+    from monitor.backend.entry_time_reader import annotate_open_positions, read_entry_times
+    _trade_log(tmp_path, _open_record(entry_day="2026-08-05"))
+    payload = _payload()
+    assert annotate_open_positions(payload, read_entry_times(tmp_path)["entries"]) == 0
+    assert payload["snapshots"][0]["open_positions"][0]["entry_time_precision"] == "no_record"
+
+
+def test_entry_time_accepts_live_positions_day_spelling(tmp_path: Path):
+    """live_positions.json writes "2026-08-10 00:00:00" where the trade log writes
+    "2026-08-10". Both must land on the same key."""
+    from monitor.backend.entry_time_reader import annotate_open_positions, read_entry_times
+    _trade_log(tmp_path, _open_record())
+    payload = _payload(entry_day="2026-08-10 00:00:00")
+    assert annotate_open_positions(payload, read_entry_times(tmp_path)["entries"]) == 1
+
+
+def test_entry_time_survives_torn_last_line(tmp_path: Path):
+    """The trade log is appended to live, so the final line can be mid-write."""
+    from monitor.backend.entry_time_reader import read_entry_times
+    import json as _json
+    (tmp_path / "trade_log.jsonl").write_text(
+        _json.dumps(_open_record()) + "\n" + '{"type": "OPEN", "inst": "MES"', encoding="utf-8")
+    assert len(read_entry_times(tmp_path)["entries"]) == 1
+
+
+def test_entry_time_missing_file_reports_error(tmp_path: Path):
+    from monitor.backend.entry_time_reader import read_entry_times
+    result = read_entry_times(tmp_path)
+    assert result["entries"] == {} and result["error"]

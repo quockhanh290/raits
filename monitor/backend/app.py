@@ -28,6 +28,7 @@ from pathlib import Path
 from flask import Flask, abort, jsonify, redirect, send_from_directory
 
 from monitor.backend import ibkr_reader
+from monitor.backend.entry_time_reader import annotate_open_positions, read_entry_times
 from monitor.backend.report_reader import read_report
 from monitor.backend.runner_state_reader import read_runner_state
 from monitor.backend.runner_event_reader import read_runner_events
@@ -188,6 +189,15 @@ def api_v1_runner_state():
     snapshots = (state.get("payload") or {}).get("snapshots", [])
     days = [str(snapshot.get("date")) for snapshot in snapshots if snapshot.get("date")]
     state["event_history"] = read_runner_events(max(days), ROOT) if days else None
+    # The runner emits entry_time as a hardcoded None, so recover it from its own trade
+    # log rather than leaving the panel captioned "not emitted" forever. read_runner_state
+    # hands back a deepcopy, so annotating in place cannot leak into its cache.
+    entry_times = read_entry_times(ROOT)
+    state["entry_times"] = {"source": entry_times["source"],
+                            "observed_at": entry_times["observed_at"],
+                            "error": entry_times["error"],
+                            "filled": annotate_open_positions(state.get("payload"),
+                                                              entry_times["entries"])}
     observed = _parse_iso(state.get("observed_at"))
     schedule = get_schedule_status(ROOT, observed_at=observed)
     state["freshness"] = schedule["freshness"]
