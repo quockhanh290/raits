@@ -421,6 +421,21 @@ def _coverage(key: str, title: str, status: str, evidence: str,
     }
 
 
+def _gap(title: str, detail: str, gap_type: str, target_path: str, missing_input: str,
+         unblock_condition: str, related_key: str | None = None,
+         can_fix_now: str = "operator_data") -> dict[str, Any]:
+    return {
+        "title": title,
+        "detail": detail,
+        "type": gap_type,
+        "target_path": target_path,
+        "missing_input": missing_input,
+        "unblock_condition": unblock_condition,
+        "related_key": related_key,
+        "can_fix_now": can_fix_now,
+    }
+
+
 def _position_rows(positions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for pos in positions:
@@ -2282,15 +2297,30 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
     coverage_by_key = {item["key"]: item for item in coverage}
     gaps = []
     if c1_status == "SPEC_GAP":
-        gaps.append({"title": "C1 gate definition", "detail": "Minimum N and OPEN/STP-close gate scope are not quantified."})
+        gaps.append(_gap(
+            "C1 gate definition",
+            "Minimum N and OPEN/STP-close gate scope are not quantified.",
+            "SPEC_GAP",
+            "monitor/paper_inputs.json",
+            "c1_spec.min_n, c1_spec.max_open_mean_ticks, c1_spec.max_stp_close_mean_ticks",
+            "C1 slippage gate has numeric sample and slippage thresholds.",
+            "c1_slippage",
+            "operator_data",
+        ))
     if slip["signal_close_with_stop_ref"]:
-        gaps.append({
-            "title": "Signal close slippage reference",
-            "detail": (
+        gaps.append(_gap(
+            "Signal close slippage reference",
+            (
                 f"{slip['signal_close_with_stop_ref']} signal/market CLOSE record(s) have stop_ref-derived slip; "
                 "they are excluded from C1 and covered by Paper P&L vs backtest instead."
             ),
-        })
+            gap_type="SOURCE_LIMIT",
+            target_path="trade_log.jsonl + monitor/paper_pnl_compare.json",
+            missing_input="No independent expected market/signal-close reference is retained for C1-style slippage scoring.",
+            unblock_condition="Keep these rows excluded from C1 and reconcile their effect in Paper P&L vs backtest.",
+            related_key="paper_vs_backtest",
+            can_fix_now="documented",
+        ))
     min_nights = int(tws_spec.get("min_nights") or 0) if isinstance(tws_spec.get("min_nights"), int) else None
     if tws_status != "PASS":
         if min_nights:
@@ -2304,26 +2334,54 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
                 f"{logs['tws_restart_lines']} TWS/IBKR connectivity-restart candidate line(s) found across "
                 f"{len(logs['tws_restart_days'])} day(s); no numeric threshold or restart-proof artifact exists."
             )
-        gaps.append({"title": "TWS restart coverage", "detail": tws_detail})
+        gaps.append(_gap(
+            "TWS restart coverage",
+            tws_detail,
+            "SPEC_GAP" if not min_nights else "DATA_GAP",
+            "monitor/paper_inputs.json",
+            "tws_restart_spec.min_nights and tws_restart_nights rows with restart_proven, runner_resumed, broker_verified.",
+            f"{min_nights or 'configured'} proven restart night(s) are structured and all required flags are true.",
+            None,
+            "operator_data",
+        ))
     pvb_coverage = coverage_by_key.get("paper_vs_backtest", {})
-    if pvb_coverage.get("status") != "OBSERVED":
-        gaps.append({
-            "title": "Paper P&L vs backtest source",
-            "detail": (
+    pvb_compare = ((pvb_coverage.get("metrics") or {}).get("trade_compare") or {}) if isinstance(pvb_coverage.get("metrics"), dict) else {}
+    if pvb_coverage.get("status") != "OBSERVED" and not pvb_compare:
+        gaps.append(_gap(
+            "Paper P&L vs backtest source",
+            (
                 "A complete daily compare needs both expected_equity and actual_equity. "
                 "The live-state artifact currently has actual-only context unless a structured "
                 "monitor/paper_inputs.json paper_vs_backtest record supplies the expected backtest value."
             ),
-        })
+            gap_type="DATA_GAP",
+            target_path="monitor/paper_pnl_compare.json",
+            missing_input="Daily expected/backtest comparison artifact for the paper epoch.",
+            unblock_condition="paper_pnl_compare.py produces trade_compare + statement_pnl_compare for the active epoch.",
+            related_key="paper_vs_backtest",
+            can_fix_now="code_or_job",
+        ))
     gaps.extend([
-        {
-            "title": "STP false halt",
-            "detail": "Logs expose raw B3/STP placement evidence, but false-halt classification is not structured.",
-        },
-        {
-            "title": "Manual intervention ledger",
-            "detail": f"{logs['manual_intervention_lines']} operator-action candidate line(s) found across {len(logs['manual_intervention_days'])} day(s); no structured operator-action ledger exists.",
-        },
+        _gap(
+            "STP false halt",
+            "Logs expose raw B3/STP placement evidence, but false-halt classification is not structured.",
+            "DATA_GAP",
+            "monitor/paper_inputs.json",
+            "stp_verification records with false_halt/double_stp classification and broker/file evidence.",
+            "Raw B3/STP halt lines are grouped into reviewed STP verification records.",
+            "stp_placement",
+            "operator_data",
+        ),
+        _gap(
+            "Manual intervention ledger",
+            f"{logs['manual_intervention_lines']} operator-action candidate line(s) found across {len(logs['manual_intervention_days'])} day(s); no structured operator-action ledger exists.",
+            "OPERATOR_DECISION",
+            "monitor/paper_inputs.json",
+            "manual_interventions rows with affected trade/position, action, reason, resolution_status, and post_action_verified.",
+            "Every operator-action candidate is either classified as noise or represented by a resolved/verified manual intervention row.",
+            "manual_intervention",
+            "operator_data",
+        ),
     ])
 
     gates = [

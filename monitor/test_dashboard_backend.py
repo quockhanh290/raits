@@ -566,6 +566,10 @@ def test_paper_evidence_does_not_count_actual_only_paper_vs_backtest_as_observed
     assert coverage["paper_vs_backtest"]["status"] == "NEEDS_DECISION"
     assert coverage["paper_vs_backtest"]["metrics"]["source_kind"] == "live_state_incomplete"
     assert "Paper P&L vs backtest source" in {gap["title"] for gap in payload["gaps"]}
+    pvb_gap = next(gap for gap in payload["gaps"] if gap["title"] == "Paper P&L vs backtest source")
+    assert pvb_gap["type"] == "DATA_GAP"
+    assert pvb_gap["target_path"] == "monitor/paper_pnl_compare.json"
+    assert pvb_gap["related_key"] == "paper_vs_backtest"
 
 
 def test_paper_evidence_excludes_signal_close_from_c1_slippage(tmp_path: Path):
@@ -847,6 +851,9 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "Curve status controls daily-row freshness" in source
     assert "paper/live path defers a stop/exit after the 14h/EOD decision" in source
     assert "function gapItem" in source
+    assert "data-gap-related" in source
+    assert "unblocks when" in source
+    assert "target_path" in source
     assert "Observed data" in source
     assert "Active spec" in source
     assert "Signal/market closes shown for diagnosis" in source
@@ -874,6 +881,8 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "audit-ledger" not in css
     assert "coverage-panel" in css
     assert "coverage-group" in css
+    assert "gap-related" in css
+    assert "source-limit" in css
     assert "c1-panel" in css
     assert "stp-panel" in css
     assert "b3-panel" in css

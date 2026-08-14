@@ -1651,6 +1651,7 @@
   }
 
   function gapType(item) {
+    if (item.type) return item.type;
     const text = `${item.title || ''} ${item.detail || ''}`.toLowerCase();
     if (/threshold|required nights|spec|numeric/.test(text)) return 'SPEC';
     if (/structured|ledger|classification/.test(text)) return 'DATA';
@@ -1658,18 +1659,17 @@
     return 'DATA';
   }
 
-  function gapInput(item) {
-    const title = String(item.title || '').toLowerCase();
-    if (title.includes('tws')) return 'Set tws_restart_spec.min_nights and add proven tws_restart_nights records.';
-    if (title.includes('stp')) return 'Add structured STP verification records with false_halt/double_stp classification.';
-    if (title.includes('manual')) return 'Add structured manual intervention records with resolution and post-action verification.';
-    if (title.includes('signal close')) return 'No read-only close reference exists; keep excluded from C1 and cover with Paper P&L vs backtest.';
-    return 'Define the structured input needed to classify this evidence.';
+  function gapFixLabel(value) {
+    if (value === 'documented') return 'documented';
+    if (value === 'code_or_job') return 'code/job';
+    if (value === 'operator_data') return 'operator data';
+    return value || 'review';
   }
 
   function gapItem(item) {
     const type = gapType(item);
-    return `<article class="gap-item ${statusClass(type)}"><span>${esc(type)}</span><b>${esc(item.title)}</b><p>${esc(item.detail)}</p><small>${esc(gapInput(item))}</small></article>`;
+    const related = item.related_key ? `<button type="button" class="gap-related" data-gap-related="${esc(item.related_key)}">Open related panel</button>` : '';
+    return `<article class="gap-item ${statusClass(type)}"><div class="gap-item-head"><span>${esc(type)}</span><em>${esc(gapFixLabel(item.can_fix_now))}</em></div><b>${esc(item.title)}</b><p>${esc(item.detail)}</p><dl><div><dt>target</dt><dd>${esc(item.target_path || '--')}</dd></div><div><dt>missing</dt><dd>${esc(item.missing_input || '--')}</dd></div><div><dt>unblocks when</dt><dd>${esc(item.unblock_condition || '--')}</dd></div></dl>${related}</article>`;
   }
 
   function render(data) {
@@ -1694,6 +1694,13 @@
     $('paperSource').textContent = `Paper epoch ${payload.epoch || 'missing'} | source ${data.source || 'unknown'} | observed ${data.observed_at || 'unknown'}`;
     renderCoverage(coverage);
     $('evidenceGaps').innerHTML = (payload.gaps || []).map(gapItem).join('');
+    $('evidenceGaps').querySelectorAll('[data-gap-related]').forEach(button => {
+      button.addEventListener('click', () => {
+        selectedCoverageKey = button.getAttribute('data-gap-related') || selectedCoverageKey;
+        renderCoverage(coverage);
+        $('paperCoverage').scrollIntoView({ block: 'start' });
+      });
+    });
     const readiness = $('overallStatus').parentElement;
     readiness.classList.toggle('unknown', sourceMissing);
     readiness.classList.toggle('complete', complete);
