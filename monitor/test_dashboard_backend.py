@@ -95,6 +95,42 @@ def test_failed_slot_is_incident_while_state_remains_fresh(monkeypatch, tmp_path
     assert status["incidents"][-1]["slot_id"] == "LIVE_DAY_1415"
 
 
+def test_incident_recovers_once_a_later_slot_in_the_same_stream_runs(monkeypatch, tmp_path: Path):
+    """Live 2026-08-14: IB Gateway restarted itself and refused six NKD slots, then the
+    stream ran normally again from 02:30. The rail still read "scheduler attention required"
+    hours later, because a bare incident count cannot tell a live outage from one that ended."""
+    now = dt.datetime(2026, 8, 11, 14, 31, tzinfo=ET)
+    lines = _lines_through(now, replace={"LIVE_DAY_1415": "exited with code 1"})
+    _patch_logs(monkeypatch, lines)
+    status = schedule_status.get_schedule_status(tmp_path, observed_at=now - dt.timedelta(minutes=1), now=now)
+    incident = status["incidents"][-1]
+    assert incident["slot_id"] == "LIVE_DAY_1415"
+    assert incident["lifecycle"] == "recovered"
+    # The FIRST clean slot after the failure is what closes it — 14:20, not the latest one.
+    assert incident["recovered_by"] == "LIVE_DAY_1420"
+    # The failure stays in the day's record; it just stops driving the live alarm.
+    assert status["open_incidents"] == []
+
+
+def test_incident_stays_open_while_nothing_has_run_since(monkeypatch, tmp_path: Path):
+    now = dt.datetime(2026, 8, 11, 14, 16, tzinfo=ET)
+    lines = _lines_through(now, replace={"LIVE_DAY_1415": "exited with code 1"})
+    _patch_logs(monkeypatch, lines)
+    status = schedule_status.get_schedule_status(tmp_path, observed_at=now - dt.timedelta(minutes=5), now=now)
+    assert status["incidents"][-1]["lifecycle"] == "open"
+    assert status["open_incidents"][-1]["slot_id"] == "LIVE_DAY_1415"
+
+
+def test_recovery_does_not_cross_streams(monkeypatch, tmp_path: Path):
+    """An NKD night slot running is not evidence that the afternoon sleeve recovered."""
+    now = dt.datetime(2026, 8, 11, 14, 31, tzinfo=ET)
+    lines = _lines_through(now, replace={"LIVE_DAY_1415": "exited with code 1"})
+    _patch_logs(monkeypatch, lines)
+    status = schedule_status.get_schedule_status(tmp_path, observed_at=now, now=now)
+    assert all(item["slot_id"].startswith("LIVE_DAY") for item in status["incidents"])
+    assert status["incidents"][-1]["recovered_by"].startswith("LIVE_DAY")
+
+
 def test_mutex_skip_suppresses_late(monkeypatch, tmp_path: Path):
     now = dt.datetime(2026, 8, 11, 14, 16, tzinfo=ET)
     lines = _lines_through(now, replace={
@@ -633,7 +669,9 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "function signalCompareRows" in source
     assert "function entryCompareRows" in source
     assert "function lifecycleCompareRows" in source
+    assert "function tradeMasterReconcileRows" in source
     assert "function sourceDiffAnalyzerRows" in source
+    assert "function tableVerdict" in source
     assert "function brokerIdentity" in source
     assert "function realtimeLedgerBlock" in source
     assert "function pnlCompareTab" in source
@@ -643,6 +681,7 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "function pnlTimeline" in source
     assert "function pnlDailyRows" in source
     assert "function pnlPurposeBlock" in source
+    assert "function overviewVerdictStrip" in source
     assert "function openPositionParityRows" in source
     assert "function renderCoverage" in source
     assert "function fillQualityDetail" in source
@@ -717,11 +756,17 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "Avg entry slip" in source
     assert "TOTAL DELTA" in source
     assert "Net P&amp;L Timeline" in source
-    assert "pnl-tab-source" in source
+    assert "pnl-tab-overview" in source
+    assert "pnl-tab-trades" in source
+    assert "pnl-tab-components" in source
     assert "pnl-tab-decision" in source
-    assert "pnl-tab-trade-reconcile" in source
+    assert "Trade Master Reconcile" in source
+    assert "Overview Verdicts" in source
+    assert "Base aligned" in source
+    assert "table-verdict" in source
     assert "pnl-tab-rules" in source
     assert "timeline-readout" in source
+    assert "Timeline reconcile" in source
     assert "minimum 10-session span" in source
     assert "Classification" not in source
     assert "contract_spec_guard" in source
@@ -806,7 +851,11 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "polyline.paper" in css
     assert "timeline-readout" in css
     assert "pnl-tab-decision" in css
-    assert "trade-reconcile-panel" in css
+    assert "trades-panel" in css
+    assert "trade-master-table" in css
+    assert "overview-verdict-grid" in css
+    assert "overview-verdict-card" in css
+    assert "secondary-table" in css
     assert "lifecycle-compare-table" in css
     assert "audit-link" in css
     assert "pnl-timeline" in css
@@ -1436,6 +1485,29 @@ def test_duplicate_launch_is_one_job_not_a_wall_of_phantoms(tmp_path: Path):
     assert job["diagnostics_omitted"] == 17
 
 
+def test_same_slot_on_two_days_is_two_jobs(tmp_path: Path):
+    """Live 2026-08-14: NKD_NIGHT_0200 runs once per night, and the reader stitches the
+    previous local-date file to today's. Yesterday's run ended with "thoat OK nhung", which
+    finished the job but left it in `active` — so tonight's launch was folded into it as a
+    duplicate and then filtered away with yesterday's date. Eight slots vanished from the
+    journal while the scheduler was running them."""
+    (tmp_path / "scheduler_0813.log").write_text(
+        "2026-08-13 00:00:00 INFO run_scheduler - [NKD_NIGHT_0200] C:\\Python311\\pythonw.exe -m global_index.run_live_day --clusters nkd\n"
+        "2026-08-13 00:01:17 ERROR run_scheduler - [NKD_NIGHT_0200] thoat OK nhung da ghi 1 dong CRITICAL/ERROR\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "scheduler_0814.log").write_text(
+        "2026-08-14 00:00:00 INFO run_scheduler - [NKD_NIGHT_0200] C:\\Python311\\pythonw.exe -m global_index.run_live_day --clusters nkd\n"
+        "2026-08-14 00:01:17 ERROR run_scheduler - [NKD_NIGHT_0200] thoat OK nhung da ghi 1 dong CRITICAL/ERROR\n",
+        encoding="utf-8",
+    )
+    tonight = [job for job in read_job_journal("2026-08-14", tmp_path)["jobs"]
+               if job["job_id"] == "NKD_NIGHT_0200"]
+    assert len(tonight) == 1
+    assert tonight[0]["launch_count"] == 1
+    assert tonight[0]["status"] == "completed_with_debt"
+
+
 def test_single_failed_run_is_still_a_failure(tmp_path: Path):
     """The duplicate handling must not swallow a genuine one-process failure."""
     (tmp_path / "scheduler_0811.log").write_text(
@@ -1721,6 +1793,31 @@ def test_open_issue_contract_identifies_component_and_specific_problem(tmp_path:
     assert "did not run" in issues["job:stop_repair:missed"]["problem"]
     assert issues["known_debt:model_age"]["component"] == "runner"
     assert "2024-12-31" in issues["known_debt:model_age"]["problem"]
+
+
+def test_open_issues_include_paper_reconciliation_breaches(tmp_path: Path):
+    (tmp_path / "scheduler_0814.log").write_text(
+        "2026-08-14 09:00:00 INFO run_scheduler - [HEARTBEAT] alive\n",
+        encoding="utf-8",
+    )
+    monitor_dir = tmp_path / "monitor"
+    monitor_dir.mkdir()
+    (monitor_dir / "paper_pnl_compare.json").write_text(
+        '{"statement_pnl_compare":{"paper_minus_backtest_realized":10,'
+        '"paper_minus_flex_epoch_rebased_realized":0},'
+        '"lifecycle_compare":{"unresolved":1,"paper_minus_backtest_sum":8,'
+        '"paper_minus_flex_sum":2},'
+        '"open_position_parity":{"paper_only":[{"inst":"MES"}],"backtest_only":[]},'
+        '"signal_compare":{"classified":{"unresolved":1}},'
+        '"entry_compare":{"unresolved":0}}',
+        encoding="utf-8",
+    )
+    keys = {issue["key"] for issue in read_open_issues(tmp_path)["issues"]}
+    assert "paper:lifecycle:unresolved" in keys
+    assert "paper:pnl:paper_backtest_total_mismatch" in keys
+    assert "paper:pnl:paper_flex_total_mismatch" in keys
+    assert "paper:open_position_parity:mismatch" in keys
+    assert "paper:decision_path:unresolved" in keys
 
 
 def test_frontend_modules_keep_data_boundaries():

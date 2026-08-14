@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import datetime as dt
+import json
 import re
 import threading
 from pathlib import Path
@@ -48,6 +49,114 @@ def _issue(*, key: str, status: str, component: str, title: str, problem: str,
         "impact": impact, "action": action, "resolution_evidence": resolution,
         "evidence": evidence,
     }
+
+
+def _num(value: Any) -> float | None:
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    return result if result == result else None
+
+
+def _reconciles(left: Any, right: Any) -> bool:
+    a = _num(left)
+    b = _num(right)
+    return a is not None and b is not None and abs(a - b) < 0.005
+
+
+def _paper_reconciliation_issues(root: Path, observed_at: str) -> list[dict[str, Any]]:
+    path = root / "monitor" / "paper_pnl_compare.json"
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [_issue(
+            key="paper:pnl_compare:unreadable", status="incident", component="paper",
+            title="Paper P&L compare unreadable",
+            problem=f"The paper P&L compare artifact cannot be parsed: {exc}",
+            first_seen=observed_at, last_seen=observed_at, occurrences=1,
+            impact="Paper dashboard verdicts may be stale or unavailable.",
+            action="Regenerate monitor/paper_pnl_compare.json and confirm the dashboard loads fresh evidence.",
+            resolution="The artifact parses successfully and contains current reconciliation data.",
+            evidence=str(path),
+        )]
+
+    issues: list[dict[str, Any]] = []
+    pl = data.get("statement_pnl_compare") or {}
+    lifecycle = data.get("lifecycle_compare") or {}
+    parity = data.get("open_position_parity") or {}
+    signal = data.get("signal_compare") or {}
+    classified_signal = signal.get("classified") or {}
+    entry = data.get("entry_compare") or {}
+
+    lifecycle_unresolved = int(lifecycle.get("unresolved") or 0)
+    if lifecycle_unresolved:
+        issues.append(_issue(
+            key="paper:lifecycle:unresolved", status="incident", component="paper",
+            title="Paper lifecycle reconciliation unresolved",
+            problem=f"{lifecycle_unresolved} paper/backtest/Flex lifecycle row(s) are unresolved.",
+            first_seen=observed_at, last_seen=observed_at, occurrences=lifecycle_unresolved,
+            impact="Paper P&L vs backtest/Flex cannot be promoted to PASS while source rows are missing or unclassified.",
+            action="Open Paper Dashboard > Trades and resolve the rows marked BREACH/UNRESOLVED.",
+            resolution="Lifecycle compare reports unresolved=0 and table totals reconcile to the P&L grid.",
+            evidence="monitor/paper_pnl_compare.json lifecycle_compare.unresolved",
+        ))
+
+    if not _reconciles(lifecycle.get("paper_minus_backtest_sum"), pl.get("paper_minus_backtest_realized")):
+        issues.append(_issue(
+            key="paper:pnl:paper_backtest_total_mismatch", status="incident", component="paper",
+            title="Paper vs backtest P&L total mismatch",
+            problem="Lifecycle Paper-Backtest total does not reconcile to the headline P&L grid.",
+            first_seen=observed_at, last_seen=observed_at, occurrences=1,
+            impact="The dashboard cannot prove whether Paper-Backtest variance is explained by trade rows.",
+            action="Regenerate the compare artifact or inspect Paper Dashboard > Trades footer totals.",
+            resolution="Lifecycle Paper-Backtest sum matches statement_pnl_compare.paper_minus_backtest_realized.",
+            evidence=f"lifecycle={lifecycle.get('paper_minus_backtest_sum')} grid={pl.get('paper_minus_backtest_realized')}",
+        ))
+
+    flex_grid = pl.get("paper_minus_flex_epoch_rebased_realized", pl.get("paper_minus_statement_entry_epoch_realized"))
+    if not _reconciles(lifecycle.get("paper_minus_flex_sum"), flex_grid):
+        issues.append(_issue(
+            key="paper:pnl:paper_flex_total_mismatch", status="incident", component="paper",
+            title="Paper vs Flex P&L total mismatch",
+            problem="Lifecycle Paper-Flex total does not reconcile to the zero-base Flex headline grid.",
+            first_seen=observed_at, last_seen=observed_at, occurrences=1,
+            impact="Paper actual cannot be reconciled against the broker source of truth.",
+            action="Refresh Flex data and inspect Paper Dashboard > Trades / Source Diff footers.",
+            resolution="Lifecycle Paper-Flex sum matches the zero-base Paper-Flex grid value.",
+            evidence=f"lifecycle={lifecycle.get('paper_minus_flex_sum')} grid={flex_grid}",
+        ))
+
+    open_diff = len(parity.get("paper_only") or []) + len(parity.get("backtest_only") or [])
+    if open_diff:
+        issues.append(_issue(
+            key="paper:open_position_parity:mismatch", status="incident", component="paper",
+            title="Paper open-position parity mismatch",
+            problem=f"{open_diff} open position row(s) exist on only one side of paper/backtest parity.",
+            first_seen=observed_at, last_seen=observed_at, occurrences=open_diff,
+            impact="Closed P&L comparisons may look reconciled while current exposure is not aligned.",
+            action="Open Paper Dashboard > Decision and reconcile paper-only/backtest-only open positions.",
+            resolution="open_position_parity paper_only and backtest_only are both empty.",
+            evidence=f"paper_only={len(parity.get('paper_only') or [])} backtest_only={len(parity.get('backtest_only') or [])}",
+        ))
+
+    signal_unresolved = int(classified_signal.get("unresolved") or 0)
+    entry_unresolved = int(entry.get("unresolved") or 0)
+    if signal_unresolved or entry_unresolved:
+        issues.append(_issue(
+            key="paper:decision_path:unresolved", status="incident", component="paper",
+            title="Paper decision-path reconciliation unresolved",
+            problem=f"Signal unresolved={signal_unresolved}, entry unresolved={entry_unresolved}.",
+            first_seen=observed_at, last_seen=observed_at, occurrences=signal_unresolved + entry_unresolved,
+            impact="P&L divergence cannot be attributed cleanly until signal and entry parity are explained.",
+            action="Open Paper Dashboard > Decision and resolve signal/entry mismatch rows.",
+            resolution="signal_compare.classified.unresolved and entry_compare.unresolved are both zero.",
+            evidence="monitor/paper_pnl_compare.json signal_compare / entry_compare",
+        ))
+
+    return issues
 
 
 def _build(paths: list[Path]) -> dict[str, Any]:
@@ -182,9 +291,11 @@ def _build(paths: list[Path]) -> dict[str, Any]:
             ))
 
     priority = {"incident": 0, "unknown": 1, "known_debt": 2}
+    observed_at = _iso(stamped_lines[-1][0])
+    issues.extend(_paper_reconciliation_issues(paths[0].parent, observed_at))
     issues.sort(key=lambda item: (priority[item["status"]], item["first_seen"]))
     return {
-        "source": "scheduler_logs", "observed_at": _iso(stamped_lines[-1][0]),
+        "source": "scheduler_logs", "observed_at": observed_at,
         "coverage": {"from": first_day.isoformat(), "to": last_day.isoformat()},
         "issues": issues, "error": None,
     }
@@ -194,7 +305,11 @@ def read_open_issues(root: Path) -> dict[str, Any]:
     paths = sorted(root.glob("scheduler_*.log"))
     if not paths:
         return {"source": "scheduler_logs", "coverage": None, "issues": [], "error": "scheduler logs not found"}
-    signature = tuple((str(path.resolve()), path.stat().st_mtime_ns, path.stat().st_size) for path in paths)
+    signature_paths = list(paths)
+    paper_compare = root / "monitor" / "paper_pnl_compare.json"
+    if paper_compare.exists():
+        signature_paths.append(paper_compare)
+    signature = tuple((str(path.resolve()), path.stat().st_mtime_ns, path.stat().st_size) for path in signature_paths)
     with _lock:
         cached = _cache.get(signature)
         if cached is None:

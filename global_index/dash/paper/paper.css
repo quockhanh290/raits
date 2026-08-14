@@ -89,6 +89,26 @@
 .trade-table tfoot td { background: rgba(221,163,58,.045); border-top: 2px solid rgba(221,163,58,.35); border-bottom: 0; color: var(--bright); }
 .trade-table tr.total-row b { font-size: 13px; }
 .trade-table tr.total-row small { color: var(--muted); }
+.table-verdict { margin: 0 0 10px; padding: 10px 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; border: 1px solid var(--line); background: rgba(255,255,255,.014); box-shadow: inset 3px 0 0 var(--line-strong); }
+.table-verdict.ok { box-shadow: inset 3px 0 0 var(--green); }
+.table-verdict.watch { box-shadow: inset 3px 0 0 var(--amber); }
+.table-verdict.bad { box-shadow: inset 3px 0 0 var(--red); }
+.table-verdict.neutral { box-shadow: inset 3px 0 0 var(--violet); }
+.table-verdict > div { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 8px; align-items: center; }
+.table-verdict b { color: var(--bright); font: 800 12px/1.2 var(--mono); text-transform: uppercase; }
+.table-verdict p { grid-column: 1 / -1; margin: 0; color: var(--muted); font: 12px/1.45 var(--mono); }
+.table-verdict aside { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+.table-verdict aside span { padding: 3px 6px; color: var(--dim); border: 1px solid var(--line); background: rgba(255,255,255,.018); font: 700 10px/1.2 var(--mono); text-transform: uppercase; }
+.overview-verdict-section { grid-column: 1 / -1; }
+.overview-verdict-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.overview-verdict-card { min-width: 0; min-height: 112px; padding: 10px 11px; display: grid; align-content: start; gap: 6px; border: 1px solid var(--line); background: rgba(255,255,255,.014); box-shadow: inset 3px 0 0 var(--line-strong); }
+.overview-verdict-card.ok { box-shadow: inset 3px 0 0 var(--green); }
+.overview-verdict-card.watch { box-shadow: inset 3px 0 0 var(--amber); }
+.overview-verdict-card.bad { box-shadow: inset 3px 0 0 var(--red); }
+.overview-verdict-card.neutral { box-shadow: inset 3px 0 0 var(--violet); }
+.overview-verdict-card b { color: var(--bright); font: 800 11px/1.2 var(--mono); text-transform: uppercase; }
+.overview-verdict-card strong { color: var(--bright); font: 900 17px/1.1 var(--mono); overflow-wrap: anywhere; }
+.overview-verdict-card small { color: var(--muted); font: 11px/1.35 var(--mono); }
 .detail-metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .pnl-pl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 12px; }
 .detail-metric { min-height: 82px; padding: 10px 11px; display: grid; align-content: start; gap: 6px; background: rgba(255,255,255,.014); border: 1px solid var(--line); box-shadow: inset 3px 0 0 var(--line-strong); }
@@ -159,27 +179,31 @@
 .pnl-tabs > input { position: absolute; opacity: 0; pointer-events: none; }
 .pnl-tab-buttons { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--line); }
 .pnl-tab-buttons label { padding: 8px 10px; color: var(--dim); border: 1px solid var(--line); border-bottom: 0; background: rgba(255,255,255,.012); cursor: pointer; font: 800 11px/1.2 var(--mono); text-transform: uppercase; }
-#pnl-tab-summary:checked ~ .pnl-tab-buttons label[for="pnl-tab-summary"],
-#pnl-tab-source:checked ~ .pnl-tab-buttons label[for="pnl-tab-source"],
+#pnl-tab-overview:checked ~ .pnl-tab-buttons label[for="pnl-tab-overview"],
+#pnl-tab-trades:checked ~ .pnl-tab-buttons label[for="pnl-tab-trades"],
+#pnl-tab-components:checked ~ .pnl-tab-buttons label[for="pnl-tab-components"],
 #pnl-tab-timeline:checked ~ .pnl-tab-buttons label[for="pnl-tab-timeline"],
 #pnl-tab-decision:checked ~ .pnl-tab-buttons label[for="pnl-tab-decision"],
-#pnl-tab-trade-reconcile:checked ~ .pnl-tab-buttons label[for="pnl-tab-trade-reconcile"],
 #pnl-tab-rules:checked ~ .pnl-tab-buttons label[for="pnl-tab-rules"],
 #pnl-tab-audit:checked ~ .pnl-tab-buttons label[for="pnl-tab-audit"] { color: var(--amber); background: rgba(221,163,58,.07); box-shadow: inset 0 2px 0 var(--amber); }
 .pnl-tab-panel { display: none; min-width: 0; }
-#pnl-tab-summary:checked ~ .summary-panel,
-#pnl-tab-source:checked ~ .source-diff-panel,
+#pnl-tab-overview:checked ~ .overview-panel,
+#pnl-tab-trades:checked ~ .trades-panel,
+#pnl-tab-components:checked ~ .components-panel,
 #pnl-tab-timeline:checked ~ .timeline-panel,
 #pnl-tab-decision:checked ~ .decision-panel,
-#pnl-tab-trade-reconcile:checked ~ .trade-reconcile-panel,
 #pnl-tab-rules:checked ~ .rules-panel,
 #pnl-tab-audit:checked ~ .audit-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; }
+.trades-panel .more-section:first-child, .components-panel .more-section, .timeline-panel .more-section { grid-column: 1 / -1; }
+.secondary-table { padding: 8px 10px; border: 1px solid var(--line); background: rgba(255,255,255,.012); }
+.secondary-table summary { color: var(--amber); cursor: pointer; font: 800 12px/1.2 var(--mono); text-transform: uppercase; }
+.secondary-table[open] summary { margin-bottom: 10px; }
 .source-diff-stats { margin-bottom: 10px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
 .audit-link { margin-right: 5px; padding: 1px 5px; display: inline-block; color: var(--amber); border: 1px solid rgba(221,163,58,.4); background: rgba(221,163,58,.08); border-radius: 3px; text-decoration: none; font: 900 11px/1 var(--mono); }
 .audit-anchor { scroll-margin-top: 18px; padding: 8px; border: 1px solid rgba(221,163,58,.3); background: rgba(221,163,58,.035); }
-.pnl-daily-table, .pnl-compare-table, .signal-compare-table, .entry-compare-table, .lifecycle-compare-table, .source-diff-table, .open-position-table, .audit-evidence-table, .pnl-statement-table, .pnl-flex-bridge-table, .contract-spec-table { overflow-x: hidden; }
-.pnl-daily-table table, .signal-compare-table table, .entry-compare-table table, .lifecycle-compare-table table, .source-diff-table table, .open-position-table table, .audit-evidence-table table, .pnl-statement-table table, .pnl-flex-bridge-table table, .contract-spec-table table { min-width: 0; width: 100%; table-layout: fixed; }
-.pnl-daily-table th, .pnl-daily-table td, .signal-compare-table th, .signal-compare-table td, .entry-compare-table th, .entry-compare-table td, .lifecycle-compare-table th, .lifecycle-compare-table td, .source-diff-table th, .source-diff-table td, .open-position-table th, .open-position-table td, .audit-evidence-table th, .audit-evidence-table td, .pnl-statement-table th, .pnl-statement-table td, .pnl-flex-bridge-table th, .pnl-flex-bridge-table td, .contract-spec-table th, .contract-spec-table td { white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.pnl-daily-table, .pnl-compare-table, .signal-compare-table, .entry-compare-table, .lifecycle-compare-table, .trade-master-table, .source-diff-table, .open-position-table, .audit-evidence-table, .pnl-statement-table, .pnl-flex-bridge-table, .contract-spec-table { overflow-x: hidden; }
+.pnl-daily-table table, .signal-compare-table table, .entry-compare-table table, .lifecycle-compare-table table, .trade-master-table table, .source-diff-table table, .open-position-table table, .audit-evidence-table table, .pnl-statement-table table, .pnl-flex-bridge-table table, .contract-spec-table table { min-width: 0; width: 100%; table-layout: fixed; }
+.pnl-daily-table th, .pnl-daily-table td, .signal-compare-table th, .signal-compare-table td, .entry-compare-table th, .entry-compare-table td, .lifecycle-compare-table th, .lifecycle-compare-table td, .trade-master-table th, .trade-master-table td, .source-diff-table th, .source-diff-table td, .open-position-table th, .open-position-table td, .audit-evidence-table th, .audit-evidence-table td, .pnl-statement-table th, .pnl-statement-table td, .pnl-flex-bridge-table th, .pnl-flex-bridge-table td, .contract-spec-table th, .contract-spec-table td { white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
 .pnl-daily-table th:nth-child(1), .pnl-daily-table td:nth-child(1) { width: 12%; }
 .pnl-daily-table th:nth-child(2), .pnl-daily-table td:nth-child(2) { width: 15%; }
 .pnl-daily-table th:nth-child(3), .pnl-daily-table td:nth-child(3) { width: 16%; }
@@ -207,6 +231,12 @@
 .lifecycle-compare-table th:nth-child(4), .lifecycle-compare-table td:nth-child(4) { width: 16%; }
 .lifecycle-compare-table th:nth-child(5), .lifecycle-compare-table td:nth-child(5) { width: 16%; }
 .lifecycle-compare-table th:nth-child(6), .lifecycle-compare-table td:nth-child(6) { width: 23%; }
+.trade-master-table th:nth-child(1), .trade-master-table td:nth-child(1) { width: 15%; }
+.trade-master-table th:nth-child(2), .trade-master-table td:nth-child(2) { width: 16%; }
+.trade-master-table th:nth-child(3), .trade-master-table td:nth-child(3) { width: 16%; }
+.trade-master-table th:nth-child(4), .trade-master-table td:nth-child(4) { width: 16%; }
+.trade-master-table th:nth-child(5), .trade-master-table td:nth-child(5) { width: 15%; }
+.trade-master-table th:nth-child(6), .trade-master-table td:nth-child(6) { width: 22%; }
 .source-diff-table th:nth-child(1), .source-diff-table td:nth-child(1) { width: 15%; }
 .source-diff-table th:nth-child(2), .source-diff-table td:nth-child(2) { width: 55%; }
 .source-diff-table th:nth-child(3), .source-diff-table td:nth-child(3) { width: 30%; }

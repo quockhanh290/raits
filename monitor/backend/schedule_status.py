@@ -179,6 +179,34 @@ def _evidence(
     return base
 
 
+def _stream_of(slot_id: str | None) -> str:
+    """LIVE_DAY_1415 -> LIVE_DAY. Same grouping run_scheduler uses for its own slot families."""
+    return str(slot_id or "").rsplit("_", 1)[0]
+
+
+def _annotate_incident_lifecycle(incidents: list[dict], due_evidence: list[tuple]) -> None:
+    """Mark each incident recovered when a LATER slot of the same sleeve executed cleanly.
+
+    Same-sleeve only: NKD running at 02:30 says nothing about whether the afternoon basket
+    is healthy. They are different processes against different instruments.
+    """
+    for incident in incidents:
+        stream = _stream_of(incident["slot_id"])
+        recovered_by = None
+        for _slot, evidence in due_evidence:
+            if (
+                evidence["state"] == "executed"
+                and _stream_of(evidence["slot_id"]) == stream
+                and str(evidence["slot_at"] or "") > str(incident["slot_at"] or "")
+            ):
+                # First clean slot after the failure, not the most recent one: this names the
+                # moment the stream came back, which is what "recovered at" has to mean.
+                recovered_by = evidence["slot_id"]
+                break
+        incident["lifecycle"] = "recovered" if recovered_by else "open"
+        incident["recovered_by"] = recovered_by
+
+
 def get_schedule_status(
     root: Path,
     observed_at: dt.datetime | None = None,
@@ -230,6 +258,13 @@ def get_schedule_status(
         evidence for _slot, evidence in due_evidence
         if evidence["state"] == "failed" or evidence["severity"] == "incident"
     ]
+    # A failure that a later slot in the same sleeve has already run past is history, not a
+    # live alarm. Without this the rail reads "attention required" for the rest of the day
+    # over an outage that ended hours ago — and an alarm that never clears is one the
+    # operator learns to ignore. The failure itself stays in `incidents`: six lost NKD entry
+    # slots are a fact about the night even once the stream is healthy again.
+    _annotate_incident_lifecycle(incidents, due_evidence)
+    open_incidents = [item for item in incidents if item["lifecycle"] == "open"]
 
     if observed_at is None:
         freshness = "missing"
@@ -264,5 +299,6 @@ def get_schedule_status(
         "evidence_available": log_available,
         "evidence": latest_evidence,
         "incidents": incidents,
+        "open_incidents": open_incidents,
         "unexplained_overdue": overdue_unexplained,
     }
