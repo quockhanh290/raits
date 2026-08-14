@@ -1418,10 +1418,10 @@
 
   function runnerSnapshotRows(rows) {
     if (!rows || !rows.length) return '<p class="detail-empty">No runner snapshot rows are available.</p>';
-    return `<div class="trade-table runner-snapshot-table"><table><thead><tr><th>date</th><th>equity</th><th>activity</th><th>open</th><th>runner</th><th>breaker</th></tr></thead><tbody>${rows.map(row => {
+    return `<div class="trade-table runner-snapshot-table"><table><thead><tr><th>date</th><th>equity</th><th>snapshot activity</th><th>log rejects</th><th>open</th><th>runner</th><th>breaker</th></tr></thead><tbody>${rows.map(row => {
       const aliveKnown = row.runner_alive !== undefined && row.runner_alive !== null;
       const alive = row.runner_alive === true;
-      return `<tr><td><b>${esc(row.date || '--')}</b><small>snapshot</small></td><td><b>${fmtEquity(row.equity)}</b><small>projected</small></td><td><b>${esc(row.entries ?? 0)} / ${esc(row.exits ?? 0)} / ${esc(row.rejected ?? 0)}</b><small>entries / exits / rejects</small></td><td><b>${esc(row.open_positions ?? 0)}</b><small>open positions</small></td><td><span class="fill-result ${aliveKnown ? alive ? 'ok' : 'bad' : 'watch'}">${aliveKnown ? alive ? 'ALIVE' : 'DOWN' : 'N/A'}</span><small>${esc(row.runner_pid || '--')}</small></td><td><span class="fill-result ${row.breaker_level === 'OK' ? 'ok' : row.breaker_level ? 'watch' : 'neutral'}">${esc(row.breaker_level || '--')}</span></td></tr>`;
+      return `<tr><td><b>${esc(row.date || '--')}</b><small>snapshot</small></td><td><b>${fmtEquity(row.equity)}</b><small>projected</small></td><td><b>${esc(row.entries ?? 0)} / ${esc(row.exits ?? 0)} / ${esc(row.rejected ?? 0)}</b><small>snapshot entries / exits / rejects</small></td><td><b>${esc(row.log_rejected ?? 0)}</b><small>Rejected Signals log parser</small></td><td><b>${esc(row.open_positions ?? 0)}</b><small>open positions</small></td><td><span class="fill-result ${aliveKnown ? alive ? 'ok' : 'bad' : 'watch'}">${aliveKnown ? alive ? 'ALIVE' : 'DOWN' : 'N/A'}</span><small>${esc(row.runner_pid || '--')}</small></td><td><span class="fill-result ${row.breaker_level === 'OK' ? 'ok' : row.breaker_level ? 'watch' : 'neutral'}">${esc(row.breaker_level || '--')}</span></td></tr>`;
     }).join('')}</tbody></table></div>`;
   }
 

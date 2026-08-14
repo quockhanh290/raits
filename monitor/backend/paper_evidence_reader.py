@@ -461,12 +461,23 @@ def _snapshot_rows(payload: dict[str, Any], limit: int = 8) -> list[dict[str, An
             "entries": len(decision.get("entries") or []),
             "exits": len(decision.get("exits") or []),
             "rejected": len(decision.get("rejected_detail") or []),
+            "log_rejected": 0,
             "open_positions": len(open_positions),
             "breaker_level": snap.get("breaker_level") or breaker.get("level"),
             "runner_alive": runner.get("alive"),
             "runner_pid": runner.get("pid"),
         })
     return rows
+
+
+def _rejection_counts_by_day(rejection_metrics: dict[str, Any]) -> dict[str, int]:
+    rows = (((rejection_metrics or {}).get("samples") or {}).get("rows") or [])
+    counts: dict[str, int] = {}
+    for row in rows:
+        day = row.get("day")
+        if day:
+            counts[day] = counts.get(day, 0) + 1
+    return counts
 
 
 def _slippage(records: list[dict[str, Any]], epoch: str | None) -> dict[str, Any]:
@@ -1883,6 +1894,9 @@ def _coverage_items(root: Path, state: dict[str, Any], payload: dict[str, Any], 
     position_rows = _position_rows(positions)
     unprotected = sum(1 for row in position_rows if row.get("status") != "PROTECTED")
     snapshot_rows = _snapshot_rows(payload)
+    log_rejections_by_day = _rejection_counts_by_day(rejection_metrics)
+    for row in snapshot_rows:
+        row["log_rejected"] = log_rejections_by_day.get(row.get("date"), 0)
     pvb_status, pvb_evidence, pvb_metrics = _paper_vs_backtest_status(
         pvb,
         _records(paper_inputs.get("paper_vs_backtest")),

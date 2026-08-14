@@ -242,6 +242,7 @@ def test_paper_evidence_uses_durable_artifacts_when_runner_slippage_is_empty(tmp
     assert coverage["current_protection"]["metrics"]["position_rows"][0]["status"] == "PROTECTED"
     assert coverage["state_persist"]["metrics"]["position_rows"][0]["stop_order_id"] == "42"
     assert coverage["runner_freshness"]["metrics"]["snapshot_rows"][-1]["date"] == "2026-08-11"
+    assert coverage["runner_freshness"]["metrics"]["snapshot_rows"][-1]["log_rejected"] == 0
     assert coverage["data_freshness"]["metrics"]["checks"][0]["key"] == "regime_freshness"
     assert coverage["open_incidents"]["metrics"]["issues"] == []
     assert coverage["sample_denominators"]["metrics"]["by_inst"] == {"M2K": 1, "MES": 1, "MYM": 1}
@@ -312,6 +313,8 @@ def test_paper_evidence_counts_candidate_gap_log_lines(tmp_path: Path):
     assert coverage["rejections"]["metrics"]["samples"]["rows"][0]["projected_risk_sized"] == 4200.0
     assert coverage["rejections"]["metrics"]["samples"]["rows"][0]["cap_risk_sized"] == 2500.0
     assert coverage["rejections"]["metrics"]["samples"]["rows"][0]["over_cap_risk_sized"] == 1700.0
+    assert coverage["runner_freshness"]["metrics"]["snapshot_rows"][-1]["rejected"] == 0
+    assert coverage["runner_freshness"]["metrics"]["snapshot_rows"][-1]["log_rejected"] == 1
     assert coverage["manual_intervention"]["metrics"]["candidate_log_lines"] == 1
     assert coverage["manual_intervention"]["metrics"]["candidate_days"] == ["2026-08-10"]
     assert payload["diagnostics"]["manual_intervention_candidate_lines"] == 1
