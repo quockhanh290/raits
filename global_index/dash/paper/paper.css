@@ -41,9 +41,28 @@
 .c1-metric.watch { box-shadow: inset 2px 0 0 var(--amber); }
 .c1-metric.bad { box-shadow: inset 2px 0 0 var(--red); }
 .c1-metric.ok { box-shadow: inset 2px 0 0 var(--green); }
+.c1-metric.observed, .c1-metric.pass { box-shadow: inset 2px 0 0 var(--green); }
+.c1-metric.pending, .c1-metric.needs-decision, .c1-metric.spec-gap, .c1-metric.data-gap { box-shadow: inset 2px 0 0 var(--amber); }
+.c1-metric.breach { box-shadow: inset 2px 0 0 var(--red); }
 .c1-metric.sample i { height: 4px; display: block; overflow: hidden; background: rgba(255,255,255,.05); border-radius: 1px; }
 .c1-metric.sample em { height: 100%; display: block; background: var(--amber); }
 .c1-metric.sample.ok em { background: var(--green); }
+.reference-group > div { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.coverage-ref { min-height: 96px; }
+.coverage-ref button, .coverage-ref em {
+  width: fit-content;
+  margin-top: 3px;
+  padding: 4px 7px;
+  color: var(--amber);
+  background: rgba(221,163,58,.06);
+  border: 1px solid rgba(221,163,58,.35);
+  border-radius: 4px;
+  font: 800 10px/1 var(--mono);
+  text-transform: uppercase;
+}
+.coverage-ref button { cursor: pointer; }
+.coverage-ref button:hover { color: var(--bright); border-color: var(--amber); }
+.coverage-ref em { color: var(--dim); font-style: normal; }
 .c1-more-info { min-width: 0; }
 .c1-more-info summary { min-height: 36px; padding: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--amber); cursor: pointer; font: 800 14px/1.2 var(--mono); text-transform: uppercase; }
 .c1-more-info summary small { color: var(--dim); font: 10px/1.2 var(--mono); text-transform: none; }

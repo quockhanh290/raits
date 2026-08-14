@@ -159,9 +159,10 @@
 
   function c1ReasonChip(text) {
     let cls = 'neutral';
-    if (/within limit|scope|accepted|verified|no false|no double|match|persist|proven|complete/.test(text)) cls = 'ok';
-    if (/no samples|incomplete|missing|not structured|unverified|pending|required unset|stress missing|normal missing/.test(text)) cls = 'watch';
-    if (/over limit|failed|halt|breach|mismatch/.test(text)) cls = 'bad';
+    const value = String(text || '').toLowerCase();
+    if (/within limit|scope|accepted|verified|no false|no double|match|persist|proven|complete|pass|observed/.test(value)) cls = 'ok';
+    if (/no samples|incomplete|missing|not structured|unverified|pending|required unset|stress missing|normal missing|needs/.test(value)) cls = 'watch';
+    if (/over limit|failed|halt|breach|mismatch/.test(value)) cls = 'bad';
     return `<span class="${cls}">${esc(text)}</span>`;
   }
 
@@ -189,6 +190,41 @@
     return `<section class="c1-metric-group"><h3>${esc(title)}</h3>${note ? `<p>${esc(note)}</p>` : ''}<div>${items.join('')}</div></section>`;
   }
 
+  function coverageByKey(coverage, key) {
+    return (coverage || []).find(item => item.key === key) || null;
+  }
+
+  function coverageRefMetric(label, item, purpose) {
+    const status = item && item.status ? item.status : 'MISSING';
+    const cls = statusClass(status);
+    const key = item && item.key ? item.key : '';
+    const button = key ? `<button type="button" data-coverage-ref="${esc(key)}">Open detail</button>` : '<em>no detail</em>';
+    return `<article class="c1-metric coverage-ref ${cls}"><span>${esc(label)}</span><b>${esc(status)}</b><small>${esc(purpose || item?.evidence || '--')}</small>${button}</article>`;
+  }
+
+  function coverageRefGroup(items, note = 'Cross-checks against Additional Coverage detail panels so the top status and drill-down evidence stay tied together.') {
+    return `<section class="c1-metric-group reference-group"><h3>Cross-reference</h3><p>${esc(note)}</p><div>${items.join('')}</div></section>`;
+  }
+
+  function bindCoverageReferenceButtons(coverage) {
+    document.querySelectorAll('[data-coverage-ref]').forEach(button => {
+      button.addEventListener('click', () => {
+        selectedCoverageKey = button.getAttribute('data-coverage-ref') || selectedCoverageKey;
+        renderCoverage(coverage);
+        $('paperCoverage').scrollIntoView({ block: 'start' });
+      });
+    });
+  }
+
+  function compositeStatus(primary, refs = []) {
+    const statuses = [primary, ...refs].map(value => String(value || '').toUpperCase());
+    if (statuses.some(value => value === 'BREACH' || value === 'FAIL')) return 'BREACH';
+    if (statuses.some(value => value.includes('GAP') || value.includes('NEEDS'))) return statuses.find(value => value.includes('GAP') || value.includes('NEEDS'));
+    if (statuses.some(value => value === 'PENDING' || value === 'WATCH')) return 'PENDING';
+    if (statuses.some(value => value === 'UNKNOWN' || value === 'MISSING')) return 'UNKNOWN';
+    return statuses.some(value => value === 'PASS') ? 'PASS' : (primary || 'UNKNOWN');
+  }
+
   function coverageRuleRail() {
     const parts = [
       ['Duration', '60 days'],
@@ -209,10 +245,13 @@
     return `<details class="c1-more-info coverage-more-info"><summary><span>More info</span><small>days, exits, sources</small></summary><div class="c1-more-grid"><section class="more-section"><h3>Observed days</h3><p class="detail-copy">Paper duration is counted from durable paper_history.json days in the active paper epoch. Same-day overwrites count once per date.</p><dl class="metric-list">${metricLine('observed', duration.observed ?? 0)}${metricLine('target', duration.target ?? 60)}${metricLine('days', days.length ? days.join(', ') : '--')}</dl></section><section class="more-section"><h3>Regime and exits</h3><p class="detail-copy">Regime coverage comes from trade_log rows. Exit path coverage counts normalized CLOSE exit reasons; monitor interprets the documented word "several" as three samples per path.</p><dl class="metric-list">${metricLine('regimes', regimes.length ? regimes.join(' + ') : '--')}${metricLine('CHANDELIER', exits.CHANDELIER ?? 0)}${metricLine('MAX_HOLD', exits.MAX_HOLD ?? 0)}${metricLine('STP', exits.STP ?? 0)}${metricLine('target each', exitGate.metrics?.target_each ?? 3)}</dl></section><section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(sources)}</ul></section><p class="detail-note">Coverage progress can remain pending even when the system is healthy. It is sample coverage, not an operational failure by itself.</p></div></details>`;
   }
 
-  function updateCoveragePanel(gates) {
+  function updateCoveragePanel(gates, coverage) {
     const durationGate = gates.find(item => item.key === 'paper_duration') || {};
     const regimeGate = gates.find(item => item.key === 'regime_coverage') || {};
     const exitGate = gates.find(item => item.key === 'exit_path_coverage') || {};
+    const fillQuality = coverageByKey(coverage, 'fill_quality');
+    const sampleDenominators = coverageByKey(coverage, 'sample_denominators');
+    const sameDayMultiDay = coverageByKey(coverage, 'same_day_multi_day');
     const duration = durationGate.metrics || {};
     const regimes = (regimeGate.metrics && regimeGate.metrics.regimes) || [];
     const exits = (exitGate.metrics && exitGate.metrics.exits) || {};
@@ -243,6 +282,11 @@
         c1SampleMetric('MAX_HOLD', exits.MAX_HOLD ?? 0, targetEach, 'MAX_HOLD exit samples.', (exits.MAX_HOLD ?? 0) >= targetEach ? 'ok' : 'watch'),
         c1SampleMetric('STP', exits.STP ?? 0, targetEach, 'Stop exit samples.', (exits.STP ?? 0) >= targetEach ? 'ok' : 'watch'),
         c1Metric('Complete paths', `${completePaths}/3`, 'Exit paths meeting sample target.', completePaths >= 3 ? 'ok' : 'watch'),
+      ]),
+      coverageRefGroup([
+        coverageRefMetric('Fill quality', fillQuality, 'Checks retained trade history rows behind the sample counts.'),
+        coverageRefMetric('Sample buckets', sampleDenominators, 'Shows instrument/cluster denominators used to judge coverage breadth.'),
+        coverageRefMetric('Holding windows', sameDayMultiDay, 'Splits same-day and multi-day exits that feed exit-path coverage.'),
       ]),
       coverageMoreInfo(durationGate, regimeGate, exitGate),
     ].join('');
@@ -295,7 +339,8 @@
 
   function updateSTPPanel(gates, coverage) {
     const gate = gates.find(item => item.key === 'stp_verification') || {};
-    const placement = coverage.find(item => item.key === 'stp_placement') || {};
+    const placement = coverageByKey(coverage, 'stp_placement') || {};
+    const currentProtection = coverageByKey(coverage, 'current_protection');
     const m = gate.metrics || {};
     const p = placement.metrics || {};
     const accepted = m.stp_accepted ?? p.accepted ?? 0;
@@ -306,13 +351,14 @@
     const checks = m.checks ?? 0;
     const latestRecord = latestStpRecord(m.records || []);
     const latestPass = latestRecord && latestRecord.verified && !latestRecord.false_halt && !latestRecord.double_stp;
-    const status = gate.status || 'UNKNOWN';
+    const status = compositeStatus(gate.status || 'UNKNOWN', [placement.status]);
     const reasons = [
+      gate.status && placement.status ? `verify ${gate.status} / placement ${placement.status}` : null,
       failed ? `placement failed ${failed}` : `placement accepted ${accepted}`,
       verifyLines ? `STP-VERIFY ${verifyLines}` : 'STP-VERIFY missing',
       haltLines ? `B3 HALT ${haltLines}` : 'no false halt evidence',
       checks ? `structured checks ${checks}` : 'structured check missing',
-    ];
+    ].filter(Boolean);
 
     $('stpProgressTitle').textContent = `accepted ${accepted} | failed ${failed} | verify ${verifyLines}`;
     $('stpProgressReason').innerHTML = reasons.map(c1ReasonChip).join('');
@@ -331,6 +377,10 @@
         c1Metric('Broker reconcile', latestRecord ? `${latestRecord.date || '--'} ${latestPass ? 'PASS' : 'REVIEW'}` : '--', 'Latest reviewed STP record from monitor/paper_inputs.json.', latestPass ? 'ok' : 'watch'),
         c1Metric('Record evidence', latestRecord ? (latestRecord.evidence || '--') : '--', 'Current IBKR/runner reconciliation evidence, when available.', latestPass ? 'ok' : ''),
       ]),
+      coverageRefGroup([
+        coverageRefMetric('Placement after OPEN', placement, 'Deferred-stop route evidence: accept/fail/close-before-arm reconciliation.'),
+        coverageRefMetric('Current protection', currentProtection, 'Latest open positions with persisted stop_order_id protection.'),
+      ], 'Composite STP status uses the verification gate plus placement/protection coverage; a placement breach keeps this panel red even when the structured verification record passes.'),
       stpMoreInfo(gate, placement),
     ].join('');
   }
@@ -355,8 +405,9 @@
 
   function updateB3Panel(gates, coverage) {
     const gate = gates.find(item => item.key === 'b3_reconcile') || {};
-    const statePersist = coverage.find(item => item.key === 'state_persist') || {};
-    const currentProtection = coverage.find(item => item.key === 'current_protection') || {};
+    const statePersist = coverageByKey(coverage, 'state_persist') || {};
+    const currentProtection = coverageByKey(coverage, 'current_protection') || {};
+    const openIncidents = coverageByKey(coverage, 'open_incidents');
     const m = gate.metrics || {};
     const state = statePersist.metrics || {};
     const protection = currentProtection.metrics || {};
@@ -390,6 +441,11 @@
         c1Metric('Protected', `${protectedCount}/${positionCount}`, 'Current persisted positions with stop_order_id.', positionCount && protectedCount >= positionCount ? 'ok' : 'watch'),
         c1Metric('Live state', statePersist.status || '--', 'Current state-persist coverage status.', statusClass(statePersist.status || '') === 'observed' ? 'ok' : ''),
       ]),
+      coverageRefGroup([
+        coverageRefMetric('State persist', statePersist, 'Latest runner-state persisted-position parity used as current-state context.'),
+        coverageRefMetric('Current protection', currentProtection, 'Latest stop_order_id protection context for open positions.'),
+        coverageRefMetric('Open issues', openIncidents, 'Operational issue list that should surface unexplained reconcile items.'),
+      ]),
       b3MoreInfo(gate, statePersist, currentProtection),
     ].join('');
   }
@@ -405,14 +461,18 @@
     return `<span class="c1-spec-label">Active rule</span>${parts.map(([label, value]) => `<span><b>${esc(label)}</b>${esc(value)}</span>`).join('')}`;
   }
 
-  function twsMoreInfo(gate) {
+  function twsMoreInfo(gate, runnerFreshness) {
     const m = gate.metrics || {};
+    const runner = (runnerFreshness && runnerFreshness.metrics) || {};
     const days = m.candidate_days || [];
-    return `<details class="c1-more-info tws-more-info"><summary><span>More info</span><small>candidate days, input format, sources</small></summary><div class="c1-more-grid"><section class="more-section"><h3>Candidate evidence</h3><p class="detail-copy">Purpose: separate noisy connectivity/restart log candidates from proven restart nights. Candidate lines show that IBKR/TWS connectivity events happened; they do not prove the restart workflow was completed.</p><dl class="metric-list">${metricLine('candidate log lines', m.candidate_log_lines ?? 0)}${metricLine('candidate days', days.length ? days.join(', ') : '--')}${metricLine('structured records', m.records ?? 0)}${metricLine('proven restart nights', m.restart_nights ?? 0)}${metricLine('required nights', m.required_nights ?? '--')}</dl></section><section class="more-section"><h3>Structured input</h3><p class="detail-copy">To turn a candidate day into a proven night, monitor/paper_inputs.json needs a tws_restart_nights record with restart_proven, runner_resumed, and broker_verified all true. A tws_restart_spec.min_nights value is also required before the gate can pass.</p><dl class="metric-list">${metricLine('input path', 'monitor/paper_inputs.json')}${metricLine('required flags', 'restart_proven + runner_resumed + broker_verified')}${metricLine('spec field', 'tws_restart_spec.min_nights')}${metricLine('gate evidence', gate.evidence || '--')}</dl></section><section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(gate.sources)}</ul></section><p class="detail-note">This panel does not count raw reconnect/disconnect text as a successful restart. It remains a SPEC_GAP until a minimum-night threshold exists, then PENDING until enough structured nights are proven.</p></div></details>`;
+    return `<details class="c1-more-info tws-more-info"><summary><span>More info</span><small>candidate days, input format, sources</small></summary><div class="c1-more-grid"><section class="more-section"><h3>Candidate evidence</h3><p class="detail-copy">Purpose: separate noisy connectivity/restart log candidates from proven restart nights. Candidate lines show that IBKR/TWS connectivity events happened; they do not prove the restart workflow was completed.</p><dl class="metric-list">${metricLine('candidate log lines', m.candidate_log_lines ?? 0)}${metricLine('candidate days', days.length ? days.join(', ') : '--')}${metricLine('structured records', m.records ?? 0)}${metricLine('proven restart nights', m.restart_nights ?? 0)}${metricLine('required nights', m.required_nights ?? '--')}</dl></section><section class="more-section"><h3>Structured input</h3><p class="detail-copy">To turn a candidate day into a proven night, monitor/paper_inputs.json needs a tws_restart_nights record with restart_proven, runner_resumed, and broker_verified all true. A tws_restart_spec.min_nights value is also required before the gate can pass.</p><dl class="metric-list">${metricLine('input path', 'monitor/paper_inputs.json')}${metricLine('required flags', 'restart_proven + runner_resumed + broker_verified')}${metricLine('spec field', 'tws_restart_spec.min_nights')}${metricLine('gate evidence', gate.evidence || '--')}</dl></section><section class="more-section"><h3>Runner freshness reference</h3><p class="detail-copy">Runner freshness proves snapshots are still being projected after candidate connectivity events; it does not prove restart recovery by itself.</p><dl class="metric-list">${metricLine('runner snapshots', runner.snapshot_rows?.length ?? '--')}${metricLine('runner coverage status', runnerFreshness?.status || '--')}</dl></section><section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(gate.sources)}</ul></section><p class="detail-note">This panel does not count raw reconnect/disconnect text as a successful restart. It remains a SPEC_GAP until a minimum-night threshold exists, then PENDING until enough structured nights are proven.</p></div></details>`;
   }
 
-  function updateTWSPanel(gates) {
+  function updateTWSPanel(gates, coverage) {
     const gate = gates.find(item => item.key === 'tws_restart_nights') || {};
+    const runnerFreshness = coverageByKey(coverage, 'runner_freshness');
+    const dataFreshness = coverageByKey(coverage, 'data_freshness');
+    const logHygiene = coverageByKey(coverage, 'log_hygiene');
     const m = gate.metrics || {};
     const candidateLines = m.candidate_log_lines ?? 0;
     const candidateDays = (m.candidate_days || []).length;
@@ -442,12 +502,19 @@
         c1Metric('Records', records, 'Structured tws_restart_nights records.', records ? 'ok' : 'watch'),
         c1Metric('Gate status', status, 'Current TWS restart gate status.', status === 'PASS' ? 'ok' : status === 'SPEC_GAP' ? 'watch' : ''),
       ]),
-      twsMoreInfo(gate),
+      coverageRefGroup([
+        coverageRefMetric('Runner freshness', runnerFreshness, 'Confirms runner snapshots continue after connectivity candidates.'),
+        coverageRefMetric('Data freshness', dataFreshness, 'Shows model/data freeze and freshness gates around restart windows.'),
+        coverageRefMetric('Log hygiene', logHygiene, 'Separates production evidence from filtered test/noise log rows.'),
+      ]),
+      twsMoreInfo(gate, runnerFreshness),
     ].join('');
   }
 
-  function updateC1Panel(gates, summary) {
+  function updateC1Panel(gates, summary, coverage) {
     const gate = gates.find(item => item.key === 'c1_slippage') || {};
+    const fillQuality = coverageByKey(coverage, 'fill_quality');
+    const contractSpec = coverageByKey(coverage, 'contract_spec_guard');
     const m = gate.metrics || {};
     const spec = m.spec || {};
     const target = Number(spec.min_n || 0);
@@ -479,6 +546,10 @@
         c1SampleMetric('STP samples', stpN, target, 'Progress toward required STP close sample count.', target && stpN >= target ? 'ok' : 'watch'),
         c1Metric('Excluded closes', m.signal_close_with_stop_ref ?? 0, 'Signal/market closes shown for diagnosis, not counted in C1 mean.'),
         c1Metric('Unknown tick rows', m.unknown_tick_records ?? 0, 'Rows that could not be converted from points to ticks.'),
+      ]),
+      coverageRefGroup([
+        coverageRefMetric('Fill quality', fillQuality, 'Uses the same retained trade_log fill rows as C1 trade details.'),
+        coverageRefMetric('Contract spec guard', contractSpec, 'Confirms tick size/point value conversions before points become ticks or dollars.'),
       ]),
       c1MoreInfo(gate, openN, openMean, stpN, stpMean),
     ].join('');
@@ -1695,11 +1766,11 @@
     $('regimesSeen').textContent = (summary.regimes || []).length ? summary.regimes.join(' + ') : 'None';
     $('exitCoverage').textContent = `${summary.exit_paths_complete ?? 0} / 3`;
     $('slippageMean').textContent = fmtTicks(summary.c1_open_mean);
-    updateCoveragePanel(gates);
-    updateC1Panel(gates, summary);
+    updateCoveragePanel(gates, coverage);
+    updateC1Panel(gates, summary, coverage);
     updateSTPPanel(gates, coverage);
     updateB3Panel(gates, coverage);
-    updateTWSPanel(gates);
+    updateTWSPanel(gates, coverage);
     $('paperSource').textContent = `Paper epoch ${payload.epoch || 'missing'} | source ${data.source || 'unknown'} | observed ${data.observed_at || 'unknown'}`;
     renderCoverage(coverage);
     $('evidenceGaps').innerHTML = (payload.gaps || []).map(gapItem).join('');
@@ -1710,6 +1781,7 @@
         $('paperCoverage').scrollIntoView({ block: 'start' });
       });
     });
+    bindCoverageReferenceButtons(coverage);
     const readiness = $('overallStatus').parentElement;
     readiness.classList.toggle('unknown', sourceMissing);
     readiness.classList.toggle('complete', complete);

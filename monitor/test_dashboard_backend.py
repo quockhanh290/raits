@@ -648,7 +648,7 @@ def test_paper_dashboard_exposes_c1_observed_detail():
 
     assert "if (value == null || value === '') return '--';" in source
     assert "function updateC1Progress(gates, summary)" not in source
-    assert "function updateC1Panel(gates, summary)" in source
+    assert "function updateC1Panel(gates, summary, coverage)" in source
     assert "sample gate incomplete" in source
     assert "over limit now" in source
     assert "function c1ReasonChip" in source
@@ -686,6 +686,11 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "function updateB3Panel" in source
     assert "function b3MoreInfo" in source
     assert "function updateTWSPanel" in source
+    assert "function coverageRefMetric" in source
+    assert "function coverageRefGroup" in source
+    assert "function bindCoverageReferenceButtons" in source
+    assert "function compositeStatus" in source
+    assert "data-coverage-ref" in source
     assert "function twsMoreInfo" in source
     assert "function groupedCoverage" in source
     assert "function pnlCompareDetail" in source
@@ -860,6 +865,10 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "<dt>purpose</dt>" in source
     assert "gap-status-" in source
     assert "Observed data" in source
+    assert "Cross-reference" in source
+    assert "Placement after OPEN" in source
+    assert "Composite STP status uses the verification gate plus placement/protection coverage" in source
+    assert "Runner freshness proves snapshots are still being projected" in source
     assert "Active spec" in source
     assert "Signal/market closes shown for diagnosis" in source
     assert "Raw cumulative stats" in source
@@ -903,6 +912,8 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "span.watch" in css
     assert "c1-spec-summary" not in css
     assert "c1-metric.sample" in css
+    assert "reference-group" in css
+    assert "coverage-ref button" in css
     assert "trade-table" in css
     assert "contract-spec-table" in css
     assert "pnl-compare-table" in css
