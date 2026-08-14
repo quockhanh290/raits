@@ -3,6 +3,17 @@
   const $ = id => document.getElementById(id);
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
   let selectedCoverageKey = 'paper_vs_backtest';
+  let selectedPnlTab = 'overview';
+  const pnlTabKeys = ['overview', 'trades', 'decision', 'timeline', 'audit'];
+
+  function checkedPnlTab(key) {
+    if (!pnlTabKeys.includes(selectedPnlTab)) selectedPnlTab = 'overview';
+    return selectedPnlTab === key ? ' checked' : '';
+  }
+
+  function auditChip(label = 'audited') {
+    return `<span class="audit-chip">${esc(label)}</span>`;
+  }
 
   function fmtTicks(value) {
     if (value == null || value === '') return '--';
@@ -529,7 +540,7 @@
       const cls = classification === 'MATCHED_ENTRY' ? 'ok' : 'bad';
       const directionClass = String(row.direction || '').toLowerCase();
       const brokerCls = row.broker_verified ? 'ok' : 'watch';
-      const audit = row.audit_ref ? `<a class="audit-link" href="#${esc(row.audit_ref)}" title="${esc(row.audit_label || 'open audit log')}">*</a>` : '';
+      const audit = row.audit_ref ? `<a class="audit-link" href="#${esc(row.audit_ref)}" title="${esc(row.audit_label || 'open audit log')}">${auditChip()}</a>` : '';
       return `<tr><td><span class="fill-result ${cls}">${esc(classification)}</span><small>${esc(row.date || '--')}</small></td><td><b>${audit}${esc(row.inst || '--')} <span class="direction-chip ${directionClass}">${esc(row.direction || '--')}</span></b></td><td><b>${fmtPrice(row.paper_fill_price)}</b><small>expected ${fmtPrice(row.paper_expected_entry)}</small></td><td><b>${fmtPrice(row.backtest_entry_price)}</b><small>${esc(row.backtest_sample?.source || 'replay admitted entry')}</small></td><td><span class="fill-result ${brokerCls}">${row.broker_verified ? 'VERIFIED' : 'MISSING'}</span><small>${fmtPrice(row.broker_statement_price)}</small></td><td><b>${fmtSigned2(row.paper_fill_vs_backtest)}</b><small>fill-vs-bt | fill-vs-exp ${fmtSigned2(row.paper_fill_vs_expected)}</small></td><td><b>${esc(row.reason || '--')}</b><small>Flex-vs-fill ${fmtSigned2(row.broker_vs_paper_fill)}</small></td></tr>`;
     }).join('')}</tbody></table></div>`;
   }
@@ -563,7 +574,7 @@
     return `${tableVerdict(verdict, 'Lifecycle parity', summary, [`rows ${rows.length}`, `diff rows ${mismatches}`, `missing source ${missing}`, `P-B ${paperBacktestRecon.label}`, `P-F ${paperFlexRecon.label}`])}<div class="trade-table lifecycle-compare-table"><table><thead><tr><th>class</th><th>trade</th><th>paper actual</th><th>backtest</th><th>Flex</th><th>diff/reason</th></tr></thead><tbody>${rows.map(row => {
       const cls = row.classification === 'MATCHED_LIFECYCLE' ? 'ok' : row.classification === 'THREE_WAY_DIFF' ? 'watch' : 'bad';
       const directionClass = String(row.direction || '').toLowerCase();
-      const audit = row.audit_ref ? `<a class="audit-link" href="#${esc(row.audit_ref)}" title="${esc(row.audit_label || 'open audit log')}">*</a>` : '';
+      const audit = row.audit_ref ? `<a class="audit-link" href="#${esc(row.audit_ref)}" title="${esc(row.audit_label || 'open audit log')}">${auditChip()}</a>` : '';
       return `<tr><td><span class="fill-result ${cls}">${esc(row.classification || '--')}</span></td><td><b>${audit}${esc(row.inst || '--')} <span class="direction-chip ${directionClass}">${esc(row.direction || '--')}</span></b><small>${esc(row.entry_day || '--')}</small></td>${lifecycleSideCell(row.paper, 'paper')}${lifecycleSideCell(row.backtest, 'backtest')}${lifecycleSideCell(row.flex, 'Flex')}<td><b>${fmtMoney(row.paper_minus_backtest_pnl)}</b><small>paper-bt | paper-Flex ${fmtMoney(row.paper_minus_flex_pnl)}</small><small>${esc(row.reason || '--')}</small></td></tr>`;
     }).join('')}</tbody><tfoot><tr class="total-row"><td><span class="fill-result ${paperBacktestRecon.cls}">TOTAL</span></td><td><b>${esc(rows.length)} lifecycle row(s)</b><small>closed/open parity rows</small></td><td><b>${fmtMoney(pl.paper_epoch_closed_realized)}</b><small>paper realised grid</small></td><td><b>${fmtMoney(pl.backtest_epoch_closed_realized)}</b><small>backtest realised grid</small></td><td><b>${fmtMoney(pl.flex_epoch_rebased_realized ?? pl.statement_entry_epoch_realized)}</b><small>Flex zero-base grid</small></td><td><b class="pnl-value ${moneyClass(paperBacktestTotal)}">paper-bt ${fmtMoney(paperBacktestTotal)}</b><small><span class="fill-result ${paperBacktestRecon.cls}">${paperBacktestRecon.label}</span> vs grid ${fmtMoney(pl.paper_minus_backtest_realized)}</small><small><span class="fill-result ${paperFlexRecon.cls}">${paperFlexRecon.label}</span> paper-Flex ${fmtMoney(paperFlexTotal)} vs grid ${fmtMoney(pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized)}</small></td></tr></tfoot></table></div>`;
   }
@@ -604,7 +615,7 @@
       const hasDelta = Math.abs(Number(row.paper_minus_backtest_pnl || 0)) > 0.005 || Math.abs(Number(row.paper_minus_flex_pnl || 0)) > 0.005;
       const rowVerdict = missing ? 'BREACH' : hasDelta ? 'EXPLAINED' : 'PASS';
       const directionClass = String(row.direction || '').toLowerCase();
-      const audit = row.audit_ref ? `<a class="audit-link" href="#${esc(row.audit_ref)}" title="${esc(row.audit_label || 'open audit log')}">*</a>` : '';
+      const audit = row.audit_ref ? `<a class="audit-link" href="#${esc(row.audit_ref)}" title="${esc(row.audit_label || 'open audit log')}">${auditChip()}</a>` : '';
       return `<tr><td><span class="fill-result ${verdictClass(rowVerdict)}">${esc(rowVerdict)}</span><b>${audit}${esc(row.inst || '--')} <span class="direction-chip ${directionClass}">${esc(row.direction || '--')}</span></b><small>${esc(row.entry_day || '--')} | ${esc(row.classification || '--')}</small></td>${compactLifecycleCell(row.paper, 'paper')}${compactLifecycleCell(row.backtest, 'backtest')}${compactLifecycleCell(row.flex, 'Flex')}<td><b class="pnl-value ${moneyClass(row.paper_minus_backtest_pnl)}">P-B ${fmtMoney(row.paper_minus_backtest_pnl)}</b><small>P-F ${fmtMoney(row.paper_minus_flex_pnl)}</small></td><td><b>${esc(reason.reason_code || row.reason || '--')}</b><small>${esc(reason.reason || row.reason || '--')}</small></td></tr>`;
     }).join('')}</tbody><tfoot><tr class="total-row"><td><span class="fill-result ${verdictClass(verdict)}">TOTAL</span></td><td><b>${fmtMoney(pl.paper_epoch_closed_realized)}</b><small>paper grid</small></td><td><b>${fmtMoney(pl.backtest_epoch_closed_realized)}</b><small>backtest grid</small></td><td><b>${fmtMoney(pl.flex_epoch_rebased_realized ?? pl.statement_entry_epoch_realized)}</b><small>Flex grid</small></td><td><b class="pnl-value ${moneyClass(pbTotal)}">P-B ${fmtMoney(pbTotal)}</b><small>P-F ${fmtMoney(pfTotal)}</small></td><td><span class="fill-result ${pbRecon.cls}">${pbRecon.label}</span><small>P-F ${pfRecon.label}</small></td></tr></tfoot></table></div>`;
   }
@@ -646,7 +657,7 @@
     const moneyCls = moneyKind === 'text' ? 'component-text' : moneyClass(money);
     const moneyText = moneyKind === 'text' ? esc(money ?? '--') : fmtMoney(money);
     const refText = ref == null || ref === '' ? '--' : esc(ref);
-    return `<span class="component-ref">${refText}</span><span class="${moneyCls}">${moneyText}</span>`;
+    return `<span class="component-primary ${moneyCls}">${moneyText}</span><span class="component-ref">${refText}</span>`;
   }
 
   function componentAmount(value, label = null) {
@@ -679,8 +690,8 @@
   }
 
   function priceRefCell(price, pointValue, qty, openLabel = '--') {
-    if (price == null || price === '') return `<span class="component-ref">pts --</span><span class="component-text">${esc(openLabel)}</span>`;
-    return `<span class="component-ref">${esc(`${fmtPrice(price)} pts`)}</span><span class="component-text">${fmtDollar(priceUsd(price, pointValue, qty))}</span>`;
+    if (price == null || price === '') return `<span class="component-primary component-text">${esc(openLabel)}</span><span class="component-ref">pts --</span>`;
+    return `<span class="component-primary component-text">${fmtDollar(priceUsd(price, pointValue, qty))}</span><span class="component-ref">${esc(`${fmtPrice(price)} pts`)}</span>`;
   }
 
   function componentCompareGrid(row = {}) {
@@ -750,6 +761,27 @@
     return `<small>cost model: model cost = commission + entry/exit modeled slippage; comm ${fmtMoney(cm.commission_rt)} RT | slip ${esc(cm.slippage_ticks_per_side ?? '--')} ticks/side | tick ${fmtMoney(cm.tick_value)}</small>`;
   }
 
+  function auditGroupKey(row = {}, fallback = 'audit evidence') {
+    const text = `${row.trade_id || ''} ${row.line || ''} ${row.source || ''}`;
+    const tradeId = String(row.trade_id || '').trim();
+    if (tradeId) return tradeId;
+    const inst = (text.match(/\b(MES|MNQ|M2K|MYM|MNKD)\b/i) || [])[1];
+    const day = (text.match(/\b20\d{2}-\d{2}-\d{2}\b/) || [])[0];
+    if (inst && day) return `${inst.toUpperCase()} ${day}`;
+    return fallback;
+  }
+
+  function groupedAuditEvidence(evidence = [], fallback = 'audit evidence') {
+    if (!evidence.length) return '<p class="detail-empty">No focused signal-path evidence lines are available.</p>';
+    const groups = new Map();
+    evidence.forEach(row => {
+      const key = auditGroupKey(row, fallback);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(row);
+    });
+    return `<div class="audit-log-groups">${Array.from(groups.entries()).map(([key, rows]) => `<details class="audit-log-group"><summary>${auditChip()}<b>${esc(key)}</b><small>${esc(rows.length)} evidence line(s)</small></summary><div class="trade-table audit-evidence-table"><table><thead><tr><th>source</th><th>evidence</th></tr></thead><tbody>${rows.slice(0, 18).map(row => `<tr><td><b>${esc(row.source || '--')}</b></td><td>${esc(row.line || '--')}</td></tr>`).join('')}</tbody></table></div></details>`).join('')}</div>`;
+  }
+
   function avgField(rows, getter) {
     const values = (rows || []).map(getter).map(Number).filter(Number.isFinite);
     return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
@@ -774,7 +806,7 @@
     ].join('')}</div>`;
   }
 
-  function sourceDiffAnalyzerRows(lifecycleCompare, pl = {}) {
+  function sourceDiffAnalyzerRows(lifecycleCompare, pl = {}, compare = null) {
     const rows = (lifecycleCompare && lifecycleCompare.rows) || [];
     if (!rows.length) return '<p class="detail-empty">No source diff rows are available.</p>';
     const pbTotal = Number.isFinite(Number(lifecycleCompare.paper_minus_backtest_sum)) ? Number(lifecycleCompare.paper_minus_backtest_sum) : sumField(rows, 'paper_minus_backtest_pnl');
@@ -788,7 +820,7 @@
       : verdict === 'EXPLAINED'
         ? 'Component-level deltas exist, but the totals reconcile to the headline P&L grid.'
         : 'Component totals do not reconcile to the headline grid; this needs audit before trusting the variance.';
-    return `${tableVerdict(verdict, 'Component variance', summary, [`rows ${rows.length}`, `non-zero delta ${nonZero}`, `P-B ${pbRecon.label}`, `P-F ${pfRecon.label}`])}<div class="trade-table source-diff-table"><table><thead><tr><th>trade</th><th>side-by-side P&amp;L components</th><th>variance</th></tr></thead><tbody>${rows.map(row => {
+    return `${renderVerdict(backendVerdict(compare, 'components'), verdict, 'Component variance', summary, [`rows ${rows.length}`, `non-zero delta ${nonZero}`, `P-B ${pbRecon.label}`, `P-F ${pfRecon.label}`])}<div class="trade-table source-diff-table"><table><thead><tr><th>trade</th><th>side-by-side P&amp;L components</th><th>variance</th></tr></thead><tbody>${rows.map(row => {
       const paper = row.paper || {};
       const backtest = row.backtest || {};
       const flex = row.flex || {};
@@ -807,7 +839,7 @@
     const statement = (compare && compare.ibkr_statement) || {};
     const evidence = audit.evidence || [];
     const status = audit.status === 'BREACH' ? 'BREACH' : evidence.length ? 'EXPLAINED' : 'PENDING';
-    return `${tableVerdict(status, 'Signal path audit', evidence.length ? 'Focused evidence is attached for the audited signal/path mismatch.' : 'No focused evidence lines are attached yet.', [`evidence ${evidence.length}`, `Flex fills ${statement.fills_count ?? 0}`])}<dl class="metric-list reconcile-list">${metricLine('audit status', audit.status || '--')}${metricLine('focus', audit.focus || '--')}${metricLine('path classification', audit.classification || '--')}${metricLine('dependency', audit.dependency_note || '--')}${metricLine('Flex statement', `${statement.status || '--'} | ${statement.path || '--'} | fills ${statement.fills_count ?? 0}, closed ${statement.closed_count ?? 0}, open ${statement.open_lot_count ?? 0}`)}</dl>${evidence.length ? `<div class="trade-table audit-evidence-table"><table><thead><tr><th>source</th><th>evidence</th></tr></thead><tbody>${evidence.slice(0, 18).map(row => `<tr><td><b>${esc(row.source || '--')}</b></td><td>${esc(row.line || '--')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="detail-empty">No focused signal-path evidence lines are available.</p>'}`;
+    return `${tableVerdict(status, 'Signal path audit', evidence.length ? 'Focused evidence is attached for the audited signal/path mismatch.' : 'No focused evidence lines are attached yet.', [`evidence ${evidence.length}`, `Flex fills ${statement.fills_count ?? 0}`])}<dl class="metric-list reconcile-list">${metricLine('audit status', audit.status || '--')}${metricLine('focus', audit.focus || '--')}${metricLine('path classification', audit.classification || '--')}${metricLine('dependency', audit.dependency_note || '--')}${metricLine('Flex statement', `${statement.status || '--'} | ${statement.path || '--'} | fills ${statement.fills_count ?? 0}, closed ${statement.closed_count ?? 0}, open ${statement.open_lot_count ?? 0}`)}</dl>${groupedAuditEvidence(evidence, audit.focus || 'signal path')}`;
   }
 
   function backtestArtifactAuditBlock(compare) {
@@ -818,7 +850,7 @@
     const parquet = audit.parquet || {};
     const cls = audit.status === 'BREACH' ? 'bad' : 'ok';
     const status = audit.status === 'BREACH' ? 'BREACH' : audit.status === 'PASS' ? 'PASS' : 'EXPLAINED';
-    return `${tableVerdict(status, 'Backtest artifact audit', audit.reason || 'Replay artifact audit result for the focused entry.', [`classification ${audit.classification || '--'}`, `replay entry ${audit.replay_snapshot_has_m2k_entry ? 'YES' : 'NO'}`])}<div id="audit-m2k-entry" class="audit-anchor"><dl class="metric-list reconcile-list">${metricLine('status', audit.status || '--')}${metricLine('focus', audit.focus || '--')}${metricLine('classification', audit.classification || '--')}${metricLine('replay has M2K entry', audit.replay_snapshot_has_m2k_entry ? 'YES' : 'NO')}${metricLine('checkpoint has M2K long', audit.current_checkpoint_has_m2k_long ? 'YES' : 'NO')}${metricLine('checkpoint entry', `${fmtPrice(pos.entry)} | ${esc(pos.entry_time || pos.entry_day || '--')}`)}${metricLine('parquet focus day', `${parquet.status || '--'} | bars ${parquet.focus_day_bars ?? '--'} | max ${parquet.max || '--'}`)}</dl><p class="detail-note ${cls}">${esc(audit.reason || '--')}</p></div>`;
+    return `${tableVerdict(status, 'Backtest artifact audit', audit.reason || 'Replay artifact audit result for the focused entry.', [`classification ${audit.classification || '--'}`, `replay entry ${audit.replay_snapshot_has_m2k_entry ? 'YES' : 'NO'}`])}<details id="audit-m2k-entry" class="audit-anchor audit-log-group"><summary>${auditChip()}<b>${esc(audit.focus || 'M2K entry audit')}</b><small>${esc(audit.classification || '--')}</small></summary><dl class="metric-list reconcile-list">${metricLine('status', audit.status || '--')}${metricLine('focus', audit.focus || '--')}${metricLine('classification', audit.classification || '--')}${metricLine('replay has M2K entry', audit.replay_snapshot_has_m2k_entry ? 'YES' : 'NO')}${metricLine('checkpoint has M2K long', audit.current_checkpoint_has_m2k_long ? 'YES' : 'NO')}${metricLine('checkpoint entry', `${fmtPrice(pos.entry)} | ${esc(pos.entry_time || pos.entry_day || '--')}`)}${metricLine('parquet focus day', `${parquet.status || '--'} | bars ${parquet.focus_day_bars ?? '--'} | max ${parquet.max || '--'}`)}</dl><p class="detail-note ${cls}">${esc(audit.reason || '--')}</p></details>`;
   }
 
   function statementTradeRows(rows, empty) {
@@ -993,6 +1025,41 @@
     return `<div class="pnl-timeline">${renderVerdict(backendVerdict(compare, 'timeline'), verdict, 'Timeline reconcile', summary, [`paper ${paperRecon.label}`, `backtest ${backtestRecon.label}`, `Flex ${flexRecon.label}`])}<div class="timeline-readout">${latestCards}</div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Paper, backtest, and Flex net P&L timeline">${grid}<line class="zero" x1="${pad.left}" y1="${y(0)}" x2="${width - pad.right}" y2="${y(0)}"></line>${lines}${dots}<g class="timeline-labels">${dateLabels}</g></svg><div class="timeline-legend"><span class="paper">Paper actual</span><span class="backtest">Backtest</span><span class="flex">Flex</span><span class="neutral">X axis shown on a minimum 10-session span</span></div></div>`;
   }
 
+  function pnlTimelineSupportRows(timeline, pl = {}, compare = null) {
+    const rows = (timeline || []).filter(row => row && row.date);
+    if (!rows.length) return '<p class="detail-empty">No timeline support rows are available.</p>';
+    const flexDaily = flexPnlByDate(pl);
+    let flexCum = 0;
+    const support = rows.map(row => {
+      flexCum += Number(flexDaily.get(row.date) || 0);
+      const paper = Number(row.paper_trade_realized_cum);
+      const backtest = Number(row.backtest_trade_realized_cum);
+      return {
+        ...row,
+        paper,
+        backtest,
+        flex: flexCum,
+        paperBacktest: Number.isFinite(paper) && Number.isFinite(backtest) ? paper - backtest : null,
+        paperFlex: Number.isFinite(paper) && Number.isFinite(flexCum) ? paper - flexCum : null,
+      };
+    });
+    const latest = support[support.length - 1] || {};
+    const paperRecon = reconcileStatus(latest.paper, pl.paper_epoch_closed_realized);
+    const backtestRecon = reconcileStatus(latest.backtest, pl.backtest_epoch_closed_realized);
+    const flexRecon = reconcileStatus(latest.flex, pl.flex_epoch_rebased_realized ?? pl.statement_entry_epoch_realized);
+    const stale = support.filter(row => row.curve_status && row.curve_status !== 'covered').length;
+    const verdict = [paperRecon, backtestRecon, flexRecon].some(item => item.cls === 'bad') ? 'BREACH' : stale ? 'PENDING' : 'PASS';
+    const summary = verdict === 'PASS'
+      ? 'Rows below are the exact series values used by the chart and reconcile to the headline P&L grid.'
+      : verdict === 'PENDING'
+        ? 'Rows support the chart, but at least one daily curve row is still stale.'
+        : 'Chart support rows do not reconcile to the headline P&L grid.';
+    return `${renderVerdict(backendVerdict(compare, 'daily'), verdict, 'Timeline data', summary, [`rows ${support.length}`, `paper ${paperRecon.label}`, `backtest ${backtestRecon.label}`, `Flex ${flexRecon.label}`])}<div class="trade-table pnl-daily-table"><table><thead><tr><th>date</th><th>Paper actual</th><th>Backtest</th><th>Flex</th><th>Paper - Backtest</th><th>Paper - Flex</th><th>status</th></tr></thead><tbody>${support.map(row => {
+      const cls = row.curve_status === 'covered' ? 'ok' : 'watch';
+      return `<tr><td><b>${esc(row.date || '--')}</b><small>${esc(row.curve_status || '--')}</small></td><td><b class="pnl-value ${moneyClass(row.paper)}">${fmtMoney(row.paper)}</b><small>chart series</small></td><td><b class="pnl-value ${moneyClass(row.backtest)}">${fmtMoney(row.backtest)}</b><small>chart series</small></td><td><b class="pnl-value ${moneyClass(row.flex)}">${fmtMoney(row.flex)}</b><small>Flex cumulative</small></td><td><b class="pnl-value ${moneyClass(row.paperBacktest)}">${fmtMoney(row.paperBacktest)}</b><small>paper - backtest</small></td><td><b class="pnl-value ${moneyClass(row.paperFlex)}">${fmtMoney(row.paperFlex)}</b><small>paper - Flex</small></td><td><span class="fill-result ${cls}">${esc(row.curve_status || '--')}</span><small>${esc(row.divergence_side || '--')}</small></td></tr>`;
+    }).join('')}</tbody><tfoot><tr class="total-row"><td><span class="fill-result ${verdictClass(verdict)}">LATEST</span></td><td><b>${fmtMoney(latest.paper)}</b><small>${paperRecon.label} vs grid ${fmtMoney(pl.paper_epoch_closed_realized)}</small></td><td><b>${fmtMoney(latest.backtest)}</b><small>${backtestRecon.label} vs grid ${fmtMoney(pl.backtest_epoch_closed_realized)}</small></td><td><b>${fmtMoney(latest.flex)}</b><small>${flexRecon.label} vs grid ${fmtMoney(pl.flex_epoch_rebased_realized ?? pl.statement_entry_epoch_realized)}</small></td><td><b>${fmtMoney(latest.paperBacktest)}</b><small>grid ${fmtMoney(pl.paper_minus_backtest_realized)}</small></td><td><b>${fmtMoney(latest.paperFlex)}</b><small>grid ${fmtMoney(pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized)}</small></td><td><span class="fill-result ${stale ? 'watch' : 'ok'}">${stale ? 'STALE' : 'FRESH'}</span></td></tr></tfoot></table></div>`;
+  }
+
   function pnlDailyRows(timeline, compare = null) {
     const rows = timeline || [];
     if (!rows.length) return '<p class="detail-empty">No daily rows are available.</p>';
@@ -1071,16 +1138,16 @@
   }
 
   function pnlCompareTab(compare, m, counts, signalCompare, signalCounts, entryCompare, entryCounts, latest) {
-    return `<div class="pnl-tab-panel overview-panel"><section class="more-section trade-detail overview-verdict-section"><h3>Overview Verdicts</h3>${overviewVerdictStrip(compare, m)}</section><section class="more-section trade-detail"><h3>What This Measures</h3>${pnlPurposeBlock(m)}</section><section class="more-section trade-detail"><h3>Realtime P&amp;L Source</h3>${realtimeLedgerBlock(compare)}</section><section class="more-section trade-detail"><h3>P&amp;L Compare</h3>${statementPnlCompareBlock(compare)}</section><p class="detail-note">${esc(m.curve_status_rule || 'Curve status controls daily-row freshness, not standalone P&L pass/fail.')} Known exit timing drift is expected when the paper/live path defers a stop/exit after the 14h/EOD decision.</p></div>`;
+    return `<div class="pnl-tab-panel overview-panel"><section class="more-section trade-detail overview-verdict-section"><h3>Overview Verdicts</h3>${overviewVerdictStrip(compare, m)}</section><section class="more-section trade-detail"><h3>What This Measures</h3>${pnlPurposeBlock(m)}</section><section class="more-section trade-detail"><h3>Realtime P&amp;L Source</h3>${realtimeLedgerBlock(compare)}</section><section class="more-section trade-detail"><h3>P&amp;L Compare</h3>${statementPnlCompareBlock(compare)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section><p class="detail-note">${esc(m.curve_status_rule || 'Curve status controls daily-row freshness, not standalone P&L pass/fail.')} Known exit timing drift is expected when the paper/live path defers a stop/exit after the 14h/EOD decision.</p></div>`;
   }
 
-  function pnlSourceDiffTab(compare) {
+  function pnlSourceDiffSection(compare) {
     const pl = compare.statement_pnl_compare || {};
-    return `<div class="pnl-tab-panel components-panel"><section class="more-section trade-detail"><h3>Source Diff Analyzer</h3>${sourceDiffStatsStrip(compare.lifecycle_compare?.rows || [], pl)}${sourceDiffAnalyzerRows(compare.lifecycle_compare, pl)}</section></div>`;
+    return `<section class="more-section trade-detail"><h3>Source Diff Analyzer</h3>${sourceDiffStatsStrip(compare.lifecycle_compare?.rows || [], pl)}${sourceDiffAnalyzerRows(compare.lifecycle_compare, pl, compare)}</section>`;
   }
 
   function pnlTimelineTab(compare, m) {
-    return `<div class="pnl-tab-panel timeline-panel"><section class="more-section trade-detail"><h3>Net P&amp;L Timeline</h3>${pnlTimeline(m.daily || m.timeline, compare.statement_pnl_compare, compare)}</section><section class="more-section trade-detail"><h3>Daily Divergence Rows</h3>${pnlDailyRows(m.daily || m.timeline, compare)}</section></div>`;
+    return `<div class="pnl-tab-panel timeline-panel"><section class="more-section trade-detail"><h3>Net P&amp;L Timeline</h3>${pnlTimeline(m.daily || m.timeline, compare.statement_pnl_compare, compare)}</section><section class="more-section trade-detail"><h3>Timeline Data Rows</h3>${pnlTimelineSupportRows(m.daily || m.timeline, compare.statement_pnl_compare, compare)}</section></div>`;
   }
 
   function pnlDecisionPathTab(compare, signalCompare, entryCompare) {
@@ -1088,11 +1155,7 @@
   }
 
   function pnlTradeReconcileTab(compare, m) {
-    return `<div class="pnl-tab-panel trades-panel"><section class="more-section trade-detail"><h3>Trade Master Reconcile</h3>${tradeMasterReconcileRows(compare, compare.statement_pnl_compare)}</section><section class="more-section trade-detail"><details class="secondary-table"><summary>Lifecycle Compare (${esc(compare.lifecycle_compare?.shown ?? 0)} / ${esc(compare.lifecycle_compare?.total ?? 0)})</summary>${lifecycleCompareRows(compare.lifecycle_compare, compare.statement_pnl_compare)}</details></section><section class="more-section trade-detail"><details class="secondary-table"><summary>Trade-by-trade Reasons (${esc(compare.shown ?? 0)} / ${esc(compare.total ?? 0)})</summary>${pnlCompareRows(compare)}</details></section></div>`;
-  }
-
-  function pnlRulesTab(m) {
-    return `<div class="pnl-tab-panel rules-panel"><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section></div>`;
+    return `<div class="pnl-tab-panel trades-panel"><section class="more-section trade-detail"><h3>Trade Master Reconcile</h3>${tradeMasterReconcileRows(compare, compare.statement_pnl_compare)}</section>${pnlSourceDiffSection(compare)}</div>`;
   }
 
   function pnlAuditTab(compare) {
@@ -1105,7 +1168,7 @@
     if (!compare) return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Paper vs backtest validates aligned equity comparison.')}</p></section>`;
     const signalCompare = compare.signal_compare || {};
     const entryCompare = compare.entry_compare || {};
-    return `<div class="pnl-tabs"><input type="radio" id="pnl-tab-overview" name="pnl-tab" checked><input type="radio" id="pnl-tab-trades" name="pnl-tab"><input type="radio" id="pnl-tab-components" name="pnl-tab"><input type="radio" id="pnl-tab-decision" name="pnl-tab"><input type="radio" id="pnl-tab-timeline" name="pnl-tab"><input type="radio" id="pnl-tab-rules" name="pnl-tab"><input type="radio" id="pnl-tab-audit" name="pnl-tab"><div class="pnl-tab-buttons"><label for="pnl-tab-overview">Overview</label><label for="pnl-tab-trades">Trades</label><label for="pnl-tab-components">Components</label><label for="pnl-tab-decision">Decision</label><label for="pnl-tab-timeline">Timeline</label><label for="pnl-tab-rules">Rules</label><label for="pnl-tab-audit">Audit</label></div>${pnlCompareTab(compare, m, {}, signalCompare, {}, entryCompare, {}, {})}${pnlTradeReconcileTab(compare, m)}${pnlSourceDiffTab(compare)}${pnlDecisionPathTab(compare, signalCompare, entryCompare)}${pnlTimelineTab(compare, m)}${pnlRulesTab(m)}${pnlAuditTab(compare)}</div>`;
+    return `<div class="pnl-tabs"><input type="radio" id="pnl-tab-overview" name="pnl-tab"${checkedPnlTab('overview')}><input type="radio" id="pnl-tab-trades" name="pnl-tab"${checkedPnlTab('trades')}><input type="radio" id="pnl-tab-decision" name="pnl-tab"${checkedPnlTab('decision')}><input type="radio" id="pnl-tab-timeline" name="pnl-tab"${checkedPnlTab('timeline')}><input type="radio" id="pnl-tab-audit" name="pnl-tab"${checkedPnlTab('audit')}><div class="pnl-tab-buttons"><label for="pnl-tab-overview">Overview</label><label for="pnl-tab-trades">Trades</label><label for="pnl-tab-decision">Decision</label><label for="pnl-tab-timeline">Timeline</label><label for="pnl-tab-audit">Audit</label></div>${pnlCompareTab(compare, m, {}, signalCompare, {}, entryCompare, {}, {})}${pnlTradeReconcileTab(compare, m)}${pnlDecisionPathTab(compare, signalCompare, entryCompare)}${pnlTimelineTab(compare, m)}${pnlAuditTab(compare)}</div>`;
   }
 
   function coverageItem(item) {
@@ -1363,11 +1426,28 @@
   }
 
   function renderCoverage(items) {
-    $('paperCoverage').innerHTML = groupedCoverage(items);
-    $('paperCoverage').querySelectorAll('[data-coverage-key]').forEach(button => {
+    const root = $('paperCoverage');
+    root.innerHTML = groupedCoverage(items);
+    root.querySelectorAll('[data-coverage-key]').forEach(button => {
       button.addEventListener('click', () => {
         selectedCoverageKey = button.getAttribute('data-coverage-key') || selectedCoverageKey;
         renderCoverage(items);
+      });
+    });
+    root.querySelectorAll('input[name="pnl-tab"]').forEach(input => {
+      input.addEventListener('change', () => {
+        const key = String(input.id || '').replace('pnl-tab-', '');
+        if (pnlTabKeys.includes(key)) selectedPnlTab = key;
+      });
+    });
+    root.querySelectorAll('.audit-link[href^="#"]').forEach(link => {
+      link.addEventListener('click', event => {
+        const targetId = (link.getAttribute('href') || '').slice(1);
+        if (!targetId) return;
+        event.preventDefault();
+        selectedPnlTab = 'audit';
+        renderCoverage(items);
+        setTimeout(() => document.getElementById(targetId)?.scrollIntoView({ block: 'start' }), 0);
       });
     });
   }

@@ -3404,7 +3404,7 @@
         "P-B RECONCILED",
         "P-F RECONCILED"
       ],
-      "target": "pnl-tab-components"
+      "target": "pnl-tab-trades"
     },
     "decision": {
       "status": "PASS",

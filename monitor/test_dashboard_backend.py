@@ -738,14 +738,14 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "roska4_swing" in source
     assert "Metric Definitions" not in source
     assert "Pass Spec" not in source
-    assert "Trade-by-trade Reasons" in source
+    assert "Trade-by-trade Reasons" not in source
     assert "Base Audit" not in source
     assert "Divergence Timeline" not in source
     assert "Net P&amp;L Timeline" in source
-    assert "Daily Divergence Rows" in source
+    assert "Timeline Data Rows" in source
     assert "Signal Compare" in source
     assert "Entry Compare" in source
-    assert "Lifecycle Compare" in source
+    assert "function lifecycleCompareRows" in source
     assert "Source Diff Analyzer" in source
     assert "gross" in source
     assert "model cost" in source
@@ -754,6 +754,8 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "Realtime P&amp;L Source" in source
     assert "audit-m2k-entry" in source
     assert "audit-link" in source
+    assert "audit-chip" in source
+    assert "audit-log-group" in source
     assert "Signal Path Audit" in source
     assert "paper/backtest/Flex" in source
     assert "Entry Ref Value" in source
@@ -766,13 +768,13 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "Net P&amp;L Timeline" in source
     assert "pnl-tab-overview" in source
     assert "pnl-tab-trades" in source
-    assert "pnl-tab-components" in source
     assert "pnl-tab-decision" in source
     assert "Trade Master Reconcile" in source
     assert "Overview Verdicts" in source
     assert "Base aligned" in source
     assert "table-verdict" in source
-    assert "pnl-tab-rules" in source
+    assert "pnl-tab-components" not in source
+    assert "pnl-tab-rules" not in source
     assert "timeline-readout" in source
     assert "Timeline reconcile" in source
     assert "backendVerdict(compare, 'timeline')" in source

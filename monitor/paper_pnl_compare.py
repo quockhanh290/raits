@@ -186,7 +186,7 @@ def _pnl_verdicts(report: dict[str, Any]) -> dict[str, Any]:
             "Component variance",
             "Component deltas reconcile to headline totals." if pb_recon and pf_recon else "Component deltas do not reconcile to headline totals.",
             [f"P-B {'RECONCILED' if pb_recon else 'CHECK'}", f"P-F {'RECONCILED' if pf_recon else 'CHECK'}"],
-            "pnl-tab-components",
+            "pnl-tab-trades",
         ),
         "decision": _verdict(
             decision_status,
