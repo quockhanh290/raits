@@ -510,9 +510,15 @@
   function signalCompareRows(signalCompare) {
     const rows = (signalCompare && signalCompare.rows) || [];
     if (!rows.length) return '<p class="detail-empty">No signal-level comparison is available.</p>';
-    const mismatches = rows.filter(row => String(row.classification || '') !== 'MATCHED_SIGNAL' || row.price_compare_status === 'DIFF' || row.risk_compare_status === 'DIFF').length;
-    const verdict = mismatches ? 'BREACH' : 'PASS';
-    return `${tableVerdict(verdict, 'Signal parity', mismatches ? 'Paper and backtest signal decisions are not identical; inspect mismatch rows before treating P&L drift as execution-only.' : 'Paper and backtest emitted matching signal decisions for the displayed rows.', [`rows ${rows.length}`, `mismatch ${mismatches}`])}<div class="trade-table signal-compare-table"><table><thead><tr><th>class</th><th>signal</th><th>paper</th><th>backtest</th><th>price</th><th>risk</th><th>reason</th></tr></thead><tbody>${rows.map(row => {
+    const decisionMismatches = rows.filter(row => String(row.classification || '') !== 'MATCHED_SIGNAL').length;
+    const valueDiffs = rows.filter(row => row.price_compare_status === 'DIFF' || row.risk_compare_status === 'DIFF').length;
+    const verdict = decisionMismatches ? 'BREACH' : valueDiffs ? 'EXPLAINED' : 'PASS';
+    const summary = decisionMismatches
+      ? 'Paper and backtest signal decisions are not identical; inspect mismatch rows before treating P&L drift as execution-only.'
+      : valueDiffs
+        ? 'Paper and backtest emitted the same signal decisions, but one or more signal attributes differ and should be treated as explained metadata variance.'
+        : 'Paper and backtest emitted matching signal decisions for the displayed rows.';
+    return `${tableVerdict(verdict, 'Signal parity', summary, [`rows ${rows.length}`, `decision mismatch ${decisionMismatches}`, `attribute variance ${valueDiffs}`])}<div class="trade-table signal-compare-table"><table><thead><tr><th>class</th><th>signal</th><th>paper</th><th>backtest</th><th>price</th><th>risk</th><th>reason</th></tr></thead><tbody>${rows.map(row => {
       const classification = String(row.classification || '--');
       const cls = classification === 'MATCHED_SIGNAL' ? 'ok' : 'bad';
       const paper = row.paper_sample || {};
