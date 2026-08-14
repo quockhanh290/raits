@@ -6,6 +6,16 @@
   let selectedPnlTab = 'overview';
   const pnlTabKeys = ['overview', 'trades', 'decision', 'timeline', 'audit'];
 
+  function setText(id, value) {
+    const el = $(id);
+    if (el) el.textContent = value;
+  }
+
+  function showPaperTab(key) {
+    const input = $(`paper-tab-${key}`);
+    if (input) input.checked = true;
+  }
+
   function checkedPnlTab(key) {
     if (!pnlTabKeys.includes(selectedPnlTab)) selectedPnlTab = 'overview';
     return selectedPnlTab === key ? ' checked' : '';
@@ -190,6 +200,10 @@
     return `<section class="c1-metric-group"><h3>${esc(title)}</h3>${note ? `<p>${esc(note)}</p>` : ''}<div>${items.join('')}</div></section>`;
   }
 
+  function panelVerdictMetric(status, summary, detail, cls = '') {
+    return c1Metric('Panel verdict', status || 'CHECK', `${summary || '--'} ${detail || ''}`.trim(), cls || verdictClass(status));
+  }
+
   function coverageByKey(coverage, key) {
     return (coverage || []).find(item => item.key === key) || null;
   }
@@ -210,6 +224,7 @@
     document.querySelectorAll('[data-coverage-ref]').forEach(button => {
       button.addEventListener('click', () => {
         selectedCoverageKey = button.getAttribute('data-coverage-ref') || selectedCoverageKey;
+        showPaperTab('coverage');
         renderCoverage(coverage);
         $('paperCoverage').scrollIntoView({ block: 'start' });
       });
@@ -223,6 +238,43 @@
     if (statuses.some(value => value === 'PENDING' || value === 'WATCH')) return 'PENDING';
     if (statuses.some(value => value === 'UNKNOWN' || value === 'MISSING')) return 'UNKNOWN';
     return statuses.some(value => value === 'PASS') ? 'PASS' : (primary || 'UNKNOWN');
+  }
+
+  function blockerCard(status, label, value, detail, refKey = '') {
+    const button = refKey ? `<button type="button" data-coverage-ref="${esc(refKey)}">Open detail</button>` : '';
+    return `<article class="blocker-card ${statusClass(status)}"><span>${esc(status || 'CHECK')}</span><b>${esc(label)}</b><strong>${esc(value)}</strong><small>${esc(detail || '--')}</small>${button}</article>`;
+  }
+
+  function renderReadinessBlockers(gates, coverage, summary) {
+    const gateByKey = key => (gates || []).find(item => item.key === key) || {};
+    const coverageBy = key => coverageByKey(coverage, key) || {};
+    const duration = gateByKey('paper_duration').metrics || {};
+    const exits = (gateByKey('exit_path_coverage').metrics || {}).exits || {};
+    const c1 = gateByKey('c1_slippage').metrics || {};
+    const c1Spec = c1.spec || {};
+    const b3 = gateByKey('b3_reconcile').metrics || {};
+    const tws = gateByKey('tws_restart_nights').metrics || {};
+    const stpPlacement = coverageBy('stp_placement').metrics || {};
+    const dataFreshness = coverageBy('data_freshness');
+    const openIssues = coverageBy('open_incidents');
+    const targetEach = (gateByKey('exit_path_coverage').metrics || {}).target_each ?? 3;
+    const completePaths = ['CHANDELIER', 'MAX_HOLD', 'STP'].filter(key => (exits[key] ?? 0) >= targetEach).length;
+    const openN = c1.open_n ?? summary.c1_open_n ?? 0;
+    const stpN = c1.stp_close_n ?? c1.close_n ?? summary.c1_close_n ?? 0;
+    const minN = c1Spec.min_n ?? 100;
+    const maxMean = c1Spec.max_mean_ticks ?? 5;
+    const c1Quality = openN && Math.abs(Number(c1.open_mean)) > Number(maxMean) ? 'BREACH NOW' : 'PENDING';
+    const cards = [
+      blockerCard(gateByKey('b3_reconcile').status || 'UNKNOWN', 'B3 reconcile', `mismatch ${b3.mismatches ?? 0}`, 'Historical broker/file mismatch lines remain unclassified.'),
+      blockerCard(dataFreshness.status || 'UNKNOWN', 'Data freshness', dataFreshness.evidence || '--', 'Model/data freshness is a live-readiness blocker.', 'data_freshness'),
+      blockerCard(openIssues.status || 'UNKNOWN', 'Open issues', openIssues.evidence || '--', 'Unresolved operational blockers must be visible before live.', 'open_incidents'),
+      blockerCard('PENDING', 'Coverage sample', `${duration.observed ?? 0}/${duration.target ?? 60} days, exits ${completePaths}/3`, 'Sample coverage is pending, not an operational failure.'),
+      blockerCard(c1Quality, 'C1 execution', `OPEN ${openN}/${minN}, STP ${stpN}/${minN}`, `Current OPEN mean ${fmtTicks(c1.open_mean)} vs ${maxMean} tick limit.`, 'fill_quality'),
+      blockerCard(coverageBy('stp_placement').status || 'UNKNOWN', 'Stop placement', `${stpPlacement.continuous_session_streak ?? '--'}/${stpPlacement.required_continuous_sessions ?? '--'} clean sessions`, 'Deferred stop placement route must reconcile continuously.', 'stp_placement'),
+      blockerCard(gateByKey('tws_restart_nights').status || 'UNKNOWN', 'TWS restart', `${tws.restart_nights ?? 0}/${tws.required_nights ?? '--'} proven nights`, 'Candidate logs do not count as proven restart recovery.', 'runner_freshness'),
+    ];
+    const root = $('readinessBlockers');
+    if (root) root.innerHTML = cards.join('');
   }
 
   function coverageRuleRail() {
@@ -275,6 +327,9 @@
     $('coverageStatusEyebrow').className = `eyebrow c1-eyebrow ${statusClass(status)}`;
     $('coverageActiveSpec').innerHTML = coverageRuleRail();
     $('coverageMetricGroups').innerHTML = [
+      c1MetricGroup('Verdict', [
+        panelVerdictMetric(status, 'Sample coverage is pending; this is not an operational breach.', `Days ${days}/${targetDays}, exit paths ${completePaths}/3.`, status === 'PASS' ? 'ok' : 'watch'),
+      ]),
       c1MetricGroup('Observed data', [
         c1SampleMetric('Days', days, targetDays, 'Durable paper days in current epoch.', days >= targetDays ? 'ok' : 'watch'),
         c1Metric('Regimes', regimes.length ? regimes.join(' + ') : '--', 'Need both Normal and Stress.', missingRegimes.length ? 'watch' : 'ok'),
@@ -329,6 +384,14 @@
     return records.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
   }
 
+  function compactStpEvidence(record) {
+    if (!record) return '--';
+    const text = String(record.evidence || '');
+    const order = text.match(/order_id=([\w.-]+)/i);
+    const pos = text.match(/([A-Z0-9]+)\s+(LONG|SHORT)\s+x(\d+)/);
+    return [record.date || '--', pos ? `${pos[1]} ${pos[2]} x${pos[3]}` : '', order ? `order ${order[1]}` : ''].filter(Boolean).join(' | ');
+  }
+
   function stpMoreInfo(gate, placement) {
     const m = gate.metrics || {};
     const p = (placement && placement.metrics) || {};
@@ -367,15 +430,20 @@
     $('stpStatusEyebrow').className = `eyebrow c1-eyebrow ${statusClass(status)}`;
     $('stpActiveSpec').innerHTML = stpRuleRail();
     $('stpMetricGroups').innerHTML = [
-      c1MetricGroup('Observed data', [
-        c1Metric('Accepted', accepted, 'place_stop accepted log evidence.', accepted ? 'ok' : 'watch'),
-        c1Metric('Failed', failed, 'Failed stop placement must be zero before pass.', failed ? 'bad' : 'ok'),
-        c1Metric('STP-VERIFY', verifyLines, 'B3 STP-VERIFY log counter.'),
-        c1Metric('STP EXIT', exitLines, 'B3 stop-exit log counter.'),
-        c1Metric('B3 HALT', haltLines, 'Raw halt counter; false-halt classification is structured input.', haltLines ? 'bad' : ''),
+      c1MetricGroup('Verdict', [
+        panelVerdictMetric(status, `Verification ${gate.status || '--'}, placement ${placement.status || '--'}, current protection ${currentProtection?.status || '--'}.`, 'Composite status is the worst relevant stop-readiness status.', status === 'PASS' ? 'ok' : status === 'BREACH' ? 'bad' : 'watch'),
+      ]),
+      c1MetricGroup('Stop readiness', [
         c1Metric('Checks', checks, 'Structured operator STP verification records.', checks ? 'ok' : 'watch'),
         c1Metric('Broker reconcile', latestRecord ? `${latestRecord.date || '--'} ${latestPass ? 'PASS' : 'REVIEW'}` : '--', 'Latest reviewed STP record from monitor/paper_inputs.json.', latestPass ? 'ok' : 'watch'),
-        c1Metric('Record evidence', latestRecord ? (latestRecord.evidence || '--') : '--', 'Current IBKR/runner reconciliation evidence, when available.', latestPass ? 'ok' : ''),
+        c1Metric('Placement failed', failed, 'Failed stop placement must be zero before pass.', failed ? 'bad' : 'ok'),
+        c1Metric('Placement accepted', accepted, 'place_stop accepted log evidence.', accepted ? 'ok' : 'watch'),
+        c1Metric('Latest proof', compactStpEvidence(latestRecord), 'Condensed IBKR/runner proof; full text is in More info.', latestPass ? 'ok' : 'watch'),
+      ]),
+      c1MetricGroup('Raw counters', [
+        c1Metric('STP-VERIFY', verifyLines, 'B3 STP-VERIFY log counter.'),
+        c1Metric('STP EXIT', exitLines, 'B3 stop-exit log counter.'),
+        c1Metric('B3 HALT', haltLines, 'Raw halt counter; false-halt classification is structured input.', haltLines ? 'bad' : 'ok'),
       ]),
       coverageRefGroup([
         coverageRefMetric('Placement after OPEN', placement, 'Deferred-stop route evidence: accept/fail/close-before-arm reconciliation.'),
@@ -433,6 +501,9 @@
     $('b3StatusEyebrow').className = `eyebrow c1-eyebrow ${statusClass(status)}`;
     $('b3ActiveSpec').innerHTML = b3RuleRail();
     $('b3MetricGroups').innerHTML = [
+      c1MetricGroup('Verdict', [
+        panelVerdictMetric(status, mismatches ? 'Historical B3 mismatch lines remain unclassified.' : 'No B3 mismatches are currently observed.', 'Current persisted protection is context, not a historical mismatch waiver.', mismatches ? 'bad' : 'ok'),
+      ]),
       c1MetricGroup('Observed data', [
         c1Metric('Matches', matches, 'B3 broker/file match log observations.', matches ? 'ok' : 'watch'),
         c1Metric('Mismatches', mismatches, 'Any mismatch keeps B3 in breach until classified.', mismatches ? 'bad' : 'ok'),
@@ -494,13 +565,18 @@
     $('twsStatusEyebrow').className = `eyebrow c1-eyebrow ${statusClass(status)}`;
     $('twsActiveSpec').innerHTML = twsRuleRail(required);
     $('twsMetricGroups').innerHTML = [
-      c1MetricGroup('Observed data', [
-        c1Metric('Candidate lines', candidateLines, 'Raw connectivity/restart candidate log lines.', candidateLines ? 'watch' : ''),
-        c1Metric('Candidate days', candidateDays, 'Distinct days with candidate restart/connectivity logs.', candidateDays ? 'watch' : ''),
+      c1MetricGroup('Verdict', [
+        panelVerdictMetric(status, `Restart proof is ${proven}/${required ?? '--'} proven nights.`, 'Candidate connectivity logs are context only and do not count as proven recovery.', status === 'PASS' ? 'ok' : 'watch'),
+      ]),
+      c1MetricGroup('Proof readiness', [
         c1Metric('Proven nights', proven, 'Structured nights with restart, runner, and broker proof.', proven ? 'ok' : 'watch'),
         c1Metric('Required nights', required ?? '--', 'Minimum proven nights required by active spec.', required == null ? 'watch' : 'ok'),
         c1Metric('Records', records, 'Structured tws_restart_nights records.', records ? 'ok' : 'watch'),
         c1Metric('Gate status', status, 'Current TWS restart gate status.', status === 'PASS' ? 'ok' : status === 'SPEC_GAP' ? 'watch' : ''),
+      ]),
+      c1MetricGroup('Candidate context', [
+        c1Metric('Candidate lines', candidateLines, 'Raw connectivity/restart candidate log lines; not pass evidence.', candidateLines ? 'watch' : ''),
+        c1Metric('Candidate days', candidateDays, 'Distinct days with candidate restart/connectivity logs.', candidateDays ? 'watch' : ''),
       ]),
       coverageRefGroup([
         coverageRefMetric('Runner freshness', runnerFreshness, 'Confirms runner snapshots continue after connectivity candidates.'),
@@ -527,6 +603,9 @@
     const enough = target > 0 && openN >= target && stpN >= target;
     const currentReads = [meanRead('OPEN', openMean, openN, maxMean), meanRead('STP CLOSE', stpMean, stpN, maxMean)];
     const status = gate.status || 'UNKNOWN';
+    const openOverLimit = openN && maxMean != null && Math.abs(Number(openMean)) > Number(maxMean);
+    const stpOverLimit = stpN && maxMean != null && Math.abs(Number(stpMean)) > Number(maxMean);
+    const currentQualityStatus = openOverLimit || stpOverLimit ? 'BREACH NOW' : stpN && openN ? 'WATCH' : 'PENDING';
 
     $('c1ProgressTitle').textContent = target ? `OPEN ${openN}/${target} | STP ${stpN}/${target}` : `OPEN ${openN} | STP ${stpN}`;
     $('c1ProgressReason').innerHTML = [
@@ -539,11 +618,16 @@
     $('c1StatusEyebrow').className = `eyebrow c1-eyebrow ${statusClass(status)}`;
     $('c1ActiveSpec').innerHTML = c1SpecPills(spec, target, maxMean);
     $('c1MetricGroups').innerHTML = [
-      c1MetricGroup('Observed data', [
-        c1Metric('OPEN mean', fmtTicks(openMean), `Spec: abs mean <= ${maxMean ?? '--'} ticks. Current entry drift is ${meanRead('OPEN', openMean, openN, maxMean)}.`, openN && maxMean != null && Math.abs(Number(openMean)) > Number(maxMean) ? 'bad' : ''),
+      c1MetricGroup('Verdict', [
+        panelVerdictMetric(status, `Sample gate ${enough ? 'complete' : 'incomplete'}; current quality read is ${currentQualityStatus}.`, 'Current N=1 contract evidence must be retested when scaling.', currentQualityStatus === 'BREACH NOW' ? 'bad' : 'watch'),
+      ]),
+      c1MetricGroup('Sample readiness', [
         c1SampleMetric('OPEN samples', openN, target, 'Progress toward required entry sample count.', target && openN >= target ? 'ok' : 'watch'),
-        c1Metric('STP CLOSE mean', fmtTicks(stpMean), `Spec: abs mean <= ${maxMean ?? '--'} ticks. Stop-triggered closes only; signal closes are excluded.`),
         c1SampleMetric('STP samples', stpN, target, 'Progress toward required STP close sample count.', target && stpN >= target ? 'ok' : 'watch'),
+      ]),
+      c1MetricGroup('Current quality', [
+        c1Metric('OPEN mean', fmtTicks(openMean), `Spec: abs mean <= ${maxMean ?? '--'} ticks. Current entry drift is ${meanRead('OPEN', openMean, openN, maxMean)}.`, openOverLimit ? 'bad' : openN ? 'ok' : 'watch'),
+        c1Metric('STP CLOSE mean', fmtTicks(stpMean), `Spec: abs mean <= ${maxMean ?? '--'} ticks. Stop-triggered closes only; signal closes are excluded.`, stpOverLimit ? 'bad' : stpN ? 'ok' : 'watch'),
         c1Metric('Excluded closes', m.signal_close_with_stop_ref ?? 0, 'Signal/market closes shown for diagnosis, not counted in C1 mean.'),
         c1Metric('Unknown tick rows', m.unknown_tick_records ?? 0, 'Rows that could not be converted from points to ticks.'),
       ]),
@@ -553,9 +637,9 @@
       ]),
       c1MoreInfo(gate, openN, openMean, stpN, stpMean),
     ].join('');
-    $('slippageCount').textContent = target ? `OPEN ${openN}/${target}` : `${openN} / ${stpN}`;
-    $('c1SampleCaption').textContent = target ? `STP ${stpN}/${target} | ${meanRead('OPEN', openMean, openN, maxMean)}` : currentReads.join(' | ');
-    $('closeSlippageMean').textContent = `STP ${stpN}${target ? `/${target}` : ''} | mean ${fmtTicks(stpMean)} | limit ${maxMean ?? '--'} ticks`;
+    setText('slippageCount', target ? `OPEN ${openN}/${target}` : `${openN} / ${stpN}`);
+    setText('c1SampleCaption', target ? `STP ${stpN}/${target} | ${meanRead('OPEN', openMean, openN, maxMean)}` : currentReads.join(' | '));
+    setText('closeSlippageMean', `STP ${stpN}${target ? `/${target}` : ''} | mean ${fmtTicks(stpMean)} | limit ${maxMean ?? '--'} ticks`);
   }
 
   function pnlCompareRows(compare) {
@@ -1762,10 +1846,11 @@
     const blocked = statuses.some(status => status === 'SPEC_GAP' || status === 'STRUCTURAL_GAP');
     const breached = statuses.includes('BREACH');
     const complete = !sourceMissing && !blocked && !breached && gates.every(gate => gate.status === 'PASS');
-    $('paperDays').textContent = `${summary.days ?? 0} / 60`;
-    $('regimesSeen').textContent = (summary.regimes || []).length ? summary.regimes.join(' + ') : 'None';
-    $('exitCoverage').textContent = `${summary.exit_paths_complete ?? 0} / 3`;
-    $('slippageMean').textContent = fmtTicks(summary.c1_open_mean);
+    setText('paperDays', `${summary.days ?? 0} / 60`);
+    setText('regimesSeen', (summary.regimes || []).length ? summary.regimes.join(' + ') : 'None');
+    setText('exitCoverage', `${summary.exit_paths_complete ?? 0} / 3`);
+    setText('slippageMean', fmtTicks(summary.c1_open_mean));
+    renderReadinessBlockers(gates, coverage, summary);
     updateCoveragePanel(gates, coverage);
     updateC1Panel(gates, summary, coverage);
     updateSTPPanel(gates, coverage);
@@ -1777,6 +1862,7 @@
     $('evidenceGaps').querySelectorAll('[data-gap-related]').forEach(button => {
       button.addEventListener('click', () => {
         selectedCoverageKey = button.getAttribute('data-gap-related') || selectedCoverageKey;
+        showPaperTab('coverage');
         renderCoverage(coverage);
         $('paperCoverage').scrollIntoView({ block: 'start' });
       });

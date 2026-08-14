@@ -662,7 +662,11 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert 'id="c1MetricGroups"' in html
     assert 'id="c1ActiveSpec"' in html
     assert 'id="c1StatusEyebrow"' in html
-    assert 'id="c1SampleCaption"' in html
+    assert 'id="readinessBlockers"' in html
+    assert 'id="paper-tab-overview"' in html
+    assert 'id="paper-tab-gates"' in html
+    assert 'id="paper-tab-coverage"' in html
+    assert 'id="paper-tab-gaps"' in html
     assert 'id="stpProgressTitle"' in html
     assert 'id="stpProgressStatus"' in html
     assert 'id="stpActiveSpec"' in html
@@ -690,6 +694,10 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "function coverageRefGroup" in source
     assert "function bindCoverageReferenceButtons" in source
     assert "function compositeStatus" in source
+    assert "function renderReadinessBlockers" in source
+    assert "function blockerCard" in source
+    assert "function showPaperTab" in source
+    assert "BREACH NOW" in source
     assert "data-coverage-ref" in source
     assert "function twsMoreInfo" in source
     assert "function groupedCoverage" in source
@@ -890,10 +898,15 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "ledgerSource" not in html
     assert "ledgerSource" not in source
     assert 'id="paperSource"' in html
-    assert "paper-pnl-chart-grouped-tabs-v1" in html
+    assert "paper-live-tabs-v1" in html
+    assert "READINESS BLOCKERS" in html
+    assert "STOP PROTECTION READINESS" in html
     assert "ledger-detail" not in css
     assert "audit-ledger" not in css
     assert "coverage-panel" in css
+    assert "paper-tab-nav" in css
+    assert "blocker-card" in css
+    assert ".panel-purpose" in css
     assert "coverage-group" in css
     assert "gap-related" in css
     assert ".gap-status-warn" in css
