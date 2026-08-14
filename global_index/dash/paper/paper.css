@@ -202,9 +202,9 @@
 .audit-log-group { border: 1px solid var(--line); background: rgba(255,255,255,.012); }
 .audit-log-group summary { padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; cursor: pointer; color: var(--bright); font: 800 12px/1.25 var(--mono); }
 .audit-log-group summary small { margin-left: auto; color: var(--dim); font: 700 10px/1.25 var(--mono); }
-.pnl-daily-table, .pnl-compare-table, .signal-compare-table, .entry-compare-table, .lifecycle-compare-table, .trade-master-table, .source-diff-table, .open-position-table, .audit-evidence-table, .pnl-statement-table, .pnl-flex-bridge-table, .contract-spec-table, .state-position-table, .runner-snapshot-table { overflow-x: hidden; }
-.pnl-daily-table table, .pnl-compare-table table, .signal-compare-table table, .entry-compare-table table, .lifecycle-compare-table table, .trade-master-table table, .source-diff-table table, .open-position-table table, .audit-evidence-table table, .pnl-statement-table table, .pnl-flex-bridge-table table, .contract-spec-table table, .state-position-table table, .runner-snapshot-table table { min-width: 0; width: 100%; table-layout: fixed; }
-.pnl-daily-table th, .pnl-daily-table td, .pnl-compare-table th, .pnl-compare-table td, .signal-compare-table th, .signal-compare-table td, .entry-compare-table th, .entry-compare-table td, .lifecycle-compare-table th, .lifecycle-compare-table td, .trade-master-table th, .trade-master-table td, .source-diff-table th, .source-diff-table td, .open-position-table th, .open-position-table td, .audit-evidence-table th, .audit-evidence-table td, .pnl-statement-table th, .pnl-statement-table td, .pnl-flex-bridge-table th, .pnl-flex-bridge-table td, .contract-spec-table th, .contract-spec-table td, .state-position-table th, .state-position-table td, .runner-snapshot-table th, .runner-snapshot-table td { white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.pnl-daily-table, .pnl-compare-table, .signal-compare-table, .entry-compare-table, .lifecycle-compare-table, .trade-master-table, .source-diff-table, .open-position-table, .audit-evidence-table, .pnl-statement-table, .pnl-flex-bridge-table, .contract-spec-table, .state-position-table, .runner-snapshot-table, .data-freshness-table, .open-issue-table { overflow-x: hidden; }
+.pnl-daily-table table, .pnl-compare-table table, .signal-compare-table table, .entry-compare-table table, .lifecycle-compare-table table, .trade-master-table table, .source-diff-table table, .open-position-table table, .audit-evidence-table table, .pnl-statement-table table, .pnl-flex-bridge-table table, .contract-spec-table table, .state-position-table table, .runner-snapshot-table table, .data-freshness-table table, .open-issue-table table { min-width: 0; width: 100%; table-layout: fixed; }
+.pnl-daily-table th, .pnl-daily-table td, .pnl-compare-table th, .pnl-compare-table td, .signal-compare-table th, .signal-compare-table td, .entry-compare-table th, .entry-compare-table td, .lifecycle-compare-table th, .lifecycle-compare-table td, .trade-master-table th, .trade-master-table td, .source-diff-table th, .source-diff-table td, .open-position-table th, .open-position-table td, .audit-evidence-table th, .audit-evidence-table td, .pnl-statement-table th, .pnl-statement-table td, .pnl-flex-bridge-table th, .pnl-flex-bridge-table td, .contract-spec-table th, .contract-spec-table td, .state-position-table th, .state-position-table td, .runner-snapshot-table th, .runner-snapshot-table td, .data-freshness-table th, .data-freshness-table td, .open-issue-table th, .open-issue-table td { white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
 .pnl-daily-table th:nth-child(1), .pnl-daily-table td:nth-child(1) { width: 12%; }
 .pnl-daily-table th:nth-child(2), .pnl-daily-table td:nth-child(2) { width: 15%; }
 .pnl-daily-table th:nth-child(3), .pnl-daily-table td:nth-child(3) { width: 16%; }
@@ -307,6 +307,16 @@
 .runner-snapshot-table th:nth-child(4), .runner-snapshot-table td:nth-child(4) { width: 14%; }
 .runner-snapshot-table th:nth-child(5), .runner-snapshot-table td:nth-child(5) { width: 17%; }
 .runner-snapshot-table th:nth-child(6), .runner-snapshot-table td:nth-child(6) { width: 16%; }
+.data-freshness-table th:nth-child(1), .data-freshness-table td:nth-child(1) { width: 24%; }
+.data-freshness-table th:nth-child(2), .data-freshness-table td:nth-child(2) { width: 16%; }
+.data-freshness-table th:nth-child(3), .data-freshness-table td:nth-child(3) { width: 20%; }
+.data-freshness-table th:nth-child(4), .data-freshness-table td:nth-child(4) { width: 40%; }
+.open-issue-table th:nth-child(1), .open-issue-table td:nth-child(1) { width: 12%; }
+.open-issue-table th:nth-child(2), .open-issue-table td:nth-child(2) { width: 24%; }
+.open-issue-table th:nth-child(3), .open-issue-table td:nth-child(3) { width: 16%; }
+.open-issue-table th:nth-child(4), .open-issue-table td:nth-child(4) { width: 18%; }
+.open-issue-table th:nth-child(5), .open-issue-table td:nth-child(5) { width: 16%; }
+.open-issue-table th:nth-child(6), .open-issue-table td:nth-child(6) { width: 14%; }
 .stp-placement-table, .stp-route-table, .rejection-table { overflow-x: hidden; }
 .stp-placement-table table, .stp-route-table table, .rejection-table table { min-width: 0; width: 100%; table-layout: fixed; }
 .stp-placement-table th, .stp-placement-table td, .stp-route-table th, .stp-route-table td, .rejection-table th, .rejection-table td { white-space: normal; overflow-wrap: anywhere; word-break: break-word; }

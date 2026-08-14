@@ -1439,6 +1439,53 @@
     ].join('')}</div></section><section class="more-section trade-detail"><h3>Runner Snapshot Rows</h3>${runnerSnapshotRows(m.snapshot_rows)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
   }
 
+  function dataFreshnessCheckRows(rows) {
+    if (!rows || !rows.length) return '<p class="detail-empty">No data freshness check rows are available.</p>';
+    return `<div class="trade-table data-freshness-table"><table><thead><tr><th>check</th><th>status</th><th>value</th><th>detail</th></tr></thead><tbody>${rows.map(row => {
+      const status = String(row.status || '--').toUpperCase();
+      const cls = status === 'OK' || status === 'PASS' ? 'ok' : status === 'URGENT' || status === 'HARD' || status === 'BREACH' ? 'bad' : status === 'PENDING' ? 'watch' : 'neutral';
+      return `<tr><td><b>${esc(row.label || row.key || '--')}</b><small>${esc(row.key || '--')}</small></td><td><span class="fill-result ${cls}">${esc(status)}</span></td><td><b>${esc(row.value || '--')}</b></td><td><small>${esc(row.detail || '--')}</small></td></tr>`;
+    }).join('')}</tbody></table></div>`;
+  }
+
+  function dataFreshnessDetail(item) {
+    const m = item.metrics || {};
+    const modelStatus = String(m.model_age?.status || 'MISSING').toUpperCase();
+    const regimeStatus = String(m.regime_freshness?.status || 'MISSING').toUpperCase();
+    const refreezePending = m.refreeze?.pending === true;
+    const breach = ['URGENT', 'HARD'].includes(modelStatus) || !['OK', 'MISSING'].includes(regimeStatus) || regimeStatus === 'MISSING';
+    const verdict = breach ? 'BREACH' : refreezePending ? 'PENDING' : 'PASS';
+    return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Data freshness validates regime/model/refreeze inputs used by the runner.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${tableVerdict(verdict, 'Data freshness verdict', breach ? 'At least one data/model freshness guard is active and should be resolved before treating paper evidence as fully clean.' : refreezePending ? 'A refreeze is pending even though no hard freshness breach is currently shown.' : 'Regime/model/refreeze checks are within the active freshness rule.', [`regime ${regimeStatus}`, `model ${modelStatus}`, `refreeze ${refreezePending}`])}<div class="detail-metric-grid">${[
+      metricCard('Regime freshness', regimeStatus, 'Regime input freshness reported by runner operational_status.regime_freshness.', regimeStatus === 'OK' ? 'ok' : 'bad', regimeStatus === 'OK' ? 'PASS' : 'BREACH', `${m.regime_freshness?.bday_stale ?? '--'} bday stale`),
+      metricCard('Last SPY date', m.regime_freshness?.last_spy_date || '--', 'Latest SPY date behind regime freshness.', '', 'OBSERVED', 'input date'),
+      metricCard('Model age', `${m.model_age?.months_old ?? '--'} months`, 'Age of the active fitted HMM/model artifact.', ['URGENT', 'HARD'].includes(modelStatus) ? 'bad' : 'ok', ['URGENT', 'HARD'].includes(modelStatus) ? 'BREACH' : 'PASS', m.model_age?.model_name || '--'),
+      metricCard('Refreeze', refreezePending ? 'pending' : 'not pending', 'Whether a model refreeze is pending.', refreezePending ? 'watch' : 'ok', refreezePending ? 'PENDING' : 'PASS', 'operator workflow'),
+    ].join('')}</div></section><section class="more-section trade-detail"><h3>Freshness Check Rows</h3>${dataFreshnessCheckRows(m.checks)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
+  }
+
+  function openIssueRows(rows) {
+    if (!rows || !rows.length) return '<p class="detail-empty">No open issues are currently emitted.</p>';
+    return `<div class="trade-table open-issue-table"><table><thead><tr><th>status</th><th>issue</th><th>seen</th><th>impact</th><th>action</th><th>evidence</th></tr></thead><tbody>${rows.map(row => {
+      const status = String(row.status || '--').toUpperCase();
+      const cls = status === 'KNOWN_DEBT' ? 'watch' : status === 'INCIDENT' || status === 'UNKNOWN' ? 'bad' : 'neutral';
+      return `<tr><td><span class="fill-result ${cls}">${esc(status)}</span><small>${esc(row.component || '--')}</small></td><td><b>${esc(row.title || row.key || '--')}</b><small>${esc(row.key || '--')}</small><small>${esc(row.problem || '--')}</small></td><td><b>${esc(row.last_seen || '--')}</b><small>first ${esc(row.first_seen || '--')} | x${esc(row.occurrences ?? '--')}</small></td><td><small>${esc(row.impact || '--')}</small></td><td><small>${esc(row.action || '--')}</small></td><td><small>${esc(row.evidence || row.resolution_evidence || '--')}</small></td></tr>`;
+    }).join('')}</tbody></table></div>`;
+  }
+
+  function openIncidentsDetail(item) {
+    const m = item.metrics || {};
+    const rows = m.issues || [];
+    const incidentCount = rows.filter(row => String(row.status || '').toLowerCase() !== 'known_debt').length;
+    const debtCount = rows.filter(row => String(row.status || '').toLowerCase() === 'known_debt').length;
+    const verdict = rows.length ? 'BREACH' : 'PASS';
+    return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Open issues shows unresolved operational blockers from the realtime open-issue reader.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${tableVerdict(verdict, 'Open issue verdict', rows.length ? 'The realtime open-issue reader is emitting at least one open blocker.' : 'No realtime open issues are currently emitted.', [`issues ${rows.length}`, `incidents ${incidentCount}`, `known debt ${debtCount}`])}<div class="detail-metric-grid">${[
+      metricCard('Open issues', rows.length, 'Number of issue objects emitted by /api/v1/open-issues.', rows.length ? 'bad' : 'ok', rows.length ? 'BREACH' : 'PASS', 'must be 0'),
+      metricCard('Incidents', incidentCount, 'Open issues that are not classified as known debt.', incidentCount ? 'bad' : 'ok', incidentCount ? 'BREACH' : 'PASS', 'must be 0'),
+      metricCard('Known debt', debtCount, 'Known-debt issues still shown because they affect operator readiness.', debtCount ? 'watch' : 'ok', debtCount ? 'WATCH' : 'PASS', 'tracked'),
+      metricCard('Issue keys', (m.issue_keys || []).length ? (m.issue_keys || []).join(', ') : 'none', 'Issue identifiers emitted by the realtime reader.', rows.length ? 'watch' : 'ok', rows.length ? 'OBSERVED' : 'PASS', 'source keys'),
+    ].join('')}</div></section><section class="more-section trade-detail"><h3>Open Issue Rows</h3>${openIssueRows(rows)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
+  }
+
   function contractSpecRows(rows) {
     if (!rows || !rows.length) return '<p class="detail-empty">No local basket contract specs are available.</p>';
     return `<div class="trade-table contract-spec-table"><table><thead><tr><th>inst</th><th>local spec</th><th>IBKR spec</th><th>contract</th><th>status</th></tr></thead><tbody>${rows.map(row => {
@@ -1467,7 +1514,9 @@
     const statePersist = item.key === 'state_persist' ? statePersistDetail(item) : '';
     const currentProtection = item.key === 'current_protection' ? currentProtectionDetail(item) : '';
     const runnerFreshness = item.key === 'runner_freshness' ? runnerFreshnessDetail(item) : '';
-    const customDetail = pvb || fill || stpPlacement || rejection || contractSpec || statePersist || currentProtection || runnerFreshness;
+    const dataFreshness = item.key === 'data_freshness' ? dataFreshnessDetail(item) : '';
+    const openIncidents = item.key === 'open_incidents' ? openIncidentsDetail(item) : '';
+    const customDetail = pvb || fill || stpPlacement || rejection || contractSpec || statePersist || currentProtection || runnerFreshness || dataFreshness || openIncidents;
     const evidence = customDetail ? '' : `<p class="coverage-detail-evidence">${esc(item.evidence)}</p>`;
     return `<aside class="coverage-detail"><div class="coverage-detail-head"><h3>${esc(item.title)}</h3><span class="gate-state ${statusClass(item.status)}">${esc(item.status)}</span></div>${evidence}<div class="c1-more-grid">${customDetail || `<section class="more-section"><h3>Metrics</h3>${coverageMetrics(item.metrics)}</section>`}<section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(item.sources)}</ul></section></div></aside>`;
   }
