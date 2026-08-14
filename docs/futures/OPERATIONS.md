@@ -576,6 +576,34 @@ slot đêm trượt. Sai vì đọc code mà không kiểm job nào chạy trư�
 
 ## Khởi động scheduler hằng ngày
 
+### Preferred one-command startup
+
+Log in to IB Gateway paper first, then run:
+
+```powershell
+cd D:\raits
+python monitor\ops.py up
+```
+
+The launcher replaces stale monitor backend listeners on port 5002, starts
+`global_index.run_scheduler` if needed, starts `monitor\start_backend.py`, waits
+for `/api/connection`, and prints the Realtime/Paper URLs.
+
+Operational checks:
+
+```powershell
+python monitor\ops.py status
+python monitor\ops.py restart
+python monitor\ops.py restart --scheduler
+python monitor\ops.py down
+python monitor\ops.py down --scheduler
+python monitor\ops.py up --restart-scheduler
+```
+
+Never use `python -m flask --app monitor.backend.app:app run` as the operational
+backend command. It serves Flask routes but does not start `ibkr_reader`, so the
+dashboard will show broker truth unavailable even when IB Gateway is logged in.
+
 ```powershell
 pythonw -m global_index.run_scheduler --port 4002 [--shadow-resume]
 ```

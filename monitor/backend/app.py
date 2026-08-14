@@ -156,6 +156,7 @@ def api_all():
         "unrealized_pnl": c["account"]["unrealized_pnl"],
         "positions":      c["positions"],
         "orders":         c["orders"],
+        "contract_specs":  c.get("contract_specs", {}),
     })
 
 
@@ -179,6 +180,7 @@ def api_v1_broker():
             "unrealized_pnl": c["account"]["unrealized_pnl"],
             "positions": c["positions"],
             "orders": c["orders"],
+            "contract_specs": c.get("contract_specs", {}),
         },
     })
 

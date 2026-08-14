@@ -995,7 +995,7 @@
           tone: event.level === 'critical' ? 'incident' : event.level === 'warn' ? 'deferred'
             : /completed|passed/.test(event.kind) ? 'success' : 'system',
           category: event.category ? `${event.category} / ${eventLabel(event.kind)}` : `MONITOR / ${eventLabel(event.kind)}`,
-          time: localTime(event.ts), message: event.message || '',
+          time: localTime(event.ts), title: event.title, message: event.message || '',
           status: event.level === 'critical' ? 'open' : 'info', component: event.component || 'scheduler' });
         return;
       }

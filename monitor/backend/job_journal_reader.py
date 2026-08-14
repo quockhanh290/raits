@@ -18,6 +18,12 @@ _LINE = re.compile(
     r"(?P<level>\S+)\s+(?P<logger>\S+)\s+(?:-|—)\s+(?P<message>.*)$"
 )
 _JOB = re.compile(r"^\[(?P<job_id>[A-Z0-9_]+)]\s+(?P<detail>.*)$")
+# The scheduler launches every child as `<python> -m global_index.<entry>`. Match that shape,
+# not the bare word "python": traceback frames quote the interpreter's install path too.
+_LAUNCH = re.compile(r"-m\s+global_index\.")
+# A refused broker connection dumps ~30 traceback frames. Keep enough to name the exception,
+# not enough to bury the card.
+_MAX_CHILD_DIAGNOSTICS = 12
 _MISSED_JOB = re.compile(
     r'Run time of job "(?P<name>.+?) \(trigger:.*" '
     r'was missed by (?P<hours>\d+):(?P<minutes>\d{2}):(?P<seconds>[\d.]+)'
@@ -75,8 +81,13 @@ def _new_job(job_id: str, started_at: str) -> dict[str, Any]:
     return {
         "id": f"{job_id}:{started_at}", "job_id": job_id, "job_type": _job_type(job_id),
         "started_at": started_at, "ended_at": None, "duration_seconds": None,
-        "status": "running", "reason": None, "diagnostics": [], "events": [],
+        "status": "running", "reason": None, "launch_count": 1, "failed_runs": 0,
+        "diagnostics": [], "diagnostics_omitted": 0, "events": [],
     }
+
+
+def _duplicate_reason(job: dict[str, Any]) -> str:
+    return f"duplicate launch: {job['failed_runs']} of {job['launch_count']} runs failed"
 
 
 def _finish(job: dict[str, Any], ended_at: str, status: str, reason: str | None = None) -> None:
@@ -253,25 +264,52 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]]) ->
         if tagged:
             job_id, detail = tagged.group("job_id"), tagged.group("detail")
             current = active.get(job_id)
-            if ("python" in detail.lower() or detail.startswith("SKIPPED")) and "completed OK" not in detail:
+            # Child output, echoed back by the scheduler. It is never a launch, whatever it
+            # happens to contain — a traceback frame quotes the Python install path, and the
+            # old "python in detail" test read every such frame as a new run of the job.
+            if detail.startswith(("stdout:", "stderr:")):
+                if current is not None and detail.startswith("stderr:"):
+                    line = detail[len("stderr:"):].strip()
+                    if line:
+                        current["diagnostics"].append(line)
+                        # Keep the TAIL, not the head. A traceback says what went wrong on its
+                        # last line and how it got there on the ~28 before it; trimming from
+                        # the end left twelve frames of ib_insync plumbing and no exception.
+                        if len(current["diagnostics"]) > _MAX_CHILD_DIAGNOSTICS:
+                            current["diagnostics"].pop(0)
+                            current["diagnostics_omitted"] += 1
+                continue
+            if (_LAUNCH.search(detail) or detail.startswith("SKIPPED")) and "completed OK" not in detail:
                 if detail.startswith("SKIPPED"):
                     current = _new_job(job_id, timestamp)
                     jobs.append(current)
                     _finish(current, timestamp, "skipped", "mutex" if "previous" in detail.lower() else "scheduler")
+                elif current is not None:
+                    # A second process fired the same slot. The log carries no PID, so the two
+                    # runs cannot be told apart line by line — but they are one slot, and the
+                    # operator needs one card saying it ran twice, not two half-parsed jobs.
+                    current["launch_count"] += 1
                 else:
                     current = _new_job(job_id, timestamp)
                     jobs.append(current)
                     active[job_id] = current
                 continue
             if current and "completed OK" in detail:
-                _finish(current, timestamp, "completed")
+                _finish(current, timestamp, "completed",
+                        _duplicate_reason(current) if current["failed_runs"] else None)
                 active.pop(job_id, None)
                 continue
             if current and ("thoat OK nhung" in detail or "exited OK but" in detail):
                 _finish(current, timestamp, "completed_with_debt", "child_logged_error")
                 continue
             if current and "exited with code" in detail.lower():
-                _finish(current, timestamp, "failed", detail)
+                current["failed_runs"] += 1
+                # Another launch of this slot may still be in flight. Closing on the first
+                # non-zero exit is what let a refused duplicate bury a run that worked.
+                if current["failed_runs"] < current["launch_count"]:
+                    continue
+                _finish(current, timestamp, "failed",
+                        _duplicate_reason(current) if current["launch_count"] > 1 else detail)
                 active.pop(job_id, None)
                 continue
             if current and level in {"ERROR", "CRITICAL"}:
@@ -290,8 +328,23 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]]) ->
                 "message": "Scheduler heartbeat resumed", "stalled_at": pending_stall_at,
             })
             pending_stall_at = None
-        elif "PRE-FLIGHT" in upper and "SKIP" in upper:
-            monitor_events.append({"ts": timestamp, "kind": "preflight_skip", "level": "warn", "message": message})
+        elif "FAIL-SAFE" in upper and "PRE-FLIGHT" in upper:
+            # run_scheduler:946 prints this once at startup, inside the banner that lists TZ,
+            # port and next run times. It declares the rule; it does not report that the rule
+            # fired. Matching on "PRE-FLIGHT" + "SKIP" caught it — the sentence contains both
+            # words — and every scheduler restart drew an amber PREFLIGHT SKIP card that read
+            # exactly like the day live_day really was blocked.
+            #
+            # A fail-safe that actually fires never reaches this branch at all: the
+            # "[PRE-FLIGHT] ... FAILED" handler above consumes it into a failed PREFLIGHT job
+            # that already carries impact and action. So this is a notice, not an incident,
+            # and the raw sentence is replaced rather than passed through.
+            monitor_events.append({
+                "ts": timestamp, "kind": "preflight_policy", "level": "info",
+                "title": "Pre-flight fail-safe armed",
+                "message": "Startup notice, not an event: if a pre-flight update fails, "
+                           "that day's live_day slots are skipped.",
+            })
         elif "SCHEDULER STARTED" in upper:
             monitor_events.append({"ts": timestamp, "kind": "scheduler_started", "level": "info", "message": "Scheduler started"})
 

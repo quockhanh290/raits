@@ -16,11 +16,34 @@
     "evidence_note": "Current paper execution history is quantity/contracts=1 only; fill quality must be retested before scaling above 1 contract."
   },
   "stp_placement_spec": {
-    "min_accepted": 10,
-    "max_failed": 0,
+    "required_continuous_sessions": 10,
+    "max_trade_matched_failed": 0,
     "require_defer_rule": true,
+    "require_system_log": true,
+    "require_ibkr_accept_log": true,
     "defer_rule": "swing/NKD broker STP is intentionally deferred until 14 hours after the next session boundary in that sleeve's own timezone; roska4_swing first eligible trading slot is 14:05 ET, global_nkd follows 14:00 JST, and roska4_stress is not deferred.",
     "backtest_divergence_note": "Validated backtest does not apply a protective stop to a new swing/NKD entry on the entry day. Immediate paper/live STP after OPEN is therefore a stricter, divergent live path."
+  },
+  "rejection_coverage_spec": {
+    "required_records": 25,
+    "max_unclassified": 0,
+    "require_candidate_identity": true,
+    "require_reason": true,
+    "require_cap_classification": true,
+    "evidence_note": "This is an observability gate for rejected candidates and cap blocks: every blocked candidate must retain instrument, direction, cluster, risk_sized, and a guard reason. Current samples are paper/live single-contract behavior and must be rechecked when scaling changes cap pressure."
+  },
+  "paper_vs_backtest_spec": {
+    "require_base_alignment": true,
+    "require_signal_level_classification": true,
+    "require_trade_level_classification": true,
+    "require_current_curve": true,
+    "max_unresolved_signals": 0,
+    "max_unresolved_entries": 0,
+    "max_unresolved_trades": 0,
+    "max_signal_price_diff": 0,
+    "max_signal_risk_diff_when_available": 1,
+    "require_ibkr_ledger_bridge": false,
+    "evidence_note": "Curve freshness decides whether a daily row is eligible for conclusion; P&L pass/fail requires aligned base equity, reset backtest comparison, classified signal/trade-level divergence, and clear separation between runner system ledger P&L and broker equity context. IBKR interest, cash, and mark-to-market buckets are not inferred unless an IBKR ledger source is added."
   },
   "stp_verification": [
     {

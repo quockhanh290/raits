@@ -100,15 +100,67 @@ def _ts_str(ts):
     except Exception:
         return None
 
+def _money(v):
+    try:
+        return round(float(v), 2)
+    except Exception:
+        return None
+
+def _component_payload(inst, t, contracts, cost):
+    """Native replay P&L components, sized to the exported contract count.
+
+    Engine trade pnl is already net of modeled round-turn cost. Exporting the
+    model inputs here keeps the dashboard from inferring cost by differencing
+    reconstructed gross against pnl_sized.
+    """
+    qty = float(contracts or 1)
+    net = _money(float(t.get("pnl", 0.0)) * qty)
+    if cost is None or net is None:
+        return {
+            "gross_pnl": None,
+            "model_commission": None,
+            "model_slippage": None,
+            "model_cost": None,
+            "net_pnl": net,
+            "component_source": "backtest_replay_exported_net_only",
+        }
+    commission = _money(-float(cost.commission_rt) * qty)
+    slippage = _money(-2.0 * float(cost.slippage_ticks_per_side) * float(cost.tick_value) * qty)
+    model_cost = _money((commission or 0.0) + (slippage or 0.0))
+    gross = _money(net - model_cost)
+    return {
+        "gross_pnl": gross,
+        "model_commission": commission,
+        "model_slippage": slippage,
+        "model_cost": model_cost,
+        "net_pnl": net,
+        "cost_model": {
+            "point_value": float(cost.point_value),
+            "tick": float(cost.tick),
+            "tick_value": float(cost.tick_value),
+            "commission_rt": float(cost.commission_rt),
+            "slippage_ticks_per_side": float(cost.slippage_ticks_per_side),
+        },
+        "component_source": "backtest_replay_exported_cost_model_v1",
+    }
+
 def build_rows(n):
     rows = []
     for inst, lst in swing.items():
         for t in lst:
             ed = pd.Timestamp(t["day"])
             rs = n * ROSKA4_MULT * _asof_naive(atr[inst], ed) * pv[inst]
+            pnl_components = _component_payload(inst, t, n, costs.get(inst))
             rows.append(dict(inst=inst, cluster=CLUSTER_SWING,
                              entry=ed, exit=pd.Timestamp(t["exit_day"]),
-                             direction=t["direction"], pnl_sized=t["pnl"] * n, risk_sized=rs,
+                             direction=t["direction"], contracts=n,
+                             pnl_sized=t["pnl"] * n, risk_sized=rs,
+                             gross_pnl=pnl_components.get("gross_pnl"),
+                             model_commission=pnl_components.get("model_commission"),
+                             model_slippage=pnl_components.get("model_slippage"),
+                             model_cost=pnl_components.get("model_cost"),
+                             net_pnl=pnl_components.get("net_pnl"),
+                             pnl_components=pnl_components,
                              entry_price=t.get("entry"),
                              exit_price=t.get("exit"),
                              entry_time=_ts_str(t.get("entry_time")),
@@ -120,9 +172,17 @@ def build_rows(n):
         for t in lst:
             ed = pd.Timestamp(t["day"])
             rs = n * ROSKA4_MULT * _asof_naive(atr[inst], ed) * pv[inst]
+            pnl_components = _component_payload(inst, t, n, costs.get(inst))
             rows.append(dict(inst=inst, cluster=CLUSTER_STRESS,
                              entry=ed, exit=pd.Timestamp(t["exit_day"]),
-                             direction=t["direction"], pnl_sized=t["pnl"] * n, risk_sized=rs,
+                             direction=t["direction"], contracts=n,
+                             pnl_sized=t["pnl"] * n, risk_sized=rs,
+                             gross_pnl=pnl_components.get("gross_pnl"),
+                             model_commission=pnl_components.get("model_commission"),
+                             model_slippage=pnl_components.get("model_slippage"),
+                             model_cost=pnl_components.get("model_cost"),
+                             net_pnl=pnl_components.get("net_pnl"),
+                             pnl_components=pnl_components,
                              entry_price=t.get("entry"),
                              exit_price=t.get("exit"),
                              entry_time=_ts_str(t.get("entry_time")),
@@ -134,9 +194,16 @@ def build_rows(n):
         ed = pd.Timestamp(t["day"]).tz_localize(None)
         xd = pd.Timestamp(t["exit_day"]).tz_localize(None) if t.get("exit_day") else ed
         rs = n * NKD_MULT * _asof_naive(natr, ed) * c_spec.point_value
+        pnl_components = _component_payload("MNKD", t, n, ncost)
         rows.append(dict(inst="MNKD", cluster=CLUSTER_NKD,
-                         entry=ed, exit=xd, direction=t["direction"],
+                         entry=ed, exit=xd, direction=t["direction"], contracts=n,
                          pnl_sized=t["pnl"] * n, risk_sized=rs,
+                         gross_pnl=pnl_components.get("gross_pnl"),
+                         model_commission=pnl_components.get("model_commission"),
+                         model_slippage=pnl_components.get("model_slippage"),
+                         model_cost=pnl_components.get("model_cost"),
+                         net_pnl=pnl_components.get("net_pnl"),
+                         pnl_components=pnl_components,
                          entry_price=t.get("entry"),
                          exit_price=t.get("exit"),
                          entry_time=_ts_str(t.get("entry_time")),
@@ -324,6 +391,7 @@ for day in days:
             "entries": [
                 {
                     "inst": t["inst"], "direction": t["direction"], "cluster": t["cluster"],
+                    "contracts": t.get("contracts"),
                     "risk_sized": round(t.get("risk_sized", 0), 2),
                     "entry_price": t.get("entry_price"),
                     "entry_time": t.get("entry_time"),
@@ -332,6 +400,12 @@ for day in days:
                     "exit_reason": t.get("exit_reason"),
                     "hold_days": t.get("hold_days"),
                     "pnl_sized": round(t.get("pnl_sized", 0), 2),
+                    "gross_pnl": t.get("gross_pnl"),
+                    "model_commission": t.get("model_commission"),
+                    "model_slippage": t.get("model_slippage"),
+                    "model_cost": t.get("model_cost"),
+                    "net_pnl": t.get("net_pnl"),
+                    "pnl_components": t.get("pnl_components"),
                     "is_same_day": t.get("exit") == day,
                     "exit_day": day.strftime("%Y-%m-%d") if t.get("exit") == day else None,
                 }
@@ -344,11 +418,18 @@ for day in days:
                     "risk_sized": round(p.risk_dollars, 2),
                     "hold_days": (p.exit_day - p.entry_day).days if p.exit_day and p.entry_day else None,
                     "entry_day": p.entry_day.strftime("%Y-%m-%d"),
+                    "contracts": trade_detail.get((p.inst, p.entry_day), {}).get("contracts"),
                     "entry_price": trade_detail.get((p.inst, p.entry_day), {}).get("entry_price"),
                     "entry_time": trade_detail.get((p.inst, p.entry_day), {}).get("entry_time"),
                     "exit_price": trade_detail.get((p.inst, p.entry_day), {}).get("exit_price"),
                     "exit_time": trade_detail.get((p.inst, p.entry_day), {}).get("exit_time"),
                     "exit_reason": trade_detail.get((p.inst, p.entry_day), {}).get("exit_reason"),
+                    "gross_pnl": trade_detail.get((p.inst, p.entry_day), {}).get("gross_pnl"),
+                    "model_commission": trade_detail.get((p.inst, p.entry_day), {}).get("model_commission"),
+                    "model_slippage": trade_detail.get((p.inst, p.entry_day), {}).get("model_slippage"),
+                    "model_cost": trade_detail.get((p.inst, p.entry_day), {}).get("model_cost"),
+                    "net_pnl": trade_detail.get((p.inst, p.entry_day), {}).get("net_pnl"),
+                    "pnl_components": trade_detail.get((p.inst, p.entry_day), {}).get("pnl_components"),
                 }
                 for p in dd.exits
             ],

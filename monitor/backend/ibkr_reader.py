@@ -25,6 +25,7 @@ _cache: dict[str, Any] = {
     "account": {"equity": None, "unrealized_pnl": None},
     "positions": [],
     "orders": [],
+    "contract_specs": {},
 }
 _cache_lock = threading.Lock()
 
@@ -59,6 +60,10 @@ def _reader_thread(port: int, client_id: int, poll_interval: int) -> None:
                 ib.connect("127.0.0.1", port, clientId=client_id, timeout=10)
                 ib.sleep(2.0)  # wait for subscriptions to populate
                 logger.info("IBKR connected OK")
+
+            contract_specs = get_cache().get("contract_specs") or {}
+            if not contract_specs:
+                contract_specs = _read_contract_specs(ib, ibi)
 
             # ── Account values ───────────────────────────────────────────
             # Collect all NetLiquidation/UnrealizedPnL by currency; prefer
@@ -152,6 +157,7 @@ def _reader_thread(port: int, client_id: int, poll_interval: int) -> None:
                 "account": {"equity": equity, "unrealized_pnl": unrealized_pnl},
                 "positions": positions,
                 "orders": orders,
+                "contract_specs": contract_specs,
             })
 
             ib.sleep(float(poll_interval))  # run event loop to receive updates
@@ -177,6 +183,46 @@ def _safe_float(v: Any) -> float | None:
         return None if abs(f) > 1e30 else f
     except (TypeError, ValueError):
         return None
+
+
+def _read_contract_specs(ib: Any, ibi: Any) -> dict[str, dict[str, Any]]:
+    """Read exchange contract metadata from IBKR without touching orders/state."""
+    try:
+        from futures.basket import BASKET
+        from global_index.ibkr_broker import _IBKR_EXCHANGE, _RAITS_TO_IBKR, _current_front_month
+    except Exception as exc:
+        return {"_error": {"error": f"local spec import failed: {exc}"}}
+
+    specs: dict[str, dict[str, Any]] = {}
+    for inst in BASKET:
+        try:
+            symbol = _RAITS_TO_IBKR.get(inst, inst)
+            exchange = _IBKR_EXCHANGE.get(inst, "CME")
+            month = _current_front_month(symbol) or _current_front_month(inst)
+            contract = ibi.Future(symbol, lastTradeDateOrContractMonth=month, exchange=exchange, currency="USD")
+            details = ib.reqContractDetails(contract)
+            if not details:
+                specs[inst] = {"status": "MISSING", "error": "IBKR returned no contract details"}
+                continue
+            detail = details[0]
+            c = detail.contract
+            point_value = _safe_float(getattr(c, "multiplier", None))
+            tick = _safe_float(getattr(detail, "minTick", None))
+            specs[inst] = {
+                "status": "OBSERVED",
+                "symbol": getattr(c, "symbol", symbol),
+                "local_symbol": getattr(c, "localSymbol", None),
+                "exchange": getattr(c, "exchange", exchange),
+                "con_id": getattr(c, "conId", None),
+                "contract_month": getattr(c, "lastTradeDateOrContractMonth", month),
+                "point_value": point_value,
+                "tick": tick,
+                "tick_value": round(point_value * tick, 6) if point_value is not None and tick is not None else None,
+                "source": "IBKR reqContractDetails",
+            }
+        except Exception as exc:
+            specs[inst] = {"status": "ERROR", "error": str(exc)}
+    return specs
 
 
 def start(port: int = 4002, client_id: int = 99, poll_interval: int = 10) -> None:

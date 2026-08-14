@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from monitor.backend import ibkr_reader
 from monitor.backend.open_issue_reader import read_open_issues
 from monitor.backend.runner_state_reader import read_runner_state
 
@@ -40,6 +41,11 @@ _STP_FAILED_DETAIL = re.compile(
     r"\s+cluster=(?P<cluster>\S+)",
     re.IGNORECASE,
 )
+_STP_SYSTEM_PLACED = re.compile(
+    r"(?:STP: placed\s+(?P<placed_inst>[A-Z0-9]+)\s+(?P<placed_direction>LONG|SHORT)\s+stop\s+@\s+(?P<placed_stop>[-\d.]+)\s+orderId=(?P<placed_order_id>\S+)\s+cluster=(?P<placed_cluster>\S+)"
+    r"|B4 REPLACED:\s+(?P<b4_inst>[A-Z0-9]+)/(?P<b4_cluster>\S+)\s+was open with no stop order.*?re-placed\s+@\s+(?P<b4_stop>[-\d.]+)\s+orderId=(?P<b4_order_id>\S+))",
+    re.IGNORECASE,
+)
 _STP_DEFERRED = re.compile(r"\bSTP HOAN:", re.IGNORECASE)
 _STP_DEFER_REMINDER = re.compile(r"\bcua so hoan CO CHU DICH\b|\bstop_deferred\b", re.IGNORECASE)
 _STP_DEFERRED_DETAIL = re.compile(
@@ -47,7 +53,16 @@ _STP_DEFERRED_DETAIL = re.compile(
     r"(?:\s+@\s+(?P<stop>[-\d.]+))?.*?(?:cluster=(?P<cluster>\S+)|$)",
     re.IGNORECASE,
 )
-_REJECTED = re.compile(r"REJECTED .* risk_sized=.*")
+_REJECTED = re.compile(r"\bREJECTED\b.*\brisk_sized=", re.IGNORECASE)
+_REJECTED_DETAIL = re.compile(
+    r"REJECTED\s+(?P<direction>LONG|SHORT)\s+(?P<inst>[A-Z0-9]+)\s+\((?P<cluster>[^)]+)\)"
+    r"\s+risk_sized=\$(?P<risk_sized>[-\d.,]+)\s+[—-]\s+(?P<reason>.+)$",
+    re.IGNORECASE,
+)
+_CAP_REASON_DETAIL = re.compile(
+    r"(?P<cluster>\S+)\s+(?P<cap_kind>gross|net)\s+(?P<projected_pct>[-\d.]+)%\s+>\s+cap\s+(?P<cap_pct>[-\d.]+)%",
+    re.IGNORECASE,
+)
 _ROLL_SLIP = re.compile(r"C2: Roll .* slippage=|C2: Roll complete .* slippage=")
 _MANUAL_INTERVENTION = re.compile(r"\b(manual|intervention|operator|override)\b", re.IGNORECASE)
 _TWS_RESTART = re.compile(
@@ -126,7 +141,7 @@ SOURCES = {
     "paper_inputs": _source(
         "monitor/paper_inputs.json",
         "monitor/operator maintained data input",
-        "JSON object with c1_spec, stp_verification, tws_restart_nights, manual_interventions, roll_slippage, paper_vs_backtest",
+        "JSON object with c1_spec, fill_quality_spec, stp_placement_spec, rejection_coverage_spec, paper_vs_backtest_spec, tws_restart_nights, manual_interventions, roll_slippage, paper_vs_backtest",
         "Updated manually or by monitoring-only tooling when evidence is reviewed",
         "No code-level deletion or rotation observed",
     ),
@@ -136,6 +151,13 @@ SOURCES = {
         "JSON audit report with daily equity windows and classified paper/backtest trade matches",
         "Generated on demand by read-only monitoring audit",
         "No code-level deletion or rotation observed",
+    ),
+    "ibkr_contract_specs": _source(
+        "/api/v1/broker payload.contract_specs",
+        "monitor.backend.ibkr_reader reqContractDetails",
+        "Read-only IBKR ContractDetails minTick + contract multiplier",
+        "Cached by backend reader after IBKR connection",
+        "Current backend process cache only",
     ),
 }
 
@@ -159,6 +181,13 @@ def _signature(root: Path) -> tuple[tuple[str, int, int], ...]:
         except OSError:
             continue
         values.append((str(path.resolve()), stat.st_mtime_ns, stat.st_size))
+    try:
+        specs = ibkr_reader.get_cache().get("contract_specs") or {}
+        encoded = json.dumps(specs, sort_keys=True).encode("utf-8")
+        checksum = sum(encoded)
+        values.append(("ibkr_contract_specs", len(encoded), checksum))
+    except Exception:
+        pass
     return tuple(values)
 
 
@@ -197,6 +226,17 @@ def _parse_ts(value: Any) -> dt.datetime | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=dt.timezone.utc)
     return parsed.astimezone(dt.timezone.utc)
+
+
+def _parse_log_ts(value: Any) -> dt.datetime | None:
+    if not value:
+        return None
+    text = str(value)[:19]
+    try:
+        parsed = dt.datetime.strptime(text, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=ZoneInfo("America/Edmonton")).astimezone(dt.timezone.utc)
 
 
 def _fmt_ts(value: dt.datetime | None) -> str | None:
@@ -266,6 +306,90 @@ def _tick(inst: Any) -> float | None:
     contract = BASKET.get(str(inst)) or SPECS.get(str(inst))
     tick = getattr(contract, "tick", None)
     return float(tick) if tick else None
+
+
+def _local_contract_specs() -> dict[str, dict[str, Any]]:
+    try:
+        from futures.basket import BASKET
+    except Exception:
+        return {}
+    specs: dict[str, dict[str, Any]] = {}
+    for inst, contract in BASKET.items():
+        point_value = _number(getattr(contract, "point_value", None))
+        tick = _number(getattr(contract, "tick", None))
+        specs[str(inst)] = {
+            "point_value": point_value,
+            "tick": tick,
+            "tick_value": round(point_value * tick, 6) if point_value is not None and tick is not None else None,
+        }
+    return specs
+
+
+def _close_enough(left: Any, right: Any, tolerance: float = 1e-6) -> bool:
+    a = _number(left)
+    b = _number(right)
+    return a is not None and b is not None and abs(a - b) <= tolerance
+
+
+def _contract_spec_guard(ibkr_cache: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+    local = _local_contract_specs()
+    ibkr_specs = ibkr_cache.get("contract_specs") if isinstance(ibkr_cache.get("contract_specs"), dict) else {}
+    rows: list[dict[str, Any]] = []
+    mismatches = 0
+    missing = 0
+    for inst, local_spec in local.items():
+        ibkr_spec = ibkr_specs.get(inst) if isinstance(ibkr_specs.get(inst), dict) else {}
+        checks = {
+            "point_value": _close_enough(local_spec.get("point_value"), ibkr_spec.get("point_value")),
+            "tick": _close_enough(local_spec.get("tick"), ibkr_spec.get("tick")),
+            "tick_value": _close_enough(local_spec.get("tick_value"), ibkr_spec.get("tick_value")),
+        }
+        if not ibkr_spec or ibkr_spec.get("status") in {"MISSING", "ERROR"}:
+            status = "MISSING"
+            missing += 1
+        elif all(checks.values()):
+            status = "PASS"
+        else:
+            status = "BREACH"
+            mismatches += 1
+        rows.append({
+            "inst": inst,
+            "status": status,
+            "local": local_spec,
+            "ibkr": ibkr_spec,
+            "checks": checks,
+            "contract": {
+                "symbol": ibkr_spec.get("symbol"),
+                "local_symbol": ibkr_spec.get("local_symbol"),
+                "contract_month": ibkr_spec.get("contract_month"),
+                "exchange": ibkr_spec.get("exchange"),
+                "con_id": ibkr_spec.get("con_id"),
+            },
+        })
+    if mismatches:
+        status = "BREACH"
+    elif missing or not ibkr_specs:
+        status = "MISSING"
+    else:
+        status = "OBSERVED"
+    evidence = (
+        f"{len(local) - mismatches - missing}/{len(local)} local contract spec(s) reconciled to IBKR; "
+        f"{mismatches} mismatch(es), {missing} missing"
+    )
+    return status, evidence, {
+        "description": "Guards P&L conversion by reconciling local point_value/tick/tick_value against IBKR ContractDetails.",
+        "local_source": "futures.basket.BASKET",
+        "ibkr_connected": bool(ibkr_cache.get("connected")),
+        "ibkr_observed_at": ibkr_cache.get("last_update"),
+        "rows": rows,
+        "mismatches": mismatches,
+        "missing": missing,
+        "status_rules": [
+            "OBSERVED: every local basket instrument has IBKR ContractDetails and point_value/tick/tick_value match within tolerance.",
+            "BREACH: any IBKR multiplier/minTick-derived value differs from the local basket value.",
+            "MISSING: IBKR is disconnected or ContractDetails are not available yet; P&L conversion cannot be independently audited.",
+        ],
+    }
 
 
 def _mean(values: list[float]) -> float | None:
@@ -438,32 +562,83 @@ def _stp_trade_details(records: list[dict[str, Any]], epoch: str | None,
 def _stp_log_row(kind: str, path: Path, line_no: int, day: str | None, line: str) -> dict[str, Any]:
     accepted = _STP_ACCEPTED_DETAIL.search(line)
     failed = _STP_FAILED_DETAIL.search(line)
+    system_placed = _STP_SYSTEM_PLACED.search(line)
     deferred = _STP_DEFERRED_DETAIL.search(line)
-    match = accepted or failed or deferred
+    match = accepted or failed or system_placed or deferred
     groups = match.groupdict() if match else {}
-    cluster = groups.get("cluster") or groups.get("b4_cluster")
+    cluster = groups.get("cluster") or groups.get("placed_cluster") or groups.get("b4_cluster")
     if isinstance(cluster, str):
         cluster = cluster.rstrip(")")
+    ts = line[:19] if len(line) >= 19 and line[:4].isdigit() else None
     reason = {
         "ACCEPTED": "Broker accepted protective STP after the defer window was no longer active.",
         "FAILED": "Broker did not accept the STP; position may be unprotected after the allowed defer window.",
+        "SYSTEM_PLACED": "Runner/system logged the stop placement or B4 replacement with the broker order id.",
         "DEFERRED": "Runner deliberately withheld same-day/too-early STP to match the validated backtest stop semantics.",
     }.get(kind, "Raw STP placement evidence.")
     return {
         "kind": kind,
         "day": day,
-        "ts": line[:19] if len(line) >= 19 and line[:4].isdigit() else None,
+        "ts": ts,
+        "ts_utc": _fmt_ts(_parse_log_ts(ts)),
+        "path": path.name,
+        "line_no": line_no,
+        "inst": groups.get("inst") or groups.get("placed_inst") or groups.get("b4_inst"),
+        "direction": groups.get("direction") or groups.get("placed_direction"),
+        "cluster": cluster,
+        "qty": int(groups["qty"]) if groups.get("qty") and str(groups["qty"]).isdigit() else None,
+        "stop_price": _number(groups.get("stop") or groups.get("placed_stop") or groups.get("b4_stop")),
+        "order_id": groups.get("order_id") or groups.get("placed_order_id") or groups.get("b4_order_id"),
+        "order_status": groups.get("order_status"),
+        "reason": reason,
+        "raw": line[:260],
+    }
+
+
+def _rejection_class(reason: str | None) -> str:
+    text = (reason or "").lower()
+    if "gross" in text and "cap" in text:
+        return "cap_gross"
+    if "net" in text and "cap" in text:
+        return "cap_net"
+    if "cap" in text:
+        return "cap_block"
+    if "halt" in text or "breaker" in text:
+        return "breaker"
+    if "refreeze" in text:
+        return "refreeze"
+    if "regime" in text:
+        return "regime"
+    if "risk" in text:
+        return "risk_guard"
+    return "unclassified"
+
+
+def _rejection_log_row(path: Path, line_no: int, day: str | None, line: str) -> dict[str, Any]:
+    ts = line[:19] if len(line) >= 19 and line[:4].isdigit() else None
+    match = _REJECTED_DETAIL.search(line)
+    groups = match.groupdict() if match else {}
+    reason = groups.get("reason")
+    cap_match = _CAP_REASON_DETAIL.search(reason or "")
+    cap_groups = cap_match.groupdict() if cap_match else {}
+    klass = _rejection_class(reason)
+    return {
+        "day": day,
+        "ts": ts,
+        "ts_utc": _fmt_ts(_parse_log_ts(ts)),
         "path": path.name,
         "line_no": line_no,
         "inst": groups.get("inst"),
         "direction": groups.get("direction"),
-        "cluster": cluster,
-        "qty": int(groups["qty"]) if groups.get("qty") and str(groups["qty"]).isdigit() else None,
-        "stop_price": _number(groups.get("stop")),
-        "order_id": groups.get("order_id"),
-        "order_status": groups.get("order_status"),
+        "cluster": groups.get("cluster"),
+        "risk_sized": _number((groups.get("risk_sized") or "").replace(",", "")),
         "reason": reason,
-        "raw": line[:260],
+        "class": klass,
+        "cap_kind": cap_groups.get("cap_kind"),
+        "projected_pct": _number(cap_groups.get("projected_pct")),
+        "cap_pct": _number(cap_groups.get("cap_pct")),
+        "raw": line[:320],
+        "parsed": bool(match),
     }
 
 
@@ -477,10 +652,12 @@ def _log_summary(root: Path, epoch: str | None) -> dict[str, Any]:
         "b3_halt_lines": 0,
         "stp_accepted": 0,
         "stp_failed": 0,
+        "stp_system_placed": 0,
         "stp_deferred": 0,
         "stp_defer_reminders": 0,
         "stp_placement_rows": [],
         "rejections": 0,
+        "rejection_rows": [],
         "roll_slippage_lines": 0,
         "manual_intervention_lines": 0,
         "manual_intervention_days": set(),
@@ -519,6 +696,9 @@ def _log_summary(root: Path, epoch: str | None) -> dict[str, Any]:
             if _STP_FAILED.search(line):
                 summary["stp_failed"] += 1
                 summary["stp_placement_rows"].append(_stp_log_row("FAILED", path, idx, day, line))
+            if _STP_SYSTEM_PLACED.search(line):
+                summary["stp_system_placed"] += 1
+                summary["stp_placement_rows"].append(_stp_log_row("SYSTEM_PLACED", path, idx, day, line))
             if _STP_DEFERRED.search(line):
                 summary["stp_deferred"] += 1
                 summary["stp_placement_rows"].append(_stp_log_row("DEFERRED", path, idx, day, line))
@@ -526,6 +706,7 @@ def _log_summary(root: Path, epoch: str | None) -> dict[str, Any]:
                 summary["stp_defer_reminders"] += 1
             if _REJECTED.search(line):
                 summary["rejections"] += 1
+                summary["rejection_rows"].append(_rejection_log_row(path, idx, day, line))
             if _ROLL_SLIP.search(line):
                 summary["roll_slippage_lines"] += 1
             if _MANUAL_INTERVENTION.search(line):
@@ -956,6 +1137,7 @@ def _enrich_stp_rows(rows: list[dict[str, Any]], trades: list[dict[str, Any]]) -
 def _stp_route_reconcile(rows: list[dict[str, Any]], trades: list[dict[str, Any]]) -> dict[str, Any]:
     deferred = [row for row in rows if row.get("kind") == "DEFERRED"]
     accepted = [row for row in rows if row.get("kind") == "ACCEPTED"]
+    system_rows = [row for row in rows if row.get("kind") == "SYSTEM_PLACED"]
     failed = [row for row in rows if row.get("kind") == "FAILED"]
     reconciled = []
     counts: dict[str, int] = {}
@@ -970,10 +1152,25 @@ def _stp_route_reconcile(rows: list[dict[str, Any]], trades: list[dict[str, Any]
             item for item in failed
             if trade_id and item.get("trade_id") == trade_id
         ]
+        matching_system = [
+            item for item in system_rows
+            if item.get("order_id") and any(item.get("order_id") == accepted_item.get("order_id") for accepted_item in matching_accepted)
+        ]
         timing = _stp_close_timing(trade) if trade else {}
         if matching_accepted:
-            outcome = "ACCEPTED_AFTER_DEFER"
-            detail = f"accepted {matching_accepted[0].get('path')}:{matching_accepted[0].get('line_no')}"
+            accepted_row = matching_accepted[0]
+            accepted_at = _parse_ts(accepted_row.get("ts_utc"))
+            arm_at = _stp_arm_at(trade) if trade else None
+            after_arm = accepted_at is not None and arm_at is not None and accepted_at >= arm_at
+            if not after_arm:
+                outcome = "ACCEPTED_BEFORE_ARM"
+                detail = f"accepted {accepted_row.get('path')}:{accepted_row.get('line_no')} before defer arm"
+            elif not matching_system:
+                outcome = "ACCEPTED_MISSING_SYSTEM_LOG"
+                detail = f"IBKR accepted {accepted_row.get('path')}:{accepted_row.get('line_no')} but matching runner/B4 system log is missing"
+            else:
+                outcome = "ACCEPTED_AFTER_ARM"
+                detail = f"IBKR {accepted_row.get('path')}:{accepted_row.get('line_no')} + system {matching_system[0].get('path')}:{matching_system[0].get('line_no')}"
         elif matching_failed:
             outcome = "FAILED_AFTER_DEFER"
             detail = f"failed {matching_failed[0].get('path')}:{matching_failed[0].get('line_no')}"
@@ -1002,6 +1199,9 @@ def _stp_route_reconcile(rows: list[dict[str, Any]], trades: list[dict[str, Any]
             "qty": row.get("qty") or (trade.get("filled_qty") if trade else None) or (trade.get("contracts") if trade else None),
             "stop_price": row.get("stop_price"),
             "deferred_at": f"{row.get('path')}:{row.get('line_no')}",
+            "accepted_at": _fmt_ts(_parse_ts(matching_accepted[0].get("ts_utc"))) if matching_accepted else None,
+            "accepted_evidence": f"{matching_accepted[0].get('path')}:{matching_accepted[0].get('line_no')}" if matching_accepted else None,
+            "system_evidence": f"{matching_system[0].get('path')}:{matching_system[0].get('line_no')}" if matching_system else None,
             "outcome": outcome,
             "detail": detail,
         })
@@ -1010,6 +1210,43 @@ def _stp_route_reconcile(rows: list[dict[str, Any]], trades: list[dict[str, Any]
         "counts": counts,
         "rows": reconciled,
         "unmatched_failed": unmatched_failed,
+    }
+
+
+def _stp_session_streak(reconcile: dict[str, Any], required_sessions: int | None) -> dict[str, Any]:
+    rows = reconcile.get("rows") if isinstance(reconcile.get("rows"), list) else []
+    by_day: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        day = _date(row.get("entry_day"))
+        if day:
+            by_day.setdefault(day, []).append(row)
+    session_rows = []
+    pass_outcomes = {"ACCEPTED_AFTER_ARM", "CLOSED_BEFORE_ARM"}
+    for day in sorted(by_day):
+        items = by_day[day]
+        failures = [item for item in items if item.get("outcome") not in pass_outcomes]
+        status = "PASS" if not failures else "FAIL"
+        session_rows.append({
+            "session": day,
+            "status": status,
+            "routes": len(items),
+            "accepted_after_arm": sum(1 for item in items if item.get("outcome") == "ACCEPTED_AFTER_ARM"),
+            "closed_before_arm": sum(1 for item in items if item.get("outcome") == "CLOSED_BEFORE_ARM"),
+            "failures": len(failures),
+            "failure_reasons": [item.get("outcome") for item in failures],
+        })
+    streak = 0
+    for session in session_rows:
+        if session["status"] == "PASS":
+            streak += 1
+        else:
+            streak = 0
+    latest_failure = next((session for session in reversed(session_rows) if session["status"] == "FAIL"), None)
+    return {
+        "required": required_sessions,
+        "current": streak,
+        "sessions": session_rows,
+        "latest_failure": latest_failure,
     }
 
 
@@ -1026,9 +1263,12 @@ def _stp_placement_status(logs: dict[str, Any], spec: dict[str, Any],
     reconcile = _stp_route_reconcile(enriched_rows, trades)
     matched_failed = sum(1 for row in enriched_rows if row.get("kind") == "FAILED" and row.get("trade_id"))
     unmatched_failed = sum(1 for row in enriched_rows if row.get("kind") == "FAILED" and not row.get("trade_id"))
-    min_accepted = int(spec.get("min_accepted") or 0) if isinstance(spec.get("min_accepted"), int) else None
-    max_failed = int(spec.get("max_failed") or 0) if isinstance(spec.get("max_failed"), int) else None
+    required_sessions = int(spec.get("required_continuous_sessions") or 0) if isinstance(spec.get("required_continuous_sessions"), int) else None
+    max_failed = int(spec.get("max_trade_matched_failed") or 0) if isinstance(spec.get("max_trade_matched_failed"), int) else None
     require_defer_rule = spec.get("require_defer_rule") is True
+    require_system_log = spec.get("require_system_log") is True
+    require_ibkr_accept_log = spec.get("require_ibkr_accept_log") is True
+    session_streak = _stp_session_streak(reconcile, required_sessions)
     defer_rule = spec.get("defer_rule") if isinstance(spec.get("defer_rule"), str) else (
         "Deferred stop clusters arm 14 hours after the next session boundary in that sleeve's own timezone."
     )
@@ -1039,8 +1279,12 @@ def _stp_placement_status(logs: dict[str, Any], spec: dict[str, Any],
         "failed_unmatched_to_trade": unmatched_failed,
         "deferred": deferred,
         "defer_reminders": defer_reminders,
-        "min_accepted": min_accepted,
+        "required_continuous_sessions": required_sessions,
+        "continuous_session_streak": session_streak.get("current"),
+        "session_streak": session_streak,
         "max_failed": max_failed,
+        "require_system_log": require_system_log,
+        "require_ibkr_accept_log": require_ibkr_accept_log,
         "spec": spec if spec else None,
         "route_reconcile": reconcile,
         "placement_samples": {
@@ -1051,7 +1295,7 @@ def _stp_placement_status(logs: dict[str, Any], spec: dict[str, Any],
         },
         "description": (
             "Stop placement validates whether paper/live records the protective STP lifecycle after an OPEN: "
-            "intentional defer first, then broker acceptance after the defer window, with any broker rejection treated as a breach."
+            "intentional defer first, then accepted broker stops after the arm time for every trade still open."
         ),
         "backtest_divergence": (
             "Validated backtest stop logic does not stop a new swing/NKD entry on the entry day. "
@@ -1074,25 +1318,151 @@ def _stp_placement_status(logs: dict[str, Any], spec: dict[str, Any],
         },
         "status_rules": [
             "MISSING: no accepted, failed, or deferred STP placement evidence exists in the paper epoch.",
-            "SPEC_GAP: stp_placement_spec is absent or lacks min_accepted/max_failed/defer-rule confirmation.",
-            "PENDING: placement/defer evidence exists and no failure breached limits, but accepted samples are below min_accepted.",
-            "PASS: accepted >= min_accepted, failed <= max_failed, and the active spec confirms the 14h per-sleeve defer rule.",
-            "BREACH: trade-matched failed placement exceeds max_failed, or a non-deferred position is missing protection after its arm window.",
+            "SPEC_GAP: stp_placement_spec is absent or lacks required_continuous_sessions/max_trade_matched_failed/defer-rule/system-log/IBKR-log confirmation.",
+            "PENDING: no route failed, but the clean continuous-session streak is below required_continuous_sessions.",
+            "PASS: for required_continuous_sessions consecutive sessions, every deferred trade either closed before arm or has a corresponding STP accepted after arm and logged by both IBKR and the runner/system.",
+            "BREACH: any session has a trade still open after arm without accepted IBKR + system stop evidence, a stop accepted before arm, or trade-matched failed placement. A failed session resets the streak.",
         ],
     }
     if not rows and not accepted and not failed and not deferred:
         return "MISSING", "No STP placement/defer evidence in paper epoch", metrics
-    if not spec or min_accepted is None or max_failed is None or not require_defer_rule:
+    if not spec or required_sessions is None or max_failed is None or not require_defer_rule or not require_system_log or not require_ibkr_accept_log:
         return "SPEC_GAP", (
             f"{accepted} accepted, {failed} failed, {deferred} deferred; stp_placement_spec missing or incomplete"
         ), metrics
     if matched_failed > max_failed:
         return "BREACH", f"{accepted} accepted, {matched_failed}>{max_failed} trade-matched failed STP placement line(s), {deferred} deferred", metrics
-    if accepted < min_accepted:
+    failing_sessions = [session for session in session_streak.get("sessions", []) if session.get("status") == "FAIL"]
+    if failing_sessions:
+        latest = failing_sessions[-1]
+        return "BREACH", f"session {latest['session']} failed stop-placement reconcile; streak reset to 0", metrics
+    if (session_streak.get("current") or 0) < required_sessions:
         suffix = f", {unmatched_failed} unmatched failed log line(s)" if unmatched_failed else ""
-        return "PENDING", f"{accepted} / {min_accepted} accepted STP line(s), {matched_failed} matched failed, {deferred} deferred{suffix}", metrics
+        return "PENDING", f"{session_streak.get('current') or 0} / {required_sessions} clean continuous session(s), {deferred} deferred route(s){suffix}", metrics
     suffix = f", {unmatched_failed} unmatched failed log line(s)" if unmatched_failed else ""
-    return "PASS", f"{accepted} / {min_accepted} accepted STP line(s), {matched_failed} matched failed, {deferred} deferred{suffix}", metrics
+    return "PASS", f"{session_streak.get('current') or 0} / {required_sessions} clean continuous session(s), {deferred} deferred route(s){suffix}", metrics
+
+
+def _enrich_rejection_rows(rows: list[dict[str, Any]], account: float | None) -> list[dict[str, Any]]:
+    enriched = []
+    for row in rows:
+        item = dict(row)
+        candidate_risk = _number(item.get("risk_sized"))
+        projected_pct = _number(item.get("projected_pct"))
+        cap_pct = _number(item.get("cap_pct"))
+        if account not in {None, 0} and projected_pct is not None:
+            projected_risk = account * projected_pct / 100
+            item["account_base"] = account
+            item["projected_risk_sized"] = round(projected_risk, 2)
+            if candidate_risk is not None:
+                item["candidate_risk_sized"] = candidate_risk
+                item["existing_risk_sized"] = round(projected_risk - candidate_risk, 2)
+                item["existing_pct"] = round(((projected_risk - candidate_risk) / account) * 100, 4)
+            if cap_pct is not None:
+                item["cap_risk_sized"] = round(account * cap_pct / 100, 2)
+                item["over_cap_risk_sized"] = round(projected_risk - (account * cap_pct / 100), 2)
+                item["over_cap_pct"] = round(projected_pct - cap_pct, 4)
+        enriched.append(item)
+    return enriched
+
+
+def _rejection_coverage_status(logs: dict[str, Any], spec: dict[str, Any],
+                               account: float | None) -> tuple[str, str, dict[str, Any]]:
+    raw_rows = logs.get("rejection_rows") if isinstance(logs.get("rejection_rows"), list) else []
+    rows = _enrich_rejection_rows(raw_rows, account)
+    total = int(logs.get("rejections") or len(rows) or 0)
+    parsed = sum(1 for row in rows if row.get("parsed"))
+    missing_identity = sum(
+        1 for row in rows
+        if not row.get("inst") or not row.get("direction") or not row.get("cluster")
+    )
+    missing_reason = sum(1 for row in rows if not row.get("reason"))
+    unclassified = sum(1 for row in rows if row.get("class") == "unclassified")
+    cap_blocks = sum(1 for row in rows if str(row.get("class") or "").startswith("cap"))
+    by_class: dict[str, int] = {}
+    by_cluster: dict[str, int] = {}
+    for row in rows:
+        klass = str(row.get("class") or "unclassified")
+        by_class[klass] = by_class.get(klass, 0) + 1
+        cluster = str(row.get("cluster") or "unknown")
+        by_cluster[cluster] = by_cluster.get(cluster, 0) + 1
+    required_records = int(spec.get("required_records") or 0) if isinstance(spec.get("required_records"), int) else None
+    max_unclassified = int(spec.get("max_unclassified") or 0) if isinstance(spec.get("max_unclassified"), int) else None
+    require_identity = spec.get("require_candidate_identity") is True
+    require_reason = spec.get("require_reason") is True
+    require_cap_classification = spec.get("require_cap_classification") is True
+    metrics = {
+        "rejections": total,
+        "parsed": parsed,
+        "classified": total - unclassified,
+        "cap_blocks": cap_blocks,
+        "other_rejections": max(total - cap_blocks, 0),
+        "missing_identity": missing_identity,
+        "missing_reason": missing_reason,
+        "unclassified": unclassified,
+        "required_records": required_records,
+        "max_unclassified": max_unclassified,
+        "require_candidate_identity": require_identity,
+        "require_reason": require_reason,
+        "require_cap_classification": require_cap_classification,
+        "account_base": account,
+        "by_class": by_class,
+        "by_cluster": by_cluster,
+        "spec": spec if spec else None,
+        "samples": {
+            "total": len(rows),
+            "shown": min(len(rows), 30),
+            "limit": 30,
+            "rows": rows[-30:],
+        },
+        "description": (
+            "Rejected signals and cap blocks validates that paper/live guard decisions leave structured evidence for every "
+            "candidate that was intentionally not sent as an order: candidate identity, risk size, guard class, and raw reason."
+        ),
+        "metric_descriptions": {
+            "rejections": "Rejected candidate log lines in the active paper epoch.",
+            "parsed": "Rows parsed into direction, instrument, cluster, risk_sized, and reason.",
+            "cap_blocks": "Rows classified as exposure/risk cap blocks, such as gross or net cap.",
+            "existing_risk_sized": "Estimated open-book risk before the rejected candidate, computed from projected cap percentage minus candidate risk.",
+            "candidate_risk_sized": "Risk contribution of the new rejected candidate from the log's risk_sized field.",
+            "projected_risk_sized": "Estimated open-book risk after adding the rejected candidate, derived from projected percentage times account base.",
+            "missing_identity": "Rows without candidate identity fields needed for trade-by-trade audit.",
+            "missing_reason": "Rows without a guard reason explaining why the candidate was blocked.",
+            "unclassified": "Rows with a reason that could not be mapped to a guard class.",
+        },
+        "status_rules": [
+            "MISSING: no rejected-signal or cap-block log evidence exists in the paper epoch.",
+            "SPEC_GAP: rejection_coverage_spec is absent or lacks required_records/max_unclassified/required field flags.",
+            "PENDING: structured rejection evidence exists and has no breach, but sample count is below required_records.",
+            "PASS: rejections >= required_records, every row has candidate identity and reason when required, and unclassified rows are within max_unclassified.",
+            "BREACH: required identity/reason fields are missing, unclassified rows exceed max_unclassified, or cap-block classification is required but no cap block is observed.",
+        ],
+    }
+    if not total:
+        return "MISSING", "No rejected-signal/cap-block log evidence in paper epoch", metrics
+    if (
+        not spec
+        or required_records is None
+        or max_unclassified is None
+        or not require_identity
+        or not require_reason
+        or not require_cap_classification
+    ):
+        return "SPEC_GAP", f"{total} rejection log line(s); rejection_coverage_spec missing or incomplete", metrics
+    breaches = []
+    if require_identity and missing_identity:
+        breaches.append(f"{missing_identity} row(s) missing candidate identity")
+    if require_reason and missing_reason:
+        breaches.append(f"{missing_reason} row(s) missing reason")
+    if unclassified > max_unclassified:
+        breaches.append(f"{unclassified}>{max_unclassified} unclassified row(s)")
+    if require_cap_classification and cap_blocks == 0:
+        breaches.append("cap-block classification required but none observed")
+    if breaches:
+        return "BREACH", f"{total} rejection log line(s); " + " | ".join(breaches), metrics
+    if total < required_records:
+        return "PENDING", f"{total} / {required_records} structured rejection/cap-block row(s), {cap_blocks} cap block(s)", metrics
+    return "PASS", f"{total} / {required_records} structured rejection/cap-block row(s), {cap_blocks} cap block(s)", metrics
 
 
 def _divergence_pct(actual: float | None, expected: float | None, account: float | None = None) -> float | None:
@@ -1107,23 +1477,208 @@ def _trade_compare_summary(compare: dict[str, Any]) -> dict[str, Any] | None:
     classified = trade_filter.get("classified") if isinstance(trade_filter.get("classified"), dict) else {}
     rows = classified.get("rows") if isinstance(classified.get("rows"), list) else []
     counts = classified.get("counts") if isinstance(classified.get("counts"), dict) else {}
-    if not rows and not counts:
+    daily = compare.get("daily") if isinstance(compare.get("daily"), list) else []
+    convention = compare.get("convention") if isinstance(compare.get("convention"), dict) else {}
+    pnl_reconcile = compare.get("pnl_reconcile") if isinstance(compare.get("pnl_reconcile"), dict) else {}
+    open_position_parity = compare.get("open_position_parity") if isinstance(compare.get("open_position_parity"), dict) else {}
+    signal_compare = compare.get("signal_compare") if isinstance(compare.get("signal_compare"), dict) else {}
+    signal_classified = signal_compare.get("classified") if isinstance(signal_compare.get("classified"), dict) else {}
+    signal_rows = signal_classified.get("rows") if isinstance(signal_classified.get("rows"), list) else []
+    signal_counts = signal_classified.get("counts") if isinstance(signal_classified.get("counts"), dict) else {}
+    entry_compare = compare.get("entry_compare") if isinstance(compare.get("entry_compare"), dict) else {}
+    entry_rows = entry_compare.get("rows") if isinstance(entry_compare.get("rows"), list) else []
+    entry_counts = entry_compare.get("counts") if isinstance(entry_compare.get("counts"), dict) else {}
+    lifecycle_compare = compare.get("lifecycle_compare") if isinstance(compare.get("lifecycle_compare"), dict) else {}
+    lifecycle_rows = lifecycle_compare.get("rows") if isinstance(lifecycle_compare.get("rows"), list) else []
+    lifecycle_counts = lifecycle_compare.get("counts") if isinstance(lifecycle_compare.get("counts"), dict) else {}
+    signal_path_audit = compare.get("signal_path_audit") if isinstance(compare.get("signal_path_audit"), dict) else {}
+    backtest_artifact_audit = compare.get("backtest_artifact_audit") if isinstance(compare.get("backtest_artifact_audit"), dict) else {}
+    statement_pnl_compare = compare.get("statement_pnl_compare") if isinstance(compare.get("statement_pnl_compare"), dict) else {}
+    ibkr_statement = compare.get("ibkr_statement") if isinstance(compare.get("ibkr_statement"), dict) else {}
+    if not rows and not counts and not daily:
         return None
+    covered_daily = [row for row in daily if isinstance(row, dict) and row.get("curve_status") == "covered"]
+    stale_daily = [row for row in daily if isinstance(row, dict) and str(row.get("curve_status") or "").startswith("stale")]
     return {
         "counts": counts,
         "unresolved": int(classified.get("unresolved") or 0),
         "shown": min(len(rows), 24),
         "total": len(rows),
         "rows": rows[:24],
-        "curve_generated": (compare.get("convention") or {}).get("curve_generated") if isinstance(compare.get("convention"), dict) else None,
-        "daily": compare.get("daily") if isinstance(compare.get("daily"), list) else [],
+        "curve_generated": convention.get("curve_generated"),
+        "convention": convention,
+        "daily": daily,
+        "signal_compare": {
+            "counts": signal_counts,
+            "unresolved": int(signal_classified.get("unresolved") or 0),
+            "shown": min(len(signal_rows), 30),
+            "total": len(signal_rows),
+            "rows": signal_rows[:30],
+        },
+        "entry_compare": {
+            "counts": entry_counts,
+            "unresolved": int(entry_compare.get("unresolved") or 0),
+            "shown": min(len(entry_rows), 30),
+            "total": len(entry_rows),
+            "rows": entry_rows[:30],
+        },
+        "lifecycle_compare": {
+            "counts": lifecycle_counts,
+            "unresolved": int(lifecycle_compare.get("unresolved") or 0),
+            "paper_minus_backtest_sum": lifecycle_compare.get("paper_minus_backtest_sum"),
+            "paper_minus_flex_sum": lifecycle_compare.get("paper_minus_flex_sum"),
+            "shown": min(len(lifecycle_rows), 30),
+            "total": len(lifecycle_rows),
+            "rows": lifecycle_rows[:30],
+        },
+        "signal_path_audit": signal_path_audit,
+        "backtest_artifact_audit": backtest_artifact_audit,
+        "statement_pnl_compare": statement_pnl_compare,
+        "ibkr_statement": ibkr_statement,
+        "pnl_reconcile": pnl_reconcile,
+        "open_position_parity": open_position_parity,
+        "covered_daily_count": len(covered_daily),
+        "stale_daily_count": len(stale_daily),
+        "latest_covered_daily": covered_daily[-1] if covered_daily else None,
+        "latest_daily": daily[-1] if daily else None,
         "notes": compare.get("notes") if isinstance(compare.get("notes"), list) else [],
     }
 
 
+def _pvb_base_audit(account: float | None, items: list[dict[str, Any]],
+                    compare: dict[str, Any], trade_compare: dict[str, Any] | None) -> dict[str, Any]:
+    convention = (trade_compare or {}).get("convention") if isinstance((trade_compare or {}).get("convention"), dict) else {}
+    daily = (trade_compare or {}).get("daily") if isinstance((trade_compare or {}).get("daily"), list) else []
+    epoch = convention.get("epoch")
+    convention_account = _number(convention.get("account"))
+    first_item = next((item for item in items if _number(item.get("actual_equity")) is not None), None)
+    first_daily = next((row for row in daily if isinstance(row, dict) and _number(row.get("actual_equity")) is not None), None)
+    first_actual = first_item or first_daily or {}
+    first_actual_equity = _number(first_actual.get("actual_equity"))
+    first_expected = _number(first_actual.get("expected_equity") or first_actual.get("expected_equity_account_window"))
+    backtest_reset = first_expected == account if first_expected is not None and account is not None else None
+    return {
+        "epoch": epoch,
+        "paper_account_base": account,
+        "compare_account_base": convention_account,
+        "base_accounts_match": (
+            account == convention_account if account is not None and convention_account is not None else None
+        ),
+        "first_actual_date": _date(first_actual.get("date")),
+        "first_actual_equity": first_actual_equity,
+        "first_actual_vs_base": (
+            round(first_actual_equity - account, 2) if first_actual_equity is not None and account is not None else None
+        ),
+        "first_expected_equity": first_expected,
+        "backtest_reset_to_account": backtest_reset,
+        "trade_filter_zero_position_base": bool(convention.get("formula_trade_filter")),
+        "actual_equity_source": convention.get("actual_equity_source"),
+        "actual_equity_note": convention.get("actual_equity_note"),
+        "account_window_formula": convention.get("formula_account_window"),
+        "trade_filter_formula": convention.get("formula_trade_filter"),
+        "paper_trade_filter_formula": convention.get("formula_paper_trade_filter"),
+        "curve_generated": convention.get("curve_generated"),
+    }
+
+
+def _divergence_side(value: float | None) -> str | None:
+    if value is None:
+        return None
+    if value > 0:
+        return "FAVORABLE"
+    if value < 0:
+        return "ADVERSE"
+    return "FLAT"
+
+
+def _pvb_daily_timeline(trade_compare: dict[str, Any] | None, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    daily = (trade_compare or {}).get("daily") if isinstance((trade_compare or {}).get("daily"), list) else []
+    if not daily:
+        daily = items
+    rows = []
+    for row in daily:
+        if not isinstance(row, dict):
+            continue
+        trade_diff = _number(row.get("trade_filter_realized_diff"))
+        account_diff = _number(row.get("account_window_diff"))
+        actual = _number(row.get("actual_equity"))
+        expected = _number(
+            row.get("expected_equity_trade_filter")
+            or row.get("expected_equity")
+            or row.get("expected_equity_account_window")
+        )
+        rows.append({
+            "date": _date(row.get("date")),
+            "actual_equity": actual,
+            "actual_equity_source": row.get("actual_equity_source"),
+            "expected_equity": expected,
+            "paper_trade_filter_equity": _number(row.get("paper_trade_filter_equity")),
+            "account_window_diff": account_diff,
+            "trade_filter_realized_diff": trade_diff,
+            "system_ledger_vs_trade_filter": _number(row.get("system_ledger_vs_trade_filter")),
+            "paper_trade_realized_cum": _number(row.get("paper_trade_realized_cum")),
+            "backtest_trade_realized_cum": _number(row.get("backtest_trade_realized_cum")),
+            "divergence_side": _divergence_side(trade_diff if trade_diff is not None else account_diff),
+            "curve_status": row.get("curve_status") or ("covered" if expected is not None else "missing"),
+        })
+    return rows
+
+
 def _paper_vs_backtest_status(live_pvb: dict[str, Any], items: list[dict[str, Any]],
-                              account: float | None, compare: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+                              account: float | None, compare: dict[str, Any],
+                              spec: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
     trade_compare = _trade_compare_summary(compare)
+    base_audit = _pvb_base_audit(account, items, compare, trade_compare)
+    timeline = _pvb_daily_timeline(trade_compare, items)
+    unresolved = (trade_compare or {}).get("unresolved", 0)
+    stale_daily = (trade_compare or {}).get("stale_daily_count", 0)
+    covered_daily = (trade_compare or {}).get("covered_daily_count", 0)
+    max_unresolved = int(spec.get("max_unresolved_trades") or 0) if isinstance(spec.get("max_unresolved_trades"), int) else None
+    max_unresolved_signals = int(spec.get("max_unresolved_signals") or 0) if isinstance(spec.get("max_unresolved_signals"), int) else None
+    max_unresolved_entries = int(spec.get("max_unresolved_entries") or 0) if isinstance(spec.get("max_unresolved_entries"), int) else None
+    require_base = spec.get("require_base_alignment") is True
+    require_trade_classification = spec.get("require_trade_level_classification") is True
+    require_signal_classification = spec.get("require_signal_level_classification") is True
+    require_current_curve = spec.get("require_current_curve") is True
+    signal_unresolved = ((trade_compare or {}).get("signal_compare") or {}).get("unresolved", 0)
+    entry_unresolved = ((trade_compare or {}).get("entry_compare") or {}).get("unresolved", 0)
+    pnl_reconcile = (trade_compare or {}).get("pnl_reconcile") if isinstance((trade_compare or {}).get("pnl_reconcile"), dict) else {}
+    open_position_parity = (trade_compare or {}).get("open_position_parity") if isinstance((trade_compare or {}).get("open_position_parity"), dict) else {}
+    status_rules = [
+        "MISSING: no complete paper-vs-backtest source exists.",
+        "SPEC_GAP: paper_vs_backtest_spec is absent or lacks base/signal/trade/freshness rules.",
+        "PENDING: base plus signal/entry/trade classification are usable, but the latest backtest curve is stale or not all required daily rows are eligible.",
+        "PASS: paper and backtest share the same account base, backtest is reset to that base, curve coverage is current when required, and every signal/entry/trade-level divergence is classified within spec limits.",
+        "BREACH: account base mismatches, backtest is not reset to the paper base, unresolved signal/entry divergence exceeds spec, or unresolved trade divergence exceeds max_unresolved_trades.",
+    ]
+    common_metrics = {
+        "base_audit": base_audit,
+        "timeline": timeline,
+        "spec": spec if spec else None,
+        "covered_daily_count": covered_daily,
+        "stale_daily_count": stale_daily,
+        "max_unresolved_trades": max_unresolved,
+        "max_unresolved_signals": max_unresolved_signals,
+        "max_unresolved_entries": max_unresolved_entries,
+        "require_base_alignment": require_base,
+        "require_trade_level_classification": require_trade_classification,
+        "require_signal_level_classification": require_signal_classification,
+        "require_current_curve": require_current_curve,
+        "description": (
+            "Paper P&L vs backtest/Flex validates the paper epoch from three comparable views: paper closed trades, "
+            "replay closed trades reset to the same base, and IBKR Flex fills rebuilt from a zero-position epoch base. "
+            "The goal is to explain where P&L variance starts: signal parity, entry fill parity, lifecycle/open-position "
+            "parity, or known live-path timing drift. Realtime system ledger P&L is shown only as a ledger check and is "
+            "not IBKR NetLiquidation."
+        ),
+        "curve_status_rule": (
+            "curve_status is a freshness/eligibility check for a daily row, not a standalone P&L pass/fail verdict. "
+            "A stale curve blocks new daily conclusions; covered rows can still be audited."
+        ),
+        "status_rules": status_rules,
+        "pnl_reconcile": pnl_reconcile,
+        "open_position_parity": open_position_parity,
+    }
     complete_items = []
     for item in items:
         actual = _number(item.get("actual_equity"))
@@ -1140,18 +1695,72 @@ def _paper_vs_backtest_status(live_pvb: dict[str, Any], items: list[dict[str, An
     if complete_items:
         latest = complete_items[-1]
         timing = (trade_compare or {}).get("counts", {}).get("KNOWN_EXIT_TIMING_DRIFT", 0)
-        unresolved = (trade_compare or {}).get("unresolved", 0)
         suffix = f"; trade compare timing_drift {timing} unresolved {unresolved}" if trade_compare else ""
+        metrics = {
+            **common_metrics,
+            "source_kind": "paper_inputs",
+            "records": complete_items,
+            "latest": latest,
+            "trade_compare": trade_compare,
+        }
+        if (
+            not spec
+            or max_unresolved is None
+            or max_unresolved_signals is None
+            or max_unresolved_entries is None
+            or not require_base
+            or not require_trade_classification
+            or not require_signal_classification
+        ):
+            return (
+                "SPEC_GAP",
+                f"structured daily compare {len(complete_items)} record(s); paper_vs_backtest_spec missing or incomplete",
+                metrics,
+            )
+        if require_base and (
+            base_audit.get("base_accounts_match") is False
+            or base_audit.get("backtest_reset_to_account") is False
+        ):
+            return (
+                "BREACH",
+                "paper/backtest base alignment failed",
+                metrics,
+            )
+        if unresolved > max_unresolved:
+            return (
+                "BREACH",
+                f"{unresolved}>{max_unresolved} unresolved trade-level divergence(s)",
+                metrics,
+            )
+        if signal_unresolved > max_unresolved_signals:
+            return (
+                "BREACH",
+                f"{signal_unresolved}>{max_unresolved_signals} unresolved signal-level divergence(s)",
+                metrics,
+            )
+        if entry_unresolved > max_unresolved_entries:
+            return (
+                "BREACH",
+                f"{entry_unresolved}>{max_unresolved_entries} unresolved entry-level divergence(s)",
+                metrics,
+            )
+        if require_current_curve and stale_daily:
+            return (
+                "PENDING",
+                f"structured daily compare {len(complete_items)} record(s); latest curve stale for {stale_daily} row(s){suffix}",
+                metrics,
+            )
         return (
-            "OBSERVED",
+            "PASS",
             f"structured daily compare {len(complete_items)} record(s); latest actual {latest['actual_equity']} expected {latest['expected_equity']} divergence {latest['divergence_pct']}{suffix}",
-            {"source_kind": "paper_inputs", "records": complete_items, "latest": latest, "trade_compare": trade_compare},
+            metrics,
         )
 
     actual = _number(live_pvb.get("actual_equity"))
     expected = _number(live_pvb.get("expected_equity"))
     if actual is not None and expected is not None:
         metrics = dict(live_pvb)
+        metrics.update(common_metrics)
         metrics["divergence_pct"] = _number(live_pvb.get("divergence_pct")) if live_pvb.get("divergence_pct") is not None else _divergence_pct(actual, expected, account)
         metrics["source_kind"] = "live_state"
         metrics["trade_compare"] = trade_compare
@@ -1162,6 +1771,7 @@ def _paper_vs_backtest_status(live_pvb: dict[str, Any], items: list[dict[str, An
         )
     if actual is not None or expected is not None:
         metrics = dict(live_pvb)
+        metrics.update(common_metrics)
         metrics["source_kind"] = "live_state_incomplete"
         metrics["structured_records"] = len(items)
         metrics["trade_compare"] = trade_compare
@@ -1173,14 +1783,14 @@ def _paper_vs_backtest_status(live_pvb: dict[str, Any], items: list[dict[str, An
     return (
         "MISSING",
         "No complete paper-vs-backtest comparison source",
-        {"source_kind": "missing", "structured_records": len(items), "live_state": live_pvb, "trade_compare": trade_compare},
+        {**common_metrics, "source_kind": "missing", "structured_records": len(items), "live_state": live_pvb, "trade_compare": trade_compare},
     )
 
 
 def _coverage_items(root: Path, payload: dict[str, Any], history: dict[str, Any],
                     records: list[dict[str, Any]], logs: dict[str, Any],
                     epoch: str | None, paper_inputs: dict[str, Any], paper_compare: dict[str, Any],
-                    malformed_trades: int) -> list[dict[str, Any]]:
+                    malformed_trades: int, ibkr_cache: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     latest = _latest_snapshot(payload)
     epoch_records = _epoch_records(records, epoch)
     pvb = latest.get("paper_vs_backtest") if isinstance(latest.get("paper_vs_backtest"), dict) else {}
@@ -1202,6 +1812,11 @@ def _coverage_items(root: Path, payload: dict[str, Any], history: dict[str, Any]
         positions,
         epoch,
     )
+    rejection_status, rejection_evidence, rejection_metrics = _rejection_coverage_status(
+        logs,
+        paper_inputs.get("rejection_coverage_spec") if isinstance(paper_inputs.get("rejection_coverage_spec"), dict) else {},
+        _number(history.get("account")),
+    )
     protected = sum(1 for pos in positions if pos.get("stop_order_id"))
     open_issues = read_open_issues(root)
     issues = open_issues.get("issues") if isinstance(open_issues.get("issues"), list) else []
@@ -1216,8 +1831,13 @@ def _coverage_items(root: Path, payload: dict[str, Any], history: dict[str, Any]
     refreeze = op_status.get("refreeze") if isinstance(op_status.get("refreeze"), dict) else {}
     positions_status = op_status.get("positions") if isinstance(op_status.get("positions"), dict) else {}
     pvb_status, pvb_evidence, pvb_metrics = _paper_vs_backtest_status(
-        pvb, _records(paper_inputs.get("paper_vs_backtest")), _number(history.get("account")), paper_compare
+        pvb,
+        _records(paper_inputs.get("paper_vs_backtest")),
+        _number(history.get("account")),
+        paper_compare,
+        paper_inputs.get("paper_vs_backtest_spec") if isinstance(paper_inputs.get("paper_vs_backtest_spec"), dict) else {},
     )
+    contract_status, contract_evidence, contract_metrics = _contract_spec_guard(ibkr_cache or {})
 
     return [
         _coverage(
@@ -1250,10 +1870,10 @@ def _coverage_items(root: Path, payload: dict[str, Any], history: dict[str, Any]
         ),
         _coverage(
             "rejections", "Rejected signals and cap blocks",
-            "OBSERVED" if logs["rejections"] else "MISSING",
-            f"{logs['rejections']} rejection log line(s) in paper epoch",
-            ["logs", "live_state"],
-            {"rejections": logs["rejections"]},
+            rejection_status,
+            rejection_evidence,
+            ["logs", "paper_inputs"],
+            rejection_metrics,
         ),
         _coverage(
             "runner_freshness", "Runner evidence freshness",
@@ -1268,6 +1888,13 @@ def _coverage_items(root: Path, payload: dict[str, Any], history: dict[str, Any]
             f"regime={regime_freshness.get('status', '--')} | model={model_age.get('status', '--')} | refreeze_pending={refreeze.get('pending', '--')}",
             ["live_state"],
             {"regime_freshness": regime_freshness, "model_age": model_age, "refreeze": refreeze},
+        ),
+        _coverage(
+            "contract_spec_guard", "Contract spec guard",
+            contract_status,
+            contract_evidence,
+            ["ibkr_contract_specs"],
+            contract_metrics,
         ),
         _coverage(
             "current_protection", "Current position protection",
@@ -1364,7 +1991,8 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
     live_positions, _live_positions_error = _read_json(root / "live_positions.json")
     positions = live_positions.get("positions") if isinstance(live_positions.get("positions"), list) else []
     stp_trades = _stp_trade_details(records, epoch, positions)
-    coverage = _coverage_items(root, payload, history, records, logs, epoch, paper_inputs, paper_compare, malformed_trades)
+    ibkr_cache = ibkr_reader.get_cache()
+    coverage = _coverage_items(root, payload, history, records, logs, epoch, paper_inputs, paper_compare, malformed_trades, ibkr_cache)
     c1_status, c1_evidence, c1_metrics = _c1_status(
         slip, paper_inputs.get("c1_spec") if isinstance(paper_inputs.get("c1_spec"), dict) else {}
     )

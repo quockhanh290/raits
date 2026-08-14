@@ -224,13 +224,17 @@ def test_paper_evidence_counts_candidate_gap_log_lines(tmp_path: Path):
         "2026-08-10 05:13:00 INFO global_index.runner - STP HOAN: M2K LONG @ 3020.2000 cluster=roska4_swing - dat vao phien sau\n"
         "2026-08-10 05:14:00 INFO global_index.ibkr_broker - place_stop: accepted LONG M2K STP ×1 @ 3020.2000 orderId=288 status=PreSubmitted cluster=roska4_swing\n"
         "2026-08-10 05:15:00 ERROR global_index.runner - STP: place_stop FAILED M2K LONG @ 3020.2000 cluster=roska4_swing - position open without overnight stop protection\n"
-        "2026-08-10 05:16:00 INFO global_index.runner - B4: M2K/roska4_swing chua co STP - dang trong cua so hoan CO CHU DICH (vao ngay 2026-08-10). Se dat o lan chay dau tien ngay ke tiep.\n",
+        "2026-08-10 05:16:00 INFO global_index.runner - B4: M2K/roska4_swing chua co STP - dang trong cua so hoan CO CHU DICH (vao ngay 2026-08-10). Se dat o lan chay dau tien ngay ke tiep.\n"
+        "2026-08-10 05:17:00 WARNING run_live_day -        REJECTED SHORT MNQ (roska4_swing) risk_sized=$3340.54 - roska4_swing gross 8.4% > cap 5.0%\n",
         encoding="utf-8",
     )
     monitor = tmp_path / "monitor"
     monitor.mkdir()
     (monitor / "paper_inputs.json").write_text(
-        '{"stp_placement_spec":{"min_accepted":2,"max_failed":0,"require_defer_rule":true}}',
+        '{"stp_placement_spec":{"required_continuous_sessions":2,"max_trade_matched_failed":0,'
+        '"require_defer_rule":true,"require_system_log":true,"require_ibkr_accept_log":true},'
+        '"rejection_coverage_spec":{"required_records":1,"max_unclassified":0,'
+        '"require_candidate_identity":true,"require_reason":true,"require_cap_classification":true}}',
         encoding="utf-8",
     )
 
@@ -243,11 +247,14 @@ def test_paper_evidence_counts_candidate_gap_log_lines(tmp_path: Path):
     assert gates["stp_verification"]["metrics"]["stp_accepted"] == 1
     assert gates["stp_verification"]["metrics"]["stp_failed"] == 1
     assert gates["stp_verification"]["metrics"]["trade_details"]["total"] == 0
-    assert coverage["stp_placement"]["status"] == "PENDING"
+    assert coverage["stp_placement"]["status"] == "BREACH"
     assert coverage["stp_placement"]["metrics"]["accepted"] == 1
     assert coverage["stp_placement"]["metrics"]["failed"] == 1
     assert coverage["stp_placement"]["metrics"]["failed_matched_to_trade"] == 0
     assert coverage["stp_placement"]["metrics"]["failed_unmatched_to_trade"] == 1
+    assert coverage["stp_placement"]["metrics"]["required_continuous_sessions"] == 2
+    assert coverage["stp_placement"]["metrics"]["continuous_session_streak"] == 0
+    assert coverage["stp_placement"]["metrics"]["session_streak"]["sessions"][0]["status"] == "FAIL"
     assert coverage["stp_placement"]["metrics"]["deferred"] == 1
     assert coverage["stp_placement"]["metrics"]["defer_reminders"] == 1
     assert coverage["stp_placement"]["metrics"]["placement_samples"]["total"] == 3
@@ -255,12 +262,70 @@ def test_paper_evidence_counts_candidate_gap_log_lines(tmp_path: Path):
     assert coverage["stp_placement"]["metrics"]["placement_samples"]["rows"][1]["order_id"] == "288"
     assert coverage["stp_placement"]["metrics"]["route_reconcile"]["unmatched_failed"][0]["match_status"] == "UNMATCHED_TO_PAPER_OPEN"
     assert "immediate STP after OPEN" in coverage["stp_placement"]["metrics"]["backtest_divergence"]
+    assert coverage["rejections"]["status"] == "PASS"
+    assert coverage["rejections"]["metrics"]["rejections"] == 1
+    assert coverage["rejections"]["metrics"]["cap_blocks"] == 1
+    assert coverage["rejections"]["metrics"]["samples"]["rows"][0]["class"] == "cap_gross"
+    assert coverage["rejections"]["metrics"]["samples"]["rows"][0]["risk_sized"] == 3340.54
+    assert coverage["rejections"]["metrics"]["samples"]["rows"][0]["existing_risk_sized"] == 859.46
+    assert coverage["rejections"]["metrics"]["samples"]["rows"][0]["projected_risk_sized"] == 4200.0
+    assert coverage["rejections"]["metrics"]["samples"]["rows"][0]["cap_risk_sized"] == 2500.0
+    assert coverage["rejections"]["metrics"]["samples"]["rows"][0]["over_cap_risk_sized"] == 1700.0
     assert coverage["manual_intervention"]["metrics"]["candidate_log_lines"] == 1
     assert coverage["manual_intervention"]["metrics"]["candidate_days"] == ["2026-08-10"]
     assert payload["diagnostics"]["manual_intervention_candidate_lines"] == 1
     assert payload["diagnostics"]["manual_intervention_candidate_days"] == ["2026-08-10"]
     assert payload["diagnostics"]["tws_restart_candidate_lines"] == 1
     assert payload["diagnostics"]["tws_restart_candidate_days"] == ["2026-08-10"]
+
+
+def test_paper_evidence_contract_spec_guard_reconciles_ibkr_cache(monkeypatch, tmp_path: Path):
+    global_index = tmp_path / "global_index"
+    global_index.mkdir()
+    monitor = tmp_path / "monitor"
+    monitor.mkdir()
+    (global_index / "live_state_data.js").write_text(
+        'window.LIVE_DATA = {"meta":{"system_epoch":"2026-08-10"},"snapshots":[{"date":"2026-08-10"}]}',
+        encoding="utf-8",
+    )
+    (global_index / "paper_history.json").write_text(
+        '{"epoch":"2026-08-10","account":50000,"days":{"2026-08-10":50000}}',
+        encoding="utf-8",
+    )
+    (tmp_path / "trade_log.jsonl").write_text("", encoding="utf-8")
+    (tmp_path / "slip_stats.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "live_positions.json").write_text('{"positions":[]}', encoding="utf-8")
+    (monitor / "paper_inputs.json").write_text("{}", encoding="utf-8")
+
+    specs = {
+        "MES": {"status": "OBSERVED", "point_value": 5.0, "tick": 0.25, "tick_value": 1.25},
+        "MNQ": {"status": "OBSERVED", "point_value": 2.0, "tick": 0.25, "tick_value": 0.5},
+        "MYM": {"status": "OBSERVED", "point_value": 0.5, "tick": 1.0, "tick_value": 0.5},
+        "M2K": {"status": "OBSERVED", "point_value": 5.0, "tick": 0.1, "tick_value": 0.5},
+    }
+    monkeypatch.setattr(ibkr_reader, "get_cache", lambda: {
+        "connected": True,
+        "last_update": "2026-08-14T00:00:00Z",
+        "contract_specs": specs,
+    })
+    payload = read_paper_evidence(tmp_path)["payload"]
+    coverage = {item["key"]: item for item in payload["coverage"]}
+
+    assert coverage["contract_spec_guard"]["status"] == "OBSERVED"
+    assert coverage["contract_spec_guard"]["metrics"]["mismatches"] == 0
+    assert coverage["contract_spec_guard"]["metrics"]["rows"][0]["checks"]["point_value"] is True
+
+    bad_specs = {**specs, "MES": {**specs["MES"], "point_value": 50.0, "tick_value": 12.5}}
+    monkeypatch.setattr(ibkr_reader, "get_cache", lambda: {
+        "connected": True,
+        "last_update": "2026-08-14T00:00:01Z",
+        "contract_specs": bad_specs,
+    })
+    payload = read_paper_evidence(tmp_path)["payload"]
+    coverage = {item["key"]: item for item in payload["coverage"]}
+
+    assert coverage["contract_spec_guard"]["status"] == "BREACH"
+    assert coverage["contract_spec_guard"]["metrics"]["mismatches"] == 1
 
 
 def test_paper_evidence_uses_monitor_paper_inputs_to_unblock_gaps(tmp_path: Path):
@@ -294,24 +359,90 @@ def test_paper_evidence_uses_monitor_paper_inputs_to_unblock_gaps(tmp_path: Path
         '"tws_restart_nights":[{"night":"2026-08-10","restart_proven":true,"runner_resumed":true,"broker_verified":true}],'
         '"manual_interventions":[{"ts":"2026-08-10T05:12:00Z","resolution_status":"resolved","post_action_verified":true}],'
         '"roll_slippage":[{"date":"2026-08-10","ticks":1.5}],'
+        '"paper_vs_backtest_spec":{"require_base_alignment":true,"require_signal_level_classification":true,'
+        '"require_trade_level_classification":true,"require_current_curve":true,'
+        '"max_unresolved_signals":0,"max_unresolved_entries":0,"max_unresolved_trades":0,'
+        '"max_signal_price_diff":0,"max_signal_risk_diff_when_available":1,'
+        '"require_ibkr_ledger_bridge":false},'
         '"paper_vs_backtest":[{"date":"2026-08-10","actual_equity":50012,"expected_equity":50000,'
         '"evidence":"reviewed daily compare"}]}',
         encoding="utf-8",
     )
     (monitor / "paper_pnl_compare.json").write_text(
-        '{"convention":{"curve_generated":"2026-08-10"},'
-        '"daily":[{"date":"2026-08-10","actual_equity":50012,"account_window_diff":12,'
+        '{"convention":{"epoch":"2026-08-10","account":50000,"curve_generated":"2026-08-10",'
+        '"actual_equity_source":"system_ledger_realized_only",'
+        '"actual_equity_note":"Actual is runner system equity from paper_history/live_state, not IBKR NetLiquidation.",'
+        '"formula_account_window":"account + (backtest_curve[date] - backtest_curve[epoch])",'
+        '"formula_trade_filter":"account + cumulative pnl for trades with entry_day >= epoch",'
+        '"formula_paper_trade_filter":"account + cumulative paper trade_log pnl_sized"},'
+        '"pnl_reconcile":{"actual_source":"paper_history.days","actual_semantics":"runner system ledger / sleeve equity, realised-only by design",'
+        '"not_ibkr_equity":true,"broker_equity_context":{"value":996280.77,"not_used_for_pnl_compare":true},'
+        '"realtime_system_ledger_pnl":12,"realtime_system_ledger_formula":"live_state.meta.final_equity - paper_history.account",'
+        '"realtime_final_equity":50012,"realtime_account_base":50000,"paper_closed_trade_realized":12,'
+        '"system_ledger_offset_vs_paper_closed_trades":0,'
+        '"bridge_note":"system ledger is not broker equity"},'
+        '"daily":[{"date":"2026-08-10","actual_equity":50012,"expected_equity_trade_filter":50000,'
+        '"actual_equity_source":"system_ledger_realized_only","paper_trade_filter_equity":50012,'
+        '"system_ledger_vs_trade_filter":0,"paper_trade_realized_cum":12,"backtest_trade_realized_cum":0,'
+        '"expected_equity_account_window":50000,"account_window_diff":12,'
         '"trade_filter_realized_diff":0,"curve_status":"covered"}],'
         '"trade_filter":{"classified":{"counts":{"MATCHED_SAME_DATES":1,"KNOWN_EXIT_TIMING_DRIFT":1},'
-        '"unresolved":0,"rows":[{"classification":"MATCHED_SAME_DATES","inst":"MES","cluster":"swing",'
+        '"unresolved":0,"rows":[{"classification":"MATCHED_SAME_DATES","trade_id":"MES|swing|LONG|2026-08-10",'
+        '"inst":"MES","cluster":"swing",'
         '"direction":"LONG","entry_day":"2026-08-10","paper_exit_day":"2026-08-10",'
         '"backtest_exit_day":"2026-08-10","paper_pnl":12,"backtest_pnl":12,"pnl_diff":0,'
         '"reason":"same instrument, cluster, direction, entry day, and exit day"},'
-        '{"classification":"KNOWN_EXIT_TIMING_DRIFT","inst":"MNKD","cluster":"global_nkd",'
+        '{"classification":"KNOWN_EXIT_TIMING_DRIFT","trade_id":"MNKD|global_nkd|LONG|2026-08-10",'
+        '"inst":"MNKD","cluster":"global_nkd",'
         '"direction":"LONG","entry_day":"2026-08-10","paper_exit_day":"2026-08-10",'
         '"backtest_exit_day":"2026-08-11","exit_day_delta":-1,"paper_pnl":-110,'
         '"backtest_pnl":-54.34,"pnl_diff":-55.66,'
-        '"reason":"same trade identity but paper/live exit day differs"}]}}}',
+        '"reason":"same trade identity but paper/live exit day differs"}]}},'
+        '"signal_compare":{"classified":{"counts":{"MATCHED_SIGNAL":1},'
+        '"unresolved":0,"rows":[{"classification":"MATCHED_SIGNAL","date":"2026-08-10",'
+        '"inst":"MES","cluster":"swing","direction":"LONG","action":"OPEN",'
+        '"paper_count":1,"backtest_count":1,"reason_code":"MATCHED_DECISION","reason":"same signal",'
+        '"price_compare_status":"MATCH","risk_compare_status":"MISSING"}]}},'
+        '"entry_compare":{"counts":{"MATCHED_ENTRY":1},"unresolved":0,'
+        '"rows":[{"classification":"MATCHED_ENTRY","trade_id":"MES|swing|LONG|2026-08-10",'
+        '"date":"2026-08-10","inst":"MES",'
+        '"cluster":"swing","direction":"LONG","paper_fill_price":5001,'
+        '"paper_expected_entry":5000,"backtest_entry_price":5000,'
+        '"broker_statement_price":5001,"broker_verified":true,"reason":"same entry"}]},'
+        '"lifecycle_compare":{"counts":{"MATCHED_LIFECYCLE":1},"unresolved":0,'
+        '"paper_minus_backtest_sum":0,"paper_minus_flex_sum":0,'
+        '"rows":[{"classification":"MATCHED_LIFECYCLE","trade_id":"MES|swing|LONG|2026-08-10",'
+        '"inst":"MES","cluster":"swing",'
+        '"direction":"LONG","entry_day":"2026-08-10",'
+        '"paper":{"status":"CLOSED","entry_price":5001,"exit_day":"2026-08-10","pnl":12},'
+        '"backtest":{"status":"CLOSED","entry_price":5000,"exit_day":"2026-08-10","pnl":12},'
+        '"flex":{"status":"CLOSED","entry_price":5001,"exit_day":"2026-08-10","pnl":12},'
+        '"paper_minus_backtest_pnl":0,"paper_minus_flex_pnl":0,"reason":"same lifecycle"}]},'
+        '"signal_path_audit":{"status":"OBSERVED","focus":"fixture","dependency_note":"events depend on held positions"},'
+        '"backtest_artifact_audit":{"status":"BREACH","focus":"M2K LONG OPEN on 2026-08-10",'
+        '"classification":"REPLAY_SNAPSHOT_STALE_OR_INCONSISTENT_WITH_CURRENT_CHECKPOINT",'
+        '"replay_snapshot_has_m2k_entry":false,"current_checkpoint_has_m2k_long":true},'
+        '"statement_pnl_compare":{"status":"OBSERVED","source":"monitor/inputs/ibkr_flex/flex.csv",'
+        '"epoch":"2026-08-10","actual_system_ledger_semantics":"runner realised trade ledger / sleeve equity, not IBKR NetLiquidation",'
+        '"paper_epoch_closed_realized":12,"backtest_epoch_closed_realized":12,"paper_minus_backtest_realized":0,'
+        '"flex_epoch_rebased_realized":12,"paper_minus_flex_epoch_rebased_realized":0,'
+        '"flex_ledger_aligned_realized":12,"paper_minus_flex_ledger_aligned_realized":0,'
+        '"ledger_aligned_minus_system_ledger_pnl":0,'
+        '"ledger_alignment_override":{"status":"INACTIVE","scope":"selective","reason":"fixture",'
+        '"global_rebase_changed":false,"included_carry_closed":[]},'
+        '"raw_statement_entry_epoch_realized":12,"statement_entry_epoch_realized":12,'
+        '"paper_minus_statement_entry_epoch_realized":0,'
+        '"excluded_pre_epoch_exit_window_realized":272,"excluded_pre_epoch_closed_count":1,'
+        '"latest_system_ledger_vs_paper_trade_filter":272,'
+        '"ledger_offset_explanation":"MATCH_PRE_EPOCH_CARRY_FILL","paper_flex_bridge":[],'
+        '"paper_flex_bridge_diff_sum":0,'
+        '"flex_epoch_rebased_closed":[],"flex_epoch_rebased_open_lots":[],"flex_epoch_rebased_ignored_count":0,'
+        '"raw_statement_entry_epoch_closed":[],"ledger_offset_matching_carry_closed":[],'
+        '"raw_statement_entry_epoch_open_lots":[]},'
+        '"ibkr_statement":{"status":"OBSERVED","path":"monitor/inputs/ibkr_flex/flex.csv",'
+        '"fills_count":2,"closed_count":1,"open_lot_count":0},'
+        '"open_position_parity":{"status":"MATCH","paper_day":"2026-08-10","replay_day":"2026-08-10",'
+        '"paper_open_count":0,"replay_open_count":0,"paper_only":[],"backtest_only":[]}}',
         encoding="utf-8",
     )
 
@@ -324,9 +455,12 @@ def test_paper_evidence_uses_monitor_paper_inputs_to_unblock_gaps(tmp_path: Path
     assert gates["tws_restart_nights"]["status"] == "PASS"
     assert coverage["manual_intervention"]["status"] == "OBSERVED"
     assert coverage["roll_slippage"]["status"] == "OBSERVED"
-    assert coverage["paper_vs_backtest"]["status"] == "OBSERVED"
+    assert coverage["paper_vs_backtest"]["status"] == "PASS"
     assert coverage["paper_vs_backtest"]["metrics"]["source_kind"] == "paper_inputs"
     assert coverage["paper_vs_backtest"]["metrics"]["latest"]["divergence_pct"] == pytest.approx(0.00024)
+    assert coverage["paper_vs_backtest"]["metrics"]["base_audit"]["paper_account_base"] == 50000
+    assert coverage["paper_vs_backtest"]["metrics"]["base_audit"]["backtest_reset_to_account"] is True
+    assert coverage["paper_vs_backtest"]["metrics"]["timeline"][0]["divergence_side"] == "FLAT"
     assert coverage["fill_quality"]["status"] == "PASS"
     assert coverage["fill_quality"]["metrics"]["status_rules"]
     assert coverage["fill_quality"]["metrics"]["max_contracts_tested"] == 1
@@ -337,6 +471,23 @@ def test_paper_evidence_uses_monitor_paper_inputs_to_unblock_gaps(tmp_path: Path
     assert trade_compare["counts"]["KNOWN_EXIT_TIMING_DRIFT"] == 1
     assert trade_compare["unresolved"] == 0
     assert trade_compare["rows"][-1]["classification"] == "KNOWN_EXIT_TIMING_DRIFT"
+    assert "trade_id" in trade_compare["rows"][-1]
+    assert trade_compare["signal_compare"]["counts"]["MATCHED_SIGNAL"] == 1
+    assert trade_compare["signal_compare"]["unresolved"] == 0
+    assert trade_compare["entry_compare"]["counts"]["MATCHED_ENTRY"] == 1
+    assert trade_compare["entry_compare"]["rows"][0]["broker_verified"] is True
+    assert trade_compare["lifecycle_compare"]["counts"]["MATCHED_LIFECYCLE"] == 1
+    assert trade_compare["lifecycle_compare"]["paper_minus_backtest_sum"] == 0
+    assert trade_compare["lifecycle_compare"]["rows"][0]["flex"]["status"] == "CLOSED"
+    assert trade_compare["signal_path_audit"]["status"] == "OBSERVED"
+    assert trade_compare["backtest_artifact_audit"]["current_checkpoint_has_m2k_long"] is True
+    assert trade_compare["statement_pnl_compare"]["ledger_offset_explanation"] == "MATCH_PRE_EPOCH_CARRY_FILL"
+    assert trade_compare["statement_pnl_compare"]["flex_ledger_aligned_realized"] == 12
+    assert trade_compare["statement_pnl_compare"]["ledger_alignment_override"]["global_rebase_changed"] is False
+    assert trade_compare["ibkr_statement"]["status"] == "OBSERVED"
+    assert trade_compare["pnl_reconcile"]["not_ibkr_equity"] is True
+    assert trade_compare["pnl_reconcile"]["realtime_system_ledger_pnl"] == 12
+    assert trade_compare["open_position_parity"]["status"] == "MATCH"
     assert payload["diagnostics"]["paper_inputs_error"] is None
     assert payload["diagnostics"]["paper_pnl_compare_error"] is None
 
@@ -479,6 +630,20 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "function groupedCoverage" in source
     assert "function pnlCompareDetail" in source
     assert "function pnlCompareRows" in source
+    assert "function signalCompareRows" in source
+    assert "function entryCompareRows" in source
+    assert "function lifecycleCompareRows" in source
+    assert "function sourceDiffAnalyzerRows" in source
+    assert "function brokerIdentity" in source
+    assert "function realtimeLedgerBlock" in source
+    assert "function pnlCompareTab" in source
+    assert "function pnlAuditTab" in source
+    assert "function signalPathAuditBlock" in source
+    assert "function pnlBaseMetricCards" in source
+    assert "function pnlTimeline" in source
+    assert "function pnlDailyRows" in source
+    assert "function pnlPurposeBlock" in source
+    assert "function openPositionParityRows" in source
     assert "function renderCoverage" in source
     assert "function fillQualityDetail" in source
     assert "function fillTradeRows" in source
@@ -487,6 +652,9 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "function stpPlacementRows" in source
     assert "function stpPlacementMetricCards" in source
     assert "function stpRouteReconcileRows" in source
+    assert "function rejectionCoverageDetail" in source
+    assert "function rejectionEvidenceRows" in source
+    assert "function rejectionMetricCards" in source
     assert "function detailProgress" in source
     assert "detail-metric-readout" in source
     assert "no-progress" in source
@@ -509,13 +677,82 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "Backtest Divergence" in source
     assert "Placement Evidence" in source
     assert "Route Reconcile" in source
+    assert "Rejected Candidate Evidence" in source
+    assert "Rejected rows" in source
+    assert "<th>reason</th>" in source
+    assert "existing risk" in source
+    assert "risk before trade enter" in source
+    assert "signal risk" in source
+    assert "projected risk" in source
+    assert "over cap variance" in source
+    assert "projected - cap" in source
     assert "B4 reminders" not in source
     assert "immediate STP after OPEN" in source
     assert "roska4_swing" in source
     assert "Metric Definitions" not in source
     assert "Pass Spec" not in source
-    assert "KNOWN_EXIT_TIMING_DRIFT" in source
-    assert "Trade-by-trade reasons" in source
+    assert "Trade-by-trade Reasons" in source
+    assert "Base Audit" not in source
+    assert "Divergence Timeline" not in source
+    assert "Net P&amp;L Timeline" in source
+    assert "Daily Divergence Rows" in source
+    assert "Signal Compare" in source
+    assert "Entry Compare" in source
+    assert "Lifecycle Compare" in source
+    assert "Source Diff Analyzer" in source
+    assert "gross" in source
+    assert "model cost" in source
+    assert "net+fee" in source
+    assert "Component note" in source
+    assert "Realtime P&amp;L Source" in source
+    assert "audit-m2k-entry" in source
+    assert "audit-link" in source
+    assert "Signal Path Audit" in source
+    assert "paper/backtest/Flex" in source
+    assert "Entry Ref Value" in source
+    assert "component-ref" in source
+    assert "priceUsd" in source
+    assert "pnl-diagnostic" not in source
+    assert "source-diff-stats" in source
+    assert "Avg entry slip" in source
+    assert "TOTAL DELTA" in source
+    assert "Net P&amp;L Timeline" in source
+    assert "pnl-tab-source" in source
+    assert "pnl-tab-decision" in source
+    assert "pnl-tab-trade-reconcile" in source
+    assert "pnl-tab-rules" in source
+    assert "timeline-readout" in source
+    assert "minimum 10-session span" in source
+    assert "Classification" not in source
+    assert "contract_spec_guard" in source
+    assert "function contractSpecGuardDetail" in source
+    assert "IBKR ContractDetails" in source
+    assert "P&amp;L Compare" in source
+    assert "P&amp;L Source Reconcile" not in source
+    assert "Backtest Artifact Audit" in source
+    assert "function statementPnlCompareBlock" in source
+    assert "function flexLedgerOverrideRows" in source
+    assert "function backtestArtifactAuditBlock" in source
+    assert "Open Position Parity" in source
+    assert "system ledger" in source
+    assert "not IBKR NetLiquidation" in source
+    assert "Signal compare checks desired decision parity" in source
+    assert "Flex ledger-aligned" in source
+    assert "Flex zero-base" in source
+    assert "Flex - realtime" in source
+    assert "Component note" in source
+    assert "trade id" in source
+    assert "TradeID:" in source
+    assert "Flex broker" not in source
+    assert "Ledger alignment override" in source
+    assert "TOTAL" in source
+    assert "RECONCILED" in source
+    assert "footer total ties back to P&amp;L Compare metric" in source
+    assert "Difference Reconcile" not in source
+    assert "Zero-base Paper vs Flex closed trades" in source
+    assert "Flex epoch-rebased closed trades" not in source
+    assert "ON PURPOSE" in source
+    assert "Curve status controls daily-row freshness" in source
     assert "paper/live path defers a stop/exit after the 14h/EOD decision" in source
     assert "function gapItem" in source
     assert "Observed data" in source
@@ -540,6 +777,7 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "ledgerSource" not in html
     assert "ledgerSource" not in source
     assert 'id="paperSource"' in html
+    assert "paper-pnl-chart-grouped-tabs-v1" in html
     assert "ledger-detail" not in css
     assert "audit-ledger" not in css
     assert "coverage-panel" in css
@@ -559,7 +797,21 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "c1-spec-summary" not in css
     assert "c1-metric.sample" in css
     assert "trade-table" in css
+    assert "contract-spec-table" in css
     assert "pnl-compare-table" in css
+    assert "pnl-tabs" in css
+    assert "component-ref" in css
+    assert "pnl-diagnostic" not in css
+    assert "source-diff-stats" in css
+    assert "polyline.paper" in css
+    assert "timeline-readout" in css
+    assert "pnl-tab-decision" in css
+    assert "trade-reconcile-panel" in css
+    assert "lifecycle-compare-table" in css
+    assert "audit-link" in css
+    assert "pnl-timeline" in css
+    assert "pnl-daily-table" in css
+    assert "signal-compare-table" in css
     assert "coverage-master-detail" in css
     assert "coverage-detail" in css
     assert "coverage-item.active" in css
@@ -577,6 +829,7 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "fill-quality-table table" in css
     assert "stp-placement-table table" in css
     assert "stp-route-table table" in css
+    assert "rejection-table table" in css
     assert "divergence-list li.watch" in css
     assert ".detail-list li { padding: 10px 12px;" in css
     assert "fill-result.ok" in css

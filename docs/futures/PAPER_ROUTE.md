@@ -237,6 +237,13 @@ python -m global_index.run_live_day --port 4002 --print-signals
 | STP-VERIFY | Không false halt | False halt → find_execution bug |
 | Exit path coverage | Chandelier/MAX_HOLD/STP mỗi loại vài lần | Thiếu → chưa đủ để tin code đúng |
 
+Monitor C1 scope note (2026-08-12): Paper dashboard applies the active
+`monitor/paper_inputs.json` spec (`min_n=100`, `max_mean_ticks=5`,
+`scope=separate`, `close_scope=stp_only`, `use_absolute=true`). Signal/market
+CLOSE rows are excluded from C1 because the runner does not persist a clean
+expected close reference; those exits are covered by Paper P&L vs backtest
+instead.
+
 **Benchmark P&L:** So **swing-only IS subset** (KHÔNG full $40,919 — NKD deferred).
 Chạy: `deploy_sim.py --exclude-nkd` hoặc extract trades MES/MNQ/MYM/M2K+STRESS_MID.
 

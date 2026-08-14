@@ -599,6 +599,7 @@ class IBKRBroker(Broker):
                                 error_msg=f"exit timeout after {timeout_secs}s")
 
             status, actual_filled, avg_price = self._verified_status(ib, trade)
+            commission = self._trade_commission(trade)
 
             if status == "Filled":
                 # Partial fill: filled < ordered (rare for MARKET on liquid futures)
@@ -611,7 +612,7 @@ class IBKRBroker(Broker):
                     return Fill(order.inst, order.action, order.direction,
                                 order.contracts, order.cluster,
                                 status="PARTIAL", filled_qty=actual_filled,
-                                avg_price=avg_price)
+                                avg_price=avg_price, commission=commission)
 
                 log.info(
                     "send_order: FILLED %s %s ×%d @ %.4f (elapsed=%.1fs)",
@@ -620,7 +621,8 @@ class IBKRBroker(Broker):
                 return Fill(order.inst, order.action, order.direction,
                             order.contracts, order.cluster,
                             # pnl_sized=0: live equity tracked via get_equity(), not pnl accumulation
-                            pnl_sized=0.0, status="FILLED", avg_price=avg_price)
+                            pnl_sized=0.0, status="FILLED", avg_price=avg_price,
+                            commission=commission)
 
             # Terminal but not Filled (Cancelled / ApiCancelled / Inactive)
             if order.action == "OPEN":
@@ -698,6 +700,21 @@ class IBKRBroker(Broker):
             )
             status = "Filled"
         return status, filled, avg
+
+    @staticmethod
+    def _trade_commission(trade) -> "float | None":
+        total = 0.0
+        seen = False
+        for fill in getattr(trade, "fills", []) or []:
+            report = getattr(fill, "commissionReport", None)
+            value = getattr(report, "commission", None)
+            try:
+                if value is not None:
+                    total += float(value)
+                    seen = True
+            except (TypeError, ValueError):
+                continue
+        return round(total, 2) if seen else None
 
     def get_positions(self) -> list:
         """Return current open positions from IBKR.
@@ -1262,6 +1279,11 @@ class IBKRBroker(Broker):
                     "price":    float(getattr(ex, "price", 0.0) or 0.0),
                     "shares":   float(getattr(ex, "shares", 0.0) or 0.0),
                     "time":     str(getattr(ex, "time", "") or ""),
+                    "commission": (
+                        float(getattr(getattr(fill, "commissionReport", None), "commission"))
+                        if getattr(getattr(fill, "commissionReport", None), "commission", None) is not None
+                        else None
+                    ),
                 }
             return None
         except Exception as exc:
@@ -1353,9 +1375,11 @@ class IBKRBroker(Broker):
             )
 
         close_st, _close_qty, close_price = self._verified_status(ib, close_trade)
+        close_commission = self._trade_commission(close_trade)
         close_fill  = Fill(inst, "CLOSE", _direction, _contracts, _cluster,
                            status="FILLED" if close_st == "Filled" else "FAILED",
                            avg_price=close_price,
+                           commission=close_commission,
                            error_msg=None if close_st == "Filled"
                                      else f"roll-close status: {close_st}")
 
@@ -1403,9 +1427,11 @@ class IBKRBroker(Broker):
             )
 
         open_st, _open_qty, open_price = self._verified_status(ib, open_trade)
+        open_commission = self._trade_commission(open_trade)
         open_fill  = Fill(inst, "OPEN", _direction, _contracts, _cluster,
                           status="FILLED" if open_st == "Filled" else "FAILED",
                           avg_price=open_price,
+                          commission=open_commission,
                           error_msg=None if open_st == "Filled"
                                     else f"roll-open status: {open_st} — position flat")
 

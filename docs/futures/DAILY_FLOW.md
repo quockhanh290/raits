@@ -31,6 +31,38 @@ HÔM SAU 09:31 ET     Vòng lặp lặp lại.
 | Verify --print-signals (P0c) | Xem mục 3B bên dưới | Ngày Normal/Stress có entry, **làm tay**, không qua scheduler |
 | Monitor backend | `python monitor\start_backend.py` | Tùy ý — read-only, không ảnh hưởng trading |
 
+### One-command startup
+
+After logging in to IB Gateway paper, the preferred startup command is:
+
+```powershell
+cd D:\raits
+python monitor\ops.py up
+```
+
+This replaces stale backend listeners on port 5002, starts the scheduler if it is
+not already running, starts the read-only monitor backend through
+`monitor\start_backend.py`, waits for the IBKR reader, and prints:
+
+```text
+http://127.0.0.1:5002/realtime
+http://127.0.0.1:5002/paper
+```
+
+Useful checks:
+
+```powershell
+python monitor\ops.py status
+python monitor\ops.py restart
+python monitor\ops.py restart --scheduler
+python monitor\ops.py down
+python monitor\ops.py down --scheduler
+python monitor\ops.py up --restart-scheduler
+```
+
+Do not use `python -m flask --app monitor.backend.app:app run` for operations:
+that starts Flask only and does not start the IBKR reader thread.
+
 > **Phân biệt AUTO vs MANUAL:**
 > Scheduler (`pythonw -m global_index.run_scheduler`) là process **giữ sống** — tự fire 09:31/13:45/14:05.
 > Nếu máy reboot qua đêm → scheduler chết → phải `pythonw` lại TRƯỚC 13:45.

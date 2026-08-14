@@ -34,6 +34,13 @@ _IBKR_SYMBOL_TO_INST = {
 _CASH_TYPES = ("Position MTM", "Credit Interest", "Debit Interest", "Adjustment",
                "Deposits/Withdrawals", "Other Fees", "Dividends")
 
+_BROKER_ID_FIELDS = (
+    "OrderID", "OrderId", "Order Number", "OrderNumber", "PermID", "PermId",
+    "ExecID", "ExecId", "ExecutionID", "ExecutionId", "TradeID", "TradeId",
+    "IBOrderID", "IBExecID", "OrigOrderID", "OrigTradeID", "OrigTransactionID",
+    "BrokerageOrderID", "ExchOrderID", "ExtExecID", "TransactionID", "TransactionId",
+)
+
 
 def _inst(symbol: str) -> str:
     if symbol in _IBKR_SYMBOL_TO_INST:
@@ -47,6 +54,33 @@ def _num(cell: str) -> float:
     """Statement numbers carry footnote markers like '-21291.47(1)'."""
     cell = (cell or "").split("(")[0].strip()
     return float(cell) if cell not in ("", "-") else 0.0
+
+
+def _date(cell: str | None) -> str | None:
+    value = (cell or "").strip()
+    if len(value) == 8 and value.isdigit():
+        return f"{value[:4]}-{value[4:6]}-{value[6:]}"
+    return value or None
+
+
+def _broker_ids(item: dict[str, str]) -> dict[str, str]:
+    return {
+        key: value.strip()
+        for key in _BROKER_ID_FIELDS
+        if (value := str(item.get(key, "") or "").strip()) not in ("", "-")
+    }
+
+
+def _broker_id_label(*items: dict) -> str | None:
+    parts: list[str] = []
+    for item in items:
+        ids = item.get("broker_ids") or {}
+        for key in _BROKER_ID_FIELDS:
+            value = ids.get(key)
+            label = f"{key}:{value}" if value else None
+            if label and label not in parts:
+                parts.append(label)
+    return " | ".join(parts) or None
 
 
 def point_value(inst: str) -> float | None:
@@ -76,10 +110,42 @@ def parse_transactions(path) -> "tuple[list[dict], list[dict]]":
     """
     trades: list[dict] = []
     cash: list[dict] = []
+    header: list[str] | None = None
     with open(Path(path), encoding="utf-8") as fh:
         for row in csv.reader(fh):
+            if not row:
+                continue
+            if row[0] == "ClientAccountID":
+                header = row
+                continue
+            if header and len(row) == len(header):
+                item = dict(zip(header, row))
+                level = item.get("LevelOfDetail", "")
+                side = item.get("Buy/Sell", "")
+                if level == "EXECUTION" and side in ("BUY", "SELL"):
+                    qty = _num(item.get("Quantity", "0"))
+                    trades.append({
+                        "date": _date(item.get("TradeDate") or item.get("ReportDate")),
+                        "inst": _inst(item.get("Symbol", "")),
+                        "signed": qty if side == "BUY" else -abs(qty),
+                        "price": _num(item.get("TradePrice", "0")),
+                        "commission": _num(item.get("IBCommission", "0")),
+                        "net_amount": _num(item.get("NetCash", "0")),
+                        "broker_ids": _broker_ids(item),
+                    })
+                    continue
+                if item.get("Amount") and item.get("ActivityDescription"):
+                    cash.append({
+                        "date": _date(item.get("Date") or item.get("ReportDate")),
+                        "type": item.get("ActivityDescription"),
+                        "description": item.get("ActivityDescription"),
+                        "inst": _inst(item.get("Symbol", "")) if item.get("Symbol") else None,
+                        "amount": _num(item.get("Amount", "0")),
+                    })
+                    continue
             if len(row) < 13 or row[0] != "Transaction History" or row[1] != "Data":
                 continue
+            header = None
             date, desc, ttype, symbol = row[2], row[4], row[5], row[6]
             if ttype in ("Buy", "Sell"):
                 trades.append({
@@ -89,6 +155,7 @@ def parse_transactions(path) -> "tuple[list[dict], list[dict]]":
                     "price": _num(row[8]),
                     "commission": _num(row[11]),
                     "net_amount": _num(row[12]),
+                    "broker_ids": {},
                 })
             elif ttype in _CASH_TYPES:
                 cash.append({"date": date, "type": ttype, "description": desc,
@@ -134,6 +201,9 @@ def pair_fifo(trades: list[dict]) -> "tuple[list[dict], list[dict]]":
                 "pnl": pnl,
                 "commission": (o.get("commission", 0.0) or 0.0)
                               + (t.get("commission", 0.0) or 0.0),
+                "broker_trade_id": _broker_id_label(o, t),
+                "entry_broker_ids": o.get("broker_ids") or {},
+                "exit_broker_ids": t.get("broker_ids") or {},
             })
         else:
             lots.append(t)

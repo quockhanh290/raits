@@ -49,6 +49,7 @@ class Fill:
     status: str = "FILLED"         # "FILLED" | "PARTIAL" | "CANCELLED" | "FAILED"
     filled_qty: int = 0            # 0 = full fill; IBKRBroker sets from execution report
     avg_price: float = 0.0         # fill price; IBKRBroker sets from execution report
+    commission: float | None = None # broker commission if emitted by the broker API
     error_msg: str | None = None   # set on FAILED/CANCELLED (IBKRBroker only)
 
 

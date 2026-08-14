@@ -935,6 +935,7 @@ class FuturesRunner:
                 "expected_stop": pos.stop_price,
                 "fill_price": fill.get("price"),
                 "filled_qty": fill.get("shares"),
+                "commission": fill.get("commission"),
                 "order_id": fill.get("order_id"),
                 "perm_id": fill.get("perm_id"),
                 "status": "FILLED",
@@ -1487,6 +1488,7 @@ class FuturesRunner:
                     "expected_stop": p.stop_price,
                     "fill_price": _f.avg_price,
                     "pnl_sized": p.pnl_sized,
+                    "commission": _f.commission,
                     "slip": _slip_c,
                     "filled_qty": _f.filled_qty or p.contracts,
                     "status": _f.status,
@@ -1695,6 +1697,7 @@ class FuturesRunner:
                     "entry_day": str(day.date()) if hasattr(day, "date") else str(day),
                     "expected_entry": _exp_entry,
                     "fill_price": _open_fill.avg_price,
+                    "commission": _open_fill.commission,
                     "slip": _slip_o,
                     # Ordered vs actually filled — the dashboard's fill-quality panel
                     # cannot tell a partial from a full fill without both.

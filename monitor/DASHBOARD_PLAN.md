@@ -78,6 +78,22 @@ Tests must enforce all of these:
 3. The IBKR reader default remains client ID 99.
 4. Monitor code contains no order placement or state-file write path.
 
+## Startup command
+
+The dashboard remains read-only. Process startup is centralized outside Flask:
+
+```powershell
+cd D:\raits
+python monitor\ops.py up
+```
+
+Use `python monitor\ops.py restart` to replace the backend after dashboard/backend
+code changes. Add `--scheduler` only when the scheduler should also be restarted.
+Use `python monitor\ops.py status` to diagnose stale backend listeners, scheduler
+PID, and broker freshness. Do not run operational dashboards with
+`python -m flask --app monitor.backend.app:app run`; that bypasses
+`ibkr_reader.start()` and leaves broker truth unavailable.
+
 Runner-state reads rely on atomic `.tmp -> os.replace` writes and cache parsed data
 by file mtime. Session reports cache by `(date, relevant log mtimes)` and run only
 when the Reports module requests them.
@@ -188,14 +204,21 @@ Canvas API and has no CDN or external runtime dependency.
 - Regime coverage requires both Normal and Stress.
 - "Several" observations per exit path is recorded as 3 for Chandelier,
   MAX_HOLD, and STP-triggered exits.
-- C1 signed slippage uses the runner convention: positive is adverse. OPEN and
-  CLOSE means remain separate because the runner tracks them separately and
-  `PAPER_ROUTE.md` does not define whether they share a gate. It also does not
-  define a sufficient sample count. Until both decisions are made, the gate
-  stays pending even when an observed mean is above or below 2 ticks.
-- TWS restart nights also lack a numeric threshold. B3 mismatch and STP false
-  halt lack structured runner-state evidence. All three render as evidence gaps,
-  never inferred pass/fail states.
+- C1 signed slippage uses the runner convention: positive is adverse. The active
+  monitor input is `monitor/paper_inputs.json`: `min_n=100`, `max_mean_ticks=5`,
+  `scope=separate`, `close_scope=stp_only`, and `use_absolute=true`. OPEN samples
+  use `expected_entry`; STP CLOSE samples use `expected_stop`. Signal/market CLOSE
+  rows are excluded from C1 because the runner does not persist a clean expected
+  close reference; those exits are covered by Paper P&L vs backtest instead.
+- Paper C1 detail defines slippage in-place: `slip ticks = slip points / tick
+  size`. `trade_log.jsonl` stores `slip` in price points; the dashboard converts
+  to ticks with the instrument tick size and keeps `EXCLUDED_CLOSE` rows visible
+  for diagnosis while excluding them from the C1 gate mean.
+- TWS restart nights use the active `monitor/paper_inputs.json` threshold of 10
+  proven nights. B3 mismatch, STP false halt, manual intervention, roll
+  slippage, and Paper P&L-vs-backtest still need structured reviewed evidence.
+  Missing or incomplete sources render as evidence gaps, never inferred pass/fail
+  states.
 
 ## Delivery status
 

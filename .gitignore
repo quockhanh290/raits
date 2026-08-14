@@ -199,6 +199,7 @@ bao_cao_*.txt
 global_index/paper_history.json
 # p0c_overnight.py capture output — megabytes of run log, not source
 p0c_signals_*.txt
+monitor/inputs/ibkr_flex/
 
 # ============================================
 # Parquet data cache (2.3GB — rebuild from Polygon/Databento, never commit)
