@@ -107,6 +107,16 @@
     return `<div class="table-verdict ${verdictClass(statusText)}"><div><span class="fill-result ${verdictClass(statusText)}">${esc(statusText)}</span><b>${esc(title || 'Table verdict')}</b><p>${esc(summary || '--')}</p></div>${factItems ? `<aside>${factItems}</aside>` : ''}</div>`;
   }
 
+  function backendVerdict(compare, key) {
+    const verdict = compare && compare.verdicts && compare.verdicts[key];
+    return verdict && typeof verdict === 'object' ? verdict : null;
+  }
+
+  function renderVerdict(verdict, fallbackStatus, fallbackTitle, fallbackSummary, fallbackFacts = []) {
+    if (verdict) return tableVerdict(verdict.status, verdict.title, verdict.summary, verdict.facts || fallbackFacts);
+    return tableVerdict(fallbackStatus, fallbackTitle, fallbackSummary, fallbackFacts);
+  }
+
   function brokerIdentity(value) {
     const text = String(value || '');
     if (!text) return '--';
@@ -587,7 +597,7 @@
       : verdict === 'EXPLAINED'
         ? 'Trade-level P&L differences exist, but they reconcile to headline totals and carry row-level reasons.'
         : 'Trade master reconciliation is not clean; missing source rows or footer totals need investigation.';
-    return `${tableVerdict(verdict, 'Trade master reconcile', summary, [`rows ${rows.length}`, `delta rows ${diffRows}`, `missing ${unresolved}`, `P-B ${pbRecon.label}`, `P-F ${pfRecon.label}`])}<div class="trade-table trade-master-table"><table><thead><tr><th>verdict / trade</th><th>paper actual</th><th>backtest</th><th>Flex</th><th>variance</th><th>reason</th></tr></thead><tbody>${rows.map(row => {
+    return `${renderVerdict(backendVerdict(compare, 'trade_master'), verdict, 'Trade master reconcile', summary, [`rows ${rows.length}`, `delta rows ${diffRows}`, `missing ${unresolved}`, `P-B ${pbRecon.label}`, `P-F ${pfRecon.label}`])}<div class="trade-table trade-master-table"><table><thead><tr><th>verdict / trade</th><th>paper actual</th><th>backtest</th><th>Flex</th><th>variance</th><th>reason</th></tr></thead><tbody>${rows.map(row => {
       const key = `${row.inst}|${row.direction}|${row.entry_day}`;
       const reason = reasonByKey.get(key) || {};
       const missing = [row.paper, row.backtest, row.flex].some(side => String(side?.status || '') === 'MISSING');
@@ -902,7 +912,7 @@
     return byDay;
   }
 
-  function pnlTimeline(timeline, pl = {}) {
+  function pnlTimeline(timeline, pl = {}, compare = null) {
     const rows = (timeline || []).filter(row => row && row.date);
     if (!rows.length) return '<p class="detail-empty">No daily P&L timeline is available.</p>';
     const flexDaily = flexPnlByDate(pl);
@@ -980,10 +990,10 @@
     const summary = verdict === 'PASS'
       ? 'Timeline final values reconcile to the headline P&L grid, so the chart can be used as a visual divergence map.'
       : 'Timeline final values do not reconcile to the headline P&L grid; use table totals until the chart data source is fixed.';
-    return `<div class="pnl-timeline">${tableVerdict(verdict, 'Timeline reconcile', summary, [`paper ${paperRecon.label}`, `backtest ${backtestRecon.label}`, `Flex ${flexRecon.label}`])}<div class="timeline-readout">${latestCards}</div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Paper, backtest, and Flex net P&L timeline">${grid}<line class="zero" x1="${pad.left}" y1="${y(0)}" x2="${width - pad.right}" y2="${y(0)}"></line>${lines}${dots}<g class="timeline-labels">${dateLabels}</g></svg><div class="timeline-legend"><span class="paper">Paper actual</span><span class="backtest">Backtest</span><span class="flex">Flex</span><span class="neutral">X axis shown on a minimum 10-session span</span></div></div>`;
+    return `<div class="pnl-timeline">${renderVerdict(backendVerdict(compare, 'timeline'), verdict, 'Timeline reconcile', summary, [`paper ${paperRecon.label}`, `backtest ${backtestRecon.label}`, `Flex ${flexRecon.label}`])}<div class="timeline-readout">${latestCards}</div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Paper, backtest, and Flex net P&L timeline">${grid}<line class="zero" x1="${pad.left}" y1="${y(0)}" x2="${width - pad.right}" y2="${y(0)}"></line>${lines}${dots}<g class="timeline-labels">${dateLabels}</g></svg><div class="timeline-legend"><span class="paper">Paper actual</span><span class="backtest">Backtest</span><span class="flex">Flex</span><span class="neutral">X axis shown on a minimum 10-session span</span></div></div>`;
   }
 
-  function pnlDailyRows(timeline) {
+  function pnlDailyRows(timeline, compare = null) {
     const rows = timeline || [];
     if (!rows.length) return '<p class="detail-empty">No daily rows are available.</p>';
     const stale = rows.filter(row => row.curve_status && row.curve_status !== 'covered').length;
@@ -995,7 +1005,7 @@
       : Math.abs(Number(tradeDiff || 0)) > 0.005
         ? 'Daily paper/backtest divergence exists and should be explained by trade-level lifecycle rows.'
         : 'Daily paper/backtest trade ledger is aligned through the latest covered row.';
-    return `${tableVerdict(verdict, 'Daily divergence', summary, [`rows ${rows.length}`, `stale ${stale}`, `latest trade diff ${fmtMoney(latest.trade_filter_realized_diff)}`])}<div class="trade-table pnl-daily-table"><table><thead><tr><th>date</th><th>system ledger</th><th>paper trade ledger</th><th>backtest reset</th><th>ledger offset</th><th>trade diff</th><th>side/status</th></tr></thead><tbody>${rows.map(row => {
+    return `${renderVerdict(backendVerdict(compare, 'daily'), verdict, 'Daily divergence', summary, [`rows ${rows.length}`, `stale ${stale}`, `latest trade diff ${fmtMoney(latest.trade_filter_realized_diff)}`])}<div class="trade-table pnl-daily-table"><table><thead><tr><th>date</th><th>system ledger</th><th>paper trade ledger</th><th>backtest reset</th><th>ledger offset</th><th>trade diff</th><th>side/status</th></tr></thead><tbody>${rows.map(row => {
       const side = row.divergence_side || '--';
       const cls = side === 'FAVORABLE' ? 'ok' : side === 'ADVERSE' ? 'bad' : row.curve_status === 'covered' ? 'ok' : 'watch';
       return `<tr><td><b>${esc(row.date || '--')}</b><small>${esc(row.curve_status || '--')}</small></td><td><b>${fmtEquity(row.actual_equity)}</b><small>${esc(row.actual_equity_source || 'system ledger')}</small></td><td><b>${fmtEquity(row.paper_trade_filter_equity)}</b><small>paper closed trade P&amp;L ${fmtMoney(row.paper_trade_realized_cum)}</small></td><td><b>${fmtEquity(row.expected_equity)}</b><small>backtest closed trade P&amp;L ${fmtMoney(row.backtest_trade_realized_cum)}</small></td><td><b>${fmtMoney(row.system_ledger_vs_trade_filter)}</b><small>ledger - paper trade ledger</small></td><td><b>${fmtMoney(row.trade_filter_realized_diff)}</b><small>paper trades - backtest trades</small></td><td><span class="fill-result ${cls}">${esc(side)}</span><small>${esc(row.curve_status || '--')}</small></td></tr>`;
@@ -1035,7 +1045,8 @@
     const openDiff = ((parity.paper_only || []).length + (parity.backtest_only || []).length);
     const unresolved = Number(compare?.unresolved ?? 0) + openDiff + (pfRecon.cls === 'bad' ? 1 : 0) + (pbRecon.cls === 'bad' ? 1 : 0);
     const paperBacktestDelta = Number(pl.paper_minus_backtest_realized || 0);
-    return `<div class="overview-verdict-grid">${[
+    const backendOverview = backendVerdict(compare, 'overview');
+    return `${renderVerdict(backendOverview, unresolved ? 'BREACH' : Math.abs(paperBacktestDelta) > 0.005 ? 'EXPLAINED' : 'PASS', 'Overview verdicts', unresolved ? 'At least one headline check requires drilldown before pass.' : 'Headline checks have a table-level explanation.', [`unresolved ${unresolved}`])}<div class="overview-verdict-grid">${[
       overviewVerdictCard(baseOk ? 'Base aligned' : 'Base mismatch', baseOk ? 'PASS' : 'BREACH', base.paper_account_base == null ? '--' : fmtEquity(base.paper_account_base), baseOk ? 'Paper/backtest comparison starts from the intended account base.' : 'Paper account base or backtest reset does not match the epoch spec.'),
       overviewVerdictCard(pfRecon.cls === 'bad' ? 'Paper-Flex check' : 'Paper-Flex clean', pfRecon.cls === 'bad' ? 'BREACH' : 'PASS', fmtMoney(pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized), `zero-base footer ${pfRecon.label}`),
       overviewVerdictCard(pbRecon.cls === 'bad' ? 'Paper-BT check' : Math.abs(paperBacktestDelta) > 0.005 ? 'Paper-BT explained' : 'Paper-BT clean', pbRecon.cls === 'bad' ? 'BREACH' : Math.abs(paperBacktestDelta) > 0.005 ? 'EXPLAINED' : 'PASS', fmtMoney(pl.paper_minus_backtest_realized), `trade footer ${pbRecon.label}`),
@@ -1069,7 +1080,7 @@
   }
 
   function pnlTimelineTab(compare, m) {
-    return `<div class="pnl-tab-panel timeline-panel"><section class="more-section trade-detail"><h3>Net P&amp;L Timeline</h3>${pnlTimeline(m.daily || m.timeline, compare.statement_pnl_compare)}</section><section class="more-section trade-detail"><h3>Daily Divergence Rows</h3>${pnlDailyRows(m.daily || m.timeline)}</section></div>`;
+    return `<div class="pnl-tab-panel timeline-panel"><section class="more-section trade-detail"><h3>Net P&amp;L Timeline</h3>${pnlTimeline(m.daily || m.timeline, compare.statement_pnl_compare, compare)}</section><section class="more-section trade-detail"><h3>Daily Divergence Rows</h3>${pnlDailyRows(m.daily || m.timeline, compare)}</section></div>`;
   }
 
   function pnlDecisionPathTab(compare, signalCompare, entryCompare) {

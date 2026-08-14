@@ -95,7 +95,7 @@
     },
     "broker_equity_context": {
       "source": "live_state.meta.broker_equity and live_positions.breaker.last_broker_equity",
-      "value": 996280.77,
+      "value": 996311.98,
       "not_used_for_pnl_compare": true
     },
     "bridge_note": "system_ledger_vs_trade_filter is the retained ledger offset versus CLOSED trade_log P&L from the paper epoch. It is not classified as interest, mark-to-market, or broker cash movement unless an IBKR ledger source is added."
@@ -148,6 +148,21 @@
     },
     {
       "date": "2026-08-13",
+      "actual_equity": 50228.75,
+      "actual_equity_source": "system_ledger_realized_only",
+      "expected_equity_account_window": null,
+      "expected_equity_actual_window": null,
+      "expected_equity_trade_filter": 49836.85,
+      "paper_trade_filter_equity": 49956.75,
+      "paper_trade_realized_cum": -43.25,
+      "backtest_trade_realized_cum": -163.15,
+      "system_ledger_vs_trade_filter": 272.0,
+      "account_window_diff": null,
+      "trade_filter_realized_diff": 119.9,
+      "curve_status": "stale_through:2026-08-12"
+    },
+    {
+      "date": "2026-08-14",
       "actual_equity": 50228.75,
       "actual_equity_source": "system_ledger_realized_only",
       "expected_equity_account_window": null,
@@ -2098,7 +2113,7 @@
   },
   "open_position_parity": {
     "status": "MATCH",
-    "paper_day": "2026-08-13",
+    "paper_day": "2026-08-14",
     "replay_day": "2026-08-12",
     "paper_open_count": 1,
     "replay_open_count": 1,
@@ -3356,5 +3371,71 @@
     "Exit-day mismatches with the same trade identity are classified separately because the paper/live path can defer stop/exit handling after the 14h/EOD decision.",
     "Signal compare is pre-fill/pre-exit: it checks whether paper and replay emitted the same OPEN/REJECTED decisions by date/instrument/cluster/direction/action.",
     "Entry compare is post-admission/post-fill: it checks whether an OPEN actually admitted/filled in paper and whether IBKR statement confirms the fill."
-  ]
+  ],
+  "verdicts": {
+    "overview": {
+      "status": "EXPLAINED",
+      "title": "Overview verdicts",
+      "summary": "Headline reconciliation is table-explained and has no unresolved items.",
+      "facts": [
+        "unresolved 0",
+        "P-B RECONCILED",
+        "P-F RECONCILED"
+      ],
+      "target": "pnl-tab-overview"
+    },
+    "trade_master": {
+      "status": "EXPLAINED",
+      "title": "Trade master reconcile",
+      "summary": "Trade rows reconcile to headline totals.",
+      "facts": [
+        "rows 5",
+        "delta rows 4",
+        "missing 0",
+        "unresolved 0"
+      ],
+      "target": "pnl-tab-trades"
+    },
+    "components": {
+      "status": "EXPLAINED",
+      "title": "Component variance",
+      "summary": "Component deltas reconcile to headline totals.",
+      "facts": [
+        "P-B RECONCILED",
+        "P-F RECONCILED"
+      ],
+      "target": "pnl-tab-components"
+    },
+    "decision": {
+      "status": "PASS",
+      "title": "Decision path",
+      "summary": "Signal, entry, and open-position parity have no unresolved rows.",
+      "facts": [
+        "signal unresolved 0",
+        "entry unresolved 0",
+        "open diff 0"
+      ],
+      "target": "pnl-tab-decision"
+    },
+    "timeline": {
+      "status": "PASS",
+      "title": "Timeline reconcile",
+      "summary": "Timeline final values reconcile to headline P&L grid.",
+      "facts": [
+        "daily stale 2",
+        "latest trade diff 119.9"
+      ],
+      "target": "pnl-tab-timeline"
+    },
+    "daily": {
+      "status": "PENDING",
+      "title": "Daily divergence",
+      "summary": "Some daily rows are stale.",
+      "facts": [
+        "rows 5",
+        "stale 2"
+      ],
+      "target": "pnl-tab-timeline"
+    }
+  }
 }

@@ -1495,6 +1495,7 @@ def _trade_compare_summary(compare: dict[str, Any]) -> dict[str, Any] | None:
     backtest_artifact_audit = compare.get("backtest_artifact_audit") if isinstance(compare.get("backtest_artifact_audit"), dict) else {}
     statement_pnl_compare = compare.get("statement_pnl_compare") if isinstance(compare.get("statement_pnl_compare"), dict) else {}
     ibkr_statement = compare.get("ibkr_statement") if isinstance(compare.get("ibkr_statement"), dict) else {}
+    verdicts = compare.get("verdicts") if isinstance(compare.get("verdicts"), dict) else {}
     if not rows and not counts and not daily:
         return None
     covered_daily = [row for row in daily if isinstance(row, dict) and row.get("curve_status") == "covered"]
@@ -1534,6 +1535,7 @@ def _trade_compare_summary(compare: dict[str, Any]) -> dict[str, Any] | None:
         "signal_path_audit": signal_path_audit,
         "backtest_artifact_audit": backtest_artifact_audit,
         "statement_pnl_compare": statement_pnl_compare,
+        "verdicts": verdicts,
         "ibkr_statement": ibkr_statement,
         "pnl_reconcile": pnl_reconcile,
         "open_position_parity": open_position_parity,

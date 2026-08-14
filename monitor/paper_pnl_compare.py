@@ -102,6 +102,116 @@ def _number(value: Any) -> float | None:
         return None
 
 
+def _same_money(left: Any, right: Any, tol: float = 0.005) -> bool:
+    a = _number(left)
+    b = _number(right)
+    return a is not None and b is not None and abs(a - b) <= tol
+
+
+def _verdict(status: str, title: str, summary: str, facts: list[str] | None = None,
+             target: str | None = None) -> dict[str, Any]:
+    return {
+        "status": status,
+        "title": title,
+        "summary": summary,
+        "facts": facts or [],
+        "target": target,
+    }
+
+
+def _pnl_verdicts(report: dict[str, Any]) -> dict[str, Any]:
+    pl = report.get("statement_pnl_compare") if isinstance(report.get("statement_pnl_compare"), dict) else {}
+    lifecycle = report.get("lifecycle_compare") if isinstance(report.get("lifecycle_compare"), dict) else {}
+    parity = report.get("open_position_parity") if isinstance(report.get("open_position_parity"), dict) else {}
+    signal = report.get("signal_compare") if isinstance(report.get("signal_compare"), dict) else {}
+    classified_signal = signal.get("classified") if isinstance(signal.get("classified"), dict) else {}
+    entry = report.get("entry_compare") if isinstance(report.get("entry_compare"), dict) else {}
+    daily = report.get("daily") if isinstance(report.get("daily"), list) else []
+    rows = lifecycle.get("rows") if isinstance(lifecycle.get("rows"), list) else []
+
+    pb_recon = _same_money(lifecycle.get("paper_minus_backtest_sum"), pl.get("paper_minus_backtest_realized"))
+    flex_grid = pl.get("paper_minus_flex_epoch_rebased_realized", pl.get("paper_minus_statement_entry_epoch_realized"))
+    pf_recon = _same_money(lifecycle.get("paper_minus_flex_sum"), flex_grid)
+    lifecycle_unresolved = int(lifecycle.get("unresolved") or 0)
+    missing_sources = sum(
+        1 for row in rows
+        if any(str((row.get(side) or {}).get("status") or "") == "MISSING" for side in ("paper", "backtest", "flex"))
+    )
+    delta_rows = sum(
+        1 for row in rows
+        if abs(_number(row.get("paper_minus_backtest_pnl")) or 0.0) > 0.005
+        or abs(_number(row.get("paper_minus_flex_pnl")) or 0.0) > 0.005
+    )
+    open_diff = len(parity.get("paper_only") or []) + len(parity.get("backtest_only") or [])
+    signal_unresolved = int(classified_signal.get("unresolved") or 0)
+    entry_unresolved = int(entry.get("unresolved") or 0)
+    stale_daily = sum(1 for row in daily if row.get("curve_status") and row.get("curve_status") != "covered")
+
+    trade_master_status = (
+        "BREACH" if lifecycle_unresolved or missing_sources or not pb_recon or not pf_recon
+        else "EXPLAINED" if delta_rows
+        else "PASS"
+    )
+    decision_status = "BREACH" if signal_unresolved or entry_unresolved or open_diff else "PASS"
+    daily_diff = _number(daily[-1].get("trade_filter_realized_diff")) if daily else None
+    daily_status = "PENDING" if stale_daily else "EXPLAINED" if abs(daily_diff or 0.0) > 0.005 else "PASS"
+    overview_unresolved = lifecycle_unresolved + missing_sources + open_diff + signal_unresolved + entry_unresolved + (0 if pb_recon else 1) + (0 if pf_recon else 1)
+
+    paper_latest = daily[-1].get("paper_trade_realized_cum") if daily else None
+    backtest_latest = daily[-1].get("backtest_trade_realized_cum") if daily else None
+    flex_latest = round(sum(_number(row.get("flex_pnl")) or 0.0 for row in (pl.get("paper_flex_bridge") or [])), 2)
+    timeline_ok = (
+        _same_money(paper_latest, pl.get("paper_epoch_closed_realized"))
+        and _same_money(backtest_latest, pl.get("backtest_epoch_closed_realized"))
+        and _same_money(flex_latest, pl.get("flex_epoch_rebased_realized", pl.get("statement_entry_epoch_realized")))
+    )
+
+    return {
+        "overview": _verdict(
+            "BREACH" if overview_unresolved else "EXPLAINED" if trade_master_status == "EXPLAINED" or daily_status == "EXPLAINED" else "PASS",
+            "Overview verdicts",
+            "Headline reconciliation has unresolved/breach items." if overview_unresolved else "Headline reconciliation is table-explained and has no unresolved items.",
+            [f"unresolved {overview_unresolved}", f"P-B {'RECONCILED' if pb_recon else 'CHECK'}", f"P-F {'RECONCILED' if pf_recon else 'CHECK'}"],
+            "pnl-tab-overview",
+        ),
+        "trade_master": _verdict(
+            trade_master_status,
+            "Trade master reconcile",
+            "Trade rows reconcile to headline totals." if trade_master_status != "BREACH" else "Trade rows have unresolved sources or footer totals do not match the grid.",
+            [f"rows {len(rows)}", f"delta rows {delta_rows}", f"missing {missing_sources}", f"unresolved {lifecycle_unresolved}"],
+            "pnl-tab-trades",
+        ),
+        "components": _verdict(
+            "BREACH" if not pb_recon or not pf_recon else "EXPLAINED" if delta_rows else "PASS",
+            "Component variance",
+            "Component deltas reconcile to headline totals." if pb_recon and pf_recon else "Component deltas do not reconcile to headline totals.",
+            [f"P-B {'RECONCILED' if pb_recon else 'CHECK'}", f"P-F {'RECONCILED' if pf_recon else 'CHECK'}"],
+            "pnl-tab-components",
+        ),
+        "decision": _verdict(
+            decision_status,
+            "Decision path",
+            "Signal, entry, and open-position parity have no unresolved rows." if decision_status == "PASS" else "Signal, entry, or open-position parity has unresolved rows.",
+            [f"signal unresolved {signal_unresolved}", f"entry unresolved {entry_unresolved}", f"open diff {open_diff}"],
+            "pnl-tab-decision",
+        ),
+        "timeline": _verdict(
+            "PASS" if timeline_ok else "BREACH",
+            "Timeline reconcile",
+            "Timeline final values reconcile to headline P&L grid." if timeline_ok else "Timeline final values do not reconcile to headline P&L grid.",
+            [f"daily stale {stale_daily}", f"latest trade diff {daily_diff if daily_diff is not None else '--'}"],
+            "pnl-tab-timeline",
+        ),
+        "daily": _verdict(
+            daily_status,
+            "Daily divergence",
+            "Daily rows are fresh and divergence is explainable by trade rows." if daily_status != "PENDING" else "Some daily rows are stale.",
+            [f"rows {len(daily)}", f"stale {stale_daily}"],
+            "pnl-tab-timeline",
+        ),
+    }
+
+
 def _gross_pnl(inst: Any, direction: Any, entry_price: Any, exit_price: Any, qty: Any = 1) -> float | None:
     entry = _number(entry_price)
     exit_ = _number(exit_price)
@@ -1459,7 +1569,7 @@ def build_report(root: Path) -> dict[str, Any]:
         "system_ledger_is_comparable": bool(statement_pnl_compare.get("ledger_alignment_override", {}).get("included_carry_closed")),
     }
 
-    return {
+    report = {
         "source": "paper_pnl_compare",
         "inputs": {
             "paper_history": str(history_path.relative_to(root)),
@@ -1535,6 +1645,8 @@ def build_report(root: Path) -> dict[str, Any]:
             "Entry compare is post-admission/post-fill: it checks whether an OPEN actually admitted/filled in paper and whether IBKR statement confirms the fill.",
         ],
     }
+    report["verdicts"] = _pnl_verdicts(report)
+    return report
 
 
 def main(argv: list[str] | None = None) -> int:

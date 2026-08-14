@@ -477,6 +477,10 @@ def test_paper_evidence_uses_monitor_paper_inputs_to_unblock_gaps(tmp_path: Path
         '"raw_statement_entry_epoch_open_lots":[]},'
         '"ibkr_statement":{"status":"OBSERVED","path":"monitor/inputs/ibkr_flex/flex.csv",'
         '"fills_count":2,"closed_count":1,"open_lot_count":0},'
+        '"verdicts":{"trade_master":{"status":"PASS","title":"Trade master reconcile",'
+        '"summary":"fixture verdict","facts":["rows 1"],"target":"pnl-tab-trades"},'
+        '"timeline":{"status":"PASS","title":"Timeline reconcile","summary":"fixture timeline",'
+        '"facts":["paper RECONCILED"],"target":"pnl-tab-timeline"}},'
         '"open_position_parity":{"status":"MATCH","paper_day":"2026-08-10","replay_day":"2026-08-10",'
         '"paper_open_count":0,"replay_open_count":0,"paper_only":[],"backtest_only":[]}}',
         encoding="utf-8",
@@ -524,6 +528,8 @@ def test_paper_evidence_uses_monitor_paper_inputs_to_unblock_gaps(tmp_path: Path
     assert trade_compare["pnl_reconcile"]["not_ibkr_equity"] is True
     assert trade_compare["pnl_reconcile"]["realtime_system_ledger_pnl"] == 12
     assert trade_compare["open_position_parity"]["status"] == "MATCH"
+    assert trade_compare["verdicts"]["trade_master"]["status"] == "PASS"
+    assert trade_compare["verdicts"]["timeline"]["target"] == "pnl-tab-timeline"
     assert payload["diagnostics"]["paper_inputs_error"] is None
     assert payload["diagnostics"]["paper_pnl_compare_error"] is None
 
@@ -672,6 +678,8 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "function tradeMasterReconcileRows" in source
     assert "function sourceDiffAnalyzerRows" in source
     assert "function tableVerdict" in source
+    assert "function backendVerdict" in source
+    assert "function renderVerdict" in source
     assert "function brokerIdentity" in source
     assert "function realtimeLedgerBlock" in source
     assert "function pnlCompareTab" in source
@@ -767,6 +775,7 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "pnl-tab-rules" in source
     assert "timeline-readout" in source
     assert "Timeline reconcile" in source
+    assert "backendVerdict(compare, 'timeline')" in source
     assert "minimum 10-session span" in source
     assert "Classification" not in source
     assert "contract_spec_guard" in source
