@@ -240,9 +240,9 @@
     return statuses.some(value => value === 'PASS') ? 'PASS' : (primary || 'UNKNOWN');
   }
 
-  function blockerCard(status, label, value, detail, refKey = '') {
+  function blockerCard(status, label, value, detail, refKey = '', purpose = '', why = '', unlock = '') {
     const button = refKey ? `<button type="button" data-coverage-ref="${esc(refKey)}">Open detail</button>` : '';
-    return `<article class="blocker-card ${statusClass(status)}"><span>${esc(status || 'CHECK')}</span><b>${esc(label)}</b><strong>${esc(value)}</strong><small>${esc(detail || '--')}</small>${button}</article>`;
+    return `<article class="blocker-card ${statusClass(status)}"><div class="blocker-card-head"><span>${esc(status || 'CHECK')}</span><b>${esc(label)}</b></div><strong>${esc(value)}</strong><dl><div><dt>purpose</dt><dd>${esc(purpose || '--')}</dd></div><div><dt>why needed</dt><dd>${esc(why || '--')}</dd></div><div><dt>current status</dt><dd>${esc(detail || '--')}</dd></div><div><dt>to pass / unlock</dt><dd>${esc(unlock || '--')}</dd></div></dl>${button}</article>`;
   }
 
   function renderReadinessBlockers(gates, coverage, summary) {
@@ -265,13 +265,76 @@
     const maxMean = c1Spec.max_mean_ticks ?? 5;
     const c1Quality = openN && Math.abs(Number(c1.open_mean)) > Number(maxMean) ? 'BREACH NOW' : 'PENDING';
     const cards = [
-      blockerCard(gateByKey('b3_reconcile').status || 'UNKNOWN', 'B3 reconcile', `mismatch ${b3.mismatches ?? 0}`, 'Historical broker/file mismatch lines remain unclassified.'),
-      blockerCard(dataFreshness.status || 'UNKNOWN', 'Data freshness', dataFreshness.evidence || '--', 'Model/data freshness is a live-readiness blocker.', 'data_freshness'),
-      blockerCard(openIssues.status || 'UNKNOWN', 'Open issues', openIssues.evidence || '--', 'Unresolved operational blockers must be visible before live.', 'open_incidents'),
-      blockerCard('PENDING', 'Coverage sample', `${duration.observed ?? 0}/${duration.target ?? 60} days, exits ${completePaths}/3`, 'Sample coverage is pending, not an operational failure.'),
-      blockerCard(c1Quality, 'C1 execution', `OPEN ${openN}/${minN}, STP ${stpN}/${minN}`, `Current OPEN mean ${fmtTicks(c1.open_mean)} vs ${maxMean} tick limit.`, 'fill_quality'),
-      blockerCard(coverageBy('stp_placement').status || 'UNKNOWN', 'Stop placement', `${stpPlacement.continuous_session_streak ?? '--'}/${stpPlacement.required_continuous_sessions ?? '--'} clean sessions`, 'Deferred stop placement route must reconcile continuously.', 'stp_placement'),
-      blockerCard(gateByKey('tws_restart_nights').status || 'UNKNOWN', 'TWS restart', `${tws.restart_nights ?? 0}/${tws.required_nights ?? '--'} proven nights`, 'Candidate logs do not count as proven restart recovery.', 'runner_freshness'),
+      blockerCard(
+        gateByKey('b3_reconcile').status || 'UNKNOWN',
+        'B3 reconcile',
+        `mismatch ${b3.mismatches ?? 0}`,
+        'Historical broker/file mismatch lines remain unclassified.',
+        '',
+        'Prove runner cold-start state matches broker/file state before decisions resume.',
+        'A bad cold-start reconcile can leave the system trading from stale or wrong position state.',
+        'Group B3 logs into reviewed cold-start sessions and classify/clear every mismatch, or fix the underlying mismatch source.'
+      ),
+      blockerCard(
+        dataFreshness.status || 'UNKNOWN',
+        'Data freshness',
+        dataFreshness.evidence || '--',
+        'Model/data freshness is currently blocking readiness.',
+        'data_freshness',
+        'Confirm regime/model/refreeze inputs are fresh enough for the paper/live decision path.',
+        'Live readiness cannot depend on stale model artifacts or an urgent refresh condition.',
+        'Clear model=URGENT/freshness breaches and keep the freshness checks green through the active paper epoch.'
+      ),
+      blockerCard(
+        openIssues.status || 'UNKNOWN',
+        'Open issues',
+        openIssues.evidence || '--',
+        'Unresolved operational blockers are still present.',
+        'open_incidents',
+        'Surface unresolved monitor issues that should stop promotion even if trade gates look healthy.',
+        'Known unresolved incidents are direct operational risk and must not be hidden behind aggregate pass rates.',
+        'Resolve or explicitly classify each open issue and ensure unexplained reconcile items emit here.'
+      ),
+      blockerCard(
+        'PENDING',
+        'Coverage sample',
+        `${duration.observed ?? 0}/${duration.target ?? 60} days, exits ${completePaths}/3`,
+        'Sample coverage is pending, not an operational failure.',
+        '',
+        'Measure whether the paper epoch has enough days, regimes, and exit-path examples to trust conclusions.',
+        'A small or one-regime sample can miss live-path failures that only appear in stress or less common exits.',
+        'Reach the active duration target, observe Normal + Stress, and collect at least three samples per exit path.'
+      ),
+      blockerCard(
+        c1Quality,
+        'C1 execution',
+        `OPEN ${openN}/${minN}, STP ${stpN}/${minN}`,
+        `Current OPEN mean ${fmtTicks(c1.open_mean)} vs ${maxMean} tick limit; STP close N=${stpN}.`,
+        'fill_quality',
+        'Validate paper fill quality from retained trade history before using paper results as live evidence.',
+        'Execution drift can make paper P&L and risk look better or worse than the strategy logic actually produces.',
+        'Collect required OPEN/STP samples, keep absolute mean slippage within spec, and retest when position size scales beyond 1 contract.'
+      ),
+      blockerCard(
+        coverageBy('stp_placement').status || 'UNKNOWN',
+        'Stop placement',
+        `${stpPlacement.continuous_session_streak ?? '--'}/${stpPlacement.required_continuous_sessions ?? '--'} clean sessions`,
+        'Deferred stop placement route is still pending clean-session proof.',
+        'stp_placement',
+        'Prove every still-open deferred trade receives a system and IBKR accepted stop after the arm period.',
+        'The paper/live path intentionally defers stops after the 14h/EOD rule, so placement must be reconciled separately from backtest semantics.',
+        'Run 10 continuous clean sessions; any failed session resets the streak, while close-before-arm trades must explain close time/reason.'
+      ),
+      blockerCard(
+        gateByKey('tws_restart_nights').status || 'UNKNOWN',
+        'TWS restart',
+        `${tws.restart_nights ?? 0}/${tws.required_nights ?? '--'} proven nights`,
+        'Candidate logs do not count as proven restart recovery.',
+        'runner_freshness',
+        'Prove unattended recovery across TWS/IBKR restart windows with runner resume and broker verification.',
+        'Connectivity candidates only show events happened; they do not prove the system recovered safely afterward.',
+        'Add structured restart-night records with restart_proven, runner_resumed, and broker_verified all true until the required count is met.'
+      ),
     ];
     const root = $('readinessBlockers');
     if (root) root.innerHTML = cards.join('');

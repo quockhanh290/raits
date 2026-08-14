@@ -698,6 +698,11 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "function blockerCard" in source
     assert "function showPaperTab" in source
     assert "BREACH NOW" in source
+    assert "why needed" in source
+    assert "to pass / unlock" in source
+    assert "Prove runner cold-start state matches broker/file state" in source
+    assert "Collect required OPEN/STP samples" in source
+    assert "Run 10 continuous clean sessions" in source
     assert "data-coverage-ref" in source
     assert "function twsMoreInfo" in source
     assert "function groupedCoverage" in source
@@ -906,6 +911,8 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "coverage-panel" in css
     assert "paper-tab-nav" in css
     assert "blocker-card" in css
+    assert ".blocker-card dl" in css
+    assert ".blocker-card dt" in css
     assert ".panel-purpose" in css
     assert "coverage-group" in css
     assert "gap-related" in css
