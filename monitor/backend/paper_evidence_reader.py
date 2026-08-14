@@ -421,6 +421,54 @@ def _coverage(key: str, title: str, status: str, evidence: str,
     }
 
 
+def _position_rows(positions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for pos in positions:
+        if not isinstance(pos, dict):
+            continue
+        stop_order_id = pos.get("stop_order_id")
+        rows.append({
+            "inst": pos.get("inst"),
+            "cluster": pos.get("cluster"),
+            "direction": pos.get("direction") or pos.get("dir"),
+            "contracts": pos.get("contracts"),
+            "entry_day": _date(pos.get("entry_day") or pos.get("entry_time")),
+            "entry_price": pos.get("entry_price"),
+            "stop_price": pos.get("stop_price"),
+            "stop_order_id": stop_order_id,
+            "risk_dollars": pos.get("risk_dollars") or pos.get("risk_sized"),
+            "exit_pending": bool(pos.get("exit_pending")),
+            "status": "PROTECTED" if stop_order_id else "UNPROTECTED",
+        })
+    return rows
+
+
+def _snapshot_rows(payload: dict[str, Any], limit: int = 8) -> list[dict[str, Any]]:
+    snapshots = payload.get("snapshots") if isinstance(payload.get("snapshots"), list) else []
+    rows: list[dict[str, Any]] = []
+    for snap in snapshots[-limit:]:
+        if not isinstance(snap, dict):
+            continue
+        decision = snap.get("decision") if isinstance(snap.get("decision"), dict) else {}
+        open_positions = snap.get("open_positions") if isinstance(snap.get("open_positions"), list) else []
+        op = snap.get("operational_status") if isinstance(snap.get("operational_status"), dict) else {}
+        runner = op.get("runner") if isinstance(op.get("runner"), dict) else {}
+        breaker = op.get("breaker") if isinstance(op.get("breaker"), dict) else {}
+        rows.append({
+            "date": snap.get("date"),
+            "equity": snap.get("equity"),
+            "realized_today": decision.get("realized_today"),
+            "entries": len(decision.get("entries") or []),
+            "exits": len(decision.get("exits") or []),
+            "rejected": len(decision.get("rejected_detail") or []),
+            "open_positions": len(open_positions),
+            "breaker_level": snap.get("breaker_level") or breaker.get("level"),
+            "runner_alive": runner.get("alive"),
+            "runner_pid": runner.get("pid"),
+        })
+    return rows
+
+
 def _slippage(records: list[dict[str, Any]], epoch: str | None) -> dict[str, Any]:
     open_ticks: list[float] = []
     stp_close_ticks: list[float] = []
@@ -1789,7 +1837,7 @@ def _paper_vs_backtest_status(live_pvb: dict[str, Any], items: list[dict[str, An
     )
 
 
-def _coverage_items(root: Path, payload: dict[str, Any], history: dict[str, Any],
+def _coverage_items(root: Path, state: dict[str, Any], payload: dict[str, Any], history: dict[str, Any],
                     records: list[dict[str, Any]], logs: dict[str, Any],
                     epoch: str | None, paper_inputs: dict[str, Any], paper_compare: dict[str, Any],
                     malformed_trades: int, ibkr_cache: dict[str, Any] | None = None) -> list[dict[str, Any]]:
@@ -1832,6 +1880,9 @@ def _coverage_items(root: Path, payload: dict[str, Any], history: dict[str, Any]
     model_age = op_status.get("model_age") if isinstance(op_status.get("model_age"), dict) else {}
     refreeze = op_status.get("refreeze") if isinstance(op_status.get("refreeze"), dict) else {}
     positions_status = op_status.get("positions") if isinstance(op_status.get("positions"), dict) else {}
+    position_rows = _position_rows(positions)
+    unprotected = sum(1 for row in position_rows if row.get("status") != "PROTECTED")
+    snapshot_rows = _snapshot_rows(payload)
     pvb_status, pvb_evidence, pvb_metrics = _paper_vs_backtest_status(
         pvb,
         _records(paper_inputs.get("paper_vs_backtest")),
@@ -1868,7 +1919,17 @@ def _coverage_items(root: Path, payload: dict[str, Any], history: dict[str, Any]
             "BREACH" if positions_status.get("persist_match") is False else "OBSERVED" if positions_status else "MISSING",
             f"persist_match={positions_status.get('persist_match', '--')} | live_positions count={len(positions)}",
             ["live_state", "live_positions"],
-            {"operational_positions": positions_status, "live_positions_error": live_positions_error},
+            {
+                "description": "State persist checks whether the runner's latest projected open-position count agrees with the persisted live_positions.json file after state-changing decisions.",
+                "operational_positions": positions_status,
+                "live_positions_error": live_positions_error,
+                "position_rows": position_rows,
+                "status_rules": [
+                    "PASS: persist_match is true and live_positions.json is readable.",
+                    "BREACH: persist_match is false because runner state and persisted file disagree.",
+                    "MISSING: runner operational position status or live_positions.json evidence is unavailable.",
+                ],
+            },
         ),
         _coverage(
             "rejections", "Rejected signals and cap blocks",
@@ -1882,7 +1943,22 @@ def _coverage_items(root: Path, payload: dict[str, Any], history: dict[str, Any]
             "OBSERVED" if payload.get("snapshots") else "MISSING",
             f"{len(payload.get('snapshots') or [])} runner-state snapshot(s) projected",
             ["live_state"],
-            {"snapshot_count": len(payload.get("snapshots") or [])},
+            {
+                "description": "Runner freshness checks that the dashboard is reading a current live_state_data.js projection and that recent runner-state snapshots are available for paper evidence.",
+                "snapshot_count": len(payload.get("snapshots") or []),
+                "observed_at": state.get("observed_at"),
+                "server_now": state.get("server_now"),
+                "age_seconds": state.get("age_seconds"),
+                "freshness": state.get("freshness"),
+                "error": state.get("error"),
+                "snapshot_rows": snapshot_rows,
+                "latest_snapshot": snapshot_rows[-1] if snapshot_rows else {},
+                "status_rules": [
+                    "PASS: live_state_data.js is readable, has snapshots, and age threshold is explicitly satisfied.",
+                    "OBSERVED: snapshots exist, but no hard freshness threshold is defined for this paper audit panel.",
+                    "MISSING: live_state_data.js cannot be parsed or contains no runner snapshots.",
+                ],
+            },
         ),
         _coverage(
             "data_freshness", "Data freshness gates",
@@ -1903,7 +1979,19 @@ def _coverage_items(root: Path, payload: dict[str, Any], history: dict[str, Any]
             "BREACH" if positions and protected < len(positions) else "OBSERVED" if positions else "MISSING",
             f"{protected}/{len(positions)} persisted position(s) have stop_order_id",
             ["live_positions"],
-            {"positions": len(positions), "protected": protected, "live_positions_error": live_positions_error},
+            {
+                "description": "Current protection checks the persisted open book right now. Every open position must carry a stop_order_id; historical stop timing is audited separately in STP placement.",
+                "positions": len(positions),
+                "protected": protected,
+                "unprotected": unprotected,
+                "live_positions_error": live_positions_error,
+                "position_rows": position_rows,
+                "status_rules": [
+                    "PASS: every current persisted open position has stop_order_id.",
+                    "BREACH: at least one current persisted open position lacks stop_order_id.",
+                    "MISSING: no persisted live position file or no current open-position evidence is available.",
+                ],
+            },
         ),
         _coverage(
             "open_incidents", "Operational blockers from open issues",
@@ -1994,7 +2082,7 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
     positions = live_positions.get("positions") if isinstance(live_positions.get("positions"), list) else []
     stp_trades = _stp_trade_details(records, epoch, positions)
     ibkr_cache = ibkr_reader.get_cache()
-    coverage = _coverage_items(root, payload, history, records, logs, epoch, paper_inputs, paper_compare, malformed_trades, ibkr_cache)
+    coverage = _coverage_items(root, state, payload, history, records, logs, epoch, paper_inputs, paper_compare, malformed_trades, ibkr_cache)
     c1_status, c1_evidence, c1_metrics = _c1_status(
         slip, paper_inputs.get("c1_spec") if isinstance(paper_inputs.get("c1_spec"), dict) else {}
     )

@@ -239,6 +239,9 @@ def test_paper_evidence_uses_durable_artifacts_when_runner_slippage_is_empty(tmp
     assert gates["b3_reconcile"]["status"] == "PASS"
     assert coverage["fill_quality"]["metrics"]["fills"] == 3
     assert coverage["current_protection"]["status"] == "OBSERVED"
+    assert coverage["current_protection"]["metrics"]["position_rows"][0]["status"] == "PROTECTED"
+    assert coverage["state_persist"]["metrics"]["position_rows"][0]["stop_order_id"] == "42"
+    assert coverage["runner_freshness"]["metrics"]["snapshot_rows"][-1]["date"] == "2026-08-11"
     assert coverage["sample_denominators"]["metrics"]["by_inst"] == {"M2K": 1, "MES": 1, "MYM": 1}
     assert coverage["same_day_multi_day"]["metrics"] == {"multi_day": 1, "same_day": 0, "unknown": 0}
 
@@ -790,6 +793,14 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "function flexLedgerOverrideRows" in source
     assert "function backtestArtifactAuditBlock" in source
     assert "Open Position Parity" in source
+    assert "function statePersistDetail" in source
+    assert "function currentProtectionDetail" in source
+    assert "function runnerFreshnessDetail" in source
+    assert "Persisted Position Rows" in source
+    assert "Protection Rows" in source
+    assert "Runner Snapshot Rows" in source
+    assert "state-position-table" in source
+    assert "runner-snapshot-table" in source
     assert "system ledger" in source
     assert "not IBKR NetLiquidation" in source
     assert "Signal compare checks desired decision parity" in source
@@ -875,6 +886,8 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "coverage-master-detail" in css
     assert "coverage-detail" in css
     assert "coverage-item.active" in css
+    assert "state-position-table" in css
+    assert "runner-snapshot-table" in css
     assert "detail-list" in css
     assert "detail-metric-grid" in css
     assert "detail-progress" in css

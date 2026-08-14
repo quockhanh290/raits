@@ -1379,6 +1379,66 @@
     return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Rejected signal coverage validates retained guard decision evidence.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${rejectionMetricCards(m)}</section><section class="more-section trade-detail"><h3>Rejected Candidate Evidence (${esc(m.samples?.shown ?? 0)} / ${esc(m.samples?.total ?? 0)})</h3>${rejectionEvidenceRows(m.samples)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
   }
 
+  function stateProtectionPositionRows(rows) {
+    if (!rows || !rows.length) return '<p class="detail-empty">No current persisted position rows are available.</p>';
+    return `<div class="trade-table state-position-table"><table><thead><tr><th>status</th><th>position</th><th>entry</th><th>risk</th><th>stop</th><th>state</th></tr></thead><tbody>${rows.map(row => {
+      const protectedOk = row.status === 'PROTECTED';
+      const directionClass = String(row.direction || '').toLowerCase();
+      return `<tr><td><span class="fill-result ${protectedOk ? 'ok' : 'bad'}">${esc(row.status || '--')}</span><small>${row.stop_order_id ? 'stop id present' : 'missing stop id'}</small></td><td><b>${esc(row.inst || '--')} <span class="direction-chip ${directionClass}">${esc(row.direction || '--')}</span></b><small>${esc(row.cluster || '--')} x${esc(row.contracts ?? '--')}</small></td><td><b>${esc(row.entry_day || '--')}</b><small>${fmtPrice(row.entry_price)}</small></td><td><b>${fmtMoney(row.risk_dollars)}</b><small>risk dollars</small></td><td><b>${fmtPrice(row.stop_price)}</b><small>${esc(row.stop_order_id || '--')}</small></td><td><span class="fill-result ${row.exit_pending ? 'watch' : 'ok'}">${row.exit_pending ? 'EXIT PENDING' : 'OPEN'}</span><small>persisted file</small></td></tr>`;
+    }).join('')}</tbody></table></div>`;
+  }
+
+  function statePersistDetail(item) {
+    const m = item.metrics || {};
+    const op = m.operational_positions || {};
+    const persistMatch = op.persist_match;
+    const count = op.count ?? (m.position_rows || []).length;
+    const verdict = persistMatch === false ? 'BREACH' : persistMatch === true ? 'PASS' : 'MISSING';
+    return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'State persist checks runner projected positions against live_positions.json.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${tableVerdict(verdict, 'State persist verdict', persistMatch === true ? 'Runner projected open-position count agrees with persisted live_positions.json.' : persistMatch === false ? 'Runner projected state and persisted live_positions.json disagree.' : 'Persisted state match evidence is unavailable.', [`persist_match ${persistMatch == null ? '--' : persistMatch}`, `positions ${count}`])}<div class="detail-metric-grid">${[
+      metricCard('Persist match', persistMatch == null ? '--' : String(persistMatch), 'Runner operational_status.positions.persist_match from live_state_data.js.', persistMatch === true ? 'ok' : persistMatch === false ? 'bad' : 'watch', persistMatch === true ? 'PASS' : persistMatch === false ? 'BREACH' : 'MISSING', 'must be true'),
+      metricCard('Runner count', count ?? '--', 'Open-position count projected by runner operational status.', '', 'OBSERVED', 'latest'),
+      metricCard('Persisted rows', (m.position_rows || []).length, 'Rows loaded from live_positions.json.', '', 'OBSERVED', 'current file'),
+      metricCard('Read error', m.live_positions_error || 'none', 'live_positions.json read/parse error, if any.', m.live_positions_error ? 'bad' : 'ok', m.live_positions_error ? 'BREACH' : 'PASS', 'must be none'),
+    ].join('')}</div></section><section class="more-section trade-detail"><h3>Persisted Position Rows</h3>${stateProtectionPositionRows(m.position_rows)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
+  }
+
+  function currentProtectionDetail(item) {
+    const m = item.metrics || {};
+    const total = Number(m.positions || 0);
+    const protectedCount = Number(m.protected || 0);
+    const unprotected = Number(m.unprotected || Math.max(0, total - protectedCount));
+    const verdict = total > 0 && unprotected === 0 ? 'PASS' : total > 0 ? 'BREACH' : 'MISSING';
+    return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Current protection checks that every current persisted open position has a stop order id.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${tableVerdict(verdict, 'Current protection verdict', verdict === 'PASS' ? 'Every current persisted open position has a stop_order_id.' : verdict === 'BREACH' ? 'At least one current persisted open position is missing stop_order_id.' : 'No current persisted open-position evidence is available.', [`protected ${protectedCount}/${total}`, `unprotected ${unprotected}`])}<div class="detail-metric-grid">${[
+      metricCard('Protected rows', `${protectedCount} / ${total}`, 'Current persisted positions with stop_order_id.', total && protectedCount >= total ? 'ok' : total ? 'bad' : 'watch', total && protectedCount >= total ? 'PASS' : total ? 'BREACH' : 'MISSING', 'all required', detailProgress(protectedCount, total)),
+      metricCard('Unprotected', unprotected, 'Current persisted open positions without stop_order_id.', unprotected ? 'bad' : total ? 'ok' : 'watch', unprotected ? 'BREACH' : total ? 'PASS' : 'MISSING', 'must be 0'),
+      metricCard('Position rows', total, 'Current open-position rows in live_positions.json.', '', total ? 'OBSERVED' : 'MISSING', 'current file'),
+      metricCard('Read error', m.live_positions_error || 'none', 'live_positions.json read/parse error, if any.', m.live_positions_error ? 'bad' : 'ok', m.live_positions_error ? 'BREACH' : 'PASS', 'must be none'),
+    ].join('')}</div></section><section class="more-section trade-detail"><h3>Protection Rows</h3>${stateProtectionPositionRows(m.position_rows)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
+  }
+
+  function runnerSnapshotRows(rows) {
+    if (!rows || !rows.length) return '<p class="detail-empty">No runner snapshot rows are available.</p>';
+    return `<div class="trade-table runner-snapshot-table"><table><thead><tr><th>date</th><th>equity</th><th>activity</th><th>open</th><th>runner</th><th>breaker</th></tr></thead><tbody>${rows.map(row => {
+      const aliveKnown = row.runner_alive !== undefined && row.runner_alive !== null;
+      const alive = row.runner_alive === true;
+      return `<tr><td><b>${esc(row.date || '--')}</b><small>snapshot</small></td><td><b>${fmtEquity(row.equity)}</b><small>projected</small></td><td><b>${esc(row.entries ?? 0)} / ${esc(row.exits ?? 0)} / ${esc(row.rejected ?? 0)}</b><small>entries / exits / rejects</small></td><td><b>${esc(row.open_positions ?? 0)}</b><small>open positions</small></td><td><span class="fill-result ${aliveKnown ? alive ? 'ok' : 'bad' : 'watch'}">${aliveKnown ? alive ? 'ALIVE' : 'DOWN' : 'N/A'}</span><small>${esc(row.runner_pid || '--')}</small></td><td><span class="fill-result ${row.breaker_level === 'OK' ? 'ok' : row.breaker_level ? 'watch' : 'neutral'}">${esc(row.breaker_level || '--')}</span></td></tr>`;
+    }).join('')}</tbody></table></div>`;
+  }
+
+  function runnerFreshnessDetail(item) {
+    const m = item.metrics || {};
+    const snapshots = Number(m.snapshot_count || 0);
+    const age = Number(m.age_seconds);
+    const ageText = Number.isFinite(age) ? `${Math.round(age / 60)}m` : '--';
+    const verdict = snapshots ? 'OBSERVED' : 'MISSING';
+    return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Runner freshness checks that live_state_data.js has recent runner snapshots for paper evidence.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${tableVerdict(verdict, 'Runner freshness verdict', snapshots ? 'Runner-state snapshots are available. This panel is an observability check unless a hard freshness threshold is defined.' : 'No runner-state snapshots are available.', [`snapshots ${snapshots}`, `age ${ageText}`])}<div class="detail-metric-grid">${[
+      metricCard('Snapshots', snapshots, 'Runner-state snapshots projected in live_state_data.js.', snapshots ? 'ok' : 'bad', snapshots ? 'OBSERVED' : 'MISSING', 'must exist', detailProgress(snapshots, Math.max(snapshots, 1))),
+      metricCard('Artifact age', ageText, 'Server-observed age of global_index/live_state_data.js at dashboard read time.', Number.isFinite(age) ? 'watch' : 'bad', Number.isFinite(age) ? 'OBSERVED' : 'MISSING', 'no hard threshold'),
+      metricCard('Observed at', m.observed_at || '--', 'Filesystem timestamp for live_state_data.js.', '', 'OBSERVED', 'server stamped'),
+      metricCard('Latest snapshot', m.latest_snapshot?.date || '--', 'Most recent snapshot date inside live_state_data.js.', snapshots ? 'ok' : 'bad', snapshots ? 'OBSERVED' : 'MISSING', 'projected'),
+    ].join('')}</div></section><section class="more-section trade-detail"><h3>Runner Snapshot Rows</h3>${runnerSnapshotRows(m.snapshot_rows)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
+  }
+
   function contractSpecRows(rows) {
     if (!rows || !rows.length) return '<p class="detail-empty">No local basket contract specs are available.</p>';
     return `<div class="trade-table contract-spec-table"><table><thead><tr><th>inst</th><th>local spec</th><th>IBKR spec</th><th>contract</th><th>status</th></tr></thead><tbody>${rows.map(row => {
@@ -1404,7 +1464,10 @@
     const stpPlacement = item.key === 'stp_placement' ? stpPlacementDetail(item) : '';
     const rejection = item.key === 'rejections' ? rejectionCoverageDetail(item) : '';
     const contractSpec = item.key === 'contract_spec_guard' ? contractSpecGuardDetail(item) : '';
-    const customDetail = pvb || fill || stpPlacement || rejection || contractSpec;
+    const statePersist = item.key === 'state_persist' ? statePersistDetail(item) : '';
+    const currentProtection = item.key === 'current_protection' ? currentProtectionDetail(item) : '';
+    const runnerFreshness = item.key === 'runner_freshness' ? runnerFreshnessDetail(item) : '';
+    const customDetail = pvb || fill || stpPlacement || rejection || contractSpec || statePersist || currentProtection || runnerFreshness;
     const evidence = customDetail ? '' : `<p class="coverage-detail-evidence">${esc(item.evidence)}</p>`;
     return `<aside class="coverage-detail"><div class="coverage-detail-head"><h3>${esc(item.title)}</h3><span class="gate-state ${statusClass(item.status)}">${esc(item.status)}</span></div>${evidence}<div class="c1-more-grid">${customDetail || `<section class="more-section"><h3>Metrics</h3>${coverageMetrics(item.metrics)}</section>`}<section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(item.sources)}</ul></section></div></aside>`;
   }
