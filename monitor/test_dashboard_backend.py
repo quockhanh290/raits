@@ -570,6 +570,8 @@ def test_paper_evidence_does_not_count_actual_only_paper_vs_backtest_as_observed
     assert pvb_gap["type"] == "DATA_GAP"
     assert pvb_gap["target_path"] == "monitor/paper_pnl_compare.json"
     assert pvb_gap["related_key"] == "paper_vs_backtest"
+    assert pvb_gap["status"] == "NEEDS_ARTIFACT"
+    assert "generated epoch compare artifact" in pvb_gap["purpose"]
 
 
 def test_paper_evidence_excludes_signal_close_from_c1_slippage(tmp_path: Path):
@@ -854,6 +856,9 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "data-gap-related" in source
     assert "unblocks when" in source
     assert "target_path" in source
+    assert "<dt>status</dt>" in source
+    assert "<dt>purpose</dt>" in source
+    assert "gap-status-" in source
     assert "Observed data" in source
     assert "Active spec" in source
     assert "Signal/market closes shown for diagnosis" in source
@@ -882,6 +887,7 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "coverage-panel" in css
     assert "coverage-group" in css
     assert "gap-related" in css
+    assert ".gap-status-warn" in css
     assert "source-limit" in css
     assert "c1-panel" in css
     assert "stp-panel" in css

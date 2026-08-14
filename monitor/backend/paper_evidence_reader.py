@@ -423,10 +423,13 @@ def _coverage(key: str, title: str, status: str, evidence: str,
 
 def _gap(title: str, detail: str, gap_type: str, target_path: str, missing_input: str,
          unblock_condition: str, related_key: str | None = None,
-         can_fix_now: str = "operator_data") -> dict[str, Any]:
+         can_fix_now: str = "operator_data", status: str = "NEEDS_DATA",
+         purpose: str = "") -> dict[str, Any]:
     return {
         "title": title,
         "detail": detail,
+        "status": status,
+        "purpose": purpose,
         "type": gap_type,
         "target_path": target_path,
         "missing_input": missing_input,
@@ -2306,6 +2309,8 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
             "C1 slippage gate has numeric sample and slippage thresholds.",
             "c1_slippage",
             "operator_data",
+            "NEEDS_SPEC",
+            "Define the C1 pass/fail boundary so OPEN and STP-close slippage can graduate from raw evidence to a quantified gate.",
         ))
     if slip["signal_close_with_stop_ref"]:
         gaps.append(_gap(
@@ -2320,6 +2325,8 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
             unblock_condition="Keep these rows excluded from C1 and reconcile their effect in Paper P&L vs backtest.",
             related_key="paper_vs_backtest",
             can_fix_now="documented",
+            status="DOCUMENTED",
+            purpose="Prevent signal/market CLOSE fills from being scored against a stop-reference slippage rule that does not represent their true expected execution path.",
         ))
     min_nights = int(tws_spec.get("min_nights") or 0) if isinstance(tws_spec.get("min_nights"), int) else None
     if tws_status != "PASS":
@@ -2343,6 +2350,8 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
             f"{min_nights or 'configured'} proven restart night(s) are structured and all required flags are true.",
             None,
             "operator_data",
+            "NEEDS_DATA",
+            "Prove that TWS/IBKR restart recovery has been observed over enough sessions before relying on unattended paper/live operation.",
         ))
     pvb_coverage = coverage_by_key.get("paper_vs_backtest", {})
     pvb_compare = ((pvb_coverage.get("metrics") or {}).get("trade_compare") or {}) if isinstance(pvb_coverage.get("metrics"), dict) else {}
@@ -2360,6 +2369,8 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
             unblock_condition="paper_pnl_compare.py produces trade_compare + statement_pnl_compare for the active epoch.",
             related_key="paper_vs_backtest",
             can_fix_now="code_or_job",
+            status="NEEDS_ARTIFACT",
+            purpose="Ensure paper and backtest P&L comparisons are backed by the generated epoch compare artifact rather than actual-only live-state context.",
         ))
     gaps.extend([
         _gap(
@@ -2371,6 +2382,8 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
             "Raw B3/STP halt lines are grouped into reviewed STP verification records.",
             "stp_placement",
             "operator_data",
+            "NEEDS_CLASSIFICATION",
+            "Separate true stop-protection failures from false halt/noise so stop placement evidence can be trusted without over-counting historical log text.",
         ),
         _gap(
             "Manual intervention ledger",
@@ -2381,6 +2394,8 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
             "Every operator-action candidate is either classified as noise or represented by a resolved/verified manual intervention row.",
             "manual_intervention",
             "operator_data",
+            "NEEDS_DECISION",
+            "Determine whether raw operator/manual log candidates affected paper evidence and verify that any actual intervention left broker/file/runner state safe.",
         ),
     ])
 

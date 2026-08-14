@@ -1666,10 +1666,19 @@
     return value || 'review';
   }
 
+  function gapStatusClass(status) {
+    const value = String(status || '').toLowerCase();
+    if (value.includes('documented')) return 'ok';
+    if (value.includes('spec') || value.includes('artifact') || value.includes('classification') || value.includes('decision')) return 'warn';
+    if (value.includes('data')) return 'info';
+    return 'neutral';
+  }
+
   function gapItem(item) {
     const type = gapType(item);
+    const gapStatus = item.status || '--';
     const related = item.related_key ? `<button type="button" class="gap-related" data-gap-related="${esc(item.related_key)}">Open related panel</button>` : '';
-    return `<article class="gap-item ${statusClass(type)}"><div class="gap-item-head"><span>${esc(type)}</span><em>${esc(gapFixLabel(item.can_fix_now))}</em></div><b>${esc(item.title)}</b><p>${esc(item.detail)}</p><dl><div><dt>target</dt><dd>${esc(item.target_path || '--')}</dd></div><div><dt>missing</dt><dd>${esc(item.missing_input || '--')}</dd></div><div><dt>unblocks when</dt><dd>${esc(item.unblock_condition || '--')}</dd></div></dl>${related}</article>`;
+    return `<article class="gap-item ${statusClass(type)}"><div class="gap-item-head"><span>${esc(type)}</span><em>${esc(gapFixLabel(item.can_fix_now))}</em></div><b>${esc(item.title)}</b><p>${esc(item.detail)}</p><dl><div><dt>status</dt><dd><strong class="gap-status gap-status-${gapStatusClass(gapStatus)}">${esc(gapStatus)}</strong></dd></div><div><dt>purpose</dt><dd>${esc(item.purpose || '--')}</dd></div><div><dt>target</dt><dd>${esc(item.target_path || '--')}</dd></div><div><dt>missing</dt><dd>${esc(item.missing_input || '--')}</dd></div><div><dt>unblocks when</dt><dd>${esc(item.unblock_condition || '--')}</dd></div></dl>${related}</article>`;
   }
 
   function render(data) {
