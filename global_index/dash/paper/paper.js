@@ -1486,6 +1486,81 @@
     ].join('')}</div></section><section class="more-section trade-detail"><h3>Open Issue Rows</h3>${openIssueRows(rows)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
   }
 
+  function operatorLogRows(rows, empty = 'No candidate log rows are available.') {
+    if (!rows || !rows.length) return `<p class="detail-empty">${esc(empty)}</p>`;
+    return `<div class="trade-table operator-log-table"><table><thead><tr><th>date</th><th>source</th><th>reason</th><th>evidence</th></tr></thead><tbody>${rows.map(row => `<tr><td><b>${esc(row.day || '--')}</b></td><td><b>${esc(row.path || '--')}:${esc(row.line_no || '--')}</b></td><td><span class="fill-result watch">${esc(row.reason || 'candidate')}</span></td><td><small>${esc(row.line || '--')}</small></td></tr>`).join('')}</tbody></table></div>`;
+  }
+
+  function manualInterventionDetail(item) {
+    const m = item.metrics || {};
+    const unresolved = Number(m.unresolved || 0);
+    const records = Number(m.records || 0);
+    const candidates = Number(m.candidate_log_lines || 0);
+    const verdict = item.status === 'NEEDS_DECISION' ? 'NEEDS_DECISION' : unresolved ? 'BREACH' : records ? 'PASS' : 'MISSING';
+    return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Manual intervention evidence separates operator-action candidates from structured reviewed actions.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${tableVerdict(verdict, 'Manual intervention verdict', item.status === 'NEEDS_DECISION' ? 'Candidate operator-action log lines exist, but no structured reviewed ledger is available yet.' : unresolved ? 'At least one structured manual intervention remains unresolved or unverified.' : records ? 'Structured manual intervention records are resolved and post-action verified.' : 'No manual intervention evidence is available.', [`candidate lines ${candidates}`, `records ${records}`, `unresolved ${unresolved}`])}<div class="detail-metric-grid">${[
+      metricCard('Candidate lines', candidates, 'Raw log lines matching manual/intervention/operator/override text.', candidates ? 'watch' : 'ok', candidates ? 'NEEDS_DECISION' : 'PASS', `${(m.candidate_days || []).length} day(s)`),
+      metricCard('Structured records', records, 'Reviewed records in monitor/paper_inputs.json manual_interventions.', records ? 'ok' : candidates ? 'watch' : 'neutral', records ? 'OBSERVED' : candidates ? 'MISSING' : 'NONE', 'ledger'),
+      metricCard('Unresolved', unresolved, 'Structured records without resolution_status=resolved or post_action_verified=true.', unresolved ? 'bad' : 'ok', unresolved ? 'BREACH' : 'PASS', 'must be 0'),
+      metricCard('Candidate days', (m.candidate_days || []).length ? (m.candidate_days || []).join(', ') : '--', 'Days containing operator-action candidate lines.', '', 'OBSERVED', 'log scan'),
+    ].join('')}</div></section><section class="more-section trade-detail"><h3>Candidate Log Rows</h3>${operatorLogRows(m.candidate_rows)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
+  }
+
+  function rollSlippageDetail(item) {
+    const m = item.metrics || {};
+    const records = Number(m.records || 0);
+    const lines = Number(m.roll_slippage_lines || 0);
+    const verdict = records ? 'PASS' : 'MISSING';
+    return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Roll / C2 slippage records measure contract-roll slippage evidence.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${tableVerdict(verdict, 'Roll slippage verdict', records ? 'Structured roll slippage rows are available.' : 'No roll/C2 slippage evidence exists in the current paper epoch.', [`records ${records}`, `log lines ${lines}`, `mean ${fmtTicks(m.mean_ticks)}`])}<div class="detail-metric-grid">${[
+      metricCard('Structured records', records, 'Reviewed roll_slippage records in monitor/paper_inputs.json.', records ? 'ok' : 'watch', records ? 'OBSERVED' : 'MISSING', 'when roll occurs'),
+      metricCard('Mean ticks', fmtTicks(m.mean_ticks), 'Mean roll slippage ticks from structured rows.', records ? (Number(m.mean_ticks) > 0 ? 'bad' : 'ok') : 'neutral', records ? 'OBSERVED' : 'MISSING', 'context'),
+      metricCard('Candidate log lines', lines, 'Raw roll/C2 slippage candidate log lines.', lines ? 'watch' : 'neutral', lines ? 'OBSERVED' : 'NONE', 'log scan'),
+    ].join('')}</div></section><section class="more-section trade-detail"><h3>Roll Candidate Rows</h3>${operatorLogRows(m.candidate_rows, 'No roll/C2 slippage candidate log rows are available.')}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
+  }
+
+  function sampleDenominatorRows(rows) {
+    if (!rows || !rows.length) return '<p class="detail-empty">No denominator rows are available.</p>';
+    return `<div class="trade-table sample-denominator-table"><table><thead><tr><th>scope</th><th>bucket</th><th>count</th><th>share</th></tr></thead><tbody>${rows.map(row => `<tr><td><span class="fill-result neutral">${esc(row.scope || '--')}</span></td><td><b>${esc(row.key || '--')}</b></td><td><b>${esc(row.count ?? 0)}</b></td><td><b>${row.share == null ? '--' : `${(Number(row.share) * 100).toFixed(1)}%`}</b></td></tr>`).join('')}</tbody></table></div>`;
+  }
+
+  function sampleDenominatorsDetail(item) {
+    const m = item.metrics || {};
+    const instCount = Object.keys(m.by_inst || {}).length;
+    const clusterCount = Object.keys(m.by_cluster || {}).length;
+    return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Sample denominators show retained fill evidence by instrument and cluster.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${tableVerdict((m.total || 0) ? 'PASS' : 'MISSING', 'Sample denominator verdict', (m.total || 0) ? 'Paper-epoch fill samples exist and can be bucketed by instrument and cluster.' : 'No paper-epoch fill samples exist.', [`samples ${m.total || 0}`, `inst ${instCount}`, `cluster ${clusterCount}`])}<div class="detail-metric-grid">${[
+      metricCard('Fill samples', m.total ?? 0, 'Retained OPEN/CLOSE fill rows in the active paper epoch.', (m.total || 0) ? 'ok' : 'bad', (m.total || 0) ? 'OBSERVED' : 'MISSING', 'context'),
+      metricCard('Instruments', instCount, 'Number of instrument buckets represented by retained fills.', instCount ? 'ok' : 'bad', instCount ? 'OBSERVED' : 'MISSING', 'coverage'),
+      metricCard('Clusters', clusterCount, 'Number of strategy cluster buckets represented by retained fills.', clusterCount ? 'ok' : 'bad', clusterCount ? 'OBSERVED' : 'MISSING', 'coverage'),
+    ].join('')}</div></section><section class="more-section trade-detail"><h3>Denominator Rows</h3>${sampleDenominatorRows(m.rows)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
+  }
+
+  function holdingWindowRows(rows) {
+    if (!rows || !rows.length) return '<p class="detail-empty">No CLOSE rows are available for holding-window classification.</p>';
+    return `<div class="trade-table holding-window-table"><table><thead><tr><th>bucket</th><th>trade</th><th>window</th><th>exit</th><th>P&amp;L</th></tr></thead><tbody>${rows.map(row => {
+      const directionClass = String(row.direction || '').toLowerCase();
+      const cls = row.bucket === 'same_day' ? 'ok' : row.bucket === 'multi_day' ? 'watch' : 'neutral';
+      return `<tr><td><span class="fill-result ${cls}">${esc(row.bucket || '--')}</span></td><td><b>${esc(row.inst || '--')} <span class="direction-chip ${directionClass}">${esc(row.direction || '--')}</span></b><small>${esc(row.cluster || '--')}</small></td><td><b>${esc(row.entry_day || '--')}</b><small>exit ${esc(row.exit_day || '--')}</small></td><td><b>${esc(row.exit_reason || '--')}</b></td><td><b class="pnl-value ${moneyClass(row.pnl_sized)}">${fmtPnl(row.pnl_sized)}</b></td></tr>`;
+    }).join('')}</tbody></table></div>`;
+  }
+
+  function sameDayMultiDayDetail(item) {
+    const m = item.metrics || {};
+    const total = Number(m.same_day || 0) + Number(m.multi_day || 0) + Number(m.unknown || 0);
+    return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Same-day vs multi-day exits classify CLOSE fills by holding window.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${tableVerdict(total ? 'PASS' : 'MISSING', 'Holding-window verdict', total ? 'Retained CLOSE rows can be classified into same-day, multi-day, or unknown holding windows.' : 'No CLOSE rows are available for holding-window classification.', [`same-day ${m.same_day || 0}`, `multi-day ${m.multi_day || 0}`, `unknown ${m.unknown || 0}`])}<div class="detail-metric-grid">${[
+      metricCard('Same-day exits', m.same_day ?? 0, 'CLOSE rows where entry_day equals exit_day.', '', 'OBSERVED', 'context'),
+      metricCard('Multi-day exits', m.multi_day ?? 0, 'CLOSE rows where exit_day is after entry_day.', '', 'OBSERVED', 'context'),
+      metricCard('Unknown exits', m.unknown ?? 0, 'CLOSE rows missing entry_day or exit_day.', (m.unknown || 0) ? 'bad' : 'ok', (m.unknown || 0) ? 'CHECK' : 'PASS', 'should be 0'),
+    ].join('')}</div></section><section class="more-section trade-detail"><h3>Holding Window Rows</h3>${holdingWindowRows(m.rows)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
+  }
+
+  function logHygieneDetail(item) {
+    const m = item.metrics || {};
+    const dropped = Number(m.dropped_test_lines || 0);
+    return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Production-log hygiene shows test/noise lines filtered out of paper evidence.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${tableVerdict('PASS', 'Log hygiene verdict', 'Known test/noise markers are filtered before paper evidence is counted.', [`dropped ${dropped}`, `samples ${(m.sample_rows || []).length}`])}<div class="detail-metric-grid">${[
+      metricCard('Dropped lines', dropped, 'Log lines excluded because they match known test/noise markers.', dropped ? 'watch' : 'ok', 'OBSERVED', 'filtered'),
+      metricCard('Sample rows', (m.sample_rows || []).length, 'Representative dropped rows retained for audit display.', '', 'OBSERVED', 'capped'),
+    ].join('')}</div></section><section class="more-section trade-detail"><h3>Dropped Noise Samples</h3>${operatorLogRows(m.sample_rows, 'No dropped noise samples are available.')}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
+  }
+
   function contractSpecRows(rows) {
     if (!rows || !rows.length) return '<p class="detail-empty">No local basket contract specs are available.</p>';
     return `<div class="trade-table contract-spec-table"><table><thead><tr><th>inst</th><th>local spec</th><th>IBKR spec</th><th>contract</th><th>status</th></tr></thead><tbody>${rows.map(row => {
@@ -1516,7 +1591,12 @@
     const runnerFreshness = item.key === 'runner_freshness' ? runnerFreshnessDetail(item) : '';
     const dataFreshness = item.key === 'data_freshness' ? dataFreshnessDetail(item) : '';
     const openIncidents = item.key === 'open_incidents' ? openIncidentsDetail(item) : '';
-    const customDetail = pvb || fill || stpPlacement || rejection || contractSpec || statePersist || currentProtection || runnerFreshness || dataFreshness || openIncidents;
+    const manualIntervention = item.key === 'manual_intervention' ? manualInterventionDetail(item) : '';
+    const rollSlippage = item.key === 'roll_slippage' ? rollSlippageDetail(item) : '';
+    const sampleDenominators = item.key === 'sample_denominators' ? sampleDenominatorsDetail(item) : '';
+    const sameDayMultiDay = item.key === 'same_day_multi_day' ? sameDayMultiDayDetail(item) : '';
+    const logHygiene = item.key === 'log_hygiene' ? logHygieneDetail(item) : '';
+    const customDetail = pvb || fill || stpPlacement || rejection || contractSpec || statePersist || currentProtection || runnerFreshness || dataFreshness || openIncidents || manualIntervention || rollSlippage || sampleDenominators || sameDayMultiDay || logHygiene;
     const evidence = customDetail ? '' : `<p class="coverage-detail-evidence">${esc(item.evidence)}</p>`;
     return `<aside class="coverage-detail"><div class="coverage-detail-head"><h3>${esc(item.title)}</h3><span class="gate-state ${statusClass(item.status)}">${esc(item.status)}</span></div>${evidence}<div class="c1-more-grid">${customDetail || `<section class="more-section"><h3>Metrics</h3>${coverageMetrics(item.metrics)}</section>`}<section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(item.sources)}</ul></section></div></aside>`;
   }

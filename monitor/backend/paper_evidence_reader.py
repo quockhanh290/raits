@@ -718,11 +718,14 @@ def _log_summary(root: Path, epoch: str | None) -> dict[str, Any]:
         "rejections": 0,
         "rejection_rows": [],
         "roll_slippage_lines": 0,
+        "roll_slippage_rows": [],
         "manual_intervention_lines": 0,
         "manual_intervention_days": set(),
+        "manual_intervention_rows": [],
         "tws_restart_lines": 0,
         "tws_restart_days": set(),
         "dropped_test_lines": 0,
+        "dropped_test_rows": [],
     }
     for path in [*sorted(root.glob("scheduler_*.log")), *sorted(root.glob("live_day_*.log"))]:
         try:
@@ -735,6 +738,14 @@ def _log_summary(root: Path, epoch: str | None) -> dict[str, Any]:
                 continue
             if any(marker in line for marker in _TEST_MARKERS):
                 summary["dropped_test_lines"] += 1
+                if len(summary["dropped_test_rows"]) < 20:
+                    summary["dropped_test_rows"].append({
+                        "day": day,
+                        "path": path.name,
+                        "line_no": idx,
+                        "reason": next((marker for marker in _TEST_MARKERS if marker in line), "test/noise marker"),
+                        "line": line,
+                    })
                 continue
             if _COLD_START.search(line):
                 summary["cold_starts"] += 1
@@ -768,10 +779,14 @@ def _log_summary(root: Path, epoch: str | None) -> dict[str, Any]:
                 summary["rejection_rows"].append(_rejection_log_row(path, idx, day, line))
             if _ROLL_SLIP.search(line):
                 summary["roll_slippage_lines"] += 1
+                if len(summary["roll_slippage_rows"]) < 20:
+                    summary["roll_slippage_rows"].append({"day": day, "path": path.name, "line_no": idx, "line": line})
             if _MANUAL_INTERVENTION.search(line):
                 summary["manual_intervention_lines"] += 1
                 if day:
                     summary["manual_intervention_days"].add(day)
+                if len(summary["manual_intervention_rows"]) < 20:
+                    summary["manual_intervention_rows"].append({"day": day, "path": path.name, "line_no": idx, "line": line})
             if _TWS_RESTART.search(line):
                 summary["tws_restart_lines"] += 1
                 if day:
@@ -801,24 +816,77 @@ def _trade_denominators(records: list[dict[str, Any]]) -> dict[str, Any]:
         cluster = str(record.get("cluster") or "UNKNOWN")
         by_inst[inst] = by_inst.get(inst, 0) + 1
         by_cluster[cluster] = by_cluster.get(cluster, 0) + 1
-    return {"by_inst": dict(sorted(by_inst.items())), "by_cluster": dict(sorted(by_cluster.items()))}
+    rows = [
+        {
+            "scope": "instrument",
+            "key": key,
+            "count": value,
+            "share": round(value / len(records), 4) if records else None,
+        }
+        for key, value in sorted(by_inst.items())
+    ] + [
+        {
+            "scope": "cluster",
+            "key": key,
+            "count": value,
+            "share": round(value / len(records), 4) if records else None,
+        }
+        for key, value in sorted(by_cluster.items())
+    ]
+    return {
+        "description": "Sample denominators show how much retained fill evidence exists by instrument and strategy cluster. This is context for observability only, not a pass/fail gate.",
+        "total": len(records),
+        "by_inst": dict(sorted(by_inst.items())),
+        "by_cluster": dict(sorted(by_cluster.items())),
+        "rows": rows,
+        "status_rules": [
+            "PASS: not used as a standalone pass/fail gate; sample sufficiency is enforced in Fill quality, C1, and STP panels.",
+            "OBSERVED: at least one paper-epoch fill sample exists and denominator buckets are projected.",
+            "MISSING: no retained fill samples exist in the paper epoch.",
+        ],
+    }
 
 
 def _same_day(records: list[dict[str, Any]]) -> dict[str, int]:
     same_day = 0
     multi_day = 0
     unknown = 0
+    rows: list[dict[str, Any]] = []
     for record in records:
         if str(record.get("type")).upper() != "CLOSE":
             continue
         entry_day, exit_day = _date(record.get("entry_day")), _date(record.get("exit_day"))
         if not entry_day or not exit_day:
             unknown += 1
+            bucket = "unknown"
         elif entry_day == exit_day:
             same_day += 1
+            bucket = "same_day"
         else:
             multi_day += 1
-    return {"same_day": same_day, "multi_day": multi_day, "unknown": unknown}
+            bucket = "multi_day"
+        rows.append({
+            "bucket": bucket,
+            "inst": record.get("inst"),
+            "cluster": record.get("cluster"),
+            "direction": record.get("direction"),
+            "entry_day": entry_day,
+            "exit_day": exit_day,
+            "exit_reason": record.get("exit_reason"),
+            "pnl_sized": record.get("pnl_sized"),
+        })
+    return {
+        "description": "Same-day vs multi-day exits classify retained CLOSE fills by holding window so paper samples cover both intraday and overnight behavior.",
+        "same_day": same_day,
+        "multi_day": multi_day,
+        "unknown": unknown,
+        "rows": rows,
+        "status_rules": [
+            "PASS: not used as a standalone pass/fail gate; exit-path sample requirements live in the main paper duration/exit coverage gates.",
+            "OBSERVED: at least one CLOSE fill can be classified by entry_day and exit_day.",
+            "MISSING: no CLOSE fill rows are available for holding-window classification.",
+        ],
+    }
 
 
 def _c1_status(slip: dict[str, Any], spec: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
@@ -920,13 +988,40 @@ def _manual_input_status(items: list[dict[str, Any]], logs: dict[str, Any]) -> t
         return (
             "NEEDS_DECISION",
             f"{logs['manual_intervention_lines']} operator-action candidate line(s) across {len(logs['manual_intervention_days'])} day(s); no structured ledger is defined",
-            {"candidate_log_lines": logs["manual_intervention_lines"], "candidate_days": logs["manual_intervention_days"]},
+            {
+                "description": "Manual intervention evidence separates raw operator-action candidate log text from structured reviewed actions. Candidate lines do not prove intervention risk until a ledger record states what happened and verifies post-action state.",
+                "candidate_log_lines": logs["manual_intervention_lines"],
+                "candidate_days": logs["manual_intervention_days"],
+                "candidate_rows": logs.get("manual_intervention_rows", []),
+                "records": 0,
+                "unresolved": 0,
+                "status_rules": [
+                    "PASS: every manual action is represented by a structured record with resolution_status=resolved and post_action_verified=true.",
+                    "NEEDS_DECISION: raw operator-action candidate lines exist but no structured intervention ledger is defined.",
+                    "BREACH: a structured manual action exists but is unresolved or not post-action verified.",
+                    "OBSERVED: structured records exist and all are resolved/verified.",
+                ],
+            },
         )
     unresolved = sum(1 for item in items if item.get("resolution_status") != "resolved" or item.get("post_action_verified") is not True)
     return (
         "BREACH" if unresolved else "OBSERVED",
         f"{len(items)} manual action record(s), {unresolved} unresolved/unverified",
-        {"records": len(items), "unresolved": unresolved},
+        {
+            "description": "Manual intervention evidence separates raw operator-action candidate log text from structured reviewed actions.",
+            "records": len(items),
+            "unresolved": unresolved,
+            "candidate_log_lines": logs["manual_intervention_lines"],
+            "candidate_days": logs["manual_intervention_days"],
+            "candidate_rows": logs.get("manual_intervention_rows", []),
+            "rows": items,
+            "status_rules": [
+                "PASS: every manual action is represented by a structured record with resolution_status=resolved and post_action_verified=true.",
+                "NEEDS_DECISION: raw operator-action candidate lines exist but no structured intervention ledger is defined.",
+                "BREACH: a structured manual action exists but is unresolved or not post-action verified.",
+                "OBSERVED: structured records exist and all are resolved/verified.",
+            ],
+        },
     )
 
 
@@ -934,8 +1029,31 @@ def _roll_input_status(items: list[dict[str, Any]], logs: dict[str, Any]) -> tup
     ticks = [_number(item.get("ticks")) for item in items]
     ticks = [tick for tick in ticks if tick is not None]
     if not items:
-        return "MISSING", f"{logs['roll_slippage_lines']} roll slippage log line(s)", {"roll_slippage_lines": logs["roll_slippage_lines"]}
-    return "OBSERVED", f"{len(items)} structured roll slippage record(s), mean {_fmt_mean(_mean(ticks))}", {"records": len(items), "mean_ticks": _mean(ticks)}
+        return "MISSING", f"{logs['roll_slippage_lines']} roll slippage log line(s)", {
+            "description": "Roll / C2 slippage records measure execution slippage from contract-roll activity. No roll event exists in the current paper epoch, so this remains contextual missing evidence.",
+            "roll_slippage_lines": logs["roll_slippage_lines"],
+            "candidate_rows": logs.get("roll_slippage_rows", []),
+            "records": 0,
+            "mean_ticks": None,
+            "status_rules": [
+                "PASS: structured roll slippage records exist when a roll occurs and all required fields are populated.",
+                "OBSERVED: structured roll slippage rows are present; mean ticks are shown for context.",
+                "MISSING: no roll/C2 slippage evidence exists in the paper epoch.",
+            ],
+        }
+    return "OBSERVED", f"{len(items)} structured roll slippage record(s), mean {_fmt_mean(_mean(ticks))}", {
+        "description": "Roll / C2 slippage records measure execution slippage from contract-roll activity.",
+        "records": len(items),
+        "mean_ticks": _mean(ticks),
+        "rows": items,
+        "candidate_rows": logs.get("roll_slippage_rows", []),
+        "roll_slippage_lines": logs["roll_slippage_lines"],
+        "status_rules": [
+            "PASS: structured roll slippage records exist when a roll occurs and all required fields are populated.",
+            "OBSERVED: structured roll slippage rows are present; mean ticks are shown for context.",
+            "MISSING: no roll/C2 slippage evidence exists in the paper epoch.",
+        ],
+    }
 
 
 def _required_fill_fields(record: dict[str, Any]) -> set[str]:
@@ -2089,7 +2207,16 @@ def _coverage_items(root: Path, state: dict[str, Any], payload: dict[str, Any], 
             "OBSERVED",
             f"{logs['dropped_test_lines']} test/noise line(s) filtered from paper evidence",
             ["logs"],
-            {"dropped_test_lines": logs["dropped_test_lines"]},
+            {
+                "description": "Production-log hygiene shows how many retained log lines were excluded from paper evidence because they match known test/noise markers.",
+                "dropped_test_lines": logs["dropped_test_lines"],
+                "sample_rows": logs.get("dropped_test_rows", []),
+                "status_rules": [
+                    "PASS: not a standalone pass/fail gate; this is an evidence-quality guardrail.",
+                    "OBSERVED: noise filtering ran and dropped lines are counted/sampled.",
+                    "BREACH: use only if production evidence depends on unclassified test/noise lines.",
+                ],
+            },
         ),
     ]
 

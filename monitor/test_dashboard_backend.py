@@ -246,7 +246,11 @@ def test_paper_evidence_uses_durable_artifacts_when_runner_slippage_is_empty(tmp
     assert coverage["data_freshness"]["metrics"]["checks"][0]["key"] == "regime_freshness"
     assert coverage["open_incidents"]["metrics"]["issues"] == []
     assert coverage["sample_denominators"]["metrics"]["by_inst"] == {"M2K": 1, "MES": 1, "MYM": 1}
-    assert coverage["same_day_multi_day"]["metrics"] == {"multi_day": 1, "same_day": 0, "unknown": 0}
+    assert coverage["sample_denominators"]["metrics"]["rows"][0]["scope"] == "instrument"
+    assert coverage["same_day_multi_day"]["metrics"]["multi_day"] == 1
+    assert coverage["same_day_multi_day"]["metrics"]["same_day"] == 0
+    assert coverage["same_day_multi_day"]["metrics"]["unknown"] == 0
+    assert coverage["same_day_multi_day"]["metrics"]["rows"][0]["bucket"] == "multi_day"
 
 
 def test_paper_evidence_counts_candidate_gap_log_lines(tmp_path: Path):
@@ -812,6 +816,16 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "Open Issue Rows" in source
     assert "data-freshness-table" in source
     assert "open-issue-table" in source
+    assert "function manualInterventionDetail" in source
+    assert "function rollSlippageDetail" in source
+    assert "function sampleDenominatorsDetail" in source
+    assert "function sameDayMultiDayDetail" in source
+    assert "function logHygieneDetail" in source
+    assert "Candidate Log Rows" in source
+    assert "Roll Candidate Rows" in source
+    assert "Denominator Rows" in source
+    assert "Holding Window Rows" in source
+    assert "Dropped Noise Samples" in source
     assert "system ledger" in source
     assert "not IBKR NetLiquidation" in source
     assert "Signal compare checks desired decision parity" in source
@@ -901,6 +915,9 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "runner-snapshot-table" in css
     assert "data-freshness-table" in css
     assert "open-issue-table" in css
+    assert "operator-log-table" in css
+    assert "sample-denominator-table" in css
+    assert "holding-window-table" in css
     assert "detail-list" in css
     assert "detail-metric-grid" in css
     assert "detail-progress" in css
