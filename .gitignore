@@ -206,3 +206,22 @@ monitor/inputs/ibkr_flex/
 # ============================================
 data/
 global_index/data/
+
+# ============================================
+# Throwaway run artefacts — 6.7 MB of these had accumulated by 2026-08-15,
+# enough to bury the real entries in `git status`. All regenerable.
+# ============================================
+# Dashboard verification screenshots
+tmp_*.png
+raitstmp_*.png
+# Test-run output captured to a file rather than read from the terminal
+pb_*.txt
+opfix_final*.txt
+full_suite*.txt
+scoped_suite.txt
+# run_live_day writes one of these per day, and paper_evidence_reader SCANS them:
+# a throwaway --dry-run left a log line here that added a B3 episode and broke
+# test_per_file_log_scan_reproduces_the_single_pass_numbers. Ignoring them keeps
+# them out of git, but note they still affect that gate — delete after any
+# ad-hoc run rather than leaving them behind.
+live_day_*.log
