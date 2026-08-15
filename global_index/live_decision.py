@@ -48,6 +48,12 @@ class OpenPos:
     exit_pending: bool = False  # True when CLOSE failed; _retry_pending_exits() retries next day
     stop_price: float | None = None      # STP: entry chandelier stop level (GTC stop order placed at this price)
     stop_order_id: str | None = None     # STP: IBKR orderId for the active GTC stop order
+    # Why the signal layer stopped wanting this position (CHANDELIER / GAP / MAX_HOLD),
+    # set on the day the exit is marked. Observational only: decide_day never reads it,
+    # so it cannot change a decision. It exists because the trade log recorded closes
+    # with no exit path at all, which left the exit_path_coverage gate unable to fill
+    # no matter how long the epoch ran.
+    exit_reason: str | None = None
     # Live only: the price this position actually filled at. Realised P&L cannot be
     # computed without it, and in live pnl_sized arrives as 0.0 — the backtest fills it
     # from its ledger, the broker does not. decide_day never reads this.
