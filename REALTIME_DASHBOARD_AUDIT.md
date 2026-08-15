@@ -50,6 +50,72 @@ thật đang chạy và trên log production, trừ nơi ghi rõ là fixture.
 
 ---
 
+## TRẠNG THÁI SỬA CHỮA
+
+| Mã | Mức | Trạng thái | Ghi chú |
+|---|---|---|---|
+| **C1** | Critical | ✅ **ĐÃ SỬA** | Hai alarm quan trọng nhất im lặng vĩnh viễn vì bọc trong `if ($('schedulerHealth'))` — element không tồn tại |
+| **C2** | Critical | ✅ **ĐÃ SỬA** | Snapshot 90 ngày tuổi từng hiện `fresh`. Predicate neo vào tuổi snapshot, **không** neo vào deadline slot — Codex bắt được lỗi này trong bản kế hoạch của tôi |
+| **H1** | High | ✅ **ĐÃ SỬA** | Ba reader ba thuật toán "đã phục hồi chưa". Nay bốn lane cùng một kết luận trên cùng một log |
+| **H2** | High | ✅ **ĐÃ SỬA** | Sharpe 10.21 tính từ 4 quan sát. `MIN_METRIC_DAYS = 20`, hiện `--` kèm `n=5; needs 20` |
+| **H3** | High | ✅ **ĐÃ SỬA** | Event thiếu timestamp render `14:05 ET` giả. Chuỗi đó biến mất khỏi dữ liệu thật |
+| **H4** | High | ✅ **ĐÃ SỬA** | `localeCompare` trên chuỗi trộn UTC/ET. Sort theo epoch millis |
+| **M1** | Medium | ✅ **ĐÃ SỬA** | Stop đặt sai phía vẫn hiện `Protected`. Nay kiểm giá + hướng |
+| **M2** | Medium | ✅ **ĐÃ SỬA** | Hai cluster cùng một contract → cộng dồn số lượng thay vì lấy phần tử đầu |
+| **M3** | Medium | ✅ **ĐÃ SỬA** | `positionKey` bỏ float equality trên `entry_price` và `stop_order_id` |
+| **M4** ⬆ | **High** | ✅ **ĐÃ SỬA** | Nâng Medium → High giữa chừng, thành blocker. Ledger runner ↔ broker không đối chiếu ở đâu |
+| **M5** | Medium | ✅ **ĐÃ SỬA** | Ô HMM fit xanh trong khi 45/45 fit cảnh báo |
+| **M6** | Medium | ✅ **ĐÃ SỬA** | Header đếm covered bỏ qua `stop_deferred`, rail thì loại trừ — hai chỗ mâu thuẫn |
+| **M7** | Medium | ✅ **ĐÃ SỬA** | `coverage.to` luôn quảng cáo tới hôm nay kể cả khi scheduler chết |
+| **M8** | Medium | ✅ **ĐÃ SỬA** (vòng 2) | Ban đầu ghi ĐÓNG, **sửa lại thành MỘT PHẦN**, rồi đóng đủ hai nửa qua P2-A1. Số từ nguồn đã chết nay hiện `--` |
+| **L1, L2** | Low | ✅ **ĐÃ SỬA** | 4 hàm rail chết + CSS mồ côi; `localTime()` thật ra format ET |
+| **L3–L5** | Low | ✅ **ĐÃ SỬA** | 39 dòng known-debt gộp còn 1; Open Issues mở trên mobile; favicon 404 → 204 |
+| **L6** | Low | ✅ **ĐÃ SỬA** | Từng 🔒 hoãn vì phải sửa `runner.py`. Đổi tên `dd_pct` → `dd_pct_display` thay vì bỏ `* 100`, để consumer chưa cập nhật **hỏng to** thay vì sai lặng lẽ 100× |
+| **L7** ✚ | Low | ✅ **ĐÃ SỬA** | Phát hiện trong lúc sửa H1. Bẫy: nhánh debt phải kiểm **trước** nhánh sạch vì `"thoat OK nhung"` chứa `"thoat OK"` làm tiền tố |
+| **P2-A1** | High | ✅ **ĐÃ SỬA** | Nửa sau của M8 |
+| **P2-A2** | — | ⛔ **RÚT LẠI** | Không phải finding. Banner ghi "Monitor backend unavailable"; một endpoint chết không phải backend chết |
+| **P2-B1–B4, B6** | High/Medium | ✅ **ĐÚNG SẴN** | Năm đường dẫn đã đúng, **chỉ thiếu test**. Không đổi một dòng code sản phẩm nào |
+| **P2-B5** | Medium | ✅ **ĐÃ SỬA** | Lỗi thật: `regime_unreliable` không được frontend đọc ở đâu |
+| **P2-B7** | Low | ✅ **ĐÃ SỬA** | Lỗi thật: `refreeze.pending` cùng hình dạng với B5 |
+| **P2-C1** | Medium | ✅ **ĐÃ SỬA** | 8/10 endpoint không có contract test |
+
+> **Phase 2 trả lời một câu hỏi khác Phase 1.** Phase 1 toàn lỗi đã xác nhận; Phase 2 hỏi *"còn gì chưa ai nhìn?"* — và **5 trên 7 đường dẫn hoá ra đã đúng sẵn**. Gộp chung hai loại vào một danh sách là báo 5 lỗi không tồn tại.
+
+**Kết quả đo được sau khi sửa:**
+
+| Chỉ số | Lúc audit | Hiện tại |
+|---|---|---|
+| `pytest` trần ở gốc repo | 1765 collect, **chạy 0** (INTERNALERROR) | 795 collect, **794 passed** |
+| `pytest global_index/ futures/` | **không chạy được** | **533 passed** |
+| `pytest monitor/` | — | **250 passed** |
+| `test_event_playback` (script) | ≥6 check đỏ | **73 / 0 / 73** |
+| `test_operational_fixes` (script) | 118 / **5 đỏ** / 123 | **126 / 0 / 126** |
+| Check vô hình với pytest | **~195** (`check()` không assert) | **0** |
+| Test canh đường breaker HALT | **0 test sống** | P2a 7 check · T13 4 · T26 2 |
+| `live_state_data.js` | 426 KB, tăng một snapshot mỗi phiên | **250 KB, có trần 500** |
+| `run_day` ở 1400 ngày lịch sử | 4094 ms | **1436 ms**, metrics bit-identical |
+| Snapshot trong payload | 982 và tăng vô hạn | **500** |
+| `GET /favicon.ico` | 404 thường trực | **204**, console 0 error |
+| Snapshot 90 ngày tuổi | hiện `fresh` | **`stale`** |
+| Sharpe trên 4 quan sát | `10.21` ngang hàng số thật | **`--`** kèm `n=5; needs 20` |
+| Ô HMM fit khi 45/45 cảnh báo | xanh | **`45/45 complete / 45 warn`**, class `warning` |
+| Job Journal | 28 dòng, 16 là cùng một debt | **`COMPLETED 13 · RECOVERED 6 · KNOWN DEBT 1`** |
+| Hàm rail chết / `localTime` | 4 hàm + CSS mồ côi | **0** |
+| Hở sweep stop Chủ nhật | **6,5 tiếng** | slot 18:30 ET *(chờ restart scheduler)* |
+
+### Ba khuyết tật lặp lại, đáng nhớ hơn từng finding
+
+**Test không thể đỏ.** `check()` chỉ `print` rồi `append`; `sys.exit(1)` nằm trong `__main__`. Dưới pytest mọi hàm test luôn xanh. Đo được: script 122/2 vs pytest `"31 passed"`; và `test_event_playback` từng báo `"11 passed in 2152s"` — 36 phút không thể đỏ, phủ lên cả kịch bản breaker HALT.
+
+**Literal viết cứng trôi khỏi thực tế.** T7.4 gọi `entry_price` là "thừa" trong khi T7.2 cách nó hai dòng khẳng định nó PHẢI có. P1.8 assert mảng đảo chiều. T13.2 tính DD từ số truyền tay, báo 15,00% trong khi breaker nhìn 9,09% — một dòng xanh nằm ngay trên hai dòng đỏ mâu thuẫn với nó.
+
+**Một file kéo sập cả phiên.** `sys.exit()` cấp module trong hai file test khiến pytest INTERNALERROR lúc collect. Bảy trong tám mục `lastfailed` là hệ quả của việc đó, không phải bảy lỗi.
+
+Luật rút ra: **một phép đo phải chứng minh được nó sẽ đỏ khi thứ nó canh biến mất** — và điều đó áp cho cả cách chạy phép đo, không chỉ nội dung.
+
+
+---
+
 **Bản ghi verify (2026-08-15 00:0x ET).** Trạng thái trên đến từ phép đo của tôi, không từ báo cáo
 của agent thực thi — hai lượt trước nó hoàn thành việc mà không báo về, nên chỉ số liệu mới tính.
 
