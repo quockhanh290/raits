@@ -17,6 +17,10 @@ G2: Model age — fit_end too old. Warn only (no halt) because an old model stil
     a stale CSV which causes an immediate wrong-regime error.
     SOFT >12 months: notify MODEL AGE WARN once
     HARD >18 months: notify MODEL AGE CHECK DUE once
+    Both alerts ask for the two MEASUREMENTS, not for a re-freeze: age is not evidence
+    the model is wrong (LESSONS L11). compare_refit.py answers "would a newer fit decode
+    differently", detect_regime_miss.py answers "do the labels still match the market".
+    The first cannot answer the second — it compares the HMM against another HMM.
 
 G3: Re-freeze data coverage — futures/refreeze.py (not here).
 
@@ -180,24 +184,36 @@ class HMMStaleGuard:
     def _check_g2(self, today: pd.Timestamp) -> None:
         months = _months_since(self.fit_end, today)
 
-        # Both branches name the MEASUREMENT, not the re-freeze. Age is not evidence that
+        # Both branches name the MEASUREMENTS, not the re-freeze. Age is not evidence that
         # the model is wrong: measured 2026-08-15, fit-2024 vs fit-2025 differed on 5.84%
-        # of 2026 labels — identical to the 5.84% two random seeds of the SAME fit differ
-        # by. LESSONS L11: the refit trigger is "the old model is wrong", not "there is new
+        # of 2026 labels — the same 5.84% two random seeds of the SAME fit differ by.
+        # LESSONS L11: the refit trigger is "the old model is wrong", not "there is new
         # data". An alert whose correct response is to ignore it teaches the operator to
-        # ignore alerts, so this one asks for the check that can actually settle it.
+        # ignore alerts, so this one asks for the checks that can actually settle it.
+        #
+        # BOTH scripts, because they answer different L11 conditions and either can come
+        # back clean while the other does not:
+        #   [1] compare_refit.py      — would a newer fit decode differently?
+        #   [2] detect_regime_miss.py — do the labels still match the market?
+        # [1] alone has a blind spot it cannot see past: it compares the HMM against
+        # another HMM, so two fits wrong in the same way report zero difference and look
+        # fine. [3] "is there new OOS to replace what a refit would burn" stays a
+        # judgement — nothing can automate it, so it is named rather than scripted.
+        _CHECKS = ("`python futures/compare_refit.py` (would a newer fit decode "
+                   "differently?) and `python futures/detect_regime_miss.py` (do the "
+                   "labels still match the market?)")
+
         if months > G2_HARD_MONTHS and not self._g2_hard_notified:
             notify(
                 "MODEL AGE CHECK DUE",
                 f"HMM model is {months} months old "
                 f"(fit_end={self.fit_end.date()}, today={today.date()}). "
-                f"Run `python futures/compare_refit.py` to measure whether it is actually "
-                f"wrong — age alone is not a reason to re-freeze (LESSONS L11). "
-                f"Trading continues.",
+                f"Age alone is not a reason to re-freeze (LESSONS L11). Run both: "
+                f"{_CHECKS}. Trading continues.",
             )
             log.error(
-                "G2 HARD: model %d months old (fit_end=%s) — run compare_refit.py to decide",
-                months, self.fit_end.date(),
+                "G2 HARD: model %d months old (fit_end=%s) — run compare_refit.py AND "
+                "detect_regime_miss.py to decide", months, self.fit_end.date(),
             )
             self._g2_hard_notified = True
 
@@ -206,11 +222,10 @@ class HMMStaleGuard:
                 "MODEL AGE WARN",
                 f"HMM model is {months} months old "
                 f"(fit_end={self.fit_end.date()}, today={today.date()}). "
-                f"Plan the annual check: `python futures/compare_refit.py` measures whether "
-                f"a refit is warranted. Trading continues.",
+                f"Plan the annual check — {_CHECKS}. Trading continues.",
             )
             log.warning(
-                "G2 SOFT: model %d months old (fit_end=%s) — plan the compare_refit check",
-                months, self.fit_end.date(),
+                "G2 SOFT: model %d months old (fit_end=%s) — plan the compare_refit + "
+                "detect_regime_miss checks", months, self.fit_end.date(),
             )
             self._g2_soft_notified = True

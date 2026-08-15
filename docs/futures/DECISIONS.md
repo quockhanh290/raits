@@ -96,7 +96,8 @@ Rejected: hạ sàn xuống dưới 1.56 rồi giữ nguyên cổng tuyệt đ�
 ⚠️ `runner.BACKTEST_CALMAR_FLOOR = 1.65` (theo dõi suy giảm paper) **chưa đổi** — nó cũng nằm trong dải nhiễu và cần quyết định riêng.
 
 **G2 đổi động từ: cảnh báo tuổi model trỏ vào PHÉP ĐO, không trỏ vào re-freeze — 2026-08-15**  
-Why: `MODEL AGE URGENT — schedule re-freeze immediately` bắn mỗi ngày từ tháng thứ 19, trong khi đáp án đo được là "không refit". Cảnh báo mà phản ứng đúng là phớt lờ sẽ dạy người vận hành phớt lờ mọi cảnh báo. Đổi tiêu đề thành `MODEL AGE CHECK DUE` và nội dung trỏ vào `python futures/compare_refit.py`. Ngưỡng 12/18 tháng **giữ nguyên** — vấn đề là động từ, không phải nhịp.  
+Why: `MODEL AGE URGENT — schedule re-freeze immediately` bắn mỗi ngày từ tháng thứ 19, trong khi đáp án đo được là "không refit". Cảnh báo mà phản ứng đúng là phớt lờ sẽ dạy người vận hành phớt lờ mọi cảnh báo. Đổi tiêu đề thành `MODEL AGE CHECK DUE` và nội dung trỏ vào **phép đo**. Ngưỡng 12/18 tháng **giữ nguyên** — vấn đề là động từ, không phải nhịp.  
+**Bổ sung cùng ngày:** cảnh báo trỏ vào **cả hai** script, vì chúng trả lời hai điều kiện L11 khác nhau và cái này sạch không có nghĩa cái kia sạch — `compare_refit.py` (điều kiện 1: fit mới có decode khác không) **và** `detect_regime_miss.py` (điều kiện 2: nhãn còn khớp thị trường không). Bản đầu chỉ trỏ vào cái thứ nhất vì detector chưa tồn tại lúc đó; để nguyên là để lại một mắt xích đứt — điều kiện 1 **không thể** trả lời điều kiện 2, nó so HMM với chính HMM. Điều kiện 3 (có OOS mới bù không) không tự động hoá được nên chỉ nêu tên trong comment, không script hoá.  
 Rejected: nới `G2_HARD_MONTHS` — che triệu chứng, mất luôn nhịp kiểm tra định kỳ; tắt G2 — mất cảnh báo thật khi model thực sự lạc hậu.
 
 **Sàn nhiễu chốt bằng P95 trên 30 seed (thay vì max trên 5) — 2026-08-15**  
