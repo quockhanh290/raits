@@ -178,3 +178,11 @@ Note: Paper 2026 với fit-2024 = OOS live (model chưa thấy 2026) — mạnh 
 **Vault HMM contamination** → RESOLVED 2026-07-06: fit-2024 saw vault 2023-2024 → Calmar 4.52 (contaminated) vs 3.33 (clean), +1.19 qua MaxDD artifact. Clean run sealed. Rule: fit trước test period.  
 **NKD 0 trades vault** → RESOLVED 2026-07-06: symptom của vault n=3 bug → NKD risk $1,312 > budget $1,000. Fix: pin n=1. NKD 125+57 trades trong vaults (2023-2025).  
 **Sizer bug audit** → RESOLVED 2026-07-06: grep toàn bộ scripts gọi `size_combined`. Hai chỗ sai: `deploy_sim` subset không pin (fix: `--n-contracts 1` + guard warning) + `generate_replay_snapshots.py:142` NKD bug (fix: `= 1`). Tất cả production scripts n=1.
+
+---
+
+## Monitor / dashboard (mở 2026-08-14)
+
+**`breaker.dd_pct` lệch đơn vị 100×** → OPEN. `dump_state` phát `meta.operational_status.breaker.dd_pct` ở đơn vị **phần trăm** (0.086) trong khi `snapshot.drawdown_pct` cùng payload ở đơn vị **phân số** (0.00086). Dashboard hiện không render field này nên chưa có bug, nhưng bất kỳ ai nối `pct(ops.breaker.dd_pct)` sẽ ra 8.6% thay vì 0.086%. Sửa nguồn nằm trong `global_index/runner.py` — code giao dịch, cần quyết định riêng, cố ý không đụng trong đợt sửa dashboard. Bất biến đã khóa ở `monitor/test_realtime_contract.py::test_realtime_never_renders_the_percent_unit_breaker_field`. Ref: `REALTIME_DASHBOARD_AUDIT.md` L6.
+
+**Hai reader bất đồng về "job chạy xong"** → OPEN (latent). `schedule_status._evidence` nhận cả `"completed ok"` lẫn `"thoat ok"`; `job_journal_reader` chỉ nhận `"completed OK"` và `"thoat OK nhung"`. Một dòng `"thoat OK"` trần sẽ để job kẹt `running` vĩnh viễn ở lane journal trong khi rail gọi slot ấy là `executed`. Đo trên toàn bộ `scheduler_*.log` retained: mọi lần `thoat OK` đều kèm `nhung`, 0 lần trần → chưa kích hoạt. Fix đúng là một helper nhận diện "hoàn tất" dùng chung cho cả hai reader. Ref: `REALTIME_DASHBOARD_AUDIT.md` L7.

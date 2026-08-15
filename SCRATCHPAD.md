@@ -1320,3 +1320,40 @@ Cách bắt: một công cụ báo "việc X không chạy" mà việc đó rơi
   stop ngày D+1. Đo được: đặt ngay −$10,832 / hoãn +$47,166 (2018-2026).
 - **"Chạy lại generate_replay_snapshots là xong"** — chạy lại mà không sửa `REGIME_CSV` chỉ
   tái tạo đúng cái comparator hỏng, và GHI ĐÈ bản duy nhất đang có. Backup trước.
+
+---
+
+## Gotchas — Realtime dashboard (2026-08-14)
+
+- **`[] || x` trong JS trả về `[]`, không phải `x`.** Mảng rỗng là truthy. Nên
+  `schedule.open_incidents || schedule.incidents` âm thầm rơi về danh sách ĐẦY ĐỦ khi
+  không còn incident nào mở — đúng lý do Now Monitor hiện 6 slot đã phục hồi như "OPEN"
+  trong khi rail ngay trên nói "systems nominal". Phải dùng `??`.
+- **Test grep trên source sẽ bắt chính comment giải thích bug đó.** Guard C1 tìm
+  `$('someId')` trong `realtime.js`; comment tôi viết để giải thích lookup đã gỡ chứa đúng
+  chuỗi ấy → guard fail dù code đã sạch. Fix: lọc dòng bắt đầu bằng `//` trước khi grep
+  (code thật không bao giờ nằm trên dòng như vậy nên không mất true positive).
+- **"Trang không cuộn ngang" KHÔNG phải là kiểm tra overflow.** Nội dung vượt mép có thể bị
+  **cắt** thay vì cuộn, và khi đó `scrollWidth == clientWidth` — test vẫn xanh. Đo được:
+  `.header-live-context` trải tới 608px trên viewport 487px, `runner-header-state` nằm trọn
+  ngoài màn hình, mà assert scrollWidth vẫn pass. Kiểm đúng: không element nào được vượt
+  mép phải trừ khi nó hoặc tổ tiên có `overflow-x: auto|scroll`.
+- **`job_journal_reader._LAUNCH` là `-m\s+global_index\.`** — fixture log không chứa chuỗi
+  đó sinh ra **0 job**, và test kiểu "duyệt mọi job failed rồi assert" sẽ **pass rỗng**.
+  Luôn `assert` danh sách không rỗng trước khi vào vòng lặp.
+- **Hai reader bất đồng về "job chạy xong".** `schedule_status._evidence` nhận cả
+  `"completed ok"` lẫn `"thoat ok"`; `job_journal_reader` chỉ nhận `"completed OK"` và
+  `"thoat OK nhung"`. Một dòng `"thoat OK"` trần → job kẹt `running` vĩnh viễn ở lane
+  journal trong khi rail gọi là `executed`. Latent: đo toàn bộ `scheduler_*.log`, 0 lần trần.
+- **Ngưỡng stale không được neo vào deadline của slot.** Slot chạy mỗi 5 phút nên
+  `latest_slot + 20 phút` luôn ở tương lai suốt active window và không bao giờ trôi qua.
+  Đo được: snapshot 90 ngày tuổi lúc 14:30 ET vẫn ra "không stale". Neo vào **tuổi của
+  chính snapshot** mới bắn.
+- **Đừng đưa backtick vào prompt gửi codex-rescue.** Forwarder nội suy prompt vào shell chưa
+  escape → bash chạy command substitution, output lệnh bị nhét vào prompt thay cho lệnh, và
+  agent phóng thêm một task thứ hai mà không huỷ được task đầu → **hai writer song song trên
+  cùng file** (kết quả: hai bản sao trùng của cùng một test).
+- **`codex-companion cancel` hỏng dưới Git Bash**: MSYS đổi `/PID` thành đường dẫn
+  (`C:/Program Files/Git/PID`). Huỷ bằng PowerShell: `taskkill /PID <pid> /T /F`.
+  Bản ghi trạng thái job KHÔNG được cập nhật khi process bị giết — một dòng
+  `RUNNING 10h` trong `status --all` có thể chỉ là xác chết, đối chiếu mtime file để chắc.

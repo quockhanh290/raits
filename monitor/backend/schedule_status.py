@@ -29,6 +29,36 @@ STOP_REPAIR_SLOTS = tuple(
     (hour, 20) for hour in range(0, 24, 2)
     if hour not in (2, 14)
 )
+# Bao lâu một snapshot được phép cũ hơn slot due gần nhất trước khi bị gọi là stale.
+# Đây là tuổi của CHÍNH snapshot, không phải deadline của slot: slot chạy mỗi 5 phút
+# nên "latest_slot + allowance" luôn nằm ở tương lai suốt active window và không bao
+# giờ trôi qua — neo vào đó thì một file 90 ngày tuổi vẫn ra "fresh", đúng cái lỗ
+# C2 cần bịt. 20 phút ≈ 4 slot liên tiếp không ghi được state: đủ rộng để không báo
+# nhầm khi một slot đang chạy, đủ hẹp để dump_state fail âm thầm không lọt.
+STATE_STALE_ALLOWANCE_SECONDS = 20 * 60
+
+# Cách scheduler viết một dòng đóng. Hai reader từng giữ hai bộ chuỗi riêng nên
+# một dòng "thoat OK" TRẦN được rail coi là executed trong khi Job Journal để job
+# kẹt `running` vĩnh viễn — cùng hình dạng lỗi với H1, chỉ ở tầng chuỗi.
+# (REALTIME_DASHBOARD_AUDIT.md L7)
+CLEAN_EXIT_TOKENS = ("completed ok", "thoat ok")
+# Dòng có debt CHỨA token sạch làm tiền tố ("thoat OK nhung ..."), nên nơi nào cần
+# phân biệt hai loại thì phải kiểm bộ này TRƯỚC. Nơi nào chỉ cần biết "job đã kết
+# thúc chưa" — như _evidence dưới đây — thì cả hai đều là đã kết thúc, và giữ đúng
+# như vậy: _annotate_incident_lifecycle dựa vào state == "executed" để phát hiện
+# phục hồi, nên loại dòng debt ra khỏi "executed" sẽ làm mất trạng thái recovered.
+DEBT_EXIT_TOKENS = ("thoat ok nhung", "exited ok but")
+
+
+def is_clean_exit(detail: str) -> bool:
+    """Dòng báo tiến trình con đã thoát bình thường, kể cả khi có debt kèm theo."""
+    return any(token in str(detail).lower() for token in CLEAN_EXIT_TOKENS)
+
+
+def is_debt_exit(detail: str) -> bool:
+    """Thoát bình thường NHƯNG con đã ghi CRITICAL/ERROR."""
+    return any(token in str(detail).lower() for token in DEBT_EXIT_TOKENS)
+
 
 _cache_lock = threading.Lock()
 _log_cache: dict[tuple[str, str, tuple[tuple[str, int, int], ...]], list[str]] = {}
@@ -174,7 +204,7 @@ def _evidence(
         return {**base, "state": "skipped", "reason": reason, "severity": severity}
     if "exited with code" in joined:
         return {**base, "state": "failed", "reason": "exception", "severity": "incident"}
-    if "completed ok" in joined or "thoat ok" in joined:
+    if is_clean_exit(joined):
         return {**base, "state": "executed", "reason": "none", "severity": "none"}
     return base
 
@@ -266,8 +296,23 @@ def get_schedule_status(
     _annotate_incident_lifecycle(incidents, due_evidence)
     open_incidents = [item for item in incidents if item["lifecycle"] == "open"]
 
+    state_age_seconds = None
+    stale_against_latest = False
+    if observed_at is not None:
+        observed_utc = observed_at if observed_at.tzinfo else observed_at.replace(tzinfo=dt.timezone.utc)
+        state_age_seconds = max(0.0, round((server_now - observed_utc).total_seconds(), 3))
+        if latest is not None:
+            stale_against_latest = (
+                observed_utc < latest["at"]
+                and state_age_seconds > STATE_STALE_ALLOWANCE_SECONDS
+            )
+
     if observed_at is None:
         freshness = "missing"
+    elif stale_against_latest:
+        # Đặt TRƯỚC mọi nhánh khác: một snapshot bỏ lỡ slot gần nhất không thể
+        # được cứu bởi việc "chưa tới giờ slot kế tiếp".
+        freshness = "stale"
     elif not trading_today or before_first:
         freshness = "not_expected_yet"
     elif overdue_unexplained:
@@ -296,6 +341,7 @@ def get_schedule_status(
         "next_scheduled_job": _next_job(now_et, _scheduled_slots_for),
         "next_decision_job": _next_job(now_et, _pipeline_slots_for),
         "freshness": freshness,
+        "state_age_seconds": state_age_seconds,
         "evidence_available": log_available,
         "evidence": latest_evidence,
         "incidents": incidents,

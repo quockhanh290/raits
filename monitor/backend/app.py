@@ -90,6 +90,13 @@ def dashboard_asset(filename: str):
     return send_from_directory(DASH_ROOT, filename)
 
 
+@app.get("/favicon.ico")
+def favicon():
+    # Trình duyệt luôn xin favicon. Một 404 thường trực trong console làm lu mờ
+    # lỗi thật, và console sạch là điều kiện để smoke test nói được điều gì.
+    return "", 204
+
+
 @app.get("/live_state_data.js")
 def legacy_live_state_asset():
     return send_from_directory(LIVE_STATE_PATH.parent, LIVE_STATE_PATH.name)

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from monitor.backend.schedule_status import is_clean_exit, is_debt_exit
 from monitor.backend.session_event_reader import read_session_events
 
 LOCAL_TZ = ZoneInfo("America/Edmonton")
@@ -86,6 +87,20 @@ def _new_job(job_id: str, started_at: str) -> dict[str, Any]:
     }
 
 
+# Two processes racing the same slot launch within the same second. Slots are five minutes
+# apart, so anything beyond this is a different run, not a duplicate of the one in hand.
+_CONCURRENT_LAUNCH_SECONDS = 120
+
+
+def _is_concurrent_relaunch(current: dict[str, Any] | None, timestamp: str) -> bool:
+    if current is None or current["ended_at"] is not None:
+        return False
+    started, now = _parse_iso(current["started_at"]), _parse_iso(timestamp)
+    if started is None or now is None:
+        return False
+    return 0 <= (now - started).total_seconds() <= _CONCURRENT_LAUNCH_SECONDS
+
+
 def _duplicate_reason(job: dict[str, Any]) -> str:
     return f"duplicate launch: {job['failed_runs']} of {job['launch_count']} runs failed"
 
@@ -111,6 +126,18 @@ def _annotate_impact_and_action(jobs: list[dict[str, Any]]) -> None:
             and not any("dump_state" in item.lower() for item in candidate.get("diagnostics", []))
         ), None)
 
+        # Mọi job chưa hoàn tất phải khai báo lifecycle. Trước đây chỉ nhánh
+        # missed + stop_repair làm việc này, nên job nkd_night/live_day failed rơi
+        # về None — và frontend đọc None là "chưa recover", nên Job Journal hiện
+        # OPEN vĩnh viễn cho những slot mà schedule_status và open_issue_reader
+        # đều đã kết luận là đã phục hồi. Ba lane, ba câu trả lời khác nhau.
+        if job["status"] in {"failed", "missed"}:
+            job["lifecycle_status"] = "recovered" if later_same_stream else "open"
+            job["recovered_at"] = (
+                (later_same_stream.get("ended_at") or later_same_stream.get("started_at"))
+                if later_same_stream else None
+            )
+
         if "dump_state" in diagnostics or "live_state_data" in diagnostics:
             recovery = (
                 f" Publication resumed at {later_same_stream['job_id']}; this incident is recovered."
@@ -126,16 +153,15 @@ def _annotate_impact_and_action(jobs: list[dict[str, Any]]) -> None:
             )
         elif job["status"] == "missed":
             if job["job_type"] == "stop_repair":
+                # lifecycle_status / recovered_at đã được đặt ở trên cho mọi job
+                # failed|missed; ở đây chỉ còn phần diễn giải riêng của stop_repair.
                 if later_same_stream:
-                    job["lifecycle_status"] = "recovered"
-                    job["recovered_at"] = later_same_stream.get("ended_at") or later_same_stream.get("started_at")
                     job["impact"] = (
                         "The scheduled stop-repair inspection did not run at this slot; "
                         f"inspection resumed when {later_same_stream['job_id']} completed."
                     )
                     job["action"] = "No immediate action. The missed slot remains in daily history; review only if a later sweep fails or broker protection is not reconciled."
                 else:
-                    job["lifecycle_status"] = "open"
                     job["impact"] = "The scheduled stop-repair inspection did not run; protection was not rechecked by this slot."
                     job["action"] = "Review current broker positions and working stops, then check scheduler health before the next slot."
             elif job["job_type"] in {"live_day", "nkd_night"}:
@@ -284,23 +310,34 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]]) ->
                     current = _new_job(job_id, timestamp)
                     jobs.append(current)
                     _finish(current, timestamp, "skipped", "mutex" if "previous" in detail.lower() else "scheduler")
-                elif current is not None:
+                elif _is_concurrent_relaunch(current, timestamp):
                     # A second process fired the same slot. The log carries no PID, so the two
                     # runs cannot be told apart line by line — but they are one slot, and the
                     # operator needs one card saying it ran twice, not two half-parsed jobs.
+                    #
+                    # Only genuinely concurrent launches count. Slot ids repeat every night, and
+                    # the reader stitches two local-date files together, so a stale `active`
+                    # entry would otherwise swallow tonight's run into last night's job.
                     current["launch_count"] += 1
                 else:
                     current = _new_job(job_id, timestamp)
                     jobs.append(current)
                     active[job_id] = current
                 continue
-            if current and "completed OK" in detail:
+            # Nhánh debt phải đứng TRƯỚC nhánh sạch: "thoat OK nhung ..." chứa
+            # "thoat OK" làm tiền tố, nên kiểm ngược thứ tự sẽ nuốt mất phân loại
+            # completed_with_debt của 16/28 job trong một đêm thật.
+            if current and is_debt_exit(detail):
+                # Deliberately stays in `active`: the diagnostic that explains the debt is
+                # logged on the NEXT line and still has to attach to this job. What stops a
+                # stale entry from swallowing tomorrow's run of the same slot id is
+                # _is_concurrent_relaunch, which refuses any job that already ended.
+                _finish(current, timestamp, "completed_with_debt", "child_logged_error")
+                continue
+            if current and is_clean_exit(detail):
                 _finish(current, timestamp, "completed",
                         _duplicate_reason(current) if current["failed_runs"] else None)
                 active.pop(job_id, None)
-                continue
-            if current and ("thoat OK nhung" in detail or "exited OK but" in detail):
-                _finish(current, timestamp, "completed_with_debt", "child_logged_error")
                 continue
             if current and "exited with code" in detail.lower():
                 current["failed_runs"] += 1

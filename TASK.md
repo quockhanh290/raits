@@ -3589,3 +3589,109 @@ Báo cáo sinh ra để TÌM việc nên `need=True` gần như mọi ngày — 
 
 ### Files touched
 global_index/session_report.py
+
+---
+
+## Sub-task: Realtime dashboard — audit + sửa (IN PROGRESS 2026-08-14)
+Status: IN PROGRESS
+
+### Completed
+- [x] **Audit read-only** → `REALTIME_DASHBOARD_AUDIT.md`: 2 Critical, 4 High, 8 Medium, 7 Low.
+      Verdict: trang an toàn ở chiều "không gây hại" (read-only tuyệt đối, 0 nút lệnh,
+      client_id 99 tách khỏi runner 1) nhưng CHƯA tin được để kết luận "hệ thống đang ổn".
+- [x] **Plan 12 task** → `docs/futures/REALTIME_DASHBOARD_FIX_PLAN.md` (TDD từng bước)
+- [x] **T1** hai test tĩnh tự-suy-diễn chặn C1/C2 tái diễn (`monitor/test_realtime_contract.py`).
+      Không allowlist thủ công: id tạo động qua innerHTML tự được chấp nhận.
+      Về sau phải lọc comment cả-dòng trước khi grep — comment giải thích chính bug
+      bị bắt như thể là code.
+- [x] **T2** harness Playwright (`monitor/test_realtime_dom.py`): Flask cổng tạm, stub `/api/**`,
+      static assets thật. Đã CHỨNG MINH stub thật sự chặn (equity 77777 / regime Stress
+      render đúng, werkzeug log không thấy request `/api/*` lọt qua).
+- [x] **T3 (C1)** gỡ incident IBKR-connectivity + broker-reconcile khỏi nhánh chết
+      `if ($('schedulerHealth'))`; bỏ nén gap dựa trên cờ suy diễn `twsOutageOpen`,
+      thay bằng kiểm tra incident CÓ THẬT trong mảng.
+- [x] **T4 (C2 backend)** `schedule_status`: thêm freshness `stale` + `state_age_seconds`.
+- [x] **T5 (C2 frontend)** bỏ `hidden` khỏi `runnerContext`, đưa tuổi snapshot lên header + rail.
+- [x] **T6 (H1)** một sự thật duy nhất về "đã phục hồi chưa":
+      backend `job_journal_reader` set `lifecycle_status`/`recovered_at` cho MỌI job
+      failed|missed (trước chỉ nhánh missed+stop_repair); frontend Now Monitor đọc
+      `open_incidents ?? incidents` (dùng `??` — `[]` là truthy nên `||` rơi về list đầy đủ).
+- [x] **Ngoài plan — lane `recovered`**: 6 slot NKD mất trong đêm là sự thật về đêm đó.
+      Bỏ khỏi lane báo động là đúng, để biến mất khỏi trang thì không. Now Monitor giờ có
+      bucket thứ ba gộp theo stream: "6 NKD decision slots lost / 02:00–02:25 ET /
+      recovered by NKD_NIGHT_0230", nhãn RECOVERED xanh, không tính vào incident count.
+- [x] **T11 backend (M7)** `open_issue_reader.coverage` thêm `evidence_ends` + `stale_days`.
+- [x] **T12 phần backend/khóa**: route `GET /favicon.ico` → 204; hai bất biến khóa trong
+      `test_realtime_contract.py` (không write-surface; không render `breaker.dd_pct`).
+
+### Completed (đợt 2 — 2026-08-14/15)
+- [x] **T7 (H3/H4)** không bịa `14:05 ET`; sort journal theo epoch millis; `localTime` → `etDateTime`
+- [x] **T8 (H2/M5)** `MIN_METRIC_DAYS = 20` — Sharpe hiện `--` kèm `n=5 trading day(s); needs 20`;
+      HMM fit đổi màu theo `non_convergence_count` (`45/45 complete / 45 warn`, class `warning`)
+- [x] **T11-frontend (M4 blocker + M8)** — trang thật hiện
+      `Broker acct $996,440 / −$4,040 since Jul 8, 2026` ngay dưới `Paper Equity $50,229 / +$229`
+- [x] **T9 (M1/M2/M6)** kiểm giá stop + hướng so với market_price; cộng dồn số lượng đa-cluster;
+      `Protection` tách covered/deferred/naked → trang thật `1 covered`, không báo động giả
+- [x] **T10 (M3)** `positionKey` = `inst|cluster|direction|entry_day`
+- [x] **T12-frontend (L1/L3/L4)** xoá dead code rail + CSS mồ côi; gộp 39 dòng known-debt còn 1
+      (`COMPLETED 13 · RECOVERED 6 · KNOWN DEBT 1`); Open Issues mở trên mobile
+- [x] **L7 gỡ hoãn, đã đóng** — `is_clean_exit`/`is_debt_exit` dùng chung cho hai reader.
+      Bẫy: nhánh debt phải kiểm TRƯỚC nhánh sạch vì `"thoat OK nhung"` chứa `"thoat OK"` làm
+      tiền tố; đảo thứ tự sẽ xoá phân loại debt của 39 job. Dữ liệu thật không đổi phân loại nào.
+- [x] **Contract test payload** (blocker #6 của audit) + **guard read-only cho cả 4 dashboard**
+- [x] **Test bắt nội dung bị CẮT**, không chỉ trang bị cuộn — bản sửa C2 từng tạo ra một ca
+      clipping (header 608px trên viewport 487px) mà test cũ vẫn xanh
+
+### Next steps
+- [ ] **L6 là finding duy nhất còn mở** — `breaker.dd_pct` lệch đơn vị 100×. Cần quyết định
+      riêng vì sửa nguồn là sửa `global_index/runner.py` (code giao dịch).
+- [x] **Backend đã restart, cả bốn thay đổi có hiệu lực** (đo trên cổng 5002):
+      `/favicon.ico` → 204 · `state_age_seconds` = 27705.7 · `coverage.evidence_ends`
+      = 2026-08-14 · `lifecycle_status` = 6 recovered. `freshness: not_expected_yet`
+      với snapshot 7.7h tuổi là đúng: slot due gần nhất là LIVE_DAY_1555 và snapshot
+      ghi sau mốc đó, nên `observed > latest` ⇒ không stale.
+- [x] **M4 đã nâng Medium → HIGH và thành blocker** (quyết 2026-08-14). Giữ nguyên ID `M4`
+      để tham chiếu chéo không gãy. Audit + plan đã cập nhật; "Nên promote thành top-level
+      blocker" giờ có 4 mục, thêm *broker ledger divergence*.
+- [ ] **Làm M4 frontend TRƯỚC T9/T10** — nó là blocker, T9/T10 thì không
+
+### Key decisions
+- **Không chạm code giao dịch** trong toàn bộ đợt này. Hệ quả: L6 (`breaker.dd_pct` lệch
+  đơn vị 100×) KHÔNG sửa, chỉ ghi vào OPEN_QUESTIONS + khóa bằng test. Sửa nguồn nằm ở
+  `global_index/runner.py`, cần quyết định riêng.
+- **Predicate `stale` neo vào tuổi snapshot, KHÔNG neo vào deadline slot.** Plan viết sai
+  lúc đầu: slot chạy mỗi 5 phút nên `latest_slot + 20 phút` luôn ở tương lai suốt active
+  window và không bao giờ trôi qua — đo được: snapshot 90 ngày tuổi lúc 14:30 ET vẫn ra
+  `False`. Codex bắt được lỗi này và sửa đúng.
+- **M4 có bằng chứng thực tế**: bug MNKD→NKD 10× (sửa riêng cùng ngày) làm broker realised
+  −$1,400 trong khi sleeve ledger book −$140. Dashboard hiển thị "+$229" và không panel nào
+  có thể bắt được — đúng loại divergence M4 mô tả.
+
+### Files touched
+REALTIME_DASHBOARD_AUDIT.md, docs/futures/REALTIME_DASHBOARD_FIX_PLAN.md,
+docs/futures/OPEN_QUESTIONS.md,
+monitor/backend/schedule_status.py, monitor/backend/job_journal_reader.py,
+monitor/backend/open_issue_reader.py, monitor/backend/app.py,
+monitor/test_realtime_contract.py (mới), monitor/test_realtime_dom.py (mới),
+monitor/test_dashboard_backend.py,
+global_index/dash/realtime/{index.html,realtime.js,realtime.css}
+
+### Test state (2026-08-15, đo được)
+dashboard_backend 133 · realtime_contract 11 · realtime_dom 32 — **tổng 176 passed**.
+Baseline lúc bắt đầu audit là 114. Con số trôi vì `test_dashboard_backend.py` được sửa
+song song ngoài phạm vi, nên quy tắc là **chỉ được tăng**, không khớp số cứng.
+Verify cuối: `node --check` sạch · 0 console error · element bị cắt = `[]` ở cả 1440 và 390.
+
+### Kết quả audit
+**20/21 finding đã đóng.** Còn duy nhất **L6** (hoãn có chủ đích, cần quyết định về `runner.py`).
+Cộng 4 việc ngoài phạm vi audit gốc: lane `recovered`, test bắt nội dung bị cắt, contract test
+payload, guard read-only cho cả 4 dashboard.
+
+### Bài học vận hành (chi tiết ở SCRATCHPAD.md)
+- Agent thực thi **hai lần hoàn thành việc mà không báo về** — task tự biến khỏi `status --all`.
+  Trạng thái phải đến từ phép đo (mtime + grep dấu mốc + chạy test), không từ báo cáo.
+- Backtick trong prompt gửi codex-rescue → shell command substitution → hai writer song song
+  trên cùng file. `codex-companion cancel` hỏng dưới Git Bash (`/PID` bị đổi thành đường dẫn),
+  phải kill bằng PowerShell.
+- Chia việc theo **file** chứ không theo task: sau khi tách rạch ròi (Codex giữ frontend, tôi giữ
+  backend + test contract) thì không còn lần đụng độ nào.

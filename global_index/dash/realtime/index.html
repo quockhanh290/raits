@@ -34,7 +34,7 @@
       </label>
       <b id="sessionDate">--</b>
       <span class="broker-header-state"><i></i><b id="brokerContext">Loading</b></span>
-      <b id="runnerContext" hidden>Loading</b>
+      <span class="runner-header-state"><i></i><b id="runnerContext">Loading</b></span>
     </div>
   </header>
 
@@ -45,6 +45,7 @@
         <span class="zone-title has-tip tip-bottom" tabindex="0" data-tooltip="Paper-trading system equity maintained by the runner ledger. This excludes the broker account's total liquidation value.">Paper Equity</span>
         <div class="equity-line"><b id="metricEquity">--</b><strong id="performanceNet">--</strong></div>
         <small><em id="performanceReturn">--</em> <span id="performanceScope">--</span> / base <strong id="performanceBase">--</strong></small>
+        <small class="broker-account-line has-tip tip-bottom" tabindex="0" data-tooltip="The IBKR paper account's own equity, shown for context only. The runner ledger above is realised-only and re-anchors at the system epoch; the two are not the same number and are not meant to reconcile here."><span id="brokerAccountContext">--</span> <a href="/paper">Paper reconcile</a></small>
       </div>
 
       <div class="header-zone model-inputs-zone runner-derived" id="modelInputsZone">
@@ -85,7 +86,7 @@
         <div class="zone-grid">
           <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="Number of open futures positions currently reported by IBKR.">Positions</span><b id="metricPositions">--</b></div>
           <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="All currently working orders reported by IBKR, including protective stops.">Working orders</span><b id="metricStops">--</b></div>
-          <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="Broker positions with a valid working protective stop. Deferred protection remains legal but is not counted as covered.">Stops covered</span><b id="metricStopsCovered">--</b></div>
+          <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="Covered = a live stop with the right side, a sane price, and enough total quantity. Deferred = protection intentionally delayed by rule. Naked = neither.">Protection</span><b id="metricStopsCovered">--</b></div>
         </div>
       </div>
     </section>

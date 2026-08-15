@@ -171,7 +171,12 @@ def _build(paths: list[Path]) -> dict[str, Any]:
         return {"source": "scheduler_logs", "coverage": None, "issues": [], "error": "no timestamped scheduler evidence"}
 
     first_day = stamped_lines[0][0].astimezone(ET).date()
-    last_day = max(stamped_lines[-1][0].astimezone(ET).date(), dt.datetime.now(ET).date())
+    evidence_ends = stamped_lines[-1][0].astimezone(ET).date()
+    today = dt.datetime.now(ET).date()
+    # Quét phải chạy tới hôm nay để bắt slot missed, nhưng phạm vi BẰNG CHỨNG dừng
+    # ở dòng log cuối cùng. Trộn hai thứ này khiến UI hứa hẹn evidence không có:
+    # scheduler chết từ thứ Hai mà panel vẫn ghi "evidence ... to <hôm nay>".
+    last_day = max(evidence_ends, today)
     jobs: list[dict[str, Any]] = []
     monitor_events: list[dict[str, Any]] = []
     day = first_day
@@ -296,7 +301,9 @@ def _build(paths: list[Path]) -> dict[str, Any]:
     issues.sort(key=lambda item: (priority[item["status"]], item["first_seen"]))
     return {
         "source": "scheduler_logs", "observed_at": observed_at,
-        "coverage": {"from": first_day.isoformat(), "to": last_day.isoformat()},
+        "coverage": {"from": first_day.isoformat(), "to": last_day.isoformat(),
+                     "evidence_ends": evidence_ends.isoformat(),
+                     "stale_days": (today - evidence_ends).days},
         "issues": issues, "error": None,
     }
 
