@@ -7,8 +7,11 @@ có allowlist nào phải bảo trì bằng tay.
 """
 from __future__ import annotations
 
+import datetime as dt
 import re
 from pathlib import Path
+
+import pytest
 
 from monitor.backend.app import app
 
@@ -199,6 +202,70 @@ def test_open_incidents_is_a_subset_of_incidents(tmp_path):
     open_slots = {(item["slot_id"], item["slot_at"]) for item in body["open_incidents"]}
     assert open_slots <= all_slots, open_slots - all_slots
     assert all(item["lifecycle"] == "open" for item in body["open_incidents"])
+
+
+# P2-C1: tám endpoint còn lại chưa có hợp đồng nào. Frontend đọc thẳng các khóa
+# này, nên một field bị đổi tên sẽ làm panel render "--" hoặc rơi vào nhánh mặc
+# định mà không gì kêu lên. Mỗi mục khai báo khóa BẮT BUỘC và khóa nào là danh sách.
+_TODAY = dt.date.today().isoformat()
+_ENDPOINT_CONTRACTS = {
+    "/api/v1/broker": (
+        {"source", "observed_at", "server_now", "age_seconds", "freshness", "connected",
+         "error", "payload"},
+        {"payload": {"equity", "unrealized_pnl", "positions", "orders", "contract_specs"}},
+        ["payload.positions", "payload.orders"]),
+    "/api/v1/runner-positions": (
+        {"source", "observed_at", "error", "payload"}, {}, []),
+    "/api/v1/open-issues": (
+        {"source", "observed_at", "coverage", "issues", "error"},
+        {"coverage": {"from", "to", "evidence_ends", "stale_days"}}, ["issues"]),
+    f"/api/v1/session-events/{_TODAY}": (
+        {"source", "day", "observed_at", "events", "error"}, {}, ["events"]),
+    f"/api/v1/job-journal/{_TODAY}": (
+        {"source", "day", "observed_at", "jobs", "monitor_events", "error"}, {},
+        ["jobs", "monitor_events"]),
+    f"/api/v1/execution-quality/{_TODAY}": (
+        {"source", "day", "fills", "exceptions"}, {}, ["fills", "exceptions"]),
+    f"/api/v1/reports/{_TODAY}": ({"day", "daily"}, {}, []),
+    "/api/v1/paper-evidence": ({"source"}, {}, []),
+}
+
+
+def _dig(body: dict, path: str):
+    for part in path.split("."):
+        body = body[part]
+    return body
+
+
+@pytest.mark.parametrize("path", sorted(_ENDPOINT_CONTRACTS))
+def test_every_realtime_endpoint_keeps_its_payload_contract(path):
+    required, nested, lists = _ENDPOINT_CONTRACTS[path]
+    body = _get(path)
+    assert required <= set(body), f"{path} thieu khoa: {sorted(required - set(body))}"
+    for key, sub in nested.items():
+        assert sub <= set(body[key]), f"{path}.{key} thieu: {sorted(sub - set(body[key]))}"
+    for key in lists:
+        assert isinstance(_dig(body, key), list), f"{path}.{key} phai la list"
+    for key in ("observed_at", "server_now"):
+        if body.get(key) is not None:
+            assert _ISO_UTC.match(body[key]), (path, key, body[key])
+
+
+def test_the_endpoint_contract_covers_every_route_the_page_calls():
+    """Chống pass rỗng ở tầng danh sách: nếu frontend gọi thêm một endpoint mới
+    mà không ai thêm hợp đồng, test trên vẫn xanh vì nó chỉ duyệt những gì đã
+    khai báo. Đối chiếu với đường dẫn thật mà realtime.js fetch."""
+    js, _ = _realtime_sources()
+    # Dừng ở backtick/nháy chứ KHÔNG dừng ở ')', vì đường dẫn động là
+    # `/api/v1/session-events/${encodeURIComponent(sessionDay)}` — cắt ở ')' đầu
+    # tiên sẽ băm đôi chuỗi và test tự đỏ vì lỗi của chính nó.
+    called = {re.sub(r"\$\{[^}]*\}", "", m).rstrip("/")
+              for m in re.findall(r"fetchJson\(`?'?(/api/v1/[^`']*)", js)}
+    covered = {p.rsplit("/", 1)[0] if re.search(r"/\d{4}-\d{2}-\d{2}$", p) else p
+               for p in _ENDPOINT_CONTRACTS}
+    covered |= {"/api/v1/runner-state", "/api/v1/schedule-status"}
+    missing = sorted(c for c in called if c not in covered)
+    assert not missing, f"realtime.js goi endpoint chua co hop dong: {missing}"
 
 
 def test_all_four_readers_agree_on_which_slots_are_open(tmp_path):

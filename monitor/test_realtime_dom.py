@@ -804,6 +804,21 @@ def test_a_stale_model_is_shown_as_debt_without_crying_wolf(realtime_server, bro
     assert "nominal" in rail_text(browser_page).lower()
 
 
+def test_a_failed_refreeze_is_shown_as_debt_not_as_an_incident(realtime_server, browser_page):
+    """P2-B7. `refreeze.pending` bật khi pipeline re-freeze thất bại: model cũ
+    vẫn được dùng, giao dịch VẪN CHẠY, runner re-alert mỗi lần chạy. Đó là debt
+    chứ không phải halt — phải hiện ra, nhưng không được kéo rail vào báo động,
+    cùng cách đối xử với model age."""
+    stub_api(browser_page, {"/api/v1/runner-state": _runner_state_with(
+        refreeze={"pending": True, "attempts": 3, "fail_type": "data_missing"})})
+    open_realtime(browser_page, realtime_server)
+    text = browser_page.eval_on_selector("#nowMonitorList", "el => el.innerText")
+    assert "re-freeze" in text.lower(), text
+    assert "KNOWN DEBT" in monitor_statuses(browser_page)
+    assert "OPEN" not in monitor_statuses(browser_page)
+    assert "nominal" in rail_text(browser_page).lower()
+
+
 def test_blocked_entries_are_visible_on_the_page(realtime_server, browser_page):
     """P2-B5. `regime_unreliable` là cờ HMM stale guard G1 HARD bật khi SPY cũ
     quá 5 ngày làm việc; khi nó bật, runner chặn MỌI entry. Trang hiện độ tươi

@@ -710,7 +710,22 @@
       };
     });
 
-    const items = [...incidents, ...gaps, ...recovered];
+    // Bucket thứ tư: debt đã biết. Nó phải hiện ra nhưng KHÔNG được kêu như sự cố
+    // mới — cùng cách đối xử với model age. Re-freeze thất bại nghĩa là model cũ
+    // vẫn đang dùng và giao dịch vẫn chạy; runner đã re-alert mỗi lần chạy rồi.
+    const debts = [];
+    if (monitorOps.refreeze?.pending) debts.push({
+      key: 'runner:refreeze-pending',
+      status: 'known_debt', component: 'runner', title: 'Model re-freeze still pending',
+      problem: `A re-freeze attempt did not complete${
+        monitorOps.refreeze.fail_type ? ` (${monitorOps.refreeze.fail_type})` : ''}, so the previously frozen model is still in use.`,
+      impact: 'Trading continues on the older model. This is debt, not a halt — no entry is blocked by it.',
+      action: 'Complete the re-freeze out of band; the runner re-alerts on every slot until the pending flag clears.',
+      evidence: `refreeze.pending=true${
+        monitorOps.refreeze.attempts != null ? ` / ${monitorOps.refreeze.attempts} attempt(s)` : ''}`
+    });
+
+    const items = [...incidents, ...gaps, ...recovered, ...debts];
     if (state.selectedMonitorKey && !items.some(item => item.key === state.selectedMonitorKey)) state.selectedMonitorKey = null;
     if (!state.selectedMonitorKey && items.length && !compactIssueMedia.matches) state.selectedMonitorKey = items[0].key;
     $('nowMonitorLayout').hidden = !items.length;
@@ -732,7 +747,8 @@
     $('monitorClearIndicator').hidden = !clear;
     incidentSummary.className = `summary incident-summary ${clear ? 'clear' : 'attention'}`;
     incidentSummary.textContent = `${incidents.length} incident / ${gaps.length} telemetry gap`
-      + (recoveredSlotCount ? ` / ${recoveredSlotCount} slot(s) lost, recovered` : '');
+      + (recoveredSlotCount ? ` / ${recoveredSlotCount} slot(s) lost, recovered` : '')
+      + (debts.length ? ` / ${debts.length} known debt` : '');
   }
 
   function monitorDetail(item, withHeader = false) {

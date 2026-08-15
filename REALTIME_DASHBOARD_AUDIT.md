@@ -716,13 +716,13 @@ field có mặt trong fixture **không** có nghĩa là trạng thái được k
 | **P2-B4** | `model_age` = **URGENT** | Đây là trạng thái **THẬT của production ngay lúc này** (20 tháng, G2 HARD) — nhưng `BASE_PAYLOADS` dùng `OK`. Mọi DOM test đang chạy với một model khỏe mạnh giả định trong khi hệ thống thật thì không | **Medium** |
 | **P2-B5** | `regime_unreliable = True` | HMM stale guard G1 HARD chặn mọi entry. Trang phải nói được điều đó | **Medium** |
 | **P2-B6** | `halted_today > 0` và `rejected_detail` có bản ghi | Entry bị guard chặn, và cap block. Cả hai đều đã xảy ra thật (log 08-10 có `REJECTED SHORT MNQ ... gross 10.9% > cap 5.0%`) nhưng chưa test nào render chúng | **Medium** |
-| **P2-B7** | `refreeze pending = True` | Re-freeze thất bại để lại cờ pending; runner re-alert mỗi lần chạy | **Low** |
+| **P2-B7** ✅ | *(ĐÓNG — LỖI THẬT)* `refreeze pending = True` **không được frontend đọc ở đâu**, cùng hình dạng với B5. Đã thêm bucket thứ tư `debts` trong Now Monitor: hiện ra với nhãn KNOWN DEBT, không kéo rail vào báo động | Re-freeze thất bại để lại cờ pending; runner re-alert mỗi lần chạy | **Low** |
 
 ## C. Bề mặt chưa có hợp đồng (1)
 
 | # | Vấn đề | Mức |
 |---|---|---|
-| **P2-C1** | **8/10 endpoint không có contract test.** Chỉ `runner-state` và `schedule-status` có. Thiếu: `broker`, `runner-positions`, `open-issues`, `session-events`, `job-journal`, `execution-quality`, `reports`, `paper-evidence`. Frontend đọc các khóa này không qua lớp trung gian nào | **Medium** |
+| **P2-C1** ✅ | *(ĐÓNG)* **8/10 endpoint không có contract test.** Chỉ `runner-state` và `schedule-status` có. Thiếu: `broker`, `runner-positions`, `open-issues`, `session-events`, `job-journal`, `execution-quality`, `reports`, `paper-evidence`. Frontend đọc các khóa này không qua lớp trung gian nào | **Medium** |
 
 ## Thứ tự đề xuất
 
