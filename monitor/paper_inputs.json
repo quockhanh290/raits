@@ -1,10 +1,43 @@
 {
   "c1_spec": {
-    "min_n": 100,
-    "max_mean_ticks": 5,
-    "scope": "separate",
+    "approved_on": "2026-08-15",
+    "supersedes": {
+      "scope": "separate",
+      "min_n": 100,
+      "max_mean_ticks": 5,
+      "close_scope": "stp_only",
+      "why_replaced": "Two structural faults. The OPEN mean was pooled across instruments whose tick is worth $0.50 to $2.50, so a 28-tick M2K miss disappeared into a pooled 9.00. And min_n=100 on the STP branch needed ~178 sessions to fill against a gate whose own duration target is 60 -- unreachable by construction, the same fault as exit_path_coverage."
+    },
+    "open": {
+      "scope": "by_inst",
+      "min_n_per_inst": 20,
+      "max_mean_ticks": 3,
+      "why_by_inst": "The backtest models cost as 2.0 ticks per side applied PER INSTRUMENT, so ticks per instrument is the model's own unit -- the defect was pooling, not the unit. Measured on the same 5 fills: pooled +9.00 ticks, while by instrument M2K sits at +28.00 (14x the modelled cost) and MES at -4.00. The pooled figure showed neither. Note the ranking inverts in dollars: MNKD's +6.50 ticks costs $16.25 while M2K's +28.00 costs $14.00, so both units are published.",
+      "why_min_n_20": "Sample arrival measured on the backtest: 3,279 trades over 1,749 sessions = 1.87/session, of which MNKD takes 0.49/session and each Rosa-4 instrument 0.35/session. 20 per instrument fills in 41 sessions (MNKD) to 58 (Rosa 4), inside the 60-session duration target. 100 per instrument would need 203-289."
+    },
+    "stp_close": {
+      "scope": "pooled",
+      "min_n": 30,
+      "max_mean_ticks": 3,
+      "why_pooled": "Per-instrument would need ~136 sessions for 20 MNKD stop closes. OPEN is dense enough to judge per instrument; STP is not, so it is judged pooled with the dollar mean beside it.",
+      "why_min_n_30": "At an assumed 30% STP share of exits, 30 samples fill in 53 sessions against the 60-session target; 100 would need 178.",
+      "stp_share_is_assumed_not_measured": "The live STP share of exits is NOT measured. The backtest bounds it below 87% (13% of holds run the full 5 days and exit MAX_HOLD), but live places its stop at the entry chandelier level and does not ratchet, so exits the backtest books as CHANDELIER often become 14:05 signal exits instead. Observed so far: 3 of 10 CLOSE rows carry exit_reason=STP, which is too few to estimate from. The 30% used above is a mid-range assumption; if the true share is lower, 30 samples will take proportionally longer and the session count above is optimistic."
+    },
+    "max_mean_ticks_rationale": {
+      "modelled_cost_ticks_per_side": 2.0,
+      "annual_net_usd": 6794,
+      "cost_per_extra_tick_per_side_usd_per_year": 903,
+      "share_of_annual_net_per_extra_tick": 0.13,
+      "why_3_not_5": "The backtest's edge is computed assuming 2.0 ticks per side. Each additional tick costs about $903/year against $6,794 of annual net -- 13% of the modelled edge per tick. The old 5-tick ceiling therefore permitted execution costs consuming roughly 40% of that edge before the gate said anything. A 3-tick ceiling allows one tick of drift over the model, or 13%.",
+      "cost_cross_check": "$903/year derived two independent ways: directly as trades x 2 sides x tick value (~$7,633 over 8.53 years), and from the slippage stress test measured separately at -$7,756 per tick. They agree within 1.6%."
+    },
+    "report_confidence_interval": true,
+    "why_confidence_interval": "A min_n is a guess about a dispersion nobody measured. Publishing the 95% CI half-width beside each mean lets a sample be judged by the precision it actually delivered: at n=30 the half-width is about 0.36 x sd, so if sd is near 6 ticks the interval is +/-2.1 against a 3-tick limit and the sample is not yet decisive. When dispersion is larger than assumed the interval says so on its own, instead of a fixed count quietly certifying a mean that has not settled.",
+    "limits": "This gate measures execution drift against the modelled cost. It says nothing about whether the modelled cost was right in the first place, and nothing about slippage on signal/market closes, which carry no stop reference and are excluded by design.",
+    "use_absolute": true,
+    "why_absolute": "A mean is judged on its absolute size, so favourable slippage counts too. MES came in 4.00 ticks BETTER than its stop reference and that is still a 4-tick error in the expected fill price -- the model that sizes risk from that reference is wrong by the same amount whichever way the miss falls. It is not an economic loss and the dollar column shows the sign, but it is execution drift.",
     "close_scope": "stp_only",
-    "use_absolute": true
+    "why_close_scope": "Signal and market closes carry no stop reference, so there is no expected price to score them against. They are excluded here and reconciled in Paper P&L vs backtest instead; the count of excluded rows is published so the exclusion stays visible."
   },
   "fill_quality_spec": {
     "min_fills": 100,
@@ -23,6 +56,10 @@
     "require_ibkr_accept_log": true,
     "defer_rule": "swing/NKD broker STP is intentionally deferred until 14 hours after the next session boundary in that sleeve's own timezone; roska4_swing first eligible trading slot is 14:05 ET, global_nkd follows 14:00 JST, and roska4_stress is not deferred.",
     "backtest_divergence_note": "Validated backtest does not apply a protective stop to a new swing/NKD entry on the entry day. Immediate paper/live STP after OPEN is therefore a stricter, divergent live path."
+  },
+  "stp_verification_spec": {
+    "min_distinct_sessions": 10,
+    "evidence_note": "STP verification requires ten distinct reviewed session dates in stp_verification records; multiple rows on the same date count as one session."
   },
   "rejection_coverage_spec": {
     "required_records": 25,
@@ -75,6 +112,253 @@
       "actual_equity": 50228.75,
       "expected_equity": 49836.85,
       "evidence": "global_index/backtest_curve.json generated 2026-08-12 by python -m global_index.generate_replay_snapshots; paper actual from global_index/paper_history.json. Formula: expected = account + (bt[date] - bt[system_epoch]); bt[2026-08-12]=107949.61, bt_epoch=108112.76, account=50000.0"
+    }
+  ],
+  "ledger_adjustments": [
+    {
+      "id": "mnkd_routing_2026_08_14",
+      "date_recorded": "2026-08-14",
+      "instrument": "MNKD",
+      "cluster": "global_nkd",
+      "status": "recorded",
+      "kind": "contract_routing_defect",
+      "affected_fills": [
+        {
+          "trade_date": "2026-08-10",
+          "qty": 1,
+          "price": 66985.0,
+          "fifo_pnl_realized": -1150.0,
+          "commission": -3.01
+        },
+        {
+          "trade_date": "2026-08-10",
+          "qty": -1,
+          "price": 66765.0,
+          "fifo_pnl_realized": 50.0,
+          "commission": -3.01
+        },
+        {
+          "trade_date": "2026-08-11",
+          "qty": -1,
+          "price": 67030.0,
+          "fifo_pnl_realized": -350.0,
+          "commission": -3.01
+        },
+        {
+          "trade_date": "2026-08-11",
+          "qty": 1,
+          "price": 67090.0,
+          "fifo_pnl_realized": 50.0,
+          "commission": -3.01
+        }
+      ],
+      "broker_gross_realized": -1400.0,
+      "broker_commission": -12.04,
+      "broker_net_realized": -1412.04,
+      "sleeve_ledger_booked": -140.0,
+      "ledger_shortfall": -1260.0,
+      "ratio_broker_over_ledger": 10.0,
+      "root_cause": "ibkr_broker._RAITS_TO_IBKR routed MNKD orders to IBKR symbol 'NKD', the full-size Dollar-Denominated Nikkei 225 at multiplier 5 (conId 652545722). specs.py defines MNKD as the micro at point_value 0.50, and IBKR lists that contract as 'MNK' (conId 863279730, multiplier 0.5). Fills executed at 10x the intended size while _book_realised priced them with the micro's 0.50, so the sleeve ledger under-booked the loss by exactly 10x.",
+      "evidence": "IBKR reqContractDetails (read-only) for both symbols; IBKR Flex statement flex_20260813T103831Z_q1603041_ref6822861365.csv EXECUTION rows for NKDU6, whose FifoPnlRealized and Proceeds both imply multiplier 5; trade_log.jsonl MNKD CLOSE rows booking -140.00 at the same entry/exit prices.",
+      "fix": "_RAITS_TO_IBKR now maps MNKD->MNK and ROLL_SCHEDULE gained an MNK entry (2026-08-14). Forward fills execute at multiplier 0.5, which matches specs.py, so the ledger and the broker agree from that point without further adjustment.",
+      "scope_note": "Strategy evidence for this epoch stays usable: signal timing, direction, entry and exit prices all match the statement to the cent, and tick size is 5.0 on both contracts so slippage measured in ticks is comparable. What is NOT reusable is margin behaviour (real margin was ~$9,000 against the assumed $900) and fill quality, which was gathered on the more liquid full-size contract.",
+      "reconciliation_note": "The broker cash position is 1260.00 below what the sleeve ledger implies. This is the cost of the routing defect, not a strategy result, and it does not self-correct when routing is fixed. paper_pnl_compare currently rebuilds Flex P&L with local point_value instead of the statement's Proceeds/FifoPnlRealized, so paper-minus-Flex reads 0.00 and hides this. When that check is switched to statement money, the -1260.00 will appear and must resolve to this record rather than read as a new break."
+    }
+  ],
+  "pnl_threshold_spec": {
+    "approved_on": "2026-08-15",
+    "status": "APPROVED",
+    "summary": "Two gates, because there are two ways the epoch can fail. The edge gate asks whether the strategy is working and needs a sample before it can mean anything. The operational gate asks whether the books describe the account and needs no sample at all.",
+    "frame": {
+      "source": "global_index/backtest_curve.json",
+      "period": "2018-01-30..2026-08-12",
+      "sessions": 1749,
+      "account_base_usd": 50000.0,
+      "self_check": "equity[2024-12-31] == 98430.51",
+      "coverage_check": "All three clusters trade through the whole frame, including the 2025-2026 tail: over 2025-01-01..2026-08-12 roska4_swing moves +$5,112, global_nkd +$4,636 and roska4_stress -$109. Checked because a stale comment in generate_replay_snapshots.py:44-46 describes the tail as NKD-only -- that was true before its own fix switched REGIME_CSV to spy_daily_live.csv and the curve was regenerated on 2026-08-13.",
+      "correction_note": "The first calibration truncated at 2024-12-31 on the strength of that comment, which discarded 331 sessions of valid recent evidence and made every band tighter than the data supports: the 60-session floor read -$1,592 instead of -$2,927.",
+      "instrument_check": "The backtest sizes its Nikkei leg with SPECS['MNKD'] (point_value 0.50), the same contract live trades. Not full-size NKD."
+    },
+    "edge_gate": {
+      "applies_to": "paper_epoch_closed_realized (sleeve ledger, strategy result)",
+      "arm_after_sessions": 20,
+      "why_armed_late": "53% of healthy 5-session windows in this backtest are negative. Below 20 sessions a loss carries no information, so a threshold there would be a threshold on noise.",
+      "quantile": 0.01,
+      "why_p01": "The rule is evaluated every session, not once. Measured on this frame, p05 blocks 16.0% of known-good epochs and p01 blocks 3.6%. A gate that stops one in six healthy epochs gets overridden, and then ignored.",
+      "band_selection": "Use the floor of the largest anchor whose sessions <= the epoch's session count. Anchors step by 5; between them the rule holds the previous (looser) floor, which errs toward not blocking.",
+      "bands": [
+        {
+          "sessions": 20,
+          "floor_usd": -2073.05,
+          "windows": 1729
+        },
+        {
+          "sessions": 25,
+          "floor_usd": -2354.1,
+          "windows": 1724
+        },
+        {
+          "sessions": 30,
+          "floor_usd": -2628.95,
+          "windows": 1719
+        },
+        {
+          "sessions": 35,
+          "floor_usd": -2559.82,
+          "windows": 1714
+        },
+        {
+          "sessions": 40,
+          "floor_usd": -2603.62,
+          "windows": 1709
+        },
+        {
+          "sessions": 45,
+          "floor_usd": -2829.93,
+          "windows": 1704
+        },
+        {
+          "sessions": 50,
+          "floor_usd": -2969.03,
+          "windows": 1699
+        },
+        {
+          "sessions": 55,
+          "floor_usd": -2824.2,
+          "windows": 1694
+        },
+        {
+          "sessions": 60,
+          "floor_usd": -2927.1,
+          "windows": 1689
+        },
+        {
+          "sessions": 65,
+          "floor_usd": -3003.17,
+          "windows": 1684
+        },
+        {
+          "sessions": 70,
+          "floor_usd": -2709.81,
+          "windows": 1679
+        },
+        {
+          "sessions": 75,
+          "floor_usd": -2750.33,
+          "windows": 1674
+        },
+        {
+          "sessions": 80,
+          "floor_usd": -1751.13,
+          "windows": 1669
+        },
+        {
+          "sessions": 85,
+          "floor_usd": -1755.68,
+          "windows": 1664
+        },
+        {
+          "sessions": 90,
+          "floor_usd": -1626.34,
+          "windows": 1659
+        },
+        {
+          "sessions": 95,
+          "floor_usd": -1640.34,
+          "windows": 1654
+        },
+        {
+          "sessions": 100,
+          "floor_usd": -1470.92,
+          "windows": 1649
+        },
+        {
+          "sessions": 105,
+          "floor_usd": -1445.14,
+          "windows": 1644
+        },
+        {
+          "sessions": 110,
+          "floor_usd": -1357.45,
+          "windows": 1639
+        },
+        {
+          "sessions": 115,
+          "floor_usd": -1370.6,
+          "windows": 1634
+        },
+        {
+          "sessions": 120,
+          "floor_usd": -1293.94,
+          "windows": 1629
+        }
+      ],
+      "measured_false_block_rate": 0.0355,
+      "measured_false_block_note": "Every start date in the frame treated as a paper epoch that is known to have worked, rule evaluated daily from session 20 to 60. This is a calibration on the same distribution the bands come from, not an out-of-sample test: 4.2% is how often a good epoch is blocked, not a p-value.",
+      "measured_power": [
+        {
+          "drag_per_session_usd": 10,
+          "detected": 0.0539
+        },
+        {
+          "drag_per_session_usd": 25,
+          "detected": 0.1018
+        },
+        {
+          "drag_per_session_usd": 50,
+          "detected": 0.4008
+        },
+        {
+          "drag_per_session_usd": 100,
+          "detected": 0.8544
+        }
+      ],
+      "limitation": "This catches collapse, not slow decay. At $25/session of drag it fires 32% of the time. Detecting mild edge erosion needs a longer epoch or a different test; a P&L threshold cannot do it."
+    },
+    "operational_gate": {
+      "applies_to": "flex_epoch_rebased_realized minus paper_epoch_closed_realized",
+      "rule": "Any gap between broker-realised P&L and the sleeve ledger that is not covered by a recorded ledger adjustment blocks, regardless of size.",
+      "why_no_threshold": "This is not a statistical question. A $1 unexplained gap means the books do not describe the account. Size is irrelevant.",
+      "tolerance_usd": 0.01,
+      "worked_example": "The MNKD routing defect put broker P&L at the 0.07 percentile of 5-session windows on day one. The edge gate was correctly silent -- it was not armed, and the strategy result was unremarkable at the 48.8 percentile. The operational gate caught it immediately, with no sample and no threshold."
+    },
+    "coherence_check": {
+      "daily_circuit_breaker_usd": -2000.0,
+      "note": "The existing runtime circuit breaker halts at -4% of a $50,000 sleeve. The 20-session floor of -2,073.05 lands within $73 of one such trip. Two rules built independently arriving at the same size is a sign the size matches the risk appetite already wired into the system.",
+      "backtest_max_drawdown_usd": -4049.05,
+      "backtest_max_drawdown_pct": 8.1
+    },
+    "recalibrated_on": "2026-08-15"
+  },
+  "b3_classifications": [
+    {
+      "id": "b3_mnkd_routing_2026_08_10",
+      "status": "explained",
+      "date_recorded": "2026-08-15",
+      "episode": {
+        "path": "live_day_0810.log",
+        "line_from": 942,
+        "line_to": 10072,
+        "first_seen": "2026-08-10T06:05:22Z",
+        "last_seen": "2026-08-10T06:55:22Z",
+        "positions_affected": 2,
+        "raw_line_count": 11
+      },
+      "observed": [
+        "B3 MISMATCH: file has LONG MNKD x1 but IBKR shows x0",
+        "B3 ORPHAN: IBKR has LONG NKD x1 with no matching file entry"
+      ],
+      "finding": "Both lines describe one position seen under two names. The runner ordered MNKD and IBKR filled NKD, so the books held a contract the broker did not have and the broker held a contract the books did not name. B3 compared by instrument and counted it twice, which is why 1 position produced 2 mismatches.",
+      "root_cause": "C8: _RAITS_TO_IBKR mapped MNKD to the full-size NKD contract, so every live Nikkei order was routed to a $5/pt contract while the books priced a $0.50 one.",
+      "reconcile_verdict": "B3 was correct. Its input was wrong.",
+      "interim_action_that_hid_it": "Commit e7e38ae (2026-08-10 01:50) fixed a real and separate defect -- six call sites read contract.symbol without translating it -- by routing every read through _to_runner(), which then mapped NKD back to MNKD. That made the mismatch and the orphan resolve to the same name, cleared the halt, and left the wrong contract trading for four more days with a clean reconcile. Its own message said 'B3 working correctly on input that lied'; the input lied twice, and only the name was fixed.",
+      "fix": "2026-08-14: routing corrected to MNK (IBKR reqContractDetails: MNKU6, conId 863279730, multiplier 0.5). 2026-08-15: the map is derived from Contract.ibkr so it cannot drift from the spec, and the NKD->MNKD reverse mapping stays removed so a stray full-size position surfaces as an orphan instead of being quietly re-adopted.",
+      "money_impact_ref": "mnkd_routing_2026_08_14",
+      "recurrence_guard": [
+        "global_index/test_symbol_boundary.py::test_sb8_the_order_symbol_is_never_the_data_symbol",
+        "global_index/test_symbol_boundary.py::test_sb9_the_routing_map_is_derived_from_the_specs_not_a_second_copy",
+        "global_index/test_symbol_boundary.py::test_sb4_the_full_size_contract_is_not_adopted_as_ours"
+      ]
     }
   ]
 }

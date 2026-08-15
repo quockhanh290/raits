@@ -6,11 +6,6 @@
   let selectedPnlTab = 'overview';
   const pnlTabKeys = ['overview', 'trades', 'decision', 'timeline', 'audit'];
 
-  function setText(id, value) {
-    const el = $(id);
-    if (el) el.textContent = value;
-  }
-
   function showPaperTab(key) {
     const input = $(`paper-tab-${key}`);
     if (input) input.checked = true;
@@ -33,7 +28,7 @@
   }
 
   function statusClass(status) {
-    return String(status || 'unknown').toLowerCase().replace(/_/g, '-');
+    return String(status || 'unknown').toLowerCase().replace(/[\s_]+/g, '-');
   }
 
   function pct(value, target) {
@@ -43,13 +38,50 @@
     return Math.max(0, Math.min(100, Math.round((n / d) * 100)));
   }
 
+  function hasValue(value) {
+    return value !== null && value !== undefined && value !== '';
+  }
+
+  function metricValue(value, missing = 'missing') {
+    return hasValue(value) ? value : missing;
+  }
+
+  function evidenceStatus(item, label = 'evidence') {
+    const evidence = item && typeof item.evidence === 'string' ? item.evidence.trim() : '';
+    return evidence || `${label} missing`;
+  }
+
+  function specValue(value) {
+    return hasValue(value) ? value : 'spec missing';
+  }
+
   function sourceLine(gate) {
     const paths = (gate.sources || []).map(source => source.path).filter(Boolean);
     return paths.length ? `source: ${paths.join(' + ')}` : 'source: unavailable';
   }
 
   function metricLine(label, value) {
-    return `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`;
+    // Raw sums arrive as accumulated floats: slip_stats close_sum prints as
+    // -1560.2000000000062 and open_sum as 6.900000000000091. Those digits are float
+    // noise, not precision, and in an evidence panel they read as a measurement.
+    const n = typeof value === 'number' ? value : null;
+    const shown = n !== null && Number.isFinite(n) && !Number.isInteger(n)
+      ? Number(n.toFixed(4)).toString()
+      : value;
+    return `<div><dt>${esc(label)}</dt><dd>${esc(shown)}</dd></div>`;
+  }
+
+  function fmtDurationBetween(first, last) {
+    if (!first || !last) return '--';
+    const start = Date.parse(first);
+    const end = Date.parse(last);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return '--';
+    const minutes = Math.round((end - start) / 60000);
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours && mins) return `${hours}h ${mins}m`;
+    if (hours) return `${hours}h`;
+    return `${mins}m`;
   }
 
   function sourceDetail(sources) {
@@ -133,8 +165,17 @@
     return verdict && typeof verdict === 'object' ? verdict : null;
   }
 
-  function renderVerdict(verdict, fallbackStatus, fallbackTitle, fallbackSummary, fallbackFacts = []) {
-    if (verdict) return tableVerdict(verdict.status, verdict.title, verdict.summary, verdict.facts || fallbackFacts);
+  function renderVerdict(verdict, fallbackStatus, fallbackTitle, fallbackSummary, fallbackFacts = [],
+                         { keepSectionTitle = false } = {}) {
+    // The backend verdict carries its own title, which is right when one verdict backs
+    // one section. 'daily' does not: it titles itself "Daily divergence" and is rendered
+    // under "Timeline Data Rows", so the card announced a section the reader is not
+    // looking at. keepSectionTitle takes the backend status and reasoning but keeps the
+    // heading the reader actually clicked on.
+    if (verdict) {
+      const title = keepSectionTitle ? fallbackTitle : verdict.title;
+      return tableVerdict(verdict.status, title, verdict.summary, verdict.facts || fallbackFacts);
+    }
     return tableVerdict(fallbackStatus, fallbackTitle, fallbackSummary, fallbackFacts);
   }
 
@@ -167,13 +208,20 @@
     return Math.abs(Number(mean)) <= Number(maxMean) ? `${label} within limit now` : `${label} over limit now`;
   }
 
-  function c1ReasonChip(text) {
-    let cls = 'neutral';
-    const value = String(text || '').toLowerCase();
-    if (/within limit|scope|accepted|verified|no false|no double|match|persist|proven|complete|pass|observed/.test(value)) cls = 'ok';
-    if (/no samples|incomplete|missing|not structured|unverified|pending|required unset|stress missing|normal missing|needs/.test(value)) cls = 'watch';
-    if (/over limit|failed|halt|breach|mismatch/.test(value)) cls = 'bad';
-    return `<span class="${cls}">${esc(text)}</span>`;
+  // Tone travels with the reason instead of being guessed from its wording. The old
+  // classifier ran three regexes over the display text, last match winning, so
+  // "no false halt evidence" hit /halt/ after /no false/ and rendered red — a chip
+  // saying nothing is wrong, coloured as though something is. Colour is a property of
+  // the data, not of the sentence chosen to describe it.
+  function reason(text, tone = 'neutral') {
+    return { text, tone };
+  }
+
+  function c1ReasonChip(item) {
+    if (item && typeof item === 'object' && item.text !== undefined) {
+      return `<span class="${esc(item.tone || 'neutral')}">${esc(item.text)}</span>`;
+    }
+    return `<span class="neutral">${esc(item)}</span>`;
   }
 
   function c1Metric(label, value, description, cls = '') {
@@ -186,10 +234,16 @@
   }
 
   function c1SpecPills(spec, target, maxMean) {
+    // Every pill reads from the spec. A hardcoded threshold here would let paper_inputs
+    // change the rule while the rail kept advertising the old one.
+    const open = spec.open || {};
+    const stp = spec.stp_close || {};
     const parts = [
-      ['Minimum N', target || '--'],
+      ['OPEN scope', open.scope || spec.scope || '--'],
+      ['OPEN min N / instrument', open.min_n_per_inst ?? target ?? '--'],
+      ['STP scope', stp.scope || '--'],
+      ['STP min N', stp.min_n ?? '--'],
       ['Mean limit', maxMean != null ? `${maxMean} ticks` : '--'],
-      ['Scope', spec.scope || '--'],
       ['Close scope', spec.close_scope || '--'],
       ['Absolute', spec.use_absolute === false ? 'false' : 'true'],
     ];
@@ -240,76 +294,169 @@
     return statuses.some(value => value === 'PASS') ? 'PASS' : (primary || 'UNKNOWN');
   }
 
+  // Worst first. The array below is written in a fixed order that happens to put the
+  // breaches on top today; the moment one clears, a reader scanning from the top would
+  // start on something that is not blocking. Rank drives the order instead.
+  const BLOCKER_RANK = {
+    BREACH: 0, FAIL: 0,
+    QUALITY_BREACH: 1,
+    STRUCTURAL_GAP: 2, SPEC_GAP: 2, NEEDS_DECISION: 2, NEEDS_DATA: 2, NEEDS_CLASSIFICATION: 2,
+    PENDING: 3, WATCH: 3,
+    MISSING: 4, UNKNOWN: 4, CHECK: 4,
+    OBSERVED: 5, PASS: 6,
+  };
+
+  function blockerRank(status) {
+    const key = String(status || 'UNKNOWN').toUpperCase().replace(/\s+/g, '_');
+    return BLOCKER_RANK[key] ?? 4;
+  }
+
   function blockerCard(status, label, value, detail, refKey = '', purpose = '', why = '', unlock = '') {
     const button = refKey ? `<button type="button" data-coverage-ref="${esc(refKey)}">Open detail</button>` : '';
-    return `<article class="blocker-card ${statusClass(status)}"><div class="blocker-card-head"><span>${esc(status || 'CHECK')}</span><b>${esc(label)}</b></div><strong>${esc(value)}</strong><dl><div><dt>purpose</dt><dd>${esc(purpose || '--')}</dd></div><div><dt>why needed</dt><dd>${esc(why || '--')}</dd></div><div><dt>current status</dt><dd>${esc(detail || '--')}</dd></div><div><dt>to pass / unlock</dt><dd>${esc(unlock || '--')}</dd></div></dl>${button}</article>`;
+    return {
+      status,
+      rank: blockerRank(status),
+      html: `<article class="blocker-card ${statusClass(status)}"><div class="blocker-card-head"><span>${esc(status || 'CHECK')}</span><b>${esc(label)}</b></div><strong>${esc(value)}</strong><dl><div><dt>purpose</dt><dd>${esc(purpose || '--')}</dd></div><div><dt>why needed</dt><dd>${esc(why || '--')}</dd></div><div><dt>current status</dt><dd>${esc(detail || '--')}</dd></div><div><dt>to pass / unlock</dt><dd>${esc(unlock || '--')}</dd></div></dl>${button}</article>`,
+    };
   }
 
   function renderReadinessBlockers(gates, coverage, summary) {
     const gateByKey = key => (gates || []).find(item => item.key === key) || {};
     const coverageBy = key => coverageByKey(coverage, key) || {};
+    const durationGate = gateByKey('paper_duration');
+    const regimeGate = gateByKey('regime_coverage');
+    const exitGate = gateByKey('exit_path_coverage');
+    const b3Gate = gateByKey('b3_reconcile');
+    const c1Gate = gateByKey('c1_slippage');
+    const twsGate = gateByKey('tws_restart_nights');
     const duration = gateByKey('paper_duration').metrics || {};
-    const exits = (gateByKey('exit_path_coverage').metrics || {}).exits || {};
-    const c1 = gateByKey('c1_slippage').metrics || {};
+    const exits = (exitGate.metrics || {}).exits || {};
+    const c1 = c1Gate.metrics || {};
     const c1Spec = c1.spec || {};
-    const b3 = gateByKey('b3_reconcile').metrics || {};
-    const tws = gateByKey('tws_restart_nights').metrics || {};
+    const b3 = b3Gate.metrics || {};
+    const tws = twsGate.metrics || {};
     const stpPlacement = coverageBy('stp_placement').metrics || {};
     const dataFreshness = coverageBy('data_freshness');
     const openIssues = coverageBy('open_incidents');
-    const targetEach = (gateByKey('exit_path_coverage').metrics || {}).target_each ?? 3;
-    const completePaths = ['CHANDELIER', 'MAX_HOLD', 'STP'].filter(key => (exits[key] ?? 0) >= targetEach).length;
-    const openN = c1.open_n ?? summary.c1_open_n ?? 0;
-    const stpN = c1.stp_close_n ?? c1.close_n ?? summary.c1_close_n ?? 0;
-    const minN = c1Spec.min_n ?? 100;
-    const maxMean = c1Spec.max_mean_ticks ?? 5;
-    const c1Quality = openN && Math.abs(Number(c1.open_mean)) > Number(maxMean) ? 'BREACH NOW' : 'PENDING';
+    const targetEach = exitGate.metrics?.target_each;
+    const hasExitTarget = Number.isFinite(Number(targetEach)) && Number(targetEach) > 0;
+    const completePaths = hasExitTarget ? ['CHANDELIER', 'MAX_HOLD', 'STP'].filter(key => Number(exits[key]) >= Number(targetEach)).length : null;
+    const coverageStatuses = [durationGate.status, regimeGate.status, exitGate.status].map(status => status || 'MISSING');
+    const coverageStatus = coverageStatuses.every(status => status === 'PASS') ? 'PASS' : compositeStatus(coverageStatuses[0], coverageStatuses.slice(1));
+    const coverageEvidence = [
+      `duration: ${evidenceStatus(durationGate, 'paper_duration evidence')}`,
+      `regime: ${evidenceStatus(regimeGate, 'regime_coverage evidence')}`,
+      `exits: ${evidenceStatus(exitGate, 'exit_path_coverage evidence')}`,
+    ].join(' | ');
+    const openN = c1.open_n ?? summary.c1_open_n;
+    const stpN = c1.stp_close_n ?? c1.close_n ?? summary.c1_close_n;
+    const minN = c1Spec.min_n;
+    const maxMean = c1Spec.max_mean_ticks;
+    const c1Quality = openN && Math.abs(Number(c1.open_mean)) > Number(maxMean) ? 'QUALITY_BREACH' : 'PENDING';
+    // The epoch has two P&L truths and they answer different questions: the sleeve ledger
+    // says what the strategy would have booked, the Flex statement says what the account
+    // actually did. Publishing either alone misreads the epoch in opposite directions --
+    // ledger-only hides that real money went further down, broker-only makes the strategy
+    // look catastrophic when the loss came from a routing defect, not from signal quality.
+    // So both, labelled by what they answer. Deliberately OBSERVED and not a blocker: with
+    // this few closed trades any P&L threshold would be a threshold on noise, and the
+    // sample gates already block on exactly that insufficiency.
+    const pnlMetrics = coverageBy('paper_vs_backtest').metrics || {};
+    const pnlCompare = (pnlMetrics.trade_compare || {}).statement_pnl_compare || {};
+    const strategyPnl = pnlCompare.paper_epoch_closed_realized;
+    const brokerPnl = pnlCompare.flex_epoch_rebased_realized;
+    const pnlGap = pnlCompare.paper_minus_flex_epoch_rebased_realized;
+    const pnlAdjustment = pnlMetrics.ledger_adjustment_total;
+    const closedLots = (pnlCompare.flex_epoch_rebased_closed || []).length;
+    const hasPnl = strategyPnl != null || brokerPnl != null;
+    // A gap the recorded adjustments already account for is explained; anything left over
+    // is not, and the reviewer needs to see which of the two they are looking at.
+    const gapExplained = pnlGap != null && pnlAdjustment != null
+      && Math.abs(Number(pnlGap) + Number(pnlAdjustment)) < 0.01;
+    // The card reads the same verdict the thresholds panel publishes rather than deriving
+    // its own. Two places computing "is this a blocker" is two chances to disagree about
+    // whether the system may go live.
+    const thresholds = coverageBy('pnl_thresholds').metrics || {};
+    const edgeGate = thresholds.edge || {};
+    const opsGate = thresholds.operational || {};
+    const armNote = edgeGate.status === 'NOT_ARMED'
+      ? `Edge gate not armed: ${metricValue(edgeGate.sessions)}/${specValue(edgeGate.arm_after_sessions)} sessions, ${metricValue(edgeGate.sessions_to_arm)} to go.`
+      : edgeGate.status === 'BREACH'
+        ? `Edge gate BREACH: below the ${metricValue(edgeGate.active_band?.sessions)}-session floor of ${fmtMoney(edgeGate.floor_usd)}.`
+        : edgeGate.status === 'PASS'
+          ? `Edge gate PASS: ${fmtMoney(edgeGate.headroom_usd)} above the ${metricValue(edgeGate.active_band?.sessions)}-session floor.`
+          : '';
+    const pnlDetail = !hasPnl
+      ? 'No closed-trade P&L for the epoch yet.'
+      : `Gap ${fmtMoney(pnlGap)} between the two${gapExplained
+          ? ` is fully accounted for by recorded ledger adjustment(s) totalling ${fmtMoney(pnlAdjustment)}`
+          : `; recorded ledger adjustment(s) total ${fmtMoney(pnlAdjustment)}, so part of the gap is unexplained`}. ${armNote}`;
     const cards = [
       blockerCard(
-        gateByKey('b3_reconcile').status || 'UNKNOWN',
+        // BREACH the moment either approved gate breaches; otherwise OBSERVED, because a
+        // gate that is not armed yet is not a pass.
+        !hasPnl ? 'MISSING'
+          : (edgeGate.status === 'BREACH' || opsGate.status === 'BREACH') ? 'BREACH'
+          : (edgeGate.status === 'PASS' && opsGate.status === 'PASS') ? 'PASS'
+          : 'OBSERVED',
+        'Epoch P&L',
+        `strategy ${fmtMoney(strategyPnl)} / broker ${fmtMoney(brokerPnl)}`,
+        pnlDetail,
+        'pnl_thresholds',
+        'Show both money views of the epoch and hold each against its approved gate: what the strategy booked in the sleeve ledger, and what the account actually realised at the broker.',
+        'These two answer different questions; reporting one number as "the result" would either hide real losses or blame the strategy for an operational defect. The edge gate needs a sample before a loss means anything; the operational gate needs none.',
+        `Edge gate: from ${specValue(edgeGate.arm_after_sessions)} sessions, cumulative strategy P&L must stay above the p01 floor for the epoch length. Operational gate: any broker-vs-ledger gap not covered by a recorded adjustment blocks regardless of size. Open detail for the band table, the measured ${((thresholds.spec?.edge_gate?.measured_false_block_rate ?? 0) * 100).toFixed(1)}% false-block rate, and what the rule cannot catch.`
+      ),
+      blockerCard(
+        b3Gate.status || 'UNKNOWN',
         'B3 reconcile',
-        `mismatch ${b3.mismatches ?? 0}`,
-        'Historical broker/file mismatch lines remain unclassified.',
+        `mismatch ${metricValue(b3.episodes ?? b3.mismatches)}`,
+        evidenceStatus(b3Gate, 'b3_reconcile evidence'),
         '',
         'Prove runner cold-start state matches broker/file state before decisions resume.',
-        'A bad cold-start reconcile can leave the system trading from stale or wrong position state.',
+        'A bad cold-start reconcile can leave the system trading from stale or wrong position state; historical mismatch evidence must be classified when present.',
         'Group B3 logs into reviewed cold-start sessions and classify/clear every mismatch, or fix the underlying mismatch source.'
       ),
       blockerCard(
         dataFreshness.status || 'UNKNOWN',
         'Data freshness',
-        dataFreshness.evidence || '--',
-        'Model/data freshness is currently blocking readiness.',
+        evidenceStatus(dataFreshness, 'data_freshness evidence'),
+        evidenceStatus(dataFreshness, 'data_freshness evidence'),
         'data_freshness',
         'Confirm regime/model/refreeze inputs are fresh enough for the paper/live decision path.',
-        'Live readiness cannot depend on stale model artifacts or an urgent refresh condition.',
+        'Live readiness cannot depend on stale model artifacts or an urgent refresh condition; freshness evidence decides the card status.',
         'Clear model=URGENT/freshness breaches and keep the freshness checks green through the active paper epoch.'
       ),
       blockerCard(
         openIssues.status || 'UNKNOWN',
         'Open issues',
-        openIssues.evidence || '--',
-        'Unresolved operational blockers are still present.',
+        evidenceStatus(openIssues, 'open_incidents evidence'),
+        evidenceStatus(openIssues, 'open_incidents evidence'),
         'open_incidents',
         'Surface unresolved monitor issues that should stop promotion even if trade gates look healthy.',
-        'Known unresolved incidents are direct operational risk and must not be hidden behind aggregate pass rates.',
+        'Known unresolved incidents are direct operational risk and must not be hidden behind aggregate pass rates; issue evidence decides the card status.',
         'Resolve or explicitly classify each open issue and ensure unexplained reconcile items emit here.'
       ),
       blockerCard(
-        'PENDING',
+        coverageStatus,
         'Coverage sample',
-        `${duration.observed ?? 0}/${duration.target ?? 60} days, exits ${completePaths}/3`,
-        'Sample coverage is pending, not an operational failure.',
+        `${metricValue(duration.observed)}/${specValue(duration.target)} days, exits ${metricValue(completePaths)}/3`,
+        coverageEvidence,
         '',
         'Measure whether the paper epoch has enough days, regimes, and exit-path examples to trust conclusions.',
-        'A small or one-regime sample can miss live-path failures that only appear in stress or less common exits.',
-        'Reach the active duration target, observe Normal + Stress, and collect at least three samples per exit path.'
+        'A small or one-regime sample can miss live-path failures that only appear in stress or less common exits; sample coverage is not an operational failure by itself.',
+        // An unlabelled exit is not a missing sample. Telling the reviewer to "collect
+        // three more" when the runner never records exit_reason sends them to wait for
+        // a number that cannot arrive, so the unlock text has to change with the cause.
+        exitGate.metrics?.instrumentation_gap
+          ? `Reach the active duration target and observe Normal + Stress. Exit paths are blocked separately: ${metricValue(exitGate.metrics?.unlabelled_exits)} CLOSE fill(s) carry no exit_reason, so waiting longer cannot complete them — the runner must record exit_reason on every CLOSE.`
+          : 'Reach the active duration target, observe Normal + Stress, and collect at least three samples per exit path.'
       ),
       blockerCard(
         c1Quality,
         'C1 execution',
-        `OPEN ${openN}/${minN}, STP ${stpN}/${minN}`,
-        `Current OPEN mean ${fmtTicks(c1.open_mean)} vs ${maxMean} tick limit; STP close N=${stpN}.`,
+        `OPEN ${metricValue(openN)}/${specValue(minN)}, STP ${metricValue(stpN)}/${specValue(minN)}`,
+        `Current OPEN mean ${fmtTicks(c1.open_mean)} vs ${specValue(maxMean)} tick limit; STP close N=${metricValue(stpN)}.`,
         'fill_quality',
         'Validate paper fill quality from retained trade history before using paper results as live evidence.',
         'Execution drift can make paper P&L and risk look better or worse than the strategy logic actually produces.',
@@ -318,35 +465,41 @@
       blockerCard(
         coverageBy('stp_placement').status || 'UNKNOWN',
         'Stop placement',
-        `${stpPlacement.continuous_session_streak ?? '--'}/${stpPlacement.required_continuous_sessions ?? '--'} clean sessions`,
-        'Deferred stop placement route is still pending clean-session proof.',
+        `${metricValue(stpPlacement.continuous_session_streak)}/${specValue(stpPlacement.required_continuous_sessions)} clean sessions`,
+        evidenceStatus(coverageBy('stp_placement'), 'stp_placement evidence'),
         'stp_placement',
         'Prove every still-open deferred trade receives a system and IBKR accepted stop after the arm period.',
-        'The paper/live path intentionally defers stops after the 14h/EOD rule, so placement must be reconciled separately from backtest semantics.',
+        'The paper/live path intentionally defers stops after the 14h/EOD rule, so placement must be reconciled separately from backtest semantics; placement evidence decides the card status.',
         'Run 10 continuous clean sessions; any failed session resets the streak, while close-before-arm trades must explain close time/reason.'
       ),
       blockerCard(
-        gateByKey('tws_restart_nights').status || 'UNKNOWN',
+        twsGate.status || 'UNKNOWN',
         'TWS restart',
-        `${tws.restart_nights ?? 0}/${tws.required_nights ?? '--'} proven nights`,
-        'Candidate logs do not count as proven restart recovery.',
-        'runner_freshness',
+        `${metricValue(tws.restart_nights)}/${specValue(tws.required_nights)} proven nights`,
+        evidenceStatus(twsGate, 'tws_restart_nights evidence'),
+        'tws_restart',
         'Prove unattended recovery across TWS/IBKR restart windows with runner resume and broker verification.',
-        'Connectivity candidates only show events happened; they do not prove the system recovered safely afterward.',
+        'Connectivity candidates only show events happened; they do not prove the system recovered safely afterward; structured restart evidence decides the card status.',
         'Add structured restart-night records with restart_proven, runner_resumed, and broker_verified all true until the required count is met.'
       ),
     ];
     const root = $('readinessBlockers');
-    if (root) root.innerHTML = cards.join('');
+    // Stable within a rank: equal-severity cards keep the order they are written in, so
+    // the layout only moves when a status actually changes.
+    if (root) root.innerHTML = cards.map((card, i) => ({ card, i }))
+      .sort((a, b) => a.card.rank - b.card.rank || a.i - b.i)
+      .map(({ card }) => card.html).join('');
   }
 
-  function coverageRuleRail() {
+  function coverageRuleRail(durationMetrics = {}, exitMetrics = {}) {
+    const targetDays = specValue(durationMetrics.target);
+    const targetEach = specValue(exitMetrics.target_each);
     const parts = [
-      ['Duration', '60 days'],
+      ['Duration', hasValue(durationMetrics.target) ? `${targetDays} days` : targetDays],
       ['Regime', 'Normal + Stress'],
-      ['Chandelier', '>= 3'],
-      ['MAX_HOLD', '>= 3'],
-      ['STP', '>= 3'],
+      ['Chandelier', hasValue(exitMetrics.target_each) ? `>= ${targetEach}` : targetEach],
+      ['MAX_HOLD', hasValue(exitMetrics.target_each) ? `>= ${targetEach}` : targetEach],
+      ['STP', hasValue(exitMetrics.target_each) ? `>= ${targetEach}` : targetEach],
     ];
     return `<span class="c1-spec-label">Active rule</span>${parts.map(([label, value]) => `<span><b>${esc(label)}</b>${esc(value)}</span>`).join('')}`;
   }
@@ -357,7 +510,7 @@
     const regimes = (regimeGate.metrics && regimeGate.metrics.regimes) || [];
     const days = duration.days || [];
     const sources = [...(durationGate.sources || []), ...(regimeGate.sources || []), ...(exitGate.sources || [])];
-    return `<details class="c1-more-info coverage-more-info"><summary><span>More info</span><small>days, exits, sources</small></summary><div class="c1-more-grid"><section class="more-section"><h3>Observed days</h3><p class="detail-copy">Paper duration is counted from durable paper_history.json days in the active paper epoch. Same-day overwrites count once per date.</p><dl class="metric-list">${metricLine('observed', duration.observed ?? 0)}${metricLine('target', duration.target ?? 60)}${metricLine('days', days.length ? days.join(', ') : '--')}</dl></section><section class="more-section"><h3>Regime and exits</h3><p class="detail-copy">Regime coverage comes from trade_log rows. Exit path coverage counts normalized CLOSE exit reasons; monitor interprets the documented word "several" as three samples per path.</p><dl class="metric-list">${metricLine('regimes', regimes.length ? regimes.join(' + ') : '--')}${metricLine('CHANDELIER', exits.CHANDELIER ?? 0)}${metricLine('MAX_HOLD', exits.MAX_HOLD ?? 0)}${metricLine('STP', exits.STP ?? 0)}${metricLine('target each', exitGate.metrics?.target_each ?? 3)}</dl></section><section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(sources)}</ul></section><p class="detail-note">Coverage progress can remain pending even when the system is healthy. It is sample coverage, not an operational failure by itself.</p></div></details>`;
+    return `<details class="c1-more-info coverage-more-info"><summary><span>More info</span><small>days, exits, sources</small></summary><div class="c1-more-grid"><section class="more-section"><h3>Observed days</h3><p class="detail-copy">Paper duration is counted from durable paper_history.json days in the active paper epoch. Same-day overwrites count once per date.</p><dl class="metric-list">${metricLine('observed', metricValue(duration.observed))}${metricLine('target', specValue(duration.target))}${metricLine('days', days.length ? days.join(', ') : '--')}</dl></section><section class="more-section"><h3>Regime and exits</h3><p class="detail-copy">Regime coverage comes from trade_log rows. Exit path coverage counts normalized CLOSE exit reasons; monitor interprets the documented word "several" as the target_each value emitted by the payload.</p><dl class="metric-list">${metricLine('regimes', regimes.length ? regimes.join(' + ') : '--')}${metricLine('CHANDELIER', metricValue(exits.CHANDELIER))}${metricLine('MAX_HOLD', metricValue(exits.MAX_HOLD))}${metricLine('STP', metricValue(exits.STP))}${metricLine('target each', specValue(exitGate.metrics?.target_each))}</dl></section><section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(sources)}</ul></section><p class="detail-note">Coverage progress can remain pending even when the system is healthy. It is sample coverage, not an operational failure by itself.</p></div></details>`;
   }
 
   function updateCoveragePanel(gates, coverage) {
@@ -370,36 +523,53 @@
     const duration = durationGate.metrics || {};
     const regimes = (regimeGate.metrics && regimeGate.metrics.regimes) || [];
     const exits = (exitGate.metrics && exitGate.metrics.exits) || {};
-    const days = duration.observed ?? 0;
-    const targetDays = duration.target ?? 60;
-    const targetEach = exitGate.metrics?.target_each ?? 3;
-    const completePaths = ['CHANDELIER', 'MAX_HOLD', 'STP'].filter(key => (exits[key] ?? 0) >= targetEach).length;
+    const days = duration.observed;
+    const targetDays = duration.target;
+    const targetEach = exitGate.metrics?.target_each;
+    const hasDayTarget = Number.isFinite(Number(targetDays)) && Number(targetDays) > 0;
+    const hasExitTarget = Number.isFinite(Number(targetEach)) && Number(targetEach) > 0;
+    const completePaths = hasExitTarget ? ['CHANDELIER', 'MAX_HOLD', 'STP'].filter(key => Number(exits[key]) >= Number(targetEach)).length : null;
     const statuses = [durationGate.status, regimeGate.status, exitGate.status];
-    const status = statuses.every(item => item === 'PASS') ? 'PASS' : 'PENDING';
+    const status = statuses.every(item => item === 'PASS') ? 'PASS' : compositeStatus(statuses[0] || 'MISSING', statuses.slice(1));
     const missingRegimes = ['Normal', 'Stress'].filter(item => !regimes.includes(item));
     const reasons = [
-      days >= targetDays ? `days complete ${days}/${targetDays}` : `days pending ${days}/${targetDays}`,
-      missingRegimes.length ? `${missingRegimes.join(' + ')} missing`.toLowerCase() : 'regimes complete',
-      completePaths >= 3 ? 'exit paths complete' : `exit paths pending ${completePaths}/3`,
+      hasDayTarget
+        ? (Number(days) >= Number(targetDays)
+            ? reason(`days complete ${days}/${targetDays}`, 'ok')
+            : reason(`days pending ${metricValue(days)}/${targetDays}`, 'watch'))
+        : reason('duration spec missing', 'watch'),
+      missingRegimes.length
+        ? reason(`${missingRegimes.join(' + ')} missing`.toLowerCase(), 'watch')
+        : reason('regimes complete', 'ok'),
+      // "pending" implies waiting closes the gap. When no CLOSE carries a reason it
+      // never does, so the chip has to name the instrumentation gap instead — and it
+      // is a gap, not a sample in progress, so it does not wear the amber of waiting.
+      exitGate.metrics?.instrumentation_gap
+        ? reason(`exit paths not measurable: ${metricValue(exitGate.metrics?.unlabelled_exits)} close(s) missing exit_reason`, 'bad')
+        : hasExitTarget
+          ? (completePaths >= 3
+              ? reason('exit paths complete', 'ok')
+              : reason(`exit paths pending ${metricValue(completePaths)}/3`, 'watch'))
+          : reason('exit target spec missing', 'watch'),
     ];
 
-    $('coverageProgressTitle').textContent = `days ${days}/${targetDays} | exits ${completePaths}/3`;
+    $('coverageProgressTitle').textContent = `days ${metricValue(days)}/${specValue(targetDays)} | exits ${metricValue(completePaths)}/3`;
     $('coverageProgressReason').innerHTML = reasons.map(c1ReasonChip).join('');
     $('coverageProgressStatus').textContent = status;
     $('coverageProgressStatus').className = `gate-state ${statusClass(status)}`;
     $('coverageStatusEyebrow').className = `eyebrow c1-eyebrow ${statusClass(status)}`;
-    $('coverageActiveSpec').innerHTML = coverageRuleRail();
+    $('coverageActiveSpec').innerHTML = coverageRuleRail(duration, exitGate.metrics || {});
     $('coverageMetricGroups').innerHTML = [
       c1MetricGroup('Verdict', [
-        panelVerdictMetric(status, 'Sample coverage is pending; this is not an operational breach.', `Days ${days}/${targetDays}, exit paths ${completePaths}/3.`, status === 'PASS' ? 'ok' : 'watch'),
+        panelVerdictMetric(status, status === 'PASS' ? 'Sample coverage gates are complete.' : 'Sample coverage is not complete; this is not an operational breach.', `Days ${metricValue(days)}/${specValue(targetDays)}, exit paths ${metricValue(completePaths)}/3.`, status === 'PASS' ? 'ok' : 'watch'),
       ]),
       c1MetricGroup('Observed data', [
-        c1SampleMetric('Days', days, targetDays, 'Durable paper days in current epoch.', days >= targetDays ? 'ok' : 'watch'),
+        hasDayTarget ? c1SampleMetric('Days', days, targetDays, 'Durable paper days in current epoch.', Number(days) >= Number(targetDays) ? 'ok' : 'watch') : c1Metric('Days', metricValue(days), 'Durable paper days in current epoch; target spec missing.', 'watch'),
         c1Metric('Regimes', regimes.length ? regimes.join(' + ') : '--', 'Need both Normal and Stress.', missingRegimes.length ? 'watch' : 'ok'),
-        c1SampleMetric('Chandelier', exits.CHANDELIER ?? 0, targetEach, 'Chandelier exit samples.', (exits.CHANDELIER ?? 0) >= targetEach ? 'ok' : 'watch'),
-        c1SampleMetric('MAX_HOLD', exits.MAX_HOLD ?? 0, targetEach, 'MAX_HOLD exit samples.', (exits.MAX_HOLD ?? 0) >= targetEach ? 'ok' : 'watch'),
-        c1SampleMetric('STP', exits.STP ?? 0, targetEach, 'Stop exit samples.', (exits.STP ?? 0) >= targetEach ? 'ok' : 'watch'),
-        c1Metric('Complete paths', `${completePaths}/3`, 'Exit paths meeting sample target.', completePaths >= 3 ? 'ok' : 'watch'),
+        hasExitTarget ? c1SampleMetric('Chandelier', exits.CHANDELIER, targetEach, 'Chandelier exit samples.', Number(exits.CHANDELIER) >= Number(targetEach) ? 'ok' : 'watch') : c1Metric('Chandelier', metricValue(exits.CHANDELIER), 'Chandelier exit samples; target spec missing.', 'watch'),
+        hasExitTarget ? c1SampleMetric('MAX_HOLD', exits.MAX_HOLD, targetEach, 'MAX_HOLD exit samples.', Number(exits.MAX_HOLD) >= Number(targetEach) ? 'ok' : 'watch') : c1Metric('MAX_HOLD', metricValue(exits.MAX_HOLD), 'MAX_HOLD exit samples; target spec missing.', 'watch'),
+        hasExitTarget ? c1SampleMetric('STP', exits.STP, targetEach, 'Stop exit samples.', Number(exits.STP) >= Number(targetEach) ? 'ok' : 'watch') : c1Metric('STP', metricValue(exits.STP), 'Stop exit samples; target spec missing.', 'watch'),
+        c1Metric('Complete paths', `${metricValue(completePaths)}/3`, 'Exit paths meeting sample target.', completePaths >= 3 ? 'ok' : 'watch'),
       ]),
       coverageRefGroup([
         coverageRefMetric('Fill quality', fillQuality, 'Checks retained trade history rows behind the sample counts.'),
@@ -417,13 +587,19 @@
     return `<details class="c1-more-info"><summary><span>More info</span><small>raw stats, trades, definition, sources</small></summary><div class="c1-more-grid"><section class="more-section"><h3>Raw cumulative stats</h3><p class="detail-copy">Purpose: audit the dashboard math. Raw slip_stats is cumulative provenance and may include broader close types; Presented OPEN/STP is the scoped C1 number recomputed from paper-epoch trade_log rows after point-to-tick conversion.</p><dl class="metric-list">${metricLine('Raw OPEN N', stats.open_n ?? '--')}${metricLine('Raw OPEN sum', stats.open_sum ?? '--')}${metricLine('Raw CLOSE N', stats.close_n ?? '--')}${metricLine('Raw CLOSE sum', stats.close_sum ?? '--')}${metricLine('Presented OPEN', `${openN} rows -> ${fmtTicks(openMean)}`)}${metricLine('Presented STP', `${stpN} rows -> ${fmtTicks(stpMean)}`)}</dl></section>${c1Definition()}<section class="more-section trade-detail"><h3>Trade details (${esc(samples.shown ?? 0)} / ${esc(samples.total ?? 0)})</h3>${tradeRows(samples)}</section><section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(gate.sources)}</ul></section><p class="detail-note">Signal/market CLOSE rows are excluded from C1 because the runner does not persist a clean expected close reference. They are covered by Paper P&amp;L vs backtest instead.</p></div></details>`;
   }
 
-  function stpRuleRail() {
+  function stpRuleRail(metrics = {}, placementMetrics = {}) {
+    const requiredSessions = Number(metrics.required_sessions);
+    const verifyRule = Number.isFinite(requiredSessions) && requiredSessions > 0 ? `${requiredSessions} distinct sessions` : 'spec missing';
+    const placementSpec = placementMetrics.spec || metrics.placement_spec || metrics.stp_placement_spec || {};
+    const maxMatchedFailed = placementSpec.max_trade_matched_failed ?? placementMetrics.max_trade_matched_failed ?? placementMetrics.max_failed ?? metrics.max_trade_matched_failed ?? metrics.max_failed;
+    const placementRule = hasValue(maxMatchedFailed) ? `trade-matched failed <= ${maxMatchedFailed}` : 'spec missing';
+    const verificationSpec = metrics.spec || {};
     const parts = [
-      ['Placement', 'accepted > 0, failed = 0'],
-      ['Verify', 'structured checks required'],
-      ['False halt', '0'],
-      ['Double STP', '0'],
-      ['Unverified', '0'],
+      ['Placement', placementRule],
+      ['Verify', verifyRule],
+      ['False halt', hasValue(verificationSpec.max_false_halts) ? verificationSpec.max_false_halts : 'spec missing'],
+      ['Double STP', hasValue(verificationSpec.max_double_stp) ? verificationSpec.max_double_stp : 'spec missing'],
+      ['Unverified', hasValue(verificationSpec.max_unverified) ? verificationSpec.max_unverified : 'spec missing'],
     ];
     return `<span class="c1-spec-label">Active rule</span>${parts.map(([label, value]) => `<span><b>${esc(label)}</b>${esc(value)}</span>`).join('')}`;
   }
@@ -460,7 +636,7 @@
     const p = (placement && placement.metrics) || {};
     const details = m.trade_details || {};
     const records = m.records || [];
-    return `<details class="c1-more-info stp-more-info"><summary><span>More info</span><small>records, raw logs, trades, rule, sources</small></summary><div class="c1-more-grid"><section class="more-section trade-detail"><h3>Broker reconcile records (${esc(records.length)})</h3><p class="detail-copy">Purpose: show reviewed STP records that can actually move the gate. Current broker reconcile means runner position, IBKR position, and working protective stop were checked together.</p>${stpRecordRows(records)}</section><section class="more-section"><h3>Raw log counters</h3><p class="detail-copy">Purpose: reconcile STP status with read-only log evidence. Placement accepted/failed comes from runner logs; STP-VERIFY, STP EXIT, and B3 HALT are raw counters until structured operator verification exists.</p><dl class="metric-list">${metricLine('placement accepted', m.stp_accepted ?? p.accepted ?? 0)}${metricLine('placement failed', m.stp_failed ?? p.failed ?? 0)}${metricLine('STP-VERIFY lines', m.stp_verify_lines ?? 0)}${metricLine('STP EXIT lines', m.stp_exit_lines ?? 0)}${metricLine('B3 HALT lines', m.b3_halt_lines ?? 0)}${metricLine('structured checks', m.checks ?? 0)}</dl></section><section class="more-section"><h3>Verification rule</h3><p class="detail-copy">STP verification is the paper gate that proves positions are protected without false halt or duplicate stop behavior. Logs expose candidates, but false-halt classification needs structured input in monitor/paper_inputs.json.</p><dl class="metric-list">${metricLine('false halt', m.false_halts ?? '--')}${metricLine('double STP', m.double_stp ?? '--')}${metricLine('unverified', m.unverified ?? '--')}${metricLine('gate evidence', gate.evidence || '--')}</dl></section><section class="more-section trade-detail"><h3>Stop trade details (${esc(details.shown ?? 0)} / ${esc(details.total ?? 0)})</h3>${stopTradeRows(details)}</section><section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(gate.sources)}</ul></section><p class="detail-note">This panel does not infer false halt from raw text alone. Historical placement logs are not the same as a broker-reconciled STP check unless a retained broker statement/snapshot proves it.</p></div></details>`;
+    return `<details class="c1-more-info stp-more-info"><summary><span>More info</span><small>records, raw logs, trades, rule, sources</small></summary><div class="c1-more-grid"><section class="more-section trade-detail"><h3>Broker reconcile records (${esc(records.length)})</h3><p class="detail-copy">Purpose: show reviewed STP records that can actually move the gate. Current broker reconcile means runner position, IBKR position, and working protective stop were checked together.</p>${stpRecordRows(records)}</section><section class="more-section"><h3>Raw log counters</h3><p class="detail-copy">Purpose: reconcile STP status with read-only log evidence. Placement accepted/failed comes from runner logs; only failed lines matched to a paper trade can breach placement.</p><dl class="metric-list">${metricLine('placement accepted', metricValue(m.stp_accepted ?? p.accepted))}${metricLine('failed matched to trade', metricValue(p.failed_matched_to_trade ?? m.failed_matched_to_trade))}${metricLine('failed unmatched to trade', metricValue(p.failed_unmatched_to_trade ?? m.failed_unmatched_to_trade))}${metricLine('placement failed total', metricValue(m.stp_failed ?? p.failed))}${metricLine('STP-VERIFY lines', metricValue(m.stp_verify_lines))}${metricLine('STP EXIT lines', metricValue(m.stp_exit_lines))}${metricLine('B3 HALT lines', metricValue(m.b3_halt_lines))}${metricLine('structured checks', metricValue(m.checks))}</dl></section><section class="more-section"><h3>Verification rule</h3><p class="detail-copy">STP verification is the paper gate that proves positions are protected without false halt or duplicate stop behavior. Logs expose candidates, but false-halt classification needs structured input in monitor/paper_inputs.json.</p><dl class="metric-list">${metricLine('distinct sessions', m.required_sessions ? `${m.distinct_sessions ?? 0} / ${m.required_sessions}` : 'spec missing')}${metricLine('false halt', metricValue(m.false_halts))}${metricLine('double STP', metricValue(m.double_stp))}${metricLine('unverified', metricValue(m.unverified))}${metricLine('gate evidence', gate.evidence || '--')}</dl></section><section class="more-section trade-detail"><h3>Stop trade details (${esc(details.shown ?? 0)} / ${esc(details.total ?? 0)})</h3>${stopTradeRows(details)}</section><section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(gate.sources)}</ul></section><p class="detail-note">This panel does not infer false halt from raw text alone. Historical placement logs are not the same as a broker-reconciled STP check unless a retained broker statement/snapshot proves it.</p></div></details>`;
   }
 
   function updateSTPPanel(gates, coverage) {
@@ -469,44 +645,72 @@
     const currentProtection = coverageByKey(coverage, 'current_protection');
     const m = gate.metrics || {};
     const p = placement.metrics || {};
-    const accepted = m.stp_accepted ?? p.accepted ?? 0;
-    const failed = m.stp_failed ?? p.failed ?? 0;
-    const verifyLines = m.stp_verify_lines ?? 0;
-    const exitLines = m.stp_exit_lines ?? 0;
-    const haltLines = m.b3_halt_lines ?? 0;
-    const checks = m.checks ?? 0;
+    const accepted = m.stp_accepted ?? p.accepted;
+    const failed = m.stp_failed ?? p.failed;
+    const failedMatched = p.failed_matched_to_trade ?? m.failed_matched_to_trade;
+    const failedUnmatched = p.failed_unmatched_to_trade ?? m.failed_unmatched_to_trade;
+    const verifyLines = m.stp_verify_lines;
+    const exitLines = m.stp_exit_lines;
+    const haltLines = m.b3_halt_lines;
+    const checks = m.checks;
+    const requiredSessions = Number(m.required_sessions);
+    const hasSessionSpec = Number.isFinite(requiredSessions) && requiredSessions > 0;
+    const distinctSessions = m.distinct_sessions ?? 0;
     const latestRecord = latestStpRecord(m.records || []);
     const latestPass = latestRecord && latestRecord.verified && !latestRecord.false_halt && !latestRecord.double_stp;
-    const status = compositeStatus(gate.status || 'UNKNOWN', [placement.status]);
+    const status = compositeStatus(gate.status || 'UNKNOWN', [placement.status, currentProtection?.status]);
     const reasons = [
-      gate.status && placement.status ? `verify ${gate.status} / placement ${placement.status}` : null,
-      failed ? `placement failed ${failed}` : `placement accepted ${accepted}`,
-      verifyLines ? `STP-VERIFY ${verifyLines}` : 'STP-VERIFY missing',
-      haltLines ? `B3 HALT ${haltLines}` : 'no false halt evidence',
-      checks ? `structured checks ${checks}` : 'structured check missing',
+      gate.status && placement.status
+        ? reason(`verify ${gate.status} / placement ${placement.status}`, verdictClass(status))
+        : null,
+      hasSessionSpec
+        ? reason(`sessions ${distinctSessions}/${requiredSessions}`,
+                 Number(distinctSessions) >= Number(requiredSessions) ? 'ok' : 'watch')
+        : reason('spec missing', 'watch'),
+      hasValue(failedMatched)
+        ? reason(`trade-matched failed ${failedMatched}`, Number(failedMatched) ? 'bad' : 'ok')
+        : reason('trade-matched failure count missing', 'watch'),
+      // Unmatched failures do not gate anything — the spec bounds max_trade_matched_failed
+      // only — so they must not carry the colour of something that does.
+      hasValue(failedUnmatched)
+        ? reason(`unmatched failed ${failedUnmatched} context only`, 'neutral')
+        : reason('unmatched failure count missing', 'watch'),
+      hasValue(accepted)
+        ? reason(`placement accepted ${accepted}`, Number(accepted) ? 'ok' : 'watch')
+        : reason('placement accepted missing', 'watch'),
+      verifyLines ? reason(`STP-VERIFY ${verifyLines}`, 'ok') : reason('STP-VERIFY missing', 'watch'),
+      // Zero halt lines is the good outcome. The old classifier saw "halt" and painted
+      // this red, which is the single clearest case of colour following prose.
+      haltLines ? reason(`B3 HALT ${haltLines}`, 'bad') : reason('no false halt evidence', 'ok'),
+      checks ? reason(`structured checks ${checks}`, 'ok') : reason('structured check missing', 'watch'),
     ].filter(Boolean);
 
-    $('stpProgressTitle').textContent = `accepted ${accepted} | failed ${failed} | verify ${verifyLines}`;
+    $('stpProgressTitle').textContent = hasSessionSpec ? `sessions ${distinctSessions}/${requiredSessions} | accepted ${metricValue(accepted)} | matched failed ${metricValue(failedMatched)}` : `spec missing | accepted ${metricValue(accepted)} | matched failed ${metricValue(failedMatched)}`;
     $('stpProgressReason').innerHTML = reasons.map(c1ReasonChip).join('');
     $('stpProgressStatus').textContent = status;
     $('stpProgressStatus').className = `gate-state ${statusClass(status)}`;
     $('stpStatusEyebrow').className = `eyebrow c1-eyebrow ${statusClass(status)}`;
-    $('stpActiveSpec').innerHTML = stpRuleRail();
+    $('stpActiveSpec').innerHTML = stpRuleRail(m, p);
     $('stpMetricGroups').innerHTML = [
       c1MetricGroup('Verdict', [
         panelVerdictMetric(status, `Verification ${gate.status || '--'}, placement ${placement.status || '--'}, current protection ${currentProtection?.status || '--'}.`, 'Composite status is the worst relevant stop-readiness status.', status === 'PASS' ? 'ok' : status === 'BREACH' ? 'bad' : 'watch'),
       ]),
       c1MetricGroup('Stop readiness', [
-        c1Metric('Checks', checks, 'Structured operator STP verification records.', checks ? 'ok' : 'watch'),
+        hasSessionSpec
+          ? c1SampleMetric('Sessions', distinctSessions, requiredSessions, 'Distinct reviewed session dates.', distinctSessions >= requiredSessions ? 'ok' : 'watch')
+          : c1Metric('Sessions', 'spec missing', 'stp_verification_spec.min_distinct_sessions is missing.', 'watch'),
+        c1Metric('Checks', metricValue(checks), 'Structured operator STP verification records.', checks ? 'ok' : 'watch'),
         c1Metric('Broker reconcile', latestRecord ? `${latestRecord.date || '--'} ${latestPass ? 'PASS' : 'REVIEW'}` : '--', 'Latest reviewed STP record from monitor/paper_inputs.json.', latestPass ? 'ok' : 'watch'),
-        c1Metric('Placement failed', failed, 'Failed stop placement must be zero before pass.', failed ? 'bad' : 'ok'),
-        c1Metric('Placement accepted', accepted, 'place_stop accepted log evidence.', accepted ? 'ok' : 'watch'),
+        c1Metric('Failed matched to trade', metricValue(failedMatched), 'Only failed stop-placement lines matched to a paper trade can breach the placement rule.', failedMatched ? 'bad' : failedMatched === 0 ? 'ok' : 'watch'),
+        c1Metric('Failed unmatched to trade', metricValue(failedUnmatched), 'Unmatched failed stop-placement log lines are context only and do not breach the gate.', 'neutral'),
+        c1Metric('Placement accepted', metricValue(accepted), 'place_stop accepted log evidence.', accepted ? 'ok' : 'watch'),
         c1Metric('Latest proof', compactStpEvidence(latestRecord), 'Condensed IBKR/runner proof; full text is in More info.', latestPass ? 'ok' : 'watch'),
       ]),
       c1MetricGroup('Raw counters', [
-        c1Metric('STP-VERIFY', verifyLines, 'B3 STP-VERIFY log counter.'),
-        c1Metric('STP EXIT', exitLines, 'B3 stop-exit log counter.'),
-        c1Metric('B3 HALT', haltLines, 'Raw halt counter; false-halt classification is structured input.', haltLines ? 'bad' : 'ok'),
+        c1Metric('Placement failed total', metricValue(failed), 'All failed stop-placement log lines before trade matching; this total is not the gate rule.', failedMatched ? 'bad' : 'neutral'),
+        c1Metric('STP-VERIFY', metricValue(verifyLines), 'B3 STP-VERIFY log counter.'),
+        c1Metric('STP EXIT', metricValue(exitLines), 'B3 stop-exit log counter.'),
+        c1Metric('B3 HALT', metricValue(haltLines), 'Raw halt counter; false-halt classification is structured input.', haltLines ? 'bad' : 'ok'),
       ]),
       coverageRefGroup([
         coverageRefMetric('Placement after OPEN', placement, 'Deferred-stop route evidence: accept/fail/close-before-arm reconciliation.'),
@@ -516,12 +720,13 @@
     ].join('');
   }
 
-  function b3RuleRail() {
+  function b3RuleRail(metrics = {}) {
+    const spec = metrics.spec || {};
     const parts = [
-      ['Cold start', 'broker/file reconcile'],
-      ['Mismatch', '0'],
-      ['Persisted state', 'positions must match'],
-      ['Evidence', 'log-only until structured cold-start rows exist'],
+      ['Cold start', spec.cold_start_reconcile || 'spec missing'],
+      ['Mismatch', hasValue(spec.max_mismatch_episodes) ? `<= ${spec.max_mismatch_episodes}` : 'spec missing'],
+      ['Persisted state', spec.persist_match_required === true ? 'positions must match' : 'spec missing'],
+      ['Evidence', spec.evidence || 'spec missing'],
     ];
     return `<span class="c1-spec-label">Active rule</span>${parts.map(([label, value]) => `<span><b>${esc(label)}</b>${esc(value)}</span>`).join('')}`;
   }
@@ -531,7 +736,7 @@
     const state = (statePersist && statePersist.metrics) || {};
     const protection = (currentProtection && currentProtection.metrics) || {};
     const positions = state.operational_positions || {};
-    return `<details class="c1-more-info b3-more-info"><summary><span>More info</span><small>raw logs, persisted state, sources</small></summary><div class="c1-more-grid"><section class="more-section"><h3>Raw log counters</h3><p class="detail-copy">Purpose: separate current dashboard status from raw log evidence. B3 match/mismatch counters are read from scheduler/live-day logs; they are not yet grouped into structured cold-start sessions.</p><dl class="metric-list">${metricLine('matches', m.matches ?? 0)}${metricLine('mismatches', m.mismatches ?? 0)}${metricLine('cold starts', m.cold_starts ?? 0)}${metricLine('gate evidence', gate.evidence || '--')}</dl></section><section class="more-section"><h3>Persisted state</h3><p class="detail-copy">Current persisted state is shown for context only. It can prove current file state has protection, but it does not erase historical B3 mismatch log lines.</p><dl class="metric-list">${metricLine('persist match', positions.persist_match ?? '--')}${metricLine('position count', positions.count ?? protection.positions ?? '--')}${metricLine('protected positions', protection.protected ?? '--')}${metricLine('live_positions error', protection.live_positions_error || state.live_positions_error || '--')}</dl></section><section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(gate.sources)}</ul></section><p class="detail-note">This panel intentionally reports B3 mismatch lines as breach evidence until the logs can be grouped into cold-start sessions or marked as replay/noise by structured monitoring data.</p></div></details>`;
+    return `<details class="c1-more-info b3-more-info"><summary><span>More info</span><small>episodes, raw logs, persisted state, sources</small></summary><div class="c1-more-grid"><section class="more-section"><h3>Episode counters</h3><p class="detail-copy">Purpose: separate repeated decision-slot heartbeat lines from distinct B3 reconcile incidents. The gate status is based on mismatch episodes, with raw counters retained for audit.</p><dl class="metric-list">${metricLine('mismatch episodes', m.episodes ?? m.mismatches ?? '--')}${metricLine('positions affected', m.positions_affected ?? '--')}${metricLine('first seen', m.first_seen || '--')}${metricLine('last seen', m.last_seen || '--')}${metricLine('duration', fmtDurationBetween(m.first_seen, m.last_seen))}${metricLine('match episodes', m.match_episodes ?? m.matches ?? '--')}${metricLine('cold starts', m.cold_starts ?? '--')}${metricLine('gate evidence', gate.evidence || '--')}</dl></section><section class="more-section"><h3>Raw log counters</h3><p class="detail-copy">Raw counters are kept only for audit and should not be read as distinct reconcile attempts.</p><dl class="metric-list">${metricLine('raw mismatch count', m.raw_mismatch_count ?? '--')}${metricLine('raw mismatch lines', m.raw_line_count ?? '--')}${metricLine('raw match count', m.raw_match_count ?? '--')}${metricLine('raw match lines', m.match_raw_line_count ?? '--')}</dl></section><section class="more-section"><h3>Persisted state</h3><p class="detail-copy">Current persisted state is shown for context only. It can prove current file state has protection, but it does not erase historical B3 mismatch episodes.</p><dl class="metric-list">${metricLine('persist match', positions.persist_match ?? '--')}${metricLine('position count', positions.count ?? protection.positions ?? '--')}${metricLine('protected positions', protection.protected ?? '--')}${metricLine('live_positions error', protection.live_positions_error || state.live_positions_error || '--')}</dl></section><section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(gate.sources)}</ul></section><p class="detail-note">This panel reports grouped B3 mismatch episodes as breach evidence. Raw heartbeat line totals remain visible for audit but are not the headline event count.</p></div></details>`;
   }
 
   function updateB3Panel(gates, coverage) {
@@ -543,36 +748,82 @@
     const state = statePersist.metrics || {};
     const protection = currentProtection.metrics || {};
     const positions = state.operational_positions || {};
-    const matches = m.matches ?? 0;
-    const mismatches = m.mismatches ?? 0;
-    const coldStarts = m.cold_starts ?? 0;
+    const matches = m.match_episodes ?? m.matches;
+    const mismatches = m.episodes ?? m.mismatches;
+    const positionsAffected = m.positions_affected;
+    const coldStarts = m.cold_starts;
+    const b3Duration = fmtDurationBetween(m.first_seen, m.last_seen);
     const persistMatch = positions.persist_match;
-    const protectedCount = protection.protected ?? 0;
-    const positionCount = protection.positions ?? positions.count ?? 0;
+    const protectedCount = protection.protected;
+    const positionCount = protection.positions ?? positions.count;
+    const protectedLabel = protectedCount == null || positionCount == null ? '--' : `${protectedCount}/${positionCount}`;
     const status = gate.status || 'UNKNOWN';
+    // A mismatch with a recorded, matched root cause is not the same thing as an
+    // unexplained one, and the panel must not show them the same colour.
+    const klass = m.classification || {};
+    const unclassified = klass.unclassified_count;
+    const classified = klass.classified_count;
     const reasons = [
-      mismatches ? `mismatch ${mismatches}` : `match ${matches}`,
-      coldStarts ? `cold starts ${coldStarts}` : 'cold-start rows missing',
-      persistMatch === true ? 'persist match true' : persistMatch === false ? 'persist mismatch' : 'persist unknown',
-      `${protectedCount}/${positionCount} protected`,
+      unclassified
+        ? reason(`unclassified mismatch ${unclassified}`, 'bad')
+        : classified
+          ? reason(`mismatch explained ${classified}/${mismatches ?? classified}`, 'watch')
+        : matches != null ? reason(`match episodes ${matches}`, 'ok')
+        : reason('B3 episodes missing', 'watch'),
+      positionsAffected != null
+        ? reason(`positions ${positionsAffected}`, unclassified ? 'bad' : 'neutral')
+        : reason('positions missing', 'watch'),
+      coldStarts ? reason(`cold starts ${coldStarts}`, 'ok') : reason('cold-start rows missing', 'watch'),
+      persistMatch === true ? reason('persist match true', 'ok')
+        : persistMatch === false ? reason('persist mismatch', 'bad')
+        : reason('persist unknown', 'watch'),
+      protectedLabel === '--'
+        ? reason('protection missing', 'watch')
+        : reason(`${protectedLabel} protected`,
+                 positionCount && protectedCount >= positionCount ? 'ok' : 'bad'),
     ];
 
-    $('b3ProgressTitle').textContent = `match ${matches} | mismatch ${mismatches}`;
+    $('b3ProgressTitle').textContent = mismatches
+      ? `${mismatches} episode(s) | ${positionsAffected ?? '--'} position(s) | ${b3Duration}`
+      : matches != null ? `match episodes ${matches} | mismatch episodes ${mismatches ?? '--'}` : '--';
     $('b3ProgressReason').innerHTML = reasons.map(c1ReasonChip).join('');
     $('b3ProgressStatus').textContent = status;
     $('b3ProgressStatus').className = `gate-state ${statusClass(status)}`;
     $('b3StatusEyebrow').className = `eyebrow c1-eyebrow ${statusClass(status)}`;
-    $('b3ActiveSpec').innerHTML = b3RuleRail();
+    $('b3ActiveSpec').innerHTML = b3RuleRail(m);
     $('b3MetricGroups').innerHTML = [
       c1MetricGroup('Verdict', [
-        panelVerdictMetric(status, mismatches ? 'Historical B3 mismatch lines remain unclassified.' : 'No B3 mismatches are currently observed.', 'Current persisted protection is context, not a historical mismatch waiver.', mismatches ? 'bad' : 'ok'),
+        panelVerdictMetric(
+          status,
+          unclassified
+            ? `${unclassified} B3 mismatch episode(s) remain unclassified.`
+            : classified
+              ? `${classified} mismatch episode(s) classified with a recorded root cause. Explained is not passed — the disagreement still happened.`
+              : 'No B3 mismatch episodes are currently observed.',
+          'Current persisted protection is context, not a historical mismatch waiver.',
+          unclassified ? 'bad' : classified ? 'watch' : 'ok'),
       ]),
+      ...(klass.classified || []).length || (klass.stale_classifications || []).length
+        ? [c1MetricGroup('Classified mismatches', [
+            ...(klass.classified || []).map(row => c1Metric(
+              row.classification?.id || 'classification',
+              row.classification?.reconcile_verdict || 'explained',
+              `${row.classification?.root_cause || ''} — fix: ${row.classification?.fix || '--'}`,
+              'watch')),
+            ...(klass.stale_classifications || []).map(row => c1Metric(
+              `stale: ${row.id || 'classification'}`, 'no matching episode',
+              'This note names an episode that no longer appears in the logs. It is not coverage.',
+              'bad')),
+          ])]
+        : [],
       c1MetricGroup('Observed data', [
-        c1Metric('Matches', matches, 'B3 broker/file match log observations.', matches ? 'ok' : 'watch'),
-        c1Metric('Mismatches', mismatches, 'Any mismatch keeps B3 in breach until classified.', mismatches ? 'bad' : 'ok'),
-        c1Metric('Cold starts', coldStarts, 'Runner-start observations from logs.'),
+        c1Metric('Match episodes', matches ?? '--', 'Grouped B3 broker/file match observations.', matches ? 'ok' : 'watch'),
+        c1Metric('Mismatch episodes', mismatches ?? '--', 'Any mismatch episode keeps B3 in breach until classified.', mismatches ? 'bad' : mismatches === 0 ? 'ok' : 'watch'),
+        c1Metric('Positions affected', positionsAffected ?? '--', 'Mismatch positions affected across grouped episodes.', positionsAffected ? 'bad' : positionsAffected === 0 ? 'ok' : 'watch'),
+        c1Metric('Duration', b3Duration, 'First-to-last timestamp across mismatch episodes.'),
+        c1Metric('Cold starts', coldStarts ?? '--', 'Scheduler start observations from logs.'),
         c1Metric('Persist match', persistMatch == null ? '--' : String(persistMatch), 'Latest runner-state persisted-position match flag.', persistMatch === true ? 'ok' : persistMatch === false ? 'bad' : 'watch'),
-        c1Metric('Protected', `${protectedCount}/${positionCount}`, 'Current persisted positions with stop_order_id.', positionCount && protectedCount >= positionCount ? 'ok' : 'watch'),
+        c1Metric('Protected', protectedLabel, 'Current persisted positions with stop_order_id.', positionCount && protectedCount >= positionCount ? 'ok' : 'watch'),
         c1Metric('Live state', statePersist.status || '--', 'Current state-persist coverage status.', statusClass(statePersist.status || '') === 'observed' ? 'ok' : ''),
       ]),
       coverageRefGroup([
@@ -615,10 +866,14 @@
     const records = m.records ?? 0;
     const status = gate.status || 'UNKNOWN';
     const reasons = [
-      required == null ? 'required unset' : `required ${required}`,
-      proven ? `proven ${proven}` : 'proven missing',
-      candidateLines ? `candidate lines ${candidateLines}` : 'candidate lines missing',
-      records ? `structured records ${records}` : 'structured records missing',
+      required == null ? reason('required unset', 'watch') : reason(`required ${required}`, 'neutral'),
+      proven ? reason(`proven ${proven}`, 'ok') : reason('proven missing', 'watch'),
+      // Candidates are raw connectivity text, never proof. Zero of them is not a
+      // failure and a pile of them is not progress, so neither reads as a verdict.
+      candidateLines
+        ? reason(`candidate lines ${candidateLines} (context only)`, 'neutral')
+        : reason('no restart candidates in logs', 'neutral'),
+      records ? reason(`structured records ${records}`, 'ok') : reason('structured records missing', 'watch'),
     ];
 
     $('twsProgressTitle').textContent = `proven ${proven}${required != null ? `/${required}` : ''} | candidates ${candidateDays} day(s)`;
@@ -656,25 +911,41 @@
     const contractSpec = coverageByKey(coverage, 'contract_spec_guard');
     const m = gate.metrics || {};
     const spec = m.spec || {};
-    const target = Number(spec.min_n || 0);
-    const maxMean = spec.max_mean_ticks;
+    // OPEN is judged per instrument, STP pooled — the two branches have different sample
+    // densities, so one shared target would either be unreachable on STP or meaningless
+    // on OPEN. Read both sub-specs; never fall back to a single number.
+    const openSpec = spec.open || {};
+    const stpSpec = spec.stp_close || {};
+    const openTarget = Number(openSpec.min_n_per_inst || 0);
+    const stpTarget = Number(stpSpec.min_n || 0);
+    const maxMean = openSpec.max_mean_ticks ?? spec.max_mean_ticks;
+    const stpMaxMean = stpSpec.max_mean_ticks ?? maxMean;
+    const target = openTarget;
     const openN = m.open_n ?? summary.c1_open_n ?? 0;
     const stpN = m.stp_close_n ?? m.close_n ?? summary.c1_close_n ?? 0;
     const openMean = m.open_mean ?? summary.c1_open_mean;
     const stpMean = m.stp_close_mean ?? m.close_mean ?? summary.c1_close_mean;
-    const scope = spec.scope || 'separate';
-    const enough = target > 0 && openN >= target && stpN >= target;
-    const currentReads = [meanRead('OPEN', openMean, openN, maxMean), meanRead('STP CLOSE', stpMean, stpN, maxMean)];
+    const scope = openSpec.scope || spec.scope || 'by_inst';
+    const byInst = m.by_inst || [];
+    const breaching = m.open_breaching_instruments || [];
+    const shortOfSample = m.open_instruments_short_of_sample || [];
+    const instReady = byInst.filter(row => Number(row.open_n || 0) >= openTarget).length;
+    const enough = openTarget > 0 && byInst.length > 0
+      && instReady === byInst.length && stpN >= stpTarget;
+    const currentReads = [meanRead('OPEN', openMean, openN, maxMean), meanRead('STP CLOSE', stpMean, stpN, stpMaxMean)];
     const status = gate.status || 'UNKNOWN';
-    const openOverLimit = openN && maxMean != null && Math.abs(Number(openMean)) > Number(maxMean);
-    const stpOverLimit = stpN && maxMean != null && Math.abs(Number(stpMean)) > Number(maxMean);
-    const currentQualityStatus = openOverLimit || stpOverLimit ? 'BREACH NOW' : stpN && openN ? 'WATCH' : 'PENDING';
+    const openOverLimit = breaching.length > 0;
+    const stpOverLimit = m.stp_over_limit === true;
+    const currentQualityStatus = openOverLimit || stpOverLimit ? 'QUALITY_BREACH' : stpN && openN ? 'WATCH' : 'PENDING';
 
-    $('c1ProgressTitle').textContent = target ? `OPEN ${openN}/${target} | STP ${stpN}/${target}` : `OPEN ${openN} | STP ${stpN}`;
+    $('c1ProgressTitle').textContent = openTarget
+      ? `OPEN ${instReady}/${byInst.length || '--'} instrument(s) at N>=${openTarget} | STP ${stpN}/${stpTarget}`
+      : `OPEN ${openN} | STP ${stpN}`;
     $('c1ProgressReason').innerHTML = [
-      ...currentReads,
-      ...(enough ? [] : ['sample gate incomplete']),
-      `scope ${scope}`,
+      reason(currentReads[0], openN ? (openOverLimit ? 'bad' : 'ok') : 'watch'),
+      reason(currentReads[1], stpN ? (stpOverLimit ? 'bad' : 'ok') : 'watch'),
+      ...(enough ? [] : [reason('sample gate incomplete', 'watch')]),
+      reason(`scope ${scope}`, 'neutral'),
     ].map(c1ReasonChip).join('');
     $('c1ProgressStatus').textContent = status;
     $('c1ProgressStatus').className = `gate-state ${statusClass(status)}`;
@@ -682,12 +953,20 @@
     $('c1ActiveSpec').innerHTML = c1SpecPills(spec, target, maxMean);
     $('c1MetricGroups').innerHTML = [
       c1MetricGroup('Verdict', [
-        panelVerdictMetric(status, `Sample gate ${enough ? 'complete' : 'incomplete'}; current quality read is ${currentQualityStatus}.`, 'Current N=1 contract evidence must be retested when scaling.', currentQualityStatus === 'BREACH NOW' ? 'bad' : 'watch'),
+        panelVerdictMetric(status, `Sample gate ${enough ? 'complete' : 'incomplete'}; current quality read is ${currentQualityStatus === 'QUALITY_BREACH' ? 'quality breach (sample pending)' : currentQualityStatus}.`, 'Current N=1 contract evidence must be retested when scaling.', currentQualityStatus === 'QUALITY_BREACH' ? 'watch' : 'watch'),
       ]),
       c1MetricGroup('Sample readiness', [
-        c1SampleMetric('OPEN samples', openN, target, 'Progress toward required entry sample count.', target && openN >= target ? 'ok' : 'watch'),
-        c1SampleMetric('STP samples', stpN, target, 'Progress toward required STP close sample count.', target && stpN >= target ? 'ok' : 'watch'),
+        c1SampleMetric('Instruments ready', instReady, byInst.length || null, `Instruments with at least ${openTarget} OPEN sample(s). OPEN is judged per instrument because a pooled tick mean hides a single bad one.`, byInst.length && instReady === byInst.length ? 'ok' : 'watch'),
+        c1SampleMetric('STP samples', stpN, stpTarget, 'Progress toward the pooled STP close sample count. Pooled because per instrument it would need roughly 136 sessions to fill.', stpTarget && stpN >= stpTarget ? 'ok' : 'watch'),
       ]),
+      // Per-instrument verdicts, each with the interval around its own mean. A mean with
+      // no interval invites being read as settled when it rests on one fill.
+      ...(byInst.length ? [c1MetricGroup(`OPEN by instrument (limit ${maxMean ?? '--'} ticks, N>=${openTarget})`,
+        byInst.map(row => c1Metric(
+          row.inst,
+          `${fmtTicks(row.open_mean_ticks)} · ${fmtMoney(row.open_mean_usd)}`,
+          `N=${row.open_n ?? 0}${row.open_ci95_ticks != null ? ` · 95% CI ±${Number(row.open_ci95_ticks).toFixed(2)} ticks` : ' · CI needs N>=2'}. One tick here is ${fmtMoney(row.tick_value)}.`,
+          row.open_verdict === 'BREACH' ? 'bad' : row.open_verdict === 'PASS' ? 'ok' : 'watch')))] : []),
       c1MetricGroup('Current quality', [
         c1Metric('OPEN mean', fmtTicks(openMean), `Spec: abs mean <= ${maxMean ?? '--'} ticks. Current entry drift is ${meanRead('OPEN', openMean, openN, maxMean)}.`, openOverLimit ? 'bad' : openN ? 'ok' : 'watch'),
         c1Metric('STP CLOSE mean', fmtTicks(stpMean), `Spec: abs mean <= ${maxMean ?? '--'} ticks. Stop-triggered closes only; signal closes are excluded.`, stpOverLimit ? 'bad' : stpN ? 'ok' : 'watch'),
@@ -700,29 +979,6 @@
       ]),
       c1MoreInfo(gate, openN, openMean, stpN, stpMean),
     ].join('');
-    setText('slippageCount', target ? `OPEN ${openN}/${target}` : `${openN} / ${stpN}`);
-    setText('c1SampleCaption', target ? `STP ${stpN}/${target} | ${meanRead('OPEN', openMean, openN, maxMean)}` : currentReads.join(' | '));
-    setText('closeSlippageMean', `STP ${stpN}${target ? `/${target}` : ''} | mean ${fmtTicks(stpMean)} | limit ${maxMean ?? '--'} ticks`);
-  }
-
-  function pnlCompareRows(compare) {
-    const rows = (compare && compare.rows) || [];
-    if (!rows.length) return '<p class="detail-empty">No trade-by-trade Paper vs backtest comparison is available.</p>';
-    const pl = (compare && compare.statement_pnl_compare) || {};
-    const paperTotal = sumField(rows, 'paper_pnl');
-    const backtestTotal = sumField(rows, 'backtest_pnl');
-    const diffTotal = sumField(rows, 'pnl_diff');
-    const gridDiff = pl.paper_minus_backtest_realized;
-    const reconciled = reconcileStatus(diffTotal, gridDiff);
-    const unresolved = rows.filter(row => String(row.classification || '').includes('ONLY') || String(row.classification || '').includes('UNRESOLVED')).length;
-    const known = rows.filter(row => String(row.classification || '').includes('KNOWN') || String(row.reason || '').toLowerCase().includes('defer')).length;
-    const verdict = reconciled.cls === 'bad' ? 'BREACH' : unresolved ? 'BREACH' : known || Math.abs(Number(diffTotal || 0)) > 0.005 ? 'EXPLAINED' : 'PASS';
-    const verdictText = verdict === 'PASS'
-      ? 'Paper and backtest trade totals match with no row-level exceptions.'
-      : verdict === 'EXPLAINED'
-        ? 'Paper and backtest differ, but the table total reconciles to the grid and row reasons classify the divergence.'
-        : 'Paper/backtest trade reasons need attention because totals do not reconcile or unresolved rows remain.';
-    return `${tableVerdict(verdict, 'Trade-by-trade Paper vs Backtest', verdictText, [`rows ${rows.length}`, `unresolved ${unresolved}`, `known/explained ${known}`, `grid ${reconciled.label}`])}<div class="trade-table pnl-compare-table"><table><thead><tr><th>class</th><th>trade</th><th>paper</th><th>backtest</th><th>diff</th><th>reason</th></tr></thead><tbody>${rows.map(row => `<tr><td><b>${esc(row.classification || '--')}</b><small>${esc(row.exit_day_delta == null ? '--' : `${row.exit_day_delta} day`)}</small></td><td><b>${esc(row.inst || '--')} ${esc(row.direction || '--')}</b><small>${esc(row.entry_day || '--')}</small></td><td><b>${esc(row.paper_exit_day || '--')}</b><small>${fmtMoney(row.paper_pnl)}</small></td><td><b>${esc(row.backtest_exit_day || '--')}</b><small>${fmtMoney(row.backtest_pnl)} ${esc(row.backtest_exit_reason || '')}</small></td><td><b class="pnl-value ${moneyClass(row.pnl_diff)}">${fmtMoney(row.pnl_diff)}</b><small>${esc(row.paper_exit_reason || '--')}</small></td><td>${esc(row.reason || '--')}</td></tr>`).join('')}</tbody><tfoot><tr class="total-row"><td><span class="fill-result ${reconciled.cls}">TOTAL</span></td><td><b>${esc(rows.length)} row(s)</b><small>trade table sum</small></td><td><b>${fmtMoney(paperTotal)}</b><small>paper total</small></td><td><b>${fmtMoney(backtestTotal)}</b><small>backtest total</small></td><td><b class="pnl-value ${moneyClass(diffTotal)}">${fmtMoney(diffTotal)}</b><small>grid Paper - backtest ${fmtMoney(gridDiff)}</small></td><td><span class="fill-result ${reconciled.cls}">${reconciled.label}</span><small>footer total ties back to P&amp;L Compare metric</small></td></tr></tfoot></table></div>`;
   }
 
   function signalCompareRows(signalCompare) {
@@ -780,29 +1036,6 @@
     return `<td><span class="fill-result ${cls}">${esc(status)}</span><small>${esc(label)} qty ${esc(side?.qty ?? '--')}</small><b>open ${entry}</b><small>exit ${exit}</small><b class="pnl-value ${Number(side?.pnl) > 0 ? 'ok' : Number(side?.pnl) < 0 ? 'bad' : 'neutral'}">${pnl}</b><small>fee ${fee}</small>${brokerId}${side?.reason ? `<small>${esc(side.reason)}</small>` : ''}</td>`;
   }
 
-  function lifecycleCompareRows(lifecycleCompare, pl = {}) {
-    const rows = (lifecycleCompare && lifecycleCompare.rows) || [];
-    if (!rows.length) return '<p class="detail-empty">No lifecycle comparison rows are available.</p>';
-    const paperBacktestTotal = Number.isFinite(Number(lifecycleCompare.paper_minus_backtest_sum)) ? Number(lifecycleCompare.paper_minus_backtest_sum) : sumField(rows, 'paper_minus_backtest_pnl');
-    const paperFlexTotal = Number.isFinite(Number(lifecycleCompare.paper_minus_flex_sum)) ? Number(lifecycleCompare.paper_minus_flex_sum) : sumField(rows, 'paper_minus_flex_pnl');
-    const paperBacktestRecon = reconcileStatus(paperBacktestTotal, pl.paper_minus_backtest_realized);
-    const paperFlexRecon = reconcileStatus(paperFlexTotal, pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized);
-    const mismatches = rows.filter(row => row.classification !== 'MATCHED_LIFECYCLE').length;
-    const missing = rows.filter(row => [row.paper, row.backtest, row.flex].some(side => String(side?.status || '') === 'MISSING')).length;
-    const verdict = paperBacktestRecon.cls === 'bad' || paperFlexRecon.cls === 'bad' || missing ? 'BREACH' : mismatches ? 'EXPLAINED' : 'PASS';
-    const summary = verdict === 'PASS'
-      ? 'Paper, backtest, and Flex lifecycle rows match and totals reconcile to the P&L grid.'
-      : verdict === 'EXPLAINED'
-        ? 'Lifecycle differences remain, but table totals reconcile and row reasons classify the differences.'
-        : 'Lifecycle parity needs attention because totals do not reconcile or a source is missing for a trade.';
-    return `${tableVerdict(verdict, 'Lifecycle parity', summary, [`rows ${rows.length}`, `diff rows ${mismatches}`, `missing source ${missing}`, `P-B ${paperBacktestRecon.label}`, `P-F ${paperFlexRecon.label}`])}<div class="trade-table lifecycle-compare-table"><table><thead><tr><th>class</th><th>trade</th><th>paper actual</th><th>backtest</th><th>Flex</th><th>diff/reason</th></tr></thead><tbody>${rows.map(row => {
-      const cls = row.classification === 'MATCHED_LIFECYCLE' ? 'ok' : row.classification === 'THREE_WAY_DIFF' ? 'watch' : 'bad';
-      const directionClass = String(row.direction || '').toLowerCase();
-      const audit = row.audit_ref ? `<a class="audit-link" href="#${esc(row.audit_ref)}" title="${esc(row.audit_label || 'open audit log')}">${auditChip()}</a>` : '';
-      return `<tr><td><span class="fill-result ${cls}">${esc(row.classification || '--')}</span></td><td><b>${audit}${esc(row.inst || '--')} <span class="direction-chip ${directionClass}">${esc(row.direction || '--')}</span></b><small>${esc(row.entry_day || '--')}</small></td>${lifecycleSideCell(row.paper, 'paper')}${lifecycleSideCell(row.backtest, 'backtest')}${lifecycleSideCell(row.flex, 'Flex')}<td><b>${fmtMoney(row.paper_minus_backtest_pnl)}</b><small>paper-bt | paper-Flex ${fmtMoney(row.paper_minus_flex_pnl)}</small><small>${esc(row.reason || '--')}</small></td></tr>`;
-    }).join('')}</tbody><tfoot><tr class="total-row"><td><span class="fill-result ${paperBacktestRecon.cls}">TOTAL</span></td><td><b>${esc(rows.length)} lifecycle row(s)</b><small>closed/open parity rows</small></td><td><b>${fmtMoney(pl.paper_epoch_closed_realized)}</b><small>paper realised grid</small></td><td><b>${fmtMoney(pl.backtest_epoch_closed_realized)}</b><small>backtest realised grid</small></td><td><b>${fmtMoney(pl.flex_epoch_rebased_realized ?? pl.statement_entry_epoch_realized)}</b><small>Flex zero-base grid</small></td><td><b class="pnl-value ${moneyClass(paperBacktestTotal)}">paper-bt ${fmtMoney(paperBacktestTotal)}</b><small><span class="fill-result ${paperBacktestRecon.cls}">${paperBacktestRecon.label}</span> vs grid ${fmtMoney(pl.paper_minus_backtest_realized)}</small><small><span class="fill-result ${paperFlexRecon.cls}">${paperFlexRecon.label}</span> paper-Flex ${fmtMoney(paperFlexTotal)} vs grid ${fmtMoney(pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized)}</small></td></tr></tfoot></table></div>`;
-  }
-
   function compactLifecycleCell(side, label) {
     const status = String((side && side.status) || 'MISSING');
     const cls = status === 'MISSING' ? 'bad' : status === 'OPEN' ? 'watch' : 'ok';
@@ -851,14 +1084,12 @@
     return `<span class="fill-result ${status === 'MISSING' ? 'watch' : 'ok'}">${esc(status)}</span><b>${entry} -> ${exit}</b>`;
   }
 
-  const contractPointValues = { MES: 5, MNQ: 2, MYM: 0.5, M2K: 5, MNKD: 0.5 };
-
-  function pointValueFor(inst, ...sources) {
+  function pointValueFor(inst, contractSpecs = {}, ...sources) {
     for (const source of sources) {
       const pv = Number(source?.components?.cost_model?.point_value ?? source?.cost_model?.point_value);
       if (Number.isFinite(pv)) return pv;
     }
-    const pv = contractPointValues[String(inst || '').toUpperCase()];
+    const pv = Number(contractSpecs[String(inst || '').toUpperCase()]?.point_value);
     return Number.isFinite(pv) ? pv : null;
   }
 
@@ -871,6 +1102,10 @@
   }
 
   function priceUsd(price, pointValue, qty) {
+    // Number(null) is 0 and passes Number.isFinite, so a missing price or an
+    // unreconciled contract point_value would render a confident $0.00 instead
+    // of '--'. Reject the empty cases before coercing.
+    if (price == null || price === '' || pointValue == null || pointValue === '') return null;
     const p = Number(price);
     const pv = Number(pointValue);
     const q = Number(qty || 1);
@@ -918,7 +1153,7 @@
     return `<span class="component-primary component-text">${fmtDollar(priceUsd(price, pointValue, qty))}</span><span class="component-ref">${esc(`${fmtPrice(price)} pts`)}</span>`;
   }
 
-  function componentCompareGrid(row = {}) {
+  function componentCompareGrid(row = {}, contractSpecs = {}) {
     const paper = row.paper || {};
     const backtest = row.backtest || {};
     const flex = row.flex || {};
@@ -929,7 +1164,7 @@
     const paperExitRef = paper.expected_exit ?? paperC.exit_expected_price ?? paper.exit_price;
     const btEntrySlip = modelSlippageHalf(backtestC);
     const btExitSlip = modelSlippageHalf(backtestC);
-    const pointValue = pointValueFor(row.inst, paper, backtest, flex, backtestC);
+    const pointValue = pointValueFor(row.inst, contractSpecs, paper, backtest, flex, backtestC);
     const qty = qtyFor(paper, backtest, flex, row);
     const rows = [
       ['Entry Ref Value', priceRefCell(paperEntryRef, pointValue, qty), priceRefCell(backtest.entry_price, pointValue, qty), priceRefCell(flex.entry_price, pointValue, qty), 'custom'],
@@ -948,7 +1183,7 @@
     }).join('')}</div>`;
   }
 
-  function varianceCompareGrid(row = {}) {
+  function varianceCompareGrid(row = {}, contractSpecs = {}) {
     const paper = row.paper || {};
     const backtest = row.backtest || {};
     const flex = row.flex || {};
@@ -959,7 +1194,7 @@
     const paperExitRef = paper.expected_exit ?? paperC.exit_expected_price ?? paper.exit_price;
     const btEntrySlip = modelSlippageHalf(backtestC);
     const btExitSlip = modelSlippageHalf(backtestC);
-    const pointValue = pointValueFor(row.inst, paper, backtest, flex, backtestC);
+    const pointValue = pointValueFor(row.inst, contractSpecs, paper, backtest, flex, backtestC);
     const qty = qtyFor(paper, backtest, flex, row);
     const priceDeltaMoney = value => priceUsd(value, pointValue, qty);
     const rows = [
@@ -1030,7 +1265,7 @@
     ].join('')}</div>`;
   }
 
-  function sourceDiffAnalyzerRows(lifecycleCompare, pl = {}, compare = null) {
+  function sourceDiffAnalyzerRows(lifecycleCompare, pl = {}, compare = null, contractSpecs = {}) {
     const rows = (lifecycleCompare && lifecycleCompare.rows) || [];
     if (!rows.length) return '<p class="detail-empty">No source diff rows are available.</p>';
     const pbTotal = Number.isFinite(Number(lifecycleCompare.paper_minus_backtest_sum)) ? Number(lifecycleCompare.paper_minus_backtest_sum) : sumField(rows, 'paper_minus_backtest_pnl');
@@ -1054,7 +1289,7 @@
       const backtestC = backtest.components || {};
       const flexC = flex.components || {};
       const directionClass = String(row.direction || '').toLowerCase();
-      return `<tr><td><b>${esc(row.inst || '--')} <span class="direction-chip ${directionClass}">${esc(row.direction || '--')}</span></b><small>${esc(row.entry_day || '--')}</small><small>${esc(brokerIdentity(flex.broker_trade_id))}</small></td><td>${componentCompareGrid(row)}${costModelHint(backtestC)}</td><td>${varianceCompareGrid(row)}<b>net P-B ${fmtMoney(pnlPb)}</b><small>net P-F ${fmtMoney(pnlPf)}</small></td></tr>`;
+      return `<tr><td><b>${esc(row.inst || '--')} <span class="direction-chip ${directionClass}">${esc(row.direction || '--')}</span></b><small>${esc(row.entry_day || '--')}</small><small>${esc(brokerIdentity(flex.broker_trade_id))}</small></td><td>${componentCompareGrid(row, contractSpecs)}${costModelHint(backtestC)}</td><td>${varianceCompareGrid(row, contractSpecs)}<b>net P-B ${fmtMoney(pnlPb)}</b><small>net P-F ${fmtMoney(pnlPf)}</small></td></tr>`;
     }).join('')}</tbody><tfoot><tr class="total-row"><td><span class="fill-result ${pbRecon.cls}">TOTAL DELTA</span><small>${esc(rows.length)} source row(s)</small></td><td><b>Reconcile vs P&amp;L grid</b><small><span class="fill-result ${pbRecon.cls}">${pbRecon.label}</span> P-B grid ${fmtMoney(pl.paper_minus_backtest_realized)}</small><small><span class="fill-result ${pfRecon.cls}">${pfRecon.label}</span> P-F grid ${fmtMoney(pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized)}</small></td><td><b class="pnl-value ${moneyClass(pbTotal)}">P-B ${fmtMoney(pbTotal)}</b><small>P-F ${fmtMoney(pfTotal)}</small></td></tr></tfoot></table></div>`;
   }
 
@@ -1116,11 +1351,47 @@
     }).join('')}</tbody></table></div>`;
   }
 
-  function statementPnlCompareBlock(compare) {
+  function artifactFreshnessBlock(m = {}) {
+    // Every figure on this panel comes out of monitor/paper_pnl_compare.json, which is
+    // generated rather than computed on request. Stale output looks exactly as
+    // authoritative as fresh output, so the panel has to say which one it is showing.
+    const f = m.artifact_freshness;
+    if (!f || f.status === 'CURRENT') return '';
+    const tone = f.status === 'STALE' ? 'BREACH' : 'CHECK';
+    return tableVerdict(tone, 'P&L source freshness', f.detail || '',
+      [`status ${f.status}`, ...(f.drifted || []).map(name => `changed: ${name}`)]);
+  }
+
+  function ledgerAdjustmentBlock(m = {}) {
+    // A reconciliation entry nobody can see is a note, not a control. This surfaces the
+    // recorded shortfall next to the P&L grid, because that is where the gap appears:
+    // paper-minus-Flex reads +$1,260.00 against a recorded adjustment of the same size,
+    // and without the adjustment beside it that break looks fresh and unexplained.
+    const rows = m.ledger_adjustments || [];
+    const basis = m.flex_reconcile_basis;
+    if (!rows.length && !basis) return '';
+    const total = m.ledger_adjustment_total;
+    const table = rows.length
+      ? `<div class="trade-table ledger-adjustment-table"><table><thead><tr><th>status</th><th>entry</th><th>broker</th><th>sleeve ledger</th><th>shortfall</th><th>root cause</th></tr></thead><tbody>${rows.map(row => {
+          const shortfall = Number(row.ledger_shortfall);
+          return `<tr><td><span class="fill-result watch">${esc(String(row.status || 'recorded').toUpperCase())}</span><small>${esc(row.date_recorded || '--')}</small></td><td><b>${esc(row.id || '--')}</b><small>${esc(row.instrument || '--')} ${esc(row.cluster || '')}</small><small>${esc((row.affected_fills || []).length)} fill(s)</small></td><td><b class="pnl-value ${moneyClass(row.broker_gross_realized)}">${fmtMoney(row.broker_gross_realized)}</b><small>fees ${fmtMoney(row.broker_commission)}</small></td><td><b class="pnl-value ${moneyClass(row.sleeve_ledger_booked)}">${fmtMoney(row.sleeve_ledger_booked)}</b><small>pnl_sized</small></td><td><b class="pnl-value bad">${fmtMoney(shortfall)}</b><small>ratio ${esc(row.ratio_broker_over_ledger ?? '--')}×</small></td><td><small>${esc(row.root_cause || '--')}</small></td></tr>`;
+        }).join('')}</tbody></table></div>${rows.map(row => `<p class="detail-note">${esc(row.reconciliation_note || '')}</p>`).join('')}`
+      : '<p class="detail-empty">No ledger adjustment has been recorded.</p>';
+    const verdict = rows.length
+      ? tableVerdict('EXPLAINED', 'Ledger adjustments',
+          `A recorded ${fmtMoney(total)} gap between the sleeve ledger and the money the broker actually moved. This is the cost of a known defect rather than a strategy result, and it does not disappear when the defect is fixed.`,
+          [`entries ${rows.length}`, `total ${fmtMoney(total)}`])
+      : '';
+    const basisNote = basis
+      ? `<p class="detail-note"><b>Flex reconcile basis:</b> ${esc(basis)}</p>`
+      : '';
+    return `<h4 class="detail-subhead">Ledger adjustments</h4>${verdict}${table}${basisNote}`;
+  }
+
+  function statementPnlCompareBlock(compare, m = {}) {
     const pl = (compare && compare.statement_pnl_compare) || {};
     if (!Object.keys(pl).length) return '<p class="detail-empty">No Flex P&L comparison is available.</p>';
-    const pbRecon = reconcileStatus(pl.paper_minus_backtest_realized, pl.paper_minus_backtest_realized);
-    const pfRecon = reconcileStatus(pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized, pl.paper_flex_bridge_diff_sum ?? pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized);
+    const pfRecon = reconcileStatus(pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized, pl.paper_flex_bridge_diff_sum);
     const ledgerOk = Math.abs(Number(pl.ledger_aligned_minus_system_ledger_pnl || 0)) < 0.005;
     const verdict = pfRecon.cls === 'bad' || !ledgerOk ? 'BREACH' : Math.abs(Number(pl.paper_minus_backtest_realized || 0)) > 0.005 ? 'EXPLAINED' : 'PASS';
     const summary = verdict === 'PASS'
@@ -1138,7 +1409,7 @@
       metricCard('Realtime ledger', fmtMoney((compare && compare.pnl_reconcile || {}).realtime_system_ledger_pnl), 'Runner system ledger realised P&L. This is not IBKR NetLiquidation.', '', 'SYSTEM', 'live_state'),
       metricCard('Flex ledger-aligned', fmtMoney(pl.flex_ledger_aligned_realized), 'Flex zero-base realised plus the intentionally selected carry-in close that reconciles the runner system ledger.', '', pl.ledger_alignment_override?.status || 'OBSERVED', 'selective carry'),
       metricCard('Flex - realtime', fmtMoney(pl.ledger_aligned_minus_system_ledger_pnl), 'Ledger-aligned Flex minus runner realtime system ledger. Expected to be zero when the selective carry override is correct.', Number(pl.ledger_aligned_minus_system_ledger_pnl) === 0 ? 'ok' : 'bad', 'VARIANCE', 'ledger check'),
-    ].join('')}</div><p class="detail-note">${esc(pl.note || '')} Component note: Source Diff Analyzer shows paper gross/net from trade_log, backtest native replay-exported gross/model commission/model slippage/net, and Flex reconstructed gross/native broker fee/net+fee from IBKR statement. Paper commission is exported when the broker API emits a commission report for the fill; older trade_log rows can remain missing and Flex remains the historical broker-fee source of truth. Ignored carry-close fills inside epoch: ${esc(pl.flex_epoch_rebased_ignored_count ?? 0)}. Excluded pre-epoch closed lots: ${esc(pl.excluded_pre_epoch_closed_count ?? 0)} (${fmtMoney(pl.excluded_pre_epoch_exit_window_realized)}). Raw IBKR FIFO entry-epoch realised: ${fmtMoney(pl.raw_statement_entry_epoch_realized)}.</p><h4 class="detail-subhead">Zero-base Paper vs Flex closed trades</h4>${paperFlexBridgeRows(pl.paper_flex_bridge, pl)}<h4 class="detail-subhead">Flex epoch-rebased open lots</h4>${statementTradeRows(pl.flex_epoch_rebased_open_lots || pl.statement_entry_epoch_open_lots, 'No epoch-rebased Flex open lots are retained.')}`;
+    ].join('')}</div><p class="detail-note">${esc(pl.note || '')} Component note: Source Diff Analyzer shows paper gross/net from trade_log, backtest native replay-exported gross/model commission/model slippage/net, and Flex reconstructed gross/native broker fee/net+fee from IBKR statement. Paper commission is exported when the broker API emits a commission report for the fill; older trade_log rows can remain missing and Flex remains the historical broker-fee source of truth. Ignored carry-close fills inside epoch: ${esc(pl.flex_epoch_rebased_ignored_count ?? 0)}. Excluded pre-epoch closed lots: ${esc(pl.excluded_pre_epoch_closed_count ?? 0)} (${fmtMoney(pl.excluded_pre_epoch_exit_window_realized)}). Raw IBKR FIFO entry-epoch realised: ${fmtMoney(pl.raw_statement_entry_epoch_realized)}.</p>${ledgerAdjustmentBlock(m)}<h4 class="detail-subhead">Zero-base Paper vs Flex closed trades</h4>${paperFlexBridgeRows(pl.paper_flex_bridge, pl)}<h4 class="detail-subhead">Flex epoch-rebased open lots</h4>${statementTradeRows(pl.flex_epoch_rebased_open_lots || pl.statement_entry_epoch_open_lots, 'No epoch-rebased Flex open lots are retained.')}`;
   }
 
   function pnlBaseMetricCards(m) {
@@ -1278,29 +1549,10 @@
       : verdict === 'PENDING'
         ? 'Rows support the chart, but at least one daily curve row is still stale.'
         : 'Chart support rows do not reconcile to the headline P&L grid.';
-    return `${renderVerdict(backendVerdict(compare, 'daily'), verdict, 'Timeline data', summary, [`rows ${support.length}`, `paper ${paperRecon.label}`, `backtest ${backtestRecon.label}`, `Flex ${flexRecon.label}`])}<div class="trade-table pnl-daily-table"><table><thead><tr><th>date</th><th>Paper actual</th><th>Backtest</th><th>Flex</th><th>Paper - Backtest</th><th>Paper - Flex</th><th>status</th></tr></thead><tbody>${support.map(row => {
+    return `${renderVerdict(backendVerdict(compare, 'daily'), verdict, 'Timeline data', summary, [`rows ${support.length}`, `paper ${paperRecon.label}`, `backtest ${backtestRecon.label}`, `Flex ${flexRecon.label}`], { keepSectionTitle: true })}<div class="trade-table pnl-daily-table"><table><thead><tr><th>date</th><th>Paper actual</th><th>Backtest</th><th>Flex</th><th>Paper - Backtest</th><th>Paper - Flex</th><th>status</th></tr></thead><tbody>${support.map(row => {
       const cls = row.curve_status === 'covered' ? 'ok' : 'watch';
       return `<tr><td><b>${esc(row.date || '--')}</b><small>${esc(row.curve_status || '--')}</small></td><td><b class="pnl-value ${moneyClass(row.paper)}">${fmtMoney(row.paper)}</b><small>chart series</small></td><td><b class="pnl-value ${moneyClass(row.backtest)}">${fmtMoney(row.backtest)}</b><small>chart series</small></td><td><b class="pnl-value ${moneyClass(row.flex)}">${fmtMoney(row.flex)}</b><small>Flex cumulative</small></td><td><b class="pnl-value ${moneyClass(row.paperBacktest)}">${fmtMoney(row.paperBacktest)}</b><small>paper - backtest</small></td><td><b class="pnl-value ${moneyClass(row.paperFlex)}">${fmtMoney(row.paperFlex)}</b><small>paper - Flex</small></td><td><span class="fill-result ${cls}">${esc(row.curve_status || '--')}</span><small>${esc(row.divergence_side || '--')}</small></td></tr>`;
     }).join('')}</tbody><tfoot><tr class="total-row"><td><span class="fill-result ${verdictClass(verdict)}">LATEST</span></td><td><b>${fmtMoney(latest.paper)}</b><small>${paperRecon.label} vs grid ${fmtMoney(pl.paper_epoch_closed_realized)}</small></td><td><b>${fmtMoney(latest.backtest)}</b><small>${backtestRecon.label} vs grid ${fmtMoney(pl.backtest_epoch_closed_realized)}</small></td><td><b>${fmtMoney(latest.flex)}</b><small>${flexRecon.label} vs grid ${fmtMoney(pl.flex_epoch_rebased_realized ?? pl.statement_entry_epoch_realized)}</small></td><td><b>${fmtMoney(latest.paperBacktest)}</b><small>grid ${fmtMoney(pl.paper_minus_backtest_realized)}</small></td><td><b>${fmtMoney(latest.paperFlex)}</b><small>grid ${fmtMoney(pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized)}</small></td><td><span class="fill-result ${stale ? 'watch' : 'ok'}">${stale ? 'STALE' : 'FRESH'}</span></td></tr></tfoot></table></div>`;
-  }
-
-  function pnlDailyRows(timeline, compare = null) {
-    const rows = timeline || [];
-    if (!rows.length) return '<p class="detail-empty">No daily rows are available.</p>';
-    const stale = rows.filter(row => row.curve_status && row.curve_status !== 'covered').length;
-    const latest = rows[rows.length - 1] || {};
-    const tradeDiff = Number(latest.trade_filter_realized_diff);
-    const verdict = stale ? 'PENDING' : Number.isFinite(tradeDiff) && Math.abs(tradeDiff) > 0.005 ? 'EXPLAINED' : 'PASS';
-    const summary = stale
-      ? 'Some daily rows are stale, so the curve is not a complete freshness pass yet.'
-      : Math.abs(Number(tradeDiff || 0)) > 0.005
-        ? 'Daily paper/backtest divergence exists and should be explained by trade-level lifecycle rows.'
-        : 'Daily paper/backtest trade ledger is aligned through the latest covered row.';
-    return `${renderVerdict(backendVerdict(compare, 'daily'), verdict, 'Daily divergence', summary, [`rows ${rows.length}`, `stale ${stale}`, `latest trade diff ${fmtMoney(latest.trade_filter_realized_diff)}`])}<div class="trade-table pnl-daily-table"><table><thead><tr><th>date</th><th>system ledger</th><th>paper trade ledger</th><th>backtest reset</th><th>ledger offset</th><th>trade diff</th><th>side/status</th></tr></thead><tbody>${rows.map(row => {
-      const side = row.divergence_side || '--';
-      const cls = side === 'FAVORABLE' ? 'ok' : side === 'ADVERSE' ? 'bad' : row.curve_status === 'covered' ? 'ok' : 'watch';
-      return `<tr><td><b>${esc(row.date || '--')}</b><small>${esc(row.curve_status || '--')}</small></td><td><b>${fmtEquity(row.actual_equity)}</b><small>${esc(row.actual_equity_source || 'system ledger')}</small></td><td><b>${fmtEquity(row.paper_trade_filter_equity)}</b><small>paper closed trade P&amp;L ${fmtMoney(row.paper_trade_realized_cum)}</small></td><td><b>${fmtEquity(row.expected_equity)}</b><small>backtest closed trade P&amp;L ${fmtMoney(row.backtest_trade_realized_cum)}</small></td><td><b>${fmtMoney(row.system_ledger_vs_trade_filter)}</b><small>ledger - paper trade ledger</small></td><td><b>${fmtMoney(row.trade_filter_realized_diff)}</b><small>paper trades - backtest trades</small></td><td><span class="fill-result ${cls}">${esc(side)}</span><small>${esc(row.curve_status || '--')}</small></td></tr>`;
-    }).join('')}</tbody></table></div>`;
   }
 
   function pnlReconcileBlock(compare) {
@@ -1337,7 +1589,9 @@
     const unresolved = Number(compare?.unresolved ?? 0) + openDiff + (pfRecon.cls === 'bad' ? 1 : 0) + (pbRecon.cls === 'bad' ? 1 : 0);
     const paperBacktestDelta = Number(pl.paper_minus_backtest_realized || 0);
     const backendOverview = backendVerdict(compare, 'overview');
-    return `${renderVerdict(backendOverview, unresolved ? 'BREACH' : Math.abs(paperBacktestDelta) > 0.005 ? 'EXPLAINED' : 'PASS', 'Overview verdicts', unresolved ? 'At least one headline check requires drilldown before pass.' : 'Headline checks have a table-level explanation.', [`unresolved ${unresolved}`])}<div class="overview-verdict-grid">${[
+    // Freshness goes first, above the verdicts. A reader who scrolls past a warning
+    // buried under the tables has already believed the numbers.
+    return `${artifactFreshnessBlock(m)}${renderVerdict(backendOverview, unresolved ? 'BREACH' : Math.abs(paperBacktestDelta) > 0.005 ? 'EXPLAINED' : 'PASS', 'Overview verdicts', unresolved ? 'At least one headline check requires drilldown before pass.' : 'Headline checks have a table-level explanation.', [`unresolved ${unresolved}`])}<div class="overview-verdict-grid">${[
       overviewVerdictCard(baseOk ? 'Base aligned' : 'Base mismatch', baseOk ? 'PASS' : 'BREACH', base.paper_account_base == null ? '--' : fmtEquity(base.paper_account_base), baseOk ? 'Paper/backtest comparison starts from the intended account base.' : 'Paper account base or backtest reset does not match the epoch spec.'),
       overviewVerdictCard(pfRecon.cls === 'bad' ? 'Paper-Flex check' : 'Paper-Flex clean', pfRecon.cls === 'bad' ? 'BREACH' : 'PASS', fmtMoney(pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized), `zero-base footer ${pfRecon.label}`),
       overviewVerdictCard(pbRecon.cls === 'bad' ? 'Paper-BT check' : Math.abs(paperBacktestDelta) > 0.005 ? 'Paper-BT explained' : 'Paper-BT clean', pbRecon.cls === 'bad' ? 'BREACH' : Math.abs(paperBacktestDelta) > 0.005 ? 'EXPLAINED' : 'PASS', fmtMoney(pl.paper_minus_backtest_realized), `trade footer ${pbRecon.label}`),
@@ -1362,12 +1616,12 @@
   }
 
   function pnlCompareTab(compare, m, counts, signalCompare, signalCounts, entryCompare, entryCounts, latest) {
-    return `<div class="pnl-tab-panel overview-panel"><section class="more-section trade-detail overview-verdict-section"><h3>Overview Verdicts</h3>${overviewVerdictStrip(compare, m)}</section><section class="more-section trade-detail"><h3>What This Measures</h3>${pnlPurposeBlock(m)}</section><section class="more-section trade-detail"><h3>Realtime P&amp;L Source</h3>${realtimeLedgerBlock(compare)}</section><section class="more-section trade-detail"><h3>P&amp;L Compare</h3>${statementPnlCompareBlock(compare)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section><p class="detail-note">${esc(m.curve_status_rule || 'Curve status controls daily-row freshness, not standalone P&L pass/fail.')} Known exit timing drift is expected when the paper/live path defers a stop/exit after the 14h/EOD decision.</p></div>`;
+    return `<div class="pnl-tab-panel overview-panel"><section class="more-section trade-detail overview-verdict-section"><h3>Overview Verdicts</h3>${overviewVerdictStrip(compare, m)}</section><section class="more-section trade-detail"><h3>What This Measures</h3>${pnlPurposeBlock(m)}</section><section class="more-section trade-detail"><h3>Realtime P&amp;L Source</h3>${realtimeLedgerBlock(compare)}</section><section class="more-section trade-detail"><h3>P&amp;L Compare</h3>${statementPnlCompareBlock(compare, m)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section><p class="detail-note">${esc(m.curve_status_rule || 'Curve status controls daily-row freshness, not standalone P&L pass/fail.')} Known exit timing drift is expected when the paper/live path defers a stop/exit after the 14h/EOD decision.</p></div>`;
   }
 
-  function pnlSourceDiffSection(compare) {
+  function pnlSourceDiffSection(compare, m = {}) {
     const pl = compare.statement_pnl_compare || {};
-    return `<section class="more-section trade-detail"><h3>Source Diff Analyzer</h3>${sourceDiffStatsStrip(compare.lifecycle_compare?.rows || [], pl)}${sourceDiffAnalyzerRows(compare.lifecycle_compare, pl, compare)}</section>`;
+    return `<section class="more-section trade-detail"><h3>Source Diff Analyzer</h3>${sourceDiffStatsStrip(compare.lifecycle_compare?.rows || [], pl)}${sourceDiffAnalyzerRows(compare.lifecycle_compare, pl, compare, m.contract_specs || {})}</section>`;
   }
 
   function pnlTimelineTab(compare, m) {
@@ -1379,7 +1633,7 @@
   }
 
   function pnlTradeReconcileTab(compare, m) {
-    return `<div class="pnl-tab-panel trades-panel"><section class="more-section trade-detail"><h3>Trade Master Reconcile</h3>${tradeMasterReconcileRows(compare, compare.statement_pnl_compare)}</section>${pnlSourceDiffSection(compare)}</div>`;
+    return `<div class="pnl-tab-panel trades-panel"><section class="more-section trade-detail"><h3>Trade Master Reconcile</h3>${tradeMasterReconcileRows(compare, compare.statement_pnl_compare)}</section>${pnlSourceDiffSection(compare, m)}</div>`;
   }
 
   function pnlAuditTab(compare) {
@@ -1772,11 +2026,14 @@
 
   function logHygieneDetail(item) {
     const m = item.metrics || {};
-    const dropped = Number(m.dropped_test_lines || 0);
-    return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Production-log hygiene shows test/noise lines filtered out of paper evidence.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${tableVerdict('PASS', 'Log hygiene verdict', 'Known test/noise markers are filtered before paper evidence is counted.', [`dropped ${dropped}`, `samples ${(m.sample_rows || []).length}`])}<div class="detail-metric-grid">${[
-      metricCard('Dropped lines', dropped, 'Log lines excluded because they match known test/noise markers.', dropped ? 'watch' : 'ok', 'OBSERVED', 'filtered'),
+    const dropped = m.dropped_test_lines;
+    const blocks = Array.isArray(m.excluded_blocks) ? m.excluded_blocks : null;
+    const blockCount = blocks ? blocks.length : null;
+    return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Production-log hygiene shows test/noise lines filtered out of paper evidence.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${tableVerdict('PASS', 'Log hygiene verdict', 'Known test/noise markers are filtered before paper evidence is counted.', [`dropped ${dropped ?? '--'}`, `blocks ${blockCount ?? '--'}`, `samples ${(m.sample_rows || []).length}`])}<div class="detail-metric-grid">${[
+      metricCard('Dropped lines', dropped ?? '--', 'Log lines excluded because they match known test/noise markers.', dropped ? 'watch' : dropped === 0 ? 'ok' : 'watch', 'OBSERVED', 'filtered'),
+      metricCard('Excluded blocks', blockCount ?? '--', 'Timestamp blocks excluded because at least one line in the block matched a known test/noise marker.', blockCount ? 'watch' : blockCount === 0 ? 'ok' : 'watch', 'OBSERVED', 'audit'),
       metricCard('Sample rows', (m.sample_rows || []).length, 'Representative dropped rows retained for audit display.', '', 'OBSERVED', 'capped'),
-    ].join('')}</div></section><section class="more-section trade-detail"><h3>Dropped Noise Samples</h3>${operatorLogRows(m.sample_rows, 'No dropped noise samples are available.')}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
+    ].join('')}</div></section><section class="more-section"><h3>Excluded Blocks</h3><dl class="metric-list">${blocks && blocks.length ? blocks.slice(0, 12).map(block => metricLine(`${block.path || '--'}:${block.line_from ?? '--'}-${block.line_to ?? '--'}`, `${block.timestamp || '--'} | ${block.line_count ?? '--'} lines | ${block.matched_marker || '--'}`)).join('') : metricLine('blocks', '--')}</dl></section><section class="more-section trade-detail"><h3>Dropped Noise Samples</h3>${operatorLogRows(m.sample_rows, 'No dropped noise samples are available.')}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
   }
 
   function contractSpecRows(rows) {
@@ -1797,6 +2054,90 @@
     return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Reconciles local contract metadata against IBKR ContractDetails before using points as dollars.')}</p></section><section class="more-section trade-detail"><h3>Contract Spec Reconcile</h3>${contractSpecRows(m.rows)}</section><section class="more-section"><h3>Source State</h3><dl class="metric-list">${metricLine('local source', m.local_source || '--')}${metricLine('IBKR connected', m.ibkr_connected === true ? 'true' : 'false')}${metricLine('IBKR observed', m.ibkr_observed_at || '--')}${metricLine('mismatches', m.mismatches ?? 0)}${metricLine('missing', m.missing ?? 0)}</dl></section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
   }
 
+  function pnlThresholdDetail(item) {
+    // A go-live threshold shown as a bare number is not reviewable. Everything needed to
+    // argue with it lives here: where the bands came from, how often the rule blocks a
+    // healthy epoch, what it provably cannot catch, and why it is silent right now.
+    const m = item.metrics || {};
+    const spec = m.spec;
+    if (!spec) {
+      return `<section class="more-section"><h3>No threshold defined</h3><p class="detail-empty">${esc(m.detail || 'No pnl_threshold_spec exists, so no loss level blocks go-live.')}</p></section>`;
+    }
+    const edge = m.edge || {};
+    const ops = m.operational || {};
+    const eg = spec.edge_gate || {};
+    const og = spec.operational_gate || {};
+    const frame = spec.frame || {};
+    const coh = spec.coherence_check || {};
+
+    const gateCard = (name, state, detail, rows) =>
+      `<article class="threshold-gate ${statusClass(state)}"><header><span class="fill-result ${verdictClass(state === 'NOT_ARMED' ? 'CHECK' : state)}">${esc(state)}</span><b>${esc(name)}</b></header><p>${esc(detail)}</p><dl>${rows.filter(Boolean).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join('')}</dl></article>`;
+
+    const gates = `<div class="threshold-gate-grid">${[
+      gateCard('Edge gate — is the strategy working?', edge.status || 'UNKNOWN', edge.detail || '--', [
+        ['applies to', esc(eg.applies_to || '--')],
+        ['epoch sessions', `${metricValue(edge.sessions)} / ${specValue(edge.arm_after_sessions)} to arm`],
+        edge.sessions_to_arm ? ['sessions until armed', `<b>${esc(edge.sessions_to_arm)}</b>`] : null,
+        ['active floor', edge.floor_usd == null ? 'not armed' : `<b class="pnl-value bad">${fmtMoney(edge.floor_usd)}</b>`],
+        ['strategy P&L', `<b class="pnl-value ${moneyClass(edge.value_usd)}">${fmtMoney(edge.value_usd)}</b>`],
+        edge.headroom_usd == null ? null : ['headroom', `<b class="pnl-value ${moneyClass(edge.headroom_usd)}">${fmtMoney(edge.headroom_usd)}</b>`],
+      ]),
+      gateCard('Operational gate — do the books match the account?', ops.status || 'UNKNOWN', ops.detail || '--', [
+        ['applies to', esc(og.applies_to || '--')],
+        ['broker realised', `<b class="pnl-value ${moneyClass(ops.broker_usd)}">${fmtMoney(ops.broker_usd)}</b>`],
+        ['sleeve ledger', `<b class="pnl-value ${moneyClass(ops.ledger_usd)}">${fmtMoney(ops.ledger_usd)}</b>`],
+        ['gap', `<b class="pnl-value ${moneyClass(ops.gap_usd)}">${fmtMoney(ops.gap_usd)}</b>`],
+        ['recorded adjustments', `<b class="pnl-value">${fmtMoney(ops.adjustment_total_usd)}</b>`],
+        ['threshold', `<b>none — any uncovered gap blocks</b>`],
+      ]),
+    ].join('')}</div>`;
+
+    const bands = (eg.bands || []);
+    const activeN = edge.active_band ? Number(edge.active_band.sessions) : null;
+    const bandTable = bands.length
+      ? `<div class="trade-table threshold-band-table"><table><thead><tr><th>sessions</th><th>floor (p${String((eg.quantile ?? 0) * 100).padStart(2, '0')})</th><th>% of base</th><th>windows sampled</th></tr></thead><tbody>${bands.map(b => {
+          const base = Number(frame.account_base_usd) || 0;
+          const pct = base ? (Number(b.floor_usd) / base * 100).toFixed(2) + '%' : '--';
+          const on = Number(b.sessions) === activeN;
+          return `<tr${on ? ' class="band-active"' : ''}><td>${on ? '<b>' : ''}${esc(b.sessions)}${on ? '</b> &larr; active' : ''}</td><td><b class="pnl-value bad">${fmtMoney(b.floor_usd)}</b></td><td>${esc(pct)}</td><td>${esc(b.windows)}</td></tr>`;
+        }).join('')}</tbody></table></div><p class="detail-note">${esc(eg.band_selection || '')}</p>`
+      : '<p class="detail-empty">No bands are defined.</p>';
+
+    const power = (eg.measured_power || []);
+    const powerTable = power.length
+      ? `<div class="trade-table"><table><thead><tr><th>drag per session</th><th>epochs the rule catches</th></tr></thead><tbody>${power.map(p => `<tr><td>${fmtMoney(-Math.abs(Number(p.drag_per_session_usd)))} / session</td><td><b>${(Number(p.detected) * 100).toFixed(1)}%</b></td></tr>`).join('')}</tbody></table></div>`
+      : '';
+
+    return `<section class="more-section"><h3>The two gates</h3>${gates}</section>
+      <section class="more-section"><h3>Why these numbers and not others</h3>
+        ${tableVerdict('APPROVED', `Approved ${spec.approved_on || '--'}`, spec.summary || '', [`edge quantile p${String((eg.quantile ?? 0) * 100).padStart(2, '0')}`, `armed at ${specValue(eg.arm_after_sessions)} sessions`])}
+        ${metricLine('arming rule', eg.why_armed_late)}
+        ${metricLine('quantile choice', eg.why_p01)}
+        ${metricLine('no operational threshold', og.why_no_threshold)}
+      </section>
+      <section class="more-section"><h3>Band table — the floor at each epoch length</h3>${bandTable}</section>
+      <section class="more-section"><h3>What the rule costs and what it misses</h3>
+        ${tableVerdict('MEASURED', 'False-block rate', `${((eg.measured_false_block_rate ?? 0) * 100).toFixed(1)}% of known-good epochs are blocked by this rule.`, [`quantile p${String((eg.quantile ?? 0) * 100).padStart(2, '0')}`, `armed at ${specValue(eg.arm_after_sessions)}`])}
+        ${metricLine('how that was measured', eg.measured_false_block_note)}
+        <h4 class="detail-subhead">Detection power</h4>${powerTable}
+        ${tableVerdict('LIMIT', 'What this cannot catch', eg.limitation || '', [])}
+      </section>
+      <section class="more-section"><h3>Where the distribution came from</h3>
+        ${metricLine('source', frame.source)}
+        ${metricLine('period', `${frame.period || '--'} (${metricValue(frame.sessions)} sessions, base ${fmtEquity(frame.account_base_usd)})`)}
+        ${metricLine('self-check', frame.self_check)}
+        ${metricLine('why truncated', frame.why_truncated)}
+        ${metricLine('instrument check', frame.instrument_check)}
+      </section>
+      <section class="more-section"><h3>Cross-check against existing risk limits</h3>
+        ${metricLine('daily circuit breaker', fmtMoney(coh.daily_circuit_breaker_usd))}
+        ${metricLine('20-session floor', fmtMoney((bands[0] || {}).floor_usd))}
+        ${metricLine('backtest max drawdown', `${fmtMoney(coh.backtest_max_drawdown_usd)} (${metricValue(coh.backtest_max_drawdown_pct)}%)`)}
+        ${metricLine('note', coh.note)}
+        ${metricLine('worked example', og.worked_example)}
+      </section>`;
+  }
+
   function coverageDetail(item) {
     if (!item) return '<aside class="coverage-detail"><p class="detail-empty">Select a coverage item.</p></aside>';
     const pvb = item.key === 'paper_vs_backtest' ? pnlCompareDetail(item) : '';
@@ -1814,13 +2155,14 @@
     const sampleDenominators = item.key === 'sample_denominators' ? sampleDenominatorsDetail(item) : '';
     const sameDayMultiDay = item.key === 'same_day_multi_day' ? sameDayMultiDayDetail(item) : '';
     const logHygiene = item.key === 'log_hygiene' ? logHygieneDetail(item) : '';
-    const customDetail = pvb || fill || stpPlacement || rejection || contractSpec || statePersist || currentProtection || runnerFreshness || dataFreshness || openIncidents || manualIntervention || rollSlippage || sampleDenominators || sameDayMultiDay || logHygiene;
+    const pnlThresholds = item.key === 'pnl_thresholds' ? pnlThresholdDetail(item) : '';
+    const customDetail = pvb || fill || stpPlacement || rejection || contractSpec || statePersist || currentProtection || runnerFreshness || dataFreshness || openIncidents || manualIntervention || rollSlippage || sampleDenominators || sameDayMultiDay || logHygiene || pnlThresholds;
     const evidence = customDetail ? '' : `<p class="coverage-detail-evidence">${esc(item.evidence)}</p>`;
     return `<aside class="coverage-detail"><div class="coverage-detail-head"><h3>${esc(item.title)}</h3><span class="gate-state ${statusClass(item.status)}">${esc(item.status)}</span></div>${evidence}<div class="c1-more-grid">${customDetail || `<section class="more-section"><h3>Metrics</h3>${coverageMetrics(item.metrics)}</section>`}<section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(item.sources)}</ul></section></div></aside>`;
   }
 
   const coverageGroups = [
-    ['Execution health', ['fill_quality', 'stp_placement', 'rejections', 'paper_vs_backtest']],
+    ['Execution health', ['fill_quality', 'stp_placement', 'rejections', 'paper_vs_backtest', 'pnl_thresholds']],
     ['State and protection', ['state_persist', 'current_protection', 'runner_freshness']],
     ['Data and model', ['data_freshness', 'contract_spec_guard', 'open_incidents']],
     ['Operator and sample context', ['manual_intervention', 'roll_slippage', 'sample_denominators', 'same_day_multi_day', 'log_hygiene']],
@@ -1909,10 +2251,6 @@
     const blocked = statuses.some(status => status === 'SPEC_GAP' || status === 'STRUCTURAL_GAP');
     const breached = statuses.includes('BREACH');
     const complete = !sourceMissing && !blocked && !breached && gates.every(gate => gate.status === 'PASS');
-    setText('paperDays', `${summary.days ?? 0} / 60`);
-    setText('regimesSeen', (summary.regimes || []).length ? summary.regimes.join(' + ') : 'None');
-    setText('exitCoverage', `${summary.exit_paths_complete ?? 0} / 3`);
-    setText('slippageMean', fmtTicks(summary.c1_open_mean));
     renderReadinessBlockers(gates, coverage, summary);
     updateCoveragePanel(gates, coverage);
     updateC1Panel(gates, summary, coverage);
@@ -1938,11 +2276,40 @@
     $('overallReason').textContent = sourceMissing ? 'Paper evidence source is unavailable' : complete ? 'All observable gates passed' : breached ? 'At least one observed gate breached' : blocked ? 'At least one gate needs a quantified decision before it can pass' : 'Pending evidence remains';
   }
 
-  async function load() {
+  // Polling stays; automatic repainting does not. render() reassigns innerHTML across
+  // every panel, which closes open <details>, resets table scroll and drops text
+  // selection -- and this page exists to be read slowly, one long evidence table at a
+  // time. The payload changes a few times a day, so a 60s repaint spent the reader's
+  // place to buy freshness that was not there. Now the poll only detects change and
+  // offers it; the reader decides when to lose their position.
+  let renderedText = null;
+
+  function showRefreshChip(show) {
+    const chip = $('refreshChip');
+    if (chip) chip.hidden = !show;
+  }
+
+  async function load(force = false) {
     try {
-      const response = await fetch('/api/v1/paper-evidence', { cache: 'no-store', signal: AbortSignal.timeout(30000) });
+      // 90s, not 30s. The first request after a backend restart rebuilds the evidence
+      // cache by scanning ~115MB of logs; measured 41.7s on 2026-08-15, so a 30s client
+      // timeout guaranteed that the first page load after every restart reported
+      // "Paper evidence unavailable" for a backend that was working. Warm requests
+      // return in ~0.03s, so this ceiling costs nothing in the normal case.
+      // It treats the symptom: the scan itself still belongs behind a warm-on-start.
+      const response = await fetch('/api/v1/paper-evidence', { cache: 'no-store', signal: AbortSignal.timeout(90000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      render(await response.json());
+      const text = await response.text();
+      // Detect-only on a background poll. The chip refetches when clicked rather than
+      // replaying this body, so a chip left sitting for ten minutes still shows current
+      // evidence rather than whatever was true when it appeared.
+      if (!force && renderedText !== null) {
+        if (text !== renderedText) showRefreshChip(true);
+        return;
+      }
+      render(JSON.parse(text));
+      renderedText = text;
+      showRefreshChip(false);
     } catch (error) {
       const readiness = $('overallStatus').parentElement;
       readiness.classList.add('unknown');
@@ -1953,6 +2320,8 @@
     }
   }
 
-  load();
-  window.setInterval(load, 60000);
+  const refreshChip = $('refreshChip');
+  if (refreshChip) refreshChip.addEventListener('click', () => load(true));
+  load(true);
+  window.setInterval(() => load(false), 60000);
 })();

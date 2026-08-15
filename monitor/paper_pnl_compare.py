@@ -1260,17 +1260,36 @@ def _epoch_rebased_flex(fills: list[dict[str, Any]], paper_signals: list[dict[st
         lots = books.setdefault(str(inst), [])
         if lots and (lots[0]["signed"] > 0) != (signed > 0):
             o = lots.pop(0)
-            pv = None
-            try:
-                from global_index.statement import point_value
-                pv = point_value(str(inst))
-            except Exception:
-                pv = None
             long_side = o["signed"] > 0
             qty = abs(signed)
-            pnl = (((fill["price"] - o["price"]) * pv * qty * (1 if long_side else -1))
-                   if pv else None)
+            # Money comes from the statement, not from a local multiplier.
+            #
+            # This used to be (exit - entry) * point_value(inst) * qty. The paper ledger
+            # prices its own fills with the same point_value, so both sides of
+            # "paper minus Flex" carried any multiplier error equally and it cancelled to
+            # 0.00 — the check could not fail for the one defect it exists to catch. It
+            # read 0.00 for four days while MNKD orders filled on a contract worth ten
+            # times what specs.py declared, and the broker was $1,260 further down than
+            # the books showed.
+            #
+            # Proceeds already carry the multiplier and the sign (negative on a buy), so
+            # a closed pair's gross realised P&L is the sum of its two legs. Falling back
+            # to point_value when the statement lacks proceeds would reinstate the blind
+            # spot silently, so an unpriceable pair reports None instead.
+            entry_proceeds = _number(o.get("proceeds"))
+            exit_proceeds = _number(fill.get("proceeds"))
+            pnl_basis = None
+            if entry_proceeds is not None and exit_proceeds is not None:
+                pnl = entry_proceeds + exit_proceeds
+                pnl_basis = "statement_proceeds"
+            else:
+                pnl = None
+            # IBKR's own realised figure for the same pair, kept as an independent read.
+            fifo = _number(o.get("fifo_pnl")) or 0.0
+            fifo += _number(fill.get("fifo_pnl")) or 0.0
             closed.append({
+                "pnl_basis": pnl_basis,
+                "fifo_pnl": round(fifo, 2) if pnl_basis else None,
                 "inst": inst,
                 "direction": "LONG" if long_side else "SHORT",
                 "contracts": qty,
@@ -1649,12 +1668,40 @@ def build_report(root: Path) -> dict[str, Any]:
     return report
 
 
+# The dashboard does not compute this report; it reads the file this script writes.
+# So a fix to the money logic reaches the screen only when somebody remembers to rerun
+# the script -- and until then the panel shows the old code's numbers, looking exactly
+# as authoritative as fresh ones. That happened on 2026-08-14: pair_fifo was switched to
+# broker Proceeds and the dashboard kept reporting local-point_value lots with no sign
+# anything was behind. Stamping the sources lets the reader say so.
+SOURCE_FILES = ("monitor/paper_pnl_compare.py", "global_index/statement.py")
+
+
+def source_signature(root: Path) -> dict[str, Any]:
+    """Content hash of the modules whose logic decides this report's numbers.
+
+    Content, not mtime: a checkout or a touch changes mtime without changing behaviour,
+    and a stale-warning that cries wolf gets switched off.
+    """
+    import hashlib
+
+    parts = {}
+    for rel in SOURCE_FILES:
+        path = root / rel
+        try:
+            parts[rel] = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+        except OSError:
+            parts[rel] = None
+    return parts
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--out", type=Path, default=ROOT / "monitor" / "paper_pnl_compare.json")
     args = parser.parse_args(argv)
     report = build_report(args.root)
+    report["source_signature"] = source_signature(args.root)
     args.out.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"wrote {args.out}")
     latest = report["daily"][-1] if report["daily"] else {}

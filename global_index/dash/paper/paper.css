@@ -1,6 +1,28 @@
 .paper-hero { padding: 28px 24px; display: grid; grid-template-columns: minmax(0, 1fr) 280px; align-items: center; gap: 30px; border-bottom: 1px solid var(--line); }
 .paper-hero h1 { font-size: 23px; }
 .paper-hero p:not(.eyebrow) { margin: 8px 0 0; color: var(--muted); font: 12px/1.45 var(--mono); }
+/* Offered, never forced: the poll detects new evidence, this is how the reader accepts it. */
+.refresh-chip { margin: 10px 0 0; padding: 6px 11px; display: inline-flex; align-items: center; gap: 7px; color: var(--bright); background: rgba(88,163,255,.1); border: 1px solid var(--blue); border-radius: 3px; cursor: pointer; font: 800 11px/1 var(--mono); text-transform: uppercase; }
+.refresh-chip::before { content: ""; width: 6px; height: 6px; background: var(--blue); border-radius: 50%; }
+.refresh-chip:hover { background: rgba(88,163,255,.2); }
+.refresh-chip[hidden] { display: none; }
+/* Go-live loss gates. Two cards side by side because they answer different questions
+   and can disagree — one armed and passing while the other breaches. */
+.threshold-gate-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.threshold-gate { padding: 12px 14px; display: grid; gap: 9px; align-content: start; background: rgba(255,255,255,.014); border: 1px solid var(--line); border-left: 3px solid var(--line-strong); }
+.threshold-gate.breach { border-left-color: var(--red); }
+.threshold-gate.pass { border-left-color: var(--green); }
+.threshold-gate.observed, .threshold-gate.not-armed, .threshold-gate.unknown { border-left-color: var(--blue); }
+.threshold-gate.missing { border-left-color: var(--amber); }
+.threshold-gate header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.threshold-gate header b { color: var(--bright); font: 800 12px/1.3 var(--mono); }
+.threshold-gate > p { margin: 0; color: var(--muted); font: 12px/1.5 var(--mono); }
+.threshold-gate dl { margin: 0; display: grid; gap: 0; border-top: 1px solid var(--line); }
+.threshold-gate dl > div { padding: 5px 0; display: grid; grid-template-columns: minmax(0, 132px) minmax(0, 1fr); gap: 10px; border-bottom: 1px solid var(--line); }
+.threshold-gate dt { color: var(--dim); font: 700 10px/1.5 var(--mono); text-transform: uppercase; }
+.threshold-gate dd { margin: 0; color: var(--text); font: 12px/1.5 var(--mono); word-break: break-word; }
+.threshold-band-table tr.band-active { background: rgba(88,163,255,.09); }
+.threshold-band-table tr.band-active td { color: var(--bright); }
 .readiness { padding-left: 20px; display: grid; gap: 7px; border-left: 3px solid var(--amber); }
 .readiness span, .paper-metrics span { color: var(--muted); text-transform: uppercase; font: 600 11px/1 var(--mono); }
 .readiness b { color: var(--amber); font: 700 21px/1 var(--mono); }
@@ -28,11 +50,15 @@
 .blocker-card { min-height: 268px; padding: 14px 16px; display: grid; grid-template-rows: auto auto 1fr auto; align-content: start; gap: 10px; background: var(--surface); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); box-shadow: inset 3px 0 0 var(--line-strong); }
 .blocker-card-head { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: center; }
 .blocker-card.pass, .blocker-card.observed { box-shadow: inset 3px 0 0 var(--green); }
-.blocker-card.pending, .blocker-card.breach-now { box-shadow: inset 3px 0 0 var(--amber); }
+.blocker-card.pending, .blocker-card.breach-now, .blocker-card.quality-breach { box-shadow: inset 3px 0 0 var(--amber); }
 .blocker-card.breach { box-shadow: inset 3px 0 0 var(--red); }
+/* A gap is not a pending sample: it cannot close by waiting, so it reads as its own
+   state rather than borrowing the amber of "in progress". */
+.blocker-card.spec-gap, .blocker-card.structural-gap { box-shadow: inset 3px 0 0 var(--violet); }
 .blocker-card span { width: fit-content; padding: 3px 6px; color: var(--muted); border: 1px solid var(--line); background: rgba(255,255,255,.018); text-transform: uppercase; font: 900 10px/1 var(--mono); }
 .blocker-card.breach span { color: var(--red); }
-.blocker-card.pending span, .blocker-card.breach-now span { color: var(--amber); }
+.blocker-card.pending span, .blocker-card.breach-now span, .blocker-card.quality-breach span { color: var(--amber); }
+.blocker-card.spec-gap span, .blocker-card.structural-gap span { color: var(--violet); }
 .blocker-card.observed span, .blocker-card.pass span { color: var(--green); }
 .blocker-card b { color: var(--bright); font: 800 12px/1.2 var(--mono); text-transform: uppercase; }
 .blocker-card strong { color: var(--bright); font: 900 18px/1.15 var(--mono); overflow-wrap: anywhere; }
@@ -380,7 +406,13 @@
 .holding-window-table th:nth-child(3), .holding-window-table td:nth-child(3) { width: 22%; }
 .holding-window-table th:nth-child(4), .holding-window-table td:nth-child(4) { width: 20%; }
 .holding-window-table th:nth-child(5), .holding-window-table td:nth-child(5) { width: 18%; }
-.stp-placement-table, .stp-route-table, .rejection-table { overflow-x: hidden; }
+/* auto, not hidden. These three carry fixed percentage column widths so they normally
+   fit, but "normally" is not always: measured 2026-08-15 the rejection table overflowed
+   its container by 20px at 1440 and 117px at 1024 -- a whole column unreachable, with no
+   page scrollbar to hint at it because hidden content creates none. The M4 fix put
+   overflow-x: auto only inside the <=680px media query, so the desktop and tablet cases
+   stayed clipped. Scroll is the safe default; clipping evidence is not. */
+.stp-placement-table, .stp-route-table, .rejection-table { overflow-x: auto; }
 .stp-placement-table table, .stp-route-table table, .rejection-table table { min-width: 0; width: 100%; table-layout: fixed; }
 .stp-placement-table th, .stp-placement-table td, .stp-route-table th, .stp-route-table td, .rejection-table th, .rejection-table td { white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
 .stp-placement-table th:nth-child(1), .stp-placement-table td:nth-child(1) { width: 12%; }
@@ -514,4 +546,29 @@
   .variance-compare-grid { grid-template-columns: minmax(78px, .8fr) repeat(2, minmax(0, 1fr)); }
   .component-compare-grid > div, .variance-compare-grid > div { padding: 6px 5px; font-size: 11px; }
   .component-compare-grid .component-ref, .variance-compare-grid .component-ref { display: block; }
+
+  /* Desktop squeezes these tables to width:100% with table-layout:fixed and hides the
+     overflow, which is fine at 1440px. At 390px the rejection table's eight columns
+     land at 31-56px each and 183px of content becomes unreachable — measured, not
+     estimated: container 315px against scrollWidth 498px, one row 531px tall. Scrolling
+     a readable table beats clipping an unreadable one. */
+  .trade-table { overflow-x: auto; }
+  .stp-placement-table, .stp-route-table, .rejection-table,
+  .pnl-daily-table, .pnl-compare-table, .signal-compare-table, .entry-compare-table,
+  .lifecycle-compare-table, .trade-master-table, .open-position-table,
+  .pnl-statement-table, .pnl-flex-bridge-table, .contract-spec-table,
+  .state-position-table, .runner-snapshot-table, .data-freshness-table,
+  .open-issue-table, .operator-log-table, .sample-denominator-table,
+  .holding-window-table, .fill-quality-table, .audit-evidence-table { overflow-x: auto; }
+  .stp-placement-table table, .stp-route-table table, .rejection-table table,
+  .pnl-daily-table table, .pnl-compare-table table, .signal-compare-table table,
+  .entry-compare-table table, .lifecycle-compare-table table, .trade-master-table table,
+  .open-position-table table, .pnl-statement-table table, .pnl-flex-bridge-table table,
+  .contract-spec-table table, .state-position-table table, .runner-snapshot-table table,
+  .data-freshness-table table, .open-issue-table table, .sample-denominator-table table,
+  .holding-window-table table, .fill-quality-table table {
+    min-width: 620px; table-layout: auto;
+  }
+  /* Log rows are one long sentence; wrapping beats a 620px scroll for them. */
+  .operator-log-table table, .audit-evidence-table table { min-width: 0; table-layout: fixed; }
 }

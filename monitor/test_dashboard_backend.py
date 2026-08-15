@@ -584,7 +584,11 @@ def test_enforced_gate_rules_are_published_as_spec_data(tmp_path: Path):
     stp_spec = gates["stp_verification"]["metrics"].get("spec") or {}
 
     # Exactly the keys the rule rails read; missing any one renders "spec missing".
-    assert b3_spec.get("max_mismatch_episodes") == 0
+    # The threshold is on UNCLASSIFIED episodes: a mismatch with a recorded, episode-
+    # matched root cause reads EXPLAINED rather than BREACH, so a fixed historical
+    # episode stops blocking the epoch forever while anything unexplained still does.
+    assert b3_spec.get("max_unclassified_mismatch_episodes") == 0
+    assert b3_spec.get("classification_rule")
     assert b3_spec.get("persist_match_required") is True
     assert b3_spec.get("cold_start_reconcile")
     assert b3_spec.get("evidence")
@@ -858,7 +862,9 @@ def test_paper_evidence_uses_monitor_paper_inputs_to_unblock_gaps(tmp_path: Path
         encoding="utf-8",
     )
     (monitor / "paper_inputs.json").write_text(
-        '{"c1_spec":{"min_n":2,"max_mean_ticks":2,"scope":"separate","close_scope":"stp_only","use_absolute":true},'
+        '{"c1_spec":{"open":{"scope":"by_inst","min_n_per_inst":2,"max_mean_ticks":2},'
+        '"stp_close":{"scope":"pooled","min_n":2,"max_mean_ticks":2},'
+        '"close_scope":"stp_only","use_absolute":true},'
         '"fill_quality_spec":{"min_fills":4,"max_partial_rate":0,"max_failed_or_cancelled":0,'
         '"require_complete_fields":false,"max_contracts_tested":1,"retest_when_contracts_gt":1},'
         '"stp_verification_spec":{"min_distinct_sessions":10},'
@@ -1065,7 +1071,9 @@ def test_paper_evidence_excludes_signal_close_from_c1_slippage(tmp_path: Path):
         encoding="utf-8",
     )
     (monitor / "paper_inputs.json").write_text(
-        '{"c1_spec":{"min_n":1,"max_mean_ticks":5,"scope":"separate","close_scope":"stp_only","use_absolute":true}}',
+        '{"c1_spec":{"open":{"scope":"by_inst","min_n_per_inst":1,"max_mean_ticks":5},'
+        '"stp_close":{"scope":"pooled","min_n":1,"max_mean_ticks":5},'
+        '"close_scope":"stp_only","use_absolute":true}}',
         encoding="utf-8",
     )
 
@@ -1389,7 +1397,7 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "Active spec" in source
     assert "Signal/market closes shown for diagnosis" in source
     assert "Raw cumulative stats" in source
-    assert "Progress toward required entry sample count." in source
+    assert "OPEN is judged per instrument because a pooled tick mean hides a single bad one." in source
     assert "Presented OPEN" in source
     assert "Presented STP" in source
     assert "More info" in source
@@ -1775,6 +1783,259 @@ def test_flex_reconcile_basis_is_absent_rather_than_asserted_with_no_lots():
     assert _flex_reconcile_basis({}) is None
 
 
+# Values measured on the single-pass scanner BEFORE it was split per file, on the real
+# logs. They are the anchor the refactor is held against: a self-referential comparison
+# (per-file merged vs per-file concatenated) would agree by construction and prove
+# nothing. Any of these moving means the split changed what the gates see.
+_PRE_REFACTOR_LOG_TRUTH = {
+    "cold_starts": 8,
+    "b3_match_episodes": 17,
+    "b3_mismatch_episodes": 1,
+    "b3_mismatch_positions_affected": 2,
+    "dropped_test_lines": 1160,
+    "tws_restart_lines": 4,
+    "manual_intervention_lines": 0,
+}
+
+
+def test_per_file_log_scan_reproduces_the_single_pass_numbers():
+    import monitor.backend.paper_evidence_reader as pe
+
+    summary = pe._log_summary_uncached(ROOT, "2026-08-10")
+    for field, expected in _PRE_REFACTOR_LOG_TRUTH.items():
+        assert summary[field] == expected, (
+            f"{field}: per-file scan gives {summary[field]!r}, "
+            f"single-pass gave {expected!r} before the split"
+        )
+
+
+def test_the_seam_merge_is_load_bearing_not_defensive():
+    """Episodes really do cross file boundaries, three times on the current logs.
+
+    Without the merge, 21 per-file episodes would be reported instead of 18 -- and the
+    B3 gate breaches on any unclassified MISMATCH episode, so splitting one in two
+    invents a reconcile failure that never happened.
+    """
+    import monitor.backend.paper_evidence_reader as pe
+
+    raw = []
+    for path in pe._log_paths(ROOT):
+        raw.extend(pe._scan_one_log(path, "2026-08-10").get("_b3_episodes") or [])
+    merged = []
+    for episode in raw:
+        pe._append_b3_episodes(merged, [episode])
+    assert len(raw) > len(merged), "the seam merge did nothing; the check has gone stale"
+    summary = pe._log_summary_uncached(ROOT, "2026-08-10")
+    assert summary["b3_match_episodes"] + summary["b3_mismatch_episodes"] == len(merged)
+
+
+def test_a_file_that_did_not_change_is_not_read_again():
+    """Logs only grow. Re-reading 120MB because one file gained a few kilobytes was the
+    entire cost of serving this page: 25s, of which 13s was 8 million regex searches over
+    lines parsed identically the previous twenty times."""
+    import monitor.backend.paper_evidence_reader as pe
+
+    pe._log_summary_uncached(ROOT, "2026-08-10")
+    reads = []
+    original = pe._scan_one_log
+
+    def counting(path, epoch):
+        before = len(pe._file_cache)
+        out = original(path, epoch)
+        if len(pe._file_cache) != before:
+            reads.append(path.name)
+        return out
+
+    pe._scan_one_log = counting
+    try:
+        pe._log_summary_uncached(ROOT, "2026-08-10")
+    finally:
+        pe._scan_one_log = original
+    assert reads == [], f"re-read unchanged file(s): {reads}"
+
+
+def test_episodes_are_not_split_at_a_file_boundary():
+    # The single-pass version grouped line by line and could carry an episode across
+    # files. It cannot in practice -- the walk puts scheduler_* before live_day_* so time
+    # jumps backwards there -- but the merge implements the rule rather than assuming it.
+    import datetime as dt
+
+    import monitor.backend.paper_evidence_reader as pe
+
+    a = {"kind": "mismatch", "count": 2, "first_seen": "2026-08-10T06:00:00Z",
+         "last_seen": "2026-08-10T06:05:00Z", "raw_line_count": 2, "path": "x.log",
+         "line_from": 1, "line_to": 9}
+    b = {"kind": "mismatch", "count": 2, "first_seen": "2026-08-10T06:20:00Z",
+         "last_seen": "2026-08-10T06:25:00Z", "raw_line_count": 3, "path": "y.log",
+         "line_from": 1, "line_to": 7}
+    acc = []
+    pe._append_b3_episodes(acc, [a])
+    pe._append_b3_episodes(acc, [b])
+    assert len(acc) == 1, "same kind/count within the gap must stay one episode"
+    assert acc[0]["raw_line_count"] == 5
+    assert acc[0]["last_seen"] == "2026-08-10T06:25:00Z"
+
+    # Beyond the gap it is a separate episode.
+    far = {**b, "first_seen": "2026-08-10T09:00:00Z", "last_seen": "2026-08-10T09:02:00Z"}
+    acc2 = []
+    pe._append_b3_episodes(acc2, [a])
+    pe._append_b3_episodes(acc2, [far])
+    assert len(acc2) == 2
+
+
+_C1_SPEC = {
+    "open": {"scope": "by_inst", "min_n_per_inst": 20, "max_mean_ticks": 3},
+    "stp_close": {"scope": "pooled", "min_n": 30, "max_mean_ticks": 3},
+    "close_scope": "stp_only", "use_absolute": True,
+}
+
+
+def _c1(by_inst, *, open_n=None, stp_n=0, stp_mean=None, spec=_C1_SPEC):
+    from monitor.backend.paper_evidence_reader import _c1_status
+
+    slip = {
+        "open_mean": 0.0, "open_n": open_n if open_n is not None else sum(r["open_n"] for r in by_inst),
+        "stp_close_mean": stp_mean, "stp_close_n": stp_n,
+        "close_mean": stp_mean, "close_n": stp_n,
+        "signal_close_with_stop_ref": 0, "by_inst": by_inst,
+    }
+    return _c1_status(slip, spec)
+
+
+def _inst(name, n, mean, tick_value=0.5):
+    return {"inst": name, "tick": 0.25, "tick_value": tick_value,
+            "open_n": n, "open_mean_ticks": mean, "open_mean_usd": mean * tick_value}
+
+
+def test_c1_open_is_judged_per_instrument_so_one_bad_symbol_cannot_hide():
+    """The pooled mean was the defect, not the tick unit.
+
+    On the five fills that existed, pooled read +9.00 ticks while M2K alone sat at
+    +28.00 -- fourteen times the cost the backtest models. Averaging it against MES at
+    -4.00 made the basket look merely marginal.
+    """
+    status, evidence, metrics = _c1([
+        _inst("M2K", 25, 28.0), _inst("MES", 25, -0.5, tick_value=1.25),
+    ])
+    assert metrics["open_breaching_instruments"] == ["M2K"]
+    assert status == "QUALITY_BREACH"
+    assert "M2K" in evidence
+
+
+def test_c1_favourable_slippage_still_counts_as_drift():
+    # -4 ticks is a better price, not a cheaper one to ignore: the reference the risk
+    # sizing is computed from was wrong by four ticks either way.
+    status, _, metrics = _c1([_inst("MES", 25, -4.0, tick_value=1.25)])
+    assert metrics["open_breaching_instruments"] == ["MES"]
+    assert status == "QUALITY_BREACH"
+
+
+def test_c1_an_instrument_short_of_samples_is_pending_not_passing():
+    status, _, metrics = _c1([_inst("MES", 3, 0.5, tick_value=1.25)], stp_n=30, stp_mean=0.0)
+    assert metrics["open_instruments_short_of_sample"] == ["MES"]
+    assert status == "PENDING", "a mean over three fills is not evidence of clean execution"
+
+
+def test_c1_reports_an_over_limit_mean_even_on_a_thin_sample():
+    # Waiting for a count before mentioning a 28-tick miss would be the pooled mistake
+    # in another form: the measurement most likely to matter, withheld.
+    status, _, metrics = _c1([_inst("M2K", 1, 28.0)])
+    assert status == "QUALITY_BREACH"
+    assert metrics["open_breaching_instruments"] == ["M2K"]
+
+
+def test_c1_passes_only_when_every_instrument_and_the_stp_branch_are_ready():
+    status, _, _ = _c1([_inst("MES", 25, 0.5, tick_value=1.25), _inst("MYM", 25, -1.0)],
+                       stp_n=30, stp_mean=1.0)
+    assert status == "PASS"
+    # One thin instrument is enough to hold the gate.
+    assert _c1([_inst("MES", 25, 0.5, tick_value=1.25), _inst("MYM", 2, -1.0)],
+               stp_n=30, stp_mean=1.0)[0] == "PENDING"
+    # So is a thin STP branch.
+    assert _c1([_inst("MES", 25, 0.5, tick_value=1.25)], stp_n=5, stp_mean=1.0)[0] == "PENDING"
+
+
+def test_c1_confidence_interval_is_published_beside_each_mean():
+    """A min_n is a guess about dispersion nobody measured; the interval is the measurement."""
+    from monitor.backend.paper_evidence_reader import _ci95
+
+    assert _ci95([1.0]) is None, "one sample has no interval"
+    tight = _ci95([2.0, 2.1, 1.9, 2.0, 2.05])
+    wide = _ci95([2.0, 12.0, -8.0, 2.0, 6.0])
+    assert tight is not None and wide is not None
+    assert wide > tight * 5, "a scattered sample must report a visibly wider interval"
+
+
+def test_c1_spec_publishes_why_each_threshold_is_what_it_is():
+    payload = read_paper_evidence(ROOT)["payload"]
+    spec = ({g["key"]: g for g in payload["gates"]}["c1_slippage"]["metrics"] or {}).get("spec") or {}
+    assert spec.get("open", {}).get("why_by_inst"), "no rationale for per-instrument scope"
+    assert spec.get("open", {}).get("why_min_n_20"), "no rationale for the OPEN sample count"
+    assert spec.get("stp_close", {}).get("why_min_n_30"), "no rationale for the STP count"
+    assert spec.get("stp_close", {}).get("stp_share_is_assumed_not_measured"), (
+        "the STP share underpinning min_n=30 is an assumption and must say so"
+    )
+    assert spec.get("max_mean_ticks_rationale", {}).get("why_3_not_5")
+    assert spec.get("why_absolute"), "favourable-slippage handling must be stated, not implied"
+
+
+def _episode(path="live_day_0810.log", line_from=942, line_to=10072):
+    return {"path": path, "line_from": line_from, "line_to": line_to,
+            "kind": "mismatch", "positions_affected": 2}
+
+
+def _classify(episodes, classifications):
+    from monitor.backend.paper_evidence_reader import _b3_classify
+
+    return _b3_classify(episodes, classifications)
+
+
+def test_a_b3_classification_only_clears_the_episode_it_names():
+    """One note must not absolve every future mismatch.
+
+    A classification carries the episode's identity -- file and line range -- so it can
+    only ever cover that one. Without the identity check, writing a single note would
+    stop the reconcile gate being a gate at all.
+    """
+    note = {"id": "mnkd_routing", "episode": _episode()}
+    out = _classify([_episode()], [note])
+    assert out["classified_count"] == 1 and out["unclassified_count"] == 0
+
+    # A different episode in the same file is a different event.
+    later = _classify([_episode(line_from=50000, line_to=50100)], [note])
+    assert later["unclassified_count"] == 1, "a note leaked onto an episode it does not name"
+    assert later["classified_count"] == 0
+
+
+def test_a_classified_b3_mismatch_reads_explained_not_passed():
+    """The books and the broker genuinely disagreed. That does not un-happen.
+
+    EXPLAINED buys only that a historical episode with a known and fixed cause stops
+    blocking the epoch the way an unfixable gate does.
+    """
+    payload = read_paper_evidence(ROOT)["payload"]
+    b3 = {g["key"]: g for g in payload["gates"]}["b3_reconcile"]
+    klass = b3["metrics"]["classification"]
+    if klass["classified_count"] and not klass["unclassified_count"]:
+        assert b3["status"] == "EXPLAINED", f"classified mismatches must not read {b3['status']}"
+        assert b3["status"] != "PASS"
+
+
+def test_a_classification_whose_episode_vanished_is_reported_stale():
+    # Logs rotate. A note left pointing at nothing is not reassurance, and counting it
+    # as coverage would silently reduce the gate's scope.
+    out = _classify([], [{"id": "old", "episode": _episode()}])
+    assert len(out["stale_classifications"]) == 1
+    assert out["classified_count"] == 0
+
+
+def test_an_unclassified_b3_mismatch_still_breaches():
+    out = _classify([_episode(), _episode(line_from=1, line_to=2)],
+                    [{"id": "one", "episode": _episode()}])
+    assert out["unclassified_count"] == 1
+    assert out["classified_count"] == 1
+
+
 _THRESHOLD_SPEC = {
     "edge_gate": {
         "arm_after_sessions": 20,
@@ -1876,21 +2137,33 @@ def test_published_threshold_spec_carries_its_own_provenance_and_limits():
     assert edge.get("measured_power"), "detection power not published"
     assert edge.get("limitation"), "the rule must publish what it cannot catch"
     assert "98430.51" in (frame.get("self_check") or ""), "frame self-check not published"
-    assert frame.get("why_truncated"), "must say why the 2025-2026 tail is excluded"
+    assert frame.get("coverage_check"), "must state which clusters trade through the frame"
 
 
-def test_threshold_frame_excludes_the_nkd_only_tail():
-    """Pooling the tail loosens the 60-session floor by 84%.
+def test_threshold_frame_states_that_every_cluster_trades_through_it():
+    """The bands must be drawn from the system that actually trades, whole.
 
-    generate_replay_snapshots.py records that after 2024-12-31 the curve is NKD alone,
-    because the regime labels froze and the other clusters stopped entering.
+    This test previously asserted the opposite -- that the frame stopped at 2024-12-31 --
+    on the strength of a comment in generate_replay_snapshots.py describing the tail as
+    NKD-only. That comment describes the state before its own fix; REGIME_CSV was moved
+    to spy_daily_live.csv and the curve regenerated on 2026-08-13, after which all three
+    clusters trade to the end. Truncating there dropped 331 sessions of valid recent
+    evidence and tightened every band: the 60-session floor read -$1,592 instead of
+    -$2,927.
+
+    So the invariant is not a date. It is that the frame carries a checked statement
+    about cluster coverage, and that the check is not simply asserted.
     """
     payload = read_paper_evidence(ROOT)["payload"]
     cov = {c["key"]: c for c in payload["coverage"]}
     frame = ((cov["pnl_thresholds"]["metrics"] or {}).get("spec") or {}).get("frame") or {}
-    assert frame.get("period", "").endswith("2024-12-31"), (
-        f"frame period {frame.get('period')!r} runs past the point where the backtest "
-        f"stops being the system that trades live"
+    coverage = frame.get("coverage_check") or ""
+    assert coverage, "the frame must state which clusters trade through it"
+    for cluster in ("roska4_swing", "global_nkd", "roska4_stress"):
+        assert cluster in coverage, f"{cluster} coverage is not accounted for in the frame"
+    assert frame.get("sessions", 0) > 1700, (
+        f"frame has only {frame.get('sessions')} sessions; a truncated frame tightens "
+        f"every band against evidence that exists"
     )
 
 

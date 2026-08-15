@@ -292,6 +292,54 @@ def _parse_iso(value: str | None) -> dt.datetime | None:
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+def _warm_paper_evidence() -> None:
+    """Build the paper-evidence cache off the request path, in the background.
+
+    The first request after a restart scans every scheduler/live-day log to rebuild this
+    cache. Measured cold: 30.5s on 2026-08-14, 41.7s later that day, 59.4s on 2026-08-15
+    -- it grows with the logs. Warm requests return in ~0.03s. So the cost fell on
+    whoever loaded the page first, and past ~30s they were told "Paper evidence
+    unavailable" by a backend that was working fine.
+
+    Two details this got wrong on the first attempt, both measured:
+
+    - Warming inline held the listening port shut for 40.5s. A monitor that cannot be
+      reached is worse than one that answers slowly, so it runs on a thread now.
+    - Warming immediately achieved nothing: ibkr_reader.start() returns before its first
+      poll lands, and contract_specs is part of the cache key (_signature). Warming
+      against an empty specs dict built an entry under a key no request would ever ask
+      for -- the first real request still paid 84s. So wait for the specs first.
+
+    Never fatal, and never blocking: on any failure the next request simply pays the
+    scan it would have paid anyway.
+    """
+    import threading
+    import time
+
+    def _run() -> None:
+        from monitor.backend.paper_evidence_reader import read_paper_evidence
+
+        # Bounded wait. If IBKR never connects the specs stay empty, which is itself a
+        # stable key -- warm that one rather than never warming at all.
+        deadline = time.monotonic() + 120
+        while time.monotonic() < deadline:
+            try:
+                if ibkr_reader.get_cache().get("contract_specs"):
+                    break
+            except Exception:
+                pass
+            time.sleep(2)
+        started = time.monotonic()
+        try:
+            read_paper_evidence(ROOT)
+        except Exception as exc:
+            logger.warning("paper-evidence warm-up failed (%s) — the next request pays the scan", exc)
+            return
+        logger.info("paper-evidence cache warm in %.1fs", time.monotonic() - started)
+
+    threading.Thread(target=_run, name="paper-evidence-warm", daemon=True).start()
+
+
 def main():
     ap = argparse.ArgumentParser(description="RAITS IBKR monitor backend")
     ap.add_argument("--ibkr-port", type=int, default=4002,  help="IBKR Gateway port (paper=4002)")
@@ -303,6 +351,8 @@ def main():
 
     logger.info(f"Starting IBKR reader: Gateway port={a.ibkr_port}, client_id={a.client_id}")
     ibkr_reader.start(port=a.ibkr_port, client_id=a.client_id, poll_interval=a.poll)
+
+    _warm_paper_evidence()
 
     logger.info(f"Starting Flask on http://127.0.0.1:{a.api_port}")
     logger.info("Endpoints: /api/all  /api/account  /api/positions  /api/orders  /api/connection")

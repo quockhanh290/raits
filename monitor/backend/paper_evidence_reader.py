@@ -17,6 +17,80 @@ from monitor.backend.runner_state_reader import read_runner_state
 _lock = threading.Lock()
 _cache: dict[tuple[str, tuple[tuple[str, int, int], ...]], dict[str, Any]] = {}
 
+# The log scan gets its own cache. `_cache` is cleared on every payload write so only one
+# payload is held, and the log summary must outlive that: it is keyed on the log files
+# alone, so a fill or a paper_inputs edit does not invalidate it, and re-reading 120MB
+# because an unrelated file changed was the single largest cost in serving this page.
+# A handful of entries is enough -- one per live log signature, plus room for a test root.
+_LOG_CACHE_MAX = 4
+_log_cache: dict[tuple[str, str, tuple[tuple[str, int, int], ...]], dict[str, Any]] = {}
+
+# Per-file scan results, keyed on each file's own size and mtime. This is what makes the
+# scan incremental: logs only ever grow, so a file whose stat is unchanged produces the
+# same partial it produced last time and never needs reading again. Sized for a month of
+# daily scheduler + live-day files plus headroom.
+_FILE_CACHE_MAX = 80
+_file_cache: dict[tuple[str, int, int, str], dict[str, Any]] = {}
+
+# Row lists are capped at 20 in the single-pass scan. The per-file scans keep their own
+# first 20 and the merge re-caps, which yields the same 20 because files merge in scan
+# order and the global first 20 is a prefix of the concatenation.
+_LOG_ROW_CAP = 20
+_LOG_ROW_FIELDS = (
+    "b3_match_episode_rows", "b3_mismatch_episode_rows", "stp_placement_rows",
+    "rejection_rows", "roll_slippage_rows", "manual_intervention_rows",
+    "dropped_test_rows", "excluded_blocks",
+)
+
+
+def _merge_log_partial(summary: dict[str, Any], part: dict[str, Any]) -> None:
+    """Fold one file's partial into the running summary, by field type."""
+    for field, value in part.items():
+        if field.startswith("_"):
+            continue
+        current = summary.get(field)
+        if isinstance(value, set):
+            current.update(value)
+        elif isinstance(value, list):
+            if field in _LOG_ROW_FIELDS:
+                room = _LOG_ROW_CAP - len(current)
+                if room > 0:
+                    current.extend(value[:room])
+            else:
+                current.extend(value)
+        elif isinstance(value, (int, float)):
+            summary[field] = (current or 0) + value
+
+
+def _append_b3_episodes(acc: list[dict[str, Any]], incoming: list[dict[str, Any]]) -> None:
+    """Concatenate one file's episodes, merging at the seam when the rule still holds.
+
+    This is load-bearing, not defensive. The single-pass version grouped line by line
+    and so carried episodes across file boundaries, and measured on the current logs it
+    does exactly that three times -- live_day_0810 into 0811, 0811 into 0812, 0812 into
+    0813 -- turning 21 per-file episodes into the 18 the gates report. Consecutive
+    live_day files overlap in time at their edges, so the 30-minute rule reaches across
+    them.
+
+    Dropping this step would not lose data; it would inflate the episode count, and the
+    B3 gate breaches on any unclassified mismatch episode. Splitting one episode into
+    two would invent a mismatch that never happened.
+    """
+    for episode in incoming:
+        previous = acc[-1] if acc else None
+        if (previous is not None
+                and previous.get("kind") == episode.get("kind")
+                and previous.get("count") == episode.get("count")):
+            start = _parse_ts(episode.get("first_seen"))
+            end = _parse_ts(previous.get("last_seen"))
+            if start is not None and end is not None \
+                    and dt.timedelta(0) <= start - end <= _B3_EPISODE_GAP:
+                previous["last_seen"] = episode.get("last_seen")
+                previous["raw_line_count"] += int(episode.get("raw_line_count") or 0)
+                previous["line_to"] = episode.get("line_to")
+                continue
+        acc.append(episode)
+
 _STP_ARM_BY_CLUSTER = {
     "roska4_swing": ("America/New_York", 14, 0),
     "global_nkd": ("Asia/Tokyo", 14, 0),
@@ -24,7 +98,7 @@ _STP_ARM_BY_CLUSTER = {
 
 _B3_MATCH = re.compile(r"B3: broker/file positions match \((?P<count>\d+) position")
 _B3_MISMATCH = re.compile(r"B3: (?P<count>\d+) mismatch\(es\)")
-_COLD_START = re.compile(r"Runner started: loaded")
+_COLD_START = re.compile(r"Scheduler started\. Ctrl-C to stop\.")
 _STP_VERIFY = re.compile(r"B3 STP-VERIFY")
 _STP_EXIT = re.compile(r"B3 STP EXIT")
 _B3_HALT = re.compile(r"B3 HALT")
@@ -64,9 +138,38 @@ _CAP_REASON_DETAIL = re.compile(
     re.IGNORECASE,
 )
 _ROLL_SLIP = re.compile(r"C2: Roll .* slippage=|C2: Roll complete .* slippage=")
-_MANUAL_INTERVENTION = re.compile(r"\b(manual|intervention|operator|override)\b", re.IGNORECASE)
+# Matches an operator ACTION, not the runner telling an operator what to do. The old
+# pattern was \b(manual|intervention|operator|override)\b, which fired on the runner's
+# own "OPERATOR: recompute the chandelier level ..." in every B4 NAKED alert — 108 of
+# 128 candidates came from that one phrase, and none of them meant a human had touched
+# anything. An alert asking for intervention is the opposite of evidence of one.
+_MANUAL_INTERVENTION = re.compile(r"\b(manual|manually|intervention|operator|override)\b",
+                                  re.IGNORECASE)
+# The runner addresses an operator with a literal "OPERATOR: <do this>" prefix, and every
+# B4 NAKED / C2 roll alert ends that way. 108 of 128 candidates in this epoch were that
+# one phrase — an alert asking for intervention, which is the opposite of evidence that
+# one happened. Match on the colon so "OPERATOR_ACTION: ..." still counts.
+_MANUAL_INTERVENTION_EXCLUDE = re.compile(r"\bOPERATOR:\s", re.IGNORECASE)
+
+# A restart candidate needs a restart, not merely the words IBKR and restart in one
+# line. The old pattern matched "B3: 2 mismatch(es) ... Verify live_positions.json
+# matches IBKR, then restart." — a halt alert — and every routine "[ibkr] Disconnected."
+# at session teardown. 175 of 192 surviving candidates were plain disconnects.
 _TWS_RESTART = re.compile(
-    r"\b(TWS|Gateway|IBKR)\b.*\b(restart|restarted|reconnect|reconnected|disconnect|disconnected|connection lost)\b",
+    r"\b(TWS|Gateway|IBKR)\b[^\n]{0,80}?"
+    r"\b(restart|restarted|restarting|reconnect|reconnected|reconnecting"
+    r"|connection\s+(lost|restored|re-established)|session\s+(restored|resumed))\b",
+    re.IGNORECASE,
+)
+# Two kinds of line carry the words but not the event.
+#   - Instructions: the B3 halt alert ends "Verify live_positions.json matches IBKR,
+#     then restart." That is the runner asking for a restart, not reporting one.
+#   - Routine teardown: "[ibkr] Disconnected." fires once per decision slot, 198 times
+#     in this epoch. A connection closing on schedule is not a restart night.
+# Together these were 192 of 192 surviving candidates before this filter existed.
+_TWS_RESTART_EXCLUDE = re.compile(
+    r"then\s+restart|please\s+restart|B3:|mismatch\(es\)"
+    r"|\[ibkr\]\s+(Disconnected\.|Connecting\b)",
     re.IGNORECASE,
 )
 
@@ -76,6 +179,8 @@ _TEST_MARKERS = (
     "_RecordingMockBroker", "_naked_broker", "<locals>", "test_spy.csv",
     "ibkr-456", "ibkr-789",
 )
+
+_B3_EPISODE_GAP = dt.timedelta(minutes=30)
 
 
 def _source(path: str, process: str, fmt: str, cadence: str, retention: str) -> dict[str, str]:
@@ -102,6 +207,13 @@ SOURCES = {
         "JSON object with epoch/account/days",
         "Upsert once per dump_state() call; same date is last-write-wins",
         "No code-level deletion or rotation observed",
+    ),
+    "backtest_curve": _source(
+        "global_index/backtest_curve.json",
+        "generate_replay_snapshots.py (date -> equity, written alongside the snapshot file)",
+        "JSON object with account/generated/equity",
+        "Rewritten whenever the replay snapshots are regenerated",
+        "Latest file only; the .bak siblings are manual copies, not a rotation",
     ),
     "trade_log": _source(
         "trade_log.jsonl",
@@ -311,10 +423,19 @@ def _tick(inst: Any) -> float | None:
 def _local_contract_specs() -> dict[str, dict[str, Any]]:
     try:
         from futures.basket import BASKET
+        from global_index.specs import SPECS
     except Exception:
-        return {}
+        try:
+            from futures.basket import BASKET
+        except Exception:
+            BASKET = {}
+        try:
+            from global_index.specs import SPECS
+        except Exception:
+            SPECS = {}
+    local_universe = {**BASKET, **SPECS}
     specs: dict[str, dict[str, Any]] = {}
-    for inst, contract in BASKET.items():
+    for inst, contract in local_universe.items():
         point_value = _number(getattr(contract, "point_value", None))
         tick = _number(getattr(contract, "tick", None))
         specs[str(inst)] = {
@@ -498,29 +619,106 @@ def _rejection_counts_by_day(rejection_metrics: dict[str, Any]) -> dict[str, int
     return counts
 
 
+def _tick_value(inst: Any) -> float | None:
+    """Dollar value of one tick, so slippage can be compared across instruments."""
+    try:
+        from futures.basket import BASKET
+        from global_index.specs import SPECS
+    except Exception:
+        return None
+    contract = BASKET.get(str(inst)) or SPECS.get(str(inst))
+    point_value = _number(getattr(contract, "point_value", None))
+    tick = _number(getattr(contract, "tick", None))
+    return round(point_value * tick, 6) if point_value is not None and tick is not None else None
+
+
+def _ci95(values: list[float]) -> float | None:
+    """Half-width of the 95% confidence interval for the mean.
+
+    Published beside every slippage mean so a sample is judged by the precision it
+    actually delivers rather than by whether it reached some count. A min_n is a guess
+    about dispersion nobody measured; this reports the dispersion that turned up. With
+    n=30 the half-width is 1.96*sd/sqrt(30) ~ 0.36*sd -- if that lands inside the tick
+    limit the sample is adequate, and if it does not the number says so itself.
+    """
+    n = len(values)
+    if n < 2:
+        return None
+    mean = sum(values) / n
+    var = sum((v - mean) ** 2 for v in values) / (n - 1)
+    return round(1.96 * (var ** 0.5) / (n ** 0.5), 4)
+
+
 def _slippage(records: list[dict[str, Any]], epoch: str | None) -> dict[str, Any]:
+    # A pooled tick mean is not comparable across this basket: one tick is worth $0.50
+    # on MYM/M2K/MNQ, $1.25 on MES and $2.50 on MNKD. A 28-tick M2K miss ($14) reads
+    # four times worse than a 7-tick MNKD miss ($17.50) that actually cost more. The
+    # spec limit is stated in ticks, so the tick mean stays — but per-instrument means
+    # and a dollar aggregate travel with it so the pooled number cannot be read alone.
     open_ticks: list[float] = []
     stp_close_ticks: list[float] = []
+    open_usd: list[float] = []
+    stp_close_usd: list[float] = []
+    by_inst: dict[str, dict[str, Any]] = {}
     signal_close_with_stop_ref = 0
     unknown_tick = 0
+    unknown_tick_value = 0
     for record in records:
         day = _date(record.get("entry_day") if record.get("type") == "OPEN" else record.get("exit_day"))
         if not _in_epoch(day, epoch) or record.get("slip") is None:
             continue
-        tick = _tick(record.get("inst"))
+        inst = str(record.get("inst") or "")
+        tick = _tick(inst)
         if not tick:
             unknown_tick += 1
             continue
         ticks = float(record["slip"]) / tick
+        tick_value = _tick_value(inst)
+        if tick_value is None:
+            unknown_tick_value += 1
+        usd = ticks * tick_value if tick_value is not None else None
+
+        scope = None
         if str(record.get("type")).upper() == "OPEN":
+            scope = "open"
             open_ticks.append(ticks)
+            if usd is not None:
+                open_usd.append(usd)
         elif str(record.get("type")).upper() == "CLOSE":
             reason = str(record.get("exit_reason") or "").upper()
             source = str(record.get("source") or "").upper()
             if reason == "STP" or source == "B3_STP_EXIT":
+                scope = "stp_close"
                 stp_close_ticks.append(ticks)
+                if usd is not None:
+                    stp_close_usd.append(usd)
             else:
                 signal_close_with_stop_ref += 1
+        if scope:
+            slot = by_inst.setdefault(inst, {
+                "inst": inst, "tick": tick, "tick_value": tick_value,
+                "open_ticks": [], "open_usd": [], "stp_close_ticks": [], "stp_close_usd": [],
+            })
+            slot[f"{scope}_ticks"].append(ticks)
+            if usd is not None:
+                slot[f"{scope}_usd"].append(usd)
+
+    per_inst = []
+    for inst in sorted(by_inst):
+        slot = by_inst[inst]
+        per_inst.append({
+            "inst": inst,
+            "tick": slot["tick"],
+            "tick_value": slot["tick_value"],
+            "open_n": len(slot["open_ticks"]),
+            "open_mean_ticks": _mean(slot["open_ticks"]),
+            "open_mean_usd": _mean(slot["open_usd"]),
+            "open_ci95_ticks": _ci95(slot["open_ticks"]),
+            "stp_close_n": len(slot["stp_close_ticks"]),
+            "stp_close_mean_ticks": _mean(slot["stp_close_ticks"]),
+            "stp_close_mean_usd": _mean(slot["stp_close_usd"]),
+        })
+
     return {
         "open_mean": _mean(open_ticks),
         "close_mean": _mean(stp_close_ticks),
@@ -530,6 +728,18 @@ def _slippage(records: list[dict[str, Any]], epoch: str | None) -> dict[str, Any
         "stp_close_n": len(stp_close_ticks),
         "signal_close_with_stop_ref": signal_close_with_stop_ref,
         "unknown_tick_records": unknown_tick,
+        "unknown_tick_value_records": unknown_tick_value,
+        "open_mean_usd": _mean(open_usd),
+        "stp_close_mean_usd": _mean(stp_close_usd),
+        "open_ci95_ticks": _ci95(open_ticks),
+        "stp_close_ci95_ticks": _ci95(stp_close_ticks),
+        "stp_close_ci95_usd": _ci95(stp_close_usd),
+        "by_inst": per_inst,
+        "pooled_tick_caveat": (
+            "One tick is not one price across this basket ($0.50 on MYM/M2K/MNQ, $1.25 on "
+            "MES, $2.50 on MNKD), so the pooled tick mean is not an economic comparison. "
+            "Read by_inst and the dollar means beside it."
+        ),
     }
 
 
@@ -719,11 +929,217 @@ def _rejection_log_row(path: Path, line_no: int, day: str | None, line: str) -> 
     }
 
 
+def _looks_like_log_ts(text: str) -> bool:
+    """Cheap shape check for 'YYYY-MM-DD HH:MM:SS' before paying for a real parse.
+
+    Measured on the current 120MB of logs: _parse_log_ts ran 538k times and cost 8.5s of
+    a 24s scan, almost all of it inside datetime.strptime, and the overwhelming majority
+    of those calls were on lines that are not timestamped at all. Rejecting those on
+    character positions first leaves strptime to handle only plausible candidates.
+
+    Deliberately only a shape test -- it accepts '2026-13-45 99:99:99'. The real parse
+    still runs behind it and still rejects; this only avoids paying for the obvious no.
+    """
+    if len(text) < 19:
+        return False
+    if text[4] != "-" or text[7] != "-" or text[10] != " " or text[13] != ":" or text[16] != ":":
+        return False
+    return (text[:4].isdigit() and text[5:7].isdigit() and text[8:10].isdigit()
+            and text[11:13].isdigit() and text[14:16].isdigit() and text[17:19].isdigit())
+
+
+def _log_line_timestamp(line: str) -> str | None:
+    if not _looks_like_log_ts(line):
+        return None
+    return line[:19] if _parse_log_ts(line[:19]) else None
+
+
+def _test_marker(line: str) -> str | None:
+    # Windows paths reach the log through repr()'d exception messages, so a
+    # tmpdir shows up as "...\\Temp\\tmpXXXX\\..." with doubled separators and
+    # never matches the "\Temp\tmp" marker. Collapse repeated backslashes
+    # before matching so path markers work in both spellings.
+    candidates = (line, line.replace("\\\\", "\\")) if "\\\\" in line else (line,)
+    return next(
+        (marker for marker in _TEST_MARKERS
+         if any(marker in candidate for candidate in candidates)),
+        None,
+    )
+
+
+def _excluded_log_block(path: Path, block: list[tuple[int, str]], marker: str) -> dict[str, Any]:
+    first_line, first_text = block[0]
+    last_line, _last_text = block[-1]
+    return {
+        "path": path.name,
+        "timestamp": _log_line_timestamp(first_text),
+        "line_from": first_line,
+        "line_to": last_line,
+        "line_count": len(block),
+        "matched_marker": marker,
+    }
+
+
+def _retain_production_log_lines(
+    path: Path,
+    lines: list[str],
+    epoch: str | None,
+    summary: dict[str, Any],
+) -> list[tuple[int, str]]:
+    retained: list[tuple[int, str]] = []
+    block: list[tuple[int, str]] = []
+    block_ts: str | None = None
+
+    def flush() -> None:
+        nonlocal block, block_ts
+        if not block:
+            return
+        markers = [(line_no, line, _test_marker(line)) for line_no, line in block]
+        matched = next((marker for _line_no, _line, marker in markers if marker), None)
+        if matched and len(block) >= 2 and block_ts:
+            summary["dropped_test_lines"] += len(block)
+            summary["excluded_blocks"].append(_excluded_log_block(path, block, matched))
+            for line_no, line in block:
+                if len(summary["dropped_test_rows"]) < 20:
+                    day = line[:10] if len(line) >= 10 and line[:4].isdigit() else None
+                    summary["dropped_test_rows"].append({
+                        "day": day,
+                        "path": path.name,
+                        "line_no": line_no,
+                        "reason": matched,
+                        "line": line,
+                    })
+        else:
+            for line_no, line, marker in markers:
+                if marker:
+                    summary["dropped_test_lines"] += 1
+                    if len(summary["dropped_test_rows"]) < 20:
+                        day = line[:10] if len(line) >= 10 and line[:4].isdigit() else None
+                        summary["dropped_test_rows"].append({
+                            "day": day,
+                            "path": path.name,
+                            "line_no": line_no,
+                            "reason": marker,
+                            "line": line,
+                        })
+                    continue
+                retained.append((line_no, line))
+        block = []
+        block_ts = None
+
+    for idx, line in enumerate(lines, start=1):
+        day = line[:10] if len(line) >= 10 and line[:4].isdigit() else None
+        if not _in_epoch(day, epoch):
+            flush()
+            continue
+        ts = _log_line_timestamp(line)
+        if ts and block and ts == block_ts:
+            block.append((idx, line))
+            continue
+        flush()
+        block = [(idx, line)]
+        block_ts = ts
+    flush()
+    return retained
+
+
+def _new_b3_episode(kind: str, count: int, path: Path, line_no: int, line: str) -> dict[str, Any]:
+    ts = _log_line_timestamp(line)
+    return {
+        "kind": kind,
+        "count": count,
+        "positions_affected": count,
+        "first_seen": _fmt_ts(_parse_log_ts(ts)),
+        "last_seen": _fmt_ts(_parse_log_ts(ts)),
+        "raw_line_count": 1,
+        "path": path.name,
+        "line_from": line_no,
+        "line_to": line_no,
+    }
+
+
+def _extend_b3_episode(episode: dict[str, Any], line_no: int, line: str) -> None:
+    ts = _log_line_timestamp(line)
+    episode["last_seen"] = _fmt_ts(_parse_log_ts(ts))
+    episode["raw_line_count"] += 1
+    episode["line_to"] = line_no
+
+
+def _same_b3_episode(episode: dict[str, Any], kind: str, count: int, line: str) -> bool:
+    if episode.get("kind") != kind or episode.get("count") != count:
+        return False
+    current_ts = _parse_log_ts(_log_line_timestamp(line))
+    previous_ts = _parse_ts(episode.get("last_seen"))
+    if current_ts is None or previous_ts is None:
+        return False
+    delta = current_ts - previous_ts
+    return dt.timedelta(0) <= delta <= _B3_EPISODE_GAP
+
+
+def _log_paths(root: Path) -> list[Path]:
+    return [*sorted(root.glob("scheduler_*.log")), *sorted(root.glob("live_day_*.log"))]
+
+
+def _log_signature(root: Path) -> tuple[tuple[str, int, int], ...]:
+    out = []
+    for path in _log_paths(root):
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        out.append((path.name, stat.st_mtime_ns, stat.st_size))
+    return tuple(out)
+
+
 def _log_summary(root: Path, epoch: str | None) -> dict[str, Any]:
-    summary = {
+    """Scan the scheduler/live-day logs, memoised on the logs' own signature.
+
+    Measured 2026-08-15: this reads ~120MB across 28 files and takes 21-24s warm, of
+    which 13s is 8 million regex searches. The payload cache above it keys on trade_log,
+    paper_inputs, live_state and the logs together -- so every fill, and every edit to
+    paper_inputs.json, threw away a log scan that nothing had invalidated. Keying this
+    on the log files alone makes those rebuilds free.
+
+    Deliberately NOT per-file, though the files are append-only and 27 of the 28 never
+    change again. B3 episodes are grouped by a 30-minute gap and the grouping runs
+    across the file boundary, so a per-file cache has to merge two partial episodes at
+    the seam rather than a line into an episode -- different logic, on the path that
+    feeds every gate. Worth doing, worth doing carefully, and not worth doing in the
+    same change as the memo.
+    """
+    signature = _log_signature(root)
+    key = (str(root.resolve()), str(epoch), signature)
+    with _lock:
+        cached = _log_cache.get(key)
+        if cached is not None:
+            return copy.deepcopy(cached)
+    result = _log_summary_uncached(root, epoch)
+    with _lock:
+        # Its own dict, not the payload cache: read_paper_evidence clears that one on
+        # every write to keep a single entry, which would wipe this on the very call
+        # that just paid 25s to build it. Measured before the split: the memo never
+        # survived to be read.
+        if len(_log_cache) >= _LOG_CACHE_MAX:
+            _log_cache.pop(next(iter(_log_cache)))
+        _log_cache[key] = copy.deepcopy(result)
+    return result
+
+
+def _blank_log_summary() -> dict[str, Any]:
+    return {
         "cold_starts": 0,
         "b3_matches": 0,
         "b3_mismatches": 0,
+        "b3_match_episodes": 0,
+        "b3_mismatch_episodes": 0,
+        "b3_match_positions_affected": 0,
+        "b3_mismatch_positions_affected": 0,
+        "b3_match_raw_line_count": 0,
+        "b3_mismatch_raw_line_count": 0,
+        "b3_match_raw_positions": 0,
+        "b3_mismatch_raw_positions": 0,
+        "b3_match_episode_rows": [],
+        "b3_mismatch_episode_rows": [],
         "stp_verify_lines": 0,
         "stp_exit_lines": 0,
         "b3_halt_lines": 0,
@@ -744,34 +1160,66 @@ def _log_summary(root: Path, epoch: str | None) -> dict[str, Any]:
         "tws_restart_days": set(),
         "dropped_test_lines": 0,
         "dropped_test_rows": [],
+        "excluded_blocks": [],
     }
-    for path in [*sorted(root.glob("scheduler_*.log")), *sorted(root.glob("live_day_*.log"))]:
-        try:
-            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-        except OSError:
-            continue
-        for idx, line in enumerate(lines, start=1):
+
+
+def _scan_one_log(path: Path, epoch: str | None) -> dict[str, Any]:
+    """Scan a single log file, memoised on that file's own size and mtime.
+
+    Log files are append-only and only today's changes; 27 of the 28 present will never
+    be read differently again. Rescanning all 120MB because one file grew by a few
+    kilobytes was the whole cost: 25s of which ~13s is 8 million regex searches over
+    lines that were parsed identically the last twenty times.
+
+    Returns a partial in the same shape as the whole summary, plus the file's B3
+    episodes under a private key. Row lists keep their per-file cap of 20; the merge
+    re-caps, and since files are merged in scan order the surviving 20 are the same 20
+    the single-pass version kept.
+    """
+    try:
+        stat = path.stat()
+    except OSError:
+        return {**_blank_log_summary(), "_b3_episodes": []}
+    key = (str(path.resolve()), stat.st_mtime_ns, stat.st_size, str(epoch))
+    with _lock:
+        cached = _file_cache.get(key)
+        if cached is not None:
+            return copy.deepcopy(cached)
+
+    summary = _blank_log_summary()
+    cold_start_keys: set[tuple[str, str]] = set()
+    b3_episodes: list[dict[str, Any]] = []
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        lines = []
+    if True:
+        for idx, line in _retain_production_log_lines(path, lines, epoch, summary):
             day = line[:10] if len(line) >= 10 and line[:4].isdigit() else None
-            if not _in_epoch(day, epoch):
-                continue
-            if any(marker in line for marker in _TEST_MARKERS):
-                summary["dropped_test_lines"] += 1
-                if len(summary["dropped_test_rows"]) < 20:
-                    summary["dropped_test_rows"].append({
-                        "day": day,
-                        "path": path.name,
-                        "line_no": idx,
-                        "reason": next((marker for marker in _TEST_MARKERS if marker in line), "test/noise marker"),
-                        "line": line,
-                    })
-                continue
             if _COLD_START.search(line):
-                summary["cold_starts"] += 1
-            if _B3_MATCH.search(line):
-                summary["b3_matches"] += 1
+                ts = _log_line_timestamp(line)
+                if ts and (path.name, ts) not in cold_start_keys:
+                    cold_start_keys.add((path.name, ts))
+                    summary["cold_starts"] += 1
+            match = _B3_MATCH.search(line)
+            if match:
+                count = int(match.group("count"))
+                summary["b3_match_raw_line_count"] += 1
+                summary["b3_match_raw_positions"] += count
+                if b3_episodes and _same_b3_episode(b3_episodes[-1], "match", count, line):
+                    _extend_b3_episode(b3_episodes[-1], idx, line)
+                else:
+                    b3_episodes.append(_new_b3_episode("match", count, path, idx, line))
             mismatch = _B3_MISMATCH.search(line)
             if mismatch:
-                summary["b3_mismatches"] += int(mismatch.group("count"))
+                count = int(mismatch.group("count"))
+                summary["b3_mismatch_raw_line_count"] += 1
+                summary["b3_mismatch_raw_positions"] += count
+                if b3_episodes and _same_b3_episode(b3_episodes[-1], "mismatch", count, line):
+                    _extend_b3_episode(b3_episodes[-1], idx, line)
+                else:
+                    b3_episodes.append(_new_b3_episode("mismatch", count, path, idx, line))
             if _STP_VERIFY.search(line):
                 summary["stp_verify_lines"] += 1
             if _STP_EXIT.search(line):
@@ -799,16 +1247,42 @@ def _log_summary(root: Path, epoch: str | None) -> dict[str, Any]:
                 summary["roll_slippage_lines"] += 1
                 if len(summary["roll_slippage_rows"]) < 20:
                     summary["roll_slippage_rows"].append({"day": day, "path": path.name, "line_no": idx, "line": line})
-            if _MANUAL_INTERVENTION.search(line):
+            if _MANUAL_INTERVENTION.search(line) and not _MANUAL_INTERVENTION_EXCLUDE.search(line):
                 summary["manual_intervention_lines"] += 1
                 if day:
                     summary["manual_intervention_days"].add(day)
                 if len(summary["manual_intervention_rows"]) < 20:
                     summary["manual_intervention_rows"].append({"day": day, "path": path.name, "line_no": idx, "line": line})
-            if _TWS_RESTART.search(line):
+            if _TWS_RESTART.search(line) and not _TWS_RESTART_EXCLUDE.search(line):
                 summary["tws_restart_lines"] += 1
                 if day:
                     summary["tws_restart_days"].add(day)
+    summary["_b3_episodes"] = b3_episodes
+    with _lock:
+        if len(_file_cache) >= _FILE_CACHE_MAX:
+            _file_cache.pop(next(iter(_file_cache)))
+        _file_cache[key] = copy.deepcopy(summary)
+    return summary
+
+
+def _log_summary_uncached(root: Path, epoch: str | None) -> dict[str, Any]:
+    summary = _blank_log_summary()
+    b3_episodes: list[dict[str, Any]] = []
+    for path in _log_paths(root):
+        part = _scan_one_log(path, epoch)
+        _merge_log_partial(summary, part)
+        _append_b3_episodes(b3_episodes, part.get("_b3_episodes") or [])
+    b3_episodes.sort(key=lambda episode: (_parse_ts(episode.get("first_seen")) or dt.datetime.max.replace(tzinfo=dt.timezone.utc), str(episode.get("path") or "")))
+    match_episodes = [episode for episode in b3_episodes if episode.get("kind") == "match"]
+    mismatch_episodes = [episode for episode in b3_episodes if episode.get("kind") == "mismatch"]
+    summary["b3_match_episodes"] = len(match_episodes)
+    summary["b3_mismatch_episodes"] = len(mismatch_episodes)
+    summary["b3_matches"] = len(match_episodes)
+    summary["b3_mismatches"] = len(mismatch_episodes)
+    summary["b3_match_positions_affected"] = sum(int(episode.get("positions_affected") or 0) for episode in match_episodes)
+    summary["b3_mismatch_positions_affected"] = sum(int(episode.get("positions_affected") or 0) for episode in mismatch_episodes)
+    summary["b3_match_episode_rows"] = match_episodes[:20]
+    summary["b3_mismatch_episode_rows"] = mismatch_episodes[:20]
     summary["manual_intervention_days"] = sorted(summary["manual_intervention_days"])
     summary["tws_restart_days"] = sorted(summary["tws_restart_days"])
     return summary
@@ -908,11 +1382,21 @@ def _same_day(records: list[dict[str, Any]]) -> dict[str, int]:
 
 
 def _c1_status(slip: dict[str, Any], spec: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
-    min_n = int(spec.get("min_n") or 0) if isinstance(spec.get("min_n"), int) else None
-    max_mean = _number(spec.get("max_mean_ticks"))
-    scope = str(spec.get("scope") or "").lower()
-    close_scope = str(spec.get("close_scope") or "stp_only").lower()
-    use_abs = spec.get("use_absolute") is not False
+    """Judge OPEN slippage per instrument and STP-close slippage pooled.
+
+    Two scopes because the two branches have different sample densities, measured on the
+    backtest: 1.87 trades/session overall, so each instrument sees enough OPENs to be
+    judged on its own inside the epoch's 60-session target, while stop closes do not.
+    Pooling OPENs was the old defect -- a 28-tick M2K miss vanished into a pooled 9.00 --
+    and pooling the stop branch is the only way it fills at all. Every threshold and the
+    reasoning behind it travels in `spec`, published to the panel.
+    """
+    open_spec = spec.get("open") if isinstance(spec.get("open"), dict) else {}
+    stp_spec = spec.get("stp_close") if isinstance(spec.get("stp_close"), dict) else {}
+    open_min_n = open_spec.get("min_n_per_inst")
+    open_max = _number(open_spec.get("max_mean_ticks"))
+    stp_min_n = stp_spec.get("min_n")
+    stp_max = _number(stp_spec.get("max_mean_ticks"))
     metrics = {**slip, "spec": spec if spec else None}
     base = (
         f"OPEN {_fmt_mean(slip['open_mean'])} N={slip['open_n']} | "
@@ -922,47 +1406,101 @@ def _c1_status(slip: dict[str, Any], spec: dict[str, Any]) -> tuple[str, str, di
 
     if slip["open_n"] == 0 and slip["stp_close_n"] == 0:
         return "MISSING", base, metrics
-    if not min_n or max_mean is None or scope not in {"separate", "combined"} or close_scope != "stp_only":
+    if not isinstance(open_min_n, int) or open_max is None \
+            or not isinstance(stp_min_n, int) or stp_max is None \
+            or str(open_spec.get("scope")).lower() != "by_inst":
         return "SPEC_GAP", base, metrics
 
-    values: list[float] = []
-    if slip["open_mean"] is not None:
-        values.append(abs(slip["open_mean"]) if use_abs else slip["open_mean"])
-    if slip["stp_close_mean"] is not None:
-        values.append(abs(slip["stp_close_mean"]) if use_abs else slip["stp_close_mean"])
+    # Per-instrument OPEN verdicts. An instrument short of samples is pending, not
+    # passing: a mean over three fills is not evidence that execution is clean.
+    per_inst = []
+    for row in slip.get("by_inst") or []:
+        n = int(row.get("open_n") or 0)
+        mean = _number(row.get("open_mean_ticks"))
+        over = mean is not None and abs(mean) > open_max
+        per_inst.append({
+            **row,
+            "open_min_n": open_min_n,
+            "open_limit_ticks": open_max,
+            "open_verdict": "BREACH" if over else "PENDING" if n < open_min_n else "PASS",
+            "open_over_limit": over,
+        })
+    metrics["by_inst"] = per_inst
 
-    if scope == "separate":
-        enough = slip["open_n"] >= min_n and slip["stp_close_n"] >= min_n
-        passes = enough and all(value <= max_mean for value in values)
-    else:
-        total_n = slip["open_n"] + slip["stp_close_n"]
-        enough = total_n >= min_n
-        combined = _mean([value for value in values if value is not None])
-        metrics["combined_mean"] = combined
-        passes = enough and combined is not None and combined <= max_mean
+    breaching = [row["inst"] for row in per_inst if row["open_over_limit"]]
+    short = [row["inst"] for row in per_inst if not row["open_over_limit"]
+             and int(row.get("open_n") or 0) < open_min_n]
+    stp_mean = slip["stp_close_mean"]
+    stp_over = stp_mean is not None and abs(stp_mean) > stp_max
+    stp_short = int(slip["stp_close_n"] or 0) < stp_min_n
+    metrics["open_breaching_instruments"] = breaching
+    metrics["open_instruments_short_of_sample"] = short
+    metrics["stp_over_limit"] = stp_over
+    metrics["stp_short_of_sample"] = stp_short
 
-    if not enough:
-        return "PENDING", f"{base} | need N>={min_n} ({scope})", metrics
-    return ("PASS" if passes else "BREACH", f"{base} | limit {max_mean:g} ticks ({scope})", metrics)
+    detail = (
+        f"{base} | limit {open_max:g} ticks; OPEN by instrument (N>={open_min_n} each), "
+        f"STP pooled (N>={stp_min_n})"
+    )
+    # An over-limit mean is reported even on a thin sample -- it is the measurement most
+    # likely to matter and hiding it until a count is reached would be the pooled
+    # mistake in another form. The status says QUALITY_BREACH rather than BREACH so the
+    # thin sample is visible in the word itself.
+    if breaching or stp_over:
+        offenders = ", ".join(breaching + (["STP pooled"] if stp_over else []))
+        return "QUALITY_BREACH", f"{detail} | over limit: {offenders}", metrics
+    if short or stp_short:
+        return "PENDING", f"{detail} | short of sample: {', '.join(short) or 'STP'}", metrics
+    return "PASS", detail, metrics
 
 
-def _stp_input_status(items: list[dict[str, Any]], logs: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+def _stp_input_status(items: list[dict[str, Any]], spec: dict[str, Any], logs: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+    min_sessions = (
+        int(spec.get("min_distinct_sessions") or 0)
+        if isinstance(spec.get("min_distinct_sessions"), int)
+        else None
+    )
     if not items:
         return (
             "SPEC_GAP" if logs["stp_verify_lines"] or logs["stp_exit_lines"] or logs["b3_halt_lines"] else "MISSING",
             f"STP-VERIFY {logs['stp_verify_lines']} | STP EXIT {logs['stp_exit_lines']} | B3 HALT {logs['b3_halt_lines']} | placement accepted {logs['stp_accepted']} failed {logs['stp_failed']}",
             {
+                "checks": 0,
+                "false_halts": 0,
+                "double_stp": 0,
+                "unverified": 0,
+                "distinct_sessions": 0,
+                "required_sessions": min_sessions,
+                "records": [],
                 "stp_verify_lines": logs["stp_verify_lines"],
                 "stp_exit_lines": logs["stp_exit_lines"],
                 "b3_halt_lines": logs["b3_halt_lines"],
                 "stp_accepted": logs["stp_accepted"],
                 "stp_failed": logs["stp_failed"],
+                # The zero-tolerance rules hold whether or not any record exists yet,
+                # so publish them here too. Omitting them made the rule rail claim the
+                # rules were absent on a fresh epoch.
+                "spec": {
+                    "max_false_halts": 0,
+                    "max_double_stp": 0,
+                    "max_unverified": 0,
+                    "min_distinct_sessions": min_sessions,
+                    "rule_source": "zero-tolerance rules enforced in code; session count from paper_inputs.json",
+                },
             },
         )
     false_halts = sum(1 for item in items if _bool(item.get("false_halt")))
     double_stp = sum(1 for item in items if _bool(item.get("double_stp")))
     unverified = sum(1 for item in items if item.get("verified") is not True)
-    status = "BREACH" if false_halts or double_stp or unverified else "PASS"
+    distinct_sessions = len({str(item.get("date")) for item in items if item.get("date")})
+    if not min_sessions:
+        status = "SPEC_GAP"
+    elif false_halts or double_stp or unverified:
+        status = "BREACH"
+    elif distinct_sessions < min_sessions:
+        status = "PENDING"
+    else:
+        status = "PASS"
     records = [{
         "date": item.get("date"),
         "verified": item.get("verified") is True,
@@ -970,11 +1508,26 @@ def _stp_input_status(items: list[dict[str, Any]], logs: dict[str, Any]) -> tupl
         "double_stp": _bool(item.get("double_stp")),
         "evidence": item.get("evidence"),
     } for item in items]
+    progress = (
+        f"{distinct_sessions}/{min_sessions} verified session(s)"
+        if min_sessions
+        else f"{distinct_sessions} verified session(s) | stp_verification_spec.min_distinct_sessions missing"
+    )
     return (
         status,
-        f"{len(items)} structured STP check(s), false_halt {false_halts}, double_stp {double_stp}, unverified {unverified}",
+        f"{progress}, false_halt {false_halts}, double_stp {double_stp}, unverified {unverified}",
         {"checks": len(items), "false_halts": false_halts, "double_stp": double_stp, "unverified": unverified,
-         "records": records},
+         "distinct_sessions": distinct_sessions, "required_sessions": min_sessions, "records": records,
+         # false_halt / double_stp / unverified are enforced right above this return
+         # (any non-zero -> BREACH) but live in code, not in paper_inputs.json. Publish
+         # them so the UI rule rail states the real rule instead of "spec missing".
+         "spec": {
+             "max_false_halts": 0,
+             "max_double_stp": 0,
+             "max_unverified": 0,
+             "min_distinct_sessions": min_sessions,
+             "rule_source": "zero-tolerance rules enforced in code; session count from paper_inputs.json",
+         }},
     )
 
 
@@ -1821,9 +2374,249 @@ def _pvb_daily_timeline(trade_compare: dict[str, Any] | None, items: list[dict[s
     return rows
 
 
+def _b3_classify(episodes: list[dict[str, Any]],
+                 classifications: list[dict[str, Any]]) -> dict[str, Any]:
+    """Match recorded classifications to mismatch episodes by episode identity.
+
+    A classification names the episode it covers -- file, line range, timestamps -- so
+    it can only ever clear that one. Without the identity check a single note would
+    absolve every future mismatch, which is how a reconcile gate stops being a gate.
+
+    A classified mismatch does not become a pass. It happened: the books and the broker
+    genuinely disagreed. What a classification buys is EXPLAINED instead of BREACH, so a
+    historical episode with a known and fixed cause stops blocking an epoch forever the
+    way an unfixable gate does -- while anything unclassified still reads BREACH.
+    """
+    def key(row: dict[str, Any]) -> tuple:
+        return (str(row.get("path") or ""), row.get("line_from"), row.get("line_to"))
+
+    by_key = {}
+    for item in classifications or []:
+        episode = item.get("episode") if isinstance(item.get("episode"), dict) else {}
+        by_key[key(episode)] = item
+
+    matched, unmatched = [], []
+    for episode in episodes or []:
+        found = by_key.get(key(episode))
+        if found:
+            matched.append({"episode": episode, "classification": found})
+        else:
+            unmatched.append(episode)
+    orphan_notes = [
+        item for item in (classifications or [])
+        if key(item.get("episode") if isinstance(item.get("episode"), dict) else {})
+        not in {key(e) for e in (episodes or [])}
+    ]
+    return {
+        "classified": matched,
+        "unclassified": unmatched,
+        # A note whose episode no longer appears is not reassurance: either the logs
+        # rotated out from under it or it never matched anything. Say so rather than
+        # counting it as coverage.
+        "stale_classifications": orphan_notes,
+        "classified_count": len(matched),
+        "unclassified_count": len(unmatched),
+    }
+
+
+def _pnl_threshold_status(spec: dict[str, Any], pnl: dict[str, Any],
+                          sessions: Any, adjustment_total: Any) -> dict[str, Any]:
+    """Evaluate the two approved P&L gates and publish everything behind them.
+
+    A go-live threshold that appears on screen as a bare number is not reviewable. The
+    reader has to be able to see where it came from, how often it blocks a good epoch,
+    what it cannot catch, and why it is not armed yet -- otherwise "BREACH" is an
+    instruction to obey rather than evidence to weigh. So this returns the verdict and
+    the whole spec together.
+    """
+    if not isinstance(spec, dict) or not spec:
+        return {
+            "status": "SPEC_GAP",
+            "detail": "No pnl_threshold_spec is defined, so no loss level blocks go-live.",
+            "spec": None,
+        }
+    edge = spec.get("edge_gate") or {}
+    ops = spec.get("operational_gate") or {}
+    bands = [b for b in (edge.get("bands") or []) if isinstance(b, dict)]
+    arm_at = edge.get("arm_after_sessions")
+    n = _number(sessions)
+    strategy = _number(pnl.get("paper_epoch_closed_realized"))
+    broker = _number(pnl.get("flex_epoch_rebased_realized"))
+    gap = _number(pnl.get("paper_minus_flex_epoch_rebased_realized"))
+
+    # Largest anchor at or below the epoch's length. Between anchors this holds the
+    # previous, looser floor rather than interpolating -- a gate should not block on a
+    # number nobody wrote down.
+    applicable = [b for b in bands if n is not None and _number(b.get("sessions")) is not None
+                  and _number(b["sessions"]) <= n]
+    active = max(applicable, key=lambda b: _number(b["sessions"])) if applicable else None
+    floor = _number(active.get("floor_usd")) if active else None
+
+    if n is None or arm_at is None:
+        edge_status, edge_detail = "MISSING", "Epoch session count or arming rule is unavailable."
+    elif n < _number(arm_at):
+        edge_status = "NOT_ARMED"
+        edge_detail = (
+            f"{int(n)} of {int(_number(arm_at))} sessions. Below the arming point a loss "
+            f"carries no information, so this gate deliberately says nothing yet."
+        )
+    elif floor is None or strategy is None:
+        edge_status, edge_detail = "MISSING", "No band or no strategy P&L for this epoch."
+    elif strategy < floor:
+        edge_status = "BREACH"
+        edge_detail = (
+            f"Strategy P&L {_money(strategy)} is below the {int(_number(active['sessions']))}"
+            f"-session floor of {_money(floor)}."
+        )
+    else:
+        edge_status = "PASS"
+        edge_detail = (
+            f"Strategy P&L {_money(strategy)} is above the "
+            f"{int(_number(active['sessions']))}-session floor of {_money(floor)}."
+        )
+
+    tolerance = _number(ops.get("tolerance_usd")) or 0.01
+    covered = (gap is not None and _number(adjustment_total) is not None
+               and abs(gap + _number(adjustment_total)) <= tolerance)
+    if gap is None:
+        ops_status = "MISSING"
+        ops_detail = "No broker-vs-ledger comparison is available for this epoch."
+    elif abs(gap) <= tolerance:
+        ops_status = "PASS"
+        ops_detail = f"Broker and sleeve ledger agree within {_money(tolerance)}."
+    elif covered:
+        ops_status = "PASS"
+        ops_detail = (
+            f"The {_money(gap)} gap is fully covered by recorded ledger adjustment(s) "
+            f"totalling {_money(_number(adjustment_total))}."
+        )
+    else:
+        ops_status = "BREACH"
+        ops_detail = (
+            f"{_money(gap)} of broker-vs-ledger difference is not covered by any recorded "
+            f"ledger adjustment. Size is not the point: the books do not describe the account."
+        )
+
+    combined = "BREACH" if "BREACH" in (edge_status, ops_status) else (
+        "MISSING" if "MISSING" in (edge_status, ops_status) else
+        "PASS" if edge_status == "PASS" and ops_status == "PASS" else "OBSERVED"
+    )
+    return {
+        "status": combined,
+        "detail": f"Edge gate: {edge_detail} Operational gate: {ops_detail}",
+        "edge": {
+            "status": edge_status, "detail": edge_detail,
+            "sessions": n, "arm_after_sessions": arm_at,
+            "sessions_to_arm": (max(0, int(_number(arm_at) - n)) if n is not None and arm_at is not None else None),
+            "active_band": active, "floor_usd": floor, "value_usd": strategy,
+            "headroom_usd": (round(strategy - floor, 2) if strategy is not None and floor is not None else None),
+        },
+        "operational": {
+            "status": ops_status, "detail": ops_detail,
+            "gap_usd": gap, "adjustment_total_usd": _number(adjustment_total),
+            "covered_by_adjustment": covered, "tolerance_usd": tolerance,
+            "broker_usd": broker, "ledger_usd": strategy,
+        },
+        "spec": spec,
+    }
+
+
+def _money(value: Any) -> str:
+    n = _number(value)
+    if n is None:
+        return "--"
+    return f"{'-' if n < 0 else '+'}${abs(n):,.2f}"
+
+
+def _artifact_freshness(root: Path, compare: dict[str, Any]) -> dict[str, Any] | None:
+    """Is monitor/paper_pnl_compare.json still what the current code would produce?
+
+    The dashboard reads that file rather than recomputing it, so a fix to the money
+    logic does not reach the screen until somebody reruns the generator -- and the
+    stale numbers look exactly as authoritative as fresh ones. On 2026-08-14 the Flex
+    reconcile was switched to broker Proceeds and the panel kept serving local
+    point_value lots with nothing on screen to say so.
+
+    Reports rather than blocks: a stale artifact is a reason to distrust the P&L
+    figures, not evidence about the strategy.
+    """
+    if not isinstance(compare, dict):
+        return None
+    stamped = compare.get("source_signature")
+    if not isinstance(stamped, dict):
+        # Written by a generator that predates the stamp. Say that, do not claim fresh.
+        return {
+            "status": "UNKNOWN",
+            "detail": (
+                "monitor/paper_pnl_compare.json carries no source_signature, so whether it "
+                "matches the current money logic cannot be checked. Rerun "
+                "python monitor/paper_pnl_compare.py to stamp it."
+            ),
+        }
+    try:
+        from monitor.paper_pnl_compare import source_signature
+    except Exception:
+        return None
+    current = source_signature(root)
+    drifted = sorted(k for k, v in current.items() if stamped.get(k) != v)
+    if not drifted:
+        return {"status": "CURRENT", "detail": "Artifact matches the current money logic.",
+                "sources": sorted(current)}
+    return {
+        "status": "STALE",
+        "detail": (
+            f"{', '.join(drifted)} changed since monitor/paper_pnl_compare.json was written, "
+            f"so every P&L figure on this panel is the previous code's output. Rerun "
+            f"python monitor/paper_pnl_compare.py."
+        ),
+        "drifted": drifted,
+        "sources": sorted(current),
+    }
+
+
+def _flex_reconcile_basis(trade_compare: dict[str, Any]) -> str | None:
+    """Describe where the Flex side's money comes from, read from the lots themselves.
+
+    This used to be a hardcoded sentence saying the money came from local point_value.
+    When paper_pnl_compare switched to the statement's Proceeds the sentence stayed
+    behind and started describing code that no longer existed -- on a dashboard whose
+    only job is to report truthfully. So the basis is now derived: each closed lot
+    carries the pnl_basis it was actually built from, and this reports what they say.
+    """
+    compare = (trade_compare or {}).get("statement_pnl_compare")
+    if not isinstance(compare, dict):
+        return None
+    lots = [
+        lot
+        for key in ("flex_epoch_rebased_closed", "flex_ledger_aligned_closed")
+        for lot in (compare.get(key) or [])
+        if isinstance(lot, dict)
+    ]
+    if not lots:
+        return None
+    bases = {str(lot.get("pnl_basis") or "unknown") for lot in lots}
+    if bases == {"statement_proceeds"}:
+        return (
+            "statement Proceeds (monitor/paper_pnl_compare.py sums the entry and exit "
+            "Proceeds fields from the Flex statement; every closed lot carries "
+            f"pnl_basis=statement_proceeds, n={len(lots)}). Prices, quantities, pairing "
+            "and the money all come from the broker, so a wrong local contract multiplier "
+            "no longer cancels on both sides -- it surfaces in paper-minus-Flex."
+        )
+    return (
+        f"mixed basis across {len(lots)} closed lot(s): {', '.join(sorted(bases))}. "
+        "Lots not built from statement Proceeds fall back to local point_value, where a "
+        "wrong contract multiplier cancels on both sides and hides itself in "
+        "paper-minus-Flex. Treat those rows as unverified against broker money."
+    )
+
+
 def _paper_vs_backtest_status(live_pvb: dict[str, Any], items: list[dict[str, Any]],
                               account: float | None, compare: dict[str, Any],
-                              spec: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+                              spec: dict[str, Any],
+                              ledger_adjustments: list[dict[str, Any]] | None = None,
+                              artifact_freshness: dict[str, Any] | None = None,
+                              ) -> tuple[str, str, dict[str, Any]]:
     trade_compare = _trade_compare_summary(compare)
     base_audit = _pvb_base_audit(account, items, compare, trade_compare)
     timeline = _pvb_daily_timeline(trade_compare, items)
@@ -1848,12 +2641,25 @@ def _paper_vs_backtest_status(live_pvb: dict[str, Any], items: list[dict[str, An
         "PASS: paper and backtest share the same account base, backtest is reset to that base, curve coverage is current when required, and every signal/entry/trade-level divergence is classified within spec limits.",
         "BREACH: account base mismatches, backtest is not reset to the paper base, unresolved signal/entry divergence exceeds spec, or unresolved trade divergence exceeds max_unresolved_trades.",
     ]
+    # Recorded ledger adjustments belong next to the P&L grid, because that is where the
+    # gap they explain surfaces: paper-minus-Flex now reads +1260.00 rather than 0.00, and
+    # without the adjustment beside it that break looks fresh and unexplained.
+    ledger_adjustments = list(ledger_adjustments or [])
+    adjustment_total = sum(
+        value for value in (_number(item.get("ledger_shortfall")) for item in ledger_adjustments)
+        if value is not None
+    )
     common_metrics = {
         "base_audit": base_audit,
         "timeline": timeline,
         "spec": spec if spec else None,
         "covered_daily_count": covered_daily,
         "stale_daily_count": stale_daily,
+        "contract_specs": _local_contract_specs(),
+        "ledger_adjustments": ledger_adjustments,
+        "ledger_adjustment_total": round(adjustment_total, 2) if ledger_adjustments else None,
+        "flex_reconcile_basis": _flex_reconcile_basis(trade_compare),
+        "artifact_freshness": artifact_freshness,
         "max_unresolved_trades": max_unresolved,
         "max_unresolved_signals": max_unresolved_signals,
         "max_unresolved_entries": max_unresolved_entries,
@@ -2023,6 +2829,44 @@ def _coverage_items(root: Path, state: dict[str, Any], payload: dict[str, Any], 
     roll_status, roll_evidence, roll_metrics = _roll_input_status(
         _records(paper_inputs.get("roll_slippage")), logs
     )
+    # Same inputs the gate reads, presented as an evidence surface rather than a verdict.
+    # The gate answers "are we there yet"; the panel answers "what has actually been
+    # recorded, and what are those candidate lines". Reusing _tws_input_status keeps the
+    # two from drifting into disagreeing about the same nights.
+    tws_cov_items = _records(paper_inputs.get("tws_restart_nights"))
+    tws_cov_spec = paper_inputs.get("tws_restart_spec") if isinstance(paper_inputs.get("tws_restart_spec"), dict) else {}
+    tws_gate_status, tws_gate_evidence, tws_cov_metrics = _tws_input_status(tws_cov_items, tws_cov_spec, logs)
+    tws_cov_metrics = {
+        **tws_cov_metrics,
+        "records_detail": tws_cov_items,
+        "spec": tws_cov_spec or None,
+        "status_rules": [
+            "MISSING: no structured restart-night record exists, so nothing here is evidence yet.",
+            "OBSERVED: records exist; the gate decides whether the count is sufficient.",
+        ],
+        "what_counts": (
+            "A night counts only when restart_proven, runner_resumed and broker_verified "
+            "are all true. Connectivity candidate lines show that a disconnect happened; "
+            "they do not show the system recovered, so they are context, not proof."
+        ),
+    }
+    # No records means no evidence surface at all -- say MISSING rather than borrowing the
+    # gate's PENDING, which would read as "collected some, waiting for more".
+    tws_cov_status = "MISSING" if not tws_cov_items else "OBSERVED"
+    # The approved go-live loss gates. Evaluated here so the panel and the Overview card
+    # read one verdict rather than each deriving their own.
+    pnl_thresholds = _pnl_threshold_status(
+        paper_inputs.get("pnl_threshold_spec") if isinstance(paper_inputs.get("pnl_threshold_spec"), dict) else {},
+        ((paper_compare or {}).get("statement_pnl_compare") or {}) if isinstance(paper_compare, dict) else {},
+        # Same count the paper_duration gate publishes: epoch days in paper_history.
+        len([day for day in (history.get("days") or {}) if _in_epoch(day, epoch)]),
+        sum(
+            value for value in (
+                _number(item.get("ledger_shortfall"))
+                for item in _records(paper_inputs.get("ledger_adjustments"))
+            ) if value is not None
+        ) or None,
+    )
     regime_freshness = op_status.get("regime_freshness") if isinstance(op_status.get("regime_freshness"), dict) else {}
     model_age = op_status.get("model_age") if isinstance(op_status.get("model_age"), dict) else {}
     refreeze = op_status.get("refreeze") if isinstance(op_status.get("refreeze"), dict) else {}
@@ -2039,6 +2883,8 @@ def _coverage_items(root: Path, state: dict[str, Any], payload: dict[str, Any], 
         _number(history.get("account")),
         paper_compare,
         paper_inputs.get("paper_vs_backtest_spec") if isinstance(paper_inputs.get("paper_vs_backtest_spec"), dict) else {},
+        _records(paper_inputs.get("ledger_adjustments")),
+        _artifact_freshness(root, paper_compare),
     )
     contract_status, contract_evidence, contract_metrics = _contract_spec_guard(ibkr_cache or {})
 
@@ -2206,6 +3052,28 @@ def _coverage_items(root: Path, state: dict[str, Any], payload: dict[str, Any], 
             ["logs", "live_positions", "paper_inputs"],
             manual_metrics,
         ),
+        # The gate with the largest outstanding requirement (10 nights) was the only one
+        # with no evidence surface of its own. Its gap card could not offer "open detail"
+        # because there was nothing to open, and the nearest candidate -- runner_freshness
+        # -- is exactly the wrong target that H5 removed. So the panel has to exist before
+        # the button can.
+        _coverage(
+            "pnl_thresholds", "Go-live loss thresholds",
+            pnl_thresholds["status"],
+            pnl_thresholds["detail"],
+            ["paper_inputs", "paper_pnl_compare", "backtest_curve"],
+            pnl_thresholds,
+        ),
+        _coverage(
+            "tws_restart", "TWS restart evidence",
+            tws_cov_status,
+            (
+                f"{tws_gate_evidence}; {logs['tws_restart_lines']} connectivity candidate "
+                f"line(s) across {len(logs['tws_restart_days'])} day(s) (context, not proof)"
+            ),
+            ["logs", "paper_inputs"],
+            tws_cov_metrics,
+        ),
         _coverage(
             "sample_denominators", "Samples by instrument and cluster",
             "OBSERVED" if fill_records else "MISSING",
@@ -2226,12 +3094,13 @@ def _coverage_items(root: Path, state: dict[str, Any], payload: dict[str, Any], 
             f"{logs['dropped_test_lines']} test/noise line(s) filtered from paper evidence",
             ["logs"],
             {
-                "description": "Production-log hygiene shows how many retained log lines were excluded from paper evidence because they match known test/noise markers.",
+                "description": "Production-log hygiene shows how many retained log lines or timestamp blocks were excluded from paper evidence because they match known test/noise markers.",
                 "dropped_test_lines": logs["dropped_test_lines"],
                 "sample_rows": logs.get("dropped_test_rows", []),
+                "excluded_blocks": logs.get("excluded_blocks", []),
                 "status_rules": [
                     "PASS: not a standalone pass/fail gate; this is an evidence-quality guardrail.",
-                    "OBSERVED: noise filtering ran and dropped lines are counted/sampled.",
+                    "OBSERVED: noise filtering ran and dropped lines/blocks are counted/sampled.",
                     "BREACH: use only if production evidence depends on unclassified test/noise lines.",
                 ],
             },
@@ -2267,6 +3136,8 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
     })
 
     exits = {"CHANDELIER": 0, "MAX_HOLD": 0, "STP": 0}
+    labelled_exits = 0
+    unlabelled_exits = 0
     for record in records:
         if str(record.get("type")).upper() != "CLOSE":
             continue
@@ -2275,6 +3146,13 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
         key_exit = _normalize_exit(record.get("exit_reason"))
         if key_exit:
             exits[key_exit] += 1
+            labelled_exits += 1
+        else:
+            # runner.py writes exit_reason only on the STP close path (:934); the
+            # signal/decision close path (:1482) omits it entirely. An unlabelled CLOSE
+            # is an instrumentation gap, not a missing sample: waiting longer cannot
+            # turn it into a countable exit path.
+            unlabelled_exits += 1
 
     slip = _slippage(records, epoch)
     c1_trades = _c1_trade_details(records, epoch)
@@ -2288,7 +3166,9 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
         slip, paper_inputs.get("c1_spec") if isinstance(paper_inputs.get("c1_spec"), dict) else {}
     )
     stp_status, stp_evidence, stp_metrics = _stp_input_status(
-        _records(paper_inputs.get("stp_verification")), logs
+        _records(paper_inputs.get("stp_verification")),
+        paper_inputs.get("stp_verification_spec") if isinstance(paper_inputs.get("stp_verification_spec"), dict) else {},
+        logs,
     )
     tws_items = _records(paper_inputs.get("tws_restart_nights"))
     tws_spec = paper_inputs.get("tws_restart_spec") if isinstance(paper_inputs.get("tws_restart_spec"), dict) else {}
@@ -2348,7 +3228,11 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
             "monitor/paper_inputs.json",
             "tws_restart_spec.min_nights and tws_restart_nights rows with restart_proven, runner_resumed, broker_verified.",
             f"{min_nights or 'configured'} proven restart night(s) are structured and all required flags are true.",
-            None,
+            # Was None because no TWS evidence panel existed, which left the gate with the
+            # largest outstanding requirement as the only one a reader could not drill
+            # into. The nearest existing panel is runner_freshness -- the very target H5
+            # removed for being wrong -- so the fix was to build the panel, not to borrow.
+            "tws_restart",
             "operator_data",
             "NEEDS_DATA",
             "Prove that TWS/IBKR restart recovery has been observed over enough sessions before relying on unattended paper/live operation.",
@@ -2399,6 +3283,11 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
         ),
     ])
 
+    _b3_class = _b3_classify(
+        logs["b3_mismatch_episode_rows"],
+        _records(paper_inputs.get("b3_classifications")),
+    )
+
     gates = [
         _gate(
             "paper_duration", "Paper duration",
@@ -2418,11 +3307,37 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
         ),
         _gate(
             "exit_path_coverage", "Exit path coverage",
-            "PASS" if all(count >= 3 for count in exits.values()) else "PENDING",
-            f"Chandelier {exits['CHANDELIER']} | MAX_HOLD {exits['MAX_HOLD']} | STP {exits['STP']}",
+            (
+                "PASS" if all(count >= 3 for count in exits.values())
+                # Every retained CLOSE is unlabelled: the gate cannot classify a single
+                # exit, so this is a measurement gap, not a sample shortfall. Reporting
+                # it as PENDING tells the reviewer to wait for a number that can never
+                # arrive.
+                else "STRUCTURAL_GAP" if unlabelled_exits and not labelled_exits
+                else "PENDING"
+            ),
+            (
+                f"Chandelier {exits['CHANDELIER']} | MAX_HOLD {exits['MAX_HOLD']} | STP {exits['STP']}"
+                + (
+                    f" | {unlabelled_exits} CLOSE fill(s) carry no exit_reason, so their path cannot be identified"
+                    if unlabelled_exits else ""
+                )
+            ),
             "Each path several times; monitor interprets several as 3",
             ["trade_log"],
-            {"exits": exits, "target_each": 3},
+            {
+                "exits": exits,
+                "target_each": 3,
+                "labelled_exits": labelled_exits,
+                "unlabelled_exits": unlabelled_exits,
+                "instrumentation_gap": bool(unlabelled_exits and not labelled_exits),
+                "instrumentation_note": (
+                    "runner.py writes exit_reason only on the STP close path (:934). The "
+                    "signal/decision close path (:1482) omits it, so CHANDELIER and MAX_HOLD "
+                    "exits are unlabelled and cannot be counted. This gate cannot reach 3/3 "
+                    "until the runner records exit_reason on every CLOSE."
+                ) if unlabelled_exits else None,
+            },
         ),
         _gate(
             "c1_slippage", "C1 slippage",
@@ -2434,11 +3349,55 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
         ),
         _gate(
             "b3_reconcile", "B3 cold-start reconcile",
-            "BREACH" if logs["b3_mismatches"] else "PASS" if logs["b3_matches"] else "MISSING",
-            f"{logs['b3_matches']} match observation(s), {logs['b3_mismatches']} mismatch(es)",
+            (
+                "BREACH" if _b3_class["unclassified_count"]
+                else "EXPLAINED" if _b3_class["classified_count"]
+                else "PASS" if logs["b3_matches"] else "MISSING"
+            ),
+            (
+                f"{logs['b3_match_episodes']} match episode(s), {logs['b3_mismatch_episodes']} mismatch episode(s) "
+                f"({_b3_class['classified_count']} classified, {_b3_class['unclassified_count']} unclassified), "
+                f"{logs['b3_mismatch_positions_affected']} mismatch position(s) affected; "
+                f"raw mismatch heartbeat {logs['b3_mismatch_raw_positions']} across {logs['b3_mismatch_raw_line_count']} line(s)"
+            ),
             "0 mismatches on every cold start",
             ["logs"],
-            {"matches": logs["b3_matches"], "mismatches": logs["b3_mismatches"], "cold_starts": logs["cold_starts"]},
+            {
+                "matches": logs["b3_matches"],
+                "mismatches": logs["b3_mismatches"],
+                "episodes": logs["b3_mismatch_episodes"],
+                "positions_affected": logs["b3_mismatch_positions_affected"],
+                "first_seen": logs["b3_mismatch_episode_rows"][0]["first_seen"] if logs["b3_mismatch_episode_rows"] else None,
+                "last_seen": logs["b3_mismatch_episode_rows"][-1]["last_seen"] if logs["b3_mismatch_episode_rows"] else None,
+                "raw_line_count": logs["b3_mismatch_raw_line_count"],
+                "raw_mismatch_count": logs["b3_mismatch_raw_positions"],
+                "match_episodes": logs["b3_match_episodes"],
+                "match_positions_affected": logs["b3_match_positions_affected"],
+                "match_raw_line_count": logs["b3_match_raw_line_count"],
+                "raw_match_count": logs["b3_match_raw_positions"],
+                "mismatch_episode_rows": logs["b3_mismatch_episode_rows"],
+                "match_episode_rows": logs["b3_match_episode_rows"],
+                "cold_starts": logs["cold_starts"],
+                "classification": _b3_class,
+                # The B3 rule is enforced in code (any mismatch -> BREACH) rather than
+                # configured in paper_inputs.json. Publishing it as data keeps the UI rule
+                # rail truthful: without this the rail reads "spec missing" and denies that
+                # an enforced rule exists at all.
+                "spec": {
+                    "cold_start_reconcile": "broker/file positions must match",
+                    "max_unclassified_mismatch_episodes": 0,
+                    "persist_match_required": True,
+                    "evidence": "scheduler/live-day logs, grouped into episodes",
+                    "rule_source": "enforced in paper_evidence_reader, not operator-configurable",
+                    "classification_rule": (
+                        "A mismatch episode may be classified in paper_inputs.b3_classifications "
+                        "by naming its file and line range. A classified episode reads EXPLAINED, "
+                        "not PASS -- the disagreement still happened. Anything unclassified is a "
+                        "BREACH, and a classification whose episode no longer appears is reported "
+                        "as stale rather than counted as coverage."
+                    ),
+                },
+            },
         ),
         _gate(
             "stp_verification", "STP verification",
@@ -2475,6 +3434,13 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
                 "c1_close_mean": slip["close_mean"],
                 "c1_open_n": slip["open_n"],
                 "c1_close_n": slip["close_n"],
+                "stp_failed": logs["stp_failed"],
+                "b3_episodes": logs["b3_mismatch_episodes"],
+                "b3_positions_affected": logs["b3_mismatch_positions_affected"],
+                "b3_raw_mismatch_count": logs["b3_mismatch_raw_positions"],
+                "b3_raw_mismatch_lines": logs["b3_mismatch_raw_line_count"],
+                "cold_starts": logs["cold_starts"],
+                "excluded_blocks": logs.get("excluded_blocks", []),
             },
             "gaps": gaps,
             "diagnostics": {
@@ -2485,6 +3451,7 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
                 "paper_inputs_error": paper_inputs_error,
                 "paper_pnl_compare_error": paper_compare_error,
                 "dropped_test_log_lines": logs["dropped_test_lines"],
+                "excluded_test_log_blocks": len(logs.get("excluded_blocks", [])),
                 "manual_intervention_candidate_lines": logs["manual_intervention_lines"],
                 "manual_intervention_candidate_days": logs["manual_intervention_days"],
                 "tws_restart_candidate_lines": logs["tws_restart_lines"],

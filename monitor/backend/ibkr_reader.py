@@ -186,15 +186,26 @@ def _safe_float(v: Any) -> float | None:
 
 
 def _read_contract_specs(ib: Any, ibi: Any) -> dict[str, dict[str, Any]]:
-    """Read exchange contract metadata from IBKR without touching orders/state."""
+    """Read exchange contract metadata from IBKR without touching orders/state.
+
+    Covers BASKET and SPECS, not BASKET alone. Asking only about the four Rổ-4 futures
+    is what let the MNKD routing defect run undetected: MNKD lives in SPECS, so the
+    guard never requested its ContractDetails and never noticed that orders were being
+    filled on a contract with ten times the multiplier local specs declare. A guard that
+    skips an instrument cannot report it as unreconciled — it reports nothing at all.
+    """
     try:
         from futures.basket import BASKET
         from global_index.ibkr_broker import _IBKR_EXCHANGE, _RAITS_TO_IBKR, _current_front_month
     except Exception as exc:
         return {"_error": {"error": f"local spec import failed: {exc}"}}
+    try:
+        from global_index.specs import SPECS
+    except Exception:
+        SPECS = {}
 
     specs: dict[str, dict[str, Any]] = {}
-    for inst in BASKET:
+    for inst in {**BASKET, **SPECS}:
         try:
             symbol = _RAITS_TO_IBKR.get(inst, inst)
             exchange = _IBKR_EXCHANGE.get(inst, "CME")
