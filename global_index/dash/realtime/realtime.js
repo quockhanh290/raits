@@ -479,6 +479,11 @@
       && (runnerOnly().length || stripMatched !== brokerPositions().length || stripSizeProblem);
     const stripBreaker = stripOps.breaker?.level || snap?.breaker_level;
     const stripBreakerBad = stripBreaker && stripBreaker !== 'OK';
+    // Runner phát cờ này khi HMM stale guard G1 HARD bật (SPY cũ quá 5 ngày làm
+    // việc) và nó CHẶN MỌI ENTRY, exit vẫn chạy. Trước đây frontend không đọc nó ở
+    // đâu cả: trang hiện độ tươi SPY nhưng im lặng về hệ quả — hệ thống đã ngừng
+    // vào lệnh mà màn hình vẫn nói nominal.
+    const stripEntriesBlocked = Boolean(stripOps.regime_unreliable);
     const stripUnknown = !stripSchedule?.evidence_available || !stripBrokerKnown;
     const stripDeadSources = [
       ['runner-state', state.runner?.error],
@@ -487,7 +492,8 @@
       ['open-issues', state.openIssues?.error],
       ['runner-positions', state.runnerPositions?.error]
     ].filter(([, error]) => error).map(([name]) => name);
-    const stripLevel = stripScheduleBad || stripSafetyCount || stripReconcileBad || stripBreakerBad || stripDeadSources.length
+    const stripLevel = stripScheduleBad || stripSafetyCount || stripReconcileBad || stripBreakerBad
+      || stripEntriesBlocked || stripDeadSources.length
       ? 'bad' : stripUnknown ? 'watch' : 'ok';
     const stripConditions = [];
     if (stripScheduleBad) stripConditions.push('scheduler attention required');
@@ -500,6 +506,7 @@
     if (stripSafetyCount) stripConditions.push(`${stripSafetyCount} protection issue(s)`);
     if (stripReconcileBad) stripConditions.push('position reconcile needs attention');
     if (stripBreakerBad) stripConditions.push(`risk breaker ${stripBreaker}`);
+    if (stripEntriesBlocked) stripConditions.push('entries blocked: regime input unreliable');
     if (stripDeadSources.length) stripConditions.push(`${stripDeadSources.join(', ')} unreachable`);
     if (!stripConditions.length && stripUnknown) stripConditions.push('some telemetry is unavailable');
     const stripStatus = stripConditions.length
@@ -530,6 +537,21 @@
     const incidents = [];
     const gaps = [];
     const schedule = state.schedule;
+    const monitorOps = state.runner?.payload?.meta?.operational_status || snap?.operational_status || {};
+    // Guard chặn entry là điều kiện vận hành, không phải chỉ số đầu vào. Độ tươi
+    // SPY đã hiện ở header từ trước, nhưng người vận hành cần biết HỆ QUẢ: hệ
+    // thống đã ngừng vào lệnh, và exit thì vẫn chạy.
+    if (monitorOps.regime_unreliable) incidents.push({
+      key: 'runner:entries-blocked',
+      status: 'incident', component: 'runner', title: 'Entries blocked: regime input unreliable',
+      problem: `The HMM stale guard is hard-tripped, so the runner is refusing every new entry.${
+        monitorOps.regime_freshness?.bday_stale != null
+          ? ` SPY input is ${monitorOps.regime_freshness.bday_stale} business day(s) stale.` : ''}`,
+      impact: 'No new position will be opened while this holds. Exits still run, so open positions continue to be managed.',
+      action: 'Refresh the SPY regime input, then confirm the next runner slot clears the guard.',
+      evidence: `regime_unreliable=true${
+        monitorOps.regime_freshness?.last_spy_date ? ` / last SPY ${monitorOps.regime_freshness.last_spy_date}` : ''}`
+    });
     const openConnectivity = (state.sessionEvents?.events || []).filter(event =>
       event.kind === 'connectivity_outage' && event.status === 'open');
     const openReconcile = (state.sessionEvents?.events || []).filter(event =>

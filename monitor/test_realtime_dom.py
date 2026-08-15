@@ -43,7 +43,10 @@ BASE_PAYLOADS: dict[str, dict] = {
                     "runner": {"alive": True},
                     "breaker": {"level": "OK"},
                     "regime_freshness": {"status": "OK", "last_spy_date": "2026-08-14"},
-                    "model_age": {"status": "OK", "months_old": 1},
+                    # P2-B4: production đang là URGENT (20 tháng, G2 HARD) chứ không phải
+                    # OK. Fixture cũ mô tả một model khỏe mạnh mà hệ thống thật không có,
+                    # nên mọi DOM test chạy trên một thế giới dễ hơn thực tế.
+                    "model_age": {"status": "URGENT", "months_old": 20, "model_name": "fit_C"},
                     "positions": {"count": 0, "persist_match": True},
                     "refreeze": {"pending": False},
                     "regime_unreliable": False,
@@ -691,3 +694,99 @@ def test_open_issues_stay_expanded_on_mobile(realtime_server, browser_page):
     stub_api(browser_page, {"/api/v1/open-issues": issues})
     open_realtime(browser_page, realtime_server)
     assert browser_page.eval_on_selector("#openIssuesShell", "el => el.open") is True
+
+
+# ── AUDIT PHASE 2 nhóm B: đường dẫn chưa ai chạy ─────────────────────────────
+# Ba nhánh dưới đây đã có code từ trước nhưng chưa test nào đi qua và chưa lần
+# nào xảy ra thật. Đây là test CHARACTERIZATION: xanh nghĩa là nhánh vốn đã
+# đúng và một "không biết" trở thành "ổn"; đỏ nghĩa là một finding thật.
+# Cả ba đều là đường dẫn mất tiền.
+
+def _runner_state_with(**meta_over) -> dict:
+    payload = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/runner-state"]))
+    payload["payload"]["meta"]["operational_status"].update(meta_over)
+    return payload
+
+
+@pytest.mark.parametrize("level", ["HALTED", "SHUTDOWN"])
+def test_a_tripped_circuit_breaker_is_never_reported_as_nominal(realtime_server, browser_page, level):
+    """P2-B1. Circuit breaker là trạng thái quan trọng nhất trên một dashboard
+    giao dịch: hệ thống tự dừng vì lỗ ngày −4% hoặc 5 lệnh thua liên tiếp.
+    `stripBreakerBad` có nhánh nhưng chưa test nào đi qua — nếu nó hỏng thì hỏng
+    đúng lúc mọi thứ đang tệ nhất."""
+    stub_api(browser_page, {
+        "/api/v1/runner-state": _runner_state_with(breaker={"level": level, "dd_pct": 4.2}),
+    })
+    open_realtime(browser_page, realtime_server)
+    rail = rail_text(browser_page)
+    assert "nominal" not in rail.lower(), rail
+    assert f"risk breaker {level}" in rail, rail
+
+
+def test_a_position_the_runner_does_not_know_about_raises_an_incident(realtime_server, browser_page):
+    """P2-B2. IBKR giữ một vị thế runner không biết: không stop theo kế hoạch,
+    không nằm trong tính toán exposure. Runner không thể quản lý thứ nó không
+    thấy, nên trang phải nói ra."""
+    stub_api(browser_page, {
+        "/api/v1/broker": _broker([M2K_POS], [_good_stop()]),
+        "/api/v1/runner-state": _runner_positions(),          # runner khong giu gi
+    })
+    open_realtime(browser_page, realtime_server)
+    text = browser_page.eval_on_selector("#nowMonitorList", "el => el.innerText")
+    assert "broker-only position" in text, text
+    assert "OPEN" in monitor_statuses(browser_page)
+    assert "nominal" not in rail_text(browser_page).lower()
+
+
+def test_a_stale_model_is_shown_as_debt_without_crying_wolf(realtime_server, browser_page):
+    """P2-B4. Fixture giờ mô tả đúng production: model 20 tháng, G2 HARD. Hai
+    nửa đều phải đúng — hiện ra ở header, nhưng KHÔNG kéo rail vào báo động, vì
+    known debt cố ý tách khỏi lane sự cố mới. Một báo động không bao giờ tắt là
+    báo động người ta ngừng đọc."""
+    stub_api(browser_page)
+    open_realtime(browser_page, realtime_server)
+    assert "20 mo stale" in browser_page.eval_on_selector("#modelInputAge", "el => el.textContent")
+    assert browser_page.eval_on_selector("#modelInputAge", "el => el.className") == "warning"
+    assert "nominal" in rail_text(browser_page).lower()
+
+
+def test_blocked_entries_are_visible_on_the_page(realtime_server, browser_page):
+    """P2-B5. `regime_unreliable` là cờ HMM stale guard G1 HARD bật khi SPY cũ
+    quá 5 ngày làm việc; khi nó bật, runner chặn MỌI entry. Trang hiện độ tươi
+    SPY nhưng chưa nói hệ quả — hệ thống đã ngừng vào lệnh."""
+    stub_api(browser_page, {"/api/v1/runner-state": _runner_state_with(
+        regime_unreliable=True,
+        regime_freshness={"status": "HARD", "bday_stale": 6, "last_spy_date": "2026-08-05"})})
+    open_realtime(browser_page, realtime_server)
+    page_text = browser_page.eval_on_selector("main", "el => el.innerText").lower()
+    assert "entries" in page_text and "blocked" in page_text, \
+        "trang khong noi gi ve viec entry dang bi chan"
+
+
+def test_guard_blocked_and_cap_rejected_signals_are_listed(realtime_server, browser_page):
+    """P2-B6. Cả hai đã xảy ra thật (log 08-10 có REJECTED SHORT MNQ vì
+    `roska4_swing gross 10.9% > cap 5.0%`) nhưng chưa test nào render chúng."""
+    stub_api(browser_page, {"/api/v1/runner-state": _snapshot_with_decision(_decision(
+        halted_today=2,
+        rejected_detail=[{"inst": "MNQ", "direction": "SHORT", "cluster": "roska4_swing",
+                          "risk_sized": 3340.54,
+                          "reason": "roska4_swing gross 10.9% > cap 5.0%"}]))})
+    open_realtime(browser_page, realtime_server)
+    text = browser_page.eval_on_selector("#decisionRejected", "el => el.innerText")
+    assert "MNQ" in text and "cap 5.0%" in text, text
+    assert "2 halted" in text, text
+    assert browser_page.eval_on_selector("#decisionRejectedCount", "el => el.textContent") == "2"
+
+
+def test_a_position_only_the_runner_believes_in_raises_an_incident(realtime_server, browser_page):
+    """P2-B3. Chiều ngược lại: runner nghĩ đang giữ, broker không có. Mọi logic
+    bảo vệ chạy trên một trạng thái không tồn tại."""
+    stub_api(browser_page, {
+        "/api/v1/broker": _broker([], []),                    # broker rong
+        "/api/v1/runner-state": _runner_positions(M2K_RUNNER),
+    })
+    open_realtime(browser_page, realtime_server)
+    text = browser_page.eval_on_selector("#nowMonitorList", "el => el.innerText")
+    assert "runner-only position" in text, text
+    assert "OPEN" in monitor_statuses(browser_page)
+    assert "nominal" not in rail_text(browser_page).lower()
