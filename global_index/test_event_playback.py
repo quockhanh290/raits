@@ -41,7 +41,7 @@ from futures.circuit_breaker import CircuitBreaker
 from global_index.broker import MockBroker
 from global_index.live_decision import OpenPos
 from global_index.net_exposure_multi import MultiClusterGuard, ClusterBudget
-from global_index.runner import FuturesRunner
+from global_index.runner import FuturesRunner, LIVE_SNAPSHOT_LIMIT
 
 PASS = "\033[32mPASS\033[0m"
 FAIL = "\033[31mFAIL\033[0m"
@@ -53,6 +53,45 @@ def check(name: str, cond: bool, detail: str = "") -> None:
     tag = PASS if cond else FAIL
     print(f"  {tag}  {name}" + (f"  [{detail}]" if detail else ""))
     _results.append((name, cond, detail))
+
+
+def _enforce_checks_under_pytest() -> None:
+    """Make check() failures reach pytest.
+
+    check() only prints and appends; the sys.exit(1) lives under
+    `if __name__ == "__main__"`. So under pytest every test in this file passed
+    no matter how many checks were red. This file's own pytest run reported
+    "11 passed in 2152s" while the same code as a script reported six failures,
+    one of them the breaker HALT scenario -- half an hour of runtime that could
+    not go red. The sibling file measured the same way: script 122 passed /
+    2 failed, pytest "31 passed".
+
+    Wrapping each test rather than one summary test at the bottom: a summary
+    test passes vacuously when selected alone (empty _results) and silently
+    depends on file ordering, which holds only while no shuffling plugin is
+    installed. Wrapping needs neither, and names the test that actually broke.
+    """
+    import functools
+    import sys as _sys
+
+    mod = _sys.modules[__name__]
+    for _name in [n for n in dir(mod) if n.startswith("test_")]:
+        _fn = getattr(mod, _name)
+        if not callable(_fn) or getattr(_fn, "_checks_enforced", False):
+            continue
+
+        @functools.wraps(_fn)
+        def _wrapped(*args, __fn=_fn, **kwargs):
+            start = len(_results)
+            out = __fn(*args, **kwargs)
+            mine = _results[start:]
+            assert mine, "this test recorded no checks at all"
+            failed = [(n, d) for n, ok, d in mine if not ok]
+            assert not failed, f"{len(failed)}/{len(mine)} check(s) failed: {failed}"
+            return out
+
+        _wrapped._checks_enforced = True
+        setattr(mod, _name, _wrapped)
 
 
 # ── Shared helpers ──────────────────────────────────────────────────────────
@@ -606,6 +645,51 @@ def test_part2h_events_bounded():
             check("P2h.2 live_state_data.js parseable after 1381 days", False)
 
 
+# ── Part 2i: the FILE is bounded, not just events[] ─────────────────────────
+
+def test_part2i_snapshots_bounded():
+    """PART 2h bounds meta.events. Measured at day 982 of that same run, events were
+    65 KB of a 426 KB file and snapshots were 360 KB across 982 entries, growing one
+    per trading day with no limit. So the test named "bounded" was true and the
+    artifact it protects was not.
+
+    That costs twice. live_state_data.js is refetched by the dashboard on every poll,
+    and dump_state rebuilds and reserialises the whole list inside the trading process
+    on every scheduler slot -- which is why replaying 1381 days is quadratic and takes
+    ~12 minutes. The runner's own history files stay complete; only the dashboard
+    payload is trimmed.
+    """
+    print("\nPART 2i — live_state_data.js bounded, not only events[]")
+    with tempfile.TemporaryDirectory() as td:
+        ls_path = Path(td) / "live_state_data.js"
+        hist_days = {str(d.date()): 50_000.0 + i
+                     for i, d in enumerate(pd.bdate_range("2018-01-01", periods=2000))}
+        (Path(td) / "paper_history.json").write_text(
+            json.dumps({"epoch": "2018-01-01", "account": 50_000.0, "days": hist_days}),
+            encoding="utf-8")
+
+        runner = _make_runner(_empty_broker(), _noop_signal, live_state_path=ls_path)
+        run_day = pd.Timestamp(max(hist_days))
+        runner.run_day(run_day)
+
+        live = _parse_live_js(ls_path)
+        check("P2i.1 file written", live is not None)
+        if live is None:
+            return
+        snaps = live.get("snapshots") or []
+        check("P2i.2 snapshots bounded", len(snaps) <= LIVE_SNAPSHOT_LIMIT,
+              f"got {len(snaps)} from {len(hist_days)} days of history, "
+              f"limit {LIVE_SNAPSHOT_LIMIT}")
+        # Trim the old end, never the new one: the dashboard opens on the latest day.
+        check("P2i.3 newest day survives the trim",
+              bool(snaps) and snaps[-1].get("date") == str(run_day.date()),
+              f"last={snaps[-1].get('date') if snaps else None}, ran {run_day.date()}")
+        _dates = [s.get("date") for s in snaps]
+        check("P2i.4 still oldest→newest after trimming",
+              _dates == sorted(_dates),
+              f"{_dates[0]} → {_dates[-1]}" if _dates else "empty")
+
+
 # ── Part 3: Dashboard compatibility ─────────────────────────────────────────
 
 def test_part3_dashboard_compat():
@@ -766,6 +850,17 @@ def test_part4_baseline():
             check("P4.3 JS file parseable for net_pnl check", False)
 
 
+# Applied here, after every test is defined -- the wrapper reads module globals.
+# Only outside script mode: wrapping raises on the first red check, which is right
+# for pytest but would stop the script before it printed the whole report, and
+# collect-all is what the script exists for. An autouse fixture was the obvious
+# alternative and was rejected -- asserting after `yield` is a TEARDOWN failure, so
+# pytest prints "31 passed, 2 errors" and leaves a misleading passed-count standing
+# right next to the errors.
+if __name__ != "__main__":
+    _enforce_checks_under_pytest()
+
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -773,17 +868,20 @@ if __name__ == "__main__":
     print("EVENT BACKEND END-TO-END PLAYBACK VERIFICATION")
     print("=" * 64)
 
-    test_part1_historical_playback()
-    test_part2a_breaker_halt()
-    test_part2b_g1_hard_stale()
-    test_part2c_g1_soft_stale()
-    test_part2d_g1_recovered()
-    test_part2e_c1_signal_throw()
-    test_part2f_restart()
-    test_part2g_persist_fail()
-    test_part2h_events_bounded()
-    test_part3_dashboard_compat()
-    test_part4_baseline()
+    # Discovered, not hand-listed, in definition order. The hand-written list dropped
+    # PART 2i the moment it was added: the function existed and pytest ran it, but the
+    # script silently skipped it and still printed "69 passed, 0 failed / 69 total" --
+    # a green total over a test it never called. Same family as everything else fixed
+    # in this file: a count that cannot tell you what it failed to count.
+    _suite = sorted(
+        ((fn.__code__.co_firstlineno, name, fn)
+         for name, fn in list(globals().items())
+         if name.startswith("test_") and callable(fn)
+         and getattr(fn, "__module__", None) == __name__),
+    )
+    assert _suite, "no test functions discovered"
+    for _lineno, _name, _fn in _suite:
+        _fn()
 
     print("\n" + "=" * 64)
     passed = sum(1 for _, ok, _ in _results if ok)

@@ -124,6 +124,21 @@ _ARM_BY_CLUSTER = {"roska4_swing": ("America/New_York", 14, 0),
 # deprecated.
 BACKTEST_CALMAR_FLOOR: float = 1.65
 
+# How many days of history live_state_data.js carries. ~2 trading years, which is
+# more than the day slider is ever scrubbed across and still bounds two costs that
+# were unbounded: the dashboard refetches this file on every poll, and dump_state
+# rebuilds and reserialises the whole list inside the trading process on every
+# scheduler slot. Measured on a 1381-day replay: 982 snapshots were 360 KB of a
+# 426 KB file, and per-day dump cost rose from 56 ms to 519 ms between day 50 and
+# day 400 — linear per day, quadratic overall.
+#
+# meta.events has had a 500 cap for a long time; snapshots never did, so the test
+# named "events[] bounded" passed while the artifact it protects grew forever.
+#
+# This trims the PAYLOAD only. trade_log.jsonl and paper_history.json stay complete,
+# so nothing is lost that a later change could not put back on screen.
+LIVE_SNAPSHOT_LIMIT: int = 500
+
 
 # ── E1: PID lockfile helpers ────────────────────────────────────────────────
 
@@ -205,6 +220,11 @@ def _openpos_to_dict(p: OpenPos) -> dict:
         "stop_price":     p.stop_price,
         "stop_order_id":  p.stop_order_id,
         "entry_price":    p.entry_price,
+        # Set on the day the exit is marked, read on the day it executes -- which can
+        # be a different runner process. Left unpersisted it survived only until the
+        # next restart, and a restart in that window wrote a CLOSE row with no exit
+        # path, the exact hole exit_reason was added to close.
+        "exit_reason":    p.exit_reason,
     }
 
 
@@ -225,6 +245,7 @@ def _openpos_from_dict(d: dict) -> OpenPos:
         stop_price=float(d["stop_price"]) if d.get("stop_price") is not None else None,
         stop_order_id=d.get("stop_order_id"),
         entry_price=float(d["entry_price"]) if d.get("entry_price") is not None else None,
+        exit_reason=d.get("exit_reason"),
     )
 
 
@@ -1063,6 +1084,26 @@ class FuturesRunner:
                 if _f.avg_price > 0:
                     self._book_realised(p, _f.avg_price, _f.filled_qty or p.contracts,
                                         why="retry exit")
+                # Also wrote no trade row before. A retried exit is still an exit, and the
+                # reason it was queued for is the reason it closed -- the retry is how it
+                # happened, not why. Falls back to RETRY only when the original path never
+                # attributed one.
+                self._append_trade({
+                    "type": "CLOSE",
+                    "inst": p.inst, "cluster": p.cluster,
+                    "direction": p.direction, "contracts": p.contracts,
+                    "entry_day": str(pd.Timestamp(p.entry_day).date()) if p.entry_day else None,
+                    "exit_day": str(pd.Timestamp(day).date()),
+                    "exit_reason": getattr(p, "exit_reason", None) or "RETRY",
+                    "expected_stop": p.stop_price,
+                    "fill_price": _f.avg_price,
+                    "pnl_sized": p.pnl_sized,
+                    "commission": _f.commission,
+                    "filled_qty": _f.filled_qty or p.contracts,
+                    "status": _f.status,
+                    "retried": True,
+                    "regime": self._last_regime,
+                })
                 logger.info(
                     "_retry: CLOSE success %s/%s — exit_pending cleared", p.inst, p.cluster,
                 )
@@ -1122,6 +1163,27 @@ class FuturesRunner:
                 if _f.avg_price > 0:
                     self._book_realised(p, _f.avg_price, _f.filled_qty or p.contracts,
                                         why="max hold")
+                # Every close writes a CLOSE row. This path used to book the money and
+                # emit an event but never touch the trade log, so a MAX_HOLD exit left no
+                # trade record at all -- which is why exit_path_coverage read
+                # "MAX_HOLD 0" and could never fill: the samples were happening, nothing
+                # was writing them down.
+                self._append_trade({
+                    "type": "CLOSE",
+                    "inst": p.inst, "cluster": p.cluster,
+                    "direction": p.direction, "contracts": p.contracts,
+                    "entry_day": str(pd.Timestamp(p.entry_day).date()) if p.entry_day else None,
+                    "exit_day": str(pd.Timestamp(day).date()),
+                    "exit_reason": "MAX_HOLD",
+                    "expected_stop": p.stop_price,
+                    "fill_price": _f.avg_price,
+                    "pnl_sized": p.pnl_sized,
+                    "commission": _f.commission,
+                    "filled_qty": _f.filled_qty or p.contracts,
+                    "status": _f.status,
+                    "hold_days": hold,
+                    "regime": self._last_regime,
+                })
                 self.state.open_positions = [
                     x for x in self.state.open_positions if x is not p
                 ]
@@ -1504,6 +1566,9 @@ class FuturesRunner:
                     "direction": p.direction, "contracts": p.contracts,
                     "entry_day": str(p.entry_day.date()) if p.entry_day else None,
                     "exit_day": str(day.date()) if hasattr(day, "date") else str(day),
+                    # Carried from the engine that stopped wanting the position. None
+                    # when the signal layer could not attribute it -- never guessed.
+                    "exit_reason": getattr(p, "exit_reason", None),
                     "expected_stop": p.stop_price,
                     "fill_price": _f.avg_price,
                     "pnl_sized": p.pnl_sized,
@@ -2228,7 +2293,14 @@ class FuturesRunner:
             return empty
         try:
             from global_index.deploy_sim import metrics as _metrics
-            eq = pd.Series({pd.Timestamp(d): v for d, v in days.items()}).sort_index()
+            # Vectorised index conversion, not one pd.Timestamp per key. Same values,
+            # same order, same formulas -- only the construction cost differs.
+            # _history_snapshots calls this once per snapshot, so on a 1400-day curve
+            # the per-key form built ~700k Timestamps and cProfile put 1.64s of a 4.09s
+            # run_day in this single comprehension.
+            eq = pd.Series(days)
+            eq.index = pd.to_datetime(eq.index)
+            eq = eq.sort_index()
             daily = eq.diff()
             daily.iloc[0] = eq.iloc[0] - float(account)
             m = _metrics(daily)
@@ -2499,6 +2571,12 @@ class FuturesRunner:
             if not snaps:
                 return [today_snap]
 
+            # Trim BEFORE the per-day metrics loop below, not after. Trimming after
+            # would bound the payload but still pay to compute metrics for days that
+            # get thrown away, and that loop is the expensive half of this function.
+            if len(snaps) > LIVE_SNAPSHOT_LIMIT:
+                snaps = snaps[-LIVE_SNAPSHOT_LIMIT:]
+
             # Metrics as at each day, so scrubbing the slider back shows what the book
             # looked like then rather than dashes. Same _running_metrics the live
             # snapshot uses — one formula, fed a truncated curve.
@@ -2515,7 +2593,10 @@ class FuturesRunner:
                 today_snap = {**today_snap, **{k: v for k, v in hist_today.items()
                                                if k not in ("equity",)}}
             merged.append(today_snap)
-            return merged
+            # Again at the end: today is re-appended above and may not have been in
+            # the trimmed slice, so this is what makes the limit exact rather than
+            # off-by-one. Newest kept -- the dashboard opens on the latest day.
+            return merged[-LIVE_SNAPSHOT_LIMIT:]
         except Exception as exc:
             logger.warning("dashboard history unavailable (%s) — falling back to the "
                            "current snapshot only", exc)

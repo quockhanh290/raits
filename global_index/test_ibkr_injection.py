@@ -263,4 +263,15 @@ passed = sum(1 for _, s in results if s == PASS)
 failed = sum(1 for _, s in results if s == FAIL)
 print(f"OVERALL: {passed}/{len(results)} passed  {'ALL PASS' if failed == 0 else f'{failed} FAIL'}")
 print("=" * 60)
-sys.exit(0 if failed == 0 else 1)
+if __name__ == "__main__":
+    sys.exit(0 if failed == 0 else 1)
+else:
+    # This module is all top-level script code, and the bare sys.exit() above used to
+    # run at IMPORT time. pytest raised SystemExit during collection, reported
+    # INTERNALERROR and stopped the whole session with "no tests ran" -- one file
+    # taking the suite down, and every check in here invisible either way.
+    def test_ibkr_injection_all_checks_passed():
+        """The scenarios ran at import; this is what makes their result reach pytest."""
+        assert results, "no checks were recorded at all"
+        bad = [name for name, status in results if status == FAIL]
+        assert not bad, f"{len(bad)}/{len(results)} check(s) failed: {bad}"

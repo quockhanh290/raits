@@ -50,13 +50,33 @@ def test_event_log_failure_is_fail_open_and_disables_further_attempts(monkeypatc
     ]
 
 
+def _todays_log_name() -> str:
+    """The filename _append_event_log will pick: the event's own UTC stamp in ET."""
+    import datetime as _dt
+
+    import pandas as pd
+
+    from global_index.runner import ET_TZ
+    return "runner_events_" + (pd.Timestamp(_dt.datetime.now(_dt.timezone.utc))
+                               .tz_convert(ET_TZ).strftime("%Y%m%d")) + ".jsonl"
+
+
 def test_incomplete_tail_is_not_extended(tmp_path):
-    path = tmp_path / "runner_events_20260812.jsonl"
+    # The runner derives the filename from the EVENT's timestamp, i.e. today in ET
+    # (runner.py:2186-2190). This used to hardcode runner_events_20260812.jsonl, so
+    # from 2026-08-13 on the emit landed in a different file: the corrupt one was
+    # never opened, `path.read_bytes() == partial` passed on a file nobody had
+    # touched, and only the assertion below reported anything. Derive the name so the
+    # test still tests the same thing tomorrow.
+    path = tmp_path / _todays_log_name()
     partial = b'{"ts":"2026-08-12T05:10:00Z"'
     path.write_bytes(partial)
     runner = _telemetry_runner(tmp_path)
 
     runner._emit_event("INFO", "STATE", "must not concatenate")
 
-    assert path.read_bytes() == partial
+    assert path.read_bytes() == partial, "the corrupt tail was extended"
     assert runner._event_log_disabled is True
+    # The emit must not have quietly gone somewhere else -- that is exactly how the
+    # hardcoded name hid this for three days.
+    assert sorted(p.name for p in tmp_path.glob("runner_events_*.jsonl")) == [path.name]

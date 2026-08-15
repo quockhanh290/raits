@@ -742,4 +742,16 @@ if failed:
         if s == "FAIL":
             print(f"  {name}: {detail}")
 print("=" * 60)
-sys.exit(0 if failed == 0 else 1)
+if __name__ == "__main__":
+    sys.exit(0 if failed == 0 else 1)
+else:
+    # Same shape as global_index/test_ibkr_injection.py: all top-level script code, and
+    # the bare sys.exit() ran at IMPORT time. pytest raised SystemExit during
+    # collection, reported INTERNALERROR and ended the session with "no tests ran" --
+    # one file silently taking down every test after it, and none of the checks here
+    # ever reported either way.
+    def test_refreeze_all_checks_passed():
+        """The scenarios ran at import; this is what makes their result reach pytest."""
+        assert results, "no checks were recorded at all"
+        bad = [name for name, status, _ in results if status == "FAIL"]
+        assert not bad, f"{len(bad)}/{len(results)} check(s) failed: {bad}"

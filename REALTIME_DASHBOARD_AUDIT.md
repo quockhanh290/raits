@@ -739,6 +739,28 @@ phải finding. C1 đóng.
 đã báo 5 lỗi không tồn tại. Tách "đã xác nhận" khỏi "chưa ai chạy" là thứ khiến con số cuối
 cùng dùng được.
 
+## Phụ lục — sáu test báo xanh mà không kiểm gì (2026-08-15)
+
+Bắt đầu từ gate của L6, kết thúc ngoài phạm vi dashboard. Ghi lại vì ba hình dạng dưới đây
+lặp lại, và cái nào cũng cho ra một con số xanh dùng được để yên tâm sai.
+
+| Hình dạng | Ca | Vì sao xanh |
+|---|---|---|
+| **Không có assert** | `check()` ở hai file script-style | `sys.exit(1)` nằm trong `__main__`; dưới pytest hàm test chỉ in ra rồi return. ~195 check vô hình. `test_event_playback` từng báo "11 passed in 2152s" — 36 phút không thể đỏ |
+| **Literal viết cứng, trôi khỏi thực tế** | T7.4 (9 khoá), P1.8 (mảng đảo chiều), T13.2 (DD tính từ số truyền tay), T5.2 (khẳng định ngược thiết kế) | Điều kiện đúng lúc viết, sai về sau. T7.4 mâu thuẫn với T7.2 cách nó hai dòng; T13.2 xanh ngay trên hai check đỏ mâu thuẫn với nó |
+| **Đo nhầm đối tượng** | `test_incomplete_tail_is_not_extended` | Tên file đặt cứng theo ngày; từ 13/08 emit rơi sang file khác nên `assert path.read_bytes() == partial` xanh trên một file không ai đụng |
+
+Hai thứ nữa không phải test nhưng cùng bản chất "con số không biết nó bỏ sót gì":
+
+- **`sys.exit()` cấp module** ở `test_ibkr_injection.py` và `futures/test_refreeze.py` khiến
+  pytest INTERNALERROR lúc collect ⇒ **"no tests ran"**. Bảy trong tám mục `lastfailed` là hệ
+  quả của việc này, không phải bảy lỗi. Tìm bằng quét AST toàn repo chứ không vấp rồi mới sửa.
+- **Danh sách gọi test trong `__main__` duy trì bằng tay**: thêm PART 2i mà quên khai báo,
+  script vẫn in "69 passed, 0 failed / 69 total" trên một test nó chưa từng gọi.
+
+Luật rút ra, cùng họ với ghi chú phương pháp bên dưới: **một phép đo phải chứng minh được nó
+sẽ đỏ khi thứ nó canh biến mất** — và điều đó áp cho cả cách chạy phép đo, không chỉ nội dung.
+
 ## Ghi chú về phương pháp
 
 Lần đo đầu tiên cho Phase 2 **sai**: detector của tôi báo `regime_unreliable`, `refreeze`,

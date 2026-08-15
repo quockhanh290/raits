@@ -15,6 +15,8 @@ Tests:
 from __future__ import annotations
 import json
 import logging
+import os
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -39,6 +41,39 @@ def check(name: str, cond: bool, detail: str = "") -> None:
     tag = PASS if cond else FAIL
     print(f"  {tag}  {name}" + (f" — {detail}" if detail else ""))
     _results.append((name, cond, detail))
+
+
+def _enforce_checks_under_pytest() -> None:
+    """Make check() failures reach pytest -- see the twin in test_event_playback.py.
+
+    Measured here: script mode reports 122 passed / 2 failed while
+    `pytest global_index/test_operational_fixes.py` reported "31 passed" on
+    exactly the same red checks. The suite's green covered 124 assertions, none
+    of which could fail.
+    """
+    import functools
+    import sys as _sys
+
+    mod = _sys.modules[__name__]
+    for _name in [n for n in dir(mod) if n.startswith("test_")]:
+        _fn = getattr(mod, _name)
+        if not callable(_fn) or getattr(_fn, "_checks_enforced", False):
+            continue
+
+        @functools.wraps(_fn)
+        def _wrapped(*args, __fn=_fn, **kwargs):
+            start = len(_results)
+            out = __fn(*args, **kwargs)
+            mine = _results[start:]
+            assert mine, "this test recorded no checks at all"
+            failed = [(n, d) for n, ok, d in mine if not ok]
+            assert not failed, f"{len(failed)}/{len(mine)} check(s) failed: {failed}"
+            return out
+
+        _wrapped._checks_enforced = True
+        setattr(mod, _name, _wrapped)
+
+
 
 
 def _make_guard():
@@ -264,16 +299,41 @@ def test_e1_duplicate_lock():
         runner1 = _make_runner(broker1, _noop_signal, lock_path=lock_path)
         check("T5.1 first instance starts successfully", lock_path.exists())
 
-        # Second instance must refuse
-        broker2 = _empty_broker()
+        # E1 guards against a second runner PROCESS, and the lock deliberately
+        # exempts the current PID: run_live_day takes the lock before connecting to
+        # IBKR and FuturesRunner.__init__ takes it again, so treating that as a
+        # collision would abort every live run on itself (runner.py:142-146).
+        #
+        # This used to build the second instance in THIS process and expect a refusal,
+        # so it walked straight into that exemption and had been red ever since --
+        # asserting against the design rather than finding a defect. Spawn a real
+        # second process instead, which is the thing E1 exists to stop.
+        other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
         try:
-            runner2 = _make_runner(broker2, _noop_signal, lock_path=lock_path)
-            check("T5.2 second instance refused", False, "should have raised RunnerLockError")
-        except RunnerLockError as e:
-            check("T5.2 RunnerLockError raised by second instance", True, str(e)[:60])
+            lock_path.write_text(str(other.pid))
+            broker2 = _empty_broker()
+            try:
+                _make_runner(broker2, _noop_signal, lock_path=lock_path)
+                check("T5.2 live foreign PID refused", False,
+                      f"should have raised RunnerLockError for live PID {other.pid}")
+            except RunnerLockError as e:
+                check("T5.2 live foreign PID refused", True, str(e)[:60])
+            except Exception as e:
+                check("T5.2 live foreign PID refused", False,
+                      f"wrong exception: {type(e).__name__}: {e}")
+        finally:
+            other.kill()
+            other.wait()
+
+        # The same-PID exemption is behaviour, not an accident -- pin it so nobody
+        # "fixes" it into an every-run abort.
+        lock_path.write_text(str(os.getpid()))
+        try:
+            _make_runner(_empty_broker(), _noop_signal, lock_path=lock_path)
+            check("T5.2b same-PID re-acquire allowed (run_live_day then __init__)", True)
         except Exception as e:
-            check("T5.2 RunnerLockError raised by second instance", False,
-                  f"wrong exception: {type(e).__name__}: {e}")
+            check("T5.2b same-PID re-acquire allowed (run_live_day then __init__)", False,
+                  f"{type(e).__name__}: {e}")
 
         # Stale lock (dead PID): write a definitely-dead PID, then new runner should start
         lock_path.write_text("99999999")   # almost certainly dead
@@ -372,10 +432,30 @@ def test_ratchet_not_in_openpos():
                   pd.Timestamp("2024-01-10"), None, 0.0)
     d = _openpos_to_dict(pos)
     check("T7.3 _openpos_to_dict has no 'stop' key", "stop" not in d, f"keys={list(d)}")
-    expected_keys = {"inst", "direction", "contracts", "risk_dollars", "cluster",
-                     "entry_day", "exit_day", "pnl_sized", "exit_pending"}
-    check("T7.4 serialized fields match OpenPos exactly", set(d.keys()) == expected_keys,
-          f"extra={set(d.keys())-expected_keys}, missing={expected_keys-set(d.keys())}")
+    # DERIVED from the dataclass, not a hardcoded list. The old literal named nine
+    # keys and was never updated when entry_price, stop_price and stop_order_id were
+    # added on purpose -- so it reported them as "extra" and sat red, directly
+    # contradicting T7.2 two lines above, which asserts entry_price MUST be there.
+    # A literal cannot tell a deliberate addition from an accidental one; comparing
+    # against the dataclass can, and it fails the day a field stops being persisted.
+    #
+    # That is not hypothetical: this check going red is how the missing exit_reason
+    # was found. It is set on the day an exit is marked and read on the day the exit
+    # executes, which may be a different process, so leaving it out of the persist
+    # pair meant a restart in that window silently produced a CLOSE row with no exit
+    # path -- the very hole the field was added to close.
+    persisted = {f.name for f in dataclasses.fields(OpenPos)}
+    check("T7.4 every OpenPos field is persisted, and nothing else is",
+          set(d.keys()) == persisted,
+          f"not persisted={persisted - set(d.keys())}, "
+          f"not a field={set(d.keys()) - persisted}")
+
+    # Round-trip, because "the key is present" is weaker than "the value comes back".
+    pos.exit_reason = "CHANDELIER"
+    back = _openpos_from_dict(_openpos_to_dict(pos))
+    lost = [f.name for f in dataclasses.fields(OpenPos)
+            if getattr(back, f.name) != getattr(pos, f.name)]
+    check("T7.5 persist → reload preserves every field", not lost, f"lost={lost}")
 
 
 # ─── T8: atomic write — crash during write leaves original intact ─────────────
@@ -1226,6 +1306,17 @@ def test_stress_mid_2pass_halt_day():
     check("T31.4 HALT_DAY event emitted",
           len(halt_day_events) >= 1,
           f"events: {[e['message'] for e in runner._events]}")
+
+
+# Applied here, after every test is defined -- the wrapper reads module globals.
+# Only outside script mode: wrapping raises on the first red check, which is right
+# for pytest but would stop the script before it printed the whole report, and
+# collect-all is what the script exists for. An autouse fixture was the obvious
+# alternative and was rejected -- asserting after `yield` is a TEARDOWN failure, so
+# pytest prints "31 passed, 2 errors" and leaves a misleading passed-count standing
+# right next to the errors.
+if __name__ != "__main__":
+    _enforce_checks_under_pytest()
 
 
 # ─── main ────────────────────────────────────────────────────────────────────
