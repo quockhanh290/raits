@@ -715,7 +715,7 @@ def test_a_tripped_circuit_breaker_is_never_reported_as_nominal(realtime_server,
     `stripBreakerBad` có nhánh nhưng chưa test nào đi qua — nếu nó hỏng thì hỏng
     đúng lúc mọi thứ đang tệ nhất."""
     stub_api(browser_page, {
-        "/api/v1/runner-state": _runner_state_with(breaker={"level": level, "dd_pct": 4.2}),
+        "/api/v1/runner-state": _runner_state_with(breaker={"level": level, "dd_pct_display": 4.2}),
     })
     open_realtime(browser_page, realtime_server)
     rail = rail_text(browser_page)

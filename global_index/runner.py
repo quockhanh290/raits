@@ -1811,26 +1811,26 @@ class FuturesRunner:
                     self._emit_event(
                         "CRITICAL", "GUARD",
                         f"BREAKER HALT: DD {_dd_pct}% — all new entries blocked",
-                        {"level": _new_lvl, "dd_pct": _dd_pct},
+                        {"level": _new_lvl, "dd_pct_display": _dd_pct},
                     )
                 elif _new_lvl == "HALT_DAY":
                     _dl = round(_br_st.get("daily_loss_pct", 0) * 100, 2)
                     self._emit_event(
                         "ALERT", "GUARD",
                         f"BREAKER HALT_DAY: daily loss {_dl}% — entries blocked today",
-                        {"level": _new_lvl, "dd_pct": _dd_pct, "day_loss_pct": _dl},
+                        {"level": _new_lvl, "dd_pct_display": _dd_pct, "day_loss_pct": _dl},
                     )
                 elif _new_lvl == "WARN":
                     self._emit_event(
                         "WARN", "GUARD",
                         f"BREAKER WARN: DD {_dd_pct}% — approaching limit",
-                        {"level": _new_lvl, "dd_pct": _dd_pct},
+                        {"level": _new_lvl, "dd_pct_display": _dd_pct},
                     )
                 elif self._last_breaker_level in ("HALT", "HALT_DAY", "WARN"):
                     self._emit_event(
                         "INFO", "GUARD",
                         f"BREAKER OK: recovered from {self._last_breaker_level}",
-                        {"level": _new_lvl, "dd_pct": _dd_pct},
+                        {"level": _new_lvl, "dd_pct_display": _dd_pct},
                     )
                 self._last_breaker_level = _new_lvl
 
@@ -2358,15 +2358,15 @@ class FuturesRunner:
         }
 
         # Breaker — calls status(cur_eq) which is a pure computation, no state mutation
-        breaker_item: dict = {"level": "OK", "dd_pct": 0.0}
+        breaker_item: dict = {"level": "OK", "dd_pct_display": 0.0}
         if self.state.breaker is not None:
             st = self.state.breaker.status(cur_eq)
             breaker_item = {
                 "level": st["level"],
-                "dd_pct": round(st["drawdown_pct"] * 100, 4),
+                "dd_pct_display": round(st["drawdown_pct"] * 100, 4),
             }
             if st.get("daily_loss_pct") is not None:
-                breaker_item["day_dd_pct"] = round(st["daily_loss_pct"] * 100, 4)
+                breaker_item["day_dd_pct_display"] = round(st["daily_loss_pct"] * 100, 4)
 
         # Regime freshness (G1) — read SPY CSV last date to compute bday_stale
         freshness_item = None

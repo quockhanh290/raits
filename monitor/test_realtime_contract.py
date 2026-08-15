@@ -88,15 +88,42 @@ def test_realtime_page_has_no_write_surface():
 
 
 def test_realtime_never_renders_the_percent_unit_breaker_field():
-    """L6: operational_status.breaker.dd_pct phát ra ở đơn vị phần trăm (0.086)
-    trong khi snapshot.drawdown_pct ở đơn vị phân số (0.00086) — cùng payload,
-    chênh 100x. Sửa nguồn nằm trong global_index/runner.py nên cần quyết định
-    riêng; ít nhất khóa lại việc frontend không đọc nhầm nó qua pct().
+    """L6: operational_status.breaker phát drawdown ở đơn vị PHẦN TRĂM (0.086)
+    trong khi snapshot.drawdown_pct cạnh nó là PHÂN SỐ (0.00086) — cùng payload,
+    chênh 100x. Đã đóng 2026-08-15 bằng cách đưa đơn vị vào tên field
+    (`dd_pct_display`), nhưng cái tên chỉ cảnh báo được người đọc nó; test này
+    khoá phần realtime.js không đọc nó chút nào — trang này lấy drawdown từ
+    snapshot, và trộn hai nguồn khác đơn vị là cách sai 100x quay lại.
+
+    Tiền tố khớp cả tên mới: `breaker.dd_pct` là tiền tố của
+    `breaker.dd_pct_display`, nên một dòng dùng tên mới vẫn bị bắt ở đây. Đó là
+    chủ đích — cấm là cấm mọi tên.
     """
     js, _ = _realtime_sources()
     assert "pct(ops.breaker" not in js
     assert "breaker?.dd_pct" not in js
     assert "breaker.dd_pct" not in js
+
+
+def test_the_one_place_that_does_read_the_percent_unit_field_formats_it_as_percent():
+    """Mặt kia của L6. shared/live.js:176 CÓ đọc field này, và phải đọc qua
+    fmtPctAlready — hàm tồn tại song song với fmtPct chính vì payload có hai đơn
+    vị. Đổi nó thành fmtPct/pct sẽ nhân thêm 100: 0.086% hiện thành 8.60%, tức
+    một breaker đang bình thường trông như sắp chạm trần 15%.
+
+    Test trên chỉ chứng minh realtime.js KHÔNG đọc — bản thân nó không thể đỏ
+    khi consumer thật hỏng. Đây là test đỏ được: đổi fmtPctAlready → fmtPct ở
+    dòng đó là đủ.
+    """
+    live_js = (DASH / "shared" / "live.js").read_text(encoding="utf-8")
+    reading = [line.strip() for line in live_js.splitlines()
+               if "dd_pct_display" in line]
+    assert reading, ("shared/live.js không còn đọc breaker.dd_pct_display — nếu cố ý "
+                     "bỏ thì xoá test này, đừng để nó xanh trên tập rỗng")
+    bad = [line for line in reading if re.search(r"(?<!Already)\bfmtPct\(|[^A-Za-z]pct\(", line)]
+    assert not bad, (
+        "breaker drawdown đã ở đơn vị phần trăm; formatter nhân 100 lần nữa sẽ "
+        f"báo sai 100x: {bad}")
 
 
 def test_no_dashboard_has_a_write_surface():

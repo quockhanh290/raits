@@ -580,15 +580,24 @@ def test_peak_equity_halt_after_restart():
         pos_path = Path(td) / "live_positions.json"
         D1 = pd.Timestamp("2024-06-17")
 
-        # runner1: peak=$55k, persist
-        broker1 = MockBroker({}, account=55_000)
+        # Same defect as T26, same fix -- see the note there. This used to persist a
+        # $55,000 peak and then hand runner2 a broker funded at $46,750 (15% below it),
+        # expecting HALT. runner2's SYSTEM equity is breaker.account = $50,000, not the
+        # broker balance, so the real drawdown was (55,000-50,000)/55,000 = 9.09% and
+        # nothing halted. T13.2 hid it: that check computed the drawdown itself, passing
+        # halt_equity by hand, so it measured a quantity the runner never used and went
+        # green while T13.3/T13.4 -- the ones that matter -- stayed red.
+        #
+        # Persist a $60,000 peak instead: $50,000 of system equity under it is 16.67% DD,
+        # past the 15% hard limit. The restart story is unchanged, and this is what the
+        # runner genuinely reloads (the B1 discard guard only drops a persisted peak
+        # above account*5 = $250,000, so $60,000 survives -- runner.py:344-353).
+        broker1 = MockBroker({}, account=50_000)
         runner1 = _make_runner(broker1, _noop_signal, positions_path=pos_path)
-        runner1.state.breaker.peak_equity = 55_000.0
+        runner1.state.breaker.peak_equity = 60_000.0
         runner1._persist_state()
 
-        # runner2: equity at exactly 15% DD from $55k peak → should HALT
-        halt_equity = 55_000 * (1 - 0.15)  # $46,750
-        broker2 = MockBroker({}, account=halt_equity)
+        broker2 = MockBroker({}, account=50_000)
         runner2 = _make_runner(broker2, _one_entry_signal, positions_path=pos_path)
 
         try:
@@ -598,10 +607,15 @@ def test_peak_equity_halt_after_restart():
             check("T13.1 no crash at halt boundary after restart", False, str(exc))
             return
 
-        dd = runner2.state.breaker.drawdown_pct(halt_equity)
-        check("T13.2 DD at/above halt threshold (15%)",
+        # Measure the drawdown the runner ACTED on, not one recomputed from a number
+        # of our own choosing. The old line passed halt_equity by hand, so it reported
+        # 15.00% while the breaker was looking at 9.09% -- a green check sitting
+        # directly above two red ones that contradicted it.
+        dd = runner2.state.breaker.drawdown_pct(runner2.state.equity)
+        check("T13.2 DD at/above halt threshold (15%), measured on runner equity",
               dd >= 0.15 - 0.001,
-              f"DD={dd:.2%}")
+              f"DD={dd:.2%} on system equity ${runner2.state.equity:,.0f} "
+              f"vs peak ${runner2.state.breaker.peak_equity:,.0f}")
         check("T13.3 entries halted (circuit breaker fires)",
               len(decision.entries) == 0,
               f"entries={len(decision.entries)}")
@@ -947,12 +961,17 @@ def test_g1_hard_event_emitted():
 
 def test_breaker_halt_event_emitted():
     print("\nT26: GUARD CRITICAL event emitted on breaker HALT transition")
-    # equity at 15% DD from peak → HALT
-    halt_equity = 50_000 * (1 - 0.15)
-    broker = MockBroker({}, account=halt_equity)
+    # Drawdown is peak-relative and measured against SYSTEM equity (breaker.account
+    # plus realised P&L), never the broker balance -- runner.py:751-765. This used to
+    # set MockBroker(account=$42,500) with peak=$50,000 and expect HALT; state.equity
+    # started at $50,000 = peak, so DD was 0.00%, the breaker stayed OK, T26.1 was red
+    # and T26.2 sat behind `if halt_events:` and never ran once. See the long note in
+    # test_event_playback.py test_part2a_breaker_halt.
+    # $50,000 under a $60,000 high-water mark = 16.67% DD, past the 15% hard limit.
+    broker = MockBroker({}, account=50_000)
     guard = _make_guard()
     breaker = CircuitBreaker(account=50_000)
-    breaker.peak_equity = 50_000.0  # peak stayed at 50k
+    breaker.peak_equity = 60_000.0
 
     runner = FuturesRunner(
         broker=broker, guard=guard, contracts_by_inst={"MES": 1},
@@ -966,8 +985,8 @@ def test_breaker_halt_event_emitted():
           len(halt_events) >= 1,
           f"events: {[e['message'] for e in runner._events]}")
     if halt_events:
-        check("T26.2 context has dd_pct",
-              "dd_pct" in halt_events[0].get("context", {}),
+        check("T26.2 context has dd_pct_display",
+              "dd_pct_display" in halt_events[0].get("context", {}),
               f"context: {halt_events[0].get('context')}")
 
 

@@ -178,9 +178,21 @@ def test_part1_historical_playback():
               f"keys={list(meta.get('operational_status', {}).keys())}")
         check("P1.7 meta.events is a list",
               isinstance(meta.get("events"), list))
-        check("P1.8 snapshots[0].date == last trading day",
-              live.get("snapshots", [{}])[0].get("date") == str(bdays[-1].date()),
-              f"got {live.get('snapshots', [{}])[0].get('date')}")
+        # Chronological, oldest first. This check used to read
+        # `snapshots[0] == bdays[-1]`, i.e. it asserted the array was REVERSED, and had
+        # been red ever since -- against the real contract, not a real defect. The
+        # contract is fixed by two independent witnesses: production live_state_data.js
+        # runs 2026-08-10 → 2026-08-14 ascending, and dashboard startLive takes the LAST
+        # element as current (test_dashboard_live_snapshot.py ls1/ls3). Asserting both
+        # ends so a reversal is caught rather than half-tolerated.
+        _snaps = live.get("snapshots") or []
+        check("P1.8 snapshots run oldest→newest, one per trading day",
+              len(_snaps) == len(bdays)
+              and _snaps[0].get("date") == str(bdays[0].date())
+              and _snaps[-1].get("date") == str(bdays[-1].date()),
+              f"n={len(_snaps)} first={_snaps[0].get('date') if _snaps else None} "
+              f"last={_snaps[-1].get('date') if _snaps else None} "
+              f"expected n={len(bdays)} first={bdays[0].date()} last={bdays[-1].date()}")
 
         ops = meta.get("operational_status", {})
         check("P1.9 ops.runner.alive=True", ops.get("runner", {}).get("alive") is True)
@@ -221,11 +233,29 @@ def test_part2a_breaker_halt():
     print("\nPART 2a — Inject: Breaker HALT")
     with tempfile.TemporaryDirectory() as td:
         ls_path = Path(td) / "live_state_data.js"
-        # equity at 15% DD from $50k peak → HALT
-        halt_eq = 50_000 * (1 - 0.15)
-        broker = MockBroker({}, account=halt_eq)
+        # HOW THIS SCENARIO TRIPS HALT -- read before changing any number here.
+        #
+        # The runner measures drawdown against SYSTEM equity (breaker.account plus
+        # realised P&L), never the broker balance. runner.py:751-765 says so and says
+        # why: the paper account is funded to ~$995k while the system is sized for
+        # $50k, so feeding the broker balance to the breaker put every protective
+        # threshold 20x too far away -- losing the entire design capital would have
+        # registered as a 5% drawdown.
+        #
+        # This scenario used to set MockBroker(account=$42,500) and expect HALT. It
+        # could never work: state.equity starts at breaker.account = $50,000, which
+        # was also the peak, so drawdown was 0.00% and the breaker sat at OK. Every
+        # check below was red, and T26 in test_operational_fixes.py had the same
+        # defect -- between them they were the only tests guarding the HALT path, so
+        # in practice nothing was guarding it.
+        #
+        # Drawdown is peak-relative, so put the peak where a real drawdown leaves it:
+        # $50,000 of equity under a $60,000 high-water mark is 16.67% DD, past the 15%
+        # hard limit. That is the restart-after-a-losing-streak case, and the shape the
+        # runner genuinely restores from persisted state (runner.py:809).
+        broker = MockBroker({}, account=50_000)
         breaker = CircuitBreaker(account=50_000)
-        breaker.peak_equity = 50_000.0
+        breaker.peak_equity = 60_000.0
 
         runner = _make_runner(broker, _one_entry_signal, live_state_path=ls_path,
                               breaker=breaker)
@@ -240,9 +270,9 @@ def test_part2a_breaker_halt():
         check("P2a.2 ops.breaker.level='HALT'",
               ops["breaker"]["level"] == "HALT",
               f"got {ops['breaker']['level']}")
-        check("P2a.3 ops.breaker.dd_pct ≥ 15.0",
-              ops["breaker"]["dd_pct"] >= 15.0,
-              f"got {ops['breaker']['dd_pct']}")
+        check("P2a.3 ops.breaker.dd_pct_display ≥ 15.0",
+              ops["breaker"]["dd_pct_display"] >= 15.0,
+              f"got {ops['breaker']['dd_pct_display']}")
 
         halt_evs = [e for e in runner._events
                     if e["category"] == "GUARD" and "HALT" in e["message"]
@@ -261,6 +291,17 @@ def test_part2a_breaker_halt():
         check("P2a.6 snapshot.breaker_level='HALT'",
               live["snapshots"][0]["breaker_level"] == "HALT",
               f"got {live['snapshots'][0]['breaker_level']}")
+
+        # The point of HALT is that it stops new entries -- everything above only
+        # checks that the state is REPORTED. Worth its own check because the failure
+        # is silent and expensive: when HALT stopped firing, the breaker fell to WARN,
+        # and WARN is in allow_new_entries, so the runner opened a position at 16.67%
+        # drawdown while the dashboard showed an amber "approaching limit". This runs
+        # _one_entry_signal, which returns an entry candidate every day it is asked.
+        check("P2a.7 HALT actually blocked the entry, not just reported itself",
+              len(runner.state.open_positions) == 0,
+              f"opened {len(runner.state.open_positions)} position(s) under HALT: "
+              f"{[(p.inst, p.direction) for p in runner.state.open_positions]}")
 
 
 # ── Part 2b: G1 hard-stale inject ───────────────────────────────────────────
@@ -573,11 +614,13 @@ def test_part3_dashboard_compat():
     with tempfile.TemporaryDirectory() as td:
         ls_path = Path(td) / "live_state_data.js"
 
-        # Run with a breaker HALT scenario to generate varied events
-        halt_eq = 50_000 * (1 - 0.15)
-        broker = MockBroker({}, account=halt_eq)
+        # Run with a breaker HALT scenario to generate varied events. Peak-relative,
+        # same as PART 2a -- see the long note there for why the broker balance cannot
+        # produce a drawdown. P3.11/P3.12 read snapshot.breaker_level and
+        # snapshot.drawdown_pct, which come from br.status(state.equity) too.
+        broker = MockBroker({}, account=50_000)
         breaker = CircuitBreaker(account=50_000)
-        breaker.peak_equity = 50_000.0
+        breaker.peak_equity = 60_000.0
 
         runner = _make_runner(broker, _noop_signal, live_state_path=ls_path,
                               breaker=breaker)
@@ -606,8 +649,8 @@ def test_part3_dashboard_compat():
               all(k in ops["runner"] for k in ("alive", "pid", "last_run_day")),
               f"keys={list(ops['runner'].keys())}")
         # breaker subkeys
-        check("P3.4 ops.breaker has level/dd_pct",
-              all(k in ops["breaker"] for k in ("level", "dd_pct")),
+        check("P3.4 ops.breaker has level/dd_pct_display",
+              all(k in ops["breaker"] for k in ("level", "dd_pct_display")),
               f"keys={list(ops['breaker'].keys())}")
 
         # 3.2 — events[] in log panel

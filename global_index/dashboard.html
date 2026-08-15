@@ -1449,7 +1449,10 @@ function precompute(snaps) {
         ts: snap.date + 'T16:00:00',
         level: 'WARN', category: 'GUARD',
         message: 'DD approaching limit — ' + (ddPct * 100).toFixed(1) + '% (limit ' + (targetDd * 100).toFixed(0) + '%)',
-        context: { dd_pct: Math.round(ddPct * 10000) / 100 },
+        // L6: _logCtx prints keys verbatim, so this sits in the same log as the
+        // runner's real GUARD events. `* 10000 / 100` means this is percent, same
+        // as theirs — give it the same name or the log shows two names for one unit.
+        context: { dd_pct_display: Math.round(ddPct * 10000) / 100 },
         _idx: idx
       });
     }
@@ -1464,7 +1467,9 @@ function precompute(snaps) {
       ts: ev.date + 'T09:30:00',
       level: 'CRITICAL', category: 'GUARD',
       message: 'Circuit breaker HALT — DD ' + (ev.dd_pct_at_halt * 100).toFixed(1) + '%',
-      context: { dd_pct: Math.round(ev.dd_pct_at_halt * 10000) / 100 },
+      // Same as above. `dd_pct_at_halt` itself is a FRACTION and keeps its name —
+      // only the percent value written into context takes the _display suffix.
+      context: { dd_pct_display: Math.round(ev.dd_pct_at_halt * 10000) / 100 },
       _idx: idx
     });
     if (ev.duration_days != null) {
@@ -2543,11 +2548,16 @@ function renderOpsStatus(snap) {
   // ── Breaker — derivable from snap in any mode ──
   if (snap) {
     const lvl = (ops && ops.breaker && ops.breaker.level) || snap.breaker_level || 'OK';
-    const ddPct = ((ops && ops.breaker && ops.breaker.dd_pct != null)
-      ? ops.breaker.dd_pct
+    // L6: `_display` marks the unit. operational_status carries these ALREADY in
+    // percent (0.086 means 0.086%), unlike meta.max_dd_pct / hard_dd_pct which are
+    // fractions. The bare `dd_pct` name read like the fraction ones and invited a
+    // stray *100. The snap fallback is the fraction form — hence the *100 there and
+    // not here; the two branches agree numerically.
+    const ddPct = ((ops && ops.breaker && ops.breaker.dd_pct_display != null)
+      ? ops.breaker.dd_pct_display
       : snap.drawdown_pct * 100).toFixed(2);
-    const dayStr = (ops && ops.breaker && ops.breaker.day_dd_pct != null)
-      ? ' · day ' + ops.breaker.day_dd_pct.toFixed(2) + '%' : '';
+    const dayStr = (ops && ops.breaker && ops.breaker.day_dd_pct_display != null)
+      ? ' · day ' + ops.breaker.day_dd_pct_display.toFixed(2) + '%' : '';
     const dotLvl = lvl === 'OK' ? 'ok' : (lvl === 'WARN' ? 'warn' : 'halt');
     _opsSet('opsBreakerDot','opsBreakerVal', dotLvl,
       lvl + ' · DD ' + ddPct + '%' + dayStr);

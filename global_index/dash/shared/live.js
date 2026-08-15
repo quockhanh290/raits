@@ -173,7 +173,7 @@
     const op = meta().operational_status || latestSnap().operational_status || {};
     const items = [
       ['Runner', op.runner && op.runner.alive ? 'alive' : 'down', op.runner && op.runner.pid ? 'pid ' + op.runner.pid : ''],
-      ['Breaker', op.breaker && op.breaker.level, op.breaker ? `DD ${fmtPctAlready(op.breaker.dd_pct, 2)} day ${fmtPctAlready(op.breaker.day_dd_pct, 2)}` : ''],
+      ['Breaker', op.breaker && op.breaker.level, op.breaker ? `DD ${fmtPctAlready(op.breaker.dd_pct_display, 2)} day ${fmtPctAlready(op.breaker.day_dd_pct_display, 2)}` : ''],
       ['Regime', op.regime_freshness && op.regime_freshness.status, op.regime_freshness && op.regime_freshness.last_spy_date],
       ['Model', op.model_age && op.model_age.status, op.model_age ? `${op.model_age.model_name || ''} ${op.model_age.months_old || '--'}mo` : ''],
       ['Positions', op.positions && op.positions.persist_match, op.positions ? `${op.positions.count || 0} open` : '']
