@@ -3642,9 +3642,30 @@ Status: IN PROGRESS
 - [x] **Test bắt nội dung bị CẮT**, không chỉ trang bị cuộn — bản sửa C2 từng tạo ra một ca
       clipping (header 608px trên viewport 487px) mà test cũ vẫn xanh
 
-### Next steps
-- [ ] **L6 là finding duy nhất còn mở** — `breaker.dd_pct` lệch đơn vị 100×. Cần quyết định
-      riêng vì sửa nguồn là sửa `global_index/runner.py` (code giao dịch).
+### Next steps — AUDIT PHASE 2 (mở 2026-08-15)
+Chi tiết: `REALTIME_DASHBOARD_AUDIT.md` mục "Audit Phase 2" ở cuối file.
+Phase 1 toàn lỗi ĐÃ XÁC NHẬN. Phase 2 phần lớn là ĐƯỜNG DẪN CHƯA AI CHẠY — code có, nhánh có
+viết, chưa test nào đi qua, chưa lần nào xảy ra thật. Có thể đúng sẵn; không ai biết.
+
+Làm B trước A: nhóm B rẻ (stub + assert, không đổi code sản phẩm) và mỗi test biến một
+"không biết" thành "ổn" hoặc "một finding thật". Chạy hết B rồi mới biết Phase 2 lớn cỡ nào.
+
+- [ ] **P2-B1** `breaker.level` = HALTED/SHUTDOWN chưa từng render — trạng thái quan trọng nhất
+      trên dashboard giao dịch, và nếu nhánh này hỏng thì hỏng đúng lúc mọi thứ tệ nhất (High)
+- [ ] **P2-B2** broker-only position — phơi nhiễm runner không quản lý được (High)
+- [ ] **P2-B3** runner-only position — logic bảo vệ chạy trên trạng thái không tồn tại (High)
+- [ ] **P2-B4** `model_age URGENT` là trạng thái THẬT của production, nhưng `BASE_PAYLOADS`
+      dùng `OK` → mọi DOM test chạy với model khỏe giả định (Medium)
+- [ ] **P2-A1** số từ nguồn API đã chết vẫn render như đang sống; `renderMetrics:320` không
+      kiểm `error`, chỉ mờ `opacity: .42` (High) — nửa sau của M8 chưa làm
+- [ ] **P2-A2** `fatalBanner` all-or-nothing, chỉ hiện khi cả 5 endpoint chết (Medium)
+- [ ] **P2-B5/B6/B7** `regime_unreliable`, `halted_today`+`rejected_detail`, `refreeze pending`
+- [ ] **P2-C1** 8/10 endpoint không có contract test (Medium)
+
+### Còn mở từ Phase 1
+- [ ] **L6** `breaker.dd_pct` lệch đơn vị 100×. Cần quyết định riêng vì sửa nguồn là sửa
+      `global_index/runner.py` (code giao dịch). Đã khóa bằng test để frontend không đọc nhầm.
+- [ ] **M8** một phần — xem P2-A1/A2 ở trên.
 - [x] **Backend đã restart, cả bốn thay đổi có hiệu lực** (đo trên cổng 5002):
       `/favicon.ico` → 204 · `state_age_seconds` = 27705.7 · `coverage.evidence_ends`
       = 2026-08-14 · `lifecycle_status` = 6 recovered. `freshness: not_expected_yet`

@@ -32,7 +32,7 @@ thật đang chạy và trên log production, trừ nơi ghi rõ là fixture.
 | **M5** | Màu ô HMM fit chỉ dựa `completed == attempts`, bỏ qua `non_convergence_count`. 22/22 fit cảnh báo mà ô vẫn **xanh** | `positive` chỉ khi `non_convergence_count === 0`; text kèm số cảnh báo | Trang thật: `45/45 complete / 45 warn`, class `warning` |
 | **M6** | Header đếm covered mà bỏ qua `stop_deferred`; rail thì loại trừ deferred → position deferred hợp lệ hiện `0 / 1` trong khi rail nói nominal | `protectionSummary()` dùng chung cho cả hai, tách ba trạng thái | Trang thật: `1 covered`. Stub deferred → chữ `deferred`, rail vẫn nominal |
 | **M7** | `coverage.to = max(dòng log cuối, hôm nay)` → UI luôn quảng cáo *evidence … to hôm nay* kể cả khi scheduler chết nhiều ngày | Tách `evidence_ends` + `stale_days`; UI hiện mốc thật, kèm *(ends N days ago)* khi trễ | Trang thật: `1 open / evidence 2026-07-30 to 2026-08-15`. Fixture log cũ → `stale_days ≥ 1` |
-| **M8** | Một nguồn API hỏng lẻ chỉ được báo bằng `opacity: .42`, không chữ nào, không nói nguồn nào. `fatalBanner` chỉ bật khi **cả 5** endpoint fail | `stripDeadSources` gom `error` của cả 5 nguồn và gọi tên trong rail | Stub `/api/v1/runner-state` trả 500 → rail chứa chuỗi `runner-state` |
+| **M8** | Một nguồn API hỏng lẻ chỉ được báo bằng `opacity: .42`, không chữ nào, không nói nguồn nào. `fatalBanner` chỉ bật khi **cả 5** endpoint fail | `stripDeadSources` gom `error` của cả 5 nguồn và gọi tên trong rail | ⚠️ **MỘT PHẦN** *(sửa lại 2026-08-15, trước đó ghi nhầm là ĐÓNG)*. Rail có gọi tên: stub 500 → chứa `runner-state`. Nhưng nửa sau **chưa làm**: `renderMetrics:320` vẫn `snap?.equity ?? meta.final_equity` không kiểm `error`, nên số từ nguồn đã chết vẫn render như đang sống, chỉ mờ 42%. `fatalBanner` cũng vẫn all-or-nothing (`realtime.js:261`) |
 | **L1** | `renderRailLegacy` + `railItem` + `railTips` không được gọi ở đâu; CSS `.scheduler-health` mồ côi. Chúng khai báo 9 chỉ báo khiến người đọc tưởng rail vẫn hiển thị chúng | Xoá cả ba + CSS mồ côi | `rg` = **0** cho cả bốn tên |
 | **L2** | `localTime()` không format giờ local — nó format **ET**, ở đúng phần code nhạy timezone nhất | Đổi tên `etDateTime()` | `localTime` còn **0** lần xuất hiện |
 | **L3** | 16/28 dòng Job Journal là cùng một known-debt G2, che các dòng thật | Gộp thành một hàng tóm tắt khi vượt ngưỡng | Nhãn journal thật: `COMPLETED 13 · RECOVERED 6 · KNOWN DEBT 1` (39 dòng debt → 1) |
@@ -41,7 +41,10 @@ thật đang chạy và trên log production, trừ nơi ghi rõ là fixture.
 | **L6** | `breaker.dd_pct` phát ra ở đơn vị **phần trăm** (0.086) trong khi `drawdown_pct` cạnh nó là **phân số** (0.00086) — chênh 100× | 🔒 **KHÔNG sửa có chủ đích.** Sửa nguồn là sửa `global_index/runner.py`, code giao dịch, cần quyết định riêng | UI không đọc field này. Khoá bằng `test_realtime_never_renders_the_percent_unit_breaker_field`. Ghi ở `OPEN_QUESTIONS.md` |
 | **L7** ✚ | *(phát hiện trong lúc sửa H1)* `schedule_status` nhận cả `"completed ok"` lẫn `"thoat ok"`; `job_journal_reader` chỉ nhận `"completed OK"` và `"thoat OK nhung"`. Một dòng `"thoat OK"` **trần** để job kẹt `running` vĩnh viễn ở lane này trong khi rail gọi là `executed` | `CLEAN_EXIT_TOKENS`/`DEBT_EXIT_TOKENS` + `is_clean_exit`/`is_debt_exit` dùng chung. **Nhánh debt phải kiểm TRƯỚC** vì `"thoat OK nhung"` chứa `"thoat OK"` làm tiền tố | Log thật không đổi một phân loại nào (`thoat OK` trần = **0 lần**): `completed 13 · completed_with_debt 39 · failed 6`, **không job nào `running`** |
 
-**Tổng: 20/21 đóng.** Còn duy nhất **L6**, hoãn có chủ đích.
+**Tổng: 19/21 đóng, 1 một phần (M8), 1 hoãn có chủ đích (L6).**
+
+➜ **[Audit Phase 2](#audit-phase-2--mở-2026-08-15)** mở ở cuối file: 10 mục nữa, trong đó
+2 lỗi đã xác nhận và 7 đường dẫn chưa ai chạy (breaker HALTED, position broker-only/runner-only…).
 
 ⬆ = nâng severity giữa chừng · ✚ = phát hiện thêm trong lúc sửa · 🔒 = hoãn có chủ đích
 
@@ -677,3 +680,65 @@ Cộng thêm việc trang hiện đang **tự mâu thuẫn ngay lúc audit** (ra
 11. **H2 / M5** — Sharpe kèm cỡ mẫu; HMM fit không tô xanh khi 22/22 warning.
 
 **Sau khi 1–7 xong**, trang này đủ tin cậy để làm màn hình vận hành chính cho phiên paper; các mục 8–11 nâng chất lượng kết luận nhưng không phải điều kiện an toàn.
+
+---
+
+# Audit Phase 2 — mở 2026-08-15
+
+Phase 1 đóng 20/21 finding. Phase 2 mở ra từ một câu hỏi khác: **còn gì chưa ai nhìn?**
+
+Khác biệt quan trọng so với Phase 1, và là lý do phần này tồn tại riêng: Phase 1 toàn **lỗi đã
+xác nhận**, mỗi cái có bằng chứng đo được tại thời điểm phát hiện. Phase 2 phần lớn là **đường
+dẫn chưa ai chạy** — code có tồn tại, nhánh có viết, nhưng chưa test nào đi qua và chưa lần nào
+xảy ra thật. Chúng có thể hoàn toàn đúng. Không ai biết. Đó chính là vấn đề.
+
+Trộn hai loại vào một danh sách sẽ khiến "chưa biết" đọc như "đã hỏng", hoặc tệ hơn, ngược lại.
+
+## A. Lỗi đã xác nhận (2)
+
+| # | Vấn đề | Bằng chứng | Mức |
+|---|---|---|---|
+| **P2-A1** | Số từ một nguồn API đã chết vẫn render như đang sống. Rail có gọi tên nguồn hỏng (M8 nửa đầu), nhưng `renderMetrics:320` là `snap?.equity ?? meta.final_equity` — **không kiểm `error`**. `state.runner?.error` chỉ được dùng ở `stripDeadSources` và trong text bằng chứng. Equity, drawdown, decision, regime tiếp tục hiện số cũ, chỉ mờ `opacity: .42` | Đọc code: `rg "state.runner\?\.error"` → chỉ dòng 484 và 637 | **High** — cùng họ với C2 "stale nhìn giống healthy", nhưng nhẹ hơn vì rail đã gọi tên nguồn |
+| **P2-A2** | `fatalBanner` vẫn all-or-nothing: `realtime.js:261` là `hidden = results.some(fulfilled)`, nên banner chỉ hiện khi **cả 5** endpoint chết | Đọc code | **Medium** |
+
+*P2-A1 và P2-A2 là hai nửa chưa làm của M8. Ô M8 trong bảng Phase 1 đã sửa từ ✅ thành ⚠️ MỘT PHẦN.*
+
+## B. Đường dẫn chưa ai chạy (7)
+
+Đo bằng cách tìm test nào thật sự **đặt** giá trị xấu, sau khi loại phần `BASE_PAYLOADS` — vì
+field có mặt trong fixture **không** có nghĩa là trạng thái được kiểm.
+
+| # | Trạng thái | Vì sao quan trọng | Mức |
+|---|---|---|---|
+| **P2-B1** | `breaker.level` = **HALTED / SHUTDOWN** | Trạng thái quan trọng nhất trên một dashboard giao dịch: hệ thống tự dừng vì lỗ ngày −4% hoặc 5 lệnh thua liên tiếp. `renderRail` có nhánh `stripBreakerBad`, chưa test nào đi qua. Nếu nhánh này hỏng thì nó hỏng đúng lúc mọi thứ đang tệ nhất | **High** |
+| **P2-B2** | **broker-only position** — IBKR giữ một vị thế runner không biết | Phơi nhiễm mà runner không quản lý được: không stop theo kế hoạch, không nằm trong tính toán exposure. `renderMonitor` có nhánh `broker:only`, chưa test nào đi qua | **High** |
+| **P2-B3** | **runner-only position** — runner nghĩ đang giữ, broker không có | Logic bảo vệ chạy trên trạng thái không tồn tại. Có `runnerOnly()`, chưa test | **High** |
+| **P2-B4** | `model_age` = **URGENT** | Đây là trạng thái **THẬT của production ngay lúc này** (20 tháng, G2 HARD) — nhưng `BASE_PAYLOADS` dùng `OK`. Mọi DOM test đang chạy với một model khỏe mạnh giả định trong khi hệ thống thật thì không | **Medium** |
+| **P2-B5** | `regime_unreliable = True` | HMM stale guard G1 HARD chặn mọi entry. Trang phải nói được điều đó | **Medium** |
+| **P2-B6** | `halted_today > 0` và `rejected_detail` có bản ghi | Entry bị guard chặn, và cap block. Cả hai đều đã xảy ra thật (log 08-10 có `REJECTED SHORT MNQ ... gross 10.9% > cap 5.0%`) nhưng chưa test nào render chúng | **Medium** |
+| **P2-B7** | `refreeze pending = True` | Re-freeze thất bại để lại cờ pending; runner re-alert mỗi lần chạy | **Low** |
+
+## C. Bề mặt chưa có hợp đồng (1)
+
+| # | Vấn đề | Mức |
+|---|---|---|
+| **P2-C1** | **8/10 endpoint không có contract test.** Chỉ `runner-state` và `schedule-status` có. Thiếu: `broker`, `runner-positions`, `open-issues`, `session-events`, `job-journal`, `execution-quality`, `reports`, `paper-evidence`. Frontend đọc các khóa này không qua lớp trung gian nào | **Medium** |
+
+## Thứ tự đề xuất
+
+Làm **B trước A**. Nghịch lý nhưng có lý: nhóm B rẻ (chỉ là stub + assert, không đổi code sản
+phẩm) và mỗi test biến một "không biết" thành hoặc "ổn" hoặc "một finding thật". Chạy hết B rồi
+mới biết Phase 2 thực sự lớn cỡ nào — có thể vài nhánh đã đúng sẵn, cũng có thể lòi thêm lỗi.
+
+1. **P2-B1, B2, B3** — ba đường dẫn mất tiền. Cao nhất.
+2. **P2-B4** — sửa `BASE_PAYLOADS` cho khớp production, rồi xem test nào vỡ.
+3. **P2-A1, A2** — sau khi biết B lòi ra gì, vì bản sửa A1 có thể phải phối hợp.
+4. **P2-B5, B6, C1**, rồi **B7**.
+
+## Ghi chú về phương pháp
+
+Lần đo đầu tiên cho Phase 2 **sai**: detector của tôi báo `regime_unreliable`, `refreeze`,
+`HALTED` là "có test" vì chúng xuất hiện trong `BASE_PAYLOADS` như field mặc định (`False`,
+`"OK"`). Field có mặt trong fixture không phải là trạng thái được kiểm. Cùng họ với bẫy "duyệt
+danh sách rỗng rồi assert" đã dính hai lần ở Phase 1 — đủ ba lần trong một đợt để đáng ghi thành
+luật: **một phép đo về độ phủ phải chứng minh được nó sẽ đỏ khi thứ nó canh biến mất.**
