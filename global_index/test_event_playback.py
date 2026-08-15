@@ -676,6 +676,13 @@ def test_part2i_snapshots_bounded():
         check("P2i.1 file written", live is not None)
         if live is None:
             return
+        # The checks below compare against the imported constant, so raising the
+        # constant would move the yardstick with the object and leave them all green
+        # on an unbounded file. Pin the constant to a sane range too -- found by a
+        # falsification attempt that set it to 1e9 and watched this test stay green.
+        check("P2i.0 the limit itself is a real bound",
+              100 <= LIVE_SNAPSHOT_LIMIT <= 2000,
+              f"LIVE_SNAPSHOT_LIMIT={LIVE_SNAPSHOT_LIMIT}")
         snaps = live.get("snapshots") or []
         check("P2i.2 snapshots bounded", len(snaps) <= LIVE_SNAPSHOT_LIMIT,
               f"got {len(snaps)} from {len(hist_days)} days of history, "
