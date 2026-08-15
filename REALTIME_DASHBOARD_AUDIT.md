@@ -12,29 +12,40 @@
 Bản audit dưới đây giữ nguyên như lúc viết — nó là bản ghi lịch sử, không sửa lùi.
 Khối này ghi cái gì đã đóng. Kế hoạch: [docs/futures/REALTIME_DASHBOARD_FIX_PLAN.md](docs/futures/REALTIME_DASHBOARD_FIX_PLAN.md).
 
-| Finding | Trạng thái | Ghi chú |
-|---|---|---|
-| **C1** alarm IBKR/reconcile trong nhánh chết | ✅ ĐÓNG | Gỡ `if ($('schedulerHealth'))`; gap broker nén theo incident CÓ THẬT thay vì cờ suy diễn |
-| **C2** freshness mù với tuổi snapshot + tuổi bị ẩn | ✅ ĐÓNG | Thêm `stale` + `state_age_seconds`; bỏ `hidden` khỏi `runnerContext` |
-| **H1** ba lane ba verdict | ✅ ĐÓNG | `lifecycle_status` cho mọi job failed/missed; Now Monitor đọc `open_incidents` |
-| **H2** Sharpe không có cỡ mẫu | ✅ ĐÓNG | `MIN_METRIC_DAYS = 20`; đo thật: `--` kèm title `n=5 trading day(s); needs 20` |
-| **H3** giờ bịa `14:05 ET` | ✅ ĐÓNG | `decisionTime` trả `{text, exact}`; chuỗi `14:05` biến mất khỏi journal trên dữ liệu thật |
-| **H4** sort trộn timezone | ✅ ĐÓNG | `sortInstant` quy về epoch millis; chuỗi thiếu offset coi là ET |
-| **M5** HMM fit xanh khi mọi fit cảnh báo | ✅ ĐÓNG | Màu theo `non_convergence_count`; đo thật: `45/45 complete / 45 warn`, class `warning` |
-| **M7** coverage luôn là hôm nay | ✅ ĐÓNG | `evidence_ends` + `stale_days` |
-| **L2** `localTime` không format giờ local | ✅ ĐÓNG | Đổi tên `etDateTime`; `localTime` còn 0 lần xuất hiện |
-| **L5** favicon 404 | ✅ ĐÓNG | route `GET /favicon.ico` → 204 |
-| **L7** hai reader bất đồng "job chạy xong" | ✅ ĐÓNG *(gỡ hoãn)* | `CLEAN_EXIT_TOKENS`/`DEBT_EXIT_TOKENS` + `is_clean_exit`/`is_debt_exit` dùng chung. Nhánh debt phải kiểm TRƯỚC nhánh sạch vì `"thoat OK nhung"` chứa `"thoat OK"` làm tiền tố — đảo thứ tự sẽ xoá phân loại debt của 39 job. Dữ liệu thật không đổi một phân loại nào (`thoat OK` trần = 0 lần) |
-| **L6** `breaker.dd_pct` lệch đơn vị | 🔒 HOÃN có chủ đích | Sửa nguồn = sửa `runner.py` (code giao dịch). Ghi ở `OPEN_QUESTIONS.md`, khóa bằng test |
-| **M4** ledger runner ↔ broker *(HIGH, blocker)* | ✅ ĐÓNG | Trang thật: `Broker acct $996,440 / −$4,040 since Jul 8, 2026` ngay dưới `Paper Equity $50,229 / +$229`. Đúng con số trước đây không panel nào hiển thị |
-| **M1** stop sai giá vẫn tính Protected | ✅ ĐÓNG | `stopPriceAgrees` kiểm hướng so với `market_price` + dung sai theo `tick`; position thật vẫn `PROTECTED #288`, không báo động giả |
-| **M2** hai cluster chung một contract | ✅ ĐÓNG | `expectedQuantity` cộng dồn theo root+direction; stop cộng dồn số lượng trước khi so |
-| **M3** khóa khớp position không ổn định | ✅ ĐÓNG | `positionKey` = `inst\|cluster\|direction\|entry_day`; bỏ float equality và `stop_order_id` khỏi điều kiện khớp |
-| **M6** Protection tách covered/deferred/naked | ✅ ĐÓNG | Trang thật: `1 covered` |
-| **M8** nguồn hỏng chỉ báo bằng opacity | ✅ ĐÓNG | `stripDeadSources` gọi tên nguồn hỏng trong rail |
-| **L1** dead code rail | ✅ ĐÓNG | `renderRailLegacy`/`railItem`/`railTips` = 0; CSS `.scheduler-health` = 0 |
-| **L3** gộp dòng known-debt trùng lặp | ✅ ĐÓNG | Nhãn journal thật: `COMPLETED 13 · RECOVERED 6 · KNOWN DEBT 1` — 39 dòng debt gộp còn 1 |
-| **L4** Open Issues bị thu gọn trên mobile | ✅ ĐÓNG | `openIssuesShell.open === true` @390px khi có issue |
+### Bảng tổng hợp: vấn đề → cách sửa → hiện trạng
+
+Cột "hiện trạng" là **số đo**, không phải mô tả ý định. Đo lúc 2026-08-15 00:0x ET trên trang
+thật đang chạy và trên log production, trừ nơi ghi rõ là fixture.
+
+| # | Vấn đề (audit phát hiện) | Sửa thế nào | Hiện trạng sau sửa |
+|---|---|---|---|
+| **C1** | Push incident cho mất-kết-nối-IBKR và lệch-position nằm trong `if ($('schedulerHealth'))` — element không tồn tại. Gap dự phòng lại bị nén bởi cờ `twsOutageOpen` suy ra từ chính incident không bao giờ bắn: hai lớp bảo vệ hỏng cùng hướng | Gỡ điều kiện, đưa hai vòng push ra ngoài. Nén gap dựa trên incident **có thật trong mảng** (`incidents.some(...)`) thay vì cờ suy diễn | Stub `connectivity_outage status=open` → Now Monitor hiện `IBKR connectivity unavailable`. Broker chết + outage mở → Now Monitor **không rỗng**. 2 DOM test |
+| **C2** | `freshness` suy từ log scheduler + đồng hồ, `observed_at` chỉ dùng để kiểm `None`. Dòng duy nhất mang tuổi snapshot nằm trong `<b hidden>` không bao giờ được bỏ hidden | Thêm trạng thái `stale` + `state_age_seconds`, neo vào **tuổi snapshot** chứ không vào deadline slot. Bỏ `hidden`, gộp câu chữ về một hàm dùng chung với rail | Đo: snapshot 2 phút → `fresh`, 90 ngày → `stale` (trước: cả hai `fresh`). Trang thật hiện `On schedule · next 01:10 ET`, không còn ẩn |
+| **H1** | Ba reader ba thuật toán "đã phục hồi chưa". Rail nói *systems nominal* trong khi panel ngay dưới liệt kê 6 slot là **OPEN** mà backend đã đánh dấu recovered | `job_journal_reader` set `lifecycle_status` cho **mọi** job failed/missed. Now Monitor đọc `open_incidents ?? incidents` — dùng `??` vì `[]` truthy nên `\|\|` rơi về danh sách đầy đủ | Bốn lane (rail, Now Monitor, Job Journal, reports) cùng một kết luận trên cùng một log. `open_incident_count` 6 → **0**. Test bốn-lane trong `test_realtime_contract.py` |
+| **H2** | Sharpe `10.21` tính từ 4 quan sát ngày, hiển thị ngang hàng drawdown thật. Chuỗi đo 26.96 → 14.87 → 11.85 → 10.21 là phân rã `1/√n` | `MIN_METRIC_DAYS = 20`; dưới ngưỡng thì `--` kèm `title` nói rõ cỡ mẫu | Trang thật: `--`, title `n=5 trading day(s); needs 20`. Calmar cùng cơ chế |
+| **H3** | Mọi event thiếu timestamp render `14:05 ET`, không phân biệt được với giờ thật — trong khi cron 14:10–15:55 tồn tại **chính vì** entry không xảy ra lúc 14:05 | `decisionTime` trả `{text, exact}`; thiếu giờ → `time not recorded`, in nghiêng khác màu. `sortKey` vẫn giữ mốc slot nhưng không được hiển thị như giờ | Chuỗi `14:05` biến mất khỏi Event Journal trên dữ liệu thật. Nhánh `time not recorded` khoá bằng stub |
+| **H4** | `sortKey` so bằng `localeCompare` trên chuỗi trộn `...Z` (UTC) và naive ET → event 14:05 ET (=18:05Z) xếp như thể 14:05 UTC | `sortInstant` quy mọi mốc về epoch millis; chuỗi thiếu offset coi là ET | Test trộn hai định dạng, assert thứ tự theo thời gian tuyệt đối |
+| **M1** | `validStopsFor` chỉ kiểm action/qty/status. SELL STP đặt **trên** giá thị trường cho vị thế LONG vẫn hiện `Protected` xanh | `stopPriceAgrees`: kiểm hướng so với `market_price`, và lệch so với `stop_price` của runner trong dung sai `4 × tick` (tick lấy từ `contract_specs`) | Stub stop lệch 100 điểm → `0 covered` + incident `invalid stop`. Position thật (lệch 0.04 = tick rounding) vẫn `PROTECTED #288` |
+| **M2** | IBKR net mọi cluster thành một dòng; `runnerFor` trả phần tử **đầu tiên**. Hai cluster cùng giữ một micro → false *size mismatch* **và** cả hai stop hợp lệ bị đánh invalid | `runnersFor` trả danh sách; `expectedQuantity` cộng dồn; số lượng stop cộng dồn trước khi so với `\|position\|` | Stub 2 cluster × 1 contract + 2 stop → `1 covered`, không `size mismatch`, không `invalid stop` |
+| **M3** | `persistedRunnerFor` đòi khớp đồng thời 6 trường, gồm float equality trên `entry_price` **và** `stop_order_id`. Runner ratchet stop → id mới → qty rơi về `null` | Khoá ổn định `positionKey` = `inst\|cluster\|direction\|entry_day`; giá và id thành bằng chứng phụ, không phải điều kiện khớp | Stub ratchet (id 288→301, snapshot chưa ghi lại) → không còn `quantity missing`, không `size mismatch` |
+| **M4** ⬆ | **Nâng Medium → HIGH, thành blocker.** Không đối chiếu ledger runner ↔ tài khoản broker. `meta.broker_equity` và `paper_start` có trong payload nhưng không render ở đâu | Thêm dòng context dưới Paper Equity: số dư broker + delta so với `paper_start`, link sang `/paper`. Không trộn hai ledger — chỉ làm chúng **nhìn thấy được** | Trang thật: `Broker acct $996,440 / −$4,040 since Jul 8, 2026` ngay dưới `Paper Equity $50,229 / +$229`. Ở 390px kết thúc x=327 trong viewport 487, không cắt |
+| **M5** | Màu ô HMM fit chỉ dựa `completed == attempts`, bỏ qua `non_convergence_count`. 22/22 fit cảnh báo mà ô vẫn **xanh** | `positive` chỉ khi `non_convergence_count === 0`; text kèm số cảnh báo | Trang thật: `45/45 complete / 45 warn`, class `warning` |
+| **M6** | Header đếm covered mà bỏ qua `stop_deferred`; rail thì loại trừ deferred → position deferred hợp lệ hiện `0 / 1` trong khi rail nói nominal | `protectionSummary()` dùng chung cho cả hai, tách ba trạng thái | Trang thật: `1 covered`. Stub deferred → chữ `deferred`, rail vẫn nominal |
+| **M7** | `coverage.to = max(dòng log cuối, hôm nay)` → UI luôn quảng cáo *evidence … to hôm nay* kể cả khi scheduler chết nhiều ngày | Tách `evidence_ends` + `stale_days`; UI hiện mốc thật, kèm *(ends N days ago)* khi trễ | Trang thật: `1 open / evidence 2026-07-30 to 2026-08-15`. Fixture log cũ → `stale_days ≥ 1` |
+| **M8** | Một nguồn API hỏng lẻ chỉ được báo bằng `opacity: .42`, không chữ nào, không nói nguồn nào. `fatalBanner` chỉ bật khi **cả 5** endpoint fail | `stripDeadSources` gom `error` của cả 5 nguồn và gọi tên trong rail | Stub `/api/v1/runner-state` trả 500 → rail chứa chuỗi `runner-state` |
+| **L1** | `renderRailLegacy` + `railItem` + `railTips` không được gọi ở đâu; CSS `.scheduler-health` mồ côi. Chúng khai báo 9 chỉ báo khiến người đọc tưởng rail vẫn hiển thị chúng | Xoá cả ba + CSS mồ côi | `rg` = **0** cho cả bốn tên |
+| **L2** | `localTime()` không format giờ local — nó format **ET**, ở đúng phần code nhạy timezone nhất | Đổi tên `etDateTime()` | `localTime` còn **0** lần xuất hiện |
+| **L3** | 16/28 dòng Job Journal là cùng một known-debt G2, che các dòng thật | Gộp thành một hàng tóm tắt khi vượt ngưỡng | Nhãn journal thật: `COMPLETED 13 · RECOVERED 6 · KNOWN DEBT 1` (39 dòng debt → 1) |
+| **L4** | Trên mobile `openIssuesShell` đóng mặc định, giấu luôn issue duy nhất đang mở sau `<details>` | Mở khi `issues.length > 0`, bất kể viewport | `openIssuesShell.open === true` @390px khi có issue |
+| **L5** | `GET /favicon.ico` → 404 thường trực làm lu mờ lỗi thật trong console | Route trả 204 | `curl` → **204**. Console trang thật: **0 error** |
+| **L6** | `breaker.dd_pct` phát ra ở đơn vị **phần trăm** (0.086) trong khi `drawdown_pct` cạnh nó là **phân số** (0.00086) — chênh 100× | 🔒 **KHÔNG sửa có chủ đích.** Sửa nguồn là sửa `global_index/runner.py`, code giao dịch, cần quyết định riêng | UI không đọc field này. Khoá bằng `test_realtime_never_renders_the_percent_unit_breaker_field`. Ghi ở `OPEN_QUESTIONS.md` |
+| **L7** ✚ | *(phát hiện trong lúc sửa H1)* `schedule_status` nhận cả `"completed ok"` lẫn `"thoat ok"`; `job_journal_reader` chỉ nhận `"completed OK"` và `"thoat OK nhung"`. Một dòng `"thoat OK"` **trần** để job kẹt `running` vĩnh viễn ở lane này trong khi rail gọi là `executed` | `CLEAN_EXIT_TOKENS`/`DEBT_EXIT_TOKENS` + `is_clean_exit`/`is_debt_exit` dùng chung. **Nhánh debt phải kiểm TRƯỚC** vì `"thoat OK nhung"` chứa `"thoat OK"` làm tiền tố | Log thật không đổi một phân loại nào (`thoat OK` trần = **0 lần**): `completed 13 · completed_with_debt 39 · failed 6`, **không job nào `running`** |
+
+**Tổng: 20/21 đóng.** Còn duy nhất **L6**, hoãn có chủ đích.
+
+⬆ = nâng severity giữa chừng · ✚ = phát hiện thêm trong lúc sửa · 🔒 = hoãn có chủ đích
+
+---
 
 **Bản ghi verify (2026-08-15 00:0x ET).** Trạng thái trên đến từ phép đo của tôi, không từ báo cáo
 của agent thực thi — hai lượt trước nó hoàn thành việc mà không báo về, nên chỉ số liệu mới tính.
