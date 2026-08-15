@@ -41,12 +41,12 @@ thật đang chạy và trên log production, trừ nơi ghi rõ là fixture.
 | **L6** | `breaker.dd_pct` phát ra ở đơn vị **phần trăm** (0.086) trong khi `drawdown_pct` cạnh nó là **phân số** (0.00086) — chênh 100× | ✅ **ĐÓNG 2026-08-15 — đổi tên, không đổi công thức.** `dd_pct` → `dd_pct_display`, `day_dd_pct` → `day_dd_pct_display` ở cả 7 điểm trong `runner.py` (3 ở `dump_state`, 4 ở payload notify), cùng `shared/live.js` và `test_event_playback.py`. Chọn đổi tên thay vì bỏ `* 100` để consumer nào chưa cập nhật **hỏng to** thay vì sai lặng lẽ 100×. Giá trị số và mọi quyết định giao dịch không đổi. **Lần rà đầu SÓT 2 consumer**, tìm ra khi làm gate: `dashboard.html:2546-2550` (đọc `ops.breaker.dd_pct`) và `test_operational_fixes.py:970`; thêm 2 chỗ `context: {dd_pct: …}` trong event tổng hợp của `dashboard.html` — `_logCtx` in tên khóa nguyên văn nên chúng nằm cùng log với event thật | **SỬA LẠI:** trước đó ghi *"UI không đọc field này"* — SAI. `shared/live.js:176` có đọc, và đọc đúng qua `fmtPctAlready`, một hàm tồn tại song song với `fmtPct` chính vì payload có hai đơn vị. Biện pháp giảm nhẹ cũ là **trí nhớ người viết code** phải chọn đúng một trong hai hàm chỉ khác nhau ở hậu tố `Already`. Nay đơn vị nằm trong tên field |
 | **L7** ✚ | *(phát hiện trong lúc sửa H1)* `schedule_status` nhận cả `"completed ok"` lẫn `"thoat ok"`; `job_journal_reader` chỉ nhận `"completed OK"` và `"thoat OK nhung"`. Một dòng `"thoat OK"` **trần** để job kẹt `running` vĩnh viễn ở lane này trong khi rail gọi là `executed` | `CLEAN_EXIT_TOKENS`/`DEBT_EXIT_TOKENS` + `is_clean_exit`/`is_debt_exit` dùng chung. **Nhánh debt phải kiểm TRƯỚC** vì `"thoat OK nhung"` chứa `"thoat OK"` làm tiền tố | Log thật không đổi một phân loại nào (`thoat OK` trần = **0 lần**): `completed 13 · completed_with_debt 39 · failed 6`, **không job nào `running`** |
 
-**Tổng: 20/21 đóng, 1 một phần (M8).** L6 đóng 2026-08-15 — xem hàng của nó.
+**Tổng: 21/21 đóng.** Hai mục đóng muộn trong ngày 2026-08-15: L6 (đổi tên khoá, xem hàng của nó) và M8 (nửa sau qua P2-A1). Không còn mục nào hoãn.
 
 ➜ **[Audit Phase 2](#audit-phase-2--mở-2026-08-15)** mở ở cuối file: 10 mục nữa, trong đó
 2 lỗi đã xác nhận và 7 đường dẫn chưa ai chạy (breaker HALTED, position broker-only/runner-only…).
 
-⬆ = nâng severity giữa chừng · ✚ = phát hiện thêm trong lúc sửa · 🔒 = hoãn có chủ đích
+⬆ = nâng severity giữa chừng · ✚ = phát hiện thêm trong lúc sửa · (🔒 = hoãn có chủ đích — không còn mục nào mang dấu này)
 
 ---
 
@@ -685,7 +685,7 @@ Cộng thêm việc trang hiện đang **tự mâu thuẫn ngay lúc audit** (ra
 
 # Audit Phase 2 — mở 2026-08-15
 
-Phase 1 đóng 20/21 finding. Phase 2 mở ra từ một câu hỏi khác: **còn gì chưa ai nhìn?**
+Phase 1 đóng 21/21 finding. Phase 2 mở ra từ một câu hỏi khác: **còn gì chưa ai nhìn?**
 
 Khác biệt quan trọng so với Phase 1, và là lý do phần này tồn tại riêng: Phase 1 toàn **lỗi đã
 xác nhận**, mỗi cái có bằng chứng đo được tại thời điểm phát hiện. Phase 2 phần lớn là **đường
