@@ -183,7 +183,10 @@ _Xem thêm: [FUTURES_OPERATIONAL_AUDIT.md](../../FUTURES_OPERATIONAL_AUDIT.md) |
 
 | Mã | Tên | Ý nghĩa | Nguồn |
 |---|---|---|---|
-| **fit_A** | HMM freeze 2022 | HMM trained đến 2022-12-31. **Degradation floor**: Calmar 2.38 — nếu production thấp hơn, dừng lại | `refreeze.py:53`, `FUTURES_TRUST_AUDIT.md:29` |
+| **fit_A** | HMM freeze 2022 | HMM trained đến 2022-12-31. Dùng làm **degradation floor**: Calmar **1.65** trên cơ sở hiện hành (~~2.38~~ là số 1-tick/incremental, deprecate 2026-07-09). ⚠️ **Một lần xuống dưới 1.65 chưa đủ kết luận suy giảm** — sàn này nằm trong dải nhiễu seed [1.56, 1.72] | `runner.py:100-125`, [CALMAR_PROVENANCE.md](CALMAR_PROVENANCE.md) §4b |
+| **Sàn promote vs sàn theo dõi** | Hai hằng số khác nhau | `refreeze.CALMAR_FLOOR = 1.50` = chặn thảm hoạ khi **thay model** (cổng chính là đo theo cặp). `runner.BACKTEST_CALMAR_FLOOR = 1.65` = ngưỡng **theo dõi paper** hằng ngày. Khác mục đích, khác cách suy ra — đừng đồng nhất | [CALMAR_PROVENANCE.md](CALMAR_PROVENANCE.md) §4b |
+| **Đo theo cặp** (paired) | Cách chấm điểm một fit mới | Chạy `deploy_sim` cho **cả** fit cũ lẫn fit mới, cùng cơ sở + **cùng seed**, rồi so hai vế với nhau thay vì so với một hằng số lịch sử. Nhiễu seed là common-mode nên triệt tiêu | `refreeze.paired_verdict()` |
+| **Sàn nhiễu** (seed noise floor) | Phân tán do hạt giống ngẫu nhiên | Cùng một hệ, chỉ đổi `engine.RANDOM_SEED`: Calmar trải **1.56–1.72** (9.47%), PF 0.68%, Sharpe 2.42%. Calmar nhiễu nhất vì mẫu số MaxDD chỉ là **một ngày** | `futures/measure_seed_pnl.py` |
 | **fit_B** | HMM freeze (trung gian) | Intermediate freeze được đề cập trong docs; chi tiết cần xác nhận | `FUTURES_TRUST_AUDIT_TODO.md:67` [cần xác nhận] |
 | **fit_C** | HMM freeze 2024 (production) | HMM trained đến 2024-12-31. Paper baseline: $52,962 / Calmar 2.75. File: `models/PRODUCTION.pkl` | `docs/SHARED.md:24`, `refreeze.py` |
 | **calm-flip** | Calm→{Stress,Normal} flip | Khi re-freeze, nếu số label Calm→{Stress,Normal} vượt `CALM_FLIP_LIMIT` → force VERIFY/HOLD thay vì auto-promote | `refreeze.py:51,88,296-310` |

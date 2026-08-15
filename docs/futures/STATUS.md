@@ -32,7 +32,7 @@ Bước tiếp theo: **P0b** (thứ Hai 14:05 ET) — xem PAPER_ROUTE.md § P0b.
 | Net P&L | **$52,936** (n=1, 2-tick/side, fit_C 2024-12-31) |
 | Calmar | **2.744** |
 | MaxDD | **$2,789** (5.6%) |
-| Degradation floor | Calmar **2.38** (fit_A 2022, locked) |
+| Degradation floor | ~~Calmar 2.38~~ → **1.65** (theo dõi paper, `runner.py`) và **1.50** (chặn thảm hoạ khi promote, `refreeze.py`). 2.38 là số 1-tick trên data incremental, bị deprecate 2026-07-09. Hai sàn khác mục đích — đọc [CALMAR_PROVENANCE.md](CALMAR_PROVENANCE.md) §4b trước khi dùng |
 
 Baseline locked tại `baseline_fit_c.txt`. Re-run chỉ khi annual re-freeze.
 

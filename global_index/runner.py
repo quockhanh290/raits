@@ -103,6 +103,25 @@ _ARM_BY_CLUSTER = {"roska4_swing": ("America/New_York", 14, 0),
 #     --hmm-fit-end 2022-12-31 --n-contracts 1 --slippage-ticks 2
 # 1.65 (2026-08-04, global_nkd 6%). Superseded 1.57 (nkd cap 2%) and 1.53 (bar-0
 # exit) — 1.53 was still hardcoded here long after INVARIANTS had deprecated it.
+#
+# ⚠️ READ BEFORE ACTING ON A BREACH (2026-08-15). This threshold sits INSIDE the noise
+# band of the measurement that produced it. Five random seeds of the identical system
+# (futures/measure_seed_pnl.py, same fit_end, same pinned basis) spread Calmar 1.56–1.72,
+# and two of the five landed under 1.65. A single reading below this floor is therefore
+# NOT evidence of degradation on its own — re-run measure_seed_pnl.py and check whether
+# the number falls inside [1.56, 1.72] before concluding anything.
+#
+# Why it is still 1.65. The promotion gate escaped this problem by measuring in PAIRS
+# (futures/refreeze.paired_verdict): it always has two models on the same basis and the
+# same seed, so seed variance is common-mode and cancels. Paper monitoring has one live
+# curve and one constant, so it cannot pair. Closing the gap means picking one of three
+# options — lower it below 1.56, switch to Sharpe/PF (which spread 2.42% and 0.68%
+# against Calmar's 9.47%), or keep 1.65 and require a confirming run. That is the project
+# owner's call and it is open. See docs/futures/CALMAR_PROVENANCE.md §4b.
+#
+# Do NOT copy this number anywhere without the paragraph above. Copying a floor without
+# its basis is exactly how refreeze.CALMAR_FLOOR = 2.38 survived six weeks after being
+# deprecated.
 BACKTEST_CALMAR_FLOOR: float = 1.65
 
 

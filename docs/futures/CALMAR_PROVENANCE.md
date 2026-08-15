@@ -159,6 +159,83 @@ Gate và L11 **không thay thế được cho nhau**. Gate hỏi "model có đ�
 
 ---
 
+## 4b. HAI SÀN, HAI MỤC ĐÍCH — đọc mục này trước khi sửa bất kỳ sàn nào
+
+_Thêm 2026-08-15, ngay sau khi cổng promotion đổi sang đo theo cặp._
+
+Từ 2026-08-15 trong hệ có **hai** hằng số tên gần giống nhau, giá trị khác nhau, và **suy ra từ hai
+lập luận khác nhau**. Nhầm hai cái này là tái lập đúng cái bẫy mà tài liệu này được viết ra để chặn.
+
+| | `refreeze.CALMAR_FLOOR` | `runner.BACKTEST_CALMAR_FLOOR` |
+|---|---|---|
+| **Giá trị** | **1.50** | **1.65** |
+| **Trả lời câu hỏi** | "Có nên **thay** model không?" | "Paper có đang **suy giảm** so với backtest không?" |
+| **Chạy khi nào** | Hàng năm, lúc re-freeze | Mỗi ngày, hiển thị trên dashboard |
+| **Vai trò** | **Chặn thảm hoạ** — cổng chính là đo theo cặp | **Ngưỡng chính**, không có gì đứng sau |
+| **Suy từ** | Dưới đáy nhiễu seed đo được (1.56) để không bao giờ bắn vì hạt giống | fit_A trên cơ sở ghim, 2026-08-04 (`runner.py:100-105`) |
+| **Có miễn nhiễm nhiễu seed?** | **Có** — vì cổng chính so cặp cùng seed | **KHÔNG** — nó là ngưỡng tuyệt đối |
+
+### Chỗ còn hở
+
+`BACKTEST_CALMAR_FLOOR = 1.65` nằm **bên trong** dải nhiễu seed đo được **[1.56, 1.72]**.
+Hai trong năm seed của **cùng một hệ** cho Calmar dưới 1.65 (xem §4c). Nghĩa là nếu ai đó đổi
+`engine.RANDOM_SEED`, hoặc nếu một lần nâng cấp `hmmlearn` làm EM rơi vào cực trị khác, dashboard
+có thể báo "suy giảm" mà **không có gì suy giảm cả**.
+
+Điều này **chưa được sửa**, và đó là chủ ý: cổng promotion có thể so cặp vì nó luôn có hai model để
+so; phần theo dõi paper thì không — nó chỉ có một đường cong live và một hằng số. Muốn miễn nhiễm
+nhiễu ở đó phải chọn một trong ba, và cả ba đều là quyết định của chủ dự án:
+
+1. **Hạ 1.65 xuống dưới 1.56** — hết báo động giả, nhưng cũng mất khả năng phát hiện suy giảm nhẹ.
+2. **Đổi sang Sharpe/PF** — hai thước này trải 2.42% và 0.68% (so với Calmar 9.47%), nhưng phải
+   dựng lại baseline paper trên thước mới.
+3. **Giữ 1.65 và ghi rõ** rằng một lần vượt sàn đơn lẻ chưa phải bằng chứng — cần xác nhận bằng
+   cách chạy lại với seed production trước khi kết luận.
+
+Cho tới khi chốt: **một lần Calmar paper xuống dưới 1.65 KHÔNG đủ để kết luận hệ suy giảm.**
+Chạy `python futures/measure_seed_pnl.py` để xem con số đó có nằm trong dải nhiễu không, rồi mới kết luận.
+
+### Bất biến mới cho cả hai sàn
+
+> Không sàn nào được đặt **bên trong** dải nhiễu của chính phép đo sinh ra nó.
+> Trước khi đổi bất kỳ sàn nào: chạy `measure_seed_pnl.py`, lấy `[min, max]`, đặt sàn ngoài dải đó.
+
+---
+
+## 4c. Nhiễu seed — số liệu gốc
+
+_Đo 2026-08-15, `futures/measure_seed_pnl.py`, 5 seed, CÙNG `fit_end=2024-12-31`, cơ sở ghim
+(`frozen_sim`, `--end 2024-12-31`, n=1, 2-tick, no-stress). `SC-ANCHOR` PASS: seed 42 tái tạo
+đúng $42,459 / Calmar 1.72 của INVARIANTS dòng 22._
+
+| seed | net | Calmar | MaxDD | PF | Sharpe |
+|---|---|---|---|---|---|
+| **42** (production) | $42,459 | **1.72** | $3,574 | 1.48 | 1.67 |
+| 1 | $42,319 | 1.71 | $3,574 | 1.48 | 1.65 |
+| 7 | $41,699 | 1.69 | $3,574 | 1.48 | 1.67 |
+| 123 | $40,633 | **1.57** | $3,744 | 1.47 | 1.63 |
+| 2026 | $40,254 | **1.56** | $3,744 | 1.48 | 1.65 |
+
+| thước | dải | % của trung vị |
+|---|---|---|
+| **Calmar** | 1.56 – 1.72 | **9.47%** |
+| net | $40,254 – $42,459 | 5.29% |
+| MaxDD | $3,574 / $3,744 (**chỉ 2 giá trị**) | 4.76% |
+| Sharpe | 1.63 – 1.67 | 2.42% |
+| PF | 1.47 – 1.48 | **0.68%** |
+
+**Vì sao Calmar nhiễu gấp 4–14 lần hai thước kia:** `calmar = (net/số_năm) / maxdd_$`. Mẫu số là
+**một ngày duy nhất**, và qua 5 lần chạy nó chỉ nhận **hai** giá trị — một hàm bậc thang. PF và
+Sharpe trung bình hoá trên mọi ngày nên không có bậc.
+
+→ **Hệ giao dịch ổn định; thước đo mới là thứ không ổn định.** Seed không làm hệ đánh khác đi bao
+nhiêu, nó chỉ đổi xem ngày sụt sâu nhất rơi vào đâu.
+
+Lưu ý (n=5 nên bằng chứng yếu, nhưng đáng ghi): seed production 42 cho giá trị **cao nhất** trong
+5 lần rút. Baseline 1.72 mà mọi thứ đang neo vào **không phải ước lượng trung tâm**.
+
+---
+
 ## 5. Bài học rút ra
 
 **Số phải đi kèm cơ sở đo, nếu không nó sẽ mồ côi trong vòng vài ngày.**
@@ -189,6 +266,9 @@ ngay từ lúc gõ.
       bản chép pipeline, nó gọi thẳng `deploy_sim` qua subprocess trên cơ sở ghim. Thêm 2 guard
       fail-closed (contaminated theo I2.2; hash nhãn phải khớp). 87/87 test + mutation test.
 - [x] D5 RESOLVED — `regime_csv` giờ được `run_verify` dùng thật.
-- [ ] D1–D4, D6: sửa doc-drift còn lại.
-- [ ] `runner.BACKTEST_CALMAR_FLOOR = 1.65` cũng nằm trong dải nhiễu seed [1.56, 1.72] —
-      cần quyết định riêng cho phần theo dõi suy giảm paper.
+- [x] **D3, D4 RESOLVED 2026-08-15** — STATUS.md và GLOSSARY.md không còn ghi sàn 2.38;
+      GLOSSARY thêm 3 mục: sàn promote vs sàn theo dõi, đo theo cặp, sàn nhiễu.
+- [ ] D1, D2, D6: sửa doc-drift còn lại.
+- [ ] **QUYẾT ĐỊNH CỦA CHỦ Dự ÁN** — `runner.BACKTEST_CALMAR_FLOOR = 1.65` nằm trong dải
+      nhiễu seed [1.56, 1.72]. **Đã document đầy đủ** (§4b + INVARIANTS + comment tại
+      `runner.py:100-125` + GLOSSARY), **chưa sửa giá trị**. Ba lựa chọn ở §4b.
