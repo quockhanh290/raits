@@ -1,0 +1,58 @@
+L11 REFIT GATE — decode-flip giua hai fit_end
+measured_at  2026-08-15T08:50:05.444072+00:00
+
+CO SO DO
+  spy_csv              D:\raits\spy_daily_live.csv
+  spy_csv_sha256       0e3815c29df3d5b8
+  spy_csv_first_date   2017-01-03
+  spy_csv_last_date    2026-08-13
+  spy_csv_rows         2416
+  train_end            2018-01-01
+  n_components         3
+  fit_prev             2024-12-31
+  fit_new              2025-12-31
+  git_commit           83ac849-dirty
+  python               3.11.4
+  labels_hash_prev     b70204f002b1f717
+  labels_hash_new      86853d9c8944cdf3
+
+SELF-CHECK
+  [PASS] SC1  CSV phu den fit_new (khong fit tren du lieu cut)
+         CSV last=2026-08-13  fit_new=2025-12-31
+  [PASS] SC2  fit_new > fit_prev
+         2024-12-31 -> 2025-12-31
+  [PASS] SC3  CSV khong co ngay trung (duong swing production khong dedup)
+         0 ngay trung
+  [PASS] SC4  ca hai bo nhan khong rong
+         prev=2165 new=2165
+  [PASS] SC5  hai bo nhan phu cung tap ngay
+         chi co o prev=0  chi co o new=0
+  [PASS] SC6  nhan chi thuoc ['Calm', 'Normal', 'Stress']
+  [PASS] SC7  hai fit KHAC nhau (hash khac) — giong het = fit_end khong co tac dung
+         prev=b70204f002b1f717 new=86853d9c8944cdf3
+  [PASS] SC8  cua so L11 forward du ngay de ket luan (>=20)
+         n=154 tu 2026-01-01
+  [PASS] SC9  phan tram nam trong [0,100]
+         pct=5.8442
+
+CUA SO L11 forward  2026-01-02 .. 2026-08-13
+  9/154 ngay khac = 5.84%
+    Normal->Calm           8
+    Stress->Normal         1
+
+CUA SO refreeze run_gate  2019-01-01 .. het chuoi
+  AUTO_APPROVE  3.87%  (74/1914)
+
+PHAN RA THEO NAM
+  2018  n= 251  khac=  11  4.38%
+  2019  n= 252  khac=   5  1.98%
+  2020  n= 253  khac=   9  3.56%
+  2021  n= 252  khac=  11  4.37%
+  2022  n= 251  khac=  14  5.58%
+  2023  n= 250  khac=   8  3.20%
+  2024  n= 252  khac=   6  2.38%
+  2025  n= 250  khac=  12  4.80%
+  2026  n= 154  khac=   9  5.84%
+
+VERDICT  HOLD
+  5.84% < 15.0% — dieu kien 1 cua L11 KHONG dat. Co data moi khong dong nghia model cu sai. Giu fit_prev.

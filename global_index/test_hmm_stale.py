@@ -279,12 +279,12 @@ def test_g2_model_age():
     _check("G2.5 soft WARN fires only once", len(notifs_soft2) == 0,
            f"second soft notifs={len(notifs_soft2)}")
 
-    # Hard — MODEL AGE URGENT
+    # Hard — MODEL AGE CHECK DUE
     notifs_hard, r3 = _capture_notify()
     guard.check_day(HARD, spy_last_date_override=_fresh_spy(HARD))
     r3()
-    _check("G2.6 MODEL AGE URGENT notified at 19mo",
-           any("URGENT" in n[0] for n in notifs_hard),
+    _check("G2.6 MODEL AGE CHECK DUE notified at 19mo",
+           any("CHECK DUE" in n[0] for n in notifs_hard),
            f"notifs={[n[0] for n in notifs_hard]}")
     _check("G2.7 regime_unreliable still False (G2 never halts)", not guard.regime_unreliable)
 
@@ -293,7 +293,7 @@ def test_g2_model_age():
     notifs_hard2, r4 = _capture_notify()
     guard.check_day(HARD2, spy_last_date_override=_fresh_spy(HARD2))
     r4()
-    _check("G2.8 hard URGENT fires only once", len(notifs_hard2) == 0,
+    _check("G2.8 hard CHECK DUE fires only once", len(notifs_hard2) == 0,
            f"second hard notifs={len(notifs_hard2)}")
 
 

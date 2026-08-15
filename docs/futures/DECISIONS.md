@@ -40,6 +40,64 @@ Rejected: floor từ fit_C (2.50/2.38) — baseline không phải floor; floor t
 Why: đo fit-2024 vs fit-2025 decode 2026 → 93.7% giống (118/126 ngày), chỉ 6.3% khác (8 ngày). 7/8 flip là Normal↔Calm (ít impact hành vi giao dịch); 1/8 là Stress→Normal (2026-04-06). Cải thiện MINIMAL — không bù được chi phí refit: mất OOS 2025 backtest (Calmar 3.42) + re-validate baseline/floor/vault. Decode-forward (fit cố định, gán nhãn ngày mới không retrain) là đủ cho paper regime 2026.  
 Rejected: refit gồm 2025 — cải thiện 6.3% không đáng đánh đổi; refit định kỳ ("mỗi năm") — quán tính, không theo nhu cầu đo được.  
 Measurement: `compare_refit_2025.py` (scratchpad, 2026-07-09); see LESSONS.md L11 cho refit criteria tổng quát.
+⚠️ Script scratchpad đó **chưa bao giờ được commit** → con số 6.3% không tái tạo được. Đã dựng lại và tái xác nhận 2026-08-15, xem entry dưới.
+
+**TÁI XÁC NHẬN giữ fit-2024 — HOLD, không refit 2025-12-31 — 2026-08-15**  
+Why: đo lại bằng `futures/compare_refit.py` (committed, có self-check, lưu kèm cơ sở đo). Cửa sổ L11 forward 2026-01-02..2026-08-13: **9/154 ngày khác = 5.84%** (ngưỡng L11 = 15-20%). Tái tạo gần chính xác lần đo 2026-07-09 (8/126 = 6.35%) — thêm ~6 tuần dữ liệu chỉ thêm **đúng 1 ngày** flip; phân rã trùng (8 Normal→Calm + 1 Stress→Normal, so với 7 + 1). Lần đo cũ chạy trên CSV TRƯỚC bản sửa 2026-08-13, lần này trên CSV đã sửa (có sụt giá tháng 3/2026) → bản sửa CSV **không lật kết luận**.  
+Bằng chứng mạnh nhất là phân rã theo năm: flip rải đều **2-6% khắp 2018-2026**, không dồn vào 2025-2026 (2018=4.38%, 2022=5.58%, 2026=5.84%). Nếu fit-2025 học được điều gì mới về chế độ hiện tại thì flip phải tụ ở đuôi. Nó không tụ → đây là **nhiễu fit, không phải thông tin mới**.  
+Rejected: refit 2025-12-31 — L11 điều kiện 1 trượt xa, và chi phí (2025 thành in-sample, mất vault 2025 làm bằng chứng OOS) không đổi.  
+Measurement: `python futures/compare_refit.py` → `futures/compare_refit_report.{txt,json}`; basis: `spy_daily_live.csv` sha `0e3815c29df3d5b8` (2416 dòng, tới 2026-08-13), train_end 2018-01-01, n=3, commit `83ac849-dirty`.  
+⚠️ Cùng lần chạy đó, `run_gate` trả **AUTO_APPROVE 3.87%** — tức pipeline re-freeze sẽ **tự động duyệt** đúng lần refit mà L11 nói không nên làm. Gate không có câu hỏi "có nên refit không"; nó chỉ hỏi "fit mới có khác đủ đáng sợ không". Xem CALMAR_PROVENANCE.md §3.1.
+
+**SÀN NHIỄU: chênh lệch nhãn giữa hai `fit_end` KHÔNG phân biệt được với đổi random seed — 2026-08-15**  
+Đo: `futures/measure_fit_noise.py`, 5 seed (42/1/7/123/2026), **cùng** `fit_end=2024-12-31`, 10 cặp.
+`SC-FIDELITY` chứng minh bản chép vòng lặp == production (seed 42 → hash `b70204f002b1f717`, trùng `label_regimes` thật).
+
+| Cửa sổ | nhiễu min | nhiễu trung vị | nhiễu max | tín hiệu fit-2024 vs fit-2025 |
+|---|---|---|---|---|
+| L11 (2026+) | 2.60% | **5.8442%** | 12.34% | **5.8442%** |
+| gate (2019+) | 1.20% | 3.32% | **7.58%** | 3.87% |
+
+Tín hiệu L11 trùng trung vị nhiễu **đến 4 chữ số thập phân** — không phải làm tròn: cùng mẫu số 154 ngày
+và cùng **9 ngày** khác. Đổi `fit_end` 2024→2025 làm đổi đúng bằng số nhãn 2026 mà đổi seed 42→123 làm đổi.
+→ Quyết định HOLD ở entry trên không chỉ "dưới ngưỡng" mà là **không mang thông tin nào**.
+
+⚠️ **`GATE_AUTO_PCT = 5.0` nằm DƯỚI trần nhiễu 7.58%** trên chính cửa sổ gate. Hệ quả: chạy lại
+**y hệt cấu hình cũ** với seed khác có thể ra verdict `VERIFY` (5-15%). Gate bắn được trên nhiễu thuần,
+và ngược lại không phát hiện nổi thay đổi thật cỡ nhỏ. Ngưỡng 5% chưa bao giờ được neo vào sàn nhiễu.
+
+Ghi nhận trấn an: A→C 17.16% (2026-07-02) vượt trần nhiễu 7.58% → quyết định nâng fit_C **vẫn đứng**.
+Lưu ý hai phép đo khác cửa sổ (2019-2022 vs 2019+) và khác data → đây là dấu hiệu, chưa phải chứng minh.
+
+Phân bố nhãn đổi theo seed đáng kể: Stress **253-321 ngày** (11.7%-14.8%), Calm 40.0%-44.3%.
+Production ghim seed 42 qua `engine.RANDOM_SEED` — đúng cho khả năng tái tạo, nhưng chuỗi regime đang
+chạy là **một lần rút** từ một phân bố khá rộng. Ảnh hưởng lên P&L CHƯA đo (cần deploy_sim từng seed).
+
+**Cổng promotion đổi sang ĐO THEO CẶP + 3 thước đo; `CALMAR_FLOOR` 2.38 → 1.50 (chỉ còn là chặn thảm hoạ) — 2026-08-15**  
+Đo: `futures/measure_seed_pnl.py`, 5 seed, CÙNG `fit_end=2024-12-31`, cơ sở ghim (frozen_sim, `--end 2024-12-31`, n=1, 2-tick, no-stress). `SC-ANCHOR` PASS — seed 42 tái tạo đúng $42,459 / Calmar 1.72 của INVARIANTS dòng 22.
+
+| seed | net | Calmar | MaxDD | PF | Sharpe |
+|---|---|---|---|---|---|
+| 42 (production) | $42,459 | 1.72 | $3,574 | 1.48 | 1.67 |
+| 1 | $42,319 | 1.71 | $3,574 | 1.48 | 1.65 |
+| 7 | $41,699 | 1.69 | $3,574 | 1.48 | 1.67 |
+| 123 | $40,633 | **1.57** | $3,744 | 1.47 | 1.63 |
+| 2026 | $40,254 | **1.56** | $3,744 | 1.48 | 1.65 |
+
+**2/5 seed rơi dưới `BACKTEST_CALMAR_FLOOR = 1.65`** — cùng một hệ, chỉ khác hạt giống. Sàn tuyệt đối không phân biệt được "hệ suy giảm" với "fit rơi vào cực trị địa phương khác".
+
+**Phát hiện then chốt — hệ ổn định, thước đo mới là thứ nhiễu.** Calmar trải **9.47%** trong khi PF trải **0.68%** và Sharpe **2.42%**. Nguyên nhân có cấu trúc: `calmar = (net/năm)/maxdd_$`, mẫu số là **một ngày duy nhất**, và qua 5 lần chạy MaxDD chỉ nhận **hai** giá trị ($3,574 / $3,744) — hàm bậc thang. PF và Sharpe trung bình hoá trên mọi ngày.
+
+Why (cặp): hai vế chạy cùng cơ sở và **cùng seed** nên nhiễu là common-mode và triệt tiêu. Nhiễu seed chỉ là vấn đề khi so với một hằng số lịch sử — đúng thứ cổng cũ đang làm.  
+Why (3 thước): Calmar là thước nhiễu nhất trong ba, không được là phiếu duy nhất.  
+Why (`PAIRED_TOL = 0.05`): suy từ quyết định đã có, không phải khẩu vị — fit_A floor / fit_C baseline = 1.65/1.72 = 95.9% (INVARIANTS dòng 23), tức mức sụt ~4.1% đã được chấp nhận. 5% là con số đó làm tròn.  
+Why (`CALMAR_FLOOR = 1.50`): đặt **dưới** đáy nhiễu đo được 1.56 để không bao giờ bắn vì seed. Vai trò đổi từ cổng chính thành chặn thảm hoạ.  
+Rejected: hạ sàn xuống dưới 1.56 rồi giữ nguyên cổng tuyệt đối — hết báo động giả nhưng cũng gần hết khả năng phát hiện; giữ Calmar làm phiếu duy nhất — số liệu cho thấy nó nhiễu gấp 4–14 lần hai thước kia.  
+⚠️ `runner.BACKTEST_CALMAR_FLOOR = 1.65` (theo dõi suy giảm paper) **chưa đổi** — nó cũng nằm trong dải nhiễu và cần quyết định riêng.
+
+**G2 đổi động từ: cảnh báo tuổi model trỏ vào PHÉP ĐO, không trỏ vào re-freeze — 2026-08-15**  
+Why: `MODEL AGE URGENT — schedule re-freeze immediately` bắn mỗi ngày từ tháng thứ 19, trong khi đáp án đo được là "không refit". Cảnh báo mà phản ứng đúng là phớt lờ sẽ dạy người vận hành phớt lờ mọi cảnh báo. Đổi tiêu đề thành `MODEL AGE CHECK DUE` và nội dung trỏ vào `python futures/compare_refit.py`. Ngưỡng 12/18 tháng **giữ nguyên** — vấn đề là động từ, không phải nhịp.  
+Rejected: nới `G2_HARD_MONTHS` — che triệu chứng, mất luôn nhịp kiểm tra định kỳ; tắt G2 — mất cảnh báo thật khi model thực sự lạc hậu.
 
 **Deploy dùng `label_regimes()` (không dùng `regime_coordinator`)**  
 Why: validated path qua toàn bộ reconcile chain; regime_coordinator là code path khác, chưa validate.  

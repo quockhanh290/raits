@@ -33,7 +33,11 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from dataclasses import asdict, dataclass
+import os
+import re
+import subprocess
+import sys
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
@@ -50,8 +54,38 @@ REGISTRY_BACKUP = 3          # how many historical freeze records to keep
 GATE_AUTO_PCT   = 5.0        # < 5%  → AUTO_APPROVE
 GATE_HOLD_PCT   = 15.0       # > 15% → HOLD (also triggers on calm-flip)
 CALM_FLIP_LIMIT = 10         # Calm→Stress or Calm→Normal > this → force VERIFY
-CALMAR_FLOOR    = 2.38       # degradation floor from fit_A; do not promote below this
+# Catastrophe backstop ONLY -- the primary gate is the pair, see paired_verdict().
+# 1.50 sits below the measured seed-noise minimum of 1.56 (five seeds of the identical
+# system, 2026-08-15) so it can never fire on seed choice alone. Two of those five draws
+# came in under the old live floor of 1.65, which is why an absolute threshold cannot be
+# the primary gate. History: 2.38 was the fit_A floor measured 2026-07-02 at 1-tick on
+# incremental data, deprecated by DECISIONS.md:128 four days after it was hardcoded here
+# and never updated. See docs/futures/CALMAR_PROVENANCE.md.
+CALMAR_FLOOR    = 1.50
+# Paired tolerance. Not taste: fit_A floor / fit_C baseline = 1.65/1.72 = 95.9%
+# (INVARIANTS.md line 23), i.e. a ~4.1% drop was already accepted. 5% is that, rounded.
+PAIRED_TOL      = 0.05
 PENDING_PATH    = Path("models/hmm/refreeze_pending.json")  # G3 fail-flag
+
+# ── Pinned verify basis ───────────────────────────────────────────────────────
+# run_verify shells out to deploy_sim with EXACTLY these, which is how
+# BACKTEST_CALMAR_FLOOR = 1.65 and the $42,459/1.72 baseline were measured
+# (runner.py:100-105, INVARIANTS.md line 22). Any change here silently changes what
+# every future promotion is judged against — change the invariant doc in the same commit.
+VERIFY_DATA_DIR       = "data/cache/futures/frozen_sim"
+VERIFY_NKD_PARQUET    = "global_index/data/NKD_frozen_2024.parquet"
+VERIFY_REGIME_CSV     = "spy_daily_live.csv"
+VERIFY_END            = "2024-12-31"
+VERIFY_TRAIN_END      = "2018-01-01"   # deploy_sim --hmm-train-end default
+VERIFY_N_CONTRACTS    = 1
+VERIFY_SLIPPAGE_TICKS = 2.0
+VERIFY_INCLUDE_STRESS = False          # floor lineage 2.04→1.65 is no-stress (DECISIONS.md:36)
+
+# deploy_sim's result line: "  net $42,459  |  Calmar 1.72  |  PF 1.48  |  Sharpe 1.67"
+_VERIFY_METRIC_RE = re.compile(
+    r"net \$([\d,\-]+)\s*\|\s*Calmar\s+([\d.\-]+)\s*\|\s*PF\s+([\d.\-]+)"
+    r"\s*\|\s*Sharpe\s+([\d.\-]+)")
+_VERIFY_MAXDD_RE = re.compile(r"MaxDD \$([\d,\-]+)")
 
 COMMON_START    = "2019-01-01"   # start of gate comparison window
 
@@ -69,6 +103,11 @@ class FreezeRecord:
     calmar:      float       # Calmar ratio from verify step (0.0 if skipped)
     note:        str  = ""   # operator note
     invalid:     bool = False  # True → audit-only; rollback() skips this entry
+    # The measurement basis `calmar` was produced on. Without it a recorded Calmar cannot be
+    # reproduced or compared: the 2.744 in this registry (2026-07-06) is unrecoverable for
+    # exactly this reason — see docs/futures/CALMAR_PROVENANCE.md §2.2. Empty on pre-2026-08-15
+    # entries; from_dict() defaults it so those still load.
+    calmar_basis: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -96,6 +135,11 @@ class VerifyResult:
     calmar_floor: float
     net_new:     float
     detail:      str
+    basis:       dict = field(default_factory=dict)   # what the number was measured on
+    contaminated: bool = False   # True → eval window sits inside the fit window (I2.2)
+    metrics_new:  dict = field(default_factory=dict)  # full deploy_sim metrics, new fit
+    metrics_prev: dict = field(default_factory=dict)  # same for incumbent ({} if unpaired)
+    checks:       dict = field(default_factory=dict)  # per-metric verdicts
 
 
 @dataclass
@@ -322,117 +366,232 @@ def run_gate(
 
 # ── Verify ────────────────────────────────────────────────────────────────────
 
+def _deploy_sim_metrics(fit_end: str, data_dir: str, nkd_parquet: str,
+                        regime_csv: str) -> tuple[Optional[dict], str]:
+    """One deploy_sim run on the pinned basis. Returns (metrics, error_message)."""
+    root = Path(__file__).resolve().parent.parent
+    cmd = [sys.executable, "-m", "global_index.deploy_sim",
+           "--data-dir",       data_dir,
+           "--nkd-parquet",    nkd_parquet,
+           "--regime-csv",     regime_csv,
+           "--end",            VERIFY_END,
+           "--hmm-train-end",  VERIFY_TRAIN_END,
+           "--hmm-fit-end",    fit_end,
+           "--n-contracts",    str(VERIFY_N_CONTRACTS),
+           "--slippage-ticks", str(VERIFY_SLIPPAGE_TICKS)]
+    if VERIFY_INCLUDE_STRESS:
+        cmd.append("--include-stress")
+
+    # deploy_sim prints a character cp1252 cannot encode; on Windows a redirected stdout
+    # kills the run with UnicodeEncodeError AFTER the full ~2m41s of work.
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    log.info("deploy_sim fit_end=%s", fit_end)
+    try:
+        proc = subprocess.run(cmd, cwd=str(root), capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", env=env, timeout=3600)
+    except Exception as exc:
+        return None, f"deploy_sim failed to launch (fit_end={fit_end}): {exc}"
+    if proc.returncode != 0:
+        return None, (f"deploy_sim exited {proc.returncode} (fit_end={fit_end}): "
+                      f"{(proc.stderr or proc.stdout or '')[-400:]}")
+
+    m = _VERIFY_METRIC_RE.search(proc.stdout)
+    d = _VERIFY_MAXDD_RE.search(proc.stdout)
+    if not m or not d:
+        return None, (f"could not parse DEPLOY METRICS (fit_end={fit_end}): "
+                      + proc.stdout[-400:])
+    return {
+        "fit_end": fit_end,
+        "net":     float(m.group(1).replace(",", "")),
+        "calmar":  float(m.group(2)),
+        "pf":      float(m.group(3)),
+        "sharpe":  float(m.group(4)),
+        "maxdd":   float(d.group(1).replace(",", "")),
+        "command": " ".join(cmd[1:]),
+    }, ""
+
+
+def paired_verdict(m_new: dict, m_prev: Optional[dict],
+                   calmar_floor: float = CALMAR_FLOOR,
+                   tol: float = PAIRED_TOL) -> tuple[bool, str, dict]:
+    """
+    Decide promotion from measured metrics. Pure — no I/O, so it is testable without
+    paying for two deploy_sim runs.
+
+    Primary gate is the PAIR. Measured 2026-08-15 on five random seeds of the identical
+    system: Calmar ranged 1.56–1.72 and 2 of 5 draws fell below the live floor of 1.65.
+    An absolute threshold therefore cannot tell "the system degraded" from "the fit picked
+    a different local optimum". A paired comparison can: both sides run the same basis and
+    the same seed, so that variance is common-mode and cancels.
+
+    Gated on three metrics, not one. In the same measurement Calmar spread 9.47% across
+    seeds while PF spread 0.68% and Sharpe 2.42%. The reason is structural: Calmar has
+    MaxDD in the denominator, a single day, which took only two distinct values across the
+    five runs. PF and Sharpe average over every day. Calmar is the noisiest of the three
+    and must not be the only vote.
+
+    tol comes from an existing decision rather than taste: the fit_A floor over the fit_C
+    baseline is 1.65/1.72 = 95.9% (INVARIANTS.md line 23), i.e. a ~4.1% drop was already
+    accepted as tolerable. 5% is that, rounded out.
+
+    calmar_floor is a CATASTROPHE BACKSTOP only, deliberately below the measured seed-noise
+    minimum so it can never fire on seed choice alone.
+    """
+    checks: dict = {}
+    ok = m_new["calmar"] >= calmar_floor
+    checks["calmar_backstop"] = {
+        "metric": "calmar", "value": m_new["calmar"], "threshold": calmar_floor,
+        "passed": ok, "kind": "absolute backstop",
+    }
+
+    if m_prev is None:
+        return ok, ("no previous freeze to pair against — absolute backstop only. "
+                    "Weaker than a paired check; treat the result as provisional."), checks
+
+    for k in ("calmar", "sharpe", "pf"):
+        floor_k = m_prev[k] * (1.0 - tol)
+        passed = m_new[k] >= floor_k
+        checks["paired_" + k] = {
+            "metric": k, "value": m_new[k], "prev": m_prev[k],
+            "threshold": round(floor_k, 4), "passed": passed,
+            "delta_pct": (round(100.0 * (m_new[k] - m_prev[k]) / m_prev[k], 2)
+                          if m_prev[k] else None),
+            "kind": "paired vs fit_end=" + str(m_prev["fit_end"]),
+        }
+        ok = ok and passed
+
+    bad = [c for c in checks.values() if not c["passed"]]
+    if bad:
+        reason = "FAIL on " + ", ".join(c["metric"] for c in bad) + " — " + "; ".join(
+            "{} {:.2f} < {:.2f}".format(c["metric"], c["value"], c["threshold"])
+            for c in bad)
+    else:
+        reason = ("PASS — all three paired metrics within {:.0%} of fit_end={}, "
+                  "and above the backstop").format(tol, m_prev["fit_end"])
+    return ok, reason, checks
+
+
 def run_verify(
     record:      FreezeRecord,
     labels_new:  dict,
-    data_dir:    str,
-    nkd_parquet: str,
+    data_dir:    str = VERIFY_DATA_DIR,
+    nkd_parquet: str = VERIFY_NKD_PARQUET,
     calmar_floor: float = CALMAR_FLOOR,
     verify_fn:   Optional[Callable] = None,
+    regime_csv:  str = VERIFY_REGIME_CSV,
+    fit_prev:    Optional[str] = None,
 ) -> VerifyResult:
     """
-    Lightweight deploy_sim Calmar check with new labels.
+    Score the new fit against the incumbent, both measured on the pinned basis.
+
+    Two things changed here on 2026-08-15, both driven by measurement.
+
+    First, this function used to carry its own ~70-line copy of deploy_sim's pipeline, and
+    the copy had drifted three ways: STRESS_MID always on (the floor lineage 2.04→1.65 is
+    no-stress), no end-date clip (so the number moved daily as parquet appended), and
+    data_dir taken from the caller (verify_current_freeze.py pointed it at the live cache).
+    Three symptoms, one cause. It now shells out to deploy_sim, so the gate measures what
+    INVARIANTS measures by construction. A separate process also rules out
+    _validated_core._SWING_CACHE returning a previous run's result.
+
+    Second, the gate is now PAIRED and votes on three metrics. See paired_verdict() for the
+    measurements that forced both changes.
+
+    Two guards run before the expensive part, both fail-closed:
+      - the fit window must not swallow the evaluation window (ISSUES_LOG I2.2), checked
+        first because it costs nothing;
+      - the labels deploy_sim will build must hash-match labels_new, else the gate would
+        score a different model than the one it gated.
+
     verify_fn: optional callable(labels_new) -> VerifyResult — inject for testing.
-    If None, runs full deploy_sim replay (expensive, ~3 min).
+    Without it this costs two full deploy_sim runs (~2m41s each, measured 2026-08-15).
     """
-    log.info("run_verify: version=%s fit_end=%s", record.version, record.fit_end)
+    log.info("run_verify: version=%s fit_end=%s fit_prev=%s",
+             record.version, record.fit_end, fit_prev)
     if verify_fn is not None:
         return verify_fn(labels_new)
 
-    # Full verify: run deploy_sim.replay programmatically
-    try:
-        import numpy as np
-        from pathlib import Path as P
-        from futures.basket import BASKET, REGIME, RISK, SWING_TF_PARAM, data_filename
-        from futures.swing_tf import SwingTFEngine, costs_for_basket
-        from futures.stress_mid import StressMidEngine
-        from futures.circuit_breaker import CircuitBreaker
-        from futures._validated_core import load_parquet, daily_atr_series
-        from global_index._core import load_parquet as gi_load, FuturesCost as GIFC
-        from global_index import specs as gi_specs
-        from global_index.regime import RegimeLabels
-        from global_index.net_exposure_multi import MultiClusterGuard
-        from global_index.signal_layer import CLUSTER_SWING, CLUSTER_STRESS, CLUSTER_NKD, ROSKA4_MULT, NKD_MULT
-        from global_index.deploy_sim import replay as deploy_replay, metrics
+    basis = {
+        "data_dir":        data_dir,
+        "nkd_parquet":     nkd_parquet,
+        "regime_csv":      regime_csv,
+        "end":             VERIFY_END,
+        "train_end":       VERIFY_TRAIN_END,
+        "hmm_fit_end":     record.fit_end,
+        "fit_prev":        fit_prev,
+        "n_contracts":     VERIFY_N_CONTRACTS,
+        "slippage_ticks":  VERIFY_SLIPPAGE_TICKS,
+        "include_stress":  VERIFY_INCLUDE_STRESS,
+        "paired_tol":      PAIRED_TOL,
+        "anchor_source":   "docs/futures/INVARIANTS.md line 22",
+        "measured_at":     datetime.now(timezone.utc).isoformat(),
+    }
 
-        ACCOUNT  = float(RISK["account"])
-        SLIPPAGE = 2.0
-        NKD_INST = "MNKD"
-        NKD_EMA  = 10
-
-        dfs   = {n: load_parquet(str(P(data_dir) / data_filename(c))) for n, c in BASKET.items()}
-        c_nkd = gi_specs.SPECS[NKD_INST]
-        ndf   = gi_load(nkd_parquet)
-        ndf.index = ndf.index.tz_convert(c_nkd.session_tz)
-
-        # Convert new labels to RegimeLabels
-        lbl_s     = pd.Series(labels_new).sort_index()
-        lbl_s.index = (pd.DatetimeIndex(lbl_s.index)
-                       .tz_localize(None).normalize())
-        nkd_labels = RegimeLabels(lbl_s, lag_days=1)
-
-        costs_2t  = costs_for_basket(slippage_ticks=SLIPPAGE)
-        swing_bt  = SwingTFEngine().backtest_basket(dfs, labels_new, costs_2t)
-        ncost_2t  = GIFC(point_value=c_nkd.point_value, tick=c_nkd.tick,
-                         commission_rt=c_nkd.commission_rt,
-                         slippage_ticks_per_side=SLIPPAGE)
-        nkd_bt    = __import__("futures._validated_core", fromlist=["backtest_swing_tf"]
-                                ).backtest_swing_tf(
-            ndf, nkd_labels, ncost_2t, ema_period=NKD_EMA,
-            chandelier_atr_mult=NKD_MULT, max_hold_days=5, gap_fill=True)
-        stress_bt = StressMidEngine().backtest_basket(dfs, labels_new, costs_2t)
-
-        atr_swing = {n: daily_atr_series(df) for n, df in dfs.items()}
-        atr_nkd   = daily_atr_series(ndf)
-        pv        = {n: c.point_value for n, c in BASKET.items()}
-        pv[NKD_INST] = c_nkd.point_value
-
-        def _rr(atr_s, mult, pv_, ed, n):
-            try:
-                av = atr_s.asof(pd.Timestamp(ed))
-            except Exception:
-                av = float(atr_s.median())
-            if av is None or (isinstance(av, float) and pd.isna(av)):
-                av = float(atr_s.median())
-            return n * mult * float(av) * pv_
-
-        all_tr = []
-        for inst, lst in swing_bt.items():
-            for t in lst:
-                all_tr.append(dict(inst=inst, cluster=CLUSTER_SWING,
-                    entry=pd.Timestamp(t["day"]), exit=pd.Timestamp(t["exit_day"]),
-                    direction=t["direction"],
-                    risk_sized=_rr(atr_swing[inst], ROSKA4_MULT, pv[inst], t["day"], 1),
-                    pnl_sized=t["pnl"]))
-        for inst, lst in stress_bt.items():
-            for t in lst:
-                all_tr.append(dict(inst=inst, cluster=CLUSTER_STRESS,
-                    entry=pd.Timestamp(t["day"]), exit=pd.Timestamp(t["exit_day"]),
-                    direction=t["direction"],
-                    risk_sized=_rr(atr_swing[inst], ROSKA4_MULT, pv[inst], t["day"], 1),
-                    pnl_sized=t["pnl"]))
-        for t in nkd_bt:
-            ed = pd.Timestamp(t["day"]).tz_localize(None)
-            xd = pd.Timestamp(t["exit_day"]).tz_localize(None) if t.get("exit_day") else ed
-            all_tr.append(dict(inst=NKD_INST, cluster=CLUSTER_NKD,
-                entry=ed, exit=xd, direction=t["direction"],
-                risk_sized=_rr(atr_nkd, NKD_MULT, pv[NKD_INST], ed, 1),
-                pnl_sized=t["pnl"]))
-
-        cb    = {n: 1 for n in list(BASKET) + [NKD_INST]}
-        daily, _ = deploy_replay(all_tr, ACCOUNT, MultiClusterGuard(account=ACCOUNT), cb, None)
-        m     = metrics(daily)
-        calmar_new = m.get("calmar", 0.0)
-        net_new    = float(daily.sum())
-        passed     = calmar_new >= calmar_floor
-        detail     = (f"Calmar={calmar_new:.2f} net=${net_new:,.0f} "
-                      f"{'PASS' if passed else f'FAIL (floor={calmar_floor})'}")
-        return VerifyResult(passed=passed, calmar_new=calmar_new,
-                            calmar_floor=calmar_floor, net_new=net_new, detail=detail)
-
-    except Exception as exc:
+    def _fail(detail: str, contaminated: bool = False) -> VerifyResult:
         return VerifyResult(passed=False, calmar_new=0.0, calmar_floor=calmar_floor,
-                            net_new=0.0, detail=f"verify exception: {exc}")
+                            net_new=0.0, detail=detail, basis=basis,
+                            contaminated=contaminated)
+
+    if data_dir != VERIFY_DATA_DIR:
+        log.warning("run_verify: data_dir=%r is not the pinned frozen dir %r — the result "
+                    "will not be comparable to the floor", data_dir, VERIFY_DATA_DIR)
+
+    # ── Guard 1: evaluation window must not sit inside the fit window (I2.2) ────
+    if pd.Timestamp(record.fit_end) > pd.Timestamp(VERIFY_END):
+        return _fail(
+            f"CONTAMINATED: fit_end={record.fit_end} is after the pinned evaluation end "
+            f"{VERIFY_END}, so the model was fitted on the very period it is scored on. "
+            f"ISSUES_LOG I2.2 measured this at +1.19 Calmar of pure MaxDD artifact. "
+            f"Advance VERIFY_END (and re-derive the baseline on the new window) before "
+            f"promoting a later fit — that is an operator decision, not a default.",
+            contaminated=True)
+
+    # ── Guard 2: deploy_sim must build the same labels this freeze is gating ────
+    try:
+        from futures._validated_core import benchmark_daily, label_regimes
+        lbl_check = label_regimes(benchmark_daily(regime_csv), VERIFY_TRAIN_END,
+                                  record.n_components, record.fit_end)
+    except Exception as exc:
+        return _fail(f"label consistency check failed to run: {exc}")
+
+    h_gate, h_sim = _labels_hash(labels_new), _labels_hash(lbl_check)
+    basis["labels_hash_gated"] = h_gate
+    basis["labels_hash_deploy_sim"] = h_sim
+    if h_gate != h_sim:
+        return _fail(
+            f"label mismatch: the gate compared labels {h_gate} but deploy_sim would build "
+            f"{h_sim} from {regime_csv!r} (train_end={VERIFY_TRAIN_END}, "
+            f"fit_end={record.fit_end}). Verify would score a different model than it gated. "
+            f"Most likely cause: refreeze_hmm's anchor={record.anchor!r} clipped the CSV, "
+            f"which deploy_sim does not do.")
+
+    # ── Measure both sides on the same basis, same seed ─────────────────────────
+    m_new, err = _deploy_sim_metrics(record.fit_end, data_dir, nkd_parquet, regime_csv)
+    if m_new is None:
+        return _fail(err)
+    basis["command"] = m_new["command"]
+
+    m_prev = None
+    if fit_prev and fit_prev != record.fit_end:
+        m_prev, err_prev = _deploy_sim_metrics(fit_prev, data_dir, nkd_parquet, regime_csv)
+        if m_prev is None:
+            return _fail("incumbent side of the pair failed to measure: " + err_prev)
+
+    passed, reason, checks = paired_verdict(m_new, m_prev, calmar_floor, PAIRED_TOL)
+
+    detail = ("{} | new fit_end={}: Calmar={:.2f} Sharpe={:.2f} PF={:.2f} net=${:,.0f}"
+              .format("PASS" if passed else "FAIL", record.fit_end, m_new["calmar"],
+                      m_new["sharpe"], m_new["pf"], m_new["net"]))
+    if m_prev:
+        detail += (" | prev fit_end={}: Calmar={:.2f} Sharpe={:.2f} PF={:.2f} net=${:,.0f}"
+                   .format(m_prev["fit_end"], m_prev["calmar"], m_prev["sharpe"],
+                           m_prev["pf"], m_prev["net"]))
+    detail += " | " + reason
+
+    return VerifyResult(passed=passed, calmar_new=m_new["calmar"],
+                        calmar_floor=calmar_floor, net_new=m_new["net"],
+                        detail=detail, basis=basis,
+                        metrics_new=m_new, metrics_prev=(m_prev or {}), checks=checks)
 
 
 # ── Registry (swap + rollback) ────────────────────────────────────────────────
@@ -598,9 +757,15 @@ def run_refreeze_pipeline(
 
     elif gate.verdict in ("AUTO_APPROVE",
                           "VERIFY" if operator_consent_verify else ""):
+        # regime_csv was accepted by this pipeline and then dropped on the floor until
+        # 2026-08-15 — run_verify now needs it, so the parameter finally does something.
         verify = run_verify(new_record, new_labels, data_dir, nkd_parquet,
-                            calmar_floor=calmar_floor, verify_fn=verify_fn)
-        new_record = FreezeRecord(**{**asdict(new_record), "calmar": verify.calmar_new})
+                            calmar_floor=calmar_floor, verify_fn=verify_fn,
+                            regime_csv=regime_csv,
+                            fit_prev=(cur.fit_end if cur else None))
+        new_record = FreezeRecord(**{**asdict(new_record),
+                                     "calmar": verify.calmar_new,
+                                     "calmar_basis": verify.basis})
 
         if verify.passed:
             apply_freeze(new_record, registry_path)
@@ -651,7 +816,29 @@ def _print_report(r: RefreezeReport) -> None:
     print(f"  Calm-flips: {g.calm_flip_count}  |  Reason: {g.reason}")
     if r.verify:
         v = r.verify
-        print(f"\nVERIFY: {'PASS' if v.passed else 'FAIL'}  {v.detail}")
+        print(f"\nVERIFY: {'PASS' if v.passed else 'FAIL'}")
+        if v.contaminated:
+            print("  ⚠️ CONTAMINATED — the number below is in-sample; do not promote on it.")
+        if v.metrics_new:
+            print(f"  {'':<16} {'Calmar':>8} {'Sharpe':>8} {'PF':>7} "
+                  f"{'net $':>11} {'MaxDD $':>9}")
+            for tag, mm in (("new ", v.metrics_new), ("prev", v.metrics_prev)):
+                if mm:
+                    print(f"  {tag + ' ' + str(mm['fit_end']):<16} {mm['calmar']:>8.2f} "
+                          f"{mm['sharpe']:>8.2f} {mm['pf']:>7.2f} {mm['net']:>11,.0f} "
+                          f"{mm['maxdd']:>9,.0f}")
+        for name, c in v.checks.items():
+            print(f"    [{'ok  ' if c['passed'] else 'FAIL'}] {name:<18} "
+                  f"{c['value']:.2f} vs {c['threshold']:.2f}  ({c['kind']})")
+        print(f"  {v.detail}")
+        if v.basis:
+            print("  measured on:")
+            for k in ("data_dir", "regime_csv", "end", "n_contracts", "slippage_ticks",
+                      "include_stress", "paired_tol"):
+                if k in v.basis:
+                    print(f"    {k:<16} {v.basis[k]}")
+            if "command" in v.basis:
+                print(f"    command          {v.basis['command']}")
     print(f"\nOUTCOME: {r.message}")
     print("=" * 68)
     if r.swapped:

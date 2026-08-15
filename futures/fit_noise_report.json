@@ -1,0 +1,296 @@
+{
+  "measured_at": "2026-08-15T09:01:24.042093+00:00",
+  "basis": {
+    "spy_csv": "D:\\raits\\spy_daily_live.csv",
+    "spy_csv_sha256": "0e3815c29df3d5b8",
+    "spy_csv_last_date": "2026-08-13",
+    "spy_csv_rows": 2416,
+    "train_end": "2018-01-01",
+    "n_components": 3,
+    "fit_end": "2024-12-31",
+    "seeds": [
+      42,
+      1,
+      7,
+      123,
+      2026
+    ],
+    "git_commit": "83ac849-dirty",
+    "python": "3.11.4"
+  },
+  "production_labels_hash": "b70204f002b1f717",
+  "label_distribution_by_seed": {
+    "42": {
+      "Normal": 994,
+      "Calm": 881,
+      "Stress": 290
+    },
+    "1": {
+      "Normal": 977,
+      "Calm": 867,
+      "Stress": 321
+    },
+    "7": {
+      "Normal": 969,
+      "Calm": 916,
+      "Stress": 280
+    },
+    "123": {
+      "Normal": 972,
+      "Calm": 928,
+      "Stress": 265
+    },
+    "2026": {
+      "Calm": 960,
+      "Normal": 952,
+      "Stress": 253
+    }
+  },
+  "noise": {
+    "l11_window": {
+      "n_pairs": 10,
+      "min": 2.5974,
+      "median": 5.8442,
+      "max": 12.3377
+    },
+    "gate_window": {
+      "n_pairs": 10,
+      "min": 1.2017,
+      "median": 3.3176,
+      "max": 7.5758
+    },
+    "full": {
+      "n_pairs": 10,
+      "min": 1.2471,
+      "median": 3.3487,
+      "max": 7.4365
+    }
+  },
+  "pairs": {
+    "l11_window": {
+      "42v1": {
+        "pct": 2.5974,
+        "n_diff": 4,
+        "n": 154
+      },
+      "42v7": {
+        "pct": 3.2468,
+        "n_diff": 5,
+        "n": 154
+      },
+      "42v123": {
+        "pct": 5.8442,
+        "n_diff": 9,
+        "n": 154
+      },
+      "42v2026": {
+        "pct": 9.7403,
+        "n_diff": 15,
+        "n": 154
+      },
+      "1v7": {
+        "pct": 5.8442,
+        "n_diff": 9,
+        "n": 154
+      },
+      "1v123": {
+        "pct": 8.4416,
+        "n_diff": 13,
+        "n": 154
+      },
+      "1v2026": {
+        "pct": 12.3377,
+        "n_diff": 19,
+        "n": 154
+      },
+      "7v123": {
+        "pct": 2.5974,
+        "n_diff": 4,
+        "n": 154
+      },
+      "7v2026": {
+        "pct": 6.4935,
+        "n_diff": 10,
+        "n": 154
+      },
+      "123v2026": {
+        "pct": 3.8961,
+        "n_diff": 6,
+        "n": 154
+      }
+    },
+    "gate_window": {
+      "42v1": {
+        "pct": 2.2466,
+        "n_diff": 43,
+        "n": 1914
+      },
+      "42v7": {
+        "pct": 2.1944,
+        "n_diff": 42,
+        "n": 1914
+      },
+      "42v123": {
+        "pct": 3.396,
+        "n_diff": 65,
+        "n": 1914
+      },
+      "42v2026": {
+        "pct": 5.3292,
+        "n_diff": 102,
+        "n": 1914
+      },
+      "1v7": {
+        "pct": 4.3365,
+        "n_diff": 83,
+        "n": 1914
+      },
+      "1v123": {
+        "pct": 5.5381,
+        "n_diff": 106,
+        "n": 1914
+      },
+      "1v2026": {
+        "pct": 7.5758,
+        "n_diff": 145,
+        "n": 1914
+      },
+      "7v123": {
+        "pct": 1.2017,
+        "n_diff": 23,
+        "n": 1914
+      },
+      "7v2026": {
+        "pct": 3.2393,
+        "n_diff": 62,
+        "n": 1914
+      },
+      "123v2026": {
+        "pct": 2.0376,
+        "n_diff": 39,
+        "n": 1914
+      }
+    },
+    "full": {
+      "42v1": {
+        "pct": 2.0785,
+        "n_diff": 45,
+        "n": 2165
+      },
+      "42v7": {
+        "pct": 2.1709,
+        "n_diff": 47,
+        "n": 2165
+      },
+      "42v123": {
+        "pct": 3.418,
+        "n_diff": 74,
+        "n": 2165
+      },
+      "42v2026": {
+        "pct": 5.358,
+        "n_diff": 116,
+        "n": 2165
+      },
+      "1v7": {
+        "pct": 4.157,
+        "n_diff": 90,
+        "n": 2165
+      },
+      "1v123": {
+        "pct": 5.4042,
+        "n_diff": 117,
+        "n": 2165
+      },
+      "1v2026": {
+        "pct": 7.4365,
+        "n_diff": 161,
+        "n": 2165
+      },
+      "7v123": {
+        "pct": 1.2471,
+        "n_diff": 27,
+        "n": 2165
+      },
+      "7v2026": {
+        "pct": 3.2794,
+        "n_diff": 71,
+        "n": 2165
+      },
+      "123v2026": {
+        "pct": 2.0323,
+        "n_diff": 44,
+        "n": 2165
+      }
+    }
+  },
+  "signal_from_compare_refit": {
+    "l11": 5.8442,
+    "gate": 3.8662486938349008,
+    "fit_prev": "2024-12-31",
+    "fit_new": "2025-12-31",
+    "csv_sha": "0e3815c29df3d5b8"
+  },
+  "verdicts": {
+    "l11_window": {
+      "verdict": "TRONG NHIEU",
+      "signal_pct": 5.8442,
+      "noise": {
+        "n_pairs": 10,
+        "min": 2.5974,
+        "median": 5.8442,
+        "max": 12.3377
+      },
+      "message": "tin hieu 5.84% <= nhieu max 12.34% \u2014 KHONG phan biet duoc voi viec chay lai cung mot fit bang seed khac"
+    },
+    "gate_window": {
+      "verdict": "TRONG NHIEU",
+      "signal_pct": 3.8662486938349008,
+      "noise": {
+        "n_pairs": 10,
+        "min": 1.2017,
+        "median": 3.3176,
+        "max": 7.5758
+      },
+      "message": "tin hieu 3.87% <= nhieu max 7.58% \u2014 KHONG phan biet duoc voi viec chay lai cung mot fit bang seed khac"
+    }
+  },
+  "selfchecks": [
+    {
+      "id": "SC0",
+      "desc": "seed 42 co trong danh sach (bat buoc cho SC-FIDELITY)",
+      "passed": true,
+      "detail": "seeds=[42, 1, 7, 123, 2026]"
+    },
+    {
+      "id": "SC1",
+      "desc": "co it nhat 2 seed de tao cap",
+      "passed": true,
+      "detail": "n=5"
+    },
+    {
+      "id": "SC-FIDELITY",
+      "desc": "ban chep voi seed=42 cho nhan Y HET label_regimes production",
+      "passed": true,
+      "detail": "production=b70204f002b1f717  replica_seed42=b70204f002b1f717"
+    },
+    {
+      "id": "SC2",
+      "desc": "moi seed deu tra du nhan",
+      "passed": true,
+      "detail": "prod=2165  seeds={42: 2165, 1: 2165, 7: 2165, 123: 2165, 2026: 2165}"
+    },
+    {
+      "id": "SC3",
+      "desc": "nhan chi thuoc ['Calm', 'Normal', 'Stress']",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "id": "SC4",
+      "desc": "khong seed nao lam sap trang thai (du 3 regime)",
+      "passed": true,
+      "detail": ""
+    }
+  ]
+}

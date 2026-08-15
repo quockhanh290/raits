@@ -1,0 +1,43 @@
+SAN NHIEU HMM FIT — cung fit_end, khac random seed
+measured_at  2026-08-15T09:01:24.042093+00:00
+
+CO SO DO
+  spy_csv              D:\raits\spy_daily_live.csv
+  spy_csv_sha256       0e3815c29df3d5b8
+  spy_csv_last_date    2026-08-13
+  spy_csv_rows         2416
+  train_end            2018-01-01
+  n_components         3
+  fit_end              2024-12-31
+  seeds                [42, 1, 7, 123, 2026]
+  git_commit           83ac849-dirty
+  python               3.11.4
+  production_hash      b70204f002b1f717
+
+SELF-CHECK
+  [PASS] SC0  seed 42 co trong danh sach (bat buoc cho SC-FIDELITY)
+         seeds=[42, 1, 7, 123, 2026]
+  [PASS] SC1  co it nhat 2 seed de tao cap
+         n=5
+  [PASS] SC-FIDELITY  ban chep voi seed=42 cho nhan Y HET label_regimes production
+         production=b70204f002b1f717  replica_seed42=b70204f002b1f717
+  [PASS] SC2  moi seed deu tra du nhan
+         prod=2165  seeds={42: 2165, 1: 2165, 7: 2165, 123: 2165, 2026: 2165}
+  [PASS] SC3  nhan chi thuoc ['Calm', 'Normal', 'Stress']
+  [PASS] SC4  khong seed nao lam sap trang thai (du 3 regime)
+
+PHAN BO NHAN THEO SEED
+  seed 42: {'Normal': 994, 'Calm': 881, 'Stress': 290}
+  seed 1: {'Normal': 977, 'Calm': 867, 'Stress': 321}
+  seed 7: {'Normal': 969, 'Calm': 916, 'Stress': 280}
+  seed 123: {'Normal': 972, 'Calm': 928, 'Stress': 265}
+  seed 2026: {'Calm': 960, 'Normal': 952, 'Stress': 253}
+
+SAN NHIEU
+  l11_window     n_pairs=10  min=2.5974%  median=5.8442%  max=12.3377%
+  gate_window    n_pairs=10  min=1.2017%  median=3.3176%  max=7.5758%
+  full           n_pairs=10  min=1.2471%  median=3.3487%  max=7.4365%
+
+KET LUAN
+  [l11_window] TRONG NHIEU: tin hieu 5.84% <= nhieu max 12.34% — KHONG phan biet duoc voi viec chay lai cung mot fit bang seed khac
+  [gate_window] TRONG NHIEU: tin hieu 3.87% <= nhieu max 7.58% — KHONG phan biet duoc voi viec chay lai cung mot fit bang seed khac

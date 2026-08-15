@@ -600,6 +600,132 @@ finally:
 
 print()
 
+# ─── T13: run_verify guards (the real body, which no test reached until 2026-08-15) ──
+print("=" * 60)
+print("T13: run_verify fail-closed guards + recorded basis")
+print("=" * 60)
+
+import time as _t13_time
+from futures.refreeze import (
+    VERIFY_END, VERIFY_INCLUDE_STRESS, VERIFY_SLIPPAGE_TICKS,
+    VERIFY_N_CONTRACTS, VERIFY_TRAIN_END,
+)
+
+def _t13_record(fit_end):
+    return FreezeRecord(version="t13", fit_end=fit_end, anchor=ANCHOR, n_components=3,
+                        labels_hash="deadbeef", frozen_at="2026-08-15T00:00:00+00:00",
+                        calmar=0.0)
+
+# 13.1-13.3 — contamination guard: a fit that swallowed the eval window must refuse,
+# and must refuse BEFORE paying for anything (no HMM fit, no deploy_sim).
+_t0 = _t13_time.monotonic()
+_v = run_verify(_t13_record("2025-12-31"), {}, regime_csv=REGIME_CSV)
+_elapsed = _t13_time.monotonic() - _t0
+check("T13.1 contaminated fit refuses (passed=False, contaminated=True)",
+      _v.passed is False and _v.contaminated is True,
+      f"passed={_v.passed} contaminated={_v.contaminated}")
+check("T13.2 contamination refusal never launches deploy_sim",
+      "command" not in _v.basis, f"basis keys={sorted(_v.basis)}")
+check("T13.3 contamination checked before any HMM fit (cheap refusal)",
+      _elapsed < 2.0, f"{_elapsed:.2f}s")
+
+# 13.4-13.5 — label guard: verify must not score a model different from the one gated.
+_v2 = run_verify(_t13_record(FIT_C), {}, regime_csv=REGIME_CSV)
+check("T13.4 label mismatch refuses",
+      _v2.passed is False and "label mismatch" in _v2.detail, _v2.detail[:70])
+check("T13.5 label-mismatch refusal never launches deploy_sim",
+      "command" not in _v2.basis, f"basis keys={sorted(_v2.basis)}")
+
+# 13.6 — verify_fn injection must still short-circuit both guards.
+_v3 = run_verify(_t13_record("2025-12-31"), {},
+                 verify_fn=lambda _l: VerifyResult(passed=True, calmar_new=9.9,
+                                                   calmar_floor=1.0, net_new=1.0,
+                                                   detail="injected"))
+check("T13.6 verify_fn short-circuits guards (test path intact)",
+      _v3.passed is True and _v3.detail == "injected", _v3.detail)
+
+# 13.7-13.8 — backward compatibility of the two new fields.
+_vr_old = VerifyResult(passed=True, calmar_new=2.0, calmar_floor=1.0,
+                       net_new=1.0, detail="old-style")
+check("T13.7 VerifyResult old-style construction still works (defaults)",
+      _vr_old.basis == {} and _vr_old.contaminated is False,
+      f"basis={_vr_old.basis} contaminated={_vr_old.contaminated}")
+_fr_old = FreezeRecord.from_dict({"version": "v", "fit_end": FIT_C, "anchor": ANCHOR,
+                                  "n_components": 3, "labels_hash": "h",
+                                  "frozen_at": "x", "calmar": 2.74})
+check("T13.8 registry entry without calmar_basis still loads (defaults to {})",
+      _fr_old.calmar_basis == {}, f"calmar_basis={_fr_old.calmar_basis}")
+
+# 13.9 — the pinned basis is the whole point; a silent edit must trip a test.
+check("T13.9 verify basis pinned to the floor's measurement convention",
+      VERIFY_END == "2024-12-31" and VERIFY_INCLUDE_STRESS is False
+      and VERIFY_SLIPPAGE_TICKS == 2.0 and VERIFY_N_CONTRACTS == 1
+      and VERIFY_TRAIN_END == "2018-01-01",
+      f"end={VERIFY_END} stress={VERIFY_INCLUDE_STRESS} "
+      f"slip={VERIFY_SLIPPAGE_TICKS} n={VERIFY_N_CONTRACTS} train_end={VERIFY_TRAIN_END}")
+
+print()
+
+# ─── T14: paired_verdict — the promotion decision, as a pure function ────────
+# Pure on purpose: the decision logic is the part that must be tested, and testing it
+# must not cost two 2m41s deploy_sim runs.
+print("=" * 60)
+print("T14: paired_verdict — 3-metric paired gate")
+print("=" * 60)
+
+from futures.refreeze import paired_verdict, PAIRED_TOL
+
+def _m(calmar, sharpe=1.67, pf=1.48, net=42459.0, fit_end="2024-12-31"):
+    return {"fit_end": fit_end, "calmar": calmar, "sharpe": sharpe,
+            "pf": pf, "net": net, "maxdd": 3574.0}
+
+_prev = _m(1.72)
+
+_ok, _why, _ch = paired_verdict(_m(1.72), _prev)
+check("T14.1 identical metrics pass", _ok is True, _why[:60])
+
+# A drop inside tolerance must pass — this is the case an absolute floor got wrong.
+_ok, _why, _ch = paired_verdict(_m(1.72 * 0.96), _prev)
+check("T14.2 4% Calmar drop passes (inside 5% tol)", _ok is True,
+      f"calmar={1.72*0.96:.3f}")
+
+_ok, _why, _ch = paired_verdict(_m(1.72 * 0.90), _prev)
+check("T14.3 10% Calmar drop fails", _ok is False and "calmar" in _why, _why[:70])
+
+# Three metrics vote, not one: a healthy Calmar must not carry a broken Sharpe or PF.
+_ok, _why, _ch = paired_verdict(_m(1.72, sharpe=1.67 * 0.90), _prev)
+check("T14.4 Sharpe drop fails even with Calmar intact",
+      _ok is False and "sharpe" in _why, _why[:70])
+_ok, _why, _ch = paired_verdict(_m(1.72, pf=1.48 * 0.90), _prev)
+check("T14.5 PF drop fails even with Calmar intact",
+      _ok is False and "pf" in _why, _why[:70])
+
+# Backstop is independent of the pair: both sides can collapse together.
+_ok, _why, _ch = paired_verdict(_m(1.40), _m(1.40), calmar_floor=CALMAR_FLOOR)
+check("T14.6 backstop fires when both sides are below it",
+      _ok is False and _ch["calmar_backstop"]["passed"] is False,
+      f"calmar=1.40 floor={CALMAR_FLOOR}")
+
+_ok, _why, _ch = paired_verdict(_m(1.72), None)
+check("T14.7 no incumbent → backstop only, flagged provisional",
+      _ok is True and "provisional" in _why and "paired_calmar" not in _ch, _why[:60])
+
+# The measured seed-123 draw (Calmar 1.57 vs production 1.72) is an 8.7% drop: the paired
+# gate must catch it, while the backstop alone would not have.
+_ok, _why, _ch = paired_verdict(_m(1.57), _prev)
+check("T14.8 real seed-123 gap (1.57 vs 1.72) is caught by the pair",
+      _ok is False and _ch["calmar_backstop"]["passed"] is True,
+      f"paired_calmar passed={_ch['paired_calmar']['passed']}, "
+      f"backstop passed={_ch['calmar_backstop']['passed']}")
+
+check("T14.9 backstop sits below the measured seed-noise minimum (1.56)",
+      CALMAR_FLOOR < 1.56, f"CALMAR_FLOOR={CALMAR_FLOOR}")
+check("T14.10 paired tolerance matches the accepted fit_A/fit_C drop (1.65/1.72)",
+      abs(PAIRED_TOL - 0.05) < 1e-9 and PAIRED_TOL >= (1 - 1.65 / 1.72),
+      f"PAIRED_TOL={PAIRED_TOL}  accepted_drop={1 - 1.65/1.72:.4f}")
+
+print()
+
 # ─── Cleanup ─────────────────────────────────────────────────────────────────
 shutil.rmtree(tmp_dir_t8, ignore_errors=True)
 shutil.rmtree(tmp_dir, ignore_errors=True)

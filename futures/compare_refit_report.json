@@ -1,0 +1,154 @@
+{
+  "measured_at": "2026-08-15T08:50:05.444072+00:00",
+  "basis": {
+    "spy_csv": "D:\\raits\\spy_daily_live.csv",
+    "spy_csv_sha256": "0e3815c29df3d5b8",
+    "spy_csv_first_date": "2017-01-03",
+    "spy_csv_last_date": "2026-08-13",
+    "spy_csv_rows": 2416,
+    "train_end": "2018-01-01",
+    "n_components": 3,
+    "fit_prev": "2024-12-31",
+    "fit_new": "2025-12-31",
+    "git_commit": "83ac849-dirty",
+    "python": "3.11.4"
+  },
+  "labels": {
+    "hash_prev": "b70204f002b1f717",
+    "hash_new": "86853d9c8944cdf3",
+    "n_prev": 2165,
+    "n_new": 2165
+  },
+  "windows": {
+    "l11_forward": {
+      "n": 154,
+      "n_diff": 9,
+      "pct": 5.8442,
+      "flips": {
+        "Normal->Calm": 8,
+        "Stress->Normal": 1
+      },
+      "start": "2026-01-02",
+      "end": "2026-08-13"
+    },
+    "refreeze_gate": {
+      "verdict": "AUTO_APPROVE",
+      "pct": 3.8662486938349008,
+      "n_diff": 74,
+      "n_common": 1914,
+      "calm_flip_count": 0,
+      "flips": {
+        "Normal->Calm": 43,
+        "Stress->Normal": 31
+      },
+      "reason": "3.87% label change is within auto-approve threshold (5.0%)"
+    },
+    "per_year": {
+      "2018": {
+        "n": 251,
+        "n_diff": 11,
+        "pct": 4.3825
+      },
+      "2019": {
+        "n": 252,
+        "n_diff": 5,
+        "pct": 1.9841
+      },
+      "2020": {
+        "n": 253,
+        "n_diff": 9,
+        "pct": 3.5573
+      },
+      "2021": {
+        "n": 252,
+        "n_diff": 11,
+        "pct": 4.3651
+      },
+      "2022": {
+        "n": 251,
+        "n_diff": 14,
+        "pct": 5.5777
+      },
+      "2023": {
+        "n": 250,
+        "n_diff": 8,
+        "pct": 3.2
+      },
+      "2024": {
+        "n": 252,
+        "n_diff": 6,
+        "pct": 2.381
+      },
+      "2025": {
+        "n": 250,
+        "n_diff": 12,
+        "pct": 4.8
+      },
+      "2026": {
+        "n": 154,
+        "n_diff": 9,
+        "pct": 5.8442
+      }
+    }
+  },
+  "verdict": {
+    "verdict": "HOLD",
+    "rationale": "5.84% < 15.0% \u2014 dieu kien 1 cua L11 KHONG dat. Co data moi khong dong nghia model cu sai. Giu fit_prev."
+  },
+  "selfchecks": [
+    {
+      "id": "SC1",
+      "desc": "CSV phu den fit_new (khong fit tren du lieu cut)",
+      "passed": true,
+      "detail": "CSV last=2026-08-13  fit_new=2025-12-31"
+    },
+    {
+      "id": "SC2",
+      "desc": "fit_new > fit_prev",
+      "passed": true,
+      "detail": "2024-12-31 -> 2025-12-31"
+    },
+    {
+      "id": "SC3",
+      "desc": "CSV khong co ngay trung (duong swing production khong dedup)",
+      "passed": true,
+      "detail": "0 ngay trung"
+    },
+    {
+      "id": "SC4",
+      "desc": "ca hai bo nhan khong rong",
+      "passed": true,
+      "detail": "prev=2165 new=2165"
+    },
+    {
+      "id": "SC5",
+      "desc": "hai bo nhan phu cung tap ngay",
+      "passed": true,
+      "detail": "chi co o prev=0  chi co o new=0"
+    },
+    {
+      "id": "SC6",
+      "desc": "nhan chi thuoc ['Calm', 'Normal', 'Stress']",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "id": "SC7",
+      "desc": "hai fit KHAC nhau (hash khac) \u2014 giong het = fit_end khong co tac dung",
+      "passed": true,
+      "detail": "prev=b70204f002b1f717 new=86853d9c8944cdf3"
+    },
+    {
+      "id": "SC8",
+      "desc": "cua so L11 forward du ngay de ket luan (>=20)",
+      "passed": true,
+      "detail": "n=154 tu 2026-01-01"
+    },
+    {
+      "id": "SC9",
+      "desc": "phan tram nam trong [0,100]",
+      "passed": true,
+      "detail": "pct=5.8442"
+    }
+  ]
+}

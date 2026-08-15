@@ -1,0 +1,43 @@
+P&L THEO SEED — co so ghim, deploy_sim duong production
+measured_at  2026-08-15T09:33:31.138496+00:00
+
+CO SO DO
+  data_dir             data/cache/futures/frozen_sim
+  nkd_parquet          global_index/data/NKD_frozen_2024.parquet
+  regime_csv           spy_daily_live.csv
+  end                  2024-12-31
+  n_contracts          1
+  slippage_ticks       2.0
+  include_stress       False
+  hmm_fit_end          2024-12-31
+  seeds                [42, 1, 7, 123, 2026]
+  anchor_calmar        1.72
+  anchor_net           42459
+  anchor_source        docs/futures/INVARIANTS.md line 22
+  deploy_sim_args      --data-dir data/cache/futures/frozen_sim --nkd-parquet global_index/data/NKD_frozen_2024.parquet --regime-csv spy_daily_live.csv --end 2024-12-31 --n-contracts 1 --slippage-ticks 2.0 --hmm-fit-end 2024-12-31
+  git_commit           83ac849-dirty
+  python               3.11.4
+
+SELF-CHECK
+  [PASS] SC0  seed 42 co trong danh sach (bat buoc — dung lam neo)
+         seeds=[42, 1, 7, 123, 2026]
+  [PASS] SC-ANCHOR  seed 42 tai tao baseline INVARIANTS (net + Calmar)
+         do duoc net=$42,459 calmar=1.72  |  ky vong net=$42,459 calmar=1.72
+  [PASS] SC1  moi seed chay xong
+         5/5 thanh cong
+  [PASS] SC2  moi run deu duoi cung mot co so do
+         --data-dir data/cache/futures/frozen_sim --nkd-parquet global_index/data/NKD_frozen_2024.parquet --regime-csv spy_daily_live.csv --end 2024-12-31 --n-contracts 1 --slippage-ticks 2.0 --hmm-fit-end 2024-12-31
+
+KET QUA THEO SEED
+  seed 1      net=$42,319  Calmar=1.71  MaxDD=$3,574 (7.1%)  PF=1.48  Sharpe=1.65
+  seed 7      net=$41,699  Calmar=1.69  MaxDD=$3,574 (7.1%)  PF=1.48  Sharpe=1.67
+  seed 42     net=$42,459  Calmar=1.72  MaxDD=$3,574 (7.1%)  PF=1.48  Sharpe=1.67
+  seed 123    net=$40,633  Calmar=1.57  MaxDD=$3,744 (7.5%)  PF=1.47  Sharpe=1.63
+  seed 2026   net=$40,254  Calmar=1.56  MaxDD=$3,744 (7.5%)  PF=1.48  Sharpe=1.65
+
+PHAN TAN
+  net      {'n': 5, 'min': 40254, 'max': 42459, 'median': 41699, 'range': 2205, 'stdev': 991.2806, 'range_pct_of_median': 5.29}
+  calmar   {'n': 5, 'min': 1.56, 'max': 1.72, 'median': 1.69, 'range': 0.15999999999999992, 'stdev': 0.0784, 'range_pct_of_median': 9.47}
+  maxdd    {'n': 5, 'min': 3574, 'max': 3744, 'median': 3574, 'range': 170, 'stdev': 93.1128, 'range_pct_of_median': 4.76}
+  pf       {'n': 5, 'min': 1.47, 'max': 1.48, 'median': 1.48, 'range': 0.010000000000000009, 'stdev': 0.0045, 'range_pct_of_median': 0.68}
+  sharpe   {'n': 5, 'min': 1.63, 'max': 1.67, 'median': 1.65, 'range': 0.040000000000000036, 'stdev': 0.0167, 'range_pct_of_median': 2.42}
