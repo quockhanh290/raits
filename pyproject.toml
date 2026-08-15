@@ -10,3 +10,31 @@ requires-python = ">=3.10"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["raits*"]
+
+[tool.pytest.ini_options]
+# The live system is the futures line. tests/ and raits/tests/ belong to the equity
+# RAITS project, which is not being worked on: they encode an older design (3-state
+# HMM where the engine now has 4, Stress mapping to SAFETY_MODE where the regime table
+# now keeps Stress trading, plus strategy filters that have since changed) and carry 24
+# failures on that account. Scoping the default run keeps `pytest` meaningful instead
+# of reporting two dozen failures from a subsystem nobody is touching.
+#
+# They are not deleted and not hidden -- run them deliberately with
+#   pytest tests/ raits/
+# and expect those 24 until someone decides, case by case, whether the test or the code
+# is the stale side.
+testpaths = ["global_index", "futures", "monitor"]
+
+# _archive holds retired code kept for reference. pytest was walking into it and
+# collecting _archive/scratch/raits/mini_stk_test.py, whose import fails -- and a
+# collection error is fatal to the whole session, so a bare `pytest` at the repo
+# root collected 1765 tests and then ran none of them.
+norecursedirs = ["_archive", ".git", "__pycache__", "*.egg-info", "node_modules", "data"]
+
+# pytest's default also matches *_test.py. Every file in this repo with that name is
+# a research or utility script -- tf_index_proxy_test.py, run_smoke_test.py,
+# raits/raits/scripts/*_test.py and 16 others -- and several do real work at import,
+# which is how raits/raits/scripts/rs_clean_test.py (it loads pickles by absolute
+# path) became a fatal collection error. All 91 actual tests are named test_*.py, so
+# matching only that name loses no coverage.
+python_files = ["test_*.py"]

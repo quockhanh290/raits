@@ -27,7 +27,14 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 
-logging.disable(logging.CRITICAL)
+def setUpModule():
+    # See the twin in test_week18_e2e.py: this was a module-level, process-wide
+    # logging.disable() that ran during collection and silenced the whole session.
+    logging.disable(logging.CRITICAL)
+
+
+def tearDownModule():
+    logging.disable(logging.NOTSET)
 
 from raits.backtest.wfo_grid import (
     all_param_combinations,

@@ -37,7 +37,18 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 
-logging.disable(logging.CRITICAL)   # suppress engine logs during tests
+def setUpModule():
+    # Was a bare logging.disable(logging.CRITICAL) at module level. That switch is
+    # process-wide and runs at IMPORT, i.e. during collection, before any test runs --
+    # so it silenced logging for the entire pytest session, not just this file. It made
+    # global_index/test_operational_fixes.py T10/T11 (which assert on captured C3/E3
+    # alerts) capture nothing and fail, in a directory this file has no connection to.
+    # Scoped to this module's run and restored afterwards.
+    logging.disable(logging.CRITICAL)
+
+
+def tearDownModule():
+    logging.disable(logging.NOTSET)
 
 from raits.backtest.data_types import BacktestConfig
 from raits.backtest.engine import BacktestEngine
