@@ -131,10 +131,24 @@ def test_a_non_stop_order_does_not_count_as_protection():
 
 
 def test_nkd_is_reported_under_its_runner_name():
-    """IBKR says NKD, the runner says MNKD. Reporting the IBKR name would make the
+    """IBKR says MNK, the runner says MNKD. Reporting the IBKR name would make the
     line unmatchable against live_positions.json."""
-    b = _broker([_Pos("NKD", SEP, 1)], [])
+    b = _broker([_Pos("MNK", SEP, 1)], [])
     assert [u["inst"] for u in b.unprotected_positions()] == ["MNKD"]
+
+
+def test_a_stray_full_size_nkd_still_surfaces_under_its_own_name():
+    """NKD is no longer ours — orders route to the micro MNK since 2026-08-14.
+
+    A leftover full-size position must still be reported when it has no stop, because
+    it is the largest unhedged exposure the account can carry. What it must NOT do is
+    come back as "MNKD": that name would hand it to B4, which sizes a stop from the
+    micro's $0.50 point value against a contract worth ten times that.
+    """
+    b = _broker([_Pos("NKD", SEP, 1)], [])
+    assert [u["inst"] for u in b.unprotected_positions()] == ["NKD"], (
+        "a stray full-size position must neither be dropped nor adopted as the micro"
+    )
 
 
 def test_offline_says_it_cannot_tell():

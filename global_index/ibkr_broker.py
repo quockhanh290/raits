@@ -44,7 +44,9 @@ from typing import Callable, Optional
 
 import pandas as pd
 
+from futures.basket import BASKET
 from global_index.broker import Broker, Order, Fill, BrokerPosition
+from global_index.specs import SPECS
 
 log = logging.getLogger(__name__)
 
@@ -64,9 +66,40 @@ log = logging.getLogger(__name__)
 _IBKR_INFORMATIONAL: frozenset[int] = frozenset({10349, 2109, 2174, 10147})
 
 # raits internal instrument name → IBKR Future symbol (where they differ).
-# "MNKD" is the raits mini-NKD identifier; IBKR uses "NKD" for the CME Nikkei/USD futures.
+#
+# "MNKD" is the Micro Dollar-Denominated Nikkei 225: point_value $0.50, tick 5 index
+# points, tick value $2.50 (global_index/specs.py). IBKR lists it as "MNK".
+#
+# This said "NKD" until 2026-08-14, which is the FULL-SIZE contract at $5/pt — ten times
+# the size. specs.py carried the warning all along ("confirm ticker w/ IBKR"); the
+# confirmation was never done and the full-size ticker stood in as a placeholder.
+#
+# What that cost, measured from the IBKR Flex statement rather than inferred: four NKD
+# executions on 2026-08-10/11 realised −$1,400.00 at the broker while the sleeve ledger
+# booked −$140.00, because _book_realised prices fills with specs.py's $0.50. Exactly
+# 10.0000×. Entry and exit prices matched the statement to the cent — only the multiplier
+# was wrong, so the signals were right and the position size was not.
+#
+# Confirmed against IBKR before changing (reqContractDetails, read-only):
+#   NKD → NKDU6, conId 652545722, multiplier 5,   minTick 5.0  ← what was traded
+#   MNK → MNKU6, conId 863279730, multiplier 0.5, minTick 5.0  ← what specs.py describes
+# MNK carried 2,473 one-minute bars over two days against NKD's 2,472, and 2,746 lots of
+# volume against 4,819 — thinner but continuously quoted, which at one contract is not a
+# constraint. Ticks are 5.0 on both, so slippage evidence gathered on NKD stays
+# comparable.
+#
+# Deliberately NOT changed: the historical data path. update_futures_data.py,
+# update_ibkr_daily.py and repair_parquet_utc.py fetch NKD bars for MNKD on purpose —
+# micro and full track one index, and the full-size series is the longer one. Only order
+# routing was ever wrong.
+# Derived, not declared. This was a hand-written literal until 2026-08-15; the whole
+# defect above is what a second copy of an instrument's identity costs when it drifts
+# from the first. Contract.ibkr is now the single place any layer asks "what do I put
+# on the order", and this map cannot disagree with it because it is built from it.
 _RAITS_TO_IBKR: dict[str, str] = {
-    "MNKD": "NKD",
+    name: contract.ibkr
+    for name, contract in {**BASKET, **SPECS}.items()
+    if contract.ibkr != name
 }
 
 # IBKR exchange override per symbol. MYM (Micro Dow) trades on CBOT, not CME, in IBKR.
@@ -95,12 +128,19 @@ PROTECTIVE_SIDE = {"LONG": "SELL", "SHORT": "BUY"}
 def _to_runner(symbol: str) -> str:
     """Translate an IBKR contract symbol into the runner's vocabulary.
 
-    IBKR calls the Nikkei contract NKD; the runner calls it MNKD. Every other
-    instrument agrees, so a site that forgets to translate is invisible until an NKD
+    IBKR calls the micro Nikkei contract MNK; the runner calls it MNKD. Every other
+    instrument agrees, so a site that forgets to translate is invisible until a Nikkei
     position exists — which is how six sites were found one at a time, the last of them
-    on 2026-08-10 when get_positions reported the live NKD position under a name
+    on 2026-08-10 when get_positions reported the live position under a name
     live_positions.json did not use. B3 counted that one position twice, as missing and
     as an orphan, and halted every entry.
+
+    "NKD" deliberately no longer maps back to MNKD (it did until 2026-08-14, while orders
+    were being routed to the full-size contract by mistake). The reverse map is derived
+    from _RAITS_TO_IBKR, so it now translates MNK only. A leftover NKD position must
+    surface under its own name and be treated as an orphan: it is ten times the size of
+    anything this system sizes, and quietly re-adopting it as MNKD would put a stop on it
+    computed for the micro. An orphan that halts entries is the correct alarm here.
 
     The rule is not "remember the mapping at each call". It is that nothing leaves this
     class speaking IBKR's vocabulary, and test_symbol_boundary reads this file to check
@@ -186,6 +226,22 @@ ROLL_SCHEDULE: dict[str, list[tuple[str, str, str]]] = {
         ("2026-09-04", "202609", "202612"),
         ("2026-12-04", "202612", "202703"),
     ],
+    # MNK is the micro on the same CME Nikkei series as NKD, so it shares the expiry
+    # cycle and therefore the roll dates. Keyed by IBKR symbol because that is what
+    # _current_front_month is called with — every call site resolves the symbol through
+    # _RAITS_TO_IBKR first.
+    #
+    # This entry is not optional. Without it _current_front_month("MNK") returns None,
+    # the call sites fall through to the unqualified `ibi.Future("MNK", exchange=...)`
+    # branch, and IBKR rejects it as ambiguous: MNKU6 and MNKZ6 are both live. That is
+    # the failure the comment above _current_front_month describes, and it would fire on
+    # the first bar fetch or the first order — not at import, where it would be obvious.
+    "MNK": [
+        ("2026-03-06", "202603", "202606"),
+        ("2026-06-05", "202606", "202609"),
+        ("2026-09-04", "202609", "202612"),
+        ("2026-12-04", "202612", "202703"),
+    ],
 }
 
 
@@ -216,6 +272,57 @@ def _current_front_month(inst: str, today=None) -> "str | None":
         if roll_date <= today_str:
             current = nxt
     return current
+
+
+class ContractResolutionError(RuntimeError):
+    """Raised when an instrument cannot be resolved to exactly one listed contract."""
+
+
+def _front_month_contract(ib, ibi, inst: str):
+    """Build the qualified front-month contract for a runner instrument, or raise.
+
+    Three call sites duplicated this and all three ended in `qualifyContracts`, which
+    does not raise: ib_insync leaves an unresolvable contract with conId 0 and logs a
+    warning. The request then goes out against a contract IBKR never confirmed, and the
+    failure surfaces as something else entirely — a missing bar set, or an order that
+    does not appear.
+
+    Two ways the resolution can be wrong, both of which used to pass silently:
+
+    1. No ROLL_SCHEDULE entry. `_current_front_month` returns None, the old code fell
+       through to an unqualified `ibi.Future(sym)`, and IBKR rejects it as ambiguous
+       whenever two months are live. This is the failure MNK would have hit on the first
+       order after routing moved to it, because ROLL_SCHEDULE was keyed on NKD only.
+
+    2. A month the exchange does not list. ROLL_SCHEDULE rolls MNK to 202703 on
+       2026-12-04, but CME currently lists MNK only out to Z6 — the micro carries far
+       fewer forward months than the full-size contract (2 against 15, measured
+       2026-08-14). If MNKH7 is not listed by then, the roll produces a contract that
+       cannot resolve.
+
+    Both now raise with the instrument named, because this whole incident began with a
+    contract identity the system inferred and then assumed existed.
+    """
+    ibkr_sym = _RAITS_TO_IBKR.get(inst, inst)
+    exchange = _IBKR_EXCHANGE.get(ibkr_sym, "CME")
+    front_month = _current_front_month(ibkr_sym)
+    if not front_month:
+        raise ContractResolutionError(
+            f"{inst} routes to IBKR symbol {ibkr_sym!r} but has no ROLL_SCHEDULE entry. "
+            f"An unqualified future is ambiguous whenever two months are live; add "
+            f"ROLL_SCHEDULE[{ibkr_sym!r}] rather than letting the request go out."
+        )
+    contract = ibi.Future(ibkr_sym, lastTradeDateOrContractMonth=front_month,
+                          exchange=exchange)
+    ib.qualifyContracts(contract)
+    if not getattr(contract, "conId", 0):
+        raise ContractResolutionError(
+            f"{inst} -> {ibkr_sym} {front_month} on {exchange} did not resolve to a listed "
+            f"contract (conId is unset after qualifyContracts). Check that the exchange "
+            f"lists this month: micros carry fewer forward months than the full-size "
+            f"contract, so a ROLL_SCHEDULE date can outrun the listed chain."
+        )
+    return contract
 
 
 class IBKRConnectionError(RuntimeError):
@@ -406,19 +513,9 @@ class IBKRBroker(Broker):
         try:
             import ib_insync as ibi  # type: ignore
 
-            # Resolve front-month from ROLL_SCHEDULE to avoid "Ambiguous contract" error.
-            # IBKR rejects ibi.Future("MES") when multiple contract months are active.
-            # _RAITS_TO_IBKR maps internal names (MNKD) → IBKR symbols (NKD).
-            # _IBKR_EXCHANGE overrides exchange per symbol (MYM → CBOT).
-            ibkr_sym = _RAITS_TO_IBKR.get(inst, inst)
-            exchange = _IBKR_EXCHANGE.get(ibkr_sym, "CME")
-            front_month = _current_front_month(ibkr_sym)
-            if front_month:
-                contract = ibi.Future(ibkr_sym, lastTradeDateOrContractMonth=front_month,
-                                      exchange=exchange)
-            else:
-                contract = ibi.Future(ibkr_sym, exchange=exchange)
-            ib.qualifyContracts(contract)
+            # Resolves symbol, exchange and front month, and raises if the result is not
+            # a single listed contract. See _front_month_contract.
+            contract = _front_month_contract(ib, ibi, inst)
 
             bars = ib.reqHistoricalData(
                 contract,
@@ -518,17 +615,9 @@ class IBKRBroker(Broker):
         try:
             import ib_insync as ibi  # type: ignore
 
-            # Build contract with front-month (same logic as _fetch_raw to avoid ambiguity)
-            ibkr_sym = _RAITS_TO_IBKR.get(order.inst, order.inst)
-            exchange = _IBKR_EXCHANGE.get(ibkr_sym, "CME")
-            front_month = _current_front_month(ibkr_sym)
-            if front_month:
-                contract = ibi.Future(ibkr_sym,
-                                      lastTradeDateOrContractMonth=front_month,
-                                      exchange=exchange)
-            else:
-                contract = ibi.Future(ibkr_sym, exchange=exchange)
-            ib.qualifyContracts(contract)
+            # Order path: an unresolved contract here sends a live order against
+            # something IBKR never confirmed, so this raises rather than proceeding.
+            contract = _front_month_contract(ib, ibi, order.inst)
 
             # Map direction+action → IBKR BUY/SELL
             # OPEN LONG→BUY, OPEN SHORT→SELL, CLOSE LONG→SELL, CLOSE SHORT→BUY
@@ -845,16 +934,7 @@ class IBKRBroker(Broker):
         try:
             import ib_insync as ibi  # type: ignore
 
-            ibkr_sym = _RAITS_TO_IBKR.get(inst, inst)
-            exchange = _IBKR_EXCHANGE.get(ibkr_sym, "CME")
-            front_month = _current_front_month(ibkr_sym)
-            if front_month:
-                contract = ibi.Future(ibkr_sym,
-                                      lastTradeDateOrContractMonth=front_month,
-                                      exchange=exchange)
-            else:
-                contract = ibi.Future(ibkr_sym, exchange=exchange)
-            ib.qualifyContracts(contract)
+            contract = _front_month_contract(ib, ibi, inst)
 
             ibkr_action = "SELL" if direction == "LONG" else "BUY"
             # Chandelier levels are continuous; IBKR only accepts prices on the tick

@@ -158,3 +158,54 @@ def test_lh8_heartbeat_noise_is_still_filtered(frozen, tmp_path):
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+
+# ── 9. the pytest guard itself ───────────────────────────────────────────────
+#
+# lh1/lh2 prove the handler is not attached AT IMPORT. They say nothing about a test
+# that reaches attach_file_log() through some other path -- and one did: on 2026-08-10
+# pytest wrote 1,215 injected-failure CRITICALs plus a whole mock MES replay into
+# scheduler_0810.log, and reading it cold looked like the system had failed badly.
+#
+# The fix was a PYTEST_CURRENT_TEST guard inside both attach_file_log functions. Nothing
+# tested that guard, so removing it would have left all eight tests above green while
+# pytest quietly resumed writing into the operator's log. Measured 2026-08-15: no log
+# file written after 2026-08-10 carries a test marker, which is the guard working.
+
+def test_lh9_scheduler_refuses_to_attach_under_pytest(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "test_lh9 (call)")
+    before = set(_file_handlers(paths_only=True))
+    rs.attach_file_log()
+    after = set(_file_handlers(paths_only=True))
+    assert after == before, "run_scheduler attached a file handler while pytest was running"
+    assert not list(tmp_path.glob("scheduler_*.log")), "a production log was created by a test"
+
+
+def test_lh10_live_day_refuses_to_attach_under_pytest(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "test_lh10 (call)")
+    before = set(_file_handlers(paths_only=True))
+    rld.attach_file_log()
+    after = set(_file_handlers(paths_only=True))
+    assert after == before, "run_live_day attached a file handler while pytest was running"
+    assert not list(tmp_path.glob("live_day_*.log")), "a production log was created by a test"
+
+
+def test_lh11_the_guard_is_the_reason_and_not_a_missing_cwd(tmp_path, monkeypatch):
+    """Without the env var the same call must attach — otherwise lh9/lh10 would pass
+    for the wrong reason and the operator would lose the log entirely."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    root = logging.getLogger()
+    added = None
+    try:
+        rld.attach_file_log()
+        added = [h for h in root.handlers
+                 if isinstance(h, logging.FileHandler)
+                 and "live_day_" in Path(h.baseFilename).name]
+        assert added, "attach_file_log did nothing even outside pytest"
+    finally:
+        for h in added or []:
+            root.removeHandler(h)
+            h.close()

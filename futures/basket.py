@@ -20,10 +20,22 @@ class Contract:
     point_value: float   # $ per index point
     tick: float          # index points per tick
     est_margin: float    # ESTIMATE day/overnight margin $ — CONFIRM with IBKR
+    # What IBKR must be asked for. Every Rổ 4 micro is already listed under its own
+    # name, so this stays empty here and `ibkr` falls back to it. It exists because
+    # name != data_symbol on all four (MES/ES, MNQ/NQ, ...) and the broker layer used
+    # to be left to work out which of the two to send. On the global-index sleeve it
+    # worked out the wrong one: MNKD orders went to full-size NKD at ten times the
+    # intended size. A micro whose IBKR ticker is not its own name must set this.
+    ibkr_symbol: str = ""
 
     @property
     def tick_value(self) -> float:
         return self.tick * self.point_value
+
+    @property
+    def ibkr(self) -> str:
+        """The symbol to put on an IBKR order. Never guess between the other two."""
+        return self.ibkr_symbol or self.name
 
 
 # ── RỔ 4 — the deployed basket ────────────────────────────────────────────────

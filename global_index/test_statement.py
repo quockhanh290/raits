@@ -79,8 +79,25 @@ def test_st3_symbols_map_to_runner_names(tmp_path):
 
 # ── FIFO pairing ──────────────────────────────────────────────────────────────
 
-def _t(date, inst, signed, price):
-    return {"date": date, "inst": inst, "signed": signed, "price": price}
+# The multipliers IBKR actually applies, written here rather than imported: these
+# fixtures stand in for the broker, and reading the number from the same production
+# table pair_fifo uses would make every P&L assertion agree with itself by construction.
+_BROKER_MULTIPLIER = {"MES": 5.0, "MYM": 0.5, "M2K": 5.0, "MNK": 0.5, "NKD": 5.0}
+
+
+def _t(date, inst, signed, price, multiplier=None):
+    """One statement EXECUTION row.
+
+    Proceeds is what the broker paid or received: negative when buying, positive when
+    selling, always price x quantity x the multiplier of the contract that actually
+    filled. pair_fifo takes its money from this field, so a fixture without it is a
+    fixture of a statement IBKR would never send.
+    """
+    mult = _BROKER_MULTIPLIER[inst] if multiplier is None else multiplier
+    return {
+        "date": date, "inst": inst, "signed": signed, "price": price,
+        "proceeds": -signed * price * mult,
+    }
 
 
 def test_st4_a_short_covered_is_a_short(tmp_path):
@@ -170,6 +187,55 @@ def test_st10_same_day_order_is_preserved_when_sorting_by_date():
     assert len(closed) == 1
     assert (closed[0]["entry_price"], closed[0]["exit_price"]) == (7634.75, 7771.50)
     assert len(open_lots) == 1 and open_lots[0]["price"] == 7767.00
+
+
+def test_st11_pnl_comes_from_broker_proceeds_not_our_own_multiplier():
+    """The reconcile must be able to see a contract-multiplier defect.
+
+    MNKD orders were routed to full-size NKD, so the broker filled a $5 contract while
+    the books priced a $0.50 one. Rebuilding the statement's P&L with our point_value
+    made that error cancel on both sides of the comparison: paper-minus-Flex read 0.00
+    while the account was down 10x. Proceeds are the broker's own money, so the same
+    fills now report the loss that actually happened.
+    """
+    closed, _ = pair_fifo([
+        _t("2026-08-10", "MNK", +1.0, 66985.0, multiplier=5.0),
+        _t("2026-08-10", "MNK", -1.0, 66765.0, multiplier=5.0),
+    ])
+    assert len(closed) == 1
+    c = closed[0]
+    assert c["pnl_basis"] == "statement_proceeds"
+    assert c["pnl"] == pytest.approx(-1100.00), (
+        "220 points on the $5 contract IBKR actually filled; pricing it with the local "
+        "$0.50 point value would report -110.00 and hide the routing defect"
+    )
+
+
+def test_st12_a_lot_without_proceeds_reports_no_pnl_rather_than_a_local_guess():
+    # Falling back to point_value would reinstate the blind spot silently, and a wrong
+    # number is worse here than a missing one: the panel treats it as broker-verified.
+    closed, _ = pair_fifo([
+        {"date": "2026-08-03", "inst": "MES", "signed": +1.0, "price": 7634.75},
+        {"date": "2026-08-05", "inst": "MES", "signed": -1.0, "price": 7771.50},
+    ])
+    assert len(closed) == 1
+    assert closed[0]["pnl"] is None
+    assert closed[0]["pnl_basis"] is None
+
+
+def test_st13_a_partial_close_does_not_borrow_the_whole_fills_proceeds():
+    """A 2-lot fill closing a 1-lot position carries Proceeds for all 2 lots.
+
+    Summing them against the single open lot would book twice the money that lot
+    actually made.
+    """
+    closed, _ = pair_fifo([
+        _t("2026-08-03", "MES", +1.0, 7634.75),
+        _t("2026-08-05", "MES", -2.0, 7771.50),
+    ])
+    assert len(closed) == 1
+    assert closed[0]["pnl"] is None, "size mismatch must not produce a doubled P&L"
+    assert closed[0]["pnl_basis"] is None
 
 
 def test_st8_positions_still_open_are_not_reported_as_closed():

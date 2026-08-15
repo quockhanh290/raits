@@ -132,6 +132,20 @@ def parse_transactions(path) -> "tuple[list[dict], list[dict]]":
                         "commission": _num(item.get("IBCommission", "0")),
                         "net_amount": _num(item.get("NetCash", "0")),
                         "broker_ids": _broker_ids(item),
+                        # The broker's own money, carried alongside price/qty so a
+                        # consumer never has to reconstruct it from a local multiplier.
+                        # Proceeds already include the contract multiplier and the sign
+                        # (negative on a buy), so a paired lot's realised P&L is just the
+                        # sum of the two legs. FifoPnlRealized is IBKR's own answer for
+                        # the same thing and is kept as a cross-check.
+                        #
+                        # Their absence is what let the MNKD routing defect hide: every
+                        # consumer rebuilt Flex P&L with point_value, the same number the
+                        # paper ledger used, so a wrong multiplier cancelled on both
+                        # sides and paper-minus-Flex read 0.00 while the broker was down
+                        # ten times more than the books said.
+                        "proceeds": _num(item.get("Proceeds", "0")),
+                        "fifo_pnl": _num(item.get("FifoPnlRealized", "0")),
                     })
                     continue
                 if item.get("Amount") and item.get("ActivityDescription"):
@@ -187,11 +201,25 @@ def pair_fifo(trades: list[dict]) -> "tuple[list[dict], list[dict]]":
         lots = books.setdefault(t["inst"], [])
         if lots and (lots[0]["signed"] > 0) != (t["signed"] > 0):
             o = lots.pop(0)
-            pv = point_value(t["inst"])
             long_side = o["signed"] > 0
             qty = abs(t["signed"])
-            pnl = (((t["price"] - o["price"]) * pv * qty * (1 if long_side else -1))
-                   if pv else None)
+            # Broker money, not local money. Rebuilding P&L from our own point_value made
+            # a wrong contract multiplier cancel on both sides of the reconcile, which is
+            # how MNKD orders routed to full-size NKD produced a 10x loss that read as
+            # 0.00 against the books. Proceeds are signed by the statement, so entry plus
+            # exit is the realised amount. Only when the two legs are the same size --
+            # a partial close pairs one lot against part of a fill, and that fill's
+            # Proceeds covers the whole fill, not the part being matched here.
+            entry_proceeds = o.get("proceeds")
+            exit_proceeds = t.get("proceeds")
+            same_size = abs(o["signed"]) == abs(t["signed"])
+            pnl_basis = None
+            if same_size and entry_proceeds is not None and exit_proceeds is not None:
+                pnl = entry_proceeds + exit_proceeds
+                pnl_basis = "statement_proceeds"
+            else:
+                # No silent fallback to point_value: that is the blind spot itself.
+                pnl = None
             closed.append({
                 "inst": t["inst"],
                 "direction": "LONG" if long_side else "SHORT",
@@ -199,6 +227,7 @@ def pair_fifo(trades: list[dict]) -> "tuple[list[dict], list[dict]]":
                 "entry_day": o["date"], "exit_day": t["date"],
                 "entry_price": o["price"], "exit_price": t["price"],
                 "pnl": pnl,
+                "pnl_basis": pnl_basis,
                 "commission": (o.get("commission", 0.0) or 0.0)
                               + (t.get("commission", 0.0) or 0.0),
                 "broker_trade_id": _broker_id_label(o, t),

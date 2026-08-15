@@ -340,8 +340,8 @@ class _StopsIB(_CancelIB):
 
 
 def test_ws1_nkd_stop_is_keyed_by_runner_name():
-    """IBKR reports NKD; the runner asks about MNKD."""
-    fake = _StopsIB([_StopTrade("NKD", 71)])
+    """IBKR reports MNK; the runner asks about MNKD."""
+    fake = _StopsIB([_StopTrade("MNK", 71)])
     working = _cancel_broker(fake).get_working_stops()
 
     assert working == {"MNKD": ["71"]}, (
@@ -366,8 +366,19 @@ def test_ws3_non_stop_and_dead_orders_excluded():
 
 
 def test_ws4_has_working_stop_also_speaks_runner_names():
-    fake = _StopsIB([_StopTrade("NKD", 71)])
+    fake = _StopsIB([_StopTrade("MNK", 71)])
     assert _cancel_broker(fake).has_working_stop("MNKD") is True
+
+
+def test_ws4b_a_full_size_nkd_stop_does_not_count_as_micro_protection():
+    """Since 2026-08-14 orders route to MNK; NKD is not this system's contract.
+
+    A stop sitting on the full-size contract protects ten times the exposure the micro
+    carries. Counting it as MNKD protection would let B4 skip placing the real stop and
+    report the micro position as covered by an order that is not on it.
+    """
+    fake = _StopsIB([_StopTrade("NKD", 71)])
+    assert _cancel_broker(fake).has_working_stop("MNKD") is False
 
 
 def test_ws5_pendingsubmit_is_not_a_working_stop():
