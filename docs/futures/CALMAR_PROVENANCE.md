@@ -195,6 +195,38 @@ nhiễu ở đó phải chọn một trong ba, và cả ba đều là quyết đ
 Cho tới khi chốt: **một lần Calmar paper xuống dưới 1.65 KHÔNG đủ để kết luận hệ suy giảm.**
 Chạy `python futures/measure_seed_pnl.py` để xem con số đó có nằm trong dải nhiễu không, rồi mới kết luận.
 
+### Đã chốt 2026-08-15: lựa chọn **3**, và một phát hiện lớn hơn nhiễu seed
+
+Truy vào chỗ tiêu thụ mới thấy **sàn này chưa từng gate gì cả**. `analytics.js` chỉ *hiển thị*
+hai ô cạnh nhau (`histCalmar`, `histBaseline`); không có phép so trong code, không ngưỡng, không
+cảnh báo. Và trạng thái live: `running_metrics.calmar = null` (vì `max_dd = 0.0`), 5 snapshot
+từ 2026-08-10, `paper_vs_backtest.divergence_pct = null`. UI hiện `insufficient observations`.
+
+**Lệch nền giữa hai ô lớn hơn nhiều so với ±0.16 nhiễu seed** — và code đã tự khai từ trước:
+
+| | ô `Calmar` | ô `Backtest fit_A` |
+|---|---|---|
+| dữ liệu | đầy đủ tới hiện tại | **frozen**, `--end 2024-12-31` |
+| stress sleeve | **CÓ** | **KHÔNG** |
+| nguồn | `metrics()` trên `_daily_realized` | `deploy_sim`, 2 tick, n=1 |
+
+Khác **dữ liệu, khoảng thời gian, và thành phần sleeve**. Trước đây chỉ được che bằng tooltip,
+trong khi nhãn ô lại là *"Floor"* — một chữ mời người đọc làm đúng phép so mà tooltip nói là
+không làm được.
+
+**Đã làm:** nhãn `Floor fit_A` → `Backtest fit_A`; dòng dưới ô thành *"nền khác — tham chiếu,
+không phải ngưỡng"*; `CALMAR_NOTE` thêm hai điều — dashboard **không** so hai ô này, và kể cả
+đưa về cùng quy ước thì 1.65 vẫn không phải vạch sắc (dải 1.56–1.72, 2/5 seed dưới sàn).
+Giá trị hằng số **không đổi**.
+
+**Chưa làm — lựa chọn 1 thật sự:** bỏ so với hằng số lịch sử, so paper với backtest chạy trên
+**đúng cửa sổ paper** — nguyên lý *đo theo cặp* đã áp cho cổng promotion, đem sang phần theo dõi.
+Khung có sẵn: `paper_vs_backtest.expected_equity` / `divergence_pct` đang `null` chứ không phải
+không tồn tại. Đây mới là thứ chữa **cả** lệch nền lẫn nhiễu seed. Chờ paper đủ dài.
+
+**Rejected:** hạ 1.65 xuống dưới 1.56, hoặc chuyển sang Sharpe/PF — chỉ chữa nhiễu seed, để
+nguyên lệch nền, và làm con số trông chính xác hơn thực tế.
+
 ### Bất biến mới cho cả hai sàn
 
 > Không sàn nào được đặt **bên trong** dải nhiễu của chính phép đo sinh ra nó.

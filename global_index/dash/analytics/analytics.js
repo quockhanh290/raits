@@ -11,14 +11,22 @@
   let executionQuality = null;
   const CALMAR_NOTE = [
     'HAI SỐ KHÁC QUY ƯỚC — không so trực tiếp được.',
+    'Dashboard KHÔNG so hai ô này: không có gate, không có cảnh báo nào gắn vào chúng.',
     '',
     'Calmar: curve của chính dashboard này — dữ liệu đầy đủ tới hiện tại, CÓ cluster',
     '  stress, metrics() trên _daily_realized.',
-    'Floor fit_A: deploy_sim trên dữ liệu FROZEN, --end 2024-12-31, KHÔNG có stress,',
+    'Backtest fit_A: deploy_sim trên dữ liệu FROZEN, --end 2024-12-31, KHÔNG có stress,',
     '  2 tick/side, n_contracts=1.',
     '',
-    'Muốn so đúng cặp thì phải so floor với baseline chạy CÙNG quy ước đó',
-    '(deploy_sim frozen, --end 2024-12-31, no-stress) — xem docs/futures/INVARIANTS.md.',
+    'Kể cả khi đưa về cùng quy ước, 1.65 vẫn không phải một vạch sắc. Đo 2026-08-15',
+    '(futures/measure_seed_pnl.py): 5 hạt giống ngẫu nhiên của CÙNG một hệ, cùng dữ liệu,',
+    'cùng mọi tham số, cho Calmar trải 1.56–1.72 — và 2/5 rơi xuống dưới 1.65. Nguyên nhân',
+    'có cấu trúc: mẫu số của Calmar là MaxDD, một ngày duy nhất, chỉ nhận hai giá trị qua',
+    'cả 5 lần chạy. PF trải 0.68% và Sharpe 2.42% trong khi Calmar trải 9.47%.',
+    '',
+    'Nên: một lần Calmar xuống dưới 1.65 KHÔNG đủ để kết luận hệ suy giảm. Chạy',
+    'futures/measure_seed_pnl.py xem con số có nằm trong dải nhiễu không rồi mới kết luận.',
+    'Chi tiết: docs/futures/CALMAR_PROVENANCE.md §4b, §4c.',
   ].join('\n');
   let selected = Math.max(0, snapshots.length - 1);
   const $ = id => document.getElementById(id);

@@ -37,7 +37,11 @@
       <div><span>Calmar</span><b id="histCalmar">--</b><small id="calmarSource">running</small></div>
       <div><span>Sharpe</span><b id="histSharpe">--</b></div>
       <div><span>Max Drawdown</span><b id="histMaxDd">--</b></div>
-      <div><span>Floor fit_A</span><b id="histBaseline">--</b><small id="baselineSource">quy ước khác — không so trực tiếp</small></div>
+      <!-- "Floor" đọc như một ngưỡng, và không có gì trong dashboard so hai ô này với
+           nhau — không gate, không cảnh báo. Nhãn cũ mời người đọc tự làm phép so mà
+           chính CALMAR_NOTE nói là không làm được. Đổi thành "Backtest fit_A", và dòng
+           dưới nói rõ nó là tham chiếu chứ không phải ngưỡng. -->
+      <div><span>Backtest fit_A</span><b id="histBaseline">--</b><small id="baselineSource">nền khác — tham chiếu, không phải ngưỡng</small></div>
     </section>
 
     <section class="chart-band">
