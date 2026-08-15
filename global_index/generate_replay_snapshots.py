@@ -37,13 +37,19 @@ from global_index.deploy_sim import size_combined, metrics, replay
 from global_index.runner import BACKTEST_CALMAR_FLOOR
 
 DATA_DIR    = r"D:\raits\data\cache\futures"
-# spy_daily.csv dừng ở 2024-12-31, và hai cluster tra nhãn theo hai kiểu khác nhau:
-# swing/stress dùng `labels.get(day)` (dict thuần) → None sau 2024-12-31 → gate ở
-# _validated_core.py:402 chặn, ngừng vào lệnh; global_nkd dùng RegimeLabels.get →
-# `self.reg.asof(target)` (regime.py:58), nối giá trị cuối nên chạy tiếp tới 2026 trên
-# nhãn ĐÓNG BĂNG ở 2024-12-31. Hệ quả: cả đoạn 2025-2026 của backtest_curve.json là
-# NKD một mình (đo 2026-08-11: NKD +$12,851, swing -$194 đuôi đóng vị thế, stress $0),
-# trong khi live giao dịch cả Rổ 4 lẫn NKD → panel paper_vs_backtest so hai hệ khác nhau.
+# PHẢI dùng spy_daily_live.csv. LỊCH SỬ (đã sửa 2026-08-13, giữ lại vì nó giải thích
+# vì sao dòng này quan trọng): spy_daily.csv dừng ở 2024-12-31, và hai cluster tra nhãn
+# theo hai kiểu khác nhau — swing/stress dùng `labels.get(day)` (dict thuần) → None sau
+# 2024-12-31 → gate ở _validated_core.py:402 chặn, ngừng vào lệnh; global_nkd dùng
+# RegimeLabels.get → `self.reg.asof(target)` (regime.py:58), nối giá trị cuối nên chạy
+# tiếp. Hệ quả LÚC ĐÓ: đoạn 2025-2026 của backtest_curve.json là NKD một mình.
+#
+# TRẠNG THÁI HIỆN TẠI, đo trên artifact sinh ngày 2026-08-13: cả ba cluster đều chạy
+# suốt đuôi. Trên 2025-01-01..2026-08-12: roska4_swing +$5,112, global_nkd +$4,636,
+# roska4_stress -$109. Đừng đọc đoạn lịch sử trên như mô tả hiện tại — đã có người
+# (2026-08-15) cắt khung đo ngưỡng go-live ở 2024-12-31 vì tưởng đuôi vẫn hỏng, bỏ đi
+# 331 phiên bằng chứng hợp lệ và siết mọi band chặt hơn mức dữ liệu cho phép.
+#
 # spy_daily_live.csv là tập cha đúng nghĩa: trùng khít 2012/2012 ngày chồng lấn (lệch
 # max 0.0), thêm 402 ngày. hmm_fit_end vẫn cắt ở 2024-12-31 và label_regimes gán nhãn
 # bằng cửa sổ mở rộng, nên đoạn 2017-2024 không nhìn thấy dữ liệu mới — không look-ahead.

@@ -12,6 +12,8 @@ Dependency: futures._validated_core (internalized validated logic) + raits.*
 from __future__ import annotations
 from dataclasses import dataclass
 
+import pandas as pd
+
 from futures.basket import BASKET, SWING_TF_PARAM, REGIME, data_filename
 from futures.cost import FuturesCost
 
@@ -44,25 +46,77 @@ class SwingTFEngine:
                 for name in dfs}
 
     # ── live signal: the position the engine WANTS to hold right now ───────────
-    def desired_position(self, df, labels, cost):
+    def desired_position(self, df, labels, cost, *, reason_out=None):
         """Run the validated backtest on data-through-now and return the OPEN
         position at the end (the live target). Live runner reconciles the broker
         to this → live == backtest by construction. Returns dict or None:
-        {direction, entry, stop, entry_day}."""
+        {direction, entry, stop, entry_day}.
+
+        reason_out: optional single-entry dict. When given, and the backtest closed a
+        trade on this data's last day, it receives that trade's exit reason
+        (CHANDELIER / GAP / MAX_HOLD).
+
+        The reason has always existed -- backtest_swing_tf writes it on every trade it
+        closes -- but this method discarded the trade list and kept only the open
+        position, so the live path lost it at exactly the point where the position stops
+        being desired. Downstream, a CLOSE reached the trade log with exit_reason=None
+        and the exit_path_coverage gate could never fill: not for lack of samples, but
+        because nothing recorded which path each exit took.
+
+        Keyword-only with a None default so every existing caller and test double is
+        unaffected, and so this stays observational: nothing here changes what is
+        returned or what the runner then does.
+        """
         from futures._validated_core import backtest_swing_tf
-        _, pos = backtest_swing_tf(
+        trades, pos = backtest_swing_tf(
             df, labels, cost,
             ema_period=self.ema_period,
             chandelier_atr_mult=self.chandelier_atr_mult,
             max_hold_days=self.max_hold_days, return_open=True)
+        if reason_out is not None:
+            self._record_exit_reason(reason_out, trades, df)
         if pos is None:
             return None
         return dict(direction=pos["dir"], entry=float(pos["entry"]),
                     stop=float(pos["stop"]), entry_day=pos["entry_day"])
 
-    def desired_basket(self, dfs: dict, labels, costs: dict):
-        """dict instrument -> desired_position (or None) across the basket."""
-        return {name: self.desired_position(dfs[name], labels, costs[name]) for name in dfs}
+    @staticmethod
+    def _record_exit_reason(reason_out: dict, trades, df) -> None:
+        """Report a reason only for a trade that closed on the last bar's own day.
+
+        Without the date check the last trade in the list would be reported forever:
+        a position closed a week ago would relabel today's exit with last week's reason,
+        which is worse than no label at all -- it reads as evidence.
+        """
+        if not trades or df is None or len(df.index) == 0:
+            return
+        last = trades[-1]
+        reason = last.get("reason")
+        exit_day = last.get("exit_day")
+        if not reason or exit_day is None:
+            return
+        try:
+            if pd.Timestamp(exit_day).normalize() != pd.Timestamp(df.index[-1]).normalize():
+                return
+        except (TypeError, ValueError):
+            return
+        reason_out["reason"] = str(reason)
+        reason_out["exit_day"] = str(exit_day)
+
+    def desired_basket(self, dfs: dict, labels, costs: dict, *, reasons_out=None):
+        """dict instrument -> desired_position (or None) across the basket.
+
+        reasons_out: optional dict; receives {instrument: {reason, exit_day}} for any
+        instrument whose backtest closed a trade on the last bar's day.
+        """
+        out = {}
+        for name in dfs:
+            per_inst = {} if reasons_out is not None else None
+            out[name] = self.desired_position(dfs[name], labels, costs[name],
+                                              reason_out=per_inst)
+            if per_inst:
+                reasons_out[name] = per_inst
+        return out
 
 
 def costs_for_basket(slippage_ticks: float = 1.0) -> dict:

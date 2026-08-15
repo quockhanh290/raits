@@ -199,6 +199,12 @@ def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs
     held_by_key = {(p.inst, p.cluster): p for p in held}
     desired: dict = {}
     force_entries: list = []  # same-direction rollover: exit old + enter new
+    # Why each engine stopped wanting a position, collected alongside `desired` and
+    # attached to the exit objects at the end. Collected here rather than derived later
+    # because this is the only place the reason still exists: diff_desired_vs_held sees
+    # an absence, and an absence has no reason.
+    _exit_reasons_swing: dict = {}
+    _exit_reasons_nkd: dict = {}
 
     # --- swing TF (Rổ 4) : STATE ---
     # C4: isolated try/except — swing failure skips swing entries; held positions
@@ -209,7 +215,8 @@ def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs
         # Gated: the engine is never called (short-circuit) and the loop below is a
         # no-op, so `desired` keeps only the hold-dummies marked just above.
         for inst, sig in (
-                swing_engine.desired_basket(swing_dfs, swing_labels, swing_costs).items()
+                swing_engine.desired_basket(swing_dfs, swing_labels, swing_costs,
+                                            reasons_out=_exit_reasons_swing).items()
                 if CLUSTER_SWING in _active else ()):
             key = (inst, CLUSTER_SWING)
             if sig is None:
@@ -250,7 +257,8 @@ def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs
         nkd_key = (nkd_inst, CLUSTER_NKD)
         # Gated: engine not called, and `desired[nkd_key] = None` is skipped so it
         # cannot clobber the hold-dummy marked above.
-        nkd_sig = (nkd_engine.desired_position(nkd_df, nkd_labels, nkd_cost)
+        nkd_sig = (nkd_engine.desired_position(nkd_df, nkd_labels, nkd_cost,
+                                               reason_out=_exit_reasons_nkd)
                    if CLUSTER_NKD in _active else None)
         if nkd_sig is None:
             if CLUSTER_NKD in _active:
@@ -281,6 +289,19 @@ def generate_today_signals(*, swing_engine, swing_dfs, swing_labels, swing_costs
     # state-diff → entry/exit events for swing + NKD
     state_entries, exits = diff_desired_vs_held(desired, held)
     state_entries.extend(force_entries)
+
+    # Label the exits. Purely additive: `exits` keeps the same objects in the same order,
+    # so decide_day and replay_via_decision see exactly what they saw before. A position
+    # with no matching reason keeps None rather than being given a plausible guess --
+    # an exit labelled by assumption is worse evidence than an exit labelled not at all.
+    for _p in exits:
+        _r = None
+        if _p.cluster == CLUSTER_SWING:
+            _r = (_exit_reasons_swing.get(_p.inst) or {}).get("reason")
+        elif _p.cluster == CLUSTER_NKD:
+            _r = _exit_reasons_nkd.get("reason")
+        if _r:
+            _p.exit_reason = str(_r)
 
     # pre-compute daily ATR series — same as deploy_sim's  atr = {n: daily_atr_series(df) ...}
     # Skipped for gated clusters: nothing reads the series (no candidates are built
