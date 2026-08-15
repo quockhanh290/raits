@@ -738,6 +738,60 @@ def test_a_position_the_runner_does_not_know_about_raises_an_incident(realtime_s
     assert "nominal" not in rail_text(browser_page).lower()
 
 
+def _kill_endpoints(page, *paths) -> None:
+    """Cho các endpoint chỉ định trả 500; phần còn lại vẫn stub bình thường."""
+    stub_api(page)
+    for path in paths:
+        page.route(f"**{path}", lambda route: route.fulfill(
+            status=500, content_type="application/json", body='{"error": "boom"}'))
+
+
+def test_numbers_from_a_dead_source_are_not_shown_as_current(realtime_server, browser_page):
+    """P2-A1. Khi /api/v1/runner-state chết, `state.runner` giữ payload cũ nên
+    equity, drawdown và realized vẫn render như số hiện tại — chỉ mờ 42%. Người
+    vận hành đọc được một con số trông sống động từ một nguồn đã chết."""
+    # Phải để MỘT lần poll thành công trước rồi mới giết endpoint. Nếu nó chết
+    # ngay từ đầu thì state.runner chưa từng có payload, số ra "--" vì THIẾU DỮ
+    # LIỆU chứ không phải vì code kiểm lỗi — test sẽ xanh mà chẳng chứng minh gì.
+    stub_api(browser_page)
+    open_realtime(browser_page, realtime_server)
+    assert browser_page.eval_on_selector("#metricEquity", "el => el.textContent").strip() != "--", \
+        "lan poll dau phai thanh cong thi test moi co y nghia"
+
+    browser_page.route("**/api/v1/runner-state", lambda route: route.fulfill(
+        status=500, content_type="application/json", body='{"error": "boom"}'))
+    browser_page.wait_for_function(
+        "() => document.getElementById('metricEquity').textContent.trim() === '--'",
+        timeout=20_000)
+    for metric in ("metricEquity", "metricRealized", "metricDrawdown", "performanceNet"):
+        value = browser_page.eval_on_selector(f"#{metric}", "el => el.textContent").strip()
+        assert value == "--", f"{metric} hien '{value}' tu nguon da chet"
+    # Nguồn broker vẫn sống nên số của nó KHÔNG được bị xoá theo.
+    assert browser_page.eval_on_selector("#metricPositions", "el => el.textContent").strip() != "--"
+    # Và trang vẫn phải nói ra nguồn nào hỏng.
+    assert "runner-state" in rail_text(browser_page).lower()
+
+
+def test_the_fatal_banner_speaks_only_for_a_dead_backend(realtime_server, browser_page):
+    """P2-A2. Banner ghi "Monitor backend unavailable". Một endpoint chết KHÔNG
+    phải backend chết — lúc đó rail gọi tên nguồn hỏng là đủ và đúng. Banner chỉ
+    được xuất hiện khi mọi nguồn im lặng. Đây là ghim hành vi đúng, không phải
+    sửa lỗi."""
+    _kill_endpoints(browser_page, "/api/v1/runner-state")
+    browser_page.goto(f"{realtime_server}/realtime", wait_until="domcontentloaded")
+    browser_page.wait_for_selector("#statusRail .system-conclusion", timeout=10_000)
+    assert browser_page.eval_on_selector("#fatalBanner", "el => el.hidden") is True
+
+    browser_page.route("**/api/**", lambda route: route.fulfill(
+        status=500, content_type="application/json", body='{"error": "boom"}'))
+    browser_page.goto(f"{realtime_server}/realtime?all-dead=1", wait_until="domcontentloaded")
+    browser_page.wait_for_function(
+        "() => document.getElementById('fatalBanner') && !document.getElementById('fatalBanner').hidden",
+        timeout=10_000)
+    assert browser_page.eval_on_selector("#fatalBanner", "el => el.textContent").strip() \
+        == "Monitor backend unavailable."
+
+
 def test_a_stale_model_is_shown_as_debt_without_crying_wolf(realtime_server, browser_page):
     """P2-B4. Fixture giờ mô tả đúng production: model 20 tháng, G2 HARD. Hai
     nửa đều phải đúng — hiện ra ở header, nhưng KHÔNG kéo rail vào báo động, vì

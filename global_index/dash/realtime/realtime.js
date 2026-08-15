@@ -316,13 +316,20 @@
   }
 
   function renderMetrics(snap) {
-    const meta = state.runner?.payload?.meta || {};
-    const equity = snap?.equity ?? state.runner?.payload?.meta?.final_equity;
+    // Khi nguồn runner-state chết, poll() cố ý GIỮ payload cũ để những phần khác
+    // của trang còn tham chiếu được và để lane reconcile không báo động giả. Nhưng
+    // CON SỐ thì không được hiện như đang sống: người vận hành đọc một giá trị
+    // trông sống động từ một nguồn đã tắt, và mờ 42% không phải là một câu nói.
+    // Chỉ chặn phần runner-derived; số của broker là nguồn riêng, vẫn đúng.
+    const runnerDead = Boolean(state.runner?.error);
+    const meta = runnerDead ? {} : (state.runner?.payload?.meta || {});
+    const snapshot = runnerDead ? null : snap;
+    const equity = snapshot?.equity ?? meta.final_equity;
     const unreal = state.broker?.payload?.unrealized_pnl;
-    const realized = snap?.decision?.realized_today;
-    const drawdown = Number(snap?.drawdown_pct);
-    const drawdownDollars = Number(snap?.drawdown_dollars);
-    const hardDrawdown = Number(state.runner?.payload?.meta?.hard_dd_pct);
+    const realized = snapshot?.decision?.realized_today;
+    const drawdown = Number(snapshot?.drawdown_pct);
+    const drawdownDollars = Number(snapshot?.drawdown_dollars);
+    const hardDrawdown = Number(meta.hard_dd_pct);
     const gaugePct = Number.isFinite(drawdown) && Number.isFinite(hardDrawdown) && hardDrawdown > 0
       ? Math.min(100, Math.max(0, drawdown / hardDrawdown * 100)) : 0;
     $('metrics').classList.toggle('broker-stale', !brokerUsable());
@@ -349,8 +356,8 @@
       : [`${protection.covered} covered`,
          protection.deferred ? `${protection.deferred} deferred` : null,
          protection.naked ? `${protection.naked} naked` : null].filter(Boolean).join(' / ');
-    const running = snap?.running_metrics || {};
-    const sampleDays = (state.runner?.payload?.snapshots || []).length;
+    const running = snapshot?.running_metrics || {};
+    const sampleDays = runnerDead ? 0 : (state.runner?.payload?.snapshots || []).length;
     const enoughSample = sampleDays >= MIN_METRIC_DAYS;
     const sampleNote = `n=${sampleDays} trading day(s); needs ${MIN_METRIC_DAYS}`;
     const performanceValue = (id, value, numeric = null) => {

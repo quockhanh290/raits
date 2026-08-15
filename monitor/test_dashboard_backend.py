@@ -1532,17 +1532,26 @@ def _run_paper_js_probe(script: str) -> str:
     if not node:
         pytest.skip("node is not available")
     source = (DASH / "paper" / "paper.js").read_text(encoding="utf-8")
-    source = source.replace(
-        "  load();\n  window.setInterval(load, 60000);\n})();",
-        "  globalThis.__paperTest = { renderReadinessBlockers, updateCoveragePanel, updateB3Panel, updateSTPPanel, b3MoreInfo, logHygieneDetail };\n})();",
+    # Inject the export just inside the closing IIFE rather than string-matching the
+    # bootstrap lines. Pinning the exact bootstrap text made every paper.js probe fail
+    # the moment the refresh wiring changed, which reads as eight broken behaviours
+    # instead of one stale fixture.
+    closing = "\n})();"
+    assert closing in source, "paper.js no longer ends in a closing IIFE"
+    cut = source.rindex(closing)
+    source = (
+        source[:cut]
+        + "\n  globalThis.__paperTest = { renderReadinessBlockers, updateCoveragePanel,"
+          " updateB3Panel, updateSTPPanel, b3MoreInfo, logHygieneDetail };"
+        + source[cut:]
     )
     program = (
         "const vm = require('vm');\n"
         "const elements = new Map();\n"
-        "function el(id) { if (!elements.has(id)) elements.set(id, { id, textContent: '', innerHTML: '', className: '', parentElement: { classList: { add(){}, remove(){}, toggle(){} } }, querySelectorAll(){ return []; }, addEventListener(){}, scrollIntoView(){} }); return elements.get(id); }\n"
+        "function el(id) { if (!elements.has(id)) elements.set(id, { id, textContent: '', innerHTML: '', className: '', hidden: false, parentElement: { classList: { add(){}, remove(){}, toggle(){} } }, querySelectorAll(){ return []; }, addEventListener(){}, scrollIntoView(){} }); return elements.get(id); }\n"
         "globalThis.document = { getElementById: el };\n"
         "globalThis.window = { setInterval(){} };\n"
-        "globalThis.fetch = async () => ({ ok: true, json: async () => ({ payload: {} }) });\n"
+        "globalThis.fetch = async () => ({ ok: true, json: async () => ({ payload: {} }), text: async () => '{\"payload\":{}}' });\n"
         "globalThis.AbortSignal = { timeout(){} };\n"
         f"vm.runInThisContext({json.dumps(source)});\n"
         f"{script}\n"
@@ -1650,6 +1659,178 @@ def test_overview_coverage_sample_passes_when_all_three_coverage_gates_pass():
     html = json.loads(out)["html"]
     assert '<span>PASS</span><b>Coverage sample</b>' in html
     assert '<span>PENDING</span><b>Coverage sample</b>' not in html
+
+
+_PNL_COVERAGE_JS = (
+    "const coverage = [\n"
+    "  { key: 'paper_vs_backtest', status: 'OBSERVED', metrics: {\n"
+    "      ledger_adjustment_total: %s,\n"
+    "      trade_compare: { statement_pnl_compare: {\n"
+    "        paper_epoch_closed_realized: -43.25,\n"
+    "        flex_epoch_rebased_realized: -1303.25,\n"
+    "        paper_minus_flex_epoch_rebased_realized: 1260.0,\n"
+    "        flex_epoch_rebased_closed: [{}, {}, {}, {}],\n"
+    "      } } } },\n"
+    "];\n"
+)
+
+
+def _pnl_card_html(ledger_total: str) -> str:
+    out = _run_paper_js_probe(
+        (_PNL_COVERAGE_JS % ledger_total)
+        + "__paperTest.renderReadinessBlockers([], coverage, {});\n"
+        "console.log(JSON.stringify({ html: elements.get('readinessBlockers').innerHTML }));"
+    )
+    return json.loads(out)["html"]
+
+
+def test_overview_publishes_both_epoch_pnl_views_side_by_side():
+    """Neither number alone is the epoch result.
+
+    The sleeve ledger answers "did the strategy work"; the Flex statement answers "what
+    did the account do". Showing only the ledger hides that real money went 30x further
+    down; showing only the broker blames the strategy for a routing defect.
+    """
+    html = _pnl_card_html("-1260.0")
+    assert "<b>Epoch P&amp;L</b>" in html
+    assert "strategy -$43.25 / broker -$1,303.25" in html
+
+
+def test_overview_epoch_pnl_is_observed_not_a_blocker():
+    # A threshold on four closed lots is a threshold on noise, and the sample gates
+    # already block on that. If this ever renders BREACH/PENDING it has become a
+    # go-live blocker with no risk policy behind its number.
+    html = _pnl_card_html("-1260.0")
+    assert "<span>OBSERVED</span><b>Epoch P&amp;L</b>" in html
+
+
+def test_overview_epoch_pnl_says_whether_the_gap_is_fully_accounted_for():
+    explained = _pnl_card_html("-1260.0")
+    assert "fully accounted for by recorded ledger adjustment(s)" in explained
+    assert "part of the gap is unexplained" not in explained
+    # Same +1260.00 gap, adjustments that only cover part of it: the reviewer must not
+    # be told it is explained.
+    partial = _pnl_card_html("-400.0")
+    assert "part of the gap is unexplained" in partial
+    assert "fully accounted for" not in partial
+
+
+def test_overview_epoch_pnl_reports_missing_rather_than_zero_when_absent():
+    out = _run_paper_js_probe(
+        "const coverage = [{ key: 'paper_vs_backtest', status: 'MISSING', metrics: {} }];\n"
+        "__paperTest.renderReadinessBlockers([], coverage, {});\n"
+        "console.log(JSON.stringify({ html: elements.get('readinessBlockers').innerHTML }));"
+    )
+    html = json.loads(out)["html"]
+    assert "<span>MISSING</span><b>Epoch P&amp;L</b>" in html
+    assert "strategy -- / broker --" in html
+    assert "$0.00" not in html
+
+
+def _basis_for(lots: list[dict]) -> str | None:
+    from monitor.backend.paper_evidence_reader import _flex_reconcile_basis
+
+    return _flex_reconcile_basis({"statement_pnl_compare": {"flex_epoch_rebased_closed": lots}})
+
+
+def test_flex_reconcile_basis_is_read_from_the_lots_not_hardcoded():
+    """This string used to be a hardcoded sentence claiming the Flex money came from
+    local point_value. paper_pnl_compare switched to the statement's Proceeds and the
+    sentence stayed behind, describing code that no longer existed -- on the one panel
+    whose entire job is to report where the money came from."""
+    basis = _basis_for([{"pnl_basis": "statement_proceeds"}, {"pnl_basis": "statement_proceeds"}])
+    assert "statement Proceeds" in basis
+    assert "n=2" in basis
+    assert "local point_value" not in basis
+
+
+def test_flex_reconcile_basis_warns_when_any_lot_falls_back_to_local_point_value():
+    # A lot priced from local point_value cancels a multiplier defect on both sides, so
+    # paper-minus-Flex cannot see it. Mixing one in must not read as broker-verified.
+    basis = _basis_for([{"pnl_basis": "statement_proceeds"}, {"pnl_basis": None}])
+    assert "mixed basis" in basis
+    assert "unverified against broker money" in basis
+    assert "statement Proceeds (" not in basis
+
+
+def test_flex_reconcile_basis_is_absent_rather_than_asserted_with_no_lots():
+    assert _basis_for([]) is None
+    from monitor.backend.paper_evidence_reader import _flex_reconcile_basis
+
+    assert _flex_reconcile_basis({}) is None
+
+
+def _run_paper_refresh_probe(payloads: list[str]) -> dict:
+    """Drive load() through a scripted sequence of server responses.
+
+    Exports load() and the chip element so the poll's repaint decision can be observed
+    directly, rather than inferred from whether some panel changed.
+    """
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not available")
+    source = (DASH / "paper" / "paper.js").read_text(encoding="utf-8")
+    cut = source.rindex("\n})();")
+    source = source[:cut] + "\n  globalThis.__paperLoad = load;" + source[cut:]
+    program = (
+        "const vm = require('vm');\n"
+        "const elements = new Map();\n"
+        "let renders = 0;\n"
+        "function el(id) { if (!elements.has(id)) elements.set(id, { id, textContent: '', hidden: true, "
+        "set innerHTML(v) { renders += 1; this._h = v; }, get innerHTML() { return this._h || ''; }, "
+        "className: '', parentElement: { classList: { add(){}, remove(){}, toggle(){} } }, "
+        "querySelectorAll(){ return []; }, addEventListener(){}, scrollIntoView(){} }); return elements.get(id); }\n"
+        "globalThis.document = { getElementById: el, querySelectorAll(){ return []; }, querySelector(){ return null; } };\n"
+        "globalThis.window = { setInterval(){} };\n"
+        f"const bodies = {json.dumps(payloads)};\n"
+        "let call = 0;\n"
+        "globalThis.fetch = async () => ({ ok: true, text: async () => bodies[Math.min(call++, bodies.length - 1)] });\n"
+        "globalThis.AbortSignal = { timeout(){} };\n"
+        f"vm.runInThisContext({json.dumps(source)});\n"
+        "(async () => {\n"
+        # paper.js bootstraps its own load() on evaluation. Let that settle and reset the
+        # counters, otherwise its late render lands mid-probe and reads as a poll repaint.
+        "  for (let i = 0; i < 5; i += 1) await new Promise(r => setTimeout(r, 0));\n"
+        "  call = 0; renders = 0; el('refreshChip').hidden = true;\n"
+        "  await globalThis.__paperLoad(true);\n"
+        "  const afterFirst = renders;\n"
+        "  await globalThis.__paperLoad(false);\n"
+        "  const afterPoll = renders;\n"
+        "  const chipAfterPoll = el('refreshChip').hidden === false;\n"
+        "  await globalThis.__paperLoad(true);\n"
+        "  console.log(JSON.stringify({ afterFirst, afterPoll, afterAccept: renders, "
+        "chipAfterPoll, chipAfterAccept: el('refreshChip').hidden === false }));\n"
+        "})();\n"
+    )
+    result = subprocess.run([node, "-"], input=program, capture_output=True, text=True, encoding="utf-8", timeout=60)
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout.strip())
+
+
+_PAPER_PAYLOAD_A = '{"payload": {"gates": [], "coverage": [], "summary": {}}}'
+_PAPER_PAYLOAD_B = '{"payload": {"gates": [], "coverage": [], "summary": {"paper_days": 13}}}'
+
+
+def test_background_poll_does_not_repaint_while_the_reader_is_reading():
+    """render() reassigns innerHTML everywhere, closing open <details> and resetting
+    scroll. The payload changes a few times a day, so repainting on a 60s timer spends
+    the reader's place in a long evidence table to buy freshness that is not there."""
+    seen = _run_paper_refresh_probe([_PAPER_PAYLOAD_A, _PAPER_PAYLOAD_B, _PAPER_PAYLOAD_B])
+    assert seen["afterFirst"] > 0, "first load must render"
+    assert seen["afterPoll"] == seen["afterFirst"], "background poll must not repaint"
+    assert seen["chipAfterPoll"], "new evidence must be offered via the refresh chip"
+    assert seen["afterAccept"] > seen["afterPoll"], "accepting the chip must repaint"
+    assert not seen["chipAfterAccept"], "chip must clear once the reader accepts"
+
+
+def test_unchanged_payload_does_not_raise_a_refresh_chip():
+    # A chip that appears when nothing changed trains the reader to ignore it.
+    seen = _run_paper_refresh_probe([_PAPER_PAYLOAD_A, _PAPER_PAYLOAD_A, _PAPER_PAYLOAD_A])
+    assert not seen["chipAfterPoll"]
+    assert seen["afterPoll"] == seen["afterFirst"]
 
 
 def test_coverage_rule_bar_reads_duration_and_exit_targets_from_payload():
@@ -2681,7 +2862,10 @@ def test_frontend_modules_keep_data_boundaries():
     assert "decision.exits" in realtime_js
     assert "decision.rejected_detail" in realtime_js
     assert "renderDecisions(snap)" in realtime_js
-    assert "const equity = snap?.equity" in realtime_js
+    # P2-A1 đổi `snap` thành `snapshot` trong renderMetrics: khi nguồn runner-state
+    # chết thì `snapshot` là null nên số không còn render như đang sống. Ý định của
+    # assert này — equity đến từ snapshot chứ không phải nguồn khác — giữ nguyên.
+    assert "const equity = snapshot?.equity" in realtime_js
     assert "metricDrawdownFill" in realtime
     assert "metricDrawdownAmount" in realtime
     assert "schedule?.evidence_available" in realtime_js

@@ -698,8 +698,8 @@ Trộn hai loại vào một danh sách sẽ khiến "chưa biết" đọc như 
 
 | # | Vấn đề | Bằng chứng | Mức |
 |---|---|---|---|
-| **P2-A1** | Số từ một nguồn API đã chết vẫn render như đang sống. Rail có gọi tên nguồn hỏng (M8 nửa đầu), nhưng `renderMetrics:320` là `snap?.equity ?? meta.final_equity` — **không kiểm `error`**. `state.runner?.error` chỉ được dùng ở `stripDeadSources` và trong text bằng chứng. Equity, drawdown, decision, regime tiếp tục hiện số cũ, chỉ mờ `opacity: .42` | Đọc code: `rg "state.runner\?\.error"` → chỉ dòng 484 và 637 | **High** — cùng họ với C2 "stale nhìn giống healthy", nhưng nhẹ hơn vì rail đã gọi tên nguồn |
-| **P2-A2** | `fatalBanner` vẫn all-or-nothing: `realtime.js:261` là `hidden = results.some(fulfilled)`, nên banner chỉ hiện khi **cả 5** endpoint chết | Đọc code | **Medium** |
+| **P2-A1** ✅ | *(ĐÓNG 2026-08-15)* Số từ một nguồn API đã chết vẫn render như đang sống. Rail có gọi tên nguồn hỏng (M8 nửa đầu), nhưng `renderMetrics:320` là `snap?.equity ?? meta.final_equity` — **không kiểm `error`**. `state.runner?.error` chỉ được dùng ở `stripDeadSources` và trong text bằng chứng. Equity, drawdown, decision, regime tiếp tục hiện số cũ, chỉ mờ `opacity: .42` | Đọc code: `rg "state.runner\?\.error"` → chỉ dòng 484 và 637 | **High** — cùng họ với C2 "stale nhìn giống healthy", nhưng nhẹ hơn vì rail đã gọi tên nguồn |
+| **P2-A2** ⬇ | *(RÚT LẠI 2026-08-15 — không phải lỗi)* Banner ghi **"Monitor backend unavailable."**. Một endpoint chết KHÔNG phải backend chết; hiện banner lúc đó là nói sai. Điều kiện all-or-nothing đúng với thông điệp nó mang, và khiếu nại gốc — fail lẻ vô hình — đã được rail đóng ở M8. Ghim bằng `test_the_fatal_banner_speaks_only_for_a_dead_backend` | Đọc code + test | ~~Medium~~ → **không phải finding** |
 
 *P2-A1 và P2-A2 là hai nửa chưa làm của M8. Ô M8 trong bảng Phase 1 đã sửa từ ✅ thành ⚠️ MỘT PHẦN.*
 
