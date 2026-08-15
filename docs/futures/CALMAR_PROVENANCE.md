@@ -300,7 +300,16 @@ ngay từ lúc gõ.
 - [x] D5 RESOLVED — `regime_csv` giờ được `run_verify` dùng thật.
 - [x] **D3, D4 RESOLVED 2026-08-15** — STATUS.md và GLOSSARY.md không còn ghi sàn 2.38;
       GLOSSARY thêm 3 mục: sàn promote vs sàn theo dõi, đo theo cặp, sàn nhiễu.
-- [ ] D1, D2, D6: sửa doc-drift còn lại.
+- [x] **D1, D2 RESOLVED 2026-08-15** — `PIPELINE_FLOW.md` không còn ghi
+      `refreeze.py → models/PRODUCTION.pkl` (không có file đó; `label_regimes` gọi
+      `save=False`) và không còn ghi `HMMStaleGuard chưa wire` (đã wire, `run_live_day.py:709`).
+- [x] **D6 RESOLVED 2026-08-15** — `runner._refreeze_status()` đọc `refreeze_pending.json`
+      thật thay cho hardcode `{"pending": False}`. **Fail-closed**: cờ đọc không được thì báo
+      `pending=True` + `unknown=True`, vì consumer map `pending` falsy thẳng sang trạng thái OK
+      (`paper_evidence_reader.py`) — báo False khi lỗi đọc là in "an toàn" đè lên một lần
+      re-freeze hỏng chưa xử lý. `pending` vẫn là bool (T19.6 ghim). Test T19b.1–.9, có
+      mutation-test; **T19b.8/.9 đi qua `_build_operational_status`** vì chỉ test helper thì
+      để nguyên đúng lỗi đang sửa — helper đúng mà không ai gọi.
 - [ ] **QUYẾT ĐỊNH CỦA CHỦ Dự ÁN** — `runner.BACKTEST_CALMAR_FLOOR = 1.65` nằm trong dải
       nhiễu seed [1.56, 1.72]. **Đã document đầy đủ** (§4b + INVARIANTS + comment tại
       `runner.py:100-125` + GLOSSARY), **chưa sửa giá trị**. Ba lựa chọn ở §4b.

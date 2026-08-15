@@ -10,17 +10,23 @@ _Cập nhật: 2026-07-14. Chi tiết file: xem [SCRIPT_INVENTORY.md](SCRIPT_INV
 PRE-DAY (13:45 ET, scheduler tự động):
   update_ibkr_daily.py → futures parquet (4 instruments MES/MNQ/MYM/M2K + NKD = 5 total, append daily bars)
   update_spy_csv.py    → spy_daily_live.csv  (Polygon adjusted close, 30d overlap)
-  [G1 freshness gate: HMMStaleGuard chưa wire trong production — xem I5.12]
+  [G1/G2 freshness gate: HMMStaleGuard ĐÃ wire — run_live_day.py:709]
   ── (annual) ──
-  refreeze.py       → models/PRODUCTION.pkl
+  refreeze.py       → models/hmm/futures_freeze_registry.json  (KHÔNG ghi .pkl nào)
 
 CONSTRUCTION (MỖI NGÀY — run_live_day.py là run-and-exit subprocess, label_regimes gọi trong main()):
   label_regimes(spy_daily_live.csv, fit_end=2024-12-31)
   → RegimeLabels dict {date → "Calm"/"Normal"/"Stress"}   ← HMM model frozen (fit_end=2024-12-31)
   SwingTFEngine(basket), StressMidEngine(basket), CircuitBreaker
   → bound vào signal_fn (closure)
-  → FuturesRunner(broker, signal_fn, guard, breaker, hmm_stale_guard=None)
-  [G1 HMMStaleGuard chưa wire: hmm_stale_guard=None trong production — xem I5.12]
+  → FuturesRunner(broker, signal_fn, guard, breaker,
+                  hmm_stale_guard=HMMStaleGuard(regime_csv, fit_end))   ← run_live_day.py:709
+
+[2026-08-15] Hai dòng trên trước đây ghi "HMMStaleGuard chưa wire, hmm_stale_guard=None
+trong production — xem I5.12", và "refreeze.py → models/PRODUCTION.pkl". Cả hai đều sai:
+guard đã wire từ lâu, và refreeze KHÔNG ghi .pkl nào — `label_regimes` gọi
+`eng.fit(..., save=False)` nên model chỉ tồn tại trong RAM; `models/hmm/` chỉ có registry
+JSON cộng 16 .pkl từ 2026-06-05 là artifact test của stocks. Xem CALMAR_PROVENANCE.md §4 (D1, D2).
 
 ────────────────────────────────────────────────
 RUN_DAY(day):

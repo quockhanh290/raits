@@ -2436,6 +2436,44 @@ class FuturesRunner:
 
     # ── Live state snapshot ──────────────────────────────────────────────────
 
+    def _refreeze_status(self) -> dict:
+        """Read the re-freeze pending flag instead of asserting there is not one.
+
+        This field returned a hardcoded {"pending": False} from the day it was written
+        until 2026-08-15, so models/hmm/refreeze_pending.json — the flag refreeze.py
+        writes and re-alerts on after every failed attempt — reached no dashboard. The
+        panel whose whole job is to show re-freeze state showed "not pending" whether or
+        not one was pending.
+
+        Fail closed. A flag file that exists but will not parse is not the same as no
+        flag, and the consumer maps a falsy `pending` straight to status OK
+        (paper_evidence_reader.py), so returning False on a read error would print an
+        all-clear over an unresolved failure. `pending` stays a bool because T19.6 pins
+        that; `unknown` carries the distinction.
+
+        The path comes from refreeze.PENDING_PATH rather than a second literal, and stays
+        relative exactly as the writer has it — both sides run from the repo root.
+        """
+        try:
+            from futures.refreeze import PENDING_PATH
+            path = Path(PENDING_PATH)
+            if not path.exists():
+                return {"pending": False}
+            flag = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logger.warning(
+                "refreeze pending flag unreadable (%s) — reporting pending so an "
+                "unresolved re-freeze cannot hide behind a read error", exc)
+            return {"pending": True, "unknown": True, "detail": f"unreadable: {exc}"}
+
+        return {
+            "pending": True,
+            "fail_type": flag.get("fail_type"),
+            "fit_end_target": flag.get("fit_end_target"),
+            "attempts": flag.get("attempts"),
+            "failed_at": flag.get("failed_at"),
+        }
+
     def _build_operational_status(self, day) -> dict:
         """Build the 7-item operational_status dict from current runner state."""
         cur_eq = self.state.equity   # SYSTEM equity, not broker balance
@@ -2523,7 +2561,7 @@ class FuturesRunner:
             "regime_freshness": freshness_item,
             "model_age": model_age_item,
             "positions": {"count": n_open, "persist_match": persist_match},
-            "refreeze": {"pending": False},
+            "refreeze": self._refreeze_status(),
             "regime_unreliable": bool(
                 getattr(self._hmm_stale_guard, "regime_unreliable", False)
             ) if self._hmm_stale_guard else False,

@@ -894,6 +894,72 @@ def test_ops_status_keys():
           isinstance(ops["regime_unreliable"], bool))
 
 
+# ─── T19b: refreeze.pending is READ, not asserted away ───────────────────────
+
+def test_refreeze_pending_flag_is_read():
+    print("\nT19b: refreeze.pending reflects models/hmm/refreeze_pending.json")
+    import futures.refreeze as _rf
+    broker = _empty_broker()
+    runner = _make_runner(broker, _noop_signal)
+    original = _rf.PENDING_PATH
+    branches = []
+    try:
+        with tempfile.TemporaryDirectory(prefix="refreeze_flag_") as tmp:
+            flag = Path(tmp) / "refreeze_pending.json"
+
+            # 1. No flag on disk — the ordinary case, and the only one the old hardcoded
+            #    {"pending": False} ever got right.
+            _rf.PENDING_PATH = flag
+            s = runner._refreeze_status(); branches.append(s)
+            check("T19b.1 no flag file → pending False", s == {"pending": False}, str(s))
+
+            # 2. A real flag, in refreeze._write_pending_flag's own shape.
+            flag.write_text(json.dumps({
+                "fail_type": "data_missing", "fit_end_target": "2025-12-31",
+                "error": "G3 ABORT: spy csv short", "attempts": 3,
+                "failed_at": "2026-08-15T00:00:00+00:00"}), encoding="utf-8")
+            s = runner._refreeze_status(); branches.append(s)
+            check("T19b.2 flag present → pending True", s["pending"] is True, str(s))
+            check("T19b.3 attempts reach the dashboard", s.get("attempts") == 3,
+                  str(s.get("attempts")))
+            check("T19b.4 fit_end_target reaches the dashboard",
+                  s.get("fit_end_target") == "2025-12-31", str(s.get("fit_end_target")))
+
+            # 3. Unreadable flag must FAIL CLOSED. paper_evidence_reader maps a falsy
+            #    `pending` straight to status OK, so False here would print an all-clear
+            #    over an unresolved re-freeze failure.
+            flag.write_text("{ not json", encoding="utf-8")
+            s = runner._refreeze_status(); branches.append(s)
+            check("T19b.5 unreadable flag → pending True (fail closed)",
+                  s["pending"] is True, str(s))
+            check("T19b.6 unreadable flag marked unknown", s.get("unknown") is True, str(s))
+
+            # 4. End-to-end through _build_operational_status, which is what dump_state
+            #    actually publishes. Checking _refreeze_status() alone leaves the exact
+            #    bug being fixed alive: a correct helper that nothing calls, with the
+            #    hardcode still sitting in the dict. A mutation putting {"pending": False}
+            #    back left 1-3 green precisely because they never went through here.
+            flag.write_text(json.dumps({
+                "fail_type": "unexpected", "fit_end_target": "2025-12-31",
+                "attempts": 1, "failed_at": "2026-08-15T00:00:00+00:00"}), encoding="utf-8")
+            e2e_day = pd.Timestamp("2024-06-17")
+            runner.run_day(e2e_day)
+            ops = runner._build_operational_status(e2e_day)
+            branches.append(ops["refreeze"])
+            check("T19b.8 the pending flag reaches operational_status, not just the helper",
+                  ops["refreeze"]["pending"] is True, str(ops["refreeze"]))
+            check("T19b.9 fail_type survives the trip to operational_status",
+                  ops["refreeze"].get("fail_type") == "unexpected",
+                  str(ops["refreeze"].get("fail_type")))
+    finally:
+        _rf.PENDING_PATH = original
+
+    # T19.6 pins pending as a bool. Every branch has to honour that, not just the first.
+    check("T19b.7 pending is bool on every branch",
+          all(isinstance(b["pending"], bool) for b in branches),
+          str([type(b["pending"]).__name__ for b in branches]))
+
+
 # ─── T20: events bounded to 500 ──────────────────────────────────────────────
 
 def test_events_bounded():
@@ -1343,6 +1409,7 @@ if __name__ == "__main__":
     test_h2_invalid_position_discarded()
     test_h1_schema_version()
     test_g4a_lock_bad_path()
+    test_refreeze_pending_flag_is_read()
     test_h3_csv_dedup()
     test_ops_status_keys()
     test_events_bounded()
