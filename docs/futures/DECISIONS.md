@@ -99,6 +99,55 @@ Rejected: hạ sàn xuống dưới 1.56 rồi giữ nguyên cổng tuyệt đ�
 Why: `MODEL AGE URGENT — schedule re-freeze immediately` bắn mỗi ngày từ tháng thứ 19, trong khi đáp án đo được là "không refit". Cảnh báo mà phản ứng đúng là phớt lờ sẽ dạy người vận hành phớt lờ mọi cảnh báo. Đổi tiêu đề thành `MODEL AGE CHECK DUE` và nội dung trỏ vào `python futures/compare_refit.py`. Ngưỡng 12/18 tháng **giữ nguyên** — vấn đề là động từ, không phải nhịp.  
 Rejected: nới `G2_HARD_MONTHS` — che triệu chứng, mất luôn nhịp kiểm tra định kỳ; tắt G2 — mất cảnh báo thật khi model thực sự lạc hậu.
 
+**Sàn nhiễu chốt bằng P95 trên 30 seed (thay vì max trên 5) — 2026-08-15**  
+`measure_fit_noise.py --seeds <30 giá trị>`, 435 cặp, SC-FIDELITY PASS.
+
+| cửa sổ | min | trung vị | p90 | **p95** | max |
+|---|---|---|---|---|---|
+| L11 (2026) | 0.00% | 3.90% | 9.74% | **11.04%** | 11.69% |
+| gate (2019+) | 0.00% | 2.87% | 8.31% | **9.09%** | 10.03% |
+
+Verdict đổi từ so với `max` sang so với **P95**: max của mẫu nhỏ là ước lượng đuôi tệ nhất.
+Percentile dùng **nearest-rank**, không nội suy — nội suy trên mẫu nhỏ là bịa ra độ chính xác.
+
+⚠️ **max ở đây KHÔNG phải trần thật.** Bộ 30 seed không chứa `123` và `2026` — đúng cặp sinh ra
+12.34% ở lần chạy 5 seed. Gộp cả hai lần, **cực đại đã quan sát = 12.34%**.
+
+Hệ quả: tín hiệu L11 **5.84% < P95 11.04%** → nằm trong nhiễu, xác nhận lại HOLD với thống kê
+tốt hơn nhiều. `GATE_AUTO_PCT = 5.0` **thấp hơn P95 của chính cửa sổ nó dùng (9.09%)** — khẳng định
+lại phát hiện cũ. Ngược lại, **ngưỡng L11 15–20% nằm TRÊN P95 → ngưỡng đó là hợp lệ**, không cần đổi.
+
+**Detector cho L11 điều kiện 2 — `futures/detect_regime_miss.py` — 2026-08-15**  
+Why: `compare_refit.py` so HMM với **chính HMM**; nếu cả hai fit cùng sai một kiểu, nó báo 0% và
+mọi thứ trông ổn. Cần một thước không phải HMM.
+
+Ba lớp, ghi rõ độ độc lập vì gọi nhầm là tự lừa mình:
+- **Lớp A — độc lập thật**: HMM chỉ nhìn log-return + vol 5 ngày **trailing** (`features.py`), không
+  bao giờ thấy tương lai. Nên hỏi: nhãn hôm nay có dự báo được vol **10 ngày tới** không? Đo bằng
+  AUC vượt trội (dựa trên hạng, không ngưỡng).
+- **Lớp B — KHÔNG độc lập**: vol trailing chính là feature của model → chỉ kiểm nhất quán, bắt
+  sập/đảo trạng thái (kiểu hỏng của retrain 20260619).
+- **Lớp C — độc lập yếu**: drawdown từ đỉnh 60 ngày, cùng chuỗi giá nhưng không phải feature.
+
+**Neo IS 2018-2024 (bắt buộc, không đậu thì không phát verdict):**
+- Lớp A **AUC = 0.8943** (n=265 Stress / 708 Calm) — *lần đầu HMM được kiểm chứng độc lập trong dự án*
+- Lớp B đúng thứ tự: Calm 7.24% < Normal 15.13% < Stress 30.70%
+- Lớp C: median drawdown Stress −9.10% vs Calm −0.30%
+
+**Kết quả 12 tháng gần nhất: KHÔNG ĐÁNH GIÁ ĐƯỢC (thị trường chỉ vừa chạm).** 4 ngày Stress / 252.
+Sụt sâu nhất −9.13% (2026-03-30), đúng 1 ngày chạm ngưỡng IS-Stress −9.10%, và model **có** bắn
+Stress ở đó (lớp C AUC = 1.0 — cả 4 ngày Stress đều sâu hơn mọi ngày Calm).
+
+Why bản phân tách: *"thiếu ngày Stress"* mơ hồ giữa **thị trường yên** và **model mù** — hai kết
+luận đối lập, cùng một output. Script tách bằng drawdown (không phụ thuộc nhãn), ngưỡng lấy từ
+median drawdown của chính những ngày IS gọi là Stress, **không bịa**.
+
+**Không đặt ngưỡng suy giảm.** Chỉ tự kết luận ở hai trường hợp không cãi được: thứ tự bị đảo,
+hoặc AUC ≤ 0.5. Một ngưỡng kiểu "giảm 15%" cần block bootstrap trên chuỗi tự tương quan — chưa làm.
+
+**Trả lời "làm sao biết khi nào":** trigger tự động = **cửa sổ 12 tháng đầu tiên tích đủ ≥10 ngày
+Stress**. Từ đó detector phát verdict thật. Không phải lịch, mà là dữ liệu.
+
 **Deploy dùng `label_regimes()` (không dùng `regime_coordinator`)**  
 Why: validated path qua toàn bộ reconcile chain; regime_coordinator là code path khác, chưa validate.  
 Rejected: regime_coordinator — chưa chứng minh identical output.

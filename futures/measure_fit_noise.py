@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import statistics
 import subprocess
 import sys
@@ -152,12 +153,24 @@ def pct_diff(sa: pd.Series, sb: pd.Series, start: str | None) -> tuple:
     return round(100.0 * nd / len(idx), 4), nd, len(idx)
 
 
+def _pct(sorted_vals: list, q: float) -> float:
+    """Nearest-rank percentile. No interpolation on purpose: with a small number of
+    pairs an interpolated quantile invents precision the sample does not have."""
+    k = max(1, math.ceil(q * len(sorted_vals)))
+    return sorted_vals[min(k, len(sorted_vals)) - 1]
+
+
 def _stats(vals: list) -> dict:
     vals = [v for v in vals if v is not None]
     if not vals:
-        return {"n_pairs": 0, "min": None, "median": None, "max": None}
-    return {"n_pairs": len(vals), "min": round(min(vals), 4),
-            "median": round(statistics.median(vals), 4), "max": round(max(vals), 4)}
+        return {"n_pairs": 0, "min": None, "median": None,
+                "p90": None, "p95": None, "max": None}
+    sv = sorted(vals)
+    return {"n_pairs": len(sv), "min": round(sv[0], 4),
+            "median": round(statistics.median(sv), 4),
+            "p90": round(_pct(sv, 0.90), 4),
+            "p95": round(_pct(sv, 0.95), 4),
+            "max": round(sv[-1], 4)}
 
 
 def _read_signal() -> dict:
@@ -314,7 +327,8 @@ def main() -> int:
 
     print("\n" + "-" * 74)
     print("SAN NHIEU (chenh lech giua cac cap seed, CUNG fit_end)")
-    print(f"  {'cua so':<14} {'cap':>4} {'min':>8} {'trung vi':>10} {'max':>8}   tin hieu da do")
+    print(f"  {'cua so':<14} {'cap':>5} {'min':>8} {'trung vi':>9} {'p90':>8} "
+          f"{'p95':>8} {'max':>8}   tin hieu da do")
     for wname in windows:
         st = noise[wname]
         s_txt = ""
@@ -322,8 +336,9 @@ def main() -> int:
             s_txt = f"   {sig['l11']:.2f}%  (fit-{sig.get('fit_prev')} vs fit-{sig.get('fit_new')})"
         elif wname == "gate_window" and sig.get("gate") is not None:
             s_txt = f"   {sig['gate']:.2f}%  (run_gate)"
-        print(f"  {wname:<14} {st['n_pairs']:>4} {st['min']:>7.2f}% "
-              f"{st['median']:>9.2f}% {st['max']:>7.2f}%{s_txt}")
+        print(f"  {wname:<14} {st['n_pairs']:>5} {st['min']:>7.2f}% "
+              f"{st['median']:>8.2f}% {st['p90']:>7.2f}% {st['p95']:>7.2f}% "
+              f"{st['max']:>7.2f}%{s_txt}")
 
     # ── Ket luan ─────────────────────────────────────────────────────────────
     print("\n" + "=" * 74)
@@ -336,13 +351,13 @@ def main() -> int:
         st = noise[wname]
         if s is None or st["median"] is None:
             continue
-        if s <= st["max"]:
+        if s <= st["p95"]:
             v = "TRONG NHIEU"
-            msg = (f"tin hieu {s:.2f}% <= nhieu max {st['max']:.2f}% — KHONG phan biet duoc "
-                   f"voi viec chay lai cung mot fit bang seed khac")
+            msg = (f"tin hieu {s:.2f}% <= nhieu P95 {st['p95']:.2f}% (max {st['max']:.2f}%) "
+                   f"— KHONG phan biet duoc voi viec chay lai cung mot fit bang seed khac")
         elif s <= 2 * st["median"]:
             v = "GAN NHIEU"
-            msg = (f"tin hieu {s:.2f}% > nhieu max {st['max']:.2f}% nhung chua toi 2x trung vi "
+            msg = (f"tin hieu {s:.2f}% > nhieu P95 {st['p95']:.2f}% nhung chua toi 2x trung vi "
                    f"({st['median']:.2f}%) — bien mong")
         else:
             v = "TREN NHIEU"

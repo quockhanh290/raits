@@ -1,5 +1,5 @@
 SAN NHIEU HMM FIT — cung fit_end, khac random seed
-measured_at  2026-08-15T09:01:24.042093+00:00
+measured_at  2026-08-15T10:48:21.112862+00:00
 
 CO SO DO
   spy_csv              D:\raits\spy_daily_live.csv
@@ -9,35 +9,60 @@ CO SO DO
   train_end            2018-01-01
   n_components         3
   fit_end              2024-12-31
-  seeds                [42, 1, 7, 123, 2026]
-  git_commit           83ac849-dirty
+  seeds                [42, 1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107]
+  git_commit           e1a7d87-dirty
   python               3.11.4
   production_hash      b70204f002b1f717
 
 SELF-CHECK
   [PASS] SC0  seed 42 co trong danh sach (bat buoc cho SC-FIDELITY)
-         seeds=[42, 1, 7, 123, 2026]
+         seeds=[42, 1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107]
   [PASS] SC1  co it nhat 2 seed de tao cap
-         n=5
+         n=30
   [PASS] SC-FIDELITY  ban chep voi seed=42 cho nhan Y HET label_regimes production
          production=b70204f002b1f717  replica_seed42=b70204f002b1f717
   [PASS] SC2  moi seed deu tra du nhan
-         prod=2165  seeds={42: 2165, 1: 2165, 7: 2165, 123: 2165, 2026: 2165}
+         prod=2165  seeds={42: 2165, 1: 2165, 2: 2165, 3: 2165, 5: 2165, 7: 2165, 11: 2165, 13: 2165, 17: 2165, 19: 2165, 23: 2165, 29: 2165, 31: 2165, 37: 2165, 41: 2165, 43: 2165, 47: 2165, 53: 2165, 59: 2165, 61: 2165, 67: 2165, 71: 2165, 73: 2165, 79: 2165, 83: 2165, 89: 2165, 97: 2165, 101: 2165, 103: 2165, 107: 2165}
   [PASS] SC3  nhan chi thuoc ['Calm', 'Normal', 'Stress']
   [PASS] SC4  khong seed nao lam sap trang thai (du 3 regime)
 
 PHAN BO NHAN THEO SEED
   seed 42: {'Normal': 994, 'Calm': 881, 'Stress': 290}
   seed 1: {'Normal': 977, 'Calm': 867, 'Stress': 321}
+  seed 2: {'Normal': 962, 'Calm': 946, 'Stress': 257}
+  seed 3: {'Normal': 973, 'Calm': 924, 'Stress': 268}
+  seed 5: {'Normal': 960, 'Calm': 948, 'Stress': 257}
   seed 7: {'Normal': 969, 'Calm': 916, 'Stress': 280}
-  seed 123: {'Normal': 972, 'Calm': 928, 'Stress': 265}
-  seed 2026: {'Calm': 960, 'Normal': 952, 'Stress': 253}
+  seed 11: {'Normal': 972, 'Calm': 916, 'Stress': 277}
+  seed 13: {'Normal': 969, 'Calm': 910, 'Stress': 286}
+  seed 17: {'Normal': 960, 'Calm': 852, 'Stress': 353}
+  seed 19: {'Normal': 957, 'Calm': 850, 'Stress': 358}
+  seed 23: {'Normal': 969, 'Calm': 932, 'Stress': 264}
+  seed 29: {'Normal': 970, 'Calm': 928, 'Stress': 267}
+  seed 31: {'Normal': 961, 'Calm': 946, 'Stress': 258}
+  seed 37: {'Normal': 960, 'Calm': 896, 'Stress': 309}
+  seed 41: {'Normal': 961, 'Calm': 853, 'Stress': 351}
+  seed 43: {'Calm': 956, 'Normal': 956, 'Stress': 253}
+  seed 47: {'Normal': 957, 'Calm': 850, 'Stress': 358}
+  seed 53: {'Normal': 949, 'Calm': 866, 'Stress': 350}
+  seed 59: {'Normal': 969, 'Calm': 932, 'Stress': 264}
+  seed 61: {'Normal': 971, 'Calm': 933, 'Stress': 261}
+  seed 67: {'Normal': 958, 'Calm': 952, 'Stress': 255}
+  seed 71: {'Normal': 968, 'Calm': 908, 'Stress': 289}
+  seed 73: {'Normal': 961, 'Calm': 946, 'Stress': 258}
+  seed 79: {'Normal': 962, 'Calm': 865, 'Stress': 338}
+  seed 83: {'Normal': 973, 'Calm': 920, 'Stress': 272}
+  seed 89: {'Normal': 971, 'Calm': 928, 'Stress': 266}
+  seed 97: {'Normal': 962, 'Calm': 901, 'Stress': 302}
+  seed 101: {'Normal': 975, 'Calm': 924, 'Stress': 266}
+  seed 103: {'Calm': 957, 'Normal': 955, 'Stress': 253}
+  seed 107: {'Normal': 968, 'Calm': 937, 'Stress': 260}
 
 SAN NHIEU
-  l11_window     n_pairs=10  min=2.5974%  median=5.8442%  max=12.3377%
-  gate_window    n_pairs=10  min=1.2017%  median=3.3176%  max=7.5758%
-  full           n_pairs=10  min=1.2471%  median=3.3487%  max=7.4365%
+  l11_window     n_pairs=435  min=0.0%  median=3.8961%  max=11.6883%
+  gate_window    n_pairs=435  min=0.0%  median=2.8736%  max=10.0313%
+  full           n_pairs=435  min=0.0%  median=2.8637%  max=9.746%
 
 KET LUAN
-  [l11_window] TRONG NHIEU: tin hieu 5.84% <= nhieu max 12.34% — KHONG phan biet duoc voi viec chay lai cung mot fit bang seed khac
-  [gate_window] TRONG NHIEU: tin hieu 3.87% <= nhieu max 7.58% — KHONG phan biet duoc voi viec chay lai cung mot fit bang seed khac
+  [l11_window] TRONG NHIEU: tin hieu 5.84% <= nhieu P95 11.04% (max 11.69%) — KHONG phan biet duoc voi viec chay lai cung mot fit bang seed khac
+  [gate_window] TRONG NHIEU: tin hieu 3.87% <= nhieu P95 9.09% (max 10.03%) — KHONG phan biet duoc voi viec chay lai cung mot fit bang seed khac

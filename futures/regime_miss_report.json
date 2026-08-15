@@ -1,0 +1,147 @@
+{
+  "measured_at": "2026-08-15T10:52:27.521932+00:00",
+  "basis": {
+    "spy_csv": "D:\\raits\\spy_daily_live.csv",
+    "spy_csv_sha256": "0e3815c29df3d5b8",
+    "spy_csv_last_date": "2026-08-13",
+    "spy_csv_rows": 2416,
+    "hmm_fit_end": "2024-12-31",
+    "train_end": "2018-01-01",
+    "n_components": 3,
+    "vol_window": 5,
+    "forward_days": 10,
+    "drawdown_window": 60,
+    "recent_months": 12,
+    "anchor_auc_min": 0.7,
+    "git_commit": "e1a7d87-dirty",
+    "python": "3.11.4"
+  },
+  "anchor_is": {
+    "tag": "IS 2018-01-02..2024-12-31",
+    "start": "2018-01-02",
+    "end": "2024-12-31",
+    "n_days": 1761,
+    "label_counts": {
+      "Normal": 788,
+      "Calm": 708,
+      "Stress": 265
+    },
+    "layer_a": {
+      "what": "forward realised vol, day t+1..t+10 (model never sees this)",
+      "independent": true,
+      "n_stress": 265,
+      "n_calm": 708,
+      "n_normal": 788,
+      "auc_stress_over_calm": 0.8943076431084106,
+      "auc_normal_over_calm": 0.6971880466890361,
+      "median_stress": 0.22579422954665657,
+      "median_normal": 0.14269072115190723,
+      "median_calm": 0.10169141090567035
+    },
+    "layer_b": {
+      "what": "trailing 5-day realised vol \u2014 THIS IS THE MODEL OWN INPUT FEATURE",
+      "independent": false,
+      "median_by_label": {
+        "Calm": 0.07240735306840201,
+        "Normal": 0.1513347742632406,
+        "Stress": 0.3069952626689889
+      },
+      "monotone_calm_lt_normal_lt_stress": true
+    },
+    "layer_c": {
+      "what": "drawdown from trailing 60-day peak (same prices, not a model feature)",
+      "independent": "weak",
+      "median_drawdown_stress": -0.09101756295660535,
+      "median_drawdown_calm": -0.003011530137127405,
+      "auc_calm_over_stress": 0.9773931350602281
+    }
+  },
+  "recent": {
+    "tag": "recent 12m",
+    "start": "2025-08-13",
+    "end": "2026-08-13",
+    "n_days": 252,
+    "label_counts": {
+      "Normal": 127,
+      "Calm": 121,
+      "Stress": 4
+    },
+    "layer_a": {
+      "what": "forward realised vol, day t+1..t+10 (model never sees this)",
+      "independent": true,
+      "n_stress": 4,
+      "n_calm": 118,
+      "n_normal": 120,
+      "auc_stress_over_calm": 0.5995762711864406,
+      "auc_normal_over_calm": 0.5992937853107345,
+      "median_stress": 0.12058789363047293,
+      "median_normal": 0.12490217933244313,
+      "median_calm": 0.10967880759964263
+    },
+    "layer_b": {
+      "what": "trailing 5-day realised vol \u2014 THIS IS THE MODEL OWN INPUT FEATURE",
+      "independent": false,
+      "median_by_label": {
+        "Calm": 0.07195891218944428,
+        "Normal": 0.14340808597555307,
+        "Stress": 0.2861145973210208
+      },
+      "monotone_calm_lt_normal_lt_stress": true
+    },
+    "layer_c": {
+      "what": "drawdown from trailing 60-day peak (same prices, not a model feature)",
+      "independent": "weak",
+      "median_drawdown_stress": -0.057448705229406594,
+      "median_drawdown_calm": -0.0028970004902616475,
+      "auc_calm_over_stress": 1.0
+    }
+  },
+  "verdict": {
+    "verdict": "KHONG DANH GIA DUOC (thi truong chi vua cham)",
+    "reason": "chi 4 ngay Stress \u2014 duoi muc 10 can de tinh AUC. Nhung thi truong CO cham vung stress (1 ngay sut <= -9.10%) va model CO bat, nen day khong phai dau hieu model mu. Chua du mau de do MUC DO, du de loai kha nang mu.",
+    "probe": {
+      "is_stress_median_drawdown": -0.09101756295660535,
+      "recent_worst_drawdown": -0.09133129160735598,
+      "recent_days_at_or_below_is_stress_level": 1,
+      "market_reached_stress_territory": true
+    }
+  },
+  "selfchecks": [
+    {
+      "id": "SC1",
+      "desc": "nhan khong rong",
+      "passed": true,
+      "detail": "n=2165"
+    },
+    {
+      "id": "SC2",
+      "desc": "nhan chi thuoc Calm/Normal/Stress",
+      "passed": true,
+      "detail": "['Calm', 'Normal', 'Stress']"
+    },
+    {
+      "id": "SC-NOLOOKAHEAD",
+      "desc": "vol_fwd NaN o 10 ngay cuoi (khong the biet tuong lai), co gia tri o giua",
+      "passed": true,
+      "detail": "tail_all_nan=True mid_all_present=True"
+    },
+    {
+      "id": "SC-ANCHOR-A",
+      "desc": "lop A tren IS >= 0.7 (nhan co du bao duoc vol tien khong)",
+      "passed": true,
+      "detail": "AUC=0.8943"
+    },
+    {
+      "id": "SC-ANCHOR-B",
+      "desc": "lop B tren IS xep dung thu tu Calm < Normal < Stress",
+      "passed": true,
+      "detail": "{'Calm': 0.0724, 'Normal': 0.1513, 'Stress': 0.307}"
+    },
+    {
+      "id": "SC-SAMPLE",
+      "desc": "du mau de danh gia (>=20 Calm, >=10 Stress)",
+      "passed": false,
+      "detail": "n_calm=118 n_stress=4"
+    }
+  ]
+}

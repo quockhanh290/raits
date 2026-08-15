@@ -1,0 +1,47 @@
+L11 DIEU KIEN 2 — model co gan sai regime khong
+measured_at  2026-08-15T10:52:27.521932+00:00
+
+CO SO DO
+  spy_csv              D:\raits\spy_daily_live.csv
+  spy_csv_sha256       0e3815c29df3d5b8
+  spy_csv_last_date    2026-08-13
+  spy_csv_rows         2416
+  hmm_fit_end          2024-12-31
+  train_end            2018-01-01
+  n_components         3
+  vol_window           5
+  forward_days         10
+  drawdown_window      60
+  recent_months        12
+  anchor_auc_min       0.7
+  git_commit           e1a7d87-dirty
+  python               3.11.4
+
+SELF-CHECK
+  [PASS] SC1  nhan khong rong
+         n=2165
+  [PASS] SC2  nhan chi thuoc Calm/Normal/Stress
+         ['Calm', 'Normal', 'Stress']
+  [PASS] SC-NOLOOKAHEAD  vol_fwd NaN o 10 ngay cuoi (khong the biet tuong lai), co gia tri o giua
+         tail_all_nan=True mid_all_present=True
+  [PASS] SC-ANCHOR-A  lop A tren IS >= 0.7 (nhan co du bao duoc vol tien khong)
+         AUC=0.8943
+  [PASS] SC-ANCHOR-B  lop B tren IS xep dung thu tu Calm < Normal < Stress
+         {'Calm': 0.0724, 'Normal': 0.1513, 'Stress': 0.307}
+  [FAIL] SC-SAMPLE  du mau de danh gia (>=20 Calm, >=10 Stress)
+         n_calm=118 n_stress=4
+
+NEO (IS)  2018-01-02 .. 2024-12-31  (1761 ngay)
+  nhan: {'Normal': 788, 'Calm': 708, 'Stress': 265}
+  lop A (doc lap)       AUC(Stress>Calm) = 0.8943  n_stress=265 n_calm=708
+  lop B (KHONG doc lap) median vol trailing = {'Calm': 0.0724, 'Normal': 0.1513, 'Stress': 0.307}  monotone=True
+  lop C (doc lap yeu)   median drawdown Stress=-0.09101756295660535 Calm=-0.003011530137127405
+
+GAN DAY  2025-08-13 .. 2026-08-13  (252 ngay)
+  nhan: {'Normal': 127, 'Calm': 121, 'Stress': 4}
+  lop A (doc lap)       AUC(Stress>Calm) = 0.5996  n_stress=4 n_calm=118
+  lop B (KHONG doc lap) median vol trailing = {'Calm': 0.072, 'Normal': 0.1434, 'Stress': 0.2861}  monotone=True
+  lop C (doc lap yeu)   median drawdown Stress=-0.057448705229406594 Calm=-0.0028970004902616475
+
+VERDICT  KHONG DANH GIA DUOC (thi truong chi vua cham)
+  chi 4 ngay Stress — duoi muc 10 can de tinh AUC. Nhung thi truong CO cham vung stress (1 ngay sut <= -9.10%) va model CO bat, nen day khong phai dau hieu model mu. Chua du mau de do MUC DO, du de loai kha nang mu.
