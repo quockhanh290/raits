@@ -731,6 +731,29 @@ def make_scheduler(port: int, dry_run: bool,
             misfire_grace_time=SLOT_MISFIRE_GRACE_SECS,
         )
 
+    # ── Chủ nhật 18:30 ET: bịt khoảng hở giữa lúc CME mở lại và sweep mon-fri đầu tiên ──
+    # CME mở lại 18:00 ET Chủ nhật, nhưng slot mon-fri sớm nhất là STOP_REPAIR_0020 sáng
+    # thứ Hai. Ở giữa là 6 tiếng rưỡi thị trường ĐANG CHẠY mà không lượt nào kiểm rằng
+    # stop bảo vệ còn sống. Nếu một lần TWS restart cuối tuần làm mất GTC stop — đúng
+    # kịch bản Fix 1 sinh ra để chống — thì không ai biết cho tới sáng thứ Hai.
+    #
+    # Cùng lập luận dòng 402 dùng để CỐ Ý không gate heartbeat theo mon-fri: một sự cố
+    # bắt đầu cuối tuần phải nhìn thấy được TRƯỚC slot đầu tiên của thứ Hai, không phải sau.
+    #
+    # KHÔNG mở sweep cho cả cuối tuần: từ 17:00 ET thứ Sáu tới 18:00 ET Chủ nhật thị
+    # trường đóng, không có giá để trigger stop. Quét lúc đó là quét vào chỗ trống.
+    # 18:30 (mở cửa + 30 phút) cho phiên ổn định trước khi đọc trạng thái lệnh.
+    sched.add_job(
+        lambda lbl="STOP_REPAIR_SUN_1830": _run(
+            [sys.executable, "-m", "global_index.run_stop_repair",
+             "--positions-path", "live_positions.json", "--port", str(port)],
+            label=lbl, dry_run=dry_run),
+        "cron", day_of_week="sun", hour=18, minute=30,
+        id="stop_repair_sun_1830",
+        name="Stop repair sweep 18:30 ET (Sunday reopen)",
+        misfire_grace_time=SLOT_MISFIRE_GRACE_SECS,
+    )
+
     # ── 01:10–02:55 ET Mon-Fri: NKD night slots ──────────────────────────────
     # NKD's entry window is between_time("14:00","15:55") on its session clock,
     # and specs.MNKD.session_tz is Asia/Tokyo → 14:00-15:55 JST = 01:00-02:55 ET.

@@ -431,6 +431,18 @@
     return 'ok';
   }
 
+  // Giờ trần đủ dùng khi mọi thứ trong cùng một ngày, và gây hiểu nhầm khi không.
+  // Tối thứ Sáu, "NEXT JOB 00:20 ET" đọc như còn vài tiếng, thực ra là thứ Hai —
+  // cách 46 tiếng. Chỉ thêm ngày khi nó KHÁC hôm nay, để dòng thường ngày không dài ra.
+  const etClockWithDay = iso => {
+    if (!iso) return '--';
+    const when = new Date(iso);
+    const dayOf = value => new Intl.DateTimeFormat('en-CA', { timeZone: ET_ZONE }).format(value);
+    if (dayOf(when) === dayOf(new Date())) return etClock(iso);
+    const label = new Intl.DateTimeFormat('en-US', { timeZone: ET_ZONE, weekday: 'short' }).format(when);
+    return `${label} ${etClock(iso)}`;
+  };
+
   function renderScheduleFacts() {
     const schedule = state.schedule;
     const nextScheduled = schedule?.next_scheduled_job;
@@ -441,7 +453,7 @@
     // operator has to be able to grep it straight out of scheduler_MMDD.log — a dashboard
     // vocabulary that exists nowhere else in the system is a translation step under pressure.
     const fact = (label, job, at, tone = 'next') => `<div class="schedule-fact ${tone}">
-      <span>${esc(label)}</span><div><b>${esc(job ? job.job_id : 'Not observed')}</b><time>${esc(at ? etClock(at) : '--')}</time></div>
+      <span>${esc(label)}</span><div><b>${esc(job ? job.job_id : 'Not observed')}</b><time>${esc(etClockWithDay(at))}</time></div>
     </div>`;
     $('nowScheduleFacts').innerHTML = [
       fact('Next job', nextScheduled, nextScheduled?.at),

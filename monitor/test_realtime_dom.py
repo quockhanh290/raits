@@ -738,6 +738,20 @@ def test_a_position_the_runner_does_not_know_about_raises_an_incident(realtime_s
     assert "nominal" not in rail_text(browser_page).lower()
 
 
+def test_a_job_on_another_day_shows_which_day(realtime_server, browser_page):
+    """Tối thứ Sáu, "NEXT JOB 00:20 ET" đọc như còn vài tiếng — thực ra là thứ
+    Hai, cách 46 tiếng. Giờ trần chỉ đủ dùng khi mọi thứ cùng một ngày."""
+    schedule = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/schedule-status"]))
+    far = "2099-12-28T05:20:00Z"          # thu Hai, chac chan khac hom nay
+    schedule["next_scheduled_job"] = {"job_id": "STOP_REPAIR_0020", "at": far}
+    schedule["next_decision_job"] = {"job_id": "LIVE_DAY_1405", "at": far}
+    stub_api(browser_page, {"/api/v1/schedule-status": schedule})
+    open_realtime(browser_page, realtime_server)
+    facts = browser_page.eval_on_selector("#nowScheduleFacts", "el => el.innerText")
+    assert "Mon" in facts, facts
+    assert "00:20 ET" in facts, facts
+
+
 def _kill_endpoints(page, *paths) -> None:
     """Cho các endpoint chỉ định trả 500; phần còn lại vẫn stub bình thường."""
     stub_api(page)

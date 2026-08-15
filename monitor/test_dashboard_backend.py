@@ -4,6 +4,7 @@ import ast
 import datetime as dt
 import inspect
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -1107,8 +1108,22 @@ def test_paper_evidence_payload_contract_is_stable(tmp_path: Path):
 
 
 def test_paper_dashboard_allows_cold_evidence_scan():
+    """The client must outlast the cold scan, not match a particular number.
+
+    This asserted the literal 30000 and so pinned a value that was measured too small:
+    the first request after a backend restart rebuilds the evidence cache from ~115MB
+    of logs and took 41.7s on 2026-08-15, meaning every first page load reported
+    "Paper evidence unavailable" for a backend that was working fine.
+    """
     source = (DASH / "paper" / "paper.js").read_text(encoding="utf-8")
-    assert "AbortSignal.timeout(30000)" in source
+    found = re.findall(r"AbortSignal\.timeout\((\d+)\)", source)
+    assert found, "the evidence fetch has no timeout at all"
+    MEASURED_COLD_SCAN_MS = 41_700
+    for value in found:
+        assert int(value) > MEASURED_COLD_SCAN_MS, (
+            f"timeout {value}ms is below the measured {MEASURED_COLD_SCAN_MS}ms cold scan, "
+            f"so the first load after a restart fails every time"
+        )
 
 
 def test_paper_dashboard_exposes_c1_observed_detail():
@@ -1758,6 +1773,201 @@ def test_flex_reconcile_basis_is_absent_rather_than_asserted_with_no_lots():
     from monitor.backend.paper_evidence_reader import _flex_reconcile_basis
 
     assert _flex_reconcile_basis({}) is None
+
+
+_THRESHOLD_SPEC = {
+    "edge_gate": {
+        "arm_after_sessions": 20,
+        "quantile": 0.01,
+        "bands": [
+            {"sessions": 20, "floor_usd": -1920.60},
+            {"sessions": 25, "floor_usd": -1962.86},
+            {"sessions": 30, "floor_usd": -2082.52},
+        ],
+    },
+    "operational_gate": {"tolerance_usd": 0.01},
+}
+
+
+def _gates(sessions, strategy, *, gap=0.0, adjustments=None, spec=_THRESHOLD_SPEC):
+    from monitor.backend.paper_evidence_reader import _pnl_threshold_status
+
+    return _pnl_threshold_status(
+        spec,
+        {
+            "paper_epoch_closed_realized": strategy,
+            "flex_epoch_rebased_realized": (strategy - gap) if strategy is not None else None,
+            "paper_minus_flex_epoch_rebased_realized": gap,
+        },
+        sessions,
+        adjustments,
+    )
+
+
+def test_edge_gate_stays_silent_until_the_sample_can_carry_a_verdict():
+    """53% of healthy 5-session windows in the backtest are negative.
+
+    Blocking on a loss before the arming point would be blocking on noise, so the gate
+    must say NOT_ARMED rather than PASS -- an unarmed gate is not evidence of health.
+    """
+    out = _gates(5, -5000.0)["edge"]
+    assert out["status"] == "NOT_ARMED"
+    assert out["sessions_to_arm"] == 15
+    assert "carries no information" in out["detail"]
+
+
+def test_edge_gate_blocks_below_the_floor_for_the_epoch_length():
+    breached = _gates(20, -1921.0)["edge"]
+    assert breached["status"] == "BREACH"
+    assert breached["floor_usd"] == -1920.60
+    # A dollar the other side of the same floor must not block.
+    assert _gates(20, -1920.0)["edge"]["status"] == "PASS"
+
+
+def test_edge_gate_uses_the_largest_band_at_or_below_the_epoch_length():
+    # Between anchors the rule holds the previous, looser floor rather than interpolating
+    # onto a number nobody wrote down.
+    assert _gates(28, 0.0)["edge"]["active_band"]["sessions"] == 25
+    assert _gates(30, 0.0)["edge"]["active_band"]["sessions"] == 30
+    assert _gates(999, 0.0)["edge"]["active_band"]["sessions"] == 30, "clamp to the last band"
+
+
+def test_operational_gate_blocks_any_uncovered_gap_however_small():
+    """Not a statistical question: a $1 unexplained gap means the books do not describe
+    the account. The MNKD defect was caught by this gate on day one, with no sample."""
+    out = _gates(5, -43.25, gap=1.0)["operational"]
+    assert out["status"] == "BREACH"
+    assert "Size is not the point" in out["detail"]
+
+
+def test_operational_gate_passes_when_a_recorded_adjustment_covers_the_gap():
+    out = _gates(5, -43.25, gap=1260.0, adjustments=-1260.0)["operational"]
+    assert out["status"] == "PASS"
+    assert out["covered_by_adjustment"] is True
+    # A partial adjustment must not clear the whole gap.
+    assert _gates(5, -43.25, gap=1260.0, adjustments=-400.0)["operational"]["status"] == "BREACH"
+
+
+def test_an_unarmed_edge_gate_never_reports_the_epoch_as_passed():
+    combined = _gates(5, -43.25, gap=1260.0, adjustments=-1260.0)
+    assert combined["edge"]["status"] == "NOT_ARMED"
+    assert combined["operational"]["status"] == "PASS"
+    assert combined["status"] == "OBSERVED", "one gate passing is not the epoch passing"
+
+
+def test_a_missing_threshold_spec_is_a_spec_gap_not_a_silent_pass():
+    from monitor.backend.paper_evidence_reader import _pnl_threshold_status
+
+    out = _pnl_threshold_status({}, {}, 40, None)
+    assert out["status"] == "SPEC_GAP"
+    assert "no loss level blocks go-live" in out["detail"]
+
+
+def test_published_threshold_spec_carries_its_own_provenance_and_limits():
+    """A go-live number shown without its derivation is an instruction, not evidence."""
+    payload = read_paper_evidence(ROOT)["payload"]
+    cov = {c["key"]: c for c in payload["coverage"]}
+    assert "pnl_thresholds" in cov, "the approved thresholds have no panel"
+    spec = (cov["pnl_thresholds"]["metrics"] or {}).get("spec") or {}
+    edge = spec.get("edge_gate") or {}
+    frame = spec.get("frame") or {}
+    assert edge.get("bands"), "no band table is published"
+    assert edge.get("measured_false_block_rate") is not None, "false-block rate not published"
+    assert edge.get("measured_power"), "detection power not published"
+    assert edge.get("limitation"), "the rule must publish what it cannot catch"
+    assert "98430.51" in (frame.get("self_check") or ""), "frame self-check not published"
+    assert frame.get("why_truncated"), "must say why the 2025-2026 tail is excluded"
+
+
+def test_threshold_frame_excludes_the_nkd_only_tail():
+    """Pooling the tail loosens the 60-session floor by 84%.
+
+    generate_replay_snapshots.py records that after 2024-12-31 the curve is NKD alone,
+    because the regime labels froze and the other clusters stopped entering.
+    """
+    payload = read_paper_evidence(ROOT)["payload"]
+    cov = {c["key"]: c for c in payload["coverage"]}
+    frame = ((cov["pnl_thresholds"]["metrics"] or {}).get("spec") or {}).get("frame") or {}
+    assert frame.get("period", "").endswith("2024-12-31"), (
+        f"frame period {frame.get('period')!r} runs past the point where the backtest "
+        f"stops being the system that trades live"
+    )
+
+
+def _freshness(compare: dict, root=None) -> dict | None:
+    from monitor.backend.paper_evidence_reader import _artifact_freshness
+
+    return _artifact_freshness(root or ROOT, compare)
+
+
+def test_stale_pnl_artifact_is_reported_rather_than_served_as_current():
+    """The dashboard reads monitor/paper_pnl_compare.json instead of computing it.
+
+    On 2026-08-14 the Flex reconcile was switched to broker Proceeds and the panel kept
+    serving the previous code's lots -- looking exactly as authoritative as fresh ones,
+    with nothing on screen to say otherwise.
+    """
+    from monitor.paper_pnl_compare import source_signature
+
+    current = source_signature(ROOT)
+    assert _freshness({"source_signature": current})["status"] == "CURRENT"
+
+    drifted = {**current, "global_index/statement.py": "deadbeefdeadbeef"}
+    stale = _freshness({"source_signature": drifted})
+    assert stale["status"] == "STALE"
+    assert stale["drifted"] == ["global_index/statement.py"]
+    assert "paper_pnl_compare.py" in stale["detail"], "must say how to fix it"
+
+
+def test_unstamped_pnl_artifact_is_unknown_not_assumed_fresh():
+    # An artifact written before stamping existed cannot be checked. Claiming CURRENT
+    # would be the same false reassurance the stamp exists to remove.
+    assert _freshness({})["status"] == "UNKNOWN"
+    assert _freshness({"source_signature": "not-a-dict"})["status"] == "UNKNOWN"
+
+
+def test_pnl_source_signature_tracks_the_modules_that_decide_the_money():
+    from monitor.paper_pnl_compare import SOURCE_FILES, source_signature
+
+    assert "global_index/statement.py" in SOURCE_FILES, (
+        "pair_fifo builds the Flex lots; a change there changes every P&L on the panel"
+    )
+    assert "monitor/paper_pnl_compare.py" in SOURCE_FILES
+    sig = source_signature(ROOT)
+    assert all(isinstance(v, str) and len(v) == 16 for v in sig.values())
+
+
+def test_tws_restart_has_an_evidence_panel_of_its_own():
+    """The gate with the largest outstanding requirement had no panel to open.
+
+    Its gap card could not offer a drilldown, and the nearest existing panel is
+    runner_freshness -- the target H5 removed for being wrong. Pointing at that again
+    would trade one missing button for one misleading one.
+    """
+    payload = read_paper_evidence(ROOT)["payload"]
+    cov = {c["key"]: c for c in payload["coverage"]}
+    assert "tws_restart" in cov, "no TWS evidence surface exists"
+    metrics = cov["tws_restart"]["metrics"] or {}
+    assert "restart_proven" in (metrics.get("what_counts") or ""), (
+        "the panel must state what makes a night count, not just show a number"
+    )
+    assert "context, not proof" in cov["tws_restart"]["evidence"], (
+        "connectivity candidate lines must not read as restart evidence"
+    )
+
+
+def test_every_gap_card_can_open_the_panel_it_refers_to():
+    payload = read_paper_evidence(ROOT)["payload"]
+    keys = {c["key"] for c in payload["coverage"]}
+    for gap in payload.get("gaps") or []:
+        related = gap.get("related_key")
+        assert related, f"gap {gap['title']!r} has no panel to open"
+        assert related in keys, (
+            f"gap {gap['title']!r} points at {related!r}, which is not a coverage panel"
+        )
+    assert "runner_freshness" not in {g.get("related_key") for g in payload.get("gaps") or []}, (
+        "runner_freshness is the wrong target H5 removed; do not route gaps back to it"
+    )
 
 
 def _run_paper_refresh_probe(payloads: list[str]) -> dict:
@@ -3153,6 +3363,29 @@ def test_both_readers_agree_a_clean_exit_is_not_an_incident(tmp_path: Path, clos
     jobs = read_job_journal("2026-08-14", tmp_path)["jobs"]
     assert status["incidents"] == [], (closing_line, status["incidents"])
     assert all(job["status"] != "running" for job in jobs), (closing_line, jobs)
+
+
+def test_sunday_reopen_sweep_is_modelled_like_the_scheduler_runs_it():
+    """CME mở lại 18:00 ET Chủ nhật nhưng sweep mon-fri sớm nhất là 00:20 ET thứ
+    Hai — 6 tiếng rưỡi thị trường chạy mà không lượt kiểm bảo vệ nào. Scheduler
+    có slot Chủ nhật 18:30; dashboard phải mô hình hóa GIỐNG HỆT, nếu không nó
+    coi slot đó là lạ và dựng incident giả mỗi tuần."""
+    from raits.live.trading_calendar import is_trading_day
+
+    sunday, saturday = dt.date(2026, 8, 16), dt.date(2026, 8, 15)
+    assert sunday.weekday() == 6 and not is_trading_day(sunday)
+    assert [slot["id"] for slot in schedule_status._scheduled_slots_for(sunday)] \
+        == ["STOP_REPAIR_SUN_1830"]
+    # Thứ Bảy thị trường vẫn đóng: quét lúc đó là quét vào chỗ trống.
+    assert schedule_status._scheduled_slots_for(saturday) == []
+
+
+def test_the_next_job_after_friday_close_is_the_sunday_sweep():
+    """Trước khi có slot này, câu trả lời là 00:20 ET thứ Hai."""
+    now = dt.datetime(2026, 8, 15, 3, 0, tzinfo=ET)
+    nxt = schedule_status._next_job(now, schedule_status._scheduled_slots_for)
+    assert nxt["job_id"] == "STOP_REPAIR_SUN_1830"
+    assert nxt["at"] == "2026-08-16T22:30:00Z"
 
 
 def test_favicon_does_not_404():

@@ -29,6 +29,9 @@ STOP_REPAIR_SLOTS = tuple(
     (hour, 20) for hour in range(0, 24, 2)
     if hour not in (2, 14)
 )
+# (weekday, hour, minute) — Chủ nhật là 6 theo date.weekday(). Phải khớp
+# run_scheduler.py: cron day_of_week="sun", hour=18, minute=30.
+SUNDAY_REPAIR_SLOT = (6, 18, 30)
 # Bao lâu một snapshot được phép cũ hơn slot due gần nhất trước khi bị gọi là stale.
 # Đây là tuổi của CHÍNH snapshot, không phải deadline của slot: slot chạy mỗi 5 phút
 # nên "latest_slot + allowance" luôn nằm ở tương lai suốt active window và không bao
@@ -113,6 +116,15 @@ def _scheduled_slots_for(day: dt.date) -> list[dict[str, Any]]:
         "id": f"STOP_REPAIR_{hour:02d}{minute:02d}",
         "at": dt.datetime.combine(day, dt.time(hour, minute), tzinfo=ET),
     } for hour, minute in STOP_REPAIR_SLOTS if is_trading_day(day))
+    # Chủ nhật KHÔNG phải trading day nên vòng trên bỏ qua nó — nhưng scheduler thật
+    # có một sweep lúc 18:30 ET, ngay sau khi CME mở lại, để 6 tiếng rưỡi đầu phiên
+    # không trôi qua mà không lượt kiểm bảo vệ nào (run_scheduler.py, day_of_week="sun").
+    # Không mirror ở đây thì dashboard coi nó là slot lạ và dựng incident giả mỗi tuần.
+    if day.weekday() == SUNDAY_REPAIR_SLOT[0]:
+        slots.append({
+            "id": "STOP_REPAIR_SUN_1830",
+            "at": dt.datetime.combine(day, dt.time(*SUNDAY_REPAIR_SLOT[1:]), tzinfo=ET),
+        })
     return sorted(slots, key=lambda item: item["at"])
 
 
