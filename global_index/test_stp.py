@@ -1090,6 +1090,78 @@ def test_stp13c_the_ledger_moves_on_a_stop_exit(tmp_path):
         f"sổ phải giảm sau khi stop khớp lỗ; equity={runner.state.equity}")
 
 
+def test_stp13e_a_forgotten_fill_still_reaches_the_trade_log(tmp_path):
+    """H4 path B. The money moves; the order book has to say so too.
+
+    stp13d below already pins that this path BOOKS the loss and warns the price is an
+    estimate. What nothing pinned is the trade log: _book_realised ran and
+    _record_stop_exit did not, so equity fell while trade_log.jsonl gained no row.
+
+    Everything derived from the trade log is then short by exactly that trade —
+    including paper_epoch_closed_realized, the headline P&L figure — and the gap has a
+    ready-made explanation sitting next to it (ledger_offset_explanation:
+    MATCH_PRE_EPOCH_CARRY_FILL) that would absorb the discrepancy without anyone
+    looking. A systematically biased number with an excuse attached is worse than a
+    missing one.
+
+    Reachable whenever a stop fires and is noticed more than ~2 days later, which is
+    the Sunday-reopen sweep's whole purpose (83ac849).
+    """
+    log_path = tmp_path / "t.jsonl"
+    runner = _runner_with(_AmnesiacBroker({}, ACCOUNT), _persisted(tmp_path), log_path)
+
+    assert runner.state.equity < ACCOUNT, (
+        "precondition: this path must have booked the loss, or the test below proves "
+        "nothing about a gap between the two ledgers")
+
+    closes = _closes(log_path)
+    assert closes, (
+        "equity moved but the trade log gained no CLOSE row, so every figure derived "
+        "from it is short by this trade")
+    assert closes[0].get("fill_price_estimated") is True, (
+        "the row carries the PLACED level, not a real fill price. Unmarked it is "
+        "indistinguishable from a genuine fill and the estimate spreads silently: "
+        f"{closes[0]}")
+
+
+def test_stp13f_a_same_day_round_trip_reaches_the_trade_log(tmp_path):
+    """H4 path F. Two real orders, money booked, and not one line written.
+
+    A same-day trade never becomes an OpenPos, so it misses the exits loop that logs
+    every other close — and it also never went through the entry logging, so BOTH sides
+    are missing. Currently zero impact only because the STRESS_MID cron at 10:20 is off;
+    it becomes live the moment that sleeve is switched on.
+    """
+    class _PricedBroker(_RecordingMockBroker):
+        """MockBroker returns avg_price 0.0, and the same-day block is gated on a real
+        price — correctly, since it must not book or log a fill it has no price for. A
+        broker that never reports one cannot reach the path under test."""
+
+        def send_order(self, o):
+            f = super().send_order(o)
+            return Fill(o.inst, o.action, o.direction, o.contracts, o.cluster,
+                        pnl_sized=f.pnl_sized, status="FILLED",
+                        avg_price=5000.0 if o.action == "OPEN" else 5010.0)
+
+    log_path = tmp_path / "t.jsonl"
+    broker = _PricedBroker({}, ACCOUNT)
+    runner = FuturesRunner(
+        broker=broker, guard=_make_guard(), contracts_by_inst={"MES": 1},
+        signal_fn=_sameday_signal, breaker=CircuitBreaker(account=ACCOUNT),
+        positions_path=tmp_path / "pos.json", trade_log_path=log_path,
+        today=DAY1, now=pd.Timestamp(DAY1) + pd.Timedelta(hours=14, minutes=5),
+    )
+    runner.run_day(DAY1)
+
+    rows = [json.loads(l) for l in log_path.read_text(encoding="utf-8").splitlines()] \
+        if log_path.exists() else []
+    kinds = [r.get("type") for r in rows]
+
+    assert "OPEN" in kinds and "CLOSE" in kinds, (
+        f"a same-day round trip sent two real orders and left no record of either; "
+        f"live_history.build_snapshots would see neither side. rows={rows}")
+
+
 def test_stp13d_a_forgotten_fill_is_booked_but_labelled_an_estimate(tmp_path, caplog):
     """reqExecutions chỉ nhớ ~2 ngày. IBKR nói FILLED nên vị thế CHẮC CHẮN đã đóng —
     bỏ qua sẽ làm sổ sai theo chiều ngược lại. Ghi theo mức đã đặt, nhưng phải NÓI

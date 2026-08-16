@@ -841,6 +841,24 @@ class FuturesRunner:
                     # closed, so booking the placed level beats leaving the ledger
                     # stale. Already logged as an estimate at the discovery site.
                     self._book_realised(_sp, _sp.stop_price, why="stop")
+                    # H4 path B. The line above moves system equity; without the line
+                    # below nothing reaches trade_log.jsonl, so every figure derived
+                    # from it — paper_epoch_closed_realized among them — is short by
+                    # exactly this trade. Worse than merely missing: the gap it opens in
+                    # system_ledger_vs_trade_filter already has an explanation parked
+                    # beside it (MATCH_PRE_EPOCH_CARRY_FILL) that would absorb the
+                    # difference with nobody looking.
+                    #
+                    # The price is the level the stop was PLACED at, not a fill, so the
+                    # row says so. An unmarked estimate is indistinguishable from a real
+                    # fill and spreads into slippage and fill-quality figures as though
+                    # it were measured.
+                    self._record_stop_exit(
+                        _sp,
+                        {"price": _sp.stop_price, "shares": _sp.contracts,
+                         "time": None, "estimated": True},
+                        source="B3_STP_NO_EXEC_RECORD",
+                    )
             except Exception as _e:
                 logger.error(
                     "B3: khong ghi so duoc lenh stop %s/%s (%s) — SO SLEECH LECH so voi "
@@ -993,6 +1011,12 @@ class FuturesRunner:
                 "perm_id": fill.get("perm_id"),
                 "status": "FILLED",
                 "source": source,
+                # True when fill_price is the level the stop was PLACED at rather than a
+                # price IBKR reported — reqExecutions had already forgotten the fill.
+                # Consumers that measure execution quality must be able to exclude it;
+                # an estimate that looks like a measurement is how a ledger drifts
+                # without anyone being able to point at the moment it went wrong.
+                "fill_price_estimated": bool(fill.get("estimated")),
             })
             logger.info(
                 "B3 STP-VERIFY: recorded stop exit %s/%s @ %.4f (permId=%s) — "
@@ -1680,6 +1704,42 @@ class FuturesRunner:
                 self._book_realised(
                     _sd_pos, _sd_close.avg_price,
                     _sd_close.filled_qty or n, why="same-day")
+                # H4 path F. Two real orders went out above and the line before this
+                # moved system equity, while trade_log.jsonl recorded neither side —
+                # not the open, not the close. A same-day trade never becomes an
+                # OpenPos, so it misses the exits loop that logs every other close, and
+                # it takes a different branch from the entry that logs every other open.
+                # Both halves are written here because both halves happened.
+                _sd_day = str(day.date()) if hasattr(day, "date") else str(day)
+                self._append_trade({
+                    "type": "OPEN",
+                    "inst": t["inst"], "cluster": t["cluster"],
+                    "direction": t["direction"], "contracts": n,
+                    "entry_day": _sd_day,
+                    "expected_entry": t.get("entry"),
+                    "fill_price": _sd_open.avg_price,
+                    "commission": _sd_open.commission,
+                    "filled_qty": _sd_open.filled_qty or n,
+                    "status": _sd_open.status,
+                    "regime": self._last_regime,
+                })
+                self._append_trade({
+                    "type": "CLOSE",
+                    "inst": t["inst"], "cluster": t["cluster"],
+                    "direction": t["direction"], "contracts": n,
+                    "entry_day": _sd_day,
+                    "exit_day": _sd_day,
+                    # The engine closes these on the session it opened them; there is no
+                    # signal-layer exit reason to carry, and inventing one would put a
+                    # label on the exit_path_coverage gate that nothing measured.
+                    "exit_reason": "SAME_DAY",
+                    "fill_price": _sd_close.avg_price,
+                    "pnl_sized": t.get("pnl_sized", 0.0),
+                    "commission": _sd_close.commission,
+                    "filled_qty": _sd_close.filled_qty or n,
+                    "status": _sd_close.status,
+                    "regime": self._last_regime,
+                })
 
         # H4: fold the broker's realised P&L into system equity after ALL closes
         # (multi-day exits + same-day STRESS_MID), so HALT_DAY can fire on a same-session
