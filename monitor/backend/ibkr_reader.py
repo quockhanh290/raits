@@ -196,7 +196,7 @@ def _read_contract_specs(ib: Any, ibi: Any) -> dict[str, dict[str, Any]]:
     """
     try:
         from futures.basket import BASKET
-        from global_index.ibkr_broker import _IBKR_EXCHANGE, _RAITS_TO_IBKR, _current_front_month
+        from global_index.ibkr_broker import ibkr_symbol_and_exchange, _current_front_month
     except Exception as exc:
         return {"_error": {"error": f"local spec import failed: {exc}"}}
     try:
@@ -207,9 +207,14 @@ def _read_contract_specs(ib: Any, ibi: Any) -> dict[str, dict[str, Any]]:
     specs: dict[str, dict[str, Any]] = {}
     for inst in {**BASKET, **SPECS}:
         try:
-            symbol = _RAITS_TO_IBKR.get(inst, inst)
-            exchange = _IBKR_EXCHANGE.get(inst, "CME")
-            month = _current_front_month(symbol) or _current_front_month(inst)
+            # One routing rule, asked once. This used to resolve the symbol here and
+            # then ask _IBKR_EXCHANGE with the UNtranslated name, which returns the
+            # default — right only while the single translated instrument (MNKD -> MNK)
+            # happens to be on CME.
+            symbol, exchange = ibkr_symbol_and_exchange(inst)
+            # The `or _current_front_month(inst)` fallback that used to sit here was a
+            # workaround for that lookup not translating either; it does now.
+            month = _current_front_month(symbol)
             contract = ibi.Future(symbol, lastTradeDateOrContractMonth=month, exchange=exchange, currency="USD")
             details = ib.reqContractDetails(contract)
             if not details:

@@ -285,9 +285,17 @@ def _current_front_month(inst: str, today=None) -> "str | None":
     Return the active front-month contract string (e.g. '202609') for inst on today.
     Walks ROLL_SCHEDULE: before first roll → use first front_month; after each roll → switch to nxt.
     Returns None if inst not in ROLL_SCHEDULE (caller falls back to unqualified contract).
+
+    Resolves the symbol first, exactly as get_roll_event does — same table, so the same
+    rule. Callers were expected to translate before calling, and that expectation has
+    already been broken once for real: repair_parquet_utc records "Passing the raits
+    name returned None, the contract went out with no month, and IBKR rejected it as
+    ambiguous across fifteen listed expiries." A lookup that is only correct when every
+    caller remembers something is a lookup waiting for the caller that does not.
+    Idempotent: symbols already in IBKR form map to themselves.
     """
     today_str = str(pd.Timestamp(today or pd.Timestamp.now(tz="America/New_York")).date())
-    schedule = ROLL_SCHEDULE.get(inst, [])
+    schedule = ROLL_SCHEDULE.get(_RAITS_TO_IBKR.get(inst, inst), [])
     if not schedule:
         return None
     current = schedule[0][1]  # front_month of first row = pre-roll default
@@ -295,6 +303,22 @@ def _current_front_month(inst: str, today=None) -> "str | None":
         if roll_date <= today_str:
             current = nxt
     return current
+
+
+def ibkr_symbol_and_exchange(inst: str) -> "tuple[str, str]":
+    """(IBKR symbol, exchange) for a runner instrument — the whole routing rule, once.
+
+    Both halves must be answered from the SAME name. _IBKR_EXCHANGE is keyed by IBKR
+    symbol, so asking it with the runner's name silently returns the default: correct
+    today only because the one instrument that needs translating (MNKD -> MNK) happens
+    to trade on CME. monitor/backend/ibkr_reader did exactly that — resolved the symbol
+    on one line and asked for the exchange with the untranslated name on the next.
+
+    Two copies of a routing rule is how MNKD reached the full-size contract to begin
+    with, so there is one copy and everything asks it.
+    """
+    sym = _RAITS_TO_IBKR.get(inst, inst)
+    return sym, _IBKR_EXCHANGE.get(sym, "CME")
 
 
 class ContractResolutionError(RuntimeError):
@@ -364,8 +388,7 @@ def _month_contract(ib, ibi, inst: str, month: str):
     too, and _current_front_month answers "what is front now", which on the roll date is
     already the next one.
     """
-    ibkr_sym = _RAITS_TO_IBKR.get(inst, inst)
-    exchange = _IBKR_EXCHANGE.get(ibkr_sym, "CME")
+    ibkr_sym, exchange = ibkr_symbol_and_exchange(inst)
     contract = ibi.Future(ibkr_sym, lastTradeDateOrContractMonth=month,
                           exchange=exchange)
     ib.qualifyContracts(contract)
@@ -755,7 +778,13 @@ class IBKRBroker(Broker):
                     return Fill(order.inst, order.action, order.direction,
                                 order.contracts, order.cluster,
                                 status="PARTIAL", filled_qty=actual_filled,
-                                avg_price=avg_price, commission=commission)
+                                avg_price=avg_price, commission=commission,
+                                # A partial fill is still a fill, on a real contract.
+                                # Omitting this put the position in the book with an
+                                # unknown month — unreachable at one lot per order, and
+                                # live the moment the system scales.
+                                contract_month=getattr(
+                                    contract, "lastTradeDateOrContractMonth", None))
 
                 log.info(
                     "send_order: FILLED %s %s ×%d @ %.4f (elapsed=%.1fs)",

@@ -170,6 +170,61 @@ def test_sb8_the_roll_path_refuses_an_unlisted_contract(monkeypatch):
         b._handle_rollover("MNKD", "2026-09-04", "LONG", 1, "global_nkd")
 
 
+def test_sb9_the_front_month_lookup_translates_too():
+    """C1's twin. get_roll_event was fixed to resolve its key; this reads the SAME table
+    and did not.
+
+    It is safe today only because its main caller resolves first — and that discipline
+    has already failed once in production. repair_parquet_utc carries the note: "Passing
+    the raits name returned None, the contract went out with no month, and IBKR rejected
+    it as ambiguous across fifteen listed expiries." Caller discipline is not a fix; the
+    lookup translating is.
+    """
+    from global_index.ibkr_broker import _current_front_month
+
+    assert _current_front_month("MNK"), "IBKR symbol must resolve — control"
+    assert _current_front_month("MNKD") == _current_front_month("MNK"), (
+        "the runner's own name for the Nikkei micro returns no front month, so a caller "
+        "that forgets to translate sends an unqualified contract")
+
+
+def test_sb10_the_exchange_is_chosen_by_the_resolved_symbol():
+    """_IBKR_EXCHANGE is keyed by IBKR symbol, so it must be asked with the IBKR symbol.
+
+    Correct today only by luck: the one instrument whose name needs translating (MNKD ->
+    MNK) happens to trade on CME, the default. The monkeypatch below removes that luck —
+    it is the only way to tell "looked up by the resolved symbol" from "fell through to
+    the default and happened to be right".
+    """
+    from global_index import ibkr_broker as B
+
+    sym, exch = B.ibkr_symbol_and_exchange("MYM")
+    assert (sym, exch) == ("MYM", "CBOT"), "declared override must be honoured"
+    assert B.ibkr_symbol_and_exchange("MES") == ("MES", "CME"), "default — control"
+
+    saved = dict(B._IBKR_EXCHANGE)
+    try:
+        B._IBKR_EXCHANGE["MNK"] = "OSE.JPN"      # keyed by IBKR symbol, as the table is
+        assert B.ibkr_symbol_and_exchange("MNKD") == ("MNK", "OSE.JPN"), (
+            "asked with the runner name, so an override keyed by the IBKR symbol is "
+            "missed and the request goes to the wrong exchange")
+    finally:
+        B._IBKR_EXCHANGE.clear()
+        B._IBKR_EXCHANGE.update(saved)
+
+
+def test_sb11_the_dashboard_reader_does_not_re_derive_the_routing():
+    """monitor/backend/ibkr_reader built its own symbol+exchange pair, and got the
+    exchange half wrong by asking with the runner name. Two copies of one routing rule
+    is how MNKD reached the full-size contract in the first place — the reader uses the
+    shared resolver instead."""
+    src = (Path(__file__).resolve().parent.parent
+           / "monitor" / "backend" / "ibkr_reader.py").read_text(encoding="utf-8")
+    assert "_IBKR_EXCHANGE.get(" not in src, (
+        "the reader picks the exchange itself; ask ibkr_symbol_and_exchange() so there "
+        "is one routing rule, not two")
+
+
 def test_sb4_the_full_size_contract_is_not_adopted_as_ours():
     """NKD is the $5/pt contract; MNKD is the $0.50/pt micro. They are not the same size.
 

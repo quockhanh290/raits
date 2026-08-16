@@ -222,6 +222,50 @@ def test_cm5_a_roll_moves_the_month_in_the_book(tmp_path):
         f"split is undetectable from the file, which is the C1 blind spot: {after[0]}")
 
 
+def test_cm7_every_filled_return_from_send_order_carries_the_month():
+    """No fill path may forget it — including the partial one.
+
+    The first version set contract_month on send_order's full-fill return and missed
+    the PARTIAL return beside it, so a partially filled entry would enter the book with
+    the month unknown. Impact today is zero because N_CONTRACTS = 1 and a one-lot market
+    order cannot fill partially (audit M1), which is exactly why a runtime test would
+    not have caught it: the path is unreachable at current size and becomes reachable
+    the moment the system scales.
+
+    Checked on the source, like sb5: the defect is a missing argument at a return
+    statement, and no assertion on a fake broker can see what the real one forgot to
+    pass.
+    """
+    src = (Path(__file__).resolve().parent / "ibkr_broker.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+
+    send_order = next((n for n in ast.walk(tree)
+                       if isinstance(n, ast.FunctionDef) and n.name == "send_order"), None)
+    assert send_order is not None, "send_order not found — the locator is broken"
+
+    offenders, checked = [], 0
+    for node in ast.walk(send_order):
+        if not (isinstance(node, ast.Return) and isinstance(node.value, ast.Call)):
+            continue
+        call = node.value
+        if getattr(call.func, "id", None) != "Fill":
+            continue
+        kw = {k.arg: k.value for k in call.keywords}
+        status = kw.get("status")
+        if not (isinstance(status, ast.Constant) and status.value in ("FILLED", "PARTIAL")):
+            continue  # CANCELLED/FAILED returns describe no fill, so no contract
+        checked += 1
+        if "contract_month" not in kw:
+            offenders.append(f"line {node.lineno} (status={status.value})")
+
+    assert checked, (
+        "no FILLED/PARTIAL Fill return found inside send_order — the locator is looking "
+        "in the wrong place, so a green result here would prove nothing")
+    assert not offenders, (
+        "these return a fill without saying which contract it was filled on, so the "
+        "position enters the book with an unknown month: " + ", ".join(offenders))
+
+
 def test_cm6_the_month_reaches_the_dashboard_projection(tmp_path):
     """runner_positions_reader projects a fixed key list, so a new key is dropped unless
     it is named. Recording the month in a file nobody can see is half a fix."""
