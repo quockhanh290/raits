@@ -61,8 +61,10 @@ import os
 import subprocess
 import sys
 import threading
+import time
 from datetime import date as _date
 from pathlib import Path
+from typing import NamedTuple
 
 _CWD = Path(__file__).parents[1]   # d:\raits
 if not (_CWD / "global_index").is_dir() or not (_CWD / "futures").is_dir():
@@ -214,6 +216,59 @@ _FAIL_TAIL_LINES = 25        # child output echoed on failure — enough for the
 # dispatches jobs on a thread pool, so a threading.Lock is the right primitive.
 _slot_lock = threading.Lock()
 
+# When the current holder took the lock, monotonic. A one-element list rather than a
+# module global so the closure that sets it needs no `global` declaration; None when the
+# lock is free. Read only for reporting, never to decide anything.
+_slot_started_at: list = [None]
+
+# Wall-clock ceiling for one child process — see _run. A normal run_live_day is ~5.5 min
+# and the two slots that also run a full shadow replay add ~5 more, so ~11 min is
+# legitimate; this is roughly double that.
+_SLOT_TIMEOUT_SECS = 20 * 60
+
+# Longer than this and the mutex holder is not overlapping, it is stuck. Set above the
+# subprocess ceiling on purpose: below it, a run that is about to be killed anyway would
+# be reported as a dead session first, and the two messages would fight.
+_INFLIGHT_STUCK_SECS = _SLOT_TIMEOUT_SECS + 5 * 60
+
+
+class _InflightReport(NamedTuple):
+    level: str
+    message: str
+
+
+def _inflight_report(elapsed_secs: float) -> _InflightReport:
+    """How to describe a slot that found the previous run still going.
+
+    H5's second half, and the half a timeout alone does not fix. One slot overlapping
+    the previous is routine — slots are 5 minutes apart and a run takes ~5.5 — so it
+    must stay quiet. A run that has held the mutex far longer than any run legitimately
+    takes is a different event and has to read differently, or the operator sees the
+    same WARNING whether one slot slipped or the whole session died.
+
+    Carrying the elapsed time is the point: it is the only number that separates the two,
+    and the old message did not print it.
+
+    A pure function so it can be tested for what it decides. test_slot_overlap tests the
+    lock through a stand-in that re-implements the guard, which cannot catch a change to
+    the real one.
+    """
+    mins = elapsed_secs / 60.0
+    if elapsed_secs >= _INFLIGHT_STUCK_SECS:
+        return _InflightReport(
+            "critical",
+            f"previous run has held the slot lock for {mins:.0f} min — that is not an "
+            f"overlap, it is stuck. No slot can run until it exits. Expected ceiling is "
+            f"{_SLOT_TIMEOUT_SECS / 60:.0f} min, so the kill did not take either: "
+            f"check IB Gateway and the scheduler process.",
+        )
+    return _InflightReport(
+        "warning",
+        f"SKIPPED — previous run_live_day still in flight ({elapsed_secs:.0f}s, "
+        f"{mins:.1f} min). Slots are 5 min apart and a run takes ~5.5 min; overlapping "
+        f"children collide on IBKR clientId. Next slot picks it up.",
+    )
+
 # ── Heartbeat: cap the wait, and measure the stall ────────────────────────────
 #
 # BlockingScheduler._main_loop does Event.wait(seconds_until_next_job). On Windows that
@@ -336,7 +391,7 @@ def _save_preflight_state() -> None:
                   "fail-closed after a restart", _PREFLIGHT_STATE, exc)
 
 
-def _run(args: list[str], label: str, dry_run: bool) -> bool:
+def _run(args: list[str], label: str, dry_run: bool, timeout: float | None = None) -> bool:
     """Run subprocess, return True on success (returncode==0)."""
     log.info("[%s] %s", label, " ".join(args))
     if dry_run:
@@ -347,8 +402,40 @@ def _run(args: list[str], label: str, dry_run: bool) -> bool:
     # the 13:45 pre-flight failed on MES and skipped the entire trading day, and the
     # log held nothing but "exited with code 1". A re-run later succeeded, so the
     # cause is still unknown.
-    result = subprocess.run(args, cwd=str(_CWD), capture_output=True,
-                            text=True, errors="replace")
+    # H5. Without a ceiling here a child that never returns is waited on forever, and it
+    # is holding _slot_lock: every remaining slot in the session then logs only
+    # "SKIPPED — previous run_live_day still in flight", at WARNING, which is exactly
+    # what an ordinary overlap logs. The session dies and the log reads normal.
+    #
+    # The broker's own waits are all bounded (send_order 30/120s, get_equity ~14s,
+    # get_positions ~8s, _await_stop_accepted 5s, cancel_order 5s). The synchronous
+    # ib_insync calls are not — qualifyContracts, reqAllOpenOrders, reqExecutions,
+    # reqHistoricalData take no timeout — so the only place left to cut is the parent.
+    #
+    # Ceiling, not a target: a normal run is ~5.5 min and the two slots that also do a
+    # full shadow replay add ~5 more, so ~11 min is legitimate. 20 min is roughly double
+    # the longest honest run and still frees the session with most of a 1h50m window
+    # left. Losing four slots beats losing every remaining one.
+    try:
+        result = subprocess.run(args, cwd=str(_CWD), capture_output=True,
+                                text=True, errors="replace",
+                                timeout=timeout or _SLOT_TIMEOUT_SECS)
+    except subprocess.TimeoutExpired as _to:
+        # subprocess.run has already killed the child before re-raising.
+        log.critical(
+            "[%s] TIMEOUT after %.0fs — child killed. This is NOT an overlapping slot: "
+            "the process stopped responding and would otherwise have held the slot lock "
+            "for the rest of the session. Check IB Gateway; the unbounded waits are the "
+            "synchronous ib_insync calls.",
+            label, float(getattr(_to, "timeout", 0) or 0),
+        )
+        for _stream, _name in ((getattr(_to, "stdout", None), "stdout"),
+                               (getattr(_to, "stderr", None), "stderr")):
+            _txt = _stream.decode("utf-8", "replace") if isinstance(_stream, bytes) else _stream
+            _lines = [ln for ln in (_txt or "").splitlines() if ln.strip()]
+            for ln in _lines[-_FAIL_TAIL_LINES:]:
+                log.error("[%s] %s (%s before the kill)", label, ln.strip(), _name)
+        return False
     if result.returncode == 0:
         # Mã thoát 0 KHÔNG có nghĩa là không có gì hỏng. 2026-08-10: MAX_HOLD đóng MYM
         # thành công (nên thoát 0) nhưng `cancel_order(12)` thất bại, và runner đã kêu
@@ -556,16 +643,20 @@ def make_scheduler(port: int, dry_run: bool,
         next slot does whatever this one would have.
         """
         if not _slot_lock.acquire(blocking=False):
-            log.warning("[%s] SKIPPED — previous run_live_day still in flight. "
-                        "Slots are 5 min apart, a run takes ~5.5 min; overlapping "
-                        "children collide on IBKR clientId. Next slot picks it up.",
-                        slot_id)
+            # H5: say HOW LONG. Without it "still in flight" reads the same after 90
+            # seconds and after an hour, and the second one means the session is dead.
+            _since = _slot_started_at[0]
+            _elapsed = (time.monotonic() - _since) if _since else 0.0
+            _rep = _inflight_report(_elapsed)
+            getattr(log, _rep.level)("[%s] %s", slot_id, _rep.message)
             return
+        _slot_started_at[0] = time.monotonic()
         try:
             _live_day_body_inner(slot_id, first_slot=first_slot,
                                  clusters=clusters, prev_preflight=prev_preflight,
                                  verify=verify, stress_entry=stress_entry)
         finally:
+            _slot_started_at[0] = None
             _slot_lock.release()
 
     # ── Shared runner body (all 14:05–15:55 slots) ───────────────────────────

@@ -62,6 +62,64 @@ def test_an_error_line_survives_too(monkeypatch):
     assert any("place_stop raised" in e for e in errs)
 
 
+def test_a_hung_child_is_killed_instead_of_holding_the_session(monkeypatch):
+    """H5. subprocess.run had no timeout, so a child that never returns never returns.
+
+    Slots are serialised by _slot_lock. A run_live_day that hangs holds it for the rest
+    of the session and every later slot logs only "SKIPPED — previous run_live_day still
+    in flight", at WARNING — the same line a perfectly normal overlap produces, because
+    a run takes ~5.5 min in a 5-minute slot. The trading day ends and the log looks
+    ordinary.
+
+    The waits inside the broker all have ceilings; the synchronous ib_insync calls
+    (qualifyContracts, reqAllOpenOrders, reqExecutions, reqHistoricalData) do not, and
+    nothing above them could cut one short.
+    """
+    calls = {}
+
+    def _boom(*a, **k):
+        calls["timeout"] = k.get("timeout")
+        raise rs.subprocess.TimeoutExpired(cmd=a[0] if a else ["x"],
+                                           timeout=k.get("timeout") or 0)
+
+    monkeypatch.setattr(rs.subprocess, "run", _boom)
+    errs = []
+    monkeypatch.setattr(rs.log, "error", lambda m, *a: errs.append(m % a if a else m))
+    monkeypatch.setattr(rs.log, "critical", lambda m, *a: errs.append(m % a if a else m))
+    monkeypatch.setattr(rs.log, "info", lambda m, *a: None)
+
+    ok = rs._run(["x"], label="T", dry_run=False)
+
+    assert calls.get("timeout"), (
+        "subprocess.run was called with no timeout, so a hung child is waited on "
+        "forever and the slot mutex is never released")
+    assert ok is False, "a killed run must not report success"
+    assert any("TIMEOUT" in e.upper() for e in errs), (
+        f"the failure has to name itself; sharing wording with an ordinary overlap is "
+        f"what made a dead session unreadable. logged={errs}")
+
+
+def test_an_overlap_and_a_dead_session_do_not_read_the_same():
+    """The other half of H5, and the half a timeout alone does not fix.
+
+    One slot overlapping the previous is routine and must stay quiet. A run that has
+    held the mutex far longer than any run legitimately takes is a dead session, and it
+    has to say so in different words — otherwise the operator is reading the same
+    WARNING either way.
+    """
+    routine = rs._inflight_report(elapsed_secs=90.0)
+    stuck = rs._inflight_report(elapsed_secs=45 * 60.0)
+
+    assert routine.level == "warning", "a normal overlap must not cry wolf"
+    assert stuck.level in ("error", "critical"), (
+        "a mutex held for 45 minutes is not an overlap; it has to escalate so "
+        "run_scheduler's own CRITICAL/ERROR echo picks it up")
+    assert "90" in routine.message or "1.5" in routine.message, (
+        f"the message must carry HOW LONG, or the two cases stay indistinguishable: "
+        f"{routine.message}")
+    assert routine.message != stuck.message
+
+
 def test_a_clean_run_stays_quiet(monkeypatch):
     """Nửa còn lại: chạy trơn thì vẫn chỉ một dòng INFO. Một bản vá làm log ồn lên mỗi slot
     sẽ tự đánh mất tác dụng của chính nó."""
