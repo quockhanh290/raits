@@ -32,7 +32,7 @@ lọt qua ba lớp kiểm.
 | **M1** | Medium | ⏸️ **ĐỂ LẠI — trục scaling** | Bằng **0** hôm nay (`N_CONTRACTS = 1`, lệnh thị trường 1 hợp đồng không khớp một phần). Chủ dự án chốt để lại. Thuộc danh sách chặn của mục *Scaling — bốn trục* (`TASK.md:3179`), **không** thuộc danh sách lỗi — gộp vào là báo một lỗi không đang chảy máu |
 | **M2** | Medium | ✅ **ĐÃ SỬA** `acdc9fa` | Hỏi `get_order_status` trước khi kết luận. `FILLED` → **không phải orphan**, phát ALERT *"runner cũng vừa gửi CLOSE của chính nó, kiểm tài khoản có bị đảo chiều không"* (cùng hình dạng C2); `CANCELLED` → INFO; `NOT_FOUND` → **UNVERIFIED**, không còn khẳng định "still live" khi chưa hề hỏi; còn sống → CRITICAL giữ nguyên. `test_stp9` + `stp14b` là hai đối chứng chứng minh cảnh báo thật **không** bị xoá |
 | **M3** | Medium | ✅ **ĐÃ SỬA** `9322984` | Lọc thêm theo **hợp đồng** (caller luôn có `OpenPos`), và **từ chối đoán** khi còn nhiều ứng viên — trả `None` để caller rơi vào đường ước lượng có gắn nhãn của H4. Kèm `test_fe7` canh **chỗ nối**: bộ lọc không ai truyền `inst` là H2 lặp lại. Ba stub broker đã lệch chữ ký so với hàm thật, và `except Exception` biến `TypeError` thành "không có fill" — một câu trả lời sai thay vì một tiếng nổ |
-| **M4** | Medium | ⏸️ **HOÃN CÓ CHỦ ĐÍCH** | Sửa đúng là luồn **ngày phiên** qua `_front_month_contract` tới cả ba call site, mà `place_stop` hiện không biết ngày phiên — đổi chữ ký xuyên broker. Xứng đáng một lượt riêng chứ không nhét vào cuối một batch dọn dẹp |
+| **M4** | Medium | ✅ **ĐÃ SỬA** `0688c69` | **Không ép một đồng hồ — đó mới là điểm chính.** Hai bên trả lời hai câu hỏi khác nhau: *"hôm nay có phải ngày roll?"* phải dùng ngày phiên, *"lệnh đi vào tháng nào?"* phải dùng đồng hồ tường vì hợp đồng hết hạn thì không giao dịch được. Luồn ngày phiên vào định tuyến lệnh sẽ khiến **mọi lần chạy bù gửi lệnh vào hợp đồng đã hết hạn**. `session_month_conflict()` **phát hiện khi hai bên lệch rồi từ chối**, nối ở `send_order` (`order.ref_day`) và `_handle_rollover` (`today`), kèm test canh chỗ nối. Đo: session-day 2026-09-04 → `202612`, đồng hồ tường 2026-08-16 → `202609` |
 | **M5** | Medium | ✅ **ĐÃ SỬA** `3f8a0e9` | So **phần dư** `delta − số sleeve book cùng lần chạy`, không phải `\|delta\|` trần. Ngưỡng **$250 đo được, không bốc** — xem bảng phân bố dưới đây. Phát ALERT chứ không CRITICAL: ngưỡng dựng trên n=29 chưa đủ tin để tiêu vào ngân sách mà `run_scheduler` dành cho CRITICAL (bài học M2) |
 | **M6** | Medium | ✅ **ĐÃ SỬA** `e59e321` | `max_dd_dollars` và `max_dd_pct` là **max thật**, bền hoá trong khối breaker — thiếu bước đó thì "all-time max" reset mỗi 5 phút, cùng lời nói dối ở dạng khác. `total_days` đếm **ngày phân biệt** (dump lại mỗi slot nên `len()` thô đếm trùng); `ibkr_connected` hỏi `_ib.isConnected()`, giữ `None` khi broker không trả lời được thay vì khai `False`; `model_name` theo `fit_end` guard đang giữ |
 | **L1** | Low | ⛔ **BÁC BỎ — tiền đề sai ở HEAD** | Audit viết *"không đường production nào còn tra `ROLL_SCHEDULE[\"NKD\"]`"*. Đo lại: `ibkr_reader` duyệt `{**BASKET, **SPECS}` = **6 mã gồm `NKD`**, và `_current_front_month("NKD")` trả `202609`. Xoá hai dòng đó sẽ làm panel contract-specs dựng hợp đồng NKD không đủ định danh — đúng lỗi IBKR từ chối vì mơ hồ. **Mục thứ hai của audit sai ở HEAD, sau H3** |
@@ -46,14 +46,27 @@ lọt qua ba lớp kiểm.
 | **`contract_month`** ✚ | — | ✅ **ĐÃ THÊM 2026-08-15** | Trường docstring hứa ba lần mà chưa bao giờ tồn tại. Nay chạy suốt `Fill` → `OpenPos` → JSON → dashboard. 6 gate trong `test_contract_month.py`, gồm **cm3**: `ast` chứng minh `decide_day` **không đọc** trường này — quan sát-thuần như `entry_price`/`exit_reason`. `MockBroker` để `None` nên verify/replay không đổi |
 | **§4.5** | — | ✅ **ĐÃ ĐÓNG 2026-08-15** | `global_index/test_kill_switch.py`: 3 test đọc **AST** của từng entry point (khiếm khuyết là một tham số bị quên ở call site — không assert runtime nào trên runner tự dựng nhìn thấy được điều đó) + 2 test hành vi có **đối chứng** |
 
-**Tổng: 19/22 mục đã đóng. Không còn mục Critical, High hay Medium nào mở.**
+**Tổng: 20/22 mục đã đóng. Không còn mục Critical, High hay Medium nào mở.**
 
 | Kết cục | Mục |
 |---|---|
-| ✅ Đã sửa trong đợt 15–16/8 | C1, C2, H1, H2, H4, H5, M2, M3, M5, M6, L2, L4 + §4.1, §4.3, §4.4, §4.5 |
+| ✅ Đã sửa trong đợt 15–16/8 | C1, C2, H1, H2, H4, H5, M2, M3, M4, M5, M6, L2, L4 + §4.1, §4.3, §4.4, §4.5 |
 | ✅ Đã đóng trước đợt này (`5c901f0`) | H3, §4.2 |
 | ⛔ Bác bỏ — tiền đề sai ở HEAD | L1 |
-| ⏸️ Hoãn có chủ đích | M4 (đổi chữ ký xuyên broker) · M1, L3 (trục scaling) |
+| ⏸️ Để lại — trục scaling, chủ dự án chốt | M1, L3 |
+
+**Việc runner từ paper audit cũng đã đóng:** schema CLOSE hợp nhất ở `f954375` — mọi dòng
+CLOSE nay mang đủ 22 khoá, chuẩn hoá tại `_append_trade` chứ không tại từng literal, vì luật
+áp ở call site chỉ giữ được tới call site tiếp theo (H4 vừa chứng minh: nó thêm writer thứ
+năm và đó là cái mỏng nhất). Lấy **hợp** chứ không lấy **giao** — thu về 12 khoá chung sẽ
+vứt mất `order_id`, `perm_id`, `source`, tức những trường làm một lần stop-exit truy vết được.
+
+**Nợ test cuối cùng cũng đã đóng** (`d2c368b`): `test_slot_overlap` từng kiểm mutex qua
+*"minimal stand-in… with the same semantics"* — một bản sao, chỉ xác nhận được rằng bản sao
+giống chính nó. Nay `_run_guarded` là hàm module-level và `_live_day_body` gọi nó, nên test
+và production chạy **cùng một đoạn mã**. Đây là ca thứ ba của họ lỗi "kiểm một bản sao", sau
+`test_rollover` hỏi bằng khoá `NKD` (thứ đã cho C1 sống) và một class trùng tên tôi tự tạo
+rồi tự sửa trong chính đợt này.
 
 **Bốn mục phát sinh trong lúc sửa, đều đã đóng:** trường `contract_month` (docstring hứa
 ba lần, chưa bao giờ tồn tại) · hai định dạng tháng trong một trường · nhánh PARTIAL không
@@ -142,11 +155,13 @@ Ba trạng thái được ràng: không có file → `pending False` · có file
 | Chỉ số | Bản gốc ghi | Đo lại ở HEAD `77594ff` | Sau đợt sửa 15/8 |
 |---|---|---|---|
 | `pytest global_index/ --ignore=test_event_playback.py` | 506 passed | **507 passed** (+1 = T19b của `5c901f0`) | **517 passed** |
-| `pytest` trần (mọi testpath) | — | — | **843 passed**, 0 đỏ, 0 skip, 19′58″ |
+| `pytest` trần (mọi testpath) | — | — | **847 passed**, 0 đỏ, 0 skip, 18′54″ |
 | Phép kiểm không thể đỏ dưới pytest | — | **43** (`test_hmm_stale`) | **0** — quét cả 56 tệp |
 | Nơi dựng hợp đồng IBKR | 4 | *(như trên)* | **1**, có bất biến `ast` canh |
 | Đường đóng lệnh book tiền mà không ghi sổ | **2 / 6** | *(như trên)* | **0 / 6** |
-| Cặp song song không có phép đối soát | **7** | *(như trên)* | **6** (M5 đã nối; M4 hoãn) |
+| Cặp song song không có phép đối soát | **7** | *(như trên)* | **5** (M5 và M4 đã nối) |
+| Khoá trên một dòng CLOSE | 12–22 tuỳ writer | *(như trên)* | **22 ở cả 5 writer** |
+| Test kiểm bản sao thay vì code thật | 2 (`test_rollover`, `test_slot_overlap`) | *(như trên)* | **0** |
 | Ngày roll của MNKD | **0** | *(như trên)* | **4**, khớp bốn mã Rổ 4 |
 | Nơi dựng hợp đồng IBKR | 4 (một chỗ hand-rolled) | *(như trên)* | **1**, có bất biến `ast` canh |
 | Sổ ghi tháng hợp đồng | **không có trường** | *(như trên)* | `contract_month` chạy tới tận dashboard |
