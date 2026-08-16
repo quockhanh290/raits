@@ -27,18 +27,18 @@ lọt qua ba lớp kiểm.
 | **H1** | High | ✅ **ĐÃ SỬA 2026-08-15** | Xác minh `ce4ea2d` **không** chạm đường roll, rồi tách `_month_contract(ib, ibi, inst, month)` làm nơi dựng hợp đồng **duy nhất**; `_front_month_contract` và cả hai chỗ trong `_handle_rollover` cùng gọi nó. Tháng là **tham số** vì roll cần cả tháng đi ra, thứ `_current_front_month` không trả được (đúng ngày roll nó đã trả tháng mới). **Sửa C1 làm H1 thành gấp chứ không còn tuỳ chọn**: trước đó `ibi.Future("MNKD", …)` là code chết vì roll không bao giờ chạy cho Nikkei |
 | **H2** | High | ✅ **ĐÃ SỬA 2026-08-15** | `STOP_FILE_NAME = "STOP_TRADING"` khai **một lần** ở `runner.py:66`; ba entry point import và truyền `stop_path=a.stop_path` (thêm cờ `--stop-path`, có mặc định nên không caller nào phải đổi). Không viết literal ba lần — đó đúng hình dạng đã cho `ROLL_SCHEDULE` hai khoá cho một hợp đồng. Đã kiểm `STOP_TRADING` **không** tồn tại trên đĩa, và nó **không** bị gitignore nên sẽ hiện trong `git status` nếu ai đó tạo |
 | **H3** | High | ✅ **ĐÃ SỬA** — `5c901f0` | Hằng số biến mất. `runner.py:2439 _refreeze_status()` đọc `futures.refreeze.PENDING_PATH`, **fail closed** (file không parse được → `pending: True, unknown: True`), gọi ở `:2564`. Xem mục "Đính chính" bên dưới |
-| **H4** | High | ❌ **CÒN NGUYÊN** | `repro_h4.py` ở HEAD: đường B `50000 → 49500`, trade_log **0 dòng**; đường F hai lệnh thật, trade_log **0 dòng**. Bảng sáu đường khớp chính xác HEAD: A `:822/:824` · **B `:830` book-only** · C `:1085` · D `:1164` · E `:1542` · **F `:1660` book-only** |
-| **H5** | High | ❌ **CÒN NGUYÊN** | `run_scheduler.py:350` `subprocess.run(...)` vẫn không có `timeout`. Chữ `timeout` duy nhất trong tệp là comment `:220` |
-| **M1** | Medium | ❌ **CÒN NGUYÊN** | `repro_h4.py` phần M1 ở HEAD: `place_stop` gọi với 3 khi giữ 1. Vẫn **bằng 0 hôm nay** (`N_CONTRACTS = 1`) — chặn khi tăng quy mô |
-| **M2** | Medium | ❌ **CÒN NGUYÊN** | `ibkr_broker.py:1075` vẫn lọc `not t.isDone()` → `return False` `:1080`; `runner.py:2165` vẫn in `STP ORPHAN … still working at the broker` |
-| **M3** | Medium | ❌ **CÒN NGUYÊN** | `ibkr_broker.py:1354` vẫn lọc theo `orderId`; `perm_id` vẫn chỉ được **trả về** ở `:1358`, không dùng để lọc |
-| **M4** | Medium | ❌ **CÒN NGUYÊN** | `repro_c1.py` phần M4 ở HEAD: từ 2026-09-04 lệnh đi vào `MNK202612` trong khi `roll('MNKD')` vẫn `None` |
-| **M5** | Medium | ❌ **CÒN NGUYÊN** | `runner.py:1673-1684`: `_h4_delta` tính xong, cập nhật `_last_broker_equity`, in log, không so với gì |
-| **M6** | Medium | ❌ **CÒN NGUYÊN** | Cả bốn còn nguyên, số dòng trôi vì `_refreeze_status` chèn vào: `model_name "fit_C"` **`:2541`** · `max_dd_dollars` **`:2721`/`:2760`** · `total_days 1` **`:2762`** · `ibkr_connected None` **`:2780`** |
-| **L1** | Low | ❌ **CÒN NGUYÊN** | `ROLL_SCHEDULE` vẫn giữ cả `MNK` lẫn `NKD`; `test_rollover.py:198-201,215` vẫn neo vào `NKD` |
-| **L2** | Low | ❌ **CÒN NGUYÊN** | `BACKTEST_CALMAR_FLOOR` = **0** lần trong `global_index/test_*.py`, `futures/test_*.py`, `monitor/test_*.py` |
-| **L3** | Low | ❌ **CÒN NGUYÊN** | `runner.py:1630`, `:1716`, `live_decision.py:138` vẫn `.get(inst, 1)` |
-| **L4** | Low | ❌ **CÒN NGUYÊN** | `runner.py:1083` vẫn cộng lại `p.pnl_sized` ở nhánh retry |
+| **H4** | High | ✅ **ĐÃ SỬA** `c1fd242` | Đường B gọi `_record_stop_exit` kèm cờ mới **`fill_price_estimated`** — giá ghi là mức stop **đã đặt**, không phải giá khớp, và một ước lượng không gắn nhãn sẽ lan vào chỉ số slippage như thể được đo. Đường F ghi cả OPEN lẫn CLOSE, `exit_reason: SAME_DAY`. Cả hai nằm **trong** cổng `avg_price > 0` sẵn có: nới cổng cho test xanh sẽ sinh dòng giá 0 ở mọi lượt replay — lệch hai sổ theo chiều ngược lại. ⚠️ **Sửa "dòng không tồn tại", KHÔNG sửa "các dòng lệch hình dạng"** — xem khối schema CLOSE |
+| **H5** | High | ✅ **ĐÃ SỬA** `59b476d` | `timeout=20 phút` cho tiến trình con + bắt `TimeoutExpired`. Ngưỡng là **trần chứ không phải đích**: chạy thường ~5,5′, hai slot có shadow replay thêm ~5′, nên ~11′ là hợp lệ. Nửa thứ hai quan trọng hơn: dòng SKIPPED nay mang **đã bao lâu** và leo thang qua ngưỡng đặt **trên** trần subprocess — đặt dưới thì một lần chạy sắp bị giết sẽ bị báo là "phiên chết" trước, hai thông điệp đá nhau. Tách `_inflight_report()` thành hàm thuần để test được cái nó **quyết định** |
+| **M1** | Medium | ⏸️ **ĐỂ LẠI — trục scaling** | Bằng **0** hôm nay (`N_CONTRACTS = 1`, lệnh thị trường 1 hợp đồng không khớp một phần). Chủ dự án chốt để lại. Thuộc danh sách chặn của mục *Scaling — bốn trục* (`TASK.md:3179`), **không** thuộc danh sách lỗi — gộp vào là báo một lỗi không đang chảy máu |
+| **M2** | Medium | ✅ **ĐÃ SỬA** `acdc9fa` | Hỏi `get_order_status` trước khi kết luận. `FILLED` → **không phải orphan**, phát ALERT *"runner cũng vừa gửi CLOSE của chính nó, kiểm tài khoản có bị đảo chiều không"* (cùng hình dạng C2); `CANCELLED` → INFO; `NOT_FOUND` → **UNVERIFIED**, không còn khẳng định "still live" khi chưa hề hỏi; còn sống → CRITICAL giữ nguyên. `test_stp9` + `stp14b` là hai đối chứng chứng minh cảnh báo thật **không** bị xoá |
+| **M3** | Medium | ✅ **ĐÃ SỬA** `9322984` | Lọc thêm theo **hợp đồng** (caller luôn có `OpenPos`), và **từ chối đoán** khi còn nhiều ứng viên — trả `None` để caller rơi vào đường ước lượng có gắn nhãn của H4. Kèm `test_fe7` canh **chỗ nối**: bộ lọc không ai truyền `inst` là H2 lặp lại. Ba stub broker đã lệch chữ ký so với hàm thật, và `except Exception` biến `TypeError` thành "không có fill" — một câu trả lời sai thay vì một tiếng nổ |
+| **M4** | Medium | ⏸️ **HOÃN CÓ CHỦ ĐÍCH** | Sửa đúng là luồn **ngày phiên** qua `_front_month_contract` tới cả ba call site, mà `place_stop` hiện không biết ngày phiên — đổi chữ ký xuyên broker. Xứng đáng một lượt riêng chứ không nhét vào cuối một batch dọn dẹp |
+| **M5** | Medium | ✅ **ĐÃ SỬA** `3f8a0e9` | So **phần dư** `delta − số sleeve book cùng lần chạy`, không phải `\|delta\|` trần. Ngưỡng **$250 đo được, không bốc** — xem bảng phân bố dưới đây. Phát ALERT chứ không CRITICAL: ngưỡng dựng trên n=29 chưa đủ tin để tiêu vào ngân sách mà `run_scheduler` dành cho CRITICAL (bài học M2) |
+| **M6** | Medium | ✅ **ĐÃ SỬA** `e59e321` | `max_dd_dollars` và `max_dd_pct` là **max thật**, bền hoá trong khối breaker — thiếu bước đó thì "all-time max" reset mỗi 5 phút, cùng lời nói dối ở dạng khác. `total_days` đếm **ngày phân biệt** (dump lại mỗi slot nên `len()` thô đếm trùng); `ibkr_connected` hỏi `_ib.isConnected()`, giữ `None` khi broker không trả lời được thay vì khai `False`; `model_name` theo `fit_end` guard đang giữ |
+| **L1** | Low | ⛔ **BÁC BỎ — tiền đề sai ở HEAD** | Audit viết *"không đường production nào còn tra `ROLL_SCHEDULE[\"NKD\"]`"*. Đo lại: `ibkr_reader` duyệt `{**BASKET, **SPECS}` = **6 mã gồm `NKD`**, và `_current_front_month("NKD")` trả `202609`. Xoá hai dòng đó sẽ làm panel contract-specs dựng hợp đồng NKD không đủ định danh — đúng lỗi IBKR từ chối vì mơ hồ. **Mục thứ hai của audit sai ở HEAD, sau H3** |
+| **L2** | Low | ✅ **ĐÃ SỬA** `e59e321` | Test đọc `INVARIANTS.md` và so với `BACKTEST_CALMAR_FLOOR`. Nó **tự kiểm trước**: nếu regex không còn khớp thì FAIL, vì một locator hỏng lặng lẽ sẽ làm test xanh đúng vào lúc nó ngừng hoạt động. Đã chứng minh đỏ được bằng cách đổi hằng số trong bộ nhớ |
+| **L3** | Low | ⏸️ **ĐỂ LẠI — trục scaling** | Chủ dự án chốt để lại. Thêm một lý do kỹ thuật: bản ở `live_decision.py` là **code engine**, đổi nó động tới tính tương đương trade-for-trade với `deploy_sim.replay` — không phải thứ nên phá trong một batch dọn dẹp |
+| **L4** | Low | ✅ **ĐÃ SỬA** `e59e321` | Hoàn lại `pnl_sized` **lúc khôi phục vị thế**, không phải bỏ cộng lúc retry: giữa hai lần đó vị thế **chưa đóng**, mà breaker đọc chính equity ấy mỗi slot. Số RED nói rõ: `50000 → 50300` khi CLOSE hỏng, `→ 50600` sau retry |
 | **§4.1** | — | ✅ **ĐÃ ĐÓNG 2026-08-15** | `test_stp4_no_stp_when_open_cancelled` nay hỏi đủ bốn câu nó bỏ trống (sổ, đĩa, sự kiện, và `entry_price`), cộng `test_stp4b` canh lệnh CLOSE ngày hôm sau. Cả hai **đã xem đỏ trước khi sửa**: `Left behind: [('MES', 1, None)]` và `closes=[('MES','LONG',1)]` |
 | **§4.2** | — | ✅ **ĐÃ ĐÓNG** — `5c901f0` | **Mục này của bản gốc nay đã sai.** Xem "Đính chính" |
 | **§4.3** | — | ✅ **ĐÃ ĐÓNG 2026-08-15** | Bốn dòng `("MNKD", …)` thêm vào bảng parametrize — đỏ đúng 4/4 trước khi sửa `get_roll_event`, trong khi 11 dòng cũ vẫn xanh |
@@ -46,9 +46,36 @@ lọt qua ba lớp kiểm.
 | **`contract_month`** ✚ | — | ✅ **ĐÃ THÊM 2026-08-15** | Trường docstring hứa ba lần mà chưa bao giờ tồn tại. Nay chạy suốt `Fill` → `OpenPos` → JSON → dashboard. 6 gate trong `test_contract_month.py`, gồm **cm3**: `ast` chứng minh `decide_day` **không đọc** trường này — quan sát-thuần như `entry_price`/`exit_reason`. `MockBroker` để `None` nên verify/replay không đổi |
 | **§4.5** | — | ✅ **ĐÃ ĐÓNG 2026-08-15** | `global_index/test_kill_switch.py`: 3 test đọc **AST** của từng entry point (khiếm khuyết là một tham số bị quên ở call site — không assert runtime nào trên runner tự dựng nhìn thấy được điều đó) + 2 test hành vi có **đối chứng** |
 
-**Tổng: 9/22 mục đã đóng** — H3 và §4.2 bởi `5c901f0`; C1, C2, H1, H2, §4.1, §4.3, §4.4,
-§4.5 và trường `contract_month` trong đợt sửa 15/8. **Cả hai Critical đã đóng.**
-Còn 12 mục, cao nhất là H4 và H5. Không mục nào **tự khỏi**, không mục nào **rút lại**.
+**Tổng: 19/22 mục đã đóng. Không còn mục Critical, High hay Medium nào mở.**
+
+| Kết cục | Mục |
+|---|---|
+| ✅ Đã sửa trong đợt 15–16/8 | C1, C2, H1, H2, H4, H5, M2, M3, M5, M6, L2, L4 + §4.1, §4.3, §4.4, §4.5 |
+| ✅ Đã đóng trước đợt này (`5c901f0`) | H3, §4.2 |
+| ⛔ Bác bỏ — tiền đề sai ở HEAD | L1 |
+| ⏸️ Hoãn có chủ đích | M4 (đổi chữ ký xuyên broker) · M1, L3 (trục scaling) |
+
+**Bốn mục phát sinh trong lúc sửa, đều đã đóng:** trường `contract_month` (docstring hứa
+ba lần, chưa bao giờ tồn tại) · hai định dạng tháng trong một trường · nhánh PARTIAL không
+điền tháng · hai anh em của C1 ở `_current_front_month` và `ibkr_reader`.
+
+> **Một mục "đã đóng" mà KHÔNG tìm ra lỗi nào.** `test_hmm_stale.py` có 43 phép kiểm không
+> thể làm pytest đỏ — cùng khuyết tật audit realtime đã vá cho hai tệp khác và bỏ sót tệp
+> này. Bật lên thì **cả 43 đều đúng**. Đó là **zero bug**, không phải chiến công, và ghi nó
+> vào cột "đã sửa" là báo một lỗi không tồn tại — đúng cái Phase 2 của audit realtime cảnh
+> báo (5/7 đường hoá ra đã đúng sẵn). Giá trị của nó nằm ở tương lai: từ giờ nếu một trong
+> 43 cái đó gãy, sẽ có người biết.
+
+### Việc runner còn mở, đến từ audit khác
+
+`PAPER_DASHBOARD_AUDIT.md` có hai mục Critical mà **gốc rễ nằm ở runner** và vẫn chưa đóng:
+**C5** (🟡 vá tạm — *"sửa gốc vẫn ở runner"*) và **C6** (❌ chưa). Kèm đề xuất ở `:746`:
+*"hợp nhất một schema CLOSE duy nhất… Đây là sửa ở runner."*
+
+Đo ở HEAD: **5 chỗ ghi dòng CLOSE, 22 khoá khác nhau, chỉ 12 khoá có mặt ở cả 5.** Mỗi chỗ
+thiếu một kiểu; chỗ same-day mà H4 vừa thêm là mỏng nhất (thiếu 8). **H4 sửa "dòng không
+tồn tại", không sửa "các dòng lệch hình dạng"** — ba mục này cùng một chỗ, cùng một nguyên
+nhân, và nên làm cùng một lượt.
 
 > **Vì sao C2 và H2 đi trước C1** dù C1 mới là mục có hạn chót: C2 không cần dịp nào cả —
 > chỉ cần một lệnh vào hết 30 giây chờ — và **14:05 ET thứ Hai 17/8 là lần đầu `send_order`
@@ -115,7 +142,11 @@ Ba trạng thái được ràng: không có file → `pending False` · có file
 | Chỉ số | Bản gốc ghi | Đo lại ở HEAD `77594ff` | Sau đợt sửa 15/8 |
 |---|---|---|---|
 | `pytest global_index/ --ignore=test_event_playback.py` | 506 passed | **507 passed** (+1 = T19b của `5c901f0`) | **517 passed** |
-| `pytest` trần (mọi testpath) | — | — | **824 passed / 824 collected**, 0 đỏ, 0 skip, 18′01″ |
+| `pytest` trần (mọi testpath) | — | — | **843 passed**, 0 đỏ, 0 skip, 19′58″ |
+| Phép kiểm không thể đỏ dưới pytest | — | **43** (`test_hmm_stale`) | **0** — quét cả 56 tệp |
+| Nơi dựng hợp đồng IBKR | 4 | *(như trên)* | **1**, có bất biến `ast` canh |
+| Đường đóng lệnh book tiền mà không ghi sổ | **2 / 6** | *(như trên)* | **0 / 6** |
+| Cặp song song không có phép đối soát | **7** | *(như trên)* | **6** (M5 đã nối; M4 hoãn) |
 | Ngày roll của MNKD | **0** | *(như trên)* | **4**, khớp bốn mã Rổ 4 |
 | Nơi dựng hợp đồng IBKR | 4 (một chỗ hand-rolled) | *(như trên)* | **1**, có bất biến `ast` canh |
 | Sổ ghi tháng hợp đồng | **không có trường** | *(như trên)* | `contract_month` chạy tới tận dashboard |
