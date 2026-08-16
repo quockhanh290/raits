@@ -108,6 +108,61 @@ def _noop_signal(day, bars, held):
     return [], []
 
 
+# ─── T24: one CLOSE schema, whichever path wrote the row ─────────────────────
+
+def test_c5_a_written_close_row_carries_every_field(tmp_path):
+    """PAPER_DASHBOARD_AUDIT C5/C6, and its line 746: "hợp nhất một schema CLOSE duy
+    nhất… Đây là sửa ở runner."
+
+    Measured before this test existed: five places write a CLOSE row, 22 distinct keys
+    between them, only 12 present in all five — each missing 5 to 8. A consumer cannot
+    tell "this trade had no slippage" from "this writer never records slippage", so a
+    gate counting a field is really counting which code path happened to close the
+    position. That is what left exit_path_coverage in STRUCTURAL_GAP.
+
+    H4 made the two silent paths write at all; it did not make them agree, and the
+    same-day writer it added was the thinnest of the five.
+
+    Normalised where the row is written rather than at each literal: a sixth writer
+    that forgets a key still produces a complete row, which a rule enforced only at the
+    call sites cannot promise.
+    """
+    from global_index.runner import CLOSE_RECORD_FIELDS
+
+    log = tmp_path / "t.jsonl"
+    runner = _make_runner(_empty_broker(), _noop_signal)
+    runner._trade_log_path = log
+    runner._append_trade({"type": "CLOSE", "inst": "MES", "cluster": "roska4_swing"})
+
+    print("\nT24: every CLOSE row carries the whole schema")
+    row = json.loads(log.read_text(encoding="utf-8").splitlines()[0])
+    missing = CLOSE_RECORD_FIELDS - set(row)
+    check("T24.1 a partial CLOSE row is completed before it is written",
+          not missing,
+          f"reached the log without {sorted(missing)} — consumers cannot tell an "
+          f"absent field from an unrecorded one")
+    check("T24.2 what the writer did say is not overwritten",
+          row.get("inst") == "MES", f"inst={row.get('inst')}")
+
+
+def test_c5_an_open_row_is_left_alone(tmp_path):
+    """Control. OPEN rows have their own shape and must not be padded with CLOSE
+    fields — otherwise "one schema" just means every row carries every key of every
+    kind, and the gate counting exit_reason starts counting entries too."""
+    from global_index.runner import CLOSE_RECORD_FIELDS
+
+    log = tmp_path / "t.jsonl"
+    runner = _make_runner(_empty_broker(), _noop_signal)
+    runner._trade_log_path = log
+    runner._append_trade({"type": "OPEN", "inst": "MES"})
+
+    print("\nT25: an OPEN row is not padded with CLOSE fields")
+    row = json.loads(log.read_text(encoding="utf-8").splitlines()[0])
+    check("T25.1 OPEN keeps its own shape",
+          "exit_reason" not in row,
+          f"given CLOSE-only fields: {sorted(set(row) & CLOSE_RECORD_FIELDS)}")
+
+
 # ─── T23: L2 — the Calmar floor is tied to the document that owns it ─────────
 
 def test_l2_the_calmar_floor_matches_invariants_md():

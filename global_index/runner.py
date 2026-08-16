@@ -70,6 +70,24 @@ ET_TZ = "America/New_York"
 # root — OPERATIONS.md:89 documents it as d:\raits\STOP_TRADING.
 STOP_FILE_NAME = "STOP_TRADING"
 
+# Every field a CLOSE row in trade_log.jsonl carries, whichever path wrote it.
+#
+# Five writers had grown their own key sets — 22 keys between them, 12 common to all,
+# each missing 5 to 8. Downstream that is indistinguishable from data: a reader cannot
+# separate "this trade had no slippage" from "this writer never records slippage", so
+# exit_path_coverage was measuring which branch closed the position rather than how the
+# position closed. PAPER_DASHBOARD_AUDIT C5/C6 and its line 746.
+#
+# The union, not the intersection. Narrowing to the 12 common keys would have thrown
+# away order_id, perm_id and source — the fields that make a stop exit auditable.
+CLOSE_RECORD_FIELDS: frozenset = frozenset({
+    "type", "inst", "cluster", "direction", "contracts",
+    "entry_day", "exit_day", "hold_days",
+    "exit_reason", "expected_stop", "fill_price", "fill_price_estimated",
+    "filled_qty", "pnl_sized", "commission", "slip",
+    "order_id", "perm_id", "status", "source", "retried", "regime",
+})
+
 # M5: how much of the broker's own move may go unexplained by the sleeve's ledger before
 # it is worth saying so, in account currency.
 #
@@ -1083,6 +1101,30 @@ class FuturesRunner:
                          pos.inst, pos.cluster, exc)
 
     def _append_trade(self, record: dict) -> None:
+        """Append one trade row, and give every CLOSE row the same shape.
+
+        PAPER_DASHBOARD_AUDIT C5/C6 and its line 746 ask for one CLOSE schema. Measured
+        before this: five writers, 22 distinct keys between them, only 12 present in
+        all five — each missing 5 to 8. A reader then cannot tell "this trade had no
+        slippage" from "this writer never records slippage", so a gate counting a field
+        is really counting which code path happened to close the position. That is what
+        left exit_path_coverage reporting STRUCTURAL_GAP.
+
+        Padded here rather than at each literal on purpose. A rule applied at the call
+        sites only holds until the next call site: H4 added the fifth writer and it was
+        the thinnest of them. Filling at the single point every row passes through is
+        the one place that can promise the shape.
+
+        Missing keys become None — "not recorded" — which is honest and distinct from
+        a real value. OPEN rows are left alone: padding them with CLOSE fields would
+        mean every row carries every key of every kind, and the gate counting
+        exit_reason would start counting entries.
+        """
+        if record.get("type") == "CLOSE":
+            record = {**{k: None for k in CLOSE_RECORD_FIELDS}, **record}
+        return self._append_trade_raw(record)
+
+    def _append_trade_raw(self, record: dict) -> None:
         if self._trade_log_path is None:
             return
         record.setdefault("ts", pd.Timestamp.now("UTC").isoformat())
