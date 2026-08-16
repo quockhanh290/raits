@@ -108,6 +108,64 @@ def _noop_signal(day, bars, held):
     return [], []
 
 
+# ─── T20: M5 — the broker's move is reconciled against the sleeve's, not just logged ──
+
+class _DriftingBroker(MockBroker):
+    """get_equity moves by `drift` on the second call — the account changed and the
+    sleeve booked nothing to explain it."""
+
+    def __init__(self, drift):
+        super().__init__({}, account=50_000)
+        self._drift = drift
+        self._calls = 0
+
+    def get_equity(self):
+        self._calls += 1
+        return 50_000.0 + (self._drift if self._calls > 1 else 0.0)
+
+
+def test_m5_an_unexplained_account_move_is_reconciled_not_just_logged():
+    """M5. Both halves existed and nothing compared them.
+
+    The runner reads the broker's NetLiquidation delta every run, updates
+    _last_broker_equity, prints a line and stops. The comment said the quiet part:
+    "The line stays because a large unexplained move in the account is still worth
+    seeing." Worth seeing is not a check — it is a line in a file nobody reads every
+    five minutes.
+
+    This is the only parallel pair in the runner with both sides present and no
+    reconciliation, and it is exactly where C8 would have surfaced. Measured on the
+    real logs, the three largest deltas ever recorded are all trading divergences, and
+    two of the three are MNKD routed to the full-size contract:
+
+        -2455.00  2026-08-10   sleeve booked  -110.00   (~22x)
+        +1856.87  2026-08-05   MYM close
+         -889.58  2026-08-11   sleeve booked   -30.00   (~30x)
+
+    A reconciliation would have raised it on 05/08, nine days before anyone found it
+    by asking IBKR directly.
+    """
+    print("\nT20: M5 broker/ledger reconciliation")
+
+    quiet = _make_runner(_DriftingBroker(40.0), _noop_signal)
+    quiet.run_day(pd.Timestamp("2024-06-17"))
+    quiet_alerts = [e for e in quiet._events if e.get("category") == "RECONCILE"]
+    check("T20.1 a move inside the measured noise floor stays silent",
+          quiet_alerts == [],
+          f"post-fix p99 is $84.51; $40 must not alarm. got {quiet_alerts}")
+
+    loud = _make_runner(_DriftingBroker(-2455.0), _noop_signal)
+    loud.run_day(pd.Timestamp("2024-06-17"))
+    loud_alerts = [e for e in loud._events if e.get("category") == "RECONCILE"]
+    check("T20.2 the C8-sized move raises an event",
+          bool(loud_alerts),
+          "the account moved $2455 while the sleeve booked nothing and nothing said so")
+    check("T20.3 the event is not CRITICAL",
+          all(e.get("level") != "CRITICAL" for e in loud_alerts),
+          f"CRITICAL is echoed to the scheduler log; a threshold with a thin sample "
+          f"must not erode it (see M2). got {[e.get('level') for e in loud_alerts]}")
+
+
 def _one_entry_signal(day, bars, held):
     """Returns one LONG entry candidate — used to verify it gets blocked/discarded."""
     return [{"inst": "MES", "direction": "LONG", "cluster": "roska4_swing",

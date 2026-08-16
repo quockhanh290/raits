@@ -70,6 +70,32 @@ ET_TZ = "America/New_York"
 # root — OPERATIONS.md:89 documents it as d:\raits\STOP_TRADING.
 STOP_FILE_NAME = "STOP_TRADING"
 
+# M5: how much of the broker's own move may go unexplained by the sleeve's ledger before
+# it is worth saying so, in account currency.
+#
+# DERIVED FROM MEASUREMENT, not chosen. 267 "H4: broker delta" lines across 28 live_day
+# logs, split at 2026-08-14 when MNKD stopped being routed to the full-size contract:
+#
+#            n   median      p90      p99      max     >$100
+#   before  238    5.72   143.42   889.58  2455.00   28 (11.8%)
+#   after    29    2.83    14.59    84.51    84.51    0 (0.0%)
+#
+# The fat tail before the fix WAS the routing bug, not FX: the three largest deltas ever
+# recorded are all trading divergences, and two of the three are MNKD (-2455.00 on 08-10
+# against a booked -110.00; -889.58 on 08-11 against a booked -30.00). Reading that tail
+# as noise is what would justify a loose threshold; it is signal.
+#
+# So the noise floor is the post-fix column: everything under $100. $250 is ~3x the
+# largest clean observation and fires on none of them, while catching all three real
+# divergences. Had this existed it would have raised MNKD on 2026-08-05, nine days
+# before it was found by asking IBKR directly.
+#
+# THIN SAMPLE, REVISIT. n=29 post-fix is about five sessions and does not include a
+# violent FX day. If this starts firing on days with no trading, widen it against a
+# re-measured distribution rather than by feel — a threshold nobody re-derives is how
+# refreeze.CALMAR_FLOOR = 2.38 outlived the number it was copied from by six weeks.
+BROKER_RECONCILE_TOLERANCE = 250.0
+
 # Clusters whose engine defers the stop to the next session — see _stop_deferred.
 # Swing and NKD both run backtest_swing_tf and inherit its semantics. Stress is an
 # event model that opens and closes inside one session; it is not covered by the
@@ -302,6 +328,11 @@ class FuturesRunner:
         # can report an unpriceable close, which happens well before the operational-log
         # section further down.
         self._events: list = []
+        # M5: initialised here, not in run_day, because B3 drains stop exits during
+        # __init__ and every one of them calls _book_realised — which accumulates into
+        # this. run_day resets it per run; this is only so the first close of the
+        # process has somewhere to land.
+        self._booked_this_run: float = 0.0
         # Append-only telemetry is derived from the dashboard path so offline runners
         # without live_state_path remain write-free. It is never read by the engine.
         self._event_log_dir = Path(live_state_path).parent if live_state_path else None
@@ -957,6 +988,11 @@ class FuturesRunner:
                * (1 if pos.direction == "LONG" else -1))
         pos.pnl_sized = pnl
         self.state.equity += pnl
+        # M5: what this run has booked, for the reconciliation against the broker's own
+        # move at the end of run_day. Accumulated here rather than by diffing equity
+        # around the exits loop because there are six paths that close a position and
+        # they do not all run in one place — H4 was that lesson.
+        self._booked_this_run += pnl
         if self.state.breaker is not None:
             self.state.breaker.update(self.state.equity)
         logger.info(
@@ -1360,6 +1396,9 @@ class FuturesRunner:
         (skips CSV read). For offline testing only — not used in production."""
         # Stamp the ledger's epoch on first use so the dashboard can say what the
         # net P&L is measured from. Set once, then carried in the state file.
+        # M5: reset per run, so the reconciliation at the end compares the broker's move
+        # against what THIS run booked and not a running total.
+        self._booked_this_run = 0.0
         if self._system_epoch is None:
             self._system_epoch = str(pd.Timestamp(day).date())
             logger.info("Ledger epoch set to %s — net P&L is measured from here, "
@@ -1762,6 +1801,37 @@ class FuturesRunner:
             logger.info("H4: broker delta %+.2f (balance %.2f) — logged, not booked; "
                         "sleeve ledger stands at %.2f",
                         _h4_delta, _h4_eq, self.state.equity)
+
+        # M5: compare the two, instead of printing one and hoping someone reads it.
+        #
+        # Both halves have always been here — the account's own move and what the sleeve
+        # booked in the same run — and nothing put them side by side. The old comment
+        # admitted it: "The line stays because a large unexplained move in the account is
+        # still worth seeing." Worth seeing is not a check. This was the only parallel
+        # pair left in the runner with both sides present and no reconciliation.
+        #
+        # The residual, not the raw delta: the account carries interest and FX on a CAD
+        # balance twenty times the sleeve, so |delta| alone is noise. What has to be
+        # explained is the part the sleeve did not book.
+        _residual = _h4_delta - self._booked_this_run
+        if abs(_residual) > BROKER_RECONCILE_TOLERANCE:
+            logger.warning(
+                "M5 RECONCILE: account moved %+.2f while the sleeve booked %+.2f — "
+                "%+.2f unexplained (tolerance %.0f). Interest and FX on a CAD account "
+                "this size are normally under $100; a residual this large has usually "
+                "been an order that did not go where the ledger thinks it did.",
+                _h4_delta, self._booked_this_run, _residual, BROKER_RECONCILE_TOLERANCE,
+            )
+            self._emit_event(
+                "ALERT", "RECONCILE",
+                f"Account moved {_h4_delta:+.2f}, sleeve booked "
+                f"{self._booked_this_run:+.2f} — {_residual:+.2f} unexplained",
+                {"broker_delta": round(_h4_delta, 2),
+                 "sleeve_booked": round(self._booked_this_run, 2),
+                 "residual": round(_residual, 2),
+                 "tolerance": BROKER_RECONCILE_TOLERANCE,
+                 "broker_equity": round(_h4_eq, 2)},
+            )
 
         # Re-check the brake before the multi-day entries go out. decide_day admitted
         # them against the equity it saw BEFORE this run's closes were booked, so a day
@@ -2292,17 +2362,85 @@ class FuturesRunner:
             logger.info("STP: cancelled GTC stop orderId=%s for closed %s/%s",
                         p.stop_order_id, p.inst, p.cluster)
             return
+
+        # M2. `cancel_order` returning False does NOT mean the stop is still working.
+        # It scans reqAllOpenOrders() filtered on `not t.isDone()`, so a stop that has
+        # already FILLED is absent from that list and the method returns False for the
+        # most harmless reason available. This branch used to announce the opposite of
+        # the truth — "the stop is still working at the broker" — without asking.
+        #
+        # It is not a wording problem. run_scheduler lifts every CRITICAL/ERROR line out
+        # of a child's output into the scheduler log, a mechanism added because a REAL
+        # STP ORPHAN was swallowed on 2026-08-10. Minting false ones spends exactly the
+        # credibility that incident bought.
+        _status = None
+        try:
+            _status = self.broker.get_order_status(p.stop_order_id)
+        except Exception as _exc:
+            logger.warning("STP: could not read status of orderId=%s (%s)",
+                           p.stop_order_id, _exc)
+
+        if _status == "FILLED":
+            # The stop fired. The position is closed by it — and the runner has just
+            # sent its own CLOSE for the same position, so the account may now be short
+            # a contract nobody asked for. B3 compares file against broker on the next
+            # slot and will halt entries if so; this line is what tells the operator
+            # where to look before then.
+            logger.warning(
+                "STP FIRED: orderId=%s for %s/%s had already executed — not an orphan. "
+                "The runner also sent its own CLOSE, so verify the account is FLAT and "
+                "not reversed on this contract.",
+                p.stop_order_id, p.inst, p.cluster,
+            )
+            self._emit_event(
+                "ALERT", "ORDER",
+                f"STP FIRED before close: {p.inst}/{p.cluster} stop "
+                f"orderId={p.stop_order_id} — verify position is flat, not reversed",
+                {"inst": p.inst, "cluster": p.cluster, "order_id": p.stop_order_id},
+            )
+            return
+
+        if _status == "CANCELLED":
+            logger.info(
+                "STP: orderId=%s for %s/%s was already cancelled — nothing left to do",
+                p.stop_order_id, p.inst, p.cluster)
+            return
+
+        if _status in (None, "NOT_FOUND"):
+            # Cannot testify either way. Saying "still live" here is the same defect as
+            # a check that compares a value with itself: a claim with no measurement
+            # behind it.
+            logger.error(
+                "STP UNVERIFIED: cancel_order(%s) failed for %s/%s and the broker "
+                "cannot locate the order (%s). It may have filled, been cancelled, or "
+                "still be working. OPERATOR: check orderId=%s in TWS.",
+                p.stop_order_id, p.inst, p.cluster, _status or "status unreadable",
+                p.stop_order_id,
+            )
+            self._emit_event(
+                "ALERT", "ORDER",
+                f"STP UNVERIFIED: {p.inst}/{p.cluster} stop orderId={p.stop_order_id} "
+                f"— cancel failed and the broker cannot locate it; check TWS",
+                {"inst": p.inst, "cluster": p.cluster, "order_id": p.stop_order_id,
+                 "status": _status},
+            )
+            return
+
+        # Anything else means the broker still shows it working — the case the alarm
+        # was written for. Live 2026-08-05 carried two, one of which would have doubled
+        # a short rather than closing it.
         logger.critical(
-            "STP ORPHAN: cancel_order(%s) returned False for %s/%s — the stop is "
-            "still working at the broker and will open an unintended position when "
-            "it fires. OPERATOR: cancel orderId=%s manually in TWS.",
-            p.stop_order_id, p.inst, p.cluster, p.stop_order_id,
+            "STP ORPHAN: cancel_order(%s) returned False for %s/%s and the broker "
+            "still reports it %s — the stop is working and will open an unintended "
+            "position when it fires. OPERATOR: cancel orderId=%s manually in TWS.",
+            p.stop_order_id, p.inst, p.cluster, _status, p.stop_order_id,
         )
         self._emit_event(
             "CRITICAL", "ORDER",
             f"STP ORPHAN: {p.inst}/{p.cluster} stop orderId={p.stop_order_id} "
-            f"NOT cancelled — still live at broker, cancel manually in TWS",
-            {"inst": p.inst, "cluster": p.cluster, "order_id": p.stop_order_id},
+            f"NOT cancelled — still live at broker ({_status}), cancel manually in TWS",
+            {"inst": p.inst, "cluster": p.cluster, "order_id": p.stop_order_id,
+             "status": _status},
         )
 
     def _emit_event(self, level: str, category: str, message: str,
