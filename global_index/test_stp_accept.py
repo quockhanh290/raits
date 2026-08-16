@@ -619,6 +619,87 @@ def test_fe1_returns_the_execution_detail_not_a_bare_true():
     assert got["time"] == "2026-08-07 11:20:20"
 
 
+class _FillRecC:
+    """A fill that also carries its contract — reqExecutions returns one, and it is the
+    field that tells two same-orderId executions apart."""
+
+    def __init__(self, execution, symbol):
+        self.execution = execution
+        self.contract = type("C", (), {"symbol": symbol})()
+
+
+def test_fe4_a_repeated_orderid_is_told_apart_by_the_contract():
+    """M3. find_execution matched on orderId while its own docstring says orderId
+    repeats across clients — "the ambiguity behind the #62-vs-#9 mix-up".
+
+    It returned the FIRST match and looked no further. _book_realised takes price and
+    shares from this record to move the sleeve ledger, so a collision books the sleeve
+    at a stranger's fill price. Not hypothetical: cancel_order's own comment records
+    clientIds 1, 77, 82 and 93 all touching this account on 2026-08-06.
+
+    The caller always knows which instrument it is asking about — both call sites hold
+    the OpenPos — so the contract is free disambiguation.
+    """
+    fake = _ExecIB([
+        _FillRecC(_Exec(100, 999.0, 5, "t-other", 111), "MES"),
+        _FillRecC(_Exec(100, 3020.10, 1, "t-ours", 222), "MNK"),
+    ])
+    got = _exec_broker(fake).find_execution("100", inst="MNKD")
+
+    assert got, "the MNKD execution is present and identifiable; refusing it loses the price"
+    assert got["price"] == pytest.approx(3020.10), (
+        f"took the other client's fill: booking the sleeve at a price from a different "
+        f"contract. got {got!r}")
+    assert got["perm_id"] == 222
+
+
+def test_fe5_a_genuinely_ambiguous_match_refuses_to_guess():
+    """Two executions, same orderId, same contract. Nothing distinguishes them, so
+    there is no right answer to return — and returning the first is a wrong one 50% of
+    the time, silently.
+
+    None is the safe answer: the caller falls into the no-execution-record path, which
+    books at the placed stop level and marks the row fill_price_estimated (H4). An
+    estimate that says it is an estimate beats a precise number that is someone else's.
+    """
+    fake = _ExecIB([
+        _FillRecC(_Exec(100, 3020.10, 1, "t1", 111), "MNK"),
+        _FillRecC(_Exec(100, 2999.00, 1, "t2", 222), "MNK"),
+    ])
+    assert not _exec_broker(fake).find_execution("100", inst="MNKD"), (
+        "two indistinguishable candidates and one was returned as though it were known")
+
+
+def test_fe6_without_inst_a_single_match_still_works():
+    """Control. The instrument filter must not become a new way to lose a fill: the
+    old signature still resolves, and a lone execution is still returned."""
+    fake = _ExecIB([_FillRecC(_Exec(100, 3020.10, 1, "t", 333), "MNK")])
+    got = _exec_broker(fake).find_execution("100")
+    assert got and got["perm_id"] == 333, f"single unambiguous fill must survive: {got!r}"
+
+
+def test_fe7_the_runner_actually_passes_the_instrument():
+    """The filter is only worth having if the caller uses it.
+
+    H2 was a whole finding about exactly this shape — a mechanism implemented end to
+    end in the runner while no entry point passed the argument, so the condition was
+    always False and STOP_TRADING stopped nothing. Checked on the source because that
+    is where an omitted keyword lives.
+    """
+    import ast
+    src = (Path(__file__).resolve().parent / "runner.py").read_text(encoding="utf-8")
+    calls = [n for n in ast.walk(ast.parse(src))
+             if isinstance(n, ast.Call)
+             and getattr(n.func, "attr", None) == "find_execution"]
+
+    assert calls, "no find_execution call found in runner.py — the locator is broken"
+    missing = [n.lineno for n in calls
+               if "inst" not in {k.arg for k in n.keywords}]
+    assert not missing, (
+        f"find_execution called without inst at line(s) {missing}; orderId alone can "
+        f"match another client's execution and that price moves the sleeve ledger")
+
+
 def test_fe2_no_match_is_still_falsy():
     """B3 treats a falsy answer conservatively — that must not change."""
     fake = _ExecIB([_FillRec2(_Exec(999, 1.0, 1, "t", 1))])

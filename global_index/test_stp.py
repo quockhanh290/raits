@@ -766,7 +766,7 @@ class _StopFilledBroker(_RecordingMockBroker):
         super().__init__(bars, account, stp_status="NOT_FOUND")
         self._fill = fill
 
-    def find_execution(self, order_id):
+    def find_execution(self, order_id, inst=None):
         return dict(self._fill) if str(order_id) == "ibkr-456" else None
 
 
@@ -1004,7 +1004,7 @@ class _FillReportingBroker(_RecordingMockBroker):
         self._exec = {"price": price, "shares": shares,
                       "time": "2024-03-12 09:31:00", "permId": 777}
 
-    def find_execution(self, order_id):
+    def find_execution(self, order_id, inst=None):
         return dict(self._exec)
 
 
@@ -1014,7 +1014,7 @@ class _AmnesiacBroker(_RecordingMockBroker):
     def __init__(self, bars, account):
         super().__init__(bars, account, stp_status="FILLED")
 
-    def find_execution(self, order_id):
+    def find_execution(self, order_id, inst=None):
         return None
 
 

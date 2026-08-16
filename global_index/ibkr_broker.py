@@ -1403,7 +1403,7 @@ class IBKRBroker(Broker):
                 str(t.order.orderId))
         return working
 
-    def find_execution(self, order_id: str) -> "dict | None":
+    def find_execution(self, order_id: str, inst: str | None = None) -> "dict | None":
         """The execution record for order_id, or None.
 
         Uses ib.reqExecutions() — IB's server-side history, which survives the TWS daily
@@ -1436,10 +1436,46 @@ class IBKRBroker(Broker):
             ).strftime("%Y%m%d 00:00:00")
             order_id_int = int(order_id)
             fills = ib.reqExecutions(ibi.ExecutionFilter(time=lookback))
+
+            # M3: orderId alone does not identify an execution, and the docstring above
+            # has said so all along while the code matched on it and took the first hit.
+            # cancel_order records clientIds 1, 77, 82 and 93 on this account on
+            # 2026-08-06; _book_realised takes price and shares from whatever comes back
+            # and moves the sleeve ledger with them, so a collision books the sleeve at
+            # a stranger's fill.
+            #
+            # The instrument is free disambiguation — both call sites hold the OpenPos —
+            # and an execution on a different contract is definitely not ours.
+            candidates = []
             for fill in fills:
                 ex = fill.execution
                 if getattr(ex, "orderId", None) != order_id_int:
                     continue
+                if inst is not None:
+                    _sym = getattr(getattr(fill, "contract", None), "symbol", "") or ""
+                    if _sym and _to_runner(_sym) != inst:
+                        continue
+                candidates.append(fill)
+
+            if not candidates:
+                return None
+            if len(candidates) > 1:
+                # Nothing left to tell them apart, so there is no right answer to
+                # return and the first one is wrong half the time, silently. None sends
+                # the caller down the no-execution-record path, which books the placed
+                # stop level and marks the row an estimate — a number that admits what
+                # it is beats a precise one belonging to someone else.
+                log.error(
+                    "find_execution(orderId=%s inst=%s): %d executions match and "
+                    "nothing distinguishes them (permIds %s). Refusing to pick one; "
+                    "the caller will book the placed stop level as an estimate.",
+                    order_id, inst, len(candidates),
+                    [getattr(f.execution, "permId", None) for f in candidates],
+                )
+                return None
+
+            for fill in candidates:
+                ex = fill.execution
                 return {
                     "order_id": order_id_int,
                     "perm_id":  getattr(ex, "permId", None),
