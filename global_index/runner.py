@@ -899,15 +899,20 @@ class FuturesRunner:
         for _sp, _sf in _pending_stop_exits:
             try:
                 if _sf:
-                    self._book_realised(_sp, _sf.get("price"),
-                                        int(_sf.get("shares") or 0) or None, why="stop")
+                    # C6: carry the amount actually booked onto the row. Taken from
+                    # _book_realised, which already returns what it added — not
+                    # recomputed from fill_price and entry_price, which would be a
+                    # second answer to one question (M4).
+                    _pnl = self._book_realised(_sp, _sf.get("price"),
+                                               int(_sf.get("shares") or 0) or None,
+                                               why="stop")
                     self._record_stop_exit(_sp, _sf, source=_sf.get("_src")
-                                           or "B3_STP_VERIFY")
+                                           or "B3_STP_VERIFY", pnl=_pnl)
                 else:
                     # IBKR said FILLED but the fill record is gone; the position IS
                     # closed, so booking the placed level beats leaving the ledger
                     # stale. Already logged as an estimate at the discovery site.
-                    self._book_realised(_sp, _sp.stop_price, why="stop")
+                    _pnl = self._book_realised(_sp, _sp.stop_price, why="stop")
                     # H4 path B. The line above moves system equity; without the line
                     # below nothing reaches trade_log.jsonl, so every figure derived
                     # from it — paper_epoch_closed_realized among them — is short by
@@ -925,6 +930,7 @@ class FuturesRunner:
                         {"price": _sp.stop_price, "shares": _sp.contracts,
                          "time": None, "estimated": True},
                         source="B3_STP_NO_EXEC_RECORD",
+                        pnl=_pnl,
                     )
             except Exception as _e:
                 logger.error(
@@ -1038,7 +1044,8 @@ class FuturesRunner:
         )
         return pnl
 
-    def _record_stop_exit(self, pos, fill: dict, source: str = "B3_STP_VERIFY") -> None:
+    def _record_stop_exit(self, pos, fill: dict, source: str = "B3_STP_VERIFY",
+                          pnl: float | None = None) -> None:
         """Write the CLOSE record for a stop that fired at the broker.
 
         Nothing else writes one. The runner sends no order when a stop triggers, so the
@@ -1083,6 +1090,11 @@ class FuturesRunner:
                 "perm_id": fill.get("perm_id"),
                 "status": "FILLED",
                 "source": source,
+                # C6: the amount _book_realised just moved into the sleeve ledger.
+                # Chandelier stops are 79.5% of exits, so leaving this null meant any
+                # figure rebuilt from trade_log.jsonl read zero for most of the P&L it
+                # exists to explain — while the money had already moved.
+                "pnl_sized": pnl,
                 # True when fill_price is the level the stop was PLACED at rather than a
                 # price IBKR reported — reqExecutions had already forgotten the fill.
                 # Consumers that measure execution quality must be able to exclude it;

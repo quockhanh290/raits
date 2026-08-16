@@ -1202,6 +1202,39 @@ def test_stp13e_a_forgotten_fill_still_reaches_the_trade_log(tmp_path):
         f"{closes[0]}")
 
 
+def test_stp13g_a_stop_exit_records_the_money_it_booked(tmp_path):
+    """PAPER_DASHBOARD_AUDIT C6, the half the schema fix did not close.
+
+    Unifying the CLOSE schema gave every row a pnl_sized key. The stop-exit writer
+    still left it null — while _book_realised had already moved that exact amount into
+    the sleeve ledger. So the row exists, the money moved, and the column that says how
+    much is blank.
+
+    That matters more here than anywhere else: chandelier stops are 79.5% of exits, so
+    this is the majority of the ledger, and any figure rebuilt from trade_log.jsonl was
+    reading zero for most of the P&L it is supposed to explain.
+
+    The value is TAKEN from _book_realised, which already returns what it added. Not
+    recomputed from fill_price and entry_price — that would be a second answer to the
+    same question, and M4 is the standing lesson about two sources for one number.
+    """
+    log_path = tmp_path / "t.jsonl"
+    runner = _runner_with(_AmnesiacBroker({}, ACCOUNT), _persisted(tmp_path), log_path)
+
+    booked = ACCOUNT - runner.state.equity
+    assert booked > 0, (
+        f"precondition: the stop exit must have moved the ledger, else this proves "
+        f"nothing. equity={runner.state.equity}")
+
+    closes = _closes(log_path)
+    assert closes, "no CLOSE row at all — that is stp13e's job, not this one"
+    assert closes[0].get("pnl_sized") is not None, (
+        f"the ledger moved by {booked:.2f} and the row says nothing: {closes[0]}")
+    assert closes[0]["pnl_sized"] == pytest.approx(-booked), (
+        f"the row must carry what was actually booked ({-booked:.2f}), not a "
+        f"recomputation: got {closes[0]['pnl_sized']}")
+
+
 def test_stp13f_a_same_day_round_trip_reaches_the_trade_log(tmp_path):
     """H4 path F. Two real orders, money booked, and not one line written.
 
