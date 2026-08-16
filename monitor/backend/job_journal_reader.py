@@ -19,9 +19,15 @@ _LINE = re.compile(
     r"(?P<level>\S+)\s+(?P<logger>\S+)\s+(?:-|—)\s+(?P<message>.*)$"
 )
 _JOB = re.compile(r"^\[(?P<job_id>[A-Z0-9_]+)]\s+(?P<detail>.*)$")
-# The scheduler launches every child as `<python> -m global_index.<entry>`. Match that shape,
+# The scheduler launches every child as `<python> -m <package>.<entry>`. Match that shape,
 # not the bare word "python": traceback frames quote the interpreter's install path too.
-_LAUNCH = re.compile(r"-m\s+global_index\.")
+#
+# `monitor.` is here because the scheduler stopped launching only global_index entries on
+# 2026-08-15, when the nightly broker-statement pull and P&L rebuild were attached after
+# the session report. Anchored on global_index alone, those two would run every evening
+# and appear in this journal as nothing at all -- a job whose success AND failure are both
+# invisible, on the page built to show whether jobs ran.
+_LAUNCH = re.compile(r"-m\s+(?:global_index|monitor)\.")
 # A refused broker connection dumps ~30 traceback frames. Keep enough to name the exception,
 # not enough to bury the card.
 _MAX_CHILD_DIAGNOSTICS = 12
@@ -57,6 +63,13 @@ def _job_type(job_id: str) -> str:
         return "preflight"
     if job_id == "SESSION_REPORT":
         return "session_report"
+    # The two nightly evidence jobs. Typed rather than left as "other" so the journal can
+    # say what their failure costs -- which is not a halted trade, it is a paper P&L that
+    # no longer reconciles against the broker's own numbers.
+    if job_id == "FLEX_PULL":
+        return "flex_pull"
+    if job_id == "PAPER_PNL":
+        return "paper_pnl"
     return "other"
 
 
@@ -173,6 +186,22 @@ def _annotate_impact_and_action(jobs: list[dict[str, Any]]) -> None:
         elif job["status"] == "failed" and job["job_type"] == "preflight":
             job["impact"] = "The input gate failed; scheduled Live Day decision slots will be blocked until fresh IBKR and SPY data are confirmed."
             job["action"] = "Fix the failed input update, rerun the required update manually, and confirm both data sources are fresh before Live Day."
+        elif job["status"] == "failed" and job["job_type"] in {"flex_pull", "paper_pnl"}:
+            # Deliberately not phrased as a trading incident. Nothing is halted and no
+            # position is at risk -- what is lost is the check that the sleeve ledger
+            # still agrees with the money IBKR actually moved. That check reading 0.00
+            # while the account was $1,260 out is the whole reason it exists.
+            source = ("the broker statement was not pulled" if job["job_type"] == "flex_pull"
+                      else "the comparison was not rebuilt")
+            job["impact"] = (
+                f"Paper P&L is not reconciled against actual Flex P&L: {source}, so the "
+                f"dashboard's P&L section still reflects the previous run."
+            )
+            job["action"] = (
+                "No trading action. The Paper Evidence page flags its own P&L as STALE "
+                "from the data watermark; rerun python monitor/paper_pnl_compare.py "
+                "(after monitor/flex_pull.py if the statement is also behind) to clear it."
+            )
         elif job["status"] == "failed":
             job["impact"] = "The job emitted an unclassified error; completion and operational effects cannot be confirmed from this evidence."
             job["action"] = "Review the diagnostics below and reconcile current broker state before taking operational action."

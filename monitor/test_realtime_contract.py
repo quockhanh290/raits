@@ -352,3 +352,44 @@ def test_live_schedule_endpoint_matches_the_same_contract():
     assert isinstance(body["incidents"], list)
     assert isinstance(body["open_incidents"], list)
     assert len(body["open_incidents"]) <= len(body["incidents"])
+
+
+def test_the_nightly_evidence_jobs_are_typed_and_name_what_their_failure_costs():
+    """Two jobs were attached to the scheduler on 2026-08-15 (broker-statement pull and
+    P&L rebuild) and were invisible here: the journal anchored on `-m global_index.` and
+    they launch `-m monitor.`. They would have run every evening and appeared as nothing
+    at all -- success and failure alike -- on the page built to show whether jobs ran.
+
+    Typed rather than left as "other" so the journal can state the real cost, which is
+    not a halted trade: it is the paper ledger no longer being checked against the money
+    IBKR actually moved. That check reading 0.00 while the account was $1,260 out is the
+    reason it exists.
+    """
+    import tempfile
+    from pathlib import Path
+
+    from monitor.backend.job_journal_reader import _parse
+
+    log = (
+        "2026-08-16 16:40:22  INFO     run_scheduler - [FLEX_PULL] py -m monitor.flex_pull\n"
+        "2026-08-16 16:40:30  INFO     run_scheduler - [FLEX_PULL] completed OK\n"
+        "2026-08-16 16:40:30  INFO     run_scheduler - [PAPER_PNL] py -m monitor.paper_pnl_compare\n"
+        "2026-08-16 16:40:48  ERROR    run_scheduler - [PAPER_PNL] exited with code 1\n"
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "scheduler_0816.log"
+        path.write_text(log, encoding="utf-8")
+        jobs = {j["job_id"]: j for j in (_parse([path], "2026-08-16", []).get("jobs") or [])}
+
+    assert set(jobs) == {"FLEX_PULL", "PAPER_PNL"}, (
+        f"a scheduler job is missing from the journal: {sorted(jobs)}")
+    assert jobs["FLEX_PULL"]["job_type"] == "flex_pull"
+    assert jobs["PAPER_PNL"]["job_type"] == "paper_pnl"
+
+    failed = jobs["PAPER_PNL"]
+    assert failed["status"] == "failed"
+    assert "not reconciled against actual Flex P&L" in failed["impact"]
+    # The cost must not read as a trading incident; nothing is halted and no position is
+    # at risk. Saying otherwise trains the reader to discount the lane.
+    assert "No trading action" in failed["action"]
+    assert "paper_pnl_compare.py" in failed["action"], "must say how to clear it"
