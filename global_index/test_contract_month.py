@@ -156,8 +156,21 @@ def test_cm4_entry_records_the_month_that_was_actually_traded(tmp_path):
     Recomputing it here with _current_front_month would build a SECOND answer to
     "which month", derived from the wall clock rather than from the order that went
     out — that is M4, the two-clocks defect, rebuilt inside the fix for C1.
+
+    The fill reports what IBKR reports: qualifyContracts replaces the contract's fields
+    with the resolved ones, and the resolved expiry is a full DATE, "20260911", not the
+    "202609" that was asked for. exercise_rollover_live compares it with .startswith()
+    for exactly that reason, and backfill_nkd passes "20260910" outright.
+
+    The book must not carry two spellings of one month: entry would write "20260911"
+    while the roll path writes "202612" straight from ROLL_SCHEDULE, and any comparison
+    between them silently fails. Normalised to YYYYMM at the broker boundary — the same
+    "one vocabulary leaves IBKRBroker" rule test_symbol_boundary enforces for symbols.
+
+    The first version of this test chose "202609" for the fake and so could never have
+    caught it: the value under test was one I picked, not one IBKR produces.
     """
-    broker = _MonthBroker({}, ACCOUNT, month="202609")
+    broker = _MonthBroker({}, ACCOUNT, month="20260911")
     runner = _runner(broker, tmp_path, DAY1)
     runner.run_day(DAY1)
 

@@ -59,6 +59,29 @@ class Fill:
     # verify/replay path is unchanged.
     contract_month: str | None = None
 
+    def __post_init__(self):
+        """Normalise the expiry to the YYYYMM the rest of the system speaks.
+
+        qualifyContracts REPLACES the contract's fields with the resolved ones, and the
+        resolved expiry is a full date: ask for "202609", read back "20260911".
+        exercise_rollover_live compares it with .startswith() for exactly that reason,
+        and backfill_nkd passes "20260910" outright.
+
+        Left alone, the book would carry two spellings of one month — "20260911" from an
+        entry, "202612" from a roll, which reads ROLL_SCHEDULE directly — and any
+        comparison between them fails silently. That is the defect this field was added
+        to expose, rebuilt inside the field itself.
+
+        Done here rather than in IBKRBroker so no broker can bypass it: the book is the
+        durable artefact, and it must speak one vocabulary whoever filled the order.
+        Idempotent, so the roll path's YYYYMM passes through untouched. A value that is
+        not a plain digit string is left as-is rather than truncated — better visibly
+        odd in the book than quietly cut down to something that looks valid.
+        """
+        m = self.contract_month
+        if isinstance(m, str) and len(m) > 6 and m.isdigit():
+            self.contract_month = m[:6]
+
 
 @dataclass
 class BrokerPosition:
