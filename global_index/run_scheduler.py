@@ -232,6 +232,35 @@ _SLOT_TIMEOUT_SECS = 20 * 60
 _INFLIGHT_STUCK_SECS = _SLOT_TIMEOUT_SECS + 5 * 60
 
 
+def _run_guarded(slot_id: str, body) -> bool:
+    """Run `body` holding the slot mutex. True if it ran, False if the slot was skipped.
+
+    Module-level so the suite can drive the real guard. test_slot_overlap used to cover
+    this through a "minimal stand-in… with the same semantics" — a second copy, which
+    can only confirm that the copy behaves like itself; changing this function would not
+    have turned it red. Same family as test_rollover asking the roll table with a key
+    production never passes, which is how C1 survived a green suite.
+
+    Skipping is the correct outcome, not a loss: diff_desired_vs_held is idempotent, so
+    the next slot does whatever this one would have.
+    """
+    if not _slot_lock.acquire(blocking=False):
+        # H5: say HOW LONG. Without it "still in flight" reads the same after 90
+        # seconds and after an hour, and the second one means the session is dead.
+        _since = _slot_started_at[0]
+        _elapsed = (time.monotonic() - _since) if _since else 0.0
+        _rep = _inflight_report(_elapsed)
+        getattr(log, _rep.level)("[%s] %s", slot_id, _rep.message)
+        return False
+    _slot_started_at[0] = time.monotonic()
+    try:
+        body()
+        return True
+    finally:
+        _slot_started_at[0] = None
+        _slot_lock.release()
+
+
 class _InflightReport(NamedTuple):
     level: str
     message: str
@@ -642,22 +671,10 @@ def make_scheduler(port: int, dry_run: bool,
         idempotent — a held position yields cur != None and no re-entry — so the
         next slot does whatever this one would have.
         """
-        if not _slot_lock.acquire(blocking=False):
-            # H5: say HOW LONG. Without it "still in flight" reads the same after 90
-            # seconds and after an hour, and the second one means the session is dead.
-            _since = _slot_started_at[0]
-            _elapsed = (time.monotonic() - _since) if _since else 0.0
-            _rep = _inflight_report(_elapsed)
-            getattr(log, _rep.level)("[%s] %s", slot_id, _rep.message)
-            return
-        _slot_started_at[0] = time.monotonic()
-        try:
-            _live_day_body_inner(slot_id, first_slot=first_slot,
-                                 clusters=clusters, prev_preflight=prev_preflight,
-                                 verify=verify, stress_entry=stress_entry)
-        finally:
-            _slot_started_at[0] = None
-            _slot_lock.release()
+        # The mutex lives in _run_guarded so the suite drives the same code this does.
+        _run_guarded(slot_id, lambda: _live_day_body_inner(
+            slot_id, first_slot=first_slot, clusters=clusters,
+            prev_preflight=prev_preflight, verify=verify, stress_entry=stress_entry))
 
     # ── Shared runner body (all 14:05–15:55 slots) ───────────────────────────
     def _live_day_body_inner(slot_id: str, *, first_slot: bool = False,

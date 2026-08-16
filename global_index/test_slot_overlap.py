@@ -30,6 +30,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from global_index.runner import _acquire_lock, _release_lock, RunnerLockError
 
+pytest.importorskip("apscheduler")
+from global_index import run_scheduler as rs  # noqa: E402
+
 
 # ── process level: E1 PID lock ────────────────────────────────────────────────
 
@@ -66,19 +69,28 @@ def test_stale_lock_is_overwritten(tmp_path):
 # ── scheduler level: slot mutex ───────────────────────────────────────────────
 
 def _make_slot_runner():
-    """Minimal stand-in for _live_day_body's guard, with the same semantics."""
-    lock = threading.Lock()
+    """Drive the REAL guard, not a copy of it.
+
+    This used to be a "minimal stand-in for _live_day_body's guard, with the same
+    semantics" — a second implementation, so it could only ever confirm that the copy
+    behaved like itself. Changing the real guard would not have turned it red.
+
+    That family has already cost this project twice: test_rollover asked the roll table
+    with a key production never passes, which is how C1 survived a fully green suite,
+    and the H5 work found this file testing a re-implementation of the very lock it
+    claims to cover. The fix is a seam, not a better copy: _run_guarded is now a
+    module-level function and _live_day_body calls it, so this test and production run
+    the same code.
+    """
     ran, skipped = [], []
 
     def body(slot_id, hold=0.0):
-        if not lock.acquire(blocking=False):
-            skipped.append(slot_id)
-            return
-        try:
+        def _inner():
             ran.append(slot_id)
             time.sleep(hold)
-        finally:
-            lock.release()
+
+        if not rs._run_guarded(slot_id, _inner):
+            skipped.append(slot_id)
 
     return body, ran, skipped
 
