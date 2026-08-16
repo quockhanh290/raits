@@ -1090,6 +1090,84 @@ def test_stp13c_the_ledger_moves_on_a_stop_exit(tmp_path):
         f"sổ phải giảm sau khi stop khớp lỗ; equity={runner.state.equity}")
 
 
+class _CancelFailsWithStatus(_CancelFailsBroker):
+    """The existing _CancelFailsBroker, with the order's REAL state made explicit.
+
+    That is the whole point of M2: cancel_order returning False says nothing on its own.
+    reqAllOpenOrders is filtered on `not isDone()`, so a stop that has already FILLED is
+    absent from it and cancel_order returns False for the most benign reason available.
+    """
+
+    def __init__(self, bars, account, real_status):
+        super().__init__(bars, account, stp_status=real_status)
+
+
+def _orphan_events(runner):
+    return [e for e in runner._events
+            if "ORPHAN" in (e.get("message") or "").upper()]
+
+
+def _close_with(broker, tmp_path):
+    """DAY1 opens, DAY2 closes — the close is what cancels the stop."""
+    _runner_on(broker, tmp_path, DAY1).run_day(DAY1)
+    r2 = _runner_on(broker, tmp_path, DAY2)
+    r2.run_day(DAY2)
+    return r2
+
+
+def test_stp14_a_stop_that_already_filled_is_not_called_an_orphan(tmp_path):
+    """M2. cancel_order returns False for a stop that has already fired, and the runner
+    announced the exact opposite of the truth.
+
+    `reqAllOpenOrders()` is filtered with `not t.isDone()`, so a FILLED stop is simply
+    not in the list, `matching` is empty and the method returns False. The runner then
+    logged CRITICAL: "the stop is still working at the broker and will open an
+    unintended position when it fires." It is not working. It fired.
+
+    This matters beyond the wording. run_scheduler lifts every CRITICAL/ERROR line out
+    of a child's output into the scheduler log — a mechanism added precisely because a
+    REAL "STP ORPHAN" was swallowed on 2026-08-10. Manufacturing false ones spends the
+    credibility of the alarm that incident bought.
+    """
+    runner = _close_with(_CancelFailsWithStatus({}, ACCOUNT, "FILLED"), tmp_path)
+
+    orphans = _orphan_events(runner)
+    assert not orphans, (
+        f"the stop had already filled; calling it a live orphan sends the operator to "
+        f"TWS to cancel an order that does not exist: {orphans}")
+
+
+def test_stp14b_a_stop_that_is_still_live_is_still_an_orphan(tmp_path):
+    """The control, and the reason this fix is not simply "stop alarming".
+
+    A stop that genuinely remains working after a failed cancel is the dangerous case
+    the alarm exists for — live 2026-08-05 carried two, one of which would have doubled
+    a short rather than closing it. If this test does not stay red-capable, the fix
+    above is indistinguishable from deleting the guard.
+    """
+    runner = _close_with(_CancelFailsWithStatus({}, ACCOUNT, "PENDING"), tmp_path)
+
+    orphans = _orphan_events(runner)
+    assert orphans, (
+        "the stop is still live at the broker after a failed cancel and nothing said "
+        "so — this is the case the alarm was written for")
+    assert any(e.get("level") == "CRITICAL" for e in orphans), (
+        f"a live orphaned stop must stay CRITICAL: {orphans}")
+
+
+def test_stp14c_an_unlocatable_stop_does_not_claim_to_be_live(tmp_path):
+    """NOT_FOUND is not evidence of anything. The old message asserted the stop was
+    "still working at the broker" without ever having asked, which is the same defect
+    as the audit's "a check that compares a value with itself": a claim with no
+    measurement behind it."""
+    runner = _close_with(_CancelFailsWithStatus({}, ACCOUNT, "NOT_FOUND"), tmp_path)
+
+    said = " ".join((e.get("message") or "") for e in runner._events)
+    assert "still live at broker" not in said, (
+        f"the broker could not locate the order, so the runner cannot testify that it "
+        f"is working: {said}")
+
+
 def test_stp13e_a_forgotten_fill_still_reaches_the_trade_log(tmp_path):
     """H4 path B. The money moves; the order book has to say so too.
 
