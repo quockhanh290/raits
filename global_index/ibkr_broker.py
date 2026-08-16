@@ -321,6 +321,41 @@ def ibkr_symbol_and_exchange(inst: str) -> "tuple[str, str]":
     return sym, _IBKR_EXCHANGE.get(sym, "CME")
 
 
+def session_month_conflict(inst: str, session_day) -> "str | None":
+    """Describe a disagreement between the session's front month and today's, or None.
+
+    M4. Two clocks decide the contract month and the audit asked for one. Forcing one
+    would be wrong, and that is the finding: they answer different questions and each is
+    right for its own.
+
+      "is today a roll day?"      -> the SESSION day, the day being processed
+      "which month do I send to?" -> the WALL clock, because an expired contract cannot
+                                     be traded at all
+
+    Threading the session day into order routing would make every catch-up run address
+    a contract that has already expired. So this does not reconcile them — it notices
+    when they part company, which is the thing nothing did.
+
+    While they disagree, get_roll_event is deciding on one month and the order paths are
+    addressing another: a position and its own orders in different contracts, which is
+    exactly the shape of C1. It happens on a catch-up or replay across a roll boundary,
+    and on a slot that begins before ET midnight and ends after.
+
+    Silent on the roll date itself, when both clocks have moved together.
+    """
+    ibkr_sym = _RAITS_TO_IBKR.get(inst, inst)
+    session_front = _current_front_month(ibkr_sym, session_day)
+    live_front = _current_front_month(ibkr_sym)
+    if session_front is None or live_front is None or session_front == live_front:
+        return None
+    return (
+        f"{inst} -> {ibkr_sym}: the session being processed "
+        f"({pd.Timestamp(session_day).date()}) belongs to front month {session_front}, "
+        f"but the tradeable front month right now is {live_front}. The roll schedule "
+        f"and the order routing are on different contracts."
+    )
+
+
 class ContractResolutionError(RuntimeError):
     """Raised when an instrument cannot be resolved to exactly one listed contract."""
 
@@ -694,6 +729,16 @@ class IBKRBroker(Broker):
 
             # Order path: an unresolved contract here sends a live order against
             # something IBKR never confirmed, so this raises rather than proceeding.
+            # M4: this order belongs to order.ref_day, but the contract below resolves
+            # against the wall clock. When those imply different months the order would
+            # land in a contract the book does not think it holds — refuse rather than
+            # send it. Silent whenever the two agree, which is every ordinary run.
+            _clash = session_month_conflict(order.inst, order.ref_day)
+            if _clash:
+                log.critical("M4: refusing to send %s %s — %s",
+                             order.action, order.inst, _clash)
+                raise ContractResolutionError(f"M4 clock disagreement: {_clash}")
+
             contract = _front_month_contract(ib, ibi, order.inst)
 
             # Map direction+action → IBKR BUY/SELL
@@ -1521,6 +1566,15 @@ class IBKRBroker(Broker):
         mapping on first real paper roll event. Offline (MockBroker) path returns
         synthetic fills and is unit-testable without a live Gateway connection.
         """
+        # M4: the roll decision below reads the SESSION day while every contract this
+        # method builds resolves against the wall clock. Normally identical; when they
+        # are not, this method would close one month and open another that the order
+        # paths do not agree with.
+        _clash = session_month_conflict(inst, today)
+        if _clash:
+            log.critical("M4: refusing to roll — %s", _clash)
+            raise ContractResolutionError(f"M4 clock disagreement: {_clash}")
+
         roll = get_roll_event(inst, today)
         if roll is None:
             return None  # not a roll day

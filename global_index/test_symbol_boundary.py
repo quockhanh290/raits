@@ -117,6 +117,12 @@ def _roll_broker(monkeypatch, resolve=True):
     fake_ibi = types.SimpleNamespace(Future=_RollFuture)
     monkeypatch.setitem(sys.modules, "ib_insync", fake_ibi)
 
+    # These tests drive a FUTURE roll date, so the M4 clock guard fires before any
+    # contract is built and they would assert on an empty list. Neutralised here on
+    # purpose: sb12 and sb13 own the clock behaviour, these own contract construction,
+    # and a test that silently covers two things fails for reasons you cannot read.
+    monkeypatch.setattr(B, "session_month_conflict", lambda _inst, _day: None)
+
     b = B.IBKRBroker(_raw_fetcher=lambda i, t: None)
     b._raw_fetcher = None
     b._require_connection = lambda: ib
@@ -223,6 +229,67 @@ def test_sb11_the_dashboard_reader_does_not_re_derive_the_routing():
     assert "_IBKR_EXCHANGE.get(" not in src, (
         "the reader picks the exchange itself; ask ibkr_symbol_and_exchange() so there "
         "is one routing rule, not two")
+
+
+def test_sb12_two_clocks_that_disagree_stop_the_order():
+    """M4. Two clocks decide the contract month, and the audit called for one.
+
+    Forcing one would be wrong, and that is the whole finding. They answer different
+    questions and each is right for its own:
+
+      "is today a roll day?"        -> the SESSION day being processed
+      "which month do I send to?"   -> the WALL clock, because an expired contract
+                                       cannot be traded at all
+
+    Threading the session day into order routing would make every catch-up run send
+    orders to a contract that has already expired. The defect is not that there are two
+    clocks; it is that nothing noticed when they disagreed — and while they disagree the
+    roll logic and the order routing are operating on different months, which is the
+    shape of C1.
+
+    Measured: session day 2026-09-04 gives front 202612, while the wall clock on
+    2026-08-16 gives 202609.
+    """
+    from global_index.ibkr_broker import session_month_conflict
+
+    same = session_month_conflict("MNKD", "2026-08-17")
+    assert same is None, (
+        f"an ordinary session, where both clocks agree, must not raise an alarm: {same}")
+
+    clash = session_month_conflict("MNKD", "2026-09-04")
+    assert clash is not None, (
+        "the session being processed rolls to 202612 while the tradeable front month "
+        "is still 202609 — orders and positions would sit in different contracts and "
+        "nothing said so")
+    assert "202612" in clash and "202609" in clash, (
+        f"the message has to name BOTH months, or the operator cannot tell which way "
+        f"round the disagreement runs: {clash}")
+
+
+def test_sb13_the_order_paths_actually_ask():
+    """A detector nothing calls is H2 again — implemented end to end, wired nowhere.
+
+    Checked on the source at the two sites that hold a session day: send_order has
+    order.ref_day, _handle_rollover has today. _front_month_contract does not have one
+    and is deliberately not the place for this.
+    """
+    import ast
+    src = (Path(__file__).resolve().parent / "ibkr_broker.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+
+    callers = set()
+    for fn in ast.walk(tree):
+        if not isinstance(fn, ast.FunctionDef):
+            continue
+        for node in ast.walk(fn):
+            if (isinstance(node, ast.Call)
+                    and getattr(node.func, "id", None) == "session_month_conflict"):
+                callers.add(fn.name)
+
+    for expected in ("send_order", "_handle_rollover"):
+        assert expected in callers, (
+            f"{expected} holds the session day and never compares it with the wall "
+            f"clock; found callers: {sorted(callers)}")
 
 
 def test_sb4_the_full_size_contract_is_not_adopted_as_ours():
