@@ -249,9 +249,32 @@ def get_roll_event(inst: str, today) -> "tuple[str, str] | None":
     """
     Return (front_month, next_month) if today is a roll date for inst, else None.
     today: str "YYYY-MM-DD" or pd.Timestamp.
+
+    C1: resolve the symbol first, like every other ROLL_SCHEDULE lookup.
+
+    ROLL_SCHEDULE is keyed by IBKR symbol, and its own comment says "every call site
+    resolves the symbol through _RAITS_TO_IBKR first". This function was the one that
+    did not. Its caller is _handle_rollover, which is handed `pos.inst` — the RUNNER
+    name — straight from runner.py:1229, and run_live_day.py:88 sets NKD_INST = "MNKD".
+    So the lookup asked for a key that has never existed and got None: "not a roll day",
+    every day, for the only instrument whose key needed translating.
+
+    The bug was invisible because it was ASYMMETRIC and silent. Four of five instruments
+    are their own IBKR symbol, so they rolled correctly; only Nikkei did not, and a
+    missing roll produces no error — just a position that quietly stays in an expiring
+    contract while send_order/place_stop/_fetch_raw (which DO resolve) move to the next
+    month. From the roll date the orders and the position sit in different contracts, and
+    the next CLOSE is a market SELL on a contract holding nothing: it opens a short.
+
+    Fixed here rather than by adding a "MNKD" row to ROLL_SCHEDULE. A third copy of the
+    same expiry cycle beside MNK and NKD is three chances to drift instead of two — the
+    L1 defect — and it would leave the next runner-named instrument broken the same way.
+    Resolving is idempotent: keys already in IBKR form map to themselves, so MES, MNK and
+    NKD lookups are bit-identical to before.
     """
+    ibkr_sym = _RAITS_TO_IBKR.get(inst, inst)
     today_str = str(pd.Timestamp(today).date())
-    for roll_date, front, nxt in ROLL_SCHEDULE.get(inst, []):
+    for roll_date, front, nxt in ROLL_SCHEDULE.get(ibkr_sym, []):
         if roll_date == today_str:
             return front, nxt
     return None
@@ -304,7 +327,6 @@ def _front_month_contract(ib, ibi, inst: str):
     contract identity the system inferred and then assumed existed.
     """
     ibkr_sym = _RAITS_TO_IBKR.get(inst, inst)
-    exchange = _IBKR_EXCHANGE.get(ibkr_sym, "CME")
     front_month = _current_front_month(ibkr_sym)
     if not front_month:
         raise ContractResolutionError(
@@ -312,12 +334,44 @@ def _front_month_contract(ib, ibi, inst: str):
             f"An unqualified future is ambiguous whenever two months are live; add "
             f"ROLL_SCHEDULE[{ibkr_sym!r}] rather than letting the request go out."
         )
-    contract = ibi.Future(ibkr_sym, lastTradeDateOrContractMonth=front_month,
+    return _month_contract(ib, ibi, inst, front_month)
+
+
+def _month_contract(ib, ibi, inst: str, month: str):
+    """Build the qualified contract for a runner instrument in a SPECIFIC month, or raise.
+
+    H1. Split out of _front_month_contract so the roll path can share it.
+
+    Appendix F gathered three call sites — _fetch_raw, send_order, place_stop — and
+    reported the duplication closed. There were four. _handle_rollover builds two
+    contracts of its own, and being outside the shared helper it kept every defect the
+    helper exists to remove:
+
+      * the runner's name went out as the IBKR symbol, so a Nikkei roll would have asked
+        for "MNKD", which is not listed;
+      * exchange was hardcoded "CME" while _IBKR_EXCHANGE declares MYM on CBOT, and the
+        FIRST of the roll's two orders is the one that closes the position;
+      * qualifyContracts was called and its result ignored, so an unlisted month became
+        two market orders against a contract IBKR never confirmed.
+
+    It stayed invisible because the roll path could not run for the one instrument whose
+    symbol needed translating: get_roll_event was keyed on the IBKR name and asked with
+    the runner name, so it always answered "not a roll day" (C1). Two defects hid each
+    other — fixing C1 alone would have turned "never rolls" into "rolls into a contract
+    that cannot resolve".
+
+    The month is a parameter rather than derived here: a roll needs the OUTGOING month
+    too, and _current_front_month answers "what is front now", which on the roll date is
+    already the next one.
+    """
+    ibkr_sym = _RAITS_TO_IBKR.get(inst, inst)
+    exchange = _IBKR_EXCHANGE.get(ibkr_sym, "CME")
+    contract = ibi.Future(ibkr_sym, lastTradeDateOrContractMonth=month,
                           exchange=exchange)
     ib.qualifyContracts(contract)
     if not getattr(contract, "conId", 0):
         raise ContractResolutionError(
-            f"{inst} -> {ibkr_sym} {front_month} on {exchange} did not resolve to a listed "
+            f"{inst} -> {ibkr_sym} {month} on {exchange} did not resolve to a listed "
             f"contract (conId is unset after qualifyContracts). Check that the exchange "
             f"lists this month: micros carry fewer forward months than the full-size "
             f"contract, so a ROLL_SCHEDULE date can outrun the listed chain."
@@ -711,7 +765,11 @@ class IBKRBroker(Broker):
                             order.contracts, order.cluster,
                             # pnl_sized=0: live equity tracked via get_equity(), not pnl accumulation
                             pnl_sized=0.0, status="FILLED", avg_price=avg_price,
-                            commission=commission)
+                            commission=commission,
+                            # The month this order actually went to, read off the
+                            # contract that was sent rather than derived again.
+                            contract_month=getattr(
+                                contract, "lastTradeDateOrContractMonth", None))
 
             # Terminal but not Filled (Cancelled / ApiCancelled / Inactive)
             if order.action == "OPEN":
@@ -1424,9 +1482,10 @@ class IBKRBroker(Broker):
         open_side  = "BUY"  if _direction == "LONG" else "SELL"
 
         # ── CLOSE front month ────────────────────────────────────────────────
-        front_contract = ibi.Future(inst, lastTradeDateOrContractMonth=front_month,
-                                    exchange="CME")
-        ib.qualifyContracts(front_contract)
+        # H1: the shared resolver, not a fourth hand-rolled contract. It translates the
+        # symbol (MNKD -> MNK), picks the exchange per symbol (MYM -> CBOT) and raises
+        # rather than letting an unresolved conId 0 become a live market order.
+        front_contract = _month_contract(ib, ibi, inst, front_month)
         close_ibkr = ibi.MarketOrder(close_side, _contracts)
         close_ibkr.outsideRth = True
         close_ibkr.tif = "DAY"   # see send_order: blank TIF triggers code 10349
@@ -1460,6 +1519,7 @@ class IBKRBroker(Broker):
                            status="FILLED" if close_st == "Filled" else "FAILED",
                            avg_price=close_price,
                            commission=close_commission,
+                           contract_month=front_month,
                            error_msg=None if close_st == "Filled"
                                      else f"roll-close status: {close_st}")
 
@@ -1477,9 +1537,11 @@ class IBKRBroker(Broker):
         log.info("C2: CLOSE filled %s %s @ %.4f (%.1fs)", inst, front_month, close_price, elapsed)
 
         # ── OPEN next month ──────────────────────────────────────────────────
-        next_contract = ibi.Future(inst, lastTradeDateOrContractMonth=next_month,
-                                   exchange="CME")
-        ib.qualifyContracts(next_contract)
+        # H1. Note this one resolves AFTER the close has filled: if the next month is not
+        # listed, the position is already flat and the runner is told so (the OPEN-failed
+        # branch removes it from the book and emits CRITICAL). Raising here is still
+        # better than opening a position on a contract IBKR never confirmed.
+        next_contract = _month_contract(ib, ibi, inst, next_month)
         open_ibkr = ibi.MarketOrder(open_side, _contracts)
         open_ibkr.outsideRth = True
         open_ibkr.tif = "DAY"   # see send_order: blank TIF triggers code 10349
@@ -1512,6 +1574,9 @@ class IBKRBroker(Broker):
                           status="FILLED" if open_st == "Filled" else "FAILED",
                           avg_price=open_price,
                           commission=open_commission,
+                          # The month the runner will record on the position — the whole
+                          # point of returning both fills from here.
+                          contract_month=next_month,
                           error_msg=None if open_st == "Filled"
                                     else f"roll-open status: {open_st} — position flat")
 

@@ -63,6 +63,13 @@ from global_index.live_decision import decide_day, DecisionState, OpenPos
 # ahead, so a local date silently names the wrong session for most of the day.
 ET_TZ = "America/New_York"
 
+# D5 kill switch filename. Defined once and imported by every entry point: the same name
+# written as a literal in three argparse blocks is how ROLL_SCHEDULE ended up carrying two
+# keys for one contract, and a kill switch that half the processes spell differently is
+# worse than none. Resolved against the process CWD, which run_scheduler pins to the repo
+# root — OPERATIONS.md:89 documents it as d:\raits\STOP_TRADING.
+STOP_FILE_NAME = "STOP_TRADING"
+
 # Clusters whose engine defers the stop to the next session — see _stop_deferred.
 # Swing and NKD both run backtest_swing_tf and inherit its semantics. Stress is an
 # event model that opens and closes inside one session; it is not covered by the
@@ -225,6 +232,9 @@ def _openpos_to_dict(p: OpenPos) -> dict:
         # next restart, and a restart in that window wrote a CLOSE row with no exit
         # path, the exact hole exit_reason was added to close.
         "exit_reason":    p.exit_reason,
+        # Which contract month this position is actually in. Without it the file could
+        # not distinguish a rolled position from one left behind in an expiring month.
+        "contract_month": p.contract_month,
     }
 
 
@@ -246,6 +256,9 @@ def _openpos_from_dict(d: dict) -> OpenPos:
         stop_order_id=d.get("stop_order_id"),
         entry_price=float(d["entry_price"]) if d.get("entry_price") is not None else None,
         exit_reason=d.get("exit_reason"),
+        # d.get, per the rule above: every file written before this field existed —
+        # including the one on disk today — must still load, reading None for "unknown".
+        contract_month=d.get("contract_month"),
     )
 
 
@@ -1267,6 +1280,13 @@ class FuturesRunner:
                 self._persist_state()
                 continue
 
+            # The book now follows the position onto the new contract. This is the whole
+            # reason the field exists: before it, a successful roll left live_positions
+            # .json byte-identical to before, so nothing reading the file could tell a
+            # rolled position from one stranded in an expiring month — and C1 stranded
+            # every Nikkei position for as long as it went unnoticed.
+            pos.contract_month = open_fill.contract_month
+
             # Full success — log slippage
             roll_slippage = abs(open_fill.avg_price - close_fill.avg_price)
             logger.info(
@@ -1751,6 +1771,12 @@ class FuturesRunner:
                 )
                 if _opened is not None:
                     _opened.entry_price = float(_open_fill.avg_price)
+                    # Record the contract this actually went to, straight off the fill.
+                    # Not recomputed from _current_front_month: that would answer the
+                    # same question a second time off the wall clock instead of off the
+                    # order that was sent, which is the M4 two-clocks defect. Left as
+                    # None by MockBroker, so verify mode is unchanged.
+                    _opened.contract_month = _open_fill.contract_month
 
             _exp_entry = t.get("entry")
             _slip_o = None
@@ -1767,10 +1793,55 @@ class FuturesRunner:
                     "ADVERSE" if _slip_o > 0 else "favorable",
                     self._slip_open_sum / self._slip_open_n, self._slip_open_n,
                 )
-            elif _open_fill.status == "FAILED":
-                logger.error(
-                    "C1 OPEN FAILED: %s %s — %s",
-                    t["inst"], t["direction"], _open_fill.error_msg or "no detail",
+            elif _open_fill.status not in ("FILLED", "PARTIAL"):
+                # C2. decide_day books the position BEFORE the order goes out, and
+                # nothing here removed it when the order did not fill.
+                #
+                # This branch used to read `== "FAILED"`, which never fires for an
+                # entry: send_order returns "CANCELLED" on all three OPEN failure
+                # paths — 30s timeout, non-Filled terminal status, and any exception
+                # (ibkr_broker.py:678/:724/:741). "FAILED" is the EXIT vocabulary. So
+                # the handler was dead code and the book kept a position the broker
+                # never opened.
+                #
+                # Leaving it is worse than losing the entry. The ghost has
+                # entry_price=None so _book_realised cannot value it; it consumes
+                # cluster budget, silently refusing later real signals; the next slot
+                # is a fresh process whose B3 sees file=1 / broker=0 and halts entries
+                # for EVERY sleeve until someone edits live_positions.json by hand; and
+                # on its exit day the runner sends a CLOSE for it, which is a market
+                # SELL on a contract it does not hold — that opens a naked short rather
+                # than closing anything, and B3 does not stop it because B3 blocks
+                # entries only.
+                #
+                # Matched the same way the sibling FILLED branch above finds the
+                # position it just opened: inst + cluster + entry_price is None.
+                _ghost = next(
+                    (p for p in self.state.open_positions
+                     if p.inst == t["inst"] and p.cluster == t["cluster"]
+                     and p.entry_price is None),
+                    None,
+                )
+                if _ghost is not None:
+                    self.state.open_positions = [
+                        p for p in self.state.open_positions if p is not _ghost]
+                logger.warning(
+                    "C2: OPEN %s %s %s ×%d — no position was opened; removed from the "
+                    "book (%s). %s",
+                    _open_fill.status, t["inst"], t["direction"], n,
+                    "was booked by decide_day" if _ghost is not None
+                    else "nothing to remove — already absent",
+                    _open_fill.error_msg or "no detail",
+                )
+                self._emit_event(
+                    "ALERT", "EXEC",
+                    f"OPEN {_open_fill.status} {t['inst']} {t['direction']} ×{n} — "
+                    f"entry did not fill, position removed from the book",
+                    {"inst": t["inst"], "direction": t["direction"],
+                     "cluster": t["cluster"], "contracts": n,
+                     "status": _open_fill.status,
+                     "error": _open_fill.error_msg,
+                     "removed_from_book": _ghost is not None},
                 )
 
             if _open_fill.status in ("FILLED", "PARTIAL"):

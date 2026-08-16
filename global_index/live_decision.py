@@ -58,6 +58,14 @@ class OpenPos:
     # computed without it, and in live pnl_sized arrives as 0.0 — the backtest fills it
     # from its ledger, the broker does not. decide_day never reads this.
     entry_price: float | None = None
+    # "YYYYMM" of the contract actually held, copied from the broker's fill. Until this
+    # existed the book could not say which month it was in — for ANY instrument — so a
+    # successful roll left the file byte-identical and a position drifting out of step
+    # with its own orders was invisible to every file-based check (RUNNER_AUDIT.md C1).
+    # Observational only, like entry_price and exit_reason above: decide_day never reads
+    # it, so it cannot change a decision, and MockBroker leaves it None so the verify
+    # path is untouched.
+    contract_month: str | None = None
 
     def as_position(self) -> Position:
         return Position(self.inst, self.direction, self.contracts,

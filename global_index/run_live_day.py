@@ -76,7 +76,7 @@ from global_index.signal_layer import (generate_today_signals, CLUSTER_SWING,
                                        CLUSTER_NKD, CLUSTER_STRESS)
 from global_index.ibkr_broker import IBKRBroker
 from global_index.runner import (FuturesRunner, _openpos_from_dict,
-                                 _acquire_lock, RunnerLockError)
+                                 _acquire_lock, RunnerLockError, STOP_FILE_NAME)
 from global_index.hmm_stale_guard import HMMStaleGuard
 from global_index import replay_checkpoint as ckpt
 from global_index.replay_checkpoint import DEFAULT_PATH as CHECKPOINT_PATH
@@ -151,6 +151,9 @@ def main():
                     help="JSON file for persistent position state (B1/B3)")
     ap.add_argument("--lock-path",       default="runner.pid",
                     help="PID lockfile (E1 duplicate-runner guard)")
+    ap.add_argument("--stop-path",       default=STOP_FILE_NAME,
+                    help="D5 kill switch: while this file exists, entries are skipped "
+                         "and exits keep running (OPERATIONS.md:89)")
     ap.add_argument("--dry-run",         action="store_true",
                     help="Connect + fetch bars but emit no orders (empty signal_fn)")
     ap.add_argument("--print-signals",   action="store_true",
@@ -704,6 +707,10 @@ def main():
         breaker=CircuitBreaker(account=ACCOUNT),
         positions_path=a.positions_path,
         lock_path=a.lock_path,
+        # D5. Implemented in the runner since it was written and passed by nobody, so
+        # `STOP_TRADING` on disk stopped nothing while STATUS.md counted it among the
+        # "grep-verified" safety mechanisms. RUNNER_AUDIT.md H2.
+        stop_path=a.stop_path,
         live_state_path=a.live_state_path,
         regime_fn=_regime,
         hmm_stale_guard=HMMStaleGuard(regime_csv=a.regime_csv, fit_end=HMM_FIT_END),

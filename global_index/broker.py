@@ -51,6 +51,13 @@ class Fill:
     avg_price: float = 0.0         # fill price; IBKRBroker sets from execution report
     commission: float | None = None # broker commission if emitted by the broker API
     error_msg: str | None = None   # set on FAILED/CANCELLED (IBKRBroker only)
+    # "YYYYMM" of the contract this order actually went to, as resolved by the broker.
+    # The runner copies it onto the position so the book records WHICH contract it holds.
+    # Reported rather than recomputed: deriving it again from _current_front_month would
+    # be a second answer to the same question, read off the wall clock instead of the
+    # order that was sent — the M4 two-clocks defect. MockBroker leaves it None, so the
+    # verify/replay path is unchanged.
+    contract_month: str | None = None
 
 
 @dataclass

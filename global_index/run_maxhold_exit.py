@@ -52,7 +52,7 @@ from futures.basket import SWING_TF_PARAM, RISK
 from futures.circuit_breaker import CircuitBreaker
 from global_index.ibkr_broker import IBKRBroker
 from global_index.net_exposure_multi import MultiClusterGuard
-from global_index.runner import FuturesRunner
+from global_index.runner import FuturesRunner, STOP_FILE_NAME
 
 MAX_HOLD_DAYS = int(SWING_TF_PARAM["max_hold_days"])
 ACCOUNT       = float(RISK["account"])
@@ -67,6 +67,10 @@ log = logging.getLogger("run_maxhold_exit")
 
 def main():
     ap = argparse.ArgumentParser(description="09:31 ET MAX_HOLD exit — close positions at RTH open")
+    ap.add_argument("--stop-path",      default=STOP_FILE_NAME,
+                    help="D5 kill switch: entries are skipped while this file exists. "
+                         "This job takes no entries, but a path that ignores the switch "
+                         "is the defect H2 describes — wire it everywhere (OPERATIONS.md:89)")
     ap.add_argument("--positions-path", default="live_positions.json",
                     help="JSON state file (same as run_live_day.py, default: live_positions.json)")
     ap.add_argument("--port",           type=int, default=4002,
@@ -115,6 +119,7 @@ def main():
             signal_fn=lambda d, b, h: ([], []),
             breaker=CircuitBreaker(account=ACCOUNT),
             positions_path=pos_path,
+            stop_path=a.stop_path,        # D5 — see RUNNER_AUDIT.md H2
             # B4 runs inside __init__, so this job is what places a deferred STP —
             # 09:31 ET the morning after entry, not the 14:05 slot. Pass the session
             # date explicitly: the runner would otherwise read its own clock, and two

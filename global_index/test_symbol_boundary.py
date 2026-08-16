@@ -32,6 +32,144 @@ def test_sb1_the_translation_is_one_function():
     assert _to_runner("ZZZ") == "ZZZ", "an unknown symbol is not dropped or guessed"
 
 
+def test_sb5_no_call_site_builds_a_contract_by_hand():
+    """H1. Contract construction lives in ONE place, and the source says so.
+
+    Appendix F consolidated three call sites (_fetch_raw, send_order, place_stop) into
+    _front_month_contract and reported the job done. There were four. The roll path was
+    missed, and it kept all three defects the consolidation existed to remove: the raw
+    runner name as the IBKR symbol, exchange hardcoded "CME" (MYM is CBOT), and no conId
+    check after qualifyContracts — which does not raise, it leaves conId 0.
+
+    Same shape as sb2: enforced on the source, because a fifth hand-rolled site would
+    otherwise stay invisible until a roll date arrived.
+
+    Parsed, not grepped: the docstring of _front_month_contract discusses
+    `ibi.Future(sym)` in prose, and a text scan counts that as a violation. A test that
+    cannot tell code from a comment about code will fire on the next person who explains
+    the rule in writing.
+    """
+    import ast
+
+    tree = ast.parse(_SOURCE)
+    builders = set()
+    for fn in ast.walk(tree):
+        if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for node in ast.walk(fn):
+            if (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "Future"
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == "ibi"):
+                builders.add((fn.name, node.lineno))
+
+    # Self-check: if the locator finds nothing, the invariant is unverified, not met.
+    assert builders, (
+        "no ibi.Future(...) call found anywhere — the locator is broken, so a green "
+        "result here would mean nothing")
+
+    # The invariant is "one builder", not "a builder with this name" — pinning the name
+    # would make a rename look like a regression, and the defect was never about naming.
+    where = sorted({name for name, _ln in builders})
+    assert len(where) == 1, (
+        "every contract must be built by ONE shared resolver, which translates the "
+        "symbol, picks the exchange and refuses an unlisted contract. Built in "
+        f"{len(where)} places: " + ", ".join(where))
+
+
+class _RollIB:
+    """Fake ib. Records what was asked for and whether qualifyContracts resolved it."""
+
+    def __init__(self, resolve=True):
+        self.built = []
+        self._resolve = resolve
+
+    def qualifyContracts(self, c):
+        self.built.append(c)
+        # Real ib_insync does NOT raise on an unresolvable contract; it leaves conId 0.
+        if self._resolve:
+            c.conId = 12345
+        return [c]
+
+    def sleep(self, _s):
+        pass
+
+
+class _RollFuture:
+    def __init__(self, symbol, lastTradeDateOrContractMonth=None, exchange=None, **_kw):
+        self.symbol = symbol
+        self.lastTradeDateOrContractMonth = lastTradeDateOrContractMonth
+        self.exchange = exchange
+        self.conId = 0
+
+
+def _roll_broker(monkeypatch, resolve=True):
+    """IBKRBroker with a fake ib and a fake ib_insync, offline short-circuit removed.
+
+    _handle_rollover returns synthetic fills while _raw_fetcher is set, which is exactly
+    why no test ever reached its contract-building code (audit §4.4).
+    """
+    import types
+    from global_index import ibkr_broker as B
+
+    ib = _RollIB(resolve=resolve)
+    fake_ibi = types.SimpleNamespace(Future=_RollFuture)
+    monkeypatch.setitem(sys.modules, "ib_insync", fake_ibi)
+
+    b = B.IBKRBroker(_raw_fetcher=lambda i, t: None)
+    b._raw_fetcher = None
+    b._require_connection = lambda: ib
+    return b, ib
+
+
+def test_sb6_the_roll_path_translates_the_symbol(monkeypatch):
+    """MNKD must reach IBKR as MNK. C1 made this reachable: before the roll-schedule
+    lookup was fixed the roll never fired for Nikkei, so `ibi.Future("MNKD", ...)` was
+    dead code. Fixing C1 without this turns "never rolls" into "rolls into a contract
+    IBKR cannot resolve"."""
+    b, ib = _roll_broker(monkeypatch)
+    try:
+        b._handle_rollover("MNKD", "2026-09-04", "LONG", 1, "global_nkd")
+    except Exception:
+        pass  # the order path is not under test; the contracts are
+
+    assert ib.built, "no contract was built — the test never reached the roll path"
+    symbols = {c.symbol for c in ib.built}
+    assert symbols == {"MNK"}, (
+        f"the roll sent the runner's own name to IBKR; MNKD is not a listed symbol. "
+        f"built={[(c.symbol, c.lastTradeDateOrContractMonth, c.exchange) for c in ib.built]}")
+
+
+def test_sb7_the_roll_path_uses_the_right_exchange(monkeypatch):
+    """MYM trades on CBOT. The roll path hardcoded "CME" for every instrument, and the
+    first of the two orders it sends is the one that CLOSES the position. Next MYM roll:
+    2026-09-11."""
+    b, ib = _roll_broker(monkeypatch)
+    try:
+        b._handle_rollover("MYM", "2026-09-11", "LONG", 1, "roska4_swing")
+    except Exception:
+        pass
+
+    assert ib.built, "no contract was built — the test never reached the roll path"
+    exchanges = {c.exchange for c in ib.built}
+    assert exchanges == {"CBOT"}, (
+        f"MYM was sent to the wrong exchange; _IBKR_EXCHANGE declares CBOT. "
+        f"built={[(c.symbol, c.exchange) for c in ib.built]}")
+
+
+def test_sb8_the_roll_path_refuses_an_unlisted_contract(monkeypatch):
+    """qualifyContracts leaves conId 0 rather than raising. Without a check, two market
+    orders go out against a contract IBKR never confirmed — and the micro carries far
+    fewer forward months than the full-size contract, so a ROLL_SCHEDULE date can outrun
+    the listed chain."""
+    from global_index.ibkr_broker import ContractResolutionError
+
+    b, _ib = _roll_broker(monkeypatch, resolve=False)
+    with pytest.raises(ContractResolutionError):
+        b._handle_rollover("MNKD", "2026-09-04", "LONG", 1, "global_nkd")
+
+
 def test_sb4_the_full_size_contract_is_not_adopted_as_ours():
     """NKD is the $5/pt contract; MNKD is the $0.50/pt micro. They are not the same size.
 

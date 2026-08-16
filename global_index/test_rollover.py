@@ -199,6 +199,15 @@ def test_ro4_not_roll_day_no_op():
     ("NKD", "2026-06-05", "202606", "202609"),
     ("NKD", "2026-09-04", "202609", "202612"),
     ("NKD", "2026-12-04", "202612", "202703"),
+    # C1. The four rows above ask with "NKD", a symbol production stopped routing to on
+    # 2026-08-14. runner.py:1229 calls get_roll_event(pos.inst) and run_live_day.py:88
+    # sets NKD_INST = "MNKD", so the only key that matters here is MNKD — and it was the
+    # one key never tested. The table was green on a key no live path uses, which is
+    # exactly how "the Nikkei position never rolls" survived a full test suite.
+    ("MNKD", "2026-03-06", "202603", "202606"),
+    ("MNKD", "2026-06-05", "202606", "202609"),
+    ("MNKD", "2026-09-04", "202609", "202612"),
+    ("MNKD", "2026-12-04", "202612", "202703"),
 ])
 def test_ro5_roll_schedule_2026(inst, roll_date, expected_front, expected_next):
     """ROLL_SCHEDULE 2026 dates: correct (front_month, next_month) on roll day."""

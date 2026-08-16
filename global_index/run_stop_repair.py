@@ -69,7 +69,7 @@ from futures.basket import RISK
 from futures.circuit_breaker import CircuitBreaker
 from global_index.ibkr_broker import IBKRBroker
 from global_index.net_exposure_multi import MultiClusterGuard
-from global_index.runner import FuturesRunner
+from global_index.runner import FuturesRunner, STOP_FILE_NAME
 
 ACCOUNT = float(RISK["account"])
 
@@ -84,6 +84,10 @@ log = logging.getLogger("run_stop_repair")
 def main() -> int:
     ap = argparse.ArgumentParser(description="Quét sửa stop ngoài giờ có slot")
     ap.add_argument("--positions-path", default="live_positions.json")
+    ap.add_argument("--stop-path", default=STOP_FILE_NAME,
+                    help="D5 kill switch: entries skipped while this file exists. This "
+                         "job takes no entries, but a path that ignores the switch is "
+                         "the defect H2 describes (OPERATIONS.md:89)")
     ap.add_argument("--port", type=int, default=4002)
     # 1, trùng runner — cùng lý do với run_maxhold_exit. B4 trong job này ĐẶT stop; nếu đặt
     # bằng một id khác thì sau này runner (id 1) sẽ không huỷ được chính stop đó khi đóng vị
@@ -133,6 +137,7 @@ def main() -> int:
             signal_fn=lambda d, b, h: ([], []),    # rỗng: không entry, không exit
             breaker=CircuitBreaker(account=ACCOUNT),
             positions_path=pos_path,
+            stop_path=a.stop_path,        # D5 — see RUNNER_AUDIT.md H2
             # today/now truyền tường minh: runner sẽ tự đọc đồng hồ nếu thiếu, và hai khái
             # niệm "hôm nay" trong một lần chạy là cách cửa sổ hoãn bị tính sai.
             today=now.normalize(),

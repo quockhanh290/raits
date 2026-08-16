@@ -221,16 +221,85 @@ def test_stp3_no_stp_for_sameday_entry():
 
 # ── STP4: no place_stop when OPEN fill is CANCELLED ──────────────────────────
 
-def test_stp4_no_stp_when_open_cancelled():
+def test_stp4_no_stp_when_open_cancelled(tmp_path):
+    """C2. A cancelled entry must leave NOTHING behind — not a stop, and not a position.
+
+    This test used to have no assert at all. It leaned entirely on
+    `_CancelledOpenBroker.place_stop` raising, which checks exactly one thing: no stop
+    was placed. The four questions that actually make up C2 went unasked, and all four
+    answered wrong (RUNNER_AUDIT.md §4.1):
+
+      * is the position still in state.open_positions?   it was
+      * did it persist to disk with entry_price=None?    it did
+      * was any trade_log line written?                  none
+      * was any event emitted?                           none
+
+    Root cause: decide_day books the position before the order goes out, and
+    `send_order` never returns "FAILED" for an OPEN — all three failure paths return
+    "CANCELLED" (ibkr_broker.py:678/:724/:741), so the handler at runner.py:1770 that
+    tested `== "FAILED"` was dead code.
+    """
     broker = _CancelledOpenBroker({}, ACCOUNT)
     runner = FuturesRunner(
         broker=broker, guard=_make_guard(),
         contracts_by_inst={"MES": 1},
         signal_fn=_multi_day_signal,
         breaker=CircuitBreaker(account=ACCOUNT),
+        positions_path=tmp_path / "pos.json",
+        trade_log_path=tmp_path / "trade_log.jsonl",
+        today=DAY1,
+        now=pd.Timestamp(DAY1) + pd.Timedelta(hours=14, minutes=5),
     )
     # Must not raise (asserting inside _CancelledOpenBroker.place_stop)
     runner.run_day(DAY1)
+
+    assert runner.state.open_positions == [], (
+        "the broker holds nothing — a cancelled entry must not leave a position in the "
+        f"book. Left behind: "
+        f"{[(p.inst, p.contracts, p.entry_price) for p in runner.state.open_positions]}")
+
+    saved = json.loads((tmp_path / "pos.json").read_text(encoding="utf-8"))["positions"]
+    assert saved == [], (
+        f"the ghost was persisted to disk, so the next slot's B3 will compare it against "
+        f"an empty broker and halt every sleeve's entries: {saved}")
+
+    cancelled_events = [e for e in runner._events
+                        if "CANCEL" in e.get("message", "").upper()]
+    assert cancelled_events, (
+        "a cancelled entry must not be silent: no trade_log line, no event and no ERROR "
+        f"is how this went unnoticed. events={runner._events}")
+
+
+def test_stp4b_cancelled_entry_does_not_produce_a_close_next_day(tmp_path):
+    """C2, the part that costs money.
+
+    With the ghost in the book, the exit day sends `CLOSE MES LONG` for a position the
+    broker never opened. `send_order` maps CLOSE+LONG to a SELL market order
+    (ibkr_broker.py:631) and checks no position anywhere, so that order does not close
+    anything — it OPENS a short, with no stop, in no ledger.
+    """
+    broker = _CancelledOpenBroker({}, ACCOUNT)
+
+    def _mk(today):
+        return FuturesRunner(
+            broker=broker, guard=_make_guard(),
+            contracts_by_inst={"MES": 1},
+            signal_fn=_multi_day_signal,
+            breaker=CircuitBreaker(account=ACCOUNT),
+            positions_path=tmp_path / "pos.json",
+            trade_log_path=tmp_path / "trade_log.jsonl",
+            today=today,
+            now=pd.Timestamp(today) + pd.Timedelta(hours=14, minutes=5),
+        )
+
+    _mk(DAY1).run_day(DAY1)
+    sent_before = len(broker.fills)
+    _mk(DAY2).run_day(DAY2)
+
+    closes = [f for f in broker.fills[sent_before:] if f.action == "CLOSE"]
+    assert not closes, (
+        f"a CLOSE went to the broker for a position it never held — that is a naked "
+        f"short, not an exit. closes={[(f.inst, f.direction, f.contracts) for f in closes]}")
 
 
 # ── STP5: B3 STP EXIT auto-clear ─────────────────────────────────────────────

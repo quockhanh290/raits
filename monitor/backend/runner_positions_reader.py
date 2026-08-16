@@ -30,6 +30,12 @@ def _parse(path: Path) -> dict[str, Any]:
             key: row.get(key) for key in (
                 "inst", "direction", "contracts", "cluster", "entry_day",
                 "entry_price", "stop_price", "stop_order_id",
+                # Which contract month the book thinks it holds. This projection is an
+                # allow-list, so a key not named here is dropped — recording the month
+                # in the file and then hiding it from the only page that shows positions
+                # would leave the C1 blind spot half open. None for rows written before
+                # the field existed.
+                "contract_month",
             )
         })
     return {
