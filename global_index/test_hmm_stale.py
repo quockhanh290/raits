@@ -32,15 +32,56 @@ from global_index.notify import set_push_hook
 
 _PASS = 0
 _FAIL = 0
+_results: list = []
 
 def _check(name: str, cond: bool, detail: str = "") -> None:
     global _PASS, _FAIL
     tag = "PASS" if cond else "FAIL"
     print(f"  {tag}  {name}" + (f"  [{detail}]" if detail else ""))
+    _results.append((name, bool(cond), detail))
     if cond:
         _PASS += 1
     else:
         _FAIL += 1
+
+
+def _enforce_checks_under_pytest() -> None:
+    """Make _check failures reach pytest — the twin of the hooks in
+    test_operational_fixes.py and test_event_playback.py.
+
+    Those two were fixed when the realtime audit found that check() only printed and
+    appended, with sys.exit(1) reachable solely from __main__: under pytest every test
+    function returned None and passed no matter what the checks said. This file has the
+    same harness, was missed, and carries 43 checks — every one of them invisible.
+
+    What they cover is not incidental. G1 halts entries when the SPY series that feeds
+    the regime model goes stale, G2 watches model age, G3 aborts a re-freeze whose data
+    does not reach fit_end. A guard whose entire test file cannot go red is a guard
+    nobody is watching.
+    """
+    import functools
+    import sys as _sys
+
+    mod = _sys.modules[__name__]
+    for _name in [n for n in dir(mod) if n.startswith("test_")]:
+        _fn = getattr(mod, _name)
+        if not callable(_fn) or getattr(_fn, "_checks_enforced", False):
+            continue
+
+        @functools.wraps(_fn)
+        def _wrapped(*args, __fn=_fn, **kwargs):
+            start = len(_results)
+            out = __fn(*args, **kwargs)
+            mine = _results[start:]
+            # A test that records nothing is not passing, it is absent — the same
+            # self-check the other two hooks carry.
+            assert mine, "this test recorded no checks at all"
+            failed = [(n, d) for n, ok, d in mine if not ok]
+            assert not failed, f"{len(failed)}/{len(mine)} check(s) failed: {failed}"
+            return out
+
+        _wrapped._checks_enforced = True
+        setattr(mod, _name, _wrapped)
 
 
 def _capture_notify():
@@ -406,6 +447,14 @@ def test_gap_bdays():
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
+
+# Wrap only under pytest. In script mode the tail below already exits non-zero on
+# _FAIL, and collect-all is what the script exists for. An autouse fixture was rejected
+# in the twin for a measured reason: asserting after `yield` is a TEARDOWN failure, so
+# pytest prints "N passed, M errors" and leaves a misleading passed-count next to them.
+if __name__ != "__main__":
+    _enforce_checks_under_pytest()
+
 
 if __name__ == "__main__":
     test_gap_bdays()
