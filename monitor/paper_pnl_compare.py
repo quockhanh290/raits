@@ -1695,6 +1695,50 @@ def source_signature(root: Path) -> dict[str, Any]:
     return parts
 
 
+def data_watermark(root: Path) -> dict[str, Any]:
+    """How far the inputs reached when this report was built.
+
+    The source hash catches the code moving under the report. It cannot catch the far
+    more ordinary case: new fills arrive, nobody rebuilds, and the panel serves
+    yesterday's P&L looking exactly as authoritative as today's. A nightly job now
+    rebuilds this -- but a job that dies is precisely when the reader most needs the
+    panel to admit it is behind, so freshness must not depend on the job having run.
+
+    Last DAY rather than row counts or hashes: a trade log gains rows through the
+    session without the daily conclusions changing, but a new trading day is a day the
+    comparison has not covered at all. That is the thing worth warning about, and it
+    does not cry wolf.
+    """
+    out: dict[str, Any] = {}
+    try:
+        rows = [
+            json.loads(line)
+            for line in (root / "trade_log.jsonl").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        days = sorted(
+            day for day in
+            (str(r.get("exit_day") or r.get("entry_day") or "")[:10] for r in rows)
+            if day
+        )
+        out["trade_log_last_day"] = days[-1] if days else None
+    except (OSError, ValueError):
+        out["trade_log_last_day"] = None
+    try:
+        history = json.loads(
+            (root / "global_index" / "paper_history.json").read_text(encoding="utf-8"))
+        days = sorted(history.get("days") or {})
+        out["paper_history_last_day"] = days[-1] if days else None
+    except (OSError, ValueError, AttributeError):
+        out["paper_history_last_day"] = None
+    try:
+        statements = sorted((root / "monitor" / "inputs" / "ibkr_flex").glob("*.csv"))
+        out["flex_statement"] = statements[-1].name if statements else None
+    except OSError:
+        out["flex_statement"] = None
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=ROOT)
@@ -1702,6 +1746,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     report = build_report(args.root)
     report["source_signature"] = source_signature(args.root)
+    report["data_watermark"] = data_watermark(args.root)
     args.out.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"wrote {args.out}")
     latest = report["daily"][-1] if report["daily"] else {}

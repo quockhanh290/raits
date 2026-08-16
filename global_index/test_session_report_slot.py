@@ -293,3 +293,55 @@ def test_both_first_and_last_are_reported(tmp_path):
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+
+# ── làm mới bằng chứng paper, chạy ngay sau báo cáo ──────────────────────────
+
+def test_paper_evidence_refresh_runs_after_the_report():
+    """Bảng Paper Evidence đọc một tệp sinh sẵn, nên mỗi lệnh mới làm phần P&L cũ đi.
+
+    Trước 2026-08-15 việc dựng lại chạy tay. Gắn vào ngay sau báo cáo phiên vì tới lúc
+    đó dữ liệu trong ngày đã đủ, và vì đây là chỗ duy nhất trong lịch vốn dành cho việc
+    báo cáo chứ không phải giao dịch.
+    """
+    src = (_GI / "run_scheduler.py").read_text(encoding="utf-8")
+    assert "def _refresh_paper_evidence()" in src
+    report_at = src.index('label="SESSION_REPORT"')
+    refresh_at = src.index("_refresh_paper_evidence()", report_at)
+    assert refresh_at > report_at, "phai chay SAU bao cao, khong phai truoc"
+    assert "monitor.paper_pnl_compare" in src and "monitor.flex_pull" in src
+
+
+def test_the_refresh_never_breaks_the_trading_day():
+    """Một việc báo cáo hỏng không được kéo theo gì. Lịch này là tiến trình đặt lệnh thật."""
+    src = (_GI / "run_scheduler.py").read_text(encoding="utf-8")
+    body = src[src.index("def _refresh_paper_evidence()"):src.index("def _emit_report(")]
+    assert "except Exception:" in body and "log.exception" in body
+    assert "raise" not in body, "loi phai duoc nuot lai, chi ghi log"
+
+
+def test_the_backtest_baseline_is_not_regenerated_automatically():
+    """Baseline là MỐC SO SÁNH, và 21 band ngưỡng chặn go-live đóng băng từ nó.
+
+    Tự sinh lại nghĩa là đích so sánh tự dịch chuyển trong khi band vẫn tính trên đường
+    cong cũ — đúng dạng lỗi cả đợt audit 2026-08 đi tìm.
+    """
+    src = (_GI / "run_scheduler.py").read_text(encoding="utf-8")
+    assert "generate_replay_snapshots" not in src
+
+
+def test_operator_attestations_are_not_automated():
+    """paper_inputs.json chứa lời chứng thực của con người ("đêm này đã chứng minh khởi
+    động lại thành công"), không phải dữ liệu. Tự động hoá nó là tự ký vào bằng chứng
+    của chính mình — đúng lỗi C2.
+
+    Kiểm cái được GỌI, không cấm nhắc tên: tệp có nêu tên nó trong phần giải thích vì
+    sao KHÔNG tự động, và một test cấm nhắc tên sẽ ép người sau xoá đúng lời giải thích
+    đó để cho test xanh.
+    """
+    src = (_GI / "run_scheduler.py").read_text(encoding="utf-8")
+    invocations = [
+        line.strip() for line in src.splitlines()
+        if "paper_inputs" in line and ("_run(" in line or "-m" in line or "subprocess" in line)
+    ]
+    assert not invocations, f"scheduler dang goi thu gi do ghi paper_inputs: {invocations}"

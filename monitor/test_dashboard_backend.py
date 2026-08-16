@@ -2192,6 +2192,51 @@ def test_stale_pnl_artifact_is_reported_rather_than_served_as_current():
     assert "paper_pnl_compare.py" in stale["detail"], "must say how to fix it"
 
 
+def test_pnl_artifact_reports_stale_when_the_inputs_moved_on():
+    """The code hash catches the code moving. It cannot catch the ordinary case.
+
+    New fills arrive, nobody rebuilds, and the panel serves yesterday's P&L looking
+    exactly as authoritative as today's — the code has not moved, so the hash matches.
+    A nightly job rebuilds this now, but a job that dies is precisely when the warning
+    has to fire on its own.
+    """
+    from monitor.paper_pnl_compare import data_watermark, source_signature
+
+    fresh = {"source_signature": source_signature(ROOT), "data_watermark": data_watermark(ROOT)}
+    assert _freshness(fresh)["status"] == "CURRENT"
+
+    behind = {**fresh, "data_watermark": {**fresh["data_watermark"],
+                                          "trade_log_last_day": "1999-01-01"}}
+    out = _freshness(behind)
+    assert out["status"] == "STALE"
+    assert any("trade log" in reason for reason in out["behind"])
+    assert "paper_pnl_compare.py" in out["detail"], "must say how to fix it"
+
+
+def test_an_artifact_ahead_of_the_inputs_is_not_called_stale():
+    # Only a LATER input is staleness. An artifact built from data that has since been
+    # trimmed or rotated is not behind, and warning there teaches the reader to ignore
+    # the banner.
+    from monitor.paper_pnl_compare import data_watermark, source_signature
+
+    ahead = {"source_signature": source_signature(ROOT),
+             "data_watermark": {**data_watermark(ROOT), "trade_log_last_day": "2099-01-01"}}
+    assert _freshness(ahead)["status"] == "CURRENT"
+
+
+def test_watermark_tracks_days_not_row_counts():
+    """A trade log gains rows all session without the daily conclusions changing.
+
+    Watermarking on row count would fire on every fill and be switched off; a new
+    trading DAY is a day the comparison genuinely has not covered.
+    """
+    from monitor.paper_pnl_compare import data_watermark
+
+    mark = data_watermark(ROOT)
+    assert set(mark) == {"trade_log_last_day", "paper_history_last_day", "flex_statement"}
+    assert "rows" not in str(mark), "row counts would cry wolf on every fill"
+
+
 def test_unstamped_pnl_artifact_is_unknown_not_assumed_fresh():
     # An artifact written before stamping existed cannot be checked. Claiming CURRENT
     # would be the same false reassurance the stamp exists to remove.

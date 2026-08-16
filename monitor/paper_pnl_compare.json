@@ -3488,7 +3488,12 @@
     }
   },
   "source_signature": {
-    "monitor/paper_pnl_compare.py": "36ba1b2b505c2ccf",
+    "monitor/paper_pnl_compare.py": "d70359e017798e99",
     "global_index/statement.py": "c45e91297709a54f"
+  },
+  "data_watermark": {
+    "trade_log_last_day": "2026-08-11",
+    "paper_history_last_day": "2026-08-14",
+    "flex_statement": "flex_20260813T103831Z_q1603041_ref6822861365.csv"
   }
 }

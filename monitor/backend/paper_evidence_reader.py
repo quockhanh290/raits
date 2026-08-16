@@ -2554,23 +2554,49 @@ def _artifact_freshness(root: Path, compare: dict[str, Any]) -> dict[str, Any] |
             ),
         }
     try:
-        from monitor.paper_pnl_compare import source_signature
+        from monitor.paper_pnl_compare import data_watermark, source_signature
     except Exception:
         return None
     current = source_signature(root)
     drifted = sorted(k for k, v in current.items() if stamped.get(k) != v)
-    if not drifted:
-        return {"status": "CURRENT", "detail": "Artifact matches the current money logic.",
-                "sources": sorted(current)}
+
+    # Two ways this artifact goes stale, and the code hash only catches one. The
+    # ordinary case is that new fills arrive and nobody rebuilds: the code has not
+    # moved, so the hash still matches while the panel serves yesterday's P&L looking
+    # exactly as authoritative as today's. A nightly job rebuilds it now -- but a job
+    # that dies is precisely when this warning has to fire on its own.
+    stamped_data = compare.get("data_watermark")
+    behind: list[str] = []
+    if isinstance(stamped_data, dict):
+        live = data_watermark(root)
+        for field, label in (("trade_log_last_day", "trade log"),
+                             ("paper_history_last_day", "paper history"),
+                             ("flex_statement", "broker statement")):
+            was, now = stamped_data.get(field), live.get(field)
+            if was is not None and now is not None and str(now) > str(was):
+                behind.append(f"{label} now reaches {now}, artifact covers {was}")
+
+    if not drifted and not behind:
+        return {
+            "status": "CURRENT",
+            "detail": "Artifact matches the current money logic and the inputs it summarises.",
+            "sources": sorted(current),
+            "data_watermark": stamped_data,
+        }
+    reasons = []
+    if drifted:
+        reasons.append(
+            f"{', '.join(drifted)} changed since it was written, so every P&L figure here "
+            f"is the previous code's output")
+    if behind:
+        reasons.append("inputs have moved on: " + "; ".join(behind))
     return {
         "status": "STALE",
-        "detail": (
-            f"{', '.join(drifted)} changed since monitor/paper_pnl_compare.json was written, "
-            f"so every P&L figure on this panel is the previous code's output. Rerun "
-            f"python monitor/paper_pnl_compare.py."
-        ),
+        "detail": ". ".join(reasons) + ". Rerun python monitor/paper_pnl_compare.py.",
         "drifted": drifted,
+        "behind": behind,
         "sources": sorted(current),
+        "data_watermark": stamped_data,
     }
 
 

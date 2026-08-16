@@ -817,6 +817,40 @@ def make_scheduler(port: int, dry_run: bool,
     _LAST_JOB_ID = sorted(_fixed)[-1][2] if _fixed else None
     _report_done: dict = {}
 
+    def _refresh_paper_evidence() -> None:
+        """Kéo sao kê broker rồi dựng lại phần đối chiếu P&L của bảng Paper Evidence.
+
+        Chạy ngay sau báo cáo phiên: tới lúc đó dữ liệu trong ngày đã đủ, và đây là chỗ
+        duy nhất trong lịch vốn đã dành cho việc báo cáo chứ không phải giao dịch.
+
+        Trước 2026-08-15 hai việc này chạy tay. Bảng đọc từ một tệp sinh sẵn, nên mỗi
+        lệnh mới làm phần P&L cũ đi mà KHÔNG có dấu hiệu nào.
+
+        CỐ Ý KHÔNG có ở đây:
+          · sinh lại baseline backtest — đó là MỐC SO SÁNH, và 21 band ngưỡng chặn
+            go-live đóng băng từ chính đường cong đó. Nó tự đổi thì đích so sánh tự
+            dịch chuyển trong khi band vẫn tính trên đường cong cũ. Phải là hành động
+            có chủ đích, kèm bước tính lại band và duyệt lại.
+          · monitor/paper_inputs.json — trong đó là LỜI CHỨNG THỰC của con người
+            ("đêm này đã chứng minh khởi động lại thành công"), không phải dữ liệu.
+            Tự động hoá nó là tự ký vào bằng chứng của chính mình — đúng lỗi C2.
+
+        Không bao giờ được làm hỏng ngày giao dịch: mọi lỗi chỉ ghi log. Bảng giữ số cũ
+        và tự khai là cũ qua dấu vân tay dữ liệu.
+        """
+        try:
+            if not _run([sys.executable, "-m", "monitor.flex_pull"],
+                        label="FLEX_PULL", dry_run=dry_run):
+                log.warning("[FLEX_PULL] that bai — van dung sao ke cu; doi chieu P&L "
+                            "se tinh tren du lieu broker cu")
+            if not _run([sys.executable, "-m", "monitor.paper_pnl_compare"],
+                        label="PAPER_PNL", dry_run=dry_run):
+                log.warning("[PAPER_PNL] that bai — bang Paper Evidence giu so cu; "
+                            "dau van tay du lieu se bao STALE")
+        except Exception:
+            log.exception("[PAPER_REFRESH] loi ngoai du kien — bo qua, "
+                          "khong anh huong giao dich")
+
     def _emit_report(why: str) -> None:
         _d = _et_today().isoformat()
         if _report_done.get(_d):
@@ -826,6 +860,7 @@ def make_scheduler(port: int, dry_run: bool,
         _run([sys.executable, "-m", "global_index.session_report",
               "--out", f"bao_cao_{_et_today().strftime('%m%d')}.txt"],
              label="SESSION_REPORT", dry_run=dry_run)
+        _refresh_paper_evidence()
 
     if _LAST_JOB_ID:
         from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
