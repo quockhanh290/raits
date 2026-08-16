@@ -333,6 +333,12 @@ class FuturesRunner:
         # this. run_day resets it per run; this is only so the first close of the
         # process has somewhere to land.
         self._booked_this_run: float = 0.0
+        # M6: the worst drawdown ever observed, in dollars. Every slot is a fresh
+        # process, so without persistence an "all-time max" would reset roughly every
+        # five minutes — the same lie in a different shape. Loaded from the breaker
+        # block below.
+        self._max_dd_dollars: float = 0.0
+        self._max_dd_pct: float = 0.0
         # Append-only telemetry is derived from the dashboard path so offline runners
         # without live_state_path remain write-free. It is never read by the engine.
         self._event_log_dir = Path(live_state_path).parent if live_state_path else None
@@ -408,6 +414,13 @@ class FuturesRunner:
                         loaded_peak_equity = float(bkr["peak_equity"])
                     if bkr.get("day_start_equity") is not None:
                         loaded_day_start_equity = float(bkr["day_start_equity"])
+                    if bkr.get("max_dd_dollars") is not None:
+                        # M6. Absent in every file written before this existed, which
+                        # reads as 0.0 and simply starts the record from today rather
+                        # than crashing.
+                        self._max_dd_dollars = float(bkr["max_dd_dollars"])
+                    if bkr.get("max_dd_pct") is not None:
+                        self._max_dd_pct = float(bkr["max_dd_pct"])
                     if bkr.get("cur_day"):
                         loaded_cur_day = pd.Timestamp(bkr["cur_day"])
                     if bkr.get("system_equity") is not None:
@@ -502,7 +515,11 @@ class FuturesRunner:
                                 # happened, with the breaker sizing risk against it.
                                 _stp_fill = None
                                 try:
-                                    _stp_fill = broker.find_execution(_stp_cand.stop_order_id)
+                                    # inst: orderId repeats across clients, and this
+                                    # record sets the price _book_realised moves the
+                                    # ledger by. M3.
+                                    _stp_fill = broker.find_execution(
+                                        _stp_cand.stop_order_id, inst=_stp_cand.inst)
                                 except Exception as _e:
                                     logger.error("B3 STP EXIT: find_execution(%s) raised: %s",
                                                  _stp_cand.stop_order_id, _e)
@@ -545,7 +562,8 @@ class FuturesRunner:
                                 # VERIFY via reqExecutions() (IB server history, survives restart).
                                 _fill_verified = False
                                 try:
-                                    _fill_verified = broker.find_execution(_stp_cand.stop_order_id)
+                                    _fill_verified = broker.find_execution(
+                                        _stp_cand.stop_order_id, inst=_stp_cand.inst)
                                 except Exception:
                                     pass
 
@@ -1094,6 +1112,8 @@ class FuturesRunner:
         # it was last reconciled against must both survive on disk. Without them, equity
         # would reset to base each slot and H4 would re-book the same P&L every five
         # minutes.
+        breaker_data["max_dd_dollars"] = self._max_dd_dollars   # M6
+        breaker_data["max_dd_pct"] = self._max_dd_pct           # M6
         breaker_data["system_equity"] = self.state.equity
         breaker_data["last_broker_equity"] = self._last_broker_equity
         if self._system_epoch:
@@ -1675,9 +1695,25 @@ class FuturesRunner:
             if _f.status == "FAILED":
                 p.exit_pending = True
                 self.state.open_positions.append(p)
+                # L4: undo the credit as well as the removal. decide_day books
+                # pnl_sized the moment it decides to exit (live_decision.py:106), and
+                # restoring the position reversed only half of that — so equity carried
+                # the profit of a position that is still open, for as long as the retry
+                # took, and _retry_pending_exits then added it a second time.
+                #
+                # Reversed here rather than skipped at the retry: the circuit breaker
+                # reads this number every slot, and between the failure and the retry
+                # the trade genuinely has not happened.
+                #
+                # Zero in live (the broker fills pnl_sized only in verify mode), and
+                # MockBroker never FAILs a close, which is precisely why nothing could
+                # go red on it.
+                if p.pnl_sized:
+                    self.state.equity -= p.pnl_sized
                 logger.warning(
-                    "I4.8: CLOSE FAILED %s/%s — exit_pending=True, restored for retry",
-                    p.inst, p.cluster,
+                    "I4.8: CLOSE FAILED %s/%s — exit_pending=True, restored for retry "
+                    "(un-booked %+.2f)",
+                    p.inst, p.cluster, p.pnl_sized,
                 )
                 self._emit_event(
                     "ALERT", "EXEC",
@@ -2807,7 +2843,15 @@ class FuturesRunner:
             model_age_item = {
                 "status": m_status,
                 "months_old": months,
-                "model_name": "fit_C",
+                # M6: read the model the guard is actually holding. "fit_C" was a
+                # literal, so promoting a new freeze would have left the dashboard
+                # naming the old one indefinitely — the same shape as
+                # refreeze.CALMAR_FLOOR outliving its own number.
+                # A freeze is identified by its fit_end in this system (fit_C is the
+                # 2024-12-31 fit), and fit_end is what the guard actually holds — so
+                # this follows a promotion instead of having to be remembered.
+                "model_name": (f"fit_end={g.fit_end.date()}"
+                               if getattr(g, "fit_end", None) is not None else "unknown"),
             }
 
         # Positions — count in memory vs persisted file
@@ -2930,6 +2974,15 @@ class FuturesRunner:
             snap_dd_pct = st["drawdown_pct"]
             snap_dd_dollars = max(0.0, br.peak_equity - cur_eq)
 
+        # M6: max_dd_dollars used to be this same expression — the drawdown RIGHT NOW —
+        # so it shrank the moment the account recovered and could only ever understate.
+        # The name is not decoration: generate_replay_snapshots.py accumulates a genuine
+        # running maximum under the same key, and dashboard.html renders whatever
+        # arrives as "All-time max". Two producers, one name, and only one of them meant
+        # it. Tracked and persisted here so it survives the restart between slots.
+        self._max_dd_dollars = max(self._max_dd_dollars, snap_dd_dollars)
+        self._max_dd_pct = max(self._max_dd_pct, snap_dd_pct)   # same defect, same fix
+
         # Open positions for snapshot (display fields only — no sensitive prices)
         open_pos_snap = []
         for p in self.state.open_positions:
@@ -2982,12 +3035,21 @@ class FuturesRunner:
             )
 
         _slip_diag, _fill_diag = self._fill_diagnostics(day)
+
+        # M6. Both of these were literals sitting next to values read from live state.
+        # An underlying IB object that is present but disconnected is not "connected",
+        # and a broker that cannot answer stays None — the field's original meaning —
+        # rather than being reported as a definite False.
+        _ib_obj = getattr(self.broker, "_ib", None)
+        _ibkr_connected = (bool(_ib_obj.isConnected())
+                           if _ib_obj is not None and hasattr(_ib_obj, "isConnected")
+                           else None)
         snap = {
             "date": str(today_ts.date()) if today_ts else None,
             "equity": cur_eq,
             "drawdown_pct": snap_dd_pct,
             "drawdown_dollars": snap_dd_dollars,
-            "max_dd_dollars": snap_dd_dollars,
+            "max_dd_dollars": self._max_dd_dollars,
             "breaker_level": snap_breaker_level,
             "regime": self._last_regime,
             "open_positions": open_pos_snap,
@@ -3010,6 +3072,12 @@ class FuturesRunner:
             "operational_status": ops_status,
         }
 
+        # Built once: meta needs its length and live_data needs the list itself.
+        # total_days counts DISTINCT dates, because the same session is dumped again on
+        # every slot and a raw len() would count each of those as another day.
+        _snaps = self._history_snapshots(snap)
+        _total_days = len({s.get("date") for s in _snaps if s.get("date")}) or 1
+
         meta = {
             "account":          account,
             "hard_dd_pct":      br.hard_dd_pct      if br else 0.15,
@@ -3026,9 +3094,12 @@ class FuturesRunner:
             "system_epoch":     self._system_epoch,
             "broker_equity":    self.broker.get_equity(),
             "paper_start":      self._paper_start,
-            "max_dd_dollars":   snap_dd_dollars,
-            "max_dd_pct":       snap_dd_pct,
-            "total_days":       1,
+            "max_dd_dollars":   self._max_dd_dollars,
+            "max_dd_pct":       self._max_dd_pct,
+            # M6: the number of days the curve actually covers. This was the literal
+            # 1 while snapshots carried up to 500 entries, so anything dividing by it
+            # was dividing by one.
+            "total_days":       _total_days,
             # Read the live guard rather than restating the caps. The literals here
             # had already drifted: global_nkd stayed at 2% after the sleeve moved to
             # 6%, so the dashboard would have reported a limit the guard no longer
@@ -3046,14 +3117,17 @@ class FuturesRunner:
             "events":            list(self._events),
             "runner_health": {
                 "last_heartbeat": str(today_ts.date()) if today_ts else None,
-                "ibkr_connected": None,
+                # M6: ask the broker. This was None while the runner was holding a
+                # live connection to write the very line reporting it. getattr keeps
+                # MockBroker (no _ib) reporting None rather than claiming False.
+                "ibkr_connected": _ibkr_connected,
             },
         }
 
         live_data = {
             "runner_health": meta["runner_health"],
             "meta":          meta,
-            "snapshots":     self._history_snapshots(snap),
+            "snapshots":     _snaps,
         }
 
         try:

@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd
 
-from global_index.broker import MockBroker
+from global_index.broker import Fill, MockBroker
 from global_index.live_decision import OpenPos
 from global_index.net_exposure_multi import MultiClusterGuard, ClusterBudget
 from global_index.runner import FuturesRunner, RunnerLockError
@@ -106,6 +106,173 @@ def _make_runner(broker, signal_fn, positions_path=None, lock_path=None):
 
 def _noop_signal(day, bars, held):
     return [], []
+
+
+# ─── T23: L2 — the Calmar floor is tied to the document that owns it ─────────
+
+def test_l2_the_calmar_floor_matches_invariants_md():
+    """L2. INVARIANTS.md is declared the source of truth for this number and no test
+    compared the two, so the constant was free to drift away from it.
+
+    That is not hypothetical here: refreeze.CALMAR_FLOOR = 2.38 outlived the figure it
+    was copied from by six weeks, because nothing failed when the document moved. The
+    floor gates go-live, so a stale copy means measuring the system against a threshold
+    nobody agreed to.
+    """
+    print("\nT23: L2 BACKTEST_CALMAR_FLOOR vs INVARIANTS.md")
+    import re
+    from global_index.runner import BACKTEST_CALMAR_FLOOR
+
+    doc = Path(__file__).resolve().parents[1] / "docs" / "futures" / "INVARIANTS.md"
+    check("T23.1 INVARIANTS.md is where it is claimed to be", doc.exists(), str(doc))
+    if not doc.exists():
+        return
+
+    m = re.search(r"fit_A degradation floor\s*=\s*\*\*Calmar\s*([0-9.]+)\*\*",
+                  doc.read_text(encoding="utf-8"))
+    # Self-check first: a regex that stops matching would otherwise turn this test
+    # green for the one reason that means it has stopped working.
+    check("T23.2 the floor line is still findable in the document",
+          m is not None,
+          "the row was reworded — fix the locator, do not delete the test")
+    if m is None:
+        return
+
+    check("T23.3 the constant equals the documented floor",
+          float(m.group(1)) == BACKTEST_CALMAR_FLOOR,
+          f"INVARIANTS.md says {m.group(1)}, runner.py says {BACKTEST_CALMAR_FLOOR}")
+
+
+# ─── T22: L4 — a failed close must not leave its P&L booked ──────────────────
+
+class _CloseFailsThenWorks(MockBroker):
+    """CLOSE fails once, succeeds on the retry. OPEN always fills."""
+
+    def __init__(self):
+        super().__init__({}, account=50_000)
+        self.close_attempts = 0
+
+    def send_order(self, o):
+        f = super().send_order(o)
+        if o.action != "CLOSE":
+            return f
+        self.close_attempts += 1
+        if self.close_attempts == 1:
+            return Fill(o.inst, o.action, o.direction, o.contracts, o.cluster,
+                        status="FAILED", error_msg="rejected")
+        return Fill(o.inst, o.action, o.direction, o.contracts, o.cluster,
+                    pnl_sized=o.pnl_sized, status="FILLED", avg_price=5010.0)
+
+    def place_stop(self, *_a, **_k):
+        return "stp-1"
+
+    def cancel_order(self, _oid):
+        return True
+
+    def get_order_status(self, _oid):
+        return "PENDING"
+
+
+def test_l4_a_failed_close_does_not_book_its_pnl_twice():
+    """L4. decide_day credits pnl_sized when it decides the exit; the runner restores
+    the position when the CLOSE fails, and credits it again on the retry.
+
+    Latent, never fired: live carries pnl_sized = 0.0, and MockBroker always FILLs so
+    the retry path is unreachable in verify mode. That is exactly why no test could go
+    red on it.
+
+    Reversed at the restore rather than skipped at the retry, deliberately. Between the
+    failure and the retry — which can be a whole session — the position is NOT closed,
+    so equity must not be carrying its profit. The circuit breaker reads that number.
+    """
+    print("\nT22: L4 pnl_sized booked once across a failed close")
+
+    day1, day2 = pd.Timestamp("2024-06-17"), pd.Timestamp("2024-06-18")
+    broker = _CloseFailsThenWorks()
+
+    def sig(day, bars, held):
+        if day == day1:
+            return [dict(inst="MES", direction="LONG", cluster="roska4_swing",
+                         risk_sized=500.0, entry=5000.0, stop=4950.0,
+                         exit=day2, pnl_sized=300.0)], []
+        return [], list(held)
+
+    runner = _make_runner(broker, sig)
+    start = runner.state.equity
+    runner.run_day(day1)
+    runner.run_day(day2)      # CLOSE fails here; position restored
+    after_fail = runner.state.equity
+
+    check("T22.1 a failed close leaves nothing booked",
+          after_fail == start,
+          f"equity moved to {after_fail} from {start} for a position still open")
+
+    runner.run_day(pd.Timestamp("2024-06-19"))   # retry succeeds
+    check("T22.2 the retry books it exactly once",
+          runner.state.equity == start + 300.0,
+          f"expected {start + 300.0}, got {runner.state.equity}")
+
+
+# ─── T21: M6 — max_dd_dollars must be a maximum ──────────────────────────────
+
+def _last_snapshot(runner, day, tmp_dir):
+    """Run dump_state and read the snapshot back out of the file it writes.
+
+    Deliberately not a test-only attribute on the runner: production classes should not
+    carry hooks that exist for the suite, and reading the artefact proves the value
+    actually reaches the dashboard rather than merely existing in memory.
+    """
+    runner.dump_state(day)
+    js = (tmp_dir / "live_state_data.js").read_text(encoding="utf-8")
+    payload = json.loads(js.split("window.LIVE_DATA = ", 1)[1].rstrip().rstrip(";"))
+    return payload["snapshots"][-1]
+
+
+def test_m6_max_drawdown_is_a_maximum_not_the_current_one():
+    """M6. The field says max and carried the current drawdown.
+
+    `snap` set drawdown_dollars and max_dd_dollars to the SAME expression,
+    max(0, peak_equity - current) — which is the drawdown right now. The moment the
+    account recovers from its worst point the "max" shrinks, and it can only ever
+    understate.
+
+    Not cosmetic, because two producers write this key and only one of them meant it:
+    generate_replay_snapshots.py:321 accumulates a genuine running maximum, and
+    dashboard.html:1768 renders whatever arrives as "All-time max $X". One name, two
+    quantities, and the label on screen belongs to the other one.
+    """
+    print("\nT21: M6 max_dd_dollars is a running maximum")
+
+    import tempfile
+    tmp_dir = Path(tempfile.mkdtemp(prefix="m6_"))
+    runner = FuturesRunner(
+        broker=_empty_broker(), guard=_make_guard(),
+        contracts_by_inst={"MES": 1}, signal_fn=_noop_signal,
+        breaker=CircuitBreaker(account=50_000),
+        positions_path=tmp_dir / "pos.json",
+        live_state_path=tmp_dir / "live_state_data.js",
+    )
+    br = runner.state.breaker
+    day = pd.Timestamp("2024-06-17")
+    runner._system_epoch = "2024-06-17"
+
+    # Dig a hole, then climb most of the way out.
+    br.peak_equity = 52_000.0
+    runner.state.equity = 48_000.0
+    deep = _last_snapshot(runner, day, tmp_dir)
+
+    runner.state.equity = 51_500.0
+    recovered = _last_snapshot(runner, day, tmp_dir)
+
+    check("T21.1 the trough is recorded while it is happening",
+          deep["max_dd_dollars"] == 4_000.0, f"got {deep['max_dd_dollars']}")
+    check("T21.2 current drawdown follows the recovery",
+          recovered["drawdown_dollars"] == 500.0,
+          f"got {recovered['drawdown_dollars']}")
+    check("T21.3 the maximum does NOT follow it back up",
+          recovered["max_dd_dollars"] == 4_000.0,
+          f"a field named max_dd shrank from 4000 to "
+          f"{recovered['max_dd_dollars']} because the account recovered")
 
 
 # ─── T20: M5 — the broker's move is reconciled against the sleeve's, not just logged ──
