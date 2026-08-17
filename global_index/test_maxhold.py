@@ -71,7 +71,7 @@ class _FailCancelBroker(MockBroker):
     def cancel_order(self, _oid):
         raise RuntimeError("cancel_order timed out")
 
-    def place_stop(self, inst, _d, _c, _sp, _cl):
+    def place_stop(self, inst, _d, _c, _sp, _cl, contract_month=None):
         return f"stp-{inst}"
 
 
@@ -201,7 +201,7 @@ class _FalseCancelBroker(MockBroker):
     def cancel_order(self, _oid):
         return False
 
-    def place_stop(self, inst, _d, _c, _sp, _cl):
+    def place_stop(self, inst, _d, _c, _sp, _cl, contract_month=None):
         return f"stp-{inst}"
 
 

@@ -15,6 +15,7 @@ quietly.
 """
 import re
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -247,23 +248,298 @@ def test_sb12_two_clocks_that_disagree_stop_the_order():
     roll logic and the order routing are operating on different months, which is the
     shape of C1.
 
-    Measured: session day 2026-09-04 gives front 202612, while the wall clock on
-    2026-08-16 gives 202609.
+    BOTH clocks are pinned here. The first version passed only one of them and read the
+    real wall clock for the other, so its verdict moved with the calendar: measured by
+    stepping the clock forward, it went red on 2026-09-04 and stayed red — the Nikkei
+    roll date, which is the one day this mechanism exists for. A test that dies on the
+    day its subject matters is worse than no test, because it dies looking like a
+    regression in something else.
+
+    Pinned pair: a session on 2026-09-03 processed while the wall clock already reads
+    2026-09-04 — the roll has moved the tradeable month to 202612 while the session
+    being replayed still belongs to 202609.
     """
     from global_index.ibkr_broker import session_month_conflict
 
-    same = session_month_conflict("MNKD", "2026-08-17")
+    same = session_month_conflict("MNKD", "2026-08-17", now="2026-08-17")
     assert same is None, (
         f"an ordinary session, where both clocks agree, must not raise an alarm: {same}")
 
-    clash = session_month_conflict("MNKD", "2026-09-04")
+    clash = session_month_conflict("MNKD", "2026-09-03", now="2026-09-04")
     assert clash is not None, (
-        "the session being processed rolls to 202612 while the tradeable front month "
-        "is still 202609 — orders and positions would sit in different contracts and "
-        "nothing said so")
+        "the session being processed belongs to 202609 while the tradeable front month "
+        "has already rolled to 202612 — orders and positions would sit in different "
+        "contracts and nothing said so")
     assert "202612" in clash and "202609" in clash, (
         f"the message has to name BOTH months, or the operator cannot tell which way "
         f"round the disagreement runs: {clash}")
+
+
+def test_sb12b_the_default_clock_is_still_the_wall_clock():
+    """Control for sb12's pinning. Without it, sb12 passes just as well against a
+    function that ignored the wall clock entirely and only compared its two arguments —
+    which would make the guard blind in production, where nothing passes `now`.
+
+    Pins the DEFAULTING RULE rather than a date: omitting `now` must give the same
+    answer as passing the wall clock explicitly. That stays true on every future date,
+    and it goes red if someone defaults `now` to the session day instead — the change
+    that would silence the guard forever.
+
+    The session day is derived from the roll table rather than written down, so the
+    comparison is made on a day where the answer is NOT None. Two Nones compare equal
+    whatever the default is, and would prove nothing.
+    """
+    from global_index import ibkr_broker as B
+
+    # The module's own clock, read the way the function reads it — so this control is
+    # honest under a shifted clock too, not only on a real calendar.
+    today = str(B.pd.Timestamp.now(tz="America/New_York").date())
+    later = next((d for d, _f, _n in B.ROLL_SCHEDULE["MNK"] if d > today), None)
+    if later is None:
+        pytest.skip("roll table is exhausted — see the runway test, which owns that")
+
+    # Self-check before the real assertion: a pair that answers None either way cannot
+    # distinguish a correct default from a broken one.
+    explicit = B.session_month_conflict("MNKD", later, now=today)
+    assert explicit is not None, (
+        f"a session on the next roll date ({later}) read under today's clock ({today}) "
+        f"must disagree; if it does not, this control cannot see a broken default")
+
+    assert B.session_month_conflict("MNKD", later) == explicit, (
+        "omitting `now` must fall back to the wall clock. If the default became the "
+        "session day the two clocks could never disagree and the guard would be inert")
+
+
+# ── P1: an exit addresses the month the BOOK holds, not the month being traded ──
+
+class _OrderIB(_RollIB):
+    """_RollIB plus the two calls send_order/place_stop make beyond qualifyContracts."""
+
+    def placeOrder(self, contract, order):
+        self.placed = getattr(self, "placed", [])
+        self.placed.append((contract, order))
+        return _DoneTrade(order)
+
+    def cancelOrder(self, _o):
+        pass
+
+
+class _DoneTrade:
+    def __init__(self, order, price=5000.0, qty=1):
+        self.order = order
+        self.fills = []
+        self.orderStatus = types.SimpleNamespace(
+            status="Filled", filled=qty, avgFillPrice=price, orderId=99)
+
+    def isDone(self):
+        return True
+
+
+def _order_broker(monkeypatch, resolve=True):
+    """IBKRBroker whose order path runs for real against fake ib_insync."""
+    from global_index import ibkr_broker as B
+
+    ib = _OrderIB(resolve=resolve)
+    monkeypatch.setitem(sys.modules, "ib_insync",
+                        types.SimpleNamespace(Future=_RollFuture,
+                                              MarketOrder=_FakeOrder,
+                                              LimitOrder=_FakeOrder,
+                                              StopOrder=_FakeOrder))
+    b = B.IBKRBroker(_raw_fetcher=lambda i, t: None)
+    b._raw_fetcher = None
+    b._require_connection = lambda: ib
+    return b, ib
+
+
+class _FakeOrder:
+    def __init__(self, action, qty, price=None):
+        self.action, self.totalQuantity, self.lmtPrice = action, qty, price
+        self.orderId = 0
+
+
+# The Rổ 4 roll: from this date the tradeable front month is already 202612, while a
+# position opened before it is still held in 202609.
+ROLL_DAY_R4 = "2026-09-11"
+HELD_MONTH = "202609"       # what the book holds
+FRONT_ON_ROLL_DAY = "202612"  # what the calendar calls current from 00:00 ET that day
+
+
+def _pin_front_month(monkeypatch, month=FRONT_ON_ROLL_DAY):
+    """Pin what the CALENDAR answers, so the assertions can tell the two apart.
+
+    Written without this first, and it was green for the wrong reason: the held month
+    was 202609, which is also the real front month today, so "used the book" and "used
+    the calendar" produced the same contract and the test could not distinguish them.
+    Proved by mutation — making the order path ignore the field left the test passing.
+
+    Pinning also makes these clock-independent, which is the lesson sb12 cost.
+    """
+    monkeypatch.setattr("global_index.ibkr_broker._current_front_month",
+                        lambda _inst, _today=None: month)
+    assert month != HELD_MONTH, "the two candidate answers must differ"
+    return month
+
+
+def test_sb14_an_exit_goes_to_the_month_the_position_is_held_in(monkeypatch):
+    """The roll-day window. Measured on the schedule: from 00:00 ET on a roll date the
+    "current front month" lookup already answers with the NEXT month, but the position
+    is only actually rolled when the main session runs — 14:05 ET for Rổ 4. Everything
+    that sends an order in between addresses a contract the book does not hold.
+
+    Three things run in that 14-hour window: six stop-repair sweeps, and the 09:31
+    max-hold exit. A market SELL on a contract holding nothing does not close anything —
+    it opens a short, unprotected, that nobody asked for. That is the C1 failure mode
+    surviving inside the C1 fix.
+
+    The book already records which month it holds; the fix is that the exit paths ASK.
+    """
+    from global_index.broker import Order
+
+    b, ib = _order_broker(monkeypatch)
+    monkeypatch.setattr("global_index.ibkr_broker.session_month_conflict",
+                        lambda _i, _d, now=None: None)
+    calendar_says = _pin_front_month(monkeypatch)
+
+    b.send_order(Order("MES", "CLOSE", "LONG", 1, "roska4_swing", ROLL_DAY_R4,
+                       contract_month=HELD_MONTH))
+
+    assert ib.built, "no contract was built — the test never reached the order path"
+    months = {c.lastTradeDateOrContractMonth for c in ib.built}
+    assert months == {HELD_MONTH}, (
+        f"the exit was addressed to {months} — the calendar says {calendar_says} is "
+        f"tradeable, but the position is held in {HELD_MONTH}. On a roll date those "
+        f"differ, and selling a contract the account does not hold opens a short "
+        f"instead of closing anything")
+
+
+def test_sb15_an_exit_with_no_recorded_month_still_uses_the_front_month(monkeypatch):
+    """Control, and the compatibility guarantee.
+
+    Positions written before the month field existed carry None, and MockBroker leaves
+    it None on every verify and replay run. Those must behave exactly as before, or the
+    fix quietly changes the equivalence the whole backtest comparison rests on.
+    """
+    from global_index.broker import Order
+
+    b, ib = _order_broker(monkeypatch)
+    monkeypatch.setattr("global_index.ibkr_broker.session_month_conflict",
+                        lambda _i, _d, now=None: None)
+    calendar_says = _pin_front_month(monkeypatch)
+
+    b.send_order(Order("MES", "CLOSE", "LONG", 1, "roska4_swing", ROLL_DAY_R4))
+
+    assert ib.built, "no contract was built"
+    months = {c.lastTradeDateOrContractMonth for c in ib.built}
+    assert months == {calendar_says}, (
+        f"with no recorded month the old behaviour must be untouched — the calendar's "
+        f"answer {calendar_says}, not {months}")
+
+
+def test_sb16_a_stop_is_placed_on_the_month_the_position_is_held_in(monkeypatch):
+    """Same window, the other order the sweeps send.
+
+    A stop re-placed on the next month while the position sits in the current one is an
+    orphan the moment it is created: it protects nothing, and if it fills it opens a
+    position rather than closing one. The audit's own note that B4 "stays quiet on the
+    roll date" holds only while the old stop is still alive — the sweep exists for when
+    it is not.
+    """
+    b, ib = _order_broker(monkeypatch)
+    calendar_says = _pin_front_month(monkeypatch)
+
+    b.place_stop("MES", "LONG", 1, 4950.0, "roska4_swing", contract_month=HELD_MONTH)
+
+    assert ib.built, "no contract was built — the test never reached the stop path"
+    months = {c.lastTradeDateOrContractMonth for c in ib.built}
+    assert months == {HELD_MONTH}, (
+        f"the stop went onto {months} while the position is held in {HELD_MONTH} "
+        f"(calendar says {calendar_says}). A stop on the wrong contract protects "
+        f"nothing, and opens a position if it fills")
+
+
+def test_sb17_the_exit_paths_actually_pass_the_month():
+    """A parameter nothing passes is H2 again — implemented end to end, wired nowhere.
+
+    Checked on the source, because the defect is an omitted keyword at a call site and
+    no runtime assertion on a hand-built runner can see what the runner forgot to pass.
+    Covers both order kinds: every CLOSE order and every stop placement.
+
+    ENTRY orders are deliberately NOT covered. A new position should open in whatever
+    month is tradeable now — that is the one case where the calendar is the right
+    answer, and forcing a recorded month there would pin new trades to an expiring
+    contract.
+    """
+    import ast
+    src = (Path(__file__).resolve().parent / "runner.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+
+    closes, stops = [], []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        kw = {k.arg for k in node.keywords}
+        if getattr(node.func, "id", None) == "Order":
+            action = node.args[1] if len(node.args) > 1 else None
+            if isinstance(action, ast.Constant) and action.value == "CLOSE":
+                closes.append((node.lineno, "contract_month" in kw))
+        elif getattr(node.func, "attr", None) == "place_stop":
+            stops.append((node.lineno, "contract_month" in kw))
+
+    # Self-check first: an empty list would make both assertions pass vacuously.
+    assert closes, "no CLOSE Order(...) found in runner.py — the locator is broken"
+    assert stops, "no place_stop(...) call found in runner.py — the locator is broken"
+
+    assert all(ok for _ln, ok in closes), (
+        f"CLOSE order(s) built without naming the month the position is held in, at "
+        f"line(s) {[ln for ln, ok in closes if not ok]}. On a roll date that sends the "
+        f"exit to a contract holding nothing, which opens a short")
+    assert all(ok for _ln, ok in stops), (
+        f"stop(s) placed without naming the month, at line(s) "
+        f"{[ln for ln, ok in stops if not ok]}. A stop on the wrong month protects "
+        f"nothing and opens a position if it fills")
+
+
+def test_sb18_every_fake_broker_matches_the_real_place_stop_signature():
+    """A stub that has drifted from the interface turns a wiring bug into a green suite.
+
+    This has already cost the project once: M3 found three fake brokers whose
+    find_execution signature no longer matched the real one, and a broad `except
+    Exception` around the call turned the resulting TypeError into "no fill" — a wrong
+    answer instead of a crash. place_stop is stubbed in far more places, and B4 wraps it
+    in exactly such a try/except.
+
+    Checked on the source across every test module, so the next parameter cannot be
+    added to the interface while the fakes quietly keep the old shape.
+    """
+    import ast
+    import inspect
+    from global_index.broker import Broker
+
+    required = set(inspect.signature(Broker.place_stop).parameters) - {"self"}
+
+    drifted = []
+    for path in sorted(Path(__file__).resolve().parent.glob("test_*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.FunctionDef) and node.name == "place_stop"):
+                continue
+            args = node.args
+            if args.kwarg and args.vararg:
+                continue                      # (*a, **k) accepts anything
+            names = {a.arg for a in args.args + args.kwonlyargs} - {"self"}
+            # Stubs rename unused parameters (_d, _c...); only the keyword ones the
+            # runner passes by name have to match, since the rest arrive positionally.
+            missing = {p for p in required if p == "contract_month"} - names
+            if missing:
+                drifted.append(f"{path.name}:{node.lineno} missing {sorted(missing)}")
+
+    # Self-check: finding no place_stop at all means the locator is broken.
+    assert any(True for _ in Path(__file__).resolve().parent.glob("test_*.py")), \
+        "no test modules found — the locator is broken"
+    assert not drifted, (
+        "these fake brokers no longer match Broker.place_stop, so a runner that passes "
+        "the new argument raises TypeError inside a try/except and the stop silently "
+        "does not get placed:\n  " + "\n  ".join(drifted))
 
 
 def test_sb13_the_order_paths_actually_ask():

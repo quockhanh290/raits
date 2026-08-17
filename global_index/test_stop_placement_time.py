@@ -67,7 +67,7 @@ class _Rec(MockBroker):
         self._positions = [BrokerPosition(inst="MES", direction="LONG", contracts=1,
                                           cluster=SWING, entry_day=DAY1)]
 
-    def place_stop(self, inst, direction, contracts, stop_price, cluster):
+    def place_stop(self, inst, direction, contracts, stop_price, cluster, contract_month=None):
         self.stp_calls.append(dict(inst=inst, stop_price=stop_price))
         return f"stp-{inst}"
 

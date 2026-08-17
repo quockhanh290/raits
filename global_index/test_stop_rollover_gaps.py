@@ -73,7 +73,25 @@ def test_the_recorded_order_counts_toward_coverage_not_beyond_it():
 # ── C2 rollover ──────────────────────────────────────────────────────────────
 
 class _Pos:
+    """Stands in for OpenPos, and every field it declares is present.
+
+    It used to name only the five attributes this file happened to read. When the roll
+    path started asking for the contract month, the missing attribute raised inside the
+    `except Exception` that wraps place_stop — so the stop was silently never placed and
+    the failure surfaced as "no stop", not as a broken fake. That is the M3 defect
+    exactly: a hand-rolled double drifting from the real type, with a broad except
+    turning the mismatch into a wrong answer instead of a crash.
+
+    Built from the dataclass rather than listed by hand, so the next field added to
+    OpenPos cannot reopen the same hole.
+    """
+
     def __init__(self, entry_day=OLD, stop_price=7000.0, stop_order_id="11"):
+        import dataclasses
+        from global_index.live_decision import OpenPos
+        for f in dataclasses.fields(OpenPos):
+            setattr(self, f.name,
+                    None if f.default is dataclasses.MISSING else f.default)
         self.inst, self.direction, self.contracts = "MES", "LONG", 1
         self.cluster, self.entry_day = "roska4_swing", pd.Timestamp(entry_day)
         self.stop_price, self.stop_order_id = stop_price, stop_order_id
@@ -97,7 +115,7 @@ def _roll(pos, shift=40.0, deferred=False, accept=True):
 
     class _B:
         @staticmethod
-        def place_stop(inst, direction, contracts, stop_price, cluster):
+        def place_stop(inst, direction, contracts, stop_price, cluster, contract_month=None):
             placed.append(stop_price)
             return "new-77" if accept else ""
 

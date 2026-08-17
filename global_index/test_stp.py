@@ -49,7 +49,7 @@ class _RecordingMockBroker(MockBroker):
         self.cancel_calls: list[str] = []
         self._stp_status = stp_status  # returned by get_order_status()
 
-    def place_stop(self, inst, direction, contracts, stop_price, cluster):
+    def place_stop(self, inst, direction, contracts, stop_price, cluster, contract_month=None):
         order_id = f"stp-{inst}-{len(self.stp_calls)}"
         self.stp_calls.append(dict(
             inst=inst, direction=direction, contracts=contracts,
@@ -74,7 +74,7 @@ class _CancelledOpenBroker(MockBroker):
                         status="CANCELLED", error_msg="entry timeout")
         return super().send_order(o)
 
-    def place_stop(self, inst, _d, _c, _sp, _cl):
+    def place_stop(self, inst, _d, _c, _sp, _cl, contract_month=None):
         raise AssertionError("place_stop must NOT be called after CANCELLED OPEN")
 
     def cancel_order(self, _oid): return True
@@ -643,7 +643,7 @@ class _StopFailsBroker(_RecordingMockBroker):
     """place_stop báo thất bại kiểu IBKRBroker — trả chuỗi rỗng, không ném lỗi.
     Dùng để dựng một vị thế thật sự không có stop SAU khi cửa sổ hoãn đã qua."""
 
-    def place_stop(self, inst, direction, contracts, stop_price, cluster):
+    def place_stop(self, inst, direction, contracts, stop_price, cluster, contract_month=None):
         super().place_stop(inst, direction, contracts, stop_price, cluster)
         return ""
 
@@ -1200,6 +1200,85 @@ def test_stp13e_a_forgotten_fill_still_reaches_the_trade_log(tmp_path):
         "the row carries the PLACED level, not a real fill price. Unmarked it is "
         "indistinguishable from a genuine fill and the estimate spreads silently: "
         f"{closes[0]}")
+
+
+def test_stp13f_a_forgotten_fill_is_dated_so_the_gate_can_count_it(tmp_path):
+    """H4 path B, the half stp13e did not close: the row exists and is still invisible.
+
+    reqExecutions supplies the exit timestamp, and on this path it has forgotten the
+    fill — so exit_day came out null. Both readers that matter filter CLOSE rows on
+    exit_day and drop anything without one:
+
+      * the exit-path gate counts a stop exit only if the row survives that filter, so
+        the gate this whole thread exists to fill still cannot see the sample;
+      * the statement reconcile pairs on (inst, entry_day, exit_day), so a null there
+        can never match a broker row and the trade reads as permanently missing.
+
+    Money booked, row written, nobody counting it.
+
+    The date must NOT silently become "now": a stop that fired overnight is noticed the
+    next morning, and dating it to the reconcile would put the trade on the wrong day —
+    which is exactly why the real-fill path reads the fill's own timestamp. So the
+    session day is used AND flagged, the same contract fill_price_estimated already
+    carries for the price. An approximation that says so beats both a null and a
+    precise-looking lie.
+    """
+    from monitor.backend.paper_evidence_reader import _date, _in_epoch, _normalize_exit
+
+    log_path = tmp_path / "t.jsonl"
+    runner = _runner_with(_AmnesiacBroker({}, ACCOUNT), _persisted(tmp_path), log_path)
+
+    closes = _closes(log_path)
+    assert closes, "no CLOSE row at all — that is stp13e's job, not this one"
+    row = closes[0]
+
+    assert row.get("exit_day") is not None, (
+        f"the row carries no exit day, so every reader that filters on one drops it: "
+        f"{row}")
+    assert row.get("exit_day_estimated") is True, (
+        f"the date is the session the exit was NOTICED, not when the stop fired. "
+        f"Unflagged it is indistinguishable from a measured exit date and will be "
+        f"averaged into per-day figures as though it were one: {row}")
+
+    # The consequence, not just the field: run the row through the gate's own filter.
+    epoch = "2024-01-01"
+    assert _in_epoch(_date(row.get("exit_day")), epoch), (
+        "the row still does not survive the exit-day filter, so the exit-path gate and "
+        "the STP panel both go on ignoring it")
+    assert _normalize_exit(row.get("exit_reason")) == "STP", (
+        f"and it must still land in the STP bucket once it survives: {row}")
+
+
+def test_stp13h_a_real_fill_keeps_its_own_exit_date(tmp_path):
+    """Control for stp13f, on the case that separates the two answers.
+
+    Without this, dating the estimated row could just as well be done by stamping EVERY
+    row with the session day — which would silently overwrite the one path that has a
+    genuine execution timestamp. The shared fixture cannot catch that: its fill happens
+    at 09:31 on the session day, so "kept the fill's date" and "stamped today" give the
+    same string and the control would pass either way.
+
+    So the fill is moved to the previous evening — a stop that fired overnight and was
+    noticed the next morning, which is the exact case the recorder's own docstring says
+    it reads the fill timestamp for.
+    """
+    broker = _FillReportingBroker({}, ACCOUNT)
+    broker._exec["time"] = "2024-03-11 22:14:00"     # fired the evening before DAY2
+
+    # Self-check: the two candidate answers must differ, or this control is blind.
+    assert str(pd.Timestamp(broker._exec["time"]).date()) != str(pd.Timestamp(DAY2).date())
+
+    log_path = tmp_path / "t.jsonl"
+    runner = _runner_with(broker, _persisted(tmp_path), log_path)
+
+    closes = _closes(log_path)
+    assert closes, "precondition: the real-fill path must write a row"
+    row = closes[0]
+    assert row.get("exit_day_estimated") in (False, None), (
+        f"a fill with its own timestamp is not an estimate: {row}")
+    assert row.get("exit_day") == "2024-03-11", (
+        f"the real-fill path must keep the FILL's date. Stamping the session day here "
+        f"would move an overnight stop onto the wrong trading day: {row}")
 
 
 def test_stp13g_a_stop_exit_records_the_money_it_booked(tmp_path):

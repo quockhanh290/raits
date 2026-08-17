@@ -106,7 +106,7 @@ class _RecordingBroker(MockBroker):
         self.sent.append((o.action, o.inst, o.direction, o.contracts))
         return super().send_order(o)
 
-    def place_stop(self, inst, _d, _c, _sp, _cl):
+    def place_stop(self, inst, _d, _c, _sp, _cl, contract_month=None):
         return f"stp-{inst}"
 
     def cancel_order(self, _oid):

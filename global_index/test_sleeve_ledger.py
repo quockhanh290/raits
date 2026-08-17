@@ -80,7 +80,7 @@ class _PricedBroker(MockBroker):
     def get_equity(self):
         return self._equity
 
-    def place_stop(self, inst, direction, contracts, stop_price, cluster):
+    def place_stop(self, inst, direction, contracts, stop_price, cluster, contract_month=None):
         self.stp_calls.append(stop_price)
         return f"stp-{inst}"
 

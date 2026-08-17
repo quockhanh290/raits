@@ -36,6 +36,19 @@ class Order:
     # verify-mode metadata: lets MockBroker realize the backtest pnl for this trade
     exit_day: object = None
     pnl_sized: float = 0.0
+    # "YYYYMM" the position being CLOSED is actually held in, when the book knows it.
+    #
+    # Exits must address the contract the book holds, not the one the calendar says is
+    # tradeable. Those are the same number except on a roll date, when the front-month
+    # lookup switches at 00:00 ET while the position is not rolled until the main
+    # session runs — 14:05 ET for Rổ 4. Everything sending an order in between (six stop
+    # sweeps and the 09:31 max-hold exit) would otherwise sell a contract holding
+    # nothing, which opens a short rather than closing anything.
+    #
+    # None on entries, by design: a NEW position belongs in whatever month is tradeable
+    # now, and that is the one case where the calendar is the right answer. None also
+    # keeps every pre-existing caller and MockBroker on the old path unchanged.
+    contract_month: "str | None" = None
 
 
 @dataclass
@@ -106,10 +119,19 @@ class Broker(ABC):
     def get_equity(self) -> float: ...
     @abstractmethod
     def place_stop(self, inst: str, direction: str, contracts: int,
-                   stop_price: float, cluster: str) -> str:
+                   stop_price: float, cluster: str,
+                   contract_month: "str | None" = None) -> str:
         """Place a GTC stop order for exit protection on a multi-day position.
         Returns the broker order ID string on success, '' on failure.
-        LONG → SELL STP at stop_price; SHORT → BUY STP at stop_price."""
+        LONG → SELL STP at stop_price; SHORT → BUY STP at stop_price.
+
+        contract_month: "YYYYMM" the position is held in, when the book knows it. A
+        stop belongs on the same contract as the position it protects — on a roll date
+        the front-month lookup has already moved on, and a stop placed there is an
+        orphan the moment it exists: it protects nothing, and opens a position rather
+        than closing one if it fills. Optional with the same default as
+        has_working_stop's widened signature, so every existing caller keeps working
+        and nothing silently changes meaning at a site that was not reviewed."""
     @abstractmethod
     def cancel_order(self, order_id: str) -> bool:
         """Cancel an order by ID. Returns True if cancelled, False if not found/failed."""
@@ -195,7 +217,8 @@ class MockBroker(Broker):
     def get_equity(self) -> float:
         return self._equity
 
-    def place_stop(self, inst, _direction, _contracts, _stop_price, _cluster) -> str:
+    def place_stop(self, inst, _direction, _contracts, _stop_price, _cluster,
+                   contract_month=None) -> str:
         return f"mock-stp-{inst}"
 
     def cancel_order(self, _order_id) -> bool:

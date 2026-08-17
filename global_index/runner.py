@@ -82,7 +82,7 @@ STOP_FILE_NAME = "STOP_TRADING"
 # away order_id, perm_id and source — the fields that make a stop exit auditable.
 CLOSE_RECORD_FIELDS: frozenset = frozenset({
     "type", "inst", "cluster", "direction", "contracts",
-    "entry_day", "exit_day", "hold_days",
+    "entry_day", "exit_day", "exit_day_estimated", "hold_days",
     "exit_reason", "expected_stop", "fill_price", "fill_price_estimated",
     "filled_qty", "pnl_sized", "commission", "slip",
     "order_id", "perm_id", "status", "source", "retried", "regime",
@@ -757,8 +757,13 @@ class FuturesRunner:
                         _can_replace = p.stop_price is not None and _covered is False
                         if _can_replace:
                             try:
+                                # P1: B4 is the sweep that runs in the roll-day window —
+                                # six times before Rổ 4 rolls at 14:05. A stop re-placed
+                                # on the front month while the position sits in the old
+                                # one protects nothing and opens a position if it fills.
                                 _sid = broker.place_stop(p.inst, p.direction, p.contracts,
-                                                         p.stop_price, p.cluster)
+                                                         p.stop_price, p.cluster,
+                                                         contract_month=p.contract_month)
                             except Exception as _e:
                                 _sid = ""
                                 logger.error("B4: place_stop(%s/%s) raised: %s",
@@ -1073,6 +1078,23 @@ class FuturesRunner:
                     _exit_day = str(pd.Timestamp(_t).date())
                 except Exception:
                     _exit_day = _t[:10] or None
+            # No timestamp means reqExecutions has already forgotten the fill. A null
+            # date is not neutral here: both readers that matter filter CLOSE rows on
+            # exit_day and drop the ones without it, so the row reached the log and the
+            # exit-path gate still could not count it, while the statement reconcile —
+            # which pairs on (inst, entry_day, exit_day) — could never match it either.
+            # Booked, written, invisible.
+            #
+            # The session day is the day the exit was NOTICED, not the day the stop
+            # fired, and those differ whenever a stop goes off overnight. That is the
+            # whole reason the branch above prefers the fill's own timestamp. So it is
+            # used and FLAGGED, exactly as fill_price_estimated flags the price on this
+            # same path: an approximation that admits what it is can be excluded from a
+            # per-day figure, and a silent one cannot.
+            _exit_day_estimated = False
+            if _exit_day is None:
+                _exit_day = str(pd.Timestamp(self._today).date())
+                _exit_day_estimated = True
             self._append_trade({
                 "type": "CLOSE",
                 "inst": pos.inst,
@@ -1101,6 +1123,10 @@ class FuturesRunner:
                 # an estimate that looks like a measurement is how a ledger drifts
                 # without anyone being able to point at the moment it went wrong.
                 "fill_price_estimated": bool(fill.get("estimated")),
+                # True when exit_day is the session the exit was noticed rather than a
+                # date read off the fill. Same contract as the flag above, for the other
+                # approximated column.
+                "exit_day_estimated": _exit_day_estimated,
             })
             logger.info(
                 "B3 STP-VERIFY: recorded stop exit %s/%s @ %.4f (permId=%s) — "
@@ -1218,6 +1244,11 @@ class FuturesRunner:
             _f = self.broker.send_order(Order(
                 p.inst, "CLOSE", p.direction, p.contracts, p.cluster, day,
                 exit_day=day, pnl_sized=p.pnl_sized,
+                # P1: the month the book holds, not the one the calendar calls current.
+                # This retry runs BEFORE the rollover step in run_day, so on a roll date
+                # the lookup has already moved and this exit would address a contract
+                # holding nothing.
+                contract_month=p.contract_month,
             ))
             if _f.status != "FAILED":
                 p.exit_pending = False
@@ -1292,6 +1323,11 @@ class FuturesRunner:
             _f = self.broker.send_order(Order(
                 p.inst, "CLOSE", p.direction, p.contracts, p.cluster, day,
                 exit_day=day, pnl_sized=p.pnl_sized,
+                # P1: 09:31 ET, and the rollover step does not run on this path at all.
+                # On a Rổ 4 roll date the front month has been the NEXT one since
+                # midnight, so without this the exit sells a contract the account does
+                # not hold and opens a short instead.
+                contract_month=p.contract_month,
             ))
             if _f.status != "FAILED":
                 if p.stop_order_id is not None:
@@ -1689,7 +1725,12 @@ class FuturesRunner:
         for p in decision.exits:
             _f = self.broker.send_order(Order(
                 p.inst, "CLOSE", p.direction, p.contracts, p.cluster, day,
-                exit_day=day, pnl_sized=p.pnl_sized))
+                exit_day=day, pnl_sized=p.pnl_sized,
+                # P1: after the rollover step, so on a roll date this is already the new
+                # month — the field simply says which one rather than asking the clock
+                # a second time. Same reason the fill reports it instead of the runner
+                # recomputing it: one answer to "which contract", not two.
+                contract_month=p.contract_month))
             # C1: fill quality — signed slippage (positive = adverse).
             # LONG CLOSE (selling): lower fill = adverse → slip = stop_ref - avg.
             # SHORT CLOSE (buying): higher fill = adverse → slip = avg - stop_ref.
@@ -1819,7 +1860,11 @@ class FuturesRunner:
                 exit_day=t.get("exit"), pnl_sized=t.get("pnl_sized", 0.0)))
             _sd_close = self.broker.send_order(Order(
                 t["inst"], "CLOSE", t["direction"], n, t["cluster"], day,
-                exit_day=day, pnl_sized=t.get("pnl_sized", 0.0)))
+                exit_day=day, pnl_sized=t.get("pnl_sized", 0.0),
+                # P1: close the contract that was just opened, taken from that fill.
+                # A same-day trade never becomes an OpenPos, so there is no book row to
+                # ask — the open fill is the only record of which month it went to.
+                contract_month=_sd_open.contract_month))
             # A same-day trade never becomes an OpenPos, so it misses the exits loop
             # that books every other close. decide_day added its pnl_sized, which is
             # the ledger's own figure in verify mode and 0.0 in live — leaving a whole
@@ -1888,9 +1933,19 @@ class FuturesRunner:
         # _book_realised. The line stays because a large unexplained move in the account
         # is still worth seeing.
         if abs(_h4_delta) > 0.01:
+            # "booked this run" is here so the RESIDUAL can be re-measured from the
+            # archive. BROKER_RECONCILE_TOLERANCE was set from the distribution of this
+            # line's delta, but the gate below compares delta minus what the sleeve
+            # booked — a different quantity, and the log recorded only the first. The
+            # running total was printed instead, so the per-run figure had to be
+            # inferred from consecutive lines and vanished whenever a run printed none.
+            # Inferring it over the existing logs showed every one of the 29 calibration
+            # observations came from a run that booked nothing, i.e. no sample at all of
+            # the case the gate exists for. This line is what makes the next measurement
+            # possible; the threshold itself stays put until there is one.
             logger.info("H4: broker delta %+.2f (balance %.2f) — logged, not booked; "
-                        "sleeve ledger stands at %.2f",
-                        _h4_delta, _h4_eq, self.state.equity)
+                        "booked this run %+.2f; sleeve ledger stands at %.2f",
+                        _h4_delta, _h4_eq, self._booked_this_run, self.state.equity)
 
         # M5: compare the two, instead of printing one and hoping someone reads it.
         #
@@ -2149,7 +2204,11 @@ class FuturesRunner:
                     )
                 elif _stp_pos is not None:
                     _stp_id = self.broker.place_stop(
-                        t["inst"], t["direction"], n, t["stop"], t["cluster"])
+                        t["inst"], t["direction"], n, t["stop"], t["cluster"],
+                        # P1: the month the entry actually filled in, copied onto the
+                        # position a few lines above. Deriving it here from the clock
+                        # would be a second answer to the same question — M4.
+                        contract_month=_stp_pos.contract_month)
                     _stp_pos.stop_order_id = _stp_id if _stp_id else None
                     if _stp_id:
                         logger.info(
@@ -2269,8 +2328,13 @@ class FuturesRunner:
             return
 
         try:
+            # P1: this runs right after a successful roll, and the roll has just written
+            # the NEW month onto the position. So the replacement stop lands on the
+            # contract now held rather than being re-derived — which is the whole point
+            # of the field existing.
             _sid = self.broker.place_stop(pos.inst, pos.direction, pos.contracts,
-                                          _new_stop, pos.cluster)
+                                          _new_stop, pos.cluster,
+                                          contract_month=pos.contract_month)
         except Exception as _e:
             _sid = ""
             logger.error("C2: place_stop after roll raised for %s: %s", pos.inst, _e)

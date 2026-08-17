@@ -66,7 +66,7 @@ class _RollBroker(MockBroker):
         self.cancelled.append(order_id)
         return self._cancel_ok
 
-    def place_stop(self, inst, direction, contracts, stop_price, cluster):
+    def place_stop(self, inst, direction, contracts, stop_price, cluster, contract_month=None):
         self.placed.append((inst, direction, contracts, round(stop_price, 4), cluster))
         return "stp-new" if self._stop_accepted else ""
 

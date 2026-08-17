@@ -388,6 +388,50 @@ def test_m5_an_unexplained_account_move_is_reconciled_not_just_logged():
           f"must not erode it (see M2). got {[e.get('level') for e in loud_alerts]}")
 
 
+def test_m5_the_routine_log_line_carries_what_the_sleeve_booked(caplog):
+    """The threshold cannot be re-derived from what the log records today.
+
+    $250 was set from the distribution of the ACCOUNT's move — 267 recorded lines, 238
+    before the routing fix and 29 after. But the gate compares the RESIDUAL: the account
+    move minus what the sleeve booked in the same run. Two different quantities, and the
+    log only ever printed the first.
+
+    Re-measuring the right one is impossible from the archive: the line prints the
+    sleeve's running total, not what this run added, so the per-run figure has to be
+    inferred from consecutive lines and is lost whenever a run prints nothing. Doing
+    that inference over the existing logs showed the calibration window contains ZERO
+    runs in which the sleeve booked anything at all — every one of the 29 was a day with
+    no closes, so residual and account move were the same number by accident.
+
+    That is not a thin sample for the case that matters; it is no sample. So the routine
+    line — the one that fires on every run, not only on breach — has to carry the booked
+    figure, or the next re-measurement is as blind as this one.
+
+    Nothing else changes here. The threshold stays where it is until there is a
+    distribution of the right quantity to move it against.
+    """
+    print("\nT20b: M5 the routine line records the booked figure")
+
+    caplog.set_level(logging.INFO, logger="global_index.runner")
+    runner = _make_runner(_DriftingBroker(40.0), _noop_signal)
+    runner.run_day(pd.Timestamp("2024-06-17"))
+
+    lines = [r.getMessage() for r in caplog.records if "broker delta" in r.getMessage()]
+    # Self-check: no line means the assertion below would pass vacuously.
+    check("T20b.1 the routine delta line was emitted at all",
+          bool(lines), "no 'broker delta' line — the locator is broken, not satisfied")
+    if not lines:
+        return
+
+    check("T20b.2 it names what the sleeve booked THIS run",
+          "booked this run" in lines[0],
+          f"only the running total is printed, so the residual the gate tests cannot "
+          f"be rebuilt from the archive: {lines[0]}")
+    check("T20b.3 and the figure is the per-run amount, not the running total",
+          "booked this run +0.00" in lines[0],
+          f"this run closed nothing, so the booked figure must be zero: {lines[0]}")
+
+
 def _one_entry_signal(day, bars, held):
     """Returns one LONG entry candidate — used to verify it gets blocked/discarded."""
     return [{"inst": "MES", "direction": "LONG", "cluster": "roska4_swing",

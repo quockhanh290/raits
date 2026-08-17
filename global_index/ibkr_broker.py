@@ -321,7 +321,7 @@ def ibkr_symbol_and_exchange(inst: str) -> "tuple[str, str]":
     return sym, _IBKR_EXCHANGE.get(sym, "CME")
 
 
-def session_month_conflict(inst: str, session_day) -> "str | None":
+def session_month_conflict(inst: str, session_day, now=None) -> "str | None":
     """Describe a disagreement between the session's front month and today's, or None.
 
     M4. Two clocks decide the contract month and the audit asked for one. Forcing one
@@ -342,10 +342,17 @@ def session_month_conflict(inst: str, session_day) -> "str | None":
     and on a slot that begins before ET midnight and ends after.
 
     Silent on the roll date itself, when both clocks have moved together.
+
+    `now` overrides the wall clock, and exists so a test can pin BOTH sides. Without it
+    the only way to exercise a disagreement was to name two calendar dates and let the
+    real clock supply the second — which made the test's verdict move with the calendar.
+    Measured: that version went red on 2026-09-04 and stayed red, i.e. on the Nikkei
+    roll date, the one day this function exists for. Production never passes it, so the
+    live answer still comes from the wall clock, which is the whole point of the field.
     """
     ibkr_sym = _RAITS_TO_IBKR.get(inst, inst)
     session_front = _current_front_month(ibkr_sym, session_day)
-    live_front = _current_front_month(ibkr_sym)
+    live_front = _current_front_month(ibkr_sym, now)
     if session_front is None or live_front is None or session_front == live_front:
         return None
     return (
@@ -739,7 +746,14 @@ class IBKRBroker(Broker):
                              order.action, order.inst, _clash)
                 raise ContractResolutionError(f"M4 clock disagreement: {_clash}")
 
-            contract = _front_month_contract(ib, ibi, order.inst)
+            # P1: an exit addresses the month the BOOK holds; only an entry may take
+            # the month from the calendar. They agree on every day but a roll date,
+            # when the front-month lookup moves at 00:00 ET and the position is not
+            # rolled until the main session runs. Selling a contract the account does
+            # not hold opens a short — the C1 failure mode, in a 14-hour window.
+            contract = (_month_contract(ib, ibi, order.inst, order.contract_month)
+                        if order.contract_month
+                        else _front_month_contract(ib, ibi, order.inst))
 
             # Map direction+action → IBKR BUY/SELL
             # OPEN LONG→BUY, OPEN SHORT→SELL, CLOSE LONG→SELL, CLOSE SHORT→BUY
@@ -1047,7 +1061,8 @@ class IBKRBroker(Broker):
     # ── STP: stop order management ───────────────────────────────────────────
 
     def place_stop(self, inst: str, direction: str, contracts: int,
-                   stop_price: float, cluster: str) -> str:
+                   stop_price: float, cluster: str,
+                   contract_month: "str | None" = None) -> str:
         """Place a GTC stop order for overnight exit protection on a multi-day position.
 
         LONG  → SELL STP at stop_price  (exit if price falls to stop_price)
@@ -1058,6 +1073,12 @@ class IBKRBroker(Broker):
 
         Returns IBKR orderId string on success, '' on failure.
         Failure is non-fatal — runner logs ALERT and continues (position open without STP).
+
+        contract_month pins the stop to the contract the position is actually held in.
+        Without it a stop re-placed on a roll date lands on the next month while the
+        position sits in the current one — protecting nothing, and opening a position
+        if it fills. Falls back to the front month when the book does not know, which
+        is every position written before the field existed.
         """
         if self._raw_fetcher is not None:
             return f"mock-stp-{inst}"  # offline / test mode
@@ -1066,7 +1087,9 @@ class IBKRBroker(Broker):
         try:
             import ib_insync as ibi  # type: ignore
 
-            contract = _front_month_contract(ib, ibi, inst)
+            contract = (_month_contract(ib, ibi, inst, contract_month)
+                        if contract_month
+                        else _front_month_contract(ib, ibi, inst))
 
             ibkr_action = "SELL" if direction == "LONG" else "BUY"
             # Chandelier levels are continuous; IBKR only accepts prices on the tick
