@@ -322,6 +322,32 @@ def _inflight_report(elapsed_secs: float) -> _InflightReport:
 HEARTBEAT_SECS = 60
 _HEARTBEAT_TOLERANCE = 30    # cron drift + a slow beat; below this it is not a stall
 _last_beat: dict = {"t": None}
+# A stall has been reported and no healthy beat has been logged since. One-element dict
+# for the same reason _last_beat is: the closure that sets it needs no `global`.
+_stall_outstanding: dict = {"v": False}
+
+
+def heartbeat_alive_is_worth_logging(minute: int, stall_outstanding: bool) -> bool:
+    """Whether this healthy beat should reach the log at INFO.
+
+    The beat runs every minute; writing it every minute is 2880 lines a day and makes
+    the log unreadable, which is its own failure — a log nobody reads is the condition
+    the heartbeat exists to remove. So an ordinary beat is throttled to the hour.
+
+    But the throttle was also delaying the ONE line that says a stall is over. The
+    journal reader marks recovery on "[HEARTBEAT] ALIVE", so after a stall the dashboard
+    carried a critical incident for up to 59 more minutes while the scheduler was
+    demonstrably beating again. Measured 2026-08-17: stall at 04:15 ET, healthy from
+    04:22, earliest possible "recovered" 05:00; driving the closure at minute 55 emitted
+    only a DEBUG line, which never reaches the file.
+
+    An alarm whose off switch lags its on switch by an hour is one people learn to
+    ignore, and this project has already paid for that once — six failed night slots
+    kept a status bar red all day because nothing modelled "recovered".
+
+    One extra line per stall is not noise. It is the most informative line in the file.
+    """
+    return minute == 0 or stall_outstanding
 
 # How late a slot may be and still be worth running. APScheduler's default is 1 second,
 # which silently drops any slot that arrives even slightly behind — the state the night
@@ -527,11 +553,17 @@ def make_scheduler(port: int, dry_run: bool,
             # One INFO line an hour, not one a minute. Enough that "the log has been
             # quiet" stops being ambiguous — the state this whole fix exists to remove —
             # without the 2880 lines a day that would make the log unreadable.
-            if now.minute == 0:
+            #
+            # Plus the first healthy beat after a stall, whatever the minute: that line
+            # is what the journal reader turns into "recovered", and holding it back to
+            # the next whole hour left the incident on screen long after it was over.
+            if heartbeat_alive_is_worth_logging(now.minute, _stall_outstanding["v"]):
                 log.info("[HEARTBEAT] alive")
+                _stall_outstanding["v"] = False
             else:
                 log.debug("[HEARTBEAT] ok")
             return
+        _stall_outstanding["v"] = True
         log.warning(
             "[HEARTBEAT] STALLED %.0fs (expected ~%ds). The scheduler's wait timer does "
             "not advance while Windows sleeps, so every job due in that window was "
@@ -829,10 +861,17 @@ def make_scheduler(port: int, dry_run: bool,
     ]
     for _h, _m in _REPAIR_SLOTS:
         sched.add_job(
-            lambda lbl=f"STOP_REPAIR_{_h:02d}{_m:02d}": _run(
+            # Same mutex the live_day slots hold. All three entry points connect on
+            # clientId 1 — the guard's own message names that collision — and the
+            # schedule margin is not what it looks like: measured against the worst
+            # case a slot is allowed (20-minute ceiling + 5-minute grace after a 15:55
+            # start), STOP_REPAIR_1620 has ZERO minutes of clearance, and 15:55 is the
+            # slot that also runs a full shadow replay. Skipping a sweep costs nothing:
+            # they run every two hours and the repair is idempotent.
+            lambda lbl=f"STOP_REPAIR_{_h:02d}{_m:02d}": _run_guarded(lbl, lambda: _run(
                 [sys.executable, "-m", "global_index.run_stop_repair",
                  "--positions-path", "live_positions.json", "--port", str(port)],
-                label=lbl, dry_run=dry_run),
+                label=lbl, dry_run=dry_run)),
             "cron", day_of_week="mon-fri", hour=_h, minute=_m,
             id=f"stop_repair_{_h:02d}{_m:02d}",
             name=f"Stop repair sweep {_h:02d}:{_m:02d} ET",
@@ -852,10 +891,10 @@ def make_scheduler(port: int, dry_run: bool,
     # trường đóng, không có giá để trigger stop. Quét lúc đó là quét vào chỗ trống.
     # 18:30 (mở cửa + 30 phút) cho phiên ổn định trước khi đọc trạng thái lệnh.
     sched.add_job(
-        lambda lbl="STOP_REPAIR_SUN_1830": _run(
+        lambda lbl="STOP_REPAIR_SUN_1830": _run_guarded(lbl, lambda: _run(
             [sys.executable, "-m", "global_index.run_stop_repair",
              "--positions-path", "live_positions.json", "--port", str(port)],
-            label=lbl, dry_run=dry_run),
+            label=lbl, dry_run=dry_run)),
         "cron", day_of_week="sun", hour=18, minute=30,
         id="stop_repair_sun_1830",
         name="Stop repair sweep 18:30 ET (Sunday reopen)",

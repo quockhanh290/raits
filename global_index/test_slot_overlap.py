@@ -141,5 +141,86 @@ def test_lock_released_even_when_body_raises():
     assert ran == ["SLOT_1415"], "guard must not latch after a failure"
 
 
+def test_stop_repair_sweeps_share_the_slot_mutex():
+    """All three entry points connect on the SAME IBKR clientId — they must not overlap.
+
+    The mutex was written for the live_day slots and wrapped only those. The stop-repair
+    sweeps run ten times a day through _run directly, holding no lock, and the guard's
+    own message names the hazard: "overlapping children collide on IBKR clientId".
+
+    The schedule keeps them apart on paper, but the margin is not what it looks like.
+    Measured against the worst case a live_day slot is allowed (20-minute subprocess
+    ceiling + 5-minute misfire grace on top of the 15:55 start):
+
+        STOP_REPAIR_1620   0 minutes of clearance
+        STOP_REPAIR_0420  60 minutes
+
+    Zero. The 15:55 slot also runs a full shadow replay, which is the run most likely to
+    reach that ceiling.
+
+    Skipping a sweep costs nothing: they run every two hours and the repair they do is
+    idempotent, so the next one does whatever this one would have.
+    """
+    ran = []
+    rs._run = lambda *a, **k: ran.append(k.get("label"))       # replaced below anyway
+    sched = rs.make_scheduler(port=4002, dry_run=True)
+    job = sched.get_job("stop_repair_1620")
+    assert job is not None and job.func is not None, (
+        "no 16:20 sweep registered — the locator is broken, not satisfied")
+
+    calls = []
+    original_run, rs._run = rs._run, lambda *a, **k: calls.append(k.get("label"))
+    try:
+        assert rs._slot_lock.acquire(blocking=False), "lock must start free"
+        try:
+            job.func()                       # a live_day slot is still in flight
+            assert calls == [], (
+                f"the sweep launched a second child on clientId 1 while a run_live_day "
+                f"child was still going: {calls}")
+        finally:
+            rs._slot_lock.release()
+            rs._slot_started_at[0] = None
+
+        job.func()                           # lock free again
+        assert calls, "with the lock free the sweep must actually run"
+    finally:
+        rs._run = original_run
+
+
+def test_the_max_hold_exit_is_deliberately_not_gated():
+    """And the one job that must NOT be skipped stays outside the mutex.
+
+    Nothing else performs the max-hold exit — run_day does not — so a skipped 09:31
+    leaves a position open past its limit until the next day, with no retry path. That
+    is a worse outcome than the collision the mutex prevents, and 09:31 has no schedule
+    adjacency anyway: the nearest lock-holding window ends more than two hours earlier.
+
+    Pinned so the split stays a decision rather than an oversight, and so anyone
+    tempted to "finish the job" by wrapping this one has to read why first.
+    """
+    import ast
+    src = (Path(__file__).resolve().parent / "run_scheduler.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+
+    fn = next((n for n in ast.walk(tree)
+               if isinstance(n, ast.FunctionDef) and n.name == "job_maxhold"), None)
+    assert fn is not None, "job_maxhold is gone or renamed — the locator is broken"
+
+    parents = {c: p for p in ast.walk(fn) for c in ast.iter_child_nodes(p)}
+    launch = next((n for n in ast.walk(fn)
+                   if isinstance(n, ast.Call) and getattr(n.func, "id", None) == "_run"), None)
+    assert launch is not None, "job_maxhold no longer launches a child — locator broken"
+
+    chain, node = [], launch
+    while node in parents:
+        node = parents[node]
+        chain.append(getattr(getattr(node, "func", None), "id", None))
+    assert "_run_guarded" not in chain, (
+        "the max-hold exit was put behind the slot mutex. Nothing else performs this "
+        "exit — run_day does not — so a skip leaves a position open past its limit "
+        "with no retry path, and 09:31 has no schedule adjacency to protect it from. "
+        "If this is intended, change the reasoning in this test first.")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

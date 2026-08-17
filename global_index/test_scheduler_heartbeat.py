@@ -29,7 +29,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from global_index.run_scheduler import HEARTBEAT_SECS, heartbeat_gap, make_scheduler
+from global_index.run_scheduler import (HEARTBEAT_SECS, heartbeat_alive_is_worth_logging,
+                                        heartbeat_gap, make_scheduler)
 
 _T0 = dt.datetime(2026, 8, 5, 14, 0, 28, tzinfo=dt.timezone.utc)
 
@@ -55,6 +56,75 @@ def test_hb3_the_real_stall_is_reported_in_seconds():
 
 def test_hb4_first_beat_has_nothing_to_compare_against():
     assert heartbeat_gap(None, _T0) is None
+
+
+# ── recovery has to be as prompt as detection ─────────────────────────────────
+
+def test_hb9_the_beat_after_a_stall_is_worth_logging():
+    """The alarm turns on within a minute; its off switch must not take an hour.
+
+    The beat runs every minute but writes "[HEARTBEAT] alive" at INFO only when the
+    minute is 00 — 2880 lines a day is unreadable, so the throttle is right. What the
+    throttle also delayed was the one line that says the stall is OVER: the journal
+    reader marks recovery on an ALIVE line, so after a stall the dashboard carried a
+    critical incident for up to 59 more minutes while the scheduler was demonstrably
+    beating again.
+
+    Measured 2026-08-17: stall detected 04:15 ET, healthy from 04:22, earliest possible
+    "recovered" 05:00. Driving the real closure at minute 55 produced only a DEBUG line,
+    which never reaches the file. An alarm whose off switch lags its on switch by an
+    hour is one people learn to ignore.
+    """
+    assert not heartbeat_alive_is_worth_logging(37, False), (
+        "an ordinary healthy beat at a plain minute must stay out of the log — the "
+        "throttle exists for a reason and this must not undo it")
+    assert heartbeat_alive_is_worth_logging(0, False), (
+        "the hourly beat is the existing contract and must survive")
+    assert heartbeat_alive_is_worth_logging(37, True), (
+        "the first healthy beat after a stall is the line that clears the incident; "
+        "withholding it to the next whole hour is what leaves the panel red")
+
+
+def test_hb10_the_job_tracks_the_stall_and_clears_it(caplog):
+    """A predicate nothing calls is H2 again — implemented, wired nowhere.
+
+    Drives the REAL closure the scheduler registered, not a re-implementation, and
+    asserts through the flag rather than the clock so it holds at every minute of the
+    hour — including :00, where a clock-based assertion would pass for the wrong reason.
+    """
+    import logging
+    from global_index import run_scheduler as rs
+
+    job = _sched().get_job("heartbeat")
+    assert job is not None and getattr(job, "func", None) is not None, (
+        "no heartbeat job to drive — the locator is broken, not satisfied")
+
+    rs._last_beat["t"] = None
+    rs._stall_outstanding["v"] = False
+
+    with caplog.at_level(logging.DEBUG, logger="run_scheduler"):
+        job.func()                                   # first beat, nothing to compare
+        assert rs._last_beat["t"] is not None, "the job did not record a beat at all"
+
+        rs._last_beat["t"] = rs._last_beat["t"] - dt.timedelta(hours=1)
+        caplog.clear()
+        job.func()                                   # a sleeping machine looks like this
+        assert any("STALLED" in r.getMessage() for r in caplog.records), (
+            f"no stall reported, so the rest proves nothing: "
+            f"{[r.getMessage()[:40] for r in caplog.records]}")
+        assert rs._stall_outstanding["v"] is True, (
+            "the stall was reported and immediately forgotten, so the next healthy "
+            "beat has no reason to announce itself")
+
+        caplog.clear()
+        job.func()                                   # healthy again, whatever the minute
+        shown = [r.getMessage() for r in caplog.records if r.levelno >= logging.INFO]
+        assert any("alive" in m for m in shown), (
+            f"the beat after a stall stayed below INFO, so nothing marks recovery until "
+            f"the next whole hour: {shown}")
+        assert rs._stall_outstanding["v"] is False, (
+            "the flag stayed set, so every later beat would keep announcing a stall "
+            "that is already over")
 
 
 # ── wiring ────────────────────────────────────────────────────────────────────
