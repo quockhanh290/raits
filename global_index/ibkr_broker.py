@@ -351,6 +351,33 @@ def session_month_conflict(inst: str, session_day, now=None) -> "str | None":
     live answer still comes from the wall clock, which is the whole point of the field.
     """
     ibkr_sym = _RAITS_TO_IBKR.get(inst, inst)
+
+    # Read the session day before comparing anything with it. Three outcomes, not two:
+    # agree, disagree, and cannot tell — and "cannot tell" belongs on the same side as
+    # "disagree", because an order whose month is unknown must not go out.
+    #
+    # Both failures below were measured, and neither produced anything useful:
+    #
+    #   NaT     the schedule walk compares date STRINGS, and every "2026-.." row sorts
+    #           below "NaT", so it fell through to the LAST row of the table and
+    #           announced 202703 — a contract with no connection to the order. It
+    #           refused, which was right, for a reason that was fiction.
+    #
+    #   garbage pandas raised its own DateParseError. send_order sits inside a broad
+    #           except so it degraded to a failed order, but _handle_rollover does not,
+    #           and there the exception left this function's vocabulary entirely.
+    #
+    # An empty day (None, "") keeps its old meaning — nothing to compare, stay silent.
+    try:
+        _parsed = pd.Timestamp(session_day) if session_day else None
+    except Exception as exc:
+        return (f"{inst}: the session day {session_day!r} cannot be read as a date "
+                f"({exc}). Which contract month this belongs to is unknown, and an "
+                f"order is not sent on an unknown month.")
+    if _parsed is not None and pd.isna(_parsed):
+        return (f"{inst}: the session day is not a date. Which contract month this "
+                f"belongs to is unknown, and an order is not sent on an unknown month.")
+
     session_front = _current_front_month(ibkr_sym, session_day)
     live_front = _current_front_month(ibkr_sym, now)
     if session_front is None or live_front is None or session_front == live_front:

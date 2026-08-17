@@ -1281,6 +1281,34 @@ def test_stp13h_a_real_fill_keeps_its_own_exit_date(tmp_path):
         f"would move an overnight stop onto the wrong trading day: {row}")
 
 
+def test_stp13i_a_close_row_records_which_contract_it_closed(tmp_path):
+    """The book learned which month it holds; the trade log never did.
+
+    C1 lived in the gap where nothing recorded a contract month, and the fix closed that
+    for live_positions.json only. trade_log.jsonl is the durable side — what the
+    statement reconcile reads, and what every rebuilt P&L figure comes from — and a
+    CLOSE row there still could not say which contract was sold. A roll left it
+    byte-identical to a trade that never rolled: the same blind spot by another door.
+
+    Measured before this test existed: the position held 202609 and the row wrote None.
+
+    Carried from the position, not recomputed from the calendar. On a roll date those
+    two disagree, and that disagreement is the whole reason the field exists.
+    """
+    log_path = tmp_path / "t.jsonl"
+    pos_file = _persisted(tmp_path)
+    rows = json.loads(pos_file.read_text(encoding="utf-8"))
+    rows["positions"][0]["contract_month"] = "202609"
+    pos_file.write_text(json.dumps(rows), encoding="utf-8")
+
+    runner = _runner_with(_FillReportingBroker({}, ACCOUNT), pos_file, log_path)
+    closes = _closes(log_path)
+    assert closes, "precondition: the stop-exit path must write a row"
+    assert closes[0].get("contract_month") == "202609", (
+        f"the row does not say which contract was closed, so nothing rebuilt from the "
+        f"trade log can tell a rolled position from a stranded one: {closes[0]}")
+
+
 def test_stp13g_a_stop_exit_records_the_money_it_booked(tmp_path):
     """PAPER_DASHBOARD_AUDIT C6, the half the schema fix did not close.
 

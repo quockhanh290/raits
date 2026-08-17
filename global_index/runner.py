@@ -82,7 +82,7 @@ STOP_FILE_NAME = "STOP_TRADING"
 # away order_id, perm_id and source — the fields that make a stop exit auditable.
 CLOSE_RECORD_FIELDS: frozenset = frozenset({
     "type", "inst", "cluster", "direction", "contracts",
-    "entry_day", "exit_day", "exit_day_estimated", "hold_days",
+    "entry_day", "exit_day", "exit_day_estimated", "hold_days", "contract_month",
     "exit_reason", "expected_stop", "fill_price", "fill_price_estimated",
     "filled_qty", "pnl_sized", "commission", "slip",
     "order_id", "perm_id", "status", "source", "retried", "regime",
@@ -1127,6 +1127,10 @@ class FuturesRunner:
                 # date read off the fill. Same contract as the flag above, for the other
                 # approximated column.
                 "exit_day_estimated": _exit_day_estimated,
+                # Which contract this closed. The book records it; the durable log did
+                # not, so a rolled position and a stranded one left identical rows —
+                # the C1 blind spot on the side that outlives the process.
+                "contract_month": pos.contract_month,
             })
             logger.info(
                 "B3 STP-VERIFY: recorded stop exit %s/%s @ %.4f (permId=%s) — "
@@ -1281,6 +1285,7 @@ class FuturesRunner:
                     "status": _f.status,
                     "retried": True,
                     "regime": self._last_regime,
+                    "contract_month": p.contract_month,
                 })
                 logger.info(
                     "_retry: CLOSE success %s/%s — exit_pending cleared", p.inst, p.cluster,
@@ -1366,6 +1371,7 @@ class FuturesRunner:
                     "status": _f.status,
                     "hold_days": hold,
                     "regime": self._last_regime,
+                    "contract_month": p.contract_month,
                 })
                 self.state.open_positions = [
                     x for x in self.state.open_positions if x is not p
@@ -1409,7 +1415,32 @@ class FuturesRunner:
             return  # MockBroker — rollover not applicable offline
 
         for pos in list(self.state.open_positions):
-            result = _roll_fn(pos.inst, day, pos.direction, pos.contracts, pos.cluster)
+            # One instrument per iteration, and one failure stays in its own iteration.
+            # Nothing caught a throw here: the only try in this loop wraps cancel_order,
+            # further down. So the first instrument that raised ended the loop, every
+            # position after it went un-rolled, and since run_day does not guard this
+            # call either, the whole session died — taking the exits of positions that
+            # had nothing to do with the failure.
+            #
+            # The M4 clock guard raises BY DESIGN, which is what made that reachable:
+            # refusing to roll one instrument must not refuse the rest of the day.
+            try:
+                result = _roll_fn(pos.inst, day, pos.direction, pos.contracts, pos.cluster)
+            except Exception as _roll_exc:
+                logger.critical(
+                    "C2: roll RAISED for %s/%s — position left in its current contract, "
+                    "other positions continue. %s",
+                    pos.inst, pos.cluster, _roll_exc,
+                )
+                self._emit_event(
+                    "CRITICAL", "ROLLOVER",
+                    f"C2: roll failed for {pos.inst}/{pos.cluster} — left on "
+                    f"{pos.contract_month or 'unknown month'}; check before its "
+                    f"contract expires. {_roll_exc}",
+                    {"inst": pos.inst, "cluster": pos.cluster,
+                     "contract_month": pos.contract_month, "error": str(_roll_exc)},
+                )
+                continue
             if result is None:
                 continue  # not a roll date for this instrument
 
@@ -1775,6 +1806,7 @@ class FuturesRunner:
                     "filled_qty": _f.filled_qty or p.contracts,
                     "status": _f.status,
                     "regime": self._last_regime,
+                    "contract_month": p.contract_month,
                 })
                 self._emit_event(
                     "INFO", "EXEC",
@@ -1913,6 +1945,7 @@ class FuturesRunner:
                     "filled_qty": _sd_close.filled_qty or n,
                     "status": _sd_close.status,
                     "regime": self._last_regime,
+                    "contract_month": _sd_open.contract_month,
                 })
 
         # H4: fold the broker's realised P&L into system equity after ALL closes

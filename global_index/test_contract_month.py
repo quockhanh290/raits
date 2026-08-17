@@ -222,6 +222,52 @@ def test_cm5_a_roll_moves_the_month_in_the_book(tmp_path):
         f"split is undetectable from the file, which is the C1 blind spot: {after[0]}")
 
 
+class _OneBadRollBroker(_MonthBroker):
+    """Rolls fine for MNQ, throws for MNKD — one instrument having a bad day."""
+
+    def _handle_rollover(self, inst, today, direction, contracts, cluster):
+        if inst == "MNKD":
+            raise RuntimeError("simulated: this instrument cannot be resolved today")
+        return (
+            Fill(inst, "CLOSE", direction, contracts, cluster, status="FILLED",
+                 avg_price=1.0, contract_month="202609"),
+            Fill(inst, "OPEN", direction, contracts, cluster, status="FILLED",
+                 avg_price=1.0, contract_month="202612"),
+        )
+
+
+def test_cm8_one_position_failing_to_roll_does_not_strand_the_others(tmp_path):
+    """The roll loop walks every open position and nothing caught a throw.
+
+    Measured on the source: the only try inside that loop wraps cancel_order; the roll
+    call itself has no Try anywhere in its ancestor chain. So the first instrument that
+    raises ends the loop, every position after it goes un-rolled, and because
+    _handle_rollover_if_needed is called from run_day without a guard either, the whole
+    session dies — including the exits of positions that had nothing to do with it.
+
+    The clock guard added for M4 raises by design, which is what made this reachable:
+    refusing to roll ONE instrument should not refuse the rest of the day.
+    """
+    broker = _OneBadRollBroker({}, ACCOUNT, month="202609")
+    runner = _runner(broker, tmp_path, DAY1, signal_fn=lambda d, b, h: ([], []))
+    runner.state.open_positions = [
+        OpenPos(inst="MNKD", direction="LONG", contracts=1, risk_dollars=500.0,
+                cluster=CLUSTER, entry_day=DAY1, contract_month="202609"),
+        OpenPos(inst="MNQ", direction="LONG", contracts=1, risk_dollars=500.0,
+                cluster="roska4_swing", entry_day=DAY1, contract_month="202609"),
+    ]
+
+    runner._handle_rollover_if_needed(ROLL_DAY)      # must not propagate
+
+    moved = {p.inst: p.contract_month for p in runner.state.open_positions}
+    assert moved.get("MNQ") == "202612", (
+        f"the healthy instrument never rolled because another one threw first: {moved}")
+    assert moved.get("MNKD") == "202609", (
+        f"the failing instrument must be left exactly as it was: {moved}")
+    assert any("ROLLOVER" in (e.get("category") or "") for e in runner._events), (
+        f"a position was skipped and nothing was emitted about it: {runner._events}")
+
+
 def test_cm7_every_filled_return_from_send_order_carries_the_month():
     """No fill path may forget it — including the partial one.
 

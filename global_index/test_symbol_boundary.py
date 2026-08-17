@@ -542,6 +542,43 @@ def test_sb18_every_fake_broker_matches_the_real_place_stop_signature():
         "does not get placed:\n  " + "\n  ".join(drifted))
 
 
+def test_sb19_an_unreadable_session_day_refuses_instead_of_guessing():
+    """Three outcomes, not two: agree, disagree, and cannot tell.
+
+    Measured on the previous behaviour:
+
+      * a not-a-date session day (pandas NaT) made the guard FIRE and name 202703 —
+        because the schedule walk compares date STRINGS, and every "2026-.." row sorts
+        below "NaT", so it fell through to the last row of the table. A refusal is the
+        right answer; naming a month nobody asked about is not, and an operator reading
+        that message would go looking for a March 2027 contract that has nothing to do
+        with anything;
+
+      * a malformed string raised pandas' own DateParseError. send_order happens to sit
+        inside a broad except, but _handle_rollover does not — so the exception left the
+        guard's own vocabulary and became an unhandled failure in a different layer.
+
+    Both now return a refusal in the guard's own terms. "Cannot tell" must land on the
+    same side as "disagree": do not send.
+    """
+    import pandas as pd
+    from global_index.ibkr_broker import session_month_conflict
+
+    nat = session_month_conflict("MES", pd.NaT)
+    assert nat is not None, "an unreadable session day must not read as agreement"
+    assert "202703" not in nat, (
+        f"the message names a month inferred from a string comparison against 'NaT'; "
+        f"it must say the day is unreadable, not invent a contract: {nat}")
+
+    bad = session_month_conflict("MES", "not-a-date")
+    assert bad is not None, "a malformed session day must not read as agreement"
+
+    # Control: the ordinary path is untouched, and still silent.
+    today = pd.Timestamp.now(tz="America/New_York").normalize().tz_localize(None)
+    assert session_month_conflict("MES", today) is None, (
+        "a real session day that matches the wall clock must still say nothing")
+
+
 def test_sb13_the_order_paths_actually_ask():
     """A detector nothing calls is H2 again — implemented end to end, wired nowhere.
 
