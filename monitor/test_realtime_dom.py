@@ -887,12 +887,46 @@ def test_guard_blocked_and_cap_rejected_signals_are_listed(realtime_server, brow
     assert browser_page.eval_on_selector("#decisionRejectedCount", "el => el.textContent") == "2"
 
 
+def test_a_closed_position_stops_raising_the_runner_only_incident(realtime_server, browser_page):
+    """Đo được 2026-08-17: cảnh báo đúng nội dung, sai thời điểm, sống 4 tiếng rưỡi.
+
+    MAX_HOLD lúc 09:31 đóng M2K, ghi live_positions.json rỗng, và KHÔNG xuất bản ảnh
+    chụp mới — `dump_state` chỉ chạy trong `run_day`. Cảnh báo lại đọc
+    `latestSnap().open_positions`, nên nó vẫn kể chuyện trước 09:31 cho tới slot 14:05.
+
+    Ba nguồn lúc đó: ảnh chụp 1 vị thế · live_positions.json 0 · IBKR 0. Hai nguồn nói
+    rỗng và cảnh báo dựng trên cái thứ ba.
+
+    Không phải cảnh báo vô hại: mức `incident`, và nội dung nói "logic bảo vệ sau đó có
+    thể dùng trạng thái vị thế cũ" — mô tả đúng một tình huống nguy hiểm, cho một tình
+    huống không tồn tại.
+
+    live_positions.json là nguồn được ghi bởi MỌI đường đóng vị thế, không riêng
+    `run_day`, nên nó là nguồn đúng cho câu "runner đang giữ gì NGAY BÂY GIỜ".
+    """
+    stub_api(browser_page, {
+        "/api/v1/broker": _broker([], []),                      # broker rỗng
+        "/api/v1/runner-state": _runner_positions(M2K_RUNNER),  # ảnh chụp còn cũ
+        "/api/v1/runner-positions": _persisted_runner_positions(),   # sổ đã rỗng
+    })
+    open_realtime(browser_page, realtime_server)
+    text = browser_page.eval_on_selector("#nowMonitorList", "el => el.innerText")
+    assert "runner-only position" not in text, (
+        f"vị thế đã đóng và ghi vào sổ, nhưng bảng vẫn báo runner đang giữ — cảnh báo "
+        f"đang đọc ảnh chụp thay vì sổ: {text[:300]}")
+
+
 def test_a_position_only_the_runner_believes_in_raises_an_incident(realtime_server, browser_page):
     """P2-B3. Chiều ngược lại: runner nghĩ đang giữ, broker không có. Mọi logic
-    bảo vệ chạy trên một trạng thái không tồn tại."""
+    bảo vệ chạy trên một trạng thái không tồn tại.
+
+    Đối chứng cho phép kiểm ngay trên: nếu cảnh báo bị tắt hẳn thay vì đổi nguồn, phép
+    kiểm kia vẫn xanh còn cái này đỏ.
+    """
     stub_api(browser_page, {
         "/api/v1/broker": _broker([], []),                    # broker rong
         "/api/v1/runner-state": _runner_positions(M2K_RUNNER),
+        "/api/v1/runner-positions": _persisted_runner_positions(M2K_RUNNER),
     })
     open_realtime(browser_page, realtime_server)
     text = browser_page.eval_on_selector("#nowMonitorList", "el => el.innerText")

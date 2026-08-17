@@ -213,7 +213,25 @@
   const orphanStops = () => stopOrders().filter(order =>
     !brokerPositions().some(pos => contractKey(pos.inst) === contractKey(order.inst))
   );
-  const runnerOnly = () => runnerPositions().filter(pos =>
+  // "What does the runner hold RIGHT NOW" — read off live_positions.json, not the
+  // snapshot.
+  //
+  // The snapshot is published by dump_state, which only runs inside run_day. The
+  // 09:31 max-hold exit and the stop-repair sweeps close positions in their own
+  // processes and write live_positions.json without republishing a snapshot, so
+  // between them and the next 14:05 slot the snapshot describes a book that no longer
+  // exists. Measured 2026-08-17: max-hold closed M2K at 09:31, the file went to zero
+  // positions and IBKR showed zero, and this raised a `runner-only position` INCIDENT
+  // for four and a half hours — saying protection logic may be running on stale state,
+  // about a position that had been closed on time.
+  //
+  // Only this check moves. runnersFor() stays on the snapshot because protectionSummary
+  // reads stop_deferred from it, and the persisted projection does not carry that field
+  // — swapping wholesale would count every deliberately deferred stop as naked, trading
+  // one false alarm for a worse one.
+  const persistedPositions = () => state.runnerPositions?.payload?.positions || [];
+  const persistedUsable = () => !!state.runnerPositions?.payload && !state.runnerPositions?.error;
+  const runnerOnly = () => (persistedUsable() ? persistedPositions() : []).filter(pos =>
     !brokerPositions().some(live => rootOf(live.inst) === rootOf(pos.inst) && brokerDirection(live.position) === String(pos.direction).toUpperCase())
   );
   const protectionSummary = () => brokerPositions().reduce((acc, pos) => {
@@ -742,6 +760,12 @@
         evidence: `${pos.inst} ${pos.direction} in runner / absent at broker`
       }));
     }
+
+    // The runner-only check above reads live_positions.json. If that file cannot be
+    // read the check finds nothing and stays quiet, which is indistinguishable from
+    // "the runner holds nothing" — the one reading that is certainly unearned. Say so
+    // instead, the same way every other missing input is reported here.
+    if (!persistedUsable()) gaps.push({ key: 'gap:runner-positions', status: 'unknown', component: 'runner', title: 'Persisted runner positions unreadable', problem: 'live_positions.json could not be read, so what the runner currently holds is unknown.', impact: 'A position the runner holds but the broker does not would not be reported; silence here is not evidence of agreement.', action: 'Restore the position file before treating broker/runner agreement as checked.', evidence: state.runnerPositions?.error || 'runner-positions payload missing' });
 
     if (!state.schedule?.evidence_available) gaps.push({ key: 'gap:scheduler', status: 'unknown', component: 'scheduler', title: 'Scheduler evidence unavailable', problem: 'The monitor cannot read enough scheduler evidence to classify expected slots.', impact: 'A missing or failed job cannot be distinguished from absent telemetry.', action: 'Restore scheduler log visibility; do not infer that scheduled jobs succeeded.', evidence: state.schedule?.error || 'schedule evidence unavailable' });
     if (!state.runner || state.runner.freshness === 'missing' || state.runner.freshness === 'unknown') gaps.push({ key: 'gap:runner', status: 'unknown', component: 'runner', title: 'Runner state unknown', problem: 'The latest runner observation cannot be classified as fresh or expected.', impact: 'Runner-derived decisions and intent cannot be treated as current.', action: 'Check runner-state publication and schedule evidence before drawing conclusions.', evidence: state.runner?.error || state.runner?.freshness || 'runner source missing' });
