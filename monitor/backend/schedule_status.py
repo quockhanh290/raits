@@ -4,6 +4,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 import threading
+import time
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -16,8 +17,28 @@ ET = ZoneInfo("America/New_York")
 _SCHEDULER_CMD = "global_index.run_scheduler"
 
 
-def _running_schedulers() -> list[dict[str, Any]]:
-    """Live run_scheduler processes as {pid, started_epoch}. Empty if psutil cannot say.
+def _is_scheduler_cmdline(argv: list[str] | tuple[str, ...] | None) -> bool:
+    """True only for a python process launched with `-m global_index.run_scheduler`.
+
+    Substring-matching the module name anywhere on a command line counts the wrong
+    things. Measured on the first version: five hits on a host running one scheduler —
+    shells grepping for the name, and the measurement script itself, whose own command
+    line contained the string. The header would have shown "Scheduler x5 RUNNING", the
+    duplicate-scheduler alarm, on a healthy box.
+    """
+    argv = list(argv or ())
+    if len(argv) < 3:
+        return False
+    if "python" not in Path(argv[0]).name.lower():
+        return False
+    try:
+        return argv[argv.index("-m") + 1] == _SCHEDULER_CMD
+    except (ValueError, IndexError):
+        return False
+
+
+def _scan_scheduler_processes() -> list[dict[str, Any]]:
+    """Enumerate live schedulers. ~1.8s on Windows — never call this on a request path.
 
     Read-only, like the rest of this backend: it enumerates, it never signals.
     """
@@ -28,13 +49,64 @@ def _running_schedulers() -> list[dict[str, Any]]:
     found = []
     for proc in psutil.process_iter(["pid", "cmdline", "create_time"]):
         try:
-            cmdline = " ".join(proc.info.get("cmdline") or ())
+            argv = proc.info.get("cmdline")
         except Exception:
             continue
-        if _SCHEDULER_CMD in cmdline:
+        if _is_scheduler_cmdline(argv):
             found.append({"pid": proc.info.get("pid"),
                           "started_epoch": proc.info.get("create_time")})
     return found
+
+
+# The cost is process_iter itself, not reading cmdline — filtering by name first was
+# measured at 1748ms against 1743ms, i.e. no help. So it gets cached instead.
+#
+# Shipped without this, /api/v1/schedule-status went from milliseconds to 23 SECONDS:
+# the dashboard polls every ~8s and the 1.8s scans piled up. The first read pays for
+# itself; after that a stale value is served immediately and refreshed in the
+# background, so no request ever waits. Serving stale is right here — a scheduler's age
+# does not need eight-second resolution, and a blank header would read as "DOWN".
+_PROC_TTL_SECONDS = 60.0
+_proc_cache: dict[str, Any] = {"at": 0.0, "value": None, "refreshing": False}
+_proc_lock = threading.Lock()
+
+
+def invalidate_scheduler_cache() -> None:
+    """Drop the cached scan. For tests, and for a caller that just restarted things."""
+    with _proc_lock:
+        _proc_cache.update(at=0.0, value=None, refreshing=False)
+
+
+def _refresh_scheduler_cache() -> None:
+    try:
+        scanned = _scan_scheduler_processes()
+    except Exception:
+        scanned = _proc_cache.get("value") or []
+    with _proc_lock:
+        _proc_cache.update(at=time.monotonic(), value=scanned, refreshing=False)
+
+
+def _running_schedulers() -> list[dict[str, Any]]:
+    with _proc_lock:
+        cached = _proc_cache["value"]
+        age = time.monotonic() - _proc_cache["at"]
+        if cached is not None and age < _PROC_TTL_SECONDS:
+            return cached
+        if cached is not None:
+            if _proc_cache["refreshing"]:
+                return cached
+            _proc_cache["refreshing"] = True
+            spawn = True
+        else:
+            spawn = False
+    if spawn:
+        # Stale but usable: hand it back now, replace it out of band.
+        threading.Thread(target=_refresh_scheduler_cache, daemon=True).start()
+        return cached
+    # Nothing cached at all. Pay once rather than report a false "DOWN".
+    _refresh_scheduler_cache()
+    with _proc_lock:
+        return _proc_cache["value"] or []
 
 
 def scheduler_process_state(

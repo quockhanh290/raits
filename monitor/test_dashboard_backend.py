@@ -1841,6 +1841,54 @@ def test_scheduler_age_is_reported_next_to_the_code_it_is_running(tmp_path):
         f"False here would say the running instance is up to date: {none}")
 
 
+def test_only_a_real_scheduler_counts_as_a_scheduler():
+    """Matching the module name anywhere on a command line counts the wrong things.
+
+    Measured right after shipping the first version: the scan returned five pids on a
+    box running one scheduler. The extras were shells and python one-liners that merely
+    MENTIONED the string — including the measurement script itself, whose own command
+    line contained it. The header would have shown "Scheduler x5 RUNNING" in red, which
+    is the duplicate-scheduler alarm, on a perfectly healthy host.
+
+    A real one is a python process launched with `-m global_index.run_scheduler`.
+    """
+    from monitor.backend.schedule_status import _is_scheduler_cmdline
+
+    assert _is_scheduler_cmdline(
+        ["pythonw.exe", "-m", "global_index.run_scheduler", "--port", "4002"]) is True
+
+    assert _is_scheduler_cmdline(
+        ["bash.exe", "-c", "grep global_index.run_scheduler ops.py"]) is False, (
+        "a shell grepping for the name is not a scheduler")
+    assert _is_scheduler_cmdline(
+        ["python", "-c", "CMD='global_index.run_scheduler'"]) is False, (
+        "a one-liner that merely mentions the module is not a scheduler")
+    assert _is_scheduler_cmdline(["pythonw.exe", "-m", "monitor.backend.app"]) is False
+    assert _is_scheduler_cmdline([]) is False
+
+
+def test_the_process_scan_is_not_run_on_every_poll(monkeypatch):
+    """The dashboard polls this endpoint every ~8s; the scan takes ~1.8s.
+
+    Shipped without a cache, it made /api/v1/schedule-status take 23 SECONDS — polls
+    piling on top of each other — and the dashboard became unusable. Measuring the cost
+    of a call before putting it on a hot path is the whole lesson here.
+    """
+    from monitor.backend import schedule_status as ss
+
+    calls = []
+    monkeypatch.setattr(ss, "_scan_scheduler_processes",
+                        lambda: (calls.append(1), [])[1])
+    ss.invalidate_scheduler_cache()
+
+    for _ in range(5):
+        ss.scheduler_process_state()
+
+    assert len(calls) == 1, (
+        f"the process table was enumerated {len(calls)} times for 5 reads; at ~1.8s a "
+        f"scan and a poll every 8s this is what made the page unusable")
+
+
 def test_scheduler_age_reaches_the_payload_and_the_page():
     """A reader nobody calls, or a field nothing renders, is H2 again.
 
