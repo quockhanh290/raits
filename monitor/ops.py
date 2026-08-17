@@ -138,6 +138,10 @@ SCHEDULER_PATTERN = r"global_index\.run_scheduler"
 # backends on 5001 and 5002 — different ports, same clientId=99, so a per-port check saw
 # nothing wrong while IBKR refused the second one.
 BACKEND_PATTERN = r"monitor[\\/]start_backend\.py|monitor\.backend\.app"
+# run_live_day children the scheduler spawned. Killing the scheduler does not take them
+# with it, and an orphan holds clientId=1 — the next slot then collides with a process
+# nobody is watching. Live 2026-08-06 had clientIds 1, 77, 82 and 93 on one account.
+RUNNER_PATTERN = r"global_index\.run_live_day"
 
 
 def scan_processes(pattern: str) -> ProcessScan:
@@ -181,9 +185,20 @@ def scan_processes(pattern: str) -> ProcessScan:
     ])
 
 
+def _age_seconds(started: str | None) -> int | None:
+    """Seconds since `started` ("yyyy-MM-dd HH:mm:ss" from Win32_Process), or None."""
+    try:
+        return int((dt.datetime.now()
+                    - dt.datetime.strptime(str(started), "%Y-%m-%d %H:%M:%S")).total_seconds())
+    except (TypeError, ValueError):
+        return None
+
+
 def scheduler_processes() -> list[dict[str, Any]]:
     scan = scan_processes(SCHEDULER_PATTERN)
-    return [{"pid": item.pid, "command": item.command} for item in scan.processes]
+    return [{"pid": item.pid, "command": item.command,
+             "started": item.started, "age_seconds": _age_seconds(item.started)}
+            for item in scan.processes]
 
 
 def _ops_log(message: str) -> None:
@@ -228,6 +243,53 @@ def stop_scheduler() -> list[int]:
         _taskkill(pids)
         time.sleep(1)
     return pids
+
+
+def stop_runners() -> list[int]:
+    """Kill any run_live_day the scheduler left behind. Returns the pids it killed.
+
+    Stopping the scheduler does not stop its children. An orphaned run_live_day keeps
+    clientId=1 open, so the freshly started scheduler's next slot meets a competitor it
+    has no record of.
+    """
+    scan = scan_processes(RUNNER_PATTERN)
+    if not scan.ok or not scan.pids:
+        return []
+    _taskkill(scan.pids)
+    time.sleep(1)
+    return scan.pids
+
+
+def _human_age(seconds: float | int | None) -> str:
+    if not seconds or seconds < 0:
+        return "unknown age"
+    seconds = int(seconds)
+    days, rem = divmod(seconds, 86_400)
+    hours, rem = divmod(rem, 3_600)
+    minutes = rem // 60
+    if days:
+        return f"{days}d{hours:02d}h"
+    if hours:
+        return f"{hours}h{minutes:02d}m"
+    return f"{minutes}m"
+
+
+def describe_scheduler_state(processes: list[dict[str, Any]]) -> str:
+    """One line saying the scheduler was NOT restarted, and how old it is.
+
+    Printing nothing here is what let 21 backend restarts read as full restarts while a
+    scheduler from three days earlier kept running a cron table that no longer matched
+    the code. Age is the number that exposes it.
+    """
+    if not processes:
+        return "scheduler=none running (nothing to leave alone)"
+    parts = []
+    for item in processes:
+        age = _human_age(item.get("age_seconds"))
+        started = item.get("started") or "unknown start"
+        parts.append(f"pid {item.get('pid')} started {started} ({age} ago)")
+    return ("scheduler=UNTOUCHED — " + "; ".join(parts)
+            + ". Use `restart` (or `up --restart-scheduler`) to replace it.")
 
 
 def _describe(scan: ProcessScan) -> str:
@@ -382,6 +444,12 @@ def cmd_up(args: argparse.Namespace) -> int:
     if args.restart_scheduler:
         if not ensure_single("scheduler", SCHEDULER_PATTERN, assume_yes=assume_yes):
             return 2
+        # Children outlive the parent. An orphaned run_live_day keeps clientId=1, so the
+        # scheduler we are about to start meets a competitor it has no record of.
+        orphans = stop_runners()
+        if orphans:
+            print(f"runner: stopped orphaned run_live_day {orphans}")
+            _ops_log(f"runner: stopped orphans {orphans}")
         scheduler_pid = start_scheduler(
             args.ibkr_port,
             shadow_resume=not args.no_shadow_resume,
@@ -401,7 +469,10 @@ def cmd_up(args: argparse.Namespace) -> int:
             _ops_log(f"scheduler: found duplicates {scan.pids} -> refuse")
             return 2
         if scan.processes:
-            print(f"scheduler=already running pid {scan.pids[0]}")
+            # Say the age, not just "running". A scheduler older than the cron it is
+            # meant to be running is invisible otherwise — that is exactly how the
+            # Sunday sweep went missing for a week.
+            print(describe_scheduler_state(scheduler_processes()))
         else:
             scheduler_pid = start_scheduler(
                 args.ibkr_port,
@@ -447,12 +518,18 @@ def build_parser() -> argparse.ArgumentParser:
     up.add_argument("--assume-preflight-ok", action="store_true", help="pass through run_scheduler --assume-preflight-ok")
     up.set_defaults(func=cmd_up)
 
-    restart = sub.add_parser("restart", help="replace backend; add --scheduler to also restart run_scheduler")
-    restart.add_argument("--scheduler", dest="restart_scheduler", action="store_true", help="also stop and restart run_scheduler")
+    # `restart` means restart. It used to default to backend-only, and the scheduler
+    # half was so quiet that 21 restarts over three days all left a scheduler running
+    # code from before the cron table changed. `up` keeps the safe behaviour.
+    restart = sub.add_parser("restart", help="replace scheduler, its run_live_day children, and backend")
+    restart.add_argument("--scheduler", dest="restart_scheduler", action="store_true",
+                         help="(default) stop and restart run_scheduler")
+    restart.add_argument("--no-scheduler", dest="restart_scheduler", action="store_false",
+                         help="leave a running scheduler alone; its age is printed instead")
     restart.add_argument("--no-shadow-resume", action="store_true", help="start scheduler without --shadow-resume")
     restart.add_argument("--yes", action="store_true", help="stop running instances without asking (for unattended runs)")
     restart.add_argument("--assume-preflight-ok", action="store_true", help="pass through run_scheduler --assume-preflight-ok")
-    restart.set_defaults(func=cmd_up, restart_scheduler=False, label="restart")
+    restart.set_defaults(func=cmd_up, restart_scheduler=True, label="restart")
 
     status = sub.add_parser("status", help="show scheduler/backend/API status")
     status.set_defaults(func=lambda args: (print_status(args.api_port), 0)[1])
