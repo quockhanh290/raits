@@ -1787,26 +1787,64 @@ def test_flex_reconcile_basis_is_absent_rather_than_asserted_with_no_lots():
 # logs. They are the anchor the refactor is held against: a self-referential comparison
 # (per-file merged vs per-file concatenated) would agree by construction and prove
 # nothing. Any of these moving means the split changed what the gates see.
-_PRE_REFACTOR_LOG_TRUTH = {
-    "cold_starts": 8,
-    "b3_match_episodes": 17,
-    "b3_mismatch_episodes": 1,
-    "b3_mismatch_positions_affected": 2,
-    "dropped_test_lines": 1160,
-    "tws_restart_lines": 4,
-    "manual_intervention_lines": 0,
-}
+# Counters that are a plain sum over files — no episode spans a seam, so splitting the
+# scan cannot change them. The b3_* fields are deliberately NOT here: episodes really do
+# cross file boundaries and get merged, which is what the next test pins.
+_ADDITIVE_LOG_FIELDS = (
+    "cold_starts",
+    "dropped_test_lines",
+    "tws_restart_lines",
+    "manual_intervention_lines",
+)
 
 
 def test_per_file_log_scan_reproduces_the_single_pass_numbers():
+    """The fold that turns N per-file partials into one summary must ADD, not replace.
+
+    This used to compare a live scan against a frozen dict captured when the refactor
+    landed — cold_starts: 8, dropped_test_lines: 1160, and so on. Those counts come from
+    the PRODUCTION logs, which grow, so it measured a moving target against a fixed post.
+    It went red on 2026-08-16 for the most ordinary reason available: the scheduler was
+    restarted, a required operation, and cold_starts became 9. Nothing was broken. That
+    is the "hardcoded literal drifts from what it describes" defect the dashboard audit
+    named, in its worst form — red on correct behaviour teaches people to ignore the suite.
+
+    The obvious replacement is a trap, and it was written and thrown away before this
+    one: comparing _log_summary_uncached against the sum of _scan_one_log over
+    _log_paths. Both sides are the same loop spelled twice and both read the same path
+    list, so injecting a duplicate file inflates BOTH and the assertion still holds. It
+    is the compare-a-value-with-itself shape. Verified: that version stayed green with a
+    file deliberately scanned twice.
+
+    What the split actually introduced is _merge_log_partial, so that is what gets
+    tested — on synthetic partials, where the expected answer is known independently of
+    any log on disk.
+    """
     import monitor.backend.paper_evidence_reader as pe
 
-    summary = pe._log_summary_uncached(ROOT, "2026-08-10")
-    for field, expected in _PRE_REFACTOR_LOG_TRUTH.items():
+    summary = pe._blank_log_summary()
+    for _ in range(3):
+        pe._merge_log_partial(summary, {
+            "cold_starts": 2,
+            "dropped_test_lines": 10,
+            "tws_restart_lines": 1,
+            "manual_intervention_lines": 0,
+            "tws_restart_days": {"2026-08-10"},
+            "_b3_episodes": [{"kind": "match"}],      # underscore: must be ignored
+        })
+
+    for field, expected in (("cold_starts", 6), ("dropped_test_lines", 30),
+                            ("tws_restart_lines", 3), ("manual_intervention_lines", 0)):
         assert summary[field] == expected, (
-            f"{field}: per-file scan gives {summary[field]!r}, "
-            f"single-pass gave {expected!r} before the split"
-        )
+            f"{field}: folding three partials gave {summary[field]!r}, expected "
+            f"{expected!r} — the merge is replacing instead of accumulating, which "
+            f"would silently report only the last file's counts")
+
+    assert summary["tws_restart_days"] == {"2026-08-10"}, (
+        f"set fields must union, not overwrite: {summary['tws_restart_days']!r}")
+    assert "_b3_episodes" not in summary, (
+        "underscore keys are per-file scratch and must not leak into the summary; "
+        "episodes are merged separately because they cross file seams")
 
 
 def test_the_seam_merge_is_load_bearing_not_defensive():
