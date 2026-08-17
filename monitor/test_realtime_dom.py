@@ -664,8 +664,27 @@ def _known_debt_job(index: int) -> dict:
     }
 
 
-def test_job_journal_groups_repeated_known_debt_rows(realtime_server, browser_page):
-    """L3: repeated known-debt executions should not crowd out distinct job rows."""
+def test_job_journal_shows_one_row_per_execution(realtime_server, browser_page):
+    """Every execution gets its own row, however many share a debt.
+
+    This used to assert the opposite: more than three known-debt runs collapsed to the
+    newest one plus a summary line. That was L3's remedy for repeated debt crowding out
+    distinct jobs, and the operator rejected it after seeing what it cost:
+
+      * the header counts jobs.length and the list did not, so it read "14 jobs" above
+        two rows with nothing on the page reconciling them — the night's slots looked
+        lost rather than folded;
+      * the summary printed the FULL debt count while one of those rows was already
+        rendered above it, so two shown plus thirteen remaining came to fifteen out of
+        fourteen;
+      * and it named one cause, "G2 model age", for a status the backend assigns purely
+        on "the child exited OK but logged an error" — nothing in the code checked that
+        the cause matched, so the first debt from a different diagnostic would have been
+        filed under a cause that was not its own, and hidden behind it.
+
+    Both assertions below are discriminating: bringing the collapse back turns five rows
+    into two AND puts the summary text back, so either one alone would catch it.
+    """
     journal = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/job-journal/"]))
     journal["jobs"] = [_known_debt_job(index) for index in range(5)]
     assert journal["jobs"], "test must exercise a non-empty job list"
@@ -673,9 +692,16 @@ def test_job_journal_groups_repeated_known_debt_rows(realtime_server, browser_pa
     open_realtime(browser_page, realtime_server)
     rows = browser_page.eval_on_selector_all("#journal > li", "els => els.map(el => el.innerText)")
     assert rows, "journal rendered no rows"
-    joined = "\n".join(rows).lower()
-    assert len(rows) == 2
-    assert "5 slots completed with the same known debt" in joined
+    joined = "\n".join(rows)
+
+    assert len(rows) == 5, (
+        f"five executions must produce five rows; a collapsed list hides runs the "
+        f"header still counts. got {len(rows)}")
+    assert "completed with the same known debt" not in joined.lower(), (
+        "the summary line is back, which means rows are being hidden behind it again")
+    for index in range(5):
+        assert f"LIVE_DAY_14{index * 5:02d}" in joined, (
+            f"execution LIVE_DAY_14{index * 5:02d} has no row of its own")
 
 
 def test_open_issues_stay_expanded_on_mobile(realtime_server, browser_page):

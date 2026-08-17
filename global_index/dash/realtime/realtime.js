@@ -80,6 +80,20 @@
     const parsed = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(text) ? Date.parse(text) : etInstant(text);
     return Number.isNaN(parsed) ? 0 : parsed;
   };
+  // Today's calendar day in ET, read off the SERVER's clock when we have it.
+  //
+  // The zone conversion is safe from anywhere — Intl does that correctly whatever the
+  // viewer's timezone. What is not safe is assuming the viewer's clock reads the same
+  // INSTANT as the machine writing the scheduler log, and the comment above etInstant
+  // already flags that the two stop being one machine the day this is served over the
+  // LAN. server_now is in the broker payload on every poll and costs nothing extra, so
+  // it is the anchor; the browser clock is only the fallback for the first poll, before
+  // any payload has arrived.
+  const etToday = () => {
+    const stamped = Date.parse(state.broker?.server_now || '');
+    const instant = Number.isNaN(stamped) ? new Date() : new Date(stamped);
+    return new Intl.DateTimeFormat('en-CA', { timeZone: ET_ZONE }).format(instant);
+  };
   const CLOCK_ZONES = [
     { label: 'JST', zone: 'Asia/Tokyo' },
     { label: 'HAN', zone: 'Asia/Ho_Chi_Minh' },
@@ -240,23 +254,40 @@
     else state.openIssues = { ...(state.openIssues || {}), issues: [], error: results[3].reason?.message || 'open-issues request failed' };
     if (results[4].status === 'fulfilled') state.runnerPositions = results[4].value;
     else state.runnerPositions = { ...(state.runnerPositions || {}), payload: null, error: results[4].reason?.message || 'runner-positions request failed' };
+    // TWO days, not one. Session events and execution quality belong to a trading
+    // SESSION; scheduled jobs belong to a CALENDAR day, and the two part company
+    // exactly when it matters most.
+    //
+    // Both used to be anchored on the latest snapshot's date, and snapshots are only
+    // written by run_live_day. So on any day the runner does not hold a session there
+    // is no snapshot, the anchor does not move, and the job panel keeps showing the
+    // previous trading day. That is not a weekend inconvenience:
+    //
+    //   * the Sunday 18:30 ET stop sweep is filed under a Sunday, and no snapshot ever
+    //     bears a Sunday date, so it could never have appeared here at all;
+    //   * and when the 13:45 pre-flight fails, both skip branches return before
+    //     launching the child — no run_live_day, no snapshot. The day the whole
+    //     session is skipped is the day the panel silently shows yesterday, while the
+    //     SKIPPED rows that explain it sit under a date nothing asks for. That has
+    //     happened twice already (2026-08-03, 2026-08-04).
+    //
+    // allSettled per endpoint rather than one Promise.all: the job journal must not go
+    // blank because a session-scoped request failed, which is the same independence
+    // the two days above are about.
     const sessionDay = latestSnap()?.date;
+    const journalDay = etToday();
+    const journalResults = await Promise.allSettled([
+      fetchJson(`/api/v1/job-journal/${encodeURIComponent(journalDay)}`),
+      sessionDay ? fetchJson(`/api/v1/session-events/${encodeURIComponent(sessionDay)}`) : Promise.resolve(undefined),
+      sessionDay ? fetchJson(`/api/v1/execution-quality/${encodeURIComponent(sessionDay)}`) : Promise.resolve(undefined)
+    ]);
+    if (journalResults[0].status === 'fulfilled') state.jobJournal = journalResults[0].value;
+    else state.jobJournal = { source: 'scheduler_log', day: journalDay, jobs: [], monitor_events: [], error: journalResults[0].reason?.message || 'job-journal request failed' };
     if (sessionDay) {
-      try {
-        const [sessionEvents, jobJournal, executionQuality] = await Promise.all([
-          fetchJson(`/api/v1/session-events/${encodeURIComponent(sessionDay)}`),
-          fetchJson(`/api/v1/job-journal/${encodeURIComponent(sessionDay)}`),
-          fetchJson(`/api/v1/execution-quality/${encodeURIComponent(sessionDay)}`)
-            .catch(error => ({ source: 'trade_log.jsonl', day: sessionDay, fills: [], exceptions: [], error: error?.message || 'execution-quality request failed' }))
-        ]);
-        state.sessionEvents = sessionEvents;
-        state.jobJournal = jobJournal;
-        state.executionQuality = executionQuality;
-      } catch (error) {
-        state.sessionEvents = { source: 'live_log', day: sessionDay, events: [], error: error?.message || 'session-events request failed' };
-        state.jobJournal = { source: 'scheduler_log', day: sessionDay, jobs: [], monitor_events: [], error: error?.message || 'job-journal request failed' };
-        state.executionQuality = { source: 'trade_log.jsonl', day: sessionDay, fills: [], exceptions: [], error: error?.message || 'execution-quality request failed' };
-      }
+      if (journalResults[1].status === 'fulfilled') state.sessionEvents = journalResults[1].value;
+      else state.sessionEvents = { source: 'live_log', day: sessionDay, events: [], error: journalResults[1].reason?.message || 'session-events request failed' };
+      if (journalResults[2].status === 'fulfilled') state.executionQuality = journalResults[2].value;
+      else state.executionQuality = { source: 'trade_log.jsonl', day: sessionDay, fills: [], exceptions: [], error: journalResults[2].reason?.message || 'execution-quality request failed' };
     }
     $('fatalBanner').hidden = results.some(result => result.status === 'fulfilled');
     render();
@@ -1411,9 +1442,13 @@
   function renderJobJournal(snap) {
     const jobs = journalJobs();
     if (state.selectedJobId && !jobs.some(job => job.id === state.selectedJobId)) state.selectedJobId = null;
-    $('journalSource').textContent = snap?.date
-      ? `${state.jobJournal?.jobs?.length || 0} jobs / ${snap.date}`
-      : 'session unavailable';
+    // The day is read back off the payload rather than from the session snapshot, so
+    // the label always names the day the rows actually came from. Taking it from the
+    // snapshot is how the header came to read "14 jobs / 2026-08-17" while the rows
+    // underneath belonged to a different anchor entirely.
+    $('journalSource').textContent = state.jobJournal?.day
+      ? `${jobs.length} jobs / ${state.jobJournal.day}`
+      : 'scheduler evidence unavailable';
     $('journalSource').dataset.tooltip = `Scheduler evidence observed ${etDateTime(state.jobJournal?.observed_at)}. One row per execution; click a job to inspect its operational evidence.`;
     const jobRows = jobs.map(job => {
       const selected = job.id === state.selectedJobId;
