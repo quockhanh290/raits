@@ -65,6 +65,116 @@ def _reconciles(left: Any, right: Any) -> bool:
     return a is not None and b is not None and abs(a - b) < 0.005
 
 
+# How much of the contract calendar has to remain before it is worth saying so.
+#
+# Chosen by the operator, not derived — two weeks. The reasoning is written down so the
+# next person can move it deliberately rather than by feel.
+#
+# Two weeks is comfortable because the deadline it counts down to is NOT a cliff. The
+# last row of the table still rolls the system onto its terminal month, and that month
+# is tradeable for its own full quarter afterwards: the current table ends 2026-12-04
+# on the Nikkei leg and hands over to 202703, which does not expire until March. So the
+# warning lands roughly three and a half months before anything can actually fail, and
+# the fourteen days are only the margin on the SCHEDULED work, not on the failure.
+#
+# The work itself is small — four rows. What it has to allow for is the check before the
+# edit: the micro Nikkei carries far fewer forward months than the full-size contract
+# (2 against 15, measured 2026-08-14), so the next month may simply not be listed, and
+# that is a design question rather than data entry. Two weeks is enough to discover that
+# and still have the terminal month's own quarter to resolve it in.
+#
+# An earlier draft of mine argued for 120 days, on the grounds that maintenance should
+# match the quarterly roll cadence. That reasoning was wrong twice over: it sized the
+# warning to the rhythm of the thing being watched rather than to the time needed to
+# act, and it ignored the grace period above. It also would have fired on the day it was
+# written — choosing the number to fit the answer instead of the job.
+ROLL_SCHEDULE_MIN_RUNWAY_DAYS = 14
+
+
+def _roll_schedule_runway_issues(observed_at: str) -> list[dict[str, Any]]:
+    """Warn while the contract calendar can still be extended in time.
+
+    ROLL_SCHEDULE is a hand-maintained table of roll dates. When it runs out nothing
+    raises: `_current_front_month` keeps returning the final row's month forever, so the
+    system goes on addressing a contract that will eventually be expired, and then every
+    order fails at once — months later, with nothing having said a word.
+
+    Measured: asking the table for 2028-06-01 today still answers 202703.
+
+    Keyed on days until the LAST roll date rather than on the table being empty. Empty
+    only becomes true once the final roll has already happened, and a warning that fires
+    after the fact is a report.
+    """
+    # Fail closed. Returning [] here would take the warning away whenever the table
+    # cannot be read at all, and a panel with nothing on it reads as a healthy table —
+    # the one interpretation that is certainly wrong. Same rule the re-freeze flag
+    # follows: unreadable reports pending, not OK.
+    try:
+        from global_index.ibkr_broker import ROLL_SCHEDULE
+    except Exception as exc:
+        return [_issue(
+            key="roll_schedule:unreadable", status="unknown", component="runner",
+            title="Contract roll calendar could not be read",
+            problem=f"The roll table could not be loaded ({exc}), so how much of the "
+                    f"contract calendar remains is unknown.",
+            first_seen=observed_at, last_seen=observed_at, occurrences=1,
+            impact="The runway check did not run. An exhausted table would look exactly "
+                   "like this one does.",
+            action="Restore the import and confirm the table still has roll dates ahead.",
+            resolution="The table loads again and reports its remaining runway.",
+            evidence=f"import global_index.ibkr_broker failed: {exc!r}",
+        )]
+
+    today = dt.datetime.now(ET).date()
+    worst: tuple[int, str, str, str] | None = None
+    for symbol, rows in sorted(ROLL_SCHEDULE.items()):
+        if not rows:
+            continue
+        last_date, _front, terminal = rows[-1]
+        try:
+            remaining = (dt.date.fromisoformat(last_date) - today).days
+        except ValueError:
+            continue
+        if worst is None or remaining < worst[0]:
+            worst = (remaining, symbol, last_date, terminal)
+
+    if worst is None or worst[0] > ROLL_SCHEDULE_MIN_RUNWAY_DAYS:
+        return []
+
+    remaining, symbol, last_date, terminal = worst
+    ran_out = remaining < 0
+    return [_issue(
+        key="roll_schedule:runway",
+        status="incident" if ran_out else "unknown",
+        component="runner",
+        title=("Contract roll calendar has run out" if ran_out
+               else "Contract roll calendar is running out"),
+        problem=(
+            f"{symbol} has no scheduled roll after {last_date}, which was "
+            f"{abs(remaining)} day(s) ago. Every order now addresses {terminal} and "
+            f"nothing will move it again."
+            if ran_out else
+            f"{symbol}'s last scheduled roll is {last_date}, {remaining} day(s) away. "
+            f"After it the table is exhausted and {terminal} becomes the permanent "
+            f"answer to 'which month'."
+        ),
+        first_seen=observed_at, last_seen=observed_at, occurrences=1,
+        impact=(
+            "Nothing fails today. When the terminal month expires the contract stops "
+            "resolving and every order, stop and bar request fails together, with no "
+            "earlier signal — the table going quiet is not an error condition anywhere."
+        ),
+        action=(
+            f"Extend ROLL_SCHEDULE past {last_date}. Confirm first that the exchange "
+            f"lists the months being added: the micro Nikkei carries far fewer forward "
+            f"months than the full-size contract, so the next row may not be tradeable."
+        ),
+        resolution="A roll date beyond the threshold exists in the table again.",
+        evidence=f"ROLL_SCHEDULE[{symbol!r}] ends {last_date} -> {terminal}; "
+                 f"{remaining} day(s) of runway, threshold {ROLL_SCHEDULE_MIN_RUNWAY_DAYS}.",
+    )]
+
+
 def _paper_reconciliation_issues(root: Path, observed_at: str) -> list[dict[str, Any]]:
     path = root / "monitor" / "paper_pnl_compare.json"
     if not path.exists():
@@ -298,6 +408,7 @@ def _build(paths: list[Path]) -> dict[str, Any]:
     priority = {"incident": 0, "unknown": 1, "known_debt": 2}
     observed_at = _iso(stamped_lines[-1][0])
     issues.extend(_paper_reconciliation_issues(paths[0].parent, observed_at))
+    issues.extend(_roll_schedule_runway_issues(observed_at))
     issues.sort(key=lambda item: (priority[item["status"]], item["first_seen"]))
     return {
         "source": "scheduler_logs", "observed_at": observed_at,
@@ -317,6 +428,20 @@ def read_open_issues(root: Path) -> dict[str, Any]:
     if paper_compare.exists():
         signature_paths.append(paper_compare)
     signature = tuple((str(path.resolve()), path.stat().st_mtime_ns, path.stat().st_size) for path in signature_paths)
+    # The roll-schedule runway is a function of the DATE, not of any file here. Keyed on
+    # file signatures alone the answer is computed once and then frozen, so on a quiet
+    # weekend — no log written, nothing to invalidate — the day the table crossed the
+    # threshold would pass without the panel ever recomputing it. The schedule itself is
+    # part of the key too, so extending the table clears the warning on the next poll
+    # rather than at the next log write.
+    try:
+        from global_index.ibkr_broker import ROLL_SCHEDULE
+        table_key = str(sorted((sym, rows[-1][0]) for sym, rows in ROLL_SCHEDULE.items() if rows))
+    except Exception as exc:
+        # Not fatal here — the runway check reports the unreadable table as its own
+        # issue. Raising would 500 the whole panel over one missing input.
+        table_key = f"unreadable:{exc!r}"
+    signature = signature + ((str(dt.datetime.now(ET).date()), table_key),)
     with _lock:
         cached = _cache.get(signature)
         if cached is None:

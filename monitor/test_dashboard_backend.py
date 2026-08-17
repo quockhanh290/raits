@@ -3421,6 +3421,133 @@ def test_open_issues_include_known_debt_and_unrecovered_job(tmp_path: Path):
     assert "job:stop_repair:missed" in keys
 
 
+def _roll_table_ending_in(days: int) -> dict:
+    """A roll schedule whose LAST roll date is `days` from today, in ET.
+
+    Built from today rather than written down, so this test cannot expire the way the
+    two-clock test did — that one pinned 2026-09-04 and went red on the Nikkei roll
+    date, the one day its subject mattered.
+    """
+    import pandas as pd
+    today = pd.Timestamp.now(tz="America/New_York").normalize().tz_localize(None)
+    last = today + pd.Timedelta(days=days)
+    earlier = last - pd.Timedelta(days=91)
+    return {"MES": [(str(earlier.date()), "202609", "202612"),
+                    (str(last.date()), "202612", "202703")]}
+
+
+def test_open_issues_warn_before_the_roll_table_runs_out(tmp_path: Path, monkeypatch):
+    """The contract calendar is maintained by hand and nothing watches how much is left.
+
+    When the table runs out, `_current_front_month` does not fail — it keeps returning
+    the final month forever, so the system trades a contract that will one day be
+    expired and every order starts failing at once, months later, with no warning
+    anywhere. Measured: asking for 2028-06-01 today still answers 202703.
+
+    Warns on days remaining rather than on the table being empty, because "empty" only
+    becomes true after the last roll has already happened, which is too late to be a
+    warning.
+    """
+    from global_index import ibkr_broker
+    from monitor.backend import open_issue_reader
+
+    (tmp_path / "scheduler_0811.log").write_text(
+        "2026-08-11 23:10:00 INFO run_scheduler - [NKD_NIGHT_0110] python -m global_index.run_live_day\n",
+        encoding="utf-8",
+    )
+
+    def keys_for(days: int) -> set[str]:
+        monkeypatch.setattr(ibkr_broker, "ROLL_SCHEDULE", _roll_table_ending_in(days))
+        open_issue_reader._cache.clear()
+        return {issue["key"] for issue in read_open_issues(tmp_path)["issues"]}
+
+    KEY = "roll_schedule:runway"
+    # Self-check: the reader must produce SOMETHING here, or both branches below pass
+    # for the reason that nothing is being evaluated at all.
+    assert read_open_issues(tmp_path)["issues"] is not None
+
+    assert KEY not in keys_for(365), (
+        "a table with a year of roll dates left must stay quiet, or the warning is "
+        "noise the operator learns to ignore")
+    assert KEY in keys_for(10), (
+        "ten days from the last scheduled roll and nothing says so; the table is "
+        "extended by hand and only a warning can prompt it")
+
+    monkeypatch.setattr(ibkr_broker, "ROLL_SCHEDULE", _roll_table_ending_in(10))
+    open_issue_reader._cache.clear()
+    issue = next(i for i in read_open_issues(tmp_path)["issues"] if i["key"] == KEY)
+    assert "MES" in issue["evidence"], f"the warning must name the instrument: {issue}"
+    assert "202703" in issue["evidence"], (
+        f"and the month it would be stuck on, which is what an operator has to check "
+        f"is still listed: {issue}")
+
+
+def test_open_issues_say_so_when_the_runway_cannot_be_read(tmp_path: Path, monkeypatch):
+    """A check that cannot run must not read as a check that passed.
+
+    The reader imports ROLL_SCHEDULE inside a try. Returning [] on failure means a
+    broken import — a bad environment, a renamed table — takes the warning away and
+    leaves the panel looking clean, which is the one reading that is certainly wrong.
+    Same rule the re-freeze flag already follows: unreadable reports pending.
+
+    Found by a measurement tool of mine that patched the datetime module globally,
+    broke pyarrow, and so broke the import this function depends on — the warning went
+    silent and the tool reported "no issue" as though that were an answer.
+    """
+    import builtins
+    from monitor.backend import open_issue_reader
+
+    (tmp_path / "scheduler_0811.log").write_text(
+        "2026-08-11 23:10:00 INFO run_scheduler - [NKD_NIGHT_0110] python -m global_index.run_live_day\n",
+        encoding="utf-8",
+    )
+    real_import = builtins.__import__
+
+    def blow_up(name, *args, **kwargs):
+        if name == "global_index.ibkr_broker":
+            raise ImportError("simulated broken environment")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", blow_up)
+    open_issue_reader._cache.clear()
+    issues = open_issue_reader._roll_schedule_runway_issues("2026-08-17T00:00:00Z")
+
+    assert issues, (
+        "the roll table could not be read and the panel says nothing at all, which is "
+        "indistinguishable from a healthy table")
+    issue = issues[0]
+    assert issue["status"] == "unknown", (
+        f"an unreadable check is not a passing one, and not an incident either: {issue}")
+    assert "roll_schedule" in issue["key"], f"unexpected key: {issue}"
+
+
+def test_open_issues_runway_warning_is_not_frozen_by_the_log_cache(tmp_path: Path, monkeypatch):
+    """The runway depends on the DATE; the reader caches on log file signatures.
+
+    Without the date in the cache key the warning is computed once and then frozen: on
+    a quiet weekend no log changes, so the day the table crossed the threshold would
+    pass without the panel ever recomputing it.
+    """
+    from global_index import ibkr_broker
+    from monitor.backend import open_issue_reader
+
+    (tmp_path / "scheduler_0811.log").write_text(
+        "2026-08-11 23:10:00 INFO run_scheduler - [NKD_NIGHT_0110] python -m global_index.run_live_day\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(ibkr_broker, "ROLL_SCHEDULE", _roll_table_ending_in(365))
+    open_issue_reader._cache.clear()
+    quiet = {i["key"] for i in read_open_issues(tmp_path)["issues"]}
+    assert "roll_schedule:runway" not in quiet, "precondition: a long table must be quiet"
+
+    # Same files, untouched. Only the schedule moved — which is what a passing day does.
+    monkeypatch.setattr(ibkr_broker, "ROLL_SCHEDULE", _roll_table_ending_in(10))
+    loud = {i["key"] for i in read_open_issues(tmp_path)["issues"]}
+    assert "roll_schedule:runway" in loud, (
+        "the cache served a stale answer across a change that no log file records, so "
+        "the warning would never fire on a quiet day")
+
+
 def test_open_issues_do_not_double_count_g2_wrapper_as_exit_zero_debt(tmp_path: Path):
     (tmp_path / "scheduler_0811.log").write_text(
         "2026-08-11 23:10:00 INFO run_scheduler - [NKD_NIGHT_0110] python -m global_index.run_live_day\n"
