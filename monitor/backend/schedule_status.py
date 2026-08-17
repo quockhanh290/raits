@@ -12,6 +12,84 @@ from global_index.session_report import _is_test_line, _to_et
 from raits.live.trading_calendar import is_trading_day
 
 ET = ZoneInfo("America/New_York")
+
+_SCHEDULER_CMD = "global_index.run_scheduler"
+
+
+def _running_schedulers() -> list[dict[str, Any]]:
+    """Live run_scheduler processes as {pid, started_epoch}. Empty if psutil cannot say.
+
+    Read-only, like the rest of this backend: it enumerates, it never signals.
+    """
+    try:
+        import psutil
+    except ImportError:
+        return []
+    found = []
+    for proc in psutil.process_iter(["pid", "cmdline", "create_time"]):
+        try:
+            cmdline = " ".join(proc.info.get("cmdline") or ())
+        except Exception:
+            continue
+        if _SCHEDULER_CMD in cmdline:
+            found.append({"pid": proc.info.get("pid"),
+                          "started_epoch": proc.info.get("create_time")})
+    return found
+
+
+def scheduler_process_state(
+    *,
+    code_path: Path | None = None,
+    processes: list[dict[str, Any]] | None = None,
+    now_epoch: float | None = None,
+) -> dict[str, Any]:
+    """How old the running scheduler is, and whether it predates its own source.
+
+    Age on its own says nothing — a scheduler up for three days is healthy if nothing
+    changed. The failure on 2026-08-16 needed the comparison: the process started
+    13/8 04:30 while its cron table was rewritten 15/8 01:10, so the Sunday sweep
+    committed that day did not exist in the running instance. Twenty-one restarts went
+    past without anyone noticing, because every signal on screen said "running".
+
+    `stale_code` is None when nothing is running. Nothing running is a different
+    problem, and answering False there would assert that the live instance is current.
+    """
+    import os as _os
+
+    code = Path(code_path) if code_path else (
+        Path(__file__).resolve().parents[2] / "global_index" / "run_scheduler.py")
+    now = float(now_epoch) if now_epoch is not None else dt.datetime.now().timestamp()
+    procs = _running_schedulers() if processes is None else processes
+
+    try:
+        code_mtime = _os.path.getmtime(code)
+    except OSError:
+        code_mtime = None
+
+    if not procs:
+        return {"running": False, "pid": None, "started_at": None, "age_seconds": None,
+                "code_mtime": _iso_epoch(code_mtime), "stale_code": None,
+                "process_count": 0}
+
+    # Oldest wins: with duplicates, the stale one is the dangerous one.
+    oldest = min(procs, key=lambda p: p.get("started_epoch") or 0)
+    started = oldest.get("started_epoch")
+    return {
+        "running": True,
+        "pid": oldest.get("pid"),
+        "started_at": _iso_epoch(started),
+        "age_seconds": int(now - started) if started else None,
+        "code_mtime": _iso_epoch(code_mtime),
+        "stale_code": (bool(started < code_mtime)
+                       if started and code_mtime else None),
+        "process_count": len(procs),
+    }
+
+
+def _iso_epoch(value: float | None) -> str | None:
+    if not value:
+        return None
+    return dt.datetime.fromtimestamp(value, tz=dt.timezone.utc).astimezone(ET).isoformat(timespec="seconds")
 _LOG_TS = re.compile(r"^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})\s+(\w+)")
 
 R4_SLOTS = [(14, 5)] + [(14, minute) for minute in range(10, 60, 5)] + [
@@ -359,4 +437,8 @@ def get_schedule_status(
         "incidents": incidents,
         "open_incidents": open_incidents,
         "unexplained_overdue": overdue_unexplained,
+        # Age of the process, and whether it predates the cron table it is running.
+        # Every other field here describes what the scheduler DID; this one describes
+        # whether the scheduler on the box is the one the repo currently defines.
+        "scheduler_process": scheduler_process_state(),
     }

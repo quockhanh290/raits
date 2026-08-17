@@ -4,6 +4,7 @@ import ast
 import datetime as dt
 import inspect
 import json
+import os
 import re
 from pathlib import Path
 
@@ -1796,6 +1797,71 @@ _ADDITIVE_LOG_FIELDS = (
     "tws_restart_lines",
     "manual_intervention_lines",
 )
+
+
+def _fake_proc(pid, started_epoch):
+    return {"pid": pid, "started_epoch": started_epoch}
+
+
+def test_scheduler_age_is_reported_next_to_the_code_it_is_running(tmp_path):
+    """Age alone does not mean anything; age against the code's mtime does.
+
+    A scheduler up for three days is perfectly healthy if nothing changed. The failure
+    on 2026-08-16 was narrower and invisible: the process started 13/8 04:30 and the
+    cron table it runs was rewritten 15/8 01:10, so the Sunday sweep committed that day
+    did not exist in the running instance. Twenty-one restarts went by without anyone
+    seeing it, because everything that was displayed said "running".
+
+    So the dashboard needs the comparison, not the number: is this process older than
+    the file it is executing.
+    """
+    from monitor.backend.schedule_status import scheduler_process_state
+
+    code = tmp_path / "run_scheduler.py"
+    code.write_text("# cron", encoding="utf-8")
+    os.utime(code, (1_000_000, 1_000_000))
+
+    stale = scheduler_process_state(
+        code_path=code, processes=[_fake_proc(29340, 900_000)], now_epoch=1_300_000)
+    assert stale["running"] is True and stale["pid"] == 29340
+    assert stale["stale_code"] is True, (
+        "process started before its own source was last written and nothing said so — "
+        f"this is the 2026-08-16 failure: {stale}")
+    assert stale["age_seconds"] == 400_000
+
+    fresh = scheduler_process_state(
+        code_path=code, processes=[_fake_proc(35448, 1_200_000)], now_epoch=1_300_000)
+    assert fresh["stale_code"] is False, (
+        f"started after the last edit — must not cry wolf: {fresh}")
+
+    none = scheduler_process_state(code_path=code, processes=[], now_epoch=1_300_000)
+    assert none["running"] is False
+    assert none["stale_code"] is None, (
+        "nothing running is a different problem from running stale code; reporting "
+        f"False here would say the running instance is up to date: {none}")
+
+
+def test_scheduler_age_reaches_the_payload_and_the_page():
+    """A reader nobody calls, or a field nothing renders, is H2 again.
+
+    The runner audit's worst operational finding was a kill switch implemented end to
+    end that no caller ever passed. This is the same risk in the monitor: computing the
+    scheduler's age correctly is useless if it stops at the API boundary.
+    """
+    from monitor.backend.schedule_status import get_schedule_status
+
+    payload = get_schedule_status(ROOT)
+    assert "scheduler_process" in payload, (
+        f"the reader exists but the endpoint does not carry it: {sorted(payload)}")
+    for field in ("running", "age_seconds", "stale_code"):
+        assert field in payload["scheduler_process"], (
+            f"{field} missing from the payload block: {payload['scheduler_process']}")
+
+    page = (ROOT / "global_index" / "dash" / "realtime" / "realtime.js").read_text(
+        encoding="utf-8")
+    assert "scheduler_process" in page, (
+        "nothing in realtime.js reads scheduler_process — the number reaches the API "
+        "and dies there, which is exactly how a three-day-old scheduler stayed invisible")
 
 
 def test_per_file_log_scan_reproduces_the_single_pass_numbers():

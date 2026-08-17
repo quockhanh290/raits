@@ -307,6 +307,32 @@
     $('runnerContext').textContent = runnerFreshnessText(rf, state.runner?.expected_next_at, state.runner?.age_seconds);
     $('runnerContext').className = ['stale', 'late', 'missing'].includes(rf) ? 'negative'
       : rf === 'unknown' ? 'warning' : '';
+    // Scheduler age, and the only reading of it that means anything: is this process
+    // older than the cron table it is running. Measured 2026-08-16 — the scheduler had
+    // been up since 13/8 while its cron was rewritten 15/8, so the Sunday sweep
+    // committed that day did not exist in the running instance. Twenty-one restarts
+    // went past unnoticed because every indicator said "running".
+    const sp = state.schedule?.scheduler_process;
+    const spEl = $('schedulerContext');
+    if (spEl) {
+      if (!sp) {
+        spEl.textContent = 'Scheduler unknown';
+        spEl.className = 'warning';
+      } else if (!sp.running) {
+        spEl.textContent = 'Scheduler DOWN';
+        spEl.className = 'negative';
+      } else if (sp.process_count > 1) {
+        // Two schedulers fire every slot twice and both write live_positions.json.
+        spEl.textContent = `Scheduler ×${sp.process_count} RUNNING`;
+        spEl.className = 'negative';
+      } else if (sp.stale_code) {
+        spEl.textContent = `Scheduler ${age(sp.age_seconds)} · RUNNING OLD CRON`;
+        spEl.className = 'negative';
+      } else {
+        spEl.textContent = `Scheduler up ${age(sp.age_seconds)}`;
+        spEl.className = '';
+      }
+    }
     const connected = state.broker?.connected;
     const usable = brokerUsable();
     $('brokerContext').textContent = state.broker
