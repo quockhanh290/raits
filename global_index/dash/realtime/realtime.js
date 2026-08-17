@@ -1391,21 +1391,31 @@
     </div>`;
   }
 
+  // One row per execution, always. The collapse that used to live here hid every
+  // known-debt run but the newest whenever more than three shared a debt, and replaced
+  // them with a single summary line. It cost more than it saved:
+  //
+  //   * the header counts state.jobJournal.jobs.length, so it read "14 jobs" above a
+  //     list of two, with nothing on the page reconciling the two numbers. The night's
+  //     slots looked lost rather than folded;
+  //   * the summary said `debtJobs.length` while one of those rows was already being
+  //     rendered directly above it — 2 shown plus 13 "remaining" against a total of 14,
+  //     a count that cannot be right whichever way it is read;
+  //   * and it named ONE cause, "G2 model age", for a status the backend assigns purely
+  //     on "the child exited OK but logged an error" (DEBT_EXIT_TOKENS). Tonight all
+  //     thirteen genuinely were G2, but nothing checked that, so the first debt from a
+  //     different diagnostic would be filed under a cause that is not its own — and
+  //     hidden behind it.
+  //
+  // The tooltip has promised "one row per execution" all along; now it is true.
   function renderJobJournal(snap) {
     const jobs = journalJobs();
-    const debtJobs = jobs.filter(job => jobPresentation(job).status === 'known_debt');
-    const shownJobs = debtJobs.length > 3
-      ? [...jobs.filter(job => jobPresentation(job).status !== 'known_debt'), debtJobs[0]]
-      : jobs;
-    const debtSummary = debtJobs.length > 3
-      ? `<li class="job-row tone-cleanup status-known_debt"><div class="journal-message">${debtJobs.length} slots completed with the same known debt (G2 model age)</div></li>`
-      : '';
     if (state.selectedJobId && !jobs.some(job => job.id === state.selectedJobId)) state.selectedJobId = null;
     $('journalSource').textContent = snap?.date
       ? `${state.jobJournal?.jobs?.length || 0} jobs / ${snap.date}`
       : 'session unavailable';
     $('journalSource').dataset.tooltip = `Scheduler evidence observed ${etDateTime(state.jobJournal?.observed_at)}. One row per execution; click a job to inspect its operational evidence.`;
-    const jobRows = shownJobs.map(job => {
+    const jobRows = jobs.map(job => {
       const selected = job.id === state.selectedJobId;
       const presentation = jobPresentation(job);
       const tone = presentation.status === 'recovered' ? 'success' : presentation.status === 'known_debt' ? 'cleanup' : jobTone(job.status);
@@ -1417,7 +1427,7 @@
         </button>${selected ? renderJobDetails(job, snap, presentation) : ''}
       </li>`;
     }).join('');
-    $('journal').innerHTML = (jobRows + debtSummary) || '<li><div class="journal-message">No scheduler jobs observed for this session.</div></li>';
+    $('journal').innerHTML = jobRows || '<li><div class="journal-message">No scheduler jobs observed for this session.</div></li>';
     document.querySelectorAll('.job-trigger').forEach(button => button.addEventListener('click', () => {
       state.selectedJobId = state.selectedJobId === button.dataset.jobId ? null : button.dataset.jobId;
       renderJournal(snap);
