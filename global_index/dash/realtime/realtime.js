@@ -312,6 +312,18 @@
     // been up since 13/8 while its cron was rewritten 15/8, so the Sunday sweep
     // committed that day did not exist in the running instance. Twenty-one restarts
     // went past unnoticed because every indicator said "running".
+    // age() renders everything above an hour as "84.0h ago", and the case this
+    // indicator exists for is a scheduler that has been up for DAYS. 84 hours does not
+    // read as "three days" at a glance, which is the only glance this gets.
+    const uptime = seconds => {
+      if (seconds == null) return 'unknown age';
+      const d = Math.floor(seconds / 86400);
+      const h = Math.floor((seconds % 86400) / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      if (d) return `${d}d${String(h).padStart(2, '0')}h`;
+      if (h) return `${h}h${String(m).padStart(2, '0')}m`;
+      return `${m}m`;
+    };
     const sp = state.schedule?.scheduler_process;
     const spEl = $('schedulerContext');
     if (spEl) {
@@ -326,10 +338,10 @@
         spEl.textContent = `Scheduler ×${sp.process_count} RUNNING`;
         spEl.className = 'negative';
       } else if (sp.stale_code) {
-        spEl.textContent = `Scheduler ${age(sp.age_seconds)} · RUNNING OLD CRON`;
+        spEl.textContent = `Scheduler ${uptime(sp.age_seconds)} old · RUNNING OLD CRON`;
         spEl.className = 'negative';
       } else {
-        spEl.textContent = `Scheduler up ${age(sp.age_seconds)}`;
+        spEl.textContent = `Scheduler up ${uptime(sp.age_seconds)}`;
         spEl.className = '';
       }
     }
