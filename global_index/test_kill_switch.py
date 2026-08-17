@@ -78,6 +78,42 @@ def test_entry_point_wires_the_kill_switch(name):
     )
 
 
+@pytest.mark.parametrize("name", ENTRY_POINTS)
+def test_entry_point_wires_the_trade_log(name):
+    """Every path that can book money must have somewhere to write the row.
+
+    H4 found close paths that moved the sleeve ledger and wrote nothing to
+    trade_log.jsonl, and was closed at 0/6 — correctly, for runner.py: all six booking
+    sites call _append_trade. But _append_trade_raw opens with
+
+        if self._trade_log_path is None: return
+
+    and two of the three entry points never passed one, so the write was a silent no-op
+    at the call site while the mechanism above it looked complete.
+
+    Measured live 2026-08-17: the 09:31 max-hold exit closed M2K, moved system equity
+    50228.75 -> 50408.25, emptied the position file, and left trade_log.jsonl untouched
+    since 08-11. Reproduced offline both ways — no path: 0 rows; with a path: one CLOSE
+    carrying exit_reason=MAX_HOLD and its pnl. $179.50 the ledger knows and the trade
+    log does not, so Today's Decision, the performance stats, the equity curve and the
+    exit-path gate all read a day with no exit in it.
+
+    Same shape as the stop_path check above, and the same lesson from the other side:
+    the previous pass verified the six booking sites and never asked whether the entry
+    point handed them anywhere to write.
+    """
+    path = Path(__file__).resolve().parent / name
+    kwargs = _runner_call_kwargs(path)
+
+    assert kwargs is not None, (
+        f"{name}: no FuturesRunner(...) call found. The test is blind, not satisfied.")
+    assert "trade_log_path" in kwargs, (
+        f"{name} builds a FuturesRunner without trade_log_path, so every _append_trade "
+        f"on this path returns without writing. The money still moves; nothing records "
+        f"it. Passed kwargs: {sorted(kwargs)}"
+    )
+
+
 # ── the other half: does the runner honour the switch once it is wired? ──────────
 
 def _guard():

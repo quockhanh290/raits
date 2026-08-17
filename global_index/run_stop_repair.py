@@ -137,6 +137,12 @@ def main() -> int:
             signal_fn=lambda d, b, h: ([], []),    # rỗng: không entry, không exit
             breaker=CircuitBreaker(account=ACCOUNT),
             positions_path=pos_path,
+            # Job này không vào/ra lệnh, nhưng B3 chạy trong __init__ và ĐƯỢC PHÉP ghi
+            # sổ: khi nó thấy một stop đã khớp, `_record_stop_exit` book tiền và ghi
+            # dòng CLOSE. Thiếu đường dẫn thì `_append_trade_raw` trả về ngay, nên lượt
+            # quét vẫn chuyển tiền vào sổ vốn mà không để lại dòng nào — cùng lỗ hổng
+            # vừa đo được ở max-hold ngày 2026-08-17.
+            trade_log_path=str(_CWD / "trade_log.jsonl"),
             stop_path=a.stop_path,        # D5 — see RUNNER_AUDIT.md H2
             # today/now truyền tường minh: runner sẽ tự đọc đồng hồ nếu thiếu, và hai khái
             # niệm "hôm nay" trong một lần chạy là cách cửa sổ hoãn bị tính sai.

@@ -119,6 +119,11 @@ def main():
             signal_fn=lambda d, b, h: ([], []),
             breaker=CircuitBreaker(account=ACCOUNT),
             positions_path=pos_path,
+            # Without this every _append_trade on this path returns without writing:
+            # the exit books its P&L into the sleeve ledger and leaves no row behind.
+            # Measured 2026-08-17 — M2K closed here, equity 50228.75 -> 50408.25, and
+            # trade_log.jsonl untouched, so the day read as having no exit at all.
+            trade_log_path=str(_CWD / "trade_log.jsonl"),
             stop_path=a.stop_path,        # D5 — see RUNNER_AUDIT.md H2
             # B4 runs inside __init__, so this job is what places a deferred STP —
             # 09:31 ET the morning after entry, not the 14:05 slot. Pass the session
