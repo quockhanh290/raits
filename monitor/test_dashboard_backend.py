@@ -6,6 +6,7 @@ import inspect
 import json
 import os
 import re
+import types
 from pathlib import Path
 
 import pytest
@@ -786,6 +787,49 @@ def test_contract_spec_guard_covers_specs_not_just_basket():
     assert "for inst in BASKET:" not in source, (
         "_read_contract_specs must query SPECS too, or MNKD is never asked about"
     )
+
+
+def test_contract_specs_do_not_publish_two_meanings_under_one_name():
+    """`contract_month` must mean the same thing here as it does in the book.
+
+    IBKR answers lastTradeDateOrContractMonth with a full DATE — measured live
+    2026-08-17: 20260918 for the Rổ 4 micros, 20260910 for the Nikkei leg. The runner
+    normalises that to YYYYMM before it reaches live_positions.json, so the book says
+    202609. This reader published the raw 8-digit value under the SAME key, and the two
+    surfaces then disagreed on screen about a value neither of them was wrong about.
+
+    That is the defect Fill.__post_init__ was written to prevent — "the book must not
+    carry two spellings of one month" — closed on one producer and left open on the
+    other.
+
+    The date is not thrown away: it is the expiry, which is the most useful thing a
+    contract-spec row can show, so it keeps its own name.
+    """
+    from monitor.backend import ibkr_reader
+
+    class _Detail:
+        def __init__(self):
+            self.contract = types.SimpleNamespace(
+                symbol="MES", localSymbol="MESU6", exchange="CME", conId=1,
+                multiplier="5", lastTradeDateOrContractMonth="20260918")
+            self.minTick = 0.25
+
+    class _IB:
+        def reqContractDetails(self, _c):
+            return [_Detail()]
+
+    fake_ibi = types.SimpleNamespace(
+        Future=lambda *a, **k: types.SimpleNamespace(**k))
+    specs = ibkr_reader._read_contract_specs(_IB(), fake_ibi)
+    assert specs, "the reader returned nothing — the locator is broken, not satisfied"
+    row = next(iter(specs.values()))
+    assert row.get("status") == "OBSERVED", f"unexpected row: {row}"
+
+    assert row.get("contract_month") == "202609", (
+        f"the dashboard publishes a different spelling of the month than the book, "
+        f"under the same key: {row.get('contract_month')!r}")
+    assert row.get("last_trade_date") == "20260918", (
+        f"the expiry is the useful half of that value and must not be lost: {row}")
 
 
 def test_paper_evidence_contract_spec_guard_reconciles_ibkr_cache(monkeypatch, tmp_path: Path):

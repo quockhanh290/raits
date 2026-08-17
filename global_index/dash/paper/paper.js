@@ -2045,7 +2045,7 @@
       const cls = row.status === 'PASS' ? 'ok' : row.status === 'BREACH' ? 'bad' : 'watch';
       const checks = row.checks || {};
       const checkText = ['point_value', 'tick', 'tick_value'].map(key => `${key}:${checks[key] ? 'OK' : 'CHECK'}`).join(' | ');
-      return `<tr><td><b>${esc(row.inst || '--')}</b><small>basket symbol</small></td><td><b>point ${fmtPrice(local.point_value)}</b><small>tick ${fmtPrice(local.tick)} | tick value ${fmtMoney(local.tick_value)}</small></td><td><b>point ${fmtPrice(ibkr.point_value)}</b><small>tick ${fmtPrice(ibkr.tick)} | tick value ${fmtMoney(ibkr.tick_value)}</small></td><td><b>${esc(contract.local_symbol || contract.symbol || '--')}</b><small>${esc(contract.exchange || '--')} ${esc(contract.contract_month || '--')} conId ${esc(contract.con_id || '--')}</small></td><td><span class="fill-result ${cls}">${esc(row.status || '--')}</span><small>${esc(ibkr.error || checkText)}</small></td></tr>`;
+      return `<tr><td><b>${esc(row.inst || '--')}</b><small>basket symbol</small></td><td><b>point ${fmtPrice(local.point_value)}</b><small>tick ${fmtPrice(local.tick)} | tick value ${fmtMoney(local.tick_value)}</small></td><td><b>point ${fmtPrice(ibkr.point_value)}</b><small>tick ${fmtPrice(ibkr.tick)} | tick value ${fmtMoney(ibkr.tick_value)}</small></td><td><b>${esc(contract.local_symbol || contract.symbol || '--')}</b><small>${esc(contract.exchange || '--')} ${esc(contract.last_trade_date || contract.contract_month || '--')} conId ${esc(contract.con_id || '--')}</small></td><td><span class="fill-result ${cls}">${esc(row.status || '--')}</span><small>${esc(ibkr.error || checkText)}</small></td></tr>`;
     }).join('')}</tbody></table></div>`;
   }
 

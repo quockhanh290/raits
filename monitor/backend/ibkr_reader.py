@@ -204,6 +204,16 @@ def _read_contract_specs(ib: Any, ibi: Any) -> dict[str, dict[str, Any]]:
     except Exception:
         SPECS = {}
 
+    def _contract_month(value):
+        """YYYYMM, the vocabulary the book speaks.
+
+        Same rule as Fill.__post_init__, deliberately not imported from it: that one
+        normalises what a BROKER FILL reports, this one what reqContractDetails
+        reports, and the day the two need to diverge, sharing a helper would hide it.
+        Both are three lines and both say why.
+        """
+        return value[:6] if isinstance(value, str) and len(value) > 6 and value.isdigit() else value
+
     specs: dict[str, dict[str, Any]] = {}
     for inst in {**BASKET, **SPECS}:
         try:
@@ -230,7 +240,19 @@ def _read_contract_specs(ib: Any, ibi: Any) -> dict[str, dict[str, Any]]:
                 "local_symbol": getattr(c, "localSymbol", None),
                 "exchange": getattr(c, "exchange", exchange),
                 "con_id": getattr(c, "conId", None),
-                "contract_month": getattr(c, "lastTradeDateOrContractMonth", month),
+                # Two values, two names. IBKR answers with a full DATE — measured live
+                # 2026-08-17: 20260918 for the Rổ 4 micros, 20260910 for the Nikkei leg
+                # — while the runner normalises to YYYYMM before anything reaches
+                # live_positions.json. Publishing the raw date under `contract_month`
+                # put two spellings of one month on the same page under one key, which
+                # is the defect Fill.__post_init__ exists to prevent, closed on one
+                # producer and left open on the other.
+                #
+                # The date is not dropped: it is the expiry, and on a contract-spec row
+                # that is the most useful thing there is. It just gets its own name.
+                "contract_month": _contract_month(
+                    getattr(c, "lastTradeDateOrContractMonth", month)),
+                "last_trade_date": getattr(c, "lastTradeDateOrContractMonth", None),
                 "point_value": point_value,
                 "tick": tick,
                 "tick_value": round(point_value * tick, 6) if point_value is not None and tick is not None else None,
