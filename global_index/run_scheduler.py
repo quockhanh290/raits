@@ -375,13 +375,31 @@ def heartbeat_gap(prev, now) -> "float | None":
 _skip_warned: set = set()
 
 
-def _flex_to_date(today: _date) -> str:
-    """Ngày cuối cùng xin được từ IBKR khi job 22:20 ET chạy vào `today`.
+# Bao nhiêu ngày lịch sử xin về mỗi đêm.
+#
+# Phải phủ hết mốc bắt đầu kỳ giấy, vì bảng đối chiếu tính lại từ đó. 180 ngày là rộng
+# gấp nhiều lần tuổi kỳ hiện tại và mới bằng nửa trần 366 ngày của IBKR. Nếu kỳ giấy có
+# lúc nào già hơn ngần này thì thiếu hụt sẽ HIỆN RA chứ không im: bản kê mang theo
+# `flex_coverage`, và bảng in thẳng "Flex covers through <ngày>".
+_FLEX_LOOKBACK_DAYS = 180
 
-    Hàm riêng để kiểm được bằng phép tính chứ không bằng cách đọc mã nguồn: câu hỏi
-    "job có bao giờ xin phiên hôm nay không" phải trả lời được bằng một con số.
+
+def _flex_dates(today: _date) -> tuple[str, str]:
+    """Khoảng ngày cho lần kéo đêm nay: (từ, đến), cả hai dạng yyyyMMdd.
+
+    Trả về CẢ HAI, không chỉ ngày cuối. Bản đầu chỉ truyền `--to-date`, và IBKR từ chối
+    thẳng: `code=1023 Date range invalid. From date and to date required`. Tôi đã thử
+    ba dạng — cả hai ngày, một ngày đơn lẻ lặp lại, và không ngày nào — nhưng chưa bao
+    giờ thử đúng dạng mình đem đặt vào lịch. Phép kiểm đi kèm khi đó soi mã nguồn nên
+    nó ghim luôn cái dạng sai.
+
+    Ngày cuối là HÔM QUA: sổ của IBKR cho phiên đang chạy chưa tồn tại vào lúc job chạy
+    — đo ngày 2026-08-18, gọi lúc 00:05 ET vẫn `code=1004`, còn xin tới hôm trước thì về
+    bình thường.
     """
-    return (today - _timedelta(days=1)).strftime("%Y%m%d")
+    end = today - _timedelta(days=1)
+    start = end - _timedelta(days=_FLEX_LOOKBACK_DAYS)
+    return start.strftime("%Y%m%d"), end.strftime("%Y%m%d")
 
 
 def _et_today():
@@ -1039,8 +1057,9 @@ def make_scheduler(port: int, dry_run: bool,
             # Chưa chứng minh: liệu IBKR có luôn xong phiên D-1 trước 22:20 ET ngày D
             # hay không. Mới có một quan sát thành công. Nếu hụt, `flex_pull` sẽ nói
             # code 1004 chứ không im, và dời khung chạy muộn hơn là cách chữa.
+            _flex_from, _flex_to = _flex_dates(_et_today())
             if not _run([sys.executable, "-m", "monitor.flex_pull",
-                         "--to-date", _flex_to_date(_et_today())],
+                         "--from-date", _flex_from, "--to-date", _flex_to],
                         label="FLEX_PULL", dry_run=dry_run):
                 log.warning("[FLEX_PULL] that bai — van dung sao ke cu; doi chieu P&L "
                             "se tinh tren du lieu broker cu")

@@ -312,36 +312,46 @@ def test_paper_evidence_refresh_runs_after_the_report():
     assert "monitor.paper_pnl_compare" in src and "monitor.flex_pull" in src
 
 
-def test_flex_is_never_asked_for_a_session_ibkr_has_not_closed():
-    """Đêm 2026-08-17 job hỏng vì thiếu biến môi trường. Sửa biến xong nó vẫn hỏng.
+def test_flex_is_asked_for_a_range_ibkr_will_accept(monkeypatch, tmp_path: Path):
+    """Hai luật của IBKR, và bản đầu của tôi vi phạm cái thứ hai mà không hay.
 
-    Chạy đúng câu lệnh của scheduler lúc 00:05 ET ngày 18 — hơn 6 tiếng sau giờ đóng
-    cửa, gần 2 tiếng sau khung 22:20 — IBKR trả `code=1004 Statement is incomplete at
-    this time`. Cùng lúc đó, xin tới hôm trước thì về 35KB bình thường. Khoảng ngày mặc
-    định của Flex Query bao gồm phiên đang chạy, mà sổ của phiên đó chưa tồn tại.
+    Một: đừng xin phiên đang chạy. Đo 2026-08-18, gọi lúc 00:05 ET — hơn 6 tiếng sau giờ
+    đóng cửa và gần 2 tiếng sau khung 22:20 — vẫn `code=1004 Statement is incomplete`;
+    xin tới hôm trước thì về 35KB bình thường.
 
-    Nên độ trễ một phiên ở phía broker là bản chất chứ không phải lựa chọn, và nó phải
-    được ghim bằng phép tính: hàm không bao giờ được trả về chính ngày đang chạy.
+    Hai: đưa CẢ HAI ngày. `--to-date` một mình bị từ chối thẳng bằng `code=1023 Date
+    range invalid. From date and to date required`. Tôi đã thử ba dạng khác nhau nhưng
+    chưa bao giờ thử đúng dạng đem đặt vào lịch, và phép kiểm khi đó soi mã nguồn nên nó
+    ghim luôn cái dạng sai.
+
+    Nên ghim bằng phép tính, và ghim cả hai luật cùng lúc.
     """
     from datetime import date, timedelta
 
-    from global_index.run_scheduler import _flex_to_date
+    from global_index.run_scheduler import _FLEX_LOOKBACK_DAYS, _flex_dates
 
-    assert _flex_to_date(date(2026, 8, 17)) == "20260816"
-    # Quét cả năm: không một ngày nào được xin tới chính nó. Một hằng số viết cứng hay
-    # một phép trừ nhầm dấu đều phải đỏ ở đây.
+    start, end = _flex_dates(date(2026, 8, 18))
+    assert (start, end) == ("20260218", "20260817")
+
     d = date(2026, 1, 1)
     while d < date(2027, 1, 1):
-        got = _flex_to_date(d)
-        assert got != d.strftime("%Y%m%d"), f"xin phien dang chay: {d}"
-        assert got == (d - timedelta(days=1)).strftime("%Y%m%d"), f"sai o {d}"
+        start, end = _flex_dates(d)
+        assert len(start) == len(end) == 8 and start.isdigit() and end.isdigit()
+        assert end == (d - timedelta(days=1)).strftime("%Y%m%d"), f"xin phien dang chay: {d}"
+        assert start < end, f"khoang nguoc dau o {d}"
+        span = (date.fromisoformat(f"{end[:4]}-{end[4:6]}-{end[6:]}")
+                - date.fromisoformat(f"{start[:4]}-{start[4:6]}-{start[6:]}")).days
+        assert span <= 366, f"vuot tran 366 ngay cua IBKR o {d}: {span}"
         d += timedelta(days=1)
+
+    # Cửa sổ phải phủ được mốc bắt đầu kỳ giấy, nếu không bảng đối chiếu mất dữ liệu
+    # broker cho chính những lệnh nó đang so.
+    assert _FLEX_LOOKBACK_DAYS >= 90
 
     src = (_GI / "run_scheduler.py").read_text(encoding="utf-8")
     body = src[src.index("def _refresh_paper_evidence()"):src.index("def _emit_report(")]
-    assert '"--to-date", _flex_to_date(' in body, (
-        "job khong con truyen --to-date — no se roi ve khoang mac dinh cua query, "
-        "tuc lai xin ca phien hom nay")
+    assert '"--from-date", _flex_from, "--to-date", _flex_to' in body, (
+        "job khong con truyen ca hai ngay — IBKR se tra code=1023")
 
 
 def test_the_refresh_never_breaks_the_trading_day():
