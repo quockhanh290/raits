@@ -303,3 +303,109 @@ def test_a_status_chip_carries_its_state_in_the_letters(skin_server, skin_page):
         assert chip["text"], f"chip không có chữ, trạng thái chỉ mã hoá bằng màu: {chip}"
         assert chip["border"] != chip["color"], (
             f"chip tô viền cùng màu chữ, thành một khối màu: {chip}")
+
+
+# ── Luật được viết ra ≠ luật có tác dụng ──────────────────────────────────────
+# Shorthand không đọc lại được tin cậy qua `getPropertyValue`, nên quy về longhand.
+_LONGHAND = {
+    "border": ("border-top-width", "border-top-color"),
+    "border-left": ("border-left-width", "border-left-color"),
+    "border-bottom": ("border-bottom-width", "border-bottom-color"),
+    "background": ("background-color", "background-image"),
+    "flex": ("flex-grow", "flex-basis"),
+}
+
+
+def _component_rules() -> list[tuple[str, tuple[str, ...]]]:
+    """(danh sách selector, các thuộc tính được khai báo) cho từng luật."""
+    text = (DASH / "shared" / "components.css").read_text(encoding="utf-8")
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    rules = []
+    for selectors, body in re.findall(r"([^{}]+)\{([^{}]*)\}", text):
+        props: list[str] = []
+        for decl in body.split(";"):
+            name = decl.split(":")[0].strip().lower()
+            if not name:
+                continue
+            props.extend(_LONGHAND.get(name, (name,)))
+        if props:
+            rules.append((selectors.strip(), tuple(dict.fromkeys(props))))
+    return rules
+
+
+_FINGERPRINT = """
+([selector, props]) => {
+  const pseudo = selector.includes('::') ? '::' + selector.split('::')[1].trim() : null;
+  const base = pseudo ? selector.split('::')[0].trim() : selector;
+  const els = [...document.querySelectorAll(base)]
+    .filter(e => e.getBoundingClientRect().width > 0);
+  if (!els.length) return null;
+  const cs = getComputedStyle(els[0], pseudo);
+  return props.map(p => p + '=' + cs.getPropertyValue(p)).join(' | ');
+}
+"""
+
+
+def test_every_rule_in_the_shared_sheet_actually_wins(skin_server, skin_page):
+    """Một luật CSS không áp được thì im lặng — trang trông y hệt lúc chưa có nó.
+
+    Ca thật, hai lần trong cùng một lượt dựng. (1) Luật chip trỏ vào
+    `.gate-state`, nhưng `paper.css` tô trạng thái qua `.gate-state.pass` —
+    specificity cao hơn, luật mới thua sạch. (2) Luật tab viết
+    `input:checked + label`, trong khi bốn `<input>` nằm TRƯỚC `.paper-tab-nav`
+    chứ không kề nhãn nào. Cả hai lần trang vẫn dựng, không lỗi console, và một
+    ảnh chụp nhìn qua vẫn thấy "đã đổi" — vì các luật KHÁC trong cùng file thì
+    áp được.
+
+    Test này bật/tắt chính stylesheet đó và bắt trang phải đổi. Selector nào
+    không có phần tử nào trên payload hiện tại thì báo là CHƯA xác minh được,
+    chứ không đếm là đạt.
+    """
+    rules = _component_rules()
+    assert len(rules) >= 5, f"chỉ đọc được {len(rules)} luật — bộ phân tích hỏng"
+
+    page = skin_page
+    page.goto(f"{skin_server}/paper", wait_until="domcontentloaded")
+    page.wait_for_selector(".blocker-card", timeout=90_000)
+    page.wait_for_timeout(800)
+
+    toggle = """(off) => {
+      const s = [...document.styleSheets].find(x => (x.href||'').includes('components.css'));
+      if (!s) return 'KHÔNG-NẠP';
+      s.disabled = off; return s.disabled;
+    }"""
+    assert page.evaluate(toggle, False) != "KHÔNG-NẠP", "/paper không nạp components.css"
+
+    tabs = page.eval_on_selector_all(
+        ".paper-tab-nav label", "els => els.map(e => e.textContent.trim())")
+    assert tabs, "không thấy tab nào — test sẽ đạt trên một trang rỗng"
+
+    verdict: dict[str, str] = {}
+    for index in range(len(tabs)):
+        page.eval_on_selector_all(
+            ".paper-tab-nav label", "(els, i) => els[i] && els[i].click()", index)
+        page.wait_for_timeout(400)
+        for selectors, props in rules:
+            if verdict.get(selectors) == "áp được":
+                continue
+            for selector in (s.strip() for s in selectors.split(",")):
+                page.evaluate(toggle, True)
+                before = page.evaluate(_FINGERPRINT, [selector, list(props)])
+                page.evaluate(toggle, False)
+                after = page.evaluate(_FINGERPRINT, [selector, list(props)])
+                if after is None:
+                    verdict.setdefault(selectors, "không có phần tử nào")
+                elif before != after:
+                    verdict[selectors] = "áp được"
+                    break
+                else:
+                    verdict[selectors] = f"KHÔNG ĐỔI GÌ ({selector}: {after})"
+
+    inert = {k: v for k, v in verdict.items() if v.startswith("KHÔNG ĐỔI")}
+    assert not inert, "luật có phần tử để áp mà không đổi được gì:\n" + "\n".join(
+        f"  {k}\n    {v}" for k, v in inert.items())
+
+    applied = [k for k, v in verdict.items() if v == "áp được"]
+    assert len(applied) >= 5, (
+        f"chỉ {len(applied)}/{len(rules)} luật chứng minh được là có tác dụng; "
+        f"phần còn lại: { {k: v for k, v in verdict.items() if v != 'áp được'} }")

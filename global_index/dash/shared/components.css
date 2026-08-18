@@ -1,0 +1,86 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   components.css — /paper mượn từ vựng hình dạng của /realtime
+
+   `tokens.css` mang bảng màu; file này mang HÌNH DẠNG. Hai trang có cùng các họ
+   thành phần, chỉ khác tên lớp — nên ánh xạ bằng luật alias, không đổi markup
+   (103 tên lớp của paper được sinh trong paper.js).
+
+     .status-rail          ->  .readiness
+     .journal-view-toggle  ->  .paper-tab-nav
+     .open-issue-detail    ->  .blocker-card và các panel cùng vai
+     .section-heading      ->  .eyebrow
+     bảng                  ->  .trade-table / .audit-evidence-table
+
+   Chip trạng thái CỐ Ý không ánh xạ — xem ghi chú bên dưới.
+   Nạp SAU paper.css. Mọi luật ở đây đã được đo là thắng luật gốc, không chỉ
+   được viết ra.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.blocker-card, .c1-panel, .audit-panel, .b3-panel, .coverage-detail {
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); box-shadow: none;
+}
+.blocker-card { padding: 16px 20px; }
+
+/* ── Chip: KHÔNG alias ─────────────────────────────────────────────────────
+   `.gate-state` và `.direction-chip` vốn ĐÃ là viền + chữ màu: paper.css:481-488
+   chỉ đổi `color`/`border-color` ở alpha .35, còn nền `.direction-chip` là
+   rgba(...,.055) — 5,5%, không phải khối đặc. Con số "khối màu đặc" tôi báo
+   trước đó do bộ định dạng màu của phép đo vứt kênh alpha; chính phép đo ấy
+   trả `chipsSolidFill = 0` và mâu thuẫn lại.
+
+   Alias cũng sẽ không áp được: `.gate-state.pass` có specificity cao hơn. Nếu
+   áp được thì còn tệ hơn — nó dán mọi trạng thái về cùng một màu viền. */
+
+/* ── Bảng ──────────────────────────────────────────────────────────────────*/
+.trade-table, .audit-evidence-table {
+  border: 1px solid var(--line); border-radius: 8px;
+}
+.trade-table thead th, .audit-evidence-table thead th {
+  background: var(--panel); border-bottom: 1px solid var(--line);
+  font-weight: 500; letter-spacing: .1em;
+}
+
+/* ── Tab ───────────────────────────────────────────────────────────────────
+   Viên thuốc trong một khay, thay cho một khối màu đặc. Đo trước: tab đang chọn
+   tô nền `#dda33a` nguyên khối, bo góc 0. */
+.paper-tab-nav {
+  display: flex; gap: 4px; padding: 3px; margin: 10px 24px;
+  border: 1px solid var(--line); border-radius: 7px; background: var(--surface);
+  border-bottom: 1px solid var(--line);   /* paper.css dat border-bottom rieng */
+}
+.paper-tab-nav label {
+  flex: 1; text-align: center; padding: 8px; border: 0; border-radius: 5px;
+  background: transparent; color: var(--dim);
+  font-weight: 500; letter-spacing: .1em; text-transform: uppercase;
+}
+/* Bốn `<input>` nằm TRƯỚC `.paper-tab-nav`, không kề nhãn, nên `input:checked +
+   label` không bao giờ khớp — bản đầu viết thế và luật cũ thắng nguyên vẹn.
+   Dùng đúng dạng selector mà paper.css:39-42 đã dùng. */
+#paper-tab-overview:checked ~ .paper-tab-nav label[for="paper-tab-overview"],
+#paper-tab-gates:checked    ~ .paper-tab-nav label[for="paper-tab-gates"],
+#paper-tab-coverage:checked ~ .paper-tab-nav label[for="paper-tab-coverage"],
+#paper-tab-gaps:checked     ~ .paper-tab-nav label[for="paper-tab-gaps"] {
+  background: #1c1a2b; color: #c9c0fb; box-shadow: none;
+}
+
+/* ── Băng mục ──────────────────────────────────────────────────────────────
+   Vạch nhấn 3px trước tiêu đề mục, đúng như trên /realtime: đủ để tách các mục
+   xuống trang mà không tốn thêm một màu tiêu đề nào. */
+.eyebrow {
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 500; letter-spacing: .1em;
+}
+.eyebrow::before {
+  content: ""; flex: 0 0 3px; width: 3px; height: 13px; border-radius: 2px;
+  background: currentColor;
+}
+
+/* ── Dải phán quyết ────────────────────────────────────────────────────────
+   `.readiness` mang đúng vai của `.status-rail`: một câu trả lời trạng thái ở
+   đỉnh trang. Cho nó cùng cách nói — mép trái dày, nền loãng dần về phía nền
+   trang — thay vì chỉ một vạch 2.4px. */
+.readiness {
+  padding: 12px 0 12px 18px;
+  border-left: 3px solid var(--amber);
+  background: linear-gradient(90deg, rgba(240, 180, 41, .06) 0%, transparent 70%);
+}
