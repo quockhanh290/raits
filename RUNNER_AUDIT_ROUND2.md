@@ -1125,3 +1125,80 @@ vào PASS vẫn ra PASS.
 Bộ khung cũ mở cùng một trang hai lần cho hai trạng thái, nên `open_paper` phải gỡ tay
 chặn cũ trước — không thì lần hai vẫn được phục vụ payload lần một, và kết quả xanh là do
 chưa bao giờ kiểm trạng thái thứ hai.
+
+---
+
+## 13. Khoá liên tiến trình cho hai entry point còn lại
+
+### 13.1 Sự việc
+
+Đêm 17→18/8, hai job nối IBKR hỏng vì `TimeoutError` — cách nhau bốn ngày, và cả hai
+đều rơi vào **3–4 phút sau một lần khởi động lại scheduler**:
+
+```
+13/8   khởi động lại 07:26:56  →  MAX_HOLD timeout 07:31:05
+17/8   khởi động lại 22:17:10  →  STOP_REPAIR_0020 timeout 22:20:18
+```
+
+Lần 13/8 có cơ chế đo được: slot MAX_HOLD **bị bắn hai lần cùng một giây**, hai dòng
+lệnh y hệt nhau trong log. Hai tiến trình cùng lao vào clientId 1; một chiếm được, một
+chết. Lần 17/8 chỉ phóng **một lần** — không cùng cơ chế, và tới giờ vẫn chưa có.
+
+### 13.2 Cái đã có, và cái còn thiếu
+
+Hệ có hai cơ chế khoá khác hẳn nhau:
+
+| | phạm vi | giành không được thì |
+|---|---|---|
+| `_run_guarded` | trong **một** tiến trình | bỏ qua |
+| `_acquire_lock` (guard E1) | **liên** tiến trình, tệp PID | báo lỗi |
+
+Guard E1 tự khai là "prevents duplicate runner instances from submitting double orders".
+Trước bản vá này chỉ `run_live_day` giành nó — **đúng hai entry point còn lại là hai cái
+đã va nhau**.
+
+### 13.3 Vì sao MAX_HOLD vẫn phải nằm ngoài mutex
+
+Đề xuất đầu của tôi là đưa MAX_HOLD vào `_run_guarded`. **Sai hai lần.**
+
+Thứ nhất, docstring của chính `_run_guarded` biện minh cho việc bỏ qua bằng tính
+idempotent — "slot kế tiếp sẽ làm việc mà slot này định làm". MAX_HOLD chạy **một lần
+một ngày**; không có slot kế tiếp, nên bỏ qua nghĩa là vị thế tới hạn ở lại qua đêm.
+
+Thứ hai, nó không phải cái khoá cần: sự cố là hai **tiến trình**, mà `_slot_lock` là
+`threading.Lock` — hai tiến trình thì hai khoá, không ai thấy ai. Đưa MAX_HOLD vào đó
+đổi một đánh đổi tồi lấy một thứ không giải quyết gì.
+
+Lý do này nay được **viết vào chỗ đăng ký job**, vì nếu không thì lần sau sẽ có người
+"sửa" nó.
+
+### 13.4 Đã làm
+
+Cả ba entry point giành khoá E1 **trước khi nối IBKR**, dùng **chung một tệp**. Hai job
+xử lý thất bại khác nhau, có chủ đích: MAX_HOLD **thoát 1** kèm ERROR (một lần một
+ngày, im lặng là mất một ngày không đóng vị thế); stop-repair thoát 0 kèm WARNING
+(idempotent, lượt sau cách 2 tiếng).
+
+Kèm một lỗi suýt để lại: `main()` trần **vứt giá trị trả về**, tiến trình vẫn thoát 0 —
+scheduler sẽ đọc thành "completed OK" đúng cái ngày MAX_HOLD không chạy.
+
+Bảy nhánh kiểm; mutation gỡ khoá ở cả hai tệp làm **đúng hai** nhánh đỏ.
+
+### 13.5 ĐÍNH CHÍNH — nguyên nhân gốc đã đóng từ trước
+
+Tôi trình bày "hai scheduler cùng tồn tại" như nguyên nhân còn bỏ ngỏ. **Không phải.**
+Chủ dự án chỉ ra `monitor/ops.py` đã có, và đo lại thì đúng:
+
+- `plan_single_instance` + `ensure_single` thêm **ngày 13/8** (`159bfaa`) — chính ngày
+  sự cố; `stop_runners` dọn con mồ côi thêm 16/8 (`686d88c`).
+- Nối đủ ba nhánh `cmd_up`: thăm dò hỏng → **từ chối**; thấy >1 → **từ chối**; thấy 1 →
+  để yên, không khởi động cái thứ hai.
+- `ProcessScan` cố ý có **ba** trạng thái: gộp "không biết" thành "không có gì chạy"
+  chính là thứ đã đẻ ra scheduler thứ hai.
+- Đêm nay hai lần khởi động lại, đo được **một** tiến trình.
+
+Nên khoá E1 ở mục 13.4 là **lớp phòng thủ thứ hai**: `ensure_single` bảo vệ đường qua
+`ops.py`, khoá E1 bảo vệ bất kể ai khởi động.
+
+**Sai ở đâu:** tôi đọc log 13/8, thấy hai scheduler, rồi kết luận về hiện tại mà không
+kiểm xem đã ai sửa chưa. Dấu vết cũ nói về lúc nó xảy ra, không nói về hôm nay.

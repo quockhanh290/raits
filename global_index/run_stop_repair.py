@@ -69,7 +69,8 @@ from futures.basket import RISK
 from futures.circuit_breaker import CircuitBreaker
 from global_index.ibkr_broker import IBKRBroker
 from global_index.net_exposure_multi import MultiClusterGuard
-from global_index.runner import FuturesRunner, STOP_FILE_NAME
+from global_index.runner import (FuturesRunner, RunnerLockError, STOP_FILE_NAME,
+                                 _acquire_lock)
 
 ACCOUNT = float(RISK["account"])
 
@@ -96,6 +97,10 @@ def main() -> int:
                     help="BAT BUOC trùng clientId của run_live_day (1). IBKR chỉ nhận lệnh huỷ "
                          "từ chính clientId đã đặt lệnh, nên một id khác KHÔNG BAO GIỜ huỷ "
                          "được STP do runner đặt — xem OPERATIONS.md muc 'clientId'.")
+    ap.add_argument("--lock-path", default="runner.pid",
+                    help="PID lockfile (E1 duplicate-runner guard). Cùng mặc định với "
+                         "run_live_day và run_maxhold_exit — ba entry point phải dùng "
+                         "CHUNG một tệp, nếu không thì mỗi cái tự khoá mình.")
     ap.add_argument("--dry-run", action="store_true",
                     help="chỉ báo cáo; KHÔNG dựng runner nên B4 không đặt lệnh nào")
     a = ap.parse_args()
@@ -107,6 +112,23 @@ def main() -> int:
 
     now = pd.Timestamp.now(tz="America/New_York").tz_localize(None)
     log.info("STOP REPAIR SWEEP — %s ET", now.strftime("%Y-%m-%d %H:%M"))
+
+    # ── E1 lock TRƯỚC khi nối ────────────────────────────────────────────────
+    # Guard E1 vốn chỉ run_live_day dùng; job này và MAX_HOLD chạy trần, và cả ba nối
+    # trên clientId 1. Mutex trong run_scheduler là `threading.Lock` nên chỉ thấy các
+    # slot trong CÙNG một tiến trình — hai scheduler thì hai khoá riêng, không ai biết
+    # ai. Khoá tệp PID thì thấy.
+    #
+    # Khác MAX_HOLD: bỏ qua ở đây chấp nhận được, vì quét sửa là idempotent và lượt sau
+    # cách 2 tiếng sẽ làm đúng việc lượt này định làm — cùng lý lẽ `_run_guarded` đã
+    # dùng để bỏ qua job này. Nên WARNING và thoát 0, không phải lỗi.
+    if a.lock_path:
+        try:
+            _acquire_lock(Path(a.lock_path))
+        except RunnerLockError as exc:
+            log.warning("[lock] %s — bo qua luot quet nay; luot sau se lam. "
+                        "Khong phai loi: quet sua la idempotent.", exc)
+            return 0
 
     broker = IBKRBroker(host="127.0.0.1", port=a.port, client_id=a.client_id)
     broker.connect()

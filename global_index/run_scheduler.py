@@ -599,6 +599,19 @@ def make_scheduler(port: int, dry_run: bool,
         )
 
     # ── 09:31 ET Mon-Fri: MAX_HOLD exit at RTH open ──────────────────────────
+    # CỐ Ý không bọc trong _run_guarded, và lý do phải nằm ở đây vì nếu không thì lần
+    # sau sẽ có người "sửa" nó — tôi suýt làm đúng thế.
+    #
+    # _run_guarded giành khoá không được thì BỎ QUA, và docstring của nó tự biện minh:
+    # "diff_desired_vs_held is idempotent, so the next slot does whatever this one would
+    # have". Đúng cho live_day (5 phút một lần) và cho quét sửa stop (2 tiếng một lần).
+    # KHÔNG đúng ở đây: job này chạy MỘT LẦN MỘT NGÀY. Không có slot kế tiếp, nên bỏ qua
+    # nghĩa là hôm đó vị thế tới hạn ở lại qua đêm.
+    #
+    # Và nó cũng không phải cái khoá cần: sự cố đo được ngày 2026-08-13 là HAI TIẾN
+    # TRÌNH scheduler cùng bắn slot này trong một giây. _slot_lock là threading.Lock —
+    # hai tiến trình thì hai khoá, không ai thấy ai. Bảo vệ nằm ở khoá tệp PID (E1),
+    # nay đã được run_maxhold_exit giành TRƯỚC khi nối IBKR.
     @sched.scheduled_job("cron", day_of_week="mon-fri", hour=9, minute=31,
                          id="maxhold_exit", name="MAX_HOLD exit 09:31 ET")
     def job_maxhold(label: str = "MAX_HOLD_EXIT"):

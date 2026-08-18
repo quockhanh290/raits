@@ -52,7 +52,8 @@ from futures.basket import SWING_TF_PARAM, RISK
 from futures.circuit_breaker import CircuitBreaker
 from global_index.ibkr_broker import IBKRBroker
 from global_index.net_exposure_multi import MultiClusterGuard
-from global_index.runner import FuturesRunner, STOP_FILE_NAME
+from global_index.runner import (FuturesRunner, RunnerLockError, STOP_FILE_NAME,
+                                 _acquire_lock)
 
 MAX_HOLD_DAYS = int(SWING_TF_PARAM["max_hold_days"])
 ACCOUNT       = float(RISK["account"])
@@ -86,6 +87,10 @@ def main():
                     help="BAT BUOC trùng clientId của run_live_day (1). IBKR chỉ nhận lệnh huỷ "
                          "từ chính clientId đã đặt lệnh, nên một id khác KHÔNG BAO GIỜ huỷ "
                          "được STP do runner đặt — xem OPERATIONS.md muc 'clientId'.")
+    ap.add_argument("--lock-path",      default="runner.pid",
+                    help="PID lockfile (E1 duplicate-runner guard). Cùng mặc định với "
+                         "run_live_day: ba entry point phải dùng CHUNG một tệp, nếu "
+                         "không thì mỗi cái tự khoá mình và không cái nào thấy cái kia.")
     ap.add_argument("--dry-run",        action="store_true",
                     help="Connect + check positions but emit no orders")
     a = ap.parse_args()
@@ -103,6 +108,33 @@ def main():
     if not pos_path.exists():
         log.info("No positions file found (%s) — nothing to exit.", pos_path)
         return
+
+    # ── E1 lock BEFORE connecting ────────────────────────────────────────────
+    # Guard E1 ("PID lockfile prevents duplicate runner instances from submitting
+    # double orders") chỉ được run_live_day dùng. Job này và stop-repair chạy trần,
+    # và đó chính là hai job đã va nhau.
+    #
+    # 2026-08-13 07:31:00: hai scheduler cùng sống nên slot MAX_HOLD bị bắn HAI LẦN
+    # trong cùng một giây — hai dòng lệnh y hệt nhau trong log. Cả hai tiến trình lao
+    # vào clientId 1; một cái chiếm được, cái kia chết vì `TimeoutError` sau 5 giây,
+    # ở tầng ib_insync, không nói được gì về nguyên nhân.
+    #
+    # Mutex trong run_scheduler KHÔNG cứu được: nó là `threading.Lock`, chỉ thấy được
+    # các slot trong CÙNG một tiến trình. Hai scheduler thì hai khoá, không ai biết ai.
+    # Khoá tệp PID thì thấy.
+    #
+    # Và khác run_live_day: giành không được ở đây KHÔNG phải chuyện thường. Slot kia
+    # chạy 5 phút một lần nên bỏ qua là vô hại; MAX_HOLD chạy MỘT LẦN MỘT NGÀY, không
+    # có slot kế tiếp, nên bỏ qua nghĩa là hôm đó vị thế tới hạn không được đóng. Thoát
+    # khác 0 để scheduler báo hỏng và bảng hiện sự cố, thay vì im lặng.
+    if a.lock_path:
+        try:
+            _acquire_lock(Path(a.lock_path))
+        except RunnerLockError as exc:
+            log.error("[lock] %s — MAX_HOLD KHONG chay hom nay. Day khong phai mot slot "
+                      "bo qua vo hai: job nay chay mot lan moi ngay, nen vi the toi han "
+                      "se o lai qua dem.", exc)
+            return 1
 
     log.info("[ibkr] Connecting → 127.0.0.1:%d clientId=%d ...", a.port, a.client_id)
     broker = IBKRBroker(host="127.0.0.1", port=a.port, client_id=a.client_id)
@@ -173,4 +205,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # sys.exit(main()), khong phai main(): nhanh giành-khoá-thất-bại trả 1, mà một
+    # `main()` trần vứt giá trị đó đi và tiến trình vẫn thoát 0 — scheduler sẽ đọc
+    # thành "completed OK" đúng cái ngày MAX_HOLD không chạy.
+    sys.exit(main() or 0)
