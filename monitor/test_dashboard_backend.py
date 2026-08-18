@@ -4034,3 +4034,58 @@ def test_favicon_does_not_404():
     mờ lỗi thật, và console sạch là điều kiện để smoke test tin được."""
     client = app.test_client()
     assert client.get("/favicon.ico").status_code in (200, 204)
+
+
+def test_a_slot_cut_off_by_a_restart_is_explained_not_silent(monkeypatch, tmp_path: Path):
+    """Đêm 2026-08-18, và nó không thể tự hết.
+
+    Scheduler khởi động lại lúc 01:10:52 ET, đúng 52 giây sau khi slot 01:10 sinh tiến
+    trình con. Cha chết nên không còn ai sống để ghi dòng kết thúc — dòng đó sẽ KHÔNG
+    BAO GIỜ tới, và slot ấy giữ băng-rôn đỏ tới nửa đêm.
+
+    Cách chữa không phải để slot sau che slot trước; bản vá đầu tiên đi hướng đó và bị
+    test_older_unexplained_slot_cannot_be_hidden_by_newer_slot chặn lại, đúng như nó
+    phải thế. Đây là bằng chứng dương: slot CÓ dòng khởi chạy, và sau dòng đó log có
+    một lần scheduler khởi động.
+    """
+    now = dt.datetime(2026, 8, 18, 1, 21, tzinfo=ET)
+    lines = _lines_through(now, replace={"NKD_NIGHT_0110": ""})
+    lines.insert(0, "2026-08-18 01:10:00 INFO run_scheduler [NKD_NIGHT_0110] python -m global_index.run_live_day")
+    lines.insert(1, "2026-08-18 01:10:52 INFO apscheduler.scheduler Scheduler started")
+    _patch_logs(monkeypatch, lines)
+    status = schedule_status.get_schedule_status(
+        tmp_path, observed_at=now - dt.timedelta(minutes=1), now=now)
+
+    assert [item["slot_id"] for item in status["unexplained_overdue"]] == [], (
+        f"slot bi cat ngang van giu bang-ron do: {status['unexplained_overdue']}")
+    assert status["freshness"] != "late"
+
+
+def test_a_slot_that_started_and_vanished_with_no_restart_stays_unexplained(monkeypatch, tmp_path: Path):
+    """Nửa còn lại. Không có lần khởi động lại nào thì việc thiếu dòng kết thúc vẫn là
+    chưa giải thích được — tiến trình con có thể đã chết âm thầm, và đó là thứ phải báo."""
+    now = dt.datetime(2026, 8, 18, 1, 21, tzinfo=ET)
+    lines = _lines_through(now, replace={"NKD_NIGHT_0110": ""})
+    lines.insert(0, "2026-08-18 01:10:00 INFO run_scheduler [NKD_NIGHT_0110] python -m global_index.run_live_day")
+    _patch_logs(monkeypatch, lines)
+    status = schedule_status.get_schedule_status(
+        tmp_path, observed_at=now - dt.timedelta(minutes=1), now=now)
+
+    assert "NKD_NIGHT_0110" in {item["slot_id"] for item in status["unexplained_overdue"]}, (
+        "mot slot bien mat khong ly do da duoc tha")
+    assert status["freshness"] == "late"
+
+
+def test_a_slot_that_left_no_trace_at_all_stays_unexplained(monkeypatch, tmp_path: Path):
+    """Im lặng hoàn toàn là kiểu hỏng hệ này liên tục bị cắn — slot 09:31 từng không bắn
+    mà không ghi một dòng nào. Một lần khởi động lại ở đâu đó trong log không được phép
+    biến nó thành đã giải thích."""
+    now = dt.datetime(2026, 8, 18, 1, 21, tzinfo=ET)
+    lines = _lines_through(now, replace={"NKD_NIGHT_0110": ""})
+    lines.insert(0, "2026-08-18 01:09:00 INFO apscheduler.scheduler Scheduler started")
+    _patch_logs(monkeypatch, lines)
+    status = schedule_status.get_schedule_status(
+        tmp_path, observed_at=now - dt.timedelta(minutes=1), now=now)
+
+    assert "NKD_NIGHT_0110" in {item["slot_id"] for item in status["unexplained_overdue"]}, (
+        "mot slot khong he chay da bi coi la bi cat ngang")

@@ -341,10 +341,9 @@ def _evidence(
     lines: list[str] | None = None,
 ) -> dict[str, Any]:
     marker = f"[{slot['id']}]"
-    matched = [
-        line for line in (lines if lines is not None else _scheduler_lines(slot["at"].date(), root))
-        if marker in line
-    ]
+    scanned = lines if lines is not None else _scheduler_lines(slot["at"].date(), root)
+    matched = [line for line in scanned if marker in line]
+    last_index = max((i for i, line in enumerate(scanned) if marker in line), default=-1)
     joined = "\n".join(matched).lower()
     base = {
         "state": "not_observed",
@@ -368,6 +367,25 @@ def _evidence(
         return {**base, "state": "failed", "reason": "exception", "severity": "incident"}
     if is_clean_exit(joined):
         return {**base, "state": "executed", "reason": "none", "severity": "none"}
+    # Đã chạy rồi bị cắt ngang, khác hẳn không hề chạy — và trước đây cả hai cùng rơi
+    # vào "not_observed".
+    #
+    # Đêm 2026-08-18: scheduler khởi động lại lúc 01:10:52 ET, đúng 52 giây sau khi slot
+    # 01:10 sinh tiến trình con. Cha chết nên không còn ai sống để ghi dòng kết thúc —
+    # dòng đó sẽ KHÔNG BAO GIỜ tới, và slot ấy giữ băng-rôn "attention required" tới nửa
+    # đêm dù 01:15 và 01:20 chạy sạch ngay sau.
+    #
+    # Cách chữa KHÔNG phải là để slot sau che slot trước: một slot không để lại dấu vết
+    # nào thì im lặng đó chính là kiểu hỏng hệ này liên tục bị cắn, và
+    # test_older_unexplained_slot_cannot_be_hidden_by_newer_slot giữ đúng chỗ đó — bản
+    # vá đầu tiên của tôi đi hướng ấy và bị nó chặn lại.
+    #
+    # Đây là bằng chứng dương, không phải che: slot CÓ dòng khởi chạy, và sau dòng đó
+    # log có một lần scheduler khởi động. Nói được vì sao không có dòng kết thúc thì đó
+    # là đã giải thích, không phải đã bỏ qua.
+    if matched and any("scheduler started" in line.lower() for line in scanned[last_index + 1:]):
+        return {**base, "state": "interrupted", "reason": "scheduler_restart",
+                "severity": "expected"}
     return base
 
 
