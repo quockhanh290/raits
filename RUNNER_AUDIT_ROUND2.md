@@ -1202,3 +1202,67 @@ Nên khoá E1 ở mục 13.4 là **lớp phòng thủ thứ hai**: `ensure_singl
 
 **Sai ở đâu:** tôi đọc log 13/8, thấy hai scheduler, rồi kết luận về hiện tại mà không
 kiểm xem đã ai sửa chưa. Dấu vết cũ nói về lúc nó xảy ra, không nói về hôm nay.
+
+---
+
+## 14. Ba việc sau mục 13, và hai rủi ro để mở
+
+### 14.1 Kéo sao kê tự khoá chính mình
+
+Tôi dựng một vòng dò 20 phút/lần để đo độ trễ công bố sổ của IBKR. Tám lần hỏng liên
+tiếp và dịch vụ đổi từ `code=1004` sang `code=1025 Too many failed attempts` — khoá lại.
+
+Sai ở chỗ **đo nhầm giới hạn**: runbook ghi nhịp *1 lần/giây, 10 lần/phút*, tôi tính 20
+phút/lần là an toàn thừa rồi dừng. Nhịp không phải ràng buộc bị vi phạm; **số lần hỏng
+liên tiếp** mới là.
+
+`flex_pull` giờ tự từ chối: đếm số lần hỏng trong 60 phút và dừng ở lần thứ 3. Job đêm
+chạy một lần/ngày nên không bao giờ chạm ngưỡng, thử tay hai lần cũng không, một vòng
+lặp thì dừng. Sổ đếm nằm cạnh `--out-dir` nên phép kiểm trong thư mục tạm không khoá
+được đường thật.
+
+### 14.2 Khoảng ngày sai — thay đổi lịch chạy sang một dạng chưa từng thử
+
+Mục 3 sửa job xin tới **hôm qua**, nhưng truyền **mỗi `--to-date`**. IBKR từ chối thẳng:
+`code=1023 Date range invalid. From date and to date required`.
+
+Tôi đã thử ba dạng — cả hai ngày, một ngày lặp lại, không ngày nào — rồi đặt vào lịch
+đúng dạng thứ tư. Phép kiểm đi kèm **soi mã nguồn** nên nó ghim luôn cái dạng sai. Giờ
+ghim bằng phép tính: quét cả năm, kiểm cả hai ngày có mặt, ngày cuối luôn là hôm qua,
+khoảng không vượt trần 366 ngày.
+
+### 14.3 Nhãn lý do thoát chưa từng tới được sổ
+
+`_record_exit_reason` chỉ gán nhãn cho lệnh đóng **đúng vào ngày cuối của khung**. Nó so
+một `Timestamp` naive dựng từ chuỗi ngày với `df.index[-1]` mang múi giờ — khung sống là
+`America/New_York`. Phép `!=` giữa hai loại đó **không ném lỗi**, chỉ luôn trả `True`.
+
+Nên điều kiện không bao giờ thoả trên đường sống, và hàm **chưa từng gán được một nhãn
+nào**. Hệ quả trên bảng: cả 4 lệnh đóng trong kỳ giấy không mang lý do,
+`exit_path_coverage` đứng **0/0/0** với đích 3 mẫu mỗi lối, và **đồng hồ 60 ngày đang
+chạy trên một cổng không thể tiến**.
+
+Ẩn được vì không ngoại lệ, không log, không giá trị sai — chỉ một trường luôn rỗng. Và
+chú thích ở cả `runner.py` lẫn `signal_layer.py` đều nói rỗng là hợp lệ, nên một lời
+giải thích đúng đắn che mất một hỏng hóc toàn phần.
+
+**Điều này quyết định câu hỏi reset kỳ giấy.** Trước khi có bản vá, kỳ mới cũng sẽ tích
+luỹ đúng những con số 0 ấy — reset chỉ trả 7 ngày để mở một kỳ thứ hai với cùng chỗ
+nghẽn. Phép đo phải làm trước: chạy vài phiên, kiểm dòng CLOSE đã mang `exit_reason`
+chưa. Có nhãn thì mới biết 7 ngày cũ có cứu được không.
+
+### 14.4 Hai rủi ro để mở, do tôi tạo ra
+
+**Token Flex đang bị `1025` chặn**, còn nguyên sau 13,4 giờ. Job 22:20 ET có thể vẫn
+hỏng dù token và khoảng ngày đã đúng. Đường chắc nhất: sinh lại token trong Client
+Portal, `setx`, khởi động lại scheduler.
+
+**Ba slot NKD 02:40 / 02:45 / 02:50 ET đã bị vô hiệu hoá** — một phép kiểm tôi viết đã
+giành khoá của hệ thật. Đã dọn, đã sửa, và đã dựng dây bẫy trong `conftest.py` để lần
+sau lộ ra ngay. Không lệnh nào được gửi.
+
+### 14.5 Bước chưa làm
+
+Bản vá 14.3 chạm `futures/swing_tf.py`. Tôi chứng minh nó không đổi kết quả backtest
+bằng phép kiểm so từng trường trên chính hàm — **không** bằng cách chạy lại
+`reconcile_gd0` và `reconcile_stress`. Đó là bước duy nhất còn thiếu.
