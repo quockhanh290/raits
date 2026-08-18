@@ -155,9 +155,24 @@
 .definition-block p { margin: 0 0 10px; color: var(--muted); font: 11px/1.55 var(--mono); }
 .trade-detail { grid-column: 1 / -1; }
 .trade-table { max-height: 360px; overflow: auto; border: 1px solid var(--line); }
-.trade-table table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+/* `table-layout: fixed` chia đều bề ngang cho các cột, nên ở khổ hẹp sáu cột chỉ
+   được ~50px mỗi cột trong khi một ô như `-$1,400.00` cần ~70px: chữ tràn khỏi ô
+   và rơi sang ô bên cạnh. Đo ở 390px: 13 chỗ chữ đè chữ trong tab Coverage, gồm
+   cả ba tiêu đề cột và các ô tiền chồng lên nhau — trên đúng bảng đối soát tiền.
+
+   `.trade-table` đã có `overflow: auto` sẵn nhưng vô dụng, vì chính cái bảng cũng
+   chỉ rộng bằng khung bọc nên không có gì để cuộn. Cho nó một bề ngang tối thiểu
+   thì khung bọc mới làm được việc của nó: bảng giữ đúng tỉ lệ cột và người đọc
+   cuộn ngang để xem hết, thay vì đọc hai con số chồng lên nhau. */
+.trade-table table { width: 100%; min-width: 640px; border-collapse: collapse; table-layout: fixed; }
 .trade-table th { position: sticky; top: 0; padding: 9px; color: var(--dim); background: var(--surface); border-bottom: 1px solid var(--line); font: 700 11px/1 var(--mono); text-align: left; text-transform: uppercase; }
-.trade-table td { padding: 10px 9px; color: var(--muted); border-bottom: 1px solid var(--line); font: 12px/1.4 var(--mono); vertical-align: top; overflow-wrap: anywhere; }
+/* `overflow-wrap: anywhere` ở đây vô hiệu, vì `realtime.css` đặt
+   `th, td { white-space: nowrap }` cho cả năm dashboard và thuộc tính đó thắng:
+   một định danh như `mnkd_routing_2026_08_14` rộng 162px không xuống dòng được
+   trong ô 107px và tràn 64px sang ô bên. Cho phép xuống dòng ĐÚNG trong bảng này
+   thay vì sửa luật dùng chung — bốn trang kia chưa ai đo. */
+.trade-table td { padding: 10px 9px; color: var(--muted); border-bottom: 1px solid var(--line); font: 12px/1.4 var(--mono); vertical-align: top; overflow-wrap: anywhere; white-space: normal; }
+.trade-table td b { white-space: inherit; }
 .trade-table tr:last-child td { border-bottom: 0; }
 .trade-table b { display: block; color: var(--bright); font: 700 12px/1.35 var(--mono); }
 .trade-table small { display: block; margin-top: 4px; color: var(--dim); font: 11px/1.35 var(--mono); }

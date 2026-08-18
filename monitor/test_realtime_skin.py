@@ -79,13 +79,29 @@ _OUT_OF_VIEW = """
 
 _TEXT_COLLISIONS = """
 () => {
+  // Bố trí xong KHÔNG có nghĩa là được vẽ. Nội dung của `<details>` đóng nằm
+  // dưới `content-visibility: hidden`: `getBoundingClientRect()` vẫn trả kích
+  // thước cũ, còn `elementFromPoint` tại tâm nó trả về phần tử phía sau. Bỏ qua
+  // bước này thì mỗi khối thu gọn thành một chùm "chữ đè chữ" giả — đã đo:
+  // /paper Gates ở 390px báo 397 va chạm, lọc đúng còn 0, và 348 trên 693 node
+  // được đếm là ma.
+  const notPainted = el => {
+    for (let p = el; p && p !== document.body; p = p.parentElement) {
+      const cs = getComputedStyle(p);
+      if (cs.contentVisibility === 'hidden' || cs.visibility === 'hidden') return true;
+      const parent = p.parentElement;
+      if (parent && parent.tagName === 'DETAILS' && !parent.open && p.tagName !== 'SUMMARY')
+        return true;
+    }
+    return false;
+  };
   const outOfView = %s;
   const leaves = [];
   const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let n;
   while ((n = w.nextNode())) {
     if (!n.nodeValue.trim()) continue;
-    if (n.parentElement.closest('[hidden]')) continue;
+    if (n.parentElement.closest('[hidden]') || notPainted(n.parentElement)) continue;
     const r = document.createRange(); r.selectNodeContents(n);
     for (const rect of r.getClientRects()) {
       if (rect.width < 1 || rect.height < 1) continue;

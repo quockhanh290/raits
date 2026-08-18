@@ -9,9 +9,10 @@ không ai dám dùng.
 
 Bốn cái bẫy đã thật sự làm sai số trong phiên 2026-08-17, nay chặn ngay ở đây:
 
-  1. Node văn bản KHÔNG được vẽ vẫn có toạ độ. Trên /paper có 2082 trên 2195 node
-     nằm trong `<details>` đóng và tab ẩn; đếm cả chúng cho ra "62% dưới AA" trong
-     khi phần hiện ra chỉ là 33/113. Chỉ đếm node có hộp thật.
+  1. Node văn bản KHÔNG được vẽ vẫn có toạ độ, theo HAI cách khác nhau. Node cỡ 0
+     thì dễ thấy. Khó thấy hơn: nội dung của `<details>` đóng giữ NGUYÊN kích
+     thước cũ vì nó nằm dưới `content-visibility: hidden` — chỉ là không bao giờ
+     được vẽ. Đếm chúng cho ra 397 "va chạm" ở /paper Gates; lọc đúng còn 0.
   2. Nền trong suốt một phần. `rgba(255,255,255,0.01)` bị coi là nền đặc thì tỉ số
      tương phản thành vô nghĩa. Ở đây mọi lớp được ghép xuống nền trang.
   3. Chữ đã bị `overflow` cắt vẫn trả hình học. Không loại nó ra thì mọi thẻ kẹp
@@ -56,6 +57,22 @@ PAGES = ["/realtime", "/paper", "/analytics", "/reports", "/"]
 
 PROBE = r"""
 () => {
+  // Bố trí xong KHÔNG có nghĩa là được vẽ. Nội dung của `<details>` đóng nằm
+  // dưới `content-visibility: hidden`: `getBoundingClientRect()` vẫn trả kích
+  // thước cũ, còn `elementFromPoint` tại tâm nó trả về phần tử phía sau. Bỏ qua
+  // bước này thì mỗi khối thu gọn thành một chùm "chữ đè chữ" giả — đã đo:
+  // /paper Gates ở 390px báo 397 va chạm, lọc đúng còn 0, và 348 trên 693 node
+  // được đếm là ma.
+  const notPainted = el => {
+    for (let p = el; p && p !== document.body; p = p.parentElement) {
+      const cs = getComputedStyle(p);
+      if (cs.contentVisibility === 'hidden' || cs.visibility === 'hidden') return true;
+      const parent = p.parentElement;
+      if (parent && parent.tagName === 'DETAILS' && !parent.open && p.tagName !== 'SUMMARY')
+        return true;
+    }
+    return false;
+  };
   const outOfView = (el, rect) => {
     for (let p = el; p && p !== document.body; p = p.parentElement) {
       const cs = getComputedStyle(p);
@@ -102,7 +119,7 @@ PROBE = r"""
   while ((n = w.nextNode())) {
     if (!n.nodeValue.trim()) continue;
     const el = n.parentElement;
-    if (el.closest('[hidden]')) continue;
+    if (el.closest('[hidden]') || notPainted(el)) continue;
     const r = document.createRange(); r.selectNodeContents(n);
     const box = r.getBoundingClientRect();
     if (box.width < 2 || box.height < 2) continue;        // không được vẽ

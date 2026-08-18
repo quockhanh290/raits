@@ -541,12 +541,17 @@ small.broker-account-line {
    is a <details>, so making it the grid puts its <summary> in the first column
    and squeezes the list into whatever is left. Measured: the list track came
    out 280px and the count column 62px. */
-/* Không khai `display` ở đây. Đây là một `<details>`, và khi nó đóng thì phần
-   nội dung vẫn được bố trí (đo được: hộp cao 36px của summary, con cao 43px tràn
-   ra ngoài, đè lên mục Open Positions ở 390px). Chỉ cần KHÔNG biến nó thành lưới
-   — việc đó từng đẩy `<summary>` vào cột một — chứ không cần đặt lại display. */
+/* Không khai `display` ở đây: chỉ cần KHÔNG biến nó thành lưới, việc đó từng đẩy
+   `<summary>` vào cột một.
+
+   Từng có thêm một dòng `:not([open]) > :not(summary) { display: none }` ở đây,
+   thêm vào để chữa một va chạm ở 390px. Nó chữa một lỗi không tồn tại: nội dung
+   của `<details>` đóng nằm dưới `content-visibility: hidden`, tức GIỮ NGUYÊN hình
+   học nhưng KHÔNG BAO GIỜ được vẽ. Dựng một `<details>` sạch để kiểm:
+   `getBoundingClientRect()` của con trả 120px cả khi đóng lẫn khi mở, còn
+   `elementFromPoint` tại tâm nó trả về phần tử PHÍA SAU khi đóng. Va chạm kia là
+   của thước đo. Dòng đó đã gỡ. */
 .open-issues-shell { background: transparent; border: 0; padding: 0; }
-.open-issues-shell:not([open]) > :not(summary) { display: none; }
 .open-issues-layout {
   display: grid; grid-template-columns: 352px minmax(0, 1fr); gap: 14px;
   background: transparent; border: 0; padding: 0;
@@ -937,7 +942,25 @@ small.broker-account-line {
     gap: 8px; row-gap: 6px; font-size: 10px;
     flex-wrap: wrap; justify-content: flex-end;
   }
-  .app-header { padding: 12px 16px; gap: 12px; }
+  .app-header { padding: 12px 16px 0; gap: 12px; }
+
+  /* Give the nav back what realtime.css:519-522 does here: shrink to its grid
+     column and scroll rather than run off the edge. The skin's top-level
+     `.module-nav a { padding: 7px 16px }` is a wide-screen value and loads
+     later, so it undid the narrow padding and pushed the bar to 450px inside a
+     189px column — measured, nine header elements ran 76px past the viewport
+     with nothing able to scroll to them. Among them the scheduler alarm
+     ("RUNNING OLD CRON"), which is the one reading on this page that must never
+     be off-screen. */
+  .module-nav { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .module-nav::-webkit-scrollbar { display: none; }
+  .module-nav a { flex: 1 0 auto; padding: 6px 9px; font-size: 12px; }
+
+  /* Same for the right-hand group: it holds three state readings, and the
+     longest is the scheduler one. Let it wrap and keep every chip inside. */
+  .header-live-context { min-width: 0; }
+  .header-live-context > span { min-width: 0; }
+  .broker-header-state, .runner-header-state { min-width: 0; }
 
   .metrics-row { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 14px 16px; }
 
