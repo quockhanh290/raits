@@ -225,3 +225,11 @@ scoped_suite.txt
 # them out of git, but note they still affect that gate — delete after any
 # ad-hoc run rather than leaving them behind.
 live_day_*.log
+
+# The `*.html` rule above is for exported backtest reports. The dashboards are
+# source: their pages were tracked before that rule existed, so new ones were
+# being skipped in silence — a commit could add a whole route's CSS and JS and
+# leave the page itself behind. Added 2026-08-17 after /realtime-next shipped
+# without its index.html.
+!global_index/dash/**/*.html
+!global_index/dash/*.html

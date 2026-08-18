@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<!--
+  reference.html — the design build, made runnable.
+
+  This is `Dashboard 2A.dc.html` from the Claude Design project, with the two
+  things that stop it running here removed and nothing else touched:
+
+    * the `sc-for` / `sc-if` template loops are expanded with the exact data
+      from the component's own script block, so the markup is static;
+    * the Google Fonts <link> is swapped for the self-hosted fonts.css — every
+      dashboard page is asserted to contain no external URL, and this file is
+      served by the same backend.
+
+  It exists to be MEASURED against, not shipped: with both pages served, the
+  port can be checked node by node instead of by eye. Do not wire it to any API.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reference — Ops Dashboard (design build)</title>
+<link rel="stylesheet" href="/dash/fonts/fonts.css">
+<style>
+  html,body{margin:0;padding:0;background:#08090c;}
+  *{box-sizing:border-box;}
+  a{color:#5fd3b2;text-decoration:none;}
+  a:hover{color:#8ae6cc;}
+  @keyframes lp{0%,100%{opacity:1}50%{opacity:.32}}
+</style>
+</head>
+<body>
+
+<div style="min-width:1900px;background:#08090c;color:#e8ebf0;font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums;">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:32px;padding:15px 26px;border-bottom:1px solid #1b2027;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div style="font-weight:600;font-size:13px;letter-spacing:.15em;text-transform:uppercase;">Raits Futures</div>
+      <div style="display:flex;align-items:center;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;padding:3px 9px;border:1px solid #262d36;border-radius:4px;color:#798394;">PAPER<span style="color:#4b5563;">·</span>NEXT</div>
+    </div>
+    <div style="display:flex;gap:4px;">
+      <div style="padding:7px 16px;border-radius:5px;background:#14251f;color:#8ae6cc;font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;">Realtime</div>
+      <div style="padding:7px 16px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#798394;">Historical</div>
+      <div style="padding:7px 16px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#798394;">Paper</div>
+      <div style="padding:7px 16px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#798394;">Reports</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:22px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#798394;">
+      <div style="display:flex;align-items:center;gap:8px;"><span style="font-size:10px;letter-spacing:.12em;">FONT</span><span style="padding:5px 10px;border:1px solid #262d36;border-radius:4px;color:#e8ebf0;">IBM Plex Mono</span></div>
+      <div style="color:#e8ebf0;">Aug 17, 2026</div>
+      <div style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:#3ecf8e;animation:lp 2.4s ease-in-out infinite;"></span><span style="color:#e8ebf0;">Live</span><span>6s</span></div>
+      <div style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:#3a424f;"></span><span>Current 5m</span></div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:16px;padding:15px 26px;border-bottom:1px solid #1b2027;background:linear-gradient(90deg,#0c1512 0%,#0b0d11 42%);">
+    <div style="display:flex;align-items:center;gap:8px;"><span style="width:7px;height:7px;border-radius:50%;background:#3ecf8e;"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#8ae6cc;">OK</span></div>
+    <div style="font-size:15px;font-weight:500;letter-spacing:-.005em;">Systems nominal — feeds live, positions protected</div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;padding:3px 9px;border:1px solid #262d36;border-radius:4px;color:#798394;">1 ISSUE OPEN</div>
+    <div style="margin-left:auto;text-align:right;font-family:'IBM Plex Mono',monospace;">
+      <div style="font-size:14px;color:#e8ebf0;">02:56:49 EDT</div>
+      <div style="font-size:11px;color:#798394;margin-top:2px;">JST 15:56 · HAN 13:56 · YYC 00:56</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 452px;">
+    <div style="border-right:1px solid #1b2027;">
+
+      <div style="padding:22px 26px;border-bottom:1px solid #1b2027;">
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:16px;">
+          <span style="width:3px;height:15px;border-radius:2px;background:#5b9cf0;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Now Monitor</div>
+          <div style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:#3ecf8e;"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#798394;">CLEAR</span></div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">0 incident · 0 telemetry gap</div>
+        </div>
+        <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;display:grid;grid-template-columns:repeat(4,1fr);overflow:hidden;">
+          <div style="padding:16px 20px;border-right:1px solid #1a1f26;border-top:2px solid #5b9cf0;">
+            <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#5b9cf0;">Next job</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#e8ebf0;margin-top:7px;white-space:nowrap;">STOP_REPAIR_0420</div>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-top:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">
+              <div>04:20 ET</div><div style="margin-left:auto;color:#a8b1c0;white-space:nowrap;">in 1h 23m</div>
+            </div>
+          </div>
+          <div style="padding:16px 20px;border-right:1px solid #1a1f26;border-top:2px solid #9d8cf5;">
+            <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#9d8cf5;">Next decision</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#e8ebf0;margin-top:7px;white-space:nowrap;">MAX_HOLD_EXIT</div>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-top:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">
+              <div>09:31 ET</div><div style="margin-left:auto;color:#a8b1c0;white-space:nowrap;">in 6h 34m</div>
+            </div>
+          </div>
+          <div style="padding:16px 20px;border-right:1px solid #1a1f26;border-top:2px solid #3a6ea8;">
+            <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#3a6ea8;">Latest job</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#e8ebf0;margin-top:7px;white-space:nowrap;">NKD_NIGHT_0255</div>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-top:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">
+              <div>02:55 ET</div><div style="margin-left:auto;color:#a8b1c0;white-space:nowrap;">1m ago</div>
+            </div>
+          </div>
+          <div style="padding:16px 20px;border-top:2px solid #6b5cb8;">
+            <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#6b5cb8;">Latest decision</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#e8ebf0;margin-top:7px;white-space:nowrap;">NKD_NIGHT_0255</div>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-top:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">
+              <div>02:55 ET</div><div style="margin-left:auto;color:#a8b1c0;white-space:nowrap;">1m ago</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:22px 26px;border-bottom:1px solid #1b2027;display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div style="border:1px solid #1c2a2b;border-radius:8px;background:linear-gradient(180deg,#0f1618 0%,#0e1116 62%);padding:20px 22px;">
+          <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#5fd3b2;">Paper equity</div>
+          <div style="display:flex;align-items:baseline;gap:14px;margin-top:10px;">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:40px;font-weight:500;letter-spacing:-.03em;line-height:1;">$50,229</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#3ecf8e;">+$229</div>
+          </div>
+          <div style="margin-top:12px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#798394;white-space:nowrap;">+0.46% since Aug 10, 2026 · base $50,000</div>
+          <div style="margin-top:14px;padding-top:13px;border-top:1px solid #1a1f26;display:flex;align-items:center;gap:10px;">
+            <span style="width:6px;height:6px;border-radius:50%;background:#f2555a;flex:0 0 6px;"></span>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#ff8085;white-space:nowrap;">Broker $996,486 · −$3,994 since Jul 8</div>
+            <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5fd3b2;white-space:nowrap;">Reconcile</div>
+          </div>
+        </div>
+
+        <div style="border:1px solid #251f36;border-radius:8px;background:linear-gradient(180deg,#131120 0%,#0e1116 62%);padding:20px 22px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#9d8cf5;">Model inputs</div>
+            <span style="width:6px;height:6px;border-radius:50%;background:#f0b429;"></span>
+            <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5fd3b2;">Refit</div>
+          </div>
+          <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:18px 24px;">
+            <div><div style="font-size:11px;color:#798394;">Regime</div><div style="font-family:'IBM Plex Mono',monospace;font-size:17px;color:#e8ebf0;margin-top:3px;">Calm</div></div>
+            <div><div style="font-size:11px;color:#798394;">SPY data</div><div style="font-family:'IBM Plex Mono',monospace;font-size:17px;color:#e8ebf0;margin-top:3px;">Aug 13</div></div>
+            <div><div style="font-size:11px;color:#798394;">Model age</div><div style="font-family:'IBM Plex Mono',monospace;font-size:17px;color:#f0b429;margin-top:3px;white-space:nowrap;">20 mo stale</div></div>
+            <div><div style="font-size:11px;color:#798394;">HMM fit</div><div style="font-family:'IBM Plex Mono',monospace;font-size:17px;color:#e8ebf0;margin-top:3px;white-space:nowrap;">22/22 <span style="color:#f0b429;font-size:14px;">22 warn</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:14px 26px;border-bottom:1px solid #1b2027;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;padding:12px 16px;">
+          <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#5fd3b2;margin-bottom:10px;">Performance</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;"><div style="font-size:12px;color:#798394;white-space:nowrap;">Open UPL</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#3ecf8e;">+$240</div></div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;"><div style="font-size:12px;color:#798394;white-space:nowrap;">Realized</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#e8ebf0;">$0</div></div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;"><div style="font-size:12px;color:#798394;">Sharpe</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#4b5563;">n/a</div></div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;"><div style="font-size:12px;color:#798394;">Calmar</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#4b5563;">n/a</div></div>
+          </div>
+        </div>
+
+        <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;padding:12px 16px;">
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#e0913c;">Risk</div>
+            <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;white-space:nowrap;">0.6% of 15.00% limit</div>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:9px;">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:500;letter-spacing:-.01em;">0.09%</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#798394;">$43.25 drawdown</div>
+            <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#798394;white-space:nowrap;">peak <span style="color:#a8b1c0;">0.09%</span></div>
+          </div>
+          <div style="margin-top:10px;height:3px;border-radius:2px;background:#1a1f26;overflow:hidden;"><div style="width:4px;height:100%;background:#3ecf8e;border-radius:2px;"></div></div>
+        </div>
+
+        <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;padding:12px 16px;">
+          <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#5b9cf0;margin-bottom:10px;">Exposure</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;"><div style="font-size:12px;color:#798394;">Positions</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#e8ebf0;">1</div></div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;"><div style="font-size:12px;color:#798394;white-space:nowrap;">Orders</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#e8ebf0;">1</div></div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;"><div style="font-size:12px;color:#798394;">Protection</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#e8ebf0;white-space:nowrap;">1 of 1</div></div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;"><div style="font-size:12px;color:#798394;">Held</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#e8ebf0;">7d</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:24px 26px;border-bottom:1px solid #1b2027;">
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:14px;">
+          <span style="width:3px;height:15px;border-radius:2px;background:#5b9cf0;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Open Issues</div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">1 open · evidence 2026-07-30 → 2026-08-17</div>
+        </div>
+        <div style="display:grid;grid-template-columns:352px 1fr;gap:14px;">
+          <div style="border:1px solid #232c3d;border-left:2px solid #5b9cf0;border-radius:8px;background:linear-gradient(90deg,#121a29 0%,#0f1319 72%);padding:16px 18px;">
+            <div style="display:flex;gap:12px;">
+              <div style="display:flex;flex-direction:column;gap:5px;flex:0 0 auto;">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2e2745;border-radius:3px;color:#9d8cf5;text-align:center;">RUNNER</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2a323d;border-radius:3px;color:#f0b429;text-align:center;">DEBT</div>
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:14px;font-weight:600;letter-spacing:-.005em;">Model age remains HARD stale</div>
+                <div style="font-size:12px;color:#798394;margin-top:5px;text-wrap:pretty;">HMM fit ended 2024-12-31, 20 months old; G2 HARD remains active.</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;margin-top:8px;">last 08-17, 02:51 ET</div>
+              </div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;flex:0 0 auto;">207x</div>
+            </div>
+          </div>
+
+          <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;overflow:hidden;">
+            <div style="display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid #1a1f26;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2e2745;border-radius:3px;color:#9d8cf5;">RUNNER</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2a323d;border-radius:3px;color:#f0b429;">KNOWN DEBT</div>
+              <div style="font-size:15px;font-weight:600;letter-spacing:-.005em;">Model age remains HARD stale</div>
+              <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">207 occurrences</div>
+            </div>
+            <div style="padding:16px 20px;border-bottom:1px solid #1a1f26;">
+              <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;margin-bottom:7px;">Problem</div>
+              <div style="font-size:14px;color:#e8ebf0;text-wrap:pretty;">HMM fit ended 2024-12-31 and is 20 months old; G2 HARD remains active.</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;margin-top:9px;">first 08-10, 14:05 ET · last 08-17, 02:51 ET</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #1a1f26;">
+              <div style="padding:16px 20px;border-right:1px solid #1a1f26;">
+                <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;margin-bottom:7px;">Impact</div>
+                <div style="font-size:13px;color:#a8b1c0;text-wrap:pretty;">The stale-model guard remains active. The runner continues trading, so this is debt rather than a newly inferred trading halt.</div>
+              </div>
+              <div style="padding:16px 20px;">
+                <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;margin-bottom:7px;">Action</div>
+                <div style="font-size:13px;color:#a8b1c0;text-wrap:pretty;">Keep out of the new-incident lane and complete the separately approved model re-freeze decision.</div>
+              </div>
+            </div>
+            <div style="padding:16px 20px;background:#0b0d11;">
+              <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;margin-bottom:7px;">Evidence</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#a8b1c0;line-height:1.75;text-wrap:pretty;">2026-08-17 00:51:29 ERROR global_index.hmm_stale_guard — G2 HARD: model 20 months old (fit_end=2024-12-31) — run compare_refit.py AND detect_regime_miss.py to decide</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;margin-top:9px;">closes when a later runner observation reports model age OK — absence of another log line is not enough</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:24px 26px;border-bottom:1px solid #1b2027;">
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:14px;">
+          <span style="width:3px;height:15px;border-radius:2px;background:#5fd3b2;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Open Positions</div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">1 IBKR position · 1 runner qty · 6s ago</div>
+        </div>
+        <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;overflow:hidden;">
+          <div style="padding:20px 22px;">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:20px;">
+              <div style="display:flex;align-items:baseline;gap:12px;">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:500;letter-spacing:-.01em;">M2KU6</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#798394;">FUT · LONG x1 · roska4_swing</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;padding:2px 7px;border:1px solid #1e3a30;border-radius:3px;color:#5fd3b2;">PROTECTED #288</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:22px;color:#3ecf8e;">+$240</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">+1.59% price move</div>
+              </div>
+            </div>
+            <div style="margin-top:22px;position:relative;height:22px;">
+              <div style="position:absolute;left:0;right:0;top:10px;height:2px;background:#1a1f26;"></div>
+              <div style="position:absolute;left:11%;right:0;top:10px;height:2px;background:#3ecf8e;"></div>
+              <div style="position:absolute;left:2%;top:3px;width:2px;height:16px;background:#f2555a;"></div>
+              <div style="position:absolute;left:11%;top:7px;width:8px;height:8px;border-radius:50%;background:#798394;"></div>
+              <div style="position:absolute;left:calc(100% - 8px);top:7px;width:8px;height:8px;border-radius:50%;background:#3ecf8e;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">
+              <div><span style="color:#f2555a;">stop 3,020.2</span> · plan −0.17%</div>
+              <div>entry 3,025.3</div>
+              <div><span style="color:#3ecf8e;">last 3,073.34</span></div>
+            </div>
+          </div>
+          <div style="border-top:1px solid #1a1f26;display:grid;grid-template-columns:repeat(4,1fr);background:#0b0d11;">
+            <div style="padding:14px 22px;border-right:1px solid #1a1f26;"><div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Opened</div><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#e8ebf0;margin-top:4px;">2026-08-10 15:10</div></div>
+            <div style="padding:14px 22px;border-right:1px solid #1a1f26;"><div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Held</div><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#e8ebf0;margin-top:4px;">7d</div></div>
+            <div style="padding:14px 22px;border-right:1px solid #1a1f26;"><div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Risk budget</div><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#e8ebf0;margin-top:4px;">$602</div></div>
+            <div style="padding:14px 22px;"><div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Stop order</div><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#e8ebf0;margin-top:4px;white-space:nowrap;">STP SELL x1 <span style="color:#798394;">#288 · GTC</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:24px 26px;border-bottom:1px solid #1b2027;">
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:14px;">
+          <span style="width:3px;height:15px;border-radius:2px;background:#9d8cf5;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Today's Decision</div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">2026-08-17 · runner 02:51 ET</div>
+        </div>
+        <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;overflow:hidden;">
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);">
+            <div style="padding:16px 22px;border-right:1px solid #1a1f26;"><div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Regime</div><div style="font-family:'IBM Plex Mono',monospace;font-size:18px;color:#e8ebf0;margin-top:5px;">Calm</div></div>
+            <div style="padding:16px 22px;border-right:1px solid #1a1f26;"><div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Realized</div><div style="font-family:'IBM Plex Mono',monospace;font-size:18px;color:#e8ebf0;margin-top:5px;">$0</div></div>
+            <div style="padding:16px 22px;border-right:1px solid #1a1f26;"><div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Taken</div><div style="font-family:'IBM Plex Mono',monospace;font-size:18px;color:#a8b1c0;margin-top:5px;">0</div></div>
+            <div style="padding:16px 22px;border-right:1px solid #1a1f26;"><div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Rejected</div><div style="font-family:'IBM Plex Mono',monospace;font-size:18px;color:#a8b1c0;margin-top:5px;">0</div></div>
+            <div style="padding:16px 22px;"><div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Halted</div><div style="font-family:'IBM Plex Mono',monospace;font-size:18px;color:#a8b1c0;margin-top:5px;">0</div></div>
+          </div>
+          <div style="border-top:1px solid #1a1f26;display:grid;grid-template-columns:repeat(3,1fr);background:#0b0d11;">
+            <div style="padding:14px 22px;border-right:1px solid #1a1f26;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;"><div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Entered</div><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#a8b1c0;">0</div></div>
+              <div style="font-size:12px;color:#798394;margin-top:5px;">No open entries in this decision.</div>
+            </div>
+            <div style="padding:14px 22px;border-right:1px solid #1a1f26;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;"><div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Closed</div><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#a8b1c0;">0</div></div>
+              <div style="font-size:12px;color:#798394;margin-top:5px;">No closes in this decision.</div>
+            </div>
+            <div style="padding:14px 22px;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;"><div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Rejected / halted</div><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#a8b1c0;">0</div></div>
+              <div style="font-size:12px;color:#798394;margin-top:5px;">No rejected or halted entries.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:24px 26px 32px;">
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:14px;">
+          <span style="width:3px;height:15px;border-radius:2px;background:#e0913c;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Open Orders</div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">1 working · 6s ago</div>
+        </div>
+        <div style="border:1px solid #1e242c;border-radius:8px;overflow:hidden;">
+          <div style="display:grid;grid-template-columns:1.2fr .7fr .7fr .5fr .9fr 1.1fr .6fr;gap:14px;padding:11px 22px;background:#0b0d11;font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">
+            <div>Contract</div><div>Type</div><div>Action</div><div>Qty</div><div style="text-align:right;">Stop</div><div>Status</div><div style="text-align:right;">ID</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1.2fr .7fr .7fr .5fr .9fr 1.1fr .6fr;gap:14px;padding:15px 22px;background:#0e1116;border-top:1px solid #1a1f26;font-family:'IBM Plex Mono',monospace;font-size:13px;">
+            <div>M2KU6</div><div style="color:#a8b1c0;">STP</div><div style="color:#a8b1c0;">SELL</div><div>1</div><div style="text-align:right;">3,020.2</div><div style="color:#798394;">PreSubmitted</div><div style="text-align:right;color:#798394;">#288</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#0a0c10;">
+      <div style="padding:20px 22px 0;">
+        <div style="display:flex;align-items:baseline;gap:12px;">
+          <span style="width:3px;height:15px;border-radius:2px;background:#9d8cf5;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Job journal</div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">23 jobs · 2026-08-17</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:9px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:#3ecf8e;"></span>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#798394;">Scheduler</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#a8b1c0;">on schedule</div>
+        </div>
+        <div style="display:flex;gap:4px;margin-top:16px;padding:3px;border:1px solid #1e242c;border-radius:7px;background:#0e1116;">
+          <div style="flex:1;text-align:center;padding:8px;border-radius:5px;background:#1c1a2b;color:#c9c0fb;font-size:12px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;">Jobs</div>
+          <div style="flex:1;text-align:center;padding:8px;border-radius:5px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Events</div>
+        </div>
+      </div>
+
+      <div style="padding:6px 22px 26px;">
+
+        <div style="margin-top:8px;border:1px solid #171b22;border-radius:8px;background:#0b0d11;overflow:hidden;">
+          <div style="padding:13px 15px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">08-17, 02:55 ET</div>
+              <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">—</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;margin-top:9px;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2e2745;border-radius:3px;color:#9d8cf5;">RUNNER</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2a323d;border-radius:3px;color:#3ecf8e;">RUNNING</div>
+              <div style="margin-left:auto;width:20px;height:20px;border:1px solid #262d36;border-radius:4px;color:#a8b1c0;font-size:12px;line-height:18px;text-align:center;">+</div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#e8ebf0;margin-top:9px;">NKD_NIGHT_0255</div>
+            <div style="font-size:12px;color:#798394;margin-top:5px;text-wrap:pretty;">Execution has started and completion evidence has not arrived yet.</div>
+          </div>
+        </div>
+
+        <div style="margin-top:8px;border:1px solid #2a323d;border-radius:8px;background:#0e1116;overflow:hidden;">
+          <div style="padding:13px 15px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">08-17, 02:50 ET</div>
+              <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">1m 34s</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;margin-top:9px;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2e2745;border-radius:3px;color:#9d8cf5;">RUNNER</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2a323d;border-radius:3px;color:#f0b429;">KNOWN DEBT</div>
+              <div style="margin-left:auto;width:20px;height:20px;border:1px solid #262d36;border-radius:4px;color:#a8b1c0;font-size:12px;line-height:18px;text-align:center;">–</div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#e8ebf0;margin-top:9px;">NKD_NIGHT_0250</div>
+            <div style="font-size:12px;color:#798394;margin-top:5px;text-wrap:pretty;">Runner completed, but the HMM model-age guard remains HARD stale.</div>
+          </div>
+          <div style="border-top:1px solid #1a1f26;background:#0b0d11;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #171b22;">
+              <div style="padding:12px 15px;border-right:1px solid #171b22;">
+                <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Started</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#e8ebf0;margin-top:4px;">02:50:07 ET</div>
+              </div>
+              <div style="padding:12px 15px;">
+                <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Exit</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#f0b429;margin-top:4px;">0 · known debt</div>
+              </div>
+            </div>
+            <div style="padding:13px 15px;border-bottom:1px solid #171b22;">
+              <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;margin-bottom:6px;">Outcome</div>
+              <div style="font-size:12px;color:#e8ebf0;text-wrap:pretty;">Runner completed the decision cycle. The HMM model-age guard fired HARD stale, so the run proceeded under existing debt instead of raising a new incident. No entries, no closes.</div>
+            </div>
+            <div style="padding:13px 15px;border-bottom:1px solid #171b22;">
+              <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;margin-bottom:7px;">Log</div>
+              <div style="display:grid;grid-template-columns:62px 46px 1fr;gap:9px;padding:3px 0;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.6;">
+                <div style="color:#798394;">02:50:07</div><div style="color:#798394;">INFO</div><div style="color:#a8b1c0;text-wrap:pretty;">runner.start — session=NKD_NIGHT, mode=paper</div>
+              </div>
+              <div style="display:grid;grid-template-columns:62px 46px 1fr;gap:9px;padding:3px 0;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.6;">
+                <div style="color:#798394;">02:50:41</div><div style="color:#f0b429;">ERROR</div><div style="color:#a8b1c0;text-wrap:pretty;">global_index.hmm_stale_guard — G2 HARD: model 20 months old (fit_end=2024-12-31)</div>
+              </div>
+              <div style="display:grid;grid-template-columns:62px 46px 1fr;gap:9px;padding:3px 0;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.6;">
+                <div style="color:#798394;">02:51:04</div><div style="color:#798394;">INFO</div><div style="color:#a8b1c0;text-wrap:pretty;">runner.decision — regime=Calm, entries=0, closes=0, realized=$0</div>
+              </div>
+              <div style="display:grid;grid-template-columns:62px 46px 1fr;gap:9px;padding:3px 0;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.6;">
+                <div style="color:#798394;">02:51:41</div><div style="color:#798394;">INFO</div><div style="color:#a8b1c0;text-wrap:pretty;">runner.exit — code 0, protection unchanged (#288 GTC)</div>
+              </div>
+            </div>
+            <div style="padding:12px 15px;display:flex;align-items:center;gap:8px;">
+              <div style="padding:6px 12px;border:1px solid #262d36;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#e8ebf0;">Full log</div>
+              <div style="padding:6px 12px;border:1px solid #262d36;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#e8ebf0;">Artifacts</div>
+              <div style="margin-left:auto;padding:6px 12px;border-radius:5px;background:#14251f;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8ae6cc;">Re-run</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:8px;border:1px solid #171b22;border-radius:8px;background:#0b0d11;overflow:hidden;">
+          <div style="padding:13px 15px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">08-17, 02:45 ET</div>
+              <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">1m 27s</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;margin-top:9px;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2e2745;border-radius:3px;color:#9d8cf5;">RUNNER</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2a323d;border-radius:3px;color:#f0b429;">KNOWN DEBT</div>
+              <div style="margin-left:auto;width:20px;height:20px;border:1px solid #262d36;border-radius:4px;color:#a8b1c0;font-size:12px;line-height:18px;text-align:center;">+</div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#e8ebf0;margin-top:9px;">NKD_NIGHT_0245</div>
+            <div style="font-size:12px;color:#798394;margin-top:5px;text-wrap:pretty;">Runner completed, but the HMM model-age guard remains HARD stale.</div>
+          </div>
+        </div>
+
+        <div style="margin-top:8px;border:1px solid #171b22;border-radius:8px;background:#0b0d11;overflow:hidden;">
+          <div style="padding:13px 15px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">08-17, 02:40 ET</div>
+              <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">1m 38s</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;margin-top:9px;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2e2745;border-radius:3px;color:#9d8cf5;">RUNNER</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2a323d;border-radius:3px;color:#f0b429;">KNOWN DEBT</div>
+              <div style="margin-left:auto;width:20px;height:20px;border:1px solid #262d36;border-radius:4px;color:#a8b1c0;font-size:12px;line-height:18px;text-align:center;">+</div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#e8ebf0;margin-top:9px;">NKD_NIGHT_0240</div>
+            <div style="font-size:12px;color:#798394;margin-top:5px;text-wrap:pretty;">Runner completed, but the HMM model-age guard remains HARD stale.</div>
+          </div>
+        </div>
+
+        <div style="padding-top:16px;display:flex;align-items:center;gap:14px;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5fd3b2;cursor:pointer;">Show all 23 jobs</div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;cursor:pointer;">Collapse all</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

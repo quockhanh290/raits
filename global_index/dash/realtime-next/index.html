@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAITS Realtime Monitor — Next</title>
+  <!-- Self-hosted webfonts. Served from this host, so the page still contains no
+       external URL — the rule the backend tests assert. Loaded before the base so
+       the families exist by the time any stylesheet asks for them. -->
+  <link rel="stylesheet" href="/dash/fonts/fonts.css">
+  <!-- SHARED base with /realtime. Not duplicated: all five pages load this file,
+       so a copy would become a second version that drifts from the original. -->
+  <link rel="stylesheet" href="/dash/realtime/realtime.css">
+  <!-- Override layer: ONLY the differences introduced by the redesign. -->
+  <link rel="stylesheet" href="/dash/realtime-next/next.css">
+  <!-- The skin. This page had NONE until now, which meant every visual decision
+       made on preview.html?skin=e was invisible here: measured on this route the
+       issue row wore the base sheet's 2.4px #8b72ff and the detail panel had no
+       top accent at all, while the preview showed both at 2px #5b9cf0.
+
+       preview.html keeps its own switcher for comparing directions; this file
+       names ONE skin, and this line is where the choice lives. Point it at
+       skin-b.css to switch the whole route back to that direction. -->
+  <link rel="stylesheet" href="/dash/realtime-next/skin-e.css">
+  <!-- The script is shared too. Constraint: its element lookup returns null when an
+       id is missing and several call sites assign properties without checking, so
+       dropping one id kills the whole page. To hide an element set `hidden`;
+       NEVER remove it from the document. -->
+  <script src="/dash/realtime/realtime.js" defer></script>
+  <!-- Enhancement layer, this route only. Adds nodes; never edits or removes the
+       ones realtime.js owns. If it breaks, the page must behave as if it were absent. -->
+  <script src="/dash/realtime-next/next.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand-lockup">
+      <a class="brand" href="/">RAITS FUTURES</a>
+      <span class="mode-badge">PAPER</span>
+    </div>
+    <nav class="module-nav" aria-label="Monitor modules">
+      <a href="/realtime" aria-current="page">Realtime</a>
+      <a href="/analytics">Historical</a>
+      <a href="/paper">Paper</a>
+      <a href="/reports">Reports</a>
+    </nav>
+    <div class="header-live-context">
+      <label class="font-control has-tip tip-bottom" data-tooltip="Change the dashboard typeface. The choice is stored only in this browser.">
+        <span>Font</span>
+        <select id="fontSelector" aria-label="Dashboard font">
+          <option value="cascadia">Cascadia Mono</option>
+          <option value="consolas">Consolas</option>
+          <option value="jetbrains">JetBrains Mono</option>
+          <option value="ibm-plex">IBM Plex Mono</option>
+          <option value="lucida">Lucida Console</option>
+          <option value="courier">Courier New</option>
+          <option value="system">System UI</option>
+        </select>
+      </label>
+      <b id="sessionDate">--</b>
+      <span class="broker-header-state"><i></i><b id="brokerContext">Loading</b></span>
+      <span class="runner-header-state"><i></i><b id="runnerContext">Loading</b></span>
+      <!-- Restored. This element was missing from this route, and realtime.js:377
+           guards with `if (spEl)` so nothing crashed — it simply stopped
+           reporting. What it reports: Scheduler DOWN, Scheduler xN RUNNING,
+           RUNNING OLD CRON, Scheduler unknown. The journal's "on schedule" line
+           answers a different question and says so in its own tooltip; two
+           schedulers running at once is the state that cost six entry slots. -->
+      <span class="runner-header-state"><i></i><b id="schedulerContext">Loading</b></span>
+    </div>
+  </header>
+
+  <main>
+    <div class="overview-header">
+    <section class="header-dashboard metrics" id="metrics" aria-label="Realtime account overview">
+      <div class="metrics-row metrics-lead">
+      <div class="header-zone equity-zone runner-derived">
+        <span class="zone-title has-tip tip-bottom" tabindex="0" data-tooltip="Paper-trading system equity maintained by the runner ledger. This excludes the broker account's total liquidation value.">Paper Equity</span>
+        <div class="equity-line"><b id="metricEquity">--</b><strong id="performanceNet">--</strong></div>
+        <small><em id="performanceReturn">--</em> <span id="performanceScope">--</span> / base <strong id="performanceBase">--</strong></small>
+        <small class="broker-account-line has-tip tip-bottom" tabindex="0" data-tooltip="The IBKR paper account's own equity, shown for context only. The runner ledger above is realised-only and re-anchors at the system epoch; the two are not the same number and are not meant to reconcile here."><span id="brokerAccountContext">--</span> <a href="/paper" class="reconcile-link">Reconcile</a></small>
+      </div>
+
+      <div class="header-zone model-inputs-zone runner-derived" id="modelInputsZone">
+        <span class="zone-title has-tip tip-bottom" tabindex="0" data-tooltip="Regime, SPY source date, and fitted-model age used by the runner. Input freshness is separate from scheduler timing.">Model Inputs</span>
+        <div class="model-input-item model-input-regime">
+          <span>Regime</span><b id="sessionRegime">--</b>
+        </div>
+        <div class="model-input-item model-input-spy">
+          <span>SPY data</span><b id="regimeInputDate">--</b>
+        </div>
+        <div class="model-input-item model-input-age">
+          <span>Model age</span><b id="modelInputAge">--</b>
+        </div>
+        <div class="model-input-item model-input-fit">
+          <span class="has-tip tip-bottom" tabindex="0" data-tooltip="Daily HMM fit evidence grouped from runner logs. Convergence warnings are diagnostic unless a documented decision gate fails.">HMM fit</span><b id="modelFitStatus">--</b>
+        </div>
+        <div class="model-input-item model-input-fitend">
+          <span class="has-tip tip-bottom" tabindex="0" data-tooltip="The last date in the data the live HMM was fitted on. `Model age` says how old that fit is; this says what it is anchored to.">Fit end</span><b id="modelFitEnd">--</b>
+        </div>
+        <div class="model-input-item model-input-refreeze">
+          <span class="has-tip tip-bottom" tabindex="0" data-tooltip="Whether a model re-freeze decision is outstanding. Reported by the runner, not inferred from model age.">Re-freeze</span><b id="modelRefreeze">--</b>
+        </div>
+      </div>
+
+      </div>
+
+      <div class="metrics-row metrics-figures">
+      <div class="header-zone performance-zone">
+        <span class="zone-title">Performance</span>
+        <div class="zone-grid">
+          <div class="broker-derived"><span class="has-tip tip-bottom" tabindex="0" data-tooltip="Unrealized P&amp;L reported by IBKR for currently open positions.">Open UPL</span><b id="metricUnrealized">--</b></div>
+          <div class="runner-derived"><span class="has-tip tip-bottom" tabindex="0" data-tooltip="Realized P&amp;L recorded by the runner for the current trading date.">Realized today</span><b id="metricRealized">--</b></div>
+          <div class="runner-derived"><span class="has-tip tip-bottom" tabindex="0" data-tooltip="Running annualized Sharpe ratio from paper-trading equity observations.">Sharpe</span><b id="performanceSharpe">--</b></div>
+          <div class="runner-derived"><span class="has-tip tip-bottom" tabindex="0" data-tooltip="Running live Calmar ratio. Missing history is shown as unavailable.">Calmar</span><b id="performanceCalmar">--</b></div>
+        </div>
+      </div>
+
+      <div class="header-zone risk-zone runner-derived">
+        <span class="zone-title">Risk</span>
+        <small class="risk-limit" id="metricDrawdownLimit">--</small>
+        <div class="metric-dd-value">
+          <b id="metricDrawdown">--</b><em id="metricDrawdownAmount">--</em><span class="dd-word">drawdown</span>
+          <small class="dd-peak">peak <strong id="performanceMaxDd">--</strong></small>
+        </div>
+        <div class="dd-gauge" role="meter" aria-label="Drawdown versus hard limit"><i id="metricDrawdownFill"></i></div>
+      </div>
+
+      <div class="header-zone exposure-zone">
+        <span class="zone-title">Exposure</span>
+        <div class="zone-grid">
+          <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="Number of open futures positions currently reported by IBKR.">Positions</span><b id="metricPositions">--</b></div>
+          <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="All currently working orders reported by IBKR, including protective stops.">Working orders</span><b id="metricStops">--</b></div>
+          <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="Covered = a live stop with the right side, a sane price, and enough total quantity. Deferred = protection intentionally delayed by rule. Naked = neither.">Protection</span><b id="metricStopsCovered">--</b></div>
+          <div class="runner-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="Gross exposure across all clusters, as a percentage of equity, summed from the runner's per-cluster figures.">Gross</span><b id="metricGrossExposure">--</b></div>
+        </div>
+      </div>
+      </div>
+    </section>
+
+    <section class="status-rail" id="statusRail" aria-label="Operational status"></section>
+    </div>
+
+    <div class="workspace">
+      <div class="primary-column">
+        <section class="now-monitor section-band" id="now-monitor">
+          <div class="section-heading">
+            <div class="now-monitor-title"><h1>Now Monitor</h1><span class="monitor-clear-indicator" id="monitorClearIndicator" hidden><i class="status-dot"></i><b>CLEAR</b></span></div>
+            <div class="now-monitor-heading-status">
+              <p class="summary" id="incidentSummary">Waiting for sources</p>
+            </div>
+          </div>
+          <div class="section-body now-monitor-shell">
+            <div class="now-schedule-facts" id="nowScheduleFacts" aria-label="Scheduler job timeline"></div>
+            <div class="now-monitor-layout" id="nowMonitorLayout">
+              <div class="now-monitor-list" id="nowMonitorList" role="listbox" aria-label="Current operational issues"></div>
+              <div class="now-monitor-detail" id="nowMonitorDetail" aria-live="polite"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-band open-issues-section">
+          <div class="section-heading compact">
+            <h2>Open Issues</h2>
+            <span class="source-note has-tip tip-right" id="openIssuesSource" tabindex="0" data-tooltip="Issues reconstructed from retained read-only scheduler evidence. Known debt remains open until positive resolution evidence exists.">Loading retained evidence</span>
+          </div>
+          <details class="open-issues-shell" id="openIssuesShell">
+            <summary id="openIssuesToggle">Open issue list</summary>
+            <div class="open-issues-layout">
+              <div class="open-issue-list" id="openIssueList" role="listbox" aria-label="Open issues"></div>
+              <div class="open-issue-detail" id="openIssueDetail" aria-live="polite"></div>
+            </div>
+          </details>
+        </section>
+
+        <section class="section-band positions-section">
+          <div class="section-heading compact">
+            <h2>Open Positions</h2>
+            <span class="source-note" id="positionSource">IBKR unavailable</span>
+          </div>
+          <div class="position-grid" id="positionGrid"></div>
+        </section>
+
+        <section class="section-band decision-section runner-derived">
+          <div class="section-heading compact">
+            <h2>Today's Decision</h2>
+            <span class="source-note has-tip tip-right" id="decisionSource" tabindex="0" data-tooltip="Entries, closes, and rejected signals emitted in the decision block of the newest runner snapshot.">Session unavailable</span>
+          </div>
+          <div class="section-body decision-shell">
+            <div class="decision-summary" id="decisionSummary"></div>
+            <div class="decision-groups">
+              <section class="decision-group">
+                <div class="decision-group-head"><span>Entered</span><b id="decisionEntryCount">0</b></div>
+                <div class="decision-list" id="decisionEntries"></div>
+              </section>
+              <section class="decision-group">
+                <div class="decision-group-head"><span>Closed</span><b id="decisionCloseCount">0</b></div>
+                <div class="decision-list" id="decisionCloses"></div>
+              </section>
+              <section class="decision-group">
+                <div class="decision-group-head"><span>Rejected / Halted</span><b id="decisionRejectedCount">0</b></div>
+                <div class="decision-list" id="decisionRejected"></div>
+              </section>
+            </div>
+            <div class="execution-exceptions" id="executionExceptions" hidden></div>
+          </div>
+        </section>
+
+        <section class="section-band orders-section">
+          <div class="section-heading compact">
+            <h2>Open Orders</h2>
+            <span class="source-note" id="ordersSource">IBKR unavailable</span>
+          </div>
+          <div class="table-wrap section-body table-shell">
+            <table>
+              <thead><tr><th>Contract</th><th>Type</th><th>Action</th><th class="num">Qty</th><th class="num">Stop</th><th>Status</th><th class="num">ID</th></tr></thead>
+              <tbody id="ordersBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <aside class="journal-column">
+        <section class="section-band journal-section">
+          <div class="section-heading compact">
+            <h2 id="journalTitle">Job Journal</h2>
+            <span class="source-note journal-source has-tip tip-right" id="journalSource" tabindex="0" data-tooltip="One row per scheduler execution. Click a job to inspect its stop, order, fill, and diagnostic evidence. Operational events outside a job remain standalone.">Session unavailable</span>
+          </div>
+          <div class="journal-schedule" id="journalSchedule"></div>
+          <div class="section-body journal-shell">
+            <div class="journal-view-toggle" role="group" aria-label="Journal view">
+              <button type="button" data-journal-view="jobs" aria-pressed="true">Jobs</button>
+              <button type="button" data-journal-view="events" aria-pressed="false">Events</button>
+            </div>
+            <ol class="journal" id="journal"></ol>
+          </div>
+        </section>
+        <section class="section-band source-section">
+          <div class="section-heading compact"><h2>Source Clocks</h2></div>
+          <div class="section-body source-shell"><dl id="sourceClocks"></dl></div>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <div class="fatal-banner" id="fatalBanner" hidden>Monitor backend unavailable.</div>
+</body>
+</html>
