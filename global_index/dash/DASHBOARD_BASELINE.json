@@ -1,0 +1,354 @@
+{
+  "basis": {
+    "measured_at_utc": "2026-08-18 03:28:02Z",
+    "commit": "df908ed",
+    "branch": "future/incorporation",
+    "dash_tree_state": "?? global_index/dash/DASHBOARD_BASELINE.json\n?? global_index/dash/DASHBOARD_BASELINE.md\n?? global_index/dash/tools/",
+    "python": "3.11.4",
+    "min_text_nodes_required": 40,
+    "data_source": "backend live — số ĐẾM là ảnh chụp, không phải mốc đóng băng"
+  },
+  "rows": [
+    {
+      "page": "/realtime",
+      "width": 1900,
+      "rendered": true,
+      "textNodes": 226,
+      "collisions": 0,
+      "collisionSample": [],
+      "clippedPastRightEdge": 0,
+      "pageOverflow": 0,
+      "contrastCounted": 572,
+      "belowAA": 4,
+      "distinctFontSizes": 12,
+      "fontFamilies": [
+        "Cascadia Mono",
+        "IBM Plex Sans"
+      ],
+      "stylesheets": [
+        "fonts.css",
+        "realtime.css",
+        "next.css",
+        "skin-e.css"
+      ]
+    },
+    {
+      "page": "/realtime",
+      "width": 390,
+      "rendered": true,
+      "textNodes": 644,
+      "collisions": 0,
+      "collisionSample": [],
+      "clippedPastRightEdge": 11,
+      "pageOverflow": 0,
+      "contrastCounted": 578,
+      "belowAA": 3,
+      "distinctFontSizes": 11,
+      "fontFamilies": [
+        "Cascadia Mono",
+        "IBM Plex Sans"
+      ],
+      "stylesheets": [
+        "fonts.css",
+        "realtime.css",
+        "next.css",
+        "skin-e.css"
+      ]
+    },
+    {
+      "page": "/paper · Overview",
+      "width": 1900,
+      "rendered": true,
+      "textNodes": 131,
+      "collisions": 0,
+      "collisionSample": [],
+      "clippedPastRightEdge": 0,
+      "pageOverflow": 0,
+      "contrastCounted": 113,
+      "belowAA": 33,
+      "distinctFontSizes": 9,
+      "fontFamilies": [
+        "Cascadia Mono"
+      ],
+      "stylesheets": [
+        "realtime.css",
+        "paper.css?v=paper-live-tabs-v1-20260814"
+      ]
+    },
+    {
+      "page": "/paper · Gates",
+      "width": 1900,
+      "rendered": true,
+      "textNodes": 746,
+      "collisions": 148,
+      "collisionSample": [
+        "Paper duration is counted  | C1 SLIPPAGE",
+        "Paper duration is counted  | OPEN 0/4 instrument(s) at ",
+        "Paper duration is counted  | OPEN 0/4 instrument(s) at ",
+        "observed | OPEN over limit now"
+      ],
+      "clippedPastRightEdge": 0,
+      "pageOverflow": 0,
+      "contrastCounted": 693,
+      "belowAA": 249,
+      "distinctFontSizes": 12,
+      "fontFamilies": [
+        "Cascadia Mono"
+      ],
+      "stylesheets": [
+        "realtime.css",
+        "paper.css?v=paper-live-tabs-v1-20260814"
+      ]
+    },
+    {
+      "page": "/paper · Coverage",
+      "width": 1900,
+      "rendered": true,
+      "textNodes": 373,
+      "collisions": 0,
+      "collisionSample": [],
+      "clippedPastRightEdge": 0,
+      "pageOverflow": 0,
+      "contrastCounted": 340,
+      "belowAA": 117,
+      "distinctFontSizes": 11,
+      "fontFamilies": [
+        "Cascadia Mono"
+      ],
+      "stylesheets": [
+        "realtime.css",
+        "paper.css?v=paper-live-tabs-v1-20260814"
+      ]
+    },
+    {
+      "page": "/paper · Gaps",
+      "width": 1900,
+      "rendered": true,
+      "textNodes": 86,
+      "collisions": 0,
+      "collisionSample": [],
+      "clippedPastRightEdge": 0,
+      "pageOverflow": 0,
+      "contrastCounted": 78,
+      "belowAA": 25,
+      "distinctFontSizes": 8,
+      "fontFamilies": [
+        "Cascadia Mono"
+      ],
+      "stylesheets": [
+        "realtime.css",
+        "paper.css?v=paper-live-tabs-v1-20260814"
+      ]
+    },
+    {
+      "page": "/paper · Overview",
+      "width": 390,
+      "rendered": true,
+      "textNodes": 197,
+      "collisions": 0,
+      "collisionSample": [],
+      "clippedPastRightEdge": 0,
+      "pageOverflow": 0,
+      "contrastCounted": 113,
+      "belowAA": 33,
+      "distinctFontSizes": 8,
+      "fontFamilies": [
+        "Cascadia Mono"
+      ],
+      "stylesheets": [
+        "realtime.css",
+        "paper.css?v=paper-live-tabs-v1-20260814"
+      ]
+    },
+    {
+      "page": "/paper · Gates",
+      "width": 390,
+      "rendered": true,
+      "textNodes": 989,
+      "collisions": 389,
+      "collisionSample": [
+        "Paper duration is counted  | C1 SLIPPAGE",
+        "Paper duration is counted  | OPEN 0/4 instrument(s) at ",
+        "Paper duration is counted  | OPEN 0/4 instrument(s) at ",
+        "Paper duration is counted  | OPEN 0/4 instrument(s) at "
+      ],
+      "clippedPastRightEdge": 0,
+      "pageOverflow": 0,
+      "contrastCounted": 693,
+      "belowAA": 249,
+      "distinctFontSizes": 11,
+      "fontFamilies": [
+        "Cascadia Mono"
+      ],
+      "stylesheets": [
+        "realtime.css",
+        "paper.css?v=paper-live-tabs-v1-20260814"
+      ]
+    },
+    {
+      "page": "/paper · Coverage",
+      "width": 390,
+      "rendered": true,
+      "textNodes": 464,
+      "collisions": 13,
+      "collisionSample": [
+        "sleeve ledger | shortfall",
+        "shortfall | root cause",
+        "RECORDED | mnkd_routing_2026_08_14",
+        "2026-08-14 | MNKD global_nkd"
+      ],
+      "clippedPastRightEdge": 0,
+      "pageOverflow": 0,
+      "contrastCounted": 340,
+      "belowAA": 117,
+      "distinctFontSizes": 10,
+      "fontFamilies": [
+        "Cascadia Mono"
+      ],
+      "stylesheets": [
+        "realtime.css",
+        "paper.css?v=paper-live-tabs-v1-20260814"
+      ]
+    },
+    {
+      "page": "/paper · Gaps",
+      "width": 390,
+      "rendered": true,
+      "textNodes": 125,
+      "collisions": 0,
+      "collisionSample": [],
+      "clippedPastRightEdge": 0,
+      "pageOverflow": 0,
+      "contrastCounted": 78,
+      "belowAA": 25,
+      "distinctFontSizes": 7,
+      "fontFamilies": [
+        "Cascadia Mono"
+      ],
+      "stylesheets": [
+        "realtime.css",
+        "paper.css?v=paper-live-tabs-v1-20260814"
+      ]
+    },
+    {
+      "page": "/analytics",
+      "width": 1900,
+      "rendered": true,
+      "textNodes": 891,
+      "collisions": 0,
+      "collisionSample": [],
+      "clippedPastRightEdge": 0,
+      "pageOverflow": 0,
+      "contrastCounted": 890,
+      "belowAA": 17,
+      "distinctFontSizes": 11,
+      "fontFamilies": [
+        "Cascadia Mono"
+      ],
+      "stylesheets": [
+        "realtime.css",
+        "analytics.css"
+      ]
+    },
+    {
+      "page": "/analytics",
+      "width": 390,
+      "rendered": true,
+      "textNodes": 493,
+      "collisions": 0,
+      "collisionSample": [],
+      "clippedPastRightEdge": 0,
+      "pageOverflow": 0,
+      "contrastCounted": 890,
+      "belowAA": 17,
+      "distinctFontSizes": 10,
+      "fontFamilies": [
+        "Cascadia Mono"
+      ],
+      "stylesheets": [
+        "realtime.css",
+        "analytics.css"
+      ]
+    },
+    {
+      "page": "/reports",
+      "width": 1900,
+      "rendered": true,
+      "textNodes": 267,
+      "collisions": 0,
+      "collisionSample": [],
+      "clippedPastRightEdge": 0,
+      "pageOverflow": 0,
+      "contrastCounted": 555,
+      "belowAA": 222,
+      "distinctFontSizes": 13,
+      "fontFamilies": [
+        "Cascadia Mono"
+      ],
+      "stylesheets": [
+        "realtime.css",
+        "reports.css"
+      ]
+    },
+    {
+      "page": "/reports",
+      "width": 390,
+      "rendered": true,
+      "textNodes": 283,
+      "collisions": 0,
+      "collisionSample": [],
+      "clippedPastRightEdge": 0,
+      "pageOverflow": 0,
+      "contrastCounted": 555,
+      "belowAA": 222,
+      "distinctFontSizes": 12,
+      "fontFamilies": [
+        "Cascadia Mono"
+      ],
+      "stylesheets": [
+        "realtime.css",
+        "reports.css"
+      ]
+    },
+    {
+      "page": "/",
+      "width": 1900,
+      "rendered": false,
+      "textNodes": 19,
+      "collisions": 0,
+      "collisionSample": [],
+      "clippedPastRightEdge": 0,
+      "pageOverflow": 0,
+      "contrastCounted": 17,
+      "belowAA": 0,
+      "distinctFontSizes": 5,
+      "fontFamilies": [
+        "Cascadia Mono"
+      ],
+      "stylesheets": [
+        "realtime.css",
+        "inline"
+      ]
+    },
+    {
+      "page": "/",
+      "width": 390,
+      "rendered": false,
+      "textNodes": 26,
+      "collisions": 0,
+      "collisionSample": [],
+      "clippedPastRightEdge": 0,
+      "pageOverflow": 0,
+      "contrastCounted": 17,
+      "belowAA": 0,
+      "distinctFontSizes": 6,
+      "fontFamilies": [
+        "Cascadia Mono"
+      ],
+      "stylesheets": [
+        "realtime.css",
+        "inline"
+      ]
+    }
+  ]
+}
