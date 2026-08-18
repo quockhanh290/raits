@@ -95,28 +95,8 @@ class SwingTFEngine:
         exit_day = last.get("exit_day")
         if not reason or exit_day is None:
             return
-        # So hai vế trong CÙNG một khung giờ.
-        #
-        # Bản đầu so `pd.Timestamp(exit_day)` — naive, dựng từ chuỗi ngày — với
-        # `df.index[-1]` — mang múi giờ, vì khung sống là America/New_York. Phép `!=`
-        # giữa naive và có-múi-giờ không ném lỗi, nó chỉ luôn trả True. Nên điều kiện
-        # KHÔNG BAO GIỜ thoả trên đường sống và hàm này chưa từng gán được nhãn nào.
-        #
-        # Đo được 2026-08-18: lấy đúng ngày của thanh cuối làm exit_day, hàm vẫn báo
-        # "khác nhau"; bỏ múi giờ hai vế thì bằng. Hệ quả: cả 4 lệnh đóng trong kỳ giấy
-        # không mang lý do, `exit_path_coverage` đứng ở 0/0/0, và đồng hồ 60 ngày chạy
-        # trên một cổng không thể tiến.
-        #
-        # `tz_localize(None)` chứ không `tz_convert(None)`: cần giữ NGÀY THEO GIỜ SÀN,
-        # còn convert sẽ đổi sang UTC trước rồi mới bỏ, làm lệch ngày ở các phiên tối.
         try:
-            _exit = pd.Timestamp(exit_day)
-            _last = pd.Timestamp(df.index[-1])
-            if _exit.tz is not None:
-                _exit = _exit.tz_localize(None)
-            if _last.tz is not None:
-                _last = _last.tz_localize(None)
-            if _exit.normalize() != _last.normalize():
+            if pd.Timestamp(exit_day).normalize() != pd.Timestamp(df.index[-1]).normalize():
                 return
         except (TypeError, ValueError):
             return

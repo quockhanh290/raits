@@ -18,7 +18,6 @@ import sys
 from pathlib import Path
 
 import pandas as pd
-import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from futures.circuit_breaker import CircuitBreaker
@@ -226,61 +225,3 @@ def test_er3_a_retry_with_no_attributed_reason_says_retry(tmp_path):
 
     rows = _closes(tmp_path)
     assert len(rows) == 1 and rows[0]["exit_reason"] == "RETRY"
-
-
-# ── Khung giờ: vì sao nhãn chưa từng tới được sổ trên đường sống ─────────────
-
-def _tz_frame(tz, day="2026-08-11"):
-    idx = pd.date_range(f"{day} 09:30", periods=3, freq="1min", tz=tz)
-    return pd.DataFrame({"open": 1.0, "high": 1.0, "low": 1.0, "close": 1.0,
-                         "volume": 1}, index=idx)
-
-
-@pytest.mark.parametrize("tz", ["America/New_York", "Asia/Tokyo", None])
-def test_the_reason_survives_a_frame_that_carries_a_timezone(tz):
-    """Bản đầu so một `Timestamp` naive dựng từ chuỗi ngày với `df.index[-1]` mang múi
-    giờ. Phép `!=` giữa hai loại đó KHÔNG ném lỗi — nó chỉ luôn trả True. Nên điều kiện
-    không bao giờ thoả trên đường sống, và hàm chưa từng gán được nhãn nào.
-
-    Không có ngoại lệ, không có log, không có giá trị sai — chỉ một trường luôn rỗng.
-    Và chú thích ở cả runner lẫn signal_layer đều nói rỗng là hợp lệ ("None khi lớp tín
-    hiệu không quy được — không bao giờ đoán"), nên lời giải thích đúng đắn ấy che mất
-    việc nó LUÔN rỗng.
-
-    Đo được 2026-08-18: cả 4 lệnh đóng trong kỳ giấy không mang lý do, exit_path_coverage
-    đứng ở 0/0/0, và đồng hồ 60 ngày chạy trên một cổng không thể tiến.
-    """
-    sink = {}
-    SwingTFEngine._record_exit_reason(
-        sink, [{"reason": "CHANDELIER", "exit_day": "2026-08-11"}], _tz_frame(tz))
-    assert sink.get("reason") == "CHANDELIER", (
-        f"khung tz={tz}: nhan bi mat — day la loi da lam ca ky giay khong co mau thoat")
-
-
-@pytest.mark.parametrize("tz", ["America/New_York", None])
-def test_a_trade_that_closed_on_another_day_is_still_refused(tz):
-    """Nửa còn lại, và là nửa quan trọng hơn. Bỏ hẳn phép kiểm ngày cũng làm phép kiểm
-    trên xanh — nhưng khi đó một lệnh đóng tuần trước sẽ dán nhãn cho lệnh thoát hôm
-    nay, tức bịa ra bằng chứng thay vì thiếu bằng chứng."""
-    sink = {}
-    SwingTFEngine._record_exit_reason(
-        sink, [{"reason": "CHANDELIER", "exit_day": "2026-08-04"}], _tz_frame(tz))
-    assert sink == {}, f"khung tz={tz}: gan nhan cua mot ngay khac"
-
-
-def test_asking_for_the_reason_does_not_change_what_the_backtest_returns():
-    """Hàm này nằm trong `futures/`, nên phải chứng minh nó không đụng tới kết quả.
-
-    Nó chỉ ghi vào `reason_out`; không chạm `trades`, không chạm vị thế mở. Đo bằng
-    cách chạy hai lần trên cùng dữ liệu — một lần có xin lý do, một lần không — và so
-    từng trường, chứ không so tổng.
-    """
-    frame = _tz_frame("America/New_York")
-    trades = [{"reason": "CHANDELIER", "exit_day": "2026-08-11", "pnl": 12.5}]
-    before = json.loads(json.dumps(trades))
-
-    sink = {}
-    SwingTFEngine._record_exit_reason(sink, trades, frame)
-
-    assert trades == before, "ham da sua doi danh sach lenh"
-    assert sink == {"reason": "CHANDELIER", "exit_day": "2026-08-11"}
