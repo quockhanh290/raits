@@ -120,6 +120,36 @@ hiem: bien mot bat dong that thanh "chua toi luot".
 quan sat thanh cong. Neu hut, `flex_pull` se noi `code=1004` chu khong im, va cach chua
 la doi khung chay muon hon.
 
+## 3c. code=1025 — khoa vi hong qua nhieu lan, KHONG phai loi cau hinh
+
+Thong diep cua IBKR la `Too many failed attempts. Please review your configuration.` va
+no chi sai huong: cau hinh khong doi, cai doi la da hong qua nhieu lan lien tiep.
+
+Do duoc dem 2026-08-18. Mot vong do 20 phut/lan dung de do xem bao lau sau khi dong cua
+thi IBKR cong bo so:
+
+```
+00:26 -> 02:26 ET   tam lan, deu code=1004 (chua chot so)
+02:46 ET tro di     code=1025 — khoa
+```
+
+Nhip khong phai rang buoc bi vi pham: runbook ghi 1 lan/giay va 10 lan/phut, con vong
+do la 1 lan / 20 phut. **So lan hong lien tiep** moi la thu bi dem. Kiem dung cai gioi
+han minh tim thay, khong hoi con gioi han nao khac — do la cach mac bay nay.
+
+**Cach xu ly:** dung thu lai. De yen vai gio, roi thu **dung mot lan** bang tay. Con
+`1025` thi vao Client Portal -> Reporting -> Flex Web Service Configuration, sinh lai
+token, `setx` lai, va khoi dong lai scheduler.
+
+**Cong cu nay gio tu tu choi:** `flex_pull` dem so lan SendRequest hong trong 60 phut
+gan nhat va tu choi gui o lan thu 3. Job dem chay mot lan moi ngay nen khong bao gio
+cham nguong; thu tay hai lan cung khong; mot vong lap thi dung lai. Thanh cong thi xoa
+so dem. So dem nam canh `--out-dir` nen mot phep kiem trong thu muc tam khong the khoa
+duong chay that.
+
+**Do do tre cong bo cho dung cach:** mot lan thu moi ngay ngay truoc 22:20 ET, ghi ket
+qua lai. Cham hon nhieu, nhung khong danh nhau voi dich vu.
+
 ## 4. Reconcile voi trade log
 
 Neu report la CSV Transaction History dung format parser hien co:

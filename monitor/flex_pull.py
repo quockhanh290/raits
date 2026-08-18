@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import os
 import sys
 import time
@@ -110,6 +111,65 @@ def _text(root: ET.Element, tag: str) -> str | None:
     return None
 
 
+# ── Chặn chính mình trước khi IBKR chặn ──────────────────────────────────────
+# Đêm 2026-08-18 tôi dựng một vòng dò 20 phút/lần để đo xem bao lâu sau khi đóng cửa
+# thì IBKR công bố sổ. Tám lần hỏng liên tiếp và dịch vụ đổi từ `code=1004` sang
+# `code=1025 Too many failed attempts`, tức khoá lại — có nguy cơ làm hỏng cả job thật
+# lúc 22:20 ET, dù token và khoảng ngày đã đúng.
+#
+# Sai ở chỗ đo nhầm giới hạn: runbook ghi nhịp *1 lần/giây, 10 lần/phút*, tôi tính 20
+# phút/lần là an toàn thừa rồi dừng lại. Nhịp không phải ràng buộc bị vi phạm — **số
+# lần hỏng liên tiếp** mới là. Kiểm đúng cái giới hạn mình tìm thấy, không hỏi còn giới
+# hạn nào khác.
+#
+# Nên công cụ tự từ chối bị dùng theo kiểu đó. Đếm theo GIỜ chứ không theo lần: job đêm
+# chạy một lần một ngày nên không bao giờ chạm ngưỡng, thử tay vài lần cũng không, còn
+# một vòng lặp thì dừng sau ba lần. Thành công thì xoá sổ đếm.
+_ATTEMPT_WINDOW_MIN = 60
+_ATTEMPT_LIMIT = 3
+
+
+def _attempt_log(out_dir: Path) -> Path:
+    return out_dir / ".send_failures.json"
+
+
+def _recent_failures(path: Path, now: float) -> list[float]:
+    try:
+        stamps = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(stamps, list):
+        return []
+    floor = now - _ATTEMPT_WINDOW_MIN * 60
+    return [t for t in stamps if isinstance(t, (int, float)) and t >= floor]
+
+
+def _refuse_if_hammering(path: Path, now: float) -> None:
+    recent = _recent_failures(path, now)
+    if len(recent) >= _ATTEMPT_LIMIT:
+        raise SystemExit(
+            f"Refusing to send: {len(recent)} failed SendRequest(s) in the last "
+            f"{_ATTEMPT_WINDOW_MIN} minutes. IBKR answers code=1025 "
+            f"(\"Too many failed attempts\") after repeated failures and stops serving "
+            f"the query, which then breaks the scheduled pull as well. Wait, or delete "
+            f"{path} if you know the cause is fixed. See docs/futures/IBKR_FLEX_SETUP.md.")
+
+
+def _record_failure(path: Path, now: float) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(_recent_failures(path, now) + [now]), encoding="utf-8")
+    except OSError:
+        pass                      # sổ đếm hỏng không được làm hỏng việc chính
+
+
+def _clear_failures(path: Path) -> None:
+    try:
+        path.unlink()
+    except OSError:
+        pass
+
+
 def _send_request(token: str, query_id: str, from_date: str | None,
                   to_date: str | None) -> tuple[str, str | None]:
     params = {"t": token, "q": query_id, "v": "3"}
@@ -127,6 +187,15 @@ def _send_request(token: str, query_id: str, from_date: str | None,
     if status != "Success":
         code = _text(root, "ErrorCode") or _text(root, "Code") or "--"
         message = _text(root, "ErrorMessage") or _text(root, "Message") or raw.decode("utf-8", errors="replace")
+        if str(code) == "1025":
+            # Thông điệp của IBKR bảo "review your configuration", và nó sai hướng: cấu
+            # hình không đổi, cái đổi là đã hỏng quá nhiều lần. Đọc theo chữ thì người
+            # ta đi lục Client Portal thay vì chỉ cần dừng lại và chờ.
+            raise SystemExit(
+                f"SendRequest blocked: code=1025 ({message}). Day KHONG phai loi cau "
+                f"hinh: IBKR khoa truy van sau nhieu lan hong lien tiep. DUNG thu lai "
+                f"trong vai gio; neu van con thi sinh lai token trong Client Portal roi "
+                f"setx lai. Xem docs/futures/IBKR_FLEX_SETUP.md muc 3c.")
         raise SystemExit(f"SendRequest failed: status={status} code={code} message={message}")
     ref = _text(root, "ReferenceCode")
     if not ref:
@@ -183,12 +252,23 @@ def main() -> int:
     token = _env_required("IBKR_FLEX_TOKEN")
     query_id = _env_required("IBKR_FLEX_QUERY_ID")
 
-    ref, response_url = _send_request(token, query_id, args.from_date, args.to_date)
+    # Sổ đếm nằm cạnh nơi ghi kết quả, nên `--out-dir` khác thì sổ khác — một phép
+    # kiểm hay một lần thử trong thư mục tạm không bao giờ khoá được đường sống.
+    out_dir = Path(args.out_dir)
+    attempts = _attempt_log(out_dir)
+    _refuse_if_hammering(attempts, time.time())
+    try:
+        ref, response_url = _send_request(token, query_id, args.from_date, args.to_date)
+    except SystemExit:
+        # Ghi lại LẦN HỎNG rồi mới để nó thoát. Không có dòng này thì bộ đếm mãi rỗng
+        # và cái guard ở trên không bao giờ đếm tới — viết đủ mà không nối vào đâu.
+        _record_failure(attempts, time.time())
+        raise
     if args.sleep > 0:
         time.sleep(args.sleep)
     payload = _get_statement(token, ref, response_url)
+    _clear_failures(attempts)
 
-    out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     suffix = _extension(payload)
     name_parts = [args.prefix, _stamp(), f"q{query_id}", f"ref{ref}"]
