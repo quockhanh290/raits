@@ -62,7 +62,7 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import date as _date
+from datetime import date as _date, timedelta as _timedelta
 from pathlib import Path
 from typing import NamedTuple
 
@@ -375,6 +375,15 @@ def heartbeat_gap(prev, now) -> "float | None":
 _skip_warned: set = set()
 
 
+def _flex_to_date(today: _date) -> str:
+    """Ngày cuối cùng xin được từ IBKR khi job 22:20 ET chạy vào `today`.
+
+    Hàm riêng để kiểm được bằng phép tính chứ không bằng cách đọc mã nguồn: câu hỏi
+    "job có bao giờ xin phiên hôm nay không" phải trả lời được bằng một con số.
+    """
+    return (today - _timedelta(days=1)).strftime("%Y%m%d")
+
+
 def _et_today():
     """ET calendar date — the trading date every job is scheduled against.
 
@@ -502,6 +511,22 @@ def _run(args: list[str], label: str, dry_run: bool, timeout: float | None = Non
         # Lọc theo mức độ, không theo mã thoát: một tiến trình con đã kêu CRITICAL/ERROR
         # thì không bao giờ được im lặng, dù nó kết thúc "thành công". Chỉ lấy các dòng đó
         # nên không làm ngập log — các child in rất nhiều khi chạy trơn.
+        # Một lần đóng vị thế cũng không được phép biến mất. MAX_HOLD và STOP_REPAIR
+        # không có tệp log riêng như run_live_day — chúng ghi ra stderr, bị bắt ở đây,
+        # rồi bị bộ lọc dưới vứt, vì dòng của chúng là INFO. Sáng 2026-08-17 MAX_HOLD
+        # đóng M2K và ghi có $179.50 vào sổ; dòng duy nhất kể lại việc đó nằm trong
+        # output bị vứt, nên giá khớp và giờ khớp giờ chỉ còn ở phía broker. Con số
+        # $179.50 dựng lại được từ chênh lệch equity, nhưng giá khớp thì không —
+        # và suy ngược nó từ P&L sẽ cho ra đúng một giá trị lệch giá bằng 0, tức là
+        # bịa một số 0 vào chính cái cổng chất lượng khớp lệnh.
+        #
+        # Lọc theo mức độ không bao giờ thấy được việc này: một lần đóng chạy trơn là
+        # INFO, đúng như nó phải thế. Nên nhãn [BOOKED] là một giao kèo, không phải bắt
+        # chữ trong câu văn: bên con dán nhãn vào đúng dòng ghi lại một thay đổi đã
+        # động tới tiền hoặc tới lệnh trên sàn, bên cha không bao giờ vứt dòng đó.
+        for _b in (ln for stream in (result.stdout, result.stderr)
+                   for ln in (stream or "").splitlines() if "[BOOKED]" in ln):
+            log.info("[%s] %s", label, _b.strip())
         _loud = [ln for stream in (result.stdout, result.stderr)
                  for ln in (stream or "").splitlines()
                  if "CRITICAL" in ln or "ERROR" in ln]
@@ -986,7 +1011,23 @@ def make_scheduler(port: int, dry_run: bool,
         và tự khai là cũ qua dấu vân tay dữ liệu.
         """
         try:
-            if not _run([sys.executable, "-m", "monitor.flex_pull"],
+            # Xin tới HÔM QUA, không phải hôm nay. Khoảng ngày mặc định của Flex Query
+            # bao gồm phiên đang chạy, mà IBKR chưa chốt sổ phiên đó lúc 22:20 ET —
+            # đo được ngày 2026-08-18: gọi đúng câu lệnh này lúc 00:05 ET, tức hơn 6
+            # tiếng sau giờ đóng cửa và gần 2 tiếng sau khung chạy, vẫn nhận
+            # `code=1004 Statement is incomplete at this time`. Cùng lúc đó, xin tới
+            # hôm trước thì về 35KB bình thường.
+            #
+            # Nên độ trễ một phiên ở phía broker là bản chất, không phải lựa chọn: sổ
+            # của IBKR cho hôm nay chưa tồn tại vào lúc job chạy. Ghim nó tường minh
+            # còn hơn để khoảng mặc định của query quyết định — bảng khi đó nói rõ
+            # được nó đang phủ tới đâu.
+            #
+            # Chưa chứng minh: liệu IBKR có luôn xong phiên D-1 trước 22:20 ET ngày D
+            # hay không. Mới có một quan sát thành công. Nếu hụt, `flex_pull` sẽ nói
+            # code 1004 chứ không im, và dời khung chạy muộn hơn là cách chữa.
+            if not _run([sys.executable, "-m", "monitor.flex_pull",
+                         "--to-date", _flex_to_date(_et_today())],
                         label="FLEX_PULL", dry_run=dry_run):
                 log.warning("[FLEX_PULL] that bai — van dung sao ke cu; doi chieu P&L "
                             "se tinh tren du lieu broker cu")

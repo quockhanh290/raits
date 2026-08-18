@@ -151,11 +151,14 @@ def main():
 
         closed = runner.run_maxhold_exit(today, max_hold_days=MAX_HOLD_DAYS)
 
-        print()
+        # [BOOKED], and log rather than print: this process has no log file of its own,
+        # so everything it says goes to the scheduler, which keeps only CRITICAL/ERROR
+        # lines when a run succeeds. A close is INFO and a success, so the account of
+        # it was thrown away -- on 2026-08-17 that was the whole record of closing M2K.
+        # The marker is what the parent keeps; see _run in run_scheduler.
         if closed:
-            print(f"  Closed {len(closed)} MAX_HOLD position(s):")
             for inst, cluster in closed:
-                print(f"    {inst}/{cluster}")
+                log.info("[BOOKED] MAX_HOLD closed %s/%s", inst, cluster)
         else:
             log.info("No MAX_HOLD positions to close today.")
 

@@ -152,5 +152,54 @@ def test_it_does_not_match_the_word_inside_ordinary_text(monkeypatch):
     assert len(errs) == 2
 
 
+BOOKED = ("2026-08-17 09:31:07  INFO  run_maxhold_exit — "
+          "[BOOKED] MAX_HOLD closed M2K/roska4_swing")
+
+
+def test_a_booked_line_survives_a_zero_exit(monkeypatch):
+    """Sự cố 2026-08-17, cùng ống dẫn nhưng lọt qua bộ lọc mức độ.
+
+    MAX_HOLD đóng M2K và ghi có $179.50 vào sổ vốn. Không có gì kêu CRITICAL — đóng một
+    vị thế đúng hạn là việc bình thường và ghi ở mức INFO, đúng như nó phải thế. Nên
+    dòng duy nhất kể lại việc đó bị `_run` vứt, và `run_maxhold_exit` không có tệp log
+    riêng, nên trong hệ thống không còn dấu vết nào của một lần đóng đã động tới tiền.
+
+    Con số $179.50 sau đó dựng lại được từ chênh lệch equity, nhưng **giá khớp thì
+    không** — và suy ngược nó từ P&L sẽ cho ra đúng một giá trị lệch giá bằng 0, tức là
+    bịa một con số sạch vào chính cái cổng đo chất lượng khớp lệnh.
+
+    Lọc theo mức độ không bao giờ thấy được lớp này. [BOOKED] là giao kèo cho nó.
+    """
+    ok, errs, infos = _capture(monkeypatch, _Result(0, out=BOOKED))
+    assert ok is True
+    assert any("MAX_HOLD closed M2K" in i for i in infos), (
+        f"dong [BOOKED] bi nuot khi con thoat 0: {infos}")
+    assert errs == [], "mot lan dong binh thuong khong duoc bao nhu loi"
+
+
+def test_an_ordinary_info_line_is_still_dropped(monkeypatch):
+    """Nửa còn lại. Nếu bản vá giữ mọi dòng INFO thì nó tự vô hiệu hoá: log ngập mỗi
+    slot, và đúng thứ nó định cứu sẽ trôi mất giữa đám đó."""
+    ok, _errs, infos = _capture(
+        monkeypatch, _Result(0, out="2026-08-17  INFO  runner — [check] 1 open position"))
+    assert ok is True
+    assert not any("open position" in i for i in infos), (
+        "moi dong INFO deu duoc giu — bo loc khong con loc gi")
+
+
+def test_a_booked_line_is_not_lost_behind_a_critical_one(monkeypatch):
+    """Hai lớp phải độc lập.
+
+    Nhánh CRITICAL kết thúc bằng `return True` sớm, nên nếu [BOOKED] được xử lý sau nó
+    thì đúng lần chạy vừa đóng vị thế vừa gặp sự cố — lần đáng ghi nhất — lại là lần mất
+    dòng. Đó chính là hình dạng của sự cố 2026-08-10.
+    """
+    ok, errs, infos = _capture(monkeypatch, _Result(0, out=f"{BOOKED}\n{ORPHAN}"))
+    assert ok is True
+    assert any("STP ORPHAN" in e for e in errs), "dong CRITICAL bi nuot"
+    assert any("MAX_HOLD closed M2K" in i for i in infos), (
+        "dong [BOOKED] bi mat vi lan chay do cung co CRITICAL")
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))

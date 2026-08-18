@@ -151,7 +151,10 @@ def main() -> int:
         )
         naked = list(getattr(runner, "_b4_naked_stops", []))
         if naked:
-            log.warning("B4 đã xử lý %d vị thế thiếu stop: %s", len(naked), naked)
+            # [BOOKED]: placing a stop is a change on the exchange, and WARNING is not
+            # enough to survive — the scheduler keeps only CRITICAL/ERROR from a child
+            # that exited 0, and this job has no log file of its own.
+            log.warning("[BOOKED] B4 đã xử lý %d vị thế thiếu stop: %s", len(naked), naked)
         else:
             log.info("Không vị thế nào thiếu stop.")
         return 0

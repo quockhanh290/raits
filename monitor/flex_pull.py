@@ -28,10 +28,40 @@ _LEGACY = False
 
 
 def _env_required(name: str) -> str:
+    """The variable, or a refusal that says which scope it is missing from.
+
+    "Missing env var X" was true and still misleading. The 22:20 job died on it while
+    the operator had X set and could pull by hand all day: `$env:X` in PowerShell lives
+    in that one window, and the scheduler spawns this as a child of a process started
+    hours earlier, so it inherits an environment the variable was never in. Told only
+    that the variable is missing, the reader checks their own shell, finds it, and
+    looks somewhere else for the fault.
+
+    So the message names the scope. It reports whether a persisted User/Machine value
+    exists, which separates "never set anywhere" from "set, but not where this process
+    can see it" -- two different fixes. Values are never printed.
+    """
     value = os.environ.get(name, "").strip()
-    if not value:
-        raise SystemExit(f"Missing env var {name}")
-    return value
+    if value:
+        return value
+    persisted = ""
+    if sys.platform == "win32":
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+                persisted = str(winreg.QueryValueEx(key, name)[0] or "").strip()
+        except (OSError, ImportError, IndexError):
+            persisted = ""
+    if persisted:
+        raise SystemExit(
+            f"{name} is not in THIS process's environment, but a persisted User value "
+            f"exists. A running scheduler captured its environment when it started and "
+            f"does not re-read it -- restart the scheduler. See docs/futures/"
+            f"IBKR_FLEX_SETUP.md section 3.")
+    raise SystemExit(
+        f"Missing env var {name}, and no persisted User value either. A `$env:{name}` "
+        f"set in a PowerShell window reaches only that window, never the scheduler; "
+        f"use setx and restart it. See docs/futures/IBKR_FLEX_SETUP.md section 3.")
 
 
 def _redact(url: str) -> str:

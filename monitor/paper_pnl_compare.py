@@ -133,9 +133,15 @@ def _pnl_verdicts(report: dict[str, Any]) -> dict[str, Any]:
     flex_grid = pl.get("paper_minus_flex_epoch_rebased_realized", pl.get("paper_minus_statement_entry_epoch_realized"))
     pf_recon = _same_money(lifecycle.get("paper_minus_flex_sum"), flex_grid)
     lifecycle_unresolved = int(lifecycle.get("unresolved") or 0)
+    # Bỏ qua các dòng đã được phân loại là chờ Flex. Không có dòng này thì cả thay đổi
+    # kia thành vô nghĩa: dòng vẫn mang `flex: MISSING`, vẫn bị đếm ở đây, và vẫn ra
+    # BREACH — vá xong mà không nối vào đâu.
+    awaiting_flex = sum(1 for row in rows if str(row.get("classification") or "") == "AWAITING_FLEX")
+    _flex_through = ((pl.get("flex_coverage") or {}).get("through")) if pl else None
     missing_sources = sum(
         1 for row in rows
-        if any(str((row.get(side) or {}).get("status") or "") == "MISSING" for side in ("paper", "backtest", "flex"))
+        if str(row.get("classification") or "") != "AWAITING_FLEX"
+        and any(str((row.get(side) or {}).get("status") or "") == "MISSING" for side in ("paper", "backtest", "flex"))
     )
     delta_rows = sum(
         1 for row in rows
@@ -178,7 +184,12 @@ def _pnl_verdicts(report: dict[str, Any]) -> dict[str, Any]:
             trade_master_status,
             "Trade master reconcile",
             "Trade rows reconcile to headline totals." if trade_master_status != "BREACH" else "Trade rows have unresolved sources or footer totals do not match the grid.",
-            [f"rows {len(rows)}", f"delta rows {delta_rows}", f"missing {missing_sources}", f"unresolved {lifecycle_unresolved}"],
+            # Trần Flex hiện ngay trên thẻ, không nằm sâu trong bảng: người đọc phải
+            # biết tổng này cụt tới đâu trước khi tin nó, chứ không phải sau.
+            [f"rows {len(rows)}", f"delta rows {delta_rows}", f"missing {missing_sources}",
+             f"unresolved {lifecycle_unresolved}",
+             f"Flex covers through {_flex_through or 'unknown'}"]
+            + ([f"awaiting Flex {awaiting_flex}"] if awaiting_flex else []),
             "pnl-tab-trades",
         ),
         "components": _verdict(
@@ -834,6 +845,22 @@ def _fill_statement_cluster(inst: Any, direction: Any, entry_day: Any,
     return "global_nkd" if inst == "MNKD" else "roska4_swing"
 
 
+def _beyond_flex(row: dict[str, Any], through: str | None) -> bool:
+    """Sự việc của dòng này có xảy ra sau ngày cuối bản kê phủ không?
+
+    Ngày để hỏi là ngày ĐÓNG nếu đã đóng, còn không thì ngày VÀO: một lệnh vào trong
+    tầm phủ mà đóng ngoài tầm phủ vẫn là lệnh Flex chưa kể xong.
+
+    Không biết trần thì trả về False. Mặc định là giữ nguyên cách phân loại cũ — nghi
+    ngờ thì báo, đừng im.
+    """
+    if not through:
+        return False
+    paper = row.get("paper") or {}
+    when = str(paper.get("exit_day") or paper.get("entry_day") or row.get("entry_day") or "")[:10]
+    return bool(when) and when > str(through)[:10]
+
+
 def _lifecycle_compare(paper_signals: list[dict[str, Any]], paper_trades: list[dict[str, Any]],
                        backtest_signals: list[dict[str, Any]], backtest_trades: list[dict[str, Any]],
                        statement_pnl_compare: dict[str, Any]) -> dict[str, Any]:
@@ -964,6 +991,12 @@ def _lifecycle_compare(paper_signals: list[dict[str, Any]], paper_trades: list[d
     counts: dict[str, int] = {}
     paper_minus_backtest_sum = 0.0
     paper_minus_flex_sum = 0.0
+    # Trần của nguồn Flex, đi cùng mọi so sánh có mặt nó. Chỉ nhận khi biết CHẮC bản kê
+    # phủ tới đâu: nếu chỉ suy ra từ khớp lệnh cuối cùng thì "không có lệnh sau ngày đó"
+    # không chứng minh được bản kê phủ tới đó, và nhận nhầm sẽ biến một bất đồng thật
+    # thành "chưa tới lượt" — sai về đúng hướng nguy hiểm.
+    _cov = (statement_pnl_compare or {}).get("flex_coverage") or {}
+    _flex_through = _cov.get("through") if _cov.get("exact") else None
     for row in sorted(rows.values(), key=lambda item: (str(item.get("entry_day") or ""), str(item.get("inst") or ""), str(item.get("direction") or ""))):
         statuses = {name: (row.get(name) or {}).get("status") for name in ("paper", "backtest", "flex")}
         non_missing = [value for value in statuses.values() if value and value != "MISSING"]
@@ -979,6 +1012,19 @@ def _lifecycle_compare(paper_signals: list[dict[str, Any]], paper_trades: list[d
         elif len(non_missing) == 3:
             classification = "THREE_WAY_DIFF"
             reason = "paper, backtest, and Flex all have the trade identity but lifecycle or realised P&L differs"
+        elif len(non_missing) == 2 and statuses.get("flex") == "MISSING" and _beyond_flex(row, _flex_through):
+            # Flex chưa tới đây, chứ không phải Flex không có. Hai thứ đó trông giống
+            # nhau trên màn hình và khác hẳn nhau về ý nghĩa: một cái là câu hỏi chưa
+            # tới lượt hỏi, một cái là hai cuốn sổ bất đồng.
+            #
+            # Tách ra vì nó chặn go-live: `unresolved` cộng cả TWO_WAY_ONLY, nên một
+            # lệnh đóng hôm nay sẽ chặn bảng cho tới khi IBKR công bố — mỗi ngày một
+            # lần, mãi mãi. Đây không phải nới lỏng: dòng vẫn được đếm và vẫn hiện,
+            # chỉ dưới đúng tên của nó, và chỉ khi mất DUY NHẤT Flex. Bản phát lại
+            # thiếu thì vẫn là bất đồng thật và vẫn chặn.
+            classification = "AWAITING_FLEX"
+            reason = (f"closed after the Flex statement covers ({_flex_through}); the broker "
+                      f"has not published this session yet, so the comparison has not run")
         elif len(non_missing) == 2:
             classification = "TWO_WAY_ONLY"
             reason = "trade identity exists in two sources and is missing from the third"
@@ -1092,6 +1138,41 @@ def _open_position_parity(root: Path, replay_data: dict[str, Any], latest_paper_
     }
 
 
+def _flex_coverage(path: Path, fills: list[dict[str, Any]]) -> dict[str, Any]:
+    """Ngày cuối cùng bản kê này NÓI được — và ta biết điều đó chắc tới đâu.
+
+    Sao kê Flex không phải nguồn thời gian thực và không bao giờ là. Đo ngày
+    2026-08-18: xin phiên 17/8 lúc 00:05 ET — hơn 6 tiếng sau giờ đóng cửa và gần 2
+    tiếng sau khung chạy 22:20 — IBKR trả `code=1004 Statement is incomplete at this
+    time`; xin tới hôm trước thì về bình thường. Sổ của broker cho phiên đang chạy
+    chưa tồn tại vào lúc đối chiếu chạy.
+
+    Đó là TRẦN của nguồn dữ liệu, không phải sự cố. Nhưng bảng không có chỗ nào ghi
+    lại nó, nên một lệnh Flex chưa kịp công bố trông y hệt một lệnh Flex không có —
+    và bị đếm vào `unresolved`, tức là chặn go-live vì một câu hỏi chưa tới lượt hỏi.
+
+    Hai nguồn cho cái trần, và chúng không đáng tin ngang nhau, nên phải gọi khác tên:
+
+      · khoảng đã xin, đọc từ tên tệp — biết CHẮC bản kê phủ tới đâu, kể cả những ngày
+        không có lệnh nào.
+      · khớp lệnh cuối cùng nhìn thấy — chỉ SUY RA. Không có lệnh sau ngày đó không
+        chứng minh bản kê phủ tới đó; có thể nó dừng sớm hơn.
+
+    Nhãn `exact` giữ hai thứ tách nhau, cùng lối với `fill_price_estimated`: một ước
+    lượng trông như một phép đo là cách một cuốn sổ trôi đi mà không ai chỉ được vào
+    lúc nó bắt đầu sai.
+    """
+    m = re.search(r"_(\d{8})-(\d{8})\.csv$", path.name)
+    if m:
+        end = m.group(2)
+        return {"through": f"{end[:4]}-{end[4:6]}-{end[6:]}",
+                "source": "requested_range", "exact": True}
+    dates = sorted(str(f.get("date") or "")[:10] for f in fills if f.get("date"))
+    if dates:
+        return {"through": dates[-1], "source": "last_fill_seen", "exact": False}
+    return {"through": None, "source": "unknown", "exact": False}
+
+
 def _latest_flex_statement(root: Path) -> dict[str, Any]:
     paths = sorted((root / "monitor" / "inputs" / "ibkr_flex").glob("*.csv"), key=lambda p: p.stat().st_mtime)
     if not paths:
@@ -1110,6 +1191,9 @@ def _latest_flex_statement(root: Path) -> dict[str, Any]:
         "closed_count": len(closed),
         "open_lot_count": len(open_lots),
         "cash_count": len(cash),
+        # Bao nhiêu khớp lệnh thì bảng đã biết; TỚI NGÀY NÀO thì chưa. Thiếu nó,
+        # "Flex chưa công bố" và "Flex không có" là cùng một hình ảnh trên màn hình.
+        "coverage": _flex_coverage(path, fills),
         "fills": fills,
         "closed": closed,
         "open_lots": open_lots,
@@ -1354,6 +1438,9 @@ def _statement_pnl_compare(statement: dict[str, Any], paper_trades: list[dict[st
     return {
         "status": statement.get("status") or "MISSING",
         "source": statement.get("path"),
+        # Đi kèm mọi con số Flex dưới đây, vì mọi con số ấy chỉ đúng TỚI ngày này.
+        # Đọc chúng mà không đọc nó là đọc một tổng cụt tưởng là một tổng đủ.
+        "flex_coverage": statement.get("coverage") or {"through": None, "source": "unknown", "exact": False},
         "epoch": epoch,
         "actual_system_ledger_semantics": "runner realised trade ledger / sleeve equity, not IBKR NetLiquidation",
         "paper_epoch_closed_realized": paper_realized,

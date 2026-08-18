@@ -1132,8 +1132,15 @@ class FuturesRunner:
                 # the C1 blind spot on the side that outlives the process.
                 "contract_month": pos.contract_month,
             })
+            # [BOOKED]: this line carries the fill price of a stop exit, and through
+            # run_stop_repair it is the only place that price survives -- that entry
+            # point has no log file of its own, so everything it says is captured by
+            # the scheduler, which discards INFO when the run succeeds. Under
+            # run_live_day the day log keeps it either way; the marker costs nothing
+            # there and is the whole record on the other path. See _run in
+            # run_scheduler for the contract.
             logger.info(
-                "B3 STP-VERIFY: recorded stop exit %s/%s @ %.4f (permId=%s) — "
+                "[BOOKED] B3 STP-VERIFY: recorded stop exit %s/%s @ %.4f (permId=%s) — "
                 "nothing else writes a trade record for a stop fill",
                 pos.inst, pos.cluster, float(fill.get("price") or 0.0), fill.get("perm_id"),
             )

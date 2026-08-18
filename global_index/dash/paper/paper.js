@@ -1119,7 +1119,17 @@
     const pfTotal = Number.isFinite(Number(lifecycle.paper_minus_flex_sum)) ? Number(lifecycle.paper_minus_flex_sum) : sumField(rows, 'paper_minus_flex_pnl');
     const pbRecon = reconcileStatus(pbTotal, pl.paper_minus_backtest_realized);
     const pfRecon = reconcileStatus(pfTotal, pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized);
-    const unresolved = rows.filter(row => [row.paper, row.backtest, row.flex].some(side => String(side?.status || '') === 'MISSING')).length;
+    // A row the broker has not published yet is not an unresolved row. The Flex
+    // statement is never real-time — IBKR refuses the current session with "Statement
+    // is incomplete at this time" for hours after the close — so a trade that closed
+    // today is outside what this table can compare, and counting it as a missing
+    // source blocks the page every day for a question that has not come round yet.
+    // The generator classifies those; here they are simply not counted as unresolved.
+    const awaitingFlex = row => String(row?.classification || '') === 'AWAITING_FLEX';
+    const coverage = (pl.flex_coverage || {}).through;
+    const unresolved = rows.filter(row => !awaitingFlex(row)
+      && [row.paper, row.backtest, row.flex].some(side => String(side?.status || '') === 'MISSING')).length;
+    const awaiting = rows.filter(awaitingFlex).length;
     const diffRows = rows.filter(row => Math.abs(Number(row.paper_minus_backtest_pnl || 0)) > 0.005 || Math.abs(Number(row.paper_minus_flex_pnl || 0)) > 0.005).length;
     const verdict = pbRecon.cls === 'bad' || pfRecon.cls === 'bad' || unresolved ? 'BREACH'
       : reconcileUnmeasured(pbRecon, pfRecon) ? 'CHECK'
@@ -1131,12 +1141,21 @@
       : verdict === 'EXPLAINED'
         ? 'Trade-level P&L differences exist, but they reconcile to headline totals and carry row-level reasons.'
         : 'Trade master reconciliation is not clean; missing source rows or footer totals need investigation.';
-    return `${renderVerdict(backendVerdict(compare, 'trade_master'), verdict, 'Trade master reconcile', summary, [`rows ${rows.length}`, `delta rows ${diffRows}`, `missing ${unresolved}`, `P-B ${pbRecon.label}`, `P-F ${pfRecon.label}`])}<div class="trade-table trade-master-table"><table><thead><tr><th>verdict / trade</th><th>paper actual</th><th>backtest</th><th>Flex</th><th>variance</th><th>reason</th></tr></thead><tbody>${rows.map(row => {
+    return `${renderVerdict(backendVerdict(compare, 'trade_master'), verdict, 'Trade master reconcile', summary,
+      [`rows ${rows.length}`, `delta rows ${diffRows}`, `missing ${unresolved}`,
+       // Say how far the broker column actually reaches. A truncated total that does
+       // not announce itself reads as a complete one.
+       `Flex covers through ${coverage || 'unknown'}`,
+       ...(awaiting ? [`awaiting Flex ${awaiting}`] : []),
+       `P-B ${pbRecon.label}`, `P-F ${pfRecon.label}`])}<div class="trade-table trade-master-table"><table><thead><tr><th>verdict / trade</th><th>paper actual</th><th>backtest</th><th>Flex</th><th>variance</th><th>reason</th></tr></thead><tbody>${rows.map(row => {
       const key = `${row.inst}|${row.direction}|${row.entry_day}`;
       const reason = reasonByKey.get(key) || {};
       const missing = [row.paper, row.backtest, row.flex].some(side => String(side?.status || '') === 'MISSING');
       const hasDelta = Math.abs(Number(row.paper_minus_backtest_pnl || 0)) > 0.005 || Math.abs(Number(row.paper_minus_flex_pnl || 0)) > 0.005;
-      const rowVerdict = missing ? 'BREACH' : hasDelta ? 'EXPLAINED' : 'PASS';
+      // The row verdict is computed here and always shown — no backend verdict covers
+      // it — so this is where a not-yet-published trade would otherwise read red.
+      const rowVerdict = awaitingFlex(row) ? 'AWAITING FLEX'
+        : missing ? 'BREACH' : hasDelta ? 'EXPLAINED' : 'PASS';
       const directionClass = String(row.direction || '').toLowerCase();
       const audit = row.audit_ref ? `<a class="audit-link" href="#${esc(row.audit_ref)}" title="${esc(row.audit_label || 'open audit log')}">${auditChip()}</a>` : '';
       return `<tr><td><span class="fill-result ${verdictClass(rowVerdict)}">${esc(rowVerdict)}</span><b>${audit}${esc(row.inst || '--')} <span class="direction-chip ${directionClass}">${esc(row.direction || '--')}</span></b><small>${esc(row.entry_day || '--')} | ${esc(row.classification || '--')}</small></td>${compactLifecycleCell(row.paper, 'paper')}${compactLifecycleCell(row.backtest, 'backtest')}${compactLifecycleCell(row.flex, 'Flex')}<td><b class="pnl-value ${moneyClass(row.paper_minus_backtest_pnl)}">P-B ${fmtMoney(row.paper_minus_backtest_pnl)}</b><small>P-F ${fmtMoney(row.paper_minus_flex_pnl)}</small></td><td><b>${esc(reason.reason_code || row.reason || '--')}</b><small>${esc(reason.reason || row.reason || '--')}</small></td></tr>`;
@@ -2038,7 +2057,7 @@
     return `<div class="trade-table open-issue-table"><table><thead><tr><th>status</th><th>issue</th><th>seen</th><th>impact</th><th>action</th><th>evidence</th></tr></thead><tbody>${rows.map(row => {
       const status = String(row.status || '--').toUpperCase();
       const cls = status === 'KNOWN_DEBT' ? 'watch' : status === 'INCIDENT' || status === 'UNKNOWN' ? 'bad' : 'neutral';
-      return `<tr><td><span class="fill-result ${cls}">${esc(status)}</span><small>${esc(row.component || '--')}</small></td><td><b>${esc(row.title || row.key || '--')}</b><small>${esc(row.key || '--')}</small><small>${esc(row.problem || '--')}</small></td><td><b>${esc(row.last_seen || '--')}</b><small>first ${esc(row.first_seen || '--')} | x${esc(row.occurrences ?? '--')}</small></td><td><small>${esc(row.impact || '--')}</small></td><td><small>${esc(row.action || '--')}</small></td><td><small>${esc(row.evidence || row.resolution_evidence || '--')}</small></td></tr>`;
+      return `<tr><td><span class="fill-result ${cls}">${esc(status)}</span><small>${esc(row.component || '--')}</small></td><td><b>${esc(row.title || row.key || '--')}</b><small>${esc(row.key || '--')}</small><small>${esc(row.problem || '--')}</small></td><td><b>${esc(row.last_seen || '--')}</b><small>first ${esc(row.first_seen || '--')} | x${esc(row.occurrences ?? '--')}</small></td><td><small>${esc(row.impact || '--')}</small></td><td><small>${esc(row.action || '--')}</small></td><td><small>${esc(row.evidence || '--')}</small>${row.resolution_evidence ? `<small><b>Closes when:</b> ${esc(row.resolution_evidence)}</small>` : ''}</td></tr>`;
     }).join('')}</tbody></table></div>`;
   }
 

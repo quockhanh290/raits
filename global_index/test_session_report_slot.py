@@ -312,6 +312,38 @@ def test_paper_evidence_refresh_runs_after_the_report():
     assert "monitor.paper_pnl_compare" in src and "monitor.flex_pull" in src
 
 
+def test_flex_is_never_asked_for_a_session_ibkr_has_not_closed():
+    """Đêm 2026-08-17 job hỏng vì thiếu biến môi trường. Sửa biến xong nó vẫn hỏng.
+
+    Chạy đúng câu lệnh của scheduler lúc 00:05 ET ngày 18 — hơn 6 tiếng sau giờ đóng
+    cửa, gần 2 tiếng sau khung 22:20 — IBKR trả `code=1004 Statement is incomplete at
+    this time`. Cùng lúc đó, xin tới hôm trước thì về 35KB bình thường. Khoảng ngày mặc
+    định của Flex Query bao gồm phiên đang chạy, mà sổ của phiên đó chưa tồn tại.
+
+    Nên độ trễ một phiên ở phía broker là bản chất chứ không phải lựa chọn, và nó phải
+    được ghim bằng phép tính: hàm không bao giờ được trả về chính ngày đang chạy.
+    """
+    from datetime import date, timedelta
+
+    from global_index.run_scheduler import _flex_to_date
+
+    assert _flex_to_date(date(2026, 8, 17)) == "20260816"
+    # Quét cả năm: không một ngày nào được xin tới chính nó. Một hằng số viết cứng hay
+    # một phép trừ nhầm dấu đều phải đỏ ở đây.
+    d = date(2026, 1, 1)
+    while d < date(2027, 1, 1):
+        got = _flex_to_date(d)
+        assert got != d.strftime("%Y%m%d"), f"xin phien dang chay: {d}"
+        assert got == (d - timedelta(days=1)).strftime("%Y%m%d"), f"sai o {d}"
+        d += timedelta(days=1)
+
+    src = (_GI / "run_scheduler.py").read_text(encoding="utf-8")
+    body = src[src.index("def _refresh_paper_evidence()"):src.index("def _emit_report(")]
+    assert '"--to-date", _flex_to_date(' in body, (
+        "job khong con truyen --to-date — no se roi ve khoang mac dinh cua query, "
+        "tuc lai xin ca phien hom nay")
+
+
 def test_the_refresh_never_breaks_the_trading_day():
     """Một việc báo cáo hỏng không được kéo theo gì. Lịch này là tiến trình đặt lệnh thật."""
     src = (_GI / "run_scheduler.py").read_text(encoding="utf-8")
