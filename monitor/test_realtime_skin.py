@@ -405,7 +405,11 @@ def test_every_rule_in_the_shared_sheet_actually_wins(skin_server, skin_page):
     assert not inert, "luật có phần tử để áp mà không đổi được gì:\n" + "\n".join(
         f"  {k}\n    {v}" for k, v in inert.items())
 
+    # Ngưỡng theo TỈ LỆ, không theo con số cứng: một con số cứng sẽ khoá đúng
+    # payload của hôm nay. Lúc viết là 32/42 luật chứng minh được; 10 selector
+    # còn lại thuộc các panel chỉ dựng khi dữ liệu có, nên không kiểm được ở đây.
+    # Nếu tỉ lệ tụt xuống dưới một nửa thì phần lớn tệp đang không được kiểm gì.
     applied = [k for k, v in verdict.items() if v == "áp được"]
-    assert len(applied) >= 5, (
+    assert len(applied) >= len(rules) // 2, (
         f"chỉ {len(applied)}/{len(rules)} luật chứng minh được là có tác dụng; "
         f"phần còn lại: { {k: v for k, v in verdict.items() if v != 'áp được'} }")

@@ -84,3 +84,95 @@
   border-left: 3px solid var(--amber);
   background: linear-gradient(90deg, rgba(240, 180, 41, .06) 0%, transparent 70%);
 }
+
+
+
+/* ── Lớp chữ ────────────────────────────────────────────────────────────────
+   Đây mới là thứ mắt nhìn thấy, và phần viền/bo góc ở trên không chạm tới nó —
+   nên trang vẫn "hầu như không đổi". Đo hai trang cạnh nhau: `/realtime` để
+   phần lớn chữ ở 400, trần là 700; `paper.css` có 6 luật ở 900 và 23 luật ở
+   800, chữ nền 10px, và 40 nhãn in hoa ở 700-900.
+
+   Ba họ chữ, cả ba đều ĐO từ dải chữ thật của /realtime chứ không tự đặt ra:
+
+     chip trạng thái  →  9px / 400 / giãn 1.08px    (dải 9px, 12 node: issue-origin)
+     nhãn in hoa      →  11px / 500 / giãn 1.1px    (dải 11px/500, 16 node: zone-title)
+     chữ còn lại      →  900→700 · 800→600 · 700/600→500, và nền 10px→11px
+
+   Phân biệt chip với nhãn bằng chính khai báo trong paper.css: chip có `border`
+   VÀ `padding` (`.blocker-card span`), nhãn thì không (`.blocker-card dt`).
+   Bản trước gộp cả hai xuống 9px và đo ra ngay: paper 47 node ở 9px so với 12
+   của realtime, còn dải 11px — dải rộng nhất của realtime — thì trống trơn.
+
+   Cỡ tiêu đề (18/21px) giữ nguyên: thu nó lại là quyết định thiết kế riêng.
+
+   Toàn bộ khối dưới SINH RA từ chính `paper.css` (mọi luật có `font: <đậm> <cỡ>`,
+   đọc brace-aware nên không kéo luật trong @media ra ngoài). Gõ tay 54 luật thì
+   sót, và sót ở đây là im lặng. Selector giữ nguyên để khớp specificity luật
+   gốc; chỉ khai longhand nên nó đè đúng phần đậm/cỡ trong shorthand. */
+/* Chip trang thai (co vien + padding) -> dai 9px cua /realtime,
+   noi chi co .issue-origin / .issue-status / .event-status sinh song. */
+.refresh-chip,
+.blocker-card span,
+.blocker-card button,
+.coverage-ref button, .coverage-ref em,
+.table-verdict aside span,
+.pnl-tab-buttons label,
+.audit-chip,
+.gap-item span, .gap-item em,
+.gap-related {
+  font-weight: 400; font-size: 9px; letter-spacing: 1.08px;
+}
+
+/* Nhan in hoa (khong vien) -> dai 11px/500 cua .zone-title, KHONG phai 9px.
+   Ban truoc day het xuong 9px: paper con 47 node o 9px doi voi 12 cua realtime,
+   va dai 11px rong nhat cua realtime thi trong khong. */
+.threshold-gate dt,
+.readiness span, .paper-metrics span,
+.blocker-card dt,
+.c1-active-spec span b,
+.c1-metric-group h3,
+.detail-block h3,
+.trade-table th,
+.overview-verdict-card b,
+.detail-metric span,
+.timeline-readout b,
+.component-breakdown dt,
+.component-compare-grid .component-label,
+.variance-compare-grid .component-label,
+.coverage-group h3,
+.gap-item dt {
+  font-weight: 500; font-size: 11px; letter-spacing: 1.1px;
+}
+
+/* Chu con lai -> thang dam cua realtime.css (tran 700). */
+.threshold-gate header b { font-weight: 600; }
+.readiness b { font-weight: 500; }
+.blocker-card b { font-weight: 600; }
+.blocker-card strong { font-weight: 700; }
+.c1-panel-head h2 { font-weight: 500; }
+.c1-metric span { font-weight: 500; }
+.c1-metric b { font-weight: 500; }
+.c1-more-info summary { font-weight: 600; }
+.more-section h3 { font-weight: 500; }
+.detail-subhead { font-weight: 600; }
+.metric-list dd { font-weight: 500; }
+.trade-table b { font-weight: 500; }
+.table-verdict b { font-weight: 600; }
+.overview-verdict-card strong { font-weight: 700; }
+.detail-metric b { font-weight: 600; }
+.timeline-readout span { font-weight: 600; }
+.secondary-table summary { font-weight: 600; }
+.audit-log-group summary { font-weight: 600; }
+.audit-log-group summary small { font-weight: 500; font-size: 11px; }
+.component-breakdown dd { font-weight: 600; }
+.component-compare-grid > div { font-weight: 600; }
+.component-compare-grid .component-primary, .variance-compare-grid .component-primary { font-weight: 700; }
+.component-compare-grid .component-ref, .variance-compare-grid .component-ref { font-weight: 500; font-size: 11px; }
+.variance-compare-grid > div { font-weight: 600; }
+.fill-result { font-weight: 600; }
+.type-chip, .direction-chip { font-weight: 600; }
+.gate-state { font-weight: 500; }
+.coverage-item b { font-weight: 500; }
+.coverage-detail-head h3 { font-weight: 500; }
+.gap-item b { font-weight: 500; }
