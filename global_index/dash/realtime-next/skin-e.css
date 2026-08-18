@@ -264,7 +264,13 @@ body {
    this is a deliberate departure, asked for, and it takes about a third off the
    height of the strip. */
 .now-schedule-facts > .schedule-fact > div {
-  display: flex; flex-wrap: nowrap; align-items: baseline; gap: 10px;
+  /* Wrap, not nowrap. With `nowrap` and a name that cannot shrink, a long job
+     id beside a day-prefixed clock (`LIVE_DAY_1410` + `Fri 14:10 ET`) had
+     nowhere to go and the two ran over each other — caught by the collision
+     test at 1440px, invisible at 1900px where they happen to fit.
+     Wrapping drops the two time readings onto a second line only when they will
+     not fit; the tile stays two rows wherever there is room. */
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
   margin-top: 7px; min-width: 0;
 }
 /* realtime.css:177-180 paints the job NAME and the clock with the tone colour
@@ -535,7 +541,12 @@ small.broker-account-line {
    is a <details>, so making it the grid puts its <summary> in the first column
    and squeezes the list into whatever is left. Measured: the list track came
    out 280px and the count column 62px. */
-.open-issues-shell { display: block; background: transparent; border: 0; padding: 0; }
+/* Không khai `display` ở đây. Đây là một `<details>`, và khi nó đóng thì phần
+   nội dung vẫn được bố trí (đo được: hộp cao 36px của summary, con cao 43px tràn
+   ra ngoài, đè lên mục Open Positions ở 390px). Chỉ cần KHÔNG biến nó thành lưới
+   — việc đó từng đẩy `<summary>` vào cột một — chứ không cần đặt lại display. */
+.open-issues-shell { background: transparent; border: 0; padding: 0; }
+.open-issues-shell:not([open]) > :not(summary) { display: none; }
 .open-issues-layout {
   display: grid; grid-template-columns: 352px minmax(0, 1fr); gap: 14px;
   background: transparent; border: 0; padding: 0;
@@ -942,7 +953,12 @@ small.broker-account-line {
   .now-schedule-facts > .schedule-fact:last-child { border-bottom: 0; }
 
   .section-band { padding: 16px; }
-  .open-issues-shell, .open-issue-list-wrap { grid-template-columns: minmax(0, 1fr); }
+  /* The real grids are .open-issues-layout and .now-monitor-layout; this block
+     named .open-issues-shell and .open-issue-list-wrap, which match nothing. So
+     at 390px both kept their 352px track and the Open Issues content ran out of
+     its own band into the section below — measured, the empty-state line ended
+     at y=1725 while Open Positions had already started at y=1703. */
+  .open-issues-layout, .now-monitor-layout { grid-template-columns: minmax(0, 1fr); }
   /* realtime.css:566 swaps the selected row's blue bar to the bottom edge here. */
   .issue-list-row.selected { box-shadow: none; }
   .journal-column { padding: 16px; }
