@@ -413,3 +413,89 @@ def test_every_rule_in_the_shared_sheet_actually_wins(skin_server, skin_page):
     assert len(applied) >= len(rules) // 2, (
         f"chỉ {len(applied)}/{len(rules)} luật chứng minh được là có tác dụng; "
         f"phần còn lại: { {k: v for k, v in verdict.items() if v != 'áp được'} }")
+
+
+# Luật này bị đè hoàn toàn trên /paper, và đã bị đè y hệt trong chính paper.css:
+# mọi `span` trong `section.paper-metrics` đều nằm trong một `.blocker-card`, nơi
+# `.blocker-card span` đặt sau và cùng specificity. Ghi ra đây để một luật MỚI
+# rơi vào tình trạng đó thì test đỏ, chứ không lẫn vào nền.
+_DA_BIET_BI_DE = {".paper-metrics span"}
+
+_WINS_WITH_ITS_OWN_VALUE = """
+() => {
+  const sheet = [...document.styleSheets].find(s => (s.href||'').includes('components.css'));
+  if (!sheet) return null;
+  const px = (v, el) => v.endsWith('em')
+    ? parseFloat(v) * parseFloat(getComputedStyle(el).fontSize) : parseFloat(v);
+  const out = {};
+  for (const r of sheet.cssRules) {
+    if (!r.selectorText || !/font-(weight|size)/.test(r.cssText)) continue;
+    const want = {};
+    for (const p of ['font-weight', 'font-size', 'letter-spacing']) {
+      const v = r.style.getPropertyValue(p); if (v) want[p] = v.trim();
+    }
+    if (!Object.keys(want).length) continue;
+    for (const sel of r.selectorText.split(',').map(s => s.trim())) {
+      const els = [...document.querySelectorAll(sel)]
+        .filter(e => e.getBoundingClientRect().width > 0);
+      if (!els.length) { out[sel] = out[sel] || 'không có phần tử'; continue; }
+      const win = els.some(el => Object.keys(want).every(p => {
+        const got = getComputedStyle(el).getPropertyValue(p).trim();
+        return p === 'font-weight' ? got === want[p]
+             : Math.abs(px(got, el) - px(want[p], el)) < 0.06;
+      }));
+      if (win) out[sel] = 'thắng';
+      else if (out[sel] !== 'thắng') out[sel] = 'bị đè hoàn toàn';
+    }
+  }
+  return out;
+}
+"""
+
+
+def test_each_type_rule_reaches_the_value_it_declares(skin_server, skin_page):
+    """"Có đổi" chưa đủ — phải đổi ĐÚNG thứ nó khai.
+
+    Ca thật, và là ca người dùng nhìn thấy còn phép đo thì không. Lớp chữ được
+    sinh ra gom theo họ: mọi luật chip vào một khối, mọi luật nhãn vào khối sau.
+    Việc gom đó ĐẢO trật tự của `paper.css`. `<span>BREACH</span>` khớp cả
+    `.blocker-card span` lẫn `.paper-metrics span` — cùng specificity, nên luật
+    đứng sau thắng. Gốc xếp `.paper-metrics span` trước; bản gom xếp sau. Kết
+    quả: mọi chip nhận cỡ nhãn 11px thay vì 9px.
+
+    Phép kiểm trước đó vẫn xanh, vì luật *có* đổi một thứ gì đó — chỉ là đổi
+    sang giá trị của luật khác. Test này đọc giá trị khai trong từng luật rồi
+    đòi ít nhất một phần tử tính ra đúng giá trị ấy.
+    """
+    page = skin_page
+    page.goto(f"{skin_server}/paper", wait_until="domcontentloaded")
+    page.wait_for_selector(".blocker-card", timeout=90_000)
+    page.wait_for_timeout(800)
+
+    tabs = page.eval_on_selector_all(
+        ".paper-tab-nav label", "els => els.map(e => e.textContent.trim())")
+    assert tabs, "không thấy tab nào — test sẽ đạt trên một trang rỗng"
+
+    merged: dict[str, str] = {}
+    for index in range(len(tabs)):
+        page.eval_on_selector_all(
+            ".paper-tab-nav label", "(els, i) => els[i] && els[i].click()", index)
+        page.wait_for_timeout(400)
+        result = page.evaluate(_WINS_WITH_ITS_OWN_VALUE)
+        assert result is not None, "/paper không nạp components.css"
+        # Chỉ được NÂNG hạng, không được hạ. Bản đầu ghi đè thẳng, và một tab
+        # sau đó — nơi selector không có phần tử nào — đã xoá mất phán quyết
+        # "bị đè hoàn toàn" của tab trước: tiêm đúng lỗi cascade vào mà test
+        # vẫn xanh.
+        hang = {"không có phần tử": 0, "bị đè hoàn toàn": 1, "thắng": 2}
+        for selector, state in result.items():
+            if hang[state] > hang.get(merged.get(selector, "không có phần tử"), 0):
+                merged[selector] = state
+
+    won = [s for s, v in merged.items() if v == "thắng"]
+    assert len(won) >= 20, f"chỉ {len(won)} selector đạt đúng giá trị: {merged}"
+
+    overridden = {s for s, v in merged.items() if v == "bị đè hoàn toàn"}
+    assert overridden <= _DA_BIET_BI_DE, (
+        "luật bị đè hoàn toàn — kiểm lại trật tự so với paper.css: "
+        f"{sorted(overridden - _DA_BIET_BI_DE)}")
