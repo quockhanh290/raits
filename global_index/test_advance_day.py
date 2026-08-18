@@ -140,3 +140,147 @@ def test_a_frame_with_one_session_yields_nothing():
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+
+# ── the checkpoint must notice the ENGINE changing, not only the data ─────────
+
+import numpy as np                                                  # noqa: E402
+from global_index.replay_checkpoint import make_entry, usable       # noqa: E402
+
+SWING_KW = {"ema_period": 30, "chandelier_atr_mult": 2.5, "max_hold_days": 5}
+
+
+def _price_history(n=600):
+    idx = pd.date_range("2024-01-01", periods=n, freq="h", tz="America/New_York")
+    px = 100 + np.cumsum(np.random.RandomState(7).normal(0, 0.4, n))
+    return pd.DataFrame({"open": px, "high": px + 0.5, "low": px - 0.5, "close": px},
+                        index=idx)
+
+
+def _open_position():
+    return {"dir": "LONG", "entry": 101.0, "stop": 99.0, "extreme": 103.0,
+            "entry_day": pd.Timestamp("2024-01-14"), "regime": "Normal"}
+
+
+CKPT_DAY = pd.Timestamp("2024-01-15")
+
+
+def test_a_checkpoint_is_refused_when_the_engine_parameters_change():
+    """The fingerprint hashes the price history. Nothing hashed what turned that
+    history into a position.
+
+    A checkpoint records the open position at the end of a day. Which position that is
+    depends on ema_period, the chandelier multiple and the hold limit as much as on the
+    bars. Change any of them and the stored position is one the current engine would
+    never have produced — and the live path resumes from it without a word, because the
+    bars still hash the same.
+
+    Measured before this: an entry carried exactly last_day, fingerprint and pos, and
+    usable() took only the frame — there was nothing to compare parameters against and
+    nowhere they were written down.
+
+    That matters because the parameters are not declared once. The live shadow derives
+    them from the engine object; the bootstrap that writes the checkpoint declares
+    literals; ema_period=10 for the Nikkei leg appears in six files. The two ends of the
+    checkpoint read from different sources, which is the drift this has to catch.
+
+    The module promises "a stale checkpoint makes the run slow, never wrong". Without
+    this it makes the run fast and wrong.
+    """
+    df = _price_history()
+    entry = make_entry(df, CKPT_DAY, _open_position(), SWING_KW)
+
+    assert usable(entry, df, SWING_KW) is not None, (
+        "same data, same parameters — this must still resume, or the optimisation is "
+        "simply switched off")
+
+    changed = {**SWING_KW, "ema_period": 10}
+    assert usable(entry, df, changed) is None, (
+        "the bars are identical but the engine is not: the stored position belongs to "
+        "ema_period=30 and would be resumed into a run using 10")
+
+    for field, value in (("chandelier_atr_mult", 3.0), ("max_hold_days", 4)):
+        assert usable(entry, df, {**SWING_KW, field: value}) is None, (
+            f"{field} changes which position is open and must invalidate the entry")
+
+
+def test_an_entry_written_before_parameters_were_recorded_is_refused():
+    """Fail closed on the upgrade, not open.
+
+    Every entry on disk predates this field. Accepting them once "to avoid a rebuild"
+    keeps trusting a checkpoint whose parameters were never checked for exactly the
+    window where nobody is looking for the problem. Refusing costs one bootstrap run,
+    which is the documented recovery and is printed in the log line that reports it.
+    """
+    df = _price_history()
+    legacy = make_entry(df, CKPT_DAY, _open_position(), SWING_KW)
+    legacy.pop("params", None)                       # an entry from the old format
+
+    assert usable(legacy, df, SWING_KW) is None, (
+        "an entry with no recorded parameters cannot be shown to match the engine "
+        "about to resume from it; unknown is not the same as equal")
+
+
+def test_the_data_check_still_works_alongside_the_parameter_check():
+    """Control. Adding parameters must not quietly replace the history check — a
+    fingerprint that only compared parameters would accept a rewritten parquet."""
+    df = _price_history()
+    entry = make_entry(df, CKPT_DAY, _open_position(), SWING_KW)
+
+    edited = df.copy()
+    edited.iloc[100, edited.columns.get_loc("close")] += 0.01
+    assert usable(entry, edited, SWING_KW) is None, (
+        "a bar was rewritten in the middle of the history and the entry survived")
+
+
+def test_a_divergent_shadow_does_not_advance_the_checkpoint():
+    """Detecting the disagreement and then committing the state that produced it.
+
+    One slot a day replays the spliced frame in full and compares it with the resumed
+    answer. It is the only check that closes the loop on live data — everything else
+    runs on parquet, and the frames that decide live trades carry IBKR bars that are
+    never persisted.
+
+    When it disagreed, the code logged an ERROR and then advanced the checkpoint
+    anyway. The new position is computed with resume_pos=pos — the same resumed path
+    that just failed the comparison — so the divergence was written forward and the next
+    day resumed from it. Found by walking the ancestors of the advance_day call: no
+    condition anywhere in the chain, and no variable holding the verify result.
+
+    Not advancing is the whole fix. The entry stays where it is, so tomorrow re-runs the
+    same comparison from the same anchor: a persistent divergence is re-reported instead
+    of being buried under a moved anchor, and a transient one costs nothing. Dropping
+    the entry outright would be stronger but stops the shadow entirely — the live path
+    skips an unusable checkpoint rather than replaying it — and that is a heavy response
+    to something that has never fired (56 agreements, 0 divergences over seven days).
+
+    Checked on the source, because a runtime test here would need the whole live day.
+    """
+    import ast
+    src = (Path(__file__).resolve().parent / "run_live_day.py").read_text(encoding="utf-8")
+    fn = next((n for n in ast.walk(ast.parse(src))
+               if isinstance(n, ast.FunctionDef) and n.name == "_shadow"), None)
+    assert fn is not None, "_shadow is gone or renamed — the locator is broken"
+
+    parents = {c: p for p in ast.walk(fn) for c in ast.iter_child_nodes(p)}
+    advance = next((n for n in ast.walk(fn) if isinstance(n, ast.Call)
+                    and getattr(n.func, "attr", None) == "advance_day"), None)
+    entry = next((n for n in ast.walk(fn) if isinstance(n, ast.Call)
+                  and getattr(n.func, "attr", None) == "make_entry"), None)
+    assert advance is not None and entry is not None, (
+        "no advance_day/make_entry call found in _shadow — the locator is broken")
+
+    def _conditions(node):
+        out, cur = [], node
+        while cur in parents:
+            cur = parents[cur]
+            if isinstance(cur, ast.If):
+                out.append(ast.unparse(cur.test))
+        return out
+
+    guards = _conditions(advance) + _conditions(entry)
+    assert any("verif" in g.lower() or "agree" in g.lower() or "match" in g.lower()
+               for g in guards), (
+        f"the checkpoint is advanced without consulting the comparison, so a detected "
+        f"divergence is written forward and resumed from tomorrow. Conditions found: "
+        f"{guards}")

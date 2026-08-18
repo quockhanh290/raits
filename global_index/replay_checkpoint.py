@@ -101,9 +101,32 @@ def save(entries: dict, path: str = DEFAULT_PATH) -> None:
     tmp.replace(p)
 
 
-def make_entry(df: pd.DataFrame, last_day, pos) -> dict:
+def _param_id(params) -> "str | None":
+    """The engine settings that decided this position, as one comparable string.
+
+    The fingerprint above covers the bars. Which position those bars produce depends
+    just as much on the EMA period, the chandelier multiple and the hold limit — change
+    any of them and the stored position is one the current engine would never have
+    produced, while the history still hashes the same.
+
+    That is not a theoretical drift. The parameters are not declared once: the live
+    shadow derives them from the engine object, the bootstrap that WRITES the checkpoint
+    declares literals, and ema_period=10 for the Nikkei leg appears in six files. The
+    two ends of the checkpoint read from different sources.
+
+    Sorted and rendered rather than hashed: an entry a person can read is worth more
+    here than eight opaque hex digits, and the log line that reports a refusal can then
+    say which setting moved.
+    """
+    if params is None:
+        return None
+    return ";".join(f"{k}={params[k]!r}" for k in sorted(params))
+
+
+def make_entry(df: pd.DataFrame, last_day, pos, params=None) -> dict:
     return {"last_day": str(pd.Timestamp(last_day).date()),
             "fingerprint": fingerprint(df, last_day),
+            "params": _param_id(params),
             "pos": _pos_to_json(pos)}
 
 
@@ -147,12 +170,23 @@ def advance_day(raw: pd.DataFrame, run_day, last_day):
     return done[-1]
 
 
-def usable(entry: dict, df: pd.DataFrame):
-    """(last_day, pos) if this entry still describes df's history, else None.
+def usable(entry: dict, df: pd.DataFrame, params=None):
+    """(last_day, pos) if this entry still describes df's history AND this engine.
 
     Returns the position as-is including None: a checkpoint recording that
     nothing was open is as valid as one recording a position, and treating it
     as a miss would replay in full on every flat day.
+
+    Both halves have to match. The history is what the fingerprint covers; the engine
+    settings are what _param_id covers, and without them a checkpoint computed under
+    one EMA period is resumed into a run using another with nothing to notice — the
+    module's promise of "slow, never wrong" turned into fast and wrong.
+
+    An entry with no recorded params is refused rather than accepted. Every entry
+    written before this existed is in that state, and accepting them once "to avoid a
+    rebuild" would keep trusting an unchecked checkpoint through exactly the window
+    where nobody is looking for the problem. Unknown is not the same as equal. The
+    recovery is one --bootstrap run, which the caller's refusal message already names.
     """
     if not entry or "last_day" not in entry:
         return None
@@ -161,6 +195,8 @@ def usable(entry: dict, df: pd.DataFrame):
     except Exception:
         return None
     if fingerprint(df, last_day) != entry.get("fingerprint"):
+        return None
+    if _param_id(params) != entry.get("params"):
         return None
     return last_day, _pos_from_json(entry.get("pos"))
 
@@ -212,7 +248,7 @@ def _bootstrap():
             cut = cut.tz_localize(df.index.tz)
         _, pos = backtest_swing_tf(df[df.index < cut], labels, costs[inst],
                                    return_open=True, **kw)
-        entries[inst] = make_entry(df, last, pos)
+        entries[inst] = make_entry(df, last, pos, kw)
         held = "khong co vi the" if pos is None else \
             f"{pos['dir']} entry={pos['entry']:.2f} stop={pos['stop']:.2f}"
         print(f"  {inst:5s} last_day={last.date()}  {held}", flush=True)
@@ -245,7 +281,7 @@ def _bootstrap():
     _, npos = backtest_swing_tf(ndf[ndf.index < ncut],
                                 RegimeLabels(spy.sort_index(), lag_days=1),
                                 ncost, return_open=True, **nkw)
-    entries["MNKD"] = make_entry(ndf, nlast, npos)
+    entries["MNKD"] = make_entry(ndf, nlast, npos, nkw)
     held = "khong co vi the" if npos is None else \
         f"{npos['dir']} entry={npos['entry']:.2f} stop={npos['stop']:.2f}"
     print(f"  {'MNKD':5s} last_day={nlast.date()}  {held}", flush=True)

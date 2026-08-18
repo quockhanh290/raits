@@ -411,15 +411,28 @@ def main():
                 # measured, mechanism not established. The parquet is where the
                 # spliced frame's history comes from, so it is both the right
                 # thing to fingerprint and the one that stays stable.
-                u = ckpt.usable(entries.get(name, {}), raw)
+                # Params as well as history: the entry was computed by one engine
+                # setting and this run may be using another. kw is the same dict
+                # handed to backtest_swing_tf below, so the two ends cannot drift.
+                u = ckpt.usable(entries.get(name, {}), raw, kw)
                 if u is None:
                     _e = entries.get(name, {})
                     _ld = _e.get("last_day")
-                    log.info("[shadow] %s: khong co checkpoint dung duoc — bo qua. "
-                             "luu=%s tinh=%s (chay `python -m "
-                             "global_index.replay_checkpoint --bootstrap`)", name,
-                             _e.get("fingerprint", "(khong co)"),
-                             ckpt.fingerprint(raw, _ld) if _ld else "?")
+                    # WARNING, not INFO. Skipping here means the ONLY check that closes
+                    # the loop on live data does not run for this instrument — every
+                    # other comparison uses parquet, and the frames that decide live
+                    # trades carry IBKR bars nobody persists. An unusable checkpoint is
+                    # safe (nothing wrong is resumed) but it is not nothing: the
+                    # reconciliation goes quiet, and quiet is what this whole area keeps
+                    # being caught by. Deliberately not ERROR — that marks the job
+                    # failed, and a transitional rebuild would then drown real failures.
+                    log.warning("[shadow] %s: khong co checkpoint dung duoc — BO QUA doi "
+                                "chieu cho ma nay. luu=%s tinh=%s params=%s (chay "
+                                "`python -m global_index.replay_checkpoint --bootstrap`)",
+                                name,
+                                _e.get("fingerprint", "(khong co)"),
+                                ckpt.fingerprint(raw, _ld) if _ld else "?",
+                                _e.get("params", "(khong co — entry dinh dang cu)"))
                     continue
 
                 last_day, pos = u
@@ -445,6 +458,7 @@ def main():
                 log.info("[shadow] %s: tu checkpoint %s -> %s", name, last_day.date(),
                          _fmt(want))
 
+                _verified_agrees = True   # no verify this slot = no evidence against
                 if verify:
                     # Replay the same spliced frame in full and compare. This is the
                     # only check that closes the loop on live data: everything else
@@ -458,10 +472,28 @@ def main():
                             round(float(p["stop"]), 4),
                             str(pd.Timestamp(p["entry_day"]).date()))
 
+                    # Seven of the twelve fields a trade carries, not four.
+                    #
+                    # The offline verifier compares the whole dict (`got == want`) and
+                    # passes 14/14 on MNKD. This side compared day, exit_day, direction
+                    # and pnl — so two trades entered and exited at different PRICES,
+                    # or one stopped out on a GAP and the other on the chandelier, read
+                    # as agreement whenever the points happened to net out. The weaker
+                    # check was the one running daily, on the only data the offline one
+                    # cannot see: live IBKR bars, which are never persisted.
+                    #
+                    # entry/exit are what reach the broker and the slippage figures;
+                    # reason is which exit rule fired. The three timestamps and
+                    # hold_days are deliberately left out for now: a divergence here
+                    # freezes the checkpoint (see below), so the comparison is widened
+                    # to the fields whose disagreement is unambiguously a defect, and
+                    # widened again once a live run has shown the rest agree.
                     def _tident(t):
                         return (str(pd.Timestamp(t["day"]).date()),
                                 str(pd.Timestamp(t["exit_day"]).date()),
-                                t["direction"], round(float(t["pnl"]), 4))
+                                t["direction"], round(float(t["pnl"]), 4),
+                                round(float(t["entry"]), 4), round(float(t["exit"]), 4),
+                                t.get("reason"))
 
                     _tr_full, full = backtest_swing_tf(df, labels_, cost_,
                                                        return_open=True, **kw)
@@ -492,6 +524,7 @@ def main():
                                        enumerate(zip(_a, _b)) if x != y), None)
                         if _first is None and len(_a) != len(_b):
                             _first = min(len(_a), len(_b))
+                        _verified_agrees = False
                         log.error(
                             "[shadow] %s: DOI CHIEU LECH — vi the: day du=%s resume=%s "
                             "| lenh: %d vs %d, lech dau tien o #%s: %s vs %s",
@@ -504,7 +537,18 @@ def main():
                 # against the parquet rather than this spliced frame — see the note
                 # there. Getting it wrong is what made 2026-08-07 gather nothing.
                 new_day = ckpt.advance_day(raw, run_day, last_day)
-                if new_day is not None:
+                # Only move the anchor on evidence that has not been contradicted.
+                # pos_new below is computed with resume_pos=pos — the same resumed
+                # path the comparison just rejected — so advancing after a
+                # divergence writes it forward and tomorrow resumes from it.
+                # Leaving the entry where it is re-runs the same comparison from
+                # the same anchor tomorrow: a persistent divergence is reported
+                # again instead of being buried, and a transient one costs nothing.
+                if new_day is not None and not _verified_agrees:
+                    log.error("[shadow] %s: KHONG ghi tien checkpoint (%s -> %s) "
+                              "vi doi chieu vua LECH — giu moc cu de lan sau kiem lai",
+                              name, last_day.date(), new_day.date())
+                if new_day is not None and _verified_agrees:
                     end = new_day + pd.Timedelta(days=1)
                     if tz is not None:
                         end = end.tz_localize(tz)
@@ -512,7 +556,7 @@ def main():
                         sub[sub.index < end], labels_, cost_, datr=datr,
                         resume_pos=pos, resume_after_day=last_day,
                         return_open=True, **kw)
-                    updated[name] = ckpt.make_entry(raw, new_day, pos_new)
+                    updated[name] = ckpt.make_entry(raw, new_day, pos_new, kw)
                     log.info("[shadow] %s: checkpoint tien %s -> %s",
                              name, last_day.date(), new_day.date())
 
