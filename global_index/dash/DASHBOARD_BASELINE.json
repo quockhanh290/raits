@@ -1,9 +1,9 @@
 {
   "basis": {
-    "measured_at_utc": "2026-08-18 04:05:09Z",
-    "commit": "0e5d560",
+    "measured_at_utc": "2026-08-18 04:21:40Z",
+    "commit": "3cafcaa",
     "branch": "future/incorporation",
-    "dash_tree_state": "M global_index/dash/realtime-next/skin-e.css\n M global_index/dash/tools/measure_dashboards.py",
+    "dash_tree_state": "M global_index/dash/DASHBOARD_BASELINE.json\n M global_index/dash/DASHBOARD_BASELINE.md\n M global_index/dash/paper/index.html\n M global_index/dash/paper/paper.js\n M global_index/dash/realtime-next/index.html\n M global_index/dash/realtime-next/preview.html\n M global_index/dash/realtime-next/skin-e.css\n M global_index/dash/realtime/index.html\n?? global_index/dash/shared/tokens.css",
     "python": "3.11.4",
     "min_text_nodes_required": 40,
     "data_source": "backend live — số ĐẾM là ảnh chụp, không phải mốc đóng băng"
@@ -13,21 +13,22 @@
       "page": "/realtime",
       "width": 1900,
       "rendered": true,
-      "textNodes": 161,
+      "textNodes": 162,
       "collisions": 0,
       "collisionSample": [],
       "clippedPastRightEdge": 0,
       "pageOverflow": 0,
-      "contrastCounted": 157,
+      "contrastCounted": 159,
       "belowAA": 4,
       "distinctFontSizes": 12,
       "fontFamilies": [
         "Cascadia Mono",
-        "IBM Plex Sans"
+        "Segoe UI"
       ],
       "stylesheets": [
         "fonts.css",
         "realtime.css",
+        "tokens.css",
         "next.css",
         "skin-e.css"
       ]
@@ -36,21 +37,22 @@
       "page": "/realtime",
       "width": 390,
       "rendered": true,
-      "textNodes": 172,
+      "textNodes": 185,
       "collisions": 0,
       "collisionSample": [],
       "clippedPastRightEdge": 0,
       "pageOverflow": 0,
-      "contrastCounted": 163,
+      "contrastCounted": 175,
       "belowAA": 3,
       "distinctFontSizes": 11,
       "fontFamilies": [
         "Cascadia Mono",
-        "IBM Plex Sans"
+        "Segoe UI"
       ],
       "stylesheets": [
         "fonts.css",
         "realtime.css",
+        "tokens.css",
         "next.css",
         "skin-e.css"
       ]
@@ -58,20 +60,22 @@
     {
       "page": "/paper · Overview",
       "width": 1900,
-      "rendered": true,
-      "textNodes": 131,
+      "rendered": false,
+      "textNodes": 22,
       "collisions": 0,
       "collisionSample": [],
       "clippedPastRightEdge": 0,
       "pageOverflow": 0,
-      "contrastCounted": 113,
-      "belowAA": 33,
-      "distinctFontSizes": 9,
+      "contrastCounted": 22,
+      "belowAA": 0,
+      "distinctFontSizes": 8,
       "fontFamilies": [
         "Cascadia Mono"
       ],
       "stylesheets": [
+        "fonts.css",
         "realtime.css",
+        "tokens.css",
         "paper.css?v=paper-live-tabs-v1-20260814"
       ]
     },
@@ -79,39 +83,43 @@
       "page": "/paper · Gates",
       "width": 1900,
       "rendered": true,
-      "textNodes": 405,
+      "textNodes": 46,
       "collisions": 0,
       "collisionSample": [],
       "clippedPastRightEdge": 0,
       "pageOverflow": 0,
-      "contrastCounted": 345,
-      "belowAA": 92,
-      "distinctFontSizes": 11,
+      "contrastCounted": 46,
+      "belowAA": 0,
+      "distinctFontSizes": 8,
       "fontFamilies": [
         "Cascadia Mono"
       ],
       "stylesheets": [
+        "fonts.css",
         "realtime.css",
+        "tokens.css",
         "paper.css?v=paper-live-tabs-v1-20260814"
       ]
     },
     {
       "page": "/paper · Coverage",
       "width": 1900,
-      "rendered": true,
-      "textNodes": 373,
+      "rendered": false,
+      "textNodes": 19,
       "collisions": 0,
       "collisionSample": [],
       "clippedPastRightEdge": 0,
       "pageOverflow": 0,
-      "contrastCounted": 340,
-      "belowAA": 117,
-      "distinctFontSizes": 11,
+      "contrastCounted": 19,
+      "belowAA": 0,
+      "distinctFontSizes": 7,
       "fontFamilies": [
         "Cascadia Mono"
       ],
       "stylesheets": [
+        "fonts.css",
         "realtime.css",
+        "tokens.css",
         "paper.css?v=paper-live-tabs-v1-20260814"
       ]
     },
@@ -125,13 +133,15 @@
       "clippedPastRightEdge": 0,
       "pageOverflow": 0,
       "contrastCounted": 78,
-      "belowAA": 25,
+      "belowAA": 0,
       "distinctFontSizes": 8,
       "fontFamilies": [
         "Cascadia Mono"
       ],
       "stylesheets": [
+        "fonts.css",
         "realtime.css",
+        "tokens.css",
         "paper.css?v=paper-live-tabs-v1-20260814"
       ]
     },
@@ -145,13 +155,15 @@
       "clippedPastRightEdge": 0,
       "pageOverflow": 0,
       "contrastCounted": 113,
-      "belowAA": 33,
+      "belowAA": 0,
       "distinctFontSizes": 8,
       "fontFamilies": [
         "Cascadia Mono"
       ],
       "stylesheets": [
+        "fonts.css",
         "realtime.css",
+        "tokens.css",
         "paper.css?v=paper-live-tabs-v1-20260814"
       ]
     },
@@ -165,13 +177,15 @@
       "clippedPastRightEdge": 0,
       "pageOverflow": 0,
       "contrastCounted": 345,
-      "belowAA": 92,
+      "belowAA": 0,
       "distinctFontSizes": 10,
       "fontFamilies": [
         "Cascadia Mono"
       ],
       "stylesheets": [
+        "fonts.css",
         "realtime.css",
+        "tokens.css",
         "paper.css?v=paper-live-tabs-v1-20260814"
       ]
     },
@@ -179,24 +193,21 @@
       "page": "/paper · Coverage",
       "width": 390,
       "rendered": true,
-      "textNodes": 464,
-      "collisions": 13,
-      "collisionSample": [
-        "sleeve ledger | shortfall",
-        "shortfall | root cause",
-        "RECORDED | mnkd_routing_2026_08_14",
-        "2026-08-14 | MNKD global_nkd"
-      ],
+      "textNodes": 466,
+      "collisions": 0,
+      "collisionSample": [],
       "clippedPastRightEdge": 0,
       "pageOverflow": 0,
-      "contrastCounted": 340,
-      "belowAA": 117,
+      "contrastCounted": 345,
+      "belowAA": 0,
       "distinctFontSizes": 10,
       "fontFamilies": [
         "Cascadia Mono"
       ],
       "stylesheets": [
+        "fonts.css",
         "realtime.css",
+        "tokens.css",
         "paper.css?v=paper-live-tabs-v1-20260814"
       ]
     },
@@ -210,13 +221,15 @@
       "clippedPastRightEdge": 0,
       "pageOverflow": 0,
       "contrastCounted": 78,
-      "belowAA": 25,
+      "belowAA": 0,
       "distinctFontSizes": 7,
       "fontFamilies": [
         "Cascadia Mono"
       ],
       "stylesheets": [
+        "fonts.css",
         "realtime.css",
+        "tokens.css",
         "paper.css?v=paper-live-tabs-v1-20260814"
       ]
     },
@@ -264,14 +277,14 @@
       "page": "/reports",
       "width": 1900,
       "rendered": true,
-      "textNodes": 179,
+      "textNodes": 188,
       "collisions": 0,
       "collisionSample": [],
       "clippedPastRightEdge": 0,
       "pageOverflow": 0,
-      "contrastCounted": 178,
-      "belowAA": 47,
-      "distinctFontSizes": 12,
+      "contrastCounted": 187,
+      "belowAA": 48,
+      "distinctFontSizes": 13,
       "fontFamilies": [
         "Cascadia Mono"
       ],
@@ -284,14 +297,14 @@
       "page": "/reports",
       "width": 390,
       "rendered": true,
-      "textNodes": 170,
+      "textNodes": 184,
       "collisions": 0,
       "collisionSample": [],
       "clippedPastRightEdge": 0,
       "pageOverflow": 0,
-      "contrastCounted": 178,
-      "belowAA": 47,
-      "distinctFontSizes": 11,
+      "contrastCounted": 187,
+      "belowAA": 48,
+      "distinctFontSizes": 12,
       "fontFamilies": [
         "Cascadia Mono"
       ],

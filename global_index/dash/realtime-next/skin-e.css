@@ -23,84 +23,12 @@
    listed at the foot of this file rather than papered over here.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-:root {
-  /* Surfaces, darkest to lightest */
-  --page:      #08090c;
-  --deep:      #0b0d11;
-  --card:      #0e1116;
-  --elevated:  #12161c;
-  --journal:   #0a0c10;
+/* Khối `:root` từng nằm ở đây đã chuyển sang `/dash/shared/tokens.css`, vì
+   /paper cũng cần nó và một file mang tên một route thì không phải nhà của nó.
+   Trang nào nạp skin này PHẢI nạp tokens.css trước — nếu không, mọi `var(--x)`
+   dưới đây rơi về giá trị của bảng nền và trang sẽ trông gần đúng thay vì đúng,
+   tức là kiểu hỏng khó thấy nhất. */
 
-  /* Lines */
-  --line-page:      #1b2027;   /* between page-level bands */
-  --line-card:      #1e242c;   /* a card's own edge */
-  --line-hair:      #1a1f26;   /* inside a card */
-  --line-faint:     #171b22;   /* collapsed journal card, inner journal rules */
-  --line-open:      #2a323d;   /* expanded journal card */
-  --line-button:    #262d36;
-
-  /* Text, four steps */
-  --t-primary:   #e8ebf0;
-  --t-secondary: #a8b1c0;
-  --t-label:     #798394;
-  --t-null:      #4b5563;
-
-  /* State */
-  --s-ok:        #3ecf8e;
-  --s-ok-text:   #8ae6cc;
-  --s-ok-bg:     #14251f;
-  --s-warn:      #f0b429;
-  --s-bad:       #f2555a;
-  --s-bad-text:  #ff8085;
-
-  /* Domain accents — one hue per kind of fact */
-  --d-money:    #5fd3b2;
-  --d-runner:   #9d8cf5;
-  --d-exposure: #5b9cf0;
-  --d-risk:     #e0913c;
-  --d-job-late: #3a6ea8;
-  --d-dec-late: #6b5cb8;
-
-  /* The DATA face follows the header's font control.
-
-     realtime.js:14 writes the choice to `<html data-font="...">` and
-     realtime.css:20-25 turns that into `--font-ui`. Declaring `--mono` as a
-     literal here read none of that: measured, picking Courier or System changed
-     `data-font` and `--font-ui` while the rendered family stayed IBM Plex Mono
-     — the control moved and nothing followed it.
-
-     Chaining to --font-ui hands the choice back. IBM Plex Mono is one of the
-     options in that select, so the design's own face is still one click away;
-     it is just no longer imposed over the reader's setting.
-
-     The LANGUAGE face stays fixed: the control's options are monospace faces for
-     figures, and prose is not what it is choosing. */
-  --sans: "IBM Plex Sans", Helvetica, Arial, sans-serif;
-  --mono: var(--font-ui, "IBM Plex Mono"), "Cascadia Mono", monospace;
-
-  /* ── The base sheet's own tokens, restated ────────────────────────────────
-     realtime.css:122-124 writes `.positive { color: var(--green) !important }`,
-     so no selector this layer can write will beat it — the only way in is the
-     variable itself. Restating the six colour tokens moves every signed figure,
-     dot and rule on the page onto the reference palette in one place instead of
-     an !important war, and fixes a mismatch that was invisible until measured:
-     the base green is #36bf69, the reference green is #3ecf8e. */
-  --green:  #3ecf8e;
-  --red:    #f2555a;
-  --amber:  #f0b429;
-  --blue:   #5b9cf0;
-  --violet: #9d8cf5;
-
-  --bg:          #08090c;
-  --surface:     #0e1116;
-  --panel:       #0b0d11;
-  --line:        #1e242c;
-  --line-strong: #2a323d;
-  --text:        #e8ebf0;
-  --bright:      #e8ebf0;
-  --muted:       #a8b1c0;
-  --dim:         #798394;
-}
 
 /* ── Page ───────────────────────────────────────────────────────────────────*/
 html { font-variant-numeric: tabular-nums; }

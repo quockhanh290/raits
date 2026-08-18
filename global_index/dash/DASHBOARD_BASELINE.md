@@ -3,11 +3,18 @@
 Sinh bởi `global_index/dash/tools/measure_dashboards.py`. **Đừng sửa tay**:
 chạy lại script để cập nhật, nếu không con số sẽ rời khỏi thứ nó mô tả.
 
-- **measured_at_utc**: `2026-08-18 04:05:09Z`
-- **commit**: `0e5d560`
+- **measured_at_utc**: `2026-08-18 04:21:40Z`
+- **commit**: `3cafcaa`
 - **branch**: `future/incorporation`
-- **dash_tree_state**: `M global_index/dash/realtime-next/skin-e.css
- M global_index/dash/tools/measure_dashboards.py`
+- **dash_tree_state**: `M global_index/dash/DASHBOARD_BASELINE.json
+ M global_index/dash/DASHBOARD_BASELINE.md
+ M global_index/dash/paper/index.html
+ M global_index/dash/paper/paper.js
+ M global_index/dash/realtime-next/index.html
+ M global_index/dash/realtime-next/preview.html
+ M global_index/dash/realtime-next/skin-e.css
+ M global_index/dash/realtime/index.html
+?? global_index/dash/shared/tokens.css`
 - **python**: `3.11.4`
 - **min_text_nodes_required**: `40`
 - **data_source**: `backend live — số ĐẾM là ảnh chụp, không phải mốc đóng băng`
@@ -16,20 +23,20 @@ chạy lại script để cập nhật, nếu không con số sẽ rời khỏi 
 
 | Trang | Rộng | Node vẽ ra | Chữ đè chữ | Cắt ngoài mép | Tràn trang | Dưới AA | Cỡ chữ | Họ chữ |
 |---|---|---|---|---|---|---|---|---|
-| /realtime | 1900 | 161 | 0 | 0 | 0 | 4/157 | 12 | 2 |
-| /realtime | 390 | 172 | 0 | 0 | 0 | 3/163 | 11 | 2 |
-| /paper · Overview | 1900 | 131 | 0 | 0 | 0 | 33/113 | 9 | 1 |
-| /paper · Gates | 1900 | 405 | 0 | 0 | 0 | 92/345 | 11 | 1 |
-| /paper · Coverage | 1900 | 373 | 0 | 0 | 0 | 117/340 | 11 | 1 |
-| /paper · Gaps | 1900 | 86 | 0 | 0 | 0 | 25/78 | 8 | 1 |
-| /paper · Overview | 390 | 197 | 0 | 0 | 0 | 33/113 | 8 | 1 |
-| /paper · Gates | 390 | 544 | 0 | 0 | 0 | 92/345 | 10 | 1 |
-| /paper · Coverage | 390 | 464 | 13 | 0 | 0 | 117/340 | 10 | 1 |
-| /paper · Gaps | 390 | 125 | 0 | 0 | 0 | 25/78 | 7 | 1 |
+| /realtime | 1900 | 162 | 0 | 0 | 0 | 4/159 | 12 | 2 |
+| /realtime | 390 | 185 | 0 | 0 | 0 | 3/175 | 11 | 2 |
+| /paper · Overview ⚠ | 1900 | 22 | 0 | 0 | 0 | 0/22 | 8 | 1 |
+| /paper · Gates | 1900 | 46 | 0 | 0 | 0 | 0/46 | 8 | 1 |
+| /paper · Coverage ⚠ | 1900 | 19 | 0 | 0 | 0 | 0/19 | 7 | 1 |
+| /paper · Gaps | 1900 | 86 | 0 | 0 | 0 | 0/78 | 8 | 1 |
+| /paper · Overview | 390 | 197 | 0 | 0 | 0 | 0/113 | 8 | 1 |
+| /paper · Gates | 390 | 544 | 0 | 0 | 0 | 0/345 | 10 | 1 |
+| /paper · Coverage | 390 | 466 | 0 | 0 | 0 | 0/345 | 10 | 1 |
+| /paper · Gaps | 390 | 125 | 0 | 0 | 0 | 0/78 | 7 | 1 |
 | /analytics | 1900 | 891 | 0 | 0 | 0 | 17/890 | 11 | 1 |
 | /analytics | 390 | 493 | 0 | 0 | 0 | 17/890 | 10 | 1 |
-| /reports | 1900 | 179 | 0 | 0 | 0 | 47/178 | 12 | 1 |
-| /reports | 390 | 170 | 0 | 0 | 0 | 47/178 | 11 | 1 |
+| /reports | 1900 | 188 | 0 | 0 | 0 | 48/187 | 13 | 1 |
+| /reports | 390 | 184 | 0 | 0 | 0 | 48/187 | 12 | 1 |
 | / ⚠ | 1900 | 19 | 0 | 0 | 0 | 0/17 | 5 | 1 |
 | / ⚠ | 390 | 26 | 0 | 0 | 0 | 0/17 | 6 | 1 |
 
@@ -47,5 +54,7 @@ chạy lại script để cập nhật, nếu không con số sẽ rời khỏi 
 
 ## Dòng KHÔNG tin được
 
+- /paper · Overview @1900px: chỉ 22 node được vẽ — trang chưa dựng xong, mọi số 0 ở dòng này không kiểm gì
+- /paper · Coverage @1900px: chỉ 19 node được vẽ — trang chưa dựng xong, mọi số 0 ở dòng này không kiểm gì
 - / @1900px: chỉ 19 node được vẽ — trang chưa dựng xong, mọi số 0 ở dòng này không kiểm gì
 - / @390px: chỉ 26 node được vẽ — trang chưa dựng xong, mọi số 0 ở dòng này không kiểm gì

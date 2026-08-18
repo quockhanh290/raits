@@ -4,7 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>RAITS Paper Evidence</title>
+  <link rel="stylesheet" href="/dash/fonts/fonts.css">
   <link rel="stylesheet" href="/dash/realtime/realtime.css">
+  <!-- Bảng màu dùng chung với /realtime. Đo trước khi thêm: paper.css khai màu
+       bằng `var(--x)` 398 lần và 395 lần dùng đúng token trong file này, nên nó
+       theo được gần trọn vẹn — 33 node dưới chuẩn AA về 0, không phát sinh va
+       chạm hay tràn. Phải nằm SAU realtime.css. -->
+  <link rel="stylesheet" href="/dash/shared/tokens.css">
   <link rel="stylesheet" href="/dash/paper/paper.css?v=paper-live-tabs-v1-20260814">
   <script src="/dash/paper/paper.js?v=paper-live-tabs-v1-20260814" defer></script>
 </head>

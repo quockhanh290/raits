@@ -1,0 +1,104 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   tokens.css — bảng màu và họ chữ dùng chung cho các dashboard
+
+   Tách ra khỏi `realtime-next/skin-e.css`, nơi nó từng nằm. Lý do tách: hai
+   trang cần nó, mà tên và vị trí cũ thuộc về đúng một route.
+
+   ĐO TRƯỚC KHI TÁCH — vì sao việc này đáng làm, và giới hạn của nó:
+
+     paper.css khai màu/chữ bằng `var(--x)` 398 lần, và 395 trong số đó dùng
+     đúng những token khai ở đây; chỉ 3 chỗ viết cứng hex. Áp thử trên /paper đo
+     được 33 node dưới chuẩn AA về 0, không phát sinh va chạm hay tràn nào.
+
+     Nhưng phần THÀNH PHẦN thì không dùng chung được: trong 122 tên lớp mà
+     skin-e đặt luật, chỉ 7 tồn tại trên /paper, và /paper có 145 tên lớp riêng
+     mà skin-e không nói gì. Nên file này chỉ mang token, không mang hình dạng.
+
+   THỨ TỰ NẠP: phải sau `realtime/realtime.css`. Nửa dưới của khối này khai lại
+   chính token của bảng nền (`--green`, `--dim`, `--line`, …) — nạp trước thì
+   bảng nền ghi đè và không có gì thay đổi.
+
+   Đổi một giá trị ở đây là đổi MỌI trang nạp nó. Đã có một ca thật: khai lại
+   `--violet` cho khớp bản dựng làm chip KNOWN DEBT trùng đúng màu chip RUNNER,
+   vì `realtime.css:219` dùng cùng token đó cho một nghĩa khác hẳn. Trước khi
+   sửa một dòng ở đây: `grep -rn "var(--tên)" global_index/dash` và đọc hết.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Surfaces, darkest to lightest */
+  --page:      #08090c;
+  --deep:      #0b0d11;
+  --card:      #0e1116;
+  --elevated:  #12161c;
+  --journal:   #0a0c10;
+
+  /* Lines */
+  --line-page:      #1b2027;   /* between page-level bands */
+  --line-card:      #1e242c;   /* a card's own edge */
+  --line-hair:      #1a1f26;   /* inside a card */
+  --line-faint:     #171b22;   /* collapsed journal card, inner journal rules */
+  --line-open:      #2a323d;   /* expanded journal card */
+  --line-button:    #262d36;
+
+  /* Text, four steps */
+  --t-primary:   #e8ebf0;
+  --t-secondary: #a8b1c0;
+  --t-label:     #798394;
+  --t-null:      #4b5563;
+
+  /* State */
+  --s-ok:        #3ecf8e;
+  --s-ok-text:   #8ae6cc;
+  --s-ok-bg:     #14251f;
+  --s-warn:      #f0b429;
+  --s-bad:       #f2555a;
+  --s-bad-text:  #ff8085;
+
+  /* Domain accents — one hue per kind of fact */
+  --d-money:    #5fd3b2;
+  --d-runner:   #9d8cf5;
+  --d-exposure: #5b9cf0;
+  --d-risk:     #e0913c;
+  --d-job-late: #3a6ea8;
+  --d-dec-late: #6b5cb8;
+
+  /* The DATA face follows the header's font control.
+
+     realtime.js:14 writes the choice to `<html data-font="...">` and
+     realtime.css:20-25 turns that into `--font-ui`. Declaring `--mono` as a
+     literal here read none of that: measured, picking Courier or System changed
+     `data-font` and `--font-ui` while the rendered family stayed IBM Plex Mono
+     — the control moved and nothing followed it.
+
+     Chaining to --font-ui hands the choice back. IBM Plex Mono is one of the
+     options in that select, so the design's own face is still one click away;
+     it is just no longer imposed over the reader's setting.
+
+     The LANGUAGE face stays fixed: the control's options are monospace faces for
+     figures, and prose is not what it is choosing. */
+  --sans: "IBM Plex Sans", Helvetica, Arial, sans-serif;
+  --mono: var(--font-ui, "IBM Plex Mono"), "Cascadia Mono", monospace;
+
+  /* ── The base sheet's own tokens, restated ────────────────────────────────
+     realtime.css:122-124 writes `.positive { color: var(--green) !important }`,
+     so no selector this layer can write will beat it — the only way in is the
+     variable itself. Restating the six colour tokens moves every signed figure,
+     dot and rule on the page onto the reference palette in one place instead of
+     an !important war, and fixes a mismatch that was invisible until measured:
+     the base green is #36bf69, the reference green is #3ecf8e. */
+  --green:  #3ecf8e;
+  --red:    #f2555a;
+  --amber:  #f0b429;
+  --blue:   #5b9cf0;
+  --violet: #9d8cf5;
+
+  --bg:          #08090c;
+  --surface:     #0e1116;
+  --panel:       #0b0d11;
+  --line:        #1e242c;
+  --line-strong: #2a323d;
+  --text:        #e8ebf0;
+  --bright:      #e8ebf0;
+  --muted:       #a8b1c0;
+  --dim:         #798394;
+}
