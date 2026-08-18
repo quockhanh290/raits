@@ -12,8 +12,7 @@ vì slot chạy 10 giây thay vì 77 nên chưa chạm tới guard.
 
 Quét tĩnh không thay được cái này: tìm `write_text` ngoài `tmp_path` ra 86 dòng, và hai
 dòng đáng ngờ nhất khi soi kỹ đều là nhiễu — biến dựng từ `tmp_path` ở dòng trước, hoặc
-đường dẫn đã bị `monkeypatch.setattr` đổi hướng trong fixture. Không nhìn từng dòng mà
-biết được.
+đường dẫn đã bị `monkeypatch.setattr` đổi hướng trong fixture.
 
 Và so dấu vân tay trước/sau cũng không đủ: bản đầu của canh gác này làm thế, rồi phép tự
 kiểm bác ngay — một probe tạo `runner.pid` rồi xoá đi thì trước và sau giống hệt nhau,
@@ -100,24 +99,40 @@ def _fingerprint() -> dict[str, str | None]:
 
 @pytest.fixture(scope="session", autouse=True)
 def _live_state_is_left_alone():
-    """Cảnh báo khi suite chạm vào trạng thái của hệ thật.
+    """Báo khi trạng thái hệ thật động đậy trong lúc suite chạy — và nói rõ ai làm.
 
-    Cảnh báo chứ không làm đỏ suite: hỏng ở đây là hỏng của bộ kiểm chứ không phải của
-    mã sản xuất, và biến nó thành lỗi sẽ che mất kết quả thật khi cả hai cùng xảy ra.
-    Dòng cảnh báo nêu tên tệp, thao tác, và việc dấu vết có ở lại hay không.
+    Hai kết luận khác hẳn nhau, và bản đầu gộp chúng làm một. Audit hook chỉ nghe được
+    tiến trình pytest, nên nó QUY TRÁCH NHIỆM được: thấy gì tức là một phép kiểm đã ghi.
+    So trước/sau thì không — trên máy này hệ thật chạy song song, và ngay lần đầu bật
+    dây bẫy nó đã báo "suite đã chạm" cho một tệp do job STOP_REPAIR_0420 ghi lúc 04:20
+    ET. Sai người.
+
+    Dù vậy dòng cảnh báo ấy vẫn có ích: nó lộ ra rằng job kia để lại khoá chết, một lỗi
+    trong bản vá vừa lên cùng đêm. Nên vẫn báo — chỉ là dưới đúng tên của nó.
+
+    Báo chứ không làm đỏ suite: hỏng ở đây là hỏng của bộ kiểm chứ không phải của mã sản
+    xuất, và biến nó thành lỗi sẽ che mất kết quả thật khi cả hai cùng xảy ra.
     """
     before = _fingerprint()
     yield
     after = _fingerprint()
     changed = {rel for rel in GUARDED if before[rel] != after[rel]}
-    if not (changed or _TOUCHED):
-        return
-    lines = []
-    for rel in sorted(set(_TOUCHED) | changed):
-        how = _TOUCHED.get(rel, "noi dung doi")
-        lasting = "con lai sau khi chay" if rel in changed else "thoang qua"
-        lines.append("  {}: {} ({})".format(rel, how, lasting))
-    banner = "!! SUITE DA CHAM VAO TRANG THAI HE THAT:"
-    hint = ("   Mot phep kiem dang ghi ra ngoai hop cat. Xem conftest.py de biet vi sao "
-            "dieu nay tung vo hieu hoa ba slot NKD lien tiep.")
-    print("\n\n" + banner + "\n" + "\n".join(lines) + "\n" + hint + "\n")
+
+    if _TOUCHED:
+        print("")
+        print("MOT PHEP KIEM DA GHI VAO TRANG THAI HE THAT:")
+        for rel, event in sorted(_TOUCHED.items()):
+            print("  {}: {}".format(rel, event))
+        print("   Ghi ra ngoai hop cat. Xem conftest.py de biet vi sao dieu nay")
+        print("   tung vo hieu hoa ba slot NKD lien tiep.")
+        print("")
+
+    only_outside = sorted(changed - set(_TOUCHED))
+    if only_outside:
+        print("")
+        print("GHI NHAN (khong quy trach nhiem duoc): cac tep sau doi trong luc suite")
+        print("chay, nhung audit hook khong thay tien trinh pytest ghi — nhieu kha nang")
+        print("la he that dang chay song song:")
+        for rel in only_outside:
+            print("  " + rel)
+        print("")

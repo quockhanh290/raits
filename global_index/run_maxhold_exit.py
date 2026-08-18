@@ -25,7 +25,8 @@ Schedule (Windows Task Scheduler or cron):
     09:31 ET Mon-Fri
 """
 from __future__ import annotations
-import argparse, logging, sys, time
+import argparse
+import atexit, logging, sys, time
 from pathlib import Path
 
 _CWD = Path.cwd()
@@ -53,7 +54,7 @@ from futures.circuit_breaker import CircuitBreaker
 from global_index.ibkr_broker import IBKRBroker
 from global_index.net_exposure_multi import MultiClusterGuard
 from global_index.runner import (FuturesRunner, RunnerLockError, STOP_FILE_NAME,
-                                 _acquire_lock)
+                                 _acquire_lock, _release_lock)
 
 MAX_HOLD_DAYS = int(SWING_TF_PARAM["max_hold_days"])
 ACCOUNT       = float(RISK["account"])
@@ -130,6 +131,18 @@ def main():
     if a.lock_path:
         try:
             _acquire_lock(Path(a.lock_path))
+            # Trả khoá trên MỌI đường thoát, kể cả khi `broker.connect()` ném.
+            #
+            # run_live_day truyền `lock_path` vào FuturesRunner và runner tự đăng ký
+            # `atexit.register(_release_lock, ...)`; hai entry point này giành khoá thủ
+            # công nên không ai đăng ký gì, và bản vá đầu tiên của tôi bỏ hẳn phần trả.
+            # Đo được ngay đêm nó lên: STOP_REPAIR_0420 chạy xong lúc 02:20:11 và để
+            # lại `runner.pid` mang PID 43248 đã chết.
+            #
+            # Bản sửa thứ hai đặt lời gọi trong `finally` của khối làm việc — vẫn hụt,
+            # vì khoá được giành TRƯỚC `broker.connect()`, nên một lần nối hỏng thì
+            # không bao giờ tới `finally`. Đó đúng là ca đã xảy ra. atexit phủ hết.
+            atexit.register(_release_lock, Path(a.lock_path))
         except RunnerLockError as exc:
             log.error("[lock] %s — MAX_HOLD KHONG chay hom nay. Day khong phai mot slot "
                       "bo qua vo hai: job nay chay mot lan moi ngay, nen vi the toi han "

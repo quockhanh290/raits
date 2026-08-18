@@ -145,3 +145,47 @@ def test_an_unheld_lock_does_not_block_anything(module, monkeypatch, tmp_path):
     không bao giờ chạy — và cả hai phép kiểm trên vẫn xanh."""
     with pytest.raises(_NeverConnected):
         _run_with_lock_held(module, monkeypatch, tmp_path, held=False)
+
+
+@pytest.mark.parametrize("module", [mh, sr])
+def test_the_lock_is_given_back_even_when_the_broker_connection_fails(module, monkeypatch, tmp_path):
+    """Giành khoá mà không trả là đổi một lỗi lấy một lỗi khác.
+
+    Đo được ngay đêm bản vá lên: STOP_REPAIR_0420 chạy 04:20 ET, xong sạch, và để lại
+    `runner.pid` mang PID đã chết. Không chặn lượt sau — `_acquire_lock` kiểm PID còn
+    sống rồi ghi đè — nhưng nếu hệ điều hành cấp lại đúng số PID ấy cho tiến trình khác
+    thì lượt sau bị từ chối oan.
+
+    Ca kiểm ở đây là ca KHÓ: broker ném ngay khi nối. Khoá được giành TRƯỚC lúc nối, nên
+    một bản sửa đặt việc trả khoá trong `finally` của khối làm việc sẽ không bao giờ
+    chạy tới — bản sửa thứ hai của tôi đúng như thế.
+    """
+    import atexit as _atexit
+    lock = tmp_path / "runner.pid"
+    positions = tmp_path / "live_positions.json"
+    positions.write_text("[]", encoding="utf-8")
+
+    registered = []
+    monkeypatch.setattr(_atexit, "register",
+                        lambda fn, *a, **k: registered.append((fn, a)) or fn)
+    monkeypatch.setattr(module, "atexit", _atexit, raising=False)
+
+    def _boom(*_a, **_k):
+        raise _NeverConnected()
+    monkeypatch.setattr(module, "IBKRBroker", _boom)
+    monkeypatch.setattr(sys, "argv", [
+        "x", "--positions-path", str(positions), "--lock-path", str(lock)])
+
+    with pytest.raises(_NeverConnected):
+        module.main()
+
+    assert lock.exists(), "khoa phai duoc giu truoc khi noi — neu khong thi guard vo dung"
+    freed = [a for fn, a in registered if fn is rn._release_lock]
+    assert freed, (
+        "khong ai dang ky tra khoa: mot lan noi hong se de lai khoa chet vinh vien")
+    assert Path(freed[0][0]) == lock
+
+    for fn, a in registered:                 # chạy tay để chứng minh nó thật sự xoá
+        if fn is rn._release_lock:
+            fn(*a)
+    assert not lock.exists(), "ham tra khoa duoc dang ky nhung khong xoa duoc tep"
