@@ -985,3 +985,143 @@ Mọi phép kiểm mới **đã xem đỏ trước khi sửa**, và những cái
   vào nào. Đây là điều kiện để mục 3.1 có tác dụng; nếu trường luôn rỗng thì bản sửa rơi
   về hành vi cũ, im lặng.
 - Vùng chưa ai rà: đường phát lại bóng, khâu sinh tín hiệu, các panel ngoài hai tệp đã chạm.
+
+---
+
+## 12. Quét nốt ba vùng còn treo
+
+Ba chỗ mục 11 tự nhận là chưa đọc kỹ. Đọc hết, đo từng chỗ.
+
+### 12.1 Vòng quét vào lệnh dưới chế độ nối tiếp — SẠCH
+
+Câu hỏi: khi phát lại từ mốc cắt thay vì từ đầu, lệnh **vào** có giống không? Đã kiểm
+lệnh **ra**, chưa kiểm lệnh vào.
+
+Đọc: khung 5 phút mà bộ sinh tín hiệu đọc là của **riêng ngày đó**, dựng lại từ các thanh
+1 phút trong ngày. Đường trung bình và biên độ khi vào lệnh vì thế không đọc gì trước
+ngày. Điều kiện duy nhất còn lại là khung phải bắt đầu **đúng đầu phiên** — nếu bắt đầu
+giữa ngày, thanh đầu bị ép "không có khoảng trống" và một lần thoát theo khoảng trống sẽ
+âm thầm biến thành thoát theo dải.
+
+Đo đường sống: khung cắt từ **nửa đêm của ngày mốc**, trùng đúng mốc phép kiểm dùng.
+
+Rồi đo xem phép kiểm có **thật sự đi qua** nhánh vào lệnh không, thay vì chỉ đọc rằng nó
+đi qua:
+
+```
+mốc cắt 2026-07-31 · 3 lệnh đóng sau mốc
+  mang qua  vào 07-31  ra 08-02  CHANDELIER
+  VÀO SAU   vào 08-03  ra 08-09  MAX_HOLD
+  VÀO SAU   vào 08-10  ra 08-16  MAX_HOLD
+```
+
+Hai lệnh vào sau mốc, giá vào của chúng nằm trong phép so từng trường. **Không lệch.**
+
+### 12.2 Trang bằng chứng giấy — hai lỗi có thật, hai bẫy chưa nổ
+
+2327 dòng, đọc hết. Bốn chỗ đáng nói, mỗi chỗ đo trên payload trang đang phục vụ hôm nay.
+
+**(a) Không còn vị thế nào → ba nơi tô ba màu. CÓ THẬT HÔM NAY.**
+
+Hôm nay sổ trống — max-hold đã thoát hết. Cùng một trạng thái `0/0`:
+
+| nơi | trả về |
+|---|---|
+| chip trên bảng đối soát nguội | **ĐỎ** |
+| ô đo ngay dưới nó | vàng |
+| trang chi tiết bảo vệ vị thế | "chưa có bằng chứng" |
+
+Chỉ trang chi tiết đúng. Không có vị thế nào thì không có vị thế nào **không được bảo vệ**
+— chip đỏ đang báo động về một thứ không tồn tại. Nguyên nhân là `0 && …` cho ra giá trị
+giả, rồi rơi vào nhánh "hỏng" chung với trường hợp thật sự thiếu chốt lỗ. Cùng họ với
+sự cố "vị thế ma" người dùng đã báo trước đó.
+
+**(b) Một lựa chọn hai nhánh giống hệt nhau. CÓ THẬT HÔM NAY.**
+
+Thẻ kết luận chất lượng khớp lệnh chọn màu bằng `nếu vỡ ngưỡng thì vàng, không thì vàng`.
+Viết như thể phân biệt, mà không phân biệt.
+
+Hôm nay điều kiện ấy **đang bật**: bốn mã vượt giới hạn lệch giá khi vào (`M2K` `MES`
+`MNKD` `MYM`). Chữ có nói "quality breach", nhưng màu thì không.
+
+Đây là câu hỏi thiết kế chứ không phải lỗi rõ ràng: **có ai cố ý giữ vàng vì mẫu còn
+thiếu, hay đây là tàn dư của một lần sửa?** Chỉ người viết dòng đó trả lời được. Nếu là
+cố ý thì bỏ nhánh giả đi, đừng để nó trông như một quyết định.
+
+**(c) "Không so được" được tính là "khớp". BẪY, CHƯA NỔ.**
+
+Hàm đối soát có **ba** kết quả: khớp · lệch · *một bên không đọc được*. Năm nơi dùng nó
+chỉ hỏi đúng một câu — "có phải lệch không?" — nên kết quả thứ ba đi chung đường với
+"khớp", và bảng in ra "mọi lệnh đều đối soát khớp trên cả ba nguồn".
+
+Hôm nay cả năm cặp đều đọc được, nên chưa nổ. Đường kích hoạt có tên: một lần kéo sao kê
+hỏng là một vế thành rỗng, và trang sẽ nói *khớp*.
+
+**(d) Trạng thái tổng có thể **xanh hơn** thành phần chính của nó. BẪY, CHƯA NỔ.**
+
+Hàm gộp trạng thái xếp hạng theo mức xấu, nhưng nhánh cuối là "có bất kỳ cái nào PASS thì
+tổng là PASS". Ba trạng thái đang sống rơi thẳng xuống nhánh cuối: `EXPLAINED`,
+`OBSERVED`, `QUALITY_BREACH`.
+
+Hôm nay chưa nổ vì **chưa có cổng nào PASS cả**. Nghĩa là bẫy này bật đúng vào lúc mọi
+thứ bắt đầu xanh — tức đúng lúc chuẩn bị lên thật.
+
+### 12.3 Kết luận vùng quét
+
+| vùng | trạng thái |
+|---|---|
+| vòng quét vào lệnh khi nối tiếp | sạch, có đo, có đi qua nhánh |
+| engine phát lại | 7 điểm soi, vững cả 7, không sửa dòng nào |
+| khâu sinh tín hiệu | không finding mới |
+| 5 tệp giao diện | 2 lỗi có thật + 2 bẫy chưa nổ (đều ở trang bằng chứng giấy) |
+
+### 12.4 Đã vá — và một tiền đề của chính tôi bị sai
+
+**(a) và (b) sửa như mô tả.** Ba nơi hỏi "vị thế nào chưa có chốt lỗ" giờ gọi chung một
+hàm, nên không thể lệch nhau lần nữa; sổ trống trả về **trung tính**, không phải hỏng —
+vì câu hỏi không phát sinh, chứ không phải nó qua. Nhánh giả ở thẻ chất lượng đọc là
+**tàn dư**, không phải chủ ý: cùng điều kiện ấy, ô trung bình lệch giá và từng thẻ mã bên
+dưới đều đã đỏ sẵn, chỉ mỗi thẻ tóm tắt ngồi trên chúng tô vàng.
+
+Kèm theo, bảng màu không biết `QUALITY_BREACH` là gì nên trả về **xám** — một mức vỡ đã
+đo được sơn cùng màu với "không có ý kiến".
+
+**(c) TIỀN ĐỀ SAI, và suýt vá vào chỗ chết.** Sau khi sửa xong bốn bảng, tôi kiểm xem
+chúng có thật sự chạy không. Không: kết luận của bốn bảng ấy do một tệp sinh sẵn cung
+cấp, và trang **bỏ qua** phần tính của chính nó khi tệp đó có mặt — hôm nay nó có mặt cho
+cả bốn. Đọc tiếp tới bộ sinh: nó so tiền bằng một hàm trả `sai` khi một vế rỗng, tức là
+**fail-closed** — không so được thì báo vỡ. Ngược hướng lo ngại của tôi, và là hướng an
+toàn.
+
+Bản vá ở bốn bảng vẫn giữ, nhưng phải nói rõ: nó **không sống hôm nay**. Nó chỉ chạy khi
+tệp sinh sẵn thiếu phần kết luận, và giờ nó nghiêng cùng hướng với bộ sinh thay vì ngược
+lại.
+
+Đổi lại, việc soi ấy tìm ra **hai bảng khác trang tự quyết, không ai đè lên**: bảng đối
+chiếu đầu trang và khối sổ thời gian thực. Cả hai đọc số bằng `Number(rỗng || 0)`, cho ra
+`0`, và `0` thì nằm trong dung sai — **rỗng biến thành khớp**. Hai chỗ này đã sửa, và đây
+mới là chỗ có thể nói dối thật.
+
+**(d) sửa hai đầu, và bản vá đầu tiên của tôi cũng chỉ đóng một nửa.** Tôi định ra luật
+"chỉ PASS khi mọi đầu vào đều PASS". Nó chặn đúng trường hợp đã đo, nhưng để hở mặt
+gương: cổng chính **PASS** đứng cạnh một tham chiếu **OBSERVED** vẫn cho ra PASS — cũng là
+panel xanh hơn đầu vào của nó, và `OBSERVED` là trạng thái đang sống trong bảng hôm nay.
+
+Bản cuối làm đúng thứ cái tên đã hứa: **trả về trạng thái xấu nhất đang có**, xếp theo
+chính bảng mức độ mà các thẻ đã dùng để sắp xếp — một thang mức độ cho cả trang thay vì
+hai. Trạng thái ngang mức giữ nguyên thứ tự viết, nên cổng chính vẫn nói thay cho panel
+khi không có gì bên cạnh nó tệ hơn.
+
+### 12.5 Hàng rào
+
+Bốn phép kiểm mới, chạy Chromium thật trên payload thật đã sửa từng trường, **mỗi cái đủ
+hai chiều**: sổ trống không đỏ *và* vị thế thiếu chốt lỗ vẫn đỏ · vỡ ngưỡng đỏ *và* sạch
+thì không · rỗng ra CHECK, bằng 0 ra PASS, lệch $250 ra BREACH (ba trạng thái phải ra ba
+kết luận khác nhau) · tổng không xanh hơn thành phần **theo cả hai chiều** *và* ba đầu
+vào PASS vẫn ra PASS.
+
+Đã xem **đỏ cả bốn** trên mã trước khi sửa, xanh cả bốn sau khi sửa.
+
+Bộ khung cũ mở cùng một trang hai lần cho hai trạng thái, nên `open_paper` phải gỡ tay
+chặn cũ trước — không thì lần hai vẫn được phục vụ payload lần một, và kết quả xanh là do
+chưa bao giờ kiểm trạng thái thứ hai.

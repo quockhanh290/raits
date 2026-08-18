@@ -139,6 +139,29 @@
     return !Number.isFinite(n) || n === 0 ? 'neutral' : n > 0 ? 'ok' : 'bad';
   }
 
+  // Three panels asked "is every open position protected?" and three answered
+  // differently when the book was empty. The B3 chip wrote
+  // `positionCount && protectedCount >= positionCount ? 'ok' : 'bad'`, and with no
+  // positions that leading 0 is falsy, so an empty book was painted the same red as a
+  // position sitting without a stop. The metric beside it wrote the same expression
+  // for amber; only the detail panel, which tested `total > 0` first, said what is
+  // actually true — there is nothing to protect and therefore nothing to report.
+  //
+  // An empty book is not a passing check either. It is neutral: the question did not
+  // arise. One function so the three cannot disagree again.
+  function protectionRead(protectedCount, positionCount) {
+    if (protectedCount == null || positionCount == null) {
+      return { label: '--', tone: 'watch', verdict: 'MISSING', summary: 'No current persisted open-position evidence is available.' };
+    }
+    const label = `${protectedCount}/${positionCount}`;
+    if (Number(positionCount) === 0) {
+      return { label, tone: 'neutral', verdict: 'MISSING', summary: 'The book is empty, so there is no position to protect.' };
+    }
+    return Number(protectedCount) >= Number(positionCount)
+      ? { label, tone: 'ok', verdict: 'PASS', summary: 'Every current persisted open position has a stop_order_id.' }
+      : { label, tone: 'bad', verdict: 'BREACH', summary: 'At least one current persisted open position is missing stop_order_id.' };
+  }
+
   function reconcileStatus(left, right) {
     const a = Number(left);
     const b = Number(right);
@@ -146,10 +169,25 @@
     return Math.abs(a - b) < 0.005 ? { label: 'RECONCILED', cls: 'ok' } : { label: 'CHECK', cls: 'bad' };
   }
 
+  // reconcileStatus answers three things, not two: the totals matched, the totals
+  // disagreed, or one side was unreadable and nothing was compared at all. Every
+  // consumer asked only "is it bad?", so the third collapsed into the first and a
+  // table nobody could check announced "every displayed trade reconciles across Paper,
+  // Backtest, and Flex". The CHECK label was on screen the whole time, under a green
+  // headline contradicting it. All five grid values are readable today, so this has
+  // not yet lied; one failed statement pull is enough to make it.
+  function reconcileUnmeasured(...items) {
+    return items.some(item => item && item.cls === 'watch');
+  }
+
   function verdictClass(status) {
     const value = String(status || '').toUpperCase();
     if (value === 'PASS' || value === 'RECONCILED') return 'ok';
-    if (value === 'BREACH' || value === 'FAIL') return 'bad';
+    // QUALITY_BREACH is a live gate status, not a hypothetical one, and it did not
+    // appear here: it failed the === 'BREACH' test and fell through to neutral, so a
+    // measured breach was painted the same grey as "no opinion". BLOCKER_RANK already
+    // places it one step below BREACH; this is the same judgement in the colour map.
+    if (value === 'BREACH' || value === 'FAIL' || value === 'QUALITY_BREACH') return 'bad';
     if (value === 'EXPLAINED' || value === 'WATCH' || value === 'PENDING') return 'watch';
     return 'neutral';
   }
@@ -285,13 +323,33 @@
     });
   }
 
+  // "Worst of the relevant statuses" — which it was not at both ends.
+  //
+  // QUALITY_BREACH fell past every branch: it is not === 'BREACH', holds no GAP or
+  // NEEDS, so a measured breach arrived at the last line as an ordinary status.
+  //
+  // And that last line read "if anything here passed, the composite passed", so a
+  // primary of OBSERVED or EXPLAINED beside one PASS reference came out PASS — a
+  // panel greener than the gate it is summarising. Nothing has PASSED yet, so this has
+  // never fired; it arms itself on the day the first gate goes green, which is exactly
+  // the day someone reads these panels to decide about going live.
+  //
+  // The replacement is the thing the name already promised: return the worst status
+  // present, ranked by the same BLOCKER_RANK the cards are sorted with, so there is one
+  // severity order on this page instead of two. "PASS unless every input passed" would
+  // have closed only the half that was measured — a PASS primary beside an OBSERVED
+  // reference is the same panel-greener-than-its-input in mirror, and OBSERVED is a
+  // live coverage status today.
   function compositeStatus(primary, refs = []) {
     const statuses = [primary, ...refs].map(value => String(value || '').toUpperCase());
-    if (statuses.some(value => value === 'BREACH' || value === 'FAIL')) return 'BREACH';
+    const breach = statuses.find(value => value === 'BREACH' || value === 'FAIL' || value.endsWith('_BREACH'));
+    if (breach) return breach;
     if (statuses.some(value => value.includes('GAP') || value.includes('NEEDS'))) return statuses.find(value => value.includes('GAP') || value.includes('NEEDS'));
     if (statuses.some(value => value === 'PENDING' || value === 'WATCH')) return 'PENDING';
     if (statuses.some(value => value === 'UNKNOWN' || value === 'MISSING')) return 'UNKNOWN';
-    return statuses.some(value => value === 'PASS') ? 'PASS' : (primary || 'UNKNOWN');
+    // Stable: equal-severity statuses keep written order, so the primary still speaks
+    // for the panel whenever nothing beside it is worse.
+    return statuses.slice().sort((a, b) => blockerRank(a) - blockerRank(b))[0] || primary || 'UNKNOWN';
   }
 
   // Worst first. The array below is written in a fixed order that happens to put the
@@ -756,7 +814,7 @@
     const persistMatch = positions.persist_match;
     const protectedCount = protection.protected;
     const positionCount = protection.positions ?? positions.count;
-    const protectedLabel = protectedCount == null || positionCount == null ? '--' : `${protectedCount}/${positionCount}`;
+    const protection0 = protectionRead(protectedCount, positionCount);
     const status = gate.status || 'UNKNOWN';
     // A mismatch with a recorded, matched root cause is not the same thing as an
     // unexplained one, and the panel must not show them the same colour.
@@ -777,10 +835,9 @@
       persistMatch === true ? reason('persist match true', 'ok')
         : persistMatch === false ? reason('persist mismatch', 'bad')
         : reason('persist unknown', 'watch'),
-      protectedLabel === '--'
+      protection0.verdict === 'MISSING' && protection0.label === '--'
         ? reason('protection missing', 'watch')
-        : reason(`${protectedLabel} protected`,
-                 positionCount && protectedCount >= positionCount ? 'ok' : 'bad'),
+        : reason(`${protection0.label} protected`, protection0.tone),
     ];
 
     $('b3ProgressTitle').textContent = mismatches
@@ -823,7 +880,7 @@
         c1Metric('Duration', b3Duration, 'First-to-last timestamp across mismatch episodes.'),
         c1Metric('Cold starts', coldStarts ?? '--', 'Scheduler start observations from logs.'),
         c1Metric('Persist match', persistMatch == null ? '--' : String(persistMatch), 'Latest runner-state persisted-position match flag.', persistMatch === true ? 'ok' : persistMatch === false ? 'bad' : 'watch'),
-        c1Metric('Protected', protectedLabel, 'Current persisted positions with stop_order_id.', positionCount && protectedCount >= positionCount ? 'ok' : 'watch'),
+        c1Metric('Protected', protection0.label, 'Current persisted positions with stop_order_id.', protection0.tone),
         c1Metric('Live state', statePersist.status || '--', 'Current state-persist coverage status.', statusClass(statePersist.status || '') === 'observed' ? 'ok' : ''),
       ]),
       coverageRefGroup([
@@ -953,7 +1010,12 @@
     $('c1ActiveSpec').innerHTML = c1SpecPills(spec, target, maxMean);
     $('c1MetricGroups').innerHTML = [
       c1MetricGroup('Verdict', [
-        panelVerdictMetric(status, `Sample gate ${enough ? 'complete' : 'incomplete'}; current quality read is ${currentQualityStatus === 'QUALITY_BREACH' ? 'quality breach (sample pending)' : currentQualityStatus}.`, 'Current N=1 contract evidence must be retested when scaling.', currentQualityStatus === 'QUALITY_BREACH' ? 'watch' : 'watch'),
+        panelVerdictMetric(status, `Sample gate ${enough ? 'complete' : 'incomplete'}; current quality read is ${currentQualityStatus === 'QUALITY_BREACH' ? 'quality breach (sample pending)' : currentQualityStatus}.`, 'Current N=1 contract evidence must be retested when scaling.', currentQualityStatus === 'QUALITY_BREACH' ? 'bad' : 'watch'),
+      // ^ this read `? 'watch' : 'watch'` — written as a discrimination that made none.
+      // Read as residue rather than intent, because the rest of the panel already
+      // disagreed with it: the OPEN-mean chip and every per-instrument card go red on
+      // the same condition, and this card sat amber above them summarising them. It is
+      // live today, with four instruments over the tick limit.
       ]),
       c1MetricGroup('Sample readiness', [
         c1SampleMetric('Instruments ready', instReady, byInst.length || null, `Instruments with at least ${openTarget} OPEN sample(s). OPEN is judged per instrument because a pooled tick mean hides a single bad one.`, byInst.length && instReady === byInst.length ? 'ok' : 'watch'),
@@ -1059,8 +1121,12 @@
     const pfRecon = reconcileStatus(pfTotal, pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized);
     const unresolved = rows.filter(row => [row.paper, row.backtest, row.flex].some(side => String(side?.status || '') === 'MISSING')).length;
     const diffRows = rows.filter(row => Math.abs(Number(row.paper_minus_backtest_pnl || 0)) > 0.005 || Math.abs(Number(row.paper_minus_flex_pnl || 0)) > 0.005).length;
-    const verdict = pbRecon.cls === 'bad' || pfRecon.cls === 'bad' || unresolved ? 'BREACH' : diffRows ? 'EXPLAINED' : 'PASS';
-    const summary = verdict === 'PASS'
+    const verdict = pbRecon.cls === 'bad' || pfRecon.cls === 'bad' || unresolved ? 'BREACH'
+      : reconcileUnmeasured(pbRecon, pfRecon) ? 'CHECK'
+      : diffRows ? 'EXPLAINED' : 'PASS';
+    const summary = verdict === 'CHECK'
+      ? 'One side of a footer total is unreadable, so the rows were not reconciled against the grid at all. This is not a pass.'
+      : verdict === 'PASS'
       ? 'Every displayed trade reconciles across Paper, Backtest, and Flex with matching totals.'
       : verdict === 'EXPLAINED'
         ? 'Trade-level P&L differences exist, but they reconcile to headline totals and carry row-level reasons.'
@@ -1273,8 +1339,12 @@
     const pbRecon = reconcileStatus(pbTotal, pl.paper_minus_backtest_realized);
     const pfRecon = reconcileStatus(pfTotal, pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized);
     const nonZero = rows.filter(row => Math.abs(Number(row.paper_minus_backtest_pnl || 0)) > 0.005 || Math.abs(Number(row.paper_minus_flex_pnl || 0)) > 0.005).length;
-    const verdict = pbRecon.cls === 'bad' || pfRecon.cls === 'bad' ? 'BREACH' : nonZero ? 'EXPLAINED' : 'PASS';
-    const summary = verdict === 'PASS'
+    const verdict = pbRecon.cls === 'bad' || pfRecon.cls === 'bad' ? 'BREACH'
+      : reconcileUnmeasured(pbRecon, pfRecon) ? 'CHECK'
+      : nonZero ? 'EXPLAINED' : 'PASS';
+    const summary = verdict === 'CHECK'
+      ? 'A headline grid value is unreadable, so the component totals were never compared against it.'
+      : verdict === 'PASS'
       ? 'Component totals match across sources for the displayed rows.'
       : verdict === 'EXPLAINED'
         ? 'Component-level deltas exist, but the totals reconcile to the headline P&L grid.'
@@ -1333,8 +1403,10 @@
     const gridDiff = pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized;
     const reconciled = reconcileStatus(diffTotal, gridDiff);
     const mismatches = rows.filter(row => row.classification !== 'MATCHED' || Math.abs(Number(row.paper_minus_flex || 0)) > 0.005).length;
-    const verdict = reconciled.cls === 'bad' ? 'BREACH' : mismatches ? 'EXPLAINED' : 'PASS';
-    return `${tableVerdict(verdict, 'Paper vs Flex zero-base', mismatches ? 'Paper and Flex have row-level differences, but the table indicates whether the total still reconciles to the grid.' : 'Paper closed trades match Flex comparable broker fills on the zero-base view.', [`rows ${rows.length}`, `row diff ${mismatches}`, `grid ${reconciled.label}`])}<div class="trade-table pnl-flex-bridge-table"><table><thead><tr><th>class</th><th>trade</th><th>paper detail</th><th>Flex detail</th><th>prices / fees</th><th>diff/reason</th></tr></thead><tbody>${rows.map(row => {
+    const verdict = reconciled.cls === 'bad' ? 'BREACH'
+      : reconcileUnmeasured(reconciled) ? 'CHECK'
+      : mismatches ? 'EXPLAINED' : 'PASS';
+    return `${tableVerdict(verdict, 'Paper vs Flex zero-base', verdict === 'CHECK' ? 'The grid total is unreadable, so this table was not reconciled against it.' : mismatches ? 'Paper and Flex have row-level differences, but the table indicates whether the total still reconciles to the grid.' : 'Paper closed trades match Flex comparable broker fills on the zero-base view.', [`rows ${rows.length}`, `row diff ${mismatches}`, `grid ${reconciled.label}`])}<div class="trade-table pnl-flex-bridge-table"><table><thead><tr><th>class</th><th>trade</th><th>paper detail</th><th>Flex detail</th><th>prices / fees</th><th>diff/reason</th></tr></thead><tbody>${rows.map(row => {
       const cls = row.classification === 'MATCHED' ? 'ok' : row.classification === 'PAPER_CLOSED_FLEX_OPEN' ? 'watch' : 'bad';
       const directionClass = String(row.direction || '').toLowerCase();
       const carry = row.fifo_carry_entry_day ? `FIFO carry ${esc(row.fifo_carry_entry_day)} ${fmtMoney(row.fifo_carry_pnl)}` : '';
@@ -1388,13 +1460,30 @@
     return `<h4 class="detail-subhead">Ledger adjustments</h4>${verdict}${table}${basisNote}`;
   }
 
+  // `Number(x || 0) < 0.005` reads a missing figure as a matching one: null becomes 0,
+  // 0 is inside tolerance, and the panel announces the ledger reconciles when in fact
+  // nothing was read. Both blocks that ask this question shared the coercion, so both
+  // get the same three-way answer. Unlike the four tables above, no backend verdict
+  // overrides these two — what this function returns is what the reader sees.
+  function ledgerAlignment(pl = {}) {
+    const raw = pl.ledger_aligned_minus_system_ledger_pnl;
+    if (raw == null || raw === '') return { known: false, ok: false };
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return { known: false, ok: false };
+    return { known: true, ok: Math.abs(n) < 0.005 };
+  }
+
   function statementPnlCompareBlock(compare, m = {}) {
     const pl = (compare && compare.statement_pnl_compare) || {};
     if (!Object.keys(pl).length) return '<p class="detail-empty">No Flex P&L comparison is available.</p>';
     const pfRecon = reconcileStatus(pl.paper_minus_flex_epoch_rebased_realized ?? pl.paper_minus_statement_entry_epoch_realized, pl.paper_flex_bridge_diff_sum);
-    const ledgerOk = Math.abs(Number(pl.ledger_aligned_minus_system_ledger_pnl || 0)) < 0.005;
-    const verdict = pfRecon.cls === 'bad' || !ledgerOk ? 'BREACH' : Math.abs(Number(pl.paper_minus_backtest_realized || 0)) > 0.005 ? 'EXPLAINED' : 'PASS';
-    const summary = verdict === 'PASS'
+    const ledger = ledgerAlignment(pl);
+    const verdict = pfRecon.cls === 'bad' || (ledger.known && !ledger.ok) ? 'BREACH'
+      : reconcileUnmeasured(pfRecon) || !ledger.known ? 'CHECK'
+      : Math.abs(Number(pl.paper_minus_backtest_realized || 0)) > 0.005 ? 'EXPLAINED' : 'PASS';
+    const summary = verdict === 'CHECK'
+      ? 'A figure the headline check needs is unreadable, so the totals were not compared. This is neither a pass nor a breach.'
+      : verdict === 'PASS'
       ? 'Headline P&L totals are aligned across paper, backtest, Flex, and realtime ledger checks.'
       : verdict === 'EXPLAINED'
         ? 'Headline totals reconcile, with Paper vs Backtest variance expected to be explained by trade-level rows.'
@@ -1513,10 +1602,13 @@
     const paperRecon = reconcileStatus(latestPaper, pl.paper_epoch_closed_realized);
     const backtestRecon = reconcileStatus(latestBacktest, pl.backtest_epoch_closed_realized);
     const flexRecon = reconcileStatus(latestFlex, pl.flex_epoch_rebased_realized ?? pl.statement_entry_epoch_realized);
-    const verdict = [paperRecon, backtestRecon, flexRecon].some(item => item.cls === 'bad') ? 'BREACH' : 'PASS';
+    const verdict = [paperRecon, backtestRecon, flexRecon].some(item => item.cls === 'bad') ? 'BREACH'
+      : reconcileUnmeasured(paperRecon, backtestRecon, flexRecon) ? 'CHECK' : 'PASS';
     const summary = verdict === 'PASS'
       ? 'Timeline final values reconcile to the headline P&L grid, so the chart can be used as a visual divergence map.'
-      : 'Timeline final values do not reconcile to the headline P&L grid; use table totals until the chart data source is fixed.';
+      : verdict === 'CHECK'
+        ? 'At least one grid total is unreadable, so the chart was never checked against it. Do not read the lines as verified.'
+        : 'Timeline final values do not reconcile to the headline P&L grid; use table totals until the chart data source is fixed.';
     return `<div class="pnl-timeline">${renderVerdict(backendVerdict(compare, 'timeline'), verdict, 'Timeline reconcile', summary, [`paper ${paperRecon.label}`, `backtest ${backtestRecon.label}`, `Flex ${flexRecon.label}`])}<div class="timeline-readout">${latestCards}</div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Paper, backtest, and Flex net P&L timeline">${grid}<line class="zero" x1="${pad.left}" y1="${y(0)}" x2="${width - pad.right}" y2="${y(0)}"></line>${lines}${dots}<g class="timeline-labels">${dateLabels}</g></svg><div class="timeline-legend"><span class="paper">Paper actual</span><span class="backtest">Backtest</span><span class="flex">Flex</span><span class="neutral">X axis shown on a minimum 10-session span</span></div></div>`;
   }
 
@@ -1543,8 +1635,12 @@
     const backtestRecon = reconcileStatus(latest.backtest, pl.backtest_epoch_closed_realized);
     const flexRecon = reconcileStatus(latest.flex, pl.flex_epoch_rebased_realized ?? pl.statement_entry_epoch_realized);
     const stale = support.filter(row => row.curve_status && row.curve_status !== 'covered').length;
-    const verdict = [paperRecon, backtestRecon, flexRecon].some(item => item.cls === 'bad') ? 'BREACH' : stale ? 'PENDING' : 'PASS';
-    const summary = verdict === 'PASS'
+    const verdict = [paperRecon, backtestRecon, flexRecon].some(item => item.cls === 'bad') ? 'BREACH'
+      : reconcileUnmeasured(paperRecon, backtestRecon, flexRecon) ? 'CHECK'
+      : stale ? 'PENDING' : 'PASS';
+    const summary = verdict === 'CHECK'
+      ? 'At least one grid total is unreadable, so these rows were not reconciled against it.'
+      : verdict === 'PASS'
       ? 'Rows below are the exact series values used by the chart and reconcile to the headline P&L grid.'
       : verdict === 'PENDING'
         ? 'Rows support the chart, but at least one daily curve row is still stale.'
@@ -1565,8 +1661,8 @@
     const reconcile = (compare && compare.pnl_reconcile) || {};
     const pl = (compare && compare.statement_pnl_compare) || {};
     const trace = reconcile.system_ledger_offset_trace || {};
-    const ledgerOk = Math.abs(Number(pl.ledger_aligned_minus_system_ledger_pnl || 0)) < 0.005;
-    return `${tableVerdict(ledgerOk ? 'PASS' : 'BREACH', 'Realtime ledger source', ledgerOk ? 'Ledger-aligned Flex reconciles to the runner realtime system ledger.' : 'Ledger-aligned Flex does not reconcile to realtime system ledger.', [`source ${reconcile.actual_source || '--'}`, `delta ${fmtMoney(pl.ledger_aligned_minus_system_ledger_pnl)}`])}<dl class="metric-list reconcile-list">${metricLine('Realtime system ledger P&L', fmtMoney(reconcile.realtime_system_ledger_pnl))}${metricLine('formula', reconcile.realtime_system_ledger_formula || 'live_state.meta.final_equity - paper_history.account')}${metricLine('final equity / base', `${fmtEquity(reconcile.realtime_final_equity)} / ${fmtEquity(reconcile.realtime_account_base)}`)}${metricLine('paper closed-trade P&L', fmtMoney(reconcile.paper_closed_trade_realized))}${metricLine('ledger offset vs closed trades', fmtMoney(reconcile.system_ledger_offset_vs_paper_closed_trades))}${metricLine('Flex comparable source', trace.comparable_source_of_truth || '--')}${metricLine('Flex comparable realised', fmtMoney(trace.comparable_flex_realized))}${metricLine('Flex vs realtime delta', fmtMoney(pl.ledger_aligned_minus_system_ledger_pnl))}</dl><p class="detail-note">${esc(trace.conclusion || 'The realtime system ledger is reconciled separately from zero-base strategy P&L.')} The selective carry-in is intentional and does not move the global strategy rebase date.</p><h4 class="detail-subhead">Ledger alignment override</h4>${flexLedgerOverrideRows(pl.ledger_alignment_override)}`;
+    const ledger = ledgerAlignment(pl);
+    return `${tableVerdict(!ledger.known ? 'CHECK' : ledger.ok ? 'PASS' : 'BREACH', 'Realtime ledger source', !ledger.known ? 'The ledger-aligned Flex figure is unreadable, so no comparison against the runner system ledger was made.' : ledger.ok ? 'Ledger-aligned Flex reconciles to the runner realtime system ledger.' : 'Ledger-aligned Flex does not reconcile to realtime system ledger.', [`source ${reconcile.actual_source || '--'}`, `delta ${fmtMoney(pl.ledger_aligned_minus_system_ledger_pnl)}`])}<dl class="metric-list reconcile-list">${metricLine('Realtime system ledger P&L', fmtMoney(reconcile.realtime_system_ledger_pnl))}${metricLine('formula', reconcile.realtime_system_ledger_formula || 'live_state.meta.final_equity - paper_history.account')}${metricLine('final equity / base', `${fmtEquity(reconcile.realtime_final_equity)} / ${fmtEquity(reconcile.realtime_account_base)}`)}${metricLine('paper closed-trade P&L', fmtMoney(reconcile.paper_closed_trade_realized))}${metricLine('ledger offset vs closed trades', fmtMoney(reconcile.system_ledger_offset_vs_paper_closed_trades))}${metricLine('Flex comparable source', trace.comparable_source_of_truth || '--')}${metricLine('Flex comparable realised', fmtMoney(trace.comparable_flex_realized))}${metricLine('Flex vs realtime delta', fmtMoney(pl.ledger_aligned_minus_system_ledger_pnl))}</dl><p class="detail-note">${esc(trace.conclusion || 'The realtime system ledger is reconciled separately from zero-base strategy P&L.')} The selective carry-in is intentional and does not move the global strategy rebase date.</p><h4 class="detail-subhead">Ledger alignment override</h4>${flexLedgerOverrideRows(pl.ledger_alignment_override)}`;
   }
 
   function pnlPurposeBlock(m) {
@@ -1879,10 +1975,12 @@
     const total = Number(m.positions || 0);
     const protectedCount = Number(m.protected || 0);
     const unprotected = Number(m.unprotected || Math.max(0, total - protectedCount));
-    const verdict = total > 0 && unprotected === 0 ? 'PASS' : total > 0 ? 'BREACH' : 'MISSING';
+    // Same helper the B3 panel reads, so the two cannot drift apart again.
+    const read = protectionRead(protectedCount, total);
+    const verdict = read.verdict === 'PASS' && unprotected !== 0 ? 'BREACH' : read.verdict;
     return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Current protection checks that every current persisted open position has a stop order id.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${tableVerdict(verdict, 'Current protection verdict', verdict === 'PASS' ? 'Every current persisted open position has a stop_order_id.' : verdict === 'BREACH' ? 'At least one current persisted open position is missing stop_order_id.' : 'No current persisted open-position evidence is available.', [`protected ${protectedCount}/${total}`, `unprotected ${unprotected}`])}<div class="detail-metric-grid">${[
-      metricCard('Protected rows', `${protectedCount} / ${total}`, 'Current persisted positions with stop_order_id.', total && protectedCount >= total ? 'ok' : total ? 'bad' : 'watch', total && protectedCount >= total ? 'PASS' : total ? 'BREACH' : 'MISSING', 'all required', detailProgress(protectedCount, total)),
-      metricCard('Unprotected', unprotected, 'Current persisted open positions without stop_order_id.', unprotected ? 'bad' : total ? 'ok' : 'watch', unprotected ? 'BREACH' : total ? 'PASS' : 'MISSING', 'must be 0'),
+      metricCard('Protected rows', read.label, 'Current persisted positions with stop_order_id.', read.tone, read.verdict, 'all required', detailProgress(protectedCount, total)),
+      metricCard('Unprotected', unprotected, 'Current persisted open positions without stop_order_id.', unprotected ? 'bad' : total ? 'ok' : 'neutral', unprotected ? 'BREACH' : total ? 'PASS' : 'MISSING', 'must be 0'),
       metricCard('Position rows', total, 'Current open-position rows in live_positions.json.', '', total ? 'OBSERVED' : 'MISSING', 'current file'),
       metricCard('Read error', m.live_positions_error || 'none', 'live_positions.json read/parse error, if any.', m.live_positions_error ? 'bad' : 'ok', m.live_positions_error ? 'BREACH' : 'PASS', 'must be none'),
     ].join('')}</div></section><section class="more-section trade-detail"><h3>Protection Rows</h3>${stateProtectionPositionRows(m.position_rows)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
