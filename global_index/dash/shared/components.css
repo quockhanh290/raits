@@ -115,11 +115,7 @@
 .threshold-gate header b                                   { font-weight: 600; }   /* thang */
 .threshold-gate dt                                         { font-weight: 500; font-size: 11px; letter-spacing: 1.1px; }   /* nhan */
 .readiness span, .paper-metrics span                       { font-weight: 500; font-size: 11px; letter-spacing: 1.1px; }   /* nhan */
-.readiness b                                               { font-weight: 500; }   /* thang */
 .blocker-card span                                         { font-weight: 400; font-size: 9px; letter-spacing: 1.08px; }   /* chip */
-.blocker-card b                                            { font-weight: 600; }   /* thang */
-.blocker-card strong                                       { font-weight: 700; }   /* thang */
-.blocker-card dt                                           { font-weight: 500; font-size: 11px; letter-spacing: 1.1px; }   /* nhan */
 .blocker-card button                                       { font-weight: 400; font-size: 9px; letter-spacing: 1.08px; }   /* chip */
 .c1-panel-head h2                                          { font-weight: 500; }   /* thang */
 .c1-active-spec span b                                     { font-weight: 500; font-size: 11px; letter-spacing: 1.1px; }   /* nhan */
@@ -165,3 +161,43 @@
 .gap-item b                                                { font-weight: 500; }   /* thang */
 .gap-item dt                                               { font-weight: 500; font-size: 11px; letter-spacing: 1.1px; }   /* nhan */
 .gap-related                                               { font-weight: 400; font-size: 9px; letter-spacing: 1.08px; }   /* chip */
+
+/* ── Hai mặt chữ ────────────────────────────────────────────────────────────
+   Chữ ký rõ nhất của /realtime, và là thứ khiến /paper "nhìn sơ qua là thấy
+   font không đổi": realtime TRỘN hai mặt chữ — sans cho câu văn, tiêu đề, nhãn,
+   điều hướng; mono cho số liệu, mã, dấu thời gian, chip. Đo ở 506px: realtime
+   vẽ 69 node bằng sans, paper vẽ ĐÚNG 0 — mọi thứ đều mono.
+
+   Giá trị lấy nguyên từ skin-e.css chứ không tự đặt: thân trang 400 14px/1.45
+   (dòng 37), thương hiệu 600 13px/.15em (45), điều hướng 400 12px/.06em (54),
+   tiêu đề 600 17px/1.3 (100), câu phán quyết 500 15px/1.4 (84), nhãn mục
+   500 11px/1.4/.1em (559), câu văn 400 12px/1.5 (758).
+
+   Cái gì Ở LẠI mono: `.blocker-card strong` (regime=OK | model=URGENT), chip
+   trạng thái, bảng số, dấu thời gian. Đó là dữ liệu — đọc theo cột, cần chữ
+   đều bề ngang. Đổi chúng sang sans là mất đúng thứ mono dùng để làm. */
+body                       { font: 400 14px/1.45 var(--sans); }
+.brand                     { font: 600 13px/1.2 var(--sans); letter-spacing: .15em; }
+.module-nav a              { font: 400 12px/1.2 var(--sans); letter-spacing: .06em; }
+.eyebrow                   { font: 500 11px/1.4 var(--sans); letter-spacing: .1em; }
+.paper-hero h1, h1, h2     { font: 600 17px/1.3 var(--sans); letter-spacing: -.01em; }
+.readiness b               { font: 500 15px/1.4 var(--sans); letter-spacing: -.005em; }
+.readiness small, small    { font: 400 12px/1.45 var(--sans); letter-spacing: normal; }
+.blocker-card b            { font: 500 11px/1.4 var(--sans); letter-spacing: .1em; }
+.blocker-card dt           { font: 500 11px/1.4 var(--sans); letter-spacing: .1em; }
+.blocker-card dd           { font: 400 12px/1.5 var(--sans); letter-spacing: normal; }
+
+/* Số liệu ở lại mono, chỉ hạ về cỡ giá trị lớn của realtime (15px/500). */
+.blocker-card strong       { font: 500 15px/1.35 var(--mono); }
+
+/* `paper.css` đã vẽ viền hổ phách trên đỉnh khối này; luật `.readiness` ở trên
+   thêm mép trái, thành một chữ L hở bên phải — trông như khung vẽ dở. Trên
+   /realtime `.status-rail` không có viền cạnh nào, chỉ một vạch dưới. Giữ mép
+   trái (đúng cách các panel sự cố của realtime nói) và bỏ vạch trên. */
+.readiness { border-top: 0; }
+
+/* `p.summary` là câu văn dẫn mục, và trên /realtime chính nó cũng là sans
+   14px/400. Hai chuỗi mono còn lại trong vùng này CỐ Ý ở lại mono: dòng
+   `Paper epoch … | observed …` là dấu thời gian, và `strong` trong thẻ là
+   số liệu — cả hai đọc theo cột. */
+.section-heading .summary { font: 400 14px/1.5 var(--sans); letter-spacing: normal; }

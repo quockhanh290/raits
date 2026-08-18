@@ -320,7 +320,8 @@
 
    CONSTRAINT: every figure, contract code, order id, timestamp and log line stays
    monospace so numeric columns keep aligning. Only sentences change. */
-:root { --sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif; }
+/* --sans đã chuyển về shared/tokens.css — một token, một nơi định nghĩa.
+   Giữ ở đây thì trang nào không nạp next.css sẽ lặng lẽ dùng mặt chữ khác. */
 
 .issue-problem p,
 .issue-assessment p,

@@ -17,6 +17,10 @@
        vạch nhấn. Chip trạng thái KHÔNG bị đụng tới. Xoá dòng này là trở lại
        nguyên trạng. -->
   <link rel="stylesheet" href="/dash/shared/components.css">
+  <!-- Áp font đã lưu. /paper nạp bảng ánh xạ trong realtime.css nhưng không
+       nạp realtime.js, nơi đặt data-font — thiếu dòng này thì lựa chọn font
+       của người dùng im lặng không có tác dụng. Không dùng defer. -->
+  <script src="/dash/shared/font-pref.js"></script>
   <script src="/dash/paper/paper.js?v=paper-live-tabs-v1-20260814" defer></script>
 </head>
 <body>

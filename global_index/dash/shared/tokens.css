@@ -76,7 +76,11 @@
 
      The LANGUAGE face stays fixed: the control's options are monospace faces for
      figures, and prose is not what it is choosing. */
-  --sans: "IBM Plex Sans", Helvetica, Arial, sans-serif;
+  /* Giá trị này là mặt chữ mà /realtime ĐANG vẽ, không phải giá trị trong bản
+     trích ban đầu. `next.css:323` đè token này thành Segoe UI, mà chỉ /realtime
+     nạp next.css — nên /paper vẽ IBM Plex Sans còn /realtime vẽ Segoe UI, cùng
+     một token, hai trang hai mặt chữ. Định nghĩa trùng bên next.css đã bỏ. */
+  --sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
   --mono: var(--font-ui, "IBM Plex Mono"), "Cascadia Mono", monospace;
 
   /* ── The base sheet's own tokens, restated ────────────────────────────────
