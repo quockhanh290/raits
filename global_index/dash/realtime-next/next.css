@@ -1,0 +1,395 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   next.css — override layer for /realtime-next
+
+   This route exists so the monitor can be redesigned WITHOUT touching /realtime.
+
+   Rules for this file:
+   1. Contains ONLY the differences. The base is /dash/realtime/realtime.css,
+      loaded before this file. Never restate a rule the base already has.
+   2. NEVER remove an element from the page. realtime.js looks elements up by id
+      and several call sites assign properties without a null check, so a missing
+      id kills the whole page rather than one tile. To hide something, use
+      `display: none` and keep the id.
+   3. Narrow-screen breakpoints must use EXACTLY 680px — that number is a contract
+      with realtime.js, which holds a matchMedia at the same value to decide
+      whether the first issue auto-opens. A different value creates a band where
+      the page lays out narrow while the script still behaves wide.
+   4. No logic. Everything below only re-orders and re-paints what the script built.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* Route marker — also the proof that this override layer actually loaded.
+   `nowrap` applies from 681px up ONLY: at 390px it widens the badge from 57px to
+   106px, pushing the header's first column from 173px to 223px and taking the
+   whole row 35px past the viewport. A debug marker must not cost layout. */
+.mode-badge::after { content: " · NEXT"; color: var(--violet); font-weight: 700; }
+@media (min-width: 681px) { .mode-badge { white-space: nowrap; } }
+
+
+/* ═══ A5 · Contrast ═════════════════════════════════════════════════════════
+   The dim token measured 3.14–3.48:1, below AA in 111 places. Lifted just enough,
+   hue preserved: 4.55:1 on the lightest panel, 5.0:1 on the darkest background.
+   Scoped to this route for now. The real fix belongs in the base stylesheet,
+   because all five pages share this token. */
+:root { --dim: #728392; }
+
+
+/* ═══ A1 · The header row must not print text over text ═════════════════════
+   The third track was floored at 300px so it could not grow to fit its content,
+   while the status block is `nowrap` and right-aligned — so the overflow ran
+   BACKWARDS to the left, over the nav. At 1366px "Reports" was 100% covered.
+   Let the track size to content, and let the status block wrap.
+
+   This MUST be limited to wide viewports. At 1050px and below the base stylesheet
+   re-lays the header (nav drops to row 2, spanning every column). Applying
+   content-sized tracks there pushes the columns past the viewport and CUTS the
+   nav by 270px at 390px — measured, and caused by this very fix on its first pass. */
+@media (min-width: 1051px) {
+  .app-header { grid-template-columns: minmax(240px, auto) auto minmax(300px, auto); }
+  .header-live-context {
+    flex-wrap: wrap; row-gap: 6px; justify-content: flex-end; white-space: normal;
+  }
+}
+
+/* Same failure family in the equity tile: the broker reconcile line is also
+   `nowrap`, 232px wide holding 413px of content — it bled 181px into the Model
+   Inputs tile and printed over "Model age" / "20 mo stale". Three text collisions
+   measured at 1440px.
+
+   WARNING for whoever edits this next: the base stylesheet ALREADY contains
+   `.broker-account-line { white-space: normal }` — this bug was fixed once. But it
+   loses to `.equity-zone > small { nowrap }`, which is more specific, so that fix
+   has been sitting in the file with no effect. The selector must be specific
+   enough or it does nothing. */
+.equity-zone > small.broker-account-line {
+  white-space: normal; overflow-wrap: anywhere; line-height: 1.5;
+}
+
+
+/* ═══ E1 · The verdict moves to the top ═════════════════════════════════════
+   Before: the page opened with figures and left the reader to synthesise a
+   verdict. The two largest numbers (37px, 29px) both said "fine", while the
+   health conclusion sat at 13px.
+   After: verdict first, figures demoted to supporting evidence. */
+.overview-header { display: flex; flex-direction: column; }
+.overview-header > .status-rail { order: -1; }
+
+.status-rail {
+  padding: 18px 28px;
+  border-bottom: 1px solid var(--line);
+  align-items: flex-start;
+}
+
+/* Tier 1 — the operational verdict. */
+.system-conclusion {
+  flex: 1; align-items: center; gap: 14px;
+  font-size: 22px; line-height: 1.35;
+}
+.system-conclusion b { color: var(--bright); font-weight: 600; }
+
+/* Shrink the two numbers that were shouting over the verdict. Before: 37px and
+   29px, and both of them said "fine" — scanning the page hit them before the
+   conclusion. Not removed, just no longer the largest thing: paper equity is
+   still the biggest figure because it is legitimate context, but it no longer
+   competes with the verdict band above it. */
+.equity-line > b { font-size: 26px; }
+.risk-zone .metric-dd-value > b { font-size: 22px; }
+
+/* Tier 2 — the open-issue count, SEPARATED from the verdict sentence.
+   These two facts are independent by design: operational state deliberately does
+   not count already-known debt, and the counter is accumulated over the evidence
+   window rather than live. Printed at equal weight inside one sentence they read
+   as self-contradictory ("nominal … 1 issue open"). Split into its own chip. */
+.system-conclusion strong {
+  flex: 0 0 auto;
+  padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: 999px;
+  color: var(--text); background: var(--surface);
+  font: 600 12px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .04em;
+}
+
+
+/* ═══ A2 · State is encoded by SHAPE, not by colour alone ═══════════════════
+   Measured: green and amber differ by 6 grey levels out of 255 (ratio 1.06). In
+   greyscale, on a poor screen, or for a red-green colour-blind reader, all three
+   states are the same dot. Each state gets its own shape and a text label; colour
+   drops to a third, supporting channel. */
+.system-conclusion .status-dot {
+  width: 11px; height: 11px; flex: 0 0 auto; box-shadow: none;
+  position: relative;
+}
+.system-conclusion .status-dot::after {
+  position: absolute; left: 17px; top: 50%; transform: translateY(-50%);
+  font: 700 11px/1 var(--mono); letter-spacing: .06em;
+}
+/* nominal — circle */
+.system-conclusion.ok .status-dot { border-radius: 50%; }
+.system-conclusion.ok .status-dot::after { content: "OK"; color: var(--green); }
+/* warning — triangle */
+.system-conclusion.watch .status-dot {
+  border-radius: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+.system-conclusion.watch .status-dot::after { content: "WARN"; color: var(--amber); }
+/* failure — square */
+.system-conclusion.bad .status-dot { border-radius: 0; }
+.system-conclusion.bad .status-dot::after { content: "FAIL"; color: var(--red); }
+/* room for the text label beside the shape */
+.system-conclusion .status-dot { margin-right: 34px; }
+.system-conclusion.watch .status-dot { margin-right: 48px; }
+.system-conclusion.bad   .status-dot { margin-right: 44px; }
+
+/* The whole rail takes a severity tint — always alongside the shape above, never
+   as the only signal. */
+.status-rail:has(.system-conclusion.watch) { background: rgba(221, 163, 58, .07); }
+.status-rail:has(.system-conclusion.bad)   { background: rgba(240, 91, 97, .09); }
+
+
+/* The grouped incident card that lived here has been removed. realtime.js
+   already groups recovered incidents by the same stream key, labels them
+   RECOVERED, names the slot that resumed the stream, and counts them in the
+   Now Monitor summary — all of it, 1285px down the page. Moving Now Monitor
+   under the verdict fixed the real problem, which was distance, and left the
+   card restating the section immediately below it. */
+
+/* ═══ E1 tier 3 + E2 · Separate "glance" from "investigate" ═════════════════
+   The issue card's ACTION cell answers "what do I do now", but it sat below three
+   other sections. CSS cannot lift that text into the verdict band, but it can
+   re-order the sections.
+
+   E2: the page was built for ONE reader — the careful one. But 90% of visits are
+   a five-second glance. Two groups:
+     GLANCE      — open issues, positions and their protection
+     INVESTIGATE — schedule, today's decision, order book
+   Nothing is hidden; it is only placed after, and the boundary is stated. */
+.workspace .primary-column { display: flex; flex-direction: column; }
+.primary-column > .open-issues-section { order: -2; }   /* glance */
+.primary-column > .positions-section   { order: -1; }   /* glance */
+.primary-column > .decision-section    { order: 1; }
+.primary-column > .orders-section      { order: 2; }
+
+/* Now Monitor is moved into the header by next.js, so it needs to sit in the same
+   order group as the strips there rather than keep a workspace order. */
+.overview-header > .now-monitor { order: -1; }
+
+/* ═══ One two-column grid, from the top ═════════════════════════════════════
+   next.js lifts the status rail and the journal column out to be direct children
+   of <main>, so the whole page can run as a single grid instead of a full-width
+   header stacked on top of a two-column workspace:
+
+       status rail                  (spans both columns)
+       Now Monitor    |  journal
+       figures        |  journal
+       workspace      |  journal
+
+   Before this the journal lived inside `.workspace`, which starts only after the
+   figures — so it began roughly a screen below Now Monitor.
+
+   A side effect worth naming: this also fixes the width mismatch between the two
+   issue lists. Now Monitor and Open Issues use the same
+   `minmax(280px, .8fr) minmax(0, 1.2fr)` split, but Now Monitor used to span the
+   whole page while Open Issues sat inside the narrower column, so the identical
+   ratio resolved to widths about 180px apart. Both now share one column, so the
+   ratio does what it says. The earlier 470px right-margin patch is gone with it —
+   it was compensating for a layout that no longer exists. */
+@media (min-width: 1051px) {
+  main.is-two-column {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(420px, 450px);
+    align-items: start;
+  }
+  /* Every row is placed explicitly. A first attempt left the rows implicit and
+     put the journal at `grid-row: 2 / -1`, which does NOT mean "row 2 to the
+     bottom": `-1` counts back from the edge of the EXPLICIT grid, and with no
+     `grid-template-rows` declared that grid has no rows, so `-1` resolves to line
+     1. `2 / 1` then normalises to `1 / 2` and the journal jumped up onto row 1,
+     level with the status rail — above the verdict instead of beside Now Monitor. */
+  main.is-two-column > .status-rail     { grid-column: 1 / -1; grid-row: 1; }
+  main.is-two-column > .overview-header { grid-column: 1; grid-row: 2; min-width: 0; }
+  main.is-two-column > .workspace       { grid-column: 1; grid-row: 3; min-width: 0; }
+  /* Starts level with Now Monitor and runs down past the workspace. */
+  main.is-two-column > .journal-column {
+    grid-column: 2; grid-row: 2 / span 2;
+    position: sticky; top: 58px; height: calc(100vh - 58px); overflow: auto;
+  }
+  /* The workspace has lost its right-hand child, so it is a single column now. */
+  main.is-two-column > .workspace { display: block; }
+}
+
+/* Below the breakpoint the base already stacks everything; the grid would only
+   re-introduce a column that has nowhere to go. */
+@media (max-width: 1050px) {
+  main.is-two-column > .journal-column { position: static; height: auto; }
+}
+
+/* A labelled divider between the two groups was tried here and removed: with the
+   glance group already lifted to the top of the page and Now Monitor moved into
+   the header, the ordering does the work on its own. A full-width strip of text
+   explaining the ordering cost more attention than the ordering it explained. */
+
+
+/* ═══ E3 · Time stated in the operator's frame ══════════════════════════════
+   Content injected by next.js. The stock page says only "Mon 01:10 ET", leaving
+   an operator on Hanoi time to work out "midday tomorrow, in about N hours" —
+   arithmetic that gets done at 2am. */
+
+/* Entry-window strip, directly under the verdict. */
+.window-bar {
+  order: -1;                      /* right after .status-rail, before the figures */
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px;
+  padding: 11px 28px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  font: 500 13px/1.4 var(--mono);
+}
+.window-bar > b { color: var(--text); font-size: 15px; font-weight: 700; }
+.window-bar > span { color: var(--muted); }
+/* Inside the entry window: this is when the system can actually place orders.
+   Carries a shape (thick left rule) as well as colour. */
+.window-bar.in-window {
+  border-left: 4px solid var(--green);
+  background: rgba(54, 191, 105, .09);
+}
+.window-bar.in-window > b { color: var(--green); }
+
+/* Extra line under each schedule fact: how far away, and the operator's clock.
+
+   Both halves MUST be on their own line. Kept on one row the text runs about
+   250px inside a 231px column and bleeds into the neighbouring cell — five text
+   collisions measured on the first pass. The cell is also a `nowrap`
+   space-between flex row, so an appended node becomes a third flex item and gets
+   PUSHED RIGHT, as far as the journal column; hence the full-width basis. */
+.now-schedule-facts { overflow: visible; }
+.schedule-fact { height: auto; }
+.schedule-fact > div { flex-wrap: wrap; }
+.next-when { flex: 0 0 100%; width: 100%; }
+.next-when { display: block; margin-top: 4px; font: 500 11px/1.45 var(--mono); }
+.next-when > b { display: block; color: var(--blue); font-weight: 700; }
+
+@media (max-width: 680px) { .window-bar { padding: 10px 18px; } }
+
+
+/* ═══ A4 · Never truncate a state value ═════════════════════════════════════
+   The "Protection" tile read `1 co…` — 70px of room for 111px of content, losing
+   42px, which is the whole word `covered`. That tile says whether the position is
+   protected by a stop, exactly what someone opens this page at 2am to check.
+   `1 co…` reads equally well as "1 covered" or "1 conflict". Wrap, never clip. */
+.exposure-zone .zone-grid > div > b { white-space: normal; overflow: visible; text-overflow: clip; }
+
+/* NOTE for whoever reads the history here: a further "fix" was added at this point
+   (shrinking the exposure values to 16px, re-gridding the tile, extra wraps) and
+   then REVERTED, because the measurement behind it was wrong. That check compared
+   each text box against the card's PADDING edge, so any child with a deliberate
+   negative margin — the journal list bleeding to the card edges, for one — counted
+   as an overflow. Re-measured against the card's BORDER edge, this tile overflows
+   by nothing. The truncation finding above is separate and was real. */
+
+/* Three more truncations, same reason — characters lost, not merely shrunk. */
+.schedule-fact.next > div > b,
+.issue-list-copy > b,
+.positions-section .source-note { white-space: normal; overflow: visible; text-overflow: clip; }
+
+
+/* On narrow screens the price-track label row lost 179px — swallowing the STOP
+   PRICE (`stop 3,020.2 · plan 3,020.24 · -0.17%` cut down to a stub inside
+   103px). That figure decides "where is this position still protected", so it
+   must never be clipped. */
+.price-track-labels > span {
+  white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.5;
+}
+
+
+/* ═══ Pre-existing bug: the "HMM fit" row collapsed its label column to 0px ══
+   Measured: this row is a two-column grid, but the label track computed to `0px`
+   because the value "45/45 complete / 45 warn" claimed all 225px. The label was
+   squeezed to zero width so its text spilled outside its box, and the value ran
+   46px past the row — which is what read as text printed over text. Give the
+   label track a floor and let the value wrap instead of pushing the column. */
+.model-input-item {
+  grid-template-columns: minmax(58px, auto) minmax(0, 1fr);
+  align-items: baseline;
+}
+.model-input-item > b { white-space: normal; overflow-wrap: anywhere; }
+
+
+/* ═══ E4 · Separate prose type from figure type ═════════════════════════════
+   The whole page used ONE monospace face for everything, prose included — and
+   there is plenty of prose: issue descriptions, impact and action cells, every
+   line in the journal. Monospace at 11–13px is measurably tiring to read at length.
+
+   The intent to split was ALREADY in the base stylesheet: a `--sans` token exists
+   and is used (by the tooltip), but it points back at the monospace face, so it
+   does nothing. Someone started this and stopped. Here it points at a real sans.
+
+   CONSTRAINT: every figure, contract code, order id, timestamp and log line stays
+   monospace so numeric columns keep aligning. Only sentences change. */
+:root { --sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif; }
+
+.issue-problem p,
+.issue-assessment p,
+.job-summary,
+.journal-message {
+  font-family: var(--sans);
+  font-size: 13px; line-height: 1.55; letter-spacing: 0;
+}
+/* DELIBERATE exception: the evidence cell is a raw log line (timestamps, module
+   names, parameters). That has to stay monospace to be read character by character. */
+.issue-evidence p { font-family: var(--mono); }
+
+
+/* ═══ E6 · The risk bar states its thresholds ═══════════════════════════════
+   Before: a 5px sliver plus the text "0.6% of 15.00% hard limit", leaving the
+   reader to picture where 0.09% falls against the limit.
+   After: the three bands are drawn, and each is LABELLED IN TEXT rather than only
+   tinted.
+
+   66% and 100% are NOT thresholds invented here — they are the values realtime.js
+   already uses to switch the bar's class (>=100 'bad', >=66 'watch'). Use the
+   system's thresholds, do not mint new ones. */
+.dd-gauge {
+  height: 9px; border-radius: 2px; overflow: hidden;
+  background:
+    linear-gradient(to right,
+      rgba(54,191,105,.18) 0 66%,
+      rgba(221,163,58,.22) 66% 100%,
+      rgba(240,91,97,.28) 100%);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+/* tick at 66% — the "watch" boundary */
+.dd-gauge { position: relative; }
+.dd-gauge::after {
+  content: ""; position: absolute; left: 66%; top: 0; bottom: 0;
+  width: 1px; background: var(--line-strong);
+}
+.gauge-scale {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 10px;
+  margin-top: 4px;
+  font: 600 9px/1.3 var(--mono); text-transform: uppercase; letter-spacing: .05em;
+}
+/* Anchoring the first label to the 66% tick with `flex-basis: 66%` was tried and
+   reverted: "safe" is a short word, so the leftover space pushed the other two
+   labels onto a second line at both 1440px and 390px. Spread evenly reads better
+   and still runs low-to-high left to right. */
+.gauge-scale > span { flex: 0 1 auto; color: var(--dim); white-space: nowrap; }
+.gauge-scale > span:nth-child(2) { color: var(--amber); }
+.gauge-scale > span:nth-child(3) { color: var(--red); }
+
+
+/* ═══ A8 · Restore the focus ring ═══════════════════════════════════════════
+   The base stylesheet explicitly disables the focus outline on the 21 elements
+   that carry a tooltip. */
+.has-tip { outline: revert; }
+.has-tip:focus-visible { outline: 1px solid var(--blue); outline-offset: 2px; }
+
+
+/* ═══ Narrow screens ════════════════════════════════════════════════════════
+   680px — EXACTLY the breakpoint realtime.js uses. Do not introduce another. */
+@media (max-width: 680px) {
+  .status-rail { padding: 14px 18px; }
+  .system-conclusion { font-size: 16px; align-items: flex-start; }
+  .system-conclusion .status-dot { margin-top: 4px; }
+  /* A7 · touch targets big enough for a finger.
+     Keep the base's `overflow-x: auto` so the bar still scrolls when cramped. */
+  .module-nav a { display: flex; align-items: center; min-height: 44px; padding: 0 12px; }
+  .module-nav { height: 46px; }
+  /* A6 · the broker reconcile line was cut by 41px with no way to scroll to it. */
+  .broker-account-line { white-space: normal; overflow-wrap: anywhere; }
+  .broker-account-line a { display: inline-block; margin-top: 4px; }
+}

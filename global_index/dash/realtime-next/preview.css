@@ -1,0 +1,22 @@
+/* Styling for the design-preview banner. Kept out of next.css so the operations
+   page's override layer carries no design-time-only code. */
+
+#previewBanner {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px;
+  padding: 9px 18px;
+  color: #1a1205; background: repeating-linear-gradient(
+    45deg, #dda33a 0 12px, #c9922f 12px 24px);
+  font: 600 12px/1.4 var(--mono);
+}
+#previewBanner > b { font-weight: 800; letter-spacing: .06em; }
+#previewBanner > span { color: #2a1f08; }
+#previewBanner nav { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
+#previewBanner nav a {
+  padding: 3px 8px; border: 1px solid rgba(0,0,0,.35); border-radius: 3px;
+  color: #1a1205; font-weight: 700;
+}
+#previewBanner nav.skin-nav { margin-left: 0; flex-basis: 100%; }
+#previewBanner nav.skin-nav a { background: rgba(0,0,0,.12); }
+#previewBanner nav a[aria-current="page"] { background: #1a1205; color: #dda33a; }
+#previewBanner nav a:hover { background: rgba(0,0,0,.18); }

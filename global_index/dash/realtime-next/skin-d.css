@@ -1,0 +1,114 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   skin-d.css — DIRECTION D: "HUD"  (throwaway probe, design choice only)
+
+   Instrument-panel treatment: black ground, hairline rules, corner brackets on
+   every tile, monospace throughout, a restrained glow on live values.
+
+   Deliberate restraint, because this style fails easily: no scanlines, no glitch,
+   no neon body text. Glow is confined to status marks, never to figures or
+   sentences — the page is read at 2am by a tired operator, and glowing prose is
+   measurably harder to read than plain prose.
+
+   Two-channel colour rule as in the other probes: figures desaturated, status
+   colours reserved and vivid. Cyan is used for STRUCTURE (rules, brackets), never
+   to mean anything, so it cannot be confused with a state.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --bg: #000305;
+  --surface: #04090d;
+  --panel: #070e14;
+  --line: rgba(60, 190, 210, .22);
+  --line-strong: rgba(60, 190, 210, .40);
+  --text: #cfe3e8;
+  --bright: #eafcff;
+  --muted: #8fb0ba;
+  --dim: #6d8b95;
+
+  --hud: #3cbed2;            /* structural cyan — carries no meaning */
+
+  /* data channel — desaturated */
+  --green: #6fb394;
+  --red:   #cc8085;
+  --blue:  #7ba8c4;
+  --violet:#8f86bd;
+
+  /* status channel — reserved */
+  --status-ok:   #24e07a;
+  --status-warn: #ffc043;
+  --status-fail: #ff4d5e;
+  --amber: var(--status-warn);
+}
+
+body { background: var(--bg); }
+
+/* Hairline frame + corner brackets on each tile. The brackets are drawn with
+   gradients rather than extra elements, so no id or node is added anywhere. */
+.header-dashboard { gap: 10px; padding: 10px 18px; background: transparent; }
+.header-zone {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 16px 18px;
+}
+.header-zone + .header-zone { border-left: 1px solid var(--line); border-top: 1px solid var(--line); }
+.header-zone::before, .header-zone::after {
+  content: ""; position: absolute; width: 12px; height: 12px; pointer-events: none;
+}
+.header-zone::before { top: -1px; left: -1px;
+  border-top: 2px solid var(--hud); border-left: 2px solid var(--hud); }
+.header-zone::after  { bottom: -1px; right: -1px;
+  border-bottom: 2px solid var(--hud); border-right: 2px solid var(--hud); }
+
+.zone-title {
+  color: var(--hud); letter-spacing: .18em; font-size: 10px; font-weight: 700;
+}
+
+/* Bands share the same frame language. */
+.status-rail, .window-bar, .verdict-evidence, .section-band {
+  border: 1px solid var(--line); border-radius: 0; background: var(--surface);
+}
+.status-rail { margin: 10px 18px 0; padding: 16px 18px; }
+.window-bar  { margin: 8px 18px 0;  padding: 10px 18px; background: var(--panel); }
+.verdict-evidence { margin: 8px 18px 0; padding: 14px 18px; }
+.section-band { margin: 10px 18px; padding: 4px 0; }
+.journal-shell > .journal { margin-left: 0; margin-right: 0; }
+.equity-zone > small { white-space: normal; overflow-wrap: anywhere; }
+
+/* Status marks are the only things allowed to glow. */
+.system-conclusion.ok    .status-dot { background: var(--status-ok);
+  box-shadow: 0 0 10px var(--status-ok); }
+.system-conclusion.ok    .status-dot::after { color: var(--status-ok); }
+.system-conclusion.watch .status-dot { background: var(--status-warn);
+  box-shadow: 0 0 10px var(--status-warn); }
+.system-conclusion.watch .status-dot::after { color: var(--status-warn); }
+.system-conclusion.bad   .status-dot { background: var(--status-fail);
+  box-shadow: 0 0 12px var(--status-fail); }
+.system-conclusion.bad   .status-dot::after { color: var(--status-fail); }
+
+.status-rail:has(.system-conclusion.watch) { border-color: var(--status-warn); background: #0f0c04; }
+.status-rail:has(.system-conclusion.bad)   { border-color: var(--status-fail); background: #100407; }
+
+.verdict-evidence.has-open      { background: #100407; border-color: var(--status-fail);
+                                  border-left: 3px solid var(--status-fail); }
+.verdict-evidence.all-recovered { background: #0f0c04; border-color: var(--status-warn);
+                                  border-left: 3px solid var(--status-warn); }
+.has-open .evidence-shape       { background: var(--status-fail); }
+.all-recovered .evidence-shape  { background: var(--status-warn); }
+.evidence-group > b.open        { background: var(--status-fail); color: #1a0306; }
+.evidence-group > b.recovered   { background: var(--status-warn); color: #1f1602; }
+
+/* Everything monospace, including prose — this direction is the one place where
+   E4's sans split is deliberately reverted, because the look depends on it. */
+.issue-problem p, .issue-assessment p, .job-summary, .journal-message,
+.zone-title, .evidence-head, .window-bar > b, .system-conclusion b {
+  font-family: var(--mono);
+}
+
+/* Sparse technical markers on the entry-window strip. */
+.window-bar { position: relative; }
+.window-bar::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: var(--hud);
+}

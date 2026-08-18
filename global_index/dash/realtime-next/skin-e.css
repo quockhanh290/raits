@@ -1,0 +1,1007 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   skin-e.css — port of the design build
+
+   Ground truth is `reference.html` in this folder: the design project's
+   `Dashboard 2A.dc.html` with its template loops expanded, served by the same
+   backend so the two pages can be measured against each other instead of
+   compared by eye. Every number below was read off that page, not invented.
+
+   Rules this layer keeps:
+
+   1. NEVER remove an element realtime.js owns. It resolves its targets with
+      getElementById and rewrites their contents on every poll. Hide with
+      `display: none`, never delete, and keep every id.
+   2. Breakpoints use EXACTLY 680px — realtime.js:8 holds a matchMedia on that
+      width, so the sheet and the script have to name the same number.
+   3. The reference declares `min-width: 1900px` and never meets a phone. Any
+      value taken from it that breaks narrow is re-stated in the 680px block at
+      the end, not left to overflow.
+
+   Where the reference and this page disagree on TEXT rather than styling — the
+   verdict sentence, the header's freshness wording, the protection format —
+   that text comes from realtime.js, which is shared with production. Those are
+   listed at the foot of this file rather than papered over here.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Surfaces, darkest to lightest */
+  --page:      #08090c;
+  --deep:      #0b0d11;
+  --card:      #0e1116;
+  --elevated:  #12161c;
+  --journal:   #0a0c10;
+
+  /* Lines */
+  --line-page:      #1b2027;   /* between page-level bands */
+  --line-card:      #1e242c;   /* a card's own edge */
+  --line-hair:      #1a1f26;   /* inside a card */
+  --line-faint:     #171b22;   /* collapsed journal card, inner journal rules */
+  --line-open:      #2a323d;   /* expanded journal card */
+  --line-button:    #262d36;
+
+  /* Text, four steps */
+  --t-primary:   #e8ebf0;
+  --t-secondary: #a8b1c0;
+  --t-label:     #798394;
+  --t-null:      #4b5563;
+
+  /* State */
+  --s-ok:        #3ecf8e;
+  --s-ok-text:   #8ae6cc;
+  --s-ok-bg:     #14251f;
+  --s-warn:      #f0b429;
+  --s-bad:       #f2555a;
+  --s-bad-text:  #ff8085;
+
+  /* Domain accents — one hue per kind of fact */
+  --d-money:    #5fd3b2;
+  --d-runner:   #9d8cf5;
+  --d-exposure: #5b9cf0;
+  --d-risk:     #e0913c;
+  --d-job-late: #3a6ea8;
+  --d-dec-late: #6b5cb8;
+
+  /* The DATA face follows the header's font control.
+
+     realtime.js:14 writes the choice to `<html data-font="...">` and
+     realtime.css:20-25 turns that into `--font-ui`. Declaring `--mono` as a
+     literal here read none of that: measured, picking Courier or System changed
+     `data-font` and `--font-ui` while the rendered family stayed IBM Plex Mono
+     — the control moved and nothing followed it.
+
+     Chaining to --font-ui hands the choice back. IBM Plex Mono is one of the
+     options in that select, so the design's own face is still one click away;
+     it is just no longer imposed over the reader's setting.
+
+     The LANGUAGE face stays fixed: the control's options are monospace faces for
+     figures, and prose is not what it is choosing. */
+  --sans: "IBM Plex Sans", Helvetica, Arial, sans-serif;
+  --mono: var(--font-ui, "IBM Plex Mono"), "Cascadia Mono", monospace;
+
+  /* ── The base sheet's own tokens, restated ────────────────────────────────
+     realtime.css:122-124 writes `.positive { color: var(--green) !important }`,
+     so no selector this layer can write will beat it — the only way in is the
+     variable itself. Restating the six colour tokens moves every signed figure,
+     dot and rule on the page onto the reference palette in one place instead of
+     an !important war, and fixes a mismatch that was invisible until measured:
+     the base green is #36bf69, the reference green is #3ecf8e. */
+  --green:  #3ecf8e;
+  --red:    #f2555a;
+  --amber:  #f0b429;
+  --blue:   #5b9cf0;
+  --violet: #9d8cf5;
+
+  --bg:          #08090c;
+  --surface:     #0e1116;
+  --panel:       #0b0d11;
+  --line:        #1e242c;
+  --line-strong: #2a323d;
+  --text:        #e8ebf0;
+  --bright:      #e8ebf0;
+  --muted:       #a8b1c0;
+  --dim:         #798394;
+}
+
+/* ── Page ───────────────────────────────────────────────────────────────────*/
+html { font-variant-numeric: tabular-nums; }
+body {
+  background: var(--page); color: var(--t-primary);
+  font: 400 14px/1.45 var(--sans);
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────────*/
+.app-header {
+  padding: 15px 26px; gap: 32px;
+  background: var(--page); border-bottom: 1px solid var(--line-page);
+}
+.brand { font: 600 13px/1.2 var(--sans); letter-spacing: .15em; text-transform: uppercase; color: var(--t-primary); }
+.mode-badge {
+  padding: 3px 9px; border: 1px solid var(--line-button); border-radius: 4px;
+  font: 400 10px/1.5 var(--mono); letter-spacing: .12em; color: var(--t-label);
+  background: transparent;
+}
+.module-nav { gap: 4px; }
+.module-nav a {
+  padding: 7px 16px; border-radius: 5px; border: 0; background: transparent;
+  font: 400 12px/1.2 var(--sans); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--t-label);
+}
+.module-nav a[aria-current="page"] {
+  background: var(--s-ok-bg); color: var(--s-ok-text); font-weight: 500;
+}
+.header-live-context { gap: 22px; font: 400 12px/1.2 var(--mono); color: var(--t-label); }
+.header-live-context b, .header-live-context strong { color: var(--t-primary); font-weight: 400; }
+
+/* The live dot breathes. A hard blink reads as an alarm, and this one is on
+   screen whenever the page is healthy. */
+@keyframes rn-live { 0%, 100% { opacity: 1; } 50% { opacity: .32; } }
+.header-live-context i, .runner-header-state i { animation: rn-live 2.4s ease-in-out infinite; }
+
+/* ── Verdict strip ──────────────────────────────────────────────────────────
+   One wash from the state's own hue back to the page ground, so the strip reads
+   as a state without putting a block of colour behind the sentence. */
+.status-rail {
+  padding: 15px 26px; gap: 16px;
+  /* The clock block is two lines and the verdict is one. Left top-aligned, the
+     sentence sat against the header divider with 30px of nothing under it while
+     the clock filled the strip — measured: verdict 182-206, clock 182-220,
+     strip 167-236. Centred, both read against the same middle. */
+  align-items: center;
+  border-bottom: 1px solid var(--line-page); border-top: 0;
+  background: linear-gradient(90deg, #0c1512 0%, var(--deep) 42%);
+}
+.status-rail:has(.system-conclusion.watch) { background: linear-gradient(90deg, #15120a 0%, var(--deep) 42%); }
+.status-rail:has(.system-conclusion.bad)   { background: linear-gradient(90deg, #170e10 0%, var(--deep) 42%); }
+.system-conclusion b {
+  font: 500 15px/1.4 var(--sans); letter-spacing: -.005em; color: var(--t-primary);
+}
+.system-conclusion .rail-tag,
+.status-rail .issue-count {
+  padding: 3px 9px; border: 1px solid var(--line-button); border-radius: 4px;
+  font: 400 11px/1.5 var(--mono); letter-spacing: .06em; color: var(--t-label);
+  background: transparent;
+}
+.rail-clock > b { font: 400 14px/1.3 var(--mono); color: var(--t-primary); }
+.rail-clock > span { font: 400 11px/1.3 var(--mono); color: var(--t-label); }
+
+/* ── Section headings ───────────────────────────────────────────────────────
+   Three pixels of colour before the title is enough to tell the sections apart
+   down the page without spending a whole heading colour on it. */
+.section-heading h1, .section-heading h2, .now-monitor-title h1, .journal-column h2 {
+  display: flex; align-items: baseline; gap: 12px;
+  font: 600 17px/1.3 var(--sans); letter-spacing: -.01em; color: var(--t-primary);
+}
+.section-heading h1::before, .section-heading h2::before,
+.now-monitor-title h1::before, .journal-column h2::before {
+  content: ""; flex: 0 0 3px; width: 3px; height: 15px; border-radius: 2px;
+  background: var(--d-exposure); align-self: center;
+}
+.positions-section .section-heading h2::before { background: var(--d-money); }
+.decision-section  .section-heading h2::before { background: var(--d-runner); }
+.orders-section    .section-heading h2::before { background: var(--d-risk); }
+.journal-column h2::before                     { background: var(--d-runner); }
+.section-heading .source-note, .section-heading small {
+  margin-left: auto; font: 400 11px/1.4 var(--mono); color: var(--t-label);
+}
+
+/* ── Page split ─────────────────────────────────────────────────────────────*/
+@media (min-width: 1051px) {
+  main.is-two-column { grid-template-columns: minmax(0, 1fr) 452px; }
+  main.is-two-column > .overview-header,
+  main.is-two-column > .workspace { border-right: 1px solid var(--line-page); }
+  main.is-two-column > .journal-column { background: var(--journal); }
+}
+
+/* The journal runs the full height of the page rather than one screen.
+
+   next.css pins it `position: sticky` at `calc(100vh - 58px)`, so it stopped at
+   942px while the page ran to 1781px — the column ended two thirds of the way
+   down with empty ground beneath it. Stretched to the grid row instead: it now
+   ends where the page ends, and the page scrolls as one surface. */
+@media (min-width: 1051px) {
+  /* The COLUMN stretches to the grid row, so its surface runs from the top of
+     the page to the bottom with no bare ground under it. The LIST inside keeps
+     the viewport-height scroller next.css gave it — letting the list set the
+     column's height instead made the document 7801px long, with the left side
+     empty for the last six thousand of them. */
+  main.is-two-column > .journal-column {
+    position: static; height: auto; align-self: stretch; overflow: visible;
+    display: flex; flex-direction: column;
+  }
+  /* The list takes whatever height is left and Source Clocks sits on the floor.
+
+     Capping the list at one viewport left 382px of bare column under Source
+     Clocks — the column reached the bottom of the page but its contents stopped
+     two thirds of the way down. Letting the list flex into that space fills it
+     and puts the clocks where they belong, at the end, without a gap on either
+     side of them. */
+  main.is-two-column > .journal-column > .journal-section {
+    /* basis 0, not auto: with `auto` the list's own 7467px of content becomes
+       its base size, so it drives the column and the document went to 7968px.
+       At basis 0 it contributes nothing to the column's height — the grid row is
+       sized by the left column — and then grows into whatever is left. */
+    flex: 1 1 0; min-height: 0; overflow: auto; position: static;
+  }
+  main.is-two-column > .journal-column > .source-section {
+    flex: 0 0 auto; margin-top: 0;
+  }
+}
+
+/* ── Now Monitor ────────────────────────────────────────────────────────────
+   One card, four cells, each carrying its own domain colour on the top edge.
+   The cell reads label → job name → (clock time, then how far away), which is
+   the order the question gets asked in. */
+.now-monitor > .section-body, .now-monitor .now-monitor-shell { padding: 0; }
+.now-schedule-facts {
+  border: 1px solid var(--line-card); border-radius: 8px; background: var(--card);
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden; gap: 0;
+}
+.now-schedule-facts > .schedule-fact {
+  display: block; padding: 16px 20px; margin: 0;
+  border: 0; border-right: 1px solid var(--line-hair);
+  border-top: 2px solid var(--d-exposure);
+  background: transparent; border-radius: 0;
+}
+.now-schedule-facts > .schedule-fact:nth-child(2) { border-top-color: var(--d-runner); }
+.now-schedule-facts > .schedule-fact:nth-child(3) { border-top-color: var(--d-job-late); }
+.now-schedule-facts > .schedule-fact:nth-child(4) { border-top-color: var(--d-dec-late); }
+.now-schedule-facts > .schedule-fact:last-child   { border-right: 0; }
+
+.now-schedule-facts > .schedule-fact > span {
+  display: block; font: 500 11px/1.4 var(--sans);
+  letter-spacing: .1em; text-transform: uppercase; color: var(--d-exposure);
+}
+.now-schedule-facts > .schedule-fact:nth-child(2) > span { color: var(--d-runner); }
+.now-schedule-facts > .schedule-fact:nth-child(3) > span { color: var(--d-job-late); }
+.now-schedule-facts > .schedule-fact:nth-child(4) > span { color: var(--d-dec-late); }
+
+/* realtime.js writes <b>job</b><time>clock</time> here and next.js appends the
+   relative time as <small>. All three sit on ONE line — name left, clock and
+   distance right — so the tile is two rows instead of three.
+
+   The reference build gives these tiles three rows (label / name / clock+rel);
+   this is a deliberate departure, asked for, and it takes about a third off the
+   height of the strip. */
+.now-schedule-facts > .schedule-fact > div {
+  display: flex; flex-wrap: nowrap; align-items: baseline; gap: 10px;
+  margin-top: 7px; min-width: 0;
+}
+/* realtime.css:177-180 paints the job NAME and the clock with the tone colour
+   (`.schedule-fact.next b` etc., specificity 0,2,1 — a bare `.schedule-fact > div > b`
+   at 0,1,2 loses). The reference puts the domain hue on the LABEL only and keeps
+   the name white: four job names in four different colours is four things to
+   decode before reading any of them. */
+/* The NAME takes the free space, so the two time readings land on the right
+   edge together. `margin-left: auto` on the clock did the same thing visually
+   but consumed every spare pixel, which left nothing for the relative time —
+   it wrapped onto a third line, measured at y=73 against the clock's y=43, and
+   the tile stayed three rows tall while looking like two. */
+.now-schedule-facts > .schedule-fact > div > b {
+  min-width: 0; flex: 1 1 auto;
+  font: 400 14px/1.35 var(--mono); color: var(--t-primary); white-space: nowrap;
+}
+.now-schedule-facts > .schedule-fact > div > time {
+  flex: 0 0 auto;
+  font: 400 11px/1.4 var(--mono); color: var(--t-label); white-space: nowrap;
+}
+/* next.css:262 still carries `flex: 0 0 100%; width: 100%` from when this sat on
+   a line of its own. Overriding `flex` alone was not enough: with basis `auto`
+   the width declaration became the base size, so this element claimed all 304px
+   of the row, the job name shrank to ZERO, and everything overlapped — while the
+   tile still reported one visual line. Width has to be released too. */
+.schedule-fact > div > .next-when {
+  flex: 0 0 auto; width: auto; margin-top: 0; text-align: right;
+  font: 400 11px/1.4 var(--mono); color: var(--t-secondary); white-space: nowrap;
+}
+.schedule-fact > div > .next-when b {
+  display: inline; font-weight: 400; color: inherit; font-size: inherit;
+}
+
+/* ── The five figure cards ──────────────────────────────────────────────────
+   The reference lays these out as two bands: equity | model inputs, then
+   performance | risk | exposure. Six columns expresses both without touching
+   the markup — 3+3 on the first row, 2+2+2 on the second. */
+/* Two bands, exactly as the reference runs them: the two lead cards on their
+   own row at 22px 26px, a divider, then the three figure cards at 14px 26px.
+
+   The single six-column grid this replaces could not express either the divider
+   or the two different column gaps (14px above, 12px below), and it needed
+   `align-items: start` to stop the short cards stretching — which is what left
+   the three figure cards at 98 / 107 / 98 instead of matching. Inside a row of
+   its own, the default stretch makes them equal again for free. */
+.header-dashboard {
+  display: block; padding: 0; background: transparent;
+  border-bottom: 1px solid var(--line-page);
+}
+.metrics-row { display: grid; }
+.metrics-lead {
+  grid-template-columns: 1fr 1fr; gap: 14px;
+  /* No rule between the two lead cards and the three figure cards: they are one
+     block of numbers, and a divider there split it into two things to read. */
+  /* The reference pads this band 22px top and bottom, which puts 37px between
+     the two rows once the divider and the lower band's 14px are counted. Pulled
+     the bottom in to 16px on request — 31px between the rows. This is the one
+     number here that deliberately departs from the design build; set it back to
+     22px to be exact again. */
+  padding: 22px 26px 0;
+}
+.metrics-figures {
+  grid-template-columns: 1fr 1fr 1fr; gap: 12px;
+  /* 14px above, the same distance the cards keep from each other, so the five
+     cards read as one field rather than two stacked bands. */
+  padding: 14px 26px;
+}
+
+.header-zone {
+  min-height: 0;
+  border: 1px solid var(--line-card); border-radius: 8px; background: var(--card);
+  padding: 12px 16px; box-shadow: none;
+}
+.zone-title {
+  display: block; font: 500 11px/1.4 var(--sans);
+  letter-spacing: .1em; text-transform: uppercase; color: var(--t-label);
+}
+.performance-zone > .zone-title { color: var(--d-money); margin-bottom: 10px; }
+.exposure-zone    > .zone-title { color: var(--d-exposure); margin-bottom: 10px; }
+.risk-zone        > .zone-title { color: var(--d-risk); }
+.equity-zone      > .zone-title { color: var(--d-money); }
+.model-inputs-zone > .zone-title { color: var(--d-runner); }
+
+/* Equity and model inputs are the two lead cards: taller padding, and a wash
+   toward their own domain that fades into the shared card colour by 62%. */
+/* The two lead cards, tightened.
+
+   The reference pads them 20px 22px and spaces the equity block 10 / 12 / 14+13.
+   Measured at 190px tall against the reference's 182px, with the model card's
+   2x2 carrying an 18px row gap it did not need. Pulled in on request: padding
+   16px 18px, and the internal rhythm down a step. Every one of these is a
+   deliberate departure from the design build — the reference values are named
+   in the comment beside each so they can be put back. */
+.equity-zone {
+  border-color: #1c2a2b; padding: 16px 18px;      /* ref 20px 22px */
+  background: linear-gradient(180deg, #0f1618 0%, var(--card) 62%);
+}
+.equity-line { margin-top: 8px; }                  /* ref 10px */
+.equity-zone > small { margin-top: 9px; }          /* ref 12px */
+small.broker-account-line { margin-top: 10px; padding-top: 10px; }  /* ref 14 / 13 */
+.model-inputs-zone,
+.model-inputs-zone.watch, .model-inputs-zone.bad {
+  border: 1px solid #251f36; padding: 16px 18px;   /* ref 20px 22px */
+  background: linear-gradient(180deg, #131120 0%, var(--card) 62%);
+}
+/* The amber rule across the top of this card is painted by the base sheet as a
+   `::after` — 2px tall, the full 681px width — so every border measurement came
+   back clean while the line was plainly on screen. Pseudo-elements do not show
+   up in getComputedStyle(el); they need getComputedStyle(el, '::after').
+   The dot below replaces it. */
+.model-inputs-zone::after,
+.model-inputs-zone.watch::after,
+.model-inputs-zone.bad::after { content: none; }
+
+/* Staleness is said by a dot beside the title and by the amber value below it,
+   which is where the reader is already looking — not by a coloured rule across
+   the top of the card, which reads as a section divider. */
+.model-inputs-zone.watch > .zone-title::after,
+.model-inputs-zone.bad > .zone-title::after {
+  content: ""; display: inline-block; margin-left: 10px; vertical-align: middle;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--s-warn);
+}
+.model-inputs-zone.bad > .zone-title::after { background: var(--s-bad); }
+.equity-line { display: flex; align-items: baseline; gap: 14px; }
+.equity-line > b {
+  font: 500 40px/1 var(--mono); letter-spacing: -.03em; color: var(--t-primary);
+}
+.equity-line > strong { font: 400 15px/1.2 var(--mono); }
+.equity-zone > small {
+  display: block; font: 400 12px/1.5 var(--mono); color: var(--t-label);
+}
+small.broker-account-line {
+  border-top: 1px solid var(--line-hair);
+  display: flex; align-items: center; gap: 10px;
+}
+.broker-account-line .reconcile-link {
+  margin-left: auto; font: 400 11px/1.4 var(--mono); color: var(--d-money); white-space: nowrap;
+}
+
+/* Six readings, still two rows.
+
+   Fit end and Re-freeze were added without giving the card another line: the
+   grid goes from two columns to three, so the box keeps the height it had while
+   carrying half again as much. The reference runs 2x2 at 1fr 1fr — this is a
+   deliberate departure, and the only cost is narrower value columns, which the
+   values (a date, a word, a count) all fit inside. */
+.model-inputs-zone {
+  display: grid;
+  /* Content-sized columns, spread across the card. Three equal 1fr tracks gave
+     every cell 202px, but "45/45 complete / 45 warn" measures 216px — it spilled
+     14px into the Fit end column while the other five had 100-166px of slack.
+     Measured with a Range on the text node: the <b> boxes all reported exactly
+     202px, because a nowrap box does not grow with the text inside it. */
+  grid-template-columns: repeat(3, minmax(0, max-content));
+  justify-content: space-between;
+  gap: 12px 20px;                                  /* ref 18px 24px, 2 columns */
+  align-content: start;
+}
+.model-inputs-zone > .zone-title { grid-column: 1 / -1; margin-bottom: 2px; }
+/* realtime.css:112 gives every cell after the first `margin-top: 7px`, written
+   for a vertical stack. In a grid that lands on the first cell of each row's
+   siblings only, so Regime sat 7px above SPY data and Model age on the same row.
+   Padding and border were already cleared here; the margin was not. */
+.model-inputs-zone > .model-input-item {
+  display: block; padding: 0; margin: 0; border: 0; min-width: 0;
+}
+.model-inputs-zone > .model-input-item > span {
+  display: block; font: 400 11px/1.4 var(--sans); letter-spacing: 0;
+  text-transform: none; color: var(--t-label);
+}
+.model-inputs-zone > .model-input-item > b {
+  display: block; margin-top: 3px;
+  font: 400 15px/1.3 var(--mono);                  /* ref 17px, at two columns */
+  color: var(--t-primary); white-space: nowrap;
+}
+
+/* Performance and Exposure: two by two, label left, figure right. */
+.performance-zone .zone-grid,
+.exposure-zone .zone-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px;
+}
+.performance-zone .zone-grid > div,
+.exposure-zone .zone-grid > div {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 0; border: 0;
+}
+.performance-zone .zone-grid > div > span,
+.exposure-zone .zone-grid > div > span {
+  font: 400 12px/1.4 var(--sans); letter-spacing: 0; text-transform: none;
+  color: var(--t-label); white-space: nowrap;
+}
+.performance-zone .zone-grid > div > b,
+.exposure-zone .zone-grid > div > b {
+  font: 400 15px/1.3 var(--mono); color: var(--t-primary); white-space: nowrap;
+}
+.performance-zone .zone-grid > div > b.null,
+.exposure-zone .zone-grid > div > b.null { color: var(--t-null); }
+
+/* Risk: the limit sits beside the title, the figure and its peak share one
+   line, and the gauge closes the card as a hairline rather than a bar. */
+.risk-zone { display: block; }
+.risk-zone > .zone-title { display: inline-block; }
+.risk-zone > .risk-limit {
+  float: right; font: 400 11px/1.4 var(--mono); color: var(--t-label); white-space: nowrap;
+}
+.risk-zone > .metric-dd-value {
+  clear: both; display: flex; align-items: baseline; gap: 9px; padding-top: 10px;
+}
+.metric-dd-value > b {
+  font: 500 20px/1.2 var(--mono); letter-spacing: -.01em; color: var(--t-primary);
+}
+.metric-dd-value > em {
+  font: 400 12px/1.4 var(--mono); font-style: normal; color: var(--t-label);
+}
+.metric-dd-value > .dd-word { font: 400 12px/1.4 var(--mono); color: var(--t-label); }
+.metric-dd-value > .dd-peak {
+  margin-left: auto; font: 400 12px/1.4 var(--mono); color: var(--t-label); white-space: nowrap;
+}
+.metric-dd-value > .dd-peak strong { color: var(--t-secondary); font-weight: 400; }
+.risk-zone > .dd-gauge {
+  margin-top: 10px; height: 3px; border-radius: 2px;
+  background: var(--line-hair); overflow: hidden; box-shadow: none;
+}
+.risk-zone > .dd-gauge > i { height: 100%; border-radius: 2px; background: var(--s-ok); }
+.risk-zone > .dd-gauge > i.watch { background: var(--s-warn); }
+.risk-zone > .dd-gauge > i.bad   { background: var(--s-bad); }
+/* The reference prints no band labels under the gauge; the limit line above
+   already names the scale. Hidden rather than removed — next.js still owns it. */
+.risk-zone .gauge-scale { display: none; }
+
+
+/* The "next entry window" strip was dropped from the design: the Now Monitor
+   tiles above already carry the next job and the next decision with their own
+   countdowns, so this restated them one band lower. next.js still builds the
+   node, so it is hidden, not deleted. */
+.window-bar { display: none; }
+
+/* ── Section bands ──────────────────────────────────────────────────────────*/
+.section-band {
+  padding: 24px 26px; border-bottom: 1px solid var(--line-page);
+  background: transparent; border-radius: 0; box-shadow: none;
+}
+.section-band > .section-heading { margin-bottom: 14px; }
+.section-band > .section-body {
+  padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none;
+}
+
+/* Now Monitor's incident list IS the Open Issues list — same row markup, same
+   chips, same accent, and the same two-part shell: a list beside a detail.
+   Measured, the two agreed on everything except the track. Giving the list a
+   352px width alone left the detail where it was and opened a 196px hole down
+   the middle; the split belongs on the LAYOUT, exactly as in Open Issues. */
+.now-monitor-layout {
+  display: grid; grid-template-columns: 352px minmax(0, 1fr); gap: 14px;
+  background: transparent; border: 0; padding: 0;
+}
+.now-monitor-list { display: block; grid-template-columns: none; background: transparent; border: 0; padding: 0; }
+.now-monitor-detail {
+  border: 1px solid var(--line-card); border-radius: 8px; background: var(--card);
+  overflow: hidden; padding: 0; min-width: 0;
+}
+.now-monitor-detail:empty { display: none; }
+.now-monitor-layout:has(.now-monitor-detail:empty) { grid-template-columns: 352px; }
+
+/* Open Issues: a fixed 352px list beside the detail.
+
+   The split lives on .open-issues-layout, NOT on .open-issues-shell — the shell
+   is a <details>, so making it the grid puts its <summary> in the first column
+   and squeezes the list into whatever is left. Measured: the list track came
+   out 280px and the count column 62px. */
+.open-issues-shell { display: block; background: transparent; border: 0; padding: 0; }
+.open-issues-layout {
+  display: grid; grid-template-columns: 352px minmax(0, 1fr); gap: 14px;
+  background: transparent; border: 0; padding: 0;
+}
+.open-issue-list { display: block; background: transparent; border: 0; padding: 0; }
+.issue-list-row {
+  padding: 16px 18px; border: 1px solid var(--line-faint); border-radius: 8px;
+  background: var(--deep); margin: 0 0 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto; gap: 0 12px;
+}
+.issue-list-row > .issue-badges { align-content: start; gap: 5px; }
+.issue-list-row > .issue-count { font: 400 11px/1.4 var(--mono); color: var(--t-label); }
+/* ── One accent, one meaning, both places ───────────────────────────────────
+   There were TWO top stripes on the detail panel, 2px apart: a fixed blue one on
+   the outer .open-issue-detail / .now-monitor-detail (written here) and, right
+   beneath it, the base sheet's own stripe on the inner .issue-detail-panel
+   coloured by the issue's STATE — #f2555a for an incident, #9d8cf5 for known
+   debt. Measuring only the outer element reported a match while the eye saw the
+   inner one.
+
+   The state colour is the one worth keeping: it says how bad the issue is, where
+   the blue only said "selected". So the outer stripe is gone and the accent —
+   on the list row's left edge and on the panel's top edge alike — now takes the
+   issue's state, using the same mapping as the chips:
+
+       incident / open   red      known debt   amber
+       unknown           grey     recovered    green
+
+   known debt is amber, not the base's violet: violet is the runner chip's
+   colour, and two different things wearing it was the collision fixed earlier. */
+.issue-list-row.selected {
+  border: 1px solid #232c3d; border-left: 2px solid var(--t-label);
+  /* No edge on the right, and no shadow standing in for one.
+
+     realtime.css:207 marks the selected row with BOTH `border-right-color:
+     var(--blue)` AND `box-shadow: inset -2px 0 0 var(--blue)`. Killing the
+     border alone left the shadow painting the same 2px blue bar on the right —
+     invisible to every border measurement, which is why four passes reported a
+     clean right edge while the bar was plainly on screen. realtime.css:566
+     re-aims the same shadow at the bottom below 1050px, so that one is cleared
+     in the narrow block too. */
+  border-right: 0; box-shadow: none;
+  background: linear-gradient(90deg, #121a29 0%, #0f1319 72%);
+}
+.issue-list-row.selected.incident, .issue-list-row.selected.failed { border-left-color: var(--s-bad); }
+.issue-list-row.selected.known_debt                                { border-left-color: var(--s-warn); }
+.issue-list-row.selected.unknown                                   { border-left-color: var(--t-label); }
+.issue-list-row.selected.recovered                                 { border-left-color: var(--s-ok); }
+
+.issue-detail-panel { border-top: 2px solid var(--t-label); }
+.issue-detail-panel.incident, .issue-detail-panel.failed { border-top-color: var(--s-bad); }
+.issue-detail-panel.known_debt                           { border-top-color: var(--s-warn); }
+.issue-detail-panel.unknown                              { border-top-color: var(--t-label); }
+.issue-detail-panel.recovered                            { border-top-color: var(--s-ok); }
+/* The selected row and its detail are one object shown in two places, so they
+   carry the same accent: a 2px edge in --d-exposure on the row's left and the
+   panel's top. Measured before: the row had #5b9cf0 down its left while the
+   panel's top was the plain card line #1e242c, which read as two unrelated
+   cards that happened to sit side by side. */
+.open-issue-detail {
+  border: 1px solid var(--line-card); border-radius: 8px; background: var(--card);
+  overflow: hidden; padding: 0;
+}
+.open-issue-detail > * { padding: 16px 20px; border-bottom: 1px solid var(--line-hair); }
+.open-issue-detail > :last-child { border-bottom: 0; background: var(--deep); }
+/* This rule was written for the PROBLEM / IMPACT / ACTION labels and caught the
+   <h3> in the panel's head as well — so the issue's own title rendered at 11px,
+   uppercase, in the label grey: the smallest and faintest text in a panel where
+   it should be the largest. Scoped to the sub-blocks only. */
+/* h3 is not in this list: realtime.js:836 emits it only in the panel head, as
+   the issue's title. The earlier attempt tried to exclude the head with
+   `> :not(.issue-detail-head)`, which failed because the head is a GRANDchild —
+   an .issue-detail-panel sits between — so the exclusion matched the wrapper and
+   the label rule went on winning at (0,2,1) over the title rule at (0,1,1). */
+.open-issue-detail h4,
+.open-issue-detail .issue-problem > span {
+  font: 500 11px/1.4 var(--sans); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--t-label); margin: 0 0 7px;
+}
+
+/* The head carries the title, at the weight the reference gives it. */
+.open-issue-detail .issue-detail-head h3 {
+  font: 600 15px/1.35 var(--sans); letter-spacing: -.005em; text-transform: none;
+  color: var(--t-primary); margin: 0;
+}
+.open-issue-detail .issue-detail-head > b {
+  margin-left: auto; font: 400 11px/1.4 var(--mono); letter-spacing: normal;
+  color: var(--t-label);
+}
+
+/* Language in the sans face, figures in the mono one — the same split the rest
+   of this skin uses. The list card was rendering its title and its description
+   in mono, which is the base sheet's single-family default. */
+.issue-list-row .issue-list-copy > b,
+.issue-list-row .issue-list-copy > strong,
+.issue-list-row .issue-list-copy > div {
+  font: 600 14px/1.35 var(--sans); letter-spacing: -.005em; color: var(--t-primary);
+}
+.issue-list-row .issue-list-copy small {
+  font: 400 12px/1.45 var(--sans); letter-spacing: normal; color: var(--t-label);
+}
+.issue-list-row .issue-list-copy em {
+  font: 400 11px/1.4 var(--mono); font-style: normal; color: var(--t-label);
+}
+
+/* ── Chips ─────────────────────────────────────────────────────────────────
+   The real class names are `.issue-origin` and `.event-status` — an earlier
+   pass wrote `.tag.runner` / `.tag.debt`, which match nothing here, so the
+   chips kept the base sheet's treatment: the state colour painted on the BORDER
+   as well as the text, which turns a 9px label into a coloured box.
+
+   The reference keeps the border neutral (#2e2745 for a source, #2a323d for a
+   state) and puts the colour only in the letters. One shape, colour by meaning. */
+.issue-origin, .event-status {
+  display: inline-block;
+  font: 400 9px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  padding: 2px 7px; border: 1px solid var(--line-open); border-radius: 3px;
+  background: transparent; color: var(--t-label);
+}
+.issue-origin.runner { border-color: #2e2745; color: var(--d-runner); }
+.issue-origin.scheduler { border-color: var(--line-open); color: var(--t-label); }
+.issue-origin.broker { border-color: #1e3a30; color: var(--d-money); }
+
+/* The base sheet also gives the state chip a coloured outline, which draws a
+   second edge just outside the neutral border. The letters carry the state. */
+.event-status, .issue-origin { outline: 0; }
+/* Two chips were still off the system, measured against the rest of the page:
+
+     .issue-status   11px/700 with the state colour painted on the BORDER as
+                     well as the text — twice the weight of every other chip
+     the rail count  a filled pill at radius 999px on #0e1116, where every other
+                     count on the page is a flat outlined rectangle
+
+   Both are brought onto the one chip shape: 9-11px, neutral border, colour in
+   the letters only. */
+.issue-status {
+  font: 400 9px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  padding: 2px 7px; border: 1px solid var(--line-open); border-radius: 3px;
+  background: transparent;
+}
+/* The state does not live on this chip — realtime.js:816 writes a bare
+   `<span class="issue-status">` and the base sheet colours it from an ANCESTOR
+   class (realtime.css:219 `.known_debt .issue-status`). So `.issue-status.known_debt`
+   matched nothing, and KNOWN DEBT kept the base's `var(--violet)` — which, after
+   this file restated that token to #9d8cf5, became the exact purple of the
+   RUNNER chip beside it. Two chips, one colour, no way to tell them apart.
+
+   Mapped the same way as the journal's `.event-status`, so the two lists finally
+   agree with each other:
+     open / incident  red      · known debt  amber
+     unknown          grey — an absence of evidence is not a warning
+     recovered        green */
+.issue-status { color: var(--s-bad); }
+.known_debt .issue-status, .status-known_debt .issue-status { color: var(--s-warn); }
+.unknown .issue-status,    .status-unknown .issue-status    { color: var(--t-label); }
+.recovered .issue-status,  .status-recovered .issue-status  { color: var(--s-ok); }
+
+/* The badge column is pinned to the top of the row. Left to stretch, it centres
+   itself against a title that has wrapped to two lines. */
+.issue-badges { align-self: start; align-content: start; justify-items: start; gap: 5px; }
+
+.status-rail strong, .system-conclusion strong {
+  padding: 3px 9px; border: 1px solid var(--line-button); border-radius: 4px;
+  background: transparent; color: var(--t-label);
+  font: 400 11px/1.5 var(--mono); letter-spacing: .06em; text-transform: uppercase;
+}
+
+.event-status { border-color: var(--line-open); }
+.event-status.known_debt, .event-status.debt, .event-status.warn { color: var(--s-warn); }
+.event-status.open, .event-status.failed, .event-status.incident { color: var(--s-bad); }
+.event-status.completed, .event-status.recovered, .event-status.running { color: var(--s-ok); }
+
+/* ── Which figures earn a colour ───────────────────────────────────────────
+   The base sheet marks anything it can sign as `.positive` / `.negative`, so a
+   calendar date and a drawdown peak both come out coloured — the SPY input date
+   reads green as if it were a gain, and the peak reads red although a drawdown
+   peak is negative by definition and says nothing by being so.
+
+   Colour is kept for money that genuinely moved, and taken back everywhere the
+   sign carries no information. */
+/* Where the reference carries NO colour, restating the token is not enough —
+   the class is still applied, so the figure would merely change hue. These few
+   have to win outright, and the base rule is !important, so this one must be
+   too. Kept to the shortest possible list: a calendar date, a drawdown peak,
+   and a fit tally — none of which say anything by their sign. */
+#regimeInputDate { color: var(--t-primary) !important; }
+#performanceMaxDd { color: var(--t-secondary) !important; }
+#modelFitStatus { color: var(--t-primary) !important; }
+#modelFitStatus strong, #modelFitStatus em, #modelFitStatus .warning {
+  color: var(--s-warn) !important;
+}
+
+/* Tables: the header row sits a step darker than the body. */
+/* `overflow: hidden` here rounded the corners and CUT the table: at 390px the
+   browser test found the whole thead/tbody clipped off the right edge with no
+   way to reach it. A table that does not fit must scroll, not disappear —
+   horizontal auto keeps the radius and gives the columns somewhere to go. */
+.table-wrap {
+  border: 1px solid var(--line-card); border-radius: 8px;
+  overflow-x: auto; overflow-y: hidden; background: transparent;
+}
+.table-wrap thead th {
+  background: var(--deep); padding: 11px 22px;
+  font: 500 11px/1.4 var(--sans); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--t-label); border: 0;
+}
+.table-wrap tbody td {
+  background: var(--card); padding: 15px 22px; border-top: 1px solid var(--line-hair);
+  font: 400 13px/1.4 var(--mono); color: var(--t-primary);
+}
+
+/* Positions and decision: flat cards with hairline-divided fact rows. */
+.position-card, .decision-shell {
+  border: 1px solid var(--line-card); border-radius: 8px; background: var(--card);
+  overflow: hidden; padding: 0; box-shadow: none;
+}
+.position-facts, .decision-summary {
+  border-top: 1px solid var(--line-hair); background: var(--deep);
+  display: grid; gap: 0;
+}
+.position-facts > div, .decision-summary > div {
+  padding: 14px 22px; border-right: 1px solid var(--line-hair); border-bottom: 0;
+  background: transparent;
+}
+.position-facts > div:last-child, .decision-summary > div:last-child { border-right: 0; }
+
+/* ── Job journal ────────────────────────────────────────────────────────
+   The class names here were checked against the rendered page, not guessed —
+   an earlier pass styled `.journal-tabs`, `.job-note` and `.job-log-line`,
+   none of which exist, so none of it reached the screen. The real names are
+   `.journal-view-toggle`, `.job-summary` and `.job-evidence`.
+
+   The expanded panel is only in the DOM for the SELECTED row: realtime.js
+   inserts renderJobDetails() for that one card and nothing for the others, so
+   `.job-detail` being absent on a fresh page is correct, not missing. */
+.journal-column { background: var(--journal); padding: 20px 22px 26px; }
+.journal-section, .journal-section > .section-body { padding: 0; background: transparent; border: 0; }
+.journal-schedule {
+  display: flex; align-items: center; gap: 8px; margin-top: 9px;
+  font: 400 11px/1.4 var(--mono); color: var(--t-secondary);
+}
+
+.journal-view-toggle {
+  display: flex; gap: 4px; margin: 16px 0 0; padding: 3px;
+  height: auto;                     /* realtime.css:350 pins this at 31px */
+  border: 1px solid var(--line-card); border-radius: 7px; background: var(--card);
+}
+.journal-view-toggle button {
+  flex: 1; padding: 8px; border: 0; border-radius: 5px; background: transparent;
+  font: 400 12px/1.3 var(--sans); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--t-label); cursor: pointer;
+}
+.journal-view-toggle button[aria-pressed="true"] {
+  background: #1c1a2b; color: #c9c0fb; font-weight: 500;
+  box-shadow: none;                 /* realtime.css:353 draws an inset underline */
+}
+
+.journal { display: block; padding: 0; margin: 0; list-style: none; }
+.journal > li.job-row {
+  margin: 8px 0 0; padding: 0; border: 1px solid var(--line-faint); border-radius: 8px;
+  background: var(--deep); overflow: hidden;
+}
+.journal > li.job-row.selected { border-color: var(--line-open); background: var(--card); }
+.job-trigger {
+  width: 100%; padding: 13px 15px; border: 0; background: transparent;
+  text-align: left; cursor: pointer;
+}
+.job-trigger:hover { background: var(--elevated); }
+.job-time, .job-duration { font: 400 11px/1.4 var(--mono); color: var(--t-label); }
+.job-chevron {
+  width: 20px; height: 20px; border: 1px solid var(--line-button); border-radius: 4px;
+  color: var(--t-secondary); font: 400 12px/18px var(--mono); text-align: center;
+}
+.job-badges { gap: 7px; }
+.job-name { font: 400 13px/1.4 var(--mono); color: var(--t-primary); }
+.job-summary { font: 400 12px/1.5 var(--sans); color: var(--t-label); }
+
+.job-detail { border-top: 1px solid var(--line-hair); background: var(--deep); padding: 0; }
+.job-detail > * {
+  padding: 13px 15px; border-bottom: 1px solid var(--line-faint);
+  background: transparent; border-radius: 0;
+}
+.job-detail > :last-child { border-bottom: 0; }
+.job-detail b, .job-detail dt, .job-detail .issue-problem > span {
+  font: 500 11px/1.4 var(--sans); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--t-label);
+}
+.job-detail p, .job-detail dd {
+  margin: 4px 0 0; font: 400 12px/1.5 var(--sans); color: var(--t-primary);
+}
+
+/* The four facts sit two up, matching the reference's Started | Exit band. */
+.job-detail > dl {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding: 0;
+}
+.job-detail > dl > div {
+  padding: 12px 15px; border-right: 1px solid var(--line-faint);
+  border-bottom: 1px solid var(--line-faint);
+}
+/* With Duration hidden (see next.js — it is printed verbatim in the row above),
+   three cells remain: Started and Completed side by side, Outcome across. */
+.job-detail > dl > div:nth-of-type(2) { border-right: 0; }
+.job-detail > dl > div:last-of-type {
+  grid-column: 1 / -1; border-right: 0; border-bottom: 0;
+}
+.job-detail > dl dd { font-family: var(--mono); color: var(--t-primary); }
+
+/* Impact and Action are two cells divided by a hairline, not two boxes inside
+   the card. The base sheet gives each its own border and fill, which reads as a
+   card inside a card inside a card. */
+/* Measured inside the expanded job card: `.job-assessment` carried a border on
+   all four sides and `.job-diagnostic` a 1.6px left rail in #9d8cf5 — the same
+   purple as the RUNNER chip, so it read as a second card wearing the source
+   colour. Both are flattened: inside a card, a hairline divides; a box nests. */
+.job-assessment {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding: 0;
+  border: 0; border-radius: 0; background: transparent; box-shadow: none;
+}
+.job-detail .job-diagnostic {
+  border: 0; border-radius: 0; background: transparent; box-shadow: none;
+  padding: 0; margin: 8px 0 0;
+}
+.job-detail .job-evidence-list { padding: 13px 15px; }
+.job-detail .job-evidence { border-left: 0; padding-left: 0; }
+.job-assessment > .job-impact, .job-assessment > .job-action {
+  padding: 13px 15px; border: 0; border-radius: 0;
+  background: transparent; box-shadow: none;
+}
+.job-assessment > .job-impact { border-right: 1px solid var(--line-faint); }
+
+/* Same treatment for the issue detail panel, which shares these blocks. */
+.open-issue-detail .job-assessment > .job-impact,
+.open-issue-detail .job-assessment > .job-action {
+  padding: 16px 20px; border: 0; background: transparent;
+}
+.open-issue-detail .job-assessment > .job-impact { border-right: 1px solid var(--line-hair); }
+
+/* The toggle buttons keep the browser default outline on the pressed state,
+   which draws a second edge inside the pill. The pill itself is the state. */
+/* The pressed pill already states the selection; the base sheet's focus ring
+   drew a second edge inside it (measured 2.4px in currentColor). Keyboard focus
+   still gets a ring, just not a permanent one after a mouse click. */
+.journal-view-toggle button,
+.journal-view-toggle button:focus,
+.journal-view-toggle button[aria-pressed="true"] { outline: 0; box-shadow: none; }
+.journal-view-toggle button:focus-visible {
+  outline: 2px solid var(--d-exposure); outline-offset: 1px;
+}
+
+/* Each evidence row is <time> + <div><b>label</b><p>message</p></div>. Gridding
+   both levels gives the reference's three columns — clock, kind, message — out
+   of a two-level DOM, without adding a node realtime.js does not emit. */
+.job-evidence {
+  display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 9px;
+  padding: 3px 0; border: 0; background: transparent;
+}
+.job-evidence > time { font: 400 11px/1.6 var(--mono); color: var(--t-label); }
+.job-evidence > div { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 9px; }
+.job-evidence > div > b {
+  font: 400 11px/1.6 var(--mono); letter-spacing: 0; text-transform: none;
+  color: var(--t-label);
+}
+.job-evidence.tone-bad > div > b   { color: var(--s-bad); }
+.job-evidence.tone-watch > div > b { color: var(--s-warn); }
+.job-evidence > div > p {
+  margin: 0; font: 400 11px/1.6 var(--mono); color: var(--t-secondary);
+}
+.job-diagnostic > b { color: var(--s-warn); }
+.job-diagnostic.incident-diagnostic > b { color: var(--s-bad); }
+.job-empty { color: var(--t-null); font-style: normal; }
+
+/* ── Narrow screens ─────────────────────────────────────────────────────────
+   Everything above comes from a build that declares `min-width: 1900px`, so
+   none of it was chosen with a phone in mind. Measured at 390px, three values
+   break: the 40px figure runs past its card, the even two-column grids push
+   their values out, and the six-column band leaves each card ~105px wide.
+
+   680px is the number realtime.js:8 already watches. */
+@media (max-width: 680px) {
+  /* Give the header back what realtime.css:527-530 does here.
+
+     That block shrinks the live context to 10px with an 8px gap and lets it
+     wrap; the skin's top-level `.header-live-context { gap: 22px; font-size:
+     12px }` loads later and quietly undid it, so at 390px the row could no
+     longer fit and the browser test found eight elements clipped off the right
+     edge — including the font control and both state chips. */
+  .header-live-context {
+    gap: 8px; row-gap: 6px; font-size: 10px;
+    flex-wrap: wrap; justify-content: flex-end;
+  }
+  .app-header { padding: 12px 16px; gap: 12px; }
+
+  .metrics-row { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 14px 16px; }
+
+  .equity-zone, .model-inputs-zone { padding: 14px 16px; }
+  .equity-line > b { font-size: 28px; letter-spacing: -.02em; }
+  .model-inputs-zone { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .model-inputs-zone > .model-input-item > b { font-size: 15px; }
+
+  .now-schedule-facts { grid-template-columns: minmax(0, 1fr); }
+  .now-schedule-facts > .schedule-fact {
+    border-right: 0; border-bottom: 1px solid var(--line-hair); padding: 12px 14px;
+  }
+  .now-schedule-facts > .schedule-fact:last-child { border-bottom: 0; }
+
+  .section-band { padding: 16px; }
+  .open-issues-shell, .open-issue-list-wrap { grid-template-columns: minmax(0, 1fr); }
+  /* realtime.css:566 swaps the selected row's blue bar to the bottom edge here. */
+  .issue-list-row.selected { box-shadow: none; }
+  .journal-column { padding: 16px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Not reachable from this file
+
+   These differ from the reference because the TEXT comes from realtime.js,
+   which /realtime and /realtime-next share. Changing them means either editing
+   that file — which touches production — or having next.js rewrite the string
+   after each render pass. Neither is done here, so the difference is real and
+   stays visible rather than being hidden:
+
+     verdict sentence   reference "Systems nominal — feeds live, positions
+                        protected"; page emits lowercase with a colon
+                        (realtime.js:602)
+     header freshness   reference "Live 6s" / "Current 5m"; page emits
+                        "Live · updated 8s ago" / "On schedule · next 14:05 ET"
+                        (realtime.js:382, :463)
+     drawdown limit     reference "0.6% of 15.00% limit"; page emits
+                        "… hard limit" (realtime.js:413)
+     protection         reference "1 of 1"; page emits "1 covered"
+     Exposure · Held    the reference has a fourth cell the page has no element
+                        for; the value exists in the runner payload, so this
+                        needs a wire, not a style
+     Model inputs Refit the reference offers an action this page has no
+                        endpoint for — left out rather than drawn as a dead
+                        control
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Stale runner: mark reaches only as far as the marks do ─────────────────
+   `realtime.css:121` reads `.metrics.runner-stale .runner-derived { opacity: .42 }`.
+   It is not a page-wide dim: every figure carries the name of its source, and a
+   stale source fades exactly its own figures. Measured: seven elements wear
+   `runner-derived`, all seven inside #metrics, none outside.
+
+   Today's Decision prints its own provenance — "2026-08-17 / runner 08-17,
+   15:59 ET" — from the same runner observation that is 2.6h stale, and stayed at
+   full opacity. Marked, and dimmed by the same mechanism through the state class
+   that already exists on #metrics.
+
+   NOT extended to Open Positions (broker truth is current; only the runner
+   quantity is doubtful, and fading the whole card would overstate it) nor to the
+   Job journal (scheduler evidence, a different source with its own freshness). */
+main:has(#metrics.runner-stale) .decision-section.runner-derived { opacity: .42; }
+main:has(#metrics.broker-stale) .positions-section .broker-qty { opacity: .42; }
+
+/* ── The freshness line says, by colour, that it is alive ───────────────────
+   realtime.js:357 marks this element `negative` for stale/late/missing and
+   `warning` for unknown, and leaves it BARE for `fresh` and `not_expected_yet`.
+   Bare therefore means healthy, and healthy is the one state that had no colour
+   — it read the same as a dead string. Green only where no state class is set,
+   so red and amber still win outright.
+
+   Measured before changing anything: the element is rewritten 3 times in 26s,
+   on realtime.js's 8s poll. It is live; it only looked static because "next
+   01:10 ET" does not change until the slot does. */
+#runnerContext:not(.negative):not(.warning) { color: var(--s-ok); }
+.runner-header-state:has(#runnerContext:not(.negative):not(.warning)) i {
+  background: var(--s-ok); color: var(--s-ok);
+}

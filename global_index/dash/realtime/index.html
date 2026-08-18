@@ -4,8 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>RAITS Realtime Monitor</title>
+  <!-- Self-hosted webfonts, loaded before the base so the families exist by the
+       time any stylesheet asks for them. Served from this host: the page still
+       contains no external URL, which the backend tests assert. -->
+  <link rel="stylesheet" href="/dash/fonts/fonts.css">
   <link rel="stylesheet" href="/dash/realtime/realtime.css">
+  <!-- Redesign, applied from /realtime-next. Three layers, in order:
+         next.css    structural overrides (two-column page, spacing)
+         skin-e.css  palette, type and component treatment
+         next.js     additive behaviour; never edits what realtime.js owns
+       realtime.css and realtime.js are UNTOUCHED - the other four dashboards
+       share them, so a change there would follow this one onto pages nobody
+       reviewed. To revert this page, delete these three lines. -->
+  <link rel="stylesheet" href="/dash/realtime-next/next.css">
+  <link rel="stylesheet" href="/dash/realtime-next/skin-e.css">
   <script src="/dash/realtime/realtime.js" defer></script>
+  <script src="/dash/realtime-next/next.js" defer></script>
 </head>
 <body>
   <header class="app-header">
@@ -42,11 +56,12 @@
   <main>
     <div class="overview-header">
     <section class="header-dashboard metrics" id="metrics" aria-label="Realtime account overview">
+      <div class="metrics-row metrics-lead">
       <div class="header-zone equity-zone runner-derived">
         <span class="zone-title has-tip tip-bottom" tabindex="0" data-tooltip="Paper-trading system equity maintained by the runner ledger. This excludes the broker account's total liquidation value.">Paper Equity</span>
         <div class="equity-line"><b id="metricEquity">--</b><strong id="performanceNet">--</strong></div>
         <small><em id="performanceReturn">--</em> <span id="performanceScope">--</span> / base <strong id="performanceBase">--</strong></small>
-        <small class="broker-account-line has-tip tip-bottom" tabindex="0" data-tooltip="The IBKR paper account's own equity, shown for context only. The runner ledger above is realised-only and re-anchors at the system epoch; the two are not the same number and are not meant to reconcile here."><span id="brokerAccountContext">--</span> <a href="/paper">Paper reconcile</a></small>
+        <small class="broker-account-line has-tip tip-bottom" tabindex="0" data-tooltip="The IBKR paper account's own equity, shown for context only. The runner ledger above is realised-only and re-anchors at the system epoch; the two are not the same number and are not meant to reconcile here."><span id="brokerAccountContext">--</span> <a href="/paper" class="reconcile-link">Reconcile</a></small>
       </div>
 
       <div class="header-zone model-inputs-zone runner-derived" id="modelInputsZone">
@@ -63,8 +78,17 @@
         <div class="model-input-item model-input-fit">
           <span class="has-tip tip-bottom" tabindex="0" data-tooltip="Daily HMM fit evidence grouped from runner logs. Convergence warnings are diagnostic unless a documented decision gate fails.">HMM fit</span><b id="modelFitStatus">--</b>
         </div>
+        <div class="model-input-item model-input-fitend">
+          <span class="has-tip tip-bottom" tabindex="0" data-tooltip="The last date in the data the live HMM was fitted on. Model age says how old that fit is; this says what it is anchored to.">Fit end</span><b id="modelFitEnd">--</b>
+        </div>
+        <div class="model-input-item model-input-refreeze">
+          <span class="has-tip tip-bottom" tabindex="0" data-tooltip="Whether a model re-freeze decision is outstanding. Reported by the runner, not inferred from model age.">Re-freeze</span><b id="modelRefreeze">--</b>
+        </div>
       </div>
 
+      </div>
+
+      <div class="metrics-row metrics-figures">
       <div class="header-zone performance-zone">
         <span class="zone-title">Performance</span>
         <div class="zone-grid">
@@ -77,9 +101,12 @@
 
       <div class="header-zone risk-zone runner-derived">
         <span class="zone-title">Risk</span>
-        <div class="metric-dd-value"><b id="metricDrawdown">--</b><em id="metricDrawdownAmount">--</em></div>
+        <small class="risk-limit" id="metricDrawdownLimit">--</small>
+        <div class="metric-dd-value">
+          <b id="metricDrawdown">--</b><em id="metricDrawdownAmount">--</em><span class="dd-word">drawdown</span>
+          <small class="dd-peak">peak <strong id="performanceMaxDd">--</strong></small>
+        </div>
         <div class="dd-gauge" role="meter" aria-label="Drawdown versus hard limit"><i id="metricDrawdownFill"></i></div>
-        <small><span id="metricDrawdownLimit">--</span><span>Peak <strong id="performanceMaxDd">--</strong></span></small>
       </div>
 
       <div class="header-zone exposure-zone">
@@ -88,7 +115,9 @@
           <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="Number of open futures positions currently reported by IBKR.">Positions</span><b id="metricPositions">--</b></div>
           <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="All currently working orders reported by IBKR, including protective stops.">Working orders</span><b id="metricStops">--</b></div>
           <div class="broker-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="Covered = a live stop with the right side, a sane price, and enough total quantity. Deferred = protection intentionally delayed by rule. Naked = neither.">Protection</span><b id="metricStopsCovered">--</b></div>
+          <div class="runner-derived"><span class="has-tip tip-right tip-bottom" tabindex="0" data-tooltip="Gross exposure across all clusters, as a percentage of equity, summed from the per-cluster figures the runner publishes.">Gross</span><b id="metricGrossExposure">--</b></div>
         </div>
+      </div>
       </div>
     </section>
 
@@ -135,7 +164,7 @@
           <div class="position-grid" id="positionGrid"></div>
         </section>
 
-        <section class="section-band decision-section">
+        <section class="section-band decision-section runner-derived">
           <div class="section-heading compact">
             <h2>Today's Decision</h2>
             <span class="source-note has-tip tip-right" id="decisionSource" tabindex="0" data-tooltip="Entries, closes, and rejected signals emitted in the decision block of the newest runner snapshot.">Session unavailable</span>

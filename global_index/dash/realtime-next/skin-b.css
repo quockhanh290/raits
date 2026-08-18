@@ -1,0 +1,477 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   skin-b.css — DIRECTION B: "modern ops console"  (throwaway probe, design choice only)
+
+   Moves away from the terminal look: layered surfaces, rounded cards separated by
+   gaps instead of hairlines, sans for prose against monospace for figures, more
+   generous spacing.
+
+   Applies the SAME two-channel colour rule as direction A — desaturated data,
+   reserved vivid status — so the comparison is about form, not about which one
+   happens to make the alert visible.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Neutrals: nearly neutral ─────────────────────────────────────────────
+     The previous palette put EVERY neutral on hue 212 at 16-35% saturation —
+     background, surfaces, rules, body text, muted and dim alike. With the ground
+     that blue, no accent could read as an accent: `--blue` was also hue 212, i.e.
+     the same hue as the text sitting on it, so it registered as "slightly
+     different grey" rather than as blue.
+
+     Fix the ground, not the accents. Neutrals drop to ~10% saturation and keep a
+     faint cool cast; every accent hue then separates on its own. */
+  --bg:          #0b0e12;
+  --surface:     #12161c;
+  --panel:       #181d25;
+  --line:        #232a33;
+  --line-strong: #38424f;
+  --text:        #dee3e9;
+  --bright:      #f4f7fa;   /* not pure white: #fff glares on a dark ground */
+  --muted:       #98a1ac;
+  --dim:         #7f8996;
+
+  /* ── Data channel: FULLY SATURATED ────────────────────────────────────────
+     These were deliberately desaturated (32-45%) so that status colour would
+     stand out against them. That was the wrong trade: muting every figure is
+     exactly what made the page look washed out, and the figures are most of what
+     the page is. Reverted to full strength.
+
+     Status still separates — but by FORM, not by saturation: a filled chip, a
+     distinct shape, and a text label. Form is the more robust channel anyway; it
+     survives greyscale, a poor screen and colour blindness, none of which a
+     saturation difference does. */
+  --green:  #35d68a;
+  --red:    #ff5d6a;
+  --blue:   #4da6ff;
+  --violet: #a98bff;
+
+  /* Status channel — reserved for state, never applied to a figure.
+     ok and warn were 5 grey levels apart (170 vs 175): the same mark once colour
+     is gone. Pushed apart so the pair survives greyscale on its own too. */
+  --status-ok:   #17b355;   /* deeper than the data green, so the two do not read as one */
+  --status-warn: #ffc233;
+  --status-fail: #ff4757;
+  --amber: var(--status-warn);
+}
+
+body { background: var(--bg); }
+
+/* Cards with gaps, not dividers.
+
+   Six columns rather than five equal ones. Measured: every tile rendered at 246px
+   because the row takes its tallest member, but the CONTENT ranged from 92px
+   (Exposure) to 217px (Model Inputs) — so Model Inputs set the height and the
+   other four sat two-thirds empty.
+
+   Model Inputs is the one tile with four label/value pairs, so it gets two columns
+   and lays them out two-up; that halves its height instead of shrinking its type.
+   Widening it is what lets the rest of the row stop being padding.
+
+   Now that the journal sits beside the figures instead of below them, that row of
+   six no longer has the whole page — it has `100% - 450px`, about 950px at 1440.
+   Six tiles there would be 158px each, too narrow for `13/13 complete / 13 warn`
+   or for `$50,229`. So the strip becomes three columns over two rows, and Model
+   Inputs — the only tile holding four label/value pairs — keeps its double width:
+
+       EQUITY   |  MODEL INPUTS (×2)
+       PERF     |  RISK  |  EXPOSURE
+
+   Which also puts the two tiles that are read together, equity and model inputs,
+   on the same line. */
+.header-dashboard {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px; padding: 12px 20px; background: transparent;
+}
+.equity-zone       { grid-column: span 1; }
+.model-inputs-zone { grid-column: span 2; }
+.performance-zone, .risk-zone, .exposure-zone { grid-column: span 1; }
+
+/* Two-up inside the wider tile, but NOT two equal halves. Auto placement puts
+   Regime and Model age in the first column and SPY data and HMM fit in the second
+   — and those two sets are nothing like the same width. Equal columns gave the
+   short pair 198px it did not need while `13/13 complete / 13 warn` had 198px it
+   barely fit in. `auto` sizes the first column to its content and hands the rest
+   to the column that actually needs it. */
+.model-inputs-zone {
+  display: grid; grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 32px; row-gap: 0; align-content: start;
+}
+.model-inputs-zone > .zone-title { grid-column: 1 / -1; }
+
+/* ── Label beside value, not above it ───────────────────────────────────────
+   The base stacks each label over its value, so a tile with two pairs per column
+   runs to four rows for what is four facts:
+
+       Open UPL              Realized today
+       +$238                 +$0
+       Sharpe                Calmar
+       --                    --
+
+   Set side by side it is two rows, and reads the same:
+
+       Open UPL +$238        Realized today +$0
+       Sharpe   --           Calmar         --
+
+   Exposure drops from two rows to one by the same rule. `overflow-wrap` on the
+   value replaces the base's ellipsis: these are figures, and a clipped figure is
+   worse than a wrapped one. */
+.zone-grid > div, .risk-facts > div {
+  display: flex; align-items: baseline; gap: 8px; min-width: 0;
+}
+.zone-grid > div > span, .risk-facts > div > span { flex: 0 0 auto; }
+.zone-grid > div > b, .risk-facts > div > b {
+  min-width: 0; white-space: normal; overflow: visible;
+  text-overflow: clip; overflow-wrap: anywhere;
+}
+.zone-grid { row-gap: 8px; column-gap: 24px; }
+.exposure-zone .zone-grid { grid-template-rows: auto; row-gap: 0; align-items: baseline; }
+.header-zone {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 16px 18px; box-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+.header-zone + .header-zone { border-left: 1px solid var(--line); border-top: 1px solid var(--line); }
+
+.section-band {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  margin: 10px 20px; padding: 4px 0;
+}
+
+/* ── One card layer, not three ──────────────────────────────────────────────
+   Giving `.section-band` a border and a background turned every box already
+   inside it into a card within a card: the schedule tiles, the issue list rows
+   and the issue detail panel each carried their own frame, so a single incident
+   was drawn inside three nested boxes.
+
+   The band keeps the frame — it is the thing being separated from the page. What
+   is inside it is separated by SPACE and by a single rule, not by more boxes.
+   Selection is the one exception: the chosen row still needs to be marked, and
+   that is what its left accent is for.
+
+   Naming the inner boxes one by one missed two of them — `.decision-shell` and
+   `.table-wrap` kept their frames, and one guessed class (`.decision-block`) did
+   not exist at all. Target the STRUCTURAL role instead: every section body, and
+   the boxes inside it, are stripped; only the band keeps a frame. */
+.section-band > .section-body,
+.section-band .now-schedule-facts,
+.section-band .schedule-fact,
+.section-band .issue-list-item,
+.section-band .issue-detail-panel,
+.section-band .position-card,
+.section-band .decision-shell,
+.section-band .table-wrap,
+.section-band .now-monitor-shell,
+.section-band .open-issues-shell {
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+/* `.table-wrap` must keep scrolling horizontally — only its frame is removed. */
+.section-band .table-wrap { overflow-x: auto; }
+
+/* One vertical rhythm for every section body. Measured: the decision body carried
+   `18px 0` while the orders table carried `0`, so the three sections started their
+   content at different heights even though their outer padding matched. */
+.section-band > .section-body { padding-top: 10px; padding-bottom: 10px; }
+
+/* One horizontal start too. Measured from the section's own left edge: the
+   positions card and the orders table began their text at 31px, because each
+   carries its own inner padding, while the decision body began at 19px — flush
+   with the heading. Twelve pixels is enough to read as a broken rail down the
+   left of the page. The decision body is brought out to match the other two
+   rather than pulling those in, which would have meant re-padding table cells.
+
+   Written with both classes on the band so it outranks the blanket
+   `.section-band > .section-body { padding-left: 0 }` further down this file —
+   at equal specificity that later rule wins, and a first attempt at this silently
+   did nothing for exactly that reason. */
+.section-band.decision-section > .section-body { padding-left: 12px; padding-right: 12px; }
+/* Clearing the background and the radius is not enough — a box with a border and
+   no fill is still a visible frame. `.decision-shell` and `.table-wrap` kept a
+   0.8px border on all four sides and so still read as a card inside a card. The
+   detector missed it too, because it only counted a box as a card when it had a
+   border AND a fill; a bordered-but-unfilled box slipped through. */
+.section-band > .section-body,
+.section-band .now-schedule-facts,
+.section-band .issue-detail-panel,
+.section-band .position-card,
+.section-band .decision-shell,
+.section-band .table-wrap { border: 0; }
+.section-band .schedule-fact { border-width: 0 0 0 1px; border-color: var(--line); }
+.section-band .schedule-fact:first-child { border-left: 0; }
+
+/* Selected row is marked by a filled shape, not by an edge: no border at all, a
+   soft fill and rounded corners. The earlier left-rule version put a hard line
+   back into a section whose whole point was to stop drawing boxes. */
+.section-band .issue-list-row {
+  background: transparent; border: 0; border-radius: 8px;
+}
+.section-band .issue-list-row.selected {
+  background: rgba(77, 166, 255, .10);
+}
+/* The journal list carries a negative horizontal margin so its row highlights
+   reach the card edges. That is invisible on the borderless base, but here the
+   card has a rounded border and the list bleeds outside it. Pull it back in. */
+.journal-shell > .journal { margin-left: 0; margin-right: 0; }
+
+.status-rail {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  margin: 12px 20px 0; padding: 16px 20px; border-bottom: 1px solid var(--line);
+}
+.window-bar {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  margin: 10px 20px 0; padding: 12px 20px; border-bottom: 1px solid var(--line);
+}
+
+/* Status channel. */
+.system-conclusion.ok    .status-dot { background: var(--status-ok); }
+.system-conclusion.ok    .status-dot::after { color: var(--status-ok); }
+.system-conclusion.watch .status-dot { background: var(--status-warn); }
+.system-conclusion.watch .status-dot::after { color: var(--status-warn); }
+.system-conclusion.bad   .status-dot { background: var(--status-fail); }
+.system-conclusion.bad   .status-dot::after { color: var(--status-fail); }
+
+.status-rail:has(.system-conclusion.watch) { background: #241d0e; border-color: var(--status-warn); }
+.status-rail:has(.system-conclusion.bad)   { background: #261416; border-color: var(--status-fail); }
+
+
+/* Card padding plus borders narrow the content box enough that the equity
+   sub-line ("… / base $50,000") runs past the tile edge — measured only under
+   this skin, so the fix belongs here rather than in the shared layer. */
+.equity-zone > small { white-space: normal; overflow-wrap: anywhere; }
+
+/* ── One spacing scale ──────────────────────────────────────────────────────
+   Measured problem, and self-inflicted: every card starts at x=20, but the first
+   text inside them started at 21 / 39 / 41 / 66 / 110 — five different left edges
+   staggering the whole left column. Cause: card padding was added to the tiles and
+   the bands, but `.section-band` carries no horizontal padding of its own (its
+   heading relies on the band for that), so those headings stayed flush at 21 while
+   everything else moved in to 39.
+
+   The base page was nearly aligned (24 / 26 / 28, a 4px spread). This layer made
+   it worse, so the fix belongs here.
+
+   One horizontal inset for every card-level container; inner elements that carry
+   their own inset are zeroed so it cannot double. */
+:root { --pad-x: 18px; --pad-y: 14px; }
+
+.header-zone,
+.status-rail,
+.window-bar,
+.section-band { padding-left: var(--pad-x); padding-right: var(--pad-x); }
+
+.header-zone, .status-rail       { padding-top: var(--pad-y); padding-bottom: var(--pad-y); }
+.window-bar { padding-top: 11px; padding-bottom: 11px; }
+.section-band                    { padding-top: 6px;  padding-bottom: 6px; }
+
+/* These sit inside a band that now supplies the inset; keep their vertical
+   rhythm, drop their horizontal one so the text does not step in twice. */
+.section-band > .section-body,
+.section-band > .now-monitor-shell,
+.section-band > .journal-shell { padding-left: 0; padding-right: 0; }
+
+/* Same reason the journal list was pulled back earlier: it bleeds sideways to
+   reach the old flush edges, which now overshoots the padded card.
+   The list itself was pulled back before, but each ROW carries its own
+   `margin: 0 -10px` for the hover highlight — measured: message text started 7px
+   OUTSIDE the card's padding. Both levels have to come back in. */
+.journal-shell > .journal { margin-left: 0; margin-right: 0; }
+.journal > .job-row, .journal > li { margin-left: 0; margin-right: 0; }
+/* Do NOT also zero the rows' inner padding. A first attempt did, and it looked
+   worse rather than better: that 17px left padding is the gap between the row's
+   coloured status stripe and its text, so removing it pushed the text flush
+   against the stripe. The measurement said "improved" only because it compared
+   the text against the CARD's content box — the wrong reference. What the eye
+   judges here is text against the row's own left edge. */
+
+/* The grouped-row summary line sits as a DIRECT child of the row, not inside
+   `.job-trigger`, so it never picked up that element's 17px left inset: measured
+   2px from the row edge while every other item in the row sat at 19px. That is
+   the stagger visible in the journal. Match it to the rest. */
+.journal > li > .journal-message { padding-left: 17px; padding-right: 10px; }
+
+/* A heading's source note is `nowrap` + ellipsis, so it drops characters as soon
+   as the card narrows — the same "never clip a value" case as the tiles. */
+.section-heading .source-note,
+.section-heading > span { white-space: normal; overflow: visible; text-overflow: clip; }
+
+/* One outer margin, so the cards form a single column rather than three. */
+.status-rail, .window-bar { margin: 10px 20px 0; }
+.section-band { margin: 10px 20px; }
+.header-dashboard { padding: 10px 20px; }
+
+
+/* ── Typeface ───────────────────────────────────────────────────────────────
+   Measured on this machine: of the seven options in the font switcher, only
+   Cascadia Mono, Consolas, Lucida Console and Courier New are actually installed.
+   `JetBrains Mono` and `IBM Plex Mono` are offered but absent, so choosing them
+   silently falls back to Cascadia with no indication — a pre-existing fault in
+   the live page, not something this route introduced.
+
+   Self-hosting the files fixes the cause rather than the symptom: the family now
+   exists regardless of what the machine has, and the switcher's JetBrains option
+   starts doing what it says.
+
+   JetBrains Mono for every figure (its digits are wide, unambiguous, and the
+   zero is slashed — worth having when a stop price is read at 2am).
+   Inter for prose. */
+:root {
+  --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+  /* ONE family. The two-family split is reverted, and the honest reason is that
+     the case for it was never measured: the claim that "monospace at 11-13px is
+     more tiring to read than sans" was asserted here, not tested against this
+     page. What was measured is that two families used without a rule a reader can
+     infer look messier than one family used consistently — and the base page,
+     which never drew a complaint about type, is entirely monospace.
+
+     The --sans token is kept pointing at the mono stack rather than deleted, so
+     the split can be reinstated in one line if it is ever actually measured. */
+  --sans: var(--mono);
+}
+/* ── One rule, applied both ways ────────────────────────────────────────────
+   The previous split was not something a reader could infer: "Paper Equity" was
+   sans while "Problem" was mono, section headings were sans while the nav was
+   mono. Two families used without a rule reads as messier than one family used
+   consistently — which is what the base page was.
+
+   The rule now:
+     SANS  everything that is LANGUAGE — brand, nav, headings, field labels,
+           sentences, buttons. Anything you read as words.
+     MONO  everything that is DATA — figures, prices, contract codes, order ids,
+           timestamps, durations, log lines. Anything you read as a value, and
+           anything that has to line up in a column.
+
+   Default to sans and name the data explicitly, rather than the reverse: a label
+   that slips through reads slightly off, whereas a figure that slips through
+   breaks column alignment. */
+body { font-family: var(--sans); }
+
+.zone-title, .section-heading h1, .section-heading h2,
+.window-bar > b, .system-conclusion b, .system-conclusion strong,
+.issue-problem span, .issue-assessment span, .issue-evidence span,
+.issue-detail-head h3, .issue-origin, .issue-status,
+.job-summary, .journal-message, .issue-problem p, .issue-assessment p,
+.zone-grid > div > span, .model-input-item > span, .schedule-fact > span,
+.gauge-scale {
+  font-family: var(--sans); letter-spacing: 0;
+}
+
+/* EXCEPTION to the rule above, and a real one rather than an oversight: the
+   wordmark and the module nav are the product's identity and its chrome, not
+   running language. Sweeping them into sans stripped the terminal character the
+   product reads by. A logotype belongs to neither side of a language/data split. */
+.brand, .mode-badge, .module-nav a,
+
+.equity-line > b, .equity-line > strong, .equity-zone > small,
+.metric-dd-value > b, .metric-dd-value > em,
+.zone-grid > div > b, .model-input-item > b,
+.schedule-fact time, .schedule-fact > div > b,
+.next-when,
+.rail-clock, .system-facts,
+.issue-evidence p, .issue-timing,
+table, .price-track-labels, .position-card { font-family: var(--mono); }
+
+.system-conclusion b { font-weight: 650; }
+.zone-title { text-transform: uppercase; letter-spacing: .08em; font-size: 11px; }
+
+
+/* ── Now Monitor, compacted ─────────────────────────────────────────────────
+   It sits directly under the verdict now, so its height is the price of every
+   other thing on the page. Three sources of bulk, all of them repetition rather
+   than information:
+
+   1. Each schedule fact ran to four lines — label, job name, ET time, then the
+      two lines this layer adds for the operator's clock. Folded to two: the
+      relative time and the local time join the ET time on one line.
+   2. Every incident row repeated the same sentence. With six failed slots the
+      list read "The expected scheduler slot is unresolved: exception." six times.
+      That sentence has NOT been removed from the page — it is in the detail panel
+      to the right, in full, for whichever row is selected. The list goes back to
+      being an index: badge, name, and nothing else.
+   3. Row and cell padding sized for a sparse list, not a list of six. */
+
+.now-schedule-facts { row-gap: 0; }
+.schedule-fact { padding: 6px 12px; }
+.schedule-fact > span { font-size: 10px; letter-spacing: .06em; }
+.schedule-fact > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.schedule-fact > div > b { font-size: 13px; }
+.schedule-fact time { font-size: 11px; color: var(--muted); }
+/* the operator-clock line joins the row instead of owning two lines of its own */
+.schedule-fact .next-when { flex: 0 1 auto; width: auto; display: inline; margin-top: 0; }
+.schedule-fact .next-when > b { display: inline; }
+
+.now-monitor-list .issue-list-row { padding: 5px 10px; gap: 8px; align-items: center; }
+.now-monitor-list .issue-list-copy { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.now-monitor-list .issue-list-copy > b { font-size: 12px; }
+/* The repeated sentence: present in the detail panel, not restated per row. */
+.now-monitor-list .issue-list-copy > small { display: none; }
+.now-monitor-list .issue-badges { flex: 0 0 auto; }
+.now-monitor-list .issue-origin,
+.now-monitor-list .issue-status { font-size: 9px; padding: 1px 5px; }
+
+.now-monitor .section-heading h1 { font-size: 17px; }
+.now-monitor .section-heading { padding-top: 2px; padding-bottom: 2px; }
+
+
+/* ── The price-track labels under an open position ──────────────────────────
+   Three equal 284px columns, but the left one carries THREE values
+   (`stop 3,020.2 · plan 3,020.24 · -0.17%`, about 290px) while the middle and
+   right carry one each at ~110px. So the left one wrapped to two lines with
+   340px sitting unused beside it.
+
+   Size the outer two to their content and let the middle take the slack; the
+   stop price then stays on one line without being clipped, which was the point
+   of un-clipping it in the first place. */
+.price-track-labels {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline; column-gap: 16px;
+}
+.price-track-labels > :nth-child(1) { white-space: nowrap; text-align: left; }
+.price-track-labels > :nth-child(2) { text-align: center; }
+.price-track-labels > :nth-child(3) { white-space: nowrap; text-align: right; }
+
+/* Narrow screens have no slack, so stack instead of clipping. */
+@media (max-width: 680px) {
+  .price-track-labels { grid-template-columns: minmax(0, 1fr); row-gap: 2px; }
+  .price-track-labels > :nth-child(n) { white-space: normal; text-align: left; }
+}
+
+
+/* ── Model Inputs: stack the label above the value ──────────────────────────
+   `45/45 complete / 45 warn` is 24 characters in a 122px value column, so it wrapped
+   to three lines. Shrinking the type cannot fix that on its own: one line inside
+   122px needs about 8.5px type, which is too small to read at a glance. Stacking
+   the label gives the value the tile's full 227px, where 15px fits on one line. */
+/* No rule between every row. Four label/value pairs already read as four things
+   because each label sits above its value; adding a line under three of the four
+   (the last one has none, which is its own inconsistency) just draws furniture. */
+.model-input-item { display: block; padding: 5px 0; border: 0; }
+.model-input-item > span { display: block; font-size: 10px; letter-spacing: .06em;
+                           text-transform: uppercase; color: var(--dim); }
+.model-input-item > b    { display: block; font-size: 15px; line-height: 1.3;
+                           white-space: nowrap; }
+
+
+/* ── The three strips above the figures ─────────────────────────────────────
+   Measured 60 + 45 + 71 = 176px before this. They are the first thing on the page,
+   so every pixel here pushes the actual content down. Tightened without dropping
+   anything: the verdict keeps the largest type on the page, it just no longer
+   carries 14px of padding above and below it. */
+.status-rail      { padding-top: 9px;  padding-bottom: 9px; }
+.status-rail { margin-top: 7px; }
+
+/* The entry-window strip is hidden, not deleted: next.js still builds and updates
+   it, and the element keeps its id. Removing it from the document would be the
+   one thing this layer must never do — several call sites in realtime.js assign
+   to elements by id without a null check. Hiding also keeps it one line away from
+   coming back if the countdown turns out to be wanted somewhere else. */
+.window-bar { display: none; }
+
+.system-conclusion { font-size: 16px; gap: 9px; }
+.system-conclusion .status-dot { width: 9px; height: 9px; margin-right: 30px; }
+.system-conclusion.watch .status-dot { margin-right: 42px; }
+.system-conclusion.bad   .status-dot { margin-right: 38px; }
+.system-conclusion .status-dot::after { left: 14px; font-size: 10px; }
+.system-conclusion strong { padding: 2px 8px; font-size: 11px; }
+
+.window-bar > b   { font-size: 13px; }
+.window-bar > span { font-size: 11px; }

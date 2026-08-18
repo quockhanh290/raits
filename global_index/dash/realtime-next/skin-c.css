@@ -1,0 +1,172 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   skin-c.css — DIRECTION C: "bento"  (throwaway probe, design choice only)
+
+   The only one of these probes that changes STRUCTURE rather than paint. A and B
+   both kept the same five equal tiles in one strip, which is very likely what
+   actually reads as flat.
+
+   Idea: tile size follows importance, not tidiness.
+     row 1   PAPER EQUITY (wide)      PERFORMANCE (wide)
+     row 2   MODEL INPUTS (wide)      RISK        EXPOSURE
+
+   And because tile size is now a variable, it can respond to state: when the
+   verdict has open evidence the evidence card takes the full width above
+   everything; when the day is clean it disappears and the grid closes up.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --bg: #0a0e13;
+  --surface: #121821;
+  --panel: #171f2a;
+  --line: #202a37;
+  --line-strong: #2d3a49;
+  --radius: 16px;
+
+  /* Cards here sit LIGHTER than the base ground, so the muted text tokens tuned
+     against the darker surface lose contrast against them — measured 96 of 373
+     text nodes below AA before this, against 19 on the base. Lift both tokens to
+     match the lighter cards. Re-measure after any further change to --surface:
+     these two values are tied to it. */
+  --muted: #a3b4c6;
+  --dim:   #8a9cb0;
+
+  /* data channel — desaturated, same two-channel rule as the other probes */
+  --green: #6fb08d;
+  --red:   #cd8085;
+  --blue:  #7fa4cf;
+  --violet:#9186c9;
+
+  /* status channel — reserved */
+  --status-ok:   #2ecc71;
+  --status-warn: #f5a524;
+  --status-fail: #f2545b;
+  --amber: var(--status-warn);
+}
+
+body { background: var(--bg); }
+
+/* ── The bento grid ─────────────────────────────────────────────────────────
+   Four columns; tiles claim 1 or 2 of them. Every span uses minmax(0, …) so a
+   long value shrinks the text rather than the track — without it one wide figure
+   silently pushes a whole column out of the viewport. */
+.header-dashboard {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Rows size to their content and tiles sit at the top of their row. Without
+     this the grid stretches every tile in a row to the tallest one, so a tile
+     with less to say just gets more air: measured 1% / 1% / 11% / 21% / 24%
+     empty across the five tiles, which reads as sloppy rather than spacious. */
+  grid-auto-rows: min-content;
+  align-items: start;
+  gap: 8px; padding: 8px 16px; background: transparent;
+}
+.header-zone {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 12px 14px;
+  min-height: 0;
+}
+.header-zone + .header-zone { border-left: 1px solid var(--line); border-top: 1px solid var(--line); }
+
+.equity-zone       { grid-column: span 2; }
+.performance-zone  { grid-column: span 2; }
+.model-inputs-zone { grid-column: span 2; }
+.risk-zone         { grid-column: span 1; }
+.exposure-zone     { grid-column: span 1; }
+
+/* ── One type scale, three steps ────────────────────────────────────────────
+   The metrics block was using NINE sizes (34/22/21/20/16/13/12/11/9), including
+   four different sizes for things that are all just "a metric's value" — 34 for
+   equity, 22 for risk, 21 for exposure, 20 for performance. Four near-identical
+   sizes read as four levels of importance when there are only two.
+     28px  the one lead figure
+     18px  every other metric value
+     10px  every label
+   Anything outside these three is a mistake, not a nuance. */
+.equity-line > b { font-size: 28px; line-height: 1.15; }
+.risk-zone .metric-dd-value > b,
+.exposure-zone .zone-grid > div > b,
+.performance-zone .zone-grid > div > b,
+.model-inputs-zone .model-input-item > b { font-size: 18px; line-height: 1.25; }
+.zone-title { font-size: 10px; letter-spacing: .12em; }
+.zone-grid > div > span,
+.model-input-item > span { font-size: 11px; }
+
+/* Tighter internal rhythm; the tiles were spending most of their height on gaps. */
+.zone-grid { row-gap: 6px; column-gap: 16px; }
+.model-input-item { padding-top: 3px; padding-bottom: 3px; }
+.equity-zone > small { margin-top: 2px; line-height: 1.45; }
+
+/* Model Inputs holds four label/value pairs stacked in one column, which made it
+   198px tall — the tallest tile, and since grid rows take their tallest member it
+   was setting the height of the entire first row. Two columns halves it. */
+.model-inputs-zone {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 18px; row-gap: 2px; align-content: start;
+}
+.model-inputs-zone > .zone-title { grid-column: 1 / -1; }
+
+/* The three sizes that escaped the scale: the equity delta, the drawdown amount,
+   and the gauge legend. Folded back in — 18 for a value, 11 for an annotation,
+   10 for a label. Four sizes total now: 28 / 18 / 11 / 10. */
+.equity-line > strong { font-size: 18px; }
+.metric-dd-value > em { font-size: 11px; }
+.gauge-scale { font-size: 10px; }
+
+@media (max-width: 1050px) {
+  .header-dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .equity-zone, .performance-zone, .model-inputs-zone { grid-column: span 2; }
+  .risk-zone, .exposure-zone { grid-column: span 1; }
+}
+@media (max-width: 680px) {
+  .header-dashboard { grid-template-columns: minmax(0, 1fr); padding: 10px 14px; }
+  .equity-zone, .performance-zone, .model-inputs-zone,
+  .risk-zone, .exposure-zone { grid-column: span 1; }
+  .equity-line > b { font-size: 28px; }
+}
+
+/* ── Bands become cards too, so the whole page reads as one system ──────────── */
+.status-rail, .window-bar, .verdict-evidence {
+  border-radius: var(--radius); margin: 8px 16px 0;
+  border: 1px solid var(--line); border-bottom: 1px solid var(--line);
+}
+.status-rail { background: var(--surface); padding: 11px 14px; }
+.window-bar  { background: var(--panel);   padding: 8px 14px; }
+.section-band {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); margin: 8px 16px; padding: 2px 0;
+}
+/* The verdict is still the largest thing on the page, but it no longer needs
+   22px to be: it sits alone in a band at the very top. */
+.system-conclusion { font-size: 17px; gap: 10px; }
+.window-bar > b { font-size: 13px; }
+.window-bar, .window-bar > span { font-size: 12px; }
+/* The journal list bleeds sideways by design to reach the old card edges; with a
+   rounded border that shows outside the card. */
+.journal-shell > .journal { margin-left: 0; margin-right: 0; }
+.equity-zone > small { white-space: normal; overflow-wrap: anywhere; }
+
+/* ── Size follows state ─────────────────────────────────────────────────────
+   The whole point of a variable grid: when something is open, its card is the
+   largest thing on the page; when nothing is, it is not there at all. */
+.verdict-evidence { padding: 10px 14px; gap: 6px; }
+.verdict-evidence .evidence-head { font-size: 14px; }
+.verdict-evidence.has-open {
+  background: #1d1114; border-color: var(--status-fail); border-left: 5px solid var(--status-fail);
+}
+.verdict-evidence.all-recovered {
+  background: #1c1608; border-color: var(--status-warn); border-left: 5px solid var(--status-warn);
+}
+.verdict-evidence.has-open .evidence-head { font-size: 17px; }
+
+.system-conclusion.ok    .status-dot { background: var(--status-ok); }
+.system-conclusion.ok    .status-dot::after { color: var(--status-ok); }
+.system-conclusion.watch .status-dot { background: var(--status-warn); }
+.system-conclusion.watch .status-dot::after { color: var(--status-warn); }
+.system-conclusion.bad   .status-dot { background: var(--status-fail); }
+.system-conclusion.bad   .status-dot::after { color: var(--status-fail); }
+.status-rail:has(.system-conclusion.watch) { background: #1c1608; border-color: var(--status-warn); }
+.status-rail:has(.system-conclusion.bad)   { background: #1d1114; border-color: var(--status-fail); }
+.has-open .evidence-shape      { background: var(--status-fail); }
+.all-recovered .evidence-shape { background: var(--status-warn); }
+.evidence-group > b.open       { background: var(--status-fail); color: #24080b; }
+.evidence-group > b.recovered  { background: var(--status-warn); color: #241a05; }

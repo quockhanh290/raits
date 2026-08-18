@@ -1,0 +1,73 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   skin-a.css — DIRECTION A: "refined terminal"  (throwaway probe, design choice only)
+
+   Keeps the existing DNA — dark ground, monospace, dense instrument panel — and
+   fixes what measurement showed was wrong with its execution:
+
+   - an 8px rhythm instead of the current mix of 4/5/7/9/11/17/20/28px paddings
+   - depth carried by background steps rather than 1px rules everywhere
+   - TWO COLOUR CHANNELS, the rule agreed for both directions:
+       data channel   — P&L and deltas, DESATURATED
+       status channel — OK / WARN / FAIL, kept vivid and reserved
+     Measured reason: green currently paints equity delta, regime, SPY date, UPL,
+     realised P&L and the status dot — six unrelated jobs, one colour. When the
+     state turns bad the eye has nothing to catch. Making figures quieter is what
+     lets the status colour mean something again.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ground: one step darker, so raised surfaces read without borders */
+  --bg: #06090c;
+  --surface: #0b1116;
+  --panel: #10171e;
+  --line: #18222b;
+  --line-strong: #24303b;
+
+  /* data channel — desaturated. Still green-up / red-down, just no longer shouting. */
+  --green: #6fae87;
+  --red:   #c8797d;
+  --blue:  #7d9fc4;
+  --violet:#8f86bd;
+
+  /* status channel — reserved, vivid, never used for a figure */
+  --status-ok:   #2fd06f;
+  --status-warn: #ffb02e;
+  --status-fail: #ff4d57;
+
+  --amber: var(--status-warn);
+}
+
+/* 8px rhythm */
+.status-rail   { padding: 16px 24px; }
+.window-bar    { padding: 8px 24px; }
+.verdict-evidence { padding: 12px 24px; gap: 8px; }
+.header-zone   { padding: 16px 24px; }
+.section-band  { padding-top: 8px; padding-bottom: 8px; }
+
+/* Depth by surface step, not by rules. */
+.header-zone + .header-zone { border-left: 0; }
+.header-dashboard { gap: 1px; background: var(--line); }
+.header-zone { background: var(--bg); }
+.status-rail { background: var(--surface); border-bottom: 0; }
+
+/* Status channel applied to the verdict. */
+.system-conclusion.ok    .status-dot { background: var(--status-ok); }
+.system-conclusion.ok    .status-dot::after { color: var(--status-ok); }
+.system-conclusion.watch .status-dot { background: var(--status-warn); }
+.system-conclusion.watch .status-dot::after { color: var(--status-warn); }
+.system-conclusion.bad   .status-dot { background: var(--status-fail); }
+.system-conclusion.bad   .status-dot::after { color: var(--status-fail); }
+
+.status-rail:has(.system-conclusion.watch) { background: #1c1710; box-shadow: inset 3px 0 0 var(--status-warn); }
+.status-rail:has(.system-conclusion.bad)   { background: #1e1113; box-shadow: inset 3px 0 0 var(--status-fail); }
+
+.verdict-evidence.has-open      { background: #1a0f11; border-left-color: var(--status-fail); }
+.verdict-evidence.all-recovered { background: #191509; border-left-color: var(--status-warn); }
+.has-open .evidence-shape       { background: var(--status-fail); }
+.all-recovered .evidence-shape  { background: var(--status-warn); }
+.evidence-group > b.open        { background: var(--status-fail); color: #26060a; }
+.evidence-group > b.recovered   { background: var(--status-warn); color: #241a05; }
+
+/* Figures stay monospace and tabular; only their colour steps back. */
+.equity-line > b { font-weight: 600; letter-spacing: -.01em; }
+.zone-title { color: #6f8093; letter-spacing: .1em; }
