@@ -42,6 +42,36 @@
     return value !== null && value !== undefined && value !== '';
   }
 
+  // A number, or nothing — never a 0 standing in for a figure that was not there.
+  //
+  // `Number(x || 0)` is the shape this page kept getting caught by: null becomes 0, 0
+  // is inside every tolerance and under every ceiling, and a metric nobody could read
+  // renders as a metric that passed. It appeared 21 times, and the tell that it was
+  // oversight rather than intent is inside a single function — fillMetricCards writes
+  // `spec.min_fills ?? Infinity` for one check, which fails closed on purpose, and
+  // then `Number(m.partial_rate || 0) <= Number(spec.max_partial_rate ?? 0)` for the
+  // next three, which pass when both sides are absent.
+  function num(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // Is the measurement inside its limit? THREE answers, because there are three: yes,
+  // no, and "one of the two is missing, so the question was never asked". Callers must
+  // handle null; that is the point of returning it rather than a convenient false.
+  function withinLimit(value, limit, compare = (v, l) => v <= l) {
+    const v = num(value);
+    const l = num(limit);
+    return v === null || l === null ? null : compare(v, l);
+  }
+
+  // Ba trạng thái đó, dịch sang thứ thẻ metric cần: màu và nhãn.
+  function limitRead(ok, passLabel = 'PASS', failLabel = 'BREACH') {
+    if (ok === null) return { cls: 'watch', status: 'CHECK' };
+    return ok ? { cls: 'ok', status: passLabel } : { cls: 'bad', status: failLabel };
+  }
+
   function metricValue(value, missing = 'missing') {
     return hasValue(value) ? value : missing;
   }
@@ -1499,7 +1529,10 @@
     const ledger = ledgerAlignment(pl);
     const verdict = pfRecon.cls === 'bad' || (ledger.known && !ledger.ok) ? 'BREACH'
       : reconcileUnmeasured(pfRecon) || !ledger.known ? 'CHECK'
-      : Math.abs(Number(pl.paper_minus_backtest_realized || 0)) > 0.005 ? 'EXPLAINED' : 'PASS';
+      // Same shape one more time: a missing variance became 0, 0 is inside tolerance,
+      // and "we could not read it" printed as "the totals agree".
+      : num(pl.paper_minus_backtest_realized) === null ? 'CHECK'
+      : Math.abs(num(pl.paper_minus_backtest_realized)) > 0.005 ? 'EXPLAINED' : 'PASS';
     const summary = verdict === 'CHECK'
       ? 'A figure the headline check needs is unreadable, so the totals were not compared. This is neither a pass nor a breach.'
       : verdict === 'PASS'
@@ -1806,19 +1839,25 @@
     const spec = m.spec || {};
     const partialRate = m.partial_rate == null ? '--' : Number(m.partial_rate).toFixed(4);
     const fillsOk = (m.fills ?? 0) >= (spec.min_fills ?? Infinity);
-    const partialOk = Number(m.partial_rate || 0) <= Number(spec.max_partial_rate ?? 0);
-    const failedOk = (m.failed_or_cancelled ?? 0) <= (spec.max_failed_or_cancelled ?? 0);
+    // Three of the four below used to read a missing metric or a missing spec as 0 and
+    // pass. The one above already refused to, with `?? Infinity` — same function, same
+    // shape, opposite answer, which is what makes it a slip rather than a choice.
+    const partialOk = withinLimit(m.partial_rate, spec.max_partial_rate);
+    const failedOk = withinLimit(m.failed_or_cancelled, spec.max_failed_or_cancelled);
     const malformedOk = (m.malformed_trade_log_lines ?? 0) === 0;
     const missingOk = (m.missing_required_field_rows ?? 0) === 0;
-    const scaleOk = Number(m.max_contracts_observed || 0) <= Number(m.max_contracts_tested || 0);
+    const scaleOk = withinLimit(m.max_contracts_observed, m.max_contracts_tested);
+    const partialR = limitRead(partialOk);
+    const failedR = limitRead(failedOk);
+    const scaleR = limitRead(scaleOk, 'PASS', 'RETEST');
     return `<div class="detail-metric-grid">${[
       metricCard('Fills', `${m.fills ?? 0} / ${spec.min_fills ?? '--'}`, 'Count of OPEN/CLOSE fill records in the active paper epoch.', fillsOk ? 'ok' : 'watch', fillsOk ? 'PASS' : 'PENDING', `min ${spec.min_fills ?? '--'}`, detailProgress(m.fills, spec.min_fills)),
-      metricCard('Partial rate', partialRate, 'partials / fills; with current quantity=1 this mostly proves single-contract behavior only.', partialOk ? 'ok' : 'bad', partialOk ? 'PASS' : 'BREACH', `max ${spec.max_partial_rate ?? '--'}`),
-      metricCard('Failed/cancelled', m.failed_or_cancelled ?? 0, 'Fill records whose status is not FILLED/PARTIAL/blank.', failedOk ? 'ok' : 'bad', failedOk ? 'PASS' : 'BREACH', `max ${spec.max_failed_or_cancelled ?? '--'}`),
+      metricCard('Partial rate', partialRate, 'partials / fills; with current quantity=1 this mostly proves single-contract behavior only.', partialR.cls, partialR.status, `max ${spec.max_partial_rate ?? '--'}`),
+      metricCard('Failed/cancelled', m.failed_or_cancelled ?? '--', 'Fill records whose status is not FILLED/PARTIAL/blank.', failedR.cls, failedR.status, `max ${spec.max_failed_or_cancelled ?? '--'}`),
       metricCard('Completeness', m.missing_required_field_rows ?? 0, 'Rows missing fields needed for later audit, including identity, size, fill price, timestamp, and exit P&L for CLOSE rows.', missingOk ? 'ok' : 'bad', missingOk ? 'PASS' : 'BREACH', spec.require_complete_fields ? 'required' : 'not required'),
       metricCard('Partials', m.partials ?? 0, 'Records where filled_qty is lower than requested contracts.', (m.partials ?? 0) ? 'bad' : 'ok', (m.partials ?? 0) ? 'BREACH' : 'PASS', 'must be 0'),
       metricCard('Malformed lines', m.malformed_trade_log_lines ?? 0, 'JSONL lines that could not be parsed as retained fill history.', malformedOk ? 'ok' : 'bad', malformedOk ? 'PASS' : 'BREACH', 'must be 0'),
-      metricCard('Max contracts', m.max_contracts_observed ?? '--', 'Largest contracts value seen in the paper-epoch fill records.', scaleOk ? 'ok' : 'watch', scaleOk ? 'PASS' : 'RETEST', `tested ${m.max_contracts_tested ?? '--'}`, detailProgress(m.max_contracts_observed ?? 0, m.max_contracts_tested ?? 0)),
+      metricCard('Max contracts', m.max_contracts_observed ?? '--', 'Largest contracts value seen in the paper-epoch fill records.', scaleR.cls, scaleR.status, `tested ${m.max_contracts_tested ?? '--'}`, detailProgress(m.max_contracts_observed ?? 0, m.max_contracts_tested ?? 0)),
       metricCard('Retest scale', m.retest_when_contracts_gt ?? '--', 'Retest fill quality before scaling above the largest contracts value covered by paper trade history.', 'watch', 'WATCH', `when > ${m.retest_when_contracts_gt ?? '--'}`),
     ].join('')}</div>`;
   }
@@ -1926,7 +1965,8 @@
   function rejectionMetricCards(m) {
     const required = m.required_records ?? '--';
     const completeOk = !(m.missing_identity || m.missing_reason);
-    const classifiedOk = Number(m.unclassified || 0) <= Number(m.max_unclassified ?? 0);
+    const classifiedOk = withinLimit(m.unclassified, m.max_unclassified);
+    const classifiedR = limitRead(classifiedOk);
     const sampleOk = Number(m.rejections || 0) >= Number(m.required_records ?? Infinity);
     const capOk = (m.cap_blocks ?? 0) > 0 || !m.require_cap_classification;
     return `<div class="detail-metric-grid">${[
@@ -1934,7 +1974,7 @@
       metricCard('Parsed rows', `${m.parsed ?? 0} / ${m.rejections ?? 0}`, m.metric_descriptions?.parsed || 'Rows parsed into candidate identity, risk size, and reason.', (m.parsed ?? 0) === (m.rejections ?? 0) ? 'ok' : 'watch', (m.parsed ?? 0) === (m.rejections ?? 0) ? 'PASS' : 'CHECK', 'structured', detailProgress(m.parsed, m.rejections)),
       metricCard('Cap blocks', m.cap_blocks ?? 0, m.metric_descriptions?.cap_blocks || 'Rows classified as gross/net/risk cap blocks.', capOk ? 'ok' : 'bad', capOk ? 'PASS' : 'BREACH', 'required'),
       metricCard('Completeness', (m.missing_identity || m.missing_reason) ? `${m.missing_identity ?? 0} / ${m.missing_reason ?? 0}` : 0, 'Missing identity / missing reason rows. Both must be zero when required.', completeOk ? 'ok' : 'bad', completeOk ? 'PASS' : 'BREACH', 'identity/reason'),
-      metricCard('Unclassified', m.unclassified ?? 0, m.metric_descriptions?.unclassified || 'Rows whose reason could not be mapped to a guard class.', classifiedOk ? 'ok' : 'bad', classifiedOk ? 'PASS' : 'BREACH', `max ${m.max_unclassified ?? '--'}`),
+      metricCard('Unclassified', m.unclassified ?? '--', m.metric_descriptions?.unclassified || 'Rows whose reason could not be mapped to a guard class.', classifiedR.cls, classifiedR.status, `max ${m.max_unclassified ?? '--'}`),
       metricCard('Clusters', Object.keys(m.by_cluster || {}).length, 'Number of clusters represented by rejected candidate evidence.', '', 'OBSERVED', 'context'),
     ].join('')}</div>`;
   }
