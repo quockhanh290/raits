@@ -111,3 +111,61 @@ Select-String -Path "d:\raits\global_index\*.py","d:\raits\futures\*.py" `
 ```
 
 Kết quả verify: CLEAN — chỉ `_archive/` files reference các scripts đã moved.
+
+---
+
+## 2026-08-29 — Stage 5ZZZ-Y — Track 1 scratch backlog
+
+**Đích:** `_archive/scratch/track1_2026-08-29/<đường dẫn tương đối gốc>`
+**Số file chuyển:** 341 · **trả về chỗ cũ sau khi kiểm tham chiếu:** 38 · **xoá: 0**
+
+**Nguồn kế hoạch:** `scratch/track1_stage5zzzw_untracked_archive_plan_20260829.json`
+**Manifest đầy đủ (đường dẫn cũ/mới + sha256 từng file):**
+`_archive/scratch/track1_2026-08-29/ARCHIVE_MOVE_MANIFEST_5ZZZY_20260829.json`
+**Báo cáo:** `scratch/track1_stage5zzzy_apply_untracked_archive_20260829.md`
+
+### Nguồn gốc source được commit TRƯỚC khi chuyển
+
+Toàn bộ source của tuyến Track 1 **chưa từng được commit** — `git log --all` rỗng cho
+`global_index/track1_*.py`. Stage 5ZZZ-X đã commit trước ở
+**`22f6086137519b547e41ba1612f724fad4157ff3`** (163 file: 46 source, 113 test, 3 tài liệu
+chuẩn, 1 hồ sơ quyết định). Chỉ sau đó mới chuyển kho — để nếu một lần chuyển làm hỏng thứ gì,
+git còn nói được cái gì đã đổi.
+
+### Chính sách
+
+| Giữ nguyên | Lý do |
+|---|---|
+| `docs/futures/TRACK1_BASELINE_INDEX/HISTORY/RUNTIME_PIPELINE` | tài liệu chuẩn |
+| `track1_go_live_confirmation.json` | gitignore — **file ARM tuyến**, checkout không được tạo ra nó |
+| `track1_swing_paper_override.json` | hồ sơ quyết định, tuyến ĐỌC lúc chạy; đã tracked ở 5ZZZ-X |
+| `global_index/track1_runtime/**`, `track1_b1/*.jsonl` | bằng chứng runtime |
+| toàn bộ test đang chạy và source | 0 file bị chuyển |
+
+Đã chuyển: 244 stage report · 66 supporting proof · 13 research · 12 rejected research ·
+6 generated temp.
+
+### Bài học: quét import phải lấy **cả đường dẫn chấm**, không chỉ gói cấp một
+
+Lượt chuyển đầu làm **hỏng 3 test** (collection từ 2 lỗi nền lên 5). Nguyên nhân: bộ dò import
+lấy `m.split(".")[0]`, nên `from scratch.track1_foo import bar` bị ghi thành import của
+`scratch` — **tên module thật bị vứt đi**. Quét lại bằng mọi đoạn của đường dẫn chấm cộng mọi
+tên file xuất hiện trong chuỗi ký tự: **38 file vẫn còn được tham chiếu**, đã trả về chỗ cũ,
+hash khớp 38/38. Collection trở lại đúng nền **2 lỗi** (`test_raits_vs_hold`,
+`test_orb_integration` — cả hai có từ trước, do một lần archive cũ **không ghi log**).
+
+Đây chính là lý do mục này tồn tại. Một lần chuyển không ghi log đã làm hỏng một test và nó
+hỏng cho tới hôm nay.
+
+### Kiểm chứng sau khi chuyển
+
+```text
+file thiếu ở đích            0        hash lệch                    0
+đường dẫn cũ còn sót         0        xoá                          0
+test bị chuyển               0        source bị chuyển             0
+bằng chứng runtime bị chuyển 0        hồ sơ quyết định bị chuyển   0
+tài liệu chuẩn bị chuyển     0        link tài liệu chuẩn hỏng     0
+pytest --collect-only        4.418 test, 2 lỗi (đúng bằng nền)
+```
+
+`orders_possible` vẫn `False`, chặn bởi `PAPER_SHADOW_EVIDENCE`. Không đụng scheduler/backend.

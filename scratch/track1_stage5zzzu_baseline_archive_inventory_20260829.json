@@ -1,0 +1,4176 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-U",
+ "title": "Track 1 baseline archive and canonical index",
+ "route": "track1_candidate",
+ "date": "2026-08-29",
+ "index_file": "docs/futures/TRACK1_BASELINE_INDEX_2026-08-29.md",
+ "inventory": {
+  "files_inventoried": 558,
+  "counts": {
+   "SUPPORTING_PROOF": 381,
+   "DECISION_RECORD": 15,
+   "REFERENCE_ONLY": 24,
+   "REJECTED_RESEARCH": 12,
+   "RESEARCH_ONLY": 15,
+   "CANONICAL": 2,
+   "TEST_ARTIFACT": 109
+  },
+  "patterns_searched": [
+   "docs/futures/*",
+   "scratch/track1_stage*",
+   "scratch/*baseline*",
+   "scratch/*handoff*",
+   "scratch/*wfo*",
+   "scratch/*proxy*",
+   "scratch/*canonical*",
+   "scratch/*decision*",
+   "scratch/test_track1_*.py",
+   "scratch/normal_promotion_trades_*.json",
+   "scratch/*.params.json"
+  ],
+  "nothing_deleted_moved_or_renamed": true,
+  "old_reports_rewritten": 0,
+  "approach": "an index and a manifest instead of editing history - the brief's preference, and it keeps every original readable as written"
+ },
+ "verification_of_the_brief": {
+  "why": "the brief hands over the numbers to publish. It is a hand-off, not a source. Publishing a retyped figure into the file everyone quotes from is exactly how a wrong number becomes canonical",
+  "headline_numbers_checked": 36,
+  "headline_numbers_matched": 36,
+  "method": "compared field by field against the Stage 5ZZZ-N artifact on disk",
+  "discrepancy_found": {
+   "what": "the brief labels +18,429 / +3,906 / -464 'Swing contribution'. Those are the Swing CLUSTER P&L (pnl_by_cluster.roska4_swing), not the marginal contribution",
+   "marginal_vs_no_swing_control": {
+    "floor": 17382.31,
+    "vault2025": 3803.57,
+    "vault2026": -625.96
+   },
+   "cluster_pnl": {
+    "floor": 18428.52,
+    "vault2025": 3905.85,
+    "vault2026": -464.47
+   },
+   "no_swing_control": {
+    "floor": 49414,
+    "vault2025": 12377,
+    "vault2026": 8731
+   },
+   "why_it_matters": "they answer different questions and differ by ~$1,000 on the floor. The 2026 figure is negative on both and WORSE on the marginal one (-626 against -464), which is the one that answers 'what does Swing add?'",
+   "resolution": "the index publishes BOTH, labelled, side by side"
+  },
+  "arithmetic_self_check": "the four cluster P&Ls sum exactly to the full-stack net in all three windows"
+ },
+ "canonical_to_quote": [
+  {
+   "path": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+   "holds": "Part A reference and Part B live-tradable selected, reproduced from code"
+  },
+  {
+   "path": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.md",
+   "holds": "the same in prose"
+  },
+  {
+   "path": "track1_swing_paper_override.json",
+   "holds": "the signed paper-scope decision; grants nothing"
+  },
+  {
+   "path": "track1_go_live_confirmation.json",
+   "holds": "legacy retirement only; carries NO order-approval field"
+  },
+  {
+   "path": "docs/futures/TRACK1_BASELINE_INDEX_2026-08-29.md",
+   "holds": "the reconciliation of all of the above - the file to quote"
+  }
+ ],
+ "high_risk_files_named": [
+  {
+   "path": "scratch/track1_stage5zzzh_full_candidate_swing_d1_remeasure_20260829.md",
+   "status": "REFERENCE_ONLY",
+   "replacement": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+   "why_not_quote_directly": "contains the same-day variant alongside D-1. The same-day column needs the 16:00 close and cannot exist during the 14:05-15:55 Swing window, so it is not tradable"
+  },
+  {
+   "path": "scratch/track1_stage5zzzi_swing_d1_wfo_retune_20260829.md",
+   "status": "RESEARCH_ONLY",
+   "replacement": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+   "why_not_quote_directly": "narrow D-1 retune (ema=10). Measured, NOT promoted - quoting it as a baseline would publish a parameter the route does not run"
+  },
+  {
+   "path": "scratch/track1_stage5zzzl_swing_full_wfo_causal_d1_20260829.md",
+   "status": "RESEARCH_ONLY",
+   "replacement": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+   "why_not_quote_directly": "full D-1 grid. Its winner was NOT promoted, and its apparatus concern was resolved by Stage 5ZZZ-M"
+  },
+  {
+   "path": "scratch/track1_stage5zzzj_swing_intraday_spy_proxy_20260829.md",
+   "status": "REJECTED_RESEARCH",
+   "replacement": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+   "why_not_quote_directly": "SPY intraday regime proxy - research only, not selected for paper"
+  },
+  {
+   "path": "scratch/track1_stage5zzzk_es_intraday_proxy_label_recovery_20260829.md",
+   "status": "REJECTED_RESEARCH",
+   "replacement": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+   "why_not_quote_directly": "ES intraday proxy label-recovery test - not a trading backtest, nothing promoted"
+  },
+  {
+   "path": "scratch/track1_stage5zzzm_swing_artifact_param_obedience_20260829.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+   "why_not_quote_directly": "root cause of the ema 30->50 substitution. Explains WHY the selected identity is 'old/effective ema=50'; not itself a baseline"
+  }
+ ],
+ "superseded_classes": {
+  "pre_B1_blocker_lists": "SUPERSEDED - B1 was signed 2026-08-27; suites written before that date still assert the confirmation file does not exist",
+  "stale_slot_count_docs": "SUPERSEDED - the Track 1 slot table is 71, and older documents and tests still say 70",
+  "stage_5ZZZ_L_apparatus_concern": "SUPERSEDED by Stage 5ZZZ-M, which found the cause was an unrecorded ema 30->50 substitution in the regeneration wrapper",
+  "old_dashboard_wording_docs": "SUPERSEDED by Stages 5ZZZ-F and 5ZZZ-S, which changed the market-view contract and the panel states",
+  "same_day_swing_reports": "REFERENCE_ONLY - real numbers, not attainable, because the label needs a close that has not happened at decide time",
+  "spy_and_es_proxies": "REJECTED_RESEARCH - measured, not selected",
+  "stage_5ZZZ_I_retune": "RESEARCH_ONLY - ema=10, not promoted"
+ },
+ "baseline_summary": {
+  "historical_reference_not_live_tradable": {
+   "full_stack": {
+    "floor": 74410,
+    "vault2025": 16997,
+    "vault2026": 9288
+   },
+   "risk_clean": {
+    "floor": 64903,
+    "vault2025": 13236,
+    "vault2026": 8260
+   }
+  },
+  "selected_paper_live_tradable": {
+   "full_stack": {
+    "floor": 66796,
+    "vault2025": 16181,
+    "vault2026": 8105
+   },
+   "risk_clean": {
+    "floor": 57289,
+    "vault2025": 12419,
+    "vault2026": 7077
+   }
+  },
+  "swing_cluster_pnl": {
+   "floor": 18429,
+   "vault2025": 3906,
+   "vault2026": -464
+  },
+  "swing_marginal": {
+   "floor": 17382,
+   "vault2025": 3804,
+   "vault2026": -626
+  }
+ },
+ "paper_scope": {
+  "schema": "track1_swing_paper_override/1",
+  "route": "track1_candidate",
+  "sleeves": {
+   "global_nkd": {
+    "in_scope": true,
+    "basis": "in_scope_by_route_design",
+    "evidence": "pending"
+   },
+   "roska4_stress": {
+    "in_scope": true,
+    "basis": "in_scope_by_route_design",
+    "evidence": "pending"
+   },
+   "roska4_calm": {
+    "in_scope": true,
+    "basis": "in_scope_by_route_design",
+    "evidence": "pending"
+   },
+   "roska4_swing": {
+    "in_scope": true,
+    "basis": "operator_override",
+    "risk_accepted": true,
+    "evidence_promoted": false,
+    "parameter_promoted": false,
+    "identity": "D1_OLD_EFFECTIVE_EMA50",
+    "regime_basis": "causal_d1",
+    "override_valid": true,
+    "override_reason": "",
+    "caveats": [
+     "same-day Swing not live-tradable",
+     "Swing 2026 contribution negative",
+     "no-Swing risk-adjusted OOS better",
+     "no bootstrap yet"
+    ],
+    "evidence": "pending"
+   }
+  },
+  "grants_orders": false,
+  "satisfies_shadow_evidence": false,
+  "note": "Paper SCOPE only. No entry here releases a gate, satisfies PAPER_SHADOW_EVIDENCE, or promotes a parameter."
+ },
+ "remaining_blocker_before_paper": {
+  "id": "PAPER_SHADOW_EVIDENCE",
+  "requires": "5 judgeable days, 0 failing days allowed, complete Calm decision evidence",
+  "current_obstacle": "every day in the qualifying window was recorded BEFORE the Stage 5ZZZ-Q Swing fix, so the window cannot be entirely post-fix until five post-fix trading days have run",
+  "first_post_fix_swing_slot": "Monday 2026-08-31 14:05 ET"
+ },
+ "validation": {
+  "suite": "scratch/test_track1_stage5zzzu_baseline_index_20260829.py",
+  "checks": [
+   "index and inventory exist",
+   "every net and maxdd in the artifact appears in the index",
+   "BOTH swing cluster P&L and marginal figures are published",
+   "historical baseline marked reference-only and not live-tradable",
+   "selected baseline marked live-tradable and operator-chosen",
+   "swing identity is causal D-1 old/effective ema=50",
+   "no parameter promotion",
+   "the index never says same-day Swing is tradable",
+   "the index never claims orders are possible",
+   "the remaining blocker is recorded",
+   "every classification is one of the ten allowed",
+   "every non-canonical row carries a why-not-quote reason",
+   "every file the index points at actually exists"
+  ],
+  "numbers_checked_against_the_artifact_not_pinned_as_literals": true
+ },
+ "safety": {
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "orders_sent": 0,
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "confirmation_present": true,
+  "confirmation_untouched": true,
+  "swing_override_present_and_valid": true,
+  "swing_override_grants": "nothing",
+  "broker_calls": 0,
+  "scheduler_restarted": false,
+  "backend_restarted": false,
+  "files_deleted": 0,
+  "files_moved": 0,
+  "files_renamed": 0,
+  "runtime_trading_files_touched": 0,
+  "strategy_logic_changed": false,
+  "params_changed": false,
+  "gates_changed": false
+ },
+ "rows": [
+  {
+   "path": "docs/futures/ARCHIVE_LOG.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 7961
+  },
+  {
+   "path": "docs/futures/ASSUMPTIONS.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 3031
+  },
+  {
+   "path": "docs/futures/BUG_SWEEP_R2.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 12566
+  },
+  {
+   "path": "docs/futures/CALMAR_PROVENANCE.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 22241
+  },
+  {
+   "path": "docs/futures/CALM_OPENLOC_AUDIT_2026-08-21.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 12774
+  },
+  {
+   "path": "docs/futures/CALM_PCLOC_NOT_DEEP_GAP_AUDIT_2026-08-21.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 20235
+  },
+  {
+   "path": "docs/futures/CALM_PCLOC_NOT_DEEP_GAP_REPAIR_2026-08-21.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 3701
+  },
+  {
+   "path": "docs/futures/CALM_SLEEVE_AUDIT_2026-08-21.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 41149
+  },
+  {
+   "path": "docs/futures/CALM_STRATEGY_EXCAVATION_PROMPT.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 3497
+  },
+  {
+   "path": "docs/futures/DAILY_FLOW.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 15202
+  },
+  {
+   "path": "docs/futures/DAILY_UPDATE_RUNBOOK.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 6275
+  },
+  {
+   "path": "docs/futures/DECISIONS.md",
+   "status": "DECISION_RECORD",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 20803
+  },
+  {
+   "path": "docs/futures/DRYRUN_SUNDAY.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 5508
+  },
+  {
+   "path": "docs/futures/GLOSSARY.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 18579
+  },
+  {
+   "path": "docs/futures/IBKR_FLEX_SETUP.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 7416
+  },
+  {
+   "path": "docs/futures/IBKR_TODO.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 6941
+  },
+  {
+   "path": "docs/futures/INVARIANTS.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 10351
+  },
+  {
+   "path": "docs/futures/ISSUES_LOG.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 45386
+  },
+  {
+   "path": "docs/futures/LESSONS.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 19526
+  },
+  {
+   "path": "docs/futures/LIVE_RUNNER_AUDIT.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 12481
+  },
+  {
+   "path": "docs/futures/NORMAL_STRESS_CALM_HANDOFF_2026-08-22.md",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "hand-off note; superseded by later stage reports",
+   "bytes": 53327
+  },
+  {
+   "path": "docs/futures/NORMAL_STRESS_CANDIDATES_2026-08-22.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 55837
+  },
+  {
+   "path": "docs/futures/OOS_VALIDATION_LOG.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 9565
+  },
+  {
+   "path": "docs/futures/OPEN_QUESTIONS.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 14096
+  },
+  {
+   "path": "docs/futures/OPERATIONS.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 52339
+  },
+  {
+   "path": "docs/futures/PAPER_DASHBOARD_INPUT_VERIFY_PLAN.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 21696
+  },
+  {
+   "path": "docs/futures/PAPER_INPUT_REVIEW_WORKSHEET.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 7988
+  },
+  {
+   "path": "docs/futures/PAPER_ROUTE.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 14292
+  },
+  {
+   "path": "docs/futures/PIPELINE_FLOW.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 15277
+  },
+  {
+   "path": "docs/futures/REALTIME_DASHBOARD_FIX_PLAN.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 105655
+  },
+  {
+   "path": "docs/futures/RUNNER_AUDIT.html",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 21426
+  },
+  {
+   "path": "docs/futures/SCALING_ANALYSIS.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 7448
+  },
+  {
+   "path": "docs/futures/SCALING_PLAN.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 2542
+  },
+  {
+   "path": "docs/futures/SCRIPT_INVENTORY.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 12538
+  },
+  {
+   "path": "docs/futures/STATUS.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 7921
+  },
+  {
+   "path": "docs/futures/SYSTEM_EXPLORER.html",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 230875
+  },
+  {
+   "path": "docs/futures/SYSTEM_MODEL.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 22813
+  },
+  {
+   "path": "docs/futures/TF_REGIME_RESEARCH_2026-08-20.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 334028
+  },
+  {
+   "path": "docs/futures/TRACK1_RUNTIME_PIPELINE_2026-08-24.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 490145
+  },
+  {
+   "path": "docs/futures/TRACK1_SHADOW_WINDOW_RUNBOOK.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 8944
+  },
+  {
+   "path": "docs/futures/TRACK1_SWITCHOVER_RUNBOOK.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 88951
+  },
+  {
+   "path": "docs/futures/VISUALIZE.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 34819
+  },
+  {
+   "path": "docs/futures/VPS_DEPLOY_PLAN.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 16025
+  },
+  {
+   "path": "scratch/track1_stage0_runtime_telemetry_readiness_20260822.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 3998
+  },
+  {
+   "path": "scratch/track1_stage0_runtime_telemetry_readiness_20260822.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 14089
+  },
+  {
+   "path": "scratch/track1_stage1_execute_prompt_20260822.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 6115
+  },
+  {
+   "path": "scratch/track1_stage1_execute_report_20260822.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8983
+  },
+  {
+   "path": "scratch/track1_stage2c_book_bootstrap_20260822.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 22406
+  },
+  {
+   "path": "scratch/track1_stage2c_breaker_mutation_1107_20260822.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 45769
+  },
+  {
+   "path": "scratch/track1_stage2c_breaker_mutation_20260822.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 39484
+  },
+  {
+   "path": "scratch/track1_stage2c_breaker_mutation_20260822.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 8344
+  },
+  {
+   "path": "scratch/track1_stage2c_breaker_mutation_intraday_20260822.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 40462
+  },
+  {
+   "path": "scratch/track1_stage2c_cluster_isolation_20260822.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 38606
+  },
+  {
+   "path": "scratch/track1_stage2d_full_production_route_audit_20260822.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 48035
+  },
+  {
+   "path": "scratch/track1_stage2d_full_production_route_audit_20260822.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 66656
+  },
+  {
+   "path": "scratch/track1_stage2_equivalence_bootstrap_report_20260822.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12808
+  },
+  {
+   "path": "scratch/track1_stage3b_close_blockers_20260822.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 18057
+  },
+  {
+   "path": "scratch/track1_stage3b_close_blockers_report_20260822.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 20397
+  },
+  {
+   "path": "scratch/track1_stage3_shadow_route_build_20260822.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 19914
+  },
+  {
+   "path": "scratch/track1_stage3_shadow_route_build_report_20260822.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 23859
+  },
+  {
+   "path": "scratch/track1_stage4b_identity_liveframe_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4813
+  },
+  {
+   "path": "scratch/track1_stage4b_identity_liveframe_report_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 16023
+  },
+  {
+   "path": "scratch/track1_stage4c_live_frame_adapter_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4618
+  },
+  {
+   "path": "scratch/track1_stage4c_live_frame_adapter_report_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 16458
+  },
+  {
+   "path": "scratch/track1_stage4_production_clean_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 16763
+  },
+  {
+   "path": "scratch/track1_stage4_production_clean_report_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 19334
+  },
+  {
+   "path": "scratch/track1_stage5aa_health_slots_only_report_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11550
+  },
+  {
+   "path": "scratch/track1_stage5ab_g1_source_mode_report_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9262
+  },
+  {
+   "path": "scratch/track1_stage5b_runbook_fix_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 5034
+  },
+  {
+   "path": "scratch/track1_stage5b_runbook_fix_report_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10011
+  },
+  {
+   "path": "scratch/track1_stage5c_shadow_readiness_probe_20260823.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 10087
+  },
+  {
+   "path": "scratch/track1_stage5c_shadow_start_readiness_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8758
+  },
+  {
+   "path": "scratch/track1_stage5c_shadow_start_readiness_report_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12786
+  },
+  {
+   "path": "scratch/track1_stage5d_shadow_live_wiring_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 3358
+  },
+  {
+   "path": "scratch/track1_stage5d_shadow_live_wiring_report_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8740
+  },
+  {
+   "path": "scratch/track1_stage5e_live_source_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4039
+  },
+  {
+   "path": "scratch/track1_stage5e_live_source_report_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9596
+  },
+  {
+   "path": "scratch/track1_stage5f_stress_equivalence_20260823.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 2741
+  },
+  {
+   "path": "scratch/track1_stage5f_stress_live_source_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4136
+  },
+  {
+   "path": "scratch/track1_stage5f_stress_live_source_report_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7538
+  },
+  {
+   "path": "scratch/track1_stage5g_live_frame_provider_gate_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4813
+  },
+  {
+   "path": "scratch/track1_stage5g_live_frame_provider_gate_report_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7728
+  },
+  {
+   "path": "scratch/track1_stage5h0_missed_surfaces_audit_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 6676
+  },
+  {
+   "path": "scratch/track1_stage5h0_missed_surfaces_audit_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10520
+  },
+  {
+   "path": "scratch/track1_stage5h_b1_shadow_preflight_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4230
+  },
+  {
+   "path": "scratch/track1_stage5h_b1_shadow_preflight_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9679
+  },
+  {
+   "path": "scratch/track1_stage5h_closeout_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4194
+  },
+  {
+   "path": "scratch/track1_stage5h_closeout_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7558
+  },
+  {
+   "path": "scratch/track1_stage5i_live_shadow_evidence_wiring_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4527
+  },
+  {
+   "path": "scratch/track1_stage5i_live_shadow_evidence_wiring_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8245
+  },
+  {
+   "path": "scratch/track1_stage5j_operator_shadow_start_runbook_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 5836
+  },
+  {
+   "path": "scratch/track1_stage5j_operator_shadow_start_runbook_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13433
+  },
+  {
+   "path": "scratch/track1_stage5k0_operational_paths_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7669
+  },
+  {
+   "path": "scratch/track1_stage5k0_operational_paths_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 6193
+  },
+  {
+   "path": "scratch/track1_stage5k_ops_startup_integration_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4597
+  },
+  {
+   "path": "scratch/track1_stage5k_ops_startup_integration_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7678
+  },
+  {
+   "path": "scratch/track1_stage5l_mutations_20260823.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 6085
+  },
+  {
+   "path": "scratch/track1_stage5l_shared_preflight_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10336
+  },
+  {
+   "path": "scratch/track1_stage5l_shared_preflight_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11890
+  },
+  {
+   "path": "scratch/track1_stage5m0_mutations_20260823.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 6749
+  },
+  {
+   "path": "scratch/track1_stage5m0_state_repair_20260823.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 9710
+  },
+  {
+   "path": "scratch/track1_stage5m0_state_repair_preflight_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8203
+  },
+  {
+   "path": "scratch/track1_stage5m0_state_repair_preflight_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11484
+  },
+  {
+   "path": "scratch/track1_stage5m1_fill_law_identity_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7565
+  },
+  {
+   "path": "scratch/track1_stage5m1_fill_law_identity_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10705
+  },
+  {
+   "path": "scratch/track1_stage5m1_mutations_20260823.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 6167
+  },
+  {
+   "path": "scratch/track1_stage5m_a_arm_fill_probe_20260823.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 4487
+  },
+  {
+   "path": "scratch/track1_stage5m_a_normal_r4_promotion_audit_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8334
+  },
+  {
+   "path": "scratch/track1_stage5m_a_normal_r4_promotion_audit_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11672
+  },
+  {
+   "path": "scratch/track1_stage5m_b_mutations_20260823.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 7763
+  },
+  {
+   "path": "scratch/track1_stage5m_b_normal_r4_shadow_slots_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9383
+  },
+  {
+   "path": "scratch/track1_stage5m_b_normal_r4_shadow_slots_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13045
+  },
+  {
+   "path": "scratch/track1_stage5m_c_mutations_20260823.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 6136
+  },
+  {
+   "path": "scratch/track1_stage5m_c_swing_provider_readiness_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7011
+  },
+  {
+   "path": "scratch/track1_stage5m_c_swing_provider_readiness_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9203
+  },
+  {
+   "path": "scratch/track1_stage5m_d_legacy_removable_probe_20260823.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 10210
+  },
+  {
+   "path": "scratch/track1_stage5m_d_mutations_20260823.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 7573
+  },
+  {
+   "path": "scratch/track1_stage5m_d_track1_only_shadow_mode_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8712
+  },
+  {
+   "path": "scratch/track1_stage5m_d_track1_only_shadow_mode_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9971
+  },
+  {
+   "path": "scratch/track1_stage5n_mutations_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 7995
+  },
+  {
+   "path": "scratch/track1_stage5n_nkd_track1_ownership_20260824.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7562
+  },
+  {
+   "path": "scratch/track1_stage5n_nkd_track1_ownership_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8465
+  },
+  {
+   "path": "scratch/track1_stage5o_mutations_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 8290
+  },
+  {
+   "path": "scratch/track1_stage5o_route_aware_safety_20260824.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7500
+  },
+  {
+   "path": "scratch/track1_stage5o_route_aware_safety_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7213
+  },
+  {
+   "path": "scratch/track1_stage5p_full_four_sleeve_shadow_readiness_20260824.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7570
+  },
+  {
+   "path": "scratch/track1_stage5p_full_four_sleeve_shadow_readiness_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8853
+  },
+  {
+   "path": "scratch/track1_stage5p_mutations_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 7826
+  },
+  {
+   "path": "scratch/track1_stage5p_operator_text_cleanup_20260824.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 5967
+  },
+  {
+   "path": "scratch/track1_stage5p_operator_text_cleanup_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 5949
+  },
+  {
+   "path": "scratch/track1_stage5q1_audit_semantics_report_20260824.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13591
+  },
+  {
+   "path": "scratch/track1_stage5q1_audit_semantics_report_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 20794
+  },
+  {
+   "path": "scratch/track1_stage5q1_mutations_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 13159
+  },
+  {
+   "path": "scratch/track1_stage5q2_explanation_integrity_report_20260824.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12887
+  },
+  {
+   "path": "scratch/track1_stage5q2_explanation_integrity_report_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 19753
+  },
+  {
+   "path": "scratch/track1_stage5q2_mutations_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 10737
+  },
+  {
+   "path": "scratch/track1_stage5q3_live_frame_splice_report_20260824.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11851
+  },
+  {
+   "path": "scratch/track1_stage5q3_live_frame_splice_report_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 16504
+  },
+  {
+   "path": "scratch/track1_stage5q3_mutations_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 10111
+  },
+  {
+   "path": "scratch/track1_stage5q4_mnq_overlap_audit_20260824.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 14343
+  },
+  {
+   "path": "scratch/track1_stage5q4_mnq_overlap_audit_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 18190
+  },
+  {
+   "path": "scratch/track1_stage5q4_mutations_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 8347
+  },
+  {
+   "path": "scratch/track1_stage5q4_probe_boundary_bars_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 5283
+  },
+  {
+   "path": "scratch/track1_stage5q4_probe_parquet_tail_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 4460
+  },
+  {
+   "path": "scratch/track1_stage5q4_repair_boundary_bar_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 13816
+  },
+  {
+   "path": "scratch/track1_stage5q5_freshness_boundary_fix_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 1477
+  },
+  {
+   "path": "scratch/track1_stage5q5_freshness_boundary_report_20260824.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11220
+  },
+  {
+   "path": "scratch/track1_stage5q5_freshness_boundary_report_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 18259
+  },
+  {
+   "path": "scratch/track1_stage5q5_mutations_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 11944
+  },
+  {
+   "path": "scratch/track1_stage5q6_operationalize_freshness_boundary_20260824.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11794
+  },
+  {
+   "path": "scratch/track1_stage5q6_operationalize_freshness_boundary_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 16501
+  },
+  {
+   "path": "scratch/track1_stage5q7_apply_boundary_restart_mnkd_identity_20260824.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 15970
+  },
+  {
+   "path": "scratch/track1_stage5q7_apply_boundary_restart_mnkd_identity_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 18976
+  },
+  {
+   "path": "scratch/track1_stage5q7_mnkd_identity_probe_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 9567
+  },
+  {
+   "path": "scratch/track1_stage5q7_mutations_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 6455
+  },
+  {
+   "path": "scratch/track1_stage5q8_raw_backtest_identity_audit_20260824.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 16425
+  },
+  {
+   "path": "scratch/track1_stage5q8_raw_backtest_identity_audit_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 17282
+  },
+  {
+   "path": "scratch/track1_stage5q9_identity_admission_closeout_20260824.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12281
+  },
+  {
+   "path": "scratch/track1_stage5q9_identity_admission_closeout_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13701
+  },
+  {
+   "path": "scratch/track1_stage5q9_sizing_basis_admission_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 13474
+  },
+  {
+   "path": "scratch/track1_stage5q_mutations_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 14192
+  },
+  {
+   "path": "scratch/track1_stage5q_post_window_audit_report_20260824.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 14194
+  },
+  {
+   "path": "scratch/track1_stage5q_post_window_audit_report_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 22581
+  },
+  {
+   "path": "scratch/track1_stage5r0_boundary_tail_closeout_20260824.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11457
+  },
+  {
+   "path": "scratch/track1_stage5r0_boundary_tail_closeout_20260824.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12463
+  },
+  {
+   "path": "scratch/track1_stage5r0_mutations_20260824.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 6706
+  },
+  {
+   "path": "scratch/track1_stage5r1_operational_repair_restart_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12167
+  },
+  {
+   "path": "scratch/track1_stage5r1_operational_repair_restart_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12927
+  },
+  {
+   "path": "scratch/track1_stage5s_paper_readiness_gate_audit_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11432
+  },
+  {
+   "path": "scratch/track1_stage5s_paper_readiness_gate_audit_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13872
+  },
+  {
+   "path": "scratch/track1_stage5t_paper_broker_path_audit_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12420
+  },
+  {
+   "path": "scratch/track1_stage5t_paper_broker_path_audit_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 15119
+  },
+  {
+   "path": "scratch/track1_stage5u_order_state_reconcile_design_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12202
+  },
+  {
+   "path": "scratch/track1_stage5u_order_state_reconcile_design_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13029
+  },
+  {
+   "path": "scratch/track1_stage5v1_intraday_causality_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8034
+  },
+  {
+   "path": "scratch/track1_stage5v1_intraday_causality_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9633
+  },
+  {
+   "path": "scratch/track1_stage5v1_mutations_20260825.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 6120
+  },
+  {
+   "path": "scratch/track1_stage5v_mutations_20260825.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 7661
+  },
+  {
+   "path": "scratch/track1_stage5v_order_journal_writer_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9564
+  },
+  {
+   "path": "scratch/track1_stage5v_order_journal_writer_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9127
+  },
+  {
+   "path": "scratch/track1_stage5w_mutations_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 3569
+  },
+  {
+   "path": "scratch/track1_stage5w_mutations_20260825.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 17179
+  },
+  {
+   "path": "scratch/track1_stage5w_paper_executor_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4200
+  },
+  {
+   "path": "scratch/track1_stage5w_paper_executor_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 17130
+  },
+  {
+   "path": "scratch/track1_stage5x_broker_readside_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 5137
+  },
+  {
+   "path": "scratch/track1_stage5x_broker_readside_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 14700
+  },
+  {
+   "path": "scratch/track1_stage5x_mutations_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4030
+  },
+  {
+   "path": "scratch/track1_stage5x_mutations_20260825.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 13834
+  },
+  {
+   "path": "scratch/track1_stage5y_mutations_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4738
+  },
+  {
+   "path": "scratch/track1_stage5y_mutations_20260825.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 18967
+  },
+  {
+   "path": "scratch/track1_stage5y_order_id_writepath_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 5259
+  },
+  {
+   "path": "scratch/track1_stage5y_order_id_writepath_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 15063
+  },
+  {
+   "path": "scratch/track1_stage5za_causal_slot_audit_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 1512
+  },
+  {
+   "path": "scratch/track1_stage5za_causal_slot_audit_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 3036
+  },
+  {
+   "path": "scratch/track1_stage5zb_mutations_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4818
+  },
+  {
+   "path": "scratch/track1_stage5zb_mutations_20260825.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 14225
+  },
+  {
+   "path": "scratch/track1_stage5zb_operational_audit_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7172
+  },
+  {
+   "path": "scratch/track1_stage5zb_operational_audit_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12353
+  },
+  {
+   "path": "scratch/track1_stage5zc_post_window_runtime_check_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10050
+  },
+  {
+   "path": "scratch/track1_stage5zc_post_window_runtime_check_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12904
+  },
+  {
+   "path": "scratch/track1_stage5zd_mutations_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 6243
+  },
+  {
+   "path": "scratch/track1_stage5zd_mutations_20260825.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 18764
+  },
+  {
+   "path": "scratch/track1_stage5zd_signal_diagnostics_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8005
+  },
+  {
+   "path": "scratch/track1_stage5zd_signal_diagnostics_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12724
+  },
+  {
+   "path": "scratch/track1_stage5ze_job_view_operator_diagnostics_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8906
+  },
+  {
+   "path": "scratch/track1_stage5ze_job_view_operator_diagnostics_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12603
+  },
+  {
+   "path": "scratch/track1_stage5ze_mutations_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 5113
+  },
+  {
+   "path": "scratch/track1_stage5ze_mutations_20260825.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 16650
+  },
+  {
+   "path": "scratch/track1_stage5zf_ops_report_completeness_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12290
+  },
+  {
+   "path": "scratch/track1_stage5zf_ops_report_completeness_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13343
+  },
+  {
+   "path": "scratch/track1_stage5zg_mutations_20260825.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 14110
+  },
+  {
+   "path": "scratch/track1_stage5zg_route_aware_safety_reporting_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12097
+  },
+  {
+   "path": "scratch/track1_stage5zg_route_aware_safety_reporting_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 15109
+  },
+  {
+   "path": "scratch/track1_stage5zh_mutations_20260825.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 8729
+  },
+  {
+   "path": "scratch/track1_stage5zh_quiet_checkpoint_audit_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 14229
+  },
+  {
+   "path": "scratch/track1_stage5zh_quiet_checkpoint_audit_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 16295
+  },
+  {
+   "path": "scratch/track1_stage5zi_prepaper_errorproofing_map_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 39258
+  },
+  {
+   "path": "scratch/track1_stage5zi_prepaper_errorproofing_map_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 26653
+  },
+  {
+   "path": "scratch/track1_stage5zj_make_5zg_live_20260826.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 14382
+  },
+  {
+   "path": "scratch/track1_stage5zj_make_5zg_live_20260826.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13141
+  },
+  {
+   "path": "scratch/track1_stage5zk_checkpoint_frames_resume_20260826.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 16901
+  },
+  {
+   "path": "scratch/track1_stage5zk_checkpoint_frames_resume_20260826.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 16519
+  },
+  {
+   "path": "scratch/track1_stage5zl_regime_tristate_20260826.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 14828
+  },
+  {
+   "path": "scratch/track1_stage5zl_regime_tristate_20260826.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 16031
+  },
+  {
+   "path": "scratch/track1_stage5zm_route_aware_reporting_pnl_20260826.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12157
+  },
+  {
+   "path": "scratch/track1_stage5zm_route_aware_reporting_pnl_20260826.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13010
+  },
+  {
+   "path": "scratch/track1_stage5zn_planned_stop_executor_lifecycle_20260826.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11893
+  },
+  {
+   "path": "scratch/track1_stage5zn_planned_stop_executor_lifecycle_20260826.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 14370
+  },
+  {
+   "path": "scratch/track1_stage5zo_live_bar_pull_proof_20260826.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9953
+  },
+  {
+   "path": "scratch/track1_stage5zo_live_bar_pull_proof_20260826.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11874
+  },
+  {
+   "path": "scratch/track1_stage5zp_dashboard_diagnostics_polish_20260826.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9560
+  },
+  {
+   "path": "scratch/track1_stage5zp_dashboard_diagnostics_polish_20260826.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11178
+  },
+  {
+   "path": "scratch/track1_stage5zq_legacy_flat_b1_audit_20260826.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 14325
+  },
+  {
+   "path": "scratch/track1_stage5zq_legacy_flat_b1_audit_20260826.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 16885
+  },
+  {
+   "path": "scratch/track1_stage5zr_b1_operator_decision_20260826.json",
+   "status": "DECISION_RECORD",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 14333
+  },
+  {
+   "path": "scratch/track1_stage5zr_b1_operator_decision_20260826.md",
+   "status": "DECISION_RECORD",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 14934
+  },
+  {
+   "path": "scratch/track1_stage5zs_book_carry_forward_safety_isolation_20260826.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10687
+  },
+  {
+   "path": "scratch/track1_stage5zs_book_carry_forward_safety_isolation_20260826.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11436
+  },
+  {
+   "path": "scratch/track1_stage5zu_calm_timing_identity_20260826.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12883
+  },
+  {
+   "path": "scratch/track1_stage5zu_calm_timing_identity_20260826.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13943
+  },
+  {
+   "path": "scratch/track1_stage5zv_calm_shadow_paper_execution_identity_20260826.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13483
+  },
+  {
+   "path": "scratch/track1_stage5zv_calm_shadow_paper_execution_identity_20260826.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10899
+  },
+  {
+   "path": "scratch/track1_stage5zw_calm_prepaper_execution_plan_20260827.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8506
+  },
+  {
+   "path": "scratch/track1_stage5zw_calm_prepaper_execution_plan_20260827.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8415
+  },
+  {
+   "path": "scratch/track1_stage5zx_calm_shadow_intent_20260827.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11898
+  },
+  {
+   "path": "scratch/track1_stage5zx_calm_shadow_intent_20260827.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 15473
+  },
+  {
+   "path": "scratch/track1_stage5zy_pre_live_calm_phase_check_20260827.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13273
+  },
+  {
+   "path": "scratch/track1_stage5zy_pre_live_calm_phase_check_20260827.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 14467
+  },
+  {
+   "path": "scratch/track1_stage5zzb_spy_refresh_coverage_20260827.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12605
+  },
+  {
+   "path": "scratch/track1_stage5zzb_spy_refresh_coverage_20260827.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 16510
+  },
+  {
+   "path": "scratch/track1_stage5zzc_spy_refresh_retry_calm_watch_20260827.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9842
+  },
+  {
+   "path": "scratch/track1_stage5zzc_spy_refresh_retry_calm_watch_20260827.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11811
+  },
+  {
+   "path": "scratch/track1_stage5zzd_pre_nkd_spy_refresh_20260827.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7728
+  },
+  {
+   "path": "scratch/track1_stage5zzd_pre_nkd_spy_refresh_20260827.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9369
+  },
+  {
+   "path": "scratch/track1_stage5zze_paper_account_baseline_20260827.json",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 10107
+  },
+  {
+   "path": "scratch/track1_stage5zze_paper_account_baseline_20260827.md",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 11633
+  },
+  {
+   "path": "scratch/track1_stage5zzf_dashboard_source_hygiene_20260827.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8964
+  },
+  {
+   "path": "scratch/track1_stage5zzf_dashboard_source_hygiene_20260827.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9167
+  },
+  {
+   "path": "scratch/track1_stage5zzg_order_send_wire_20260827.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8183
+  },
+  {
+   "path": "scratch/track1_stage5zzg_order_send_wire_20260827.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9991
+  },
+  {
+   "path": "scratch/track1_stage5zzh_dashboard_hygiene_20260827.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12955
+  },
+  {
+   "path": "scratch/track1_stage5zzh_dashboard_hygiene_20260827.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13450
+  },
+  {
+   "path": "scratch/track1_stage5zzi_calm_live_bar_refusal_20260827.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8825
+  },
+  {
+   "path": "scratch/track1_stage5zzi_calm_live_bar_refusal_20260827.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11961
+  },
+  {
+   "path": "scratch/track1_stage5zzj_b1_operator_decision_20260827.json",
+   "status": "DECISION_RECORD",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 11797
+  },
+  {
+   "path": "scratch/track1_stage5zzj_b1_operator_decision_20260827.md",
+   "status": "DECISION_RECORD",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 11623
+  },
+  {
+   "path": "scratch/track1_stage5zzk_b1_confirmation_recognition_20260827.json",
+   "status": "DECISION_RECORD",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 11574
+  },
+  {
+   "path": "scratch/track1_stage5zzk_b1_confirmation_recognition_20260827.md",
+   "status": "DECISION_RECORD",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 12001
+  },
+  {
+   "path": "scratch/track1_stage5zzl_market_view_regime_monitor_20260827.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12216
+  },
+  {
+   "path": "scratch/track1_stage5zzl_market_view_regime_monitor_20260827.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13259
+  },
+  {
+   "path": "scratch/track1_stage5zzm_market_view_visual_polish_20260827.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10880
+  },
+  {
+   "path": "scratch/track1_stage5zzm_market_view_visual_polish_20260827.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11153
+  },
+  {
+   "path": "scratch/track1_stage5zzn_scheduler_mode_enforcement_20260827.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10538
+  },
+  {
+   "path": "scratch/track1_stage5zzn_scheduler_mode_enforcement_20260827.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11862
+  },
+  {
+   "path": "scratch/track1_stage5zzo_backend_restart_guard_20260827.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8492
+  },
+  {
+   "path": "scratch/track1_stage5zzo_backend_restart_guard_20260827.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7627
+  },
+  {
+   "path": "scratch/track1_stage5zzp_strategy_levels_regime_metrics_20260828.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10269
+  },
+  {
+   "path": "scratch/track1_stage5zzp_strategy_levels_regime_metrics_20260828.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10066
+  },
+  {
+   "path": "scratch/track1_stage5zzq_setup_boundaries_hmm_explain_20260828.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9745
+  },
+  {
+   "path": "scratch/track1_stage5zzq_setup_boundaries_hmm_explain_20260828.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9543
+  },
+  {
+   "path": "scratch/track1_stage5zzr_mutations_20260828.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 5297
+  },
+  {
+   "path": "scratch/track1_stage5zzr_strategy_native_market_view_redesign_20260828.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9620
+  },
+  {
+   "path": "scratch/track1_stage5zzr_strategy_native_market_view_redesign_20260828.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10965
+  },
+  {
+   "path": "scratch/track1_stage5zzs_mutations_20260828.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 12350
+  },
+  {
+   "path": "scratch/track1_stage5zzs_post_b1_ops_invariants_20260828.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11288
+  },
+  {
+   "path": "scratch/track1_stage5zzs_post_b1_ops_invariants_20260828.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11002
+  },
+  {
+   "path": "scratch/track1_stage5zzt_mutations_20260828.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 7069
+  },
+  {
+   "path": "scratch/track1_stage5zzt_schedule_mirror_spy_ladder_20260828.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9659
+  },
+  {
+   "path": "scratch/track1_stage5zzt_schedule_mirror_spy_ladder_20260828.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8745
+  },
+  {
+   "path": "scratch/track1_stage5zzu_mutations_20260828.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 9365
+  },
+  {
+   "path": "scratch/track1_stage5zzu_track1_recovery_stream_isolation_20260828.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11105
+  },
+  {
+   "path": "scratch/track1_stage5zzu_track1_recovery_stream_isolation_20260828.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11466
+  },
+  {
+   "path": "scratch/track1_stage5zzw_dashboard_track1_mode_hygiene_20260828.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10739
+  },
+  {
+   "path": "scratch/track1_stage5zzw_dashboard_track1_mode_hygiene_20260828.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10456
+  },
+  {
+   "path": "scratch/track1_stage5zzw_mutations_20260828.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 9457
+  },
+  {
+   "path": "scratch/track1_stage5zzx_backend_console_noise_hygiene_20260828.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7855
+  },
+  {
+   "path": "scratch/track1_stage5zzx_backend_console_noise_hygiene_20260828.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7475
+  },
+  {
+   "path": "scratch/track1_stage5zzx_mutations_20260828.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 6134
+  },
+  {
+   "path": "scratch/track1_stage5zzy_dashboard_poll_no_shell_20260828.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8568
+  },
+  {
+   "path": "scratch/track1_stage5zzy_dashboard_poll_no_shell_20260828.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7801
+  },
+  {
+   "path": "scratch/track1_stage5zzy_mutations_20260828.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 6761
+  },
+  {
+   "path": "scratch/track1_stage5zzzc_mutations_20260828.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 7687
+  },
+  {
+   "path": "scratch/track1_stage5zzzc_shadow_evidence_real_failures_20260828.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9374
+  },
+  {
+   "path": "scratch/track1_stage5zzzc_shadow_evidence_real_failures_20260828.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9472
+  },
+  {
+   "path": "scratch/track1_stage5zzze_calm_two_phase_diagnostics_20260828.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 6162
+  },
+  {
+   "path": "scratch/track1_stage5zzze_calm_two_phase_diagnostics_20260828.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9297
+  },
+  {
+   "path": "scratch/track1_stage5zzzf_market_view_ui_contract_cleanup_20260828.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9811
+  },
+  {
+   "path": "scratch/track1_stage5zzzf_market_view_ui_contract_cleanup_20260828.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13025
+  },
+  {
+   "path": "scratch/track1_stage5zzzg_swing_d1_regime_detector_consistency_20260828.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 6259
+  },
+  {
+   "path": "scratch/track1_stage5zzzg_swing_d1_regime_detector_consistency_20260828.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9185
+  },
+  {
+   "path": "scratch/track1_stage5zzzh_compare_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 12373
+  },
+  {
+   "path": "scratch/track1_stage5zzzh_compare_20260829.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 3995
+  },
+  {
+   "path": "scratch/track1_stage5zzzh_full_candidate_swing_d1_remeasure_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9490
+  },
+  {
+   "path": "scratch/track1_stage5zzzh_full_candidate_swing_d1_remeasure_20260829.md",
+   "status": "REFERENCE_ONLY",
+   "replacement": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+   "why_not_quote_directly": "contains the same-day variant alongside D-1. The same-day column needs the 16:00 close and cannot exist during the 14:05-15:55 Swing window, so it is not tradable",
+   "bytes": 10406
+  },
+  {
+   "path": "scratch/track1_stage5zzzh_full_replay_20260829.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 4854
+  },
+  {
+   "path": "scratch/track1_stage5zzzh_full_replay_base_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4540
+  },
+  {
+   "path": "scratch/track1_stage5zzzh_full_replay_d1pb_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4533
+  },
+  {
+   "path": "scratch/track1_stage5zzzh_full_replay_d1repro_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4530
+  },
+  {
+   "path": "scratch/track1_stage5zzzh_full_replay_d1r_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4532
+  },
+  {
+   "path": "scratch/track1_stage5zzzh_full_replay_d1_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4530
+  },
+  {
+   "path": "scratch/track1_stage5zzzh_full_replay_noswing_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4320
+  },
+  {
+   "path": "scratch/track1_stage5zzzh_full_replay_proxy_20260829.json",
+   "status": "REJECTED_RESEARCH",
+   "replacement": null,
+   "why_not_quote_directly": "regime-proxy research; not selected for paper",
+   "bytes": 1531
+  },
+  {
+   "path": "scratch/track1_stage5zzzh_swing_churn_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4396
+  },
+  {
+   "path": "scratch/track1_stage5zzzh_swing_churn_20260829.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 5083
+  },
+  {
+   "path": "scratch/track1_stage5zzzh_swing_d1_regen_20260829.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 14218
+  },
+  {
+   "path": "scratch/track1_stage5zzzi_compare_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10859
+  },
+  {
+   "path": "scratch/track1_stage5zzzi_compare_20260829.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 3858
+  },
+  {
+   "path": "scratch/track1_stage5zzzi_make_noswing_20260829.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 1690
+  },
+  {
+   "path": "scratch/track1_stage5zzzi_swing_d1_wfo_retune_20260829.json",
+   "status": "RESEARCH_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "parameter search; nothing promoted from it",
+   "bytes": 8257
+  },
+  {
+   "path": "scratch/track1_stage5zzzi_swing_d1_wfo_retune_20260829.md",
+   "status": "RESEARCH_ONLY",
+   "replacement": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+   "why_not_quote_directly": "narrow D-1 retune (ema=10). Measured, NOT promoted - quoting it as a baseline would publish a parameter the route does not run",
+   "bytes": 10080
+  },
+  {
+   "path": "scratch/track1_stage5zzzi_swing_wfo_20260829.json",
+   "status": "RESEARCH_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "parameter search; nothing promoted from it",
+   "bytes": 9374
+  },
+  {
+   "path": "scratch/track1_stage5zzzi_swing_wfo_20260829.py",
+   "status": "RESEARCH_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "parameter search; nothing promoted from it",
+   "bytes": 10344
+  },
+  {
+   "path": "scratch/track1_stage5zzzj_compare_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10973
+  },
+  {
+   "path": "scratch/track1_stage5zzzj_make_proxy_labels_20260829.py",
+   "status": "REJECTED_RESEARCH",
+   "replacement": null,
+   "why_not_quote_directly": "regime-proxy research; not selected for paper",
+   "bytes": 2250
+  },
+  {
+   "path": "scratch/track1_stage5zzzj_proxy_agreement_20260829.json",
+   "status": "REJECTED_RESEARCH",
+   "replacement": null,
+   "why_not_quote_directly": "regime-proxy research; not selected for paper",
+   "bytes": 720
+  },
+  {
+   "path": "scratch/track1_stage5zzzj_proxy_agreement_20260829.py",
+   "status": "REJECTED_RESEARCH",
+   "replacement": null,
+   "why_not_quote_directly": "regime-proxy research; not selected for paper",
+   "bytes": 9036
+  },
+  {
+   "path": "scratch/track1_stage5zzzj_proxy_labels_20260829.json",
+   "status": "REJECTED_RESEARCH",
+   "replacement": null,
+   "why_not_quote_directly": "regime-proxy research; not selected for paper",
+   "bytes": 32973
+  },
+  {
+   "path": "scratch/track1_stage5zzzj_spy_intraday_inventory_20260829.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 3376
+  },
+  {
+   "path": "scratch/track1_stage5zzzj_swing_intraday_spy_proxy_20260829.json",
+   "status": "REJECTED_RESEARCH",
+   "replacement": null,
+   "why_not_quote_directly": "regime-proxy research; not selected for paper",
+   "bytes": 16518
+  },
+  {
+   "path": "scratch/track1_stage5zzzj_swing_intraday_spy_proxy_20260829.md",
+   "status": "REJECTED_RESEARCH",
+   "replacement": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+   "why_not_quote_directly": "SPY intraday regime proxy - research only, not selected for paper",
+   "bytes": 9740
+  },
+  {
+   "path": "scratch/track1_stage5zzzk_es_intraday_proxy_label_recovery_20260829.json",
+   "status": "REJECTED_RESEARCH",
+   "replacement": null,
+   "why_not_quote_directly": "regime-proxy research; not selected for paper",
+   "bytes": 11110
+  },
+  {
+   "path": "scratch/track1_stage5zzzk_es_intraday_proxy_label_recovery_20260829.md",
+   "status": "REJECTED_RESEARCH",
+   "replacement": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+   "why_not_quote_directly": "ES intraday proxy label-recovery test - not a trading backtest, nothing promoted",
+   "bytes": 9171
+  },
+  {
+   "path": "scratch/track1_stage5zzzk_es_proxy_label_recovery_20260829.json",
+   "status": "REJECTED_RESEARCH",
+   "replacement": null,
+   "why_not_quote_directly": "regime-proxy research; not selected for paper",
+   "bytes": 5062
+  },
+  {
+   "path": "scratch/track1_stage5zzzk_es_proxy_label_recovery_20260829.py",
+   "status": "REJECTED_RESEARCH",
+   "replacement": null,
+   "why_not_quote_directly": "regime-proxy research; not selected for paper",
+   "bytes": 11074
+  },
+  {
+   "path": "scratch/track1_stage5zzzl_full_wfo_20260829.json",
+   "status": "RESEARCH_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "parameter search; nothing promoted from it",
+   "bytes": 2791
+  },
+  {
+   "path": "scratch/track1_stage5zzzl_full_wfo_20260829.py",
+   "status": "RESEARCH_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "parameter search; nothing promoted from it",
+   "bytes": 9178
+  },
+  {
+   "path": "scratch/track1_stage5zzzl_make_volfeature_arm_20260829.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 1865
+  },
+  {
+   "path": "scratch/track1_stage5zzzl_precommit_20260829.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 5089
+  },
+  {
+   "path": "scratch/track1_stage5zzzl_swing_full_wfo_causal_d1_20260829.json",
+   "status": "RESEARCH_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "parameter search; nothing promoted from it",
+   "bytes": 23512
+  },
+  {
+   "path": "scratch/track1_stage5zzzl_swing_full_wfo_causal_d1_20260829.md",
+   "status": "RESEARCH_ONLY",
+   "replacement": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+   "why_not_quote_directly": "full D-1 grid. Its winner was NOT promoted, and its apparatus concern was resolved by Stage 5ZZZ-M",
+   "bytes": 11498
+  },
+  {
+   "path": "scratch/track1_stage5zzzm_param_trace_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 1425
+  },
+  {
+   "path": "scratch/track1_stage5zzzm_param_trace_20260829.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 5029
+  },
+  {
+   "path": "scratch/track1_stage5zzzm_swing_artifact_param_obedience_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9605
+  },
+  {
+   "path": "scratch/track1_stage5zzzm_swing_artifact_param_obedience_20260829.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+   "why_not_quote_directly": "root cause of the ema 30->50 substitution. Explains WHY the selected identity is 'old/effective ema=50'; not itself a baseline",
+   "bytes": 9080
+  },
+  {
+   "path": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+   "status": "CANONICAL",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 19974
+  },
+  {
+   "path": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.md",
+   "status": "CANONICAL",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 13797
+  },
+  {
+   "path": "scratch/track1_stage5zzzn_regime_basis_proof_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 966
+  },
+  {
+   "path": "scratch/track1_stage5zzzn_regime_basis_proof_20260829.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 3245
+  },
+  {
+   "path": "scratch/track1_stage5zzzo_swing_paper_override_decision_trail_20260829.json",
+   "status": "DECISION_RECORD",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 5701
+  },
+  {
+   "path": "scratch/track1_stage5zzzo_swing_paper_override_decision_trail_20260829.md",
+   "status": "DECISION_RECORD",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 9058
+  },
+  {
+   "path": "scratch/track1_stage5zzzp_live_execution_replay_parity_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 13399
+  },
+  {
+   "path": "scratch/track1_stage5zzzp_live_execution_replay_parity_20260829.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8682
+  },
+  {
+   "path": "scratch/track1_stage5zzzp_parity_raw_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8486
+  },
+  {
+   "path": "scratch/track1_stage5zzzq_swing_live_causal_d1_identity_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7055
+  },
+  {
+   "path": "scratch/track1_stage5zzzq_swing_live_causal_d1_identity_20260829.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9019
+  },
+  {
+   "path": "scratch/track1_stage5zzzr_restart_liveness_postfix_parity_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8598
+  },
+  {
+   "path": "scratch/track1_stage5zzzr_restart_liveness_postfix_parity_20260829.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9618
+  },
+  {
+   "path": "scratch/track1_stage5zzzs_dashboard_endpoint_performance_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10349
+  },
+  {
+   "path": "scratch/track1_stage5zzzs_dashboard_endpoint_performance_20260829.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10970
+  },
+  {
+   "path": "scratch/track1_stage5zzzt_gate_ast_memoization_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7248
+  },
+  {
+   "path": "scratch/track1_stage5zzzt_gate_ast_memoization_20260829.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 7530
+  },
+  {
+   "path": "scratch/track1_stage5zzz_a_mutations_20260828.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 7101
+  },
+  {
+   "path": "scratch/track1_stage5zzz_a_shadow_audit_confirmation_policy_20260828.json",
+   "status": "DECISION_RECORD",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 9038
+  },
+  {
+   "path": "scratch/track1_stage5zzz_a_shadow_audit_confirmation_policy_20260828.md",
+   "status": "DECISION_RECORD",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 7896
+  },
+  {
+   "path": "scratch/track1_stage5zzz_strategy_diagnostics_runtime_and_reconstruction_20260828.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9721
+  },
+  {
+   "path": "scratch/track1_stage5zzz_strategy_diagnostics_runtime_and_reconstruction_20260828.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9924
+  },
+  {
+   "path": "scratch/track1_stage5zz_ops_status_process_reporting_20260827.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 8918
+  },
+  {
+   "path": "scratch/track1_stage5zz_ops_status_process_reporting_20260827.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10667
+  },
+  {
+   "path": "scratch/track1_stage5z_callsite_dryrun_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 9263
+  },
+  {
+   "path": "scratch/track1_stage5z_callsite_dryrun_20260825.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 11963
+  },
+  {
+   "path": "scratch/track1_stage5z_freshness_root_contract_report_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 14364
+  },
+  {
+   "path": "scratch/track1_stage5z_mutations_20260825.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 4491
+  },
+  {
+   "path": "scratch/track1_stage5z_mutations_20260825.py",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "supporting material",
+   "bytes": 15613
+  },
+  {
+   "path": "scratch/track1_stage5_preswitch_audit_20260823.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 10386
+  },
+  {
+   "path": "scratch/track1_stage5_preswitch_audit_report_20260823.md",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "stage report - narrative and proof for one step",
+   "bytes": 14328
+  },
+  {
+   "path": "scratch/baseline_1.txt",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 1261
+  },
+  {
+   "path": "scratch/baseline_1405.py",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 7047
+  },
+  {
+   "path": "scratch/baseline_1405.txt",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 2146
+  },
+  {
+   "path": "scratch/baseline_2.txt",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 1226
+  },
+  {
+   "path": "scratch/baseline_3.txt",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 1263
+  },
+  {
+   "path": "scratch/baseline_4.txt",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 1223
+  },
+  {
+   "path": "scratch/baseline_5.txt",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 1263
+  },
+  {
+   "path": "scratch/baseline_6.txt",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 1223
+  },
+  {
+   "path": "scratch/baseline_7.txt",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 1264
+  },
+  {
+   "path": "scratch/baseline_8.txt",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 1223
+  },
+  {
+   "path": "scratch/baseline_corrected.py",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 6879
+  },
+  {
+   "path": "scratch/baseline_corrected.txt",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 7519
+  },
+  {
+   "path": "scratch/baseline_half.py",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 7036
+  },
+  {
+   "path": "scratch/baseline_half.txt",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 2160
+  },
+  {
+   "path": "scratch/baseline_noratchet.py",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 7084
+  },
+  {
+   "path": "scratch/baseline_noratchet.txt",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 3921
+  },
+  {
+   "path": "scratch/test_track1_stage5zze_paper_account_baseline_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 20859
+  },
+  {
+   "path": "scratch/test_track1_stage5zzzn_canonical_baseline_20260829.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 12463
+  },
+  {
+   "path": "scratch/_stage3b_legacy_baseline.json",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 3596
+  },
+  {
+   "path": "scratch/_stage3_legacy_baseline.json",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 2694
+  },
+  {
+   "path": "scratch/_stage4b_baseline.json",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 3625
+  },
+  {
+   "path": "scratch/_stage4_legacy_baseline.json",
+   "status": "REFERENCE_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "baseline-like; check against the canonical index before quoting",
+   "bytes": 4149
+  },
+  {
+   "path": "scratch/calm_neg_overnight_wfo_stability.csv",
+   "status": "RESEARCH_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "parameter search; nothing promoted from it",
+   "bytes": 2331
+  },
+  {
+   "path": "scratch/calm_neg_overnight_wfo_stability.py",
+   "status": "RESEARCH_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "parameter search; nothing promoted from it",
+   "bytes": 5809
+  },
+  {
+   "path": "scratch/joint_wfo.py",
+   "status": "RESEARCH_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "parameter search; nothing promoted from it",
+   "bytes": 8470
+  },
+  {
+   "path": "scratch/joint_wfo.txt",
+   "status": "RESEARCH_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "parameter search; nothing promoted from it",
+   "bytes": 2863
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2026_m_B_wfo_winner_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 118303
+  },
+  {
+   "path": "scratch/tf_rewfo_qqq_results.json",
+   "status": "RESEARCH_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "parameter search; nothing promoted from it",
+   "bytes": 10455
+  },
+  {
+   "path": "scratch/wfo_stop_width.py",
+   "status": "RESEARCH_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "parameter search; nothing promoted from it",
+   "bytes": 8607
+  },
+  {
+   "path": "scratch/wfo_stop_width.txt",
+   "status": "RESEARCH_ONLY",
+   "replacement": null,
+   "why_not_quote_directly": "parameter search; nothing promoted from it",
+   "bytes": 3349
+  },
+  {
+   "path": "scratch/normal_promotion_trades_floor_proxy_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 914289
+  },
+  {
+   "path": "scratch/tf_index_proxy_results.json",
+   "status": "REJECTED_RESEARCH",
+   "replacement": null,
+   "why_not_quote_directly": "regime-proxy research; not selected for paper",
+   "bytes": 68812
+  },
+  {
+   "path": "scratch/test_track1_stage5zr_b1_decision_20260826.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 25372
+  },
+  {
+   "path": "scratch/test_track1_stage5zzj_b1_operator_decision_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 17190
+  },
+  {
+   "path": "scratch/track1_b1_decision_candidate_20260827.json",
+   "status": "DECISION_RECORD",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 805
+  },
+  {
+   "path": "scratch/track1_b1_decision_template_20260826.json",
+   "status": "DECISION_RECORD",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 2881
+  },
+  {
+   "path": "scratch/test_track1_dashboard_panel_consistency_20260826.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 19608
+  },
+  {
+   "path": "scratch/test_track1_dashboard_runtime_wiring_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 19024
+  },
+  {
+   "path": "scratch/test_track1_explain_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 34621
+  },
+  {
+   "path": "scratch/test_track1_explain_wiring_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 22584
+  },
+  {
+   "path": "scratch/test_track1_ops_status_mode_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 9047
+  },
+  {
+   "path": "scratch/test_track1_presleep_readiness_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 16188
+  },
+  {
+   "path": "scratch/test_track1_presleep_schedule_status_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 12899
+  },
+  {
+   "path": "scratch/test_track1_route_checkpoint_stage1_20260822.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 22054
+  },
+  {
+   "path": "scratch/test_track1_stage2_equivalence_bootstrap_20260822.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 15130
+  },
+  {
+   "path": "scratch/test_track1_stage3b_blockers_20260822.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 48906
+  },
+  {
+   "path": "scratch/test_track1_stage3_route_20260822.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 33582
+  },
+  {
+   "path": "scratch/test_track1_stage4b_identity_liveframe_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 28092
+  },
+  {
+   "path": "scratch/test_track1_stage4c_live_source_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 40976
+  },
+  {
+   "path": "scratch/test_track1_stage4_production_clean_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 27256
+  },
+  {
+   "path": "scratch/test_track1_stage5ab_g1_source_mode_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 14576
+  },
+  {
+   "path": "scratch/test_track1_stage5b_runbook_fix_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 16471
+  },
+  {
+   "path": "scratch/test_track1_stage5c_shadow_readiness_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 8934
+  },
+  {
+   "path": "scratch/test_track1_stage5d_shadow_live_wiring_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 26069
+  },
+  {
+   "path": "scratch/test_track1_stage5e_live_source_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 25471
+  },
+  {
+   "path": "scratch/test_track1_stage5f_stress_live_source_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 27268
+  },
+  {
+   "path": "scratch/test_track1_stage5i_live_shadow_evidence_wiring_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 21169
+  },
+  {
+   "path": "scratch/test_track1_stage5k0_operational_paths_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 6706
+  },
+  {
+   "path": "scratch/test_track1_stage5k_ops_startup_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 18606
+  },
+  {
+   "path": "scratch/test_track1_stage5l_shared_preflight_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 24890
+  },
+  {
+   "path": "scratch/test_track1_stage5m0_state_repair_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 14814
+  },
+  {
+   "path": "scratch/test_track1_stage5m1_fill_law_identity_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 19435
+  },
+  {
+   "path": "scratch/test_track1_stage5m_b_normal_r4_shadow_slots_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 26241
+  },
+  {
+   "path": "scratch/test_track1_stage5m_c_swing_provider_readiness_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 26804
+  },
+  {
+   "path": "scratch/test_track1_stage5m_d_track1_only_shadow_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 25388
+  },
+  {
+   "path": "scratch/test_track1_stage5n_nkd_track1_ownership_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 25112
+  },
+  {
+   "path": "scratch/test_track1_stage5o_route_aware_safety_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 22091
+  },
+  {
+   "path": "scratch/test_track1_stage5p_full_shadow_readiness_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 30391
+  },
+  {
+   "path": "scratch/test_track1_stage5p_operator_text_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 12322
+  },
+  {
+   "path": "scratch/test_track1_stage5q1_audit_semantics_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 34571
+  },
+  {
+   "path": "scratch/test_track1_stage5q2_explanation_integrity_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 31218
+  },
+  {
+   "path": "scratch/test_track1_stage5q3_live_frame_splice_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 27689
+  },
+  {
+   "path": "scratch/test_track1_stage5q4_overlap_and_repair_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 26166
+  },
+  {
+   "path": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 26022
+  },
+  {
+   "path": "scratch/test_track1_stage5q7_mnkd_identity_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 8454
+  },
+  {
+   "path": "scratch/test_track1_stage5q8_identity_audit_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 13018
+  },
+  {
+   "path": "scratch/test_track1_stage5q9_identity_admission_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 10223
+  },
+  {
+   "path": "scratch/test_track1_stage5q_post_window_audit_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 50122
+  },
+  {
+   "path": "scratch/test_track1_stage5r0_boundary_tail_20260824.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 25241
+  },
+  {
+   "path": "scratch/test_track1_stage5s_paper_readiness_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 22199
+  },
+  {
+   "path": "scratch/test_track1_stage5t_paper_broker_path_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 13546
+  },
+  {
+   "path": "scratch/test_track1_stage5u_order_state_reconcile_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 18076
+  },
+  {
+   "path": "scratch/test_track1_stage5v1_intraday_causality_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 18292
+  },
+  {
+   "path": "scratch/test_track1_stage5v_order_journal_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 21188
+  },
+  {
+   "path": "scratch/test_track1_stage5w_paper_executor_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 32806
+  },
+  {
+   "path": "scratch/test_track1_stage5x_broker_readside_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 31254
+  },
+  {
+   "path": "scratch/test_track1_stage5y_order_id_writepath_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 38127
+  },
+  {
+   "path": "scratch/test_track1_stage5za_causal_slot_audit_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 9201
+  },
+  {
+   "path": "scratch/test_track1_stage5zb_operational_audit_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 27142
+  },
+  {
+   "path": "scratch/test_track1_stage5zd_signal_diagnostics_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 34751
+  },
+  {
+   "path": "scratch/test_track1_stage5ze_job_view_operator_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 33149
+  },
+  {
+   "path": "scratch/test_track1_stage5zf_ops_report_completeness_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 34665
+  },
+  {
+   "path": "scratch/test_track1_stage5zg_route_aware_safety_reporting_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 26640
+  },
+  {
+   "path": "scratch/test_track1_stage5zh_quiet_checkpoint_audit_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 29874
+  },
+  {
+   "path": "scratch/test_track1_stage5zk_checkpoint_frames_resume_20260826.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 34592
+  },
+  {
+   "path": "scratch/test_track1_stage5zl_regime_tristate_20260826.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 31938
+  },
+  {
+   "path": "scratch/test_track1_stage5zm_route_aware_reporting_20260826.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 24492
+  },
+  {
+   "path": "scratch/test_track1_stage5zn_planned_stop_lifecycle_20260826.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 33170
+  },
+  {
+   "path": "scratch/test_track1_stage5zo_live_bar_pull_proof_20260826.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 30694
+  },
+  {
+   "path": "scratch/test_track1_stage5zp_dashboard_polish_20260826.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 22931
+  },
+  {
+   "path": "scratch/test_track1_stage5zq_legacy_flat_b1_20260826.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 28490
+  },
+  {
+   "path": "scratch/test_track1_stage5zs_book_carry_forward_20260826.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 25025
+  },
+  {
+   "path": "scratch/test_track1_stage5zu_calm_timing_identity_20260826.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 19053
+  },
+  {
+   "path": "scratch/test_track1_stage5zv_calm_execution_identity_20260826.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 13730
+  },
+  {
+   "path": "scratch/test_track1_stage5zw_calm_prepaper_execution_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 10438
+  },
+  {
+   "path": "scratch/test_track1_stage5zx_calm_shadow_intent_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 22898
+  },
+  {
+   "path": "scratch/test_track1_stage5zzb_spy_refresh_coverage_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 21995
+  },
+  {
+   "path": "scratch/test_track1_stage5zzc_spy_retry_ladder_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 21401
+  },
+  {
+   "path": "scratch/test_track1_stage5zzd_pre_nkd_spy_refresh_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 19448
+  },
+  {
+   "path": "scratch/test_track1_stage5zzf_dashboard_source_hygiene_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 15904
+  },
+  {
+   "path": "scratch/test_track1_stage5zzg_order_send_wire_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 26601
+  },
+  {
+   "path": "scratch/test_track1_stage5zzh_dashboard_hygiene_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 26759
+  },
+  {
+   "path": "scratch/test_track1_stage5zzi_calm_live_bar_refusal_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 17336
+  },
+  {
+   "path": "scratch/test_track1_stage5zzk_b1_confirmation_recognition_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 15980
+  },
+  {
+   "path": "scratch/test_track1_stage5zzl_market_view_regime_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 49333
+  },
+  {
+   "path": "scratch/test_track1_stage5zzn_scheduler_mode_enforcement_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 17225
+  },
+  {
+   "path": "scratch/test_track1_stage5zzo_backend_restart_guard_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 10402
+  },
+  {
+   "path": "scratch/test_track1_stage5zzp_strategy_levels_regime_metrics_20260828.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 14108
+  },
+  {
+   "path": "scratch/test_track1_stage5zzq_setup_boundaries_hmm_explain_20260828.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 29293
+  },
+  {
+   "path": "scratch/test_track1_stage5zzr_strategy_native_market_view_20260828.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 25309
+  },
+  {
+   "path": "scratch/test_track1_stage5zzt_schedule_mirror_spy_ladder_20260828.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 12746
+  },
+  {
+   "path": "scratch/test_track1_stage5zzu_recovery_stream_isolation_20260828.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 15925
+  },
+  {
+   "path": "scratch/test_track1_stage5zzw_dashboard_track1_mode_hygiene_20260828.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 18843
+  },
+  {
+   "path": "scratch/test_track1_stage5zzx_backend_console_noise_20260828.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 10885
+  },
+  {
+   "path": "scratch/test_track1_stage5zzy_dashboard_poll_no_shell_20260828.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 15997
+  },
+  {
+   "path": "scratch/test_track1_stage5zzzc_shadow_evidence_real_failures_20260828.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 15682
+  },
+  {
+   "path": "scratch/test_track1_stage5zzze_calm_two_phase_diagnostics_20260828.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 19881
+  },
+  {
+   "path": "scratch/test_track1_stage5zzzf_market_view_ui_contract_20260828.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 33759
+  },
+  {
+   "path": "scratch/test_track1_stage5zzzg_swing_d1_regime_20260829.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 17619
+  },
+  {
+   "path": "scratch/test_track1_stage5zzzm_param_obedience_20260829.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 13095
+  },
+  {
+   "path": "scratch/test_track1_stage5zzzo_swing_override_20260829.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 12765
+  },
+  {
+   "path": "scratch/test_track1_stage5zzzp_replay_parity_20260829.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 13905
+  },
+  {
+   "path": "scratch/test_track1_stage5zzzq_swing_causal_d1_live_20260829.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 10904
+  },
+  {
+   "path": "scratch/test_track1_stage5zzzr_restart_liveness_postfix_parity_20260829.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 9203
+  },
+  {
+   "path": "scratch/test_track1_stage5zzzs_dashboard_endpoint_performance_20260829.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 10234
+  },
+  {
+   "path": "scratch/test_track1_stage5zzzt_gate_ast_memoization_20260829.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 12084
+  },
+  {
+   "path": "scratch/test_track1_stage5zzz_a_shadow_audit_confirmation_20260828.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 13196
+  },
+  {
+   "path": "scratch/test_track1_stage5zzz_b_strategy_diagnostics_20260828.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 17783
+  },
+  {
+   "path": "scratch/test_track1_stage5zz_ops_status_process_reporting_20260827.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 19769
+  },
+  {
+   "path": "scratch/test_track1_stage5z_callsite_dryrun_20260825.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 26160
+  },
+  {
+   "path": "scratch/test_track1_stage5z_freshness_root_20260823.py",
+   "status": "TEST_ARTIFACT",
+   "replacement": null,
+   "why_not_quote_directly": "test suite - pins behaviour, carries no quotable baseline",
+   "bytes": 22310
+  },
+  {
+   "path": "scratch/normal_promotion_trades_floor_20260821.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 1104614
+  },
+  {
+   "path": "scratch/normal_promotion_trades_floor_d1f_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 1117050
+  },
+  {
+   "path": "scratch/normal_promotion_trades_floor_d1pb_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 1127492
+  },
+  {
+   "path": "scratch/normal_promotion_trades_floor_d1repro_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 1117050
+  },
+  {
+   "path": "scratch/normal_promotion_trades_floor_d1repro_20260829.params.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 504
+  },
+  {
+   "path": "scratch/normal_promotion_trades_floor_d1r_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 1154317
+  },
+  {
+   "path": "scratch/normal_promotion_trades_floor_d1_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 1117050
+  },
+  {
+   "path": "scratch/normal_promotion_trades_floor_noswing_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 246995
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2025_20260821.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 151428
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2025_d1f_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 151453
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2025_d1pb_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 152193
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2025_d1repro_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 151453
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2025_d1repro_20260829.params.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 512
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2025_d1r_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 151852
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2025_d1_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 151453
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2025_noswing_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 34211
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2026_20260821.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 120831
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2026_d1f_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 118303
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2026_d1f_20260829.params.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 509
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2026_d1pb_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 119027
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2026_d1repro_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 118303
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2026_d1repro_20260829.params.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 512
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2026_d1r_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 127363
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2026_d1_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 118303
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2026_m_A_default_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 118303
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2026_m_C_ema10_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 127363
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2026_m_D_ema20_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 125874
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2026_noswing_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 28827
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2026_t20m25_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 125874
+  },
+  {
+   "path": "scratch/normal_promotion_trades_vault2026_t50m25_20260829.json",
+   "status": "SUPPORTING_PROOF",
+   "replacement": null,
+   "why_not_quote_directly": "per-window trade artifact a replay reads; quote the canonical report, not the artifact",
+   "bytes": 118303
+  },
+  {
+   "path": "track1_swing_paper_override.json",
+   "status": "DECISION_RECORD",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 1371
+  },
+  {
+   "path": "track1_go_live_confirmation.json",
+   "status": "DECISION_RECORD",
+   "replacement": null,
+   "why_not_quote_directly": null,
+   "bytes": 805
+  }
+ ],
+ "file_count": 558,
+ "counts": {
+  "SUPPORTING_PROOF": 381,
+  "DECISION_RECORD": 15,
+  "REFERENCE_ONLY": 24,
+  "REJECTED_RESEARCH": 12,
+  "RESEARCH_ONLY": 15,
+  "CANONICAL": 2,
+  "TEST_ARTIFACT": 109
+ }
+}

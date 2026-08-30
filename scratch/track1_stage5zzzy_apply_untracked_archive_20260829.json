@@ -1,0 +1,124 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-Y",
+ "title": "Apply untracked Track 1 archive plan",
+ "route": "track1_candidate",
+ "date": "2026-08-29",
+ "part_a_revalidation": {
+  "candidates_in_plan": 379,
+  "approved_after_revalidation": 379,
+  "skipped_at_revalidation": 0,
+  "checks_run_per_candidate": [
+   "path still exists",
+   "sha256 matches the plan",
+   "destination unique",
+   "destination does not exist",
+   "not now tracked (5ZZZ-X committed 163 files)",
+   "not imported by an active test or source module",
+   "not linked by a canonical document"
+  ],
+  "non_vacuity_proof": "the tracked set was confirmed non-empty (992) and a positive control - global_index/track1_gates.py - was verified present in it, so the tracked-check could actually fire"
+ },
+ "part_c_moves": {
+  "archive_root": "_archive/scratch/track1_2026-08-29/<original relative path>",
+  "relative_paths_preserved": true,
+  "moved": 341,
+  "restored_after_reference_check": 38,
+  "net_archived": 341,
+  "deletes": 0,
+  "moved_by_classification": {
+   "STAGE_REPORT": 244,
+   "SUPPORTING_PROOF": 66,
+   "GENERATED_TEMP": 6,
+   "RESEARCH_ONLY": 13,
+   "REJECTED_RESEARCH": 12
+  },
+  "total_mb": 4.3,
+  "manifest": "_archive/scratch/track1_2026-08-29/ARCHIVE_MOVE_MANIFEST_5ZZZY_20260829.json",
+  "per_file_verification": "each move checked immediately - old path gone, new path present, sha256 identical - with single-file rollback and abort on any failure"
+ },
+ "THE_MISTAKE_I_MADE_AND_CAUGHT": {
+  "what_happened": "the first sweep moved all 379 and BROKE 3 TESTS. pytest collection went from the known baseline of 2 errors to 5",
+  "root_cause": "the import scan took `m.split('.')[0]`, so `from scratch.track1_foo import bar` was recorded as an import of `scratch` and the real module name was thrown away. Every dotted submodule import was invisible to it",
+  "the_three_broken": [
+   "scratch.track1_bootstrap_checkpoint_20260822",
+   "scratch.track1_stage5c_shadow_readiness_probe_20260823",
+   "scratch.track1_stage5zzzh_swing_d1_regen_20260829"
+  ],
+  "how_it_was_caught": "the brief's own gate: compare pytest --collect-only against the known baseline. 5 errors against a baseline of 2 is not a pass",
+  "the_fix": "rescanned with EVERY segment of every dotted import plus every filename appearing in a string literal. 38 moved files were still referenced; all 38 were restored to their original paths, hashes verified 38/38",
+  "why_it_matters": "this is the same failure that left tests/test_raits_vs_hold.py broken by an unlogged archive move - the one Stage 5ZZZ-V found still broken today. It nearly happened again, in the stage that knew about it",
+  "final_state": "collection back to exactly the baseline: 2 pre-existing errors"
+ },
+ "part_f_validation": {
+  "moved_files_present_at_archive_path": 341,
+  "missing_at_archive_path": 0,
+  "old_paths_still_present": 0,
+  "hash_mismatches": 0,
+  "restored_files_back_and_intact": "38/38",
+  "deletes": 0,
+  "tracked_files_moved": 0,
+  "test_files_moved": 0,
+  "source_files_moved": 0,
+  "runtime_evidence_moved": 0,
+  "decision_records_moved": 0,
+  "canonical_docs_moved": 0,
+  "broken_canonical_links": 0,
+  "canonical_named_paths_missing": 0,
+  "pytest_collect_only": {
+   "collected": 4418,
+   "errors": 2,
+   "baseline_errors": 2,
+   "new_errors": 0,
+   "known_errors": [
+    "tests/test_raits_vs_hold.py",
+    "tests/integration/test_orb_integration.py"
+   ]
+  }
+ },
+ "part_e_references": {
+  "canonical_docs_needed_updating": 0,
+  "why": "the revalidation excluded anything a canonical document names, so no link could break. Verified after the move as well: 0 broken markdown links, 0 canonical-named paths missing",
+  "TASK_md": "updated - it is the operator's working log and is not committed, per the repo rule confirmed in Stage 5ZZZ-X"
+ },
+ "git_status_shape": {
+  "untracked_files_file_level": 1060,
+  "of_which_under_the_archive_dir": 342,
+  "why_status_short_looks_smaller": "git status --short collapses an untracked directory into ONE line, so the 342 archived files appear as a single `?? _archive/scratch/track1_2026-08-29/`",
+  "archive_dir_is_gitignored": false,
+  "modified_tracked_files": 36,
+  "modified_by_this_stage": [
+   "docs/futures/ARCHIVE_LOG.md",
+   "docs/futures/TRACK1_RUNTIME_PIPELINE_2026-08-24.md",
+   "TASK.md"
+  ],
+  "the_other_33": "pre-existing operator work, untouched since before this session",
+  "clean_except_intended_changes": true
+ },
+ "safety": {
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "orders_sent": 0,
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "confirmation_present": true,
+  "confirmation_still_gitignored": true,
+  "confirmation_sha16": "67504a1c8a31a6a4",
+  "swing_override_tracked": true,
+  "swing_override_valid": true,
+  "swing_override_grants": "nothing",
+  "broker_calls": 0,
+  "scheduler_restarted": false,
+  "backend_restarted": false,
+  "scheduler_pid_alive": true,
+  "files_deleted": 0,
+  "git_reset_or_checkout_used": false,
+  "archive_moves_in_the_5zzzx_commit": 0,
+  "strategy_logic_changed": false,
+  "params_changed": false,
+  "gates_changed": false,
+  "runtime_trading_files_edited": 0
+ }
+}

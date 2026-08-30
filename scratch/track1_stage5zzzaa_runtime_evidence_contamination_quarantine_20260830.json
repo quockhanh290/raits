@@ -1,0 +1,165 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-AA",
+ "title": "Runtime evidence contamination quarantine",
+ "route": "track1_candidate",
+ "date": "2026-08-30",
+ "evidence_deleted": 0,
+ "evidence_rows_rewritten": 0,
+ "contaminated_rows": {
+  "file": "global_index/track1_runtime/signals/track1_signals_20260829.jsonl",
+  "rows": 2,
+  "row_sha256": [
+   "8e5f8c0425afc06818e92b7b163e6e216a81c3ab1b9c832aa2e423a297f16b73",
+   "5729c4d2564594bed584efbc6e5608cd5cbab296c73c03ff57def54ac9dd2a7f"
+  ],
+  "identity": {
+   "session_date": "2026-08-29",
+   "sleeve": "roska4_swing",
+   "slot_id": "TRACK1_SWING_1405",
+   "slot_time": "14:05",
+   "mode": "shadow_live",
+   "status": "SLOT_REFUSED",
+   "reason": "overlap_disagreement"
+  },
+  "written_at": {
+   "machine_MT": "2026-08-29T21:50:49",
+   "market_ET": "2026-08-29T23:50:49-04:00"
+  },
+  "written_by": "python -m pytest scratch -q, started 2026-08-29T21:40:05 MT (Stage 5ZZZ-Z)"
+ },
+ "proof_not_live_slots": [
+  {
+   "proof": "trading calendar",
+   "detail": "2026-08-29 is a SATURDAY; the repo's own is_trading_day() returns False"
+  },
+  {
+   "proof": "impossible timing",
+   "detail": "the row claims slot_time 14:05 but the file was written at 23:50 ET, nine hours later"
+  },
+  {
+   "proof": "no scheduler launch",
+   "detail": "TRACK1_SWING_1405 appears ZERO times in scheduler_0829.log and zero jobs fired that day"
+  },
+  {
+   "proof": "impossible price",
+   "detail": "payload says M2K feed 103.0000 against history 3048.3000 - a fixture value"
+  },
+  {
+   "proof": "wrong data identity",
+   "detail": "data_source_identity names the ES store while the sleeve is roska4_swing on M2K"
+  }
+ ],
+ "taint_record": {
+  "path": "global_index/track1_runtime/evidence_taint/evidence_taint_20260829.jsonl",
+  "taint_id": "5ZZZ-AA-20260830-001",
+  "taint_type": "TEST_CONTAMINATION",
+  "source_stage": "5ZZZ-Z",
+  "created_by_stage": "5ZZZ-AA",
+  "append_only": true,
+  "matched_by": "sha256 of the exact stored line",
+  "why_hash_not_predicate": "a human-readable predicate could widen to a legitimate future row. A hash cannot - a new row has a different hash and is untouched",
+  "action": "exclude_from_parity_and_shadow_evidence"
+ },
+ "the_honest_gap": {
+  "what": "three data_observation files were written in the same window (mtimes 21:50:49, 22:17:10, 21:51:20) but their rows carry their own historical session dates and none shows the fixture tell",
+  "duplicates_found": {
+   "20260820": 0,
+   "20260824": 13,
+   "20260825": 3
+  },
+  "why_not_tainted": "there is no before-snapshot to say whether those duplicates are new. Tainting rows that might be real is the same falsification in the other direction",
+  "recorded_as": "touched_unproven - reported, not excluded",
+  "label": "this is a measured 'I could not tell', not a clean bill of health"
+ },
+ "readers_updated": {
+  "global_index/track1_evidence_taint.py": "NEW - the taint reader. Three states: tainted / touched / clean",
+  "global_index/track1_replay_parity.py": {
+   "change": "newest_slot() excludes tainted rows; the report surfaces them under tainted_test_evidence with verdict TAINTED_TEST_EVIDENCE",
+   "read_side_only": true,
+   "before": "roska4_swing = FAIL (from a slot that never ran)",
+   "after": "roska4_swing = NOT_YET_OBSERVED, tainted rows shown separately"
+  },
+  "paper_readiness_audit": "verified unchanged - 2026-08-29 never entered the judgeable window, so no code change was needed. Asserted by test rather than assumed",
+  "surfaced_not_hidden": "an excluded row that is invisible is indistinguishable from a row that never existed, so the parity report lists them"
+ },
+ "parity_after": {
+  "sleeves": {
+   "global_nkd": "NOT_YET_OBSERVED",
+   "roska4_stress": "NOT_YET_OBSERVED",
+   "roska4_calm": "NOT_YET_OBSERVED",
+   "roska4_swing": "NOT_YET_OBSERVED"
+  },
+  "tainted_test_evidence_rows": 2,
+  "any_FAIL": false,
+  "any_PASS": false
+ },
+ "paper_shadow_evidence_unchanged": {
+  "judgeable_window": [
+   "2026-08-24",
+   "2026-08-25",
+   "2026-08-26",
+   "2026-08-27",
+   "2026-08-28"
+  ],
+  "contaminated_saturday_in_window": false,
+  "failing_checks": [
+   "no_failing_days",
+   "calm_decision_evidence"
+  ],
+  "same_as_before_contamination": true
+ },
+ "recurrence_prevention": {
+  "guard": "global_index/track1_signals._refuse_production_write_under_pytest",
+  "fires_only_when_BOTH": [
+   "PYTEST_CURRENT_TEST is set",
+   "the destination is inside the track1_runtime tree"
+  ],
+  "opt_in_for_deliberate_integration_writes": "TRACK1_ALLOW_RUNTIME_WRITE_IN_TEST=1",
+  "does_not_break": [
+   "tests writing to tmp_path",
+   "the scheduler, which is not under pytest"
+  ],
+  "why_narrow": "a guard that blocks legitimate writes is a guard people learn to switch off",
+  "runbook": "docs/futures/INVARIANTS.md gained a section with the incident, the rule, and the guard"
+ },
+ "tests": {
+  "suite": "scratch/test_track1_stage5zzzaa_evidence_taint_20260830.py",
+  "passed": 19,
+  "mutations": [
+   "taint record empty",
+   "newest_slot stops skipping tainted rows",
+   "tainted evidence scored PASS",
+   "guard removed",
+   "guard too wide (blocks tmp_path)",
+   "predicate widened to everything"
+  ],
+  "mutations_caught": 6,
+  "mutations_survived": 0,
+  "regression_passed": 139
+ },
+ "safety": {
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "orders_sent": 0,
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "confirmation_present": true,
+  "confirmation_still_gitignored": true,
+  "confirmation_sha16": "67504a1c8a31a6a4",
+  "swing_override_valid": true,
+  "swing_override_grants": "nothing",
+  "broker_calls": 0,
+  "scheduler_restarted": false,
+  "backend_restarted": false,
+  "scheduler_pid_alive": true,
+  "runtime_evidence_deleted": 0,
+  "runtime_evidence_rewritten": 0,
+  "files_moved_or_archived": 0,
+  "gates_changed": "no. The order gate does not import the taint module - asserted by test",
+  "strategy_logic_changed": false,
+  "params_changed": false
+ }
+}

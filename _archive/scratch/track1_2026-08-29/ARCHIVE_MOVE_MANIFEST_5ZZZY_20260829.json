@@ -1,0 +1,2711 @@
+{
+ "schema": "track1_archive_move_manifest/1",
+ "stage": "5ZZZ-Y",
+ "started": "2026-08-29T20:18:09",
+ "finished": "2026-08-29T20:18:09",
+ "archive_root": "_archive/scratch/track1_2026-08-29/",
+ "source_plan": "scratch/track1_stage5zzzw_untracked_archive_plan_20260829.json",
+ "track1_source_committed_first": "22f6086137519b547e41ba1612f724fad4157ff3 (Stage 5ZZZ-X)",
+ "candidates_in_plan": 379,
+ "approved_after_revalidation": 379,
+ "moved": 341,
+ "failed": 0,
+ "deletes": 0,
+ "moves": [
+  {
+   "old_path": "scratch/_track1_stage5q1_mutations.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5q1_mutations.json",
+   "sha256": "211d5f354c3991dd5aaf6642004b8494379d7f547b0f5aa40781a353eebd2383",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5q2_mutations.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5q2_mutations.json",
+   "sha256": "67b6d6b92b13af0dfe1aa37054cb25ce804ac6c962e2b837b2a696643a2c72a8",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5q3_mutations.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5q3_mutations.json",
+   "sha256": "c65c839d7acc4bcf5375ba5ac5ba87875c4003a9471df07844ae5f32d4e6a1f6",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5q4_boundary_bars.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5q4_boundary_bars.json",
+   "sha256": "2bdd570abdb3efc3e460ae3310e4759230b37c2ce6ebda5c17ae4a66c0c7d978",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5q4_mutations.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5q4_mutations.json",
+   "sha256": "52e6dacb9bc1fca76eefe0948f080ecb0d993712d4c5a458f129b19abe6fab61",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5q4_parquet_tail.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5q4_parquet_tail.json",
+   "sha256": "6a7f9f035f4e368db9ce214e34a7785d9b4569964c85d80ce5e2cfdba5d8b011",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5q4_repair_M2K.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5q4_repair_M2K.json",
+   "sha256": "85e67511119d800988bd3b4430d4c2b6fee3da2c831914a97262779f1df5813d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5q4_repair_MES.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5q4_repair_MES.json",
+   "sha256": "42019c3240de0f2d0146391b93f106492365df58adbb0de89434a523897971dc",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5q4_repair_MNQ.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5q4_repair_MNQ.json",
+   "sha256": "9c3ba54aaa19941069ffabf2d4cb568b974393917f2ac54d1b428adffba0226c",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5q4_repair_MYM.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5q4_repair_MYM.json",
+   "sha256": "9508da62a372878c6be45534288d5eb4c1fb02a8e167f2e024072cf7af7877fc",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5q5_mutations.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5q5_mutations.json",
+   "sha256": "8130465bc7d1602c5205b81bb98e0394b34719d37053026ee29ebb1733f77f5d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5q7_mutations.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5q7_mutations.json",
+   "sha256": "a91f459c7869ac931cf73c50e04e55ccaa0c27a22a8e11b68bb5d29f2cb4f4e7",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5q_mutations.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5q_mutations.json",
+   "sha256": "5e0ca81e4efde685b4c0032bcc807fd930b9897225708322ce781ab41fcda045",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5r0_mutations.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5r0_mutations.json",
+   "sha256": "59e0cd7e0c17417a404649182517c1ef38e6c09ed1c3ffed44c310244f855d85",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5r1_after.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5r1_after.json",
+   "sha256": "eb1e4f06be8541a81798b84573875b4ae959c5780b6b169459bd7de9cf5ff44a",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5r1_before.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5r1_before.json",
+   "sha256": "66b373a86aa7264a9d3398299811f6e7cbe6cdd90bc9b6423ed7b10d90191d7c",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5v1_mutations.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5v1_mutations.json",
+   "sha256": "979285146e6e263d0fe6355f1d7a422a41719769b0d9b342b34b1aa31ffbba74",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/_track1_stage5v_mutations.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5v_mutations.json",
+   "sha256": "e30b133c54ed8f8a6c746d2f15f3625a7332d3ab72747538c98f12b19b5b318c",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/gen_track1_explain_schema_20260823.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/gen_track1_explain_schema_20260823.py",
+   "sha256": "ab2a68f42a9fbc5c99f54554e771fa272028142688c9ed43938e3f3997957ade",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/gen_track1_rule_table_20260823.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/gen_track1_rule_table_20260823.py",
+   "sha256": "2500b9b36cd04739ff135d8ad191b6166ad4e9fbf5ab43bdace98dbcbaa1c012",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_fill_shortgate_measure_20260822.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_fill_shortgate_measure_20260822.py",
+   "sha256": "5c23f9f779899eda937eb49e67b841a404d9d887321ce1ccb7ca18001d61ccb8",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_fill_shortgate_regen_20260822.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_fill_shortgate_regen_20260822.py",
+   "sha256": "e2b6ff83f86fd5ee4d62b283d505fade6997afb6b18a8f07a4dd71034a0ca49f",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_presleep_mutations_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_presleep_mutations_20260824.py",
+   "sha256": "10bcca159f18663f31b80fe32c6f1a705c593b6af44b59e0d64e4f6dbf5ca413",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_presleep_readiness_mutations_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_presleep_readiness_mutations_20260824.py",
+   "sha256": "e146719ea8c0186c60a67e4c2e5715fa822d53e21919cc8720c8d3364ab06080",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_production_feasibility_audit_20260822.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_production_feasibility_audit_20260822.py",
+   "sha256": "52058b327823260e5c30a6532a0e53f5f48a83bbf23fdfeae036a7964b6768db",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_shadow/shadow_decisions_vault2025.jsonl",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_shadow/shadow_decisions_vault2025.jsonl",
+   "sha256": "9c0b3a914fae65f6e04e661fb726acca76c5d3646b175e28df723be69ef1a30b",
+   "classification": "GENERATED_TEMP",
+   "reason": "Track 1 generated temp"
+  },
+  {
+   "old_path": "scratch/track1_shadow/shadow_decisions_vault2026.jsonl",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_shadow/shadow_decisions_vault2026.jsonl",
+   "sha256": "7fcc8b5bb747773b826534a860a184ac2de07a51059138d4d957d390462e0fba",
+   "classification": "GENERATED_TEMP",
+   "reason": "Track 1 generated temp"
+  },
+  {
+   "old_path": "scratch/track1_shadow/shadow_settlements_vault2025.jsonl",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_shadow/shadow_settlements_vault2025.jsonl",
+   "sha256": "93361c6567043f134013b5b5fbc94bd6734a28f71bf1406938d256ca7eedcc6d",
+   "classification": "GENERATED_TEMP",
+   "reason": "Track 1 generated temp"
+  },
+  {
+   "old_path": "scratch/track1_shadow/shadow_settlements_vault2026.jsonl",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_shadow/shadow_settlements_vault2026.jsonl",
+   "sha256": "14f3ed0593429a680da3ac0b0846c3481fcad5434d2d003acf41fa5dde93ab91",
+   "classification": "GENERATED_TEMP",
+   "reason": "Track 1 generated temp"
+  },
+  {
+   "old_path": "scratch/track1_shadow_test/shadow_decisions_vault2026.jsonl",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_shadow_test/shadow_decisions_vault2026.jsonl",
+   "sha256": "7fcc8b5bb747773b826534a860a184ac2de07a51059138d4d957d390462e0fba",
+   "classification": "GENERATED_TEMP",
+   "reason": "Track 1 generated temp"
+  },
+  {
+   "old_path": "scratch/track1_shadow_test/shadow_settlements_vault2026.jsonl",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_shadow_test/shadow_settlements_vault2026.jsonl",
+   "sha256": "14f3ed0593429a680da3ac0b0846c3481fcad5434d2d003acf41fa5dde93ab91",
+   "classification": "GENERATED_TEMP",
+   "reason": "Track 1 generated temp"
+  },
+  {
+   "old_path": "scratch/track1_stage0_runtime_telemetry_readiness_20260822.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage0_runtime_telemetry_readiness_20260822.json",
+   "sha256": "829ac780a3e46d06be7579cd5e20a2da76f597ef7136506866c32477c6c0360e",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage0_runtime_telemetry_readiness_20260822.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage0_runtime_telemetry_readiness_20260822.md",
+   "sha256": "3106a8c1fc60d9e12f1c1307da1fbc0a4609a4f198e25a2787c2c1409a692425",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage1_execute_prompt_20260822.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage1_execute_prompt_20260822.md",
+   "sha256": "da545d3f5babc414a679c34e55fd8952fb379696ab676eaaf793c366da803830",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage1_execute_report_20260822.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage1_execute_report_20260822.md",
+   "sha256": "4ab8148dc7994ee4d01537841b0eab7bd5a325f51398c32c9411ed542d7458bb",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage2_equivalence_bootstrap_report_20260822.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage2_equivalence_bootstrap_report_20260822.md",
+   "sha256": "6160277ac2543683d6158eefdeed1caeae62099028e170405e6d0a63a0777bc9",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage2c_breaker_mutation_1107_20260822.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage2c_breaker_mutation_1107_20260822.json",
+   "sha256": "8b4e9f072295c584aafd2ed1ea6f6b24af8e5f5107a83208dd68b931b3754169",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage2c_breaker_mutation_20260822.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage2c_breaker_mutation_20260822.json",
+   "sha256": "e448573c29ab44d27d089a6e726f7e527cc105eb5aba8d64da5f4a8f9ea0ca0f",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage2c_breaker_mutation_20260822.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage2c_breaker_mutation_20260822.py",
+   "sha256": "62ab03145fe5cff8f4117db9d08f0f4a5dee72b69252acffb94e8db0a5c10861",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage2c_breaker_mutation_intraday_20260822.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage2c_breaker_mutation_intraday_20260822.json",
+   "sha256": "7122d3f361ab6d9ae043bff4376259b0856a8901049866de3db86c711c4b4fcb",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage2c_cluster_isolation_20260822.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage2c_cluster_isolation_20260822.json",
+   "sha256": "12c69710e96d540bbfd55604646e47153aec1cba4558364fa2504455bec1c6eb",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage2d_full_production_route_audit_20260822.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage2d_full_production_route_audit_20260822.json",
+   "sha256": "acf377c37d619ec80711987988bab163af7b6d17d2ce96604289debea51a61cf",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage2d_full_production_route_audit_20260822.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage2d_full_production_route_audit_20260822.md",
+   "sha256": "2300477f615e1f8867c775a29bd7e2ce2212aae7b3253c195431675743e8d8b4",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage3_shadow_route_build_20260822.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage3_shadow_route_build_20260822.json",
+   "sha256": "6c3c9389bb42abc7da8ad82d6eaded2cb8b3820df6b57f79a3255de4cbac856f",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage3_shadow_route_build_report_20260822.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage3_shadow_route_build_report_20260822.md",
+   "sha256": "d017fa8366efc1bf238a46f595c8cea54f9989c322f1c23c8b309ab59e0a1221",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage3b_close_blockers_20260822.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage3b_close_blockers_20260822.json",
+   "sha256": "dcd0a6d77ed6a4f92d9a4c09d494d21312f855ddf6273b01c516df05c3bb4c18",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage3b_close_blockers_report_20260822.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage3b_close_blockers_report_20260822.md",
+   "sha256": "e06edf18e4d5043ec313b28f5f66d66998a324116a6448d1e87987812c1903ce",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage4_production_clean_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage4_production_clean_20260823.json",
+   "sha256": "351344e5a79cf03b7be3b5e82464a61faafe23bde879ab143d6227a18412dcac",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage4_production_clean_report_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage4_production_clean_report_20260823.md",
+   "sha256": "d75f6b904c44f097d21f321dab098cc22072b802029d2c1425becf9bd3ff69eb",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage4b_identity_liveframe_report_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage4b_identity_liveframe_report_20260823.md",
+   "sha256": "40f846d02f0d9526d17ab600928071d54378291b41238dfa6efbb9bebd415ed3",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage4c_live_frame_adapter_report_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage4c_live_frame_adapter_report_20260823.md",
+   "sha256": "138923b15f0f35b7d57810c01450143a1295ec6ffd504712c76f77951809fb9d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5_preswitch_audit_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5_preswitch_audit_20260823.json",
+   "sha256": "860193fc71b3bf3b47f2000f933f3cc777c79d1a233b2f31d9e51ee92374974c",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5_preswitch_audit_report_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5_preswitch_audit_report_20260823.md",
+   "sha256": "412d771117c55d8058a9f868cd7456c055e9696ca4d807c2d33904567e16d693",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5aa_health_slots_only_report_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5aa_health_slots_only_report_20260823.md",
+   "sha256": "c930d0d9d8528e80108049f84e42d2c0ddd647d530eb26f8ac726403f6bd7649",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5b_runbook_fix_report_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5b_runbook_fix_report_20260823.md",
+   "sha256": "9a052fe0c303df52ebba2367d2b2807fa9ff2e59d9d84fffc31fcebb639feb7e",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5c_shadow_start_readiness_report_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5c_shadow_start_readiness_report_20260823.md",
+   "sha256": "873f336385bfacce078efbe0117382ee50ef10bc5bf5499f81f6bfe8dfa83033",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5d_shadow_live_wiring_report_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5d_shadow_live_wiring_report_20260823.md",
+   "sha256": "52a5da440e12ab7b639c4a7ddd048f1d5d3fd382850964cc3e184465b16dec56",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5e_live_source_report_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5e_live_source_report_20260823.md",
+   "sha256": "d5047d6aa788ca84f18fe813401e3badaa4259aa742cc015d41e9206efc2f225",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5f_stress_live_source_report_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5f_stress_live_source_report_20260823.md",
+   "sha256": "0cd02ec40f068ea964da3ba6f38e0a0ae705e581179e0c01a47b994528634e86",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5g_live_frame_provider_gate_report_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5g_live_frame_provider_gate_report_20260823.md",
+   "sha256": "9e978ce4af511535c64730464955123fcc2ef45f23578d67497f9fe6d39e5f50",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5l_mutations_20260823.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5l_mutations_20260823.py",
+   "sha256": "f63ed6e413e4922e3ef7cf25e1778b5acdcb6e651bad2bb446afefa76534589c",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5l_shared_preflight_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5l_shared_preflight_20260823.json",
+   "sha256": "7fafc10f41d9e549063d2a2e15c40dfe1424eedc08cb55f9f843f2b694e04199",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5l_shared_preflight_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5l_shared_preflight_20260823.md",
+   "sha256": "e29d031b0c104aca85c65dd738e9aebacf0adcfd49f0c88eaf94143caa570eda",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5m0_mutations_20260823.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m0_mutations_20260823.py",
+   "sha256": "6c6a99fc9706009e8c3a441be43488296ac01bde2c01f60aa3bfb339d1d854e2",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5m0_state_repair_preflight_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m0_state_repair_preflight_20260823.json",
+   "sha256": "ec9cb3c907dacacc8ecb9e0cd14f785f5049982adefc4118255f09a1c9a6e1e6",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5m0_state_repair_preflight_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m0_state_repair_preflight_20260823.md",
+   "sha256": "8a5d36ab06e80e5063e9f56f5f7fd639a7bb8103cab7a4b49915dcc01943d782",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5m1_fill_law_identity_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m1_fill_law_identity_20260823.json",
+   "sha256": "969846d5c8e7cd947c0490745fb21155b40791783b3bdf04bd9d172b48f1d219",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5m1_fill_law_identity_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m1_fill_law_identity_20260823.md",
+   "sha256": "f75135504a7fea5af157c600ba04a0a260512674ebe9350dc8b64684615f5c22",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5m1_mutations_20260823.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m1_mutations_20260823.py",
+   "sha256": "9aa4e24b3d7f04f1065ff4d9c677da968dda842699ba3eb5afad8fa679900fb5",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5m_a_arm_fill_probe_20260823.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m_a_arm_fill_probe_20260823.py",
+   "sha256": "19b7d315b4132fc1febd58c40e6bdcf04a57cf83d25536d86c92cb49c24115c3",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5m_a_normal_r4_promotion_audit_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m_a_normal_r4_promotion_audit_20260823.json",
+   "sha256": "49ae6bb7666bed2803e9c061f50ea3706510a24d381f288759103540f94dc222",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5m_a_normal_r4_promotion_audit_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m_a_normal_r4_promotion_audit_20260823.md",
+   "sha256": "3bd93a45a57e77d9245361cec83170903f853d77b36d5031b85e4d5125124e28",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5m_b_mutations_20260823.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m_b_mutations_20260823.py",
+   "sha256": "c2823668bf6ac62b98e0a1e979ea69a26c1f34c7abc0a0b9351147130333df90",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5m_b_normal_r4_shadow_slots_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m_b_normal_r4_shadow_slots_20260823.json",
+   "sha256": "25a1248d2ceb181ee0c2c59a755a83e1b23dcd6897c19ad726a01de760660be3",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5m_b_normal_r4_shadow_slots_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m_b_normal_r4_shadow_slots_20260823.md",
+   "sha256": "bcdcee0775a515dfbddc056517b05e207ac00f652b86ee2930071d39a96d6418",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5m_c_mutations_20260823.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m_c_mutations_20260823.py",
+   "sha256": "85aae673d612c363df8e30f55a7559a90c5512cb4339a92315a6b2d24363755f",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5m_c_swing_provider_readiness_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m_c_swing_provider_readiness_20260823.json",
+   "sha256": "a1b1ba738247ce423e972f8aefd0e62ad6c4912319d8121a1eddf92495a7c14b",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5m_c_swing_provider_readiness_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m_c_swing_provider_readiness_20260823.md",
+   "sha256": "4416025ab794f4832252b72fcfb6845efc0558541fe123aec78e682b5557180c",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5m_d_legacy_removable_probe_20260823.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m_d_legacy_removable_probe_20260823.py",
+   "sha256": "bb8c49290513e834f34bf14e27374bc596f29d1a18c404cb31f70bfaf9222ef8",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5m_d_mutations_20260823.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m_d_mutations_20260823.py",
+   "sha256": "877f168363ca113bf604b045a6baa462f796fe4468401ffa59a01263feab8037",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5m_d_track1_only_shadow_mode_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m_d_track1_only_shadow_mode_20260823.json",
+   "sha256": "f45b5182616f5672d31181646c54a65ad6aa43b39a5211d2a7b5597f45314970",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5m_d_track1_only_shadow_mode_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5m_d_track1_only_shadow_mode_20260823.md",
+   "sha256": "b063ddacad9d9090cac7cbff58e338df444d335f3964932eca7aa64b3e295926",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5n_mutations_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5n_mutations_20260824.py",
+   "sha256": "f66cfc43a3b2ce9595fd065cfe821afcc7a7c687d39270e9231a0aa8723ef46b",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5n_nkd_track1_ownership_20260824.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5n_nkd_track1_ownership_20260824.json",
+   "sha256": "6558251a021ca7b8f65683b2fec84869bb52539a246b2fd0ed213980c429b5b0",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5n_nkd_track1_ownership_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5n_nkd_track1_ownership_20260824.md",
+   "sha256": "797df4ca980b1164b1dba9b7f5dcf21cc1311221c7fbd83c339b96985c3870bb",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5o_mutations_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5o_mutations_20260824.py",
+   "sha256": "d1af577a4e5d947f5ec2a6b0b1132ddba682b73f508616f59f1f397e45e64922",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5o_route_aware_safety_20260824.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5o_route_aware_safety_20260824.json",
+   "sha256": "3ce57d29c3159a20f5bf54c7a96466015001534b0e08a617eacbc52867f86b3c",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5o_route_aware_safety_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5o_route_aware_safety_20260824.md",
+   "sha256": "04a2cabc5de9f2a3b51fba9243e2528abeab9e232474e77c639246c4dd884b7d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5p_full_four_sleeve_shadow_readiness_20260824.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5p_full_four_sleeve_shadow_readiness_20260824.json",
+   "sha256": "12daa609246b77825f62919414fd7f1b69c5bc36c8a6edfd4777cbaff924da9f",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5p_full_four_sleeve_shadow_readiness_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5p_full_four_sleeve_shadow_readiness_20260824.md",
+   "sha256": "85a248e11d9263ccc404c0d59ef61954168bd64a2949cfb5f6e50905a3a6b0ef",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5p_mutations_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5p_mutations_20260824.py",
+   "sha256": "7c9d6eddb890e6fc8653436940470626eaf220cc0d3960ee92df3572f7d02638",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5p_operator_text_cleanup_20260824.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5p_operator_text_cleanup_20260824.json",
+   "sha256": "f1eebbe896791de8c2406420f98bd294f9224b0cd136db5c071efff72f760e2c",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5p_operator_text_cleanup_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5p_operator_text_cleanup_20260824.md",
+   "sha256": "2b18725049382e6c3bc6b220f6ae270ab910dd1ed68d6fcbde5b7f0366b932e9",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q1_audit_semantics_report_20260824.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q1_audit_semantics_report_20260824.json",
+   "sha256": "ff02a06030ac4fcebabe681897a3edde540c87b72fb67f3603c80626761cf833",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q1_audit_semantics_report_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q1_audit_semantics_report_20260824.md",
+   "sha256": "bd30d76e02bf9437aee21a70dcbc1994afe4b11c279d55ee86df823c457f0142",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q1_mutations_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q1_mutations_20260824.py",
+   "sha256": "146283fb2da22930e4aa7322451edabccfff347cbc65e240978121240dfe711c",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5q2_explanation_integrity_report_20260824.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q2_explanation_integrity_report_20260824.json",
+   "sha256": "a994681ca9fab0ecc99d2e63dfc5aa44ecd322677dd956f956b875bb62a37492",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q2_explanation_integrity_report_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q2_explanation_integrity_report_20260824.md",
+   "sha256": "6defe17aa807f42f0134be910b2908999ba45729c70036720334f6aee5cca78e",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q2_mutations_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q2_mutations_20260824.py",
+   "sha256": "4836b9cd836db1fa13b1615945133b69fd6fce2a29f47e5a4352a28425fc8e5e",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5q3_live_frame_splice_report_20260824.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q3_live_frame_splice_report_20260824.json",
+   "sha256": "78027d34f934b8809b6ef1f4311b84abc75cdc43b117a743cbcb4fee82f92e55",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q3_live_frame_splice_report_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q3_live_frame_splice_report_20260824.md",
+   "sha256": "b85857364a1a07f05a3f574bbecaf6f511d721622ac0ed3ed286eb79fd4df99f",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q3_mutations_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q3_mutations_20260824.py",
+   "sha256": "3a648d0d347065d5b8d7cf731eee642bf74e0d0222297ef350845455d1f49228",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5q4_mnq_overlap_audit_20260824.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q4_mnq_overlap_audit_20260824.json",
+   "sha256": "25b6564136854ca4b58e84db56489929af83b0b2b3b5a8c8163b9ecffba1b253",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q4_mnq_overlap_audit_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q4_mnq_overlap_audit_20260824.md",
+   "sha256": "f158795d6e44d7231f48bfb78962af1b6e438dac2e0f98d47d68e6a917876711",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q4_mutations_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q4_mutations_20260824.py",
+   "sha256": "8173ceee09a095b576275f34ff81ba78d27f5503195f78603127aa49cd010e79",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5q4_probe_boundary_bars_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q4_probe_boundary_bars_20260824.py",
+   "sha256": "c5a059643bacaf82fb15470a529f2156bdd398b6f9ab3ae3abba745b6f6491ab",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5q4_probe_parquet_tail_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q4_probe_parquet_tail_20260824.py",
+   "sha256": "6888e60e9bdd3d046861bd4c740345d3ab7906bf916c2187f9c112b58a49ff9d",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5q5_freshness_boundary_fix_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q5_freshness_boundary_fix_20260824.md",
+   "sha256": "6453bc006235f7bc771dcaee20666a5fa70f59373fe46feceaaaa4f7de73c464",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q5_freshness_boundary_report_20260824.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q5_freshness_boundary_report_20260824.json",
+   "sha256": "21841e7a6cd4b0f0ba734522c226897ce0c84160a85c7c67088d8c25d4a45e77",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q5_freshness_boundary_report_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q5_freshness_boundary_report_20260824.md",
+   "sha256": "aaead17659a1bb00f5e533b625400bffc1e8cea4ec82662f41dec9e14e9ca535",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q5_mutations_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q5_mutations_20260824.py",
+   "sha256": "d43428f00b20f6b78a9bada920b1d4e0d89371b21708b8abf703d6913e3a5a1d",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5q6_operationalize_freshness_boundary_20260824.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q6_operationalize_freshness_boundary_20260824.json",
+   "sha256": "5a94f3041d1d6050becf04131ceb056008961e4ba7ef6434f450cf600b1d5498",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q6_operationalize_freshness_boundary_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q6_operationalize_freshness_boundary_20260824.md",
+   "sha256": "584d054aea5f2a9f4926e9a2b378dc86ff3847f5249b4fa7dff50f717324a57d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q7_apply_boundary_restart_mnkd_identity_20260824.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q7_apply_boundary_restart_mnkd_identity_20260824.json",
+   "sha256": "0c6e248a9e2f935c2d951eb46e6f26e7212221386c4167a50e052d68c9ed1afc",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q7_apply_boundary_restart_mnkd_identity_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q7_apply_boundary_restart_mnkd_identity_20260824.md",
+   "sha256": "52ce7e9903a923d32c60993079ac8adab17acb697a634c1c97e75bb9d3c6204e",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q7_mnkd_identity_probe_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q7_mnkd_identity_probe_20260824.py",
+   "sha256": "587d9892bd1cd7b55ca2394e5621fb5d6bb60e5c0ae7fae1b35c7b09a100032d",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5q7_mutations_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q7_mutations_20260824.py",
+   "sha256": "2274b045e5961df973c431b98cbac46a2f69687858a7d0bdba095409b37462c1",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5q8_raw_backtest_identity_audit_20260824.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q8_raw_backtest_identity_audit_20260824.json",
+   "sha256": "9d594f498ff252cb05cefd560c4a442a55c1bca3278219b8a1270e21e8e6145d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q8_raw_backtest_identity_audit_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q8_raw_backtest_identity_audit_20260824.md",
+   "sha256": "7bc4c0d26d87be53444b931a4f73d8e4aa94506b5cffefbf5d824698603a065a",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q9_identity_admission_closeout_20260824.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q9_identity_admission_closeout_20260824.json",
+   "sha256": "5303bd8a4ce1cfe3150aa8ddc72303da214c61f3b54643c1fd0112812572cf08",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q9_identity_admission_closeout_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q9_identity_admission_closeout_20260824.md",
+   "sha256": "8a562d7d3ae21022ce9d023419df6d9b01c484a483fd3603b9063f8f9e9f6bd2",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q9_sizing_basis_admission_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q9_sizing_basis_admission_20260824.py",
+   "sha256": "c3d031c68303a158916c8a81bd247ff41d90068c9e71e9d4e187b42fd0a0c039",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5q_mutations_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q_mutations_20260824.py",
+   "sha256": "a6d310fb8d29338d4a4e2105349c3c66992ce7d67e4d159b4dff9d8e33a3ae27",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5q_post_window_audit_report_20260824.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q_post_window_audit_report_20260824.json",
+   "sha256": "1a46961c38fe25ad6ce28decbfb48ef9b849340bde36c3cfd3d0c91aaeb7be8d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5q_post_window_audit_report_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5q_post_window_audit_report_20260824.md",
+   "sha256": "12dbb8cdfe2c3f1333dd8bd8359e26917eeeac6721dc525afb2c2c264541ac20",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5r0_boundary_tail_closeout_20260824.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5r0_boundary_tail_closeout_20260824.json",
+   "sha256": "8e00b0108d66229b910fe9a338be5e3c078536e2daf4e981fd9f55c7b3982096",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5r0_boundary_tail_closeout_20260824.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5r0_boundary_tail_closeout_20260824.md",
+   "sha256": "a50c7463980742efea417009d28b030eb3bdb8314bcd119c9fb2b689ed99d6d6",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5r0_mutations_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5r0_mutations_20260824.py",
+   "sha256": "a2e36e6c571b24e30a8a8e4c6f4175a6dd112f75910e0f378d580c8004270ca8",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5r1_operational_repair_restart_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5r1_operational_repair_restart_20260825.json",
+   "sha256": "a329f1c3d05de900ccc260c9d7bdfffc72cc998c1a0412c73b1e42ada1343fd6",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5r1_operational_repair_restart_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5r1_operational_repair_restart_20260825.md",
+   "sha256": "d6ad1ac1efb8bf39450ecdfc49338bd80f7e80a79e4c93be23c1f7de7d25719a",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5s_paper_readiness_gate_audit_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5s_paper_readiness_gate_audit_20260825.json",
+   "sha256": "72f3800daeea09d55e3e1e8c9af0d523ebd8a5fb1b029c56216da5cd09401e58",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5s_paper_readiness_gate_audit_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5s_paper_readiness_gate_audit_20260825.md",
+   "sha256": "a496d55cdcb618309f4a6787cc6cfbe4770822e2bfd462c16a3fa7d4471ed77b",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5u_order_state_reconcile_design_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5u_order_state_reconcile_design_20260825.json",
+   "sha256": "abeb650495c840587aaec19a15905988e27c972128131507b87f5ad7b1b9ccc4",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5u_order_state_reconcile_design_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5u_order_state_reconcile_design_20260825.md",
+   "sha256": "0f54393aa7d77d0a557bef98b1a5c02a5c11ddc45807f029b6298dc852ddb125",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5v1_intraday_causality_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5v1_intraday_causality_20260825.json",
+   "sha256": "f8985f1624a3a2fdbd0ca72e6023855848bada0b5f0dcfd585ddaca89973c15c",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5v1_intraday_causality_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5v1_intraday_causality_20260825.md",
+   "sha256": "90ac265eb89f99e2681b4c45b6acc34282da09dddbebaccc930bc5db839b2e83",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5v1_mutations_20260825.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5v1_mutations_20260825.py",
+   "sha256": "0c57a6b5d26b09a5168f0bc1e4c40018486d6c1ee4618fa159e9c678eeab61cb",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5v_mutations_20260825.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5v_mutations_20260825.py",
+   "sha256": "b94aa0d98bd102e0e2366227ba100b07f4f390e11e3a971675b74043494a61dd",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5v_order_journal_writer_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5v_order_journal_writer_20260825.json",
+   "sha256": "9dc91abf9b6d8f3d25ea096621ee32a53b93c0e3fde268f5c2198541db96c111",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5v_order_journal_writer_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5v_order_journal_writer_20260825.md",
+   "sha256": "f8bd7c5cc0f769b98f85c2f96fde8378213bb2ffae07334e281c12dedb153ea8",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5w_mutations_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5w_mutations_20260825.json",
+   "sha256": "486572067ac4a7eed1feeb2d0c9c326030354640bc9fe11265664717ca1810e3",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5w_mutations_20260825.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5w_mutations_20260825.py",
+   "sha256": "e642950857081aca094a846be597a1c08db593cea8c8ad8a48675d1f681d95c1",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5w_paper_executor_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5w_paper_executor_20260825.json",
+   "sha256": "9b83c7234ad88c961269d0cbdabc1f2526ffbf0478b7dac55e06cb9bfb3ccb55",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5w_paper_executor_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5w_paper_executor_20260825.md",
+   "sha256": "7f6107a3f1a4855de175d62e81b2a497562ea369bdcd5224bd2dcf292dcab6bf",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5x_broker_readside_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5x_broker_readside_20260825.json",
+   "sha256": "39088dc5d900d48976737f235c1295f9947246ca58bbe68c3dc5f976aeecb825",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5x_broker_readside_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5x_broker_readside_20260825.md",
+   "sha256": "cd8ad154535db338508aa830c85968266a1388b15f4d6afcd25df36eb00bfcc4",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5x_mutations_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5x_mutations_20260825.json",
+   "sha256": "f55e683b5b43003431663730ba01642e5f786957210735887873a6f2592c0b54",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5x_mutations_20260825.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5x_mutations_20260825.py",
+   "sha256": "cfcd88c0a9ecde7ea4e7892b200f847bbffc11086a2bf1a7c3ba1667f6481962",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5y_mutations_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5y_mutations_20260825.json",
+   "sha256": "f50847baadad99b47e08643f83c0eaa49d3a9660adcb5f92c33e1f849ef91e23",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5y_mutations_20260825.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5y_mutations_20260825.py",
+   "sha256": "ed5edaa94517a610cb48798add7c7e03236a997b5210f9a2bf98b52b45e4334e",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5y_order_id_writepath_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5y_order_id_writepath_20260825.json",
+   "sha256": "9ddcb809246946abcb209ef306ef0883c74b0322dc7656b9fbdbbc5e6bf5ad58",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5y_order_id_writepath_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5y_order_id_writepath_20260825.md",
+   "sha256": "e0ba311dca5d05c1922cbfa3468515b4ccdafbe50cda44b79be97ff3bd9d18f7",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5z_callsite_dryrun_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5z_callsite_dryrun_20260825.json",
+   "sha256": "de222337594a8845302dc73e747f85a6c85c7938efb89dfeaee35de38fd71bbb",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5z_callsite_dryrun_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5z_callsite_dryrun_20260825.md",
+   "sha256": "ce5dbd0577c60ac2f701b35d86148f9c5fec923473087b00f4fb04d7ff48c31c",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5z_freshness_root_contract_report_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5z_freshness_root_contract_report_20260823.md",
+   "sha256": "70b7d4865116202190c3c291679f7f3bf3f1ae5f3457f387936f5e239b8815b0",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5z_mutations_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5z_mutations_20260825.json",
+   "sha256": "9f5a3a8ed731a3ebad2c510f004d9212dc1eb7b05c7bdd67d2e90e50133b96ce",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5z_mutations_20260825.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5z_mutations_20260825.py",
+   "sha256": "aa9b925de6a35e5b067baedc07efc6cff64d0c4a23de09d48e3570d679390503",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5za_causal_slot_audit_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5za_causal_slot_audit_20260825.json",
+   "sha256": "3c193f482daf1250290ad9225ef6e9f8b65a041e727e6c4bf36ffca3f7a7f1f0",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5za_causal_slot_audit_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5za_causal_slot_audit_20260825.md",
+   "sha256": "d800481ac162b423529f129c93f1d641f7ffa97cbe43a4710d34d472a4aab9f1",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zb_mutations_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zb_mutations_20260825.json",
+   "sha256": "47ffc668f6d8d988a7c5c7345e13aa8e646d71f4ba4e14c3987c9bef082d7f9a",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zb_mutations_20260825.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zb_mutations_20260825.py",
+   "sha256": "0ad8383442d03f877f32dab0051b75d9f181f2c26ecddac675baa878d25a074b",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zb_operational_audit_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zb_operational_audit_20260825.json",
+   "sha256": "e408da7f87b25085312e1f74f7a24a3f98749d96db832acfe8e68cb2f62ec18d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zb_operational_audit_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zb_operational_audit_20260825.md",
+   "sha256": "33d0174f9fd44883fababc69190d5fce92b950401a2679580e698a804871ba13",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zc_post_window_runtime_check_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zc_post_window_runtime_check_20260825.json",
+   "sha256": "fa000f337c7929ef2e2d08827acb3514961ba2695e72b2fda2d1f05a118e658d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zc_post_window_runtime_check_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zc_post_window_runtime_check_20260825.md",
+   "sha256": "f336890204192c502d1a652bd84ba97ac22c57405f99dc22e899373e1b775d9d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zd_mutations_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zd_mutations_20260825.json",
+   "sha256": "cc494619f8d47ed3eae24616ac432a8fa5fc60b95289765b8d3dd87e7358d477",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zd_mutations_20260825.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zd_mutations_20260825.py",
+   "sha256": "f676e57a4d94ceb20af2eb34527efc612c80c27612de12a7924a65854f5bac90",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zd_signal_diagnostics_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zd_signal_diagnostics_20260825.json",
+   "sha256": "9ea685e62cd5bbf41e3c31949aaa23eadfd518eabaeec38c507b63dd3707c3fc",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zd_signal_diagnostics_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zd_signal_diagnostics_20260825.md",
+   "sha256": "aa0a5050a976d95e04f86da4fcf308bcab278df7c9d83e7c331ee29646b9d092",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5ze_job_view_operator_diagnostics_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5ze_job_view_operator_diagnostics_20260825.json",
+   "sha256": "f1bf90bcb573c6b87b8fd3830e8c1813657acb9eb39bfec3b7aa01177a653351",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5ze_job_view_operator_diagnostics_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5ze_job_view_operator_diagnostics_20260825.md",
+   "sha256": "ebae47723695b664913aaa995524566e57fcaef30efcaba08d4d08bbcc9086b6",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5ze_mutations_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5ze_mutations_20260825.json",
+   "sha256": "25adc804167caa7b77e3bb5ab5648feb96705451d16d3dc1e3225016e663758e",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5ze_mutations_20260825.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5ze_mutations_20260825.py",
+   "sha256": "5720ff74d5e20917798e7a17cd12a6d84bc4fcc0856080f2b4686e675b89c634",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zf_ops_report_completeness_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zf_ops_report_completeness_20260825.json",
+   "sha256": "e94e19ba43a3ed76930b952a30d1db28d2bf3cea81ff4f2a2f365d1f397f7e2e",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zf_ops_report_completeness_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zf_ops_report_completeness_20260825.md",
+   "sha256": "8f33229d41db1280485d28f0c471c19b9e5f276e49b6b4ac0b2e44abda5d0dff",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zg_mutations_20260825.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zg_mutations_20260825.py",
+   "sha256": "06fdccbc2e57429f142ad0d3cbbdc290333b4063cf5e114363bc4d801b206928",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zg_route_aware_safety_reporting_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zg_route_aware_safety_reporting_20260825.json",
+   "sha256": "6329604c51b836db624266894b8ade892ea7f9d522999802502e058ffb59b24c",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zg_route_aware_safety_reporting_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zg_route_aware_safety_reporting_20260825.md",
+   "sha256": "dc94ac4aac69e01ad7f5522090784ec0620970a0678868effcf63f9fea8dae9d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zh_mutations_20260825.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zh_mutations_20260825.py",
+   "sha256": "b028825d846bbfba91e3c3540a74d8c2cc337ff86e64f06bffbbc805b180240f",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zh_quiet_checkpoint_audit_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zh_quiet_checkpoint_audit_20260825.json",
+   "sha256": "d6874a591275d488b6cdabee0d2c1f37ccaa8cdc60d06569848c16ce2ac0559d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zh_quiet_checkpoint_audit_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zh_quiet_checkpoint_audit_20260825.md",
+   "sha256": "a7fbdf99df96f44f300fac3a0d7e1617ac7be1127f00fb9be9e39521ef415f69",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zi_prepaper_errorproofing_map_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zi_prepaper_errorproofing_map_20260825.json",
+   "sha256": "4fde574df01157d36e3a9ac6b6cb0158790bfb21e97fad34ef692ffb7a609622",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zi_prepaper_errorproofing_map_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zi_prepaper_errorproofing_map_20260825.md",
+   "sha256": "84eff76b0b27a17872e1f992c642293f760cdff0ef8b8d79f7aeb20402eac09c",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zj_make_5zg_live_20260826.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zj_make_5zg_live_20260826.json",
+   "sha256": "6360209f92634dd9e4ab298dddd1e4ea53b7d37c6bb0b80387cbb21534593e97",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zj_make_5zg_live_20260826.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zj_make_5zg_live_20260826.md",
+   "sha256": "dd4a0d16cec980a40af8cefc7ab60ae163dc448e3a565dfcaaec072bc63c9031",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zk_checkpoint_frames_resume_20260826.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zk_checkpoint_frames_resume_20260826.json",
+   "sha256": "022a3750662cba1541d94d22e1e65d71004cb738abc1a17390a05909be609ff4",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zk_checkpoint_frames_resume_20260826.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zk_checkpoint_frames_resume_20260826.md",
+   "sha256": "8848df17849b5830b7683a15d3a2edaa1d33413e709283a0464ffcf195f0bd63",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zl_regime_tristate_20260826.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zl_regime_tristate_20260826.json",
+   "sha256": "c31c627734acf645dce6b81ee72c0892f1f88e98e09d17e9583ca406d81c9b58",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zl_regime_tristate_20260826.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zl_regime_tristate_20260826.md",
+   "sha256": "f666eccb2c21efb9f8b556deff0819b222ef13f80df734448624da87c6965471",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zm_route_aware_reporting_pnl_20260826.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zm_route_aware_reporting_pnl_20260826.json",
+   "sha256": "d8b5849753375a943879ca0cde74c2360161be1aba09aa98c6d78dcbca3aa185",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zm_route_aware_reporting_pnl_20260826.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zm_route_aware_reporting_pnl_20260826.md",
+   "sha256": "7065fd009115b59f97e4cc734123f8c871287b1b52ee39f86428cb163c3793cf",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zn_planned_stop_executor_lifecycle_20260826.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zn_planned_stop_executor_lifecycle_20260826.json",
+   "sha256": "206bf948faaebc2d3f80442508a81dc3f5227e230934eed7c909d92758877550",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zn_planned_stop_executor_lifecycle_20260826.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zn_planned_stop_executor_lifecycle_20260826.md",
+   "sha256": "23a4aa6338025c37d51b1268d408f52a13822ab9a8036b57aa002067db173b54",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zo_live_bar_pull_proof_20260826.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zo_live_bar_pull_proof_20260826.json",
+   "sha256": "7ccd28dad2479f3740a8e270cc7be6ab3400da3d53015f685c8ebc0096b1e546",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zo_live_bar_pull_proof_20260826.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zo_live_bar_pull_proof_20260826.md",
+   "sha256": "ac914a00f7ff0a1914057753ca5a038ebf8fc99b216c0ef73fb9ac19c858bd58",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zp_dashboard_diagnostics_polish_20260826.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zp_dashboard_diagnostics_polish_20260826.json",
+   "sha256": "420c71a31c0f5f8d554980c7291602374b25ed5f815a323a97db4d96dd5ac8fe",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zp_dashboard_diagnostics_polish_20260826.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zp_dashboard_diagnostics_polish_20260826.md",
+   "sha256": "7c63a673103c7893dbe4fdfd8d8d12d454aa0580a3118183a74a82fade242383",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zq_legacy_flat_b1_audit_20260826.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zq_legacy_flat_b1_audit_20260826.json",
+   "sha256": "fa86462b63f738b00c5137e47f6a93d59608cf3bd07198824018edc575dbef9a",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zq_legacy_flat_b1_audit_20260826.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zq_legacy_flat_b1_audit_20260826.md",
+   "sha256": "8b213d852f09252d7acf2c80f0cd839dbecccaf690704e9a3913195441e9811d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zr_b1_operator_decision_20260826.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zr_b1_operator_decision_20260826.json",
+   "sha256": "b2f53495948230508a2edfc0e7e189a5370696cb1fa36f31d16254b31cfeb480",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zr_b1_operator_decision_20260826.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zr_b1_operator_decision_20260826.md",
+   "sha256": "9d6751ed9d853d82ece7113a5b50156c71bd7c09c50a5d77e4f26f084fbdedf1",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zs_book_carry_forward_safety_isolation_20260826.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zs_book_carry_forward_safety_isolation_20260826.json",
+   "sha256": "d6f1aafbd3ea969fdf2e6fcc4c82bcc4438d54ba9e5c95cad509e7a07659fcb1",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zs_book_carry_forward_safety_isolation_20260826.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zs_book_carry_forward_safety_isolation_20260826.md",
+   "sha256": "25ed3a1860d518f3d4d67f215a8af52063dd53712d2beda5dcac17b9d6bacb68",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zu_calm_timing_identity_20260826.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zu_calm_timing_identity_20260826.json",
+   "sha256": "b4c2cab84d4092dff4fd3f032dd281adef8690d6c78048f31721e83b11f4ee06",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zu_calm_timing_identity_20260826.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zu_calm_timing_identity_20260826.md",
+   "sha256": "42b6e06c641bca3f5b7fe7df59e18cc3b4709b5cd54b65c412812fc671f239ca",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zv_calm_shadow_paper_execution_identity_20260826.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zv_calm_shadow_paper_execution_identity_20260826.json",
+   "sha256": "c873cb108d4d7036344c6ef9ef88dc09d731912f9dd81d752082334750c6b6ef",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zv_calm_shadow_paper_execution_identity_20260826.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zv_calm_shadow_paper_execution_identity_20260826.md",
+   "sha256": "43e2e9237a5bbf139b8d69e2df37b9de60d3430c0b20a3ef59225d98fb11652f",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zw_calm_prepaper_execution_plan_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zw_calm_prepaper_execution_plan_20260827.json",
+   "sha256": "502a4c755634cadf8d4cadaada1c63e7f11c109d020cb9250cff4f50af7a6323",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zw_calm_prepaper_execution_plan_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zw_calm_prepaper_execution_plan_20260827.md",
+   "sha256": "bff1fd61125890e81cf50569295fd0dc32eb69f200ff7b045df02c98685bc549",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zx_calm_shadow_intent_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zx_calm_shadow_intent_20260827.json",
+   "sha256": "18359371fc20f6dbd05617bf434f9fc21f39d9f6c790f6f4b57173fa4c31ab5c",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zx_calm_shadow_intent_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zx_calm_shadow_intent_20260827.md",
+   "sha256": "71438ce567e6685d89216914f72468eb6a7adddfc66a4cfb320a96f3b53b4268",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zy_pre_live_calm_phase_check_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zy_pre_live_calm_phase_check_20260827.json",
+   "sha256": "74d556087b0cd1c8cedc0c442285828f1e11f8ada6593c371b8155dd6a347ece",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zy_pre_live_calm_phase_check_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zy_pre_live_calm_phase_check_20260827.md",
+   "sha256": "65c1a6ca4a1f19c939450edc78d0ef5d3981de06792c111634000cb857f5adf4",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zz_ops_status_process_reporting_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zz_ops_status_process_reporting_20260827.json",
+   "sha256": "7e97647d653f0465088eff4c0ac7ccfecbf50903f41ab56e00aa7f56cc16377c",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zz_ops_status_process_reporting_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zz_ops_status_process_reporting_20260827.md",
+   "sha256": "99f36f935376e45877a86b82558db49f69db3c21aab0c83515dce8c58b1095ed",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzb_spy_refresh_coverage_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzb_spy_refresh_coverage_20260827.json",
+   "sha256": "149d30b3a2ea3afeeb0e1ebb59f3ef00c9d25308ba01fbcd74e9207ee4e18021",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzb_spy_refresh_coverage_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzb_spy_refresh_coverage_20260827.md",
+   "sha256": "bee5637ca3192b4e06b5f5178a38ddf72bdc6caeffaf3ad4b7733f62b2b0fa76",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzc_spy_refresh_retry_calm_watch_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzc_spy_refresh_retry_calm_watch_20260827.json",
+   "sha256": "c35e88bae34e4f889cc5c4d496e005803a7a3ffb15b69e73964331f08c5d24c2",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzc_spy_refresh_retry_calm_watch_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzc_spy_refresh_retry_calm_watch_20260827.md",
+   "sha256": "1b46ba15be9a06f451077fbf853af6aa35811bafe8346377730c04c29429a40e",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzd_pre_nkd_spy_refresh_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzd_pre_nkd_spy_refresh_20260827.json",
+   "sha256": "fb2b5a948c9184223404c767d89d2fc17f74b41c9039a616d0db22dc80a464cf",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzd_pre_nkd_spy_refresh_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzd_pre_nkd_spy_refresh_20260827.md",
+   "sha256": "f98bca1d9eda420e21b7f9f9da938e4be40a85cdd04ef1b586b79dc6386dc357",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zze_paper_account_baseline_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zze_paper_account_baseline_20260827.json",
+   "sha256": "fc49476d8f812b4826365de6609b37981480ac241ac678b3ce2898fa35c48a72",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zze_paper_account_baseline_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zze_paper_account_baseline_20260827.md",
+   "sha256": "79c98c21888841e646a3871199221f26932aaa49ecb475434f5b0d24be73537b",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzf_dashboard_source_hygiene_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzf_dashboard_source_hygiene_20260827.json",
+   "sha256": "fcbf421d3a3b4c77e195a54eb39786dd53962d8321c9f700e3f82335572cd721",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzf_dashboard_source_hygiene_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzf_dashboard_source_hygiene_20260827.md",
+   "sha256": "da84fc20183054f416a25e710d42ca7da348cdde9d858bb6d255db23b52e4843",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzg_order_send_wire_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzg_order_send_wire_20260827.json",
+   "sha256": "32e0ef20a5b52e8455b133f51079bbe5a7425dac90bccbe5cf4c7f9a45fc0824",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzg_order_send_wire_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzg_order_send_wire_20260827.md",
+   "sha256": "d1c731e871fab456dbf0fcab079cebd6452ad2f76539af87d84c1af35825b16d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzh_dashboard_hygiene_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzh_dashboard_hygiene_20260827.json",
+   "sha256": "aae27626acf87007730723be761a741737106e84bb916004cf09ef241c17e012",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzh_dashboard_hygiene_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzh_dashboard_hygiene_20260827.md",
+   "sha256": "3a3a62f2758d4243f65badb93f34fa4ea245e15184488125e0364373f35ee5b8",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzi_calm_live_bar_refusal_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzi_calm_live_bar_refusal_20260827.json",
+   "sha256": "4fba5bbbd4f1d35dc4239c2d4b89646db53d41a56ec143f8ef2ed2d84e898bc9",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzi_calm_live_bar_refusal_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzi_calm_live_bar_refusal_20260827.md",
+   "sha256": "ee796a9b049c1f349495cd791f71c56ae2bc41b71dcba40ed4548294ef0997a5",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzj_b1_operator_decision_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzj_b1_operator_decision_20260827.json",
+   "sha256": "b59584d6bd9aff331794beb7fcdcbaf9a78284aa4d02e44be1cef9e4691868dd",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzj_b1_operator_decision_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzj_b1_operator_decision_20260827.md",
+   "sha256": "72cedf1c8afc42f23bf3bb31bb57b5e911a8742212a77b4fc5ef062fd41b0915",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzk_b1_confirmation_recognition_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzk_b1_confirmation_recognition_20260827.json",
+   "sha256": "d29c4941d1aa1ce6f2c5145dfd8a15baaba529ec400b966582d3ad5da3493925",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzk_b1_confirmation_recognition_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzk_b1_confirmation_recognition_20260827.md",
+   "sha256": "7c88282f3ea7733b287193ff4272181b54b6ff86f60c6de72756e1818f253c80",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzl_market_view_regime_monitor_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzl_market_view_regime_monitor_20260827.json",
+   "sha256": "135fdde0e037c1a14ec894849272e5db98f252cac18c7cc4d05b722c6a551e5a",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzl_market_view_regime_monitor_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzl_market_view_regime_monitor_20260827.md",
+   "sha256": "89563ce02d763cc80c6a29070da6cc632b42c8da8ab9e8959569c188569aa1e3",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzm_market_view_visual_polish_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzm_market_view_visual_polish_20260827.json",
+   "sha256": "d7b09ed8ee97108d9cbd6e6d94890a93b2c30a01eb4cb33bccce1dbfb40a3c54",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzm_market_view_visual_polish_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzm_market_view_visual_polish_20260827.md",
+   "sha256": "4a07d647de1b864d4e86a247cb7f543cf98c259a5388244ae30b65efcc4f11af",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzn_scheduler_mode_enforcement_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzn_scheduler_mode_enforcement_20260827.json",
+   "sha256": "f0a525987046251f8bce4b33d86d51213a0710099fa4f8bc30c66289424feb56",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzn_scheduler_mode_enforcement_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzn_scheduler_mode_enforcement_20260827.md",
+   "sha256": "e291f79052a8fafc7677b99022492cda3fca79f6607bded2aebb32357cf5dc7d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzo_backend_restart_guard_20260827.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzo_backend_restart_guard_20260827.json",
+   "sha256": "c1cb316fb1b20bba2596b2254ba89c25792f8453d02889f2521c716557e2447f",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzo_backend_restart_guard_20260827.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzo_backend_restart_guard_20260827.md",
+   "sha256": "e487f5af08c4a4a5cab738c21a080d8f87474da759393a119b2c86e452ebde37",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzp_strategy_levels_regime_metrics_20260828.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzp_strategy_levels_regime_metrics_20260828.json",
+   "sha256": "e96edf750588e2541d0e55b8b79765948495819981043c3d62253907be006d99",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzp_strategy_levels_regime_metrics_20260828.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzp_strategy_levels_regime_metrics_20260828.md",
+   "sha256": "4d5772b40d6cb5e195d80f743e1d3d4a941c4dd4a8b8ee040f400822c2c88f2f",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzq_setup_boundaries_hmm_explain_20260828.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzq_setup_boundaries_hmm_explain_20260828.json",
+   "sha256": "76c0f6826e81afe9fc42c9c80b8b7aa6d4a4133a25251e1239667406a02c73ff",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzq_setup_boundaries_hmm_explain_20260828.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzq_setup_boundaries_hmm_explain_20260828.md",
+   "sha256": "77064e17f94194c556a1e0ef20449eee2bd473f1dcf37a8e19147240321696b9",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzr_mutations_20260828.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzr_mutations_20260828.py",
+   "sha256": "0fdad6e3dc80571cf9a3541acacc05235318e831d153d7182f354ff1f55f2e10",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzr_strategy_native_market_view_redesign_20260828.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzr_strategy_native_market_view_redesign_20260828.json",
+   "sha256": "13bccbfe8652e2adb17f309112dda95425459a8b0c354d615c00fea0c49d7666",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzr_strategy_native_market_view_redesign_20260828.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzr_strategy_native_market_view_redesign_20260828.md",
+   "sha256": "4b884c3bd24bc738bda57495aa154a6a909e0b0a3af93f6ae55b19712874fc00",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzs_mutations_20260828.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzs_mutations_20260828.py",
+   "sha256": "52d442e996169b7923cbbb2ca81d683689032b94cd20487dad4d2667e5b5c1b1",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzs_post_b1_ops_invariants_20260828.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzs_post_b1_ops_invariants_20260828.json",
+   "sha256": "28d847bdb1541aed6aa1e6a684e8a59fc91c309eef0c5cd17b6ccb6988b703c5",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzs_post_b1_ops_invariants_20260828.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzs_post_b1_ops_invariants_20260828.md",
+   "sha256": "c07ecde067f57f4e035b5f47a40fb4fc021b1d5243460d6958f80eadc63f6ea9",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzt_mutations_20260828.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzt_mutations_20260828.py",
+   "sha256": "4526d72d68a9c5da2544afd0cb9a85c8a0c90dfeb5699ff6109da8e1295ebc0a",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzt_schedule_mirror_spy_ladder_20260828.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzt_schedule_mirror_spy_ladder_20260828.json",
+   "sha256": "56244427408ebf8e0bda46b592d796c1efed82b6d5f4e1233f67a37600169987",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzt_schedule_mirror_spy_ladder_20260828.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzt_schedule_mirror_spy_ladder_20260828.md",
+   "sha256": "b17315c041bd9865f8b38379b4e38de6b1ba4e312085cecf5761ce8de07f2156",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzu_mutations_20260828.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzu_mutations_20260828.py",
+   "sha256": "f4335c45a129d3ed90ec537dfe41bb0cf7b93d5b9fa44088d92606cade74f804",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzu_track1_recovery_stream_isolation_20260828.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzu_track1_recovery_stream_isolation_20260828.json",
+   "sha256": "b5643431958eb0ebe816a68a35c9fbe498e5a2b0aa3d8ee1798911aae3cd0cfe",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzu_track1_recovery_stream_isolation_20260828.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzu_track1_recovery_stream_isolation_20260828.md",
+   "sha256": "cf716219b62e8e4770ca1da9c158470c1caffbd29f9ba737e81193d071314f27",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzw_dashboard_track1_mode_hygiene_20260828.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzw_dashboard_track1_mode_hygiene_20260828.json",
+   "sha256": "35c4522eb91e25b06f0157b89cbf82b7361166e5859f6392a85e240dc669643b",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzw_dashboard_track1_mode_hygiene_20260828.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzw_dashboard_track1_mode_hygiene_20260828.md",
+   "sha256": "c3c0f4685df8193a4226dda9115796138a0a574db807c7a35f1963f8857de538",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzw_mutations_20260828.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzw_mutations_20260828.py",
+   "sha256": "c9cadc5cb02dd769d4c8f8b866606334804a11c68b19b2ae1a98571c3ffd6959",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzx_backend_console_noise_hygiene_20260828.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzx_backend_console_noise_hygiene_20260828.json",
+   "sha256": "8509d86c7d3a0e60efb83e9bee99037fc1d527aade9095d256d066aba177e946",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzx_backend_console_noise_hygiene_20260828.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzx_backend_console_noise_hygiene_20260828.md",
+   "sha256": "146db5f4a18f31e3cfdfb7636ca73fc01b75e28adc65c9a108a1ceab4f589f84",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzx_mutations_20260828.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzx_mutations_20260828.py",
+   "sha256": "e9aaa8bd1e9099ba53fd1bc00eac51a795c9363f1fd2692988daccfd025a9d31",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzy_dashboard_poll_no_shell_20260828.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzy_dashboard_poll_no_shell_20260828.json",
+   "sha256": "7007f9dde09c30be9de550d771aa842217c5a23a6809b3d11745e490cf9036d6",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzy_dashboard_poll_no_shell_20260828.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzy_dashboard_poll_no_shell_20260828.md",
+   "sha256": "d7663167f3347398b085259bebe380f48a162d23675380370bd055a5d1bf68df",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzy_mutations_20260828.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzy_mutations_20260828.py",
+   "sha256": "e124ca64b41ba11b36adba350fd3d271beb4653c0cb534227941d6eefb698983",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzz_a_mutations_20260828.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzz_a_mutations_20260828.py",
+   "sha256": "8b7c4ef71ae9b5db58080ec83b2bbad905feb88137ccc9f42fd080fc00c8b11b",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzz_a_shadow_audit_confirmation_policy_20260828.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzz_a_shadow_audit_confirmation_policy_20260828.json",
+   "sha256": "9fd693b57662fd6c85ccfca3e316ca502734a00f408addb731ee3e9055959649",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzz_a_shadow_audit_confirmation_policy_20260828.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzz_a_shadow_audit_confirmation_policy_20260828.md",
+   "sha256": "c15ed5036c2e6cc30798fcc9dbaa4ea109d2934da25745b70f2c4a92f58b1c8d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzz_strategy_diagnostics_runtime_and_reconstruction_20260828.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzz_strategy_diagnostics_runtime_and_reconstruction_20260828.json",
+   "sha256": "bb177f432dacabb7711875f2c648577559a29b24518d7e01130bc1b68cc0b94d",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzz_strategy_diagnostics_runtime_and_reconstruction_20260828.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzz_strategy_diagnostics_runtime_and_reconstruction_20260828.md",
+   "sha256": "9ca8ff3f6c147cf184ae093af5bcb5ff73c156533c617274ff49e9ed6d3dd8f5",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzc_mutations_20260828.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzc_mutations_20260828.py",
+   "sha256": "8486d25664cc5227a9c2b1352952ec73e64aca826ed3dde7e232896ceb2d49b0",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzc_shadow_evidence_real_failures_20260828.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzc_shadow_evidence_real_failures_20260828.json",
+   "sha256": "5e61ff22022160969f9270632a6a8df4b67fdb4e92fd57e422fc386e93b4f0f2",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzc_shadow_evidence_real_failures_20260828.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzc_shadow_evidence_real_failures_20260828.md",
+   "sha256": "4bdfed7a7f179677288bf29ae8a7237529bb923bb2a3c9b51abee01123758eca",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzze_calm_two_phase_diagnostics_20260828.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzze_calm_two_phase_diagnostics_20260828.json",
+   "sha256": "3f6fad22b0f5386df245a4ef7723926f9e937d66ce2060a0d8d0e0f63e164d1e",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzze_calm_two_phase_diagnostics_20260828.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzze_calm_two_phase_diagnostics_20260828.md",
+   "sha256": "e88cdef0b21b6bf43aa6a18af1854aec7b738b36a4ece633b753d2eee6d012c3",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzf_market_view_ui_contract_cleanup_20260828.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzf_market_view_ui_contract_cleanup_20260828.json",
+   "sha256": "af59eaca52052656ea508d4f0a4d1c7bfb8f6e9a99cb4a33c1967da7d83dfbf0",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzf_market_view_ui_contract_cleanup_20260828.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzf_market_view_ui_contract_cleanup_20260828.md",
+   "sha256": "75e623abae8dd028d17133ea56596d750f9e046caaad1c6bcc0f205c2bc17106",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzg_swing_d1_regime_detector_consistency_20260828.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzg_swing_d1_regime_detector_consistency_20260828.json",
+   "sha256": "dc2cd5a65994994653a3af9c0d432ecb0bc170b8c0c0024a84d9c4328d0fbdf1",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzg_swing_d1_regime_detector_consistency_20260828.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzg_swing_d1_regime_detector_consistency_20260828.md",
+   "sha256": "de36a0da5e9c62424f767ca6c54d30c49bc059e2028cdc5f62b35971e217531b",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzh_compare_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzh_compare_20260829.json",
+   "sha256": "128da6949dfbab69d57c3c5c50048f971f50133a6230377e6856e9443dbcf65f",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzh_compare_20260829.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzh_compare_20260829.py",
+   "sha256": "af9aa1bd3e26294cf05e6183278720d84d0c98f4be880cbe6abdb8f052705787",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzh_full_candidate_swing_d1_remeasure_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzh_full_candidate_swing_d1_remeasure_20260829.json",
+   "sha256": "e6df7f1774007c3f38badd36f80a6e8928bde89ef4a4cba085fa5a3c0ae7d634",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzh_full_replay_20260829.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzh_full_replay_20260829.py",
+   "sha256": "4b52b639d09732b78f727fd4e32225e3fa7c6a64661274c98e095e7fab6053a8",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzh_full_replay_base_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzh_full_replay_base_20260829.json",
+   "sha256": "794e91527ebc4d75a2a46d25e68347a4753257d907d9d283f5e23ce333806285",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzh_full_replay_d1_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzh_full_replay_d1_20260829.json",
+   "sha256": "f6d110eae7eb41e06e0ef73537a65cb0fe92b1732b13cb7dac5084a77da05c1c",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzh_full_replay_d1pb_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzh_full_replay_d1pb_20260829.json",
+   "sha256": "41eb9add3068d53c5dfa30bbf476c90bd6e5d9349c92beeddfab1a94013b3f2c",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzh_full_replay_d1r_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzh_full_replay_d1r_20260829.json",
+   "sha256": "bb066ba68b193920c72efc03d10f197676edb52f067fd944ddf3cb19d7798f00",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzh_full_replay_d1repro_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzh_full_replay_d1repro_20260829.json",
+   "sha256": "f6d110eae7eb41e06e0ef73537a65cb0fe92b1732b13cb7dac5084a77da05c1c",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzh_full_replay_noswing_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzh_full_replay_noswing_20260829.json",
+   "sha256": "a7ca03fec5fd37b7d31565a746d6525cb36540fc10875d2f89fd4aa7619ec060",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzh_full_replay_proxy_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzh_full_replay_proxy_20260829.json",
+   "sha256": "228fff37aa8a04a0ace0d00e247882c97864dc284865ea535450c6df3261ade5",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzh_swing_churn_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzh_swing_churn_20260829.json",
+   "sha256": "168d0a3a86f9990e4cf55e5a1b2479175dd5cc51bde469e02c70c0c13aa19064",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzh_swing_churn_20260829.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzh_swing_churn_20260829.py",
+   "sha256": "8a7da1801f3cd1cf695ec0218917a12cd7086c0092e83c49d0b105e9e66fd2dc",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzi_compare_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzi_compare_20260829.json",
+   "sha256": "3b423574f417b40bb77e0d43522dcf3111d0ac108e44c7495e746daebb7dbf50",
+   "classification": "RESEARCH_ONLY",
+   "reason": "Track 1 research only"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzi_compare_20260829.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzi_compare_20260829.py",
+   "sha256": "e617da75028807513fce70b0350f7722c21388dd6b7a764f0747a7a42f0014cb",
+   "classification": "RESEARCH_ONLY",
+   "reason": "Track 1 research only"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzi_make_noswing_20260829.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzi_make_noswing_20260829.py",
+   "sha256": "df2e15c4300eac349755211180336d5e0f99d7da56b9399df553f3c7e7420106",
+   "classification": "RESEARCH_ONLY",
+   "reason": "Track 1 research only"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzi_swing_d1_wfo_retune_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzi_swing_d1_wfo_retune_20260829.json",
+   "sha256": "95f5640a9c4db6a8b980a9b7c522fe3c48f547ff2e71b3370b8d02e9d350c08c",
+   "classification": "RESEARCH_ONLY",
+   "reason": "Track 1 research only"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzi_swing_d1_wfo_retune_20260829.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzi_swing_d1_wfo_retune_20260829.md",
+   "sha256": "29189916d1b9eaf608df5ad37bf89a8f6fd9b377563aab5ecdbde623ac7b8611",
+   "classification": "RESEARCH_ONLY",
+   "reason": "Track 1 research only"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzi_swing_wfo_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzi_swing_wfo_20260829.json",
+   "sha256": "97f78a50e0fb9c5f58adaedfd1fb5c7dd016fa5956f9342a20db77b092861369",
+   "classification": "RESEARCH_ONLY",
+   "reason": "Track 1 research only"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzi_swing_wfo_20260829.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzi_swing_wfo_20260829.py",
+   "sha256": "50d6183300522f71fd49e5def67dffd8293b1ae5bde412976d9e26508d1d3a88",
+   "classification": "RESEARCH_ONLY",
+   "reason": "Track 1 research only"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzj_compare_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzj_compare_20260829.json",
+   "sha256": "2c6fa3b5f31d42a2ec898d35e5ea2790a6a8142b77750bc4d9256f64ec0251c3",
+   "classification": "REJECTED_RESEARCH",
+   "reason": "Track 1 rejected research"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzj_make_proxy_labels_20260829.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzj_make_proxy_labels_20260829.py",
+   "sha256": "2c8e4226a88f4d3c9adf8472173a9742c0a6ad372a9d030fbbfec73442cbb8a4",
+   "classification": "REJECTED_RESEARCH",
+   "reason": "Track 1 rejected research"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzj_proxy_agreement_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzj_proxy_agreement_20260829.json",
+   "sha256": "97e52ffb2039fbbc39ecea409345b4ff6d65c9a1c3c7a164dff91aaff89c3f10",
+   "classification": "REJECTED_RESEARCH",
+   "reason": "Track 1 rejected research"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzj_proxy_agreement_20260829.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzj_proxy_agreement_20260829.py",
+   "sha256": "530479d60cad7be8c4d11ba96be0cfdd67dd92c9b57e782860be5f2b7b181745",
+   "classification": "REJECTED_RESEARCH",
+   "reason": "Track 1 rejected research"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzj_proxy_labels_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzj_proxy_labels_20260829.json",
+   "sha256": "bdb32a37c1c280cf7a0c50605dd512634af97b8f65f955f184936c80955824e6",
+   "classification": "REJECTED_RESEARCH",
+   "reason": "Track 1 rejected research"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzj_spy_intraday_inventory_20260829.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzj_spy_intraday_inventory_20260829.py",
+   "sha256": "3125c7b0ff2d973792c0ec3037eb0353d5416e21a3aec0e9166f7ea486228fbb",
+   "classification": "REJECTED_RESEARCH",
+   "reason": "Track 1 rejected research"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzj_swing_intraday_spy_proxy_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzj_swing_intraday_spy_proxy_20260829.json",
+   "sha256": "4b42312cf3e4b1deec7cef8fd12ca2e38a4a0bdd2eea812332022777da029ba9",
+   "classification": "REJECTED_RESEARCH",
+   "reason": "Track 1 rejected research"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzj_swing_intraday_spy_proxy_20260829.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzj_swing_intraday_spy_proxy_20260829.md",
+   "sha256": "c3160831ca3de47fba298de9db188ec40e7a63b8bd40799078fca1dead1e1b89",
+   "classification": "REJECTED_RESEARCH",
+   "reason": "Track 1 rejected research"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzk_es_intraday_proxy_label_recovery_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzk_es_intraday_proxy_label_recovery_20260829.json",
+   "sha256": "44bc0cfd4174f51b109087c80c5f9a9d84245ea4261ce60f7b907a560920f423",
+   "classification": "REJECTED_RESEARCH",
+   "reason": "Track 1 rejected research"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzk_es_intraday_proxy_label_recovery_20260829.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzk_es_intraday_proxy_label_recovery_20260829.md",
+   "sha256": "d00a08aa6f78c817606a8ff878eb4ff44719684c225ddd799b957579daf7a5c0",
+   "classification": "REJECTED_RESEARCH",
+   "reason": "Track 1 rejected research"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzk_es_proxy_label_recovery_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzk_es_proxy_label_recovery_20260829.json",
+   "sha256": "70a55129bd45acf7a0b9632a7c7122ca3b77020b758bce17916e65375644c2dc",
+   "classification": "REJECTED_RESEARCH",
+   "reason": "Track 1 rejected research"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzk_es_proxy_label_recovery_20260829.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzk_es_proxy_label_recovery_20260829.py",
+   "sha256": "694f69c3d778a549125dce15bee3c319bf9e9268139de8cae82aecfc4c7e8dfc",
+   "classification": "REJECTED_RESEARCH",
+   "reason": "Track 1 rejected research"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzl_full_wfo_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzl_full_wfo_20260829.json",
+   "sha256": "3e4895024ccfb5ef55f97a5db571d21b9f39d6d604bc3277345cdcb0697781a0",
+   "classification": "RESEARCH_ONLY",
+   "reason": "Track 1 research only"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzl_full_wfo_20260829.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzl_full_wfo_20260829.py",
+   "sha256": "7f60cc093ebe391a4d8dc9306f08bb6f53858b5bef79973b922b72a6a97096ea",
+   "classification": "RESEARCH_ONLY",
+   "reason": "Track 1 research only"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzl_make_volfeature_arm_20260829.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzl_make_volfeature_arm_20260829.py",
+   "sha256": "3936cf8bc5302babf4859940f8fce7b72a29ac57b122f92cb1590046d8e34d36",
+   "classification": "RESEARCH_ONLY",
+   "reason": "Track 1 research only"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzl_precommit_20260829.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzl_precommit_20260829.md",
+   "sha256": "4959c14370f8bfd404b5b670201cc430e6b59c9bcf6d52a8e0cc5eb0bfb7c431",
+   "classification": "RESEARCH_ONLY",
+   "reason": "Track 1 research only"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzl_swing_full_wfo_causal_d1_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzl_swing_full_wfo_causal_d1_20260829.json",
+   "sha256": "e5b9e23e8ac382e1988b3c6416aaf1620d22fdd40ce5542071c80c53364958bd",
+   "classification": "RESEARCH_ONLY",
+   "reason": "Track 1 research only"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzl_swing_full_wfo_causal_d1_20260829.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzl_swing_full_wfo_causal_d1_20260829.md",
+   "sha256": "95781547f4855fccbe046fbc07be52a0b13cd7b064b602edf0e42ea3a48d7604",
+   "classification": "RESEARCH_ONLY",
+   "reason": "Track 1 research only"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzm_param_trace_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzm_param_trace_20260829.json",
+   "sha256": "42ff845a4d0d51ee98838a7787066d08460b5232b0fe7e0e9ccc904b641b95f8",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzm_param_trace_20260829.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzm_param_trace_20260829.py",
+   "sha256": "d1186d69c5fb6cae7fb0a0798868f0d7c0e5cfff7030825f14bc18fc7713db65",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzm_swing_artifact_param_obedience_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzm_swing_artifact_param_obedience_20260829.json",
+   "sha256": "00e9463ac738a6772cd6989499cb982204a4f17c1de4761e7ba95b55173d6b27",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzm_swing_artifact_param_obedience_20260829.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzm_swing_artifact_param_obedience_20260829.md",
+   "sha256": "0be26dfeaa8c600950e2f1e9f12c9b3a92b748d767a74bd6d7b4e2d34ae73de8",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzn_regime_basis_proof_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzn_regime_basis_proof_20260829.json",
+   "sha256": "922f62d239e984a76bc9bbde06155d8ef528bb530290e031bdb524b67c9b129b",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzn_regime_basis_proof_20260829.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzn_regime_basis_proof_20260829.py",
+   "sha256": "6c93b7bb967b4f09646faf0557bd987e3f7727283cf756d912c8ebd240c25973",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzo_swing_paper_override_decision_trail_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzo_swing_paper_override_decision_trail_20260829.json",
+   "sha256": "c7ba081393778c689dd20a828bdc8338974c58eec773080d506679028217da6e",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzo_swing_paper_override_decision_trail_20260829.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzo_swing_paper_override_decision_trail_20260829.md",
+   "sha256": "06b37de9bf752e2ae0ebbf46c87bf24f9e05412645d89c3b9d6e4e811e4a8102",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzp_live_execution_replay_parity_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzp_live_execution_replay_parity_20260829.json",
+   "sha256": "2b0a988203a8dd18666b454722fd69ba9194a830cbdec31ae949cb133a9d9334",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzp_live_execution_replay_parity_20260829.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzp_live_execution_replay_parity_20260829.md",
+   "sha256": "eb82a5f1b5d7f4be4006b3d57edbf31ffaba006ad03eb84e1e7a95c3eac815fc",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzp_parity_raw_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzp_parity_raw_20260829.json",
+   "sha256": "65a89c4b8352559e70c32f58b6597b4cc2ad0019cbef833fbac708d3648f5ae6",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzq_swing_live_causal_d1_identity_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzq_swing_live_causal_d1_identity_20260829.json",
+   "sha256": "e926a977f305af21db39e6681f3ab90f06b8d4625d358a27dbe940e90afc72c9",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzq_swing_live_causal_d1_identity_20260829.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzq_swing_live_causal_d1_identity_20260829.md",
+   "sha256": "b2790a1e7598932c5b4cac86eba88c5a0e74659b55b0e9c487ea482d7736dbe4",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzr_restart_liveness_postfix_parity_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzr_restart_liveness_postfix_parity_20260829.json",
+   "sha256": "0c0a0092547e236c43c69b26835c2491a52db08e55e88ce52412998133ff0aec",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzr_restart_liveness_postfix_parity_20260829.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzr_restart_liveness_postfix_parity_20260829.md",
+   "sha256": "f3f4e613db9956f8d4b0c82ea2f207b1bc0bbe46494475ca18142416ffc585d1",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzs_dashboard_endpoint_performance_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzs_dashboard_endpoint_performance_20260829.json",
+   "sha256": "68c99d65687992b7c603f6cb70c2a813f3df5300f902810dc131d46230de1f9a",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzs_dashboard_endpoint_performance_20260829.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzs_dashboard_endpoint_performance_20260829.md",
+   "sha256": "a1a5daec5af300e3d71f8a9519469c02f9dfe447db689ff00d340712b86d04e2",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzt_gate_ast_memoization_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzt_gate_ast_memoization_20260829.json",
+   "sha256": "e264c7b60f8b059c9502b883562461603ade813a5c675ac68045671bdc1fea58",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzt_gate_ast_memoization_20260829.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzt_gate_ast_memoization_20260829.md",
+   "sha256": "8254202ceafac79f6c4e7d06833883135d152f601b237723be1a761ec7567ec1",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzv_repo_archive_and_history_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzv_repo_archive_and_history_20260829.json",
+   "sha256": "1fd197ca7353efcaf4f12faa9da851ef853d7403faa233bfbd47f561a2198092",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzv_repo_archive_and_history_20260829.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzv_repo_archive_and_history_20260829.md",
+   "sha256": "b06b53f48e1d58443ff6c7b509ac055981e5a74cfca8670599b956d15bdfd549",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report"
+  }
+ ],
+ "failures": [],
+ "restored_after_reference_check": [
+  {
+   "old_path": "scratch/_track1_stage5q7_mnkd_identity.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5q7_mnkd_identity.json",
+   "sha256": "4fa057d8f9477e69b5c338f7e986414782a6c0f55e624cc03b72c1a7d099f5fe",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/_track1_stage5q9_sizing_basis.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/_track1_stage5q9_sizing_basis.json",
+   "sha256": "0ff68c3f2db004006b4a79262f8a9faef57f20f1cb4ae4bf48aaada8428082d8",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_bootstrap_checkpoint_20260822.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_bootstrap_checkpoint_20260822.py",
+   "sha256": "06b50bd8e6f0c4bb2419061d291fbfdcdb29ffb768eeb39d69f201b9fa5e01d3",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_equivalence_harness_20260822.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_equivalence_harness_20260822.py",
+   "sha256": "dee5547fd0691508c864bac223af308c28c6e7ecf634521a0818241fb3231a8b",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_replay_source_20260822.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_replay_source_20260822.py",
+   "sha256": "9eb4981558362dfbadb00e90aece0639a952cb5ab7b4a76597f2ecfdc985ed5d",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_shadow_audit_20260824.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_shadow_audit_20260824.py",
+   "sha256": "dd3455c9e13782b361cf94edc92ddcd680b9fe5f0ea7032a4ac4dd90d21fb8a0",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage2c_book_bootstrap_20260822.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage2c_book_bootstrap_20260822.py",
+   "sha256": "a28fe6c8d6d0811146884a85312a71ecb72c7c7036f2a53ef5e631385e646219",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage4b_identity_liveframe_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage4b_identity_liveframe_20260823.json",
+   "sha256": "cf3433fc7b24b02b3e9c33008e29907625fdd16878417aec58db7d846a4cbf63",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage4c_live_frame_adapter_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage4c_live_frame_adapter_20260823.json",
+   "sha256": "a9ef56c12fa2068a162895e5e5e99ce4c4d30295d1507f21da76ac44fd163a49",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5ab_g1_source_mode_report_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5ab_g1_source_mode_report_20260823.md",
+   "sha256": "fcb3326ef80d949e3f95d30f1001d34e20786ec937f17180af8ff69d1f9f86f9",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5b_runbook_fix_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5b_runbook_fix_20260823.json",
+   "sha256": "eeb4a056104e09919a051348132d66e6499baf09ee4bce40fbd4055cb044446f",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5c_shadow_readiness_probe_20260823.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5c_shadow_readiness_probe_20260823.py",
+   "sha256": "1ab425d75df02e2147387b655c1d6cc8c2543459d9ee1f5a327770b8d387c99f",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5c_shadow_start_readiness_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5c_shadow_start_readiness_20260823.json",
+   "sha256": "72f00bc186a60852a0de4fda882495a54ff51081fef2f801f9fdc4a2264cd9c6",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5d_shadow_live_wiring_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5d_shadow_live_wiring_20260823.json",
+   "sha256": "61d409894ee0165b287ff81b74df87164e07217ac63680f171f771e3ed061627",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5e_live_source_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5e_live_source_20260823.json",
+   "sha256": "66752d89d8bfd0b1264816af0ba4ee0c7e1a024565a521bdbb45020fc28b56ae",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5f_stress_equivalence_20260823.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5f_stress_equivalence_20260823.py",
+   "sha256": "d9b0b7c79fb5f2efe546b11dd2430230a607c803fd1144719756413d1c50ed0e",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5f_stress_live_source_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5f_stress_live_source_20260823.json",
+   "sha256": "3de70bf08e94dad5c05b0c99c2a29c7986a3e29c1d29a740412776fcc9afe89c",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5g_live_frame_provider_gate_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5g_live_frame_provider_gate_20260823.json",
+   "sha256": "d27a2a5261618ae60967db9236ab9bf153028f0a7b56b65392ef3a2fe0d549b8",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5h0_missed_surfaces_audit_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5h0_missed_surfaces_audit_20260823.json",
+   "sha256": "29275c828d6bb6aaf3f1270d2078e80a5e1848f19fccab48bfa5eb056a6e2282",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5h0_missed_surfaces_audit_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5h0_missed_surfaces_audit_20260823.md",
+   "sha256": "98548c36e37fcc5051872bcada9973a08960a0c7ebf1cb5f71c5d0a2f321029c",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5h_b1_shadow_preflight_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5h_b1_shadow_preflight_20260823.json",
+   "sha256": "a34014e4f5f9a7dbd5f276b0f12a49d8e0252fb3dff9f057f8f1823bcb7b6941",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5h_b1_shadow_preflight_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5h_b1_shadow_preflight_20260823.md",
+   "sha256": "1a59da6c44c46530ef4a2b7437d1195602e152f4fc36317f0b438cbab85b683b",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5h_closeout_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5h_closeout_20260823.json",
+   "sha256": "a3c3f81848ec23d0aa6a3f6341a0a1ddb6f3a0709ec83a5fb203cffc543cda01",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5h_closeout_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5h_closeout_20260823.md",
+   "sha256": "9a2d73e7183fef9ea6de127f300e879a5180415c46e0cdaa223d60d549fe203b",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5i_live_shadow_evidence_wiring_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5i_live_shadow_evidence_wiring_20260823.json",
+   "sha256": "d782914b524a3517340fe555ada858076835cd1a48b646e9dd1427f79214c2fc",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5i_live_shadow_evidence_wiring_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5i_live_shadow_evidence_wiring_20260823.md",
+   "sha256": "11e6415c1dba2ed211692e4fb0b173fca5d0bca3f030b6fc5a8d578e83361646",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5j_operator_shadow_start_runbook_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5j_operator_shadow_start_runbook_20260823.json",
+   "sha256": "9d8bd8ab2edcf8b9ca0d2e7c03bb227d0244d740cc5b9d9f224d0d82953645ec",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5j_operator_shadow_start_runbook_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5j_operator_shadow_start_runbook_20260823.md",
+   "sha256": "258a377a1512ab01ae083580407b12e04c78d8ddebd8322ca590b674089702b5",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5k0_operational_paths_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5k0_operational_paths_20260823.json",
+   "sha256": "31c3f2ba46e330f1c86bc1ee26d53f376fdd49eff099aa2e83c10ff7438a60c5",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5k0_operational_paths_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5k0_operational_paths_20260823.md",
+   "sha256": "f96149fe92595bd5a74821a0799fb59dcc010f83ef7baef49e63a3d26dc724a6",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5k_ops_startup_integration_20260823.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5k_ops_startup_integration_20260823.json",
+   "sha256": "4e2bb30e223e18d505d6b8623be2e6b159dd6067b81f472d0a408fb5cecb0486",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5k_ops_startup_integration_20260823.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5k_ops_startup_integration_20260823.md",
+   "sha256": "1ab4ee109c5a1950fa73f44894cda742bf8bd1946c7d8258e666e4cdddd2d4ed",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5t_paper_broker_path_audit_20260825.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5t_paper_broker_path_audit_20260825.json",
+   "sha256": "8cad3a4ca12a494be648d53f8a29018822fb7ebdaa9d3e56bf9a7693a4fae551",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5t_paper_broker_path_audit_20260825.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5t_paper_broker_path_audit_20260825.md",
+   "sha256": "4247c4f4517ad86876e7ccb32df7d924224fa571b7c8008feed1c4156330c6c0",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzh_swing_d1_regen_20260829.py",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzh_swing_d1_regen_20260829.py",
+   "sha256": "c9e48501a12c1cc101c5386ad4ae509f1da093c2557ec5e16d6a9c84b21d9e5f",
+   "classification": "SUPPORTING_PROOF",
+   "reason": "Track 1 supporting proof",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzu_baseline_archive_inventory_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzu_baseline_archive_inventory_20260829.json",
+   "sha256": "56fcdb96106edfecba2089ca0a687d2b312444fa926af382b85d92f2f90c01d6",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzu_baseline_archive_inventory_20260829.md",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzu_baseline_archive_inventory_20260829.md",
+   "sha256": "d4539b9e88bc2f4ba0fab6c3e4b6e45ab7073de92aaaa8bdd5c371732215dce2",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  },
+  {
+   "old_path": "scratch/track1_stage5zzzv_repo_archive_plan_20260829.json",
+   "new_path": "_archive/scratch/track1_2026-08-29/scratch/track1_stage5zzzv_repo_archive_plan_20260829.json",
+   "sha256": "4bd97938fa7c3392537570e2c13780d22a18ee07d76b4cdb5f252c27a2a85ebd",
+   "classification": "STAGE_REPORT",
+   "reason": "Track 1 stage report",
+   "restore_reason": "still referenced by an active test or module - the first import scan took only the top-level package of a dotted import"
+  }
+ ],
+ "restored": 38
+}

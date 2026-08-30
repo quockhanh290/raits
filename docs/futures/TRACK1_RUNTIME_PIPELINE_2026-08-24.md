@@ -8567,3 +8567,200 @@ it broken to this day. And two pairs of files share a basename, so flattening th
 archive directory would have had one silently overwrite the other, which is data loss rather than
 a broken link. Neither was visible from the outside. Both were only findable by writing the plan
 down before acting on it.
+
+---
+
+## Stage 5ZZZ-X — the route acquires a history
+
+The previous stage found that the Track 1 route had never been committed. This one fixed it. One
+hundred and sixty-three files: the forty-six source modules the running route depends on, the
+hundred and thirteen tests that hold their behaviour in place, the three canonical documents, and
+the signed decision record that puts the Swing sleeve in paper scope.
+
+The cost of not having done this had already been paid once. Two stages ago, seven tests failed
+alongside a change to the order gate, and the ordinary way to find out whether the change caused
+them is to compare against the committed version. There was no committed version. The answer came
+back as "exists on disk, but not in HEAD", and the attribution had to be done by neutralising the
+change in memory and re-running instead. That detour is no longer necessary.
+
+What was left out matters as much as what went in. The confirmation record stays out of git for a
+reason written into the ignore file: it is the file that arms the route, and a checkout must never
+be able to create one. The runtime evidence stays out because it is append-only output measured in
+megabytes. The operator's working notes stay out because the repository's own rule says so — the
+brief asked for one of them, the rule forbade it, and rather than pick a side quietly the conflict
+went back to the operator, who confirmed it stays out.
+
+Thirty-four tracked files were already modified before any of this work began. They are somebody
+else's work in progress, unreviewed, and committing them beneath a message that says "Track 1
+route source" would describe them as something they are not. They were left exactly where they
+were.
+
+The interesting decision was the second record. The override that puts Swing in paper scope now
+lives in git while the confirmation beside it does not, and the difference is not arbitrary. The
+confirmation arms the route; restoring it from a checkout would arm a route. The override cannot
+arm anything — it grants no orders, satisfies no evidence gate, promotes no parameter, and each of
+those is held down by a test that went into the same commit. Restoring it restores a decision
+about scope, never one about permission. And it has to be versioned, because the route reads it
+while running: lose the file and paper scope changes without anyone deciding it should.
+
+Staging was done from an explicit list rather than a wildcard, and the staged set was compared
+against that list as a set before the commit was made — exact match, nothing extra, nothing
+missing. The commit was then checked again from the other side, by listing what it actually
+contains and looking for each forbidden thing by name. None of them are in it.
+
+---
+
+## Stage 5ZZZ-Y — the archive applied, and the same mistake very nearly made twice
+
+Three hundred and forty-one files moved into the repository's archive, hashes preserved, nothing
+deleted. The interesting part is what happened between the first sweep and the final count.
+
+The first sweep moved everything the plan approved, and then the check that the brief insists on —
+collect the test suite and compare the error count against the known baseline — came back with
+five errors where there should have been two. Three tests had stopped importing. The cause was in
+the tool that was supposed to prevent exactly that: the scan that decides whether anything still
+imports a file took only the first segment of each import, so a module imported from inside the
+scratch package registered as an import of the package and the actual module name was discarded.
+Every submodule import in the repository was invisible to it.
+
+This is the same failure that broke a test during an earlier archive sweep and left it broken to
+this day — the one found two stages ago and quoted as the reason to be careful. It nearly happened
+again, in the stage that had just written it down. The only thing standing between the plan and a
+repeat was the collection gate.
+
+The repair was a rescan that takes every segment of every dotted import and every filename that
+appears inside a string. Thirty-eight of the moved files were still referenced by something. All
+thirty-eight went back where they came from, verified by hash, and the collection count returned
+to exactly its baseline.
+
+Everything else held. No test, no source file, no runtime evidence, no decision record and no
+canonical document moved. The signed override is where it belongs and now tracked; the
+confirmation that arms the route is where it belongs and still ignored. Relative directory
+structure was preserved inside the archive, which is what keeps two same-named pairs of shadow
+files from overwriting each other.
+
+One reading needed care. After the move, the short status showed a third fewer untracked entries,
+which is the shape a mistake makes. It was not one: the short status collapses an untracked
+directory into a single line, and the three hundred and forty-two archived files were all still
+there at file level. Worth checking rather than assuming, because the alternative reading was that
+a third of the working tree had gone missing.
+
+The archive log now carries the entry in the repository's own format, including the note that the
+route source was committed before any of this was moved. That ordering is the whole reason this
+sweep was safer than the last one: if a move ever does break something, git can now say what
+changed.
+
+---
+
+## Stage 5ZZZ-Z — checking that the cleanup broke nothing, and reading the failures properly
+
+Seven tests fail after the archive, and none of them is the archive's doing. Establishing that
+took more care than the count suggests, because a failure list is easy to read badly in either
+direction — waving it away, or treating every red line as damage.
+
+Six of the seven are tests that recorded a state before an action and are now being run after it.
+One pinned the number of tracked files as it stood before the route source was committed. Four
+pinned the pre-move world: the planned files still sitting in their original places, the archive
+directory not yet existing, the destinations still free. All four now fail with numbers that match
+the move manifest exactly — three hundred and forty-one paths gone, which is precisely what was
+moved.
+
+The sixth is the most interesting. It was written to fire the moment the version-control finding
+was fixed, and its failure message says so in as many words: the source is now tracked, update the
+plan. It is not a defect. It is a test doing the job it was given, in the one circumstance it was
+designed for.
+
+The seventh needed the closest look, because its name says orders are still impossible and it went
+red. Reading the assertions rather than the title settles it: the three that actually check order
+safety all pass — orders are impossible, the blocker list is non-empty, the orders directory does
+not exist. It fails on a fourth line asserting that the confirmation file does not exist, in a
+suite written on the twenty-seventh, about a file the operator signed at five past ten that same
+morning. Its timestamp and checksum have not moved since. The archive could not have caused it.
+
+One error was mine and worth recording. Comparing collection counts, the obvious command gives
+just over a thousand tests against a baseline of four and a half thousand — an alarming gap that
+means nothing, because the baseline was taken with an explicit list of directories and the bare
+command searches a different scope. Measured with the same command, the number matches exactly.
+A comparison across two different frames produces a number that looks like evidence and is not.
+
+Nothing was re-pinned. Every failing test still fails, with its cause written down beside it,
+because editing a test until it agrees is how a record stops being a record.
+
+---
+
+## Stage 5ZZZ-AA — what to do with evidence that should not exist
+
+The previous stage's broad test run wrote two rows into the production signals journal. They
+describe a Swing slot on a Saturday, at two in the afternoon, recorded at ten to midnight, on
+a day the scheduler launched nothing at all, carrying a price for the Russell contract about
+thirty times too small and naming the wrong data store. Nothing about them is real.
+
+The obvious response is to delete them, and it is the wrong one. Runtime evidence is
+append-only, and a bad row quietly removed by the same party that wrote it is a second
+falsification, tidier than the first and harder to notice later. So the rows stay exactly where
+they are, and a separate append-only record says they are not to be believed.
+
+That record identifies them by the checksum of each stored line rather than by a description.
+A description of a bad row — this sleeve, this slot, this date — is a rule, and rules widen:
+some legitimate row written months from now could match it and be silently discarded. A
+checksum cannot do that. It names two specific lines and nothing else, ever.
+
+The readers changed, not the evidence. The parity tool no longer selects a tainted row as a
+sleeve's most recent slot, which removes the false failure it had been reporting for a slot
+that never ran. It does not score them either — not as failures and not as passes, because a
+row that is not evidence should not produce a verdict in either direction. And it still shows
+them, because an exclusion nobody can see is indistinguishable from a row that never existed.
+
+One thing could not be settled. Three observation files were written in the same minutes, and
+their contents look ordinary: their own dates, no impossible values, a handful of duplicate
+lines. Without a snapshot from before the run there is no way to tell whether those duplicates
+are new. They are therefore recorded as touched and explicitly not tainted, because marking
+rows that might be genuine is the same error running the other way. It is an unresolved
+question written down as one, not a clean result.
+
+The evidence gate turned out to be unaffected: the contaminated Saturday never entered its
+five-day window. That was luck rather than design, which is the reason for the last change —
+the signal writer now refuses to append to the real runtime tree while a test is running,
+unless a test says explicitly that it means to. The refusal is narrow on purpose. It ignores
+writes to temporary directories and it ignores the scheduler, because a guard that interferes
+with legitimate work is a guard someone eventually switches off, and then it protects nothing.
+
+---
+
+## Stage 5ZZZ-AC — asking on Sunday evening instead of at a quarter to one
+
+The Friday evening ladder has three rungs and on the twenty-eighth all three ran without the
+provider returning that day's close. After the last rung nothing looks at the file again until
+a quarter to one on Monday morning, which is twenty-five minutes before the overnight window
+opens. Fifty-five hours in which the series is short and no one is told, ending at an hour when
+being told is nearly useless.
+
+The new job asks the same question on Sunday evening. It sits at six, half an hour before the
+stop-repair sweep that already runs on Sundays, so the weekend log reads in the order a person
+would want it: is the data there, then is the book protected. The quarter-to-one job is
+untouched and stays exactly where it was, because it is still the last look and this is only an
+earlier one.
+
+The day it asks about is not calculated. It calls the same function the freshness gate calls, so
+the job cannot report satisfaction about a session the gate is about to refuse — and a holiday
+Monday needs no special handling, because when the next session is the Tuesday that function
+already answers with the Friday before the holiday. The test that holds this in place parses the
+job, removes its docstring and blanks its strings before looking for hand-rolled date
+arithmetic, which is necessary because an honest log line in that job mentions Friday and a
+sentence is not a calculation.
+
+Two smaller things were kept separate on purpose. The dashboard mirrors the new slot the way it
+mirrors the Sunday sweep, because a slot the scheduler runs and the mirror does not know about
+becomes a fabricated incident every week. And the journal gives it its own recovery stream
+rather than folding it into either existing SPY stream: a Sunday success must not be able to
+mark Friday's failed rung as recovered, which is the exact fault an earlier stage had to fix
+when a stop-repair sweep was closing failed data refreshes.
+
+The gap that prompted all this closed on its own while the work was being done — the file gained
+the missing day at ten past five on Sunday morning, by something that was not the scheduler, not
+the status reader and not the tests, and most likely a person. That is worth writing down as an
+observation rather than a conclusion. It changes tonight and it does not change the argument:
+nothing automatic looks across a weekend, and now something does.
+
+It is not running yet. The scheduler reads its cron once, at startup, and the process currently
+alive predates this code.

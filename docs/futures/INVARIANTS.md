@@ -58,3 +58,41 @@ _Cập nhật: 2026-07-11_
 3. Trace root cause (đọc code path, không đoán)
 4. Ghi vào `futures/OPEN_QUESTIONS.md` nếu cần quyết định
 5. Chỉ commit sau khi invariant restore
+
+---
+
+## Chạy test KHÔNG được ghi vào bằng chứng runtime thật
+
+**Sự cố có thật, 2026-08-29 (Stage 5ZZZ-Z → 5ZZZ-AA).** Chạy `python -m pytest scratch -q`
+trên toàn bộ thư mục mà **không cô lập đầu ra**. Một test đi qua đường Swing live đã **ghi 2
+dòng vào file bằng chứng runtime thật**:
+
+```text
+global_index/track1_runtime/signals/track1_signals_20260829.jsonl
+  roska4_swing · TRACK1_SWING_1405 · mode shadow_live · 2 dòng
+  ghi lúc 21:50:49 giờ máy = 23:50 ET, **thứ Bảy** — không slot nào chạy được
+```
+
+Hậu quả đo được: `replay parity` chuyển `roska4_swing` từ `NOT_YET_OBSERVED` sang **FAIL** cho
+một slot chưa từng chạy. Cổng `PAPER_SHADOW_EVIDENCE` **không bị ảnh hưởng** (2026-08-29 không
+vào cửa sổ 5 ngày), nhưng đó là may, không phải thiết kế.
+
+### Luật
+
+1. **Test ghi ra `tmp_path`, không bao giờ ghi vào `global_index/track1_runtime/`.**
+2. **Không chạy cả `scratch/` một lượt** trừ khi đã cô lập đầu ra. Các suite ở đó gọi thẳng
+   đường live.
+3. Bằng chứng runtime là **append-only**: dòng bẩn **không được xoá, không được sửa**. Cách xử
+   lý đúng là ghi một bản ghi *taint* (xem `global_index/track1_evidence_taint.py`) để bên đọc
+   biết không được tin dòng đó. Xoá nó đi là làm giả lần thứ hai, êm hơn lần đầu.
+
+### Chốt chặn đã cài
+
+`track1_signals.append` gọi `_refuse_production_write_under_pytest`. Nó chỉ chặn khi **cả hai**
+đúng: đang chạy dưới pytest (`PYTEST_CURRENT_TEST`) **và** đích nằm trong cây
+`track1_runtime/`. Ghi vào `tmp_path` không bị chặn; scheduler không chạy dưới pytest nên
+không bị ảnh hưởng. Test nào **cố ý** muốn ghi thật thì đặt
+`TRACK1_ALLOW_RUNTIME_WRITE_IN_TEST=1` và nói rõ lý do.
+
+Chốt chặn này hẹp có chủ đích. Chặn rộng hơn sẽ làm hỏng các test hợp lệ, và một chốt chặn hay
+báo động giả là chốt chặn người ta học cách tắt.

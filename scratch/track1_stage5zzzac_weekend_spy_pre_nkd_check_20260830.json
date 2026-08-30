@@ -1,0 +1,154 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-AC",
+ "title": "Weekend SPY pre-NKD early warning job",
+ "route": "track1_candidate",
+ "date": "2026-08-30",
+ "the_gap_this_closes": {
+  "measured": "on Friday 2026-08-28 all three evening rungs ran and the provider still did not return that day's close",
+  "current_state_verified_live": {
+   "required": "2026-08-28",
+   "last": "2026-08-28",
+   "state": "covers_required_day"
+  },
+  "silence_window": "Friday 17:15 ET to Monday 00:45 ET = 55 hours in which the file is short and nothing looks",
+  "why_00_45_is_not_enough": "it fires 25 minutes before the NKD window at 01:10, in the middle of the night, with no time to act",
+  "IMMEDIATE_GAP_CLOSED_DURING_THIS_STAGE": {
+   "observed": "spy_daily_live.csv read 2026-08-27 at the start of this stage (04:56 machine) and 2026-08-28 later. File mtime 2026-08-30T05:11:31, row count 2426 -> 2427",
+   "what_it_was_NOT": [
+    "the scheduler - scheduler_0830.log has heartbeats only, and the running scheduler has no Sunday SPY job at all",
+    "coverage_status - read-only, verified in source",
+    "my test runs - the harness monkeypatches the launcher so nothing spawns, and every regression run happened AFTER 05:11"
+   ],
+   "attribution": "not determinable from the evidence; most likely a manual operator run. Recorded as measured, not guessed",
+   "consequence": "the IMMEDIATE gap is closed - tonight NKD window has its data either way. What this stage fixes is the STRUCTURAL gap: nothing automatic looks between Friday 17:15 and Monday 00:45",
+   "does_not_change_the_case_for_the_job": true
+  }
+ },
+ "schedule_added": {
+  "id": "spy_weekend_pre_nkd_check",
+  "label": "SPY_WEEKEND_PRE_NKD_CHECK",
+  "cron": "day_of_week=\"sun\", hour=18, minute=0  (ET - APScheduler is ET-native)",
+  "name": "SPY weekend pre-NKD check 18:00 ET (Sunday early warning)",
+  "convention_followed": "the repo already has a weekend job - the Sunday 18:30 ET stop-repair sweep - registered the same way. 18:00 puts the data check half an hour BEFORE the protection sweep, so one Sunday log reads in order: is the data there, then is the book protected"
+ },
+ "required_date_logic": {
+  "call": "track1_freshness.required_daily_close_through(pd.Timestamp(_et_today()))",
+  "never_computed_by_hand": true,
+  "pinned_by_test": "the job's code is parsed, its docstring stripped and its string literals blanked, then scanned for weekday()/timedelta/friday. Proven to catch a hand-rolled version",
+  "et_not_machine_local": "_et_today(), never date.today()",
+  "verified_cases": {
+   "Sunday 2026-08-30": "2026-08-28 (Friday) - exactly the missing day",
+   "Sunday 2026-09-06 before Labor Day": "2026-09-04 - skips the Monday holiday and lands on the Friday, with no special case in the job",
+   "agrees_with_the_00_45_job": true
+  }
+ },
+ "behaviour": {
+  "already_covered": "logs 'nothing to do' and calls NO provider - asserted by test",
+  "missing": "python -m global_index.update_spy_csv --csv spy_daily_live.csv --verify-strict --require-through <day> --skip-if-covered [--api-key]",
+  "recovered": "WARNING naming that the Friday ladder was late and the weekend recovered it",
+  "still_missing": "ERROR naming the required day, the day the series ends on, the 01:10 window it stops, the remaining 00:45 attempt, and the manual command",
+  "provider_failure": "stays fail-closed - no RECOVERED, the shortfall is still reported",
+  "dry_run": "invents no failure",
+  "writes_preflight_state": false
+ },
+ "existing_00_45_job": {
+  "removed": false,
+  "modified": false,
+  "still": "day_of_week=\"mon-fri\", 00:45 ET",
+  "pinned_by_test": true
+ },
+ "dashboard_and_journal": {
+  "schedule_mirror": "monitor/backend/schedule_status.SUNDAY_SPY_PRE_NKD_SLOT = (6, 18, 0), mirrored in _scheduled_slots_for the same way the Sunday sweep is. Without it the dashboard treats the slot as stray and invents an incident every week",
+  "mirror_order": "SPY_WEEKEND_PRE_NKD_CHECK 18:00 then STOP_REPAIR_SUN_1830 18:30",
+  "job_type": "spy_weekend_pre_nkd_check",
+  "recovery_stream": "a THIRD stream, separate from spy_refresh_pm and spy_last_chance_pre_nkd",
+  "why_separate": "folding it into the ladder would let a Sunday success mark a Friday rung recovered - the same fault Stage 5ZZT fixed when a stop-repair sweep was closing failed refreshes. Folding it into the last-chance stream is subtler and still wrong: a Sunday failure that Monday then fixes is a real two-event recovery story",
+  "impact_and_action_text_added": true
+ },
+ "ops_status": {
+  "function": "monitor.ops._spy_next_automatic_attempt",
+  "weekend_behaviour": "when the file is short it names the Sunday job while it is still ahead AND always still names the Monday 00:45 last chance",
+  "live_line_now": "covers 2026-08-28, which is what the next session asks for",
+  "weekday_behaviour": "silent - the evening ladder speaks for itself"
+ },
+ "tests": {
+  "suite": "scratch/test_track1_stage5zzzac_weekend_spy_pre_nkd_20260830.py",
+  "passed": 27,
+  "covers": [
+   "registered Sunday 18:00 ET",
+   "the 00:45 job is untouched",
+   "runs before the 18:30 sweep",
+   "asks freshness, never computes the day",
+   "holiday Monday gives the Friday",
+   "Sunday and Monday agree on the day",
+   "ET not machine date",
+   "already-covered calls no provider",
+   "missing calls update_spy_csv with --require-through and --skip-if-covered",
+   "recovered logs a warning",
+   "shortfall logs an error with the manual command",
+   "provider failure stays fail-closed",
+   "dry-run invents no failure",
+   "never writes preflight_state",
+   "schedule mirror shows it Sunday 18:00",
+   "mirror keeps it before the sweep",
+   "nothing added on weekdays/Saturday",
+   "journal gives it its own job_type",
+   "recovery stream isolation",
+   "no broker imports",
+   "orders still impossible"
+  ],
+  "regression": {
+   "passed": 351,
+   "failed": 3,
+   "three_failures_pre_existing": [
+    "5ZZD test_14_orders_are_still_impossible - asserts the confirmation file is absent; the operator signed it 2026-08-27",
+    "presleep test_state_slot_count_is_seventy - 71 vs 70, known stale",
+    "presleep test_the_running_backend_answer - same 71 vs 70"
+   ]
+  },
+  "three_tests_I_updated_because_MY_change_made_them_wrong": [
+   "5ZZD test_15: the SPY family is now FIVE jobs, not four - the count in the name grew rather than the assertion being loosened to 'at least four'",
+   "dashboard test_sunday_reopen_sweep: Sunday now has two slots, and the ORDER is part of the assertion",
+   "dashboard test_the_next_job_after_friday_close: the first thing to look at the data after Friday's close is now this job, which is the whole point"
+  ],
+  "a_test_of_mine_that_was_wrong": "my first 'never writes preflight_state' test scanned raw source and matched the DOCSTRING, which mentions preflight_state.json precisely to say it does not write it. Rewritten as an AST walk with the docstring stripped. A second scan then flagged the word 'Friday' in an honest log message, so string literals are blanked too"
+ },
+ "restart": {
+  "required": true,
+  "done_in_this_stage": false,
+  "why_required": "APScheduler reads cron only at startup. The running scheduler (pid 34564, started 2026-08-29 09:11:11) predates this code and does not have the job",
+  "why_not_done": "the brief says not to restart unless explicitly requested",
+  "timing_if_restarted_today": {
+   "now_ET": "2026-08-30 07:10 Sunday",
+   "job_fires": "Sunday 18:00 ET, in ~10.8h (MT Sun 16:00, VN Mon 05:00)",
+   "covers_the_current_gap": true
+  },
+  "if_not_restarted_before_18_00_ET": "the job does not run today and the first automatic attempt remains SPY_LAST_CHANCE_PRE_NKD at Monday 00:45 ET, 25 minutes before NKD 01:10 - exactly the situation this stage was written to remove",
+  "command": "python monitor/ops.py restart --scheduler --track1-only-shadow --yes"
+ },
+ "safety": {
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "orders_sent": 0,
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "confirmation_present": true,
+  "confirmation_still_gitignored": true,
+  "confirmation_sha16": "67504a1c8a31a6a4",
+  "swing_override_valid": true,
+  "swing_override_grants": "nothing",
+  "broker_calls": 0,
+  "scheduler_restarted": false,
+  "backend_restarted": false,
+  "scheduler_pid_alive": true,
+  "strategy_logic_changed": false,
+  "params_changed": false,
+  "gates_changed": false,
+  "regime_or_freshness_requirements_changed": false,
+  "spy_csv_written_by_this_stage": false,
+  "preflight_state_written": false
+ }
+}

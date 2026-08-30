@@ -1,0 +1,118 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-X",
+ "title": "Version Track 1 route source before archive",
+ "route": "track1_candidate",
+ "date": "2026-08-29",
+ "part_a_inventory": {
+  "untracked_track1_source_py": 46,
+  "breakdown": {
+   "source": 46,
+   "test": 113,
+   "doc": 3,
+   "decision_record": 1
+  },
+  "was_ever_committed_before": false,
+  "git_log_all_before_this_stage": "empty for global_index/track1_*.py"
+ },
+ "part_b_commit_policy": {
+  "ADD": 163,
+  "DEFER": 34,
+  "KEEP_UNTRACKED": 4,
+  "IGNORE": 1,
+  "deferred_categories": {
+   "TASK.md / SCRATCHPAD.md": "the repo's own rule (raits-live-ops, CLAUDE.md) is never to commit them - they are operator working notes. The brief listed TASK.md; the conflict was raised, not resolved unilaterally, and the operator confirmed they stay out",
+   "34 modified tracked files": "already tracked and modified BEFORE this session - pre-existing operator work I did not make and have not reviewed. Committing them under a message that says 'Track 1 route source' would misdescribe them"
+  }
+ },
+ "the_special_decision_swing_override": {
+  "verdict": "TRACKED (committed)",
+  "compared_against": "track1_go_live_confirmation.json, which stays gitignored",
+  "why_the_confirmation_is_ignored": ".gitignore:211 - it is the file that ARMS the route, so a checkout must never be able to create it. Restoring it from git would arm a route",
+  "why_that_reasoning_does_not_transfer": "the override grants NO gate or order authority - grants_orders false, satisfies_shadow_evidence false, parameter_promotion false, evidence_promotion false, all proven by test. A checkout restoring it restores a SCOPE decision, never an ARMING one",
+  "why_it_must_be_tracked": "the route READS it at runtime through track1_swing_paper_override.py, so paper scope would change silently if it were lost, and the signed risk acceptance with its four caveats exists nowhere else",
+  "tests_that_prove_it_grants_nothing": [
+   "scratch/test_track1_stage5zzzo_swing_override_20260829.py",
+   "scratch/test_track1_stage5zzzt_gate_ast_memoization_20260829.py (test_the_confirmation_and_override_grant_no_order_authority)",
+   "scratch/test_track1_stage5zzzu_baseline_index_20260829.py"
+  ],
+  "both_tests_and_record_are_in_this_commit": true
+ },
+ "part_c_pre_stage_checks": {
+  "secrets_in_ADD_list": 0,
+  "gitignored_files_in_ADD_list": 0,
+  "runtime_evidence_in_ADD_list": 0,
+  "config_private_py_is_gitignored": true,
+  "canonical_markdown_links_broken": 0,
+  "validation_tests_passed": 93,
+  "orders_possible_read_from_gates_not_broker": false
+ },
+ "part_d_commit": {
+  "committed": true,
+  "commit_hash": "22f6086137519b547e41ba1612f724fad4157ff3",
+  "commit_short": "22f6086",
+  "branch": "future/incorporation",
+  "message_subject": "Track 1 route source and baseline records",
+  "files": 163,
+  "insertions": 80925,
+  "staging_method": "explicit pathspec file - never `git add .`, and the staged set was compared to the ADD list as a SET before committing: exact match, 0 extra, 0 missing",
+  "operator_approval": "asked and given: 'the 163 ADD list as planned'"
+ },
+ "proof_nothing_forbidden_was_committed": {
+  "runtime_evidence_files": 0,
+  "b1_evidence_files": 0,
+  "go_live_confirmation": 0,
+  "secrets_or_config_private": 0,
+  "operator_notes_TASK_or_SCRATCHPAD": 0,
+  "method": "git show --name-only on the commit, filtered for each forbidden pattern",
+  "by_kind_in_commit": {
+   "source": 46,
+   "test": 113,
+   "doc": 3,
+   "decision_record": 1
+  }
+ },
+ "post_commit_state": {
+  "track1_gates_py_now_tracked": true,
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "pre_existing_modified_files_still_unstaged": 34,
+  "working_tree_untouched_apart_from_the_commit": true
+ },
+ "what_this_fixes": [
+  "the live order gate now has version history",
+  "a future regression can be attributed with git instead of a runtime monkeypatch - the workaround Stage 5ZZZ-T had to use because `git show HEAD:<file>` answered 'exists on disk, but not in HEAD'",
+  "the signed paper-scope decision and the canonical baseline documents survive this disk"
+ ],
+ "still_open": {
+  "the_archive_apply_stage": "Stage 5ZZZ-W's 379 candidates remain unmoved; that stage is now safer to run because the source it must not touch is versioned",
+  "34_modified_tracked_files": "pre-existing operator work, still uncommitted by choice",
+  "b1_evidence_and_confirmation": "deliberately out of git, unchanged"
+ },
+ "safety": {
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "orders_sent": 0,
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "confirmation_present": true,
+  "confirmation_sha16": "67504a1c8a31a6a4",
+  "confirmation_committed": false,
+  "swing_override_present_and_valid": true,
+  "swing_override_grants": "nothing",
+  "broker_calls": 0,
+  "scheduler_restarted": false,
+  "backend_restarted": false,
+  "scheduler_pid_alive": true,
+  "files_moved_or_archived": 0,
+  "git_reset_or_checkout_used": false,
+  "strategy_logic_changed": false,
+  "params_changed": false,
+  "gates_changed": false,
+  "runtime_trading_files_edited": 0
+ }
+}

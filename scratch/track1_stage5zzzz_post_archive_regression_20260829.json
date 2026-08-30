@@ -1,0 +1,219 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-Z",
+ "title": "Post-archive regression verification",
+ "route": "track1_candidate",
+ "date": "2026-08-29",
+ "verification_only_nothing_changed": true,
+ "part_a_baseline_state": {
+  "branch": "future/incorporation",
+  "head": "22f6086 Track 1 route source and baseline records",
+  "archive_root_exists": true,
+  "files_under_archive_root": 342,
+  "archive_log_has_5zzzy_entry": true,
+  "canonical_links_broken": 0,
+  "canonical_named_paths_missing": 0,
+  "orders_possible": false,
+  "orders_dir_present": false,
+  "approval_env_set": false,
+  "scheduler_backend_untouched": true
+ },
+ "part_b_targeted": {
+  "suites": [
+   "5ZZZ-U baseline index",
+   "5ZZZ-V repo archive",
+   "5ZZZ-W untracked plan"
+  ],
+  "note_5zzzx_5zzzy": "neither stage has a test suite - 5ZZZ-X was a commit and 5ZZZ-Y a move. Their guarantees are checked here directly instead, and that gap is named rather than glossed",
+  "passed": 42,
+  "failed": 6,
+  "failed_tests": [
+   "scratch/test_track1_stage5zzzv_repo_archive_20260829.py::test_the_plan_parses_and_covers_every_tracked_file",
+   "scratch/test_track1_stage5zzzw_untracked_plan_20260829.py::test_every_planned_source_path_still_exists",
+   "scratch/test_track1_stage5zzzw_untracked_plan_20260829.py::test_no_archive_destination_directory_was_created",
+   "scratch/test_track1_stage5zzzw_untracked_plan_20260829.py::test_no_destination_exists_yet",
+   "scratch/test_track1_stage5zzzw_untracked_plan_20260829.py::test_the_finding_matches_what_git_says_right_now",
+   "scratch/test_track1_stage5zzzw_untracked_plan_20260829.py::test_the_plan_covers_every_untracked_file"
+  ]
+ },
+ "part_c_core_track1": {
+  "suites": [
+   "canonical baseline",
+   "swing override",
+   "replay parity",
+   "live Swing causal D-1",
+   "restart liveness",
+   "dashboard performance",
+   "gate AST memoization",
+   "paper account baseline",
+   "B1 operator decision",
+   "B1 confirmation recognition",
+   "market view UI contract"
+  ],
+  "passed": 270,
+  "failed": 1,
+  "failed_tests": [
+   "scratch/test_track1_stage5zze_paper_account_baseline_20260827.py::test_19_orders_are_still_impossible_and_nothing_was_armed"
+  ]
+ },
+ "part_d_collect_only": {
+  "command": "python -m pytest --collect-only -q scratch/ tests/ monitor/",
+  "collected": 4418,
+  "errors": 2,
+  "baseline_collected": 4418,
+  "baseline_errors": 2,
+  "matches_baseline": true,
+  "known_errors": [
+   "tests/test_raits_vs_hold.py (an earlier UNLOGGED archive move)",
+   "tests/integration/test_orb_integration.py"
+  ],
+  "a_frame_error_i_caught": "a bare `pytest --collect-only -q` reports 1,004, not 4,418. That is a different scope, not a regression - the baseline was measured with an explicit path list and the comparison has to use the same command"
+ },
+ "part_e_broad_scratch": {
+  "command": "python -m pytest scratch -q",
+  "ran": true,
+  "elapsed_seconds": 2011,
+  "passed": 3410,
+  "failed": 167,
+  "skipped": 5,
+  "failing_suites": 57,
+  "archive_caused": 0,
+  "decisive_check": "ZERO failures reference a missing file, missing module or import error - which is exactly how an archive break would manifest",
+  "order_dependence_tested_and_REJECTED": "the 5 worst suites were re-run ALONE and failed with identical counts (9,6,6,5,5), so this is not cross-suite contamination - the failures are real",
+  "dominant_causes": {
+   "track1_go_live_confirmation.json asserted absent": 89,
+   "B1_broker_account_or_legacy_retirement as lead blocker": 24,
+   "TRACK1_CALM_1000 slot": 16,
+   "unknown_slot": 16
+  },
+  "what_those_mean": "all three are operator/design changes: the operator SIGNED the confirmation on 2026-08-27 (so the lead blocker advanced to PAPER_SHADOW_EVIDENCE), and Calm was split into DECIDE_0932 / OBSERVE_1002 by the two-phase work. 43 of the 57 failing suites are dated 08-22..08-26 and predate those changes",
+  "classification": "STALE_TEST / PRE_EXISTING - 0 NEW_FROM_ARCHIVE",
+  "honest_note": "I had expected roughly 24 known failures. The real number is 167 because my known set came from a CURATED subset of suites I had run before - I had never run all of scratch. The estimate was wrong; the attribution is not",
+  "CAUSED_RUNTIME_CONTAMINATION": true
+ },
+ "part_f_classification": {
+  "NEW_FROM_ARCHIVE": 0,
+  "STALE_TEST": 6,
+  "PRE_EXISTING": 1,
+  "FLAKY_ORDER_DEPENDENT": 0,
+  "ENVIRONMENTAL": 0,
+  "UNKNOWN": 0,
+  "detail": [
+   {
+    "test": "5ZZZ-V::test_the_plan_parses_and_covers_every_tracked_file",
+    "class": "STALE_TEST",
+    "evidence": "assert 829 == 992",
+    "why": "the plan recorded 829 tracked files; Stage 5ZZZ-X then committed 163 more. The test pins a count a later authorised stage deliberately changed",
+    "archive_caused": false
+   },
+   {
+    "test": "5ZZZ-W::test_the_plan_covers_every_untracked_file",
+    "class": "STALE_TEST",
+    "evidence": "346 untracked file(s) absent from the plan, all under _archive/scratch/track1_2026-08-29/",
+    "why": "the archived files are new untracked paths that did not exist when the plan was written",
+    "archive_caused": false
+   },
+   {
+    "test": "5ZZZ-W::test_no_destination_exists_yet",
+    "class": "STALE_TEST",
+    "evidence": "_archive/.../_track1_stage5q1_mutations.json exists",
+    "why": "the destinations exist because Stage 5ZZZ-Y was authorised to create them",
+    "archive_caused": false
+   },
+   {
+    "test": "5ZZZ-W::test_every_planned_source_path_still_exists",
+    "class": "STALE_TEST",
+    "evidence": "341 planned path(s) no longer exist",
+    "why": "exactly the 341 files Stage 5ZZZ-Y moved - the count matches the manifest",
+    "archive_caused": false
+   },
+   {
+    "test": "5ZZZ-W::test_no_archive_destination_directory_was_created",
+    "class": "STALE_TEST",
+    "evidence": "_archive/scratch/track1_2026-08-29 exists",
+    "why": "created by the authorised apply stage",
+    "archive_caused": false
+   },
+   {
+    "test": "5ZZZ-W::test_the_finding_matches_what_git_says_right_now",
+    "class": "STALE_TEST",
+    "evidence": "its own message: 'track1 source is now tracked - update the plan'",
+    "why": "this test was written to fire when the version-control finding was FIXED. Stage 5ZZZ-X fixed it. The test is working exactly as designed",
+    "archive_caused": false
+   },
+   {
+    "test": "5ZZE::test_19_orders_are_still_impossible_and_nothing_was_armed",
+    "class": "PRE_EXISTING",
+    "evidence": "the three order-safety assertions PASS (orders_possible False, blockers non-empty, orders dir absent). It fails only on `assert not Path('track1_go_live_confirmation.json').exists()`",
+    "why": "a suite written 2026-08-27 asserting a file the operator signed at 10:05 that same day. The file's mtime is 2026-08-27 and its sha16 has not changed all session, so the archive cannot be the cause",
+    "archive_caused": false
+   }
+  ],
+  "not_re_pinned": "no failing test was edited or re-pinned. Each is reported with its cause, in line with the rule followed since Stage 5ZZZ-R"
+ },
+ "part_g_no_side_effects": {
+  "runtime_trading_files_modified": 0,
+  "orders_dir_created": false,
+  "approval_env_set": false,
+  "broker_calls": 0,
+  "scheduler_restarted": false,
+  "backend_restarted": false,
+  "archive_files_deleted": 0,
+  "archived_files_present": "341/341",
+  "archived_hash_mismatches": 0,
+  "restored_files_intact": "38/38"
+ },
+ "verdict": {
+  "archive_safe": true,
+  "reason": "no failure is attributable to the archive. Six are tests pinning a pre-action state that later AUTHORISED stages deliberately changed, and one is a suite from 2026-08-27 asserting the absence of a file the operator signed that day. Collection matches the baseline exactly, and every archived file is present with its hash intact",
+  "but": "the archive is clean; the broad test run was not. The only new failure in this stage was caused by my own test run writing evidence, not by the archive"
+ },
+ "safety": {
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "orders_sent": 0,
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "confirmation_present": true,
+  "confirmation_still_gitignored": true,
+  "confirmation_sha16": "67504a1c8a31a6a4",
+  "swing_override_tracked": true,
+  "swing_override_valid": true,
+  "swing_override_grants": "nothing",
+  "broker_calls": 0,
+  "scheduler_pid_alive": true,
+  "scheduler_restarted": false,
+  "backend_restarted": false,
+  "files_moved_or_deleted_this_stage": 0,
+  "git_reset_or_checkout_used": false,
+  "strategy_logic_changed": false,
+  "params_changed": false,
+  "gates_changed": false
+ },
+ "CONTAMINATION_I_CAUSED_AND_FOUND": {
+  "severity": "the most important finding of this stage, and it is my own doing",
+  "what": "the Part E broad scratch run WROTE REAL RUNTIME EVIDENCE: 2 synthetic rows for roska4_swing TRACK1_SWING_1405, mode shadow_live, reason overlap_disagreement, into global_index/track1_runtime/signals/track1_signals_20260829.jsonl at 21:50:49 - during the run, which started 21:40:05",
+  "also_touched": [
+   "data_observation_20260820.jsonl",
+   "data_observation_20260824.jsonl",
+   "data_observation_20260825.jsonl"
+  ],
+  "why_it_is_wrong": "2026-08-29 is a SATURDAY. No Swing slot ran or could have run",
+  "how_it_surfaced": "replay parity flipped roska4_swing from NOT_YET_OBSERVED to FAIL, and the 5ZZZ-P test asserting 4 sleeves NOT_YET_OBSERVED failed with assert 3 == 4. That test PASSED in Part C an hour earlier, so the change had to be new",
+  "this_is_a_documented_hazard": "raits-live-ops section 6: isolate ALL output - a --dry-run once added a B3 episode and turned a gate red, then was blamed on another session. I ran the full suite without isolating output and reproduced exactly that",
+  "IMPACT_MEASURED": {
+   "paper_shadow_evidence_gate": "UNCHANGED - judgeable window still 2026-08-24..2026-08-28, same 2 FAILs, same reasons. 2026-08-29 never entered the window",
+   "orders_possible": false,
+   "blockers": [
+    "PAPER_SHADOW_EVIDENCE"
+   ],
+   "confined_to": "2 signal rows + 3 data_observation files",
+   "false_signal_created": "replay parity now reports roska4_swing FAIL on a slot no slot produced"
+  },
+  "what_I_did_NOT_do": "delete or rewrite the rows. Runtime evidence is append-only operational record and the standing rule is never to rewrite it - a contaminated row removed by me would be a second, quieter falsification",
+  "recommended_remedy": "the operator decides. The rows are identifiable by ran_at 2026-08-29T21:50:49 and by being dated to a Saturday. Until they are dealt with, replay parity will keep reporting roska4_swing FAIL for a slot that never ran",
+  "lesson": "a broad test run over live-route suites is not read-only. Isolate output or do not run it"
+ }
+}
