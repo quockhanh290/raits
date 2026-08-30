@@ -1,0 +1,30 @@
+{
+ "schema": "track1_swing_paper_override/1",
+ "decision_type": "swing_paper_scope",
+ "decision": "INCLUDE_SWING_IN_PAPER_BY_OPERATOR_OVERRIDE",
+ "confirmed_by": "kevindo290",
+ "confirmed_at": "2026-08-29",
+ "route": "track1_candidate",
+ "sleeve": "roska4_swing",
+ "regime_basis": "causal_d1",
+ "selected_identity": "D1_OLD_EFFECTIVE_EMA50",
+ "parameter_promotion": false,
+ "evidence_promotion": false,
+ "risk_acceptance": true,
+ "caveats": [
+  "same-day Swing not live-tradable",
+  "Swing 2026 contribution negative",
+  "no-Swing risk-adjusted OOS better",
+  "no bootstrap yet"
+ ],
+ "source_stage": "5ZZZ-N",
+ "baseline_reference": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+ "note": "Paper SCOPE only. This record releases no gate, does not satisfy PAPER_SHADOW_EVIDENCE, does not set TRACK1_ORDERS_APPROVED, and promotes no parameter. Swing runs the route's existing effective identity (ema=50 after the harness substitution of the requested 30, stop basis 2.0, causal D-1 labels); nothing about the strategy changed. The decision is an operator's acceptance of the risk stated in the caveats above, recorded here so the route can read it rather than only a report.",
+ "measured_at_time_of_record": {
+  "orders_possible": false,
+  "blocking": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "gates_source_mentions_this_record": false
+ }
+}
