@@ -32,10 +32,16 @@ Jobs mỗi ngày Mon-Fri (thứ tự):
   Đo lường (check_resumebar_timing.py, 2017 trades, 4 instruments):
     Single fire 14:05 → 0%  |  +14:10 → 22%  |  +14:30 → 50%  |  +15:55 → 100%
 
-── Pre-flight fail-safe ─────────────────────────────────────────────────────
+── Pre-flight 13:45 — HẠ TẦNG DÙNG CHUNG, không phải job của legacy ─────────
   Nếu update_ibkr_daily hoặc update_spy_csv thất bại (Gateway rớt, guard abort,
   API key thiếu), TẤT CẢ slots 14:05–15:55 bị SKIP ngày đó — không trade trên
   data stale. Flag _preflight_ok[date] chỉ set True khi cả hai bước thành công.
+
+  Job này làm mới hai nguồn dữ liệu mà CẢ HAI tuyến đều đọc, và ghi lại bằng
+  chứng duy nhất rằng việc làm mới đã chạy (preflight_state.json). Track 1 đọc
+  chính tệp đó qua track1_freshness.check_preflight_record. Vì vậy khi gỡ bỏ các
+  job vào lệnh của legacy, job 13:45 PHẢI ở lại — xem bảng phân loại trong
+  global_index/track1_slots.route_classification().
 
 Machine TZ-independent: VN (UTC+7), MST (UTC-7), ET, cloud — đều đúng.
 APScheduler timezone="America/New_York" là ET-native, DST tự động.
@@ -64,9 +70,32 @@ import threading
 import time
 from datetime import date as _date, timedelta as _timedelta
 from pathlib import Path
+
+# Additive telemetry. Every call is a no-op unless RAITS_TELEMETRY_DIR is set
+# in the environment, so an unflagged scheduler behaves exactly as before.
+from global_index import slot_telemetry as _tel
 from typing import NamedTuple
 
 _CWD = Path(__file__).parents[1]   # d:\raits
+
+# Stage 5Q. This process's own start instant in ET, captured at import — which for
+# `python -m global_index.run_scheduler` is process start to within the import time.
+#
+# It exists because the post-window audit has to tell "the window produced nothing" from
+# "there was no process to produce anything", and the second is not a failure. Reading it
+# back out of the process table works and is what the hand-run script does, but that scan
+# fails to an EMPTY LIST on any hiccup — and an empty list means "no scheduler", which would
+# turn a pre-start window into a manufactured incident. The process that knows the answer
+# for certain is this one, so it says so in the child's argv instead of making the child
+# guess.
+#
+# ET, not machine-local: this box runs Calgary time and every window in the project is ET.
+# The two-hour difference is exactly large enough to move the NKD window (01:10-02:55 ET)
+# across a scheduler start and reverse the verdict.
+_PROCESS_START_ET = (
+    __import__("datetime").datetime.now(__import__("zoneinfo").ZoneInfo("America/New_York"))
+    .replace(tzinfo=None).isoformat(timespec="seconds")
+)
 if not (_CWD / "global_index").is_dir() or not (_CWD / "futures").is_dir():
     sys.stderr.write(f"CWD guard FAIL — run from d:\\raits: {_CWD}\n")
     sys.exit(1)
@@ -209,6 +238,13 @@ _PREFLIGHT_STATE = Path("global_index/preflight_state.json")
 # number was produced under.
 _maxhold_done: dict = {}
 _MAXHOLD_STATE = Path("global_index/maxhold_state.json")
+
+# Track 1's OWN max-hold marker — Stage 5O. One shared file was the audit's silent failure:
+# two routes, one "already ran today" marker, and the second route reads a mark it did not
+# write, concludes the sweep is done, and leaves a five-day position open. Same shape, own
+# file, and neither marker is ever consulted for the other route's job.
+_maxhold_done_t1: dict = {}
+_MAXHOLD_STATE_T1 = Path("global_index/maxhold_state.track1.json")
 _PREFLIGHT_KEEP = 7          # days retained; keeps the file from growing without bound
 _FAIL_TAIL_LINES = 25        # child output echoed on failure — enough for the traceback
 
@@ -251,6 +287,7 @@ def _run_guarded(slot_id: str, body) -> bool:
         _elapsed = (time.monotonic() - _since) if _since else 0.0
         _rep = _inflight_report(_elapsed)
         getattr(log, _rep.level)("[%s] %s", slot_id, _rep.message)
+        _tel.record_skip(slot_id, "skipped_mutex", inflight_s=round(_elapsed, 1))
         return False
     _slot_started_at[0] = time.monotonic()
     try:
@@ -357,6 +394,11 @@ def heartbeat_alive_is_worth_logging(minute: int, stall_outstanding: bool) -> bo
 # skipping: an NKD entry would land hours from its signal bar.
 SLOT_MISFIRE_GRACE_SECS = 300
 
+#: Track 1's Stress entry window, in the same shape as `_ENTRY_WINDOWS`. Declared here so the
+#: scheduler and `global_index/track1_slots.REQUIRED_ENTRY_WINDOW` can be asserted equal
+#: rather than kept in step by hand — two copies of a window is two chances to drift.
+_TRACK1_STRESS_WINDOW = ((10, 35), (12, 30))
+
 
 def heartbeat_gap(prev, now) -> "float | None":
     """Seconds lost since the previous beat, or None if the beat arrived on time.
@@ -457,6 +499,33 @@ def _save_maxhold_state() -> None:
         log.error("[MAXHOLD] could not persist state to %s: %s", _MAXHOLD_STATE, exc)
 
 
+def _load_maxhold_state_t1() -> None:
+    if not _MAXHOLD_STATE_T1.exists():
+        return
+    try:
+        with open(_MAXHOLD_STATE_T1, encoding="utf-8") as fh:
+            _maxhold_done_t1.update({k: bool(v) for k, v in json.load(fh).items()})
+    except Exception as exc:
+        log.warning("[MAXHOLD_T1] could not read %s (%s) — will treat today as not run",
+                    _MAXHOLD_STATE_T1, exc)
+
+
+def _save_maxhold_state_t1() -> None:
+    """Atomic, same failure direction as the legacy writer: a torn file reads as 'not run'
+    and re-runs an idempotent job."""
+    try:
+        keep = dict(sorted(_maxhold_done_t1.items())[-_PREFLIGHT_KEEP:])
+        _maxhold_done_t1.clear()
+        _maxhold_done_t1.update(keep)
+        _MAXHOLD_STATE_T1.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _MAXHOLD_STATE_T1.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(keep, fh, indent=2)
+        os.replace(tmp, _MAXHOLD_STATE_T1)
+    except Exception as exc:
+        log.error("[MAXHOLD_T1] could not persist state to %s: %s", _MAXHOLD_STATE_T1, exc)
+
+
 def _save_preflight_state() -> None:
     """Atomic write: a torn file would read as 'no record' and skip every slot."""
     try:
@@ -473,8 +542,17 @@ def _save_preflight_state() -> None:
                   "fail-closed after a restart", _PREFLIGHT_STATE, exc)
 
 
-def _run(args: list[str], label: str, dry_run: bool, timeout: float | None = None) -> bool:
-    """Run subprocess, return True on success (returncode==0)."""
+def _run(args: list[str], label: str, dry_run: bool, timeout: float | None = None,
+         route: str | None = None, rc_out: list | None = None) -> bool:
+    """Run subprocess, return True on success (returncode==0).
+
+    Stage 5ZZC. `rc_out`, when given, receives the child's actual exit code. The return type is
+    left alone on purpose — every other caller here treats this as a yes/no and changing that
+    would be a wide edit for one job's benefit. The SPY refresh needs more than yes/no because
+    its child now answers with three different noes: 1 for a history that moved, 2 for a day
+    the provider did not have, and 1 again for a crash. Only the first two are worth waking
+    somebody for at different volumes.
+    """
     log.info("[%s] %s", label, " ".join(args))
     if dry_run:
         log.info("[%s] dry-run — command NOT executed (treating as success)", label)
@@ -499,8 +577,27 @@ def _run(args: list[str], label: str, dry_run: bool, timeout: float | None = Non
     # the longest honest run and still frees the session with most of a 1h50m window
     # left. Losing four slots beats losing every remaining one.
     try:
+        _env = dict(os.environ)
+        # Telemetry identity travels in the environment, NOT in argv: the command is
+        # logged one line above and must stay byte-identical to every historical run.
+        #
+        # No default is invented for RAITS_TELEMETRY_DIR. Setting one here would have
+        # switched child telemetry ON for every spawn while the module still claimed to
+        # be off by default, and would have left the parent (which writes the skip
+        # records from its own environment) OFF — parent and child disagreeing about
+        # whether the day was instrumented. It is inherited from os.environ or absent.
+        _env["RAITS_SLOT_ID"] = label
+        if route is not None:
+            # The caller knows which route this child IS, so it says so outright. Track 1 slots
+            # were inheriting the legacy default and stamping every window-ledger row
+            # `route="legacy"` — the coverage that precondition 5 is read from was being filed
+            # under the route it exists to replace. `setdefault` is kept for legacy so an
+            # operator-exported value still wins there, exactly as before.
+            _env["RAITS_ROUTE"] = route
+        else:
+            _env.setdefault("RAITS_ROUTE", "legacy")   # identity only; enables nothing
         result = subprocess.run(args, cwd=str(_CWD), capture_output=True,
-                                text=True, errors="replace",
+                                text=True, errors="replace", env=_env,
                                 timeout=timeout or _SLOT_TIMEOUT_SECS)
     except subprocess.TimeoutExpired as _to:
         # subprocess.run has already killed the child before re-raising.
@@ -517,7 +614,11 @@ def _run(args: list[str], label: str, dry_run: bool, timeout: float | None = Non
             _lines = [ln for ln in (_txt or "").splitlines() if ln.strip()]
             for ln in _lines[-_FAIL_TAIL_LINES:]:
                 log.error("[%s] %s (%s before the kill)", label, ln.strip(), _name)
+        if rc_out is not None:
+            rc_out.append(-1)          # killed, which is not an exit code the child chose
         return False
+    if rc_out is not None:
+        rc_out.append(int(result.returncode))
     if result.returncode == 0:
         # Mã thoát 0 KHÔNG có nghĩa là không có gì hỏng. 2026-08-10: MAX_HOLD đóng MYM
         # thành công (nên thoát 0) nhưng `cancel_order(12)` thất bại, và runner đã kêu
@@ -569,17 +670,55 @@ def _run(args: list[str], label: str, dry_run: bool, timeout: float | None = Non
     return False
 
 
+def _spy_series_last_day(csv_path: str) -> str:
+    """The last date in the daily series, or "" when it cannot be read.
+
+    Stage 5ZL. Empty means "could not tell", never "up to date" — the caller must not read a
+    failure to look as a successful look. Deliberately does not raise: a status line must not
+    be able to fail the job it is describing.
+    """
+    try:
+        from pathlib import Path as _P
+        lines = [ln for ln in _P(csv_path).read_text(encoding="utf-8").splitlines() if ln.strip()]
+        return lines[-1].split(",")[0].strip() if len(lines) > 1 else ""
+    except Exception:                                          # noqa: BLE001
+        return ""
+
+
 def make_scheduler(port: int, dry_run: bool,
                    data_dir: str = "data/cache/futures",
                    nkd_parquet: str = "global_index/data/NKD_continuous_1m_8y.parquet",
                    regime_csv: str = "spy_daily_live.csv",
                    polygon_api_key: str = "",
                    live_state_path: str = "global_index/live_state_data.js",
-                   shadow_resume: bool = False):
+                   shadow_resume: bool = False,
+                   track1_shadow: bool = False,
+                   track1_only: bool = False):
+    """Build the schedule. Three modes, and the third is new in Stage 5M-D.
+
+        (default)              legacy only. 60 jobs. Unchanged, and tested to be unchanged.
+        track1_shadow          legacy PLUS Track 1's slots. Transitional: both routes run.
+        track1_only            Track 1 plus shared infrastructure; legacy STRATEGY jobs are
+                               not scheduled at all.
+
+    Why `track1_only` exists, and why `STOP_TRADING` was not enough. The root switch halts new
+    ENTRIES — `runner.run_day` checks it — but by then the legacy slot has spawned a child,
+    connected on IBKR clientId 1, fetched bars for every instrument, rolled contracts and run
+    the exit and reconcile path. Freezing legacy removes the trading, not the load. So a
+    'frozen legacy' shadow period still had a legacy child in every 14:05-15:55 minute, which
+    is exactly the window Track 1's Normal-R4 slots occupy, and it is why Stage 5M-C left the
+    swing provider staged behind an env var rather than switched on.
+
+    `track1_only` removes that collision structurally rather than by timing, so in this mode
+    the swing slots take a provider by default.
+    """
     try:
         from apscheduler.schedulers.blocking import BlockingScheduler
     except ImportError:
         sys.exit("apscheduler not installed: pip install apscheduler>=3.10")
+
+    if track1_only:
+        track1_shadow = True
 
     sched = BlockingScheduler(timezone="America/New_York")   # ET-native
 
@@ -693,17 +832,78 @@ def make_scheduler(port: int, dry_run: bool,
             _live_day_body("STRESS_MID_1020", clusters="stress",
                            prev_preflight=True, stress_entry=True)
 
-    # ── 13:45 ET Mon-Fri: pre-flight (update parquet + spy CSV) ─────────────
-    # Runs BEFORE 14:05 run_live_day. Typical duration: ~20s for 5 instruments.
-    # 20-min margin is sufficient. Fail-safe: any failure → live_day skipped today.
+    # ── 13:45 ET Mon-Fri: SHARED PRODUCTION PRE-FLIGHT (parquet + spy CSV) ───
+    #
+    # SHARED INFRASTRUCTURE — NOT a legacy strategy job. Retiring the legacy entry
+    # slots must NOT retire this one.
+    #
+    # It sits between the legacy slots in this file only because legacy was written
+    # first. What it actually does is refresh the two data sources the WHOLE system
+    # reads, and record whether that refresh succeeded:
+    #
+    #   update_ibkr_daily  → the futures parquet store
+    #   update_spy_csv     → the regime CSV
+    #   preflight_state.json → the only record that either of them ran
+    #
+    # Three consumers, two routes:
+    #   legacy 14:05-15:55 slots  read _preflight_ok[today]
+    #   legacy NKD night slots    read _preflight_ok[prev business day]
+    #   Track 1's freshness gate  reads preflight_state.json off disk
+    #                             (global_index/track1_freshness.check_preflight_record)
+    #
+    # Track 1's morning slots (Calm 10:00, Stress 10:35-12:30) fire BEFORE 13:45, so
+    # what they trade on is the PREVIOUS business day's completed pre-flight plus
+    # today's live bars from the broker. That is the designed contract — see
+    # track1_freshness.required_data_through — not a gap to be closed by adding a
+    # pre-market refresh. Adding one would change the contract every Track 1 number
+    # was produced under.
+    #
+    # Timing (13:45), body, and fail-closed direction are all load-bearing and are
+    # pinned by scratch/test_track1_stage5l_shared_preflight_20260823.py.
+    #
+    # The job NAME is load-bearing too, and it does not look it: the dashboard's job
+    # journal maps a run back to a job by matching the name prefix "Pre-flight
+    # update" (monitor/backend/job_journal_reader._job_id_from_name). Renaming this
+    # to something clearer would make every pre-flight run vanish from the journal
+    # silently — the reader returns None and drops the run, it does not complain.
+    # Ownership is stated in this comment and in the classification table instead,
+    # where saying it costs nothing.
+    #
+    # Typical duration: ~20s for 5 instruments; the 20-min margin before 14:05 is
+    # sufficient. Fail-safe: any failure → every legacy slot skipped today, and
+    # Track 1's gate refuses on the same record.
     @sched.scheduled_job("cron", day_of_week="mon-fri", hour=13, minute=45,
                          id="preflight", name="Pre-flight update 13:45 ET")
     def job_preflight():
         today = _et_today().isoformat()
         log.info("[PRE-FLIGHT] Starting: update_ibkr_daily -> update_spy_csv (%s)", today)
 
+        # `--repair-boundary` — Stage 5Q-6, and it is enabled on measured recurrence rather
+        # than on principle. THIS job creates the defect it now repairs: the append keeps only
+        # bars strictly newer than the last stored one, so whatever minute the fetch stops on
+        # is frozen as a partial bar for ever.
+        #
+        # Measured on 2026-08-24, from the run this very line drives: one pre-flight left
+        # THREE partial boundary bars out of five instruments —
+        #
+        #     MNQ  13:45  high +2.0   close +2.0   volume  738 -> 1801
+        #     MYM  13:45                           volume  137 ->  182
+        #     M2K  13:46  high +0.1                volume    2 ->   15
+        #     MES  13:44  clean
+        #
+        # and Friday's equivalents refused 46 Track 1 slots that day (23 Stress + 23 Swing).
+        # Recurrence is not a risk here, it is the observed daily behaviour.
+        #
+        # What makes it safe to run unattended: the replacement is accepted ONLY when the
+        # feed's bar is a COMPLETION of the stored one — open unchanged, low no higher, high
+        # no rise reversed, volume no smaller — so two sources disagreeing about WHICH bar it
+        # is can never be written as if one had merely finished. It snapshots before writing,
+        # verifies by re-reading, exempts exactly one timestamp from the history invariant,
+        # and any refusal takes the same `failed` path that makes this pre-flight exit
+        # non-zero — so the day is marked FAILED rather than quietly ok.
         ibkr_ok = _run(
-            [sys.executable, "-m", "global_index.update_ibkr_daily", "--port", str(port)],
+            [sys.executable, "-m", "global_index.update_ibkr_daily", "--port", str(port),
+             "--repair-boundary"],
             label="IBKR_UPDATE", dry_run=dry_run,
         )
         if not ibkr_ok:
@@ -719,6 +919,10 @@ def make_scheduler(port: int, dry_run: bool,
         spy_cmd = [sys.executable, "-m", "global_index.update_spy_csv", "--csv", regime_csv]
         if polygon_api_key:
             spy_cmd += ["--api-key", polygon_api_key]
+        # Stage 5ZL: NO `--verify-strict`. The reason is written down rather than implied —
+        # this call decides whether the whole day trades, and a verification that could not
+        # run must not skip every slot. It still RECORDS its status, so readiness and the
+        # dashboard see it; only the exit code is left alone.
         spy_ok = _run(spy_cmd, label="SPY_UPDATE", dry_run=dry_run)
         if not spy_ok:
             _preflight_ok[today] = False
@@ -733,6 +937,295 @@ def make_scheduler(port: int, dry_run: bool,
         _preflight_ok[today] = True
         _save_preflight_state()
         log.info("[PRE-FLIGHT] OK — parquet + spy CSV fresh. run_live_day cleared for 14:05.")
+
+    # ── Stage 5Q-5: the SPY refresh that runs AFTER the close ────────────────
+    #
+    # The 13:45 pre-flight fetches the daily series through "today", and SPY's daily bar does
+    # not close until 16:00 — so that fetch can NEVER bring today's close. Measured
+    # 2026-08-24: `preflight_state.json` said `2026-08-21: true` while `spy_daily_live.csv`
+    # still ended on `2026-08-20`. A true record and a short file, side by side.
+    #
+    # The consequence was not cosmetic. A session on day D trades the regime label of D-1
+    # (`RegimeLabels.get` = `reg.asof(day - 1)`), so on Monday morning the route needs Friday's
+    # close — and the only refresh that could have brought it ran at 13:45 on Friday, before
+    # Friday closed. Track 1's freshness gate BINDS in `shadow_live`, so no candidate could be
+    # admitted on any morning, ever.
+    #
+    # 16:20 ET, not 16:00: Polygon's daily aggregate for the session settles a few minutes
+    # after the close, and asking at 16:00 fetches the same short series the 13:45 run already
+    # has. Twenty minutes is the same order of margin the 13:45 job leaves before 14:05.
+    #
+    # SPY ONLY. `update_ibkr_daily` is not re-run: the intraday parquets were already brought
+    # to today by the 13:45 job, this job exists for the one input that cannot be, and a second
+    # IBKR fetch would open a second Gateway client for no gain.
+    #
+    # It does NOT write `preflight_state.json`. That record is about the 13:45 job, and a
+    # second writer would make "did the pre-flight run" ambiguous — the failure this repo has
+    # paid for in other shapes. The evidence that this job worked is the CSV's own last date,
+    # which the freshness gate already reads.
+    #: Which rung follows which, so a message can say when the next attempt is instead of
+    #: leaving the reader to look it up. The last rung maps to nothing, and that is what makes
+    #: its message the loud one.
+    _SPY_LADDER_NEXT = {"SPY_REFRESH_PM": "16:45", "SPY_REFRESH_PM_R1": "17:15",
+                        "SPY_REFRESH_PM_R2": None}
+
+    def _spy_refresh(label: str, *, attempt: int) -> None:
+        """One rung of the post-close ladder. Stage 5ZZC.
+
+        Why a ladder at all, in one measured sentence: on 2026-08-26 this job ran cleanly at
+        16:20 and the provider did not yet have that day's SPY close, so the series stayed a
+        day short — and the overnight Nikkei window, which runs at 01:10 before its own
+        pre-flight, refused the next morning on stale daily context. The job warned at the
+        time, in the right words, and its warning ended "only a problem if it is still true
+        tomorrow". Nothing looked tomorrow. Rungs are the thing that looks.
+
+        Retries carry `--skip-if-covered`, so a rung with nothing to do exits 0 without a fetch
+        or an API call. Measured before this was written: without it a retry on a GOOD day
+        exits 1, because the series already ends at today, so the update returns early with
+        `UNKNOWN (no_snapshot)` — nothing fetched, nothing compared — and strict mode fails on
+        anything that is not a PASS. Two rungs reporting FAILED on every day that went well is
+        an alarm that fires when nothing is wrong, and this project has already written down
+        what happens to those.
+        """
+        today = _et_today().isoformat()
+        first = attempt == 1
+        log.info("[%s] Starting: update_spy_csv after the close (%s)%s", label, today,
+                 "" if first else " — retry %d" % (attempt - 1))
+        before = _spy_series_last_day(regime_csv)
+
+        cmd = [sys.executable, "-m", "global_index.update_spy_csv", "--csv", regime_csv,
+               "--verify-strict", "--require-through", today]
+        if not first:
+            # Only the retries skip. The 16:20 run does the verification even when the day is
+            # already there, because checking the labels is part of what that run is for.
+            cmd += ["--skip-if-covered"]
+        if polygon_api_key:
+            cmd += ["--api-key", polygon_api_key]
+
+        rc: list = []
+        ok = _run(cmd, label=label, dry_run=dry_run, rc_out=rc)
+        if dry_run:
+            # `_run` reports a dry run as success without executing anything, so the series on
+            # disk is whatever it already was. Reading it here and judging the rung against it
+            # would report a FAILED refresh for a command that was never sent — a false alarm
+            # invented by the mode meant to avoid side effects.
+            log.info("[%s] dry-run — no refresh attempted, series left as it is", label)
+            return
+        code = rc[0] if rc else (0 if ok else 1)
+        covered = _spy_series_last_day(regime_csv)
+
+        # Four outcomes, named apart. "It worked", "a later rung rescued it", "nobody has it
+        # yet" and "the run itself broke" call for four different reactions, and one word for
+        # all of them is how the 2026-08-26 shortfall reached the next morning unread.
+        if ok and covered == today:
+            if first:
+                log.info("[%s] OK — the daily series now covers %s, which is what tomorrow's "
+                         "sessions need.", label, today)
+            elif before == today:
+                log.info("[%s] nothing to do — %s was already in the series when this rung "
+                         "ran. An earlier attempt had it.", label, today)
+            else:
+                log.warning("[%s] RECOVERED — %s was missing when the earlier attempt ran and "
+                            "is there now. The 16:20 refresh is running before the provider "
+                            "is ready; if this keeps happening, move it later rather than "
+                            "relying on the ladder.", label, today)
+            return
+
+        if code == 2:
+            nxt = _SPY_LADDER_NEXT.get(label)
+            if nxt:
+                log.warning("[%s] the daily series still ends on %s, not %s — the provider "
+                            "does not have it yet. Next attempt at %s ET.",
+                            label, covered or "an unreadable date", today, nxt)
+            else:
+                log.error("[%s] LAST ATTEMPT — the daily series still ends on %s, not %s. "
+                          "Tomorrow's Track 1 slots that run before the 13:45 pre-flight — "
+                          "the overnight NKD window and BOTH Calm phases — will refuse on "
+                          "`regime_csv: stale`. Re-run by hand or expect no evidence from "
+                          "them.", label, covered or "an unreadable date", today)
+            return
+
+        # Everything else: the run itself did not complete. Read the recorded status rather
+        # than guessing, because a drift and an unverifiable history are different problems
+        # and both arrive here with the same exit code.
+        from global_index import regime_verify as _rv
+        _v = _rv.latest(".")
+        if _v.status == _rv.DRIFT:
+            log.error("[%s] FAILED — REGIME LABEL DRIFT. %s. The engine's view of history "
+                      "moved; tomorrow's sleeve selection would be made on labels nobody has "
+                      "agreed to.", label, _v.detail)
+        elif _v.status == _rv.UNKNOWN:
+            log.error("[%s] FAILED — the regime labels COULD NOT BE VERIFIED (%s). %s. This "
+                      "is not 'no drift'.", label, _v.code, _v.detail)
+        else:
+            log.error("[%s] FAILED — the refresh did not complete (exit %s) and the series "
+                      "ends on %s. Check POLYGON_API_KEY and the network.",
+                      label, code, covered or "an unreadable date")
+
+    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=16, minute=20,
+                         id="spy_refresh_pm", name="SPY daily refresh 16:20 ET (post-close)")
+    def job_spy_refresh_pm():
+        _spy_refresh("SPY_REFRESH_PM", attempt=1)
+
+    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=16, minute=45,
+                         id="spy_refresh_pm_r1", name="SPY daily refresh 16:45 ET (retry 1)")
+    def job_spy_refresh_pm_r1():
+        _spy_refresh("SPY_REFRESH_PM_R1", attempt=2)
+
+    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=17, minute=15,
+                         id="spy_refresh_pm_r2",
+                         name="SPY daily refresh 17:15 ET (retry 2, last)")
+    def job_spy_refresh_pm_r2():
+        _spy_refresh("SPY_REFRESH_PM_R2", attempt=3)
+
+    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=0, minute=45,
+                         id="spy_last_chance_pre_nkd",
+                         name="SPY daily last chance 00:45 ET (before NKD 01:10)")
+    def job_spy_last_chance_pre_nkd():
+        """The last look before anything freshness-bound runs. Stage 5ZZD.
+
+        The evening ladder asks for the day that just closed. This asks a DIFFERENT question:
+        the day the sleeves about to run will demand — which at a quarter to one in the morning
+        is the previous TRADING day, not yesterday's date. Those two are the same thing from
+        Tuesday to Friday and are not the same thing on a Monday, when the previous trading day
+        is the Friday and the last evening rung ran thirty-one hours ago. That Monday gap is
+        the one this job earns its place on: nothing between Friday 17:15 and Monday 01:10 has
+        ever looked.
+
+        It protects more than the Nikkei window. Everything that runs before the 13:45
+        pre-flight reads this file — the overnight window at 01:10 and BOTH Calm phases at
+        09:32 and 10:02 — and all of them refuse if it is short.
+
+        The required day is ASKED FOR rather than computed here. A second copy of "which day is
+        needed" drifts from the gate that actually refuses, and then this job reports fine about
+        a morning the gate is about to stop.
+        """
+        import pandas as _pd
+
+        from global_index import track1_freshness as _fresh
+
+        # `_et_today`, not `date.today`. Its own docstring records the measurement: on a
+        # machine west of ET the 01:10 slots land on the PREVIOUS local date, and a job that
+        # used the machine's calendar here would ask for the wrong session by one day exactly
+        # when it matters most.
+        need = _fresh.required_daily_close_through(_pd.Timestamp(_et_today()))
+        need_s = str(need.date())
+        covered = _spy_series_last_day(regime_csv)
+        label = "SPY_LAST_CHANCE_PRE_NKD"
+
+        if covered == need_s or (covered and covered > need_s):
+            log.info("[%s] nothing to do — the daily series covers %s, which is what the "
+                     "overnight window and both Calm phases will ask for.", label, need_s)
+            return
+
+        log.warning("[%s] the daily series ends on %s and %s is needed in 25 minutes. "
+                    "Trying once more — the provider has had all evening.",
+                    label, covered or "an unreadable date", need_s)
+
+        cmd = [sys.executable, "-m", "global_index.update_spy_csv", "--csv", regime_csv,
+               "--verify-strict", "--require-through", need_s, "--skip-if-covered"]
+        if polygon_api_key:
+            cmd += ["--api-key", polygon_api_key]
+
+        rc: list = []
+        ok = _run(cmd, label=label, dry_run=dry_run, rc_out=rc)
+        if dry_run:
+            log.info("[%s] dry-run — no refresh attempted, series left as it is", label)
+            return
+        code = rc[0] if rc else (0 if ok else 1)
+        after = _spy_series_last_day(regime_csv)
+
+        if ok and after and after >= need_s:
+            log.warning("[%s] RECOVERED at the last look — %s arrived after the evening "
+                        "ladder had given up. The 17:15 rung is running before the provider "
+                        "is ready on at least some days.", label, need_s)
+            return
+
+        # Nothing after this looks before the sleeves do. This is the message somebody has to
+        # read, so it says the file, the day, and who it stops — not a flag.
+        log.error("[%s] SPY daily file is missing %s; NKD/Calm freshness-bound slots will "
+                  "refuse unless manually refreshed. The series ends on %s. This is the LAST "
+                  "attempt before the overnight window at 01:10 — nothing else looks until the "
+                  "13:45 pre-flight, which is after both Calm phases. Re-run: "
+                  "python -m global_index.update_spy_csv --csv %s --verify-strict "
+                  "--require-through %s (exit %s)",
+                  label, need_s, after or "an unreadable date", regime_csv, need_s, code)
+
+    @sched.scheduled_job("cron", day_of_week="sun", hour=18, minute=0,
+                         id="spy_weekend_pre_nkd_check",
+                         name="SPY weekend pre-NKD check 18:00 ET (Sunday early warning)")
+    def job_spy_weekend_pre_nkd_check():
+        """Sunday evening: ask early whether Monday's overnight window will have its data.
+
+        Stage 5ZZZ-AC, and it exists because of a measured gap rather than a theory. On Friday
+        2026-08-28 the evening ladder ran all three rungs and the provider still did not return
+        that day's close. Nothing looks again until Monday 00:45 — so the first warning would
+        have arrived **twenty-five minutes** before the 01:10 NKD window, in the middle of the
+        night, with no time to do anything about it. Between Friday 17:15 and Monday 00:45 is
+        fifty-five hours in which the file is short and nobody is told.
+
+        This job does not replace that 00:45 last look, which stays exactly as it was. It asks
+        the same question earlier, when there is still a Sunday evening to fix it in.
+
+        18:00 ET is half an hour before the Sunday stop-repair sweep already at 18:30, which
+        is the repo's existing weekend convention — the market has reopened, the provider has
+        had the weekend, and an operator reading one Sunday log reads both.
+
+        The required day is ASKED FOR, never computed here. `required_daily_close_through` is
+        the same function the 00:45 job and the freshness gate use, so this cannot report fine
+        about a day the gate is about to refuse. It is also why a holiday Monday needs no
+        special case: when the next session is the Tuesday, the function returns the Friday
+        before the holiday on its own.
+
+        It writes no `preflight_state.json`. Pre-flight is a weekday 13:45 contract, and a
+        weekend job that stamped it would be claiming a check nobody ran.
+        """
+        import pandas as _pd
+
+        from global_index import track1_freshness as _fresh
+
+        label = "SPY_WEEKEND_PRE_NKD_CHECK"
+        need = _fresh.required_daily_close_through(_pd.Timestamp(_et_today()))
+        need_s = str(need.date())
+        covered = _spy_series_last_day(regime_csv)
+
+        if covered == need_s or (covered and covered > need_s):
+            log.info("[%s] nothing to do — the daily series covers %s, which is what Monday's "
+                     "overnight window and both Calm phases will ask for. No provider call.",
+                     label, need_s)
+            return
+
+        log.warning("[%s] the daily series ends on %s and %s is needed before the next "
+                    "overnight window. The evening ladder did not get it; trying now, while "
+                    "there is still a Sunday evening to act in.",
+                    label, covered or "an unreadable date", need_s)
+
+        cmd = [sys.executable, "-m", "global_index.update_spy_csv", "--csv", regime_csv,
+               "--verify-strict", "--require-through", need_s, "--skip-if-covered"]
+        if polygon_api_key:
+            cmd += ["--api-key", polygon_api_key]
+
+        rc: list = []
+        ok = _run(cmd, label=label, dry_run=dry_run, rc_out=rc)
+        if dry_run:
+            log.info("[%s] dry-run — no refresh attempted, series left as it is", label)
+            return
+        code = rc[0] if rc else (0 if ok else 1)
+        after = _spy_series_last_day(regime_csv)
+
+        if ok and after and after >= need_s:
+            log.warning("[%s] RECOVERED — %s arrived on the weekend after the Friday evening "
+                        "ladder had given up. The overnight window is covered and the 00:45 "
+                        "last look will find nothing to do.", label, need_s)
+            return
+
+        log.error("[%s] SPY daily file is still missing %s. The series ends on %s. The next "
+                  "overnight NKD window is at 01:10 ET and the only remaining automatic "
+                  "attempt is SPY_LAST_CHANCE_PRE_NKD at 00:45 ET, 25 minutes before it — "
+                  "NKD and both Calm phases will refuse on freshness if it also fails. "
+                  "Re-run now: python -m global_index.update_spy_csv --csv %s --verify-strict "
+                  "--require-through %s (exit %s)",
+                  label, need_s, after or "an unreadable date", regime_csv, need_s, code)
 
     def _prev_bday(d):
         """Previous weekday. Night NKD slots run before their own day's pre-flight."""
@@ -801,6 +1294,7 @@ def make_scheduler(port: int, dry_run: bool,
                 )
             else:
                 log.warning("[%s] SKIPPED — pre-flight failed for %s.", slot_id, today)
+            _tel.record_skip(slot_id, "skipped_preflight", reason="preflight_failed")
             return
 
         else:
@@ -825,6 +1319,7 @@ def make_scheduler(port: int, dry_run: bool,
                 )
             else:
                 log.debug("[%s] SKIPPED — no pre-flight record for %s.", slot_id, today)
+            _tel.record_skip(slot_id, "skipped_preflight", reason="preflight_missing")
             return
 
         _run([sys.executable, "-m", "global_index.run_live_day",
@@ -910,7 +1405,16 @@ def make_scheduler(port: int, dry_run: bool,
     # Trước đó tôi để 19 lượt mỗi tiếng (lấy "lấp kín khoảng trống" làm mục tiêu thay vì
     # "giảm thời gian không ai nhìn"), rồi cắt xuống 3. Cả hai đều là lập luận suông. Mốc
     # 2 tiếng là do người vận hành chốt.
+    # Track 1's Stress window is an ENTRY window too, and a stop-repair sweep inside an entry
+    # window is an extra B3 reconcile — an extra chance to halt entries on a false mismatch,
+    # at the worst possible moment. 12:20 is the one sweep that lands inside 10:35-12:30.
+    #
+    # Added ONLY when the Track 1 shadow route is enabled. Adding it unconditionally would
+    # remove STOP_REPAIR_1220 from a legacy schedule that has never run without it, which is
+    # a change to production behaviour dressed up as preparation.
     _ENTRY_WINDOWS = [((1, 0), (2, 55)), ((14, 0), (15, 55))]
+    if track1_shadow:
+        _ENTRY_WINDOWS.append(_TRACK1_STRESS_WINDOW)
     _REPAIR_SLOTS = [
         (h, 20) for h in range(0, 24, 2)
         if not any(lo <= (h, 20) <= hi for lo, hi in _ENTRY_WINDOWS)
@@ -994,6 +1498,94 @@ def make_scheduler(port: int, dry_run: bool,
             name=f"NKD night run {_h:02d}:{_m:02d} ET",
             misfire_grace_time=SLOT_MISFIRE_GRACE_SECS,
         )
+
+    # ── Track 1 shadow slots — OFF unless --track1-shadow ────────────────────
+    # Declared in global_index/track1_slots.py and registered here only on the flag. The
+    # route they call cannot place an order: its gate refuses while any blocker is open, and
+    # every blocker is open. So these slots exercise the wiring, the window ledger and the
+    # decision stream, and nothing else.
+    #
+    # A SEPARATE mutex, not `_slot_lock`. The legacy lock exists because three legacy entry
+    # points collide on IBKR **clientId 1**; Track 1 connects on clientId 89 when it connects
+    # at all, so making it queue behind a legacy slot would delay it for a reason that does not
+    # apply to it. It still serialises against ITSELF, because two Track 1 slots would write
+    # the same route files.
+    #
+    # CORRECTED in Stage 5M-B. This comment used to say the Track 1 shadow route "opens no
+    # broker connection", and that stopped being true in Stage 5I, which wired
+    # `--bar-provider ibkr` onto the Calm and Stress slots — `build_bar_provider` calls
+    # `broker.connect()`. The separate-mutex decision is still right, but it was resting on a
+    # reason that no longer held, which is how a decision quietly loses its justification.
+    #
+    # What is true today, per slot rather than per route:
+    #   Calm 10:00 and Stress 10:35-12:30   --bar-provider ibkr    (since Stage 5I)
+    #   Swing 14:05-15:55                   --bar-provider none    (Stage 5M-B)
+    #
+    # The swing slots deliberately start without a provider. They land on the same minutes as
+    # the legacy 14:05-15:55 entry slots, whose runs take a median 194s of a 300s window and a
+    # measured maximum of 291s — so a second child every minute has real but thin headroom, and
+    # nobody has measured what a Track 1 slot costs because none has ever run in production.
+    # With no provider each swing slot refuses by name, writes its ledger row and exits, which
+    # is what makes that measurement possible in 5M-C without risking the legacy window.
+    if track1_shadow:
+        from global_index import track1_slots as _t1
+        _t1_lock = threading.Lock()
+
+        def _track1_body(slot_id: str, sleeve: str, provider: str = "ibkr",
+                         phase: str = "") -> None:
+            if not _t1_lock.acquire(blocking=False):
+                log.warning("[%s] SKIPPED — previous Track 1 slot still in flight", slot_id)
+                _tel.record_skip(slot_id, "skipped_mutex", route="track1_candidate")
+                return
+            try:
+                # `--source live-shadow` is not decoration. Without it the entry point takes
+                # its defaults — `--source replay --window vault2026` — and every one of these
+                # Track 1 slot re-runs the SAME measured window from months ago. That produced no
+                # window coverage and no checkpoint, because a replay is not allowed to testify
+                # that anyone looked at today, so both of the runbook preconditions this route
+                # was going to be started to satisfy could never turn green. The sleeve and the
+                # slot id travel with it because the ledger row belongs to one slot of one
+                # window, and no process here knows which one it is except this closure.
+                # `--bar-provider` comes from the SLOT, not from a constant here. It was a
+                # literal "ibkr" until Stage 5M-B, and a literal is what would have silently
+                # given the new swing slots a broker connection they are not ready for.
+                #
+                # Still no `--allow-orders`, no `--port`, no `--window`: the order gate refuses
+                # while any blocker is open and every blocker is open, but the argv should not
+                # be the only thing standing between a shadow slot and an order path.
+                # Stage 5ZX. `--phase` comes from the SLOT, like `--bar-provider` does, and
+                # appears ONLY for a slot that has one. The argv of a phased slot should say
+                # out loud which half it is, because that is what an operator reads in the
+                # process list at half past nine — but a sleeve that is not split has no half,
+                # and printing an empty one for it is noise that also changes the command line
+                # of three sleeves this stage did not touch.
+                _run([sys.executable, "-m", "global_index.run_live_day_track1",
+                      "--source", "live-shadow",
+                      "--sleeve", sleeve,
+                      "--slot-id", slot_id,
+                      "--bar-provider", provider]
+                     + (["--phase", phase] if phase else [])
+                     + ["--regime-csv", regime_csv],
+                     label=slot_id, dry_run=dry_run, route=_t1.EVENT_ROUTE_VALUE)
+            finally:
+                _t1_lock.release()
+
+        for _s in _t1.TRACK1_SLOTS:
+            # `provider_for` rather than `_s.provider`: the Normal-R4 slots are staged behind
+            # RAITS_TRACK1_SWING_PROVIDER (Stage 5M-C) and resolve to `none` unless an operator
+            # set it for this session. Resolved ONCE here, at registration, so every slot in a
+            # session agrees — reading the env inside the body would let a mid-session export
+            # split the window into two halves that ran differently.
+            sched.add_job(
+                lambda sid=_s.id, sl=_s.sleeve, ph=_s.phase,
+                       pv=_t1.provider_for(_s, track1_only=track1_only):
+                    _track1_body(sid, sl, pv, ph),
+                "cron", day_of_week="mon-fri", hour=_s.hour, minute=_s.minute,
+                id=_s.id.lower(), name=f"Track1 {_s.sleeve} {_s.hour:02d}:{_s.minute:02d} ET",
+                misfire_grace_time=SLOT_MISFIRE_GRACE_SECS,
+            )
+        log.info("Track 1 SHADOW slots registered: %d (no orders — the route's gate refuses)",
+                 len(_t1.TRACK1_SLOTS))
 
     # ── Báo cáo phiên: chạy KHI VIỆC CUỐI CÙNG TRONG NGÀY XONG ───────────────
     # Không hẹn giờ cố định. Bản đầu tôi đặt cron 16:00, rồi 23:50 — cả hai đều là ĐOÁN:
@@ -1108,7 +1700,184 @@ def make_scheduler(port: int, dry_run: bool,
                         _LAST_JOB_ID)
             _emit_report("luoi an toan 23:55")
 
+    # ── Stage 5M-D: Track 1-only. Legacy STRATEGY jobs come back out. ────────
+    #
+    # Built then removed, rather than guarded at each registration point, and that is a
+    # deliberate choice with one strong reason behind it: the set removed here is
+    # `track1_slots.legacy_retirement_candidates()`, the SAME table the legacy-removability
+    # audit and the Stage 5L classification read. Guarding four registration sites with
+    # `if not track1_only` would create a second definition of "which jobs are legacy's",
+    # and the two would drift the first time a job moved. One table, three readers.
+    #
+    # `remove_job` raises on an id that is not there, and that is wanted: an id renamed in
+    # one place and not the other stops the scheduler from building instead of silently
+    # leaving a legacy job registered in a mode whose whole point is that none are.
+    #
+    # What is NOT removed, and why:
+    #   shared infrastructure  the 13:45 pre-flight (Track 1's freshness gate reads its
+    #                          record), the heartbeat, the session-report fallback. None
+    #                          decides a trade; all three are route-neutral (Stage 5L).
+    #   the safety sweeps      stop repair and the max-hold exit. They are NOT route-safe —
+    #                          both are hard-wired to `live_positions.json`, legacy's book —
+    #                          and removing them would leave any position still open in that
+    #                          book with no stop repair and no five-day exit. They stay, and
+    #                          they are the reason this mode is not yet legacy-INDEPENDENT.
+    #                          That is Stage 5O's work and it is recorded as a blocker, not
+    #                          waved through.
+    if track1_only:
+        from global_index import track1_slots as _t1r
+        _doomed = sorted(_t1r.legacy_retirement_candidates(port, track1_shadow=True))
+        for _jid in _doomed:
+            sched.remove_job(_jid)
+        log.info("[track1-only] %d legacy strategy jobs not scheduled; %d jobs remain",
+                 len(_doomed), len(sched.get_jobs()))
+
+        # ── Stage 5O: Track 1's own safety net ───────────────────────────────
+        #
+        # Registered in THIS mode only. In the transitional mode legacy's safety already
+        # watches the only book that can hold positions — Track 1 places no orders — so a
+        # second connected child per sweep minute there would be load with nothing to
+        # protect. Here, the moment Track 1 ever holds a position, its stops get repaired
+        # and its five-day exits fire, against ITS book.
+        #
+        # The LEGACY safety jobs are deliberately NOT removed above (they are in the safety
+        # bucket, not the retirement set): they keep watching `live_positions.json` while
+        # any legacy position drains. Two safety sets, two books, two lock files
+        # (runner.pid vs runner.track1.pid), two client ids (1 vs 90) — and two max-hold
+        # markers, because a shared "already ran today" file is how one route's run
+        # silently suppresses the other's.
+        #
+        # `run_maxhold_exit` returns before connecting when the positions file does not
+        # exist, so in a pure shadow period these jobs cost one short-lived process each
+        # and open nothing.
+        def _t1_maxhold_body(label: str = "TRACK1_MAX_HOLD_EXIT"):
+            ok = _run([sys.executable, "-m", "global_index.run_maxhold_exit",
+                       "--positions-path", _t1r.TRACK1_POSITIONS_PATH,
+                       "--stop-path", _t1r.TRACK1_STOP_PATH,
+                       "--lock-path", _t1r.TRACK1_LOCK_PATH,
+                       "--client-id", str(_t1r.TRACK1_SAFETY_CLIENT_ID),
+                       # Stage 5ZG: the sixth per-route file. Without it this job reads
+                       # Track 1's book and writes legacy's log, and a close lands in the
+                       # aggregate paper_evidence_reader treats as one system.
+                       "--trade-log-path", _t1r.TRACK1_TRADE_LOG_PATH,
+                       "--route", _t1r.EVENT_ROUTE_VALUE,
+                       "--port", str(port)],
+                      label=label, dry_run=dry_run, route=_t1r.EVENT_ROUTE_VALUE)
+            # Same rule as the legacy job: only a REAL run counts. A dry-run that marked
+            # the day done would skip the catch-up that exists for exactly that day.
+            if ok and not dry_run:
+                _maxhold_done_t1[_et_today().isoformat()] = True
+                _save_maxhold_state_t1()
+            return ok
+
+        def _t1_repair_body(label: str):
+            _run([sys.executable, "-m", "global_index.run_stop_repair",
+                  "--positions-path", _t1r.TRACK1_POSITIONS_PATH,
+                  "--stop-path", _t1r.TRACK1_STOP_PATH,
+                  "--lock-path", _t1r.TRACK1_LOCK_PATH,
+                  "--client-id", str(_t1r.TRACK1_SAFETY_CLIENT_ID),
+                  # Stage 5ZG — same reason as the max-hold job above. B3 inside
+                  # FuturesRunner.__init__ books a matched stop and writes a CLOSE row,
+                  # so this sweep is a writer even though it takes no entries.
+                  "--trade-log-path", _t1r.TRACK1_TRADE_LOG_PATH,
+                  "--route", _t1r.EVENT_ROUTE_VALUE,
+                  "--port", str(port)],
+                 label=label, dry_run=dry_run, route=_t1r.EVENT_ROUTE_VALUE)
+
+        for _sj in _t1r.track1_safety_jobs():
+            if _sj.kind == "maxhold":
+                sched.add_job(_t1_maxhold_body, "cron", day_of_week=_sj.day_of_week,
+                              hour=_sj.hour, minute=_sj.minute, id=_sj.id,
+                              name=f"Track 1 MAX_HOLD exit {_sj.hour:02d}:{_sj.minute:02d} ET")
+            else:
+                sched.add_job(
+                    lambda lbl=_sj.id.upper(): _t1_repair_body(lbl),
+                    "cron", day_of_week=_sj.day_of_week, hour=_sj.hour, minute=_sj.minute,
+                    id=_sj.id,
+                    name=f"Track 1 stop repair {_sj.hour:02d}:{_sj.minute:02d} ET")
+        log.info("[track1-only] %d Track 1 safety jobs registered against %s",
+                 len(_t1r.track1_safety_jobs()), _t1r.TRACK1_POSITIONS_PATH)
+
+        # ── Stage 5Q: the post-window audit jobs ─────────────────────────────
+        #
+        # Registered in THIS mode only, for the same reason the Track 1 safety jobs are: in
+        # the transitional mode legacy still owns the day and a Track 1 audit would grade a
+        # route that is only half scheduled.
+        #
+        # These are the only jobs in the schedule that READ rather than act. They open the
+        # runtime evidence, ask the committed acceptance gate for a verdict, and append one
+        # record per sleeve under `global_index/track1_runtime/audits/`. They do not connect
+        # to IB Gateway, do not import a broker module, do not touch a book, a checkpoint or
+        # a kill switch, and cannot place an order: their argv carries no `--allow-orders`
+        # and no `--bar-provider`, and the audit module imports neither.
+        #
+        # Why they are scheduled at all rather than left to the operator: the evidence is
+        # written every day and, until this stage, was read only when somebody remembered.
+        # The morning nobody looked had no record of whether the night was judged — and this
+        # project's whole ledger design rests on absence being a signal rather than silence.
+        # An audit that never ran now leaves an ABSENT RECORD the dashboard names.
+        #
+        # The scheduler hands the child its OWN start instant. The child could read the
+        # process table instead, but that scan fails to an empty list on any hiccup and an
+        # empty list means "no scheduler running", which would turn a window that closed
+        # before this process existed into a manufactured incident — exactly the false alarm
+        # the 2026-08-24 NKD case produced on the dashboard.
+        def _t1_audit_body(job_id: str, argv: list) -> None:
+            _run(list(argv), label=job_id.upper(), dry_run=dry_run,
+                 route=_t1r.EVENT_ROUTE_VALUE)
+
+        for _aj in _t1r.track1_audit_jobs():
+            sched.add_job(
+                lambda jid=_aj.id, av=_t1r.audit_job_argv(
+                    _aj, scheduler_started_et=_PROCESS_START_ET): _t1_audit_body(jid, av),
+                "cron", day_of_week=_aj.day_of_week, hour=_aj.hour, minute=_aj.minute,
+                id=_aj.id,
+                name=f"Track 1 audit {_aj.scope} {_aj.sleeve or 'day'} "
+                     f"{_aj.hour:02d}:{_aj.minute:02d} ET",
+                misfire_grace_time=SLOT_MISFIRE_GRACE_SECS,
+            )
+        log.info("[track1-only] %d Track 1 audit jobs registered (read-only, no broker) "
+                 "writing to %s", len(_t1r.track1_audit_jobs()),
+                 "global_index/track1_runtime/audits")
+
+
     return sched
+
+
+def _catch_up_maxhold_track1(sched) -> None:
+    """The Track 1 twin of `_catch_up_maxhold` — Stage 5O.
+
+    A SEPARATE function reading a SEPARATE marker, and that separation is the whole point:
+    the legacy marker saying "already ran today" is a statement about legacy's book, and
+    letting it satisfy the Track 1 check would leave a five-day Track 1 position open on any
+    day the scheduler restarted after 09:31 — precisely the day the catch-up exists for.
+
+    Fires only when the job exists, i.e. only in track1-only mode. `run_maxhold_exit`
+    returns before connecting when the Track 1 positions file is absent, so during a pure
+    shadow period this catch-up costs one short-lived process and opens nothing.
+    """
+    from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo
+
+    job = sched.get_job("track1_maxhold_exit")
+    if job is None:
+        return
+    now = _dt.now(ZoneInfo("America/New_York"))
+    today = now.date().isoformat()
+    if now.weekday() >= 5:
+        return
+    if now.hour * 60 + now.minute < 9 * 60 + 31:
+        return
+    if _maxhold_done_t1.get(today):
+        log.info("[MAXHOLD_T1] da chay hom nay (%s) — bo qua catch-up", today)
+        return
+    log.warning("[MAXHOLD_T1] CATCH-UP: khoi dong luc %s ET, sau moc 09:31, va job Track 1 "
+                "hom nay chua chay. Chay ngay bay gio.", now.strftime("%H:%M"))
+    ok = job.func(label="TRACK1_MAX_HOLD_EXIT_CATCHUP")
+    if not ok:
+        log.critical("[MAXHOLD_T1] CATCH-UP THAT BAI — vi the Track 1 du 5 ngay co the chua "
+                     "duoc dong. Chay tay: python -m global_index.run_maxhold_exit "
+                     "--positions-path live_positions.track1.json --port <port>")
 
 
 def _catch_up_maxhold(sched) -> None:
@@ -1177,6 +1946,22 @@ def main():
                     help="pass --shadow-resume to run_live_day: log a "
                          "checkpoint-resumed target for comparison, without "
                          "trading off it")
+    ap.add_argument("--track1-shadow",    action="store_true",
+                    help="TRANSITIONAL: register the Track 1 slots ALONGSIDE the legacy "
+                         "schedule. Both routes run. The Track 1 route cannot place an order; "
+                         "its gate refuses while any blocker is open. OFF by default, and off "
+                         "means the legacy schedule is byte-identical to what it has always "
+                         "been. For a clean validation session use --track1-only-shadow.")
+    ap.add_argument("--track1-only-shadow", action="store_true",
+                    help="Track 1 plus shared infrastructure; legacy STRATEGY jobs are NOT "
+                         "scheduled. This is the clean validation path. Note what it fixes "
+                         "that STOP_TRADING does not: the root switch halts legacy ENTRIES, "
+                         "but a legacy slot still spawns, connects on clientId 1 and fetches "
+                         "before that check is reached — so it does not free the 14:05-15:55 "
+                         "window. This mode does, which is why the Normal-R4 slots take a bar "
+                         "provider by default here. The safety sweeps still run against "
+                         "legacy's positions file and are Stage 5O's work. Orders remain "
+                         "impossible.")
     ap.add_argument("--assume-preflight-ok", action="store_true",
                     help="Mark today's pre-flight as passed on startup (use after manual update_ibkr_daily + update_spy_csv)")
     a = ap.parse_args()
@@ -1198,6 +1983,7 @@ def main():
     # not blank out yesterday's record — the NKD night slots read it.
     _load_preflight_state()
     _load_maxhold_state()
+    _load_maxhold_state_t1()
 
     if a.assume_preflight_ok:
         from datetime import date as _d
@@ -1211,6 +1997,8 @@ def main():
         regime_csv=a.regime_csv, polygon_api_key=a.polygon_api_key,
         live_state_path=a.live_state_path,
         shadow_resume=a.shadow_resume,
+        track1_shadow=a.track1_shadow,
+        track1_only=a.track1_only_shadow,
     )
 
     jobs = sched.get_jobs()
@@ -1223,6 +2011,7 @@ def main():
         log.info("  %-20s  next: %s", j.id, _next)
     log.info("Pre-flight fail-safe: update fail -> live_day skipped (no stale-data trades)")
     _catch_up_maxhold(sched)
+    _catch_up_maxhold_track1(sched)
 
     log.info("Scheduler started. Ctrl-C to stop.")
     try:

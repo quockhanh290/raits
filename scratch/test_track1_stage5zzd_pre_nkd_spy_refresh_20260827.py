@@ -240,13 +240,18 @@ def test_14_orders_are_still_impossible():
     assert not Path("track1_go_live_confirmation.json").exists()
 
 
-def test_15_the_spy_family_is_four_jobs_in_every_mode():
+def test_15_the_spy_family_is_five_jobs_in_every_mode():
     """Written as a property from the start, not as a total.
 
     The equivalent test in the previous stage pinned the schedule's whole size and this stage
     broke it by adding one unrelated job — a pin failing for something it is not about. The
     family is what this is about, so the family is what it counts, and an unrelated job added
     tomorrow leaves it alone.
+
+    Stage 5ZZZ-AC added a FIFTH member, and this one is not unrelated: `spy_weekend_pre_nkd_
+    check` runs Sunday 18:00 ET and asks the same question the 00:45 job asks, early enough
+    to act on. So the expected set grew by one on purpose, and the count in the name grew
+    with it rather than the assertion being loosened to "at least four".
     """
     logging.disable(logging.CRITICAL)
     for name, kw in (("legacy", {}), ("transitional", {"track1_shadow": True}),
@@ -254,7 +259,7 @@ def test_15_the_spy_family_is_four_jobs_in_every_mode():
         ids = {j.id for j in rs.make_scheduler(port=7497, dry_run=True, **kw).get_jobs()}
         family = {i for i in ids if i.startswith("spy_")}
         assert family == {"spy_refresh_pm", "spy_refresh_pm_r1", "spy_refresh_pm_r2",
-                          JOB}, f"{name}: {sorted(family)}"
+                          JOB, "spy_weekend_pre_nkd_check"}, f"{name}: {sorted(family)}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

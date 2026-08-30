@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import datetime as dt
 import re
 import threading
@@ -50,7 +51,88 @@ def _parse_iso(value: str | None) -> dt.datetime | None:
     return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
+#: Stage 5ZD. The Track 1 STRATEGY slots, and only these, may carry signal diagnostics.
+#: Safety, max-hold, stop-repair, audit, pre-flight and the SPY refresh are operations health;
+#: a stop-repair row reading "NO SIGNAL" would be a category error a reader cannot undo.
+TRACK1_STRATEGY_PREFIXES: tuple = ("TRACK1_CALM_", "TRACK1_STRESS_", "TRACK1_SWING_",
+                                   "TRACK1_NKD_")
+TRACK1_STRATEGY_SLOT = "track1_strategy_slot"
+
+
+def is_track1_strategy_job(job_id: str) -> bool:
+    return str(job_id).startswith(TRACK1_STRATEGY_PREFIXES)
+
+
+#: Stage 5ZZU. Track 1's maintenance jobs, each an explicit stream of its own.
+#:
+#: They were distinguishable from legacy already — the comment below has kept TRACK1_ ahead of
+#: the legacy prefixes since it was written — but distinguishable is not the same as typed, and
+#: they all landed in `other` together. `other` is a bucket, and two lanes were reading it as a
+#: stream, in opposite directions:
+#:
+#:   the journal lane   grouped every catch-all job into ONE stream, so any of them completing
+#:                      closed any other that had failed. Measured on 2026-08-27: a stop-repair
+#:                      sweep closed two failed SPY refreshes (Stage 5ZZT), and the same fixture
+#:                      shows an audit closing a failed stop-repair sweep and vice versa.
+#:   the issue lane     fell back to the job ID, so each sweep was alone. A Track 1 sweep that
+#:                      failed at 06:20 could never be closed by the identical sweep at 08:20,
+#:                      while its legacy counterpart — which has a real type — always could.
+#:                      One is a false all-clear, the other is an alarm that never clears.
+#:
+#: A real type answers both at once, and it is a STRUCTURED value rather than a substring test
+#: at each call site: three lanes read it and none of them has to know the id spelling.
+TRACK1_SAFETY_STOP_REPAIR = "track1_safety_stop_repair"
+TRACK1_SAFETY_MAX_HOLD = "track1_safety_max_hold"
+TRACK1_WINDOW_AUDIT = "track1_window_audit"
+
+#: The maintenance types, for the readers that need to ask "is this a Track 1 upkeep job?"
+#: without listing them again and drifting from this one.
+TRACK1_MAINTENANCE_TYPES: frozenset = frozenset({
+    TRACK1_SAFETY_STOP_REPAIR, TRACK1_SAFETY_MAX_HOLD, TRACK1_WINDOW_AUDIT})
+
+
+#: Stage 5ZZY. The stream a job may be RECOVERED by, which is finer than its type.
+#:
+#: Every Track 1 strategy slot shares one type, and that is right for every reader that asks
+#: "is this a strategy slot" — the chip, the scheduler-owned list, the panel. It is wrong for
+#: recovery. Measured before this was written: a failed TRACK1_CALM_DECIDE_0932 was reported
+#: `lifecycle_status: recovered` by a completed TRACK1_STRESS_1035 an hour later. Different
+#: sleeves are different processes against different instruments; one finishing says nothing
+#: about the other having failed.
+#:
+#: The incidents lane in `schedule_status` already keyed on the slot id and was never wrong
+#: here — this is the journal and issue lanes catching up with it, which is the same split
+#: Stage 5ZZU made for the maintenance jobs one layer down.
+#:
+#: Both Calm phases land in the same stream on purpose: DECIDE at 09:32 and OBSERVE at 10:02
+#: are two phases of one sleeve's day, and the later one covering the earlier is a real
+#: recovery rather than a coincidence.
+def recovery_stream(job: dict) -> str:
+    job_type = job.get("job_type") or ""
+    if job_type != TRACK1_STRATEGY_SLOT:
+        return job_type
+    job_id = str(job.get("job_id") or "").upper()
+    for prefix in TRACK1_STRATEGY_PREFIXES:
+        if job_id.startswith(prefix):
+            return f"{TRACK1_STRATEGY_SLOT}:{prefix.rstrip('_').lower()}"
+    return job_type
+
+
 def _job_type(job_id: str) -> str:
+    # Checked BEFORE the legacy prefixes: TRACK1_STOP_REPAIR_* would otherwise be typed as a
+    # stop_repair job, and the two routes' safety jobs must stay distinguishable.
+    if is_track1_strategy_job(job_id):
+        return TRACK1_STRATEGY_SLOT
+    # Stage 5ZZU, and for the same reason — ahead of the legacy prefixes, never sharing them.
+    # Both spellings of the max-hold id are accepted: the slot table declares
+    # `track1_maxhold_exit` and the log label that reaches this reader is TRACK1_MAX_HOLD_EXIT.
+    # Matching only one of them would type the job on some days and not others.
+    if job_id.startswith("TRACK1_STOP_REPAIR"):
+        return TRACK1_SAFETY_STOP_REPAIR
+    if job_id.startswith(("TRACK1_MAX_HOLD", "TRACK1_MAXHOLD")):
+        return TRACK1_SAFETY_MAX_HOLD
+    if job_id.startswith("TRACK1_AUDIT"):
+        return TRACK1_WINDOW_AUDIT
     if job_id.startswith("LIVE_DAY"):
         return "live_day"
     if job_id.startswith("NKD_NIGHT"):
@@ -61,6 +143,35 @@ def _job_type(job_id: str) -> str:
         return "max_hold"
     if job_id == "PREFLIGHT":
         return "preflight"
+    # Stage 5ZF. Typed rather than left in the `other` bucket. It was already VISIBLE there —
+    # a failure produced a row — but the impact read "the job emitted an unclassified error",
+    # which is true of anything and tells an operator nothing. This job's failure has one
+    # specific, next-morning consequence and the reader can state it.
+    # Stage 5ZZT. The retry rungs join the SAME stream as the 16:20 run, which is what makes
+    # `later_same_stream` below express the ladder correctly: a rung that missed and a later
+    # rung that completed is a recovery, and that is precisely what a ladder is for.
+    #
+    # Before this they fell into `other`, and the cost was not merely unhelpful wording.
+    # Measured on 2026-08-27, when all three rungs failed: both retries were reported
+    # `lifecycle_status: recovered`, recovered_at 22:20:14 — which was TRACK1_STOP_REPAIR_1820,
+    # a stop-repair sweep. An unrelated job closed a failed data refresh, because `other` is a
+    # catch-all and a catch-all is not a stream.
+    if job_id.startswith("SPY_REFRESH_PM"):
+        return "spy_refresh_pm"
+    # A separate stream on purpose. It runs at 00:45 and asks for the PREVIOUS TRADING DAY,
+    # not for today's close, so a success here does not answer the question the evening ladder
+    # asked. Folding it in would let it mark an evening rung recovered for the wrong reason.
+    if job_id == "SPY_LAST_CHANCE_PRE_NKD":
+        return "spy_last_chance_pre_nkd"
+    # Stage 5ZZZ-AC. A THIRD stream, separate from both of the above on purpose. It runs on
+    # Sunday evening and asks for the day the next overnight window will demand. Folding it
+    # into `spy_refresh_pm` would let a Sunday success mark a Friday rung recovered, which is
+    # the same fault Stage 5ZZT fixed when a stop-repair sweep was closing failed refreshes.
+    # Folding it into `spy_last_chance_pre_nkd` would be subtler and still wrong: they ask the
+    # same question, but a Sunday failure that the Monday job then fixes is a real recovery
+    # story worth seeing as two events, not one.
+    if job_id == "SPY_WEEKEND_PRE_NKD_CHECK":
+        return "spy_weekend_pre_nkd_check"
     if job_id == "SESSION_REPORT":
         return "session_report"
     # The two nightly evidence jobs. Typed rather than left as "other" so the journal can
@@ -134,7 +245,7 @@ def _annotate_impact_and_action(jobs: list[dict[str, Any]]) -> None:
         diagnostics = "\n".join(job.get("diagnostics", [])).lower()
         later_same_stream = next((
             candidate for candidate in ordered[index + 1:]
-            if candidate["job_type"] == job["job_type"]
+            if recovery_stream(candidate) == recovery_stream(job)
             and candidate["status"] in {"completed", "completed_with_debt"}
             and not any("dump_state" in item.lower() for item in candidate.get("diagnostics", []))
         ), None)
@@ -177,12 +288,169 @@ def _annotate_impact_and_action(jobs: list[dict[str, Any]]) -> None:
                 else:
                     job["impact"] = "The scheduled stop-repair inspection did not run; protection was not rechecked by this slot."
                     job["action"] = "Review current broker positions and working stops, then check scheduler health before the next slot."
+            elif job["job_type"] == "spy_refresh_pm":
+                # The missed case matters more than the failed one here: the machine sleeping
+                # through 16:20 is the observed failure mode, 33 stall events across 16 days.
+                #
+                # Stage 5ZZT split this in two. The ladder exists so that one rung can be lost
+                # without costing anything, and the language above was written when 16:20 was
+                # the only rung there was. Saying "tomorrow's slots will be refused" about a
+                # rung a later rung already covered is a false alarm, and the stop-repair
+                # branch immediately above has drawn this distinction since it was written.
+                if later_same_stream:
+                    job["impact"] = (
+                        "This rung of the post-close SPY ladder did not run; the series was "
+                        f"brought up to date when {later_same_stream['job_id']} completed."
+                    )
+                    job["action"] = (
+                        "No immediate action. Review only if the whole ladder starts missing, "
+                        "which would point at the machine being asleep rather than at the data."
+                    )
+                else:
+                    job["impact"] = (
+                        "The post-close SPY refresh did not run, so the daily series is still "
+                        "a day short and tomorrow's Track 1 slots will meet a freshness "
+                        "refusal."
+                    )
+                    job["action"] = (
+                        "Rerun the SPY daily update before the next session, and check whether "
+                        "the machine was asleep at the scheduled time."
+                    )
+            elif job["job_type"] == "spy_weekend_pre_nkd_check":
+                job["impact"] = (
+                    "The Sunday early look at the daily series did not run. Nothing else "
+                    "checks it until 00:45 Monday, which is 25 minutes before the overnight "
+                    "window — too late to fix anything by hand."
+                )
+                job["action"] = (
+                    "Check the daily series covers the previous trading day now, while there "
+                    "is still an evening to act in, rather than waiting for the 00:45 job."
+                )
+            elif job["job_type"] == "spy_last_chance_pre_nkd":
+                job["impact"] = (
+                    "The last look at the daily series before the overnight window did not "
+                    "run. Nothing after it checks the series before the sleeves do, and on a "
+                    "Monday the evening ladder last ran thirty-one hours earlier."
+                )
+                job["action"] = (
+                    "Confirm the daily series covers the previous trading day before the "
+                    "01:10 window, and check whether the machine was asleep at 00:45."
+                )
+            elif job["job_type"] == TRACK1_SAFETY_STOP_REPAIR:
+                # Stage 5ZZU. The same shape as the legacy stop-repair branch above, because it
+                # is the same operation on the other route's book — and for the same reason, a
+                # later sweep of THIS route is what closes it.
+                if later_same_stream:
+                    job["impact"] = (
+                        "The Track 1 stop-repair sweep did not run at this slot; the Track 1 "
+                        f"book was rechecked when {later_same_stream['job_id']} completed."
+                    )
+                    job["action"] = (
+                        "No immediate action. The missed slot stays in daily history; review "
+                        "only if later sweeps also fail."
+                    )
+                else:
+                    job["impact"] = (
+                        "The Track 1 stop-repair sweep did not run, so protective stops on the "
+                        "Track 1 book were not rechecked at this slot."
+                    )
+                    job["action"] = (
+                        "Confirm the Track 1 book still has its protective stops, then check "
+                        "scheduler health before the next sweep."
+                    )
+            elif job["job_type"] == TRACK1_SAFETY_MAX_HOLD:
+                job["impact"] = (
+                    "The Track 1 max-hold exit check did not run, so a position past its "
+                    "maximum hold would not have been closed at this slot."
+                )
+                job["action"] = (
+                    "Check the Track 1 book for positions past their max hold, then confirm "
+                    "the next scheduled check runs."
+                )
+            elif job["job_type"] == TRACK1_WINDOW_AUDIT:
+                # Nothing about the broker here on purpose. This job reads the route's own
+                # evidence records; a miss costs a gap in that evidence, not a trading risk.
+                job["impact"] = (
+                    "The window audit did not run, so no evidence record was written for that "
+                    "window. Nothing is at risk in the book; the shadow record has a gap, and "
+                    "the paper-evidence gate reads that record."
+                )
+                job["action"] = (
+                    "Rerun the audit for the affected window if the evidence record is needed, "
+                    "and check scheduler health before the next audit."
+                )
             elif job["job_type"] in {"live_day", "nkd_night"}:
                 job["impact"] = "The scheduled decision run did not execute; this slot produced no decision or runner-state update."
                 job["action"] = "Check scheduler health and confirm the next expected decision slot runs."
             else:
                 job["impact"] = "The scheduled job did not run; its intended check or output is absent for this slot."
                 job["action"] = "Review scheduler health and confirm the next expected run."
+        elif (job["status"] == "failed" and job["job_type"] == "spy_refresh_pm"
+                and later_same_stream):
+            # Stage 5ZZT. A rung that failed and was caught by a later one. Measured on
+            # 2026-08-27 this was not hypothetical: 16:20, 16:45 and 17:15 all failed, and the
+            # 00:45 last look the next morning is what actually brought the series up to date.
+            job["impact"] = (
+                "This rung of the post-close SPY ladder failed; the series was brought up to "
+                f"date when {later_same_stream['job_id']} completed."
+            )
+            job["action"] = (
+                "No immediate action. Review the diagnostics if rungs keep failing, since the "
+                "ladder is then running on its last rung."
+            )
+        elif job["status"] == "failed" and job["job_type"] == "spy_last_chance_pre_nkd":
+            job["impact"] = (
+                "The last look at the daily series before the overnight window failed. If the "
+                "evening ladder also failed, nothing has refreshed the series since the "
+                "previous session and the overnight sleeves will meet a freshness refusal."
+            )
+            job["action"] = (
+                "Check whether the evening ladder succeeded. If it did not, rerun the SPY "
+                "daily update before the 01:10 window."
+            )
+        elif job["status"] == "failed" and job["job_type"] == "spy_refresh_pm":
+            # Not a trading incident today, and a blocking one tomorrow. The 13:45 pre-flight
+            # runs BEFORE the close and can never bring today's daily bar, so this 16:20 job
+            # is the only thing that puts it in the series. Without it the file is a day
+            # short, and every Track 1 slot the next morning meets a freshness gate that
+            # refuses — which is a whole window lost, not a warning.
+            job["impact"] = (
+                "The daily SPY series was not refreshed after the close, so it is still a day "
+                "short. Nothing is at risk right now; tomorrow's Track 1 slots will be refused "
+                "by the freshness gate until the missing close is present."
+            )
+            job["action"] = (
+                "Rerun the SPY daily update before the next session and confirm the series "
+                "reaches today's close."
+            )
+        elif job["status"] == "failed" and job["job_type"] == TRACK1_SAFETY_STOP_REPAIR:
+            job["impact"] = (
+                "The Track 1 stop-repair sweep failed, so protective stops on the Track 1 book "
+                "were not confirmed at this slot."
+            )
+            job["action"] = (
+                "Review the diagnostics below and confirm the Track 1 book still has its "
+                "protective stops."
+            )
+        elif job["status"] == "failed" and job["job_type"] == TRACK1_SAFETY_MAX_HOLD:
+            job["impact"] = (
+                "The Track 1 max-hold exit check failed, so a position past its maximum hold "
+                "may still be open."
+            )
+            job["action"] = (
+                "Review the diagnostics below and check the Track 1 book for positions past "
+                "their max hold."
+            )
+        elif job["status"] == "failed" and job["job_type"] == TRACK1_WINDOW_AUDIT:
+            job["impact"] = (
+                "The window audit failed, so its evidence record is missing or incomplete for "
+                "that window. Nothing is at risk in the book; the paper-evidence gate reads "
+                "that record and a gap in it delays evidence, it does not create exposure."
+            )
+            job["action"] = (
+                "Review the diagnostics below and rerun the audit for that window if the "
+                "evidence record is needed."
+            )
         elif job["status"] == "failed" and job["job_type"] == "preflight":
             job["impact"] = "The input gate failed; scheduled Live Day decision slots will be blocked until fresh IBKR and SPY data are confirmed."
             job["action"] = "Fix the failed input update, rerun the required update manually, and confirm both data sources are fresh before Live Day."
@@ -219,7 +487,8 @@ def _annotate_impact_and_action(jobs: list[dict[str, Any]]) -> None:
             job["action"] = "Observe until completion evidence arrives; investigate only if it exceeds its expected runtime."
 
 
-def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]]) -> dict[str, Any]:
+def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]],
+           root: Path = Path(".")) -> dict[str, Any]:
     jobs: list[dict[str, Any]] = []
     active: dict[str, dict[str, Any]] = {}
     monitor_events: list[dict[str, Any]] = []
@@ -440,6 +709,7 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]]) ->
             counts[event["kind"]] = counts.get(event["kind"], 0) + 1
         job["event_counts"] = counts
     _annotate_impact_and_action(jobs)
+    _annotate_signal_diagnostics(jobs, day, root)
     deduped_monitor: list[dict[str, Any]] = []
     seen_monitor: set[tuple[str, str]] = set()
     for event in monitor_events:
@@ -453,6 +723,294 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]]) ->
         "observed_at": observed.isoformat().replace("+00:00", "Z"),
         "jobs": jobs, "monitor_events": deduped_monitor, "error": None,
     }
+
+
+#: A slot that takes this long has stopped being a five-minute slot. Stated as a constant so
+#: the page can say "within budget" rather than printing a number the reader has to judge.
+SLOT_RUNTIME_BUDGET_S = 300
+
+
+def _coverage_rows(day: str, root: Path) -> dict:
+    """`{slot_id: coverage row}` for the day. Read-only, and never fatal."""
+    try:
+        p = root / "global_index" / "track1_runtime" / "window_coverage" / \
+            f"window_coverage_{day.replace('-', '')}.jsonl"
+        if not p.exists():
+            return {}
+        out = {}
+        for line in p.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            if r.get("event") == "slot_observed" and r.get("slot_id"):
+                out[str(r["slot_id"])] = r
+        return out
+    except Exception:
+        return {}
+
+
+def _audit_verdicts(day: str, root: Path) -> dict:
+    """`{sleeve: verdict}` from the day's audit rows, or `{}` if none has run."""
+    try:
+        p = root / "global_index" / "track1_runtime" / "audits" / \
+            f"track1_audit_{day.replace('-', '')}.jsonl"
+        if not p.exists():
+            return {}
+        out = {}
+        for line in p.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            if r.get("sleeve") and r.get("verdict"):
+                out[str(r["sleeve"])] = str(r["verdict"])
+        return out
+    except Exception:
+        return {}
+
+
+def _et_clock(iso: "str | None") -> str:
+    """`HH:MM:SS` in Eastern, or `--` if the stamp is unusable. Never raises."""
+    if not iso:
+        return "--"
+    try:
+        t = dt.datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+        if t.tzinfo is None:
+            t = t.replace(tzinfo=dt.timezone.utc)
+        return t.astimezone(ZoneInfo("America/New_York")).strftime("%H:%M:%S")
+    except Exception:
+        return "--"
+
+
+def _operational(job: dict, signal_row, coverage: dict, audits: dict,
+                 data_observation: "dict | None" = None) -> dict:
+    """Did the slot RUN correctly — separately from what the strategy then saw.
+
+    Stage 5ZE. Audited first, and none of this was on the page: the expanded panel showed
+    started/completed/duration/outcome, an impact and an action, and the job's own event list —
+    which is empty for every Track 1 slot, because a shadow slot emits no trade events. So an
+    operator could see that a slot ran and for how long, and nothing at all about whether the
+    freshness gate passed, whether the live frame was refused, whether the evidence row was
+    written, or whether the duration was near its budget.
+
+    Every field here is read from evidence that already exists. Nothing new is computed about
+    the strategy, and nothing here can change a decision.
+    """
+    from global_index import track1_signals as sig
+
+    slot_id = str(job.get("job_id", ""))
+    status = str(job.get("status", ""))
+    dur = job.get("duration_seconds")
+    cov = coverage.get(slot_id)
+    lines: list[str] = []
+
+    # 1. did it run at all
+    if status == "missed":
+        ran = "missed"
+        lines.append("The scheduler never started this slot.")
+        if job.get("reason"):
+            lines.append(str(job["reason"]))
+    elif status in ("failed",):
+        ran = "failed"
+        lines.append("The slot started and exited with an error.")
+    elif status == "running":
+        ran = "running"
+        lines.append("The slot is still running.")
+    else:
+        ran = "ran"
+        # ET, because every schedule constant in this system is written in ET and the raw
+        # field is UTC. A panel that printed the stored value would make an operator do the
+        # conversion in their head, which is the habit this project has already lost an hour
+        # to once today.
+        when = _et_clock(job.get("started_at"))
+        lines.append(f"Ran at {when} ET" + (f", duration {dur}s." if dur is not None else "."))
+
+    over = bool(dur is not None and float(dur) >= SLOT_RUNTIME_BUDGET_S)
+    if dur is not None:
+        lines.append(f"Runtime {'OVER' if over else 'within'} the {SLOT_RUNTIME_BUDGET_S}s "
+                     f"budget.")
+
+    # 2. did it leave the evidence row the audit counts
+    if ran == "ran":
+        lines.append("Ledger row written." if cov else
+                     "No ledger row for this slot — the audit cannot count it.")
+
+    # 3. the runtime gates, in operator words
+    refused = None
+    freshness = None
+    if signal_row is not None:
+        freshness = signal_row.get("freshness_allow")
+        if signal_row.get("status") == sig.SLOT_REFUSED:
+            refused = str(signal_row.get("reason") or "")
+    elif cov is not None:
+        if not cov.get("decided"):
+            refused = str(cov.get("reason") or "")
+        freshness = cov.get("freshness_allow")
+
+    if refused:
+        lines.append("Slot refused before strategy evaluation.")
+        detail = ""
+        if signal_row is not None:
+            detail = str(signal_row.get("detail") or "")
+        elif cov is not None:
+            detail = str(cov.get("detail") or "")
+        # The refusal code and its detail are DIFFERENT codes -- `gate_refused` names the
+        # gate, `stale` names what it found. Both are mapped; neither is dropped.
+        named = sig.label(refused)
+        extra = ", ".join(sig.label(c) for c in detail.split(",") if c) if detail else ""
+        lines.append(f"Reason: {named}." + (f" ({extra})" if extra else ""))
+    elif freshness is not None:
+        lines.append("Freshness check passed." if freshness else "Freshness check failed.")
+        if ran == "ran" and not refused:
+            lines.append("Live frame passed.")
+
+    # 3b. Stage 5ZO — one line proving what data the slot actually looked at.
+    #
+    # One line, in the Operational block, beside the other runtime facts. Not a new section:
+    # the panel already has a health block and a signal chip, and a third heading for a single
+    # sentence would cost more attention than it returns. Three shapes, because there are three
+    # states an operator would act on differently — observed, refused, and not recorded at all
+    # by the version of the slot that ran.
+    from global_index import track1_data_observation as dobs
+
+    lines.append(dobs.operator_line(data_observation))
+
+    # 4. what a shadow slot is expected NOT to do, said out loud so its absence is not read
+    #    as a fault
+    lines.append("No checkpoint or book write expected in shadow.")
+
+    sleeve = _sleeve_of(slot_id)
+    verdict = audits.get(sleeve) if sleeve else None
+    if verdict:
+        lines.append(f"Window audit for {sleeve}: {verdict}.")
+
+    return {
+        "ran": ran,
+        # Stage 5ZO. `None` means the slot ran under a version that did not write one, which
+        # the panel renders as "not recorded by this slot version" — never as a fault.
+        "data_observation": data_observation,
+        "duration_seconds": dur,
+        "over_budget": over,
+        "budget_seconds": SLOT_RUNTIME_BUDGET_S,
+        "ledger_row": bool(cov),
+        "freshness_pass": freshness,
+        "refused": bool(refused),
+        "refusal_reason": sig.label(refused) if refused else None,
+        "audit_verdict": verdict,
+        "lines": lines,
+    }
+
+
+def _sleeve_of(slot_id: str) -> str:
+    for prefix, sleeve in (("TRACK1_CALM_", "roska4_calm"),
+                           ("TRACK1_STRESS_", "roska4_stress"),
+                           ("TRACK1_SWING_", "roska4_swing"),
+                           ("TRACK1_NKD_", "global_nkd")):
+        if slot_id.startswith(prefix):
+            return sleeve
+    return ""
+
+
+def _annotate_signal_diagnostics(jobs: list[dict[str, Any]], day: str, root: Path) -> None:
+    """Attach one compact signal line to each Track 1 STRATEGY job. Read-only.
+
+    Two rules decide what a job gets, and both are about not lying:
+
+    **Only strategy slots.** Everything else is left completely untouched — no key added, not
+    even an empty one. A `signal: null` on a stop-repair row would invite a renderer to print
+    "no signal" about a job that has no signals to have.
+
+    **A slot that never ran is MISSED, never NO_SIGNAL.** The journal has no row for it because
+    it never wrote one, and inventing a `NO_SIGNAL` here would turn "the machine was asleep"
+    into "the strategy looked and declined". On 2026-08-25 the machine slept through the whole
+    Calm window, so this is the difference between a true record and a fiction.
+
+    The one-line summary is composed by `track1_signals.one_line`, not here and not in the
+    browser: one owner for the phrasing, and a test can assert it.
+    """
+    from global_index import track1_signals as sig
+
+    strategy = [j for j in jobs if is_track1_strategy_job(j.get("job_id", ""))]
+    if not strategy:
+        return
+    try:
+        rows, _invalid = sig.read_day(day.replace("-", ""), root=root)
+    except Exception:
+        rows = []
+    by_slot: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        if r.get("slot_id"):
+            by_slot[str(r["slot_id"])] = r          # last row for a slot wins
+
+    coverage = _coverage_rows(day, root)
+    audits = _audit_verdicts(day, root)
+
+    # Stage 5ZO. Read once for the day, not per job: it is one small file and forty lookups
+    # of it would be forty reads of the same thing.
+    try:
+        from global_index import track1_data_observation as _dobs
+        _obs_rows, _ = _dobs.read(root=root, day=day)
+        obs_by_slot = {str(r.get("slot_id") or ""): r for r in _obs_rows}
+    except Exception:                                          # noqa: BLE001
+        obs_by_slot = {}
+
+    for job in strategy:
+        row = by_slot.get(str(job.get("job_id", "")))
+        job["operational"] = _operational(
+            job, row, coverage, audits,
+            data_observation=obs_by_slot.get(str(job.get("job_id", ""))))
+        if row is None:
+            # Two different absences, and the JOB's own status is what tells them apart.
+            # A slot that never spawned is MISSED — operations health. A slot that ran and
+            # left no row is NO DIAGNOSTICS — which is what every slot looked like on the day
+            # the journal was introduced, and rendering those as MISSED would have accused
+            # the scheduler of failing when it had not.
+            ran = str(job.get("status", "")) not in ("missed", "")
+            status = sig.SLOT_NO_ROW if ran else sig.SLOT_MISSED
+            job["signal"] = {
+                "status": status,
+                "chip": sig.chip(status),
+                "summary": sig.one_line({"status": status}),
+                # Both point at the Operational block rather than repeating it. Stage 5ZE:
+                # a REFUSED/MISSED row that printed the runtime evidence twice would give the
+                # operator two copies to reconcile, and they are never both updated.
+                "operator": sig.operator_lines({"status": status}),
+                "details": None,
+                "debug": None,
+            }
+            continue
+
+        status = row.get("status")
+        job["signal"] = {
+            "status": status,
+            "chip": sig.chip(status),
+            "summary": sig.one_line(row),
+            # What the panel renders. Plain English, no field names, no JSON.
+            "operator": sig.operator_lines(row),
+            "details": {
+                "reason": row.get("reason"),
+                "rejecting_layer": row.get("rejecting_layer") or None,
+                "rejected_by": sig.LAYER_LABELS.get(row.get("rejecting_layer")),
+                "raw_candidates": row.get("raw_candidates"),
+                "accepted": row.get("accepted"),
+                "rejected": row.get("rejected"),
+                "orders_enabled": bool(row.get("orders_enabled")),
+                "order_attempted": bool(row.get("order_attempted")),
+                "candidates": row.get("candidates") or [],
+            },
+            # Developer material. Shipped so it is not lost, and rendered by NOTHING by
+            # default — the panel has no code path that prints it. `rule_checks` is where
+            # `breadth_down_count` and the raw JSON thresholds live, and after Stage 5ZD
+            # every one of them comes back unmeasured, so rendering them would be thirty
+            # rows of UNKNOWN burying the two lines that carry information.
+            "debug": {
+                "rule_checks": row.get("rule_checks") or [],
+                "primary_failure": sig.primary_failure(row.get("rule_checks") or []),
+                "params_hash": row.get("params_hash") or None,
+                "data_source_identity": row.get("data_source_identity") or None,
+                "freshness_allow": row.get("freshness_allow"),
+                "detail": row.get("detail"),
+            },
+        }
 
 
 def read_job_journal(day: str, root: Path) -> dict[str, Any]:
@@ -473,7 +1031,7 @@ def read_job_journal(day: str, root: Path) -> dict[str, Any]:
         cached = _cache.get(key)
         if cached is None:
             events = read_session_events(day, root).get("events", [])
-            cached = _parse(paths, day, events)
+            cached = _parse(paths, day, events, root)
             _cache.clear()
             _cache[key] = cached
         return copy.deepcopy(cached)

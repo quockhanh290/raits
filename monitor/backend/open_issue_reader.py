@@ -35,7 +35,15 @@ def _iso(value: dt.datetime) -> str:
 
 
 def _stream(job: dict[str, Any]) -> str:
-    return job["job_type"] if job["job_type"] != "other" else job["job_id"]
+    # Stage 5ZZY: through the journal reader's own notion of a recovery stream, so the two
+    # lanes cannot disagree about who may close whom. For a Track 1 strategy slot that is the
+    # SLEEVE, not merely "a strategy slot" — a completed Stress run must not close a failed
+    # Calm one, which is what the incidents lane has always said.
+    from monitor.backend import job_journal_reader as _jj
+
+    if job["job_type"] == "other":
+        return job["job_id"]
+    return _jj.recovery_stream(job)
 
 
 def _issue(*, key: str, status: str, component: str, title: str, problem: str,
@@ -49,6 +57,109 @@ def _issue(*, key: str, status: str, component: str, title: str, problem: str,
         "impact": impact, "action": action, "resolution_evidence": resolution,
         "evidence": evidence,
     }
+
+
+#: Which route an issue is ABOUT. Stage 5ZZF.
+#:
+#: Added because the Track 1 panel and the issue list sat on one page with nothing between
+#: them, and three legacy paper-reconciliation issues read, to anyone glancing at it, as
+#: reasons Track 1 was not ready. They are not: they compare the legacy paper ledger against
+#: Flex statements and read no Track 1 artefact at all.
+#:
+#: NOTHING IS DELETED OR HIDDEN by this. An issue that was open stays open, keeps its status,
+#: its evidence and its place in the list. What it gains is a sentence saying whose problem it
+#: is — which is the difference between a list somebody triages and a list somebody stops
+#: reading.
+SCOPE_TRACK1 = "track1"
+SCOPE_LEGACY = "legacy"
+SCOPE_SCHEDULER = "scheduler"
+SCOPE_DEBT = "known_debt"
+
+#: A Track 1 readiness blocker is decided by `track1_gates`, not by this reader. Nothing here
+#: may promote itself into that list — the gate is the only thing that says what blocks orders,
+#: and a second opinion living in a log parser is how the two come to disagree.
+TRACK1_BLOCKERS_ARE_DECIDED_BY = "global_index.track1_gates.blocking()"
+
+
+def _route_scope(issue: dict[str, Any]) -> tuple[str, str]:
+    """`(scope, why)` for one issue, derived from what it actually reads.
+
+    Derived from the key rather than from a hand-kept list of issue titles, for the reason this
+    repo already has a scar for: a list maintained beside the thing it describes is a list that
+    will one day be missing the entry somebody just added.
+    """
+    key = str(issue.get("key") or "")
+    status = str(issue.get("status") or "")
+    if status == "known_debt":
+        return SCOPE_DEBT, ("carried debt, not a new failure; it is listed so it does not "
+                            "disappear, not so it competes with today's incidents")
+    if key.startswith("track1:"):
+        return SCOPE_TRACK1, "reads Track 1 runtime artefacts"
+    if key.startswith("paper:"):
+        return SCOPE_LEGACY, ("compares the LEGACY paper ledger against broker statements; it "
+                              "reads no Track 1 artefact and is not a Track 1 readiness "
+                              "blocker")
+    if key.startswith(("job:", "roll:")):
+        return SCOPE_SCHEDULER, ("about the scheduler or the contract calendar, which serve "
+                                 "both routes")
+    return SCOPE_SCHEDULER, "origin not attributable to one route; treated as shared"
+
+
+def legacy_retirement_state(root: Path | None = None) -> dict[str, Any]:
+    """Is the legacy route retired ON THIS LOGIN, and what says so. Stage 5ZZW.
+
+    Three facts have to hold together, and each is read rather than assumed:
+
+        the operator signed the B1 decision           `confirmation`
+        the running scheduler is in a compatible mode `scheduler_mode`
+        it registers no legacy entry job              `legacy_entry_jobs`
+
+    The scheduler facts come from the backend's cached process scan. Calling `ops.py` from the
+    dashboard request path shells out to PowerShell, and a polling page must not create a
+    terminal window just to decide whether retired legacy issues still count.
+    """
+    unknown = {"retired": False, "confirmation": None, "scheduler_mode": None,
+               "legacy_entry_jobs": None,
+               "reason": "the scheduler could not be read, so legacy is treated as live"}
+    try:
+        from monitor.backend import schedule_status as ss
+
+        status = ss.scheduler_track1_mode_status()
+    except Exception as exc:                                          # noqa: BLE001
+        return {**unknown, "reason": f"the scheduler could not be read ({type(exc).__name__})"}
+    if status.get("track1_mode_source") != "process_table":
+        return unknown
+    # `scheduler_mode` is a NESTED record, not a string, and `legacy_entry_jobs` lives inside
+    # it. Reading them as top-level fields returned None for the job count and a dict for the
+    # mode, so the retirement never fired and every legacy issue stayed in the active count -
+    # a silently wrong answer that looked like a deliberate "not retired".
+    base = Path(root) if root is not None else Path(__file__).resolve().parents[2]
+    confirmation = (base / "track1_go_live_confirmation.json").exists()
+    mode = "compatible" if status.get("scheduler_track1_only") else "incompatible"
+    jobs = status.get("legacy_entry_jobs")
+    retired = bool(confirmation and mode == "compatible" and jobs == 0)
+    return {
+        "retired": retired,
+        "confirmation": confirmation,
+        "scheduler_mode": mode,
+        "legacy_entry_jobs": jobs,
+        "reason": ("the B1 decision is signed, the scheduler mode is compatible with it, and "
+                   "it registers no legacy entry job"
+                   if retired else
+                   "at least one of the three conditions does not hold, so legacy issues stay "
+                   "in the active count"),
+    }
+
+
+def _scoped(issues: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Every issue, unchanged, plus the three fields that say whose it is."""
+    for item in issues:
+        scope, why = _route_scope(item)
+        item["route_scope"] = scope
+        item["scope_reason"] = why
+        # Never true from here. See TRACK1_BLOCKERS_ARE_DECIDED_BY.
+        item["track1_readiness_blocker"] = False
+    return issues
 
 
 def _num(value: Any) -> float | None:
@@ -355,7 +466,18 @@ def _build(paths: list[Path]) -> dict[str, Any]:
         status = "unknown" if job["status"] == "running" else "incident"
         diagnostics = [item for item in job.get("diagnostics", []) if "G2 HARD" not in item]
         component = "runner" if diagnostics else "scheduler"
-        if job["status"] == "missed" and job["job_type"] == "stop_repair":
+        if job["status"] == "missed" and job["job_type"] == "track1_safety_stop_repair":
+            # Stage 5ZZU. Named separately from the legacy sweep because it inspects the other
+            # route's book. Before this, these jobs had no type at all, so `_stream` below fell
+            # back to the job id and a Track 1 sweep that failed at 06:20 could never be closed
+            # by the identical sweep at 08:20 — an issue that stayed open by construction.
+            problem = (f"The scheduled Track 1 stop-repair sweep did not run; latest evidence "
+                       f"says {job.get('reason') or 'slot missed'}.")
+        elif job["status"] == "missed" and job["job_type"] == "track1_window_audit":
+            problem = (f"The scheduled window audit did not run, so no evidence record was "
+                       f"written for that window; latest evidence says "
+                       f"{job.get('reason') or 'slot missed'}.")
+        elif job["status"] == "missed" and job["job_type"] == "stop_repair":
             problem = f"The scheduled stop-repair sweep did not run; latest evidence says {job.get('reason') or 'slot missed'}."
         elif diagnostics and "dump_state" in diagnostics[-1]:
             problem = "The runner completed its work but could not publish live_state_data.js for this slot."
@@ -410,8 +532,16 @@ def _build(paths: list[Path]) -> dict[str, Any]:
     issues.extend(_paper_reconciliation_issues(paths[0].parent, observed_at))
     issues.extend(_roll_schedule_runway_issues(observed_at))
     issues.sort(key=lambda item: (priority[item["status"]], item["first_seen"]))
+    # The RETURN value, not the side effect. `_scoped` happens to label in place today, and a
+    # caller that relied on that would break silently the day it returned a new list instead —
+    # which is exactly how a mutation test found this line raising a KeyError rather than
+    # reporting a wrong answer.
+    issues = _scoped(issues)
     return {
         "source": "scheduler_logs", "observed_at": observed_at,
+        # Said in the payload so a reader does not have to infer it from the absence of a field.
+        "track1_readiness_blockers_come_from": TRACK1_BLOCKERS_ARE_DECIDED_BY,
+        "scopes": sorted({i["route_scope"] for i in issues}),
         "coverage": {"from": first_day.isoformat(), "to": last_day.isoformat(),
                      "evidence_ends": evidence_ends.isoformat(),
                      "stale_days": (today - evidence_ends).days},
@@ -419,10 +549,38 @@ def _build(paths: list[Path]) -> dict[str, Any]:
     }
 
 
+def _apply_retirement(payload: dict[str, Any], root: Path | None = None) -> dict[str, Any]:
+    """Mark each issue active or retired-history. Stage 5ZZW.
+
+    Applied on every read, OUTSIDE the cache, and that placement is the point. `_build` is
+    memoised on the scheduler log signatures plus the date, so anything computed inside it is
+    frozen until a log file changes. Whether legacy is retired is a fact about the RUNNING
+    SCHEDULER and can change at any moment — an operator restarting into legacy mode writes no
+    log line here — so computing it inside would have answered from whenever the logs last
+    moved. The comment on the roll-schedule key just above records the same trap.
+
+    Nothing is deleted. Every issue still travels; what is decided is only whether it counts
+    toward the number at the top of the page, and the reason travels beside the flag.
+    """
+    issues = payload.get("issues") or []
+    retirement = legacy_retirement_state(root)
+    for item in issues:
+        retired_only = retirement["retired"] and item.get("route_scope") == SCOPE_LEGACY
+        item["counts_as_active"] = not retired_only
+        item["active_reason"] = (
+            "legacy is retired on this login, so this is history rather than an open issue"
+            if retired_only else "counts toward the active total")
+    payload["legacy_retirement"] = retirement
+    payload["active_count"] = sum(1 for i in issues if i["counts_as_active"])
+    payload["retired_history_count"] = sum(1 for i in issues if not i["counts_as_active"])
+    return payload
+
+
 def read_open_issues(root: Path) -> dict[str, Any]:
     paths = sorted(root.glob("scheduler_*.log"))
     if not paths:
-        return {"source": "scheduler_logs", "coverage": None, "issues": [], "error": "scheduler logs not found"}
+        return _apply_retirement({"source": "scheduler_logs", "coverage": None, "issues": [],
+                                  "error": "scheduler logs not found"}, root)
     signature_paths = list(paths)
     paper_compare = root / "monitor" / "paper_pnl_compare.json"
     if paper_compare.exists():
@@ -448,4 +606,4 @@ def read_open_issues(root: Path) -> dict[str, Any]:
             cached = _build(paths)
             _cache.clear()
             _cache[signature] = cached
-        return copy.deepcopy(cached)
+        return _apply_retirement(copy.deepcopy(cached), root)

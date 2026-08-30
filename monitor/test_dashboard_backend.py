@@ -1933,6 +1933,56 @@ def test_the_process_scan_is_not_run_on_every_poll(monkeypatch):
         f"scan and a poll every 8s this is what made the page unusable")
 
 
+def test_track1_mode_does_not_call_ops_on_the_dashboard_poll_path(monkeypatch):
+    """Route mode is a dashboard hot path; it must not shell out through ops.py.
+
+    Stage 5ZZW correctly made the scheduler command line authoritative, but asked it through
+    ``ops.track1_status()``, which spawns PowerShell. Opening the dashboard then produced a
+    visible cmd/PowerShell window on every poll.
+    """
+    from monitor.backend import schedule_status as ss
+    from monitor import ops
+
+    monkeypatch.setattr(ss, "_running_schedulers", lambda: [{
+        "pid": 3000,
+        "started_epoch": 1_000_000,
+        "command": "pythonw.exe -m global_index.run_scheduler --port 4002 --track1-only-shadow",
+    }])
+    monkeypatch.setattr(ops, "track1_status",
+                        lambda: (_ for _ in ()).throw(AssertionError("ops.py shell path used")))
+
+    for _ in range(5):
+        assert ss.resolve_track1_only() is True
+        mode = ss.scheduler_track1_mode_status()
+        assert mode["track1_mode"] == "track1-only-shadow"
+        assert mode["legacy_entry_jobs"] == 0
+
+
+def test_open_issue_retirement_does_not_call_ops_on_the_dashboard_poll_path(monkeypatch,
+                                                                            tmp_path):
+    from monitor.backend import open_issue_reader as issues
+    from monitor.backend import schedule_status as ss
+    from monitor import ops
+
+    (tmp_path / "track1_go_live_confirmation.json").write_text(
+        '{"schema_version":1,"confirmed_by":"operator","confirmed_at":"2026-08-27T00:00:00Z",'
+        '"legacy_retired_confirmed":true,"note":"test"}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(ss, "scheduler_track1_mode_status", lambda: {
+        "scheduler_running": True,
+        "track1_mode_source": "process_table",
+        "scheduler_track1_only": True,
+        "legacy_entry_jobs": 0,
+    })
+    monkeypatch.setattr(ops, "track1_status",
+                        lambda: (_ for _ in ()).throw(AssertionError("ops.py shell path used")))
+
+    state = issues.legacy_retirement_state(tmp_path)
+    assert state["retired"] is True
+    assert state["legacy_entry_jobs"] == 0
+
+
 def test_scheduler_age_reaches_the_payload_and_the_page():
     """A reader nobody calls, or a field nothing renders, is H2 again.
 
@@ -2672,6 +2722,15 @@ def _ops_stub(monkeypatch, calls, *, schedulers, backends):
     """
     from monitor import ops
 
+    # Stage 5ZZN. These describe a LEGACY start, and Stage 5ZZN made a legacy start refuse
+    # while a signed B1 decision says legacy has retired from this login. That guard is
+    # correct and is tested in the 5ZZN suite; here it was reading the real machine's
+    # confirmation file, so these process-management tests began failing for a reason that has
+    # nothing to do with process management. Pointed at a path that does not exist, which is
+    # the pre-B1 world they were written for.
+    monkeypatch.setattr(ops, "TRACK1_CONFIRMATION",
+                        Path("no-such-confirmation-for-this-test.json"))
+
     live = {"sched": list(schedulers) if schedulers is not None else None,
             "backend": list(backends) if backends is not None else None}
 
@@ -2697,10 +2756,23 @@ def _ops_stub(monkeypatch, calls, *, schedulers, backends):
     monkeypatch.setattr(ops, "time", type("_t", (), {"sleep": staticmethod(lambda _s: None)})())
     monkeypatch.setattr(
         ops, "start_scheduler",
-        lambda port, *, shadow_resume, assume_preflight_ok:
+        # `track1_shadow`/`track1_only` accepted because the real signature grew them in
+        # Stages 5K and 5M-D. A stub narrower than the function it replaces fails as a
+        # TypeError raised from inside production code — the same stale-stub family as the
+        # stage-4 `_run` lambda — and this suite only trips it on the restart path, which is
+        # the first caller to pass them through.
+        lambda port, *, shadow_resume, assume_preflight_ok, track1_shadow=False,
+               track1_only=False:
             calls.append(("start_scheduler", port, shadow_resume, assume_preflight_ok)) or 303,
     )
-    monkeypatch.setattr(ops, "start_backend", lambda ibkr, api: calls.append(("start_backend", ibkr, api)) or 404)
+    # Same stale-stub trap as start_scheduler above: `start_backend` grew the Track 1 flags
+    # on 2026-08-24, and a two-argument stub would fail as a TypeError raised from inside
+    # ops.main. The flags are RECORDED, not swallowed, so a test can assert the backend was
+    # told what the scheduler was told.
+    monkeypatch.setattr(
+        ops, "start_backend",
+        lambda ibkr, api, *, track1_shadow=False, track1_only=False:
+            calls.append(("start_backend", ibkr, api, track1_shadow, track1_only)) or 404)
     monkeypatch.setattr(ops, "wait_backend", lambda port: {"connected": True})
     return ops
 
@@ -2725,7 +2797,7 @@ def test_ops_up_leaves_one_healthy_scheduler_alone_and_replaces_the_backend(monk
     calls = []
     ops = _ops_stub(monkeypatch, calls, schedulers=[29340], backends=[555])
     assert ops.main(["up", "--yes"]) == 0
-    assert calls == [("taskkill", [555]), ("start_backend", 4002, 5002)]
+    assert calls == [("taskkill", [555]), ("start_backend", 4002, 5002, False, False)]
 
 
 def test_ops_up_starts_a_scheduler_when_none_is_running(monkeypatch):
@@ -2734,7 +2806,7 @@ def test_ops_up_starts_a_scheduler_when_none_is_running(monkeypatch):
     assert ops.main(["--ibkr-port", "4003", "--api-port", "5003", "up", "--yes"]) == 0
     assert calls == [
         ("start_scheduler", 4003, True, False),
-        ("start_backend", 4003, 5003),
+        ("start_backend", 4003, 5003, False, False),
     ]
 
 
@@ -2744,6 +2816,124 @@ def test_ops_restart_scheduler_stops_every_instance_before_starting_one(monkeypa
     assert ops.main(["restart", "--scheduler", "--yes"]) == 0
     assert calls[0] == ("taskkill", [29340, 35120])
     assert ("start_scheduler", 4002, True, False) in calls
+
+
+# ── Stage 5AB: the backend child must be told what the scheduler was told ────
+#
+# Root cause measured on the live box 2026-08-24: `ops.py status` read
+# `track1_mode=track1-only-shadow` off the RUNNING scheduler's command line, while
+# `/api/v1/schedule-status` served `state_slot_count=45` and a legacy `next_decision_job`.
+# `start_scheduler` passed `_env(track1_shadow=..., track1_only=...)`; `start_backend`
+# passed a bare `_env()`. Two children of one `up`, disagreeing about which route runs.
+
+def test_start_backend_carries_track1_only_into_the_child_environment(monkeypatch):
+    import monitor.ops as ops
+    captured = {}
+
+    class _P:
+        pid = 4242
+
+    def _popen(args, **kw):
+        captured.update(kw)
+        return _P()
+
+    monkeypatch.setattr(ops.subprocess, "Popen", _popen)
+    monkeypatch.setattr(ops, "_open_log", lambda name: None)
+    ops.start_backend(4002, 5002, track1_shadow=True, track1_only=True)
+    env = captured["env"]
+    assert env["RAITS_TRACK1_ONLY"] == "1"
+    assert env["RAITS_TRACK1_SHADOW"] == "1"
+    # the ledger/telemetry homes travel too, or a reader looks in the wrong directory
+    assert env["RAITS_WINDOW_LEDGER_DIR"] == str(ops.TRACK1_LEDGER_DIR)
+    assert env["RAITS_TELEMETRY_DIR"] == str(ops.TRACK1_TELEMETRY_DIR)
+    # widening this must NEVER be able to arm the route
+    assert ops.TRACK1_ORDERS_ENV not in env
+
+
+def test_start_backend_carries_transitional_track1_shadow(monkeypatch):
+    import monitor.ops as ops
+    captured = {}
+
+    class _P:
+        pid = 4242
+
+    monkeypatch.setattr(ops.subprocess, "Popen",
+                        lambda args, **kw: (captured.update(kw), _P())[1])
+    monkeypatch.setattr(ops, "_open_log", lambda name: None)
+    ops.start_backend(4002, 5002, track1_shadow=True)
+    env = captured["env"]
+    assert env["RAITS_TRACK1_SHADOW"] == "1"
+    assert "RAITS_TRACK1_ONLY" not in env
+
+
+def test_start_backend_default_stays_legacy(monkeypatch):
+    """The regression that matters most: an ordinary `ops.py up` must not switch the
+    dashboard to a route nobody asked for."""
+    import monitor.ops as ops
+    captured = {}
+
+    class _P:
+        pid = 4242
+
+    monkeypatch.setattr(ops.subprocess, "Popen",
+                        lambda args, **kw: (captured.update(kw), _P())[1])
+    monkeypatch.setattr(ops, "_open_log", lambda name: None)
+    ops.start_backend(4002, 5002)
+    env = captured["env"]
+    assert "RAITS_TRACK1_ONLY" not in env
+    assert "RAITS_TRACK1_SHADOW" not in env
+
+
+def test_ops_up_track1_only_tells_the_backend_too(monkeypatch):
+    """End to end through `main`, not just the helper: the flag has to survive the whole
+    dispatch, which is the seam the live defect actually sat in."""
+    calls = []
+    ops = _ops_stub(monkeypatch, calls, schedulers=[], backends=[])
+    monkeypatch.setattr(ops, "track1_shadow_blockers", lambda *, track1_only=False: [])
+    rc = ops.main(["up", "--yes", "--track1-only-shadow"])
+    assert rc == 0, calls
+    backend = [c for c in calls if c[0] == "start_backend"]
+    assert backend, calls
+    assert backend[0][3] is True and backend[0][4] is True, backend
+
+
+def test_restart_no_scheduler_reaches_the_backend_without_touching_the_scheduler(monkeypatch):
+    """The operator's only safe way to correct a dashboard mirroring the wrong route.
+
+    Until 2026-08-24 this refused: the Track 1 guard fired for any running scheduler, and
+    its advice was `restart --scheduler`, i.e. bounce a live scheduler to fix a dashboard.
+    That is the more dangerous of the two acts. With `--no-scheduler` the operator has said
+    in as many words to leave it alone, and the flag now has a real effect without it.
+    """
+    calls = []
+    ops = _ops_stub(monkeypatch, calls, schedulers=[33868], backends=[555])
+    monkeypatch.setattr(ops, "track1_shadow_blockers", lambda *, track1_only=False: [])
+    rc = ops.main(["restart", "--no-scheduler", "--yes", "--track1-only-shadow"])
+    assert rc == 0, calls
+    assert not any(c[0] == "start_scheduler" for c in calls), calls
+    backend = [c for c in calls if c[0] == "start_backend"]
+    assert backend, calls
+    assert backend[0][3] is True and backend[0][4] is True, backend
+
+
+def test_restart_no_scheduler_also_works_for_transitional_shadow(monkeypatch):
+    calls = []
+    ops = _ops_stub(monkeypatch, calls, schedulers=[33868], backends=[555])
+    monkeypatch.setattr(ops, "track1_shadow_blockers", lambda *, track1_only=False: [])
+    assert ops.main(["restart", "--no-scheduler", "--yes", "--track1-shadow"]) == 0
+    backend = [c for c in calls if c[0] == "start_backend"]
+    assert backend and backend[0][3] is True and backend[0][4] is False, backend
+
+
+def test_up_still_refuses_the_track1_flag_against_a_running_scheduler(monkeypatch):
+    """The refusal must stay for `up`. There the operator did NOT say --no-scheduler, so a
+    flag that silently reached only the backend would leave them believing the scheduler
+    had been switched too."""
+    calls = []
+    ops = _ops_stub(monkeypatch, calls, schedulers=[33868], backends=[555])
+    monkeypatch.setattr(ops, "track1_shadow_blockers", lambda *, track1_only=False: [])
+    assert ops.main(["up", "--yes", "--track1-only-shadow"]) == 2
+    assert not any(c[0] == "start_backend" for c in calls), calls
 
 
 def test_ops_startup_command_is_documented():
@@ -4015,18 +4205,25 @@ def test_sunday_reopen_sweep_is_modelled_like_the_scheduler_runs_it():
 
     sunday, saturday = dt.date(2026, 8, 16), dt.date(2026, 8, 15)
     assert sunday.weekday() == 6 and not is_trading_day(sunday)
+    # Stage 5ZZZ-AC thêm SPY_WEEKEND_PRE_NKD_CHECK lúc 18:00, ngay TRƯỚC sweep 18:30:
+    # kiểm dữ liệu trước, quét bảo vệ sau, cùng một log Chủ nhật. Thứ tự là một phần
+    # của khẳng định, không chỉ tập hợp.
     assert [slot["id"] for slot in schedule_status._scheduled_slots_for(sunday)] \
-        == ["STOP_REPAIR_SUN_1830"]
+        == ["SPY_WEEKEND_PRE_NKD_CHECK", "STOP_REPAIR_SUN_1830"]
     # Thứ Bảy thị trường vẫn đóng: quét lúc đó là quét vào chỗ trống.
     assert schedule_status._scheduled_slots_for(saturday) == []
 
 
-def test_the_next_job_after_friday_close_is_the_sunday_sweep():
-    """Trước khi có slot này, câu trả lời là 00:20 ET thứ Hai."""
+def test_the_next_job_after_friday_close_is_the_sunday_spy_check():
+    """Trước khi có slot Chủ nhật, câu trả lời là 00:20 ET thứ Hai.
+
+    Stage 5ZZZ-AC: giờ câu trả lời sớm hơn nữa — SPY_WEEKEND_PRE_NKD_CHECK 18:00 ET,
+    nửa tiếng trước sweep. Đó chính là điểm của nó: sau khi thị trường đóng thứ Sáu,
+    thứ ĐẦU TIÊN nhìn lại dữ liệu là job này, không phải 00:45 thứ Hai."""
     now = dt.datetime(2026, 8, 15, 3, 0, tzinfo=ET)
     nxt = schedule_status._next_job(now, schedule_status._scheduled_slots_for)
-    assert nxt["job_id"] == "STOP_REPAIR_SUN_1830"
-    assert nxt["at"] == "2026-08-16T22:30:00Z"
+    assert nxt["job_id"] == "SPY_WEEKEND_PRE_NKD_CHECK"
+    assert nxt["at"] == "2026-08-16T22:00:00Z"
 
 
 def test_favicon_does_not_404():

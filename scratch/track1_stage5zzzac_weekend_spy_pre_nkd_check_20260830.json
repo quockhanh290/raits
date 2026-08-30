@@ -115,7 +115,7 @@
   "a_test_of_mine_that_was_wrong": "my first 'never writes preflight_state' test scanned raw source and matched the DOCSTRING, which mentions preflight_state.json precisely to say it does not write it. Rewritten as an AST walk with the docstring stripped. A second scan then flagged the word 'Friday' in an honest log message, so string literals are blanked too"
  },
  "restart": {
-  "required": true,
+  "required": false,
   "done_in_this_stage": false,
   "why_required": "APScheduler reads cron only at startup. The running scheduler (pid 34564, started 2026-08-29 09:11:11) predates this code and does not have the job",
   "why_not_done": "the brief says not to restart unless explicitly requested",
@@ -125,7 +125,15 @@
    "covers_the_current_gap": true
   },
   "if_not_restarted_before_18_00_ET": "the job does not run today and the first automatic attempt remains SPY_LAST_CHANCE_PRE_NKD at Monday 00:45 ET, 25 minutes before NKD 01:10 - exactly the situation this stage was written to remove",
-  "command": "python monitor/ops.py restart --scheduler --track1-only-shadow --yes"
+  "command": "python monitor/ops.py restart --scheduler --track1-only-shadow --yes",
+  "CORRECTION_the_job_is_now_LIVE": {
+   "when": "the scheduler was restarted 2026-08-30T05:18:44 from OUTSIDE this session (ops.log: kill_then_start, found=[34564])",
+   "after_my_edit": "run_scheduler.py mtime 04:58:22, scheduler start 05:18:47",
+   "proof_it_registered": "scheduler_0830.log: Added job \"SPY weekend pre-NKD check 18:00 ET (Sunday early warning)\" to job store \"default\"",
+   "so": "the job fires TONIGHT at Sunday 18:00 ET without any further action",
+   "my_report_said_otherwise": "the 5ZZZ-AC report was written before that restart and said the job was not live. It was true when written and is now out of date - the same lesson as 5ZZZ-R: a report that records a pid describes something that moves",
+   "restart_still_not_performed_by_me": true
+  }
  },
  "safety": {
   "orders_possible": false,

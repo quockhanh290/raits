@@ -33,7 +33,7 @@ from monitor.backend.report_reader import read_report
 from monitor.backend.runner_state_reader import read_runner_state
 from monitor.backend.runner_event_reader import read_runner_events
 from monitor.backend.runner_positions_reader import read_runner_positions
-from monitor.backend.schedule_status import get_schedule_status
+from monitor.backend.schedule_status import get_schedule_status, resolve_track1_only
 from monitor.backend.session_event_reader import read_session_events
 from monitor.backend.job_journal_reader import read_job_journal
 from monitor.backend.open_issue_reader import read_open_issues
@@ -42,6 +42,82 @@ from monitor.backend.execution_quality_reader import read_execution_quality
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# Stage 5ZZX — console hygiene, IN THIS PROCESS ONLY
+#
+# Measured on the retained backend log before changing anything, 358,361 lines:
+#
+#     GET ... 200          337,972   94.3%   dashboard polling
+#     GET ... 3xx            8,860
+#     other                  8,036
+#     WARNING / ERROR        2,806
+#     "Adding job tentatively"  685           six distinct days, in bursts
+#     "slots registered"           2
+#
+# So the flood is the access log, and it is not evidence of anything: a page polling every
+# eight seconds writes ten thousand successful GETs a day whether the system is healthy or on
+# fire. The APScheduler lines are not a flood at all — they arrive in bursts, and the burst
+# dated today at 07:17:13 lands four minutes BEFORE this process logged "Starting Flask" at
+# 07:21:12. They are `ops.py` constructing a scheduler object to enumerate it, with its console
+# output going to the same file, not this backend serving a request.
+#
+# What is kept is everything that could ever be the first sign of a problem: startup lines,
+# every WARNING and ERROR, tracebacks, and any request that did not succeed.
+# ══════════════════════════════════════════════════════════════════════════════════════════
+
+class _QuietSuccessfulRequests(logging.Filter):
+    """Drop access-log lines for requests that succeeded; keep everything else.
+
+    The status code is parsed out of the formatted message rather than read from a field,
+    because that is all Werkzeug's access logger provides. Anything that does not parse is
+    KEPT — an unrecognised line is not a line to throw away, and a filter that swallowed what
+    it could not read would hide exactly the malformed cases worth seeing.
+    """
+
+    _OK = ("200", "204", "301", "302", "304")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.levelno >= logging.WARNING:
+            return True
+        message = record.getMessage()
+        if '" ' not in message:
+            return True
+        status = message.rsplit('" ', 1)[-1].strip().split(" ")[0]
+        return status not in self._OK
+
+
+class _NoTentativeJobAdds(logging.Filter):
+    """Drop APScheduler's per-job INFO chatter from building a scheduler for inspection.
+
+    The mirror deliberately builds a real scheduler object and enumerates it rather than
+    keeping a hand-written slot list — the comment on `scheduler_slot_ids` records why, and a
+    second list is how the two drift apart. Nothing is started: `sched.start()` appears exactly
+    once in the tree, in the scheduler's own main. So these lines describe an object being
+    inspected, and a reader cannot tell them from a scheduler doing work.
+
+    WARNING and above still pass, which is the half that matters: a job that cannot be added at
+    all is not an INFO line.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.levelno >= logging.WARNING:
+            return True
+        return "Adding job tentatively" not in record.getMessage()
+
+
+def _quiet_backend_console() -> None:
+    """Applied to THIS process. The scheduler's own log is untouched — it is a different
+    process with its own handlers, and its INFO lines are the record of work actually done."""
+    logging.getLogger("werkzeug").addFilter(_QuietSuccessfulRequests())
+    logging.getLogger("apscheduler").addFilter(_NoTentativeJobAdds())
+    # `apscheduler.scheduler` is where the line is emitted; a filter on the parent is not
+    # consulted for a record made by a child logger, so it is attached at both levels.
+    logging.getLogger("apscheduler.scheduler").addFilter(_NoTentativeJobAdds())
+
+
+_quiet_backend_console()
 
 app = Flask(__name__)
 ROOT = Path(__file__).resolve().parents[2]
@@ -68,6 +144,14 @@ def dashboard_home():
 @app.get("/realtime")
 def dashboard_realtime():
     return send_from_directory(DASH_ROOT / "realtime", "index.html")
+
+
+@app.get("/realtime-next")
+def dashboard_realtime_next():
+    # Bản nháp thiết kế lại của /realtime. Tồn tại để sửa giao diện mà không đụng
+    # vào route đang dùng thật. Nó nạp CHUNG realtime.css và realtime.js, chỉ thêm
+    # một lớp CSS đè riêng — nên không có bản sao nào của nền để trôi khỏi bản gốc.
+    return send_from_directory(DASH_ROOT / "realtime-next", "index.html")
 
 
 @app.get("/analytics")
@@ -186,7 +270,15 @@ def api_v1_broker():
             "equity": c["account"]["equity"],
             "unrealized_pnl": c["account"]["unrealized_pnl"],
             "positions": c["positions"],
+            # Whether each list is an ANSWER or an artefact of a swallowed exception. The
+            # collector builds both inside try/except blocks that leave the list empty, so
+            # without these an empty list means either "holds nothing" or "the call raised".
+            # B1 reads these and treats a missing flag as UNKNOWN, never as flat.
+            "positions_ok": c.get("positions_ok", False),
+            "positions_error": c.get("positions_error"),
             "orders": c["orders"],
+            "orders_ok": c.get("orders_ok", False),
+            "orders_error": c.get("orders_error"),
             "contract_specs": c.get("contract_specs", {}),
         },
     })
@@ -208,22 +300,53 @@ def api_v1_runner_state():
                             "filled": annotate_open_positions(state.get("payload"),
                                                               entry_times["entries"])}
     observed = _parse_iso(state.get("observed_at"))
-    schedule = get_schedule_status(ROOT, observed_at=observed)
+    # Stage 5ZZW. The live dashboard asks the SCHEDULER which mode it is in, rather than
+    # inferring it from how this backend process happened to be started. A backend launched by
+    # hand, or one that outlived a mode change, used to answer `legacy` for a machine running
+    # track1-only — and then reported a legacy snapshot's staleness as the route's health.
+    schedule = get_schedule_status(ROOT, observed_at=observed,
+                                   track1_only=resolve_track1_only())
     state["freshness"] = schedule["freshness"]
     state["expected_next_at"] = schedule["expected_next_at"]
     return jsonify(state)
 
 
+@app.get("/api/v1/track1-market-view")
+def api_v1_track1_market_view():
+    # Stage 5ZZL. Its OWN endpoint rather than a block on /track1-runtime: this one slices
+    # instrument stores, and the runtime endpoint is polled on a short interval by a page
+    # that needs it to stay cheap. Read-only, offline, and it never opens a connection --
+    # bars come from the persisted store, never from the broker.
+    from monitor.backend.track1_market_view import build, regime
+    return jsonify({"market_view": build(ROOT), "regime": regime(ROOT)})
+
+
 @app.get("/api/v1/runner-positions")
 def api_v1_runner_positions():
-    return jsonify(read_runner_positions(RUNNER_POSITIONS_PATH))
+    # Stage 5P: labelled at the SOURCE. This is the LEGACY route's book — during a Track 1
+    # shadow period it is the draining legacy state, and a panel that presented it as "the
+    # system's positions" would be presenting the wrong route. Track 1's own state is served
+    # by /api/v1/track1-runtime, which reads only Track 1 paths.
+    payload = read_runner_positions(RUNNER_POSITIONS_PATH)
+    payload["route"] = "legacy"
+    payload["route_note"] = ("legacy book (draining during Track 1 shadow); Track 1 state "
+                             "is at /api/v1/track1-runtime")
+    return jsonify(payload)
+
+
+@app.get("/api/v1/track1-runtime")
+def api_v1_track1_runtime():
+    # Additive, read-only, Track 1 paths only — see track1_runtime_reader's module docstring.
+    from monitor.backend.track1_runtime_reader import read_track1_runtime
+    return jsonify(read_track1_runtime(ROOT))
 
 
 @app.get("/api/v1/schedule-status")
 def api_v1_schedule_status():
     state = read_runner_state(LIVE_STATE_PATH)
     observed = _parse_iso(state.get("observed_at"))
-    return jsonify(get_schedule_status(ROOT, observed_at=observed))
+    return jsonify(get_schedule_status(ROOT, observed_at=observed,
+                                       track1_only=resolve_track1_only()))
 
 
 @app.get("/api/v1/session-events/<day>")

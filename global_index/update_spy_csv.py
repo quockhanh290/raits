@@ -35,6 +35,8 @@ import logging
 import os
 import shutil
 import sys
+from dataclasses import dataclass
+from typing import Any
 from datetime import date
 from pathlib import Path
 
@@ -68,69 +70,35 @@ def save_snapshot(csv_path: Path, snapshot_dir: Path = SNAPSHOT_DIR) -> Path | N
 
 
 def verify_regime_labels(snap_path: Path, new_csv: Path,
-                          check_end: str = "2024-12-31") -> int:
-    """Compare HMM regime labels for 2018-2024 between snapshot and updated CSV.
-    Returns count of dates where label changed (should be 0).
+                         check_end: str = "2024-12-31"):
+    """Compare HMM regime labels between snapshot and updated CSV. Returns a `VerifyResult`.
 
-    Why labels, not just prices:
-        Labels = HMM.decode(prices). Prices bất biến + HMM code bất biến → labels bất biến.
-        But HMM refit (code change / different seed / different fit_end) with SAME prices
-        can give DIFFERENT labels. Price verify alone does NOT catch HMM drift.
-        This function verifies labels DIRECTLY.
+    Stage 5ZL. This used to return a COUNT, and returned 0 from four places that had verified
+    nothing — no engine, unreadable inputs, a raising labeller, and no overlapping dates. Zero
+    is also what a clean run returns, so "I could not check" and "I checked and it was fine"
+    were the same number. The logic now lives in `regime_verify`, which answers PASS, DRIFT or
+    UNKNOWN and carries a code saying which of the seven conditions it met.
 
-    Logs WARNING if any label changed, with date list (up to 10 examples).
-    Runs label_regimes twice (old spy + new spy) with production HMM params.
+    The return type changed deliberately rather than by adding a second function. A caller
+    that keeps treating the answer as a count now fails loudly instead of silently reading
+    `UNKNOWN` as zero drift, which is the exact mistake this stage exists to remove.
     """
-    try:
-        from futures._validated_core import benchmark_daily, label_regimes
-    except ImportError:
-        log.warning("verify_regime_labels: cannot import futures._validated_core — skipping")
-        return 0
+    from global_index import regime_verify as rv
 
-    try:
-        old_bench = benchmark_daily(str(snap_path))
-        new_bench = benchmark_daily(str(new_csv))
-    except Exception as exc:
-        log.warning("verify_regime_labels: could not load CSVs — %s", exc)
-        return 0
-
-    hmm_train_end = "2018-01-01"
-    n_components  = 3
-    hmm_fit_end   = check_end  # production: 2024-12-31
-
-    try:
-        old_labels = label_regimes(old_bench, hmm_train_end, n_components, hmm_fit_end)
-        new_labels = label_regimes(new_bench, hmm_train_end, n_components, hmm_fit_end)
-    except Exception as exc:
-        log.warning("verify_regime_labels: label_regimes failed — %s", exc)
-        return 0
-
-    import pandas as _pd
-    cutoff = _pd.Timestamp(check_end)
-    old_labels = _pd.Series(old_labels)
-    new_labels = _pd.Series(new_labels)
-    common = old_labels.index.intersection(new_labels.index)
-    common = common[common <= cutoff]
-
-    diff_idx = [d for d in common if old_labels.get(d) != new_labels.get(d)]
-    n_diff = len(diff_idx)
-
-    if n_diff:
-        log.warning(
-            "LABEL DRIFT: %d date(s) with changed regime label (2018→%s): %s%s",
-            n_diff, check_end,
-            [str(d.date()) for d in diff_idx[:10]],
-            " ..." if n_diff > 10 else "",
-        )
-        log.warning(
-            "  Possible causes: (1) Polygon revised SPY prices, "
-            "(2) HMM code/params changed, (3) refit with different seed. "
-            "Compare snapshot vs updated CSV and check HMM fit_end."
-        )
+    result = rv.verify_labels(snap_path, new_csv, check_end=check_end)
+    if result.status == rv.PASS:
+        log.info("Regime labels verified: %s", result.detail)
+    elif result.status == rv.DRIFT:
+        log.error("LABEL DRIFT: %s", result.detail)
+        log.error("  The engine's view of history moved. Compare the snapshot against the "
+                  "updated CSV and check the HMM fit end before anything trades on it.")
     else:
-        log.info("Regime labels unchanged (%d dates verified through %s) — HMM stable",
-                 len(common), check_end)
-    return n_diff
+        # ERROR, not WARNING. The scheduler keeps only CRITICAL and ERROR from a child that
+        # exited 0, so a WARNING here never reaches the job journal — which is how a
+        # verification that could not run stayed invisible for as long as it did.
+        log.error("REGIME VERIFICATION UNKNOWN (%s): %s", result.code, result.detail)
+        log.error("  This is NOT 'no drift'. Nothing was proved about the labels.")
+    return result
 
 
 def verify_historical_prices(snap_path: Path, new_csv: Path, overlap_start: date) -> int:
@@ -218,10 +186,35 @@ def fetch_spy_close(api_key: str, from_date: date, to_date: date) -> pd.DataFram
 OVERLAP_DAYS = 30   # re-fetch last N calendar days and replace them (see docstring)
 
 
-def update_spy_csv(csv_path: Path, api_key: str,
-                   snapshot_dir: Path = SNAPSHOT_DIR) -> int:
+@dataclass(frozen=True)
+class UpdateOutcome:
+    """What one update did, and what it could say about the labels afterwards.
+
+    Stage 5ZL. This used to be a bare row count, so the verification result had nowhere to go
+    and was dropped on the floor at the call site. `rows_added` keeps the old meaning; callers
+    that only want the count read that field.
     """
-    Extend spy_daily.csv with new rows.  Returns number of NEW rows added.
+    rows_added: int
+    verify: Any = None
+
+    def __int__(self) -> int:
+        return int(self.rows_added)
+
+    def __eq__(self, other) -> bool:
+        # So `outcome == 0` still reads the way every existing caller and test expects.
+        if isinstance(other, int):
+            return self.rows_added == other
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash((self.rows_added, id(self.verify)))
+
+
+def update_spy_csv(csv_path: Path, api_key: str,
+                   snapshot_dir: Path = SNAPSHOT_DIR,
+                   verify_root: str | None = None) -> "UpdateOutcome":
+    """
+    Extend spy_daily.csv with new rows.  Returns an `UpdateOutcome`.
     Raises NotImplementedError until fetch_spy_close() is wired.
 
     Adjustment consistency strategy (IMPORTANT — do not change to pure-append):
@@ -263,7 +256,14 @@ def update_spy_csv(csv_path: Path, api_key: str,
     today = date.today()
     if last_date >= today:
         log.info("spy_daily.csv up-to-date (last=%s)", last_date)
-        return 0
+        # Stage 5ZL: no fetch, no snapshot, no comparison. Returning a bare 0 here used to be
+        # indistinguishable from a run that verified cleanly.
+        from global_index import regime_verify as _rv
+        return UpdateOutcome(rows_added=0, verify=_rv.VerifyResult(
+            status=_rv.UNKNOWN, code=_rv.NO_SNAPSHOT,
+            detail=f"the series already ends at {last_date}, so nothing was fetched and no "
+                   f"snapshot comparison was made",
+            checked_at=_rv._now(), inputs={"updated": str(csv_path)}))
 
     # ── Snapshot BEFORE any mutation ──────────────────────────────────────────
     snap_path = save_snapshot(csv_path, snapshot_dir)
@@ -278,7 +278,12 @@ def update_spy_csv(csv_path: Path, api_key: str,
     fetched = fetch_spy_close(api_key, fetch_from, today)
     if fetched.empty:
         log.warning("fetch_spy_close returned empty — no update applied")
-        return 0
+        from global_index import regime_verify as _rv
+        return UpdateOutcome(rows_added=0, verify=_rv.VerifyResult(
+            status=_rv.UNKNOWN, code=_rv.UNREADABLE,
+            detail="the fetch returned no rows, so the updated series was never written and "
+                   "no comparison was made",
+            checked_at=_rv._now(), inputs={"updated": str(csv_path)}))
 
     fetched["date"] = pd.to_datetime(fetched["date"])
 
@@ -295,9 +300,25 @@ def update_spy_csv(csv_path: Path, api_key: str,
     combined[["date", "close"]].to_csv(tmp, index=False)
     os.replace(str(tmp), str(csv_path))
 
+    # Stage 5ZL. The result is KEPT, recorded and returned. It used to be discarded on this
+    # very line, so a drift logged a warning nobody reads and the process exited 0.
+    from global_index import regime_verify as _rv
     if snap_path:
         verify_historical_prices(snap_path, csv_path, fetch_from)
-        verify_regime_labels(snap_path, csv_path)   # verify labels directly (prices→labels insufficient)
+        verify_result = verify_regime_labels(snap_path, csv_path)
+    else:
+        verify_result = _rv.VerifyResult(
+            status=_rv.UNKNOWN, code=_rv.NO_SNAPSHOT,
+            detail="snapshots are disabled for this run, so no comparison was possible",
+            checked_at=_rv._now(), inputs={"updated": str(csv_path)})
+    try:
+        _rv.record(verify_result, root=verify_root or ".", source="update_spy_csv")
+    except OSError as _exc:
+        # Recording is evidence, not control flow: a series that was fetched correctly must
+        # not be thrown away because a status file could not be written. But say so loudly —
+        # an unrecorded verification reads as no verification to everything downstream.
+        log.error("could not record the regime verification (%s) — readiness will read this "
+                  "as UNKNOWN, which is the safe direction but not the true one", _exc)
 
     n_after = len(combined)
     n_new = max(0, n_after - n_before)
@@ -305,10 +326,55 @@ def update_spy_csv(csv_path: Path, api_key: str,
         "Updated %s: %d new row(s), %d total (last=%s)",
         csv_path, n_new, n_after, combined["date"].iloc[-1],
     )
-    return n_new
+    return UpdateOutcome(rows_added=n_new, verify=verify_result)
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
+
+
+#: What the daily series can say about a day somebody needs. Stage 5ZZB.
+#:
+#: Four states, because the caller has to tell them apart and three of them used to look the
+#: same from outside. `--verify-strict` checks the regime LABELS and reports, in its own words,
+#: "1761 label(s) compared through 2024-12-31" — it is a drift check over settled history and
+#: says nothing whatever about whether last night's close arrived. So a run could append zero
+#: rows, verify perfectly, exit 0, and leave the series a day short of what the next morning
+#: asks for. That is precisely what happened on 2026-08-26.
+COVERAGE_OK = "covers_required_day"
+COVERAGE_SHORT = "provider_did_not_return_required_day"
+COVERAGE_UNREADABLE = "coverage_unknown"
+COVERAGE_NOT_ASKED = "coverage_not_requested"
+
+#: Exit code for "the run was clean and the series is still short". Deliberately NOT 1: 1 means
+#: the labels moved or could not be verified, which is a different problem with a different
+#: owner, and collapsing them would leave an operator unable to tell a data-supply gap from a
+#: history that changed under them.
+EXIT_COVERAGE_SHORT = 2
+
+
+def coverage_status(csv_path, required_through) -> dict:
+    """Does the series reach `required_through`? Read-only, and never guesses.
+
+    An unreadable file is its own answer. "I could not tell" and "it is short" lead to
+    different actions — one is a retry, the other is a question for whoever owns the feed —
+    and a check that returns the same thing for both is how a gap gets retried forever.
+    """
+    import datetime as _dt
+
+    want = (required_through if isinstance(required_through, _dt.date)
+            else _dt.date.fromisoformat(str(required_through)[:10]))
+    try:
+        df = pd.read_csv(csv_path)
+        last = pd.to_datetime(df["date"]).max().date()
+    except Exception as exc:                                          # noqa: BLE001
+        return {"state": COVERAGE_UNREADABLE, "last": None, "required": want.isoformat(),
+                "detail": f"the series could not be read ({type(exc).__name__}: {exc})"}
+    if last >= want:
+        return {"state": COVERAGE_OK, "last": last.isoformat(), "required": want.isoformat(),
+                "detail": f"the series covers {want}"}
+    return {"state": COVERAGE_SHORT, "last": last.isoformat(), "required": want.isoformat(),
+            "detail": (f"the series ends on {last} and {want} was asked for. The run itself "
+                       f"was clean; the provider did not have that day when it was asked")}
 
 
 def main(argv=None):
@@ -328,6 +394,48 @@ def main(argv=None):
         "--snapshot-dir", default=str(SNAPSHOT_DIR),
         help=f"Directory for pre-update snapshots (default: {SNAPSHOT_DIR})",
     )
+    # Stage 5ZL. Off by default, and the default is the DOCUMENTED reason rather than an
+    # oversight: the 13:45 pre-flight gates the whole trading day, and making a verification
+    # result skip every slot is a far larger decision than this stage is allowed to take —
+    # the brief is explicit that UNKNOWN must not block shadow execution. The 16:20 post-close
+    # refresh gates nothing, so it runs strict and its failure is visible on its own.
+    parser.add_argument(
+        "--verify-strict", action="store_true",
+        help="exit non-zero when the regime verification is DRIFT or UNKNOWN. Off by "
+             "default: the pre-flight caller must not skip a trading day over it.",
+    )
+    parser.add_argument(
+        "--verify-root", default=None,
+        help="where to record the verification status (default: the working directory)",
+    )
+    # Stage 5ZZB. Coverage is a SEPARATE question from drift and now has its own answer and
+    # its own exit code. The caller says which day it needs; this says whether it is there.
+    # Stage 5ZZC. What makes a RETRY possible at all.
+    #
+    # Measured before building the ladder: a retry that finds nothing to do — the SUCCESSFUL
+    # case, the one that happens on every good day — exits 1. The series already ends at
+    # today, so the update returns early with `UNKNOWN (no_snapshot)`: nothing was fetched, so
+    # nothing could be compared, which is an honest verification result and not a PASS. Strict
+    # mode then fails on it.
+    #
+    # Two retries a day, each reporting FAILED on every day that went well, is an alarm that
+    # fires when nothing is wrong — and this project's own record says what happens to those:
+    # people learn to ignore them, and then the one real firing goes unread too.
+    #
+    # So a retry asks first and works second. If the day it was sent for is already there, it
+    # says so and stops: no fetch, no API call, no verification, exit 0. There is nothing to
+    # verify about a file nobody is going to touch.
+    parser.add_argument(
+        "--skip-if-covered", action="store_true",
+        help="exit 0 immediately when --require-through is already satisfied, before any "
+             "fetch. For retries: a retry with nothing to do is a success, not a failure.",
+    )
+    parser.add_argument(
+        "--require-through", default=None, metavar="YYYY-MM-DD",
+        help="the last daily close the caller needs. When the series is still short of it "
+             f"after the update, exit {EXIT_COVERAGE_SHORT} — distinct from the drift "
+             "failure, because a data-supply gap and a moved history are different problems.",
+    )
     args = parser.parse_args(argv)
 
     api_key = args.api_key or os.environ.get("POLYGON_API_KEY", "")
@@ -339,16 +447,65 @@ def main(argv=None):
         )
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+    # Before anything else, and before the API key is used. A retry that is not needed must
+    # cost nothing and must not be able to fail.
+    if args.skip_if_covered and args.require_through:
+        pre = coverage_status(Path(args.csv), args.require_through)
+        if pre["state"] == COVERAGE_OK:
+            print(f"coverage: {pre['state']} — {pre['detail']}")
+            print("nothing to do: the day this run was sent for is already in the series.")
+            return 0
+
     try:
-        n = update_spy_csv(Path(args.csv), api_key, snapshot_dir=Path(args.snapshot_dir))
+        outcome = update_spy_csv(Path(args.csv), api_key,
+                                 snapshot_dir=Path(args.snapshot_dir),
+                                 verify_root=args.verify_root)
     except NotImplementedError as exc:
         sys.exit(f"fetch_spy_close not yet wired: {exc}")
 
+    n = int(outcome)
     if n == 0:
         print("spy_daily.csv: already up-to-date")
     else:
         print(f"spy_daily.csv: appended {n} new row(s)")
 
+    from global_index import regime_verify as rv
+    v = getattr(outcome, "verify", None)
+    if v is not None:
+        print(f"regime verification: {v.one_line()}")
+        if args.verify_strict and v.status != rv.PASS:
+            # The two are separated on purpose. A drift is a finding about the data; an unknown
+            # is the absence of a finding. Collapsing them into one exit code would be the same
+            # mistake this stage removed from the return value.
+            if v.status == rv.DRIFT:
+                print("FAILING: the regime labels moved. Nothing should trade on them until "
+                      "the cause is separated from the other two.")
+            else:
+                print("FAILING: the regime labels could not be verified. This is not "
+                      "'no drift' — nothing was proved.")
+            return 1
+
+    # Coverage last, and separately. It is reported on EVERY run, asked for or not, so a reader
+    # of the output never has to work out from the row count whether the day they need arrived.
+    cov = (coverage_status(Path(args.csv), args.require_through)
+           if args.require_through else
+           {"state": COVERAGE_NOT_ASKED, "last": None, "required": None,
+            "detail": "no --require-through was given, so no day was checked for"})
+    print(f"coverage: {cov['state']} — {cov['detail']}")
+    if cov["state"] == COVERAGE_SHORT:
+        print("FAILING: the run was clean and the series is still short. This is not a retry "
+              "for the same minute — the day being asked for did not exist when it was asked "
+              "for, and it may exist later.")
+        return EXIT_COVERAGE_SHORT
+    if cov["state"] == COVERAGE_UNREADABLE:
+        print("FAILING: the series could not be read, so coverage is unknown. Unknown is not "
+              "covered.")
+        return EXIT_COVERAGE_SHORT
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    # sys.exit(main()), not a bare main(): a bare call throws the return value away and the
+    # process exits 0, which is precisely how a failed verification used to read as success.
+    sys.exit(main() or 0)
