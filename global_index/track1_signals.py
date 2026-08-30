@@ -535,6 +535,41 @@ def signals_dir(root: str | Path = ".") -> Path:
     return Path(root) / SIGNALS_DIR
 
 
+#: Stage 5ZZZ-AA. A test may opt IN to writing the production journal, for a deliberate
+#: integration check. Nothing else may.
+ALLOW_TEST_WRITE_ENV = "TRACK1_ALLOW_RUNTIME_WRITE_IN_TEST"
+
+
+def _refuse_production_write_under_pytest(target: Path) -> None:
+    """Refuse to append to the PRODUCTION signals journal from inside a test run.
+
+    Stage 5ZZZ-Z ran the whole scratch suite without isolating output, and a test exercising
+    the live Swing path appended two rows to the real journal on a Saturday. They had to be
+    quarantined rather than deleted, because runtime evidence is append-only.
+
+    The refusal is deliberately narrow. It fires only when BOTH are true: pytest is running,
+    and the destination is the real `global_index/track1_runtime/` tree. A test writing under
+    `tmp_path` - which is what a test should do - never sees this, and neither does the
+    scheduler, which does not run under pytest. A test that genuinely means to write the real
+    journal sets the opt-in env var and says so.
+    """
+    if not os.environ.get("PYTEST_CURRENT_TEST"):
+        return                                   # not a test run: the scheduler's normal path
+    if os.environ.get(ALLOW_TEST_WRITE_ENV):
+        return                                   # deliberate, opted-in integration write
+    try:
+        resolved = target.resolve()
+    except OSError:                                                # noqa: BLE001
+        resolved = target
+    parts = [p.lower() for p in resolved.parts]
+    if "track1_runtime" not in parts:
+        return                                   # tmp_path or any other root: allowed
+    raise SignalJournalRefused(
+        f"refusing to write production runtime evidence from a test: {resolved}. "
+        f"Point the test at tmp_path, or set {ALLOW_TEST_WRITE_ENV}=1 if the write is "
+        f"deliberate. See Stage 5ZZZ-AA - two rows written this way had to be quarantined.")
+
+
 def journal_path(day, root: str | Path = ".") -> Path:
     d = str(day).replace("-", "")
     if len(d) != 8 or not d.isdigit():
@@ -563,6 +598,7 @@ def append(row: SignalRow, *, root: str | Path = ".", day=None) -> "Path | None"
     if not isinstance(row, SignalRow):
         raise SignalJournalRefused(f"expected a SignalRow, got {type(row).__name__}")
     target = journal_path(day or row.session_date, root)
+    _refuse_production_write_under_pytest(target)
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         line = json.dumps(row.as_row(), ensure_ascii=False, default=str) + "\n"

@@ -23,6 +23,8 @@ import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from global_index import track1_evidence_taint as _taint
+
 SCHEMA = "track1_replay_parity/1"
 ROUTE = "track1_candidate"
 
@@ -102,9 +104,14 @@ def _read_jsonl(p: Path) -> list:
     for line in p.read_text(encoding="utf-8").splitlines():
         if line.strip():
             try:
-                out.append(json.loads(line))
+                row = json.loads(line)
             except Exception:                                      # noqa: BLE001
                 continue
+            # Stage 5ZZZ-AA. The raw line is the identity a taint record matches on, so it has
+            # to survive parsing. Nothing is filtered here - that decision belongs to the
+            # caller, which must be able to SHOW a tainted row rather than silently drop it.
+            row["_raw_line"] = line
+            out.append(row)
     return out
 
 
@@ -126,12 +133,26 @@ def live_rows(root: str | Path = ".", day: str | None = None) -> list:
         for r in _read_jsonl(f):
             r["_file"] = f.name
             r["_file_mtime"] = stamp
+            r["_tainted"] = _taint.is_tainted(r.get("_raw_line", ""), root)
             rows.append(r)
     return rows
 
 
+def tainted_rows(root: str | Path = ".") -> list:
+    """Rows a taint record says are not live slot evidence - surfaced, never scored."""
+    return [r for r in live_rows(root) if r.get("_tainted")]
+
+
 def newest_slot(root: str | Path = ".", sleeve: str = "") -> dict | None:
-    rows = [r for r in live_rows(root) if r.get("sleeve") == sleeve]
+    """The newest live slot for a sleeve, EXCLUDING tainted rows.
+
+    Stage 5ZZZ-AA. A test run once wrote two Swing rows into the production signals file on a
+    Saturday, and this function picked the newest of them, which made parity report FAIL for a
+    slot that never ran. A tainted row is not evidence: it must not be selected here, and it
+    must not be scored PASS or FAIL anywhere. It is reported separately by `tainted_rows`.
+    """
+    rows = [r for r in live_rows(root)
+            if r.get("sleeve") == sleeve and not r.get("_tainted")]
     if not rows:
         return None
     return sorted(rows, key=lambda r: (str(r.get("session_date")),
@@ -318,11 +339,25 @@ def parity(root: str | Path = ".") -> dict:
     cutoff = cut["cutoff"]
     diag_dir = Path(root).joinpath(*DIAG_DIR)
 
+    _tainted = tainted_rows(root)
     out = {"schema": SCHEMA, "route": ROUTE, "fix_cutoff": cut,
            "runtime_diagnostics_store_present": diag_dir.exists(),
            "counts_toward_paper_shadow_evidence": False,
            "note": ("Read-only. This module releases no gate and marks no evidence satisfied. "
                     "UNKNOWN is never reported as PASS."),
+           # Stage 5ZZZ-AA. Shown, not hidden: a row excluded from evidence still has to be
+           # visible, or the exclusion is indistinguishable from the row never existing.
+           "tainted_test_evidence": {
+               "verdict": _taint.TAINTED,
+               "rows": len(_tainted),
+               "excluded_from_parity_and_evidence": True,
+               "never_scored_pass_or_fail": True,
+               "detail": [{"file": r.get("_file"), "sleeve": r.get("sleeve"),
+                           "slot_id": r.get("slot_id"),
+                           "session_date": r.get("session_date"),
+                           "taint_id": (_taint.taint_for(r.get("_raw_line", ""), root) or {})
+                           .get("taint_id", "")} for r in _tainted],
+           },
            "sleeves": {}}
 
     for sleeve in SLEEVES:
