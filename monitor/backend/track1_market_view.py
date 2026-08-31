@@ -1130,6 +1130,44 @@ def _observe_window_only(frame, labels, inst, day, now, params, context, obs) ->
                            apply_context_filter=bool(context), observer=obs)
 
 
+def _apply_stress_block(out: dict, block: dict) -> dict:
+    """One recorded Stress block, mapped into the fields the panel already reads.
+
+    Stage 5ZZZ-BB. The SAME field names the reconstruction fills, so the page needs no second
+    reader and cannot end up describing the two sources differently. Nothing is recomputed:
+    every value, threshold, comparator and verdict is copied from what the detector reported
+    when the slot ran.
+
+    Rows and gates are built from ONE list in ONE order by `stress_block`, so they pair by
+    POSITION. Pairing by label would look tidier and would be wrong the day two conditions
+    share a display string.
+    """
+    gates = block.get("gates") or []
+    rows = block.get("rows") or []
+    rules = []
+    for i, g in enumerate(gates):
+        r = rows[i] if i < len(rows) else {}
+        # A row whose verdict is None is a condition the detector did not compare -- a
+        # nullable threshold left unset. It is reported, and it does not vote.
+        applicable = r.get("passed") is not None
+        rules.append({
+            "id": g.get("gate"),
+            "label": r.get("label") or g.get("gate"),
+            "value": g.get("value"),
+            "threshold": g.get("threshold"),
+            "comparator": r.get("comparator") or "",
+            "unit": r.get("unit") or "",
+            "passed": g.get("passed"),
+            "source": "sleeve_detector" if applicable else NOT_APPLICABLE,
+        })
+    out["rules"] = rules
+    out["first_failed"] = (block.get("nearest_failed_condition") or {}).get("gate")
+    out["diagnostics_source"] = block.get("diagnostics_source")
+    out["detail"] = block.get("summary") or ""
+    out["status"] = "set_up" if block.get("setup") else (block.get("reason") or "unknown")
+    return out
+
+
 def _strategy(root: Path, sleeve: str, day: str, spec: dict, *, now=None) -> dict:
     """The sleeve's own rule values for this session, from the detector.
 
@@ -1227,6 +1265,18 @@ def _strategy(root: Path, sleeve: str, day: str, spec: dict, *, now=None) -> dic
                          "rule values to publish")
         out["status"] = NOT_COMPUTED_UNTIL_ENTRY
         return out
+    # Stage 5ZZZ-BB. The slot's OWN account first, the replay only when there is none.
+    #
+    # The reconstruction below reads the parquet stores and judges the basket again. That is a
+    # fair answer for a session nobody recorded, and the wrong one for a session that WAS
+    # recorded: the store is appended after a session closes, so during a live session its
+    # newest bars are the previous day's. Same asymmetry the Normal-R4 branch settled -- old
+    # numbers under a card labelled with today's session are worse than none.
+    recorded = _sd.recorded_for(root, day, sleeve)
+    if recorded and (recorded.get("rows") or []):
+        blk = _apply_stress_block(dict(out), recorded)
+        blk["slot_series"] = _slot_series(root, day, sleeve)
+        return blk
     try:
         import pandas as pd
         from global_index import track1_stress_mnq as SM

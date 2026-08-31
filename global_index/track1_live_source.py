@@ -109,6 +109,21 @@ CA_DECIDE_PHASE = "decide"
 CA_OBSERVE_PHASE = "observe"
 
 
+def _new_stress_observer():
+    """A Stress observer, or None if the diagnostics module cannot be imported.
+
+    Same fallback as its Normal-R4 neighbour and for the same reason: this runs on the
+    candidate path, and an import error in an observability module must not stop a sleeve
+    finding its entries.
+    """
+    try:
+        from global_index import track1_strategy_diagnostics as SD
+
+        return SD.StressObserver()
+    except Exception:                                              # noqa: BLE001
+        return None
+
+
 def _new_observer():
     """A detector observer, or a no-op if the diagnostics module cannot be imported.
 
@@ -914,6 +929,24 @@ class LiveTrack1Source:
         except Exception:                                          # noqa: BLE001
             pass
 
+    def _stash_stress_diagnostics(self, observer, setups) -> None:
+        """Keep the basket state for the slot to persist, in the sleeve's own block shape.
+
+        Stage 5ZZZ-BB. Wrapped end to end like its neighbours: a diagnostics failure must not
+        be the reason a sleeve loses a candidate, and this runs on the path that finds them.
+        """
+        try:
+            if observer is None or not getattr(observer, "state", None):
+                return
+            from global_index import track1_strategy_diagnostics as SD
+
+            block = SD.stress_block(sleeve="roska4_stress", slot_id="", observer=observer,
+                                    setups=setups, source=SD.RECORDED,
+                                    data_identity="basket:" + ",".join(SM.BREADTH_BASKET))
+            self.last_diagnostics.setdefault("roska4_stress", []).append(block)
+        except Exception:                                          # noqa: BLE001
+            pass
+
     def _stash_diagnostics(self, sleeve: str, inst: str, params, observer, setup,
                            labels=None) -> None:
         """Keep the detector's own account of this instrument, for the slot to persist.
@@ -1242,16 +1275,19 @@ class LiveTrack1Source:
                     f"counting a smaller basket lowers the bar the rule was measured at")
 
         params = self.stress_params or SM.StressParams()
-        setups = SM.detect_entry_for_slot(frames, day, now=now, params=params)
-        # Stage 5ZZZ-AT, NOT DONE HERE. Stress answers all four entry conditions in full --
-        # `entry_conditions` is `all()` over the table `entry_checks` walks -- and the slot
-        # records none of it, so its lanes read "value not published" for rules the detector
-        # answered. Wiring it needs an observer seam in `track1_stress_mnq` the way Calm got
-        # one, because the features are computed inside `detect_entry_for_slot` and reaching
-        # them from here would mean recomputing a basket state the slot already has. A first
-        # attempt called `basket_state` with the wrong arguments; recomputing it correctly
-        # would still be a second evaluation of a rule that decides, which is the thing this
-        # whole stage refuses to do.
+        _obs = _new_stress_observer()
+        setups = SM.detect_entry_for_slot(frames, day, now=now, params=params,
+                                          observer=_obs)
+        self._stash_stress_diagnostics(_obs, setups)
+        # Stage 5ZZZ-BB. Done now, through the seam rather than around it. Stress answers all
+        # four entry conditions in full -- `entry_conditions` is `all()` over the table
+        # `entry_checks` walks -- and until this stage the slot recorded none of it, so its
+        # lanes read "value not published" for rules the detector had answered.
+        #
+        # The route NOT taken, twice: calling `basket_state` from here. A first attempt did it
+        # with the wrong arguments; doing it correctly would still be a SECOND evaluation of a
+        # rule that decides, and the day the two copies disagreed nobody could say which one
+        # was the slot. The seam hands out the state the detector already computed.
         out = []
         for st in setups:
             cost = self._cost_for(st.inst)

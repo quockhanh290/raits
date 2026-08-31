@@ -378,7 +378,7 @@ def basket_state(day, bars: Mapping, prev_close: Mapping,
 
 def detect_entry_for_slot(frames: Mapping[str, pd.DataFrame], day, *, now=None,
                           params: StressParams | None = None,
-                          bars=None, prev_close=None) -> list:
+                          bars=None, prev_close=None, observer=None) -> list:
     """Every Stress setup for `day`, judged with only what exists by `now`.
 
     `now` bounds the entry scan: a slot firing at 11:00 may see a break that happened at 10:40
@@ -387,6 +387,22 @@ def detect_entry_for_slot(frames: Mapping[str, pd.DataFrame], day, *, now=None,
 
     Returns a list — empty when the basket did not set up, or set up and never broke the low.
     Empty is an ANSWER. Anything that stops the rule from running raises in the caller instead.
+
+    `observer` — Stage 5ZZZ-BB, OBSERVABILITY ONLY. `basket_state` already answers everything
+    the panel needs: every condition with its value, its threshold, its comparator and its
+    verdict, plus which one refused first. On a day the basket does not set up, that answer was
+    computed and then DISCARDED at the `return []` below, so the sleeve's card had nothing to
+    show and printed "no data" beside a decision that had in fact been made carefully.
+
+    A listener is passed IN rather than the state being returned, for the reason this route
+    states everywhere else: what decides is reused, never re-derived. The alternative — having
+    the live caller invoke `basket_state` itself — would be a SECOND evaluation of a rule that
+    trades, and the day the two copies disagreed nobody could say which one was the slot.
+
+    It cannot change a decision. It is called after `basket_state` has already answered, its
+    return value is discarded, and the whole call is wrapped: a diagnostics bug must not be the
+    reason a slot fails to find its entry. `build_trades` passes no observer, so the historical
+    builder cannot start reporting no matter what this path does.
     """
     p = params or StressParams()
     day = _day_key(day)
@@ -394,6 +410,17 @@ def detect_entry_for_slot(frames: Mapping[str, pd.DataFrame], day, *, now=None,
         bars, prev_close = daily_slices(frames, p)
 
     state = basket_state(day, bars, prev_close, p)
+    if observer is not None:
+        try:
+            observer({"kind": "basket_state", "day": str(day), "now": str(now),
+                      "set_up": bool(state.get("set_up")),
+                      "reason": state.get("reason") or "",
+                      "detail": state.get("detail") or "",
+                      "checks": list(state.get("checks") or []),
+                      "features": dict(state.get("features") or {}),
+                      "first_failed": state.get("first_failed")})
+        except Exception:                                      # noqa: BLE001
+            pass
     if not state["set_up"]:
         return []
     ctxs, feats = state["contexts"], state["features"]

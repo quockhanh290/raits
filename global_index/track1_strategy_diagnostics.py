@@ -391,6 +391,110 @@ def regime_basis(labels) -> str:
     return REGIME_BASIS_UNKNOWN
 
 
+class StressObserver:
+    """Collects the basket state the Stress detector already computed. Decides nothing.
+
+    Stage 5ZZZ-BB. Stress is the sleeve that needed this least and got it last, because it
+    answers every entry condition in FULL: `entry_conditions` is `all()` over the table
+    `entry_checks` walks, and each row of that table already carries a value, a threshold, a
+    comparator and a verdict. None of it reached the slot, so the panel printed "value not
+    published" beside four rules the detector had answered carefully.
+
+    One event, not a stream: the basket is judged once per slot, so there is no per-bar channel
+    here and nothing that could outrank a slot-level refusal the way `bar_gates` would.
+    """
+
+    def __init__(self) -> None:
+        self.state: dict = {}
+
+    def __call__(self, event: dict) -> None:
+        if event.get("kind") == "basket_state":
+            self.state = {k: v for k, v in event.items() if k != "kind"}
+
+    @property
+    def checks(self) -> list:
+        return list(self.state.get("checks") or [])
+
+    @property
+    def first_failed(self) -> "dict | None":
+        """The first refusal IN THE DETECTOR'S OWN ORDER, not the first one found."""
+        want = self.state.get("first_failed")
+        for c in self.checks:
+            if c.get("id") == want:
+                return c
+        return next((c for c in self.checks if c.get("passed") is False), None)
+
+    def rows(self) -> list:
+        """One row per entry condition, in the order the detector evaluates them.
+
+        Verdicts are COPIED. Unlike the Normal-R4 rows -- where seven of eight are measurements
+        with no verdict and stamping one agreed with its gate 52.7% of the time -- every row
+        here IS the condition: same value, same threshold, same comparator, same answer, taken
+        from the list `entry_conditions` reduces over.
+        """
+        out = []
+        for c in self.checks:
+            applicable = c.get("applicable") is not False
+            out.append(_row(str(c.get("label") or c.get("id") or ""), c.get("value"),
+                            unit=str(c.get("unit") or ""),
+                            threshold=c.get("threshold"),
+                            comparator=str(c.get("comparator") or ""),
+                            passed=(c.get("passed") if applicable else None),
+                            detail=("" if applicable else
+                                    "threshold is unset for this sleeve, so the detector "
+                                    "does not compare it and it does not vote")))
+        return out
+
+
+def stress_block(*, sleeve: str, slot_id: str, observer: StressObserver,
+                 setups=None, params_hash: str = "", data_identity: str = "",
+                 source: str = RECORDED) -> dict:
+    """One Stress diagnostics block for a slot, in the shape every other sleeve publishes.
+
+    Deliberately the SAME keys as `normal_r4_block`, so the panel does not need a second
+    reader and a future field lands on both sleeves or on neither.
+    """
+    rows = observer.rows()
+    first = observer.first_failed
+    st = observer.state or {}
+    n_setups = len(setups or [])
+    return {
+        "schema": SCHEMA,
+        "diagnostics_source": source,
+        "sleeve": sleeve,
+        "slot_id": slot_id,
+        "detector": "track1_stress_mnq",
+        "params_hash": params_hash,
+        "data_source_identity": data_identity,
+        "session_date": str(st.get("day") or "")[:10],
+        "slot_ran_at": st.get("now"),
+        "rows": rows,
+        # The basket is judged once, so these ARE the slot gates -- copied, not re-derived.
+        "gates": [{"gate": c.get("id"), "passed": c.get("passed"),
+                   "value": c.get("value"), "threshold": c.get("threshold"),
+                   "detail": "%s %s needs %s %s" % (c.get("label"), c.get("value"),
+                                                    c.get("comparator"), c.get("threshold"))}
+                  for c in observer.checks],
+        "bar_gate_grid": {"bars": [], "rows": [], "legend": {}},
+        "bars_evaluated": None,
+        "last_bar_ts": None,
+        "last_bar_complete": None,
+        "setup": bool(st.get("set_up")),
+        "price_levels": [],
+        "levels_armed": False,
+        "nearest_failed_condition": (
+            None if first is None else
+            {"gate": first.get("id"), "detail": first.get("label"),
+             "value": first.get("value"), "threshold": first.get("threshold")}),
+        "summary": (("A setup formed and %d entry candidate(s) followed" % n_setups)
+                    if st.get("set_up") and n_setups
+                    else "The basket set up; no instrument broke its pre-entry low"
+                    if st.get("set_up")
+                    else (st.get("detail") or "The basket did not set up")),
+        "reason": st.get("reason") or "",
+    }
+
+
 def normal_r4_block(*, sleeve: str, slot_id: str, ema_period: int, observer: NormalR4Observer,
                     setup, params_hash: str = "", data_identity: str = "",
                     source: str = RECORDED, reconstructed_through=None,
