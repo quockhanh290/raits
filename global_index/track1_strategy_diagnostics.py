@@ -63,6 +63,30 @@ def _num(value) -> "float | None":
     return out if out == out and abs(out) != float("inf") else None      # NaN / inf -> None
 
 
+def _bar_had_closed(bar_ts, now, *, minutes: int = 5):
+    """Had the bar the detector LAST EVALUATED closed by the time the slot ran?
+
+    Stage 5ZZZ-AW. Answered here because this is the only place holding both halves: the
+    detector reports its clock, the observer keeps its last bar, and neither knows the other.
+
+    Returns None -- never a guess -- when either half is missing or unparseable. "We did not
+    measure" and "the bar had closed" are the two answers this field exists to keep apart, and
+    a bool cannot hold three states.
+    """
+    if not bar_ts or not now:
+        return None
+    try:
+        b = _dt.datetime.fromisoformat(str(bar_ts))
+        n = _dt.datetime.fromisoformat(str(now))
+        # The caller converts `now` into the frame's own clock before truncating, so when one
+        # side carries a tz and the other does not they are already the same wall clock.
+        if (b.tzinfo is None) != (n.tzinfo is None):
+            b, n = b.replace(tzinfo=None), n.replace(tzinfo=None)
+        return bool(b + _dt.timedelta(minutes=minutes) <= n)
+    except Exception:                                          # noqa: BLE001
+        return None
+
+
 def _row(label: str, value, *, unit: str = "", threshold=None, comparator: str = "",
          passed=None, detail: str = "", missing: str = "") -> dict:
     """One named variable, with what it was compared against when there is a comparison.
@@ -125,6 +149,10 @@ class NormalR4Observer:
         #: is preserved BY CONSTRUCTION rather than by remembering to be careful.
         self.bar_gates: list[dict] = []
         self.last_bar: dict | None = None
+        #: Stage 5ZZZ-AW. When the slot ran, and whether its newest bar had closed by then.
+        #: Its own channel for the same reason `bar_gates` is: `first_failed_gate` walks
+        #: `gates` in order, and a clock is not a gate.
+        self.clock: dict = {}
         self.bars_seen = 0
         self.signal: dict | None = None
 
@@ -134,6 +162,8 @@ class NormalR4Observer:
             self.gates.append({k: v for k, v in event.items() if k != "kind"})
         elif kind == "bar_gate":
             self.bar_gates.append({k: v for k, v in event.items() if k != "kind"})
+        elif kind == "clock":
+            self.clock = {k: v for k, v in event.items() if k != "kind"}
         elif kind == "bar":
             self.bars_seen += 1
             self.last_bar = event
@@ -214,9 +244,23 @@ class NormalR4Observer:
                 "legend": {self.CELL_PASS: "passed", self.CELL_FAIL: "failed",
                            self.CELL_NOT_REACHED: "an earlier gate returned first"}}
 
+    @property
+    def regime_gate(self) -> "dict | None":
+        """The SLOT-level regime gate, when the detector reported one.
+
+        Stage 5ZZZ-AW. Seven of these eight rows are measurements and carry no verdict on
+        purpose -- see the paragraph on "Close minus EMA", where stamping one produced a 52.7%
+        agreement with the gate it was read as reporting. `Regime` is the exception, and the
+        only one: the detector reports a gate of that name, with that value, against that
+        threshold, and the row was printing "NOT REPORTED" beside a verdict sitting a few
+        fields away in the same block. Nothing is recomputed here -- the gate is copied.
+        """
+        return next((g for g in self.gates if g.get("gate") == "regime"), None)
+
     def rows(self, *, ema_period: int) -> list[dict]:
         """The four variables this sleeve decides on, plus the price they were measured at."""
         bar = self.last_bar
+        rg = self.regime_gate or {}
         if bar is None:
             why = MISSING_DATA if self.first_failed_gate else MISSING_NOT_REPORTED
             return [_row(f"Trend filter (EMA {ema_period})", None, missing=why),
@@ -226,7 +270,10 @@ class NormalR4Observer:
                     _row("Volume", None, missing=why),
                     _row("Average volume (10 bars)", None, missing=why),
                     _row("Volume vs average", None, missing=why),
-                    _row("Regime", None, missing=why, detail=self.regime_detail)]
+                    _row("Regime", rg.get("value"), threshold=rg.get("threshold"),
+                         comparator="in" if rg else "", passed=rg.get("passed"),
+                         missing="" if rg.get("value") is not None else why,
+                         detail=self.regime_detail)]
 
         resume = bar.get("resume_bar")
         close = _num(getattr(resume, "close", None) if resume is not None else None)
@@ -278,8 +325,9 @@ class NormalR4Observer:
             _row("Average volume (10 bars)", avgv, unit="count",
                  detail="taken by position inside the window, looking backward"),
             _row("Volume vs average", ratio, unit="ratio"),
-            _row("Regime", bar.get("regime") or None,
-                 detail=self.regime_detail),
+            _row("Regime", bar.get("regime") or rg.get("value") or None,
+                 threshold=rg.get("threshold"), comparator="in" if rg else "",
+                 passed=rg.get("passed"), detail=self.regime_detail),
         ]
 
 
@@ -356,6 +404,11 @@ def normal_r4_block(*, sleeve: str, slot_id: str, ema_period: int, observer: Nor
         # what the detector actually saw rather than what it is supposed to see.
         "regime_basis": regime_basis_note or "",
         "last_bar_ts": last_bar_ts,
+        # Stage 5ZZZ-AW. None when nobody said what the clock was -- never guessed, because
+        # "we did not measure" and "the bar had closed" are the two answers this field exists
+        # to keep apart.
+        "last_bar_complete": _bar_had_closed(last_bar_ts, (observer.clock or {}).get("now")),
+        "slot_ran_at": (observer.clock or {}).get("now"),
         "bars_evaluated": observer.bars_seen,
         "rows": rows,
         "gates": observer.gates,
@@ -446,6 +499,46 @@ def read(*, root=".", day: str) -> list:
             out.append(json.loads(line))
         except Exception:                                          # noqa: BLE001
             continue
+    return out
+
+
+def recorded_series(root, day: str, sleeve: str) -> list:
+    """EVERY recorded slot for one sleeve on one day, oldest first -- a session, not a snapshot.
+
+    Stage 5ZZZ-AX. `recorded_for` returns the LAST block, which is the right answer for "what
+    did the detector decide" and the wrong one for "what has the session been doing". The panel
+    only ever had the snapshot, and a snapshot of this sleeve is actively misleading: slots fire
+    on the five-minute boundary, so the newest bar is seconds old and its volume reads 0.
+    Measured across 2026-08-31, the thirteen slots that carried numbers read
+
+        volume       0  0  0  0  5  0  6  14  0  0  4  1  0
+        ten-bar avg  5.8 ... 32.0
+
+    -- a column of zeros beside a baseline that grew five-fold. No single slot can show that.
+
+    Duplicated slot ids collapse to the LAST one, matching `recorded_for`, so a slot that was
+    re-run does not appear twice on the line.
+    """
+    seen: dict = {}
+    for block in read(root=root, day=day):
+        if block.get("diagnostics_source") != RECORDED or block.get("sleeve") != sleeve:
+            continue
+        key = block.get("slot_id") or block.get("slot_time") or len(seen)
+        seen[key] = block
+    out = []
+    for block in seen.values():
+        values = {r.get("label"): r.get("value") for r in (block.get("rows") or [])}
+        out.append({
+            "slot_id": block.get("slot_id"),
+            "slot_time": block.get("slot_time"),
+            "bars_evaluated": block.get("bars_evaluated"),
+            "last_bar_ts": block.get("last_bar_ts"),
+            # Whether the newest bar had CLOSED. The reason a volume of 0 is a reading of a
+            # bar seconds old rather than a dead market, and the line cannot say so without it.
+            "last_bar_complete": block.get("last_bar_complete"),
+            "values": values,
+        })
+    out.sort(key=lambda r: str(r.get("slot_time") or ""))
     return out
 
 

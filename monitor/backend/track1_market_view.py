@@ -610,6 +610,39 @@ MISSING_REFUSED = "refused"                       # it ran and declined
 MISSING_DATA = "missing_data"                     # the inputs were not there
 MISSING_NOT_REPORTED = "not_reported_by_detector"  # computed inside, never returned
 
+
+#: Stage 5ZZZ-AX. The four series the setup card charts, mapped from the row labels the
+#: detector publishes. Named here rather than on the page: the page must not have to know
+#: which of the eight rows are commensurable, and a label that changes shape should break the
+#: chart loudly rather than draw a flat line.
+_SERIES_LABELS = {
+    "close": "Close used",
+    "ema": None,          # resolved per sleeve: the period is in the label
+    "atr": "Daily ATR",
+    "volume": "Volume",
+    "avg_volume": "Average volume (10 bars)",
+}
+
+
+def _slot_series(root, day: str, sleeve: str) -> list:
+    """One point per recorded slot, carrying only what the chart draws.
+
+    Kept narrow on purpose. The blocks hold gates, grids and price levels, and shipping those
+    per slot would multiply the payload of an endpoint that is polled.
+    """
+    out = []
+    for rec in _sd.recorded_series(root, day, sleeve):
+        vals = rec.get("values") or {}
+        ema = next((v for k, v in vals.items() if str(k).startswith("Trend filter")), None)
+        point = {"slot_time": rec.get("slot_time"), "bars": rec.get("bars_evaluated"),
+                 "last_bar_ts": rec.get("last_bar_ts"),
+                 "last_bar_complete": rec.get("last_bar_complete"), "ema": ema}
+        for key, label in _SERIES_LABELS.items():
+            if label:
+                point[key] = vals.get(label)
+        out.append(point)
+    return out
+
 PRICE_BOUNDARY = "price_boundary"
 METRIC_BOUNDARY = "metric_boundary"
 ENTRY_AFTER_SETUP_ONLY = "entry_after_setup_only"
@@ -792,6 +825,12 @@ def _setup_boundary(sleeve: str, spec: dict, strategy: dict, slots: list) -> dic
         if rows:
             out["diagnostics_source"] = diag.get("diagnostics_source")
             out["last_bar_ts"] = diag.get("last_bar_ts")
+            # Stage 5ZZZ-AW. Whether that bar had CLOSED when the slot ran. NKD slots fire on
+            # the five-minute boundary, so its newest bar is seconds old and its volume reads
+            # near zero at nearly every slot -- a true reading of a bar that has barely begun.
+            # None means nobody measured it, and the page must not print it as "still forming".
+            out["last_bar_complete"] = diag.get("last_bar_complete")
+            out["slot_ran_at"] = diag.get("slot_ran_at")
             out["bars_evaluated"] = diag.get("bars_evaluated")
             out["reconstructed_at"] = diag.get("reconstructed_at")
             out["reconstructed_through"] = diag.get("reconstructed_through")
@@ -805,7 +844,13 @@ def _setup_boundary(sleeve: str, spec: dict, strategy: dict, slots: list) -> dic
                     "id": None, "label": r["label"], "value": r["value"],
                     "threshold": r["threshold"], "comparator": r["comparator"],
                     "unit": r["unit"], "passed": r["passed"], "distance": None,
-                    "display_value": r["display_value"], "display_threshold": "",
+                    # Stage 5ZZZ-AW. The Regime row now carries a verdict, and a verdict
+                    # without what it was measured against is half a sentence.
+                    "display_value": r["display_value"],
+                    "display_threshold": (", ".join(str(x) for x in r["threshold"])
+                                          if isinstance(r["threshold"], (list, tuple))
+                                          else ("" if r["threshold"] is None
+                                                else str(r["threshold"]))),
                     "missing": r["missing"],
                     "source": r["missing"] or diag.get("diagnostics_source")})
             return out
@@ -1075,39 +1120,13 @@ def _apply_r4_block(out: dict, block: dict) -> dict:
 
 
 def _observe_window_only(frame, labels, inst, day, now, params, context, obs) -> None:
-    """Walk the session window through the detector's own scan, recording and deciding nothing.
-
-    Mirrors `detect_entry_for_slot`'s set-up — same cache, same strategy, same signal function,
-    same window and the same truncation at `now` — and then calls `_scan_window` with the
-    observer attached. Whatever it returns is discarded.
-    """
-    import pandas as pd
+    """Delegates. Stage 5ZZZ-AV promoted the body into the detector module, where the live slot
+    can reach it too -- two copies of the window set-up is two chances to drift, and the clock
+    handling in it is the trap that once overwrote 1,050 frozen NKD bars."""
     from global_index import track1_normal_r4 as NR
 
-    cache = NR._cache_for(frame, params)
-    d = pd.Timestamp(day).normalize()
-    b5 = cache["b5"].get(d)
-    if b5 is None or not len(b5):
-        return
-    regime = labels.get(d) if hasattr(labels, "get") else None
-    win = b5.between_time("14:00", "15:55")
-    now_ts = pd.Timestamp(now)
-    widx = win.index
-    if now_ts.tz is not None and widx.tz is not None:
-        now_ts = now_ts.tz_convert(widx.tz).tz_localize(None)
-    elif now_ts.tz is not None:
-        now_ts = now_ts.tz_convert("America/New_York").tz_localize(None)
-    widx_naive = widx.tz_localize(None) if widx.tz is not None else widx
-    win = win[widx_naive <= now_ts]
-    if len(win) < 2:
-        return
-    ctx = (NR.R4ContextFilter(frame, range_max=params.range_max,
-                              vol_max=params.rel_volume_max, vol_feature=params.vol_feature)
-           if context else None)
-    strat = NR._strategy(params)
-    signal_for = NR.make_signal_fn(strat, params, cache["datr"],
-                                   short_days=set(), context=ctx)
-    NR._scan_window(strat, b5, win, regime, signal_for, params.ema_period, observer=obs)
+    NR.observe_window_only(frame, labels, day, now, params,
+                           apply_context_filter=bool(context), observer=obs)
 
 
 def _strategy(root: Path, sleeve: str, day: str, spec: dict, *, now=None) -> dict:
@@ -1167,7 +1186,12 @@ def _strategy(root: Path, sleeve: str, day: str, spec: dict, *, now=None) -> dic
             # had been written. The replay is the expensive path and keeps its cache.
             recorded = _sd.recorded_for(root, day, sleeve)
             if recorded and (recorded.get("rows") or []):
-                return _apply_r4_block(dict(out), recorded)
+                blk = _apply_r4_block(dict(out), recorded)
+                # Stage 5ZZZ-AX. The SESSION beside the snapshot. Same file, same read, one
+                # small block per slot -- so this costs an extra pass over a list already in
+                # memory, and the panel stops having to infer a session from one slot.
+                blk["slot_series"] = _slot_series(root, day, sleeve)
+                return blk
             if now is not None:
                 return _normal_r4_reconstruction(root, sleeve, day, spec, out, now=now)
             _key = (sleeve, day, str(_store_path(spec["instrument"])))

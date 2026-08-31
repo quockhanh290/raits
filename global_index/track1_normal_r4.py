@@ -512,6 +512,90 @@ class SwingSetup:
     regime: str
 
 
+def _observe_clock(observer, now_ts) -> None:
+    """Tell the observer WHEN the slot ran. Not whether anything had closed -- see below.
+
+    Stage 5ZZZ-AW. The truncation admits every bar whose bucket STARTS at or before `now`, so
+    the newest bar is normally still forming. NKD slots fire every five minutes on the
+    boundary, which makes it a few seconds old at essentially every slot: measured on
+    2026-08-31, slot 02:05 ET evaluated the 15:05 Tokyo bar and read its volume as 0 against a
+    ten-bar average of 3.2. The reading is TRUE -- it is what the detector saw -- and the
+    decision is unharmed, because the next slot re-reads the same bar complete. What was
+    missing is any way for the page to SAY so.
+
+    This reports the clock and nothing else. The first version also computed whether the bar
+    had closed, from the last bar in the WINDOW -- and the window's last bar is not the last
+    bar the detector EVALUATED. Measured on 2026-08-28 at 15:52: the detector's last evaluated
+    bar was 15:25, closed twenty-seven minutes earlier, and the flag still said "still
+    forming". Only the block sees both, so only the block can answer it.
+
+    Deliberately its own event kind. `gates` is what `first_failed_gate` walks in order and
+    `bar_gates` is what the grid is built from; a clock is neither, and putting it in either
+    would change a meaning that is currently preserved by construction.
+    """
+    if observer is None:
+        return
+    try:
+        observer({"kind": "clock", "now": str(now_ts)})
+    except Exception:                                          # noqa: BLE001
+        pass
+
+
+def observe_window_only(df, labels, day, now, params: NormalR4Params, *,
+                        apply_context_filter: bool, observer) -> None:
+    """Walk the session window through the detector's own scan, deciding NOTHING.
+
+    Stage 5ZZZ-AV. Promoted from the dashboard, which had grown its own copy of this
+    set-up -- same cache, same strategy, same signal function, same window, same truncation.
+    Two copies of the window logic is two chances to drift, and the clock handling here is the
+    one-keystroke trap that once overwrote 1,050 frozen NKD bars.
+
+    Why a slot needs it. The gates run in order and the first refusal returns, so on a day the
+    regime is wrong the detector stops before it looks at a single bar -- and the panel's
+    condition rows, which are only written from inside the scan, come back empty. Measured on
+    2026-08-31: the slot fetched today's bars from IBKR and reported `bars_evaluated: 0`,
+    because nothing had examined them, and every condition read "Data unavailable".
+
+    The replay could fill those rows and its numbers came from the PERSISTED store, which is
+    appended after a session closes -- so during a live session it holds the previous day. Old
+    numbers under a card labelled with today's session is worse than an empty card.
+
+    So the walk runs here, on the bars the slot already has. It is called AFTER the decision
+    has been made and its result is discarded; every call is guarded by the caller so a
+    backtest, which passes no observer, never pays for it.
+    """
+    cache = _cache_for(df, params)
+    d = pd.Timestamp(day).normalize()
+    b5 = cache["b5"].get(d)
+    if b5 is None or not len(b5):
+        return
+    regime = labels.get(d) if hasattr(labels, "get") else None
+    win = b5.between_time("14:00", "15:55")
+    now_ts = pd.Timestamp(now)
+    widx = win.index
+    if now_ts.tz is not None and widx.tz is not None:
+        now_ts = now_ts.tz_convert(widx.tz).tz_localize(None)
+    elif now_ts.tz is not None:
+        now_ts = now_ts.tz_convert("America/New_York").tz_localize(None)
+    widx_naive = widx.tz_localize(None) if widx.tz is not None else widx
+    win = win[widx_naive <= now_ts]
+    if len(win) < 2:
+        return
+    ctx = (R4ContextFilter(df, range_max=params.range_max, vol_max=params.rel_volume_max,
+                           vol_feature=params.vol_feature) if apply_context_filter else None)
+    strat = _strategy(params)
+    # Stage 5ZZZ-AW. The observer has to reach the SIGNAL function, not only the scan. Without
+    # it this walk filled the panel's measurement rows and left the per-bar grid empty --
+    # measured on 2026-08-31: 12 bars evaluated, `bar_gate_grid()` returning no rows -- because
+    # every per-bar verdict is emitted from inside `make_signal_fn`. The deciding path twenty
+    # lines down has always passed it; this copy was promoted from the dashboard, which had no
+    # grid to fill and so never noticed the omission.
+    signal_for = make_signal_fn(strat, params, cache["datr"], short_days=set(), context=ctx,
+                                observer=observer)
+    _observe_clock(observer, now_ts)
+    _scan_window(strat, b5, win, regime, signal_for, params.ema_period, observer=observer)
+
+
 def detect_entry_for_slot(df: pd.DataFrame, labels, inst: str, day, now, params: NormalR4Params,
                           *, short_days: set,
                           apply_context_filter: bool = True,
@@ -562,6 +646,17 @@ def detect_entry_for_slot(df: pd.DataFrame, labels, inst: str, day, now, params:
          threshold=sorted(ALLOWED_REGIMES),
          detail=f"regime {regime!r}; this sleeve trades {sorted(ALLOWED_REGIMES)}")
     if regime not in ALLOWED_REGIMES:
+        # Stage 5ZZZ-AV. The decision is already made and does not change. This only records
+        # what the session looked like, on the bars this call already holds, so a panel can say
+        # "no entry because the regime is wrong -- and here is the market it was wrong in".
+        # Guarded on the observer, so the backtest never reaches it.
+        if observer is not None:
+            try:
+                observe_window_only(df, labels, day, now, params,
+                                    apply_context_filter=apply_context_filter,
+                                    observer=observer)
+            except Exception:                                  # noqa: BLE001
+                pass
         return None
 
     # A day with no usable DAILY ATR is dropped, matching `scan_signals`. The asymmetry with
@@ -595,6 +690,7 @@ def detect_entry_for_slot(df: pd.DataFrame, labels, inst: str, day, now, params:
         now_ts = now_ts.tz_convert("America/New_York").tz_localize(None)
     widx_naive = widx.tz_localize(None) if widx.tz is not None else widx
     win = win[widx_naive <= now_ts]
+    _observe_clock(observer, now_ts)
     _say("gate", gate="bars_so_far", passed=len(win) >= 2, value=len(win), threshold=2,
          detail=f"{len(win)} bar(s) in the window up to {now_ts}")
     if len(win) < 2:
