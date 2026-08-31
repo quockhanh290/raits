@@ -512,3 +512,118 @@ class TestSignalGeneration(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# Stage 5ZZZ-AK — the gate reporter.
+#
+# `generate_signal` answers three different refusals with one `None`. That single
+# undifferentiated `None` is why every rule downstream of it has only ever been able to
+# report "value not published": measured across every stored session of the live route —
+# 291 slot records, five days, three sleeves, 24 declared rules — ZERO verdicts.
+#
+# The reporter is observability only. These tests exist to keep it that way: what the method
+# DECIDES may not depend on whether anyone is listening.
+# ══════════════════════════════════════════════════════════════════════════════════════════
+
+class TestGateReporter(unittest.TestCase):
+
+    def setUp(self):
+        self.strategy = TrendFollowStrategy()
+
+    def _call(self, fixture, *, hmm_state='Normal', on_gate=None):
+        return self.strategy.generate_signal(
+            pullback_bar=get_pullback_bar(fixture),
+            resume_bar=get_resume_bar(fixture),
+            ema_20=fixture['ema_20'], atr=fixture['atr'],
+            hmm_state=hmm_state,
+            avg_volume_10=fixture['avg_volume_10'],
+            on_gate=on_gate,
+        )
+
+    def test_listening_does_not_change_the_answer(self):
+        """The whole contract in one assertion, on both a signal and a refusal."""
+        for fixture, state in ((CLEAN_LONG_PULLBACK, 'Normal'),
+                               (CLEAN_SHORT_PULLBACK, 'Normal'),
+                               (CLEAN_LONG_PULLBACK, 'Calm')):
+            silent = self._call(fixture, hmm_state=state)
+            heard = []
+            noisy = self._call(fixture, hmm_state=state, on_gate=lambda *a: heard.append(a))
+            self.assertEqual(silent, noisy)
+            self.assertTrue(heard, "nothing was reported at all — the test would pass on a "
+                                   "reporter that was never wired in")
+
+    def test_a_reporter_that_raises_cannot_cost_a_signal(self):
+        """A diagnostics bug must never be the reason a trade is not found."""
+        def boom(*_a):
+            raise RuntimeError("the listener is broken")
+
+        expected = self._call(CLEAN_LONG_PULLBACK)
+        self.assertIsNotNone(expected, "the fixture stopped producing a signal — this test "
+                                       "would then be asserting None == None")
+        self.assertEqual(expected, self._call(CLEAN_LONG_PULLBACK, on_gate=boom))
+
+    def test_gates_report_only_as_far_as_evaluation_reached(self):
+        """"Not reached" and "checked and passed" are different facts.
+
+        The gates are ordered and the first refusal returns, so a bar blocked on regime must
+        report the regime gate and nothing after it. A reporter that filled in the rest would
+        be inventing verdicts for tests that never ran.
+        """
+        heard = []
+        out = self._call(CLEAN_LONG_PULLBACK, hmm_state='Calm',
+                         on_gate=lambda *a: heard.append(a))
+        self.assertIsNone(out)
+        self.assertEqual([g[0] for g in heard], ['regime'])
+        self.assertFalse(heard[0][1], "the regime gate reported a pass on a refused bar")
+
+        heard = []
+        self._call(CLEAN_LONG_PULLBACK, on_gate=lambda *a: heard.append(a))
+        names = [g[0] for g in heard]
+        self.assertEqual(names[:2], ['regime', 'ema_proximity'])
+        self.assertIn('volume_pullback_declined', names)
+        self.assertIn('volume_resume_surge', names)
+        self.assertTrue(all(g[1] for g in heard),
+                        "a bar that produced a signal reported a failing gate")
+
+    def test_the_reported_threshold_comes_from_the_config_that_decides(self):
+        """A restated threshold is a threshold that goes stale the first time anyone tunes it.
+
+        Asserted by MOVING the config and watching the report move with it — a test that
+        compared the report against the same config it was read from would agree with itself.
+        """
+        heard = []
+        self._call(CLEAN_LONG_PULLBACK, on_gate=lambda *a: heard.append(a))
+        ema = next(g for g in heard if g[0] == 'ema_proximity')
+        self.assertEqual(ema[3], self.strategy.config['ema_proximity_pct'])
+
+        moved = TrendFollowStrategy({**self.strategy.config, 'ema_proximity_pct': 0.123})
+        heard = []
+        moved.generate_signal(
+            pullback_bar=get_pullback_bar(CLEAN_LONG_PULLBACK),
+            resume_bar=get_resume_bar(CLEAN_LONG_PULLBACK),
+            ema_20=CLEAN_LONG_PULLBACK['ema_20'], atr=CLEAN_LONG_PULLBACK['atr'],
+            hmm_state='Normal', avg_volume_10=CLEAN_LONG_PULLBACK['avg_volume_10'],
+            on_gate=lambda *a: heard.append(a))
+        ema = next(g for g in heard if g[0] == 'ema_proximity')
+        self.assertEqual(ema[3], 0.123, "the report carries a threshold of its own")
+
+    def test_the_ema_gate_keeps_its_original_predicate_on_a_nan(self):
+        """`ema_ok = distance <= threshold` reads like the same test and is not.
+
+        On a NaN distance `>` is False — the engine admits the bar — and `<=` is also False,
+        so a rewrite phrased the other way round would REFUSE it. Nothing upstream rejects a
+        NaN EMA, so the case is reachable and no row-comparison window need contain one for
+        the rewrite to be wrong.
+        """
+        f = CLEAN_LONG_PULLBACK
+        pull, res = get_pullback_bar(f), get_resume_bar(f)
+        heard = []
+        out = self.strategy.generate_signal(pull, res, float('nan'), f['atr'], 'Normal',
+                                            f['avg_volume_10'],
+                                            on_gate=lambda *a: heard.append(a))
+        names = [g[0] for g in heard]
+        self.assertIn('ema_proximity', names,
+                      "the EMA gate returned before reporting — it refused a NaN it used to "
+                      "let through")
+        self.assertIsNotNone(out, "a NaN EMA now blocks a bar the engine used to admit")

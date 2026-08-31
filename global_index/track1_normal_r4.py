@@ -160,7 +160,7 @@ def _cache_for(df: pd.DataFrame, params: NormalR4Params) -> dict:
 
 
 def make_signal_fn(strat, params: NormalR4Params, datr: pd.Series, *,
-                   short_days: set, context: "R4ContextFilter | None"):
+                   short_days: set, context: "R4ContextFilter | None", observer=None):
     """One callable that answers "what does this bar signal", gates included.
 
     This is the seam that replaces the monkeypatch. The scratch path reached the same
@@ -187,21 +187,68 @@ def make_signal_fn(strat, params: NormalR4Params, datr: pd.Series, *,
     being dropped — matching the wrapper, which returns the signal untouched.
     """
     def signal_for(prev_bar, resume_bar, ema, atr, regime, avgv):
-        sig = strat.generate_signal(prev_bar, resume_bar, ema, atr, regime, avgv)
+        # Stage 5ZZZ-AL. OBSERVABILITY ONLY, and only on the LIVE path.
+        #
+        # `make_signal_fn` has exactly two callers in this file: `run_instrument`, which is
+        # the backtest, and `detect_entry_for_slot`, which is the live slot. Only the second
+        # passes an observer, so the backtest reaches every line below with `observer is
+        # None` and allocates nothing — the row-for-row comparison against the committed
+        # artifacts is unchanged BY CONSTRUCTION rather than by having been checked.
+        #
+        # Reported as `bar_gate`, never as `gate`: these fire once per bar and the slot-level
+        # list feeds "nearest failed condition", which must keep describing the session.
+        on_gate = None
+        if observer is not None:
+            _ts0 = resume_bar.name
+
+            def on_gate(name, passed, value, threshold, comparator):   # noqa: F811
+                try:
+                    observer({"kind": "bar_gate", "gate": name, "passed": bool(passed),
+                              "value": value, "threshold": threshold,
+                              "comparator": comparator, "bar_ts": _ts0})
+                except Exception:                                  # noqa: BLE001
+                    pass
+
+        sig = strat.generate_signal(prev_bar, resume_bar, ema, atr, regime, avgv,
+                                    on_gate=on_gate)
         if not sig:
             return None
         ts = pd.Timestamp(resume_bar.name)
         day = (ts.tz_localize(None) if ts.tz is not None else ts).normalize()
-        if sig.get("direction") == "SHORT" and day not in short_days:
+        # Each of the three below keeps its ORIGINAL predicate and derives the report from it.
+        # The reverse — phrasing the report first and testing its negation — is how the EMA
+        # gate in the engine nearly started refusing a NaN it had always admitted.
+        short_blocked = sig.get("direction") == "SHORT" and day not in short_days
+        if on_gate is not None:
+            # Comparator left empty on purpose: this gate is a membership test against a
+            # day set, not an inequality, and printing an operator beside a filter NAME made
+            # the panel read "needs long or short-allowed day below_sma50".
+            on_gate("spy_short_gate", not short_blocked, sig.get("direction"),
+                    {"spy_short_filter": params.spy_short_filter}, "")
+        if short_blocked:
             return None
-        if context is not None and not context.allow(ts):
+        context_blocked = context is not None and not context.allow(ts)
+        if on_gate is not None:
+            on_gate("r4_context_filter", not context_blocked, str(ts),
+                    {"range_max": params.range_max, "rel_volume_max": params.rel_volume_max},
+                    "")
+        if context_blocked:
             return None
         try:
             da = float(datr.asof(day))
         except Exception:
+            if on_gate is not None:
+                on_gate("fixed_stop_daily_atr", False, None,
+                        {"stop_basis_atr_mult": params.stop_basis_atr_mult}, "")
             return sig
         if not np.isfinite(da) or da <= 0:
+            if on_gate is not None:
+                on_gate("fixed_stop_daily_atr", False, da,
+                        {"stop_basis_atr_mult": params.stop_basis_atr_mult}, "")
             return sig
+        if on_gate is not None:
+            on_gate("fixed_stop_daily_atr", True, da,
+                    {"stop_basis_atr_mult": params.stop_basis_atr_mult}, "")
         sig = dict(sig)
         ep = float(sig["entry_price"])
         band = params.stop_basis_atr_mult * da
@@ -552,8 +599,11 @@ def detect_entry_for_slot(df: pd.DataFrame, labels, inst: str, day, now, params:
                                vol_feature=params.vol_feature)
                if apply_context_filter else None)
     strat = _strategy(params)
+    # Stage 5ZZZ-AL. The observer reaches the per-bar gates HERE and only here. The backtest
+    # builder twenty lines up is deliberately left without one, so `run_instrument` cannot
+    # start reporting — and cannot start allocating — no matter what this path does.
     signal_for = make_signal_fn(strat, params, cache["datr"], short_days=short_days,
-                                context=context)
+                                context=context, observer=observer)
     hit = _scan_window(strat, b5, win, regime, signal_for, params.ema_period,
                        observer=observer)
     _say("gate", gate="setup_bar", passed=hit is not None,

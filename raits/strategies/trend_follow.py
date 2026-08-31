@@ -290,7 +290,8 @@ class TrendFollowStrategy:
 
     def check_volume_pattern(self, pullback_bar: pd.Series,
                               resume_bar: pd.Series,
-                              avg_volume: float) -> bool:
+                              avg_volume: float,
+                              *, on_gate=None) -> bool:
         """
         Validate the volume pattern for a pullback entry.
 
@@ -313,6 +314,12 @@ class TrendFollowStrategy:
         """
         # Check 1: Volume declined on pullback
         pullback_ok = pullback_bar['volume'] < avg_volume
+        if on_gate is not None:
+            try:
+                on_gate("volume_pullback_declined", pullback_ok,
+                        pullback_bar['volume'], avg_volume, "<")
+            except Exception:                                  # noqa: BLE001
+                pass
         if not pullback_ok:
             logger.debug(f"Volume pattern FAIL: pullback volume "
                          f"{pullback_bar['volume']:,} >= avg {avg_volume:,}")
@@ -321,6 +328,12 @@ class TrendFollowStrategy:
         # Check 2: Volume surged on resume
         surge_threshold = avg_volume * self.config['resume_volume_surge_mult']
         resume_ok = resume_bar['volume'] > surge_threshold
+        if on_gate is not None:
+            try:
+                on_gate("volume_resume_surge", resume_ok,
+                        resume_bar['volume'], surge_threshold, ">")
+            except Exception:                                  # noqa: BLE001
+                pass
         if not resume_ok:
             logger.debug(f"Volume pattern FAIL: resume volume "
                          f"{resume_bar['volume']:,} <= threshold {surge_threshold:,.0f}")
@@ -342,7 +355,8 @@ class TrendFollowStrategy:
                         ema_20: float,
                         atr: float,
                         hmm_state: str,
-                        avg_volume_10: float) -> Optional[dict]:
+                        avg_volume_10: float,
+                        *, on_gate=None) -> Optional[dict]:
         """
         Evaluate a two-bar pullback pattern for a trend continuation entry.
 
@@ -367,28 +381,82 @@ class TrendFollowStrategy:
         atr           : float     — 14-period ATR
         hmm_state     : str       — 'Calm', 'Normal', or 'Stress'
         avg_volume_10 : float     — 10-bar avg volume for volume pattern check
+        on_gate       : callable  — OPTIONAL, observability only. See below.
 
         Returns
         -------
         dict or None
+
+        `on_gate` — why it exists, and what it may never do
+        ---------------------------------------------------
+        This method answers three different refusals with one `None`: the regime was wrong,
+        the pullback never reached the EMA, or the volume pattern did not hold. A caller
+        cannot tell them apart, and that single undifferentiated `None` is why every rule
+        downstream of it has only ever been able to report "value not published" — measured
+        across every stored session of the live route: 291 slot records, five days, three
+        sleeves, 24 declared rules, ZERO verdicts.
+
+        The alternative that was tried and must not be tried again was recomputing these
+        tests somewhere else so a panel could show a number. That produced a display which
+        agreed with this method on 52.7% of 3,999 real bars, and printed "passed" for a bar
+        7.06% from the EMA against a 0.50% threshold. A rule has one implementation, and it
+        is this one; anything else that wants the answer has to be told, not to work it out.
+
+        So: `on_gate(name, passed, value, threshold, comparator)`, called at each gate as it
+        is evaluated, in evaluation order. It is called AFTER the predicate has already been
+        computed, its return value is discarded, and every call is wrapped — a diagnostics
+        bug must never be the reason a signal is lost. Left as `None` (every backtest call
+        site, unchanged) it costs one `is not None` per gate and changes nothing.
+
+        Gates report only as far as evaluation reached: the gates are ordered and the first
+        refusal returns, so a bar blocked on regime reports `regime` and nothing after it.
+        That is the fact, not a limitation to paper over — "not reached" and "checked and
+        passed" are different things and the caller must be able to see which it has.
         """
 
         # ── Gate 1: Regime — Normal and Stress only ───────────────────────────
         # This is the OPPOSITE of VWAP MR. We need trending conditions.
         # Calm regime = range-bound market = no trend to follow = skip.
-        if hmm_state not in self.config['allowed_regimes']:
+        regime_ok = hmm_state in self.config['allowed_regimes']
+        if on_gate is not None:
+            try:
+                on_gate("regime", regime_ok, hmm_state,
+                        list(self.config['allowed_regimes']), "in")
+            except Exception:                                  # noqa: BLE001
+                pass
+        if not regime_ok:
             logger.debug(f"TrendFollow BLOCKED: regime={hmm_state} "
                          f"not in {self.config['allowed_regimes']}")
             return None
 
         # ── Gate 2: EMA proximity — did pullback bar touch the EMA? ──────────
-        # The pullback_bar's close must be within 0.2% of the 20 EMA.
+        # The pullback_bar's close must be within `ema_proximity_pct` of the EMA.
         # This confirms the pullback reached the moving average support level.
+        #
+        # The number in this comment used to be 0.2%. `DEFAULT_CONFIG` says 0.005, and has
+        # for as long as it has been in the file — the comment was describing a threshold
+        # nothing enforced, at 2.5x off the one that does. Named from the config now, because
+        # a restated constant is a constant that drifts.
         ema_distance_pct = abs(pullback_bar['close'] - ema_20) / ema_20
-        if ema_distance_pct > self.config['ema_proximity_pct']:
+        # The ORIGINAL predicate, character for character, and the report derived from it —
+        # never the other way round. `ema_ok = distance <= threshold` reads like the same
+        # test and is not: on a NaN distance `>` is False and `<=` is also False, so the
+        # rewrite would REFUSE a bar the engine admits. Nothing upstream rejects a NaN EMA —
+        # `_scan_window` guards the ATR and the average volume and not this — so the case is
+        # reachable, and no window in the row-comparison need contain one for the rewrite to
+        # be wrong. The decision keeps the branch it always had; only a line was added beside it.
+        ema_blocked = ema_distance_pct > self.config['ema_proximity_pct']
+        if on_gate is not None:
+            try:
+                on_gate("ema_proximity", not ema_blocked, ema_distance_pct,
+                        self.config['ema_proximity_pct'], "<=")
+            except Exception:                                  # noqa: BLE001
+                pass
+        if ema_blocked:
             logger.debug(f"TrendFollow BLOCKED: pullback bar close "
                          f"${pullback_bar['close']:.2f} is {ema_distance_pct:.3%} "
-                         f"from EMA ${ema_20:.2f} (max 0.2%)")
+                         f"from EMA ${ema_20:.2f} "
+                         f"(max {self.config['ema_proximity_pct']:.3%})")
             return None
 
         # ── Gate 3: Direction — which side of EMA is price on? ───────────────
@@ -400,7 +468,11 @@ class TrendFollowStrategy:
             direction = 'SHORT'
 
         # ── Gate 4: Volume pattern ────────────────────────────────────────────
-        if not self.check_volume_pattern(pullback_bar, resume_bar, avg_volume_10):
+        # `on_gate` is forwarded rather than the two halves being re-tested here: the method
+        # that decides is the method that reports, so "which half failed" cannot drift from
+        # which half actually failed.
+        if not self.check_volume_pattern(pullback_bar, resume_bar, avg_volume_10,
+                                         on_gate=on_gate):
             return None
 
         # ── Compute trade levels ─────────────────────────────────────────────

@@ -185,8 +185,43 @@ RULES: dict = {
 }
 
 
+#: Stage 5ZZZ-AJ. Names in `RULES` that are NOT entry conditions, and the reason for each.
+#:
+#: Declared HERE, one line under the table it qualifies, so the two cannot drift apart. A copy
+#: of this list kept in the dashboard would be a copy that goes stale the first time a rule is
+#: renamed, and the panel would then quietly promote an exit parameter back into the entry
+#: lanes without anyone deciding to.
+#:
+#: These stay in `RULES` and stay on the evidence row: taking them out would change the shape
+#: of a record that sessions already on disk were written in, and the fact that the sleeve
+#: declares them is itself worth keeping. What changes is only how a panel may present them —
+#: as configuration that IS, not as a test awaiting a verdict it can never receive.
+#:
+#: Measured across every stored session (291 slot records, 5 days, three sleeves): not one of
+#: the 24 declared rules has ever carried a verdict. For the twenty-one others that is a gap
+#: waiting on the detector to report which gate it stopped at. For these three it is not a gap
+#: — there is no verdict for them to report, and a lane that must stay empty forever is a lane
+#: an operator learns to skip, taking the twenty-one that CAN fill with it.
+NOT_ENTRY_CONDITIONS: dict = {
+    "japan_session_window":
+        "not a test — the window is applied by slicing the bars before the detector runs, so "
+        "every bar it evaluates is inside the window by construction and none can fail it",
+    "max_hold_context":
+        "an EXIT parameter — how many days a position may be held. At entry time there is no "
+        "position to measure it against",
+    "stop_arm_rule":
+        "an EXIT parameter — when the stop is armed AFTER an entry exists, and how long the "
+        "position may run. Nothing about it is decided at the moment of entry",
+}
+
+
 def rule_names(sleeve: str) -> tuple:
     return RULES.get(sleeve, ())
+
+
+def entry_rule_names(sleeve: str) -> tuple:
+    """`rule_names` minus the ones that can never carry an entry-time verdict."""
+    return tuple(n for n in RULES.get(sleeve, ()) if n not in NOT_ENTRY_CONDITIONS)
 
 
 def thresholds(sleeve: str) -> dict:

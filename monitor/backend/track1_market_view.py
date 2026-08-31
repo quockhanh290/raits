@@ -381,6 +381,52 @@ def _threshold_display(raw) -> str:
     return str(raw)
 
 
+def _not_entry_conditions() -> dict:
+    """Read from the table that declares the rules, never restated here.
+
+    A copy of these three names in this file is a copy that goes stale the first time one is
+    renamed, and the panel would then silently promote an exit parameter back into the entry
+    lanes. Empty on an import failure, which puts every rule back in the lanes — noisy, and
+    the direction a failure here is allowed to break in.
+    """
+    try:
+        from global_index import track1_signals as _sig
+
+        return dict(getattr(_sig, "NOT_ENTRY_CONDITIONS", {}) or {})
+    except Exception:                                             # noqa: BLE001
+        return {}
+
+
+_NOT_ENTRY_CONDITIONS = _not_entry_conditions()
+
+
+def _declared_config(rows: list, sleeve: str) -> list:
+    """The sleeve's declared parameters that are NOT entry conditions, shown as facts.
+
+    Stage 5ZZZ-AJ. These sat in the rule lanes and reported "value not published" on every
+    slot of every stored session — correctly, and permanently, because none of them is a test
+    a slot can pass or fail. One is the window the bars are sliced to before the detector even
+    runs; the other two govern a position that does not exist yet at entry time.
+
+    Presented with their thresholds and their reason, so the panel says what the sleeve is
+    CONFIGURED to do instead of implying it checked something and could not say what.
+    """
+    out: list = []
+    seen: set = set()
+    for r in rows:
+        if r.get("sleeve") != sleeve:
+            continue
+        for c in r.get("rule_checks") or []:
+            name = str(c.get("rule") or "")
+            if name not in _NOT_ENTRY_CONDITIONS or name in seen:
+                continue
+            seen.add(name)
+            out.append({"rule": name, "label": name.replace("_", " "),
+                        "threshold_display": _threshold_display(c.get("threshold")),
+                        "reason": _NOT_ENTRY_CONDITIONS[name]})
+    return out
+
+
 def _rule_lanes(rows: list, sleeve: str, slots: list) -> list:
     """Per-slot outcome for every rule this sleeve's detector declares.
 
@@ -409,6 +455,13 @@ def _rule_lanes(rows: list, sleeve: str, slots: list) -> list:
         for c in r.get("rule_checks") or []:
             name = str(c.get("rule") or "")
             if not name:
+                continue
+            if name in _NOT_ENTRY_CONDITIONS:
+                # Stage 5ZZZ-AJ. Kept out of the lanes, not out of the payload: these three
+                # are declared by the sleeve and recorded on every row, but none of them is a
+                # test a slot can pass or fail, so a lane for them is an empty lane FOREVER —
+                # and an operator who learns to skip a permanently empty lane skips the ones
+                # beside it that will fill. `_declared_config` reports them as what they are.
                 continue
             if name not in meta:
                 order.append(name)
@@ -964,6 +1017,19 @@ def _normal_r4_reconstruction(root: Path, sleeve: str, day: str, spec: dict,
         # can say WHY two sleeves running one detector report different regimes.
         regime_basis_note=SD.regime_basis(labels))
 
+    return _apply_r4_block(out, block)
+
+
+def _apply_r4_block(out: dict, block: dict) -> dict:
+    """Map one diagnostics block onto the strategy payload, whatever produced it.
+
+    Stage 5ZZZ-AH. This was the tail of the RECONSTRUCTION and could therefore only ever
+    describe a replay. It reads no source label and decides nothing from one - it copies the
+    block's own `diagnostics_source` outward - so the identical mapping serves a block the slot
+    RECORDED while it ran. Both are built by the same `normal_r4_block`, from the same observer
+    contract; the only difference between them is which of the two wrote it, and that is the
+    one thing this function must pass through rather than flatten.
+    """
     out["diagnostics"] = block
     # Stage 5ZZZ-F. The source, on the block the payload contract is read from. It was reachable
     # only at `strategy.diagnostics.diagnostics_source`, one level down, so anything reading the
@@ -1063,6 +1129,22 @@ def _strategy(root: Path, sleeve: str, day: str, spec: dict, *, now=None) -> dic
             # file's mtime in it would mint a new key every bar, and a new key has nothing to
             # serve stale, so every append would pay the full minute inline. Freshness is the
             # TTL's job, and `last_bar_ts` on the block says exactly which bar the answer used.
+            # Stage 5ZZZ-AH. What the SLOT recorded beats what the dashboard can replay, and
+            # it is asked for first rather than used as a fallback.
+            #
+            # The replay reads the persisted bar store; the slot read the live provider join.
+            # Those are not the same data, and the block says so - the reconstruction carries
+            # "computed after the fact; not official runtime evidence" precisely because its
+            # last bar can differ from the one the slot decided on. So a session that HAS a
+            # recorded block was being described by a replay of itself, with the weaker of two
+            # available answers shown as though it were the only one.
+            #
+            # Read on every call rather than cached: the file is one small block per slot per
+            # sleeve, and a cache here would serve a session's early slots after later ones
+            # had been written. The replay is the expensive path and keeps its cache.
+            recorded = _sd.recorded_for(root, day, sleeve)
+            if recorded and (recorded.get("rows") or []):
+                return _apply_r4_block(dict(out), recorded)
             if now is not None:
                 return _normal_r4_reconstruction(root, sleeve, day, spec, out, now=now)
             _key = (sleeve, day, str(_store_path(spec["instrument"])))
@@ -1278,14 +1360,81 @@ def _summary(sleeve: str, status: str, slots: list, levels: list, data: dict,
     return head
 
 
-def _coverage(root: Path) -> dict:
-    """The window ledger's own verdict per sleeve. Read here rather than required from the
-    caller: a status that silently degraded to `unknown` because an argument was not passed
-    is a status that lies about a sleeve which finished cleanly."""
+def _anchor_day(today: str) -> str:
+    """The day the panel should describe: today when today is a trading day, else the last one.
+
+    Stage 5ZZZ-AG. The panel used to describe TODAY unconditionally, and on a Saturday or a
+    Sunday that meant a whole page of absences on a day the route was never scheduled to run:
+    22 NKD slots labelled "no record was written for this slot" for a session that does not
+    exist. An alarm that fires every weekend is an alarm nobody reads by Monday.
+
+    The rule is "last TRADING day", NOT "last day that has data", and the difference is the
+    only reason this function is worth writing. They give the same answer on a weekend. They
+    give opposite answers on the day that matters:
+
+        Wednesday, scheduler dead, nothing recorded
+          last day WITH DATA  -> shows Tuesday, complete, green. The outage is invisible.
+          last TRADING day    -> shows Wednesday, 24 empty slots. The outage is the screen.
+
+    So this consults the calendar and never the evidence. A trading day with no evidence still
+    anchors here, and the emptiness is the finding.
+    """
+    try:
+        from global_index import track1_freshness as _fresh
+
+        if _fresh._is_trading_day(today):
+            return today
+        return _fresh.prev_trading_day(today).strftime("%Y-%m-%d")
+    except Exception:                                             # noqa: BLE001
+        # Never a reason to fail the payload: an unresolvable calendar falls back to today,
+        # which is the behaviour that existed before this function and is merely noisy.
+        return today
+
+
+def _calendar_source() -> str:
+    """Which calendar decided the anchor. Reported, because the fallback is weekday-only and
+    a holiday would then be anchored on as though the market had been open."""
+    try:
+        from global_index import track1_freshness as _fresh
+
+        return _fresh.calendar_source()
+    except Exception:                                             # noqa: BLE001
+        return "unavailable"
+
+
+def _coverage(root: Path, day: str | None = None) -> dict:
+    """The window ledger's own verdict per sleeve, FOR THE DAY THE PANEL IS SHOWING.
+
+    Stage 5ZZZ-AG. This took the ledger's LATEST day whatever day the panel was on, and the
+    two part company exactly when it matters. Measured on Sunday 2026-08-30: the summary line
+    read "Complete · 22/22 slots observed" — Friday's count — printed directly above a strip
+    of 22 of Sunday's slots with no record in any of them. Two days in one sentence, and the
+    half that reassures was the half that was not about today.
+
+    Asking the ledger for the day being shown also keeps the alarm working. On a trading day
+    where nothing ran, `wl.status` has no `window_closed` record for that date and answers
+    `unobserved / 0 observed / absence is the signal` — which is the whole point. Falling back
+    to "the last day that has data" would have answered `complete` and hidden it.
+    """
     try:
         from monitor.backend import track1_runtime_reader as tr
 
-        return ((tr._coverage(root) or {}).get("latest") or {})
+        full = tr._coverage(root) or {}
+        if day is None:
+            return full.get("latest") or {}
+        import global_index.window_ledger as wl
+        from global_index.track1_params import WINDOWS_ET
+
+        d = root / tr.COVERAGE_DIR
+        rows: list = []
+        if d.is_dir():
+            for f in sorted(d.glob("window_coverage_*.jsonl")):
+                try:
+                    rows.extend(json.loads(line) for line in
+                                f.read_text(encoding="utf-8").splitlines() if line.strip())
+                except Exception:                                 # noqa: BLE001
+                    continue
+        return {sleeve: wl.status(rows, sleeve, day) for sleeve in WINDOWS_ET}
     except Exception:                                             # noqa: BLE001
         return {}
 
@@ -1328,13 +1477,29 @@ def build(root: str | Path = ".", *, day: str | None = None, now: Any = None,
 
     root = Path(root)
     ref = pd.Timestamp(now) if now is not None else pd.Timestamp.now(tz=ET)
-    asked = day or (ref.tz_convert(ET) if ref.tzinfo else ref).strftime("%Y-%m-%d")
-    now_hhmm = (ref.tz_convert(ET) if ref.tzinfo else ref).strftime("%H:%M")
+    ref_et = ref.tz_convert(ET) if ref.tzinfo else ref
+    today = ref_et.strftime("%Y-%m-%d")
+    asked = day or _anchor_day(today)
+    is_today = asked == today
+
+    # The clock only judges slots on the day the clock belongs to. Sunday's 09:00 must not be
+    # used to call Friday's 10:35 slot "has not fired yet" — Friday is over, and every slot on
+    # a closed day is judged by whether a record exists, not by where the hands are now.
+    now_hhmm = ref_et.strftime("%H:%M") if is_today else "23:59"
 
     rows = _signal_rows(root, asked)
-    cov = coverage if coverage is not None else _coverage(root)
+    cov = coverage if coverage is not None else _coverage(root, asked)
     out: dict = {"schema": SCHEMA, "generated_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
-                 "route": ROUTE, "session_date": asked, "now_et": now_hhmm,
+                 "route": ROUTE, "session_date": asked, "now_et": ref_et.strftime("%H:%M"),
+                 # Stated, never inferred. A panel showing Friday on a Sunday has to say so in
+                 # the payload, or the page has no honest way to label it and the reader takes
+                 # a closed session for the live one.
+                 "today_et": today, "session_is_today": is_today,
+                 "session_anchor": ("today" if is_today else "last_trading_day"),
+                 "session_anchor_reason": (
+                     "" if is_today else
+                     f"{today} is not a trading day; showing the last one, {asked}"),
+                 "calendar_source": _calendar_source(),
                  "levels_note": LEVELS_NOT_EXPOSED, "sleeves": {}}
 
     # Stage 5ZZZ-E. Calm, as TWO cards rather than one sleeve.
@@ -1398,6 +1563,9 @@ def build(root: str | Path = ".", *, day: str | None = None, now: Any = None,
                 # Stage 5ZZY. One row per declared rule, one cell per slot, built from the
                 # SAME diagnostics rows the slots came from — no second read, no new file.
                 "rule_lanes": _rule_lanes(rows, sleeve, slots),
+                # Stage 5ZZZ-AJ. Beside the lanes, never inside them: what the sleeve is
+                # configured to do, as opposed to what a slot decided.
+                "declared_config": _declared_config(rows, sleeve),
                 "levels_note": None if levels else LEVELS_NOT_EXPOSED,
                 # Stage 5ZZP. The sleeve's own rule values, where the detector publishes them.
                 "strategy": _strategy(root, sleeve, asked, spec, now=now),  # the CALLER's instant, not the derived one:
@@ -1412,6 +1580,16 @@ def build(root: str | Path = ".", *, day: str | None = None, now: Any = None,
             blk = out["sleeves"][sleeve]
             blk["setup_boundary"] = _setup_boundary(sleeve, spec, blk["strategy"],
                                                     blk["slots"])
+            # Stage 5ZZZ-AM. The per-BAR grid, lifted to where a renderer can reach it.
+            #
+            # It is a different axis from `rule_lanes` and must stay one: a lane cell is a
+            # SLOT and a grid cell is a BAR. Measured on a real session, the two cannot be
+            # merged — within a single slot `volume_pullback_declined` is answered twelve
+            # times pass and ten times fail, so the slot cell has no value, while every bar
+            # cell has exactly one and never changes (865 verdicts recomputed across a
+            # session, 80 distinct, zero ever different).
+            blk["bar_grid"] = ((blk.get("strategy") or {}).get("diagnostics")
+                               or {}).get("bar_gate_grid") or None
             _settle_levels_note(blk)
         except Exception as exc:                                  # noqa: BLE001
             out["sleeves"][sleeve] = {

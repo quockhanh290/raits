@@ -104,6 +104,26 @@ class NormalR4Observer:
 
     def __init__(self) -> None:
         self.gates: list[dict] = []
+        #: Stage 5ZZZ-AL. A SECOND channel, and the separation is the whole point of it.
+        #:
+        #: `gates` holds SLOT-level gates — five of them at most, one pass through the
+        #: detector: measured on 2026-08-10, `session_bars`, `regime`, `daily_atr`,
+        #: `bars_so_far`, `setup_bar`. `first_failed_gate` reads that list in order and takes
+        #: the first refusal, and the panel prints it as the reason the SLOT found nothing.
+        #:
+        #: The gates the engine and the sleeve wrapper report fire per BAR, inside the window
+        #: scan — which runs between `bars_so_far` and `setup_bar`. Appending them to `gates`
+        #: would put up to 154 events (22 bars x 4 engine gates + 3 wrapper gates) into that
+        #: slot, and the first per-bar refusal would be reached BEFORE `setup_bar`. The panel
+        #: for 2026-08-10 would have turned from
+        #:      setup_bar — "no bar in the window so far signalled"   (about the session)
+        #: into
+        #:      volume_resume_surge — one bar's reading, 22 bars before the conclusion
+        #: and not rarely: `volume_resume_surge` refuses 388 of the 397 bars that reach it.
+        #:
+        #: So they live here, `first_failed_gate` never sees them, and the slot-level meaning
+        #: is preserved BY CONSTRUCTION rather than by remembering to be careful.
+        self.bar_gates: list[dict] = []
         self.last_bar: dict | None = None
         self.bars_seen = 0
         self.signal: dict | None = None
@@ -112,6 +132,8 @@ class NormalR4Observer:
         kind = event.get("kind")
         if kind == "gate":
             self.gates.append({k: v for k, v in event.items() if k != "kind"})
+        elif kind == "bar_gate":
+            self.bar_gates.append({k: v for k, v in event.items() if k != "kind"})
         elif kind == "bar":
             self.bars_seen += 1
             self.last_bar = event
@@ -127,6 +149,71 @@ class NormalR4Observer:
     #: falls back to the older wording rather than claiming a basis nobody supplied.
     regime_detail: str = "handed to the detector, not computed here"
 
+    #: One character per bar. `NOT_REACHED` is the one that had to exist: the gates are
+    #: ordered and the first refusal returns, so a bar blocked on the EMA never reaches the
+    #: volume test — and "did not run" is not "ran and passed".
+    CELL_PASS = "P"
+    CELL_FAIL = "F"
+    CELL_NOT_REACHED = "-"
+
+    def bar_gate_grid(self) -> dict:
+        """One row per rule, one CELL PER BAR, plus each row's own tally.
+
+        Stage 5ZZZ-AM. The unit is the BAR, and that is a measured fact rather than a choice.
+        Cutting the window at every five-minute mark through a real session and re-asking the
+        detector: 865 verdicts were computed across the session, 80 of them distinct, and
+        **not one verdict ever changed between cuts**. A bar's answer is fixed the moment the
+        bar closes.
+
+        That is what makes a grid possible at all. The panel used to draw one cell per SLOT,
+        which has no single value — the 14:10 slot has seen one bar and the 15:55 slot has
+        seen twenty-two, and within one slot a rule can be answered twelve times pass and ten
+        times fail. Anchored on the bar instead, every cell has exactly one value, forever.
+
+        Stored as a STRING per row, not a list of dicts. A slot can produce 154 cells and
+        every slot of every session persists a block; this repo already carries one array
+        nobody capped, which reached 360 KB inside a 426 KB file. Twenty-two characters do
+        not.
+
+        `reached` and `passed` on each row are the funnel, derived here so the two readings
+        cannot disagree: the panel's summary and its cells come out of the same pass.
+        """
+        bars: list = []
+        seen: dict = {}
+        order: list = []
+        rows: dict = {}
+        for e in self.bar_gates:
+            name = str(e.get("gate") or "")
+            if not name:
+                continue
+            ts = str(e.get("bar_ts"))
+            if ts not in seen:
+                seen[ts] = len(bars)
+                bars.append(ts)
+            if name not in rows:
+                order.append(name)
+                rows[name] = {"gate": name, "cells": {}, "reached": 0, "passed": 0,
+                              "threshold": e.get("threshold"),
+                              "comparator": str(e.get("comparator") or ""),
+                              "last_value": None}
+            r = rows[name]
+            r["cells"][seen[ts]] = self.CELL_PASS if e.get("passed") else self.CELL_FAIL
+            r["reached"] += 1
+            if e.get("passed"):
+                r["passed"] += 1
+            r["last_value"] = e.get("value")
+        out_rows = []
+        for name in order:
+            r = rows[name]
+            cells = "".join(r["cells"].get(i, self.CELL_NOT_REACHED)
+                            for i in range(len(bars)))
+            out_rows.append({"gate": name, "cells": cells, "reached": r["reached"],
+                             "passed": r["passed"], "threshold": r["threshold"],
+                             "comparator": r["comparator"], "last_value": r["last_value"]})
+        return {"bars": bars, "rows": out_rows,
+                "legend": {self.CELL_PASS: "passed", self.CELL_FAIL: "failed",
+                           self.CELL_NOT_REACHED: "an earlier gate returned first"}}
+
     def rows(self, *, ema_period: int) -> list[dict]:
         """The four variables this sleeve decides on, plus the price they were measured at."""
         bar = self.last_bar
@@ -134,7 +221,7 @@ class NormalR4Observer:
             why = MISSING_DATA if self.first_failed_gate else MISSING_NOT_REPORTED
             return [_row(f"Trend filter (EMA {ema_period})", None, missing=why),
                     _row("Close used", None, missing=why),
-                    _row("Price vs EMA", None, missing=why),
+                    _row("Close minus EMA", None, missing=why),
                     _row("Daily ATR", None, missing=why),
                     _row("Volume", None, missing=why),
                     _row("Average volume (10 bars)", None, missing=why),
@@ -154,9 +241,38 @@ class NormalR4Observer:
                  detail="the sleeve's own period, from the detector"),
             _row("Close used", close, unit="price",
                  detail=f"the bar the detector last evaluated: {bar.get('bar_ts')}"),
-            _row("Price vs EMA", gap, unit="price",
-                 passed=(None if gap is None else gap > 0),
-                 detail="above the trend filter is the direction this sleeve looks for"),
+            # Stage 5ZZZ-AJ. A MEASUREMENT, and no longer a verdict.
+            #
+            # This carried `passed = gap > 0` and read as the sleeve's EMA filter having been
+            # checked and met. It was neither that filter nor the bar that filter looks at:
+            #
+            #   the filter   |pullback_bar.close - ema| / ema <= ema_proximity_pct (0.005)
+            #                a PROXIMITY test, on bar[-2]
+            #   this row     resume_bar.close - ema > 0
+            #                a SIGN test, on bar[-1] — which is the DIRECTION gate, a
+            #                different gate one step later in the same function
+            #
+            # Measured on the real stores, 3,999 bars per sleeve, comparing this row's answer
+            # against the engine gate it was read as reporting:
+            #
+            #   NKD    agree 52.7%  ·  row says PASSED where the gate refuses 1.9%  ·
+            #          row says FAILED where the gate allows 45.4%
+            #   Swing  agree 53.8%  ·  3.1%  ·  43.1%
+            #
+            # A coin flip, and wrong in both directions. The 45.4% is every SHORT setup, whose
+            # gap is negative by construction. The 1.9% is the dangerous half: the worst bar
+            # printed "passed" here while sitting 7.06% from the EMA, against a 0.50%
+            # threshold — fourteen times over the limit the engine refuses at.
+            #
+            # Recomputing the real test here instead would be a second implementation of a
+            # rule that trades — the defect this module's own contract exists to refuse. So
+            # the number stays, the tick mark goes, and the verdict waits for the detector to
+            # report which gate it stopped at.
+            _row("Close minus EMA", gap, unit="price",
+                 detail="the last evaluated bar's close against the trend filter. NOT the "
+                        "sleeve's EMA test, which measures the PULLBACK bar's distance to "
+                        "the EMA against a proximity threshold and whose verdict the "
+                        "detector does not return"),
             _row("Daily ATR", atr, unit="price"),
             _row("Volume", volume, unit="count"),
             _row("Average volume (10 bars)", avgv, unit="count",
@@ -243,6 +359,10 @@ def normal_r4_block(*, sleeve: str, slot_id: str, ema_period: int, observer: Nor
         "bars_evaluated": observer.bars_seen,
         "rows": rows,
         "gates": observer.gates,
+        # Stage 5ZZZ-AM. Beside `gates`, never merged into it — see `bar_gates`. Compacted
+        # here rather than at the reader, so the persisted record can never carry the raw
+        # per-bar events even if a future caller forgets to.
+        "bar_gate_grid": observer.bar_gate_grid(),
         "setup": setup is not None,
         "price_levels": levels,
         "levels_armed": bool(levels),
