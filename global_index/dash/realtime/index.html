@@ -64,11 +64,11 @@
         <span class="zone-title has-tip tip-bottom" tabindex="0" data-tooltip="Paper-trading system equity maintained by the runner ledger. This excludes the broker account's total liquidation value.">Paper Equity</span>
         <div class="equity-line"><b id="metricEquity">--</b><strong id="performanceNet">--</strong></div>
         <small><em id="performanceReturn">--</em> <span id="performanceScope">--</span> / base <strong id="performanceBase">--</strong></small>
-        <small class="broker-account-line has-tip tip-bottom" tabindex="0" data-tooltip="The IBKR paper account's own equity, shown for context only. The runner ledger above is realised-only and re-anchors at the system epoch; the two are not the same number and are not meant to reconcile here."><span id="brokerAccountContext">--</span> <a href="/paper" class="reconcile-link">Reconcile</a></small>
+        <small class="broker-account-line has-tip tip-bottom" tabindex="0" data-tooltip="The paper account this route would start from, taken from the recorded baseline (track1-runtime.paper_account) and proven against the broker. A fresh broker reading is shown beside it and may differ by live drift. The legacy runner's own last view is a different number from a different era — it appears only under its own name and only with its age, never as the current account."><span id="brokerAccountContext">--</span> <a href="/paper" class="reconcile-link">Reconcile</a></small>
       </div>
 
-      <div class="header-zone model-inputs-zone runner-derived" id="modelInputsZone">
-        <span class="zone-title has-tip tip-bottom" tabindex="0" data-tooltip="Regime, SPY source date, and fitted-model age used by the runner. Input freshness is separate from scheduler timing.">Model Inputs</span>
+      <div class="header-zone model-inputs-zone" id="modelInputsZone">
+        <span class="zone-title has-tip tip-bottom" tabindex="0" data-tooltip="Regime, SPY session and fitted-model anchor, read from the Track 1 regime record. Input freshness is separate from scheduler timing.">Model Inputs</span>
         <div class="model-input-item model-input-regime">
           <span>Regime</span><b id="sessionRegime">--</b>
         </div>
@@ -159,20 +159,96 @@
           </details>
         </section>
 
+        <section class="section-band track1-section">
+          <div class="section-heading compact">
+            <h2>Track 1 Runtime</h2>
+            <span class="source-note" id="track1Source">Track 1 runtime not yet observed</span>
+          </div>
+          <div class="now-schedule-facts" id="track1Facts"></div>
+          <p class="source-note" id="track1Note"></p>
+        </section>
+
+        <!-- Stage 5ZZL. Two panels, deliberately separate. The market view answers "what did
+             price do while the sleeve was watching"; the regime monitor answers "what regime
+             does the model think we are in". Folding the second into a tab of the first would
+             say they are the same question about the same window, and they are not: one is
+             intraday and per sleeve, the other is daily and route-wide. -->
+        <!-- Stage 5ZZY. The market view laid out as three stacked cards under one verdict
+             line: the setup lanes (what each rule did, slot by slot), the price panel, and
+             the setup card. The order is the order an operator asks the questions in —
+             "did anything fire", then "what was price doing", then "what would it have
+             taken" — and each card carries its own header so a screenshot of one card is
+             still self-describing. -->
+        <section class="section-band market-view-section mv2">
+          <div class="mv2-head">
+            <span class="mv2-accent"></span>
+            <h2>Track 1 Market View</h2>
+            <div class="mv-tabs" id="marketViewTabs" role="tablist" aria-label="Sleeve"></div>
+            <span class="source-note mv2-meta" id="marketViewSource">Market view not yet read</span>
+          </div>
+          <!-- The verdict and the chips are two rows, not one: the verdict is the answer and
+               the chips are the evidence for it, and a reader who only takes in the first
+               line must still get the answer. -->
+          <div class="mv2-verdict" id="marketViewVerdict"></div>
+          <p class="mv-summary" id="marketViewSummary">--</p>
+          <div class="mv2-innertabs" id="marketViewInnerTabs"></div>
+          <div id="marketViewLanes"></div>
+          <div class="mv-chart" id="marketViewChart" role="img"
+               aria-label="Five-minute price bars for the selected sleeve window"></div>
+          <div id="marketViewSetup"></div>
+          <p class="source-note" id="marketViewNote"></p>
+        </section>
+
+        <!-- Stage 5ZZZ-E put Calm outside the sleeve tabs, because it is two instants half an
+             hour apart under a contract forbidding the first from seeing what the second
+             learns, and one tabbed card is where that leak would live. Stage 5ZZZ-F finishes
+             the move: it was still rendering INSIDE the market-view band, under whichever
+             sleeve happened to be selected, which read as though it belonged to that sleeve.
+             Its own band, with its own header, says whose values these are. -->
+        <section class="section-band market-view-section mv2" id="calmSection" hidden>
+          <div class="mv2-head">
+            <span class="mv2-accent"></span>
+            <h2>Calm &middot; two phases</h2>
+            <span class="source-note mv2-meta">09:32 decides &middot; 10:02 reads the price</span>
+          </div>
+          <div id="marketViewCalm"></div>
+        </section>
+
+        <section class="section-band regime-section rg2">
+          <div class="mv2-head">
+            <span class="mv2-accent purple"></span>
+            <h2>Regime Monitor</h2>
+            <span class="source-note mv2-meta" id="regimeSource">Regime not yet read</span>
+          </div>
+          <div class="rg2-card">
+            <div class="rg2-top">
+              <div class="rg2-anchor-cell" id="regimeFacts"></div>
+              <div class="rg2-metrics" id="regimeMetrics"></div>
+            </div>
+            <div class="rg2-mid">
+              <div class="rg2-post-cell" id="regimePosterior"></div>
+              <div class="rg2-feat-cell" id="regimeFeatures"></div>
+            </div>
+            <div class="regime-strip" id="regimeStrip"></div>
+            <p class="rg2-foot" id="regimeNote"></p>
+          </div>
+        </section>
+
         <section class="section-band positions-section">
           <div class="section-heading compact">
-            <h2>Open Positions</h2>
+            <h2>Open Positions <span class="source-note">legacy / drain</span></h2>
             <span class="source-note" id="positionSource">IBKR unavailable</span>
           </div>
           <div class="position-grid" id="positionGrid"></div>
         </section>
 
-        <section class="section-band decision-section runner-derived">
+        <section class="section-band decision-section runner-derived" id="decisionSection">
           <div class="section-heading compact">
             <h2>Today's Decision</h2>
             <span class="source-note has-tip tip-right" id="decisionSource" tabindex="0" data-tooltip="Entries, closes, and rejected signals emitted in the decision block of the newest runner snapshot.">Session unavailable</span>
           </div>
           <div class="section-body decision-shell">
+            <div class="decision-retired" id="decisionRetired" hidden></div>
             <div class="decision-summary" id="decisionSummary"></div>
             <div class="decision-groups">
               <section class="decision-group">

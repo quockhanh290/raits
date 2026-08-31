@@ -4286,3 +4286,626 @@ def test_a_slot_that_left_no_trace_at_all_stays_unexplained(monkeypatch, tmp_pat
 
     assert "NKD_NIGHT_0110" in {item["slot_id"] for item in status["unexplained_overdue"]}, (
         "mot slot khong he chay da bi coi la bi cat ngang")
+
+
+# --- Stage 5ZZZ-AF: the realtime page's fetch budget and its first paint -----------------
+#
+# Measured 2026-08-30, one machine, one warm backend process, same evidence tree:
+#
+#   runner-state 57-66ms · broker 3ms · schedule-status 41-93ms · open-issues 24-33ms
+#   runner-positions 3ms · track1-market-view 13-90ms
+#   track1-runtime  0.67-1.68s back to back, and 7.09s / 9.04s / 9.37s / 11.06s on the
+#                   first call after an idle gap, because it walks the whole
+#                   window_coverage + explanations tree with a cold OS file cache
+#
+# Two defects came out of that spread, and each test below pins one of them.
+
+MEASURED_TRACK1_RUNTIME_COLD_MS = 11_100
+
+
+def _realtime_js() -> str:
+    return (DASH / "realtime" / "realtime.js").read_text(encoding="utf-8")
+
+
+def test_the_track1_runtime_fetch_outlasts_its_measured_cold_read():
+    """A budget below the measured cold read fails on the one load a person is looking at.
+
+    The page gave all seven endpoints a single 6000ms timeout, and the slowest of them was
+    measured at 7.09s, 9.04s, 9.37s and 11.06s after an idle gap. So the panel announced
+    "Track 1 runtime endpoint did not answer" about a backend that answered correctly, and
+    it announced it on the FIRST poll, which is the only one a person sees on arrival.
+
+    Pinned as a relation to the measurement, not as a literal: the paper dashboard already
+    paid for a test that asserted the number instead of the behaviour.
+    """
+    js = _realtime_js()
+    call = re.search(r"fetchJson\('/api/v1/track1-runtime',\s*([A-Za-z0-9_]+)\s*\)", js)
+    assert call, "track1-runtime is fetched without a timeout of its own"
+    name = call.group(1)
+    if name.isdigit():
+        budget = int(name)
+    else:
+        decl = re.search(rf"const\s+{re.escape(name)}\s*=\s*(\d+)", js)
+        assert decl, f"the timeout constant {name} is never given a value"
+        budget = int(decl.group(1))
+    assert budget > MEASURED_TRACK1_RUNTIME_COLD_MS, (
+        f"track1-runtime gets {budget}ms but has been measured taking "
+        f"{MEASURED_TRACK1_RUNTIME_COLD_MS}ms cold, so the first load fails every time"
+    )
+
+
+def test_the_slowest_endpoint_does_not_gate_the_first_paint():
+    """One slow read must not decide when the rest of the page is allowed to appear.
+
+    track1-runtime sat inside the awaited `Promise.allSettled` batch, and `render()` ran
+    only after that batch settled. Measured on a fresh load with that endpoint slow: the
+    Market View summary read "--" and the Regime block was empty from 0.5s to somewhere
+    between 9.06s and 12.05s, while the market-view endpoint that fills BOTH had already
+    answered in 41ms. That is the "Market View shows no data even though the API worked"
+    report, and it is a frontend ordering defect, not a data one.
+    """
+    js = _realtime_js()
+    batch = re.search(r"const results = await Promise\.allSettled\(\[(.*?)\]\);", js, re.S)
+    assert batch, "poll() no longer has the settled batch this test is about"
+    assert "/api/v1/track1-market-view" in batch.group(1), (
+        "market-view left the batch — this test would then pass without checking anything"
+    )
+    assert "/api/v1/track1-runtime" not in batch.group(1), (
+        "track1-runtime is back inside the awaited batch, so its cold read once again holds "
+        "back the first paint of Market View and Regime"
+    )
+
+
+def test_the_track1_panel_separates_not_yet_answered_from_did_not_answer():
+    """Polling on its own clock creates a state that did not exist before: no answer YET.
+
+    Before the split, `state.track1` was always set by the time anything rendered, so the
+    renderer could treat "falsy" as "failed". Now there is a real moment on every load when
+    the request is simply still in flight, and printing "the endpoint did not answer" during
+    it is the same false alarm in the opposite direction.
+    """
+    js = _realtime_js()
+    assert "if (!t1 || t1.error) {" not in js, (
+        "the renderer still collapses 'not answered yet' into 'did not answer'"
+    )
+    assert re.search(r"if \(!t1\) \{", js), "there is no 'still reading' branch"
+    assert re.search(r"if \(t1\.error\) \{", js), "there is no 'answered with an error' branch"
+    assert "Reading the Track 1 evidence tree" in js
+    assert "Track 1 runtime endpoint did not answer" in js
+
+
+def test_only_one_track1_runtime_read_is_in_flight_at_a_time():
+    """The budget is longer than the poll interval, so overlap has to be closed explicitly.
+
+    20s budget against an 8s poll means up to three reads of the same evidence tree in
+    flight together, and whichever finished last would win — an older payload able to
+    overwrite a newer one.
+    """
+    js = _realtime_js()
+    assert "let track1InFlight = false;" in js
+    assert re.search(r"if \(track1InFlight\) return;", js)
+    # NOT a bare `"track1InFlight = false;" in js`: the DECLARATION one line up satisfies
+    # that substring, so deleting the release inside `finally` left the assert green while
+    # the guard latched shut forever and the panel stopped refreshing. The release has to be
+    # checked where it has to happen — in the finally, so a thrown read still opens the gate.
+    released = re.search(r"\}\s*finally\s*\{[^}]*track1InFlight = false;[^}]*\}", js)
+    assert released, "the in-flight guard is never released in a finally, so it latches shut"
+
+
+# --- Stage 5ZZZ-AG: which DAY the market view describes ----------------------------------
+#
+# The panel described the calendar day unconditionally. On Saturday 2026-08-29 and Sunday
+# 2026-08-30 that meant 22 NKD slots labelled "no record was written for this slot" for a
+# session that was never scheduled, and a summary line reading "Complete · 22/22 slots
+# observed" — Friday's count — printed directly above those 22 empty slots.
+#
+# The anchor is the last TRADING day, never "the last day that has data". The two agree on a
+# weekend and disagree on the one day that matters, which is what the second test is for.
+
+def _mv():
+    from monitor.backend import track1_market_view as mv
+    return mv
+
+
+def test_the_market_view_anchors_on_the_last_trading_day_when_the_market_is_shut():
+    mv = _mv()
+    # 2026-08-29 Sat and 2026-08-30 Sun both fall back to Friday the 28th.
+    assert mv._anchor_day("2026-08-29") == "2026-08-28"
+    assert mv._anchor_day("2026-08-30") == "2026-08-28"
+    # A holiday is a closed day too, and the fallback has to skip it rather than land on it:
+    # 2026-09-07 is Labor Day, so Tuesday the 8th looks back past it to Friday the 4th.
+    assert mv._anchor_day("2026-09-07") == "2026-09-04"
+    assert mv._anchor_day("2026-09-08") == "2026-09-08"
+    # An ordinary trading day anchors on itself.
+    assert mv._anchor_day("2026-08-28") == "2026-08-28"
+    assert mv._anchor_day("2026-08-31") == "2026-08-31"
+
+
+def test_a_trading_day_with_no_evidence_still_anchors_on_itself():
+    """The whole reason the rule is "last trading day" and not "last day with data".
+
+    A Wednesday where the scheduler died has no evidence at all. Anchoring on the last day
+    that HAS data would show Tuesday — complete, green, and the outage invisible. The
+    calendar decides the anchor and the evidence decides what is drawn on it, so an outage
+    shows up as the empty day it is.
+    """
+    mv = _mv()
+    # No root, no ledger, no bars are passed in — the anchor cannot be consulting evidence,
+    # because it is not given any. A trading day far enough ahead that nothing can exist for
+    # it still comes back as itself.
+    assert mv._anchor_day("2026-12-16") == "2026-12-16"     # a Wednesday
+    import inspect
+    params = list(inspect.signature(mv._anchor_day).parameters)
+    assert params == ["today"], (
+        f"_anchor_day takes {params}; anything beyond the date is an opening for the "
+        f"evidence to decide the anchor, which is the defect this rule exists to prevent"
+    )
+
+
+def test_the_coverage_verdict_is_for_the_day_shown_not_the_last_day_recorded(tmp_path):
+    """Two days in one sentence was the reported symptom; this pins the half that lied.
+
+    The ledger holds a COMPLETE Friday. Asked about the Monday after, the panel must not
+    hand back Friday's 22/22 — it must say the Monday is unobserved, which is what the
+    ledger itself says about a date with no `window_closed` record.
+    """
+    import global_index.window_ledger as wl
+    from global_index.track1_params import WINDOWS_ET
+
+    mv = _mv()
+    sleeve = sorted(WINDOWS_ET)[0]
+    d = tmp_path / "global_index" / "track1_runtime" / "window_coverage"
+    d.mkdir(parents=True)
+    exp = wl.expected_slots(sleeve) or 22
+    rows = [{"event": wl.SLOT_OBSERVED, "sleeve": sleeve, "date": "2026-08-28"}
+            for _ in range(exp)]
+    rows.append({"event": wl.WINDOW_CLOSED, "sleeve": sleeve, "date": "2026-08-28",
+                 "outcome": wl.COMPLETE, "signal": wl.NO_SIGNAL,
+                 "expected_slots": exp, "observed_slots": exp})
+    (d / "window_coverage_20260828.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+
+    friday = mv._coverage(tmp_path, "2026-08-28")
+    assert friday[sleeve]["outcome"] == wl.COMPLETE
+    assert friday[sleeve]["observed_slots"] == exp, "the fixture itself has to be readable"
+
+    monday = mv._coverage(tmp_path, "2026-08-31")
+    assert monday[sleeve]["date"] == "2026-08-31"
+    assert monday[sleeve]["outcome"] == wl.UNOBSERVED
+    assert monday[sleeve]["observed_slots"] == 0, (
+        "Friday's count leaked onto Monday — this is the 'Complete · 22/22' printed above "
+        "22 empty slots that the stage was opened on"
+    )
+    assert monday[sleeve]["usable_as_evidence"] is False
+
+
+def test_the_page_says_when_it_is_showing_a_closed_session():
+    """Anchoring on Friday and staying silent about it is the same lie pointed the other way.
+
+    The payload carries `session_is_today`, and the chip strip has to read it: without a
+    line saying so, "Complete · no signal" from Friday reads as this morning's verdict.
+    """
+    js = _realtime_js()
+    assert "session_is_today === false" in js, (
+        "nothing on the page reacts to the session not being today"
+    )
+    assert "Closed today" in js
+    # And the backend must actually publish the field the page keys off.
+    src = (BACKEND / "track1_market_view.py").read_text(encoding="utf-8")
+    for field in ('"session_is_today"', '"today_et"', '"session_anchor"',
+                  '"session_anchor_reason"'):
+        assert field in src, f"{field} is read by the page but never published"
+
+
+# --- Stage 5ZZZ-AH: recorded evidence beats a replay of it -------------------------------
+
+def test_the_setup_card_prefers_what_the_slot_recorded_over_a_replay(tmp_path, monkeypatch):
+    """The replay reads the persisted bar store; the slot read the live provider join.
+
+    They are not the same data, and the block that carries the replay says so in its own
+    warning. So a session that HAS a recorded block was being described by a reconstruction
+    of itself — the weaker of two available answers, shown as though it were the only one.
+    """
+    from global_index import track1_strategy_diagnostics as sd
+
+    mv = _mv()
+    day, sleeve = "2026-08-31", "global_nkd"
+    block = {"schema": sd.SCHEMA, "sleeve": sleeve, "slot_id": "TRACK1_NKD_0255",
+             "session_date": day, "diagnostics_source": sd.RECORDED,
+             "detector": "track1_normal_r4", "last_bar_ts": "2026-08-31 02:55:00",
+             "bars_evaluated": 22, "reconstructed_at": None, "reconstructed_through": None,
+             "warning": "", "summary": "recorded by the slot",
+             "nearest_failed_condition": None, "price_levels": [], "levels_armed": False,
+             "setup": None, "gates": [],
+             "rows": [{"label": "Trend filter (EMA 10)", "value": 66600.0,
+                       "display_value": "66,600.00", "unit": "price", "threshold": None,
+                       "comparator": "", "passed": None, "detail": "", "missing": None}]}
+    sd.record(block, root=tmp_path, day=day)
+
+    # If the replay were reached it would raise, so this also proves which path ran.
+    def _must_not_run(*a, **k):                      # pragma: no cover - the point is it isn't
+        raise AssertionError("the reconstruction ran even though a recorded block exists")
+    monkeypatch.setattr(mv, "_normal_r4_reconstruction", _must_not_run)
+
+    out = mv._strategy(tmp_path, sleeve, day, mv.SLEEVES[sleeve])
+    assert out["diagnostics_source"] == sd.RECORDED
+    assert out["rules"], "the recorded rows did not reach the payload"
+    assert out["rules"][0]["value"] == 66600.0
+    assert out["rules"][0]["source"] == sd.RECORDED
+
+
+def test_a_session_with_no_recorded_block_still_falls_back_to_the_replay(tmp_path, monkeypatch):
+    """The guard against fixing one blank by creating another.
+
+    Every session before the recording seam landed has no block at all, and those days must
+    keep showing the replay rather than going empty.
+    """
+    mv = _mv()
+    sentinel = {"status": "replayed", "rules": [], "diagnostics_source": "reconstructed_today"}
+    monkeypatch.setattr(mv, "_normal_r4_reconstruction",
+                        lambda root, sleeve, day, spec, out, **k: dict(sentinel))
+    out = mv._strategy(tmp_path, "global_nkd", "2026-08-28", mv.SLEEVES["global_nkd"],
+                       now="2026-08-28 03:00")
+    assert out["status"] == "replayed", "an absent recorded block took the panel blank"
+
+
+def test_the_page_header_dates_the_track1_session_not_the_legacy_snapshot():
+    """The date at the top is the frame every panel under it is read in.
+
+    Measured 2026-08-30: the header read "Aug 24, 2026" — the legacy runner's last snapshot,
+    six days old — while Track 1's own last session was 2026-08-28.
+    """
+    js = _realtime_js()
+    assert "sessionDate(snap?.date);" not in js, "the header still dates the legacy snapshot"
+    assert "const t1SessionDay = state.marketView?.market_view?.session_date;" in js
+    assert "sessionDate(t1SessionDay || snap?.date)" in js, (
+        "the legacy date must remain the fallback for a machine with no Track 1 record"
+    )
+    # The legacy LOG fetches must keep the legacy day: asking for session events on a day the
+    # legacy runner never held a session is a request that can only come back empty.
+    assert "const sessionDay = latestSnap()?.date;" in js, (
+        "the session-events / execution-quality fetches were switched to the Track 1 day; "
+        "those logs belong to the legacy runner and only exist on its own days"
+    )
+
+
+# --- Stage 5ZZZ-AJ: the panel must not answer a rule the engine answers differently -------
+
+def test_the_ema_row_states_a_measurement_and_never_a_verdict():
+    """It printed a tick mark for a test it was not performing.
+
+    The sleeve's EMA filter is `|pullback_bar.close - ema| / ema <= 0.005` — a PROXIMITY test
+    on bar[-2]. The row computed `resume_bar.close - ema > 0` — a SIGN test on bar[-1], which
+    is the DIRECTION gate, a different gate one step later in the same function.
+
+    Measured on the real stores, 3,999 bars per sleeve, row answer against engine gate:
+    NKD agree 52.7% (says PASSED where the gate refuses 1.9%, says FAILED where it allows
+    45.4%); Swing agree 53.8% / 3.1% / 43.1%. The worst bar printed "passed" while sitting
+    7.06% from the EMA against a 0.50% threshold.
+
+    Recomputing the real test in the diagnostics module would be a second implementation of a
+    rule that trades. So the number stays and the verdict goes.
+    """
+    from global_index import track1_strategy_diagnostics as sd
+
+    # Inherits the real observer rather than duck-typing it. Stage 5ZZZ-AW gave `rows()` a
+    # verdict copied from the slot's own `regime` gate, and a stand-in that only carried a last
+    # bar stopped satisfying the contract. Subclassing keeps the contract whole -- with no
+    # gates recorded, the Regime row simply has no verdict, which is the honest answer.
+    class _Obs(sd.NormalR4Observer):
+        first_failed_gate = None
+        regime_detail = ""
+
+    obs = _Obs()
+
+    class _Bar:
+        def __init__(self, close, volume): self.close, self.volume = close, volume
+
+    # A bar 5% above the EMA: the old row called this "passed"; the engine's gate refuses it.
+    obs.last_bar = {"ema": 100.0, "atr": 1.0, "avgv": 10.0, "bar_ts": "2026-08-31 02:55",
+                    "regime": "Normal", "resume_bar": _Bar(105.0, 12.0)}
+    rows = sd.NormalR4Observer.rows(obs, ema_period=10)
+    by_label = {r["label"]: r for r in rows}
+    assert "Price vs EMA" not in by_label, "the row still carries the old, wrong name"
+    row = by_label.get("Close minus EMA")
+    assert row is not None, "the distance row disappeared instead of losing its verdict"
+    assert row["value"] == 5.0, "the measurement itself must survive — only the verdict goes"
+    assert row["passed"] is None, (
+        "the row still publishes a verdict for a test it does not perform"
+    )
+
+
+def test_rules_that_cannot_have_an_entry_verdict_leave_the_lanes(tmp_path):
+    """A lane that must stay empty forever is a lane an operator learns to skip.
+
+    Measured across every stored session — 291 slot records, 5 days, three sleeves — not one
+    of the 24 declared rules has ever carried a verdict. For twenty-one that is a gap waiting
+    on the detector. For these three it is permanent: the window is applied by slicing the
+    bars before the detector runs, and the other two govern a position that does not exist at
+    entry time.
+    """
+    from global_index import track1_signals as sig
+
+    mv = _mv()
+    assert set(sig.NOT_ENTRY_CONDITIONS) == {"japan_session_window", "max_hold_context",
+                                            # Stage 5ZZZ-BG: declared by the
+                                            # Stress sleeve, never evaluated.
+                                            "no_regime_label_required",
+                                             "stop_arm_rule"}
+    # Every name classified out has to still BE a declared rule, or the classification is
+    # silently doing nothing and the lanes would look correct for the wrong reason.
+    declared = {n for s in sig.RULES for n in sig.RULES[s]}
+    assert set(sig.NOT_ENTRY_CONDITIONS) <= declared, (
+        "a name was classified out of the lanes that no sleeve declares — the two lists drifted"
+    )
+    for sleeve in ("global_nkd", "roska4_swing"):
+        entry = set(sig.entry_rule_names(sleeve))
+        assert entry, "a sleeve lost every entry rule"
+        assert entry < set(sig.rule_names(sleeve)), "nothing was classified out for this sleeve"
+        assert not (entry & set(sig.NOT_ENTRY_CONDITIONS))
+
+    rows = [{"sleeve": "global_nkd", "slot_id": "TRACK1_NKD_0110",
+             "rule_checks": [{"rule": n, "threshold": None, "comparator": "", "detail": "",
+                              "source": "not_exposed_by_sleeve", "passed": None}
+                             for n in sig.rule_names("global_nkd")]}]
+    slots = [{"slot_id": "TRACK1_NKD_0110", "time_et": "01:10", "status": "no_signal"}]
+    lanes = {L["rule"] for L in mv._rule_lanes(rows, "global_nkd", slots)}
+    assert "japan_session_window" not in lanes and "max_hold_context" not in lanes
+    # Stage 5ZZZ-AS moved the per-BAR rules to the grid, so `ema10_filter` is no longer the
+    # witness that an entry rule survived. `regime_lag_1` is: the detector answers it once per
+    # slot, so a lane cell can hold it, and it must not be swept out with the two above.
+    assert "regime_lag_1" in lanes, "an entry rule was swept out with them"
+    assert "ema10_filter" not in lanes, (
+        "a per-bar rule is back in the per-slot lanes; within one slot it is answered once "
+        "per bar and the cell has no single value")
+
+    cfg = mv._declared_config(rows, "global_nkd")
+    assert {c["rule"] for c in cfg} == {"japan_session_window", "max_hold_context"}, (
+        "they left the lanes and were not reported anywhere else — that is deletion, not a move"
+    )
+    assert all(c["reason"] for c in cfg), "each has to say WHY it carries no verdict"
+
+
+def test_the_page_draws_the_declared_config_row():
+    js = _realtime_js()
+    css = (DASH / "realtime" / "realtime.css").read_text(encoding="utf-8")
+    assert "function mvDeclaredConfig(s)" in js
+    assert "${mvDeclaredConfig(s)}" in js, "the block is defined but never drawn"
+    assert "s.declared_config" in js
+    assert ".mv2-lane-track.config" in css, "the row has no layout and would stack on the cells"
+
+
+# --- Stage 5ZZZ-AM: the verdict belongs to the BAR, never to the slot --------------------
+#
+# Measured by cutting the window at every five-minute mark through a real session and
+# re-asking the detector: 865 verdicts computed, 80 distinct, and NOT ONE that differed
+# between cuts. A bar's answer is fixed when the bar closes.
+#
+# That is what makes a grid possible. The panel drew one cell per SLOT, and a slot cell has
+# no single value: the 14:10 slot has seen one bar, the 15:55 slot twenty-two, and within one
+# slot a rule can come back twelve times pass and ten times fail. Which is why every detector
+# rule has read "value not published" on all 291 slot records ever written — not for want of
+# data, but because the question had no answer.
+
+def _observer_with(events):
+    from global_index import track1_strategy_diagnostics as sd
+    obs = sd.NormalR4Observer()
+    for e in events:
+        obs({"kind": "bar_gate", **e})
+    return obs
+
+
+def test_the_grid_is_anchored_on_bars_and_marks_gates_that_never_ran():
+    from global_index import track1_strategy_diagnostics as sd
+
+    obs = _observer_with([
+        {"gate": "ema", "passed": True, "value": 1, "threshold": 0.005, "bar_ts": "t1"},
+        {"gate": "vol", "passed": False, "value": 2, "threshold": 3, "bar_ts": "t1"},
+        {"gate": "ema", "passed": False, "value": 9, "threshold": 0.005, "bar_ts": "t2"},
+        # t2 never reaches `vol` — the EMA gate returned first. That absence has to READ as
+        # an absence, not as a pass and not as a failure.
+        {"gate": "ema", "passed": True, "value": 1, "threshold": 0.005, "bar_ts": "t3"},
+        {"gate": "vol", "passed": True, "value": 4, "threshold": 3, "bar_ts": "t3"},
+    ])
+    g = obs.bar_gate_grid()
+    assert g["bars"] == ["t1", "t2", "t3"], "the columns are not the bars, in bar order"
+    rows = {r["gate"]: r for r in g["rows"]}
+    assert rows["ema"]["cells"] == "PFP"
+    assert rows["vol"]["cells"] == "F-P", (
+        "a gate that never ran on a bar is drawn as though it had — 'did not run' and "
+        "'ran and passed' are different facts about the route"
+    )
+    assert (rows["vol"]["reached"], rows["vol"]["passed"]) == (2, 1)
+    assert (rows["ema"]["reached"], rows["ema"]["passed"]) == (3, 2)
+    assert rows["ema"]["threshold"] == 0.005, "the row lost the threshold it was measured on"
+    # The funnel is the same pass, so the summary and the cells cannot disagree.
+    assert rows["vol"]["reached"] == rows["ema"]["passed"], (
+        "the funnel does not chain: `reached` on a later gate must equal `passed` on the one "
+        "before it, because the gates are ordered and the first refusal returns"
+    )
+
+
+def test_the_persisted_block_never_carries_the_raw_per_bar_events():
+    """A slot can produce 154 of them and every slot of every session persists a block.
+
+    This repo already carries one array nobody capped: it reached 360 KB inside a 426 KB
+    file, one entry per trading day, and it was found by reading the file rather than by any
+    check. Twenty-two characters per rule do not do that.
+    """
+    from global_index import track1_strategy_diagnostics as sd
+
+    obs = _observer_with([{"gate": "ema", "passed": True, "value": i, "threshold": 1,
+                           "bar_ts": f"t{i}"} for i in range(40)])
+    block = sd.normal_r4_block(sleeve="global_nkd", slot_id="S", ema_period=10,
+                               observer=obs, setup=None, data_identity="d",
+                               source=sd.RECORDED)
+    assert "bar_gate_grid" in block
+    assert "bar_gates" not in block, "the raw event list reached the persisted record"
+    assert block["bar_gate_grid"]["rows"][0]["cells"] == "P" * 40
+    assert len(json.dumps(block, default=str)) < 8000, "the block is growing without a bound"
+
+
+def test_the_bar_grid_never_lands_in_the_slot_lanes():
+    """Two axes, and merging them is the defect this stage exists to end.
+
+    `rule_lanes` is one cell per SLOT and `bar_grid` is one cell per BAR. A reader who takes
+    one for the other is reading a verdict against the wrong instant.
+    """
+    mv = _mv()
+    src = (BACKEND / "track1_market_view.py").read_text(encoding="utf-8")
+    assert 'blk["bar_grid"]' in src, "the grid never reaches the payload"
+    assert "bar_gate_grid" in src
+
+    # A per-SLOT rule, because a per-bar one no longer produces a lane at all and the
+    # assertion below would then be counting cells on an empty list.
+    rows = [{"sleeve": "global_nkd", "slot_id": "TRACK1_NKD_0110",
+             "rule_checks": [{"rule": "regime_lag_1", "threshold": None, "comparator": "",
+                              "detail": "", "source": "not_exposed_by_sleeve",
+                              "passed": None}]}]
+    slots = [{"slot_id": "TRACK1_NKD_0110", "time_et": "01:10", "status": "no_signal"}]
+    lanes = mv._rule_lanes(rows, "global_nkd", slots)
+    assert lanes, "the fixture produced no lanes — this test would pass on nothing"
+    for lane in lanes:
+        assert len(lane["cells"]) == len(slots), (
+            "a lane has a cell count that is not the slot count, so something bar-shaped "
+            "was written into the slot axis"
+        )
+
+
+def test_the_page_draws_the_bar_grid_apart_from_the_lanes():
+    js = _realtime_js()
+    css = (DASH / "realtime" / "realtime.css").read_text(encoding="utf-8")
+    assert "function mvBarGrid(s)" in js
+    # Stage 5ZZZ-AS gave the grid its own tab, so it is drawn through its card wrapper rather
+    # than appended to the lanes. The thing being pinned is unchanged: it reaches the page.
+    assert "mvBarGridCard(s)" in js, "the grid is built but never drawn"
+    assert "function mvBarGridCard(s)" in js
+    assert "s.bar_grid" in js
+    assert "one cell per bar, not per slot" in js, (
+        "nothing on the page tells the reader the grid is on a different axis from the lanes"
+    )
+    assert ".mv2-bargrid" in css, "the grid has no fence and would read as more lanes"
+
+
+def test_track1_never_paints_the_page_before_the_batch_has_landed():
+    """A race I put there, found by three DOM tests failing on one run and a different one
+    on the next.
+
+    `pollTrack1` awaits ONE request; the batch awaits six and then a second round of three
+    before it renders. So Track 1 nearly always won on a fresh load and its `render()`
+    painted the whole page out of empty state — a status rail with no runner behind it and
+    every metric reading "--". The DOM tests wait for that rail and then read a metric, so
+    they read the empty pass.
+
+    Nothing is lost by waiting: before the batch lands there is nothing else to draw.
+    """
+    js = _realtime_js()
+    assert "let firstBatchRendered = false;" in js
+    assert "if (firstBatchRendered) render();" in js, (
+        "pollTrack1 renders unconditionally again — it can repaint the page from empty state"
+    )
+    # The flag has to be raised by the BATCH, not by Track 1, or it means nothing.
+    m = re.search(r"firstBatchRendered = true;\s*\n\s*render\(\);", js)
+    assert m, "the flag is never raised where the batch renders"
+    # And raised BEFORE that render, so a Track 1 read landing mid-render is not suppressed
+    # for a whole extra cycle.
+    assert js.index("firstBatchRendered = true;") < js.index(
+        "$('fatalBanner').hidden") + js[js.index("$('fatalBanner').hidden"):].index("render();") \
+        + js.index("$('fatalBanner').hidden")
+
+
+def test_the_detail_tabs_survive_a_session_with_bars_but_no_slot_records():
+    """The strip gated on the LANES alone, and that stopped being right when the grid became
+    a tab of its own.
+
+    Early on a trading day the replay can have scanned bars while no slot has written a record
+    yet: per-bar verdicts exist, lanes do not, and the whole strip vanished -- taking the only
+    route to those verdicts with it. Found on a live page at 04:25 ET on a Monday, where the
+    session anchored on today and today had no records.
+    """
+    js = _realtime_js()
+    assert "const hasGrid" in js and "if (!hasLanes && !hasGrid)" in js, (
+        "the tab strip is gated on lanes alone again, so a session with bars and no slot "
+        "records has no way to reach its per-bar verdicts"
+    )
+
+
+# --- Stage 5ZZZ-AU: a job that never spawns a child was invisible ------------------------
+#
+# Measured across every August scheduler log: five bracketed labels had NEVER become a job
+# card, because a card was only opened on a line carrying `-m global_index.`. Three of them
+# are registered scheduler jobs -- `PREFLIGHT`, the 13:45 gate that decides whether the
+# session runs at all; `SPY_WEEKEND_PRE_NKD_CHECK`; and `SPY_LAST_CHANCE_PRE_NKD`, which is
+# visible on the days it has work and vanishes on the days it looks and finds the data
+# already fresh. `MAXHOLD_T1` carries a CRITICAL about a five-day Track 1 position possibly
+# not being closed.
+#
+# The invisible case was the GOOD one, which is why no failure ever revealed it.
+
+def _journal_from(lines, tmp_path, day="2026-08-31"):
+    from monitor.backend import job_journal_reader as jj
+
+    (tmp_path / f"scheduler_{day[5:7]}{day[8:10]}.log").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8")
+    return jj.read_job_journal(day, root=tmp_path)
+
+
+def test_an_in_process_job_gets_a_card_and_that_card_is_closed(tmp_path):
+    """One line in, one finished card out.
+
+    A card left open would sit on the operations page reading "running" forever -- an alarm
+    with no off switch, which is worse than the silence it replaced.
+    """
+    d = _journal_from([
+        "2026-08-31 00:45:00  INFO     run_scheduler — [SPY_LAST_CHANCE_PRE_NKD] nothing to "
+        "do — the daily series covers 2026-08-28",
+    ], tmp_path)
+    jobs = {j["job_id"]: j for j in d["jobs"]}
+    assert "SPY_LAST_CHANCE_PRE_NKD" in jobs, "an in-process job is invisible again"
+    job = jobs["SPY_LAST_CHANCE_PRE_NKD"]
+    assert job["ended_at"] is not None, "the card never closes and reads as running forever"
+    assert job["status"] == "completed"
+    assert "nothing to do" in (job["reason"] or "")
+
+
+def test_a_critical_from_an_in_process_job_is_a_failed_card(tmp_path):
+    """`MAXHOLD_T1` logs CRITICAL when the catch-up that closes a five-day Track 1 position
+    fails. That must not arrive as a green card, and must not arrive as nothing."""
+    d = _journal_from([
+        "2026-08-31 09:31:00  CRITICAL  run_scheduler — [MAXHOLD_T1] CATCH-UP THAT BAI",
+    ], tmp_path)
+    jobs = {j["job_id"]: j for j in d["jobs"]}
+    assert "MAXHOLD_T1" in jobs
+    assert jobs["MAXHOLD_T1"]["status"] == "failed"
+
+
+def test_the_heartbeat_is_a_pulse_and_never_a_job(tmp_path):
+    """545 lines of the word "alive" across August. Cards for those would bury the page this
+    journal exists to keep readable."""
+    d = _journal_from([
+        f"2026-08-31 {h:02d}:00:00  INFO     run_scheduler — [HEARTBEAT] alive"
+        for h in range(6)
+    ], tmp_path)
+    assert d["jobs"] == [], f"the heartbeat became {len(d['jobs'])} job cards"
+
+
+def test_every_scheduler_job_can_reach_the_journal():
+    """The two-way check, run against the REAL scheduler rather than a list kept here.
+
+    A job added to the scheduler that the journal can never show is the defect this stage
+    exists to close, and it is the kind that is only ever found by somebody asking.
+    """
+    from monitor.backend import job_journal_reader as jj
+
+    src = (ROOT / "global_index" / "run_scheduler.py").read_text(encoding="utf-8")
+    registered = {i.upper() for i in re.findall(r'id="([a-z0-9_]+)"', src)}
+    assert registered, "no scheduler jobs were found — this test would pass on nothing"
+    unreachable = sorted(j for j in registered
+                         if j in jj._LIVENESS_LABELS and j != "HEARTBEAT")
+    assert not unreachable, (
+        f"these registered jobs are classified as a pulse and can never appear: {unreachable}")
+    # And the liveness list stays a list of pulses, not a place things get hidden.
+    assert jj._LIVENESS_LABELS == frozenset({"HEARTBEAT"}), (
+        "something new was excluded from the journal; a label that is not a pulse belongs on "
+        "the page, and hiding it here is how a job goes quiet without anyone deciding it should"
+    )

@@ -167,8 +167,93 @@ h2 { font-size: 21px; }
 .source-note { max-width: 52%; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .section-body { min-width: 0; }
 .now-monitor-shell { display: grid; gap: 10px; overflow: visible; }
-.now-schedule-facts { min-width: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
-.schedule-fact { min-width: 0; padding: 9px 11px; }
+/* One cell inset for every fact grid on the page, declared on the container so both the
+   schedule strip and the Track 1 panel read the SAME number. The skin raises it; whichever
+   value is in force, the two panels move together instead of one of them being edited. */
+.now-schedule-facts { min-width: 0; --fact-pad: 9px 11px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+/* Stage 5AB — Track 1 runtime facts only. A blocker id is one unbroken 38-character
+   token ('B1_broker_account_or_legacy_retirement') and it overflowed its cell into the
+   neighbouring value at 1440x900, which the overlap test caught. Scoped to this panel
+   so no existing fact grid changes. */
+/* Stage 5ZP. `Route track1_candidate` and `Orders possible no` were rendering as one run-on
+   string because label and value were inline siblings with no separation of their own. The
+   panel now uses the same shape as `.schedule-fact` next door: a small uppercase label on its
+   own line, the value beneath it, and room for a long blocker list to wrap instead of
+   pushing into the column beside it. No new card, no new colours — the existing tokens. */
+/* The panel borrowed the fact grid's CARD — background, edge, corner radius — but its cells
+   carry `.fact`, and every rule that dresses a cell is written for `.schedule-fact`. So it
+   inherited the container and none of the cell: zero inset, so the text sat against the card
+   edge, and no divider, so twelve facts read as one block of text. The inset is now the
+   grid's own `--fact-pad`, and the dividers are drawn by each cell casting a hairline on
+   its own right and bottom edge, which stays correct at one, two or four columns without
+   anything having to count cells.
+
+   NOT by a 1px gap over a hairline ground, which was the first attempt: the fact count is
+   not a multiple of the column count, so the last row is part empty — and with the ground
+   set to the hairline colour that empty remainder became a visible lighter block three
+   cells wide. A gap paints the space between cells AND the space where there are none. */
+/* Stage 5ZZL: the regime panel reuses this label/value pair, so it is named here
+   rather than given a parallel set of rules. Measured before it was: the regime rows
+   rendered UNSTYLED -- label inline at 14px instead of block at 11px -- so 'Regime'
+   and 'Calm' ran together into one word. One label language on the page, which is
+   what the comment above this block already argues for. */
+#track1Facts .fact, #regimeFacts .fact {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--fact-pad);
+  box-shadow: 1px 0 0 var(--line-hair), 0 1px 0 var(--line-hair);
+}
+/* One label language on the page. These were the only labels set in mono at weight 700;
+   every other label — the schedule cells, and IMPACT / ACTION / EVIDENCE inside a job —
+   is uppercase sans at 500 with the same tracking. */
+#track1Facts .fact-label, #regimeFacts .fact-label {
+  display: block;
+  color: var(--t-label);
+  text-transform: uppercase;
+  font: 500 11px/1.4 var(--sans);
+  letter-spacing: .1em;
+}
+/* Values stay mono — that is the page's convention for a value — but at the weight the
+   rest of the page uses. 600 made this the boldest text in the panel. */
+#track1Facts .fact-value, #regimeFacts .fact-value {
+  min-width: 0;
+  color: var(--t-primary);
+  font: 400 13px/1.45 var(--mono);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+/* A blocker list is the one value that can be long. It wraps as chips rather than as one
+   unbroken string, so a third gate does not push the panel wider. */
+#track1Facts .t1-gates, #regimeFacts .t1-gates { display: flex; flex-wrap: wrap; gap: 4px; }
+#track1Facts .t1-gate, #regimeFacts .t1-gate {
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  color: var(--amber);
+  font: 700 11px/1.25 var(--mono);
+  white-space: normal;
+}
+/* The sentence under the panel wears `.source-note`, which is built for the one-line note
+   that sits at the RIGHT of a section heading: right-aligned, capped at 52% width, no
+   wrapping, and anything past the cap replaced with an ellipsis. Under a panel that made
+   the note start at a ragged indent and cut it off — measured at 1920px, the text needed
+   1255px of a 736px box, so roughly two fifths of it was never on screen. Below a panel a
+   note is a paragraph: it starts at the left and it wraps. */
+#track1Note {
+  max-width: 100%;
+  margin-top: 8px;
+  text-align: left;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+@media (max-width: 720px) {
+  #track1Facts .fact-value, #regimeFacts .fact-value { font-size: 12px; }
+}
+.schedule-fact { min-width: 0; padding: var(--fact-pad); }
 .schedule-fact + .schedule-fact { border-left: 1px solid var(--line); }
 .schedule-fact > span { display: block; margin-bottom: 6px; color: var(--dim); text-transform: uppercase; font: 700 11px/1 var(--mono); }
 .schedule-fact > div { min-width: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
@@ -591,3 +676,1152 @@ tbody tr:last-child td { border-bottom: 0; }
 @media (prefers-reduced-motion: reduce) {
   .fact-scheduler.ok .scheduler-live-dot { animation: none; }
 }
+
+
+
+/* Stage 5ZE — job view: operational health first, signal chip second.
+   Both reuse the existing chip language (`.event-status`: 3px 6px, 1px currentColor border,
+   3px radius, mono 700 11px) rather than inventing a second one. No new card, no new column,
+   and nothing that widens the schedule table. */
+
+/* Stage 5ZP. The signal chip was a bordered pill spanning its own grid row, which is what
+   made every Track 1 job row two lines tall and made the chip read as a different kind of
+   object from RUNNER and COMPLETED beside it. It now uses `.event-status` outright and only
+   carries its tone; nothing here changes size, spacing or shape. */
+.event-status.signal-good    { color: var(--green); }
+.event-status.signal-warn    { color: var(--amber); }
+.event-status.signal-watch   { color: var(--blue); }
+.event-status.signal-bad     { color: var(--red); }
+.event-status.signal-neutral { color: var(--muted); }
+.event-status.signal-muted   { color: var(--dim); }
+
+/* The two expanded sections. Same spacing and label weight as the existing
+   IMPACT / ACTION blocks, so the panel reads as one thing rather than three. */
+/* `.journal li` above dresses a top-level journal ROW: a 3px rail, a hairline under it,
+   a bullet dot and a -10px bleed so the row sits flush with the card edge. It matches by
+   DESCENT, so every bullet inside an expanded panel was wearing it too — a seven-line
+   Operational block drew seven rails, seven hairlines and seven dots, and each line sat
+   10px outside the band's own text column (measured: label at x=1526, line at x=1516).
+   A list inside the panel is a list, not a row. Reset here rather than at each list, so
+   the next list added inside a panel does not have to remember. */
+.job-detail li { margin: 0; border: 0; }
+.job-detail li::before { content: none; }
+.job-section { margin-top: 10px; }
+.job-section > b {
+  display: inline-block;
+  margin-bottom: 4px;
+  color: var(--dim);
+  font: 700 10px/1 var(--mono);
+  letter-spacing: .08em;
+  position: relative;
+}
+.job-section .job-lines { list-style: none; margin: 0; padding: 0; }
+/* Same ink as every other paragraph in the panel. These lines were the only body text
+   in the expanded card set in `--muted` at weight 500 — dimmer AND heavier than the
+   evidence, impact and resolution text beside them, which reads as a footnote rather
+   than as the answer to "did the slot run correctly". */
+.job-section .job-lines li {
+  padding: 1px 0;
+  color: var(--text);
+  font: 400 12px/1.5 var(--sans);
+  overflow-wrap: anywhere;
+}
+.job-operational.warn > b { color: var(--amber); }
+.job-operational.bad > b  { color: var(--red); }
+
+.signal-candidates { list-style: none; margin: 4px 0 0; padding: 0; }
+.signal-candidates li {
+  padding: 1px 0;
+  color: var(--bright);
+  font: 500 12px/1.5 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .event-status.signal-good, .event-status.signal-warn { white-space: normal; }
+}
+
+/* Stage 5ZZF — whose route an open issue belongs to. Same pill geometry as `.issue-status`
+   beside it, so the badge lane keeps one shape and only the colour carries the meaning. The
+   legacy and debt lanes are deliberately quieter than TRACK 1: they must stay visible without
+   competing with a live Track 1 incident for the eye. */
+.issue-scope {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  border: 1px solid currentColor;
+  opacity: .85;
+}
+.issue-scope.track1    { color: var(--accent, #4ea1ff); opacity: 1; }
+.issue-scope.scheduler { color: var(--muted, #8a94a6); }
+.issue-scope.legacy    { color: var(--muted, #8a94a6); opacity: .7; }
+.issue-scope.known_debt{ color: var(--muted, #8a94a6); opacity: .6; }
+
+
+/* Stage 5ZZH. Group headings in the open-issue list — Track 1 / Shared / Legacy.
+   A rule, not a card: the list already carries every issue's own badges, and a second box
+   around each group would double the chrome to add one word. The heading is the smallest
+   thing that answers "whose problem is this" before anything is clicked. */
+.issue-group + .issue-group { margin-top: 10px; }
+.issue-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 2px;
+  border-bottom: 1px solid var(--line-hair, #191d24);
+  margin-bottom: 4px;
+}
+.issue-group-head b {
+  color: var(--t-label, #8a94a6);
+  text-transform: uppercase;
+  font: 500 11px/1.4 var(--sans);
+  letter-spacing: .1em;
+}
+.issue-group-head span { color: var(--dim, #6a7284); font: 400 11px/1.4 var(--mono); }
+/* Track 1's own group is the one that can block a go-live, so it reads at full strength
+   while the other two sit back. Same three-tier weighting the scope chips already use, so
+   the page is not learning a second visual language for the same distinction. */
+.issue-group-track1 .issue-group-head b { color: var(--accent, #4ea1ff); }
+.issue-group-legacy .issue-group-head b { opacity: .7; }
+
+/* Narrow widths: the heading must never push the list wider than its column. */
+@media (max-width: 720px) {
+  .issue-group-head { flex-wrap: wrap; }
+  .issue-group-head b { min-width: 0; overflow-wrap: anywhere; }
+}
+
+/* Stage 5ZZH. The Paper Equity card must not push the page sideways.
+
+   Two `white-space: nowrap` rules meet here: the headline figure, and the account-context
+   note under it. Both were written when the headline was `$50,408` and the note was short.
+   The headline now carries its currency — `USD 250,818`, because a money figure whose
+   currency is a guess is how this card came to subtract a CAD-era number from a USD one —
+   and the note carries the baseline, the broker reading and the legacy figure with its age.
+   Measured at 720px: the card overflowed its column by 17px before this stage and by 59px
+   after the longer headline landed. Both are fixed here, not just the one I caused.
+
+   Wrapping rather than ellipsis: an ellipsis on an account balance hides digits, and a
+   truncated money figure that still looks like a money figure is worse than a wrapped one. */
+@media (max-width: 1100px) {
+  .equity-line { flex-wrap: wrap; row-gap: 4px; }
+  .equity-line > b { min-width: 0; overflow-wrap: anywhere; }
+  .equity-zone > small { white-space: normal; overflow-wrap: anywhere; }
+}
+@media (max-width: 560px) {
+  /* Below this the figure alone is wider than the column at 31px. */
+  .equity-line > b { font-size: 26px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════
+   Stage 5ZZL — Track 1 Market View and Regime Monitor.
+
+   Flat and operational, in the language the page already speaks: `.section-band` for the
+   panel, the `#track1Facts` label/value pair for the regime rows, and the chip shape the
+   scope badges use for the tabs. No card inside a card, no hero, no gradient — this sits
+   between the Track 1 runtime panel and the positions table and should read as their
+   neighbour rather than as a feature.  */
+
+.mv-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.mv-tab {
+  padding: 3px 10px;
+  border: 1px solid var(--line, #262b33);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--t-label, #8a94a6);
+  font: 500 11px/1.4 var(--sans);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.mv-tab:hover { color: var(--t-primary, #d7dee8); }
+.mv-tab.on {
+  color: var(--accent, #4ea1ff);
+  border-color: currentColor;
+}
+
+.mv-summary {
+  margin: 0 0 10px;
+  color: var(--t-primary, #d7dee8);
+  font: 400 13px/1.45 var(--mono);
+  overflow-wrap: anywhere;
+}
+.mv-summary.negative { color: var(--red, #c64b4b); }
+.mv-summary.ok { color: var(--t-primary, #d7dee8); }
+
+/* A FIXED height, so switching tabs never moves the rest of the page. A panel that resizes
+   under the pointer is a panel an operator misclicks. */
+.mv-chart {
+  position: relative;
+  height: 320px;
+  border: 1px solid var(--line-hair, #191d24);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.mv-svg { display: block; width: 100%; height: 100%; }
+
+.mv-grid  { stroke: var(--line-hair, #191d24); stroke-width: 1; }
+.mv-band  { fill: var(--accent, #4ea1ff); opacity: .06; }
+.mv-axis  { fill: var(--dim, #6a7284); font: 400 11px/1 var(--mono); }
+.mv-time  { text-anchor: middle; }
+.mv-up    { stroke: var(--green, #3f9e6b); fill: var(--green, #3f9e6b); }
+.mv-down  { stroke: var(--red, #c64b4b); fill: var(--red, #c64b4b); }
+.mv-wick  { stroke-width: 1; }
+.mv-body  { stroke-width: 0; }
+.mv-mark  { stroke-width: 1.5; }
+.mv-level { stroke: var(--amber, #c9a227); stroke-width: 1; stroke-dasharray: 4 3; }
+.mv-level-label { fill: var(--amber, #c9a227); }
+.mv-cross { stroke: var(--muted, #8a94a6); stroke-width: 1; stroke-dasharray: 2 3; }
+
+.mv-tip {
+  position: absolute;
+  top: 8px;
+  padding: 3px 8px;
+  border: 1px solid var(--line, #262b33);
+  border-radius: 3px;
+  background: var(--panel, #12161c);
+  color: var(--t-primary, #d7dee8);
+  font: 400 11px/1.5 var(--mono);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* An empty chart must look decided, not broken. Centred, worded, and inside the same box the
+   chart would occupy, so the panel does not change shape when bars arrive. */
+.mv-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 18px;
+  text-align: center;
+}
+.mv-empty b {
+  color: var(--t-label, #8a94a6);
+  text-transform: uppercase;
+  font: 500 11px/1.4 var(--sans);
+  letter-spacing: .1em;
+}
+.mv-empty span {
+  max-width: 46ch;
+  color: var(--dim, #6a7284);
+  font: 400 12px/1.5 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+/* ── regime ─────────────────────────────────────────────────────────────────────────── */
+.regime-strip { margin-top: 10px; }
+.regime-run { display: flex; gap: 2px; height: 14px; }
+.regime-cell { flex: 1 1 0; min-width: 2px; border-radius: 1px; background: var(--muted, #8a94a6); }
+.regime-calm   { background: var(--green, #3f9e6b); color: var(--green, #3f9e6b); }
+.regime-normal { background: var(--accent, #4ea1ff); color: var(--accent, #4ea1ff); }
+.regime-stress { background: var(--amber, #c9a227); color: var(--amber, #c9a227); }
+.regime-crisis { background: var(--red, #c64b4b); color: var(--red, #c64b4b); }
+
+.regime-recent { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.regime-day { display: flex; align-items: baseline; gap: 5px; }
+.regime-day b { color: var(--dim, #6a7284); font: 400 11px/1.4 var(--mono); }
+.regime-day em { font: 500 11px/1.4 var(--mono); font-style: normal; }
+
+@media (max-width: 720px) {
+  .mv-chart { height: 240px; }
+  .mv-summary { font-size: 12px; }
+  .mv-tip { font-size: 10px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════
+   Stage 5ZZM — Market View and Regime Monitor visual polish.
+
+   Nothing new is invented here. The chip is the page's existing chip — 3px 6px, a 1px border
+   in currentColor, radius 3, 700/11 mono, uppercase, nowrap — the same shape `.issue-status`
+   and `.issue-origin` already wear, so a reader is not learning a second badge language two
+   panels down. Only the tone variants are named.  */
+
+.mv-summary { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+.mv-chip {
+  padding: 3px 6px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  color: var(--t-label, #8a94a6);
+  font: 700 11px/1.25 var(--mono);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+/* Tone carries meaning, not decoration: bad is a refusal, warn is incomplete, good is a
+   signal, live is in-progress, muted is a statement of fact with nothing to act on. */
+.mv-chip.bad   { color: var(--red, #c64b4b); }
+.mv-chip.warn  { color: var(--amber, #c9a227); }
+.mv-chip.good  { color: var(--green, #3f9e6b); }
+.mv-chip.live  { color: var(--accent, #4ea1ff); }
+.mv-chip.muted { color: var(--dim, #6a7284); }
+
+/* The marker key. Sits under the chart, in label type rather than mono, because it is prose
+   about the picture and not a value. */
+.mv-legend {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 5px 10px;
+  border-top: 1px solid var(--line-hair, #191d24);
+  background: var(--panel, #12161c);
+}
+.mv-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--dim, #6a7284);
+  font: 400 11px/1.4 var(--sans);
+}
+.mv-key {
+  width: 8px; height: 8px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+}
+/* The chart keeps its fixed height and the legend is laid over its foot, so adding the key
+   cannot move the panel — the property the tab-switch test pins. */
+.mv-chart { padding-bottom: 0; }
+.mv-svg { height: 100%; }
+
+.mv-band-label {
+  fill: var(--dim, #6a7284);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font: 500 9px/1 var(--sans);
+}
+.mv-lane { stroke: var(--line-hair, #191d24); stroke-width: 1; }
+
+/* ── regime ─────────────────────────────────────────────────────────────────────────── */
+/* The label is the anchor of the panel. Larger than a fact value and smaller than the page's
+   headline equity figure — it is the most important thing here and not the most important
+   thing on the page. */
+.regime-anchor {
+  /* A grid child with no `min-width: 0` refuses to shrink below its content, and this one
+     holds a 22px figure plus two clauses. Measured before this line: the regime panel
+     overflowed its column by 178px at 720px and 111px at 1440px. Spanning the full row as
+     well, because the anchor is the panel's heading and not one fact among several. */
+  min-width: 0;
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: var(--fact-pad);
+  box-shadow: 1px 0 0 var(--line-hair, #191d24), 0 1px 0 var(--line-hair, #191d24);
+}
+.regime-anchor b { font: 500 22px/1.1 var(--mono); }
+.regime-anchor span { color: var(--t-label, #8a94a6); font: 400 12px/1.4 var(--mono); }
+.regime-anchor em { color: var(--dim, #6a7284); font: 400 11px/1.4 var(--mono); font-style: normal; }
+.regime-anchor.warn b { color: var(--amber, #c9a227); }
+
+.regime-rowhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  margin-bottom: 5px;
+}
+.regime-rowhead > span {
+  color: var(--t-label, #8a94a6);
+  text-transform: uppercase;
+  font: 500 11px/1.4 var(--sans);
+  letter-spacing: .1em;
+}
+.regime-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.regime-legend-item {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--dim, #6a7284); font: 400 11px/1.4 var(--sans);
+}
+.regime-key { width: 8px; height: 8px; border-radius: 2px; }
+
+/* Shorter and quieter than before: sixty unlabelled cells at full strength read as a barcode.
+   The run is context, the last-five row underneath is what gets read. */
+.regime-run { height: 10px; gap: 1px; opacity: .8; }
+.regime-recent { align-items: baseline; }
+.regime-recent-head {
+  color: var(--t-label, #8a94a6);
+  text-transform: uppercase;
+  font: 500 11px/1.4 var(--sans);
+  letter-spacing: .1em;
+}
+
+@media (max-width: 720px) {
+  .regime-anchor b { font-size: 19px; }
+  .mv-legend { gap: 3px 10px; padding: 4px 8px; }
+  .mv-legend-item { font-size: 10px; }
+}
+
+/* Stage 5ZZM. A tooltip on the RIGHTMOST cell of a fact grid opens past the panel edge and
+   shows up as container overflow — measured at 11px on the regime panel at 720px, and zero
+   once the tooltips were removed. The page already solves this for the header zones
+   (`.header-zone:last-child .has-tip::after { left: auto; right: 0 }`); the same flip is
+   applied here rather than inventing a second remedy. */
+#regimeFacts .fact:last-child .has-tip::after,
+#track1Facts .fact:last-child .has-tip::after { left: auto; right: 0; }
+#regimeFacts .fact:last-child .has-tip::before,
+#track1Facts .fact:last-child .has-tip::before { left: auto; right: 12px; }
+
+/* Same edge case one panel up: the LAST chip in the summary row carries a tooltip and sits
+   against the panel's right edge, so its bubble opens outside. Measured 85px at 720px, and it
+   only appeared once the shorter copy let the chips reflow onto fewer lines — a reminder that
+   this class of overflow moves when the text does, which is why it is measured at three
+   widths after every copy change rather than once. */
+.mv-summary .mv-chip.has-tip:last-child::after { left: auto; right: 0; }
+.mv-summary .mv-chip.has-tip:last-child::before { left: auto; right: 12px; }
+
+/* Stage 5ZZQ. Setup metrics, the posterior distribution and the feature table.
+   All three reuse the label/value idiom the fact grids already use — uppercase sans label at
+   11px, mono value — so the page is not learning a fourth way to show a number. They sit
+   OUTSIDE the chart's fixed box, so the pinned panel height is untouched. */
+.mv-setup, #regimePosterior, #regimeFeatures { margin-top: 10px; }
+.mv-setup-head {
+  margin-bottom: 6px;
+  color: var(--t-label, #8a94a6);
+  text-transform: uppercase;
+  font: 500 11px/1.4 var(--sans);
+  letter-spacing: .1em;
+}
+.mv-setup-note { margin: 8px 0 0; color: var(--dim, #6a7284); font: 400 12px/1.5 var(--mono); }
+
+.mv-metrics { display: flex; flex-wrap: wrap; gap: 6px; }
+.mv-metric {
+  flex: 1 1 150px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-hair, #191d24);
+  border-left: 2px solid var(--muted, #8a94a6);
+  border-radius: 3px;
+}
+/* The failing condition nearest its threshold is the one an operator is asking about, so it
+   is the only one given emphasis. Colour alone would make four cards shout at once. */
+.mv-metric.ok   { border-left-color: var(--green, #3f9e6b); }
+.mv-metric.bad  { border-left-color: var(--red, #c64b4b); }
+.mv-metric.near { border-left-width: 3px; background: rgba(198, 75, 75, .05); }
+.mv-metric-label {
+  color: var(--t-label, #8a94a6); text-transform: uppercase;
+  font: 500 10px/1.3 var(--sans); letter-spacing: .08em; overflow-wrap: anywhere;
+}
+.mv-metric b  { color: var(--t-primary, #d7dee8); font: 400 14px/1.3 var(--mono); }
+.mv-metric em { color: var(--dim, #6a7284); font: 400 11px/1.3 var(--mono); font-style: normal; }
+.mv-metric i  { color: var(--red, #c64b4b); font: 400 11px/1.3 var(--mono); font-style: normal; }
+
+.regime-post { display: flex; flex-direction: column; gap: 3px; }
+.regime-post-row { display: grid; grid-template-columns: 68px 1fr 62px; align-items: center; gap: 8px; }
+.regime-post-row > span { color: var(--t-label, #8a94a6); font: 400 11px/1.4 var(--mono); }
+.regime-post-row > i { height: 8px; border-radius: 2px; min-width: 1px; }
+.regime-post-row > b { color: var(--t-primary, #d7dee8); font: 400 11px/1.4 var(--mono); text-align: right; }
+
+.regime-feat { width: 100%; border-collapse: collapse; }
+.regime-feat th {
+  padding: 3px 6px 3px 0; text-align: left;
+  color: var(--t-label, #8a94a6); text-transform: uppercase;
+  font: 500 10px/1.4 var(--sans); letter-spacing: .08em;
+  border-bottom: 1px solid var(--line-hair, #191d24);
+}
+.regime-feat td {
+  padding: 4px 6px 4px 0;
+  color: var(--t-primary, #d7dee8); font: 400 12px/1.4 var(--mono);
+  overflow-wrap: anywhere;
+}
+.regime-feat td em { color: var(--dim, #6a7284); font-style: normal; }
+.regime-feat td.muted { color: var(--dim, #6a7284); }
+
+@media (max-width: 720px) {
+  .mv-metric { flex-basis: 100%; }
+  .regime-feat { font-size: 11px; }
+  .regime-post-row { grid-template-columns: 56px 1fr 54px; }
+}
+
+/* Stage 5ZZQ. The feature table at phone width.
+   Measured at 375px: four columns carrying "Realised volatility, 5-day annualised" overflowed
+   the panel by 208px. A horizontally scrolling container would have hidden the overflow rather
+   than removed it — and the row would still have been unreadable. Below 560px each row becomes
+   a block: the input name on its own line, the three readings beneath it. */
+@media (max-width: 560px) {
+  .regime-feat, .regime-feat tbody, .regime-feat tr, .regime-feat td { display: block; width: 100%; }
+  .regime-feat thead { display: none; }
+  .regime-feat tr {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line-hair, #191d24);
+  }
+  .regime-feat td { padding: 1px 0; }
+  .regime-feat td:first-child {
+    color: var(--t-label, #8a94a6);
+    text-transform: uppercase;
+    font: 500 10px/1.3 var(--sans);
+    letter-spacing: .08em;
+  }
+}
+
+/* Stage 5ZZR. A level that is real but not in play must look different from one that is.
+   Stress computes its trigger from the pre-session low at 10:30 whether or not the basket gate
+   passes. Hiding it would withhold a number the operator wants to read; drawing it like a live
+   level would put a tradable line on a day nothing is trading. So: dotted and dim when not
+   armed, solid and amber when a candidate is live, and the label says which. */
+.mv-level.muted { stroke: var(--dim, #6a7284); stroke-width: 1; stroke-dasharray: 2 4; opacity: .65; }
+.mv-level.armed { stroke: var(--amber, #c9a227); stroke-width: 1.5; stroke-dasharray: none; }
+.mv-level-label.muted { fill: var(--dim, #6a7284); }
+.mv-level-label.armed { fill: var(--amber, #c9a227); }
+
+/* Stage 5ZZR. A chip tooltip carrying a long sentence built a bubble wider than the panel —
+   measured 78px of overflow at 720px once the strategy-type chip started carrying its own
+   source proof. The existing last-child flip does not help a chip in the middle of a wrapped
+   row, so the bubble is capped and allowed to wrap instead: a remedy that does not depend on
+   which chip happens to sit at the edge. */
+.mv-summary .mv-chip.has-tip::after {
+  max-width: min(280px, 78vw);
+  white-space: normal;
+}
+
+/* Anchor the chip tooltip to the ROW, not to the chip.
+   A bubble positioned against its chip extends past the panel whenever that chip sits near the
+   right edge, and which chip that is changes with the wording — so the last-child flip used
+   elsewhere cannot cover it. Making the row the positioning context means the bubble starts at
+   the row's left edge and is capped at the row's width, and no arrangement of chips can push it
+   out. This is the third place this pseudo-element has produced phantom container overflow;
+   it is the first fix that does not depend on where the element happens to sit. */
+.mv-summary { position: relative; }
+.mv-summary .mv-chip.has-tip { position: static; }
+.mv-summary .mv-chip.has-tip::after {
+  left: 0;
+  right: auto;
+  max-width: 100%;
+  white-space: normal;
+}
+.mv-summary .mv-chip.has-tip::before { left: 16px; right: auto; }
+
+/* `max-width: 100%` on a content-box pseudo-element is 100% PLUS its own padding and border.
+   Measured at 375px: row 343px wide, bubble capped at 343 and rendered 367 — the 24px is
+   9/11px padding and a 1px border on each side. Sizing it by the border box is what makes the
+   cap mean what it says. */
+.mv-summary .mv-chip.has-tip::after { box-sizing: border-box; }
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════
+   Stage 5ZZY — Track 1 Market View and Regime Monitor, laid out as cards.
+
+   Every colour here is a token from `shared/tokens.css`. Nothing in this block writes a
+   hex: the reference design and that token file already agree value for value, and a
+   literal written here would be the copy that drifts when the palette moves.
+
+   Class names are new (`mv2-`, `rg2-`) rather than overrides of the old ones. The three
+   pages that share `realtime.js` also share this sheet, and a redefinition of `.mv-setup`
+   would have reached `/paper` and the design-preview page as a silent side effect.
+   ═══════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── section chrome ─────────────────────────────────────────────────────────────────── */
+.mv2-head {
+  display: flex; align-items: center; gap: 14px;
+  padding: 4px 0 14px; flex-wrap: wrap;
+}
+.mv2-head h2 {
+  margin: 0; color: var(--t-primary);
+  font: 600 17px/1.2 var(--sans); letter-spacing: -.01em;
+}
+.mv2-accent {
+  width: 3px; height: 15px; border-radius: 2px;
+  background: var(--d-exposure); flex: 0 0 3px;
+}
+.mv2-accent.purple { background: var(--d-runner); }
+.mv2-meta {
+  margin-left: auto; color: var(--t-label);
+  font: 400 12px/1.4 var(--mono); white-space: nowrap;
+}
+
+/* ── the verdict line ───────────────────────────────────────────────────────────────── */
+.mv2-verdict { margin: 0 0 10px; }
+.mv2-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 12px; border: 1px solid var(--line-card); border-radius: 6px;
+  background: var(--deep); white-space: nowrap;
+}
+.mv2-pill > i {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--t-null); flex: 0 0 7px;
+}
+.mv2-pill > b {
+  color: var(--t-primary); font: 600 14px/1.3 var(--sans); letter-spacing: -.005em;
+}
+.mv2-pill > span { color: var(--t-secondary); font: 400 14px/1.3 var(--sans); }
+.mv2-pill.good  { border-color: var(--s-ok-bg);   background: #0f1a16; }
+.mv2-pill.good > i { background: var(--s-ok); }
+.mv2-pill.good > b { color: var(--s-ok-text); }
+.mv2-pill.live  { border-color: #233348; background: #0d1420; }
+.mv2-pill.live > i { background: var(--d-exposure); }
+.mv2-pill.live > b { color: #8dc0f7; }
+.mv2-pill.warn  { border-color: #2a2620; background: #0f0e0b; }
+.mv2-pill.warn > i { background: var(--s-warn); }
+.mv2-pill.warn > b { color: var(--s-warn); }
+.mv2-pill.bad   { border-color: #33232a; background: #100f12; }
+.mv2-pill.bad > i { background: var(--s-bad); }
+.mv2-pill.bad > b { color: var(--s-bad-text); }
+
+/* ── inner tabs ─────────────────────────────────────────────────────────────────────── */
+.mv2-innertabs { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
+.mv2-innertabs[hidden] { display: none; }
+.mv2-tabset {
+  display: flex; gap: 3px; padding: 3px;
+  border: 1px solid var(--line-card); border-radius: 7px; background: var(--card);
+}
+.mv2-tab {
+  padding: 6px 14px; border: 0; border-radius: 5px; background: transparent;
+  color: var(--t-label); font: 500 12px/1 var(--sans); letter-spacing: .06em;
+  cursor: pointer; white-space: nowrap;
+}
+.mv2-tab:hover { color: var(--t-secondary); }
+.mv2-tab.on { background: var(--s-ok-bg); color: var(--s-ok-text); }
+.mv2-tabnote { color: var(--t-label); font: 400 12px/1.4 var(--sans); }
+
+/* ── cards ──────────────────────────────────────────────────────────────────────────── */
+.mv2-card {
+  border: 1px solid var(--line-card); border-radius: 8px;
+  background: var(--card); overflow: hidden; margin-bottom: 14px;
+}
+.mv2-card-head {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px 18px; border-bottom: 1px solid var(--line-hair); background: var(--deep);
+}
+.mv2-kicker {
+  color: var(--t-label); font: 500 11px/1 var(--sans);
+  letter-spacing: .1em; text-transform: uppercase;
+}
+.mv2-mono { color: var(--t-secondary); font: 400 11px/1.4 var(--mono); }
+.mv2-mono.dim, .mv2-lane-thr.dim, .rg2-feat-rank .dim { color: var(--t-null); }
+.mv2-head-right { margin-left: auto; }
+.mv2-ohlc { color: var(--t-primary); font: 400 13px/1.3 var(--mono); }
+.mv2-ohlc.dim { color: var(--t-label); }
+.mv2-chg { font: 400 12px/1.3 var(--mono); }
+.mv2-chg.up { color: var(--s-ok); }
+.mv2-chg.down { color: var(--s-bad-text); }
+.mv2-chg.warn { color: var(--s-warn); }
+.mv2-chg.dim { color: var(--t-label); }
+
+/* ── data health strip ──────────────────────────────────────────────────────────────── */
+.mv2-health {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding: 9px 18px; border-bottom: 1px solid var(--line-hair);
+}
+.mv2-health-item { display: flex; align-items: center; gap: 8px; }
+.mv2-health-item > span { color: var(--t-label); font: 400 12px/1.3 var(--sans); }
+.mv2-health-item > b { font: 400 12px/1.3 var(--mono); white-space: nowrap; }
+.mv2-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--t-null); flex: 0 0 5px; }
+.mv2-dot.ok { background: var(--s-ok); }
+.mv2-dot.bad { background: var(--s-bad); }
+.mv2-dot.warn { background: var(--s-warn); }
+.mv2-dot.muted { background: var(--t-null); }
+.ok   { color: var(--s-ok-text); }
+.mv2-health-item b.ok { color: var(--t-secondary); }
+b.bad, .mv2-lane-value.bad { color: var(--s-bad-text); }
+b.warn { color: var(--s-warn); }
+b.muted, .mv2-lane-value.muted { color: var(--t-label); }
+
+/* ── rule lanes ─────────────────────────────────────────────────────────────────────── */
+.mv2-lane {
+  display: grid; grid-template-columns: 212px 1fr 126px;
+  border-bottom: 1px solid var(--line-hair);
+}
+.mv2-lanes .mv2-lane:last-child { border-bottom: 1px solid var(--line-hair); }
+.mv2-lane-name {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 11px 16px; border-right: 1px solid var(--line-hair);
+}
+.mv2-lane-name > .mv2-dot { margin-top: 5px; }
+.mv2-lane-label { color: var(--t-primary); font: 400 13px/1.3 var(--sans); }
+.mv2-lane-thr {
+  color: var(--t-label); font: 400 11px/1.4 var(--mono);
+  margin-top: 5px; word-break: break-word;
+}
+.mv2-lane-track {
+  position: relative; min-height: 44px;
+  border-right: 1px solid var(--line-hair);
+}
+.mv2-lane-track.slots { min-height: 38px; }
+/* Cells are absolutely placed on a percentage scale shared by every lane and by the slot
+   strip below them, so a cell and the slot decision under it are the same minute. */
+.mv2-cell {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  height: 12px; border-radius: 2px; background: var(--t-null); border: 0;
+}
+.mv2-cell.ok { background: var(--s-ok); }
+.mv2-cell.bad { background: var(--s-bad); }
+.mv2-cell.muted { background: #2a323d; }
+.mv2-cell.hollow { background: transparent; border: 1px solid #3a424f; }
+.mv2-cell.norec { background: transparent; border: 1px solid var(--s-bad); }
+.mv2-cell.future { background: transparent; border: 1px dashed var(--line-open); }
+.mv2-lane-value {
+  padding: 11px 16px; text-align: right;
+  color: var(--t-secondary); font: 400 11px/1.4 var(--mono);
+}
+.mv2-lane-value.ok { color: var(--s-ok); }
+.mv2-lane-slots { background: var(--deep); }
+.mv2-slot {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 8px; height: 8px; border-radius: 50%; border: 1px solid transparent;
+}
+.mv2-lane-axis { border-bottom: 0; }
+.mv2-lane-axis .mv2-lane-track { min-height: 26px; }
+.mv2-axis-t {
+  position: absolute; top: 6px; color: var(--t-label);
+  font: 400 11px/1 var(--mono); white-space: nowrap;
+}
+.mv2-legend {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 11px 18px; border-top: 1px solid var(--line-hair); background: var(--deep);
+}
+.mv2-legend-item {
+  display: flex; align-items: center; gap: 7px;
+  color: var(--t-secondary); font: 400 12px/1 var(--sans);
+}
+.mv2-legend-item .mv2-cell {
+  position: static; transform: none; width: 11px; height: 9px; flex: 0 0 11px;
+}
+
+/* ── setup card ─────────────────────────────────────────────────────────────────────── */
+.mv2-setup { display: grid; }
+.mv2-setup-2 { grid-template-columns: 1.4fr 1fr; }
+.mv2-setup-3 { grid-template-columns: 1.2fr 1fr 1fr; }
+.mv2-setup-col { padding: 14px 18px; border-right: 1px solid var(--line-hair); }
+.mv2-setup-col:last-child { border-right: 0; }
+.mv2-summary-text {
+  margin: 0; color: var(--t-secondary);
+  font: 400 13px/1.5 var(--sans); text-wrap: pretty;
+}
+.mv2-miss {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin-top: 15px; padding-top: 13px; border-top: 1px solid var(--line-hair);
+}
+.mv2-miss > .mv2-dot { margin-top: 6px; }
+.mv2-miss-text {
+  color: var(--t-primary); font: 400 13px/1.5 var(--sans);
+  margin-top: 5px; text-wrap: pretty;
+}
+.mv2-conds { display: flex; flex-direction: column; gap: 9px; margin-top: 11px; }
+.mv2-cond {
+  display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: baseline;
+  padding-bottom: 9px; border-bottom: 1px solid var(--line-faint);
+}
+.mv2-cond:last-child { border-bottom: 0; padding-bottom: 0; }
+.mv2-cond-label {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--t-primary); font: 400 13px/1.3 var(--sans);
+}
+.mv2-cond-val { text-align: right; }
+.mv2-cond-val > b {
+  display: block; color: var(--t-primary);
+  font: 400 14px/1.2 var(--mono); white-space: nowrap;
+}
+.mv2-cond-val > em {
+  display: block; margin-top: 5px; font: 500 10px/1 var(--mono);
+  letter-spacing: .1em; font-style: normal; color: var(--t-label);
+}
+.mv2-cond-val > em.ok { color: var(--s-ok); }
+.mv2-cond-val > em.bad { color: var(--s-bad-text); }
+.mv2-levels { display: flex; flex-direction: column; gap: 9px; margin-top: 11px; }
+.mv2-level { display: flex; align-items: center; gap: 8px; }
+.mv2-level > span { color: var(--t-label); font: 400 12px/1.3 var(--sans); }
+.mv2-level > b {
+  margin-left: auto; color: var(--t-primary); font: 400 12px/1.3 var(--mono);
+}
+.mv2-level > em {
+  font: 400 10px/1 var(--mono); font-style: normal; color: var(--t-null);
+}
+.mv2-level.muted > b { color: var(--t-secondary); }
+.mv2-level-key { width: 10px; height: 2px; border-radius: 1px; background: var(--t-null); flex: 0 0 10px; }
+.mv2-level-entry { background: var(--d-exposure); }
+.mv2-level-stop { background: var(--s-bad); }
+.mv2-level-target { background: var(--s-ok); }
+.mv2-level-trigger { background: var(--d-risk); }
+.mv2-level-reference { background: #3a424f; }
+.mv2-nolevels {
+  display: flex; align-items: center; gap: 8px; width: fit-content; margin-top: 11px;
+  padding: 5px 11px; border: 1px solid var(--line-card); border-radius: 5px;
+  background: var(--deep); color: var(--t-secondary); font: 400 12px/1.3 var(--sans);
+}
+.mv2-why {
+  margin: 10px 0 0; color: var(--t-label);
+  font: 400 12px/1.5 var(--sans); text-wrap: pretty;
+}
+
+/* ── regime monitor ─────────────────────────────────────────────────────────────────── */
+.rg2-card {
+  border: 1px solid var(--line-card); border-radius: 8px;
+  background: var(--card); overflow: hidden;
+}
+.rg2-top, .rg2-mid {
+  display: grid; grid-template-columns: 300px 1fr;
+  border-bottom: 1px solid var(--line-hair);
+}
+.rg2-anchor-cell, .rg2-post-cell {
+  padding: 13px 18px; border-right: 1px solid var(--line-hair);
+}
+.rg2-feat-cell { padding: 13px 18px; }
+.rg2-metrics { display: grid; grid-template-columns: repeat(4, 1fr); }
+.rg2-metric { padding: 13px 18px; border-right: 1px solid var(--line-hair); }
+.rg2-metric:last-child { border-right: 0; }
+.rg2-metric-val {
+  margin-top: 6px; color: var(--t-primary);
+  font: 500 18px/1.1 var(--mono); letter-spacing: -.01em; white-space: nowrap;
+}
+.rg2-metric-note {
+  margin-top: 6px; color: var(--t-label);
+  font: 400 12px/1.4 var(--sans); text-wrap: pretty;
+}
+.rg2-label-row { display: flex; align-items: center; gap: 11px; }
+.rg2-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--t-null); flex: 0 0 8px; }
+.rg2-label { font: 600 23px/1.1 var(--sans); letter-spacing: -.02em; color: var(--t-primary); }
+.rg2-held { margin-left: auto; color: var(--d-money); font: 400 11px/1.3 var(--mono); }
+.rg2-check { display: flex; align-items: center; gap: 8px; margin-top: 9px; }
+.rg2-check > span { font: 400 12px/1.3 var(--sans); color: var(--s-ok-text); }
+.rg2-check.warn > span { color: var(--s-warn); }
+.rg2-asof { margin-top: 7px; color: var(--t-label); font: 400 11px/1.4 var(--mono); }
+.rg2-key { width: 6px; height: 6px; border-radius: 2px; background: var(--t-null); flex: 0 0 6px; }
+.rg2-feat-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.rg2-feats { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 14px; }
+.rg2-feat {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: baseline;
+  padding-bottom: 9px; border-bottom: 1px solid var(--line-faint);
+}
+.rg2-feat-label { color: var(--t-secondary); font: 400 13px/1.3 var(--sans); }
+.rg2-feat-val { color: var(--t-primary); font: 400 13px/1.3 var(--mono); white-space: nowrap; }
+.rg2-feat-rank { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.rg2-feat-rank > span:first-child { color: var(--t-label); font: 400 11px/1.3 var(--mono); }
+.rg2-feat-rank > i { width: 1px; height: 9px; background: var(--line-button); }
+.rg2-feat-rank > span:last-child { font: 400 11px/1.3 var(--sans); }
+.rg2-foot {
+  display: block; padding: 12px 18px; margin: 0;
+  background: var(--deep); border-top: 1px solid var(--line-hair);
+}
+.rg2-foot > b { display: block; color: var(--t-primary); font: 400 13px/1.4 var(--sans); }
+.rg2-foot > span {
+  display: block; margin-top: 5px; max-width: 130ch;
+  color: var(--t-secondary); font: 400 12px/1.5 var(--sans); text-wrap: pretty;
+}
+/* The run strip: one flex segment per run, weighted by its length in days. */
+.regime-strip .regime-run { display: flex; gap: 3px; margin-top: 10px; align-items: flex-start; }
+.regime-runseg { min-width: 0; }
+.regime-runseg > i { display: block; height: 10px; border-radius: 3px; background: var(--t-null); }
+.regime-runseg > span {
+  display: block; margin-top: 5px; color: var(--t-label); font: 400 10px/1.2 var(--mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.regime-post-row { display: grid; grid-template-columns: 74px 1fr 56px; gap: 11px; align-items: center; }
+.regime-post-row > span:first-child { display: flex; align-items: center; gap: 7px; color: var(--t-primary); font: 400 12px/1.3 var(--sans); }
+.regime-post-row.faint > span:first-child, .regime-post-row.faint > b { color: var(--t-null); }
+.regime-post-track { height: 5px; border-radius: 3px; background: #141920; overflow: hidden; }
+.regime-post-track > i { display: block; height: 100%; border-radius: 3px; background: var(--t-null); }
+.regime-post-row > b { text-align: right; color: var(--t-primary); font: 400 12px/1.3 var(--mono); }
+.regime-recent .regime-day { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Below the lane grid's comfortable width the three columns stop being three columns.
+   Measured at 1024px the 212px name column and the 126px value column left
+   under 200px of track, which is not a row of 24 cells — it is a smear. */
+@media (max-width: 1180px) {
+  .mv2-lane { grid-template-columns: 168px 1fr 104px; }
+  .rg2-top, .rg2-mid { grid-template-columns: 240px 1fr; }
+  .rg2-feats { grid-template-columns: 1fr; }
+}
+@media (max-width: 900px) {
+  .mv2-lane { grid-template-columns: 1fr; }
+  .mv2-lane-name, .mv2-lane-track { border-right: 0; }
+  .mv2-lane-value { text-align: left; padding-top: 0; }
+  .mv2-setup-2, .mv2-setup-3 { grid-template-columns: 1fr; }
+  .mv2-setup-col { border-right: 0; border-bottom: 1px solid var(--line-hair); }
+  .rg2-top, .rg2-mid { grid-template-columns: 1fr; }
+  .rg2-anchor-cell, .rg2-post-cell { border-right: 0; border-bottom: 1px solid var(--line-hair); }
+  .rg2-metrics { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Stage 5ZZY corrections, each from looking at the rendered panel ─────────────────── */
+
+/* `#marketViewChart` used to BE the plot box and carried its 320px height. It is now the
+   price CARD — head, data-health strip, plot and legend — so that height was squeezing the
+   plot into what was left after the two strips, and the time axis fell off the bottom.
+   The height moves to the plot itself, which is the thing that needs to be fixed so the
+   tab switch cannot move the panel. */
+#marketViewChart {
+  position: static; height: auto; border: 0; border-radius: 0; overflow: visible;
+}
+#marketViewChart .mv-svg { height: 320px; }
+#marketViewChart .mv-chart, #marketViewChart .mv-tip { position: relative; }
+#marketViewChart .mv2-card > .mv-svg { display: block; }
+/* Legacy laid the legend OVER the chart's foot (`position:absolute; bottom:0`) because the
+   box had a fixed height and the key had to not move the panel. Inside the card the plot
+   owns the height and the legend is a row under it, so it goes back in the flow — left
+   absolute it anchored to the section instead and floated off the bottom of the card. */
+#marketViewChart .mv-legend {
+  position: static; padding: 11px 18px;
+  border-top: 1px solid var(--line-hair); background: var(--deep);
+}
+/* Two features side by side crushed a three-word label into three lines. The column count
+   follows the width instead of being fixed at two. */
+.rg2-feats { grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); }
+
+/* The empty state reads as a sentence, so it is set like one. Centred, it read as a
+   placeholder for something still loading. */
+#marketViewLanes .mv-empty {
+  display: block; text-align: left; padding: 22px 18px; border: 0;
+}
+#marketViewLanes .mv-empty b { display: block; }
+#marketViewLanes .mv-empty span { display: block; margin-top: 5px; max-width: 70ch; }
+
+/* A condition whose value is a SENTENCE ("Not reported by detector") is the common case
+   here, and holding it on one line crushed the label into one word per line. The value
+   wraps instead; real figures are short enough that they never do. */
+.mv2-cond { grid-template-columns: minmax(0, 1fr) minmax(0, 15ch); }
+.mv2-cond-val > b { white-space: normal; }
+.mv2-cond-label { align-items: flex-start; }
+.mv2-cond-label > .mv2-dot { margin-top: 6px; }
+
+/* ── Stage 5ZZY. Reconciling with the legacy `.regime-*` colour classes ─────────────────
+   Those four classes (realtime.css:922-925) set BOTH `background` and `color`, because
+   every place that used them was a swatch. This panel uses them for TEXT as well — the
+   label, the lean, the day chips — and there they painted a filled block behind the word.
+
+   Two rules, applied by role rather than by name:
+     text    -> background cleared, the class keeps supplying the colour
+     swatch  -> `background: currentColor`, so the same class still fills it AND the fill
+                cannot be beaten on specificity by a neutral default the way an explicit
+                colour was. */
+.rg2-label, .rg2-feat-rank span, .regime-day em, .rg2-check span { background: transparent; }
+.rg2-key, .regime-post-track > i, .regime-runseg > i { background: currentColor; }
+/* Legacy fixed the strip at 14px with the cells sitting directly in it. The runs carry a
+   label underneath, so the row sizes to its content.
+
+   Stage 5ZZZ-F: the `opacity: 1` here was resetting the legacy `.regime-run { opacity: .8 }`
+   along with the height, and took the deliberate dimming with it - the comment above explains
+   the height and the gap and says nothing about the opacity, which is the tell. Sixty cells at
+   full strength read as a barcode and pull the eye off the last-N row, which is the row that
+   gets read. Restored, and stated this time. */
+.regime-strip .regime-run { height: auto; opacity: .72; gap: 3px; }
+.regime-strip .regime-recent { flex-wrap: wrap; align-items: center; margin-top: 12px; }
+/* `.source-note` is built for a one-line right-aligned note and clips with an ellipsis
+   (realtime.css:167). The regime footnote is two sentences of prose, so it is not one. */
+.rg2-foot { max-width: none; text-align: left; white-space: normal; overflow: visible; }
+
+/* The volume pane's label sits at the top-left of its own box, and the tallest bar is
+   normalised to fill that box — so on any session whose peak volume lands early, the word
+   and the bar occupy the same pixels. A halo in the card colour keeps the label readable
+   without moving either. */
+.mv-vol-label { paint-order: stroke; stroke: var(--card); stroke-width: 3px; stroke-linejoin: round; }
+
+
+/* Stage 5ZZZ-B. Where a panel's numbers came from. Quiet by default - provenance, not a
+   finding - but RECONSTRUCTED carries a dim amber so a reader can tell at a glance that they
+   are looking at a replay rather than at what the slot recorded. */
+.mv2-card-head .mv2-src {
+  margin-left: .45rem;
+  padding: .05rem .4rem;
+  border-radius: 3px;
+  font-size: .62rem;
+  letter-spacing: .05em;
+  border: 1px solid var(--line, #2a2f3a);
+  color: var(--dim, #6a7284);
+  white-space: nowrap;
+}
+.mv2-card-head .mv2-src.recorded_runtime { color: var(--ok, #4a9d6e); border-color: currentColor; }
+.mv2-card-head .mv2-src.reconstructed_today { color: var(--amber, #c9a227); border-color: currentColor; }
+
+
+/* Stage 5ZZZ-E. Calm's two phases, side by side where there is room and stacked where there is
+   not. They are never merged: the whole point is that the earlier card cannot show what the
+   later one learned. */
+.mv2-calm { margin-top: 0; }
+.mv2-calm-cards { display: grid; gap: .5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mv2-calm-card { min-width: 0; }
+.mv2-warn { color: var(--amber, #c9a227); }
+@media (max-width: 760px) { .mv2-calm-cards { grid-template-columns: minmax(0, 1fr); } }
+
+/* Stage 5ZZZ-F. The backend saying it could not read something is a state of its own, and it
+   is drawn like the other source words rather than as an error: the panel is fine, the answer
+   is missing. */
+.mv2-src.unavailable { opacity: .85; }
+
+/* Stage 5ZZZ-F. The plot's box. Fixed, and the same box whether or not there are bars to draw
+   in it - the height used to come from the content, so a session with no bars shrank the panel
+   by 320px and moved everything below it. The empty message is centred in the box rather than
+   sitting at its top, so an empty tab reads as an empty chart and not as a broken one. */
+.mv2-plot {
+  position: relative;
+  height: 320px;
+  border: 1px solid var(--line-hair, #191d24);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: .4rem;
+}
+.mv2-plot > .mv-svg { display: block; width: 100%; height: 100%; }
+.mv2-plot > .mv-empty {
+  height: 100%;
+  margin: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .25rem;
+  text-align: center;
+}
+@media (max-width: 720px) { .mv2-plot { height: 240px; } }
+
+/* The legend goes back inside the box, laid over its foot. It only renders when there are
+   bars, so as a sibling in the flow it added 40px to a populated tab and nothing to an empty
+   one - which is the same panel-moving defect the fixed box was for, arriving by a second
+   route. Overlaid, it cannot change the height whether it is there or not. */
+.mv2-plot > .mv-legend {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  margin: 0;
+  pointer-events: none;
+}
+
+/* Stage 5ZZZ-F. The card head keeps one height whatever it has to say.
+   Measured: a populated tab's head was 41.89px and an empty tab's 40.39px, because the
+   populated one carries a market reference price and the taller glyphs raise the line box.
+   1.5px is not much to look at, but it is the whole card moving under the pointer on every
+   tab switch, and the fix is the same one the plot needed - stop letting the content set the
+   height of a box an operator clicks in. */
+.mv2-card-head { min-height: 42px; }
+
+/* Stage 5ZZZ-F. A chip may now carry a sentence, so it may wrap.
+   `white-space: nowrap` is right for "22/22 SLOTS" and wrong for "Trigger levels were computed
+   at 10:30 but are not armed", which ran 10px past the right edge at 375px. Measured, not
+   guessed: the chip's own box reached 385 on a 375 viewport.
+
+   `box-sizing: border-box` is not optional here. `max-width: 100%` on a content-box element
+   with padding and a border resolves to 100% PLUS both, which is how Stage 5ZZR shrank an
+   overflow twice without removing it. */
+.mv-chip {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 720px) { .mv-chip { white-space: normal; } }
+
+/* Stage 5ZZZ-F. The card head can shrink its children.
+   A flex item's default `min-width: auto` refuses to go below its own text, so the head's
+   right-hand block - "market ref 29,605.00 · 12:25 ET" - pushed the row 20px past its box at
+   every width once the gate's decision hour joined the row. `flex-wrap` did not save it,
+   because a single item that cannot shrink has nowhere to wrap to.
+   Measured with scrollWidth against clientWidth: the box stayed in bounds and its contents
+   did not, which is the overflow a bounding-rect check cannot see. */
+.mv2-card-head > * { min-width: 0; }
+.mv2-head-right {
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Stage 5ZZZ-AJ — the declared-configuration row under the setup-rule lanes.
+   Reuses `.mv2-lane`'s three-column grid so it lines up with the lanes above it, and only
+   the track differs: these are settings, not a per-slot series, so they flow inline instead
+   of being placed on the slot scale. Nothing above this rule changes. */
+.mv2-lane-config { border-bottom: 0; border-top: 1px solid var(--line-hair); }
+.mv2-lane-track.config {
+  position: static; min-height: 0;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 11px 16px;
+}
+.mv2-config-item {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 3px 9px; border: 1px solid var(--line-hair); border-radius: 3px;
+  color: var(--t-label); font: 400 11px/1.45 var(--mono); white-space: nowrap;
+}
+.mv2-config-item b { color: var(--t-primary); font-weight: 500; }
+
+/* Stage 5ZZZ-AM — the per-BAR detector grid, under the per-SLOT lanes.
+   It reuses `.mv2-lane`'s grid so the two read as one table, and is fenced off by its own
+   heading and a top rule because the two are on DIFFERENT axes: a lane cell is a slot, a
+   grid cell is a bar. A reader who takes one for the other is reading a rule's verdict
+   against the wrong instant, which is the confusion this whole stage exists to end. */
+.mv2-bargrid { border-top: 1px solid var(--line-hair); }
+.mv2-bargrid .mv2-lane:last-child { border-bottom: 0; }
+.mv2-lane-value.warn { color: var(--s-warn); }
+
+/* Stage 5ZZZ-AS — Calm's rule verdicts on its own phase card. Reuses `.mv2-cond`, the shape
+   the measured values beside them already use, with a dot carrying the verdict: the two are
+   read together and a second visual language here would say they are different kinds of
+   fact, which they are not. */
+.mv2-calm-gates { border-top: 1px solid var(--line-hair); margin-top: 8px; padding-top: 8px; }
+.mv2-calm-gates .mv2-cond-val.ok b { color: var(--s-ok); }
+.mv2-calm-gates .mv2-cond-val.bad b { color: var(--s-bad-text); }
+.mv2-calm-gates .mv2-cond-val.muted b { color: var(--t-label); }
+
+/* Stage 5ZZZ-AS — the inner tab strip wraps once a third tab is there.
+   `.mv2-innertabs` was a non-wrapping flex row sized for two tabs and a note beside them. A
+   third tab pushed the note off the right edge at 390px, which the clipping test caught by
+   name (SPAN.mv2-tabnote). The note drops under the tabs instead of being cut: it says which
+   question the open tab answers, and a caption nobody can read is a caption that is not there. */
+.mv2-innertabs { flex-wrap: wrap; }
+.mv2-tabset { flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .mv2-tabnote { flex-basis: 100%; }
+}
+
+
+/* Stage 5ZZZ-BA. The session as a line, under the setup card's three columns.
+   The volume pane draws the ten-bar average as a LINE and the slot's own reading as DOTS:
+   the first is measured on closed bars, the second is a bar seconds old, and joining the
+   second into a line would assert a shape the data does not have. */
+.mv2-slotchart { margin-top: 14px; border-top: 1px solid var(--mv-hair, #23262d); padding-top: 10px; }
+.mv2-slotchart-empty { margin-top: 14px; border-top: 1px solid var(--mv-hair, #23262d);
+  padding-top: 10px; font-size: 12px; color: var(--mv-dim, #8b929c); }
+.mv2-sc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-bottom: 6px; }
+.mv2-sc-key { display: inline-flex; align-items: center; gap: 5px; font-size: 11px;
+  color: var(--mv-dim, #8b929c); }
+.mv2-sc-key i { width: 14px; height: 0; border-top: 2px solid currentColor; display: inline-block; }
+.mv2-sc-k-close { color: #7fb2ff; }
+.mv2-sc-k-ema { color: #b98cff; border-top-style: dashed !important; }
+.mv2-sc-k-avgv { color: #5fbf8f; }
+.mv2-sc-k-vol { color: #d7a55a; border-top: 0 !important; width: 6px !important; height: 6px !important;
+  border-radius: 50%; background: currentColor; }
+.mv2-sc-svg { width: 100%; height: 210px; display: block; }
+.mv2-sc-close { fill: none; stroke: #7fb2ff; stroke-width: 1.6; }
+.mv2-sc-ema { fill: none; stroke: #b98cff; stroke-width: 1.4; stroke-dasharray: 5 4; }
+.mv2-sc-avgv { fill: none; stroke: #5fbf8f; stroke-width: 1.4; }
+.mv2-sc-vol { fill: #d7a55a; }
+.mv2-sc-rule { stroke: var(--mv-hair, #23262d); stroke-width: 1; }
+.mv2-sc-ax { fill: var(--mv-dim, #8b929c); font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+@media (max-width: 560px) { .mv2-sc-svg { height: 170px; } }
+
+
+/* Stage 5ZZZ-BJ. One section per instrument inside a Calm phase card. Only drawn when the
+   phase recorded more than one, so the single-instrument day looks exactly as it did. */
+.mv2-calm-inst { border-top: 1px solid var(--mv-hair, #23262d); padding-top: 8px; margin-top: 10px; }
+.mv2-calm-inst:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+.mv2-calm-inst-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.mv2-calm-inst-head b { font-size: 13px; letter-spacing: 0.02em; }
+.mv2-calm-inst-head .mv2-mono { font-size: 11px; color: var(--mv-dim, #8b929c); }
+
+
+/* Stage 5ZZZ-BK. When the legacy snapshot is retired, the decision counters are replaced by
+   the reading Track 1 publishes for itself -- not dimmed. The note beside the metrics row
+   already recorded why: 42% opacity is not a sentence. */
+.decision-retired { font-size: 12px; line-height: 1.5; color: var(--mv-dim, #8b929c);
+  border-left: 2px solid var(--amber, #c9a227); padding: 6px 0 6px 10px; margin-bottom: 4px; }
+.decision-section.runner-stale .section-heading h2 { opacity: .62; }
+
+/* Keyed on the section's own class so a later render cannot undo it. */
+.decision-section.runner-stale .decision-summary,
+.decision-section.runner-stale .decision-groups,
+.decision-section.runner-stale .execution-exceptions { display: none !important; }
+
+/* The heading says "Today's Decision" and the counters underneath were last Monday's. The
+   qualifier is CSS rather than JS because the decision renderer rewrites this section's
+   nodes after the staleness is computed, and a text edit there loses that race every time. */
+.decision-section.runner-stale .section-heading h2::after {
+  content: " — legacy route, retired"; color: var(--mv-dim, #8b929c); font-weight: 400;
+  font-size: 0.82em; letter-spacing: 0.01em; }
