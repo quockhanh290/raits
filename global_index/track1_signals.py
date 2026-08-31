@@ -177,10 +177,24 @@ RULES: dict = {
                       "avg_gap", "mnq_only_short_setup", "pre_high_stop_reference",
                       "stop_within_max_pct", "rr_target_computed",
                       "same_symbol_suppression", "family_cap", "cluster_cap"),
-    "roska4_swing": ("ema50_filter", "r4_prior_range_filter", "entry_bar_volume_filter",
+    # Stage 5ZZZ-AO. Both entries were measured against what the detector ACTUALLY runs, by
+    # running it and reading the gates it reported, rather than against what the table said.
+    #
+    # Swing gained `regime_lag_1`. It always ran one: `_strategy` sets `allowed_regimes` from
+    # a single module constant shared with NKD, and the live path wraps its labels in
+    # `RegimeLabels(lag_days=1)` exactly as NKD does. So on a Calm day both sleeves stop for
+    # the same reason, and only NKD's panel could say so.
+    #
+    # NKD gained the volume pattern and the SPY short gate. It runs both — the same
+    # `TrendFollowStrategy` and the same `make_signal_fn` wrapper Swing uses — and declared
+    # neither. Measured on one real session: the volume pattern refuses 20 of 22 bars, so the
+    # rule the panel omitted was the one deciding the outcome.
+    "roska4_swing": ("regime_lag_1", "ema50_filter", "r4_prior_range_filter",
+                     "entry_bar_volume_filter",
                      "spy_d1_close_below_sma50_short_filter", "fixed_stop_2x_daily_atr",
                      "stop_arm_rule", "admission_cap_result"),
-    "global_nkd": ("ema10_filter", "regime_lag_1", "japan_session_window",
+    "global_nkd": ("regime_lag_1", "ema10_filter", "entry_bar_volume_filter",
+                   "spy_d1_close_below_sma50_short_filter", "japan_session_window",
                    "fixed_stop_2x_daily_atr", "max_hold_context", "admission_cap_result"),
 }
 
@@ -213,6 +227,57 @@ NOT_ENTRY_CONDITIONS: dict = {
         "an EXIT parameter — when the stop is armed AFTER an entry exists, and how long the "
         "position may run. Nothing about it is decided at the moment of entry",
 }
+
+
+#: Stage 5ZZZ-AO. The bridge between the two vocabularies, in ONE place.
+#:
+#: The detectors name their own gates; this table names what a sleeve DECLARES it checks. The
+#: two were never reconciled, and the drift showed up as rules the panel listed but nobody
+#: evaluated, and rules the engine ran that the panel never mentioned.
+#:
+#: Kept as a mapping rather than by renaming one side to the other, and the reason is the
+#: blast radius: five committed test files pin the declared names, and the declared names
+#: carry the sleeve's own parameter (`ema10` vs `ema50`) where the engine's single
+#: `ema_proximity` cannot. What makes a mapping safe is not care — it is that a test RUNS the
+#: detectors and asserts this table is total in both directions. A hand-checked mapping is a
+#: mapping that drifts on the first rule anybody adds.
+#:
+#: One declared name may answer TWO emitted gates: the engine decides the volume pattern in
+#: two halves with different thresholds, and on one measured session each half refused ten of
+#: the twenty-two bars. The halves stay separate where they are drawn; the declared table
+#: names the rule once.
+EMITTED_TO_DECLARED: dict = {
+    "regime": "regime_lag_1",
+    "volume_pullback_declined": "entry_bar_volume_filter",
+    "volume_resume_surge": "entry_bar_volume_filter",
+    "spy_short_gate": "spy_d1_close_below_sma50_short_filter",
+    "r4_context_filter": "r4_prior_range_filter",
+    "fixed_stop_daily_atr": "fixed_stop_2x_daily_atr",
+    # Stress reports through its own path; `wide_count` is emitted and not yet declared.
+    "below_count": "breadth_down_count",
+    "gapdown_count": "gapdown_count",
+    "avg_gap": "avg_gap",
+}
+
+#: Where one emitted gate answers to a DIFFERENT declared name per sleeve. Only the trend
+#: filter does: the engine has one `ema_proximity`, and each sleeve declares it with its own
+#: period so a reader can see which one at a glance.
+EMITTED_TO_DECLARED_BY_SLEEVE: dict = {
+    "global_nkd": {"ema_proximity": "ema10_filter"},
+    "roska4_swing": {"ema_proximity": "ema50_filter"},
+}
+
+
+def declared_for(sleeve: str, emitted: str) -> "str | None":
+    """The declared rule an emitted gate answers to, or None when nothing declares it.
+
+    None is the finding, not an error: it means the detector runs something the sleeve does
+    not admit to running.
+    """
+    per = EMITTED_TO_DECLARED_BY_SLEEVE.get(sleeve, {})
+    if emitted in per:
+        return per[emitted]
+    return EMITTED_TO_DECLARED.get(emitted)
 
 
 def rule_names(sleeve: str) -> tuple:
@@ -270,9 +335,16 @@ def thresholds(sleeve: str) -> dict:
                                           "max_hold_days": p.max_hold_days}})
         else:
             out.update({"ema10_filter": {"ema_period": p.ema_period},
-                        "regime_lag_1": {"lag": 1},
                         "japan_session_window": {"clock": "Asia/Tokyo"},
                         "max_hold_context": {"max_hold_days": p.max_hold_days}})
+        # Shared by both sleeves, because the detector applies them to both. `regime_lag_1`
+        # was NKD-only and the volume/short pair was Swing-only; neither split existed in the
+        # code that decides.
+        out.update({"regime_lag_1": {"lag": 1},
+                    "entry_bar_volume_filter": {"rel_volume_max": p.rel_volume_max,
+                                                "vol_feature": p.vol_feature},
+                    "spy_d1_close_below_sma50_short_filter": {
+                        "spy_short_filter": p.spy_short_filter}})
         return out
     return {}
 

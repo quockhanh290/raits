@@ -228,7 +228,12 @@ def make_signal_fn(strat, params: NormalR4Params, datr: pd.Series, *,
         if short_blocked:
             return None
         context_blocked = context is not None and not context.allow(ts)
-        if on_gate is not None:
+        # Reported ONLY when the sleeve actually has a context filter. NKD runs with
+        # `apply_context_filter=False`, so `context is None` and the gate is not applied at
+        # all — announcing it as "passed" would be the same lie as drawing a gate that never
+        # ran as a pass, which is the distinction this whole stage exists to keep. Caught by
+        # the vocabulary test, which found NKD reporting a filter it does not use.
+        if on_gate is not None and context is not None:
             on_gate("r4_context_filter", not context_blocked, str(ts),
                     {"range_max": params.range_max, "rel_volume_max": params.rel_volume_max},
                     "")
