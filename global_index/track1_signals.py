@@ -231,6 +231,17 @@ NOT_ENTRY_CONDITIONS: dict = {
     "stop_arm_rule":
         "an EXIT parameter — when the stop is armed AFTER an entry exists, and how long the "
         "position may run. Nothing about it is decided at the moment of entry",
+    # Stage 5ZZZ-BG. Asked on the panel: if nothing is required, why is the row there at all?
+    # Because the ABSENCE is the fact. Three sleeves gate on the regime label and this one
+    # deliberately does not, which is the answer to "why was NKD blocked all night by Calm
+    # while Stress kept running". But it is a property of the sleeve, not a test a slot takes,
+    # so it belongs beside the declared configuration rather than in a lane that can never
+    # fill. The behaviour itself is pinned by `test_the_rule_uses_no_regime_label_at_all`,
+    # which builds a source with NO labels at all and requires the candidate to appear anyway.
+    "no_regime_label_required":
+        "not a test — the sleeve was built to avoid the lag-0 daily regime label, so the "
+        "detector never asks for one and no slot can fail this. Declared so the difference "
+        "from the three sleeves that DO gate on regime is visible rather than inferred",
 }
 
 

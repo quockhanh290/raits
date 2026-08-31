@@ -480,8 +480,8 @@ def _rule_lanes(rows: list, sleeve: str, slots: list) -> list:
                 # why it has read "value not published" on every slot record ever written.
                 continue
             if name in _NOT_ENTRY_CONDITIONS:
-                # Stage 5ZZZ-AJ. Kept out of the lanes, not out of the payload: these three
-                # are declared by the sleeve and recorded on every row, but none of them is a
+                # Stage 5ZZZ-AJ. Kept out of the lanes, not out of the payload: these are
+                # declared by the sleeve and recorded on every row, but none of them is a
                 # test a slot can pass or fail, so a lane for them is an empty lane FOREVER —
                 # and an operator who learns to skip a permanently empty lane skips the ones
                 # beside it that will fill. `_declared_config` reports them as what they are.

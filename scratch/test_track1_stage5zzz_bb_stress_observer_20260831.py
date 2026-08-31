@@ -268,3 +268,43 @@ def test_an_observer_that_saw_nothing_records_nothing_and_is_not_an_error():
     src._stash_stress_diagnostics(SD.StressObserver(), [])
     assert (src.last_diagnostics.get("roska4_stress") or []) == []
     assert src.diagnostics_errors == []
+
+
+# -- a rule that can never fail is not a condition -----------------------------------------
+def test_the_no_regime_rule_is_declared_not_tested():
+    """Stage 5ZZZ-BG. Asked of the panel: if nothing is required, why is the row there?
+
+    Because the ABSENCE is the fact. Three sleeves gate on the regime label and this one
+    deliberately does not -- which is the answer to why NKD sat blocked all night on a Calm
+    label while Stress kept running. But it is a property of the sleeve, not a test a slot
+    takes, and a lane for it is an empty lane forever.
+    """
+    from global_index import track1_signals as sig
+    assert "no_regime_label_required" in sig.NOT_ENTRY_CONDITIONS
+    assert "not a test" in sig.NOT_ENTRY_CONDITIONS["no_regime_label_required"]
+    assert "no_regime_label_required" not in sig.entry_rule_names("roska4_stress")
+    assert "no_regime_label_required" in sig.RULES["roska4_stress"], (
+        "it must stay DECLARED -- dropping it hides the difference between the sleeves")
+
+
+def test_the_detector_really_does_not_ask_for_a_regime_label():
+    """The claim behind the declaration, checked against the detector rather than the table.
+
+    A declaration that stops being true is worse than none: it would tell an operator this
+    sleeve is regime-blind while the code had started gating on one.
+    """
+    from global_index import track1_stress_mnq as SM
+    checks = SM.entry_checks({"below_count": 4, "gapdown_count": 3, "wide_count": 0,
+                              "avg_gap": -0.01})
+    ids = [c["id"] for c in checks]
+    assert ids, "no checks at all -- the probe is wrong, not the answer"
+    assert not any("regime" in i for i in ids), ids
+
+
+def test_the_lane_list_does_not_carry_it():
+    """Checked on the PAYLOAD, because that is what the page draws."""
+    from monitor.backend import track1_market_view as MV
+    s = (MV.build().get("sleeves") or {}).get("roska4_stress") or {}
+    labels = [str(L.get("label", "")).lower() for L in (s.get("rule_lanes") or [])]
+    assert labels, "no lanes at all -- the probe is wrong"
+    assert not any("regime" in x for x in labels), labels
