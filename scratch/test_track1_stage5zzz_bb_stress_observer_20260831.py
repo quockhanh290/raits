@@ -217,3 +217,54 @@ def test_the_formats_that_were_already_right_are_untouched():
     assert SD._row("g", 66440.0, unit="price")["display_value"] == "66,440.00"
     assert SD._row("g", 46, unit="count")["display_value"] == "46"
     assert SD._row("g", None, missing=SD.MISSING_DATA)["display_value"] == "Data unavailable"
+
+
+# -- the CALL SITE, which is where this stage actually broke -------------------------------
+def _live_source():
+    """A LiveTrack1Source with nothing wired up. `_stash_stress_diagnostics` must not need
+    anything the slot has not already given it."""
+    from global_index.track1_live_source import LiveTrack1Source
+    return LiveTrack1Source.__new__(LiveTrack1Source)
+
+
+def test_the_stash_actually_produces_a_block():
+    """Stage 5ZZZ-BF. The test that was missing, and the reason eight live slots recorded
+    nothing.
+
+    Everything above calls `stress_block` directly. Nothing came through the method the slot
+    calls -- which referenced a name bound inside a DIFFERENT function, raised NameError on
+    every call, and had its own guard swallow it. Measured on 2026-08-31: 22 NKD blocks and 2
+    Calm blocks written that day, and 0 for Stress, while the Stress slots ran and wrote
+    their signal and coverage rows normally.
+    """
+    src = _live_source()
+    src._stash_stress_diagnostics(_obs(), [])
+    blocks = src.last_diagnostics.get("roska4_stress") or []
+    assert len(blocks) == 1, (blocks, src.diagnostics_errors)
+    assert blocks[0]["detector"] == "track1_stress_mnq"
+    assert [r["label"] for r in blocks[0]["rows"]] == ["Breadth", "Gap-down count", "Basket gap"]
+    assert not src.diagnostics_errors, src.diagnostics_errors
+
+
+def test_a_stash_failure_is_swallowed_but_never_silent(monkeypatch):
+    """The guard must keep costing the sleeve nothing, and must stop hiding the reason.
+
+    An absence with no reason attached is indistinguishable from a sleeve that had nothing to
+    say -- which is exactly how the defect above stayed invisible.
+    """
+    src = _live_source()
+    monkeypatch.setattr(SD, "stress_block",
+                        lambda **kw: (_ for _ in ()).throw(RuntimeError("boom")))
+    src._stash_stress_diagnostics(_obs(), [])
+    assert (src.last_diagnostics.get("roska4_stress") or []) == [], "a broken stash wrote a block"
+    assert any("boom" in e for e in src.diagnostics_errors), src.diagnostics_errors
+    assert any("roska4_stress" in e for e in src.diagnostics_errors)
+
+
+def test_an_observer_that_saw_nothing_records_nothing_and_is_not_an_error():
+    """A slot that refused before the basket was judged has nothing to report, and that is
+    not a failure to write down."""
+    src = _live_source()
+    src._stash_stress_diagnostics(SD.StressObserver(), [])
+    assert (src.last_diagnostics.get("roska4_stress") or []) == []
+    assert src.diagnostics_errors == []

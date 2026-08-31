@@ -894,6 +894,19 @@ class LiveTrack1Source:
     name: str = "live"
 
     @property
+    def diagnostics_errors(self) -> list:
+        """Why a diagnostics block is missing, when one is.
+
+        Stage 5ZZZ-BF. The Stress stash failed on every call for eight live slots and said
+        nothing, because its own guard swallowed the exception and the fact of it together.
+        An absence with no reason attached is indistinguishable from a sleeve that had
+        nothing to say.
+        """
+        if not hasattr(self, "_diagnostics_errors"):
+            self._diagnostics_errors = []
+        return self._diagnostics_errors
+
+    @property
     def last_diagnostics(self) -> dict:
         """Per-sleeve diagnostics blocks from the most recent candidate scan.
 
@@ -939,13 +952,25 @@ class LiveTrack1Source:
             if observer is None or not getattr(observer, "state", None):
                 return
             from global_index import track1_strategy_diagnostics as SD
+            # Imported HERE. The first version of this method used the name `SM` bound by
+            # `_stress_candidates` a few hundred lines below, which is a local there and
+            # unbound here -- so every call raised NameError, the guard below swallowed it,
+            # and the sleeve recorded nothing for eight live slots while every test stayed
+            # green, because the tests called `stress_block` directly and never came through
+            # this method.
+            from global_index import track1_stress_mnq as _SM
 
             block = SD.stress_block(sleeve="roska4_stress", slot_id="", observer=observer,
                                     setups=setups, source=SD.RECORDED,
-                                    data_identity="basket:" + ",".join(SM.BREADTH_BASKET))
+                                    data_identity="basket:" + ",".join(_SM.BREADTH_BASKET))
             self.last_diagnostics.setdefault("roska4_stress", []).append(block)
-        except Exception:                                          # noqa: BLE001
-            pass
+        except Exception as exc:                                   # noqa: BLE001
+            # Swallowed, because a diagnostics failure must not cost a sleeve its candidate.
+            # NOT silent: the reason is kept where an operator can find it. A guard that
+            # eats the exception AND the fact of it turns a broken feature into an absence
+            # nobody can explain, which is what happened above.
+            self.diagnostics_errors.append(
+                "roska4_stress: %s: %s" % (type(exc).__name__, exc))
 
     def _stash_diagnostics(self, sleeve: str, inst: str, params, observer, setup,
                            labels=None) -> None:
