@@ -2903,15 +2903,32 @@
         </div>` : ''}
       </div>`;
     };
-    // The count in the heading still counts everything. Grouping sorts the list; it does not
-    // shorten it, and a group with no members prints no heading rather than an empty one.
+    // Stage 5ZZZ-BN. A group whose every member is retired opens CLOSED.
+    //
+    // Grouping sorted the list and never shortened it, so a panel headed "Open Issues" kept
+    // three rows the backend marks `counts_as_active: false` -- the legacy paper
+    // reconciliations, which compare the LEGACY ledger against broker statements and read no
+    // Track 1 artefact. The legacy route is formally retired: B1 signed, zero legacy entry
+    // jobs. Retired history under a heading that says "open" is the panel disagreeing with
+    // itself, and the count above already says "3 open / 3 retired legacy".
+    //
+    // Collapsed, not dropped. Nothing is deleted and nothing is filtered out of the payload:
+    // the group is still there, still counted, one click away. An issue that vanishes is an
+    // issue nobody can go back to.
+    const groupOpensClosed = g => g.items.length > 0
+      && g.items.every(it => it.counts_as_active === false);
     $('openIssueList').innerHTML = issues.length
-      ? groupIssues(issues).map(g =>
-          `<div class="issue-group issue-group-${esc(g.key)}">`
-          + `<div class="issue-group-head has-tip tip-right" tabindex="0" `
-          + `data-tooltip="${esc(g.note)}"><b>${esc(g.label)}</b>`
-          + `<span>${g.items.length}</span></div>`
-          + g.items.map(issueRow).join('') + `</div>`).join('')
+      ? groupIssues(issues).map(g => {
+          const head = `<b>${esc(g.label)}</b><span>${g.items.length}</span>`;
+          const body = g.items.map(issueRow).join('');
+          return groupOpensClosed(g)
+            ? `<details class="issue-group issue-group-${esc(g.key)} issue-group-retired">`
+              + `<summary class="issue-group-head has-tip tip-right" tabindex="0" `
+              + `data-tooltip="${esc(g.note)}">${head}</summary>${body}</details>`
+            : `<div class="issue-group issue-group-${esc(g.key)}">`
+              + `<div class="issue-group-head has-tip tip-right" tabindex="0" `
+              + `data-tooltip="${esc(g.note)}">${head}</div>${body}</div>`;
+        }).join('')
       : '<div class="clear-state"><span class="status-dot"></span><b>Clear</b><span>No unresolved issue found in retained evidence</span></div>';
     const selected = issues.find(issue => issue.key === state.selectedIssueKey);
     $('openIssueDetail').innerHTML = selected ? `

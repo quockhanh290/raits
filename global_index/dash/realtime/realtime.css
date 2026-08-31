@@ -1825,3 +1825,15 @@ b.muted, .mv2-lane-value.muted { color: var(--t-label); }
 .decision-section.runner-stale .section-heading h2::after {
   content: " — legacy route, retired"; color: var(--mv-dim, #8b929c); font-weight: 400;
   font-size: 0.82em; letter-spacing: 0.01em; }
+
+
+/* Stage 5ZZZ-BN. A group whose every member is retired opens closed. Collapsed, never
+   dropped: the rows stay in the payload, stay counted in "3 retired legacy", and are one
+   click away. An issue that vanishes is an issue nobody can go back to. */
+details.issue-group-retired > summary { cursor: pointer; list-style: none; }
+details.issue-group-retired > summary::-webkit-details-marker { display: none; }
+details.issue-group-retired > summary::before {
+  content: "\25B8"; display: inline-block; width: 1em; color: var(--mv-dim, #8b929c);
+  transition: transform .12s ease; }
+details.issue-group-retired[open] > summary::before { transform: rotate(90deg); }
+details.issue-group-retired > summary b { opacity: .72; font-weight: 500; }
