@@ -908,6 +908,30 @@ def observe_live_slot(sleeve: str, slot_id: str, *, now_et, provider=None,
     # It cannot change a decision: everything it reads is already computed, and `sig.build_row`
     # is pure. The `except` is not a swallow of the slot's own work — `sig.append` already
     # fails soft — it is the last line against a diagnostics bug taking a slot down with it.
+    # Stage 5ZZZ-AT. The verdicts the slot already reported, keyed by the DECLARED rule name,
+    # so the signal row can say "measured" where it has actually measured something.
+    #
+    # Built only from `gates` -- the slot-level channel. The per-bar channel is deliberately
+    # left out: a rule answered once per bar has no single verdict for the slot (measured on a
+    # real session, twelve passes and ten failures inside one slot), and writing one here would
+    # put a number in a cell that cannot hold it. Those are drawn on the bar grid instead.
+    #
+    # Nothing is computed. The mapping is `track1_signals.declared_for`, the same bridge the
+    # panel reads, so the row and the panel cannot disagree about which rule a gate answers.
+    _measured: dict = {}
+    try:
+        for _b in list(getattr(_strategy_diag_source, "last_diagnostics", {}).get(sleeve) or []):
+            for _g in (_b.get("gates") or []):
+                _name = sig.declared_for(sleeve, str(_g.get("gate") or ""))
+                if not _name or _g.get("passed") is None:
+                    continue
+                _measured[_name] = {"passed": bool(_g.get("passed")), "value": _g.get("value"),
+                                    "threshold": _g.get("threshold"),
+                                    "comparator": str(_g.get("comparator") or ""),
+                                    "detail": str(_g.get("detail") or "")}
+    except Exception:                          # pragma: no cover - defence, not a code path
+        _measured = {}
+
     try:
         _slot_hhmm = next((f"{x.hour:02d}:{x.minute:02d}" for x in slots if x.id == slot_id),
                           "")
@@ -922,7 +946,8 @@ def observe_live_slot(sleeve: str, slot_id: str, *, now_et, provider=None,
                 gate_codes=(() if verdict is None else tuple(verdict.codes)),
                 params_hash=_signal_params_hash(sleeve),
                 regime_basis=_signal_regime_basis(sleeve),
-                data_source_identity=_signal_data_identity(data_paths, sleeve)),
+                data_source_identity=_signal_data_identity(data_paths, sleeve),
+                measured_rules=_measured),
             root=root)
     except Exception as _sig_exc:            # pragma: no cover - defence, not a code path
         # Recorded through the signals channel's own error slot rather than a logger, for two

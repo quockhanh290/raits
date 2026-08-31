@@ -104,6 +104,11 @@ def as_provider_clock(through) -> Any:
     return ts
 
 
+#: The two Calm phase names, from the diagnostics module that defines them.
+CA_DECIDE_PHASE = "decide"
+CA_OBSERVE_PHASE = "observe"
+
+
 def _new_observer():
     """A detector observer, or a no-op if the diagnostics module cannot be imported.
 
@@ -885,6 +890,30 @@ class LiveTrack1Source:
             self._last_diagnostics = {}
         return self._last_diagnostics
 
+    def _stash_calm_gates(self, phase: str, inst: str, gates: list, setup) -> None:
+        """Keep Calm's gates for the slot to persist, in the sleeve's own block shape.
+
+        Stage 5ZZZ-AR. Wrapped end to end for the same reason its Normal-R4 neighbour is: a
+        diagnostics failure must not be the reason a sleeve loses a candidate, and this runs
+        on the path that finds them.
+        """
+        try:
+            if not gates:
+                return
+            from global_index import track1_strategy_diagnostics as SD
+
+            block = SD._calm_block(
+                phase=phase, source=SD.RECORDED, slot_id="", at="",
+                summary=("recorded by the slot" if setup is not None
+                         else "recorded by the slot; no setup"),
+                rows=[], gates=list(gates),
+                nearest_failed_condition=next(
+                    (g for g in gates if g.get("passed") is False), None))
+            block["instrument"] = inst
+            self.last_diagnostics.setdefault("roska4_calm", []).append(block)
+        except Exception:                                          # noqa: BLE001
+            pass
+
     def _stash_diagnostics(self, sleeve: str, inst: str, params, observer, setup,
                            labels=None) -> None:
         """Keep the detector's own account of this instrument, for the slot to persist.
@@ -1214,6 +1243,15 @@ class LiveTrack1Source:
 
         params = self.stress_params or SM.StressParams()
         setups = SM.detect_entry_for_slot(frames, day, now=now, params=params)
+        # Stage 5ZZZ-AT, NOT DONE HERE. Stress answers all four entry conditions in full --
+        # `entry_conditions` is `all()` over the table `entry_checks` walks -- and the slot
+        # records none of it, so its lanes read "value not published" for rules the detector
+        # answered. Wiring it needs an observer seam in `track1_stress_mnq` the way Calm got
+        # one, because the features are computed inside `detect_entry_for_slot` and reaching
+        # them from here would mean recomputing a basket state the slot already has. A first
+        # attempt called `basket_state` with the wrong arguments; recomputing it correctly
+        # would still be a second evaluation of a rule that decides, which is the thing this
+        # whole stage refuses to do.
         out = []
         for st in setups:
             cost = self._cost_for(st.inst)
@@ -1276,7 +1314,17 @@ class LiveTrack1Source:
         out: list = []
         for inst in insts:
             frame = joined[inst].frame
-            pre = CA.detect_setup_before_entry(frame, labels, inst, day, params)
+            # Stage 5ZZZ-AR. OBSERVABILITY ONLY, and it reaches disk through a stream that
+            # already exists: `run_live_day_track1` writes whatever `last_diagnostics` holds
+            # for the sleeve, so nothing in the runner changes. The shadow-intent record is
+            # deliberately NOT touched -- six readers, two of them gates.
+            _cg: list = []
+            pre = CA.detect_setup_before_entry(
+                frame, labels, inst, day, params,
+                observer=lambda e, _cg=_cg: (_cg.append({k: v for k, v in e.items()
+                                                         if k != "kind"})
+                                             if e.get("kind") == "gate" else None))
+            self._stash_calm_gates(CA_DECIDE_PHASE, inst, _cg, pre)
             if pre is None:
                 continue
             atr = causal_daily_atr(frame, day)
@@ -1319,8 +1367,14 @@ class LiveTrack1Source:
         out = []
         for inst in insts:
             frame = joined[inst].frame
-            setup = CA.detect_entry_for_day(frame, labels, inst, day, params)
+            _cg: list = []
+            setup = CA.detect_entry_for_day(
+                frame, labels, inst, day, params,
+                observer=lambda e, _cg=_cg: (_cg.append({k: v for k, v in e.items()
+                                                         if k != "kind"})
+                                             if e.get("kind") == "gate" else None))
             if setup is None:
+                self._stash_calm_gates(CA_OBSERVE_PHASE, inst, _cg, None)
                 continue
             cost = self._cost_for(inst)
             atr = causal_daily_atr(frame, day)
@@ -1332,6 +1386,14 @@ class LiveTrack1Source:
             stop = CA.disaster_stop(setup.entry, atr, params)
             qty = int(tp.SLEEVE_QTY["roska4_calm"])
             risk = CA.stop_risk_dollars(setup.entry, stop, float(cost.point_value), qty)
+            # The fourth Calm rule, and it is decided HERE rather than in the detector: the
+            # two stop functions are only ever called from this path. Reported before the
+            # refusal below so a refused slot still says which condition refused it.
+            _cg.append({"gate": "stop_risk_computed",
+                        "passed": bool(np.isfinite(risk) and risk > 0),
+                        "value": float(risk) if np.isfinite(risk) else None,
+                        "threshold": {"must_be": "> 0"}, "comparator": ">"})
+            self._stash_calm_gates(CA_OBSERVE_PHASE, inst, _cg, setup)
             if not np.isfinite(risk) or risk <= 0:
                 raise LiveSourceRefused(
                     STOP_RISK_UNAVAILABLE,

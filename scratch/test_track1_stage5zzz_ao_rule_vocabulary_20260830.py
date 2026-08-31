@@ -268,3 +268,122 @@ def test_every_calm_rule_the_detector_reports_is_declared():
     src = inspect.getsource(CA)
     for name in CALM_DECIDE_RULES + ("entry_time_valid",):
         assert f'"{name}"' in src, f"{name} is asserted here and emitted nowhere"
+
+
+def test_calm_gates_reach_the_panel_without_touching_the_intent_record(tmp_path):
+    """Stage 5ZZZ-AR. The recorded row stays the authority; only the gates are merged in.
+
+    Adding a `gates` field to the shadow-intent row was measured and rejected: that record has
+    six readers, two of them gates, and the stream was four rows old. The diagnostics stream
+    already exists and already carries `gates`, which is where the other two sleeves put
+    exactly this.
+    """
+    import shutil
+
+    from global_index import track1_strategy_diagnostics as SD
+
+    src = Path("global_index/track1_runtime/shadow_intent")
+    dst = tmp_path / "global_index" / "track1_runtime" / "shadow_intent"
+    dst.mkdir(parents=True)
+    copied = [shutil.copy(f, dst / f.name) for f in src.glob("*.jsonl")]
+    assert copied, "no intent rows to read — this test would pass on an empty world"
+
+    day = "2026-08-28"
+    before = SD.calm_blocks(tmp_path, day)["decide"]
+    assert not before.get("gates"), "the fixture already had gates, so the merge proves nothing"
+
+    SD.record({"schema": SD.SCHEMA, "sleeve": "roska4_calm", "phase": SD.CALM_DECIDE,
+               "slot_id": "TRACK1_CALM_DECIDE_0932", "session_date": day,
+               "diagnostics_source": SD.RECORDED, "detector": "track1_calm_a", "rows": [],
+               "summary": "recorded by the slot",
+               "gates": [{"gate": "regime_is_calm_d1", "passed": True, "value": "Calm"},
+                         {"gate": "prior_rth_close_bottom_third", "passed": False,
+                          "value": 0.71, "threshold": 0.333, "comparator": "<="}]},
+              root=tmp_path, day=day)
+
+    after = SD.calm_blocks(tmp_path, day)["decide"]
+    assert len(after.get("gates") or []) == 2
+    assert after["nearest_failed_condition"]["gate"] == "prior_rth_close_bottom_third"
+    # The recorded row remains the authority on everything else.
+    for field in ("status", "summary", "rows", "price_levels"):
+        assert after.get(field) == before.get(field), (
+            f"{field} was overwritten by the diagnostics block; two accounts of one phase")
+
+
+def test_the_live_calm_path_reports_into_the_diagnostics_stream_not_the_intent_row():
+    """Pinned on the call sites, because wiring is what silently does not happen.
+
+    The runner is unchanged: it already writes whatever `last_diagnostics` holds for the
+    sleeve, so stashing under `roska4_calm` is the whole of the write path.
+    """
+    import inspect
+
+    from global_index import track1_live_source as LS
+
+    src = inspect.getsource(LS)
+    assert "def _stash_calm_gates" in src
+    assert src.count("observer=lambda e, _cg=_cg") == 2, (
+        "both Calm phases have to pass an observer, or one of them reports nothing")
+    assert '"gate": "stop_risk_computed"' in src, "the fourth Calm rule is not reported"
+    assert 'self.last_diagnostics.setdefault("roska4_calm"' in src
+
+    intent = inspect.getsource(__import__("global_index.track1_shadow_intent",
+                                          fromlist=["track1_shadow_intent"]))
+    assert '"gates"' not in intent, (
+        "the shadow-intent record grew a gates field — six readers and two gates read it, "
+        "which is the blast radius this design exists to avoid")
+
+
+def test_a_measured_rule_reaches_the_signal_row_as_measured():
+    """Stage 5ZZZ-AT. The lane reads `rule_checks`, and until now nothing ever wrote a verdict
+    into it: 291 slot records, 24 declared rules, zero verdicts. The slot now reports what its
+    detector already answered, through the same bridge the panel reads."""
+    row = SIG.build_row(
+        sleeve="roska4_stress", slot_id="X", slot_time="11:55", session_date="2026-08-31",
+        mode="shadow_live", decided=True, reason="decided", raw_candidates=0,
+        freshness_allow=True, gate_allow=True,
+        measured_rules={"breadth_down_count": {"passed": False, "value": 1, "threshold": 4,
+                                               "comparator": ">="}})
+    by = {c.rule: c for c in row.rule_checks}
+    got = by["breadth_down_count"]
+    assert got.source == SIG.MEASURED and got.passed is False and got.value == 1
+
+    # Everything NOT supplied stays honest rather than defaulting to a verdict.
+    assert by["gapdown_count"].source == SIG.NOT_EXPOSED
+    assert by["gapdown_count"].passed is None
+
+    # And a row built the old way is byte-for-byte the old row.
+    plain = SIG.build_row(
+        sleeve="roska4_stress", slot_id="X", slot_time="11:55", session_date="2026-08-31",
+        mode="shadow_live", decided=True, reason="decided", raw_candidates=0,
+        freshness_allow=True, gate_allow=True)
+    assert {c.rule: c.source for c in plain.rule_checks}["breadth_down_count"] == SIG.NOT_EXPOSED
+
+
+def test_only_slot_level_gates_are_written_into_the_signal_row():
+    """The per-bar channel must not reach `rule_checks`.
+
+    A rule answered once per bar has no single per-slot verdict -- twelve passes and ten
+    failures inside one slot, measured -- so writing one into a per-slot cell would put a
+    number where none can live. The runner builds its map from `gates` only.
+    """
+    import inspect
+
+    from global_index import run_live_day_track1 as RL
+
+    src = inspect.getsource(RL)
+    assert '_b.get("gates")' in src, "the runner stopped reading the slot-level channel"
+    assert '_b.get("bar_gates")' not in src, (
+        "the per-bar channel is being written into the per-slot signal row")
+    assert "sig.declared_for(sleeve" in src, (
+        "the runner maps gate names itself instead of using the one bridge the panel reads")
+
+
+def test_the_identity_case_is_not_a_catch_all():
+    """Calm emits the declared names themselves, so the bridge returns them unchanged -- but
+    only for names the sleeve actually declares. An unknown name must still come back None, or
+    the drift test above would stop being able to find anything."""
+    assert SIG.declared_for("roska4_calm", "gap_not_deep") == "gap_not_deep"
+    assert SIG.declared_for("roska4_calm", "a_rule_nobody_declares") is None
+    assert SIG.declared_for("global_nkd", "gap_not_deep") is None, (
+        "a Calm rule resolved for a sleeve that does not declare it")

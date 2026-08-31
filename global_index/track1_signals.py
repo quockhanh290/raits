@@ -316,7 +316,18 @@ def declared_for(sleeve: str, emitted: str) -> "str | None":
     per = EMITTED_TO_DECLARED_BY_SLEEVE.get(sleeve, {})
     if emitted in per:
         return per[emitted]
-    return EMITTED_TO_DECLARED.get(emitted)
+    if emitted in EMITTED_TO_DECLARED:
+        return EMITTED_TO_DECLARED[emitted]
+    # Stage 5ZZZ-AT. The IDENTITY case, and it is not a fallback: Calm has one source of truth
+    # for its rules, so its detector emits the declared names themselves and there is nothing
+    # to bridge. Returning None here would have said "the detector runs a rule nobody declares"
+    # about a sleeve whose two vocabularies are the same vocabulary.
+    #
+    # Only for a name the sleeve actually declares. An unknown name still comes back None,
+    # which is what the drift test reads as the finding it is.
+    if emitted in RULES.get(sleeve, ()):
+        return emitted
+    return None
 
 
 def rule_names(sleeve: str) -> tuple:
@@ -564,7 +575,8 @@ def _layer_for(verdict: Any) -> str:
 
 def rule_checks_for(sleeve: str, *, decided: bool, freshness_allow, gate_allow,
                     gate_codes: Sequence = (), decisions: Sequence = (),
-                    raw_candidates: int = 0) -> list:
+                    raw_candidates: int = 0,
+                    measured: "Mapping | None" = None) -> list:
     """The declared rules for this sleeve, each answered as honestly as the slot can.
 
     Three answers are possible and all three are visible:
@@ -616,6 +628,19 @@ def rule_checks_for(sleeve: str, *, decided: bool, freshness_allow, gate_allow,
     for n in names:
         if n in admission_names:
             continue
+        # Stage 5ZZZ-AT. A rule the SLOT measured is reported as measured. `measured` carries
+        # only what the detector itself answered once for this slot, mapped through the single
+        # bridge in this file. Nothing here recomputes a rule.
+        m = (measured or {}).get(n)
+        if m is not None:
+            out.append(rule(n, passed=m.get("passed"), value=m.get("value"),
+                            threshold=m.get("threshold", th.get(n) or None),
+                            comparator=str(m.get("comparator") or ""),
+                            detail=str(m.get("detail") or ""), source=MEASURED))
+            continue
+        # A per-BAR rule has no single per-slot verdict -- it is answered once per bar and the
+        # answers disagree inside one slot -- so it stays unexposed here and is drawn on the
+        # bar grid, where every cell is one bar and holds exactly one answer.
         out.append(rule(n, threshold=th.get(n) or None, source=NOT_EXPOSED,
                         detail="evaluated inside the sleeve detector; value not returned yet"))
 
@@ -643,13 +668,15 @@ def build_row(*, sleeve: str, slot_id: str, slot_time: str, session_date, mode: 
               candidates: Sequence = (), freshness_allow=None, gate_allow=None,
               gate_codes: Sequence = (), params_hash: str = "",
               data_source_identity: str = "", freshness_proof: str = "",
-              regime_basis: str = "") -> SignalRow:
+              regime_basis: str = "",
+              measured_rules: "Mapping | None" = None) -> SignalRow:
     """A `SignalRow` from the state a slot already has. Pure: reads nothing, writes nothing."""
     status = classify(decided=decided, reason=reason, raw_candidates=raw_candidates,
                       accepted=accepted, rejected=rejected)
     checks = rule_checks_for(sleeve, decided=decided, freshness_allow=freshness_allow,
                              gate_allow=gate_allow, gate_codes=gate_codes,
-                             decisions=decisions, raw_candidates=raw_candidates)
+                             decisions=decisions, raw_candidates=raw_candidates,
+                             measured=measured_rules)
 
     briefs = [_candidate_brief(c, sleeve=sleeve) for c in (candidates or [])]
     layer = ""

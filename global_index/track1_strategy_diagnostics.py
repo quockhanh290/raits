@@ -655,10 +655,45 @@ def calm_blocks(root, day: str, now=None, *, slots=None) -> dict:
                 params_hash=rec.get("params_hash") or "",
                 data_source_identity=rec.get("data_identity") or "",
                 matched_decide=(bool(be) if phase == CALM_OBSERVE else None))
+            # Stage 5ZZZ-AR. The recorded row says WHAT happened; the gates say WHY, and they
+            # live in a different stream.
+            #
+            # The obvious move was to add a `gates` field to the shadow-intent row. It was
+            # measured and rejected: that record has SIX readers, two of them gates
+            # (`track1_paper_readiness`, `track1_replay_parity`), and the stream is four rows
+            # old. Changing the shape of a running evidence record to carry a diagnostic is a
+            # large blast radius for an observability field.
+            #
+            # The diagnostics stream already exists, already carries `gates`, and is where the
+            # other two sleeves put exactly this. So the intent row is left untouched and the
+            # gates are merged in on READ. When no diagnostics block exists -- every day before
+            # the writer lands, and every day the slot did not run -- this adds nothing and the
+            # panel is what it was.
+            _merge_recorded_gates(out[phase], root, day, slot_id)
             continue
 
         out[phase] = _calm_reconstruct(root, day, phase, slot_id, hhmm, params, out)
     return out
+
+
+def _merge_recorded_gates(block: dict, root, day, slot_id: str) -> None:
+    """Add the gates the slot recorded for this phase, and nothing else.
+
+    Only `gates` and the first refusal are taken. The recorded row remains the authority on
+    status, rows and levels: a diagnostics block that could overwrite those would be a second
+    account of the same phase, and the day the two disagreed nobody could say which was the
+    slot.
+    """
+    try:
+        rec = recorded_for(root, str(day), "roska4_calm", slot_id)
+        gates = list((rec or {}).get("gates") or [])
+        if not gates:
+            return
+        block["gates"] = gates
+        block["nearest_failed_condition"] = next(
+            (g for g in gates if g.get("passed") is False), None)
+    except Exception:                                              # noqa: BLE001
+        pass
 
 
 def _calm_reconstruct(root, day, phase, slot_id, hhmm, params, so_far: dict) -> dict:
