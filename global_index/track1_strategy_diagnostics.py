@@ -245,6 +245,23 @@ class NormalR4Observer:
                            self.CELL_NOT_REACHED: "an earlier gate returned first"}}
 
     @property
+    def daily_atr_gate(self) -> "dict | None":
+        """The SLOT-level daily-ATR gate, which carries the number the STOP is built from.
+
+        Stage 5ZZZ-AY. The row labelled "Daily ATR" was never the daily ATR. `_scan_window`
+        computes `atr14(hist)` on the FIVE-MINUTE frame it is walking -- a fourteen-bar, roughly
+        seventy-minute range -- and the row printed it under a name that says one day. Measured
+        on MNKD for 2026-08-28: the row read 55, the daily ATR the stop is sized from read
+        1,548.93. Twenty-eight times apart, and the number that actually places the stop
+        appeared nowhere on the page.
+
+        Copied from the gate, like the regime verdict. `detect_entry_for_slot` already reports
+        it as `daily_atr` with the value attached; recomputing it here would be a second
+        implementation of the thing the stop is built from.
+        """
+        return next((g for g in self.gates if g.get("gate") == "daily_atr"), None)
+
+    @property
     def regime_gate(self) -> "dict | None":
         """The SLOT-level regime gate, when the detector reported one.
 
@@ -261,12 +278,17 @@ class NormalR4Observer:
         """The four variables this sleeve decides on, plus the price they were measured at."""
         bar = self.last_bar
         rg = self.regime_gate or {}
+        dag = self.daily_atr_gate or {}
         if bar is None:
             why = MISSING_DATA if self.first_failed_gate else MISSING_NOT_REPORTED
             return [_row(f"Trend filter (EMA {ema_period})", None, missing=why),
                     _row("Close used", None, missing=why),
                     _row("Close minus EMA", None, missing=why),
-                    _row("Daily ATR", None, missing=why),
+                    _row("ATR (14 x 5-min bars)", None, missing=why),
+                    _row("Daily ATR", dag.get("value"),
+                         unit="price" if dag.get("value") is not None else "",
+                         missing="" if dag.get("value") is not None else why,
+                         detail="the daily range the stop distance is sized from"),
                     _row("Volume", None, missing=why),
                     _row("Average volume (10 bars)", None, missing=why),
                     _row("Volume vs average", None, missing=why),
@@ -320,7 +342,13 @@ class NormalR4Observer:
                         "sleeve's EMA test, which measures the PULLBACK bar's distance to "
                         "the EMA against a proximity threshold and whose verdict the "
                         "detector does not return"),
-            _row("Daily ATR", atr, unit="price"),
+            _row("ATR (14 x 5-min bars)", atr, unit="price",
+                 detail="fourteen bars of the frame being walked, about seventy minutes. "
+                        "NOT the daily range -- that is the row below, and it is the one the "
+                        "stop distance is built from"),
+            _row("Daily ATR", dag.get("value"),
+                 unit="price" if dag.get("value") is not None else "",
+                 detail="the daily range the stop distance is sized from"),
             _row("Volume", volume, unit="count"),
             _row("Average volume (10 bars)", avgv, unit="count",
                  detail="taken by position inside the window, looking backward"),

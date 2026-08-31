@@ -9,6 +9,9 @@ removed before it was kept.
   2. The `Regime` row printed "NOT REPORTED" beside a verdict sitting a few fields away in the
      same block. Copied now, never recomputed: the seven rows around it stay verdict-free for
      the reason written over "Close minus EMA".
+  4. The row labelled "Daily ATR" was a fourteen-bar ATR on the FIVE-MINUTE frame -- about
+     seventy minutes. Measured on MNKD 2026-08-28: the row read 55, the daily ATR the stop is
+     sized from read 1,548.93, and that number appeared nowhere on the page.
   3. Nothing said whether the newest bar had CLOSED. NKD slots fire on the five-minute
      boundary, so the bar the detector last evaluated is seconds old and reads volume 0.
 """
@@ -105,7 +108,7 @@ def test_the_regime_row_reports_the_gate_the_detector_returned(nkd_frame, regime
     assert row["passed"] is gate["passed"], "the row disagreed with the gate it copies"
 
 
-def test_the_seven_measurement_rows_still_carry_no_verdict(nkd_frame):
+def test_the_measurement_rows_still_carry_no_verdict(nkd_frame):
     """Deliberate, and the reason is measured: stamping one agreed with its gate 52.7%.
 
     This test must go red if anyone ever "fixes" the remaining NOT REPORTED cells by computing
@@ -114,8 +117,36 @@ def test_the_seven_measurement_rows_still_carry_no_verdict(nkd_frame):
     rows = _run(nkd_frame, "Normal", "2026-08-28 15:05").rows(ema_period=10)
     verdicts = {r["label"]: r["passed"] for r in rows}
     assert verdicts.pop("Regime") is True
-    assert len(verdicts) == 7, sorted(verdicts)
+    assert len(verdicts) == 8, sorted(verdicts)
     assert set(verdicts.values()) == {None}, {k: v for k, v in verdicts.items() if v is not None}
+
+
+def test_the_two_atrs_are_separate_rows_and_are_not_the_same_number(nkd_frame):
+    """The row that says "Daily ATR" must be the daily range, not a seventy-minute one.
+
+    Measured on MNKD for 2026-08-28: the five-minute ATR reads about 55 and the daily ATR the
+    stop is sized from reads 1,548.93 -- twenty-eight times apart, and for years only the first
+    of them was on the page, under the second one's name.
+
+    Pinned as an ORDER OF MAGNITUDE, not as two literals: the numbers move with the market and
+    a test that froze them would be re-fitted the first time it went red. What cannot happen is
+    the two rows carrying the same value, or the daily one being the smaller.
+    """
+    by = {r["label"]: r["value"] for r in _run(nkd_frame, "Normal", "2026-08-28 15:05")
+          .rows(ema_period=10)}
+    five = by["ATR (14 x 5-min bars)"]
+    daily = by["Daily ATR"]
+    assert five is not None and daily is not None, by
+    assert daily > five * 5, ("the daily ATR is not meaningfully larger than the five-minute "
+                              f"one: daily={daily} five-min={five}")
+
+
+def test_the_daily_atr_row_is_copied_from_the_gate_not_recomputed(nkd_frame):
+    """A second implementation of the number the stop is built from is the defect to avoid."""
+    obs = _run(nkd_frame, "Normal", "2026-08-28 15:05")
+    gate = next(g for g in obs.gates if g.get("gate") == "daily_atr")
+    row = next(r for r in obs.rows(ema_period=10) if r["label"] == "Daily ATR")
+    assert row["value"] == gate["value"], (row["value"], gate["value"])
 
 
 # -- 3. whether the newest bar had closed -------------------------------------------------

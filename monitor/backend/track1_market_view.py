@@ -618,7 +618,8 @@ MISSING_NOT_REPORTED = "not_reported_by_detector"  # computed inside, never retu
 _SERIES_LABELS = {
     "close": "Close used",
     "ema": None,          # resolved per sleeve: the period is in the label
-    "atr": "Daily ATR",
+    "atr": "ATR (14 x 5-min bars)",
+    "daily_atr": "Daily ATR",
     "volume": "Volume",
     "avg_volume": "Average volume (10 bars)",
 }
@@ -856,7 +857,7 @@ def _setup_boundary(sleeve: str, spec: dict, strategy: dict, slots: list) -> dic
             return out
         out["diagnostics_source"] = diag.get("diagnostics_source") or MISSING_NOT_REPORTED
         for label in (f"Trend filter (EMA {period})", "Volume vs 10-bar average",
-                      "Daily ATR", "Regime"):
+                      "ATR (14 x 5-min bars)", "Daily ATR", "Regime"):
             out["metrics"].append({
                 "id": None, "label": label, "value": None, "threshold": None,
                 "comparator": "", "unit": None, "passed": None, "distance": None,

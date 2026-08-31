@@ -457,11 +457,82 @@ def b1_decision_evidence(root: str | Path = ".") -> tuple[bool, str]:
     return ok, "; ".join(parts)
 
 
+def final_bar_divergence_observed(root: str | Path = ".") -> tuple[bool, str]:
+    """Stage 5ZZZ-AZ. Has a real Normal session shown us what the LAST slot sees?
+
+    The finding this gate holds the route for. Each sleeve family's last slot fires at :55 on
+    the session clock, which is the moment the window's final bar OPENS -- so that bar is
+    seconds old when the detector reads it, and its volume reads near zero against a ten-bar
+    average. `volume_resume_surge` wants volume ABOVE that average, so a bar that has barely
+    begun fails it, and the backtest, which reads the same bar whole, does not.
+
+    Measured on the committed rows: 13 of 1,223 orders are signalled on that bar, and running
+    the three windows with it withheld costs $5,934.85 -- 12.02% of total P&L. The count share
+    is only 1.06%; the gap between the two is chain effect, because the orders that fill the
+    space left behind lose money.
+
+    Two things follow, and this gate exists because BOTH are unproven:
+      - live may be giving up 12% that nothing on the page can see, or
+      - the baseline is 12% above anything live can reach, and every comparison against it
+        will miss by that much forever, for no cause anybody can find.
+
+    What closes it: a RECORDED block from a Normal session's final slot whose per-bar grid was
+    actually written and which says whether its newest bar had closed. That is an observation,
+    not a decision -- there is nothing to sign. Until one exists the answer is UNKNOWN, and
+    absence never counts as a pass.
+    """
+    try:
+        from global_index import track1_strategy_diagnostics as sd
+
+        folder = Path(sd.path_for(str(root), "20000101")).parent
+        if not folder.exists():
+            return False, ("no strategy-diagnostics directory yet -- UNKNOWN, which is not a "
+                           "pass")
+        seen_final = 0
+        for f in sorted(folder.glob("*.jsonl"), reverse=True):
+            day = f.stem.rsplit("_", 1)[-1]
+            for block in sd.read(root=str(root), day=day):
+                if block.get("diagnostics_source") != sd.RECORDED:
+                    continue
+                slot = str(block.get("slot_id") or "")
+                if not (slot.endswith("1555") or slot.endswith("0255")):
+                    continue
+                regime = next((r.get("value") for r in (block.get("rows") or [])
+                               if r.get("label") == "Regime"), None)
+                if regime != "Normal":
+                    continue
+                seen_final += 1
+                grid = block.get("bar_gate_grid") or {}
+                if not (grid.get("rows") or []):
+                    continue
+                if block.get("last_bar_complete") is None:
+                    continue
+                surge = next((r for r in grid["rows"]
+                              if r.get("gate") == "volume_resume_surge"), None)
+                tail = "" if surge is None else (
+                    "; volume_resume_surge reached %s passed %s"
+                    % (surge.get("reached"), surge.get("passed")))
+                return True, ("%s %s on %s: newest bar closed=%s, %s bars walked%s"
+                              % (block.get("sleeve"), slot, block.get("session_date"),
+                                 block.get("last_bar_complete"),
+                                 block.get("bars_evaluated"), tail))
+        if seen_final:
+            return False, ("%d Normal final-slot record(s) found, none carrying a per-bar grid "
+                           "and a newest-bar-closed answer -- the walk did not report, so "
+                           "nothing was observed" % seen_final)
+        return False, ("no Normal session has reached a final slot with a recorded block yet "
+                       "-- UNKNOWN, which is not a pass")
+    except Exception as exc:                                    # noqa: BLE001
+        return False, ("the final-bar observation could not be read (%s: %s) -- failing closed"
+                       % (type(exc).__name__, exc))
+
+
 MEASUREMENTS: dict = {"live_frame_wiring": live_frame_wiring,
                       "shadow_evidence": shadow_evidence,
                       "regime_labels_verified": regime_labels_verified,
                       "legacy_broker_flat": legacy_broker_flat,
-                      "b1_decision_evidence": b1_decision_evidence}
+                      "b1_decision_evidence": b1_decision_evidence,
+                      "final_bar_divergence_observed": final_bar_divergence_observed}
 
 
 @dataclass(frozen=True)
@@ -551,6 +622,39 @@ BLOCKERS: dict = {
         also_requires_measurement="b1_decision_evidence",
         waiver_flag="b1_measurement_waived"),
 
+    "FINAL_BAR_DIVERGENCE_OBSERVED": Blocker(
+        id="FINAL_BAR_DIVERGENCE_OBSERVED",
+        title="What the last slot of a Normal session sees has been observed, not inferred",
+        status=MEASURED_GATE,
+        blocks_orders=True,
+        evidence=(
+            "Stage 5ZZZ-AZ. Every sleeve family's last slot fires at :55 on the session "
+            "clock, which is the moment the window's final bar OPENS. The detector therefore "
+            "reads a bar seconds old: measured on NKD 2026-08-31, slot 02:55 evaluated the "
+            "15:55 Tokyo bar and read its volume as 0 against a ten-bar average of 32. "
+            "`volume_resume_surge` requires volume above that average, so the bar fails, and "
+            "no later slot exists to read it complete. The backtest reads the same bar whole. "
+            "SIZE, measured on the committed rows: 13 of 1,223 orders are signalled on that "
+            "bar; withholding it from all three windows costs $5,934.85, 12.02% of total P&L "
+            "-- far above its 1.06% share of order count, because the orders that fill the "
+            "space left behind lose money. A 15:59 slot does not fix it: the closing minute "
+            "alone carries 56.4% of that bar's volume, so only 6 of the 13 still clear the "
+            "threshold four minutes in. "
+            "WHY IT BLOCKS. Not because 12% is at risk, but because nobody knows which 12% it "
+            "is. Either live silently gives that up, or the baseline sits that far above "
+            "anything live can reach and every comparison against it misses forever with no "
+            "visible cause. Both are unacceptable to run orders under, and one observation "
+            "separates them. "
+            "SCOPE: this asks only that the behaviour be OBSERVED on a real Normal session. "
+            "It takes no view on the fix -- adding a 16:00 slot, or removing the bar from the "
+            "baseline, are both coherent, and both are the operator's decision afterwards."),
+        decision_needed=(
+            "Let a Normal-regime session run to its final slot with the observation walk "
+            "recording, then read the per-bar grid for that slot: it says whether the newest "
+            "bar had closed and whether `volume_resume_surge` refused it. Nothing to sign -- "
+            "this gate opens when the observation exists."),
+        released_by_measurement="final_bar_divergence_observed",
+    ),
     "PAPER_SHADOW_EVIDENCE": Blocker(
         id="PAPER_SHADOW_EVIDENCE",
         title="Enough judgeable shadow days to justify an order",
