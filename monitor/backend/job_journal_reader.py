@@ -942,6 +942,38 @@ def _sleeve_of(slot_id: str) -> str:
     return ""
 
 
+def _recorded_intents(day: str, root: Path) -> dict:
+    """{slot_id: [{instrument, direction, intent}]} for slots that recorded intents.
+
+    Stage 5ZZZ-BI. Read once for the day, like its neighbours: one small file, and forty
+    lookups of it would be forty reads of the same thing.
+
+    Only rows that actually name an intent count. A row that ran and recorded nothing is not
+    a setup, and turning its presence into one would be the same fiction this module refuses
+    everywhere else.
+    """
+    try:
+        from global_index import track1_shadow_intent as si
+
+        rows = si.read_day(root, day)
+    except Exception:                                          # noqa: BLE001
+        return {}
+    out: dict = {}
+    for r in rows or []:
+        be = r.get("before_entry") or {}
+        if not be.get("intent"):
+            continue
+        slot = str(r.get("slot_id") or "")
+        if not slot:
+            continue
+        out.setdefault(slot, []).append({
+            "instrument": str(be.get("instrument") or ""),
+            "direction": str(be.get("direction") or ""),
+            "intent": str(be.get("intent") or ""),
+        })
+    return out
+
+
 def _annotate_signal_diagnostics(jobs: list[dict[str, Any]], day: str, root: Path) -> None:
     """Attach one compact signal line to each Track 1 STRATEGY job. Read-only.
 
@@ -985,6 +1017,8 @@ def _annotate_signal_diagnostics(jobs: list[dict[str, Any]], day: str, root: Pat
     except Exception:                                          # noqa: BLE001
         obs_by_slot = {}
 
+    intents_by_slot = _recorded_intents(day, root)
+
     for job in strategy:
         row = by_slot.get(str(job.get("job_id", "")))
         job["operational"] = _operational(
@@ -1012,6 +1046,30 @@ def _annotate_signal_diagnostics(jobs: list[dict[str, Any]], day: str, root: Pat
             continue
 
         status = row.get("status")
+        # Stage 5ZZZ-BI. One sleeve keeps its answer in a second store, and the card was
+        # reading only the first.
+        #
+        # Calm records what it found as a shadow INTENT, not as a tradable candidate, and that
+        # is deliberate: at 09:32 the price those trades would fill at does not exist yet, so
+        # `raw_candidates` is 0 and the signal row says NO_SIGNAL. The row is right. Measured
+        # on 2026-08-31, the same slot recorded two intents -- MES LONG and MNQ LONG, both
+        # `would_send_at_entry_reference_time` -- while the card told the operator nothing had
+        # happened.
+        #
+        # The writer's own comment asked for this reader: the intent stream is where "recorded
+        # an intent" can be told from "no setup today". So the ROW is left exactly as written,
+        # and the CARD consults both stores. `RAW_SIGNAL_FOUND` is not a new word invented for
+        # the occasion -- it already means "a setup matched, before admission and cap checks",
+        # which is what an intent waiting for ten o'clock is.
+        found = intents_by_slot.get(str(job.get("job_id", "")))
+        if found and status == sig.NO_SIGNAL:
+            status = sig.RAW_SIGNAL_FOUND
+            # The SAME row, corrected, handed to every phrase-maker. The first version passed
+            # the corrected status to `chip` and the untouched row to `one_line`, and the card
+            # came back with "RAW SIGNAL" above "Signal: NO SIGNAL" -- two lines on one card
+            # disagreeing about the same slot, which is worse than either of them alone.
+            row = {**row, "status": status,
+                   "raw_candidates": max(int(row.get("raw_candidates") or 0), len(found))}
         job["signal"] = {
             "status": status,
             "chip": sig.chip(status),
@@ -1028,6 +1086,9 @@ def _annotate_signal_diagnostics(jobs: list[dict[str, Any]], day: str, root: Pat
                 "orders_enabled": bool(row.get("orders_enabled")),
                 "order_attempted": bool(row.get("order_attempted")),
                 "candidates": row.get("candidates") or [],
+                # Present only when the sleeve recorded intents rather than candidates, so a
+                # card for any other sleeve is unchanged down to the key set.
+                **({"recorded_intents": found} if found else {}),
             },
             # Developer material. Shipped so it is not lost, and rendered by NOTHING by
             # default — the panel has no code path that prints it. `rule_checks` is where

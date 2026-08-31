@@ -824,6 +824,42 @@ def _calm_observe_rows(before_entry: dict, after_reference: dict) -> list:
     ]
 
 
+def _calm_instrument(rec: dict) -> str:
+    """Which instrument a recorded Calm row is about, from the row itself."""
+    for holder in (rec.get("before_entry"), rec.get("after_reference"), rec):
+        if isinstance(holder, dict) and holder.get("instrument"):
+            return str(holder["instrument"])
+    return ""
+
+
+def _calm_instrument_view(rec: dict, phase: str, params) -> dict:
+    """One instrument's account of a phase, in the same shape the phase block carries.
+
+    Stage 5ZZZ-BH. Built for every row the phase recorded, not just the last, so a basket
+    sleeve stops showing one of its instruments and silently dropping the others.
+    """
+    be = rec.get("before_entry") or {}
+    ar = rec.get("after_reference") or {}
+    if phase == CALM_DECIDE:
+        body = _calm_decide_rows(be, params) if be else []
+    else:
+        body = _calm_observe_rows(be, ar) if ar else []
+    return {
+        "instrument": _calm_instrument(rec),
+        "direction": str(be.get("direction") or ""),
+        "rows": body,
+        "status": str(rec.get("status") or ""),
+        "reason_code": str(rec.get("reason_code") or ""),
+        # A planned stop belongs to the phase that reads the reference price, and to the
+        # instrument it was computed for. Guarded by the phase for the same reason the block
+        # above is: one malformed row must not print a stop at half past nine.
+        "price_levels": ([{"kind": "stop", "label": "Planned stop",
+                           "price": round(float(ar["planned_stop"]), 4), "armed": False}]
+                         if (phase == CALM_OBSERVE and ar.get("planned_stop") is not None)
+                         else []),
+    }
+
+
 def calm_blocks(root, day: str, now=None, *, slots=None) -> dict:
     """`{phase: block}` for Calm on one session. Reads the recorded stream; writes nothing.
 
@@ -867,6 +903,24 @@ def calm_blocks(root, day: str, now=None, *, slots=None) -> dict:
             continue
 
         if mine:
+            # Stage 5ZZZ-BH. `mine[-1]` used to be the whole answer, and it threw the rest
+            # away without a word.
+            #
+            # This sleeve trades a BASKET: measured on 2026-08-31 it recorded two setups in
+            # one phase, MES and MNQ, with different numbers --
+            #
+            #     prior_rth_close_bottom_third   MES 0.1555   MNQ 0.1581
+            #     prior_rth_down_close           MES -0.0030  MNQ -0.0044
+            #
+            # -- and the panel showed one card, carrying MNQ because it was written last,
+            # with no instrument named on it and nothing to say a second setup existed. An
+            # operator reading a single stop level had no way to know half the sleeve's day
+            # was missing.
+            #
+            # The dict stays keyed by phase, because the two phases ARE the sleeve's shape and
+            # every reader is built on that. What changes is that the block now carries every
+            # instrument the phase recorded, and NAMES the one whose values sit at the top
+            # level -- so the pick is stated instead of silent.
             rec = mine[-1]
             be = rec.get("before_entry") or {}
             ar = rec.get("after_reference") or {}
@@ -895,7 +949,10 @@ def calm_blocks(root, day: str, now=None, *, slots=None) -> dict:
                 status=status, reason_code=code,
                 params_hash=rec.get("params_hash") or "",
                 data_source_identity=rec.get("data_identity") or "",
-                matched_decide=(bool(be) if phase == CALM_OBSERVE else None))
+                matched_decide=(bool(be) if phase == CALM_OBSERVE else None),
+                instrument=_calm_instrument(rec),
+                instruments=[_calm_instrument_view(r, phase, params) for r in mine],
+                instrument_count=len(mine))
             # Stage 5ZZZ-AR. The recorded row says WHAT happened; the gates say WHY, and they
             # live in a different stream.
             #
