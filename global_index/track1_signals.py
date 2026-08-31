@@ -275,6 +275,38 @@ EMITTED_TO_DECLARED_BY_SLEEVE: dict = {
 }
 
 
+#: Which CHANNEL a gate is reported through, and it decides where a rule can be DRAWN.
+#:
+#: The observer keeps two lists for a reason measured on 2026-08-10: within ONE slot the
+#: volume rule came back twelve times pass and ten times fail, because the detector answers it
+#: once per BAR while a slot is a moment of asking. A grid cell keyed on the slot therefore has
+#: no single value -- which is why every one of these rules read "value not published" on all
+#: 291 slot records ever written, and why exactly the two that ARE answered once per slot,
+#: `gate_allow` and `freshness_allow`, are the only two that ever carried a verdict.
+#:
+#: `regime` appears in BOTH lists: the detector answers it once for the slot and the engine
+#: answers it again for every bar. The slot-level answer is the one a lane can hold, so it is
+#: NOT classified as per-bar.
+SLOT_LEVEL_GATES: frozenset = frozenset({"session_bars", "regime", "daily_atr",
+                                         "bars_so_far", "setup_bar"})
+PER_BAR_GATES: frozenset = frozenset({"regime", "ema_proximity", "volume_pullback_declined",
+                                      "volume_resume_surge", "spy_short_gate",
+                                      "r4_context_filter", "fixed_stop_daily_atr"})
+
+
+def per_bar_rule_names(sleeve: str) -> tuple:
+    """Declared rules whose only answer is per BAR, so a per-SLOT cell cannot hold one.
+
+    Stress is untouched by this: its detector has no bar channel at all -- `entry_conditions`
+    is `all()` over four basket-wide checks answered once per slot -- so none of its gates are
+    in `PER_BAR_GATES` and none of its lanes move.
+    """
+    declared = set(RULES.get(sleeve, ()))
+    slot_answerable = {declared_for(sleeve, g) for g in SLOT_LEVEL_GATES} - {None}
+    per_bar = {declared_for(sleeve, g) for g in PER_BAR_GATES} - {None} - slot_answerable
+    return tuple(n for n in RULES.get(sleeve, ()) if n in per_bar and n in declared)
+
+
 def declared_for(sleeve: str, emitted: str) -> "str | None":
     """The declared rule an emitted gate answers to, or None when nothing declares it.
 

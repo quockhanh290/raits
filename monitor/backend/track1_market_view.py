@@ -400,6 +400,21 @@ def _not_entry_conditions() -> dict:
 _NOT_ENTRY_CONDITIONS = _not_entry_conditions()
 
 
+def _per_bar_rules(sleeve: str) -> set:
+    """Declared rules a per-SLOT cell cannot hold, read from where the rules are declared.
+
+    Stage 5ZZZ-AS. These leave the lanes for the bar grid, and the classification is derived
+    from which CHANNEL the detector reports each gate through -- not from a list here. Stress
+    and Calm answer every rule once per slot and lose nothing.
+    """
+    try:
+        from global_index import track1_signals as _sig
+
+        return set(_sig.per_bar_rule_names(sleeve))
+    except Exception:                                             # noqa: BLE001
+        return set()
+
+
 def _declared_config(rows: list, sleeve: str) -> list:
     """The sleeve's declared parameters that are NOT entry conditions, shown as facts.
 
@@ -439,6 +454,7 @@ def _rule_lanes(rows: list, sleeve: str, slots: list) -> list:
     This is the honest shape of the panel's centre. A lane of numbers here would have to
     invent every point on it, and the numbers would be read as the strategy's own.
     """
+    _per_bar = _per_bar_rules(sleeve)
     by_slot: dict = {}
     for r in rows:
         if r.get("sleeve") != sleeve:
@@ -455,6 +471,13 @@ def _rule_lanes(rows: list, sleeve: str, slots: list) -> list:
         for c in r.get("rule_checks") or []:
             name = str(c.get("rule") or "")
             if not name:
+                continue
+            if name in _per_bar:
+                # Stage 5ZZZ-AS. Drawn in the bar grid instead, where each cell is one bar and
+                # therefore holds exactly one verdict. A lane cell is a SLOT, and within one
+                # slot this rule is answered once per bar -- measured on a real session, twelve
+                # times pass and ten times fail. There is no single value to put here, which is
+                # why it has read "value not published" on every slot record ever written.
                 continue
             if name in _NOT_ENTRY_CONDITIONS:
                 # Stage 5ZZZ-AJ. Kept out of the lanes, not out of the payload: these three
