@@ -458,7 +458,8 @@ def b1_decision_evidence(root: str | Path = ".") -> tuple[bool, str]:
 
 
 def final_bar_divergence_observed(root: str | Path = ".") -> tuple[bool, str]:
-    """Stage 5ZZZ-AZ. Has a real Normal session shown us what the LAST slot sees?
+    """Stage 5ZZZ-AZ, re-pointed in 5ZZZ-BD. Has a real Normal session shown us what the LAST
+    slot sees?
 
     The finding this gate holds the route for. Each sleeve family's last slot fires at :55 on
     the session clock, which is the moment the window's final bar OPENS -- so that bar is
@@ -468,63 +469,34 @@ def final_bar_divergence_observed(root: str | Path = ".") -> tuple[bool, str]:
 
     Measured on the committed rows: 13 of 1,223 orders are signalled on that bar, and running
     the three windows with it withheld costs $5,934.85 -- 12.02% of total P&L. The count share
-    is only 1.06%; the gap between the two is chain effect, because the orders that fill the
-    space left behind lose money.
+    is only 1.06%; the gap is chain effect, because the orders that fill the space left behind
+    lose money.
 
     Two things follow, and this gate exists because BOTH are unproven:
       - live may be giving up 12% that nothing on the page can see, or
       - the baseline is 12% above anything live can reach, and every comparison against it
         will miss by that much forever, for no cause anybody can find.
 
-    What closes it: a RECORDED block from a Normal session's final slot whose per-bar grid was
-    actually written and which says whether its newest bar had closed. That is an observation,
-    not a decision -- there is nothing to sign. Until one exists the answer is UNKNOWN, and
-    absence never counts as a pass.
+    WHERE THE EVIDENCE COMES FROM, and why it moved. This first read the display-side
+    diagnostics store and filtered reconstructions out. That broke the line this file's
+    neighbours hold by construction -- no gate, readiness check or acceptance judge may
+    import the module holding reconstructions -- and the test enforcing it walks three
+    files and stops at the first offender, so the readiness check and the acceptance judge
+    stopped being checked at all. The evidence now lives in its own ledger, written only by
+    the slot path. A reconstruction cannot reach this gate because there is no path to it,
+    not because a filter turns it away.
+
+    The guard is a plain substring check over those three files, so this docstring may not
+    name the module either. Crude, and it caught the first draft of this very paragraph.
     """
     try:
-        from global_index import track1_strategy_diagnostics as sd
+        from global_index import track1_final_bar_observation as fbo
 
-        folder = Path(sd.path_for(str(root), "20000101")).parent
-        if not folder.exists():
-            return False, ("no strategy-diagnostics directory yet -- UNKNOWN, which is not a "
-                           "pass")
-        seen_final = 0
-        for f in sorted(folder.glob("*.jsonl"), reverse=True):
-            day = f.stem.rsplit("_", 1)[-1]
-            for block in sd.read(root=str(root), day=day):
-                if block.get("diagnostics_source") != sd.RECORDED:
-                    continue
-                slot = str(block.get("slot_id") or "")
-                if not (slot.endswith("1555") or slot.endswith("0255")):
-                    continue
-                regime = next((r.get("value") for r in (block.get("rows") or [])
-                               if r.get("label") == "Regime"), None)
-                if regime != "Normal":
-                    continue
-                seen_final += 1
-                grid = block.get("bar_gate_grid") or {}
-                if not (grid.get("rows") or []):
-                    continue
-                if block.get("last_bar_complete") is None:
-                    continue
-                surge = next((r for r in grid["rows"]
-                              if r.get("gate") == "volume_resume_surge"), None)
-                tail = "" if surge is None else (
-                    "; volume_resume_surge reached %s passed %s"
-                    % (surge.get("reached"), surge.get("passed")))
-                return True, ("%s %s on %s: newest bar closed=%s, %s bars walked%s"
-                              % (block.get("sleeve"), slot, block.get("session_date"),
-                                 block.get("last_bar_complete"),
-                                 block.get("bars_evaluated"), tail))
-        if seen_final:
-            return False, ("%d Normal final-slot record(s) found, none carrying a per-bar grid "
-                           "and a newest-bar-closed answer -- the walk did not report, so "
-                           "nothing was observed" % seen_final)
-        return False, ("no Normal session has reached a final slot with a recorded block yet "
-                       "-- UNKNOWN, which is not a pass")
+        v = fbo.latest(root)
+        return (v.status == fbo.OBSERVED), f"{v.status}: {v.detail}"
     except Exception as exc:                                    # noqa: BLE001
-        return False, ("the final-bar observation could not be read (%s: %s) -- failing closed"
-                       % (type(exc).__name__, exc))
+        return False, (f"the final-bar observation could not be read "
+                       f"({type(exc).__name__}: {exc}) -- failing closed")
 
 
 MEASUREMENTS: dict = {"live_frame_wiring": live_frame_wiring,

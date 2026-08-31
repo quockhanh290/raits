@@ -426,6 +426,38 @@ _data_observation_last_error = [""]
 _strategy_diagnostics_last_error: list = [None]
 
 
+def _record_final_bar_observation(block: dict, *, root, day, slot_id: str) -> None:
+    """Copy one FINAL-slot observation into the ledger the order gate reads.
+
+    Stage 5ZZZ-BD. A gate may not read the display-side diagnostics store -- that is the line
+    three files hold by construction, and a filter inside the gate is not the same guarantee.
+    So the slot writes the same fact twice, into two stores, and the gate only ever opens one
+    of them. Reconstructions are written by a different function into the other store and can
+    never appear here.
+
+    Only final slots are recorded, and only what the slot measured: `last_bar_complete` travels
+    as None when nothing measured it, because a ledger that turns a missing measurement into a
+    False reports an observation nobody made.
+
+    Wrapped like everything else on this path: bookkeeping must not cost a slot its entry.
+    """
+    try:
+        from global_index import track1_final_bar_observation as _fbo
+
+        grid = (block.get("bar_gate_grid") or {}).get("rows") or []
+        surge = next((r for r in grid if r.get("gate") == "volume_resume_surge"), None)
+        regime = next((r.get("value") for r in (block.get("rows") or [])
+                       if r.get("label") == "Regime"), "")
+        _fbo.record(root=root, session_date=str(day), sleeve=str(block.get("sleeve") or ""),
+                    slot_id=str(slot_id), regime=str(regime or ""),
+                    last_bar_complete=block.get("last_bar_complete"),
+                    bars_evaluated=block.get("bars_evaluated"),
+                    surge_reached=(surge or {}).get("reached"),
+                    surge_passed=(surge or {}).get("passed"))
+    except Exception:                                              # noqa: BLE001
+        pass
+
+
 def _write_data_observation(*, sleeve, day, slot_id, joined, refusal, decided, reason,
                             candidates, data_paths, root: str = ".") -> None:
     """Compose and append one data-observation row. Reads; never recomputes.
@@ -896,6 +928,7 @@ def observe_live_slot(sleeve: str, slot_id: str, *, now_et, provider=None,
                 _b.update(session_date=str(day), slot_id=slot_id, slot_time=_slot_hhmm_d,
                           mode=tx.SHADOW_LIVE, route=ROUTE, decided=decided, reason=reason)
                 _sd.record(_b, root=root, day=str(day))
+                _record_final_bar_observation(_b, root=root, day=day, slot_id=slot_id)
     except Exception as _sd_exc:               # pragma: no cover - defence, not a code path
         _strategy_diagnostics_last_error[0] = f"{type(_sd_exc).__name__}: {_sd_exc}"
 

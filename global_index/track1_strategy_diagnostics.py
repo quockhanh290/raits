@@ -112,6 +112,22 @@ def _row(label: str, value, *, unit: str = "", threshold=None, comparator: str =
         display = f"{num:,.0f}"
     else:
         display = f"{num:,.4f}".rstrip("0").rstrip(".")
+    # Stage 5ZZZ-BC. A value smaller than the format can show must not print as "0".
+    #
+    # The rules this module now carries are not all prices. `avg_gap` is a fraction compared
+    # against -0.001, and four decimals stripped of trailing zeros renders 1.2e-05 as "0" --
+    # a reading indistinguishable from a true zero, beside a threshold three decimals up.
+    # Measured on the real basket, 2026-08-28: the row read "0" while the detector's own
+    # sentence in the same block read the full number.
+    if num is not None and num != 0:
+        suffix = "x" if str(display).endswith("x") else ""
+        try:
+            if float(str(display).replace(",", "").rstrip("x")) == 0:
+                # The unit marker survives the reformat: dropping it turns a ratio into a
+                # bare number and the reader loses what it is a ratio OF.
+                display = f"{num:.3g}{suffix}"
+        except ValueError:
+            pass
     return {"label": label, "value": num if num is not None else value,
             "display_value": display, "unit": unit, "threshold": threshold,
             "comparator": comparator, "passed": passed, "detail": detail,

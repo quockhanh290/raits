@@ -1,12 +1,16 @@
-"""Stage 5ZZZ-AZ. The gate that holds the route until the last slot has been OBSERVED.
+"""Stage 5ZZZ-AZ, re-pointed in 5ZZZ-BD. The gate that holds the route until the last slot of
+a Normal session has been OBSERVED -- reading a ledger of its own, not the display store.
 
-Every sleeve family's last slot fires at :55, which is the moment the window's final bar opens.
+Each sleeve family's last slot fires at :55, which is the moment the window's final bar opens.
 The detector reads a bar seconds old, its volume gate refuses it, and no later slot exists to
 read it complete -- while the backtest reads the same bar whole. Measured: 13 of 1,223 orders
 are signalled on that bar and withholding it costs 12.02% of P&L.
 
-The gate asks for one thing: that a real Normal session's final slot have written down what it
-saw. These tests exist because a gate that can only ever say no is the same as no gate.
+The first version of this gate read the display-side diagnostics store and filtered
+reconstructions out. That broke a line three files hold BY CONSTRUCTION, and the test enforcing
+it stops at the first offender -- so the readiness check and the acceptance judge stopped being
+checked at all. Measured at the time: 1 mention in the gates file, 0 in the other two, and the
+loop never reached them. The evidence now has its own ledger.
 """
 from __future__ import annotations
 
@@ -14,34 +18,13 @@ import json
 
 import pytest
 
+from global_index import track1_final_bar_observation as fbo
 from global_index import track1_gates as g
-from global_index import track1_strategy_diagnostics as sd
 
 MEASURE = "final_bar_divergence_observed"
 BLOCKER = "FINAL_BAR_DIVERGENCE_OBSERVED"
-
-
-def _write(root, day: str, **over) -> None:
-    """One recorded block on disk, in the shape the runtime actually writes."""
-    block = {
-        "schema": sd.SCHEMA,
-        "diagnostics_source": sd.RECORDED,
-        "sleeve": "roska4_swing",
-        "slot_id": "LIVE_DAY_1555",
-        "session_date": day,
-        "bars_evaluated": 22,
-        "last_bar_complete": False,
-        "rows": [{"label": "Regime", "value": "Normal", "passed": True}],
-        "bar_gate_grid": {"bars": ["15:50", "15:55"],
-                          "rows": [{"gate": "regime", "reached": 22, "passed": 22},
-                                   {"gate": "volume_resume_surge", "reached": 12,
-                                    "passed": 0, "cells": "FFFFFFFFFFFF"}]},
-    }
-    block.update(over)
-    p = sd.path_for(str(root), day)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    with open(p, "a", encoding="utf-8") as fh:
-        fh.write(json.dumps(block, default=str) + "\n")
+GUARDED_FILES = ("track1_gates.py", "track1_paper_readiness.py",
+                 "track1_shadow_acceptance.py")
 
 
 @pytest.fixture()
@@ -49,92 +32,139 @@ def root(tmp_path):
     return tmp_path
 
 
+def _write(root, **over):
+    kw = dict(root=root, session_date="2026-09-01", sleeve="roska4_swing",
+              slot_id="LIVE_DAY_1555", regime="Normal", last_bar_complete=False,
+              bars_evaluated=22, surge_reached=12, surge_passed=0)
+    kw.update(over)
+    return fbo.record(**kw)
+
+
+# -- the safety line this stage exists to put back ----------------------------------------
+def test_no_gate_readiness_or_acceptance_file_reads_the_display_store():
+    """The line, checked here too rather than only in its original home.
+
+    It is enforced by a plain substring check, which is crude and is the point: it caught a
+    DOCSTRING that merely named the module. A guarantee that survives being mentioned is not
+    the guarantee this line is after.
+    """
+    import pathlib
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    offenders = [n for n in GUARDED_FILES
+                 if "track1_strategy_diagnostics"
+                 in (repo / "global_index" / n).read_text(encoding="utf-8")]
+    assert offenders == [], offenders
+
+
+def test_the_ledger_itself_cannot_reach_the_display_store():
+    """If the ledger imported it, the gate would reach it one hop away and the line would be
+    decoration."""
+    import pathlib
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    src = (repo / "global_index" / "track1_final_bar_observation.py").read_text(
+        encoding="utf-8")
+    assert "track1_strategy_diagnostics" not in src
+
+
 # -- it can say YES -----------------------------------------------------------------------
-def test_a_recorded_normal_final_slot_with_a_grid_opens_the_gate(root):
+def test_a_recorded_normal_final_slot_opens_the_gate(root):
     """Without this the gate could be hardcoded to refuse and every other test would pass."""
-    _write(root, "20260901")
+    assert _write(root) is not None
     ok, detail = g.MEASUREMENTS[MEASURE](root)
     assert ok is True, detail
     assert "closed=False" in detail
-    assert "volume_resume_surge" in detail, detail
-
-
-def test_the_detail_names_the_session_so_the_reader_can_go_and_look(root):
-    _write(root, "20260901")
-    _, detail = g.MEASUREMENTS[MEASURE](root)
-    assert "roska4_swing" in detail and "LIVE_DAY_1555" in detail and "20260901" in detail
+    assert "roska4_swing" in detail and "2026-09-01" in detail
 
 
 def test_the_night_family_last_slot_counts_too(root):
-    _write(root, "20260901", sleeve="global_nkd", slot_id="NKD_NIGHT_0255")
+    _write(root, sleeve="global_nkd", slot_id="NKD_NIGHT_0255")
     ok, _ = g.MEASUREMENTS[MEASURE](root)
     assert ok is True
 
 
+def test_a_closed_final_bar_also_counts_as_an_observation(root):
+    """The gate asks whether the behaviour was WATCHED, not what the answer turned out to be."""
+    _write(root, last_bar_complete=True)
+    ok, detail = g.MEASUREMENTS[MEASURE](root)
+    assert ok is True and "closed=True" in detail
+
+
 # -- and it says NO for each distinct reason ----------------------------------------------
-def test_nothing_on_disk_is_unknown_not_a_pass(root):
+def test_nothing_recorded_is_unknown_not_a_pass(root):
+    """Asserted on the STATUS, not on the word.
+
+    The first version of this test looked for "UNKNOWN" in the gate's detail string -- and the
+    detail sentence for this case contains that word in its prose, so collapsing the status
+    into NOT_OBSERVED left the test green. Found by mutation, not by reading it.
+    """
+    assert fbo.latest(root).status == fbo.UNKNOWN
     ok, detail = g.MEASUREMENTS[MEASURE](root)
     assert ok is False
-    assert "UNKNOWN" in detail, detail
+    assert detail.startswith(fbo.UNKNOWN + ":"), detail
 
 
 def test_a_calm_session_does_not_count(root):
     """The whole question is what the detector does when the regime lets it look at bars."""
-    _write(root, "20260901", rows=[{"label": "Regime", "value": "Calm", "passed": False}])
+    _write(root, regime="Calm")
     ok, detail = g.MEASUREMENTS[MEASURE](root)
     assert ok is False
-    assert "UNKNOWN" in detail, detail
+    assert "NOT_OBSERVED" in detail and "no Normal session" in detail
 
 
-def test_a_normal_slot_that_is_not_the_last_one_does_not_count(root):
+def test_a_slot_that_did_not_measure_is_refused_and_says_so(root):
+    """None means nobody looked. Counting it would let the gate open on silence."""
+    _write(root, last_bar_complete=None)
+    ok, detail = g.MEASUREMENTS[MEASURE](root)
+    assert ok is False
+    assert "none of which answered" in detail, detail
+    assert "UNKNOWN" not in detail, "a slot that ran is a different answer from no slot at all"
+
+
+def test_a_non_final_slot_is_never_written_at_all(root):
     """A 15:30 slot sees its newest bar again five minutes later; the final slot never does."""
-    _write(root, "20260901", slot_id="LIVE_DAY_1530")
-    ok, _ = g.MEASUREMENTS[MEASURE](root)
-    assert ok is False
-
-
-def test_a_final_slot_whose_walk_reported_nothing_is_refused_and_says_so(root):
-    """The pre-Stage-AW state: the block exists, the grid is empty, nothing was observed."""
-    _write(root, "20260901", bar_gate_grid={"bars": [], "rows": []})
+    assert _write(root, slot_id="LIVE_DAY_1530") is None
     ok, detail = g.MEASUREMENTS[MEASURE](root)
-    assert ok is False
-    assert "the walk did not report" in detail, detail
-    assert "UNKNOWN" not in detail, "an empty grid is a different answer from no record at all"
+    assert ok is False and "UNKNOWN" in detail
 
 
-def test_an_unanswered_bar_completeness_is_refused(root):
-    """None means nobody measured it. A gate must not read that as "the bar was open"."""
-    _write(root, "20260901", last_bar_complete=None)
-    ok, detail = g.MEASUREMENTS[MEASURE](root)
-    assert ok is False
-    assert "the walk did not report" in detail, detail
-
-
-def test_a_reconstructed_block_does_not_count_as_an_observation(root):
-    """A replay is computed after the fact and can differ from what the slot decided on."""
-    _write(root, "20260901", diagnostics_source="RECONSTRUCTED")
-    ok, _ = g.MEASUREMENTS[MEASURE](root)
-    assert ok is False
-
-
-def test_an_unreadable_record_fails_closed(root, monkeypatch):
+def test_an_unreadable_ledger_fails_closed(root, monkeypatch):
     """A check that cannot run is not a check that passed."""
-    # A record has to EXIST first. Without this the function returns at the missing-directory
-    # check and the monkeypatch is never reached -- the first version of this test passed on
-    # a code path it never entered.
-    _write(root, "20260901")
+    _write(root)
 
     def boom(*a, **k):
         raise OSError("disk gone")
-    monkeypatch.setattr(sd, "read", boom)
+    monkeypatch.setattr(fbo, "_read_dir", boom)
     ok, detail = g.MEASUREMENTS[MEASURE](root)
-    assert ok is False
-    assert "failing closed" in detail, detail
+    assert ok is False and "failing closed" in detail
 
 
-# -- and it is actually wired into the thing that stops orders ----------------------------
+def test_a_corrupt_line_does_not_take_the_whole_ledger_down(root):
+    p = _write(root)
+    with open(p, "a", encoding="utf-8") as fh:
+        fh.write("{not json\n")
+    ok, _ = g.MEASUREMENTS[MEASURE](root)
+    assert ok is True, "one bad line hid a good observation"
+
+
+# -- the writer records what was measured and nothing else --------------------------------
+def test_the_row_carries_the_surge_counts_the_operator_needs(root):
+    p = _write(root)
+    row = json.loads(p.read_text(encoding="utf-8").splitlines()[0])
+    assert row["surge_reached"] == 12 and row["surge_passed"] == 0
+    assert row["last_bar_complete"] is False
+    assert row["status"] == fbo.OBSERVED
+
+
+def test_the_slot_path_writes_the_ledger_beside_the_diagnostics_block():
+    """Checked at the CALL SITE: a ledger nothing writes to is a gate that never opens."""
+    import inspect
+    from global_index import run_live_day_track1 as rl
+    src = inspect.getsource(rl)
+    assert "_record_final_bar_observation(_b" in src
+
+
+# -- and it is wired into the thing that stops orders -------------------------------------
 def test_the_blocker_is_registered_and_blocks_orders():
-    """Checked at the REGISTRY, not at the function: a measurement nothing consults is inert."""
     b = g.BLOCKERS[BLOCKER]
     assert b.blocks_orders is True
     assert b.status == g.MEASURED_GATE

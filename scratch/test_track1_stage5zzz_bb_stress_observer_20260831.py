@@ -185,3 +185,35 @@ def test_the_panel_prefers_the_recorded_block_over_the_replay():
     i_rec = src.index('_sd.recorded_for(root, day, sleeve)\n    if recorded')
     i_replay = src.index("from global_index import track1_stress_mnq as SM")
     assert i_rec < i_replay, "the replay would win over the slot's own account"
+
+
+# -- a value too small for the format must not read as zero -------------------------------
+def test_a_value_below_the_formats_precision_does_not_render_as_zero():
+    """Stage 5ZZZ-BC. Found by running the seam on the real basket, not by reading the code.
+
+    The rows this module carries are no longer all prices. `avg_gap` is a fraction judged
+    against -0.001, and four decimals stripped of trailing zeros renders 1.2e-05 as "0" --
+    indistinguishable from a true zero, beside a threshold three decimals up. Measured on
+    2026-08-28: the row read "0" while the detector's own sentence in the same block carried
+    the full number.
+    """
+    assert SD._row("g", 1.2e-05, unit="pct")["display_value"] == "1.2e-05"
+    assert SD._row("g", -4e-07, unit="pct")["display_value"] != "0"
+
+
+def test_a_true_zero_still_reads_zero():
+    """The other direction. Without this the fix could turn every zero into 0.00e+00."""
+    assert SD._row("g", 0.0, unit="pct")["display_value"] == "0"
+    assert SD._row("g", 0, unit="count")["display_value"] == "0"
+
+
+def test_the_unit_marker_survives_the_reformat():
+    """A ratio without its `x` is a bare number and the reader loses what it is a ratio of."""
+    assert SD._row("g", 0.004, unit="ratio")["display_value"] == "0.004x"
+    assert SD._row("g", 1.63, unit="ratio")["display_value"] == "1.63x"
+
+
+def test_the_formats_that_were_already_right_are_untouched():
+    assert SD._row("g", 66440.0, unit="price")["display_value"] == "66,440.00"
+    assert SD._row("g", 46, unit="count")["display_value"] == "46"
+    assert SD._row("g", None, missing=SD.MISSING_DATA)["display_value"] == "Data unavailable"
