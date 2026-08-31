@@ -699,22 +699,52 @@ def _calm_reconstruct(root, day, phase, slot_id, hhmm, params, so_far: dict) -> 
                                rows=[], **stamp, missing=MISSING_DATA)
         labels = mv._label_map(Path(root))
         found = []
+        # Stage 5ZZZ-AQ. Collect each instrument's gates so a session that did NOT set up can
+        # say which condition stopped it. Before this the replay reported "did not set up" and
+        # nothing else, which is the same silence the detector used to be incapable of
+        # breaking. Per instrument, because two instruments can fail at different conditions
+        # and merging them would produce a reason that belongs to neither.
+        seen_gates: dict = {}
         for inst, frame in frames.items():
-            pre = CA.detect_setup_before_entry(frame, labels, inst, pd.Timestamp(day), params)
+            _g: list = []
+            pre = CA.detect_setup_before_entry(frame, labels, inst, pd.Timestamp(day), params,
+                                               observer=lambda e, _g=_g: (
+                                                   _g.append({k: v for k, v in e.items()
+                                                              if k != "kind"})
+                                                   if e.get("kind") == "gate" else None))
+            seen_gates[inst] = _g
             if pre is not None:
                 found.append((inst, pre))
+
+        def _gates_for(inst_name):
+            g = list(seen_gates.get(inst_name) or [])
+            first_failed = next((x for x in g if x.get("passed") is False), None)
+            return {"gates": g, "nearest_failed_condition": first_failed}
+
         if not found:
+            # The first instrument's account, NAMED as that instrument's: this branch means no
+            # instrument set up, and picking one silently would read as a statement about the
+            # sleeve rather than about one contract.
+            first_inst = next(iter(frames))
+            g = _gates_for(first_inst)
+            why = (g["nearest_failed_condition"] or {}).get("gate")
             return _calm_block(**common, rows=[], **stamp,
-                               summary="Replayed: this session did not set up",
-                               status="NO_SETUP", reason_code="no_candidate")
+                               summary=("Replayed: this session did not set up"
+                                        + (f" — {first_inst} stopped at {why}" if why else "")),
+                               status="NO_SETUP", reason_code="no_candidate", **g)
         inst, pre = found[0]
         be = {"instrument": inst, "direction": pre.direction,
               "stop_rule": "entry - %s x daily_atr" % params.disaster_stop_atr_mult,
               "entry_reference_time": params.entry_time, "risk_inputs": {}}
         if phase == CALM_DECIDE:
+            # Only the gates this phase is allowed to know. `detect_setup_before_entry` is the
+            # only thing that emitted here, and everything it reports is fixed by 09:31 --
+            # `entry_time_valid` comes from `detect_entry_for_day`, which this branch does not
+            # call, so the phase boundary is kept by which function ran rather than by a filter
+            # someone has to remember to apply.
             return _calm_block(**common, rows=_calm_decide_rows(be, params), **stamp,
                                summary="Replayed: this session set up before the entry bar",
-                               status="RECORDED", reason_code="ok")
+                               status="RECORDED", reason_code="ok", **_gates_for(inst))
         ref, _ts = CA._bar_open_at(frames[inst], pd.Timestamp(day).normalize(),
                                    params.entry_time)
         if ref is None:

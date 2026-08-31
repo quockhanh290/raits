@@ -134,24 +134,137 @@ def test_the_two_shared_gates_are_declared_by_both_normal_r4_sleeves():
             assert name in SIG.rule_names(sleeve), f"{sleeve} does not declare {name}"
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "STAGE 2 OUTSTANDING — roska4_stress emits `wide_count` and declares it nowhere. "
-    "`basket_state` already returns the value, so no new seam is needed: add the declared "
-    "name and the bridge entry. This turns green the moment that lands, and strict xfail "
-    "then fails, which is what forces this marker to be removed."))
 def test_stress_declares_every_rule_its_detector_reports():
-    for gate in ("below_count", "gapdown_count", "wide_count", "avg_gap"):
-        name = SIG.declared_for("roska4_stress", gate)
-        assert name is not None and name in SIG.rule_names("roska4_stress"), gate
+    """Stage 5ZZZ-AP. Harvested from the function that DECIDES, not from a list here.
+
+    `entry_conditions` is `all()` over `_ENTRY_CHECKS`, and `entry_checks` walks the same
+    tuple -- so whatever comes back is exactly the set of conditions that vote. A hardcoded
+    copy in this file would have gone stale on the fifth check somebody adds, which is the
+    failure mode that let `wide_count` decide sessions while the panel never named it.
+    """
+    from global_index.track1_stress_mnq import StressParams, entry_checks
+
+    # The feature keys come from the detector's own check table, not from a list here: a
+    # fifth check added there must arrive with a value, or `entry_checks` compares None
+    # against an int and this test fails with a TypeError instead of naming the drift.
+    from global_index.track1_stress_mnq import _ENTRY_CHECKS
+
+    feats = {key: 0 for key, *_ in _ENTRY_CHECKS}
+    emitted = [c["id"] for c in entry_checks(feats, StressParams())]
+    assert len(emitted) >= 4, f"the harvest came back short: {emitted}"
+
+    declared = set(SIG.rule_names("roska4_stress"))
+    missing = [(g, SIG.declared_for("roska4_stress", g)) for g in emitted
+               if SIG.declared_for("roska4_stress", g) not in declared]
+    assert not missing, (
+        f"roska4_stress decides on conditions it does not declare: {missing}")
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "STAGE 3 OUTSTANDING — roska4_calm has NO reporter. `track1_calm_a` takes no observer "
-    "and emits no gate, so its six declared entry conditions have never carried a verdict "
-    "anywhere. Building that seam is the same shape of work as the Normal-R4 one and needs "
-    "its own plan before the detector is touched."))
-def test_calm_detector_reports_its_gates():
+def test_the_stress_threshold_comes_from_the_params_the_detector_compares_against(monkeypatch):
+    """A restated threshold is a threshold that goes stale the first time anyone tunes it.
+
+    Asserted by MOVING the params and watching the reported threshold move with it. The
+    obvious version --
+
+        assert thresholds(...)["wide_count"]["wide_min"] == StressParams().wide_min
+
+    -- compares the table against the same object it was read from and agrees with itself:
+    a hardcoded literal on both sides passes it just as well. That version was written here
+    first and a mutation caught it green.
+    """
+    import global_index.track1_stress_mnq as SM
+
+    real = SM.StressParams
+
+    class Moved(real):                                    # type: ignore[misc, valid-type]
+        pass
+
+    def _factory(*a, **k):
+        obj = real(*a, **k)
+        object.__setattr__(obj, "wide_min", 4321)
+        return obj
+
+    monkeypatch.setattr(SM, "StressParams", _factory)
+    assert SIG.thresholds("roska4_stress")["wide_count"]["wide_min"] == 4321, (
+        "the declared threshold did not follow the params, so it is restated somewhere")
+
+
+CALM_DECIDE_RULES = ("regime_is_calm_d1", "prior_rth_close_bottom_third",
+                     "prior_rth_down_close", "gap_not_deep")
+CALM_OBSERVE_RULES = ("entry_time_valid", "stop_risk_computed")
+
+
+def test_calm_reports_its_three_price_rules_and_never_its_data_guards():
+    """Stage 5ZZZ-AQ. Run the real function; the fixture only supplies the two rows it reads.
+
+    The three guards -- a non-positive prior range, a zero prior open, a zero prior close --
+    say the prior session could not be READ. Reporting them as rules would put three rows on a
+    panel that no sleeve declares, which is the defect the vocabulary tests above exist for.
+    """
+    import pandas as pd
+
+    from global_index.track1_calm_a import CalmAParams, entry_conditions
+
+    p = CalmAParams()
+    ok = pd.Series({"open": 100.0, "high": 105.0, "low": 95.0, "close": 96.0})
+    seen: list = []
+    out = entry_conditions(ok, 96.5, p, on_gate=lambda e: seen.append(e))
+    assert out is not None, "the fixture stopped setting up, so nothing below is being tested"
+    assert [g["gate"] for g in seen] == list(CALM_DECIDE_RULES[1:]), (
+        "the three price rules are not reported in the order the function tests them")
+    assert all(g["passed"] for g in seen)
+
+    # A guard, not a rule: a prior session with no range at all.
+    flat = pd.Series({"open": 100.0, "high": 100.0, "low": 100.0, "close": 100.0})
+    seen = []
+    assert entry_conditions(flat, 100.0, p, on_gate=lambda e: seen.append(e)) is None
+    assert seen == [], f"a data guard was reported as a rule verdict: {seen}"
+
+    # Listening changes nothing.
+    assert entry_conditions(ok, 96.5, p) == out
+
+
+def test_the_calm_decide_phase_cannot_report_anything_the_observe_phase_knows():
+    """The one constraint that no row comparison can catch.
+
+    Both phases produce the same trade list, so a DECIDE block carrying a 10:02 fact would
+    reproduce every frozen row and still be a lookahead leak in the evidence. The boundary is
+    kept by WHICH FUNCTION emits: `detect_setup_before_entry` is called at 09:32 and knows
+    only what exists by 09:31, and the entry-time gate lives in `detect_entry_for_day`, one
+    level up. Asserted on the source so a future edit that moves the emission is caught.
+    """
     import inspect
 
     from global_index import track1_calm_a as CA
-    assert "observer" in inspect.getsource(CA)
+
+    decide_src = inspect.getsource(CA.detect_setup_before_entry)
+    entry_src = inspect.getsource(CA.detect_entry_for_day)
+
+    for name in CALM_OBSERVE_RULES:
+        assert name not in decide_src, (
+            f"{name} is reported from the DECIDE function; that phase is not allowed to know it")
+    assert "entry_time_valid" in entry_src, "the entry-time gate stopped being reported at all"
+    assert "regime_is_calm_d1" in decide_src
+
+    # And the field-level boundary, derived from the two dataclasses rather than listed here.
+    from global_index import track1_strategy_diagnostics as SD
+
+    observe_only = SD.calm_observe_only_fields()
+    assert observe_only, "the boundary came back empty, so this test would check nothing"
+    for field in observe_only:
+        assert f'"{field}"' not in decide_src, (
+            f"the DECIDE function names {field}, which only the OBSERVE phase has")
+
+
+def test_every_calm_rule_the_detector_reports_is_declared():
+    from global_index import track1_calm_a as CA
+
+    declared = set(SIG.rule_names("roska4_calm"))
+    for name in CALM_DECIDE_RULES + CALM_OBSERVE_RULES:
+        assert name in declared, f"{name} is emitted and not declared"
+    # And the emitted names really do appear in the detector, so this list cannot rot into a
+    # set of names nobody sends.
+    import inspect
+    src = inspect.getsource(CA)
+    for name in CALM_DECIDE_RULES + ("entry_time_valid",):
+        assert f'"{name}"' in src, f"{name} is asserted here and emitted nowhere"

@@ -188,7 +188,8 @@ def regime_at(regime, day) -> str | None:
         return None
 
 
-def entry_conditions(prev_row, cur_rth_open: float, params: CalmAParams) -> "dict | None":
+def entry_conditions(prev_row, cur_rth_open: float, params: CalmAParams,
+                     *, on_gate=None) -> "dict | None":
     """The Calm A entry test, in one place. `None` means the day does not set up.
 
     Extracted so the full-session detector and the 10:00 live-shadow path cannot drift into two
@@ -196,27 +197,54 @@ def entry_conditions(prev_row, cur_rth_open: float, params: CalmAParams) -> "dic
     it reads is causal at 10:00: the prior session is complete, and the current session's RTH
     OPEN is fixed at 09:30.
     """
+    # Stage 5ZZZ-AQ. `on_gate` is OBSERVABILITY ONLY and defaults to None, which is what
+    # `detect` -- the historical path the committed Calm list is generated from -- passes.
+    # Every predicate below keeps the exact form it had; each report is DERIVED from the
+    # predicate that was already computed, never the other way round. Rephrasing a comparison
+    # to read more like a report is how the trend filter nearly started refusing a NaN it had
+    # always admitted, one sleeve over.
+    #
+    # The three data guards -- a non-positive prior range, a zero prior open, a zero prior
+    # close -- are NOT reported as rules. They say the prior session could not be read, which
+    # is a different fact from a condition that was tested and not met, and no sleeve declares
+    # them. Inventing three rule names here would put three rows on a panel that the rule
+    # vocabulary test would immediately refuse.
+    def _say(name, passed, value, threshold, comparator):
+        if on_gate is None:
+            return
+        try:
+            on_gate({"kind": "gate", "gate": name, "passed": bool(passed), "value": value,
+                     "threshold": threshold, "comparator": comparator})
+        except Exception:                                      # noqa: BLE001
+            pass
+
     p = params
     rng = float(prev_row["high"]) - float(prev_row["low"])
     if not np.isfinite(rng) or rng <= 0:
         return None
     close_loc = (float(prev_row["close"]) - float(prev_row["low"])) / rng
     if not (close_loc <= p.close_loc_max):
+        _say("prior_rth_close_bottom_third", False, close_loc, p.close_loc_max, "<=")
         return None
+    _say("prior_rth_close_bottom_third", True, close_loc, p.close_loc_max, "<=")
 
     po = float(prev_row["open"])
     if not np.isfinite(po) or po == 0:
         return None
     prev_ret = float(prev_row["close"]) / po - 1.0
     if not (prev_ret <= p.prev_ret_max):
+        _say("prior_rth_down_close", False, prev_ret, p.prev_ret_max, "<=")
         return None
+    _say("prior_rth_down_close", True, prev_ret, p.prev_ret_max, "<=")
 
     pc = float(prev_row["close"])
     if not np.isfinite(pc) or pc == 0:
         return None
     gap = float(cur_rth_open) / pc - 1.0
     if not (gap >= p.gap_min):
+        _say("gap_not_deep", False, gap, p.gap_min, ">=")
         return None
+    _say("gap_not_deep", True, gap, p.gap_min, ">=")
     return {"rng": rng, "close_loc": close_loc, "prev_ret": prev_ret, "gap": gap}
 
 
@@ -272,7 +300,8 @@ def detect(df1m: pd.DataFrame, regime, inst: str,
 
 
 def detect_entry_for_day(df1m: pd.DataFrame, regime, inst: str, day,
-                        params: CalmAParams | None = None) -> "CalmSetup | None":
+                        params: CalmAParams | None = None,
+                        *, observer=None) -> "CalmSetup | None":
     """Does `day` set up, judged with only what exists by 10:00? Entry-only; no exit.
 
     `detect` cannot answer this. It needs the 15:55 bar to fill `exit`, and a session that has
@@ -291,12 +320,22 @@ def detect_entry_for_day(df1m: pd.DataFrame, regime, inst: str, day,
     Returns `None` when the day does not set up, when the prior session is missing, or when
     today has no 09:30 or 10:00 bar — never a guess filled from a neighbouring bar.
     """
-    pre = detect_setup_before_entry(df1m, regime, inst, day, params)
+    pre = detect_setup_before_entry(df1m, regime, inst, day, params, observer=observer)
     if pre is None:
         return None
 
     p = params or CalmAParams()
     entry, entry_ts = _bar_open_at(df1m, pre.day, p.entry_time)
+    # Stage 5ZZZ-AQ. The OBSERVE phase begins here: this is the first thing that cannot be
+    # known at 09:31, which is exactly why it is reported from this function and not from the
+    # one above it.
+    if observer is not None:
+        try:
+            observer({"kind": "gate", "gate": "entry_time_valid",
+                      "passed": entry is not None, "value": str(entry_ts) if entry_ts else None,
+                      "threshold": {"entry_time": p.entry_time}, "comparator": "=="})
+        except Exception:                                      # noqa: BLE001
+            pass
     if entry is None:
         return None
 
@@ -336,7 +375,8 @@ class CalmPreEntry:
 
 
 def detect_setup_before_entry(df1m: pd.DataFrame, regime, inst: str, day,
-                              params: CalmAParams | None = None) -> "CalmPreEntry | None":
+                              params: CalmAParams | None = None,
+                              *, observer=None) -> "CalmPreEntry | None":
     """Does `day` set up, judged with only what exists by 09:31? No entry price read.
 
     Stage 5ZX. Same rule, same objects, one bar earlier. `_bar_open_at` is called ONCE here —
@@ -360,13 +400,24 @@ def detect_setup_before_entry(df1m: pd.DataFrame, regime, inst: str, day,
     if len(earlier) < p.regime_lag_sessions:
         return None
     prev = earlier[-p.regime_lag_sessions]
-    if regime_at(regime, prev) != p.calm_label:
+    # Stage 5ZZZ-AQ. The DECIDE phase, and everything reported here is knowable at 09:31.
+    # `observer` is None on every historical call, so `detect` is untouched by construction.
+    seen = regime_at(regime, prev)
+    if observer is not None:
+        try:
+            observer({"kind": "gate", "gate": "regime_is_calm_d1",
+                      "passed": seen == p.calm_label, "value": seen,
+                      "threshold": {"label": p.calm_label, "lag": p.regime_lag_sessions},
+                      "comparator": "=="})
+        except Exception:                                      # noqa: BLE001
+            pass
+    if seen != p.calm_label:
         return None
 
     rth_open, open_ts = _bar_open_at(df1m, day, p.rth_start)
     if rth_open is None:
         return None
-    feats = entry_conditions(sessions.loc[prev], float(rth_open), p)
+    feats = entry_conditions(sessions.loc[prev], float(rth_open), p, on_gate=observer)
     if feats is None:
         return None
 

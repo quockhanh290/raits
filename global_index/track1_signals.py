@@ -173,7 +173,12 @@ RULES: dict = {
     "roska4_calm": ("regime_is_calm_d1", "prior_rth_close_bottom_third",
                     "prior_rth_down_close", "gap_not_deep", "entry_time_valid",
                     "stop_risk_computed"),
+    # Stage 5ZZZ-AP. `wide_count` added: the detector's own `_ENTRY_CHECKS` names four entry
+    # conditions and `entry_conditions` is `all()` over that tuple, so all four decide. Three
+    # were declared. The declared name is the detector's own, as `gapdown_count` and
+    # `avg_gap` already are -- a synonym would have been a third vocabulary.
     "roska4_stress": ("no_regime_label_required", "breadth_down_count", "gapdown_count",
+                      "wide_count",
                       "avg_gap", "mnq_only_short_setup", "pre_high_stop_reference",
                       "stop_within_max_pct", "rr_target_computed",
                       "same_symbol_suppression", "family_cap", "cluster_cap"),
@@ -253,9 +258,11 @@ EMITTED_TO_DECLARED: dict = {
     "spy_short_gate": "spy_d1_close_below_sma50_short_filter",
     "r4_context_filter": "r4_prior_range_filter",
     "fixed_stop_daily_atr": "fixed_stop_2x_daily_atr",
-    # Stress reports through its own path; `wide_count` is emitted and not yet declared.
+    # Stress reports through its own path -- `entry_checks`, derived from the same
+    # `_ENTRY_CHECKS` tuple the decision is `all()` over.
     "below_count": "breadth_down_count",
     "gapdown_count": "gapdown_count",
+    "wide_count": "wide_count",
     "avg_gap": "avg_gap",
 }
 
@@ -311,6 +318,11 @@ def thresholds(sleeve: str) -> dict:
         return {"no_regime_label_required": {"regime_label": None},
                 "breadth_down_count": {"breadth_min": p.breadth_min},
                 "gapdown_count": {"gapdown_min": p.gapdown_min, "gapdown_at": p.gapdown_at},
+                # Stage 5ZZZ-AP. `wide_count` is one of the FOUR entry checks the Stress
+                # detector runs -- `entry_conditions` is `all()` over `_ENTRY_CHECKS`, and it
+                # is in that tuple -- and nothing declared it. Threshold read from the params
+                # the detector compares against, never restated.
+                "wide_count": {"wide_min": p.wide_min},
                 "avg_gap": {"avg_gap_max": p.avg_gap_max},
                 "mnq_only_short_setup": {"instruments": list(p.instruments),
                                          "qty": p.qty},
@@ -839,6 +851,13 @@ LABELS: dict = {
     "no_regime_label_required": "No regime label required",
     "breadth_down_count": "Basket breadth",
     "gapdown_count": "Gap-down count",
+    # Stage 5ZZZ-AP. Added with `wide_count` itself: a declared rule with no label renders as
+    # its raw identifier, and the stage-5ZE guard caught exactly that within one run. The
+    # wording follows the detector's own `_ENTRY_CHECKS` entry ("Instruments with a wide
+    # range"), shortened for a lane the way its three neighbours already are — and the
+    # vocabulary test asserts every declared Stress rule keeps a label, so a fifth check
+    # cannot arrive without one.
+    "wide_count": "Wide-range count",
     "avg_gap": "Average gap",
     "mnq_only_short_setup": "MNQ short setup",
     "pre_high_stop_reference": "Pre-window high (stop reference)",
