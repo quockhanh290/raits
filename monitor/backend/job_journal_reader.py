@@ -32,6 +32,11 @@ _LAUNCH = re.compile(r"-m\s+(?:global_index|monitor)\.")
 # A refused broker connection dumps ~30 traceback frames. Keep enough to name the exception,
 # not enough to bury the card.
 _MAX_CHILD_DIAGNOSTICS = 12
+#: Labels that are a pulse, not a job. `HEARTBEAT` prints the word "alive" once an hour --
+#: 545 lines across August. Named here rather than inferred, because the test below asserts
+#: every OTHER registered scheduler job can reach this journal, and a rule that guessed which
+#: labels to drop would quietly widen itself.
+_LIVENESS_LABELS: frozenset = frozenset({"HEARTBEAT"})
 _MISSED_JOB = re.compile(
     r'Run time of job "(?P<name>.+?) \(trigger:.*" '
     r'was missed by (?P<hours>\d+):(?P<minutes>\d{2}):(?P<seconds>[\d.]+)'
@@ -602,6 +607,33 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]],
                         if len(current["diagnostics"]) > _MAX_CHILD_DIAGNOSTICS:
                             current["diagnostics"].pop(0)
                             current["diagnostics_omitted"] += 1
+                continue
+            # Stage 5ZZZ-AU. A job that does its work IN PROCESS never writes a launch line,
+            # so nothing here opened a card for it and the run was invisible -- including the
+            # run where everything was fine, which is the reading an operator most needs and
+            # the one that never produces a failure to reveal the gap.
+            #
+            # Measured across every August scheduler log: five labels had NEVER become a card.
+            # Three of them are registered scheduler jobs -- `PREFLIGHT`, the 13:45 gate that
+            # decides whether the session runs at all; `SPY_WEEKEND_PRE_NKD_CHECK`; and
+            # `SPY_LAST_CHANCE_PRE_NKD`, which appears only on the days it has work to do and
+            # vanishes on the days it looks and finds the data already fresh. `MAXHOLD_T1`
+            # carries a CRITICAL about a five-day Track 1 position possibly not being closed.
+            #
+            # So a bracketed label from the scheduler opens a card unless it is a liveness
+            # ping. `HEARTBEAT` is 545 lines of the word "alive" and is not a job; turning it
+            # into 545 cards would bury the page this one exists to keep readable.
+            if (not _LAUNCH.search(detail) and not detail.startswith("SKIPPED")
+                    and "completed OK" not in detail and job_id not in _LIVENESS_LABELS
+                    and current is None):
+                # Opened AND CLOSED on the same line. These jobs write one line and stop, so a
+                # card left open would sit on the operations page reading "running" forever --
+                # an alarm with no off switch, which is worse than the silence it replaced.
+                one_shot = _new_job(job_id, timestamp)
+                jobs.append(one_shot)
+                _finish(one_shot, timestamp,
+                        "failed" if level in ("ERROR", "CRITICAL") else "completed",
+                        detail[:200])
                 continue
             if (_LAUNCH.search(detail) or detail.startswith("SKIPPED")) and "completed OK" not in detail:
                 if detail.startswith("SKIPPED"):
