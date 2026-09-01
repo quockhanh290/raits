@@ -58,6 +58,78 @@ MISSING_NOT_REPORTED = "not_reported_by_detector"
 #: came back empty -- one is the route working, the other is something wrong.
 MISSING_NOT_REACHED = "not_reached"
 
+#: The word each absence prints in the value's own field. Module level so a row read back OUT
+#: of the store can be re-rendered with the same vocabulary the writer used, instead of a
+#: second copy of the mapping drifting away from this one.
+MISSING_WORDS = {
+    MISSING_NOT_YET: "Not yet run",
+    MISSING_NO_RECORD: "No record",
+    MISSING_REFUSED: "Refused",
+    MISSING_DATA: "Data unavailable",
+    MISSING_NOT_REPORTED: "Not reported by detector",
+    MISSING_NOT_REACHED: "Not reached",
+}
+
+DAILY_ATR_DETAIL = "the daily range the stop distance is sized from"
+
+
+def daily_atr_absence(gates, *, fallback: str = MISSING_DATA) -> tuple:
+    """(missing, detail) for the Daily ATR row, derived from a gate list.
+
+    Stage 5ZZZ-BP. Takes the LIST rather than an observer so the same derivation serves both
+    directions: the slot writing a block, and the panel reading one back that was written
+    before this existed. Two implementations of one sentence is how the sentence starts
+    disagreeing with itself.
+
+    The reason is DERIVED, never asserted: the list holds a refusal and holds no `daily_atr`
+    entry, so the detector demonstrably returned before reporting one. Writing "the regime gate
+    is answered first" would be a claim about an order this module does not own.
+    """
+    gates = list(gates or [])
+    dag = next((g for g in gates if g.get("gate") == "daily_atr"), None)
+    if dag is not None and dag.get("value") is not None:
+        return "", DAILY_ATR_DETAIL
+    blocker = next((g for g in gates if g.get("passed") is False), None) or {}
+    name = str(blocker.get("gate") or "")
+    if name and name != "daily_atr" and dag is None:
+        return MISSING_NOT_REACHED, (
+            DAILY_ATR_DETAIL + " -- not read on this slot: the detector answered the "
+            + name + " gate and returned before reporting this one")
+    return fallback, DAILY_ATR_DETAIL
+
+
+def explain_recorded_absences(block: dict) -> dict:
+    """Re-render the absence words on a block read back OUT of the store.
+
+    Stage 5ZZZ-BP. A block carries the display STRING its writer chose, so a wording fix
+    reaches the screen only from the next slot on -- measured on 2026-09-01, the Daily ATR row
+    kept reading "Unavailable" for the rest of the day because the block was written at 02:55.
+    The facts needed to say better were already on disk: the row has no value, and the gate
+    list holds `session_bars` passed and `regime` refused with no `daily_atr` entry.
+
+    Nothing on disk is modified -- the block is copied and the copy is what the panel draws.
+    The stored record keeps saying exactly what the slot said at the time it ran.
+
+    Conservative by construction: a row is only rewritten when the derivation produces an
+    actual reason. When it falls back, the stored wording stands, because replacing one blank
+    with a differently worded blank tells the reader nothing and loses the original.
+    """
+    rows = block.get("rows")
+    if not rows:
+        return block
+    missing, detail = daily_atr_absence(block.get("gates") or [])
+    if missing != MISSING_NOT_REACHED:
+        return block
+    out = dict(block)
+    new_rows = []
+    for r in rows:
+        if r.get("label") == "Daily ATR" and r.get("value") is None:
+            r = dict(r, missing=missing, detail=detail,
+                     display_value=MISSING_WORDS[missing])
+        new_rows.append(r)
+    out["rows"] = new_rows
+    return out
+
 
 def _num(value) -> "float | None":
     try:
@@ -101,12 +173,7 @@ def _row(label: str, value, *, unit: str = "", threshold=None, comparator: str =
     """
     num = _num(value)
     if missing:
-        display = {MISSING_NOT_YET: "Not yet run",
-                   MISSING_NO_RECORD: "No record",
-                   MISSING_REFUSED: "Refused",
-                   MISSING_DATA: "Data unavailable",
-                   MISSING_NOT_REPORTED: "Not reported by detector",
-                   MISSING_NOT_REACHED: "Not reached"}.get(missing, "Unavailable")
+        display = MISSING_WORDS.get(missing, "Unavailable")
     elif num is None:
         display = str(value) if value not in (None, "") else "Unavailable"
     elif unit == "price":
@@ -282,7 +349,7 @@ class NormalR4Observer:
         """
         return next((g for g in self.gates if g.get("gate") == "daily_atr"), None)
 
-    _DAILY_ATR_DETAIL = "the daily range the stop distance is sized from"
+    _DAILY_ATR_DETAIL = DAILY_ATR_DETAIL
 
     def daily_atr_absence(self, fallback: str = MISSING_DATA) -> tuple:
         """(missing, detail) for the Daily ATR row -- and WHY, when there is no number.
@@ -294,21 +361,10 @@ class NormalR4Observer:
         happen here -- the detector answered the regime gate, returned, and never reached the
         daily ATR at all.
 
-        The reason is DERIVED, never asserted: the gate list holds a refusal and holds no
-        `daily_atr` entry, so the detector demonstrably returned before reporting one. Writing
-        "the regime gate is answered first" would be a claim about an order this module does
-        not own, and the order is exactly the kind of thing that moves.
+        The derivation lives at module level so the panel can apply the identical one to a
+        block written before it existed.
         """
-        dag = self.daily_atr_gate or {}
-        if dag.get("value") is not None:
-            return "", self._DAILY_ATR_DETAIL
-        blocker = self.first_failed_gate or {}
-        name = str(blocker.get("gate") or "")
-        if name and name != "daily_atr" and dag == {}:
-            return MISSING_NOT_REACHED, (
-                self._DAILY_ATR_DETAIL + " -- not read on this slot: the detector answered the "
-                + name + " gate and returned before reporting this one")
-        return fallback, self._DAILY_ATR_DETAIL
+        return daily_atr_absence(self.gates, fallback=fallback)
 
     @property
     def regime_gate(self) -> "dict | None":

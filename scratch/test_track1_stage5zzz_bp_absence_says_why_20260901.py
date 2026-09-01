@@ -203,3 +203,78 @@ def test_the_block_the_live_slot_writes_carries_the_reason():
     assert row["display_value"] == "Not reached", row
     assert "regime" in (row["detail"] or ""), row
     assert [g.get("gate") for g in (blk.get("gates") or [])] == ["session_bars", "regime"], blk
+
+
+# -- 3. a block already on disk gets the same sentence, without being rewritten ------------
+def _stored_0255():
+    """A block as the OLD writer left it for TRACK1_NKD_0255 on 2026-09-01.
+
+    Built by the real writer -- so every key the panel indexes is present and correctly
+    shaped -- and then the one row is put back to the string the old code actually printed,
+    which the store still holds. Hand-rolling the dict instead hid a missing `threshold` key
+    and then a missing `summary`: a fixture trimmed to what the code under test happens to
+    read stops standing in for the store it is impersonating.
+    """
+    o = _obs({"gate": "session_bars", "value": 180, "passed": True},
+             {"gate": "regime", "value": "Calm", "threshold": ["Normal"], "passed": False})
+    blk = SD.normal_r4_block(sleeve="global_nkd", slot_id="TRACK1_NKD_0255", ema_period=10,
+                             observer=o, setup=None)
+    blk["rows"] = [dict(r, missing=None, display_value="Unavailable")
+                   if r["label"] == "Daily ATR" else r for r in blk["rows"]]
+    return blk
+
+
+def test_a_block_written_before_the_fix_still_gets_the_reason():
+    """Measured: the 02:55 block kept saying "Unavailable" for the rest of the day, because a
+    block carries the display string its writer chose. Everything needed to say better was
+    already on disk -- no value on the row, a refusal in the gates, no daily_atr entry."""
+    out = SD.explain_recorded_absences(_stored_0255())
+    row = [r for r in out["rows"] if r["label"] == "Daily ATR"][0]
+    assert row["display_value"] == "Not reached", row
+    assert "regime" in row["detail"], row
+    assert row["missing"] == SD.MISSING_NOT_REACHED, row
+
+
+def test_the_stored_block_itself_is_never_touched():
+    """Reading a record must not edit it. The store is the trail an audit exists to protect,
+    and a display fix that reaches back into it destroys what the slot actually said."""
+    src = _stored_0255()
+    before = [dict(r) for r in src["rows"]]
+    SD.explain_recorded_absences(src)
+    assert src["rows"] == before, src["rows"]
+    kept = [r for r in src["rows"] if r["label"] == "Daily ATR"][0]
+    assert kept["display_value"] == "Unavailable", kept
+
+
+def test_a_blank_with_no_reason_keeps_its_original_wording():
+    """Conservative on purpose. Replacing one blank with a differently worded blank tells the
+    reader nothing and loses what the writer chose to say."""
+    blk = _stored_0255()
+    blk["gates"] = [{"gate": "session_bars", "passed": True}]
+    out = SD.explain_recorded_absences(blk)
+    row = [r for r in out["rows"] if r["label"] == "Daily ATR"][0]
+    assert row["display_value"] == "Unavailable", row
+
+
+def test_a_row_that_carries_a_number_is_left_alone():
+    """The re-render must never overwrite a reading."""
+    blk = _stored_0255()
+    blk["gates"].append({"gate": "daily_atr", "value": 1548.93, "passed": True})
+    blk["rows"][1] = {"label": "Daily ATR", "value": 1548.93, "display_value": "1,548.93",
+                      "missing": None, "detail": ""}
+    out = SD.explain_recorded_absences(blk)
+    row = [r for r in out["rows"] if r["label"] == "Daily ATR"][0]
+    assert row["display_value"] == "1,548.93", row
+
+
+def test_the_panel_applies_it_to_what_it_read():
+    """The call site. A derivation nothing calls is the failure mode this repo has hit before:
+    correct code, written docs, grep-verified, and wired to no entry point."""
+    from monitor.backend import track1_market_view as MV
+    blk = dict(_stored_0255(), nearest_failed_condition=None, slot_time="0255",
+               bars_evaluated=22, last_bar_ts=None, last_bar_complete=None)
+    out = MV._apply_r4_block({}, blk)
+    row = [r for r in out["diagnostics"]["rows"] if r["label"] == "Daily ATR"][0]
+    assert row["display_value"] == "Not reached", row
+    rule = [r for r in out["rules"] if r["label"] == "Daily ATR"][0]
+    assert rule["display_value"] == "Not reached", rule

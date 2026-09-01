@@ -1111,6 +1111,10 @@ def _apply_r4_block(out: dict, block: dict) -> dict:
     contract; the only difference between them is which of the two wrote it, and that is the
     one thing this function must pass through rather than flatten.
     """
+    # Stage 5ZZZ-BP. A block carries the display string its writer chose, so a wording fix
+    # reached the screen only from the next slot on. Applied to the COPY the panel draws; the
+    # stored record is untouched and keeps saying what the slot said when it ran.
+    block = _sd.explain_recorded_absences(block)
     out["diagnostics"] = block
     # Stage 5ZZZ-F. The source, on the block the payload contract is read from. It was reachable
     # only at `strategy.diagnostics.diagnostics_source`, one level down, so anything reading the
