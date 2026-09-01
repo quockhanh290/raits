@@ -2280,6 +2280,7 @@
     const pick = k => series.map(p => num(p[k]));
     const close = pick('close'), ema = pick('ema');
     const avgv = pick('avg_volume'), vol = pick('volume');
+    const thr = pick('surge_threshold');
 
     const finite = a => a.filter(v => v !== null);
     const pAll = finite(close).concat(finite(ema));
@@ -2289,7 +2290,7 @@
     pLo -= padY; pHi += padY;
     const py = v => padT + priceH - ((v - pLo) / (pHi - pLo)) * priceH;
 
-    const vAll = finite(avgv).concat(finite(vol));
+    const vAll = finite(avgv).concat(finite(vol)).concat(finite(thr));
     const vHi = Math.max(1, ...vAll);
     const vy = v => volTop + volH - (v / vHi) * volH;
 
@@ -2305,18 +2306,34 @@
       if (cur.length > 1) runs.push(cur);
       return runs.map(r => `<polyline class="${cls}" points="${r.join(' ')}"></polyline>`).join('');
     };
-    const volPath = () => {
+    // Stage 5ZZZ-BO. The bar-volume readings are JOINED now, and the gate's own threshold is
+    // drawn beside them.
+    //
+    // They were dots on the argument that a line would assert a shape the data does not have.
+    // That was weaker than it sounded: slots fire on the five-minute boundary, so every point
+    // is sampled at the SAME phase of its bar, and a consistently sampled series is a series.
+    // The gaps are what needed care, and `volLine` breaks at them like every other line here.
+    //
+    // Without a reference the readings said little -- measured on 2026-08-31, 1 of 13 cleared
+    // the gate's threshold and the chart gave no way to see which. The threshold comes from
+    // the gate's own report, per slot, so it is absent on a day the gate was never reached.
+    const volLine = (arr, cls) => {
       const runs = [];
       let cur = [];
-      avgv.forEach((v, i) => {
+      arr.forEach((v, i) => {
         if (v === null) { if (cur.length > 1) runs.push(cur); cur = []; return; }
         cur.push(`${x(i).toFixed(1)},${vy(v).toFixed(1)}`);
       });
       if (cur.length > 1) runs.push(cur);
-      return runs.map(r => `<polyline class="mv2-sc-avgv" points="${r.join(' ')}"></polyline>`).join('');
+      return runs.map(r => `<polyline class="${cls}" points="${r.join(' ')}"></polyline>`).join('');
     };
+    const volPath = () => volLine(avgv, 'mv2-sc-avgv') + volLine(thr, 'mv2-sc-thr')
+      + volLine(vol, 'mv2-sc-volline');
+    // The dot stays on top of its line: a reading that clears the threshold should be findable
+    // at a glance, and a line alone hides where the samples actually are.
     const volDots = vol.map((v, i) => v === null ? '' :
-      `<circle class="mv2-sc-vol" cx="${x(i).toFixed(1)}" cy="${vy(v).toFixed(1)}" r="2.6"></circle>`
+      `<circle class="mv2-sc-vol${thr[i] !== null && v > thr[i] ? ' over' : ''}" `
+      + `cx="${x(i).toFixed(1)}" cy="${vy(v).toFixed(1)}" r="2.6"></circle>`
     ).join('');
 
     const fmtP = v => Number(v).toLocaleString('en-US',
@@ -2344,6 +2361,7 @@
         <span class="mv2-sc-key"><i class="mv2-sc-k-ema"></i>trend filter</span>
         <span class="mv2-sc-key"><i class="mv2-sc-k-avgv"></i>10-bar volume</span>
         <span class="mv2-sc-key"><i class="mv2-sc-k-vol"></i>bar volume</span>
+        ${finite(thr).length ? `<span class="mv2-sc-key"><i class="mv2-sc-k-thr"></i>surge threshold</span>` : ''}
       </div>
       <svg class="mv2-sc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
         <line class="mv2-sc-rule" x1="${padL}" x2="${W - padR}" y1="${(volTop - gap / 2).toFixed(1)}" y2="${(volTop - gap / 2).toFixed(1)}"></line>

@@ -635,9 +635,17 @@ def _slot_series(root, day: str, sleeve: str) -> list:
     for rec in _sd.recorded_series(root, day, sleeve):
         vals = rec.get("values") or {}
         ema = next((v for k, v in vals.items() if str(k).startswith("Trend filter")), None)
+        # Stage 5ZZZ-BO. The threshold the surge gate actually compared against, copied from
+        # the slot's own grid row. NOT recomputed, and NOT read from the declared table: that
+        # table maps both per-bar volume gates onto one name whose threshold
+        # (`rel_volume_max` 2.0 on `rvol_slot20`) is neither gate's. The engine compares the
+        # resume bar against the ten-bar average times its own multiple, and reports that
+        # number on the gate. Absent on a day the gate was never reached, which is honest:
+        # there was no threshold, because nothing was compared.
         point = {"slot_time": rec.get("slot_time"), "bars": rec.get("bars_evaluated"),
                  "last_bar_ts": rec.get("last_bar_ts"),
-                 "last_bar_complete": rec.get("last_bar_complete"), "ema": ema}
+                 "last_bar_complete": rec.get("last_bar_complete"), "ema": ema,
+                 "surge_threshold": rec.get("surge_threshold")}
         for key, label in _SERIES_LABELS.items():
             if label:
                 point[key] = vals.get(label)

@@ -1837,3 +1837,11 @@ details.issue-group-retired > summary::before {
   transition: transform .12s ease; }
 details.issue-group-retired[open] > summary::before { transform: rotate(90deg); }
 details.issue-group-retired > summary b { opacity: .72; font-weight: 500; }
+
+
+/* Stage 5ZZZ-BO. Bar volume joined into a line, with the gate's own threshold beside it. The
+   dot stays on top so a reading that clears the threshold is findable at a glance. */
+.mv2-sc-volline { fill: none; stroke: #d7a55a; stroke-width: 1.2; opacity: .55; }
+.mv2-sc-thr { fill: none; stroke: #c9668a; stroke-width: 1.2; stroke-dasharray: 3 3; }
+.mv2-sc-k-thr { color: #c9668a; border-top-style: dashed !important; }
+.mv2-sc-vol.over { fill: #e8c17a; stroke: #e8c17a; stroke-width: 2; }

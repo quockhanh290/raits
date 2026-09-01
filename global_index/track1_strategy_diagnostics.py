@@ -684,9 +684,36 @@ def recorded_series(root, day: str, sleeve: str) -> list:
             # Whether the newest bar had CLOSED. The reason a volume of 0 is a reading of a
             # bar seconds old rather than a dead market, and the line cannot say so without it.
             "last_bar_complete": block.get("last_bar_complete"),
+            # Stage 5ZZZ-BO. What `volume_resume_surge` was compared against on this slot,
+            # taken from the gate's own report. None when the gate was never reached.
+            "surge_threshold": next(
+                (r.get("threshold") for r in
+                 (((block.get("bar_gate_grid") or {}).get("rows")) or [])
+                 if r.get("gate") == "volume_resume_surge"), None),
             "values": values,
         })
     out.sort(key=lambda r: str(r.get("slot_time") or ""))
+    return out
+
+
+def recorded_by_instrument(root, day: str, sleeve: str, slot_id: str) -> dict:
+    """{instrument: block} for one slot, instead of only the last block written.
+
+    Stage 5ZZZ-BJ. `recorded_for` answers "what did this slot decide" and takes the last row,
+    which is right for a sleeve that judges one instrument. Calm judges a basket: on
+    2026-08-31 it wrote a block for MES and one for MNQ, and every reader built on
+    `recorded_for` saw MNQ and nothing else -- including the gate merge, so the four condition
+    values on the card were MNQ's while MES's own were 0.1555 and -0.0030 and appeared nowhere.
+    """
+    out: dict = {}
+    for block in read(root=root, day=day):
+        if block.get("diagnostics_source") != RECORDED:
+            continue
+        if block.get("sleeve") != sleeve:
+            continue
+        if slot_id and block.get("slot_id") != slot_id:
+            continue
+        out[str(block.get("instrument") or "")] = block
     return out
 
 
@@ -832,7 +859,7 @@ def _calm_instrument(rec: dict) -> str:
     return ""
 
 
-def _calm_instrument_view(rec: dict, phase: str, params) -> dict:
+def _calm_instrument_view(rec: dict, phase: str, params, gates_by_inst=None) -> dict:
     """One instrument's account of a phase, in the same shape the phase block carries.
 
     Stage 5ZZZ-BH. Built for every row the phase recorded, not just the last, so a basket
@@ -844,9 +871,17 @@ def _calm_instrument_view(rec: dict, phase: str, params) -> dict:
         body = _calm_decide_rows(be, params) if be else []
     else:
         body = _calm_observe_rows(be, ar) if ar else []
+    inst = _calm_instrument(rec)
+    # The gates for THIS instrument, not the last one written. Empty when the slot recorded
+    # no diagnostics block for it -- never borrowed from a sibling, which would put one
+    # instrument's numbers under another's name.
+    gates = list(((gates_by_inst or {}).get(inst) or {}).get("gates") or [])
     return {
-        "instrument": _calm_instrument(rec),
+        "instrument": inst,
         "direction": str(be.get("direction") or ""),
+        "gates": gates,
+        "nearest_failed_condition": next(
+            (g for g in gates if g.get("passed") is False), None),
         "rows": body,
         "status": str(rec.get("status") or ""),
         "reason_code": str(rec.get("reason_code") or ""),
@@ -903,6 +938,8 @@ def calm_blocks(root, day: str, now=None, *, slots=None) -> dict:
             continue
 
         if mine:
+            _gates_by_inst = recorded_by_instrument(root, str(pd.Timestamp(day).date()),
+                                                    "roska4_calm", slot_id)
             # Stage 5ZZZ-BH. `mine[-1]` used to be the whole answer, and it threw the rest
             # away without a word.
             #
@@ -951,7 +988,8 @@ def calm_blocks(root, day: str, now=None, *, slots=None) -> dict:
                 data_source_identity=rec.get("data_identity") or "",
                 matched_decide=(bool(be) if phase == CALM_OBSERVE else None),
                 instrument=_calm_instrument(rec),
-                instruments=[_calm_instrument_view(r, phase, params) for r in mine],
+                instruments=[_calm_instrument_view(r, phase, params, _gates_by_inst)
+                             for r in mine],
                 instrument_count=len(mine))
             # Stage 5ZZZ-AR. The recorded row says WHAT happened; the gates say WHY, and they
             # live in a different stream.
