@@ -645,7 +645,11 @@ def _slot_series(root, day: str, sleeve: str) -> list:
         point = {"slot_time": rec.get("slot_time"), "bars": rec.get("bars_evaluated"),
                  "last_bar_ts": rec.get("last_bar_ts"),
                  "last_bar_complete": rec.get("last_bar_complete"), "ema": ema,
-                 "surge_threshold": rec.get("surge_threshold")}
+                 "surge_threshold": rec.get("surge_threshold"),
+                 # Stage 5ZZZ-BP. Copied, never recomputed. The chart draws four series on a
+                 # day the regime gate refused every slot, and without the verdict it has no
+                 # way to say that nothing it shows was consumed by a rule.
+                 "regime": rec.get("regime"), "regime_passed": rec.get("regime_passed")}
         for key, label in _SERIES_LABELS.items():
             if label:
                 point[key] = vals.get(label)
@@ -1238,6 +1242,7 @@ def _strategy(root: Path, sleeve: str, day: str, spec: dict, *, now=None) -> dic
                 # small block per slot -- so this costs an extra pass over a list already in
                 # memory, and the panel stops having to infer a session from one slot.
                 blk["slot_series"] = _slot_series(root, day, sleeve)
+                blk["slot_series_session"] = day
                 return blk
             if now is not None:
                 return _normal_r4_reconstruction(root, sleeve, day, spec, out, now=now)
@@ -1284,6 +1289,7 @@ def _strategy(root: Path, sleeve: str, day: str, spec: dict, *, now=None) -> dic
     if recorded and (recorded.get("rows") or []):
         blk = _apply_stress_block(dict(out), recorded)
         blk["slot_series"] = _slot_series(root, day, sleeve)
+        blk["slot_series_session"] = day
         return blk
     try:
         import pandas as pd

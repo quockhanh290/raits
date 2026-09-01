@@ -53,6 +53,10 @@ MISSING_NO_RECORD = "no_record"
 MISSING_REFUSED = "refused"
 MISSING_DATA = "missing_data"
 MISSING_NOT_REPORTED = "not_reported_by_detector"
+#: Stage 5ZZZ-BP. The detector answered an earlier gate and returned, so this variable
+#: was never read. Distinct from MISSING_DATA, which says the read was attempted and
+#: came back empty -- one is the route working, the other is something wrong.
+MISSING_NOT_REACHED = "not_reached"
 
 
 def _num(value) -> "float | None":
@@ -101,7 +105,8 @@ def _row(label: str, value, *, unit: str = "", threshold=None, comparator: str =
                    MISSING_NO_RECORD: "No record",
                    MISSING_REFUSED: "Refused",
                    MISSING_DATA: "Data unavailable",
-                   MISSING_NOT_REPORTED: "Not reported by detector"}.get(missing, "Unavailable")
+                   MISSING_NOT_REPORTED: "Not reported by detector",
+                   MISSING_NOT_REACHED: "Not reached"}.get(missing, "Unavailable")
     elif num is None:
         display = str(value) if value not in (None, "") else "Unavailable"
     elif unit == "price":
@@ -277,6 +282,34 @@ class NormalR4Observer:
         """
         return next((g for g in self.gates if g.get("gate") == "daily_atr"), None)
 
+    _DAILY_ATR_DETAIL = "the daily range the stop distance is sized from"
+
+    def daily_atr_absence(self, fallback: str = MISSING_DATA) -> tuple:
+        """(missing, detail) for the Daily ATR row -- and WHY, when there is no number.
+
+        Stage 5ZZZ-BP. Measured on MNKD, 2026-09-01: the row read "Unavailable" on every slot
+        of a Calm session, beside a Regime row reading Calm with a failed verdict. Both facts
+        were on the card and the reader had to join them. "Unavailable" is what this module
+        prints when a value was looked for and not found, which is the one thing that did not
+        happen here -- the detector answered the regime gate, returned, and never reached the
+        daily ATR at all.
+
+        The reason is DERIVED, never asserted: the gate list holds a refusal and holds no
+        `daily_atr` entry, so the detector demonstrably returned before reporting one. Writing
+        "the regime gate is answered first" would be a claim about an order this module does
+        not own, and the order is exactly the kind of thing that moves.
+        """
+        dag = self.daily_atr_gate or {}
+        if dag.get("value") is not None:
+            return "", self._DAILY_ATR_DETAIL
+        blocker = self.first_failed_gate or {}
+        name = str(blocker.get("gate") or "")
+        if name and name != "daily_atr" and dag == {}:
+            return MISSING_NOT_REACHED, (
+                self._DAILY_ATR_DETAIL + " -- not read on this slot: the detector answered the "
+                + name + " gate and returned before reporting this one")
+        return fallback, self._DAILY_ATR_DETAIL
+
     @property
     def regime_gate(self) -> "dict | None":
         """The SLOT-level regime gate, when the detector reported one.
@@ -295,16 +328,18 @@ class NormalR4Observer:
         bar = self.last_bar
         rg = self.regime_gate or {}
         dag = self.daily_atr_gate or {}
+        _da_missing, _da_detail = self.daily_atr_absence()
         if bar is None:
             why = MISSING_DATA if self.first_failed_gate else MISSING_NOT_REPORTED
+            if _da_missing == MISSING_DATA:
+                _da_missing = why
             return [_row(f"Trend filter (EMA {ema_period})", None, missing=why),
                     _row("Close used", None, missing=why),
                     _row("Close minus EMA", None, missing=why),
                     _row("ATR (14 x 5-min bars)", None, missing=why),
                     _row("Daily ATR", dag.get("value"),
                          unit="price" if dag.get("value") is not None else "",
-                         missing="" if dag.get("value") is not None else why,
-                         detail="the daily range the stop distance is sized from"),
+                         missing=_da_missing, detail=_da_detail),
                     _row("Volume", None, missing=why),
                     _row("Average volume (10 bars)", None, missing=why),
                     _row("Volume vs average", None, missing=why),
@@ -364,7 +399,7 @@ class NormalR4Observer:
                         "stop distance is built from"),
             _row("Daily ATR", dag.get("value"),
                  unit="price" if dag.get("value") is not None else "",
-                 detail="the daily range the stop distance is sized from"),
+                 missing=_da_missing, detail=_da_detail),
             _row("Volume", volume, unit="count"),
             _row("Average volume (10 bars)", avgv, unit="count",
                  detail="taken by position inside the window, looking backward"),
@@ -690,6 +725,13 @@ def recorded_series(root, day: str, sleeve: str) -> list:
                 (r.get("threshold") for r in
                  (((block.get("bar_gate_grid") or {}).get("rows")) or [])
                  if r.get("gate") == "volume_resume_surge"), None),
+            # Stage 5ZZZ-BP. The regime VERDICT, not only the label. `values` is
+            # {label: value} and drops `passed`, so a chart built from it can print "Calm"
+            # without being able to say that Calm is the answer that stopped every slot.
+            "regime": next((r.get("value") for r in (block.get("rows") or [])
+                            if r.get("label") == "Regime"), None),
+            "regime_passed": next((r.get("passed") for r in (block.get("rows") or [])
+                                   if r.get("label") == "Regime"), None),
             "values": values,
         })
     out.sort(key=lambda r: str(r.get("slot_time") or ""))

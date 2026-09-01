@@ -2354,19 +2354,50 @@
     }).join('');
 
     const forming = series.some(p => p.last_bar_complete === false);
+
+    // Stage 5ZZZ-BP. Two charts, two days, one of them labelled.
+    //
+    // The candle chart above prints "Stored session 2026-08-28" when its bars are older than
+    // the panel's day; this chart draws TODAY's slots and printed no date at all. On
+    // 2026-09-01 the two sat side by side -- candles from the 28th, line from the 1st -- and
+    // nothing on the page said they were different days. The date is stated unconditionally
+    // here: a label that appears only when something is wrong cannot be used to check that
+    // nothing is.
+    // Read from the SAME object the points came out of. The first version reached for
+    // `s.slot_series_session` while the series is at `s.strategy.slot_series`, so the chip
+    // silently rendered nothing -- the payload check passed and only the page showed it. A
+    // date that is absent when the field moves is the defect this chip exists to prevent.
+    const chartDay = ((s.strategy || {}).slot_series_session) || '';
+
+    // Whether any rule consumed these readings. The verdict is copied from the slot's own
+    // regime gate; slots that recorded no verdict are not counted either way, so an
+    // unanswered session never produces the sentence.
+    const judged = series.filter(p => p.regime_passed === true || p.regime_passed === false);
+    const refused = judged.length > 0 && judged.every(p => p.regime_passed === false);
+    const refusedLabel = refused ? String(judged[judged.length - 1].regime || '') : '';
+    const thrSeen = finite(thr).length > 0;
+
     return `<div class="mv2-slotchart">
       <div class="mv2-sc-head">
         <span class="mv2-kicker">Across the session</span>
+        ${chartDay ? `<span class="mv2-sc-day">${mvEsc(chartDay)}</span>` : ''}
         <span class="mv2-sc-key"><i class="mv2-sc-k-close"></i>close</span>
         <span class="mv2-sc-key"><i class="mv2-sc-k-ema"></i>trend filter</span>
         <span class="mv2-sc-key"><i class="mv2-sc-k-avgv"></i>10-bar volume</span>
         <span class="mv2-sc-key"><i class="mv2-sc-k-vol"></i>bar volume</span>
-        ${finite(thr).length ? `<span class="mv2-sc-key"><i class="mv2-sc-k-thr"></i>surge threshold</span>` : ''}
+        ${thrSeen
+          ? `<span class="mv2-sc-key"><i class="mv2-sc-k-thr"></i>surge threshold</span>`
+          : `<span class="mv2-sc-key mv2-sc-key-off">surge threshold — not compared</span>`}
       </div>
       <svg class="mv2-sc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
         <line class="mv2-sc-rule" x1="${padL}" x2="${W - padR}" y1="${(volTop - gap / 2).toFixed(1)}" y2="${(volTop - gap / 2).toFixed(1)}"></line>
         ${path(ema, 'mv2-sc-ema')}${path(close, 'mv2-sc-close')}${volPath()}${volDots}${ticks}${times}
       </svg>
+      ${refused ? `<div class="mv2-tabnote">Regime ${mvEsc(refusedLabel)} — the regime gate `
+        + `refused on all ${judged.length} slot${judged.length === 1 ? '' : 's'} that recorded `
+        + `a verdict, so the detector returned before any rule read these numbers. They are `
+        + `measurements of the session, not a decision path, and no surge threshold exists `
+        + `because nothing was compared.</div>` : ''}
       ${forming ? `<div class="mv2-tabnote">Each dot is the bar the slot was reading, which had `
         + `only just opened — the line above it is the ten-bar average, measured on closed bars.`
         + `</div>` : ''}

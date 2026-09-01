@@ -1845,3 +1845,10 @@ details.issue-group-retired > summary b { opacity: .72; font-weight: 500; }
 .mv2-sc-thr { fill: none; stroke: #c9668a; stroke-width: 1.2; stroke-dasharray: 3 3; }
 .mv2-sc-k-thr { color: #c9668a; border-top-style: dashed !important; }
 .mv2-sc-vol.over { fill: #e8c17a; stroke: #e8c17a; stroke-width: 2; }
+
+
+/* Stage 5ZZZ-BP. The chart names its own session, and a legend entry that has no line says
+   so rather than disappearing. An absence with no reason attached reads as a bug. */
+.mv2-sc-day { font-size: 10px; letter-spacing: .04em; color: var(--mv-dim, #8b929c);
+  border: 1px solid var(--mv-hair, #23262d); border-radius: 3px; padding: 1px 5px; }
+.mv2-sc-key-off { color: var(--mv-dim, #8b929c); opacity: .7; font-style: italic; }

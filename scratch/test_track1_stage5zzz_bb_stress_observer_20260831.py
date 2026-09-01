@@ -301,10 +301,40 @@ def test_the_detector_really_does_not_ask_for_a_regime_label():
     assert not any("regime" in i for i in ids), ids
 
 
+def _last_session_the_stress_sleeve_ran() -> str:
+    """The newest day this sleeve actually recorded a slot, discovered from the store.
+
+    Stage 5ZZZ-BP. This test used to call `build()` with no day, which means TODAY, and the
+    Stress window opens at 10:35 ET. Written in the afternoon it passed; run at 04:40 ET on
+    2026-09-01 it failed its own "no lanes at all -- the probe is wrong" guard, which was the
+    guard working: today the sleeve is `waiting` and has no lanes, so there was nothing to
+    check. Measured the same morning: `day=None` gave 0 lanes, `day=2026-08-31` gave 13.
+
+    A hard-coded date would age out as the store is pruned, so the day is discovered. Nothing
+    is skipped: if no session in the store ran this sleeve, that is a failure, not a pass.
+    """
+    from global_index import track1_strategy_diagnostics as SD
+    import json
+    import pathlib
+    d = pathlib.Path(".").joinpath(*SD.RUNTIME_SUBDIR)
+    for p in sorted(d.glob("track1_strategy_diagnostics_*.jsonl"), reverse=True):
+        for line in p.read_text(encoding="utf-8").splitlines():
+            if '"roska4_stress"' not in line:
+                continue
+            try:
+                blk = json.loads(line)
+            except ValueError:
+                continue
+            if blk.get("sleeve") == "roska4_stress" and blk.get("session_date"):
+                return str(blk["session_date"])
+    raise AssertionError("no session in the diagnostics store ran roska4_stress")
+
+
 def test_the_lane_list_does_not_carry_it():
     """Checked on the PAYLOAD, because that is what the page draws."""
     from monitor.backend import track1_market_view as MV
-    s = (MV.build().get("sleeves") or {}).get("roska4_stress") or {}
+    day = _last_session_the_stress_sleeve_ran()
+    s = (MV.build(day=day).get("sleeves") or {}).get("roska4_stress") or {}
     labels = [str(L.get("label", "")).lower() for L in (s.get("rule_lanes") or [])]
-    assert labels, "no lanes at all -- the probe is wrong"
+    assert labels, "no lanes on %s, a day this sleeve recorded a slot -- the probe is wrong" % day
     assert not any("regime" in x for x in labels), labels
