@@ -118,3 +118,55 @@ def test_the_session_list_travels_with_the_payload():
     assert rows, "no sessions listed -- the picker would have nothing to draw"
     assert all({"day", "has_signals", "has_diagnostics", "is_today"} <= set(r) for r in rows), rows
     assert rows == sorted(rows, key=lambda r: r["day"], reverse=True), rows
+
+
+# -- Stage 5ZZZ-BV: a file on disk is not a session ---------------------------------------
+def test_a_non_trading_day_on_disk_is_not_offered(store):
+    """2026-08-29 was a Saturday and carried two rows -- a swing slot the gate refused -- and
+    the first version of this picker offered it as a session. Opening it would have anchored
+    the band on a day the market was shut: twenty-two slots reading "no record was written"
+    for a session that never existed, which is the page `_anchor_day` exists to prevent."""
+    _touch(store, "signals", "2026-08-29")
+    days = [r["day"] for r in MV.available_sessions(store, today="2026-09-01")]
+    assert "2026-08-29" not in days, days
+    assert "2026-08-28" in days and "2026-08-31" in days, days
+
+
+def test_the_live_row_is_the_session_the_band_anchors_on(store):
+    """On a Saturday the calendar date and the anchored session differ. Marking the calendar
+    date live would put a non-session at the top of the list while the band below it described
+    Friday."""
+    rows = MV.available_sessions(store, today="2026-08-29")
+    live = [r["day"] for r in rows if r["is_today"]]
+    assert live == ["2026-08-28"], rows
+    assert "2026-08-29" not in [r["day"] for r in rows]
+
+
+def test_the_calendar_is_the_projects_own_not_a_weekday_test_written_here(store, monkeypatch):
+    """A holiday looks like a trading day to anything that only counts days of the week. This
+    monkeypatches the project's calendar rather than waiting for a real holiday: if the picker
+    stopped delegating, the refused day would come back."""
+    from global_index import track1_freshness as fresh
+    import pandas as pd
+
+    real = fresh._is_trading_day
+    monkeypatch.setattr(fresh, "_is_trading_day",
+                        lambda d: False if str(pd.Timestamp(d).date()) == "2026-08-26"
+                        else real(d))
+    days = [r["day"] for r in MV.available_sessions(store, today="2026-09-01")]
+    assert "2026-08-26" not in days, days
+    assert "2026-08-25" in days, days
+
+
+def test_a_calendar_that_cannot_be_loaded_does_not_empty_the_picker(store, monkeypatch):
+    """A picker that empties itself because a calendar failed is worse than one that offers a
+    weekend: the band still labels whatever is opened, but an empty bar looks like "there are
+    no sessions"."""
+    from global_index import track1_freshness as fresh
+
+    def boom(_d):
+        raise RuntimeError("calendar unavailable")
+
+    monkeypatch.setattr(fresh, "_is_trading_day", boom)
+    days = [r["day"] for r in MV.available_sessions(store, today="2026-09-01")]
+    assert len(days) >= 5, days

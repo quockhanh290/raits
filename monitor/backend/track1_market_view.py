@@ -1604,6 +1604,17 @@ def available_sessions(root: str | Path = ".", *, limit: int = 7,
     `has_diagnostics` is what the session CHART needs; a day without it can still show the
     condition rows, because those can be replayed from the bars. Saying which is which is the
     difference between "nothing here" and "nothing was recorded here".
+
+    Stage 5ZZZ-BV. TRADING days only, from the same calendar `_anchor_day` uses.
+
+    A file on disk is not a session. 2026-08-29 was a Saturday and carried two rows -- a swing
+    slot the gate refused -- and the first version of this picker offered it as a session to
+    review. Opening it would have anchored the whole band on a day the market was shut, which
+    is the exact page `_anchor_day` exists to prevent: twenty-two slots reading "no record was
+    written" for a session that never existed.
+
+    Nothing is lost by dropping it. Those rows stay in the signal journal and the job journal,
+    where a refused weekend slot belongs; what they are not is a session.
     """
     import re
 
@@ -1624,12 +1635,32 @@ def available_sessions(root: str | Path = ".", *, limit: int = 7,
                 row["has_signals"] = True
             else:
                 row["has_diagnostics"] = True
-    if today and today not in seen:
-        seen[today] = {"day": today, "has_signals": False, "has_diagnostics": False}
-    out = [seen[k] for k in sorted(seen, reverse=True)]
+    # The live row is the day the panel ANCHORS on, not the calendar date. On a Saturday those
+    # differ, and offering the calendar date would put a non-session at the top of the list
+    # while the band below it described Friday.
+    live = _anchor_day(today) if today else ""
+    if live and live not in seen:
+        seen[live] = {"day": live, "has_signals": False, "has_diagnostics": False}
+    out = [seen[k] for k in sorted(seen, reverse=True) if _is_session(k)]
     for row in out:
-        row["is_today"] = bool(today) and row["day"] == today
+        row["is_today"] = bool(live) and row["day"] == live
     return out[:limit] if limit else out
+
+
+def _is_session(day: str) -> bool:
+    """Was the market open on this date? The project's own calendar answers, never a weekday
+    test written here -- a holiday looks like a trading day to anything that only counts days
+    of the week, and `calendar_source()` reports which of the two is in force."""
+    try:
+        import pandas as pd
+
+        from global_index import track1_freshness as _fresh
+
+        return bool(_fresh._is_trading_day(pd.Timestamp(day)))
+    except Exception:                                             # noqa: BLE001
+        # A picker that empties itself because a calendar could not be loaded is worse than one
+        # that offers a weekend. The band still labels whatever is opened.
+        return True
 
 
 def build(root: str | Path = ".", *, day: str | None = None, now: Any = None,
