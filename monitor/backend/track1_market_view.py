@@ -95,6 +95,20 @@ ST_LIVE = "live"
 ST_COMPLETE = "complete"
 ST_REFUSED = "refused"
 ST_INCOMPLETE = "incomplete"
+#: Stage 5ZZZ-BW. The window ledger's own word, not a new one.
+#:
+#: `unobserved` means no `window_closed` record exists -- the ledger fail-closes on purpose:
+#: "a window that opened and then vanished is not in progress after the fact, it is a window
+#: nobody can vouch for". That is a DIFFERENT fact from `incomplete`, where the window did
+#: close and counted fewer slots than expected: one says the coverage is short, the other says
+#: nobody can attest to it at all.
+#:
+#: It used to fall through to `unknown`, which is the catch-all for "this code has no name for
+#: this". Measured across the six sessions on disk, eighteen sleeve-days: seventeen carried the
+#: right word and one did not -- Swing on 2026-08-28, nine of twenty-three slots observed and
+#: no closing record, printed UNKNOWN in amber. The panel knew exactly what had happened and
+#: said it could not tell.
+ST_UNOBSERVED = "unobserved"
 ST_UNKNOWN = "unknown"
 
 #: Stage 5ZZM. Plain English, because this string is read by an operator and not by a
@@ -1582,6 +1596,12 @@ def _sleeve_status(slots: list, coverage: dict, spec: dict, now_hhmm: str) -> st
         return ST_NOT_STARTED
     if any(x["status"] == SLOT_FUTURE for x in slots):
         return ST_LIVE
+    # Stage 5ZZZ-BW. The ledger's verdict, kept instead of collapsed. Reached only after the
+    # window has ended -- the `waiting` branch above still owns the hours before it opens, so
+    # a sleeve whose window has not come is not accused of losing a closing record it was
+    # never due to write. `unknown` stays the true catch-all.
+    if outcome == ST_UNOBSERVED:
+        return ST_UNOBSERVED
     return ST_UNKNOWN
 
 

@@ -1363,6 +1363,18 @@
     }
     if (s.status === 'refused') return { word: 'REFUSED', tone: 'bad' };
     if (s.status === 'incomplete') return { word: 'INCOMPLETE', tone: 'warn' };
+    // Stage 5ZZZ-BW. Named on the WINDOW, because that is what is missing.
+    //
+    // The status word is the ledger's own, `unobserved`, but printing that beside "9/23 slots"
+    // reads as a contradiction -- nine of them plainly were observed. What went unobserved is
+    // the window's CLOSE: no closing record exists, so the coverage cannot be vouched for even
+    // though slots ran. Amber, not red: this is a gap in the evidence, not a refusal.
+    if (s.status === 'unobserved') {
+      return { word: 'WINDOW NOT CLOSED', tone: 'warn',
+               tip: (s.coverage || {}).reason
+                 || 'No window_closed record exists for this session, so the slot coverage '
+                    + 'cannot be vouched for. Slots that did run are still shown.' };
+    }
     if (s.status === 'complete') return { word: 'NO SIGNAL', tone: 'muted' };
     return { word: 'UNKNOWN', tone: 'warn' };
   }
@@ -1395,7 +1407,7 @@
                     + `describes ${mv.session_date}, the last trading day.`));
     }
     const st = mvStatusChip(s);
-    out.push(mvChip(st.word, st.tone));
+    out.push(mvChip(st.word, st.tone, st.tip));
 
     const cov = s.coverage || {};
     if (cov.observed_slots != null && cov.expected_slots != null) {
