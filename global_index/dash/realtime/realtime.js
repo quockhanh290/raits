@@ -558,9 +558,7 @@
     // and the whole runner-derived block read as live. The envelope's own `age_seconds` is
     // honest, and that is what this asks. The label is left alone: it is legacy contract and
     // other panels read it.
-    const legacyAgeHours = Number(state.runner?.age_seconds) / 3600;
-    const legacyStale = ['missing', 'unknown', 'stale'].includes(state.runner?.freshness)
-      || (Number.isFinite(legacyAgeHours) && legacyAgeHours > LEGACY_STALE_HOURS);
+    const legacyStale = legacyRunnerStale();
     $('metrics').classList.toggle('runner-stale', legacyStale);
     // Stage 5ZZZ-BK. The SAME staleness, applied to the other block that carries the same
     // marker.
@@ -4060,10 +4058,40 @@
     else renderEventJournal(snap);
   }
 
+  // Stage 5ZZZ-BU. ONE definition, because three blocks now have to answer the same question.
+  //
+  // Stale by AGE, not by the label -- the reasoning is Stage 5ZZH's and is unchanged: the
+  // freshness model asks the SCHEDULE whether a publish was due, and in track1-only mode the
+  // legacy runner is never due, so the label says `fresh` for a snapshot of any age. Measured
+  // 2026-09-01: 724,658 seconds, 201.3 hours, eight and a half days.
+  function legacyRunnerStale() {
+    const hours = Number(state.runner?.age_seconds) / 3600;
+    return ['missing', 'unknown', 'stale'].includes(state.runner?.freshness)
+      || (Number.isFinite(hours) && hours > LEGACY_STALE_HOURS);
+  }
+
   function renderClocks() {
+    // Stage 5ZZZ-BU. Two rows that read as a contradiction, and both numbers were right.
+    //
+    // Measured on the page 2026-09-01:
+    //
+    //     Runner observed    08-24, 02:58 ET
+    //     Runner freshness   fresh
+    //
+    // -- the runner is healthy, and last spoke eight days ago. The freshness value is not
+    // about the runner at all: `fresh` is set when the schedule has another slot later today.
+    // The module computing it says so in its own first line, "schedule-relative runner
+    // freshness"; the row label had dropped the half that made it true.
+    //
+    // Nothing is recomputed and the legacy contract is untouched -- other panels read that
+    // field and Stage 5ZZH deliberately left it alone. What changes is that the row says what
+    // it measures, and the observation beside it says which route it belongs to.
+    const stale = legacyRunnerStale();
+    const observed = etDateTime(state.runner?.observed_at);
     const entries = [
-      ['Runner observed', etDateTime(state.runner?.observed_at)],
-      ['Runner freshness', state.runner?.freshness || 'missing'],
+      ['Runner observed', stale ? `${observed} · legacy route, retired` : observed],
+      ['Schedule freshness', (state.runner?.freshness || 'missing')
+        + ' · whether another slot is due today, not the runner\'s health'],
       ['Expected next', etDateTime(state.schedule?.expected_next_at)],
       ['Schedule evidence', state.schedule?.evidence ? `${state.schedule.evidence.state} / ${state.schedule.evidence.reason}` : 'missing'],
       ['Broker observed', etDateTime(state.broker?.observed_at)],
