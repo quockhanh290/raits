@@ -1852,3 +1852,22 @@ details.issue-group-retired > summary b { opacity: .72; font-weight: 500; }
 .mv2-sc-day { font-size: 10px; letter-spacing: .04em; color: var(--mv-dim, #8b929c);
   border: 1px solid var(--mv-hair, #23262d); border-radius: 3px; padding: 1px 5px; }
 .mv2-sc-key-off { color: var(--mv-dim, #8b929c); opacity: .7; font-style: italic; }
+
+
+/* Stage 5ZZZ-BQ. The session bar. A day with no per-slot record is drawn thinner rather than
+   hidden: it can still be opened, it just has less in it, and hiding it would make the gap
+   in the store invisible. */
+.mv2-daybar { display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
+  padding: 6px 0 2px; }
+.mv2-daybar.loading { opacity: .5; }
+.mv2-day-label { font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--mv-dim, #8b929c); margin-right: 3px; }
+.mv2-day { font: inherit; font-size: 11px; line-height: 1.6; cursor: pointer;
+  color: var(--mv-fg, #d7dbe0); background: transparent; padding: 1px 7px;
+  border: 1px solid var(--mv-hair, #23262d); border-radius: 3px; }
+.mv2-day:hover { border-color: var(--mv-dim, #8b929c); }
+.mv2-day.thin { color: var(--mv-dim, #8b929c); border-style: dashed; }
+.mv2-day.on { color: var(--bg, #0b0c0e); background: var(--mv-fg, #d7dbe0);
+  border-color: var(--mv-fg, #d7dbe0); }
+.mv2-day i { font-style: normal; font-size: 9px; opacity: .7; margin-left: 4px; }
+.mv2-day-note { font-size: 11px; color: var(--amber, #c9a227); margin-left: 6px; }

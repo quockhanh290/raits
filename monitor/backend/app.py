@@ -317,8 +317,23 @@ def api_v1_track1_market_view():
     # instrument stores, and the runtime endpoint is polled on a short interval by a page
     # that needs it to stay cheap. Read-only, offline, and it never opens a connection --
     # bars come from the persisted store, never from the broker.
-    from monitor.backend.track1_market_view import build, regime
-    return jsonify({"market_view": build(ROOT), "regime": regime(ROOT)})
+    #
+    # Stage 5ZZZ-BQ. `build` has always taken a day; this endpoint pinned it to today, so the
+    # panel could only ever describe the session in progress. A rejected `day` is answered
+    # with today rather than an error: this endpoint feeds a page that must keep rendering.
+    import re
+
+    from flask import request
+
+    from monitor.backend.track1_market_view import available_sessions, build, regime
+
+    asked = (request.args.get("day") or "").strip()
+    if not re.fullmatch(r"20\d{2}-\d{2}-\d{2}", asked):
+        asked = ""
+    payload = build(ROOT, day=asked or None)
+    return jsonify({"market_view": payload, "regime": regime(ROOT),
+                    "sessions": available_sessions(ROOT, today=payload.get("today_et")),
+                    "requested_day": asked or None})
 
 
 @app.get("/api/v1/runner-positions")

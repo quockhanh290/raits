@@ -1585,6 +1585,53 @@ def _sleeve_status(slots: list, coverage: dict, spec: dict, now_hhmm: str) -> st
     return ST_UNKNOWN
 
 
+#: Stores whose per-day file proves a session exists to look at. `signals` is the spine --
+#: every slot writes a row, whether it found something or not -- and `strategy_diagnostics` is
+#: added because a day could in principle carry diagnostics and no signal row.
+_SESSION_STORES = ("signals", "strategy_diagnostics")
+
+
+def available_sessions(root: str | Path = ".", *, limit: int = 7,
+                       today: str | None = None) -> list:
+    """The sessions on disk, newest first -- discovered, never a calendar range.
+
+    Stage 5ZZZ-BQ. A picker offering a range would hand the operator days that were never
+    recorded, and an empty panel for a day nothing ever wrote is the absence-with-no-reason
+    this panel has spent several stages removing. Measured 2026-09-01: the signal store holds
+    25/08 through 01/09 while per-slot diagnostics begin 31/08, so the two answers differ and
+    each day says which it has.
+
+    `has_diagnostics` is what the session CHART needs; a day without it can still show the
+    condition rows, because those can be replayed from the bars. Saying which is which is the
+    difference between "nothing here" and "nothing was recorded here".
+    """
+    import re
+
+    root = Path(root)
+    seen: dict = {}
+    for store in _SESSION_STORES:
+        d = root / "global_index" / "track1_runtime" / store
+        if not d.is_dir():
+            continue
+        for f in d.glob("*.jsonl"):
+            m = re.search(r"(20\d{6})", f.name)
+            if not m:
+                continue
+            iso = "%s-%s-%s" % (m.group(1)[:4], m.group(1)[4:6], m.group(1)[6:])
+            row = seen.setdefault(iso, {"day": iso, "has_signals": False,
+                                        "has_diagnostics": False})
+            if store == "signals":
+                row["has_signals"] = True
+            else:
+                row["has_diagnostics"] = True
+    if today and today not in seen:
+        seen[today] = {"day": today, "has_signals": False, "has_diagnostics": False}
+    out = [seen[k] for k in sorted(seen, reverse=True)]
+    for row in out:
+        row["is_today"] = bool(today) and row["day"] == today
+    return out[:limit] if limit else out
+
+
 def build(root: str | Path = ".", *, day: str | None = None, now: Any = None,
           coverage: dict | None = None) -> dict:
     """The whole payload. Read-only, offline, and it never raises: a panel that 500s tells the

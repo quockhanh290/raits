@@ -4,7 +4,10 @@
   const POLL_MS = 8000;
   const MIN_METRIC_DAYS = 20;
   const EVENT_JOURNAL_LIMIT = 24;
-  const state = { runner: null, runnerPositions: null, broker: null, schedule: null, sessionEvents: null, jobJournal: null, executionQuality: null, openIssues: null, selectedJobId: null, selectedIssueKey: null, selectedMonitorKey: null, selectedEventKey: null, journalView: 'jobs', issuesSectionOpen: null, marketView: null, mvTab: null, mvInner: null };
+  const state = { runner: null, runnerPositions: null, broker: null, schedule: null, sessionEvents: null, jobJournal: null, executionQuality: null, openIssues: null, selectedJobId: null, selectedIssueKey: null, selectedMonitorKey: null, selectedEventKey: null, journalView: 'jobs', issuesSectionOpen: null, marketView: null, mvTab: null, mvInner: null, 
+    // Stage 5ZZZ-BQ. null means the live session. A date string means the operator 
+    // opened a past one, and only the market-view band follows it.
+    mvDay: null };
   const compactIssueMedia = window.matchMedia('(max-width: 680px)');
   const roots = ['MNKD', 'M2K', 'MNQ', 'MYM', 'MES'];
 
@@ -323,7 +326,8 @@
       // Stage 5ZZL. Its own endpoint, and its own failure: this one slices instrument
       // stores, so a backend that has not been restarted since it was added must leave the
       // rest of the page untouched rather than taking the poll down with it.
-      fetchJson('/api/v1/track1-market-view')
+      fetchJson('/api/v1/track1-market-view'
+                + (state.mvDay ? '?day=' + encodeURIComponent(state.mvDay) : ''))
     ]);
     // Named bindings rather than results[5] / results[6]: the numeric index has to be
     // re-counted by hand every time the list changes, and the one panel most likely to be
@@ -1380,10 +1384,17 @@
     // "Complete · no signal" from Friday would be read as this morning's verdict.
     const mv = state.marketView?.market_view || {};
     if (mv.session_is_today === false && mv.session_date) {
-      out.push(mvChip(`Closed today — session ${mv.session_date}`, 'muted',
-                      mv.session_anchor_reason
-                      || `The market is closed on ${mv.today_et || 'today'}; every panel below `
-                         + `describes ${mv.session_date}, the last trading day.`));
+      // Stage 5ZZZ-BQ. Two different reasons this band is not showing today, and only one of
+      // them is "the market is closed". Since a past session can now be opened deliberately,
+      // saying the market is shut would be a fact about the world that is simply untrue.
+      out.push(state.mvDay
+        ? mvChip(`Reviewing ${mv.session_date}`, 'muted',
+                 `You opened this session from the bar above. The panels in this band `
+                 + `describe ${mv.session_date}; everything outside it stays on the live day.`)
+        : mvChip(`Closed today — session ${mv.session_date}`, 'muted',
+                 mv.session_anchor_reason
+                 || `The market is closed on ${mv.today_et || 'today'}; every panel below `
+                    + `describes ${mv.session_date}, the last trading day.`));
     }
     const st = mvStatusChip(s);
     out.push(mvChip(st.word, st.tone));
@@ -2250,13 +2261,69 @@
   //: TEN-BAR AVERAGE as the line, because that is measured on closed bars, and the slot's own
   //: reading as dots, because it is a bar still forming. Drawing the dots as a line would
   //: assert a shape the data does not have.
+  // Stage 5ZZZ-BQ. The sessions that exist, from the backend's own listing of what is on
+  // disk. Never a calendar range: a picker offering days nothing ever wrote hands back an
+  // empty panel for a day that was never recorded, which is the absence-with-no-reason this
+  // band has spent several stages removing.
+  //
+  // Two kinds of session, and the difference is stated rather than left to be discovered.
+  // Measured 2026-09-01: signals reach back to 25/08, per-slot diagnostics begin 31/08. A day
+  // without the second still shows its condition rows -- the detector is replayed over the
+  // bars on disk, which took about eighty seconds on the first request for 26/08 -- but the
+  // session chart stays empty, because no per-slot record exists to draw.
+  function mvDayBar() {
+    const el = $('marketViewDays');
+    if (!el) return;
+    const sessions = (state.marketView || {}).sessions || [];
+    if (!sessions.length) { el.innerHTML = ''; return; }
+    const sel = state.mvDay;
+    const chips = sessions.map(row => {
+      const on = sel ? row.day === sel : row.is_today;
+      const cls = ['mv2-day', on ? 'on' : '', row.has_diagnostics ? '' : 'thin']
+        .filter(Boolean).join(' ');
+      const tip = row.has_diagnostics
+        ? 'Per-slot diagnostics were recorded for this session: conditions and the session '
+          + 'chart both come from what the slots wrote while they ran.'
+        : 'No per-slot diagnostics were recorded for this session. The conditions are '
+          + 'replayed over the bars on disk and labelled RECONSTRUCTED; the session chart '
+          + 'stays empty, because there is no per-slot record to draw.';
+      return `<button type="button" class="${cls}" data-mvday="${mvEsc(row.day)}" `
+           + `title="${mvEsc(tip)}">${mvEsc(row.day.slice(5))}`
+           + `${row.is_today ? '<i>today</i>' : ''}</button>`;
+    }).join('');
+    const past = sel && !sessions.some(r => r.day === sel && r.is_today);
+    el.innerHTML = `<span class="mv2-day-label">Session</span>${chips}`
+      + (past ? `<span class="mv2-day-note">Reviewing a past session — this band only. `
+              + `The job list and open issues below stay on the live day.</span>` : '');
+    el.querySelectorAll('[data-mvday]').forEach(b => {
+      b.onclick = () => {
+        const d = b.getAttribute('data-mvday');
+        const isToday = sessions.some(r => r.day === d && r.is_today);
+        state.mvDay = isToday ? null : d;
+        el.classList.add('loading');
+        poll();
+      };
+    });
+    el.classList.remove('loading');
+  }
+
   function mvSlotChart(s) {
     const series = ((s.strategy || {}).slot_series) || [];
     const withPrice = series.filter(p => Number.isFinite(Number(p.close)));
     if (withPrice.length < 2) {
       const ran = series.length;
+      // Stage 5ZZZ-BQ. On a session opened from the bar, an empty chart usually means the
+      // per-slot store does not reach back that far -- not that the sleeve did nothing. The
+      // conditions above it are real, replayed from the bars; only the per-slot line is
+      // missing. Two very different facts behind one empty box.
+      const sess = ((state.marketView || {}).sessions || [])
+        .find(r => r.day === ((s.strategy || {}).slot_series_session || state.mvDay));
+      const noStore = sess && sess.has_diagnostics === false;
       return `<div class="mv2-slotchart-empty">${mvEsc(
-        ran ? `${ran} slot${ran === 1 ? '' : 's'} recorded, ${withPrice.length} carrying `
+        noStore ? `No per-slot record exists for this session — the per-slot store begins `
+                  + `2026-08-31. The conditions above were replayed over the bars on disk, `
+                  + `which is why they are there and this line is not.`
+        : ran ? `${ran} slot${ran === 1 ? '' : 's'} recorded, ${withPrice.length} carrying `
               + `numbers — the line starts when the entry window opens and the detector has `
               + `bars to walk.`
             : 'No slot has recorded a reading for this session yet.')}</div>`;
@@ -2563,6 +2630,7 @@
     const host = $('marketViewChart');
     if (!host) return;
     const payload = state.marketView?.market_view;
+    mvDayBar();
     const src = $('marketViewSource');
     const sum = $('marketViewSummary');
     const note = $('marketViewNote');
