@@ -77,8 +77,15 @@ def test_only_the_scheduler_main_ever_starts_a_scheduler():
                     and node.func.attr == "start"
                     and isinstance(node.func.value, ast.Name)
                     and node.func.value.id in {"sched", "scheduler"}):
-                starts.append(f"{path.relative_to(REPO).as_posix()}:{node.lineno}")
-    assert starts == ["global_index/run_scheduler.py:1942"], starts
+                starts.append(path.relative_to(REPO).as_posix())
+    # Stage 5ZZZ-BP. The FILE and the COUNT, not the line.
+    #
+    # This pinned `run_scheduler.py:1942`, and the line number plays no part in the claim above:
+    # what matters is that `sched.start()` exists exactly once and only in the scheduler's own
+    # module. Measured 2026-09-01, before any change in this stage, it had already drifted to
+    # 2018 -- seventy-six lines of false failure guarding nothing. A pin that breaks whenever
+    # somebody inserts a line above it teaches people the test is noise.
+    assert starts == ["global_index/run_scheduler.py"], starts
 
 
 def test_the_mirror_builds_a_scheduler_without_starting_it():

@@ -685,6 +685,35 @@ def _spy_series_last_day(csv_path: str) -> str:
         return ""
 
 
+def _record_regime_label(label: str, *, dry_run: bool = False) -> None:
+    """Re-record the regime label after the benchmark series moves. Stage 5ZZZ-BP.
+
+    The panel reads a RECORDED label and never computes one, because computing it decodes an
+    HMM over the whole series -- measured 2026-09-01 at 17.4 seconds, which is a page that
+    hangs on the first poll after every refresh. So a probe writes it down and the reader reads
+    what the probe wrote, the same shape `track1_b1` and `track1_account_baseline` use.
+
+    Nothing ran the probe. Measured 2026-09-01: `spy_daily_live.csv` ended on 2026-08-31 while
+    the recorded label still said 2026-08-28, last written by hand on 2026-08-30. Calling
+    `measure()` returned 2026-08-31 straight away -- the number was never missing, the writer
+    was. Both days happened to be Calm, so nothing read wrong; the first regime CHANGE would
+    have been the one the page got wrong.
+
+    Called from the paths that MOVE the series rather than on a clock of its own. A cron of its
+    own that fired before the refresh would record the same stale label and look like it had
+    worked.
+
+    Never allowed to fail its caller: a diagnostics write must not be the reason a trading day
+    is marked unfit.
+    """
+    try:
+        _run([sys.executable, "-m", "global_index.track1_regime_record", "--record"],
+             label=label, dry_run=dry_run)
+    except Exception as exc:                                       # noqa: BLE001
+        log.warning("[%s] regime label not re-recorded (%s: %s); the panel keeps showing the "
+                    "previous label and its age", label, type(exc).__name__, exc)
+
+
 def make_scheduler(port: int, dry_run: bool,
                    data_dir: str = "data/cache/futures",
                    nkd_parquet: str = "global_index/data/NKD_continuous_1m_8y.parquet",
@@ -937,6 +966,8 @@ def make_scheduler(port: int, dry_run: bool,
         _preflight_ok[today] = True
         _save_preflight_state()
         log.info("[PRE-FLIGHT] OK — parquet + spy CSV fresh. run_live_day cleared for 14:05.")
+        # The series just moved; the label the panel reads is out of date until this runs.
+        _record_regime_label("PREFLIGHT_REGIME_LABEL", dry_run=dry_run)
 
     # ── Stage 5Q-5: the SPY refresh that runs AFTER the close ────────────────
     #
@@ -1029,6 +1060,10 @@ def make_scheduler(port: int, dry_run: bool,
                             "is there now. The 16:20 refresh is running before the provider "
                             "is ready; if this keeps happening, move it later rather than "
                             "relying on the ladder.", label, today)
+            # Every rung that ends with the series covering today must leave the recorded label
+            # covering it too, including the "nothing to do" rung: an earlier rung may have
+            # moved the series without anything re-recording the label.
+            _record_regime_label(label + "_REGIME_LABEL", dry_run=dry_run)
             return
 
         if code == 2:
