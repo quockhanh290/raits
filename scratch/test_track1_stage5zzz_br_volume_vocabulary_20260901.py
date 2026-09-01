@@ -165,3 +165,44 @@ def test_every_retired_name_says_what_it_became():
         assert new, old
         for name in new:
             assert any(name in SIG.rule_names(s) for s in SIG.RULES), (old, name)
+
+
+def test_the_live_write_path_records_both_halves_separately(tmp_path):
+    """The call site, through the two functions the live slot actually calls.
+
+    `rule_names` returning two names proves the table; it does not prove a slot writes them.
+    The live path builds its measured map by keying on `declared_for` -- the same bridge that
+    was merging them -- so before this split BOTH gates landed on one key and whichever the
+    detector reported last silently overwrote the other. One row, one number, for two
+    comparisons that had already disagreed.
+
+    Written and read back FROM DISK rather than asserted on the returned object, because the
+    stored row is what every reader and every audit sees.
+    """
+    import json
+
+    gates = [{"gate": "volume_pullback_declined", "passed": True, "value": 12.0,
+              "threshold": 25.0, "comparator": "<"},
+             {"gate": "volume_resume_surge", "passed": False, "value": 18.0,
+              "threshold": 32.5, "comparator": ">"}]
+    measured = {}
+    for g in gates:
+        name = SIG.declared_for("roska4_swing", g["gate"])
+        assert name, g["gate"]
+        measured[name] = {"passed": g["passed"], "value": g["value"],
+                          "threshold": g["threshold"], "comparator": g["comparator"],
+                          "detail": ""}
+    assert len(measured) == 2, ("two gates collapsed onto one key: %s" % sorted(measured))
+
+    row = SIG.build_row(sleeve="roska4_swing", slot_id="TRACK1_SWING_1405", slot_time="14:05",
+                        session_date="2026-09-01", mode="shadow_live", decided=True,
+                        reason="decided", raw_candidates=0, freshness_allow=True,
+                        gate_allow=True, measured_rules=measured)
+    p = SIG.append(row, root=tmp_path)
+    assert p is not None and p.exists()
+    stored = [json.loads(l) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()][0]
+    got = {c["rule"]: (c["passed"], c["value"], c["threshold"], c["comparator"])
+           for c in stored["rule_checks"] if "volume" in c["rule"]}
+    assert got == {"volume_pullback_declined": (True, 12.0, 25.0, "<"),
+                   "volume_resume_surge": (False, 18.0, 32.5, ">")}, got
+    assert not any(c["rule"] == "entry_bar_volume_filter" for c in stored["rule_checks"])
