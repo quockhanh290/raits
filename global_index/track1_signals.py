@@ -813,8 +813,29 @@ def _refuse_production_write_under_pytest(target: Path) -> None:
         resolved = target.resolve()
     except OSError:                                                # noqa: BLE001
         resolved = target
-    parts = [p.lower() for p in resolved.parts]
-    if "track1_runtime" not in parts:
+    # Stage 5ZZZ-BT. Compared against the REAL tree, not against the word "track1_runtime".
+    #
+    # The paragraph above promises "a test writing under tmp_path never sees this". It was not
+    # true: the check asked whether any path COMPONENT was named `track1_runtime`, and a test
+    # builds its fake root by mirroring the production layout inside tmp_path -- so the fake
+    # tree matched as surely as the real one. Six tests in the signal-journal suite have been
+    # refused since this landed on 2026-08-30: the append/read round trip, unreadable-line
+    # handling, write-failure disabling, the day summary, refusal surfacing, and the job-card
+    # annotation. That is the channel feeding the panel's signal cards, unexercised for two
+    # days while every one of them pointed at tmp_path exactly as instructed.
+    #
+    # Anchored on this module's own location rather than the working directory: the tree worth
+    # protecting is the one in the repository this code was imported from, and that answer does
+    # not change with where pytest happened to be started.
+    #
+    # Strictly stronger, not weaker. A test writing into the real tree is still refused -- that
+    # is the incident this exists for -- and now a test writing anywhere else is not.
+    real = (Path(__file__).resolve().parent.parent / SIGNALS_DIR).resolve()
+    try:
+        inside = resolved == real or real in resolved.parents
+    except (OSError, ValueError):                                  # noqa: BLE001
+        inside = False
+    if not inside:
         return                                   # tmp_path or any other root: allowed
     raise SignalJournalRefused(
         f"refusing to write production runtime evidence from a test: {resolved}. "
