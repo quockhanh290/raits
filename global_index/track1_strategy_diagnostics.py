@@ -163,6 +163,38 @@ def _bar_had_closed(bar_ts, now, *, minutes: int = 5):
         return None
 
 
+def format_number(value, unit: str = "") -> str:
+    """How this panel prints a number, in ONE place.
+
+    Stage 5ZZZ-BS. `_row` has always formatted its values here; the Calm gate rows never went
+    through it and reached the page as raw floats. Measured on 2026-09-01: a Calm gate printed
+    `needs <= 0.3333333333333333` beside a reading of `0.8315217391304348`, sixteen significant
+    digits each, on a panel where every other number carries two to four.
+
+    Returns "" for a value that is not a number, so the caller keeps whatever it had rather
+    than being handed a string that hides the absence.
+    """
+    num = _num(value)
+    if num is None:
+        return ""
+    if unit == "price":
+        return f"{num:,.2f}"
+    if unit == "ratio":
+        return f"{num:.2f}x"
+    if unit == "count":
+        return f"{num:,.0f}"
+    out = f"{num:,.4f}".rstrip("0").rstrip(".")
+    # A value smaller than the format can show must not print as "0" -- the same reason the
+    # row builder carries this branch, and the same measured case behind it.
+    if num != 0:
+        try:
+            if float(out.replace(",", "")) == 0:
+                out = f"{num:.3g}"
+        except ValueError:
+            pass
+    return out
+
+
 def _row(label: str, value, *, unit: str = "", threshold=None, comparator: str = "",
          passed=None, detail: str = "", missing: str = "") -> dict:
     """One named variable, with what it was compared against when there is a comparison.
@@ -973,7 +1005,9 @@ def _calm_instrument_view(rec: dict, phase: str, params, gates_by_inst=None) -> 
     # The gates for THIS instrument, not the last one written. Empty when the slot recorded
     # no diagnostics block for it -- never borrowed from a sibling, which would put one
     # instrument's numbers under another's name.
-    gates = list(((gates_by_inst or {}).get(inst) or {}).get("gates") or [])
+    gates = [dict(g, display_value=format_number(g.get("value")),
+                  display_threshold=format_number(g.get("threshold")))
+             for g in (((gates_by_inst or {}).get(inst) or {}).get("gates") or [])]
     return {
         "instrument": inst,
         "direction": str(be.get("direction") or ""),
@@ -1067,8 +1101,32 @@ def calm_blocks(root, day: str, now=None, *, slots=None) -> dict:
                            else f"No setup recorded at 09:32 - {code}")
             else:
                 body = _calm_observe_rows(be, ar) if ar else []
-                summary = ("The entry reference was read and the stop evaluated" if ar
-                           else f"Nothing observed - {code}")
+                # Stage 5ZZZ-BS. Two different reasons there is nothing to observe, and the
+                # card said the wrong one out loud.
+                #
+                # The summary echoed the stored reason code verbatim, and the live slot writes
+                # `no_decide_row_for_this_day` whenever DECIDE produced no SETUP -- including
+                # when DECIDE ran, looked, and found nothing. Measured on 2026-09-01 the two
+                # cards sat side by side reading
+                #
+                #     DECIDE    No setup recorded at 09:32 - no_candidate
+                #     OBSERVE   Nothing observed - no_decide_row_for_this_day
+                #
+                # -- one saying the phase ran and found nothing, the other saying it never ran.
+                # Those lead to different actions: "no trade today" versus "something did not
+                # run", and an operator cannot tell which from a page that says both.
+                #
+                # The stored record is untouched and the code still travels in the payload;
+                # what changes is the sentence a person reads. Whether DECIDE ran is answered
+                # from the day's own intent rows, not from the code that was in question.
+                decide_ran = any(r.get("phase") == si.DECIDE for r in rows)
+                if ar:
+                    summary = "The entry reference was read and the stop evaluated"
+                elif code == si.NO_DECIDE_ROW and decide_ran:
+                    summary = ("The decide phase ran at 09:32 and recorded no setup, so there "
+                               "was nothing to observe")
+                else:
+                    summary = f"Nothing observed - {code}"
             out[phase] = _calm_block(
                 phase=phase, source=RECORDED, slot_id=slot_id, at=hhmm, summary=summary,
                 rows=body,
@@ -1123,6 +1181,13 @@ def _merge_recorded_gates(block: dict, root, day, slot_id: str) -> None:
         gates = list((rec or {}).get("gates") or [])
         if not gates:
             return
+        # Stage 5ZZZ-BS. Printed HERE, not on the page. Every other number on this panel is
+        # formatted in this module, and a second formatter in the renderer is a second set of
+        # rounding rules for one dashboard. Old records get it too: nothing is stored, the
+        # strings are built on the way out.
+        gates = [dict(g, display_value=format_number(g.get("value")),
+                      display_threshold=format_number(g.get("threshold")))
+                 for g in gates]
         block["gates"] = gates
         block["nearest_failed_condition"] = next(
             (g for g in gates if g.get("passed") is False), None)
@@ -1149,10 +1214,30 @@ def _calm_reconstruct(root, day, phase, slot_id, hhmm, params, so_far: dict) -> 
         decide = so_far.get(CALM_DECIDE) or {}
         has_setup = bool(decide.get("rows"))
         if not has_setup:
+            # Stage 5ZZZ-BS. Two different reasons there is nothing to observe, and the card
+            # said the wrong one out loud.
+            #
+            # The check is "did DECIDE produce a setup"; the sentence said "there was no DECIDE
+            # row". Measured on 2026-09-01, the two Calm cards sat side by side reading
+            #
+            #     DECIDE    No setup recorded at 09:32 - no_candidate
+            #     OBSERVE   Nothing observed - no decide row for this day
+            #
+            # -- one saying the phase ran and found nothing, the other saying it never ran.
+            # They lead to different actions: "no trade today" versus "something did not run".
+            #
+            # The reason CODE keeps the existing vocabulary. `no_candidate` is already what
+            # DECIDE writes for exactly this outcome, so the pair now agree instead of a third
+            # word being invented for a case two already describe.
+            ran = CALM_DECIDE in so_far
             return _calm_block(
-                **common, summary="No DECIDE row for this day, so there is nothing to observe",
+                **common,
+                summary=("The decide phase ran and recorded no setup, so there is nothing to "
+                         "observe" if ran else
+                         "No DECIDE row for this day, so there is nothing to observe"),
                 rows=[], **stamp, matched_decide=False,
-                reason_code="no_decide_row_for_this_day", status="REFUSED")
+                reason_code=("no_candidate" if ran else "no_decide_row_for_this_day"),
+                status="REFUSED")
 
     try:
         from global_index import track1_calm_a as CA

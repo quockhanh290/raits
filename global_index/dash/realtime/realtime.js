@@ -2168,8 +2168,13 @@
     if (!gates.length) return '';
     return `<div class="mv2-calm-gates">` + gates.map(g => {
       const tone = g.passed === true ? 'ok' : g.passed === false ? 'bad' : 'muted';
-      const val = g.value == null ? '' : String(g.value);
-      const thr = _threshWord({ threshold: g.threshold, comparator: g.comparator || '' });
+      // Stage 5ZZZ-BS. The backend formats; this prints. `String(g.value)` put sixteen
+      // significant digits on the card next to rows carrying two. The raw value is still the
+      // fallback, for a record read by a backend that does not publish the string yet.
+      const val = g.display_value || (g.value == null ? '' : String(g.value));
+      const thr = _threshWord({
+        threshold: g.display_threshold || g.threshold,
+        comparator: g.comparator || '' });
       return `<div class="mv2-cond">
         <div><div class="mv2-cond-label"><i class="mv2-dot ${tone}"></i>` +
         `${mvEsc(String(g.gate).replace(/_/g, ' '))}</div>` +
