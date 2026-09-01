@@ -260,7 +260,9 @@ REQUIRED = {
                       "mnq_only_short_setup", "pre_high_stop_reference",
                       "rr_target_computed", "same_symbol_suppression", "family_cap",
                       "cluster_cap"),
-    "roska4_swing": ("ema50_filter", "r4_prior_range_filter", "entry_bar_volume_filter",
+    # Stage 5ZZZ-BR. One declared name became two, because the engine runs two tests.
+    "roska4_swing": ("ema50_filter", "r4_prior_range_filter",
+                     "volume_pullback_declined", "volume_resume_surge",
                      "spy_d1_close_below_sma50_short_filter", "fixed_stop_2x_daily_atr",
                      "stop_arm_rule", "admission_cap_result"),
     "global_nkd": ("ema10_filter", "regime_lag_1", "japan_session_window",
@@ -613,7 +615,18 @@ def test_45_the_developer_rule_grid_is_gone_from_the_render_path():
     the grid was thirty UNKNOWN rows burying the two lines that carried information."""
     js = _js()
     assert "rule-checks" not in js and "rule-check" not in js
-    assert "JSON.stringify" not in js
+    # Stage 5ZZZ-BR. Narrowed from "no JSON.stringify anywhere" to what this test is about.
+    #
+    # The bare ban was a PROXY for the grid: the grid serialised its rule checks into an
+    # attribute, so the call was a reliable fingerprint of it -- until the candle chart started
+    # passing its bars the same way, `data-bars='...JSON.stringify(bars.map(...))...'`, which
+    # has nothing to do with rules. The test then failed for a change it exists to permit.
+    #
+    # The class names above are the real fingerprint and they stay. What is banned here is
+    # serialising RULE data, which is the thing that must not come back.
+    import re as _re
+    assert not _re.search(r"JSON\.stringify\([^)]*rule", js, _re.I), \
+        "rule data is being serialised into the render path again"
     css = (REPO / "global_index/dash/realtime/realtime.css").read_text(encoding="utf-8")
     assert ".rule-check" not in css and ".rule-unknown" not in css
 

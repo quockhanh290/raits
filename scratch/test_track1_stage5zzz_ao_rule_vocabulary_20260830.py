@@ -128,7 +128,8 @@ def test_the_bridge_carries_every_gate_and_invents_none(sleeve):
 def test_the_two_shared_gates_are_declared_by_both_normal_r4_sleeves():
     """They run the SAME detector off the same module constant, so a rule can not belong to
     one and not the other. This is the assertion that would have caught both omissions."""
-    for name in ("regime_lag_1", "entry_bar_volume_filter",
+    # Stage 5ZZZ-BR. The volume pattern is two rules, not one. Same assertion, both halves.
+    for name in ("regime_lag_1", "volume_pullback_declined", "volume_resume_surge",
                  "spy_d1_close_below_sma50_short_filter", "fixed_stop_2x_daily_atr"):
         for sleeve in NORMAL_R4_SLEEVES:
             assert name in SIG.rule_names(sleeve), f"{sleeve} does not declare {name}"

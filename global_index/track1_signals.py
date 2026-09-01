@@ -194,11 +194,30 @@ RULES: dict = {
     # `TrendFollowStrategy` and the same `make_signal_fn` wrapper Swing uses — and declared
     # neither. Measured on one real session: the volume pattern refuses 20 of 22 bars, so the
     # rule the panel omitted was the one deciding the outcome.
+    # Stage 5ZZZ-BR. `entry_bar_volume_filter` was ONE declared name over TWO engine tests,
+    # and the settings published under it belonged to neither.
+    #
+    # The engine checks volume twice, at two different bars, in opposite directions: the bar
+    # that pulls back to the trend line must trade BELOW the ten-bar average, and the bar that
+    # resumes must trade ABOVE it by a multiple of 1.3. Measured on MNKD for 2026-09-01, with
+    # a ten-bar average of 25, those are "< 25" and "> 32.5" -- two numbers, neither of them
+    # the 2.0 the collapsed name published.
+    #
+    # That 2.0 is `rel_volume_max`, which belongs to the R4 CONTEXT filter -- a day-level gate
+    # on the previous session's range and relative volume, carried alongside `range_max`. NKD
+    # does not run it at all: `run_instrument` takes `apply_context_filter=False` for this
+    # sleeve because "that filter is an R4 thing and applying it to a Tokyo session would be
+    # inventing a rule". So NKD was publishing a parameter of a filter it never executes,
+    # under the name of a rule that is not that filter.
+    #
+    # Named with the detector's own words, as `gapdown_count` and `avg_gap` already are: a
+    # synonym here would be a third vocabulary between two that already disagreed.
     "roska4_swing": ("regime_lag_1", "ema50_filter", "r4_prior_range_filter",
-                     "entry_bar_volume_filter",
+                     "volume_pullback_declined", "volume_resume_surge",
                      "spy_d1_close_below_sma50_short_filter", "fixed_stop_2x_daily_atr",
                      "stop_arm_rule", "admission_cap_result"),
-    "global_nkd": ("regime_lag_1", "ema10_filter", "entry_bar_volume_filter",
+    "global_nkd": ("regime_lag_1", "ema10_filter",
+                   "volume_pullback_declined", "volume_resume_surge",
                    "spy_d1_close_below_sma50_short_filter", "japan_session_window",
                    "fixed_stop_2x_daily_atr", "max_hold_context", "admission_cap_result"),
 }
@@ -264,8 +283,11 @@ NOT_ENTRY_CONDITIONS: dict = {
 #: names the rule once.
 EMITTED_TO_DECLARED: dict = {
     "regime": "regime_lag_1",
-    "volume_pullback_declined": "entry_bar_volume_filter",
-    "volume_resume_surge": "entry_bar_volume_filter",
+    # Stage 5ZZZ-BR. Each answers for itself. They were merged onto one declared name whose
+    # published threshold was neither gate's, and the merge is what made the wrong number
+    # possible: one name can only carry one setting.
+    "volume_pullback_declined": "volume_pullback_declined",
+    "volume_resume_surge": "volume_resume_surge",
     "spy_short_gate": "spy_d1_close_below_sma50_short_filter",
     "r4_context_filter": "r4_prior_range_filter",
     "fixed_stop_daily_atr": "fixed_stop_2x_daily_atr",
@@ -305,17 +327,46 @@ PER_BAR_GATES: frozenset = frozenset({"regime", "ema_proximity", "volume_pullbac
                                       "r4_context_filter", "fixed_stop_daily_atr"})
 
 
+#: Stage 5ZZZ-BR. Declared names that have been RETIRED, and what each became.
+#:
+#: Sessions already on disk were written under the old name -- runtime evidence is append-only
+#: and is never rewritten -- so every reader that classifies a rule by its name meets names
+#: that no longer exist in the vocabulary. Measured the moment `entry_bar_volume_filter` was
+#: split: the panel classifies per-bar rules by looking them up in `RULES`, the retired name
+#: was no longer there, and so a rule that can never hold a per-slot value came back as a lane
+#: on every stored session -- a lane that would have read "value not published" forever.
+#:
+#: Retired here rather than left in `RULES`, because leaving it would re-declare a rule the
+#: sleeve does not run. The mapping is what lets an old record keep being read the way it was
+#: written without the vocabulary having to carry the mistake.
+RETIRED_DECLARED: dict = {
+    "entry_bar_volume_filter": ("volume_pullback_declined", "volume_resume_surge"),
+}
+
+
 def per_bar_rule_names(sleeve: str) -> tuple:
     """Declared rules whose only answer is per BAR, so a per-SLOT cell cannot hold one.
 
     Stress is untouched by this: its detector has no bar channel at all -- `entry_conditions`
     is `all()` over four basket-wide checks answered once per slot -- so none of its gates are
     in `PER_BAR_GATES` and none of its lanes move.
+
+    Retired names come last, and only when EVERY rule they became is per-bar. A retired name
+    that split into a per-bar half and a per-slot half would have to be drawn somewhere, and
+    silently hiding it would lose a verdict a stored session really does carry.
     """
     declared = set(RULES.get(sleeve, ()))
     slot_answerable = {declared_for(sleeve, g) for g in SLOT_LEVEL_GATES} - {None}
     per_bar = {declared_for(sleeve, g) for g in PER_BAR_GATES} - {None} - slot_answerable
-    return tuple(n for n in RULES.get(sleeve, ()) if n in per_bar and n in declared)
+    live = tuple(n for n in RULES.get(sleeve, ()) if n in per_bar and n in declared)
+    # Gated on `declared` as well as `per_bar`, and the first version was not: `per_bar` is
+    # derived from the global gate tables, so it names rules this sleeve may not run at all.
+    # Measured immediately -- Stress and Calm picked up the retired volume name, which
+    # contradicts the paragraph above saying none of Stress's lanes move. A retired name
+    # belonged to this sleeve only if its successors do.
+    retired = tuple(old for old, new in RETIRED_DECLARED.items()
+                    if new and all(n in per_bar and n in declared for n in new))
+    return live + retired
 
 
 def declared_for(sleeve: str, emitted: str) -> "str | None":
@@ -392,9 +443,13 @@ def thresholds(sleeve: str) -> dict:
                "admission_cap_result": {}}
         if sleeve == "roska4_swing":
             out.update({"ema50_filter": {"ema_period": p.ema_period},
-                        "r4_prior_range_filter": {"range_max": p.range_max},
-                        "entry_bar_volume_filter": {"rel_volume_max": p.rel_volume_max,
-                                                    "vol_feature": p.vol_feature},
+                        # Stage 5ZZZ-BR. `rel_volume_max` and `vol_feature` moved HERE, to the
+                        # rule that reads them. `R4ContextFilter` is constructed with all three
+                        # together -- range_max, vol_max=rel_volume_max, vol_feature -- so they
+                        # are one gate's settings and were published under another's.
+                        "r4_prior_range_filter": {"range_max": p.range_max,
+                                                  "rel_volume_max": p.rel_volume_max,
+                                                  "vol_feature": p.vol_feature},
                         "spy_d1_close_below_sma50_short_filter": {
                             "spy_short_filter": p.spy_short_filter},
                         "stop_arm_rule": {"arm_hours": p.arm_hours,
@@ -406,9 +461,17 @@ def thresholds(sleeve: str) -> dict:
         # Shared by both sleeves, because the detector applies them to both. `regime_lag_1`
         # was NKD-only and the volume/short pair was Swing-only; neither split existed in the
         # code that decides.
+        # Stage 5ZZZ-BR. The surge multiple is the one CONSTANT in the volume pattern, read
+        # from the strategy the detector actually builds rather than restated. Its partner has
+        # none: the pullback bar is compared against the plain ten-bar average, so there is no
+        # tunable to publish, and an empty dict says that rather than borrowing a number from
+        # somewhere else -- which is exactly how the wrong one arrived.
+        from global_index.track1_normal_r4 import _strategy
         out.update({"regime_lag_1": {"lag": 1},
-                    "entry_bar_volume_filter": {"rel_volume_max": p.rel_volume_max,
-                                                "vol_feature": p.vol_feature},
+                    "volume_pullback_declined": {},
+                    "volume_resume_surge": {
+                        "resume_volume_surge_mult":
+                            _strategy(p).config["resume_volume_surge_mult"]},
                     "spy_d1_close_below_sma50_short_filter": {
                         "spy_short_filter": p.spy_short_filter}})
         return out
