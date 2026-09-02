@@ -997,8 +997,33 @@ def make_scheduler(port: int, dry_run: bool,
     #: Which rung follows which, so a message can say when the next attempt is instead of
     #: leaving the reader to look it up. The last rung maps to nothing, and that is what makes
     #: its message the loud one.
+    #: Stage 5ZZZ-BZ. R2 is NOT the last rung, and saying so raised a false alarm every day.
+    #:
+    #: `spy_last_chance_pre_nkd` runs at 00:45 ET, twenty-five minutes before the overnight NKD
+    #: window, and it is the rung that actually lands. Measured across the scheduler logs:
+    #:
+    #:     2026-08-25  succeeded at the FIRST rung, 16:20 ET
+    #:     2026-08-27  16:20 / 16:45 / 17:15 all failed
+    #:     2026-08-28  same
+    #:     2026-08-31  same -- then RECOVERED at 00:45 ET the next morning
+    #:     2026-09-01  same
+    #:
+    #: Four consecutive trading days ended with R2 logging ERROR and "LAST ATTEMPT ... will
+    #: refuse on `regime_csv: stale`. Re-run by hand", and on none of them did anything refuse:
+    #: the 00:45 rung fetched the missing day each night, and the stale guard's soft threshold
+    #: is >2 business days anyway, so a one-day gap never reached it. Confirmed against the
+    #: provider directly: the 2026-09-01 close was absent at 17:15 ET and present by 00:05 ET.
+    #:
+    #: So the message was wrong twice over -- there WAS a later attempt, and the consequence it
+    #: named could not follow from a one-day gap -- and it filed a scheduler failure into Open
+    #: Issues every trading day. An alarm that fires every day when nothing is wrong is the one
+    #: this project has already written down what happens to.
+    #:
+    #: Pointing R2 at 00:45 moves it onto the branch that says "the provider does not have it
+    #: yet, next attempt at 00:45 ET", which is what is true. The error branch stays for a rung
+    #: that genuinely has no successor.
     _SPY_LADDER_NEXT = {"SPY_REFRESH_PM": "16:45", "SPY_REFRESH_PM_R1": "17:15",
-                        "SPY_REFRESH_PM_R2": None}
+                        "SPY_REFRESH_PM_R2": "00:45"}
 
     def _spy_refresh(label: str, *, attempt: int) -> None:
         """One rung of the post-close ladder. Stage 5ZZC.
