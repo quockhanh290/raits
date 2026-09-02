@@ -111,3 +111,62 @@ def test_no_rung_claims_a_consequence_the_guard_does_not_have():
     assert soft and hard, doc[:300]
     assert int(soft.group(1)) >= 2, soft.group(1)
     assert int(hard.group(1)) > int(soft.group(1)), (soft.group(1), hard.group(1))
+
+
+# -- Stage 5ZZZ-CA: the rung that lands is the rung that must re-record -------------------
+def _job_source(job_id: str) -> str:
+    """One registered job's body, cut out of the factory source."""
+    src = inspect.getsource(RS.make_scheduler)
+    i = src.index('id="%s"' % job_id)
+    tail = src[i:]
+    nxt = tail.find("\n    @sched")
+    return tail[:nxt if nxt > 0 else len(tail)]
+
+
+def test_the_last_chance_rung_re_records_the_regime_label():
+    """The gap, and it was backwards.
+
+    `_spy_refresh` carries the rule in its own words -- "every rung that ends with the series
+    covering today must leave the recorded label covering it too" -- and it was wired into the
+    pre-flight and the evening ladder and not into this one. Measured across the logs, the
+    evening rungs have failed every trading day since 2026-08-26 and THIS rung is the one that
+    recovers, so on every one of those nights the series advanced at 00:45 and nothing
+    re-recorded the label.
+
+    Found on the panel 2026-09-02: series at 2026-09-01, Regime Monitor at 2026-08-31.
+    """
+    body = _job_source("spy_last_chance_pre_nkd")
+    assert body.count("_record_regime_label(") >= 2, body.count("_record_regime_label(")
+
+
+def test_both_success_branches_record_not_just_the_recovery():
+    """Two ways this rung ends with the series covered: it recovers the day, or an earlier rung
+    already had it. The second is the one `_spy_refresh` calls out by name -- "an earlier rung
+    may have moved the series without anything re-recording the label" -- so a fix that only
+    covers the loud branch leaves the quiet one behind."""
+    body = _job_source("spy_last_chance_pre_nkd")
+    quiet = body[:body.index("the daily series ends on")]
+    loud = body[body.index("RECOVERED at the last look"):]
+    assert "_record_regime_label(" in quiet, quiet[-400:]
+    assert "_record_regime_label(" in loud, loud[:400]
+
+
+def test_the_rule_is_stated_where_the_evening_ladder_states_it():
+    """If that sentence is ever deleted from `_spy_refresh`, the rule these tests enforce has
+    no home in the code and this fails rather than the tests quietly guarding folklore."""
+    # Whitespace-normalised: the sentence is wrapped across comment lines in the source, so a
+    # literal search finds nothing even when the rule is right there.
+    src = re.sub(r"\s+#?\s*", " ", inspect.getsource(RS.make_scheduler))
+    assert "must leave the recorded label covering it too" in src, "the rule text is gone"
+
+
+def test_the_decision_path_does_not_read_the_recorded_label():
+    """Why this was display-only. The sleeves build their labels from the CSV at run time, so
+    no slot ever traded on the stale record -- and if that ever changes, the severity of the
+    gap above changes with it, which is worth failing over."""
+    from global_index import run_live_day_track1 as RL
+
+    src = inspect.getsource(RL)
+    assert "regime_csv" in src, "the live path no longer names the CSV it labels from"
+    assert "track1_regime_record" not in src, (
+        "the decision path now reads the recorded label; this gap is no longer display-only")

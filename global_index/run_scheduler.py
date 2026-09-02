@@ -1176,6 +1176,9 @@ def make_scheduler(port: int, dry_run: bool,
         if covered == need_s or (covered and covered > need_s):
             log.info("[%s] nothing to do — the daily series covers %s, which is what the "
                      "overnight window and both Calm phases will ask for.", label, need_s)
+            # Stage 5ZZZ-CA. Same rule as the evening ladder, and this is the rung it was
+            # missing from -- see the note beside the identical call in `_spy_refresh`.
+            _record_regime_label(label + "_REGIME_LABEL", dry_run=dry_run)
             return
 
         log.warning("[%s] the daily series ends on %s and %s is needed in 25 minutes. "
@@ -1199,6 +1202,22 @@ def make_scheduler(port: int, dry_run: bool,
             log.warning("[%s] RECOVERED at the last look — %s arrived after the evening "
                         "ladder had given up. The 17:15 rung is running before the provider "
                         "is ready on at least some days.", label, need_s)
+            # Stage 5ZZZ-CA. The rung that lands is the rung that must re-record.
+            #
+            # `_spy_refresh` already carries this rule in its own words -- "every rung that
+            # ends with the series covering today must leave the recorded label covering it
+            # too" -- and it was wired into the pre-flight and the evening ladder and not into
+            # this one. Which is backwards: measured across the logs, the evening rungs have
+            # failed every trading day since 2026-08-26 and THIS rung is the one that recovers.
+            #
+            # So on every one of those nights the series advanced at 00:45 and nothing
+            # re-recorded the label, leaving it a day behind until the next day's 13:45
+            # pre-flight. Found on the panel on 2026-09-02: the series read 2026-09-01 and the
+            # Regime Monitor read 2026-08-31.
+            #
+            # Display only -- the decision path builds its labels from the CSV directly, so no
+            # slot ever traded on the stale one. The panel is what was wrong.
+            _record_regime_label(label + "_REGIME_LABEL", dry_run=dry_run)
             return
 
         # Nothing after this looks before the sleeves do. This is the message somebody has to
