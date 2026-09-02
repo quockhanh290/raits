@@ -90,44 +90,159 @@ def test_the_three_words_an_operator_watches_come_out_in_order():
 
 
 # -- the word the page prints, and its colour ---------------------------------------------
-def test_the_chip_names_the_window_not_the_slots():
-    """`unobserved` printed beside "9/23 slots" reads as a contradiction -- nine of them
-    plainly were observed. What went unobserved is the window's CLOSE."""
+#
+# Two tests stood here that scraped `mvStatusChip` for the branch by regex. Stage 5ZZZ-BX moved
+# the branch into `mvProgressChip`, and both went red without a single behaviour changing --
+# they were pinned to WHERE the code lived. What they were protecting (the word, the colour,
+# and the tooltip coming from the ledger rather than a second copy) is asserted below against
+# the functions as the page actually runs them, which survives the code moving again.
+
+# -- Stage 5ZZZ-BX: where the session IS, kept apart from what it FOUND -------------------
+def _chip_fns():
+    """The two renderers, lifted out of the page and executed as written.
+
+    Read from the file rather than reimplemented here: a Python copy of the branch table would
+    agree with itself no matter what the page does, which is the failure mode this file has
+    already hit once today.
+    """
     import re
+    import subprocess
     from pathlib import Path
 
     js = (Path(__file__).resolve().parents[1]
           / "global_index/dash/realtime/realtime.js").read_text(encoding="utf-8")
-    block = js[js.index("function mvStatusChip"):]
-    block = block[:block.index("function mvChip")]
-    assert "'unobserved'" in block, block
-    m = re.search(r"s\.status === 'unobserved'\)\s*\{\s*return \{ word: '([^']+)', tone: '(\w+)'",
-                  block)
-    assert m, block
-    word, tone = m.group(1), m.group(2)
-    assert word == "WINDOW NOT CLOSED", word
-    # Amber, not red: a gap in the evidence is not a refusal, and the two colours send an
-    # operator to different places.
-    assert tone == "warn", tone
+
+    def grab(name):
+        i = js.index("function %s(s) {" % name)
+        depth, j = 0, js.index("{", i)
+        for k in range(j, len(js)):
+            if js[k] == "{":
+                depth += 1
+            elif js[k] == "}":
+                depth -= 1
+                if depth == 0:
+                    return js[i:k + 1]
+        raise AssertionError("unbalanced braces reading %s" % name)
+
+    prog, stat = grab("mvProgressChip"), grab("mvStatusChip")
+    assert "WAITING" in prog and "COMPLETE" in prog, prog[:200]
+    return prog, stat
 
 
-def test_the_chip_carries_the_ledgers_own_reason():
-    """The sentence explaining it is already on the record. Writing a second one here would be
-    a second account of the same fact, free to drift from the first."""
+def _run_js(prog, stat, sleeve):
+    import json
+    import subprocess
+
+    script = (prog + "\n" + stat + "\n"
+              + "const s = " + json.dumps(sleeve) + ";\n"
+              + "console.log(JSON.stringify({p: mvProgressChip(s), o: mvStatusChip(s)}));")
+    r = subprocess.run(["node", "-e", script], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+@pytest.fixture(scope="module")
+def chips():
+    fns = _chip_fns()
+    return lambda sleeve: _run_js(fns[0], fns[1], sleeve)
+
+
+def test_a_finished_sleeve_says_it_finished(chips):
+    """The defect, measured on the page at 21:39 ET with all three sleeves done: every tab read
+    NO SIGNAL and nothing said any of them had ended. `waiting` and `live` were visible only
+    because no outcome exists at those moments."""
+    got = chips({"status": "complete", "slots": [{"status": "no_signal"}]})
+    assert got["p"]["word"] == "COMPLETE", got
+    assert got["o"]["word"] == "NO SIGNAL", got
+
+
+def test_a_sleeve_with_nothing_decided_publishes_no_outcome(chips):
+    """Before the window there is no answer to borrow. A second chip repeating the progress
+    word would be two chips saying one thing."""
+    got = chips({"status": "waiting", "slots": []})
+    assert got["p"]["word"] == "WAITING", got
+    assert got["o"] is None, got
+
+
+def test_a_live_sleeve_shows_both_and_the_reading_is_marked_interim(chips):
+    """"No signal" on a live sleeve is an interim reading; on a complete one it is the
+    session's answer. The progress chip is what separates them."""
+    got = chips({"status": "live", "slots": [{"status": "no_signal"}, {"status": "future"}]})
+    assert got["p"]["word"] == "LIVE" and got["p"]["tone"] == "live", got
+    assert "interim" in got["p"]["tip"], got["p"]
+
+
+def test_a_signal_still_wins_the_outcome_chip(chips):
+    """The loudest fact must not be demoted by the split."""
+    got = chips({"status": "complete", "slots": [{"status": "signal"}]})
+    assert got["p"]["word"] == "COMPLETE", got
+    assert got["o"]["word"] == "SIGNAL" and got["o"]["tone"] == "good", got
+
+
+def test_an_unvouched_window_still_reports_what_its_slots_found(chips):
+    """Measured on 2026-08-28: WINDOW NOT CLOSED beside NO SIGNAL and 9/23. The nine slots that
+    ran found nothing, and that is a fact; the caveat rides on the chip next to it."""
+    got = chips({"status": "unobserved", "slots": [{"status": "no_signal"}],
+                 "coverage": {"reason": "no window_closed record"}})
+    assert got["p"]["word"] == "WINDOW NOT CLOSED" and got["p"]["tone"] == "warn", got
+    assert got["o"]["word"] == "NO SIGNAL", got
+
+
+def test_an_unvouched_window_with_nothing_decided_claims_no_outcome(chips):
+    """A window nobody closed AND nothing evaluated has no finding to report. Printing "no
+    signal" there would turn an absence of evidence into a result."""
+    got = chips({"status": "unobserved", "slots": [{"status": "missed"}], "coverage": {}})
+    assert got["o"] is None, got
+
+
+def test_a_refused_window_does_not_say_it_twice(chips):
+    """The progress chip already carries REFUSED."""
+    got = chips({"status": "refused", "slots": [{"status": "refused"}]})
+    assert got["p"]["word"] == "REFUSED" and got["p"]["tone"] == "bad", got
+    assert got["o"] is None, got
+
+
+def test_a_data_refusal_still_outranks_everything(chips):
+    """A provider that refused data is louder than either axis: nothing below it can be
+    trusted, so it must not be reduced to a second chip."""
+    got = chips({"status": "complete", "slots": [{"status": "no_signal"}],
+                 "data_status": {"ok": False, "provider_reason": "held back"}})
+    assert got["o"]["word"] == "DATA REFUSED" and got["o"]["tone"] == "bad", got
+
+
+def test_the_unvouched_tooltip_is_the_ledgers_own_sentence(chips):
+    """The explanation is already on the record. A second one written in the page would be a
+    second account of the same fact, free to drift from the first."""
+    got = chips({"status": "unobserved", "slots": [{"status": "no_signal"}],
+                 "coverage": {"reason": "no window_closed record - absence is the signal"}})
+    assert got["p"]["tip"] == "no window_closed record - absence is the signal", got["p"]
+
+
+def test_a_record_with_no_reason_still_explains_itself(chips):
+    """Older sessions may carry no reason string. Falling back to silence would leave an amber
+    chip with nothing behind it."""
+    got = chips({"status": "unobserved", "slots": [{"status": "no_signal"}], "coverage": {}})
+    assert "window_closed" in got["p"]["tip"], got["p"]
+
+
+def test_the_tooltip_is_actually_handed_to_the_chip_builder():
+    """A tip the renderer never passes on is dead code. This is the call site, not the value."""
     from pathlib import Path
-
-    import re
 
     js = (Path(__file__).resolve().parents[1]
           / "global_index/dash/realtime/realtime.js").read_text(encoding="utf-8")
-    block = js[js.index("function mvStatusChip"):js.index("function mvChip")]
-    # Bound to the GUARD, not to the file. The first version asked only whether the words
-    # `coverage` and `reason` appeared somewhere in the function, and a mutation that replaced
-    # the condition with `if (false)` left both words sitting in an unreachable body -- the
-    # test stayed green with the branch switched off.
-    m = re.search(r"if \(s\.status === 'unobserved'\) \{(.*?)\n    \}", block, re.S)
-    assert m, "the unobserved branch is gone or its condition changed"
-    body = m.group(1)
-    assert "coverage" in body and "reason" in body, body
-    # And the chip builder must actually be handed it, or the tooltip is dead code.
-    assert "mvChip(st.word, st.tone, st.tip)" in js
+    assert "mvChip(pr.word, pr.tone, pr.tip)" in js, "the progress chip drops its tooltip"
+    assert "mvChip(st.word, st.tone, st.tip)" in js, "the outcome chip drops its tooltip"
+
+
+def test_the_verdict_pill_survives_a_sleeve_with_no_outcome():
+    """The second caller. `mvStatusChip` now returns nothing while a sleeve has decided nothing,
+    and the verdict pill reads `.tone` off it -- without a fallback it would throw on every
+    waiting sleeve, which is the state the page opens in every morning."""
+    from pathlib import Path
+
+    js = (Path(__file__).resolve().parents[1]
+          / "global_index/dash/realtime/realtime.js").read_text(encoding="utf-8")
+    block = js[js.index("function mvVerdict(s) {"):]
+    block = block[:block.index("\n  function ", 10)]
+    assert "mvStatusChip(s) || mvProgressChip(s)" in block, block

@@ -1345,12 +1345,56 @@
 
   // The status chip vocabulary, in precedence order. A data refusal outranks everything: if
   // the feed did not answer, what the slots did is a smaller fact than why.
+  // Stage 5ZZZ-BX. Where the session IS, kept apart from what it FOUND.
+  //
+  // One chip was carrying two different questions and the second one won. Measured on the page
+  // 2026-09-01 at 21:39 ET, all three sleeves finished:
+  //
+  //     NKD     NO SIGNAL   22/22 slots
+  //     Stress  NO SIGNAL   24/24 slots
+  //     Swing   NO SIGNAL   23/23 slots
+  //
+  // Nothing on the page said any of them had finished. `waiting` and `live` were visible
+  // because no outcome exists yet at those moments; the instant a sleeve completed, the
+  // outcome branch fired and the progress word was gone for the rest of the day. The slot
+  // count implies it -- 22/22 -- but that is arithmetic the reader has to do, and it says
+  // nothing on the day a window closes short.
+  //
+  // Progress first, because it changes what the outcome MEANS: "no signal" on a live sleeve is
+  // an interim reading, and on a complete one it is the session's answer.
+  function mvProgressChip(s) {
+    const map = {
+      waiting: { word: 'WAITING', tone: 'muted',
+                 tip: 'The window has not opened yet, so nothing has been evaluated.' },
+      live: { word: 'LIVE', tone: 'live',
+              tip: 'Inside the window. Slots are still to come, so the reading below is interim.' },
+      complete: { word: 'COMPLETE', tone: 'muted',
+                  tip: 'The window closed and every scheduled slot was recorded.' },
+      incomplete: { word: 'INCOMPLETE', tone: 'warn',
+                    tip: 'The window closed with fewer slots recorded than were scheduled.' },
+      refused: { word: 'REFUSED', tone: 'bad',
+                 tip: 'Every slot in this window was refused before it could be evaluated.' },
+      not_started: { word: 'NOT STARTED', tone: 'muted',
+                     tip: 'The window has opened and no slot has been recorded yet.' },
+      // Named on the WINDOW, because that is what is missing. Printing "unobserved" beside
+      // "9/23 slots" reads as a contradiction -- nine of them plainly were observed.
+      unobserved: { word: 'WINDOW NOT CLOSED', tone: 'warn',
+                    tip: (s.coverage || {}).reason
+                      || 'No window_closed record exists for this session, so the slot coverage '
+                         + 'cannot be vouched for. Slots that did run are still shown.' }
+    };
+    return map[s.status] || { word: 'UNKNOWN', tone: 'warn',
+                              tip: 'The route recorded a state this panel has no name for.' };
+  }
+
   function mvStatusChip(s) {
     const d = s.data_status || {};
     const signals = (s.slots || []).filter(x => x.status === 'signal').length;
     if (d.ok === false && d.provider_reason) return { word: 'DATA REFUSED', tone: 'bad' };
-    if (s.status === 'waiting') return { word: 'WAITING', tone: 'muted' };
-    if (s.status === 'live') return { word: 'LIVE', tone: 'live' };
+    // Stage 5ZZZ-BX. The progress words moved to their own chip. What is left here answers one
+    // question: what did the sleeve FIND. A sleeve with nothing decided yet has no answer, and
+    // says nothing rather than borrowing the progress word back.
+    if (s.status === 'waiting' || s.status === 'not_started') return null;
     if (signals) return { word: signals === 1 ? 'SIGNAL' : `${signals} SIGNALS`, tone: 'good' };
     // Stage 5ZZY. A slot the gate REJECTED is not "no signal": the sleeve produced a
     // candidate and something downstream refused it, which sends an operator somewhere
@@ -1361,22 +1405,16 @@
     if (rejected) {
       return { word: rejected === 1 ? 'REJECTED' : `${rejected} REJECTED`, tone: 'bad' };
     }
-    if (s.status === 'refused') return { word: 'REFUSED', tone: 'bad' };
-    if (s.status === 'incomplete') return { word: 'INCOMPLETE', tone: 'warn' };
-    // Stage 5ZZZ-BW. Named on the WINDOW, because that is what is missing.
-    //
-    // The status word is the ledger's own, `unobserved`, but printing that beside "9/23 slots"
-    // reads as a contradiction -- nine of them plainly were observed. What went unobserved is
-    // the window's CLOSE: no closing record exists, so the coverage cannot be vouched for even
-    // though slots ran. Amber, not red: this is a gap in the evidence, not a refusal.
-    if (s.status === 'unobserved') {
-      return { word: 'WINDOW NOT CLOSED', tone: 'warn',
-               tip: (s.coverage || {}).reason
-                 || 'No window_closed record exists for this session, so the slot coverage '
-                    + 'cannot be vouched for. Slots that did run are still shown.' };
+    if (s.status === 'refused') return null;      // the progress chip already says it
+    if (s.status === 'incomplete' || s.status === 'unobserved') {
+      // The window is short or unvouched; what the slots that DID run found is still a fact,
+      // and the progress chip beside this one carries the caveat.
+      const decided = (s.slots || []).filter(
+        x => x.status === 'no_signal' || x.status === 'signal').length;
+      return decided ? { word: 'NO SIGNAL', tone: 'muted' } : null;
     }
     if (s.status === 'complete') return { word: 'NO SIGNAL', tone: 'muted' };
-    return { word: 'UNKNOWN', tone: 'warn' };
+    return null;                                   // the progress chip owns the unnamed case
   }
 
   function mvChip(word, tone, tip) {
@@ -1406,8 +1444,10 @@
                  || `The market is closed on ${mv.today_et || 'today'}; every panel below `
                     + `describes ${mv.session_date}, the last trading day.`));
     }
+    const pr = mvProgressChip(s);
+    out.push(mvChip(pr.word, pr.tone, pr.tip));
     const st = mvStatusChip(s);
-    out.push(mvChip(st.word, st.tone, st.tip));
+    if (st) out.push(mvChip(st.word, st.tone, st.tip));
 
     const cov = s.coverage || {};
     if (cov.observed_slots != null && cov.expected_slots != null) {
@@ -1746,7 +1786,13 @@
   function mvVerdict(s) {
     const host = $('marketViewVerdict');
     if (!host) return;
-    const st = mvStatusChip(s);
+    // Stage 5ZZZ-BX. The outcome when there is one, the progress when there is not.
+    //
+    // `mvStatusChip` now answers only "what did it find", and returns nothing while a sleeve
+    // has decided nothing -- so this line, the second caller, had to be found rather than
+    // assumed. Without the fallback it would have thrown on every waiting sleeve, which is
+    // the state the page opens in every morning.
+    const st = mvStatusChip(s) || mvProgressChip(s);
     host.innerHTML = `<span class="mv2-pill ${mvEsc(st.tone || 'muted')}"><i></i>` +
       `<b>${mvEsc(st.word)}</b><span>· ${mvEsc(mvVerdictDetail(s))}</span></span>`;
   }
