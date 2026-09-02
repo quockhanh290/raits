@@ -246,3 +246,38 @@ def test_the_verdict_pill_survives_a_sleeve_with_no_outcome():
     block = js[js.index("function mvVerdict(s) {"):]
     block = block[:block.index("\n  function ", 10)]
     assert "mvStatusChip(s) || mvProgressChip(s)" in block, block
+
+
+def test_a_data_refusal_is_placed_ahead_of_the_progress_chip():
+    """The regression the split caused, and the reason it is worth pinning twice.
+
+    Stage 5ZZZ-BX put progress first unconditionally, so a sleeve whose feed never answered
+    read COMPLETE first and DATA REFUSED second -- and a sleeve whose feed never answered is
+    not meaningfully complete. The commit making that split CLAIMED a data refusal still
+    outranked both; the code did not do it. A DOM test written three stages earlier caught it:
+    "if the feed did not answer, what the slots did is a smaller fact than why".
+
+    Asserted on the ordering at the render site, because the ordering IS the fix -- both chips
+    were present either way.
+    """
+    from pathlib import Path
+
+    js = (Path(__file__).resolve().parents[1]
+          / "global_index/dash/realtime/realtime.js").read_text(encoding="utf-8")
+    i_first = js.index("if (st && st.outranks) out.push(")
+    i_prog = js.index("out.push(mvChip(pr.word, pr.tone, pr.tip));")
+    i_last = js.index("if (st && !st.outranks) out.push(")
+    assert i_first < i_prog < i_last, (i_first, i_prog, i_last)
+
+
+def test_only_the_data_refusal_claims_to_outrank(chips):
+    """If every outcome outranked, the split would be undone and progress would be last."""
+    refused = chips({"status": "complete", "slots": [{"status": "no_signal"}],
+                     "data_status": {"ok": False, "provider_reason": "held back"}})
+    assert refused["o"]["outranks"] is True, refused["o"]
+    for sleeve in ({"status": "complete", "slots": [{"status": "no_signal"}]},
+                   {"status": "complete", "slots": [{"status": "signal"}]},
+                   {"status": "unobserved", "slots": [{"status": "no_signal"}],
+                    "coverage": {}}):
+        got = chips(sleeve)
+        assert not (got["o"] or {}).get("outranks"), (sleeve, got["o"])

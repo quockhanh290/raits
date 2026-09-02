@@ -57,19 +57,58 @@ ET = "America/New_York"
 #: trading window; the context is the run-up and run-down an operator needs to see around it.
 #: Calm is deliberately absent — it is a two-phase one-shot contract and a candle chart of a
 #: single decision instant would suggest a window it does not have.
+#: Stage 5ZZZ-BY. The chart span is DERIVED from each sleeve's own window, not written out.
+#:
+#: The four values were hand-written per sleeve and only three of them agreed. Measured on
+#: 2026-08-31, each sleeve's drawn range against its own window:
+#:
+#:     NKD     00:00 - 03:05    lead  -70 min    tail  +10 min
+#:     Stress  09:30 - 12:40    lead  -65 min    tail  +10 min
+#:     Swing   09:30 - 16:05    lead -275 min    tail  +10 min
+#:
+#: The tail agreed by coincidence -- three separately typed strings that happened to land on
+#: the same offset -- and the lead did not agree at all. Stress and Swing both started at the
+#: RTH open, so a sleeve whose window sits late in the day drew four and a half hours of
+#: run-up: on Swing that is eighty candles for a window of twenty-three slots, and the bars
+#: that matter are squeezed into the right-hand quarter of the chart.
+#:
+#: Derived now, so the three can no longer drift apart and the span means the same thing on
+#: every tab: one hour before the window opens, ten minutes after it closes.
+#:
+#: Nothing computes from this. It slices the bars for the chart and is published as `range`;
+#: no rule, threshold or verdict reads it, and no EMA is built from the drawn bars.
+CHART_LEAD_MINUTES = 60
+CHART_TAIL_MINUTES = 10
+
+
+def _shift_hhmm(hhmm: str, minutes: int) -> str:
+    """`HH:MM` moved by minutes, CLAMPED to the day rather than wrapped.
+
+    A window opening near midnight would otherwise take its lead-in to the previous evening --
+    23:10 for a 00:10 open -- and the slice, which asks for bars BETWEEN start and end, would
+    come back empty. An hour of missing run-up is a smaller lie than an empty chart.
+    """
+    total = int(hhmm[:2]) * 60 + int(hhmm[3:]) + minutes
+    total = max(0, min(total, 24 * 60 - 1))
+    return "%02d:%02d" % divmod(total, 60)
+
+
+def _chart_span(window_start: str, window_end: str) -> dict:
+    return {"context_start": _shift_hhmm(window_start, -CHART_LEAD_MINUTES),
+            "window_start": window_start, "window_end": window_end,
+            "context_end": _shift_hhmm(window_end, CHART_TAIL_MINUTES)}
+
+
 SLEEVES: dict = {
     "global_nkd": {
         "label": "NKD", "instrument": "MNKD", "clock": "Asia/Tokyo",
-        "context_start": "00:00", "window_start": "01:10",
-        "window_end": "02:55", "context_end": "03:05"},
+        **_chart_span("01:10", "02:55")},
     "roska4_stress": {
         "label": "Stress", "instrument": "MNQ", "clock": ET,
-        "context_start": "09:30", "window_start": "10:35",
-        "window_end": "12:30", "context_end": "12:40"},
+        **_chart_span("10:35", "12:30")},
     "roska4_swing": {
         "label": "Swing", "instrument": "MES", "clock": ET,
-        "context_start": "09:30", "window_start": "14:05",
-        "window_end": "15:55", "context_end": "16:05"},
+        **_chart_span("14:05", "15:55")},
 }
 
 BAR_MINUTES = 5

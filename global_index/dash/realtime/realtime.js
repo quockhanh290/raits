@@ -1390,7 +1390,14 @@
   function mvStatusChip(s) {
     const d = s.data_status || {};
     const signals = (s.slots || []).filter(x => x.status === 'signal').length;
-    if (d.ok === false && d.provider_reason) return { word: 'DATA REFUSED', tone: 'bad' };
+    // `outranks` puts this AHEAD of the progress chip. Stage 5ZZZ-BX split the two axes and
+    // placed progress first unconditionally, which buried this one behind the word COMPLETE --
+    // and a sleeve whose feed never answered is not meaningfully complete. The commit that
+    // made the split claimed a data refusal still outranked both; the code did not do it, and
+    // a DOM test written three stages earlier caught the difference.
+    if (d.ok === false && d.provider_reason) {
+      return { word: 'DATA REFUSED', tone: 'bad', outranks: true };
+    }
     // Stage 5ZZZ-BX. The progress words moved to their own chip. What is left here answers one
     // question: what did the sleeve FIND. A sleeve with nothing decided yet has no answer, and
     // says nothing rather than borrowing the progress word back.
@@ -1444,10 +1451,13 @@
                  || `The market is closed on ${mv.today_et || 'today'}; every panel below `
                     + `describes ${mv.session_date}, the last trading day.`));
     }
+    // Progress first, because it changes what the outcome MEANS -- unless the outcome is that
+    // the feed did not answer, in which case nothing below it can be read at all.
     const pr = mvProgressChip(s);
-    out.push(mvChip(pr.word, pr.tone, pr.tip));
     const st = mvStatusChip(s);
-    if (st) out.push(mvChip(st.word, st.tone, st.tip));
+    if (st && st.outranks) out.push(mvChip(st.word, st.tone, st.tip));
+    out.push(mvChip(pr.word, pr.tone, pr.tip));
+    if (st && !st.outranks) out.push(mvChip(st.word, st.tone, st.tip));
 
     const cov = s.coverage || {};
     if (cov.observed_slots != null && cov.expected_slots != null) {

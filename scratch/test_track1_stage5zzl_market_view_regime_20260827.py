@@ -38,16 +38,62 @@ def _payload():
 
 
 # ── backend: shape and ranges ───────────────────────────────────────────────────────────
-def test_all_three_sleeves_are_present_with_their_declared_ranges():
+def test_all_three_sleeves_are_present_with_their_own_windows():
+    """The WINDOWS are the contract; they are the sleeve's trading hours and are not derived."""
     p = _payload()
     assert sorted(p["sleeves"]) == ["global_nkd", "roska4_stress", "roska4_swing"]
-    want = {"global_nkd": ("00:00", "01:10", "02:55", "03:05"),
-            "roska4_stress": ("09:30", "10:35", "12:30", "12:40"),
-            "roska4_swing": ("09:30", "14:05", "15:55", "16:05")}
-    for sleeve, (cs, ws, we, ce) in want.items():
+    want = {"global_nkd": ("01:10", "02:55"),
+            "roska4_stress": ("10:35", "12:30"),
+            "roska4_swing": ("14:05", "15:55")}
+    for sleeve, (ws, we) in want.items():
         r = p["sleeves"][sleeve]["range"]
-        assert (r["context_start_et"], r["window_start_et"],
-                r["window_end_et"], r["context_end_et"]) == (cs, ws, we, ce)
+        assert (r["window_start_et"], r["window_end_et"]) == (ws, we), sleeve
+
+
+def _mins(hhmm: str) -> int:
+    return int(hhmm[:2]) * 60 + int(hhmm[3:])
+
+
+def test_every_sleeve_draws_the_same_span_around_its_own_window():
+    """Stage 5ZZZ-BY. Pinned as a RELATIONSHIP, because pinning the four clock strings is what
+    let them drift in the first place.
+
+    They were written out per sleeve and only three of the six offsets agreed. Measured
+    2026-08-31: leads of -70, -65 and -275 minutes with tails of +10, +10 and +10 -- the tail
+    agreeing by coincidence between three separately typed strings. Stress and Swing both
+    started at the RTH open, so a sleeve whose window sits late in the day drew four and a half
+    hours of run-up that carries nothing about it: eighty candles for twenty-three slots, with
+    the bars that matter squeezed into the right-hand quarter.
+    """
+    p = _payload()
+    spans = {}
+    for sleeve, s in p["sleeves"].items():
+        r = s["range"]
+        spans[sleeve] = (_mins(r["context_start_et"]) - _mins(r["window_start_et"]),
+                         _mins(r["context_end_et"]) - _mins(r["window_end_et"]))
+    assert spans, "no sleeve published a range -- the probe is wrong"
+    assert len(set(spans.values())) == 1, spans
+    lead, tail = next(iter(spans.values()))
+    assert (lead, tail) == (-mv.CHART_LEAD_MINUTES, mv.CHART_TAIL_MINUTES), spans
+
+
+def test_the_span_comes_from_the_constants_not_from_a_second_copy():
+    """One number for the lead and one for the tail. A sleeve carrying its own would be the
+    same defect returning under a different name."""
+    for sleeve, spec in mv.SLEEVES.items():
+        assert spec["context_start"] == mv._shift_hhmm(
+            spec["window_start"], -mv.CHART_LEAD_MINUTES), sleeve
+        assert spec["context_end"] == mv._shift_hhmm(
+            spec["window_end"], mv.CHART_TAIL_MINUTES), sleeve
+
+
+def test_a_window_near_midnight_clamps_instead_of_wrapping():
+    """A 00:10 open would take its lead-in to 23:10 the evening before, and the slice asks for
+    bars BETWEEN start and end -- it would come back empty. An hour of missing run-up is a
+    smaller lie than an empty chart."""
+    assert mv._shift_hhmm("00:10", -60) == "00:00"
+    assert mv._shift_hhmm("23:55", 10) == "23:59"
+    assert mv._shift_hhmm("10:35", -60) == "09:35"
 
 
 def test_calm_is_deliberately_absent():
