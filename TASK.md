@@ -14880,3 +14880,38 @@ BA LẦN TÔI SUÝT KẾT LUẬN SAI TRÊN ĐƯỜNG NÀY
    thành BUỘC phải nằm trong biên độ bar đóng; 0/13 thì không phải cơ chế đó.
 3. "điều chỉnh hợp đồng liên tục" — nếu vậy chênh lệch phải là hằng số; std 320.
 Chỉ phép quét không giả định (thử mọi độ lệch, khớp theo giá) mới ra đáp án.
+
+── Đối chiếu IBKR + sửa thang volume — 2026-09-03 ─────────────────────────────
+ĐỐI CHIẾU NGUỒN THỨ BA (chủ dự án yêu cầu)
+Nối IB Gateway 4002, clientId=77 (tránh 1 runner / 89 bar provider / 90 safety /
+99 backend / 10 broker). Không có runner nào đang chạy lúc nối. Lấy 2.026 dòng
+MNKD qua chính đường fetch của hệ thống, ngắt trong finally.
+Quét mọi độ lệch giờ, khớp theo giá:
+  lệch -4,00 giờ : 100,0% khớp trên 36/36 nến
+  các độ lệch khác: 5,6% trở xuống
+Tháng 9 ET = UTC-4 => chart ở UTC, IBKR trả ET, GIÁ GIỐNG HỆT. Nến trên trang
+đúng bằng thứ IBKR báo, không lệch một tick.
+
+VOLUME CHỈ THẤY MỘT CỘT — nguyên nhân và bản sửa
+Không phải thiếu dữ liệu: 36/36 nến có volume, 35 nến khác 0. Vấn đề là THANG.
+MNKD ngày 09-03: đỉnh 110, trung vị 9 — gấp 12,2 lần. Chia theo đỉnh thì 19/35
+cột có giao dịch cao dưới 4px trên pane 44px, tức vô hình; pane đọc thành một cột
+và một vạch phẳng, mà vạch phẳng đó là phiên có giao dịch ở 35/36 phút.
+Sửa: trần = phân vị 90 của các cột CÓ giao dịch (=32), cột vượt trần vẽ hết chiều
+cao và đội một nắp mỏng để không lặng lẽ bằng trần. Sàn 1,5px cho cột có giao
+dịch; cột bằng 0 GIỮ chiều cao 0 — phân biệt đó là lý do pane volume tồn tại.
+Thêm nhãn trục phải "32 peak 110" / "0" (muc 4.7 cấp cột phải cho pane 2 và 5);
+nhãn nói cả trần lẫn đỉnh thật, nếu không nó nói dối về thang.
+Đo: cột trung vị 2,9px -> 10,1px; cột vô hình 19/35 -> 10/35 (10 cột còn lại là
+volume 1-3, đúng 3% của trần nên sàn là trung thực); 3 cột chạm trần.
+Mutation: quay lại chia theo đỉnh -> test đỏ ("cột trung vị chỉ 4,3px").
+Kiểm khổ hẹp: 0 nhãn tràn khỏi svg ở cả 1605px lẫn 347px.
+
+MỘT LẦN TEST ĐỎ VÌ HARNESS, KHÔNG PHẢI VÌ TRANG
+wait_for_selector('.mv-vol') treo 20s: Playwright chờ phần tử NHÌN THẤY ĐƯỢC, mà
+cột đầu tiên có volume 0 nên height="0" — vô hình. Chờ .mv-svg rồi đếm thì đúng.
+
+@390: đè 0->3, cắt 0->3, cỡ chữ 11->13 — KHÔNG phải hồi quy. Node 172 -> 609:
+lần chạy mốc chỉ dựng được một phần trang. Cả ba va chạm là nhãn dải chạy regime
+("1d | Normal · 9d"...), không dính chart. Đúng ba va chạm đã ghi CHƯA GIẢI QUYẾT
+từ đầu phiên, cùng một lý do. 313 passed.

@@ -1521,3 +1521,67 @@ def test_the_panes_refuse_one_axis_when_the_candles_are_a_different_session(
         ".mv2-slotchart .mv2-sc-head",
         "el => getComputedStyle(el, '::after').content")
     assert "trục riêng" in label, label
+
+
+def test_a_thin_instruments_volume_is_not_flattened_by_its_own_busiest_minute(
+        realtime_server, browser_page):
+    """Đo được 2026-09-03 trên MNKD: 36 nến, đỉnh 110, trung vị 9 — gấp 12 lần.
+
+    Chia thang theo cột cao nhất thì 19 trên 35 cột có giao dịch cao dưới 4px trong một pane
+    44px, tức vô hình. Pane đọc thành MỘT cột và một vạch phẳng, mà vạch phẳng đó là một phiên
+    có giao dịch ở 35 trên 36 phút của nó.
+    """
+    mv = _market_view()
+    s = mv["sleeves"]["global_nkd"]
+    spiky = [26, 18, 33, 9, 9, 24, 14, 31, 13, 24, 4, 12,
+             27, 5, 22, 7, 110, 9, 6, 13, 1, 3, 7, 15]
+    s["bars"] = [{**b, "volume": spiky[i % len(spiky)]} for i, b in enumerate(s["bars"])]
+    _stub_mv(browser_page, mv)
+    open_realtime(browser_page, realtime_server)
+    browser_page.click('[data-mv-inner="Price context"]')
+    browser_page.wait_for_selector(".mv-vol", timeout=20_000)
+    browser_page.wait_for_timeout(400)
+
+    hs = browser_page.eval_on_selector_all(
+        ".mv-vol", "els => els.map(e => Number(e.getAttribute('height')))")
+    assert len(hs) >= 20, f"không đủ cột để đo: {len(hs)}"
+    traded = [h for h in hs if h > 0]
+    assert len(traded) == len(hs), "có cột giao dịch bị vẽ thành 0"
+
+    # Cột trung vị phải NHÌN THẤY được. Chia theo đỉnh thì nó ra 2,9px.
+    med = sorted(traded)[len(traded) // 2]
+    assert med >= 6, f"cột trung vị chỉ {med}px — vẫn bị đỉnh nuốt"
+    # Và cột vượt trần phải được đánh dấu, không được lặng lẽ bằng trần.
+    assert browser_page.eval_on_selector_all(".mv-vol-clip", "e => e.length") >= 1
+
+    # Trục phải nói cả trần lẫn đỉnh thật, nếu không nhãn đang nói dối về thang.
+    ax = browser_page.eval_on_selector_all(".mv-vol-ax", "els => els.map(e => e.textContent)")
+    assert any("peak" in a for a in ax), ax
+    assert any("110" in a for a in ax), ax
+
+
+def test_a_minute_that_did_not_trade_is_not_drawn_as_one_that_did(
+        realtime_server, browser_page):
+    """Sàn 1,5px chỉ dành cho cột CÓ giao dịch. Zero phải giữ chiều cao 0 — phân biệt đó là
+    lý do pane volume tồn tại."""
+    mv = _market_view()
+    s = mv["sleeves"]["global_nkd"]
+    s["bars"] = [{**b, "volume": (0 if i % 3 == 0 else 20)} for i, b in enumerate(s["bars"])]
+    _stub_mv(browser_page, mv)
+    open_realtime(browser_page, realtime_server)
+    browser_page.click('[data-mv-inner="Price context"]')
+    browser_page.wait_for_selector(".mv-svg", timeout=20_000)
+    browser_page.wait_for_timeout(600)
+    state = browser_page.evaluate("""() => ({
+        vol: document.querySelectorAll('.mv-vol').length,
+        candles: document.querySelectorAll('.mv-candle, .mv-svg rect').length,
+        volLabel: !!document.querySelector('.mv-vol-label'),
+      })""")
+    assert state["vol"], f"không vẽ cột volume nào: {state}"
+    hs = browser_page.eval_on_selector_all(
+        ".mv-vol", "els => els.map(e => Number(e.getAttribute('height')))")
+    zeros = [h for i, h in enumerate(hs) if i % 3 == 0]
+    rest = [h for i, h in enumerate(hs) if i % 3 != 0]
+    assert zeros and rest, (len(zeros), len(rest))
+    assert all(h == 0 for h in zeros), zeros
+    assert all(h > 0 for h in rest), rest

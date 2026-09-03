@@ -1735,16 +1735,45 @@
     // minute would draw identically, and one of those is a fact about the market.
     let vol = '';
     if (hasVol) {
-      const vmax = Math.max(...bars.map(b => Number(b.volume) || 0), 1);
+      /* Scaled to a ROBUST ceiling, not the tallest bar.
+         Measured on MNKD, 2026-09-03: thirty-six bars reading
+         26 18 33 9 9 24 ... 110 ... 37 ... 1 -- a peak of 110 against a median of 9, twelve
+         times over. Divided by the peak, eighteen of the thirty-six came out under a tenth of
+         a forty-four pixel pane: under four pixels, which on screen is nothing. The pane read
+         as one column and a flat line, and the flat line was a session that traded on
+         thirty-five of its thirty-six minutes.
+         So the ceiling is the ninetieth percentile of the bars that traded, and anything above
+         it is drawn full height with a cap on top rather than being allowed to set the scale
+         for everyone else. Two bars clip here; the other thirty-four become legible.
+         The floor is 1.5px rather than 0.5px for the same reason in the other direction: a
+         minute that traded must never draw as a minute that did not. Zero keeps its own
+         height of zero -- that distinction is the whole point of the volume pane. */
+      const vols = bars.map(b => (typeof b.volume === 'number' ? b.volume : null));
+      const traded = vols.filter(v => v).sort((a, b) => a - b);
+      const vpeak = Math.max(...vols.map(v => v || 0), 1);
+      const vhi = traded.length
+        ? Math.max(traded[Math.min(traded.length - 1, Math.floor(traded.length * 0.9))], 1)
+        : vpeak;
       const vTop = padT + ih + 6;
+      const usable = volH - 8;
       vol = bars.map((b, i) => {
         if (typeof b.volume !== 'number') return '';
-        const h = Math.max(0.5, (b.volume / vmax) * (volH - 8));
+        const over = b.volume > vhi;
+        const h = b.volume <= 0 ? 0
+          : Math.max(1.5, Math.min(1, b.volume / vhi) * usable);
+        const y = vTop + usable - h;
         return `<rect class="mv-vol ${b.close >= b.open ? 'mv-up' : 'mv-down'}"
-          x="${(x(i) - bw / 2).toFixed(1)}" y="${(vTop + (volH - 8) - h).toFixed(1)}"
-          width="${bw.toFixed(1)}" height="${h.toFixed(1)}"></rect>`;
+          x="${(x(i) - bw / 2).toFixed(1)}" y="${y.toFixed(1)}"
+          width="${bw.toFixed(1)}" height="${h.toFixed(1)}"><title>volume ${
+            b.volume}${over ? ' — taller than the pane' : ''}</title></rect>`
+          + (over ? `<rect class="mv-vol-clip" x="${(x(i) - bw / 2).toFixed(1)}"
+              y="${(y - 2.5).toFixed(1)}" width="${bw.toFixed(1)}" height="1.6"></rect>` : '');
       }).join('') +
-      `<text class="mv-axis mv-vol-label" x="${padL}" y="${(vTop + 8).toFixed(1)}">Volume</text>`;
+      `<text class="mv-axis mv-vol-label" x="${padL}" y="${(vTop + 8).toFixed(1)}">Volume</text>`
+      + `<text class="mv-axis mv-vol-ax" x="${W - padR + 6}" y="${(vTop + 8).toFixed(1)}">${
+          mvEsc(String(vhi))}${vpeak > vhi ? `  peak ${mvEsc(String(vpeak))}` : ''}</text>`
+      + `<text class="mv-axis mv-vol-ax" x="${W - padR + 6}" y="${
+          (vTop + usable).toFixed(1)}">0</text>`;
     }
 
     return `<svg class="mv-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
