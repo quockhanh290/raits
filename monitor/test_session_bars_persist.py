@@ -237,7 +237,10 @@ def test_the_frame_the_slot_wrote_is_preferred_over_the_daily_store(tmp_path):
     # Cùng ngày, cùng khung giờ, nhưng giá khác hẳn — nếu kết quả mang giá này thì khung của
     # slot đã thắng.
     marker = 12345.0
-    idx = pd.to_datetime([b["time"] for b in from_store])
+    # Nhãn trong payload là ET. Nói rõ múi giờ ra thay vì đưa vào một index naive: chỗ ghi
+    # quy mọi thứ về UTC, chỗ đọc quy về ET, nên một fixture "naive" là một fixture không nói
+    # nó đang ở đồng hồ nào — và nó sẽ lệch đúng bằng độ chênh múi giờ.
+    idx = pd.to_datetime([b["time"] for b in from_store]).tz_localize("America/New_York")
     frame = pd.DataFrame({"open": marker, "high": marker, "low": marker,
                           "close": marker, "volume": 1}, index=idx)
     assert obs.record_bars(frame, root=tmp_path, day=day, inst=spec["instrument"])
@@ -249,3 +252,37 @@ def test_the_frame_the_slot_wrote_is_preferred_over_the_daily_store(tmp_path):
     assert bars[0]["close"] == marker, (
         f"kho ngày thắng khung của slot: {bars[0]}")
     mvb._bar_cache.clear()
+
+
+def test_the_hours_on_the_chart_are_the_hours_the_window_is_declared_in(tmp_path):
+    """Đo được 2026-09-03 lúc 11:37 ET: rổ Stress trả nến chạy 09:35 tới 12:40 — hơn một
+    tiếng ở TƯƠNG LAI — trong khi sổ ghi của chính slot đặt bar mới nhất ở 11:35 ET. Rổ
+    Swing, cửa sổ còn chưa mở, hiện mười hai nến của nó.
+
+    Cả hai kho giữ index theo UTC; mọi giờ hàm này cắt theo đều là ET (`context_start_et`,
+    `window_start_et`). Cắt nhãn UTC bằng con số ET thì lệch đúng bằng độ chênh múi giờ, và
+    trang in ra giờ sai dưới đúng cái tên đúng.
+
+    `spec["clock"]` KHÔNG phải đáp án: đó là đồng hồ giao dịch của rổ — Tokyo với rổ Nhật —
+    còn giờ context thì không nằm trên nó (00:10-03:05 Tokyo không chứa nổi một cửa sổ chạy
+    14:10-15:55 Tokyo).
+    """
+    from monitor.backend import track1_market_view as mvb
+    spec = mvb.SLEEVES["roska4_stress"]
+    day = "2026-09-03"
+
+    # 13:35–14:00 UTC là 09:35–10:00 ở New York, tức nằm trong context 09:35–12:40.
+    idx = pd.date_range(f"{day} 13:35", periods=6, freq="5min", tz="UTC")
+    frame = pd.DataFrame({"open": 100.0, "high": 100.0, "low": 100.0, "close": 100.0,
+                          "volume": 1}, index=idx)
+    assert obs.record_bars(frame, root=tmp_path, day=day, inst=spec["instrument"])
+
+    mvb._bar_cache.clear()
+    bars, session_day, _ = mvb._sliced(spec["instrument"], day, spec, tmp_path)
+    mvb._bar_cache.clear()
+
+    assert bars, "không đọc được nến nào — phép kiểm này sẽ rỗng"
+    assert session_day == day
+    got = [b["time"][11:] for b in bars]
+    assert got[0] == "09:35", f"nhãn đầu {got[0]} — chart đang ghi giờ UTC dưới tên ET: {got}"
+    assert got[-1] == "10:00", got

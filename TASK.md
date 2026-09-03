@@ -15047,3 +15047,33 @@ hover 8/62 vs plot 34/68). Cả hai lần đều là một quyết định đư�
 bản, và bản thứ hai trôi. Lần này bản CSS còn thắng cả bản JS.
 
 317 passed. Cả năm dashboard, cả hai khổ: đè 0, cắt 0, tràn 0.
+
+── Nến hiện giờ TƯƠNG LAI — lỗi múi giờ trên trục thời gian — 2026-09-03 ──────
+Chủ dự án hỏi: Stress chưa chạy hết window sao nến và volume hiện đầy đủ?
+Đo lúc 11:37 ET:
+  MNQ : nến 09:35 -> 12:40 (hơn một tiếng ở TƯƠNG LAI), 13/24 slot đã chạy,
+        latest_bar_et do slot ghi = 11:35 ET
+  MES : 0 slot chạy, latest_bar_et = None, mà vẫn 12 nến 13:05 -> 14:00
+Truy: kho MNQ KHÔNG có dòng nào của 09-03 (cuối 09-02 17:44) => nến đến từ file
+phiên do runner ghi. File đó index naive tới 15:35; nếu là UTC thì = 11:35 ET,
+đúng bằng latest_bar_et. Nhãn chart khớp nhãn naive 37/38.
+=> CHART CẮT VÀ GHI NHÃN THEO UTC, trong khi mọi giờ khai trên trang là ET.
+   MNQ đang hiện 09:35-12:40 UTC = 05:35-08:40 ET, tức bar TRƯỚC khi cửa sổ mở,
+   rồi dán nhãn 09:35-12:40 lên. Đúng với cả ba sleeve, từ trước tới nay.
+
+spec["clock"] KHÔNG phải đáp án: đó là đồng hồ giao dịch của rổ (Tokyo với rổ
+Nhật), còn giờ context không nằm trên nó — 00:10-03:05 Tokyo không chứa nổi một
+cửa sổ chạy 14:10-15:55 Tokyo. Chúng là ET, đúng như tên trường nói.
+
+Sửa: quy index về ET trước khi cắt. Đo lại:
+  MNKD 00:10 -> 02:55  (khớp latest_bar_et 15:55 JST = 02:55 ET)
+  MNQ  09:35 -> 11:35  (dừng đúng bar mới nhất, hết nến tương lai)
+  MES  0 nến           (cửa sổ 13:05-16:05 chưa mở — đúng điều chủ dự án chờ)
+Kiểm chéo IBKR: trước khi sửa khớp 100% ở -4,00 giờ; sau khi sửa 97,1% ở 0,00
+(một nến trên 34 lệch, là bar đang hình thành so với lúc kéo IBKR một tiếng trước).
+Ghim: test_the_hours_on_the_chart_are_the_hours_the_window_is_declared_in.
+Mutation: quay lại cắt theo spec["clock"] -> đỏ.
+
+MỘT FIXTURE PHẢI SỬA THEO, và nó nói lên điều đáng nhớ: fixture cũ dựng index
+NAIVE từ nhãn ET rồi ghi thẳng. Chỗ ghi quy về UTC, chỗ đọc quy về ET, nên một
+index không khai múi giờ là một fixture không nói nó đang ở đồng hồ nào.

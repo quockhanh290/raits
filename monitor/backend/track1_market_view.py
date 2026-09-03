@@ -261,8 +261,21 @@ def _bars_for_day(path, day: str, spec: dict) -> list:
 
     frame = pd.read_parquet(path)
     idx = pd.DatetimeIndex(frame.index)
-    if idx.tz is not None:
-        idx = idx.tz_convert(spec["clock"]).tz_localize(None)
+    # Both stores keep their index in UTC -- the daily parquet naive, the slot's own frame
+    # normalised on the way out -- and every hour this function slices by is ET:
+    # `context_start_et`, `window_start_et`. Slicing UTC labels with ET numbers is off by the
+    # offset, and the page then prints the wrong hours under the right names.
+    #
+    # Measured 2026-09-03 at 11:37 ET: the Stress sleeve returned bars running 09:35 to 12:40
+    # -- an hour into the future -- while the slot's own record put its newest bar at 11:35
+    # ET. Its session file ends at 15:35 naive, which is 11:35 in New York, so the file was
+    # right and the reading of it was four hours out. The Swing sleeve, whose window had not
+    # opened at all, showed twelve bars of it.
+    #
+    # `spec["clock"]` is NOT the answer here: it is the sleeve's own trading clock, Tokyo for
+    # the Japan sleeve, and the context hours are not on it -- 00:10-03:05 Tokyo does not
+    # contain a window that runs 14:10-15:55 Tokyo. They are ET, as their names say.
+    idx = (idx.tz_localize("UTC") if idx.tz is None else idx).tz_convert(ET).tz_localize(None)
     frame = frame.copy()
     frame.index = idx
     want = pd.Timestamp(day).date()
