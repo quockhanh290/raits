@@ -1582,7 +1582,11 @@
      can use the same span. Written by the price renderer, read by the series one.
      Null until a chart carrying slots has been drawn — the series then falls back to
      its own full width rather than guessing a span it was not given. */
+  //: One padding for the plot and for the hover that reads it. Two copies drifted once.
+  const MV_PAD = { L: 34, R: 68 };
   let mvSlotSpan = null;
+  //: Where each slot MINUTE sits in the price chart, for the series chart to reuse.
+  let mvSlotX = null;
 
   function mvChartSvg(sleeve) {
     const bars = sleeve.bars || [];
@@ -1601,7 +1605,7 @@
     // rather than as a row of outcomes. `padB` now carries a marker lane above the time
     // axis: the dots sit on their own baseline, which is what makes them a row instead of
     // noise.
-    const W = 1000, H = 380, padL = 34, padR = 68, padT = 16, padB = 46;
+    const W = 1000, H = 380, padL = MV_PAD.L, padR = MV_PAD.R, padT = 16, padB = 46;
     const laneH = 16;
     // Stage 5ZZP. The volume pane takes its height from the SAME box, so adding it
     // cannot move the panel — the property the tab-switch test pins.
@@ -1676,12 +1680,14 @@
        47% of the price chart sat at 5% of the series chart, so the two lined up
        nowhere and the series looked stretched across width the candles never used. */
     let _slotSpan = null;
+    const _slotX = {};
     const marks = (sleeve.slots || []).map(s => {
       const t = String(s.time_et || '');
       let idx = clocks.findIndex(c => c >= t);
       if (idx < 0) return '';
       const m = MV_MARK[s.status] || MV_MARK.unknown;
       const cx = x(idx);
+      _slotX[t] = cx;
       _slotSpan = _slotSpan
         ? { from: Math.min(_slotSpan.from, cx), to: Math.max(_slotSpan.to, cx),
             count: _slotSpan.count + 1 }
@@ -1698,6 +1704,7 @@
     }).join('');
     // Published only once the row is complete, so a half-built span is never read.
     mvSlotSpan = _slotSpan;
+    mvSlotX = _slotX;
     // The lane's own baseline. Without it the dots float; with it they read as a row of
     // outcomes running under the session.
     const laneRule = `<line class="mv-lane" x1="${padL}" x2="${W - padR}"
@@ -1777,7 +1784,8 @@
     }
 
     return `<svg class="mv-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
-              data-bars='${mvEsc(JSON.stringify(bars.map(b => [mvClock(b.time), b.open, b.high, b.low, b.close])))}'>
+              data-bars='${mvEsc(JSON.stringify(bars.map(b => [mvClock(b.time), b.open, b.high, b.low,
+                b.close, (typeof b.volume === 'number' ? b.volume : null)])))}'>
         ${ticks}${band}${candles}${levels}${vol}${laneRule}${marks}${times}
         <line class="mv-cross" x1="0" x2="0" y1="${padT}" y2="${padT + ih}" style="display:none"></line>
       </svg>
@@ -1794,7 +1802,12 @@
     if (!svg || !tip || !cross) return;
     let bars = [];
     try { bars = JSON.parse(svg.dataset.bars || '[]'); } catch (_e) { bars = []; }
-    const W = 1000, padL = 8, padR = 62;
+    /* The SAME padding the plot is drawn with. It was 8 and 62 here against 34 and 68
+       there, so every hover resolved to a bar the crosshair was not standing on: measured
+       2026-09-03, the line landed at x=592.6 while candle centres ran 341.9, 367.5, ... on a
+       25.66 pitch — between two bars, and the O/H/L/C printed beside it belonged to a third.
+       Read from the plot rather than restated, so the two cannot drift apart again. */
+    const W = 1000, padL = MV_PAD.L, padR = MV_PAD.R;
     const move = ev => {
       const r = svg.getBoundingClientRect();
       if (!r.width || !bars.length) return;
@@ -2747,10 +2760,19 @@
     const _barsDay = s.bars_session_date || '';
     const _seriesDay = ((s.strategy || {}).slot_series_session) || '';
     const sameSession = !_barsDay || !_seriesDay || _barsDay === _seriesDay;
-    const span = (sameSession && mvSlotSpan && mvSlotSpan.count === n && n > 1)
-      ? mvSlotSpan : null;
-    const x = i => span
-      ? span.from + i * (span.to - span.from) / (n - 1)
+    /* Matched by the slot's own MINUTE, not by counting slots.
+       Counting was the first rule and it refuses too often to be useful: the price chart
+       marks every slot the session has while the series carries only the slots that recorded
+       a reading, so an ordinary morning — twenty of twenty-two decided — had 22 against 20
+       and the panes fell apart, on a day they describe the same session at the same minutes.
+       Reading the minute is both safer and looser: every point lands where the candle above
+       it stands, and a point whose minute the price chart never drew makes the whole pane
+       fall back rather than putting one dot in a place it does not belong. */
+    const mapped = (sameSession && mvSlotX && n > 1)
+      ? series.map(p => mvSlotX[String(p.slot_time || '')]) : null;
+    const shared = (mapped && mapped.every(v => typeof v === 'number')) ? mapped : null;
+    const x = i => shared
+      ? shared[i]
       : padL + (n < 2 ? 0 : i * (W - padL - padR) / (n - 1));
 
     // `Number(null)` is 0 and `Number.isFinite(0)` is true, so a bare Number() turns every
@@ -2928,7 +2950,7 @@
       <!-- data-xspan says whether this pane adopted the price chart's slot span.
            Stated rather than left to be inferred: a reader of the DOM cannot tell a
            shared axis from a coincidence, and the crosshair layer must not guess. -->
-      <svg class="mv2-sc-svg" data-xspan="${span ? 'shared' : 'own'}"
+      <svg class="mv2-sc-svg" data-xspan="${shared ? 'shared' : 'own'}"
            viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
         <line class="mv2-sc-rule" x1="${padL}" x2="${W - padR}" y1="${(volTop - gap / 2).toFixed(1)}" y2="${(volTop - gap / 2).toFixed(1)}"></line>
         <defs><linearGradient id="mv2CloseFill" x1="0" y1="0" x2="0" y2="1">

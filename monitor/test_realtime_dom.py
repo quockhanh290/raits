@@ -1456,7 +1456,10 @@ def _with_slot_series(mv: dict, *, series_day: str) -> dict:
                  for i, row in enumerate(s["slots"])]
     s["strategy"] = dict(s["strategy"])
     s["strategy"]["slot_series"] = [
-        {"time_et": row["time_et"], "close": 66800.0 + i, "ema": 66795.0 + i,
+        # `slot_time`, đúng tên payload thật dùng (_slot_series ở backend). Bản đầu đặt
+        # `time_et` và vẫn xanh, vì luật cũ chỉ ĐẾM slot — một fixture sai tên vẫn qua được
+        # một phép kiểm không đọc tên.
+        {"slot_time": row["time_et"], "close": 66800.0 + i, "ema": 66795.0 + i,
          "volume": 100 + i, "avg_volume": 95 + i}
         for i, row in enumerate(s["slots"])]
     s["strategy"]["slot_series_session"] = series_day
@@ -1520,7 +1523,9 @@ def test_the_panes_refuse_one_axis_when_the_candles_are_a_different_session(
     label = browser_page.eval_on_selector(
         ".mv2-slotchart .mv2-sc-head",
         "el => getComputedStyle(el, '::after').content")
-    assert "trục riêng" in label, label
+    # Giao diện này là tiếng Anh; bản đầu tôi viết nhãn bằng tiếng Việt vào một trang
+    # tiếng Anh, và phép kiểm đi theo cái sai đó.
+    assert "own axis" in label, label
 
 
 def test_a_thin_instruments_volume_is_not_flattened_by_its_own_busiest_minute(
@@ -1585,3 +1590,55 @@ def test_a_minute_that_did_not_trade_is_not_drawn_as_one_that_did(
     assert zeros and rest, (len(zeros), len(rest))
     assert all(h == 0 for h in zeros), zeros
     assert all(h > 0 for h in rest), rest
+
+
+def test_hovering_a_slot_reads_out_the_candle_beside_it(realtime_server, browser_page):
+    """Số của cây nến phải nằm TRONG ô đọc, không phải trong một dải riêng dưới chart.
+
+    realtime.js vốn đọc chúng ra `.mv-tip`, nhưng dải đó rộng nguyên khung và nằm DƯỚI plot —
+    đo được top 742 trong khi plot kết thúc ở 705, tức người đang rê chuột trên cây nến được
+    báo giá ở cách đó một chiều cao chart. Muc 4.7 gộp cả hai vào một ô phía trên.
+    """
+    _open_price_context(browser_page, realtime_server,
+                        _with_slot_series(_market_view(), series_day="2026-08-27"))
+    browser_page.wait_for_selector(".mv-mark", timeout=20_000)
+    browser_page.hover(".mv-mark >> nth=5")
+    browser_page.wait_for_timeout(400)
+
+    txt = browser_page.eval_on_selector(".mv2-chart-readout", "el => el.textContent")
+    assert "slot" in txt, txt
+    for k in ("O ", "H ", "L ", "C "):
+        assert k in txt, f"thiếu {k!r} trong ô đọc: {txt}"
+    assert "vol" in txt, txt
+    # Dải cũ phải im lặng, nếu không cùng một sự thật hiện ở hai chỗ hai kiểu.
+    assert browser_page.eval_on_selector(
+        ".mv-tip", "el => getComputedStyle(el).display") == "none"
+
+
+def test_the_hover_rule_stands_on_the_candle_it_is_reading(realtime_server, browser_page):
+    """Đo được 2026-09-03: đường nét đứt đứng ở x=592,6 trong khi tâm nến chạy 341,9 · 367,5
+    … bước 25,66 — giữa hai cây nến, và O/H/L/C in cạnh nó thuộc về cây thứ ba.
+
+    Nguyên nhân: hover tính vị trí bằng lề 8/62 còn plot vẽ bằng 34/68. Hai bản sao của một
+    quyết định, và bản sao thứ hai là thứ đã trôi.
+    """
+    _open_price_context(browser_page, realtime_server,
+                        _with_slot_series(_market_view(), series_day="2026-08-27"))
+    browser_page.wait_for_selector(".mv-mark", timeout=20_000)
+    browser_page.hover(".mv-mark >> nth=7")
+    browser_page.wait_for_timeout(400)
+
+    got = browser_page.evaluate("""() => {
+        const lines = [...document.querySelectorAll('.mv2-xhair')]
+          .filter(l => getComputedStyle(l).display !== 'none');
+        const marks = [...document.querySelectorAll('.mv-mark')].map(m => +m.getAttribute('cx'));
+        const x = lines.length ? parseFloat(lines[0].getAttribute('x1')) : null;
+        const near = x === null ? null
+          : marks.reduce((a, b) => Math.abs(b - x) < Math.abs(a - x) ? b : a);
+        return { lines: lines.length, off: x === null ? null : Math.abs(near - x),
+                 legacy: getComputedStyle(document.querySelector('.mv-cross')).display };
+      }""")
+    assert got["lines"] >= 1, got
+    assert got["off"] is not None and got["off"] < 0.6, got
+    # Một đường mỗi pane là muc 4.7; đường cũ chỉ phủ pane giá nên nó là bản thừa.
+    assert got["legacy"] == "none", got

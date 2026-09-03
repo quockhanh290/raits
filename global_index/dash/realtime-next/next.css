@@ -730,7 +730,7 @@
    chuột trên chart giá mà thấy bên dưới không nhúc nhích cần biết vì sao, thay vì
    kết luận là hover hỏng. */
 .market-view-section[data-xaxis="own"] .mv2-slotchart .mv2-sc-head::after {
-  content: "trục riêng — không dóng theo chart giá";
+  content: "own axis — not aligned to the price chart";
   margin-left: auto;
   font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
   color: var(--t-faint);
@@ -1214,3 +1214,14 @@ header .runner-header-state i { animation: none; }
 
 /* Nhãn trần/0 của pane volume — muc 4.7 cấp cho cột phải của pane 2 và 5. */
 .mv-vol-ax { fill: #4b5563; font-size: 10px; }
+
+/* Một đường dọc khi hover, không phải hai. realtime.js vẽ .mv-cross chỉ trong pane
+   giá; tầng này vẽ .mv2-xhair trên MỌI pane, đúng muc 4.7. Giữ cái phủ hết, ẩn
+   cái chỉ phủ một pane — node và listener giữ nguyên, nó vẫn là thứ điều khiển
+   ô đọc O/H/L/C. */
+#marketViewChart .mv-cross { display: none !important; }
+
+/* Dải .mv-tip nằm DƯỚI chart, rộng nguyên khung — đo được top 742 trong khi chart
+   kết thúc ở 705. Số của cây nến giờ nằm trong ô đọc phía trên, đúng muc 4.7.
+   Ẩn dải, giữ node và listener: chính nó vẫn là chỗ realtime.js đọc O/H/L/C ra. */
+#marketViewChart .mv-tip { display: none !important; }

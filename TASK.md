@@ -14915,3 +14915,42 @@ cột đầu tiên có volume 0 nên height="0" — vô hình. Chờ .mv-svg r�
 lần chạy mốc chỉ dựng được một phần trang. Cả ba va chạm là nhãn dải chạy regime
 ("1d | Normal · 9d"...), không dính chart. Đúng ba va chạm đã ghi CHƯA GIẢI QUYẾT
 từ đầu phiên, cùng một lý do. 313 passed.
+
+── Bốn chỗ hỏng ở hover / dóng trục — 2026-09-03 ──────────────────────────────
+1. HOVER KHÔNG HIỆN CHI TIẾT NẾN. Thật ra có: realtime.js đọc O/H/L/C vào .mv-tip.
+   Nhưng .mv-tip là một DẢI rộng nguyên khung nằm DƯỚI plot — đo được top 742
+   trong khi plot kết thúc ở 705. Người đang rê chuột trên cây nến được báo giá ở
+   cách đó một chiều cao chart. Muc 4.7 gộp cả hai vào MỘT ô phía trên chart.
+   Sửa: đưa O/H/L/C + volume vào .mv2-chart-readout (đọc theo PHÚT từ data-bars,
+   không theo chỉ số); thêm volume vào data-bars; ẩn dải cũ, giữ node + listener.
+
+2. HAI CHART KHÔNG DÓNG. Không phải luật ngày của tôi — hai pane cùng 09-03.
+   Luật cũ đòi BẰNG SỐ SLOT: chart giá vẽ mọi slot của phiên (22), chuỗi chỉ mang
+   slot có ghi số (20). Một buổi sáng bình thường là đủ để nó từ chối.
+   Sửa: dóng theo PHÚT của slot. Mọi điểm phải tra được về một cột slot có thật;
+   một điểm không tra được thì cả pane lùi về trục riêng, thay vì đặt một chấm
+   vào chỗ nó không thuộc về. Kết quả: shared với 22 mark / 20 điểm.
+
+3. HAI ĐƯỜNG DỌC, MỘT NÉT ĐỨT LỆCH TÂM. Hai bản cài: .mv-cross của realtime.js
+   (chỉ pane giá) và .mv2-xhair của tầng next (mọi pane, đúng muc 4.7).
+   Đường nét đứt lệch vì mvBindHover tính bằng lề 8/62 còn plot vẽ bằng 34/68 —
+   đo được x=592,6 trên lưới tâm nến 341,9 bước 25,66, tức đứng giữa hai cây.
+   Sửa: một hằng MV_PAD cho cả hai; ẩn .mv-cross. Sau sửa: lệch tâm nến 0,00 ở
+   cả ba vị trí hover, còn đúng một đường mỗi pane.
+
+4. TIẾNG VIỆT TRONG GIAO DIỆN TIẾNG ANH. "trục riêng — không dóng theo chart giá"
+   là do tôi viết. -> "own axis — not aligned to the price chart".
+
+BA LẦN PHÉP KIỂM CỦA TÔI KHÔNG KIỂM GÌ — bắt bằng mutation
+- Test "đường kẻ đứng đúng tâm nến" vẫn XANH khi trả lề về 8/62: nó đo .mv2-xhair
+  (lấy thẳng từ cx nên luôn đúng), không đo cái mang lỗi. Thêm assertion đọc
+  .mv-tip -> CŨNG xanh, vì ở lưới 24 nến phép làm tròn nuốt sai số. Gỡ cả hai và
+  thay bằng phép kiểm CẤU TRÚC ("chỉ một nơi khai lề"), có đỏ khi mutate.
+  Lỗi lề giờ không còn hệ quả nhìn thấy được vì đường mang nó đã bị ẩn — nói
+  thẳng vậy thay vì để một test trông như đang bảo vệ điều gì đó.
+- Fixture đặt khoá `time_et` trong khi payload thật dùng `slot_time`. Luật cũ chỉ
+  ĐẾM slot nên fixture sai tên vẫn qua. Luật mới đọc tên -> lộ ra.
+- Một assertion còn ghim chuỗi tiếng Việt cũ.
+
+@390 so với lần chạy đầy đủ trước đó: đè 3->3, cắt 3->3, cỡ chữ 13->13 — KHÔNG
+tăng. 316 passed.

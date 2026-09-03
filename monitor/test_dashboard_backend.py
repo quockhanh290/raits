@@ -5011,3 +5011,22 @@ def test_no_display_string_anywhere_in_the_payload_carries_a_list_literal():
         elif isinstance(o, list):
             [walk(v) for v in o]
     walk(out)
+
+
+def test_the_hover_reads_the_plot_padding_instead_of_restating_it():
+    """Hai bản sao của một quyết định, và bản thứ hai đã trôi.
+
+    `mvBindHover` tính vị trí bằng lề 8/62 trong khi plot vẽ bằng 34/68, nên đường kẻ đứng
+    giữa hai cây nến — đo được x=592,6 trên lưới tâm nến 341,9 bước 25,66. Phép kiểm này ở
+    tầng CẤU TRÚC chứ không phải hành vi, và có lý do: đường kẻ sai ấy giờ đã bị ẩn, nên
+    không còn gì nhìn thấy được để một phép kiểm hành vi bám vào. Thứ còn lại đáng bảo vệ là
+    "chỉ có MỘT nơi khai lề".
+    """
+    js = _realtime_js()
+    assert "const MV_PAD = { L: 34, R: 68 };" in js
+    assert "padL = MV_PAD.L, padR = MV_PAD.R, padT" in js, "plot không đọc từ hằng chung"
+    assert "const W = 1000, padL = MV_PAD.L, padR = MV_PAD.R;" in js, "hover không đọc từ hằng chung"
+    # Chart CHUỖI có lề riêng (52/12) và đó là đúng — nó là một plot khác. Điều phải giữ
+    # là hai nơi cùng nói về plot GIÁ thì đọc chung một hằng, không phải "không ai được
+    # viết số nữa".
+    assert "padL = 52" in js, "chart chuỗi mất lề riêng của nó"

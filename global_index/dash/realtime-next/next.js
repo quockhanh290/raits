@@ -507,10 +507,29 @@
     const time = mark.getAttribute('data-time') || '';
     const word = mark.getAttribute('data-word') || '';
     const why = mark.getAttribute('data-reason') || '';
-    readout.textContent = `slot ${index + 1} / ${marks.length}`
-      + (time ? ` · ${time} ET` : '')
-      + (word ? ` — ${word}` : '')
-      + (why ? ` · ${why}` : '');
+    /* The candle's own numbers belong HERE.
+       realtime.js already reads them on hover, into a `.mv-tip` that renders as a
+       full-width strip UNDER the plot rather than beside the pointer -- measured at
+       top 742 while the plot ends at 705, so the reader sweeping a candle is told the
+       price a chart-height away from where they are looking, if they notice at all.
+       Section 4.7 puts these in the readout above the chart with the slot, one box, so
+       the minute reads as one fact rather than two in two places. The tip keeps its node
+       and its listener; the stylesheet hides the strip. */
+    let bar = null;
+    try {
+      const rows = JSON.parse(priceSvg.dataset.bars || '[]');
+      bar = rows.find(r => String(r[0]) === time) || null;
+    } catch (e) { bar = null; }
+    const num = v => (typeof v === 'number'
+      ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : null);
+    const parts = [`slot ${index + 1} / ${marks.length}` + (time ? ` · ${time} ET` : '')];
+    if (bar) {
+      parts.push(`O ${num(bar[1])}  H ${num(bar[2])}  L ${num(bar[3])}  C ${num(bar[4])}`);
+      if (typeof bar[5] === 'number') parts.push(`vol ${num(bar[5])}`);
+    }
+    if (word) parts.push(word);
+    if (why) parts.push(why);
+    readout.textContent = parts.join('  ·  ');
   };
 
   const CHART_HINT = 'hover a slot to read both charts at the same minute';
