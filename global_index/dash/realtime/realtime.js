@@ -1573,25 +1573,6 @@
     return i < 0 ? s : s.slice(i + 1, i + 6);
   }
 
-  /* A gate's `detail` is written for a log line, not for a page: the conditions arrive as
-     one run-on string joined by semicolons, and the numbers arrive at full float width.
-     Measured on the Stress sleeve: "Instruments below open and VWAP 2 (needs >= 4);
-     Instruments gapped down 0 (needs >= 3); Average basket gap 0.004344608523355387
-     (needs <= -0.001)" -- three separate readings crammed into one sentence, one of them
-     carrying eighteen significant digits nobody can read and nobody needs.
-
-     Split on the semicolons the writer already put there, and trim decimals to four. The
-     full value stays available on the element's title, because rounding for the eye must
-     not become rounding of the evidence. */
-  function mvConditionLines(text) {
-    const raw = String(text == null ? '' : text).trim();
-    if (!raw) return [];
-    return raw.split(';').map(s => s.trim()).filter(Boolean).map(s => ({
-      full: s,
-      shown: s.replace(/-?\d+\.\d{5,}/g, m => String(Number(Number(m).toFixed(4)))),
-    }));
-  }
-
   function mvEmpty(message, detail) {
     return `<div class="mv-empty"><b>${mvEsc(message)}</b>` +
            (detail ? `<span>${mvEsc(detail)}</span>` : '') + `</div>`;
@@ -2255,14 +2236,8 @@
         <span class="mv2-mono">no bar evaluated</span>
       </div>` + mvEmpty('No bar was evaluated',
         'The detector returned before it scanned the window, so there is no per-bar verdict '
-        + 'to show. The slot-level rules beside this tab say where it stopped.')
-      + (() => {
-          const lines = mvConditionLines(mvPhrase(why));
-          return lines.length
-            ? `<ul class="mv2-cond-list">` + lines.map(l =>
-                `<li title="${mvEsc(l.full)}">${mvEsc(l.shown)}</li>`).join('') + `</ul>`
-            : '';
-        })() + `</div>`;
+        + 'to show. Setup rules says where it stopped; the readings it stopped on are in '
+        + 'Conditions below.') + `</div>`;
   }
 
   function mvBarGrid(s) {

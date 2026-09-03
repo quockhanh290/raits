@@ -1269,13 +1269,3 @@ header .runner-header-state i { animation: none; }
    đúng bất kể chấm to nhỏ thế nào. */
 .mv2-lane-track.slots > .mv2-slot { transform: translateX(-50%); }
 
-/* Các điều kiện của gate: mỗi cái một dòng, canh theo lề chữ của card. Trước đó
-   chúng bị nối thành một câu chạy dài bằng dấu chấm phẩy. */
-.mv2-cond-list {
-  list-style: none; margin: 9px 0 0; padding: 0 18px;
-  display: flex; flex-direction: column; gap: 5px;
-}
-.mv2-cond-list > li {
-  font-family: var(--mono); font-size: 11px; color: #a8b1c0;
-  padding-left: 11px; border-left: 2px solid #262d36;
-}

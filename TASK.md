@@ -15130,3 +15130,23 @@ CÒN MỞ, cần chủ dự án quyết: bốn số đo của Stress CÓ TỒN T
 không phải giá. Vẽ chúng thành chuỗi riêng là thiết kế mới — muc 4.7 định nghĩa
 pane này cho giá, và phần B nói design chưa từng vẽ price context của Stress.
 Tôi không tự vẽ.
+
+── Trùng lặp ở "No bar was evaluated" vs box Conditions — 2026-09-03 ─────────
+Chủ dự án chỉ ra. Đo cả ba sleeve: box CONDITIONS LUÔN có mặt (NKD, Stress,
+Swing đều coBoxConditions=true), và nó là TẬP CHA của phần tôi thêm:
+  tôi thêm : 3 dòng — "Instruments below open and VWAP 2 (needs >= 4)" ...
+  Conditions: 4 dòng — thêm dòng PASS, có nhãn PASS/FAIL, và định dạng đúng
+              (+0.43% thay vì 0.0043)
+Nên ba dòng ấy thừa ở MỌI trường hợp, và trình bày kém hơn bản đã có.
+
+Đáng nói: bản GỐC cũng trùng — nó nhét cùng chuỗi đó vào giữa câu giải thích,
+tức vừa trùng vừa dồn cục. Vòng trước tôi chỉ chữa phần "dồn cục" (tách dòng,
+cắt thập phân) mà không hỏi "chỗ khác đã nói chưa". Sửa đúng là GỠ HẲN — vừa hết
+trùng vừa hết dồn cục, và ít code hơn cả trước lúc tôi động vào.
+Câu còn lại trỏ đúng hai chỗ có số: Setup rules (dừng ở đâu) và Conditions (số
+nó dừng trên đó). Gỡ luôn mvConditionLines (0 tham chiếu) và CSS .mv2-cond-list.
+
+BÀI HỌC: trước khi làm đẹp một khối chữ, hỏi "khối này có cần tồn tại không".
+Tôi đã dành một vòng để trình bày lại thứ lẽ ra phải xoá.
+
+319 passed.
