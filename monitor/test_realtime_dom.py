@@ -1557,7 +1557,23 @@ def test_a_thin_instruments_volume_is_not_flattened_by_its_own_busiest_minute(
     med = sorted(traded)[len(traded) // 2]
     assert med >= 6, f"cột trung vị chỉ {med}px — vẫn bị đỉnh nuốt"
     # Và cột vượt trần phải được đánh dấu, không được lặng lẽ bằng trần.
-    assert browser_page.eval_on_selector_all(".mv-vol-clip", "e => e.length") >= 1
+    marks = browser_page.evaluate("""() => {
+        const vols = [...document.querySelectorAll('.mv-vol')];
+        return [...document.querySelectorAll('.mv-vol-clip')].map(c => {
+          const v = vols.find(v => Math.abs(+v.getAttribute('x') - +c.getAttribute('x')) < 0.6);
+          if (!v) return { orphan: true };
+          const vy = +v.getAttribute('y'), vh = +v.getAttribute('height');
+          const cy = +c.getAttribute('y'), ch = +c.getAttribute('height');
+          return { inside: cy >= vy && cy + ch <= vy + vh,
+                   fill: getComputedStyle(c).fill };
+        });
+      }""")
+    assert marks, "không cột nào bị đánh dấu là vượt trần"
+    # Dấu phải nằm TRONG cột. Bản đầu vẽ một nắp sáng lơ lửng phía trên đỉnh, và nó đọc
+    # thành hai thanh chồng nhau — ba trên ba mươi sáu cột, và cả ba đều bị hỏi tới.
+    for m in marks:
+        assert not m.get("orphan"), m
+        assert m["inside"], f"dấu nằm ngoài cột, sẽ đọc thành lớp thứ hai: {m}"
 
     # Trục phải nói cả trần lẫn đỉnh thật, nếu không nhãn đang nói dối về thang.
     ax = browser_page.eval_on_selector_all(".mv-vol-ax", "els => els.map(e => e.textContent)")

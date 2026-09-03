@@ -14977,3 +14977,12 @@ tự đo bằng getBoundingClientRect trên chính các <text>, không được 
 0 của công cụ.
 
 316 passed. @390 vẫn đúng 3 va chạm dải regime, không tăng.
+
+── "vì sao bar có 2 lớp" — 2026-09-03 ────────────────────────────────────────
+Là cái nắp tôi thêm ở vòng trước. Đo: đúng 3 nắp, mỗi nắp là thanh xám #a8b1c0
+cao 1,6 nằm LƠ LỬNG cách đỉnh cột 0,9 đơn vị. Ý định là "cột này cao hơn khung",
+nhưng vẽ tách rời khỏi cột thì mắt đọc thành hai thanh chồng nhau — và cả 3 trên
+36 cột đều bị hỏi tới, tức tín hiệu sai 100% số lần nó xuất hiện.
+Sửa: đổi thành KHE CẮT nằm bên trong đỉnh cột, tô màu nền card. Ký hiệu quy ước
+cho "còn tiếp ngoài khung", và không thể nhầm là dữ liệu vì nó không THÊM gì —
+nó lấy đi. Ghim: dấu phải nằm trong cột; mutation trả về vị trí lơ lửng -> đỏ.

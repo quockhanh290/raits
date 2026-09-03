@@ -1775,8 +1775,14 @@
           x="${(x(i) - bw / 2).toFixed(1)}" y="${y.toFixed(1)}"
           width="${bw.toFixed(1)}" height="${h.toFixed(1)}"><title>volume ${
             b.volume}${over ? ' — taller than the pane' : ''}</title></rect>`
+          /* A break INSIDE the column, not a second bar above it.
+             The first version drew a pale cap floating 0.9 units clear of the top, and it
+             read as two stacked bars rather than as one bar cut off -- three of thirty-six
+             columns, and all three were asked about. A slit in the column's own colour of
+             background is the ordinary way to say "this continues past the frame", and it
+             cannot be mistaken for data because nothing is added: something is taken out. */
           + (over ? `<rect class="mv-vol-clip" x="${(x(i) - bw / 2).toFixed(1)}"
-              y="${(y - 2.5).toFixed(1)}" width="${bw.toFixed(1)}" height="1.6"></rect>` : '');
+              y="${(y + 2.4).toFixed(1)}" width="${bw.toFixed(1)}" height="1.6"></rect>` : '');
       }).join('') +
       `<text class="mv-axis mv-vol-label" x="${padL}" y="${(vTop + 8).toFixed(1)}">Volume</text>`
       /* The ceiling label sits BELOW the price axis's last one. Both want the right
