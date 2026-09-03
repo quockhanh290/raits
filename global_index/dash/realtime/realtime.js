@@ -2533,9 +2533,22 @@
       const colHead = present.map(([, title]) =>
         `<div class="mv2-calm-colhead">${mvEsc(title)}</div>`).join('');
       const body = labels.map(label => {
+        /* A row that does not move between the two phases prints once, and the second
+           column carries the void dash. Muc 4.8, and the reason is in its own words: the
+           dash is not "no value yet", it is "the same value as the column beside it, and
+           saying it again is saying more than there is".
+           Measured on 2026-08-31: daily ATR 59.70/59.70, stop distance 89.54/89.54, risk
+           447.72/447.72 -- three rows per instrument printing the same number twice, and
+           the reader has to compare them digit by digit to learn that nothing changed. */
+        let prev = null;
         const cells = cols.map(c => {
           const v = valueAt(c, label);
-          return `<div class="mv2-calm-cell${v ? '' : ' empty'}">${mvEsc(v || '—')}</div>`;
+          const same = prev !== null && v !== '' && v === prev;
+          prev = v === '' ? prev : v;
+          return same
+            ? `<div class="mv2-calm-cell empty" title="unchanged from `
+              + `${mvEsc(String(present[0][1]))}: ${mvEsc(v)}">—</div>`
+            : `<div class="mv2-calm-cell${v ? '' : ' empty'}">${mvEsc(v || '—')}</div>`;
         }).join('');
         return `<div class="mv2-calm-rowlabel"><div class="mv2-cond-label">${mvEsc(label)}</div>` +
                (detail[label] ? `<div class="mv2-lane-thr">${mvEsc(detail[label])}</div>` : '') +

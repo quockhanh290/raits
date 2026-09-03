@@ -1269,3 +1269,8 @@ header .runner-header-state i { animation: none; }
    đúng bất kể chấm to nhỏ thế nào. */
 .mv2-lane-track.slots > .mv2-slot { transform: translateX(-50%); }
 
+/* muc 4.8 · mỗi panel một mã: padding 9px 14px 10px, vạch ngăn bên trái.
+   Đo được 08-31: nhãn hàng nằm ở x=23 sát mép panel trong khi chữ head ở x=41 —
+   lệch đúng 18px, cùng loại lỗi với thân card Calm hôm qua. */
+.mv2-calm-inst { padding: 9px 14px 10px; }
+.mv2-calm-inst + .mv2-calm-inst { border-left: 1px solid #1a1f26; }
