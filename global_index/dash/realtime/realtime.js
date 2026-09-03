@@ -1430,6 +1430,16 @@
            `>${mvEsc(word)}</span>`;
   }
 
+  /* How this sleeve decides, in words. Hoisted out of mvChips because the verdict
+     meta row now names the same thing: two copies of this table would be two copies
+     to keep true, and the second one goes stale first. */
+  const MV_BOUNDARY_WORD = {
+    metric_boundary: 'Basket gate then price trigger',
+    entry_after_setup_only: 'Entry after setup bar',
+    price_boundary: 'Price trigger',
+    two_phase: 'Two-phase decision'
+  };
+
   function mvChips(s) {
     const out = [];
     // FIRST, before the status word, because it changes what the status word means. The panel
@@ -1487,12 +1497,7 @@
     // Stage 5ZZR. HOW this sleeve decides, in words. `metric_boundary` and
     // `entry_after_setup_only` are names for the code; an operator needs the shape of the
     // rule, because it is what makes the rest of the panel make sense.
-    const kindWord = {
-      metric_boundary: 'Basket gate then price trigger',
-      entry_after_setup_only: 'Entry after setup bar',
-      price_boundary: 'Price trigger',
-      two_phase: 'Two-phase decision'
-    }[(s.setup_boundary || {}).boundary_type];
+    const kindWord = MV_BOUNDARY_WORD[(s.setup_boundary || {}).boundary_type];
     if (kindWord) {
       out.push(mvChip(kindWord, 'muted', (s.setup_boundary || {}).boundary_proof || ''));
     }
@@ -1503,7 +1508,10 @@
     const failed = (strat.rules || []).filter(r => r.passed === false);
     if (failed.length) {
       const first = failed[0];
-      out.push(mvChip(`${first.label} ${mvNum(first.value)}`, 'warn',
+      // "Regime → Calm", not "Regime Calm": with a space the two words read as one
+      // phrase and the reader has to know which half is the rule and which is what
+      // was observed. The arrow says the rule got that value.
+      out.push(mvChip(`${first.label} → ${mvNum(first.value)}`, 'warn',
         `Needs ${first.comparator} ${mvNum(first.threshold)}. ` +
         (failed.length > 1 ? `${failed.length} conditions unmet.` : 'The only unmet condition.')));
     }
@@ -1570,6 +1578,12 @@
            (detail ? `<span>${mvEsc(detail)}</span>` : '') + `</div>`;
   }
 
+  /* Where the slots sit horizontally in the price chart, so the series chart below
+     can use the same span. Written by the price renderer, read by the series one.
+     Null until a chart carrying slots has been drawn — the series then falls back to
+     its own full width rather than guessing a span it was not given. */
+  let mvSlotSpan = null;
+
   function mvChartSvg(sleeve) {
     const bars = sleeve.bars || [];
     if (!bars.length) {
@@ -1585,7 +1599,7 @@
     // rather than as a row of outcomes. `padB` now carries a marker lane above the time
     // axis: the dots sit on their own baseline, which is what makes them a row instead of
     // noise.
-    const W = 1000, H = 320, padL = 34, padR = 68, padT = 16, padB = 46;
+    const W = 1000, H = 380, padL = 34, padR = 68, padT = 16, padB = 46;
     const laneH = 16;
     // Stage 5ZZP. The volume pane takes its height from the SAME box, so adding it
     // cannot move the panel — the property the tab-switch test pins.
@@ -1653,18 +1667,35 @@
     // clock. A slot outside the drawn range is dropped rather than clamped to the edge: a
     // marker pinned to the wrong minute is worse than a marker that is not there.
     const clocks = bars.map(b => mvClock(b.time));
+    /* The x-range the slots actually occupy in THIS chart, recorded for the series
+       chart below to reuse. The two panes are read as one picture — a reader follows a
+       minute down from a candle to the close line — and that only works if the same
+       slot sits at the same horizontal place in both. Measured before this: a slot at
+       47% of the price chart sat at 5% of the series chart, so the two lined up
+       nowhere and the series looked stretched across width the candles never used. */
+    let _slotSpan = null;
     const marks = (sleeve.slots || []).map(s => {
       const t = String(s.time_et || '');
       let idx = clocks.findIndex(c => c >= t);
       if (idx < 0) return '';
       const m = MV_MARK[s.status] || MV_MARK.unknown;
       const cx = x(idx);
-      return `<circle class="mv-mark" cx="${cx.toFixed(1)}" cy="${laneY.toFixed(1)}" r="3.4"
+      _slotSpan = _slotSpan
+        ? { from: Math.min(_slotSpan.from, cx), to: Math.max(_slotSpan.to, cx),
+            count: _slotSpan.count + 1 }
+        : { from: cx, to: cx, count: 1 };
+      /* An ELLIPSE, not a circle. The plot uses preserveAspectRatio="none", so x is
+         stretched ~1.6x while y is not — every circle rendered as a flattened oval
+         10.9px wide by 6.8px tall. rx is corrected to the measured scale by next.js;
+         the authored value here is the radius we want to SEE. */
+      return `<ellipse class="mv-mark" cx="${cx.toFixed(1)}" cy="${laneY.toFixed(1)}" rx="3.4" ry="3.4"
         fill="${m.hollow ? 'none' : m.fill}" stroke="${m.fill}"
         data-slot="${mvEsc(s.slot_id)}" data-time="${mvEsc(t)}"
         data-word="${mvEsc(m.word)}" data-reason="${mvEsc(mvPhrase(s.reason))}"
-        ><title>${mvEsc(t)} · ${mvEsc(m.word)}${s.reason ? ' · ' + mvEsc(mvPhrase(s.reason)) : ''}</title></circle>`;
+        ><title>${mvEsc(t)} · ${mvEsc(m.word)}${s.reason ? ' · ' + mvEsc(mvPhrase(s.reason)) : ''}</title></ellipse>`;
     }).join('');
+    // Published only once the row is complete, so a half-built span is never read.
+    mvSlotSpan = _slotSpan;
     // The lane's own baseline. Without it the dots float; with it they read as a row of
     // outcomes running under the session.
     const laneRule = `<line class="mv-lane" x1="${padL}" x2="${W - padR}"
@@ -1793,6 +1824,61 @@
     return 'nothing recorded for this session';
   }
 
+  /* Which lane actually blocked, named, with its own tally.
+     Not a judgement made here: it is read from the cells the detector wrote. When
+     more than one lane failed the one that failed most is named; when none did,
+     this returns null rather than nominating a culprit so a clean session cannot
+     be given a blame line it did not earn. */
+  function mvBlockingLane(s) {
+    let worst = null;
+    (s.rule_lanes || []).forEach(L => {
+      const cells = L.cells || [];
+      const fails = cells.filter(c => c.state === 'fail').length;
+      const decided = cells.filter(c => c.state === 'pass' || c.state === 'fail').length;
+      if (fails && (!worst || fails > worst.fails)) {
+        worst = { label: L.label, fails, decided };
+      }
+    });
+    return worst;
+  }
+
+  /* The verdict as a sentence, under the chips.
+     The chips say COMPLETE and NO SIGNAL; they do not say why nothing fired, and
+     that is the question the panel exists to answer. Every clause is conditional
+     on the field behind it: a session that decided 18 of 22 says so rather than
+     claiming "every", and a session with no failing lane gets no blame clause. */
+  function mvReasonSentence(s) {
+    const cov = s.coverage || {};
+    const expected = Number(cov.expected_slots);
+    const observed = Number(cov.observed_slots);
+    const parts = [];
+    if (Number.isFinite(expected) && Number.isFinite(observed) && expected > 0) {
+      parts.push(observed >= expected
+        ? 'Every slot decided'
+        : `${observed} of ${expected} slots decided`);
+    }
+    if (cov.signal === 'no_signal') parts.push('none fired');
+    let out = parts.length ? parts.join(' and ') + '.' : '';
+    const blocked = mvBlockingLane(s);
+    if (blocked) {
+      out += ` ${blocked.label} failed on ${blocked.fails} of ${blocked.decided} decided slots.`;
+    }
+    return out.trim();
+  }
+
+  /* Where the evidence came from — recorded live, or replayed afterwards.
+     A reader deciding whether to act on this panel needs to know whether the
+     verdicts were written by the slots as they ran or reconstructed from bars on
+     disk. The answer is the session row's own `has_diagnostics`; it is never
+     inferred from the presence of lanes, because a replay produces lanes too. */
+  function mvEvidenceProvenance(s) {
+    const day = s.bars_session_date || state.mvDay;
+    const rows = (state.marketView || {}).sessions || [];
+    const row = day ? rows.find(r => r && r.day === day) : null;
+    if (!row) return '';
+    return row.has_diagnostics ? 'recorded while the slots ran' : 'replayed over stored bars';
+  }
+
   function mvVerdict(s) {
     const host = $('marketViewVerdict');
     if (!host) return;
@@ -1803,8 +1889,72 @@
     // assumed. Without the fallback it would have thrown on every waiting sleeve, which is
     // the state the page opens in every morning.
     const st = mvStatusChip(s) || mvProgressChip(s);
-    host.innerHTML = `<span class="mv2-pill ${mvEsc(st.tone || 'muted')}"><i></i>` +
-      `<b>${mvEsc(st.word)}</b><span>· ${mvEsc(mvVerdictDetail(s))}</span></span>`;
+    /* The design shows TWO chips here, not one: progress ("COMPLETE") and outcome
+       ("NO SIGNAL"). They answer different questions -- how far the window got, and
+       what it found -- and collapsing them loses the first. Ordered the same way
+       mvChips orders them, so the two rows never disagree about which comes first. */
+    const _prog = mvProgressChip(s);
+    const _stat = mvStatusChip(s);
+    const pills = [];
+    if (_stat && _stat.outranks) pills.push(_stat);
+    if (_prog && _prog.word) pills.push(_prog);
+    if (_stat && !_stat.outranks) pills.push(_stat);
+    if (!pills.length) pills.push(st);
+    const reason = mvReasonSentence(s);
+    const blocked = mvBlockingLane(s);
+    const provenance = mvEvidenceProvenance(s);
+    /* G4/G5. The pill states the OUTCOME and nothing else; everything that qualifies it
+       moves to one meta row underneath. Before this the pill carried a clause of its own
+       and a second column sat to the right, so the same qualification was read in two
+       places at two sizes.
+
+       Each cell is dropped entirely when its source is missing — never a dash. A row of
+       placeholders reads as data that failed to arrive, and on this panel that is a
+       different and more alarming statement than a shorter row. */
+    const slots = s.slots || [];
+    const lastSlot = slots.length ? slots[slots.length - 1] : null;
+    const kindWord = MV_BOUNDARY_WORD[(s.setup_boundary || {}).boundary_type];
+    const nearest = (s.setup_boundary || {}).nearest_failed_condition || {};
+    const ruleValue = nearest.value == null ? '' : String(nearest.value);
+    /* Which session these numbers describe closes the metadata row in the design.
+       It is the one item that says whether the row is about today at all, so a row
+       that ends without it reads as live whatever day it came from. */
+    const _mv = (state.marketView && state.marketView.market_view) || {};
+    const sessionWord = _mv.session_date
+      ? (_mv.session_is_today === false
+          ? `reviewing ${_mv.session_date}` : `live session ${_mv.session_date}`)
+      : '';
+    const cells = [
+      { txt: mvVerdictDetail(s), cls: 'mv2-vm-num' },
+      { txt: lastSlot && lastSlot.time_et ? `latest ${lastSlot.time_et} ET` : '',
+        cls: 'mv2-vm-num' },
+      { txt: kindWord || '', cls: '' },
+      { txt: blocked && ruleValue ? `${blocked.label} → ${ruleValue}` : '',
+        cls: 'mv2-vm-rule' },
+      { txt: sessionWord, cls: 'mv2-vm-prov' }
+    ].filter(c => c.txt);
+    const meta = cells.length
+      ? `<div class="mv2-verdict-meta">` + cells.map(c =>
+          `<span${c.cls ? ` class="${c.cls}"` : ''}>${mvEsc(c.txt)}</span>`).join('')
+        + `</div>`
+      : '';
+    /* The right column the design keeps: the blocking lane WITH its tally, and where
+       the evidence came from. The metadata row names the lane and the value it wanted;
+       this says how often it missed. Same two facts at two grains, and the design puts
+       the coarse one where the eye lands last. Dropped entirely when either is absent
+       -- never a dash. */
+    const sideLines = [];
+    if (blocked) sideLines.push(`${blocked.label} failed ${blocked.fails} of ${blocked.decided}`);
+    if (provenance) sideLines.push(provenance);
+    const side = sideLines.length
+      ? `<div class="mv2-verdict-side">` + sideLines.map((l, i) =>
+          `<div class="${i ? 'mv2-vs-prov' : 'mv2-vs-detail'}">${mvEsc(l)}</div>`).join('')
+        + `</div>`
+      : '';
+    host.innerHTML = pills.map(p =>
+        `<span class="mv2-pill ${mvEsc(p.tone || 'muted')}"><i></i><b>${mvEsc(p.word)}</b></span>`
+      ).join('')
+      + (reason ? `<p class="mv2-reason">${mvEsc(reason)}</p>` : '') + side + meta;
   }
 
   //: The inner tabs exist only where the sleeve HAS two things to show. A sleeve whose route
@@ -1881,14 +2031,14 @@
     'no verdict recorded': 'no verdict'
   };
 
-  function mvLaneLegend() {
+  function mvLaneLegend(tail) {
     const items = [
       ['ok', 'Passed'], ['bad', 'Failed'], ['hollow', 'Not reached'],
       ['muted', 'No verdict published'], ['norec', 'No record'], ['future', 'Not yet run']
     ];
     return `<div class="mv2-legend">` + items.map(pair =>
       `<span class="mv2-legend-item"><i class="mv2-cell ${pair[0]}"></i>${mvEsc(pair[1])}</span>`
-    ).join('') + `</div>`;
+    ).join('') + `${tail || ''}</div>`;
   }
 
   //: One row per rule, one cell per slot. This is the panel's centre, and what it draws is
@@ -1917,8 +2067,12 @@
       const cells = (L.cells || []).map((c, i) => {
         const m = MV_CELL[c.state] || MV_CELL.not_published;
         const val = c.value == null ? '' : ' · ' + String(c.value);
+        // Muc 4.5 dựng track bằng flex với gap 2px, nên cell chiếm gần trọn bước
+        // slot. Ở đây cell là position:absolute nên bước slot phải trừ tay: 0.62
+        // để lại 38% khoảng trống và lưới đọc thành những vạch rời, không phải
+        // một dải liên tục.
         return `<i class="mv2-cell ${m.cls}" style="left:${(i * w).toFixed(3)}%;` +
-          `width:${(w * 0.62).toFixed(3)}%" title="${mvEsc(c.time_et)} · ` +
+          `width:calc(${w.toFixed(3)}% - 2px)" title="${mvEsc(c.time_et)} · ` +
           `${mvEsc(L.label)} · ${mvEsc(m.word + val)}"></i>`;
       }).join('');
       const tone = L.failed > 0 ? 'bad' : L.passed > 0 ? 'ok' : 'muted';
@@ -1976,19 +2130,18 @@
       <div class="mv2-lane mv2-lane-slots">
         <div class="mv2-lane-name"><div>
           <div class="mv2-lane-label">Slot decisions</div>
-          <div class="mv2-lane-thr">${mvEsc(tally)} observed</div>
+          <div class="mv2-lane-thr">${mvEsc(
+            s.status === 'waiting' ? 'not started' : 'aligned to slot times')}</div>
         </div></div>
         <div class="mv2-lane-track slots">${strip}</div>
-        <div class="mv2-lane-value muted">${mvEsc(
-          s.status === 'waiting' ? 'not started' : 'aligned to slot times')}</div>
+        <div class="mv2-lane-value muted">${mvEsc(tally)}</div>
       </div>
       <div class="mv2-lane mv2-lane-axis">
         <div class="mv2-lane-name"></div>
         <div class="mv2-lane-track">${axis}</div>
         <div class="mv2-lane-value"></div>
       </div>
-      ${mvLaneLegend()}
-      ${mvDeclaredConfig(s)}
+      ${mvLaneLegend(mvDeclaredInline(s))}
     </div>`;
   }
 
@@ -2096,22 +2249,19 @@
   // takes the lanes beside it, the ones that CAN fill, along with it. So they are stated as
   // configuration instead, with the reason on hover. The backend decides which names these
   // are, from the table that declares the rules; this only draws what it is handed.
-  function mvDeclaredConfig(s) {
+  /* Muc 4.5 đặt phần này ở CUỐI hàng legend, không phải thành một hàng lane nữa.
+     Dời nguyên các node — mỗi item vẫn giữ data-tooltip mang lý do, thứ mà comment
+     dưới đây nói rõ là cố ý — chứ không thay bằng một dòng chữ trần. */
+  function mvDeclaredInline(s) {
     const cfg = s.declared_config || [];
     if (!cfg.length) return '';
-    return `<div class="mv2-lane mv2-lane-config">
-      <div class="mv2-lane-name"><div>
-        <div class="mv2-lane-label">Declared</div>
-        <div class="mv2-lane-thr dim">not entry conditions</div>
-      </div></div>
-      <div class="mv2-lane-track config">` + cfg.map(c =>
-        `<span class="mv2-config-item has-tip tip-top" tabindex="0" ` +
-        `data-tooltip="${mvEsc(c.reason)}">${mvEsc(c.label)}` +
-        (c.threshold_display ? ` <b>${mvEsc(c.threshold_display)}</b>` : '') +
-        `</span>`).join('') + `</div>
-      <div class="mv2-lane-value muted">${cfg.length} setting${cfg.length === 1 ? '' : 's'}</div>
-    </div>`;
+    return `<span class="mv2-legend-declared">declared · ` + cfg.map(c =>
+      `<span class="mv2-config-item has-tip tip-top" tabindex="0" ` +
+      `data-tooltip="${mvEsc(c.reason)}">${mvEsc(c.label)}` +
+      (c.threshold_display ? ` <b>${mvEsc(c.threshold_display)}</b>` : '') +
+      `</span>`).join('') + `</span>`;
   }
+
 
   //: The price card's own header: the last bar the store carried, and the change from the one
   //: before it. Both come from the payload's bars; neither is a quote. When the sleeve
@@ -2121,9 +2271,15 @@
     const bars = s.bars || [];
     const d = s.data_status || {};
     const stale = d.ok === false && !!d.provider_reason;
+    /* Which session these candles are. Same class as the series pane's chip so the
+       two read as one pair rather than two unrelated labels. Omitted entirely when the
+       field is empty — "bars · --" states a day nobody recorded. */
+    const barsDay = s.bars_session_date || '';
+    const dayChip = barsDay
+      ? `<span class="mv2-sc-day">bars · ${mvEsc(barsDay)}</span>` : '';
     if (!bars.length) {
       return `<div class="mv2-card-head">
-        <span class="mv2-kicker">Price</span>
+        <span class="mv2-kicker">Price</span>${dayChip}
         <span class="mv2-mono dim">no bars for this window</span></div>`;
     }
     const b = bars[bars.length - 1];
@@ -2143,7 +2299,7 @@
       ? 'levels published for this candidate'
       : 'no levels published — lines omitted';
     return `<div class="mv2-card-head">
-      <span class="mv2-kicker">Price</span>
+      <span class="mv2-kicker">Price</span>${dayChip}
       <span class="mv2-ohlc${stale ? ' dim' : ''}">O ${fmt(b.open)} H ${fmt(b.high)} ` +
         `L ${fmt(b.low)} C ${fmt(b.close)}</span>
       <span class="mv2-chg ${chgCls}">${mvEsc(chg)}</span>
@@ -2250,6 +2406,129 @@
     }).join('') + `</div>`;
   }
 
+  // Stage 5ZZZ-CE. Pair the two phases INSIDE each instrument, instead of giving each
+  // phase its own card.
+  //
+  // The sleeve decides at 09:32 and prices at 10:02, and the only things that change
+  // between them are the entry reference and the stop. Split by phase, those two live in
+  // different cards more than a screen apart, so answering "what actually moved?" meant
+  // holding MES's 09:32 stop in your head while scrolling to its 10:02 one. Split by
+  // instrument, DECIDE and OBSERVE sit in adjacent columns and the answer is the two rows
+  // that carry a value in both.
+  //
+  // Rows are the UNION of the two phases in phase order, not just DECIDE's: a row the
+  // observe pass introduces would otherwise be dropped silently. A row missing from a
+  // phase prints an em dash rather than an empty cell, because "not applicable here" and
+  // "we have no value" look identical when both are blank.
+  //
+  // Gates hang off the instrument and are recorded at DECIDE, so the tally is read from
+  // whichever phase carries them and counted from the array — never written as a literal,
+  // or it would keep saying 4 after the rule set changed.
+  //
+  // Only for a basket. One instrument still takes the original per-phase path below,
+  // unchanged: the extra structure exists to tell two things apart, and with one thing it
+  // is just nesting.
+  function mvCalmByInstrument(phases, order) {
+    const present = order.filter(([k]) => phases[k]);
+    const DROP = new Set(['instrument', 'direction']);
+    const forName = (b, name) => {
+      const hit = ((b && b.instruments) || []).find(i => i && i.instrument === name);
+      if (!hit) return { rows: [], gates: [], direction: '' };
+      return {
+        rows: (hit.rows || []).filter(r => r && (r.display_value || r.label)
+                                           && !DROP.has(String(r.label || '').toLowerCase())),
+        gates: hit.gates || [],
+        direction: hit.direction || ''
+      };
+    };
+
+    const names = [];
+    present.forEach(([k]) => ((phases[k] || {}).instruments || []).forEach(iv => {
+      if (iv && iv.instrument && !names.includes(iv.instrument)) names.push(iv.instrument);
+    }));
+    if (names.length < 2) return '';
+
+    const head = present.map(([k, title, at]) =>
+      `<span class="mv2-calm-phase"><b class="mv2-kicker">${mvEsc(title)}</b>` +
+      `<span class="mv2-mono">${mvEsc(at)}</span>${mvSourceBadge(phases[k])}</span>`
+    ).join('<i class="mv2-calm-sep"></i>');
+
+    const panels = names.map(name => {
+      const cols = present.map(([k]) => forName(phases[k], name));
+      const labels = [];
+      const detail = {};
+      cols.forEach(c => c.rows.forEach(r => {
+        const label = r.label || '';
+        if (!labels.includes(label)) labels.push(label);
+        if (!detail[label] && r.detail) detail[label] = r.detail;
+      }));
+      const valueAt = (c, label) => {
+        const hit = c.rows.find(r => (r.label || '') === label);
+        return hit ? (hit.display_value || '') : '';
+      };
+      const direction = cols.reduce((a, c) => a || c.direction, '');
+      const gates = cols.reduce((a, c) => (a.length ? a : (c.gates || [])), []);
+      const met = gates.filter(g => g && g.passed === true).length;
+
+      const colHead = present.map(([, title]) =>
+        `<div class="mv2-calm-colhead">${mvEsc(title)}</div>`).join('');
+      const body = labels.map(label => {
+        const cells = cols.map(c => {
+          const v = valueAt(c, label);
+          return `<div class="mv2-calm-cell${v ? '' : ' empty'}">${mvEsc(v || '—')}</div>`;
+        }).join('');
+        return `<div class="mv2-calm-rowlabel"><div class="mv2-cond-label">${mvEsc(label)}</div>` +
+               (detail[label] ? `<div class="mv2-lane-thr">${mvEsc(detail[label])}</div>` : '') +
+               `</div>${cells}`;
+      }).join('');
+
+      return `<div class="mv2-calm-inst">
+        <div class="mv2-calm-inst-head"><b>${mvEsc(name)}</b>` +
+        (direction ? `<span class="mv2-mono">${mvEsc(direction)}</span>` : '') +
+        (gates.length
+          ? `<span class="mv2-calm-tally">${met} / ${gates.length} gates met</span>` : '') +
+        `</div>
+        <div class="mv2-calm-grid" style="--calm-cols:${present.length}">
+          <div></div>${colHead}${body}
+        </div>` +
+        (gates.length
+          ? `<div class="mv2-calm-gateshead">GATES</div>${mvCalmGates({ gates })}` : '') +
+      `</div>`;
+    }).join('');
+
+    const warn = present.map(([k]) => {
+      const b = phases[k];
+      return b && b.warning ? `<p class="mv-setup-note mv2-warn">${mvEsc(b.warning)}</p>` : '';
+    }).join('');
+
+    /* What the card is made of, counted from what was just built rather than
+       written down: "2 instruments · 5 rows · 4 gates each". A reader who sees
+       five rows on MES wants to know whether MNQ carries the same five before
+       comparing the two side by side.
+       Only stated when every instrument really does carry the same shape. If one
+       recorded a row the other did not, "each" would be false, and a subtitle
+       that quietly lies about the table under it is worse than no subtitle. */
+    const shape = names.map(name => {
+      const cols = present.map(([k]) => forName(phases[k], name));
+      const labels = new Set();
+      cols.forEach(c => c.rows.forEach(r => labels.add(r.label || '')));
+      return labels.size + '/' + cols.reduce((a, c) => (a.length ? a : (c.gates || [])), []).length;
+    });
+    const uniform = shape.every(s => s === shape[0]);
+    const [rowCount, gateCount] = (shape[0] || '0/0').split('/');
+    const meta = uniform && names.length
+      ? `<span class="mv2-calm-shape">${names.length} instruments · ${rowCount} rows` +
+        (Number(gateCount) ? ` · ${gateCount} gates each` : '') + `</span>`
+      : '';
+
+    return `<div class="mv2-calm"><div class="mv2-calm-cards">
+      <div class="mv2-card mv2-calm-card mv2-calm-paired">
+        <div class="mv2-card-head mv2-calm-phases">${head}${meta}</div>
+        <p class="mv-setup-note">Only the two priced rows change; the rest was fixed before the open.</p>
+        <div class="mv2-calm-ivs">${panels}</div>${warn}
+      </div></div></div>`;
+  }
+
   function mvCalmCards(calm) {
     const phases = (calm && calm.phases) || {};
     const order = [['decide', 'DECIDE', '09:32 ET'], ['observe', 'OBSERVE', '10:02 ET']];
@@ -2263,6 +2542,10 @@
         <p class="mv-setup-note">${mvEsc(calm.error)}</p></div>`;
     }
     if (!order.some(([k]) => phases[k])) return '';
+    // A basket day pairs the phases per instrument; anything else falls through to the
+    // original per-phase cards below, byte for byte.
+    const paired = mvCalmByInstrument(phases, order);
+    if (paired) return paired;
     const cards = order.map(([key, title, at]) => {
       const b = phases[key];
       if (!b) return '';
@@ -2363,9 +2646,17 @@
            + `${row.is_today ? '<i>today</i>' : ''}</button>`;
     }).join('');
     const past = sel && !sessions.some(r => r.day === sel && r.is_today);
+    /* Why some chips are dim. The tooltip on each thin chip already says it, but a
+       tooltip is only read by someone who already suspected something — the row
+       otherwise looks like four days rendered wrong. Shown only when a thin day is
+       actually on the row, so the line never explains a state nobody can see, and
+       only when the past-session notice is not already occupying the same slot. */
+    const thin = sessions.some(row => !row.has_diagnostics);
     el.innerHTML = `<span class="mv2-day-label">Session</span>${chips}`
       + (past ? `<span class="mv2-day-note">Reviewing a past session — this band only. `
-              + `The job list and open issues below stay on the live day.</span>` : '');
+              + `The job list and open issues below stay on the live day.</span>`
+         : thin ? `<span class="mv2-day-note">Sessions on disk. Dim days recorded no `
+              + `per-slot diagnostics; their conditions are replayed from bars.</span>` : '');
     el.querySelectorAll('[data-mvday]').forEach(b => {
       b.onclick = () => {
         const d = b.getAttribute('data-mvday');
@@ -2399,11 +2690,36 @@
               + `bars to walk.`
             : 'No slot has recorded a reading for this session yet.')}</div>`;
     }
-    const W = 1000, H = 210, padL = 52, padR = 12, padT = 14, padB = 24;
+    const W = 1000, H = 250, padL = 52, padR = 12, padT = 14, padB = 24;
     const priceH = 104, gap = 18;
     const volTop = padT + priceH + gap, volH = H - padB - volTop;
     const n = series.length;
-    const x = i => padL + (n < 2 ? 0 : i * (W - padL - padR) / (n - 1));
+    /* The same horizontal span the price chart gave its slots, when it published one
+       for the same number of slots. The two panes are read as one picture: a reader
+       follows a minute down from a candle to the close line. Before this the series
+       ran 52 → 988 while the candles kept their slots between 342 → 881, so nothing
+       lined up and the line looked stretched across width the candles never used.
+
+       Only adopted when the counts match. A span from a chart with a different number
+       of slots would line the two up by index onto different minutes, which is worse
+       than not lining them up at all. */
+    /* ...and only when the two panes are the SAME SESSION. Counting slots is not enough:
+       the candle store is appended once a day, so during a live window its newest bars are
+       the previous day's while the slot series is today's. The counts still match — 22 slots
+       either way — so the old test adopted the span and lined today's slots up against
+       yesterday's candles, on one axis, with one synced crosshair. The note printed under
+       the head said "the crosshair matches within each pane, not across them" while the
+       panes were in fact matched: the sentence was true about the intent and false about
+       the picture. Sharing is now refused when the sessions differ, which is what makes
+       that sentence true and what rule 8 asks for. */
+    const _barsDay = s.bars_session_date || '';
+    const _seriesDay = ((s.strategy || {}).slot_series_session) || '';
+    const sameSession = !_barsDay || !_seriesDay || _barsDay === _seriesDay;
+    const span = (sameSession && mvSlotSpan && mvSlotSpan.count === n && n > 1)
+      ? mvSlotSpan : null;
+    const x = i => span
+      ? span.from + i * (span.to - span.from) / (n - 1)
+      : padL + (n < 2 ? 0 : i * (W - padL - padR) / (n - 1));
 
     // `Number(null)` is 0 and `Number.isFinite(0)` is true, so a bare Number() turns every
     // slot that has not run yet into a real zero. Measured on the first render: nine empty
@@ -2469,10 +2785,25 @@
       + volLine(vol, 'mv2-sc-volline');
     // The dot stays on top of its line: a reading that clears the threshold should be findable
     // at a glance, and a line alone hides where the samples actually are.
+    /* Ellipses, not circles: this svg is preserveAspectRatio="none" too, so a circle
+       here renders as a flattened oval exactly as the slot dots did. next.js corrects
+       rx to the measured x-scale. */
     const volDots = vol.map((v, i) => v === null ? '' :
-      `<circle class="mv2-sc-vol${thr[i] !== null && v > thr[i] ? ' over' : ''}" `
-      + `cx="${x(i).toFixed(1)}" cy="${vy(v).toFixed(1)}" r="2.6"></circle>`
+      `<ellipse class="mv2-sc-vol${thr[i] !== null && v > thr[i] ? ' over' : ''}" `
+      + `cx="${x(i).toFixed(1)}" cy="${vy(v).toFixed(1)}" rx="2.6" ry="2.6"></ellipse>`
     ).join('');
+
+    /* A marker on every reading, on all four lines — the design puts one on each.
+       A line alone says where the value went; the dots say where it was MEASURED, and
+       with 22 slots across a wide pane those are not the same question. Close and bar
+       volume are filled; the trend filter and the ten-bar average are hollow, matching
+       the design's split between a reading and a derived line. */
+    const dotsFor = (arr, cls, r, plot) => arr.map((v, i) => v === null ? '' :
+      `<ellipse class="${cls}" cx="${x(i).toFixed(1)}" `
+      + `cy="${plot(v).toFixed(1)}" rx="${r}" ry="${r}"></ellipse>`).join('');
+    const closeDots = dotsFor(close, 'mv2-sc-dot mv2-sc-dot-close', 2.6, py);
+    const emaDots   = dotsFor(ema,   'mv2-sc-dot mv2-sc-dot-ema',   2.4, py);
+    const avgvDots  = dotsFor(avgv,  'mv2-sc-dot mv2-sc-dot-avgv',  2.4, vy);
 
     const fmtP = v => Number(v).toLocaleString('en-US',
       { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -2515,10 +2846,45 @@
     const refusedLabel = refused ? String(judged[judged.length - 1].regime || '') : '';
     const thrSeen = finite(thr).length > 0;
 
+    /* The soft wash under the close line, as the design draws it. Built from the SAME
+       runs the line uses, so a gap in the data leaves a gap in the fill — a continuous
+       wash under a broken line would quietly claim the missing minutes were measured.
+       The baseline is the volume rule, not the bottom of the box, so it cannot spill
+       into the volume pane below. */
+    const closeArea = (arr) => {
+      const base = (volTop - gap / 2).toFixed(1);
+      const runs = [];
+      let cur = [];
+      arr.forEach((v, i) => {
+        if (v === null) { if (cur.length > 1) runs.push(cur); cur = []; return; }
+        cur.push([x(i), py(v)]);
+      });
+      if (cur.length > 1) runs.push(cur);
+      return runs.map(r => {
+        const pts = r.map(q => `${q[0].toFixed(1)},${q[1].toFixed(1)}`).join(' ');
+        return `<polygon class="mv2-sc-closefill" points="`
+             + `${r[0][0].toFixed(1)},${base} ${pts} `
+             + `${r[r.length - 1][0].toFixed(1)},${base}"></polygon>`;
+      }).join('');
+    };
+    /* G2. The candles and the slot series can be two different sessions: the bars come
+       from the instrument store, the slot series from what the slots recorded. When they
+       differ the panes are not two views of one day, and a crosshair that lines them up
+       would be lining up two different afternoons.
+
+       Said out loud rather than normalised to one day: picking one would silently throw
+       away the other, and which one is right is not this renderer's call. */
+    const barsDay = s.bars_session_date || '';
+    const dayMismatch = barsDay && chartDay && barsDay !== chartDay
+      ? `<div class="mv2-tabnote">Candles are ${mvEsc(barsDay)}; the slot series is `
+        + `${mvEsc(chartDay)}. The crosshair matches within each pane, not across them.`
+        + `</div>` : '';
+
     return `<div class="mv2-slotchart">
+      ${dayMismatch}
       <div class="mv2-sc-head">
         <span class="mv2-kicker">Across the session</span>
-        ${chartDay ? `<span class="mv2-sc-day">${mvEsc(chartDay)}</span>` : ''}
+        ${chartDay ? `<span class="mv2-sc-day">slots · ${mvEsc(chartDay)}</span>` : ''}
         <span class="mv2-sc-key"><i class="mv2-sc-k-close"></i>close</span>
         <span class="mv2-sc-key"><i class="mv2-sc-k-ema"></i>trend filter</span>
         <span class="mv2-sc-key"><i class="mv2-sc-k-avgv"></i>10-bar volume</span>
@@ -2527,9 +2893,17 @@
           ? `<span class="mv2-sc-key"><i class="mv2-sc-k-thr"></i>surge threshold</span>`
           : `<span class="mv2-sc-key mv2-sc-key-off">surge threshold — not compared</span>`}
       </div>
-      <svg class="mv2-sc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      <!-- data-xspan says whether this pane adopted the price chart's slot span.
+           Stated rather than left to be inferred: a reader of the DOM cannot tell a
+           shared axis from a coincidence, and the crosshair layer must not guess. -->
+      <svg class="mv2-sc-svg" data-xspan="${span ? 'shared' : 'own'}"
+           viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
         <line class="mv2-sc-rule" x1="${padL}" x2="${W - padR}" y1="${(volTop - gap / 2).toFixed(1)}" y2="${(volTop - gap / 2).toFixed(1)}"></line>
-        ${path(ema, 'mv2-sc-ema')}${path(close, 'mv2-sc-close')}${volPath()}${volDots}${ticks}${times}
+        <defs><linearGradient id="mv2CloseFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#8dc0f7" stop-opacity=".20"></stop>
+          <stop offset="100%" stop-color="#8dc0f7" stop-opacity="0"></stop>
+        </linearGradient></defs>
+        ${closeArea(close)}${path(ema, 'mv2-sc-ema')}${path(close, 'mv2-sc-close')}${volPath()}${avgvDots}${emaDots}${closeDots}${volDots}${ticks}${times}
       </svg>
       ${refused ? `<div class="mv2-tabnote">Regime ${mvEsc(refusedLabel)} — the regime gate `
         + `refused on all ${judged.length} slot${judged.length === 1 ? '' : 's'} that recorded `
@@ -2542,7 +2916,7 @@
     </div>`;
   }
 
-  function mvSetupCard(s) {
+  function mvSetupCard(s, opts) {
     const b = s.setup_boundary || {};
     const metrics = (b.metrics || []).filter(m => m && (m.display_value || m.label));
     const levels = (b.price_levels || []).filter(l => Number.isFinite(Number(l.price)));
@@ -2662,7 +3036,7 @@
         ${conditions}
         ${levelsCol}
       </div>
-      ${mvSlotChart(s)}
+      ${(opts && opts.withChart === false) ? '' : mvSlotChart(s)}
     </div>`;
   }
 
@@ -2793,13 +3167,25 @@
       // that was meant to prevent this says so in its own comment - "a panel that resizes under
       // the pointer is a panel an operator misclicks" - and it was pinned to the outer host,
       // which the redesign stopped being the element that holds the plot.
+      /* Stage 5ZZZ-CF. "Across the session" belongs to THIS tab and no other.
+         Measured on the design, tab by tab: the series chart appears only under
+         Price context, the Conditions/Readings/Nearest-miss/Trade-levels block only
+         under Detector rules. Both were rendering on all three, so whichever tab was
+         chosen the reader got the same two panels underneath and the tabs looked
+         decorative. */
       host.innerHTML = `<div class="mv2-card">` + mvPriceHead(s) + mvDataHealth(s) +
         `<div class="mv2-plot">` + mvChartSvg(s) +
-          ((s.bars || []).length ? mvLegend() : '') + `</div>` + `</div>`;
+          ((s.bars || []).length ? mvLegend() : '') + `</div>` + `</div>`
+        + (hasInner ? mvSlotChart(s) : '');
       mvBindHover(host);
     }
     // Outside the chart's fixed box, so the panel keeps its pinned height.
-    if (setupHost) setupHost.innerHTML = mvSetupCard(s);
+    /* Without the tab strip there is nothing to choose between, so the panel keeps its
+       old shape and carries everything. With it, this block is the Detector tab's. */
+    if (setupHost) {
+      setupHost.innerHTML = !hasInner ? mvSetupCard(s)
+        : showGrid ? mvSetupCard(s, { withChart: false }) : '';
+    }
     // ONE line at most, and only what the chips did not already say. The footer used to
     // repeat the levels note the chips now carry, so the same sentence appeared twice on
     // one panel.
@@ -2965,7 +3351,7 @@
       // a nine-feature model elsewhere must not assume seven are being withheld.
       feats.innerHTML = rows.length
         ? `<div class="rg2-feat-head">
-             <span class="mv2-kicker">Why this label</span>
+             <span class="mv2-kicker">Why this label?</span>
              <span class="mv2-mono">${rows.length} input${rows.length === 1 ? '' : 's'} ` +
                `behind the ${mvEsc(r.label_date || '')} label — the model is fitted on these</span>
            </div>

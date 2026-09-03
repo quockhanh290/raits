@@ -4909,3 +4909,95 @@ def test_every_scheduler_job_can_reach_the_journal():
         "something new was excluded from the journal; a label that is not a pulse belongs on "
         "the page, and hiding it here is how a job goes quiet without anyone deciding it should"
     )
+
+
+def test_a_list_threshold_is_worded_not_repr_printed():
+    """Ngưỡng dạng danh sách phải đọc được, không phải repr Python.
+
+    Ca thật, đo trên /realtime phiên 2026-08-31: lane "regime lag 1" in ra
+    `needs ['Normal']`. Dấu ngoặc vuông và dấu nháy đơn là cú pháp Python lọt
+    thẳng ra bảng vận hành — người trực đọc `['Normal']` không biết đó là một
+    trạng thái hay một danh sách rỗng viết sai.
+
+    Nguồn: một detector publish ngưỡng là list (các regime được phép), còn
+    `_threshold_display` chỉ có nhánh cho None/dict/bool rồi rơi vào `str(raw)`.
+    Docstring của nó nói "scalars và one-key dicts" — list là trường hợp thứ ba
+    không ai lường, và nó im lặng.
+
+    Test ghim CÁCH ĐỌC, không ghim một literal: một phần tử đọc thẳng, nhiều
+    phần tử nối bằng "or" để câu "needs …" bên cạnh vẫn thành câu tiếng Anh.
+    """
+    from monitor.backend.track1_market_view import _threshold_display
+
+    assert _threshold_display(["Normal"]) == "Normal"
+    assert _threshold_display(["Normal", "Stress"]) == "Normal or Stress"
+    assert _threshold_display(["Calm", "Normal", "Stress"]) == "Calm, Normal or Stress"
+    assert _threshold_display([]) == ""
+    # Không được có cú pháp Python trong bất kỳ đầu ra nào
+    for raw in (["Normal"], ["Normal", "Stress"], ("Normal",)):
+        rendered = _threshold_display(raw)
+        assert "[" not in rendered and "'" not in rendered, rendered
+
+
+def test_a_python_list_literal_never_reaches_a_display_string():
+    """Chuỗi văn xuôi từ detector không được mang cú pháp Python ra bảng.
+
+    Ca thật, đo trên /realtime: hai chỗ in ra
+    `regime 'Calm'; this sleeve trades ['Normal']`. Câu này do engine dựng
+    (track1_normal_r4: f-string in thẳng `sorted(ALLOWED_REGIMES)`) rồi dashboard
+    chuyển nguyên si ra ngoài qua `summary` và `nearest_failed_condition`.
+
+    Chỉ chuẩn hoá LIST LITERAL, cố ý không đụng dấu nháy đơn trong văn xuôi:
+    ghép cặp nháy trong "today's own row and tomorrow's" sẽ nuốt mất nửa câu.
+    Dấu ngoặc vuông là thứ không thể nhầm; dấu nháy thì có thể.
+    """
+    from monitor.backend.track1_market_view import _words_for_list_literals as f
+
+    assert f("this sleeve trades ['Normal']") == "this sleeve trades Normal"
+    assert f("trades ['Normal', 'Stress']") == "trades Normal or Stress"
+    assert f("trades ['Calm', 'Normal', 'Stress']") == "trades Calm, Normal or Stress"
+    assert f("regime 'Calm'; this sleeve trades ['Normal']") \
+        == "regime 'Calm'; this sleeve trades Normal"
+    # văn xuôi có dấu nháy phải nguyên vẹn
+    keep = "today's own row and tomorrow's are both read"
+    assert f(keep) == keep
+    # không có ngoặc vuông thì không đổi gì
+    assert f("needs >= 3") == "needs >= 3"
+    assert f("") == ""
+    assert f(None) is None
+
+
+def test_no_display_string_anywhere_in_the_payload_carries_a_list_literal():
+    """Quét CẢ payload, không vá từng trường.
+
+    Lần đầu tôi chỉ sửa `threshold_display`, và trang vẫn còn hai chỗ; sửa tiếp
+    `setup_boundary` thì vẫn còn một chỗ nữa ở `strategy.detail`. Ba lần vá ba
+    trường là dấu hiệu đang đuổi theo triệu chứng: bất kỳ detector nào sau này
+    nội suy một list vào câu văn cũng sẽ lọt ra y như vậy, và nó sẽ không báo.
+
+    Nên cổng đặt ở CHỖ RA: không một chuỗi nào trong payload được mang cú pháp
+    list của Python. Danh sách thật (`threshold: ["Normal"]`) vẫn là danh sách —
+    đó là dữ liệu có cấu trúc, không phải chuỗi hiển thị.
+    """
+    from monitor.backend.track1_market_view import _scrub_list_literals
+
+    payload = {
+        "a": "trades ['Normal']",
+        "b": {"c": "needs ['Calm', 'Stress']", "d": ["Normal"], "e": 7},
+        "f": [{"g": "plain"}, "trades ['A', 'B', 'C']"],
+    }
+    out = _scrub_list_literals(payload)
+    assert out["a"] == "trades Normal"
+    assert out["b"]["c"] == "needs Calm or Stress"
+    assert out["b"]["d"] == ["Normal"], "danh sách thật phải giữ nguyên kiểu"
+    assert out["b"]["e"] == 7
+    assert out["f"][1] == "trades A, B or C"
+
+    def walk(o):
+        if isinstance(o, str):
+            assert "['" not in o and "']" not in o, o
+        elif isinstance(o, dict):
+            [walk(v) for v in o.values()]
+        elif isinstance(o, list):
+            [walk(v) for v in o]
+    walk(out)

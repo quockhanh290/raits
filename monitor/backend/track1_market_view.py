@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import collections
 import datetime as _dt
+import re
 import threading as _threading
 
 from global_index import track1_strategy_diagnostics as _sd
@@ -422,6 +423,13 @@ def _threshold_display(raw) -> str:
     dicts (`{"breadth_min": 4}`, `{"ema_period": 10}`). Both are real and both are shown;
     a rule that published nothing gets an empty string rather than a plausible default,
     because a threshold nobody published is a bar an operator would measure against.
+
+    A third shape turned up that this docstring did not list: a LIST of allowed values.
+    `track1_normal_r4` publishes the regimes its sleeve trades, and with no branch for
+    a sequence the value fell through to `str(raw)` — so the lane on /realtime read
+    `needs ['Normal']`, with Python's brackets and quotes printed onto an operations
+    page. Measured on the 2026-08-31 session. Sequences are now worded, so the
+    "needs …" the UI writes beside them stays a sentence.
     """
     if raw is None:
         return ""
@@ -431,7 +439,75 @@ def _threshold_display(raw) -> str:
         return " · ".join(f"{k.replace('_', ' ')} {v}" for k, v in raw.items())
     if isinstance(raw, bool):
         return "true" if raw else "false"
+    if isinstance(raw, (list, tuple, set, frozenset)):
+        # A set has no order of its own; sorting keeps the same payload rendering the
+        # same way twice rather than shuffling between polls.
+        members = [str(v) for v in (sorted(raw) if isinstance(raw, (set, frozenset)) else raw)]
+        members = [m for m in members if m != ""]
+        if not members:
+            return ""
+        if len(members) == 1:
+            return members[0]
+        return " or ".join([", ".join(members[:-1]), members[-1]])
     return str(raw)
+
+
+_LIST_LITERAL = re.compile(r"\[\s*((?:'[^']*'|\"[^\"]*\")(?:\s*,\s*(?:'[^']*'|\"[^\"]*\"))*)\s*\]")
+
+
+def _words_for_list_literals(text):
+    """Turn a Python list literal inside a display string into words.
+
+    The detectors build some of their prose with f-strings, and one of them
+    interpolates a list: `track1_normal_r4` writes "this sleeve trades
+    {sorted(ALLOWED_REGIMES)}", which arrives here as
+    `this sleeve trades ['Normal']` and was printed onto /realtime in two places.
+    Brackets and quotes are Python's syntax, not an operator's.
+
+    Only BRACKETED lists are rewritten. Bare single quotes are deliberately left
+    alone: pairing them off would turn "today's own row and tomorrow's" into
+    something with the middle eaten, and prose apostrophes are far more common in
+    these strings than quoted tokens. A bracket cannot be mistaken for prose; a
+    quote can.
+
+    The real repair belongs in the detector that writes the sentence, but that
+    file is the engine's, not the dashboard's — so the display layer refuses to
+    pass the artifact on rather than reaching across to fix it.
+    """
+    if not text or not isinstance(text, str):
+        return text
+
+    def _wordify(match: "re.Match") -> str:
+        members = [m[1:-1] for m in re.findall(r"'[^']*'|\"[^\"]*\"", match.group(1))]
+        members = [m for m in members if m != ""]
+        if not members:
+            return ""
+        if len(members) == 1:
+            return members[0]
+        return " or ".join([", ".join(members[:-1]), members[-1]])
+
+    return _LIST_LITERAL.sub(_wordify, text)
+
+
+def _scrub_list_literals(node):
+    """Apply `_words_for_list_literals` to every string in a payload.
+
+    Placed at the exit rather than on the three fields caught so far. Chasing
+    fields was losing: `threshold_display` was fixed and two places still printed
+    it, `setup_boundary` was fixed and `strategy.detail` still did. Any detector
+    that interpolates a list into prose reaches a page the same way, and none of
+    them will announce it.
+
+    Real lists keep their type — only strings are rewritten — so structured data
+    like `threshold: ["Normal"]` stays a list for the front end to word itself.
+    """
+    if isinstance(node, str):
+        return _words_for_list_literals(node)
+    if isinstance(node, dict):
+        return {k: _scrub_list_literals(v) for k, v in node.items()}
+    if isinstance(node, list):
+        return [_scrub_list_literals(v) for v in node]
+    return node
 
 
 def _not_entry_conditions() -> dict:
@@ -1859,7 +1935,9 @@ def build(root: str | Path = ".", *, day: str | None = None, now: Any = None,
     # sleeves instead, and speaks only when every sleeve agrees.
     _notes = {(v.get("levels_note") or "") for v in out["sleeves"].values()}
     out["levels_note"] = _notes.pop() if len(_notes) == 1 else ""
-    return out
+    # One gate on the way out. See _scrub_list_literals for why this is not done
+    # field by field.
+    return _scrub_list_literals(out)
 
 
 def regime(root: str | Path = ".") -> dict:

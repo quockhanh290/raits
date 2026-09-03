@@ -23,8 +23,10 @@ from monitor.backend.app import app
 from monitor.test_realtime_dom import (  # noqa: F401  (helper, không phải fixture)
     M2K_RUNNER,
     _broker,
+    _market_view,
     _persisted_runner_positions,
     _runner_positions,
+    _stub_mv,
     open_realtime,
     stub_api,
 )
@@ -499,3 +501,164 @@ def test_each_type_rule_reaches_the_value_it_declares(skin_server, skin_page):
     assert overridden <= _DA_BIET_BI_DE, (
         "luật bị đè hoàn toàn — kiểm lại trật tự so với paper.css: "
         f"{sorted(overridden - _DA_BIET_BI_DE)}")
+
+
+CALM_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "track1_market_view_20260831.json"
+
+
+def _calm_instrument_panels(page, names):
+    """Với mỗi mã, đếm phần tử chứa RIÊNG mã đó và mang cả hai pha.
+
+    Viết theo thứ quan sát được chứ không theo tên class, để test không phải sửa
+    lại mỗi lần lớp trình bày đổi tên — và để nó vẫn đỏ đúng lý do khi cấu trúc
+    còn chia theo pha.
+    """
+    return page.evaluate(
+        """(names) => {
+          const root = document.getElementById('calmSection');
+          if (!root) return null;
+          const out = {};
+          for (const name of names) {
+            out[name] = [...root.querySelectorAll('*')].filter(el => {
+              const t = el.textContent || '';
+              if (!t.includes(name)) return false;
+              // Panel của MỘT mã: không được chứa mã kia.
+              if (names.some(o => o !== name && t.includes(o))) return false;
+              return /DECIDE/i.test(t) && /OBSERVE/i.test(t);
+            }).length;
+          }
+          return out;
+        }""",
+        names,
+    )
+
+
+def test_calm_shows_both_phases_inside_one_instrument_panel(skin_server, skin_page):
+    """Thẻ Calm phải ghép theo MÃ, không phải theo PHA.
+
+    Bản thiết kế đặt DECIDE và OBSERVE cạnh nhau trong cùng một panel cho mỗi mã,
+    và tự nói vì sao ngay dưới bảng: "Only the two priced rows change; the rest was
+    fixed before the open." Chỉ nhìn thấy được điều đó khi hai cột nằm cạnh nhau.
+
+    Trang đang chia ngược lại — một thẻ cho DECIDE, một thẻ cho OBSERVE, mỗi thẻ
+    liệt kê cả hai mã — nên muốn biết giá nào đã đổi thì phải so chéo giữa hai thẻ
+    cách nhau hơn một màn hình.
+
+    Payload là bản THẬT của phiên 2026-08-31 lấy nguyên từ endpoint, không dựng tay:
+    một payload viết tay sẽ trôi khỏi hình dạng thật và test sẽ canh một thứ không
+    tồn tại. Đó cũng là phiên mà bản thiết kế được dựng từ đó.
+    """
+    payload = json.loads(CALM_FIXTURE.read_text(encoding="utf-8"))
+    stub_api(skin_page, {"/api/v1/track1-market-view": payload})
+    open_realtime(skin_page, skin_server)
+    skin_page.wait_for_selector("#calmSection .mv2-calm-inst", timeout=30_000)
+
+    names = ["MES", "MNQ"]
+    # Chốt chặn: nếu thẻ Calm rỗng thì mọi assert bên dưới đạt mà không kiểm gì.
+    rendered = skin_page.eval_on_selector_all(
+        "#calmSection .mv2-calm-inst", "els => els.length")
+    assert rendered >= len(names), (
+        f"thẻ Calm chỉ dựng {rendered} khối mã — test sẽ đạt rỗng, không phải đạt thật")
+
+    panels = _calm_instrument_panels(skin_page, names)
+    assert panels is not None, "không có #calmSection trên trang"
+    missing = [n for n in names if not panels.get(n)]
+    assert not missing, (
+        "không có panel nào mang riêng một mã kèm CẢ HAI pha: "
+        f"{missing} — đếm được {panels}")
+
+
+def test_calm_instrument_panel_states_how_many_gates_it_met(skin_server, skin_page):
+    """Mỗi mã phải tự nói đã qua bao nhiêu cổng.
+
+    Bản thiết kế in "4 / 4 gates met" ngay cạnh tên mã, nên người đọc biết cái
+    setup này dựa trên bao nhiêu điều kiện mà không phải đếm chấm. Trang hiện vẽ
+    các cổng nhưng không có tổng, và cũng không có nhãn GATES để biết cụm đó là gì.
+
+    Tổng phải rút từ payload chứ không viết cứng: nếu số cổng đổi mà dòng này vẫn
+    in 4 thì nó thành một lời mô tả đã rời khỏi thứ nó mô tả.
+    """
+    payload = json.loads(CALM_FIXTURE.read_text(encoding="utf-8"))
+    phases = payload["market_view"]["calm"]["phases"]
+    gate_count = max(len(p.get("gates") or []) for p in phases.values())
+    assert gate_count > 0, "payload không có cổng nào — test này sẽ không kiểm được gì"
+
+    stub_api(skin_page, {"/api/v1/track1-market-view": payload})
+    open_realtime(skin_page, skin_server)
+    skin_page.wait_for_selector("#calmSection .mv2-calm-inst", timeout=30_000)
+
+    text = skin_page.eval_on_selector(
+        "#calmSection", "el => el.textContent.replace(/\s+/g, ' ')")
+    tallies = re.findall(r"(\d+)\s*/\s*(\d+)\s*gates met", text)
+    assert len(tallies) >= 2, f"thiếu tổng cổng cho từng mã; đọc được {tallies}"
+    for met, total in tallies:
+        assert int(total) == gate_count, (
+            f"tổng cổng in ra {total} nhưng payload có {gate_count} — "
+            "con số viết cứng sẽ nói sai khi luật đổi")
+
+
+# ── Chữ trong pane bị kéo giãn ────────────────────────────────────────────────
+# Không dựng chuỗi tham chiếu bằng HTML: bản đầu làm thế và sai hai lần liền —
+# thiếu `text-transform` thì nhãn viết hoa bằng CSS lệch 18%, và hộp HTML còn dôi
+# một nấc letter-spacing cuối chuỗi mà hộp SVG không có. `getComputedTextLength()`
+# trả bề rộng chữ theo đơn vị user của chính SVG, không chịu ảnh hưởng của phép
+# biến đổi đang sửa lỗi, nên nó so được mà không phải sao chép thuộc tính font nào.
+_LABEL_ASPECT = r"""
+  () => {
+    const svg = document.querySelector('.market-view-section .mv-svg');
+    if (!svg) return { labels: 0, skew: 1, skewed: [] };
+    const vb = (svg.getAttribute('viewBox') || '').trim().split(/\s+/).map(Number);
+    const box = svg.getBoundingClientRect();
+    const sx = vb.length === 4 && vb[2] ? box.width / vb[2] : 1;
+    const sy = vb.length === 4 && vb[3] ? box.height / vb[3] : 1;
+    const out = [...svg.querySelectorAll('text')].map(el => {
+      const adv = el.getComputedTextLength();
+      // Phóng đều thì chữ vẫn đúng dáng; chỉ phóng LỆCH mới là lỗi. Nên chia bề
+      // rộng thật cho bề rộng lẽ ra phải có nếu pane phóng đều theo chiều dọc.
+      return { txt: el.textContent.trim(),
+               aspect: adv && sy ? box.width && el.getBoundingClientRect().width / (adv * sy) : 1 };
+    });
+    return { labels: out.length, par: svg.getAttribute('preserveAspectRatio'),
+             skew: sy ? sx / sy : 1,
+             aspects: out };
+  }
+"""
+
+
+def test_a_chart_label_is_not_stretched_by_the_pane_it_sits_in(skin_server, skin_page):
+    """Đo được 2026-09-02: nhãn giá trên trục y rộng gấp 1,606 lần bề rộng đúng của nó.
+
+    Pane giá đặt `preserveAspectRatio="none"` để kéo hình học cho vừa khung, và
+    phép kéo ấy không phân biệt hình học với chữ. Các chấm slot đã được sửa trước
+    đó bằng cách chia rx cho tỉ lệ; 15 nhãn trong cùng pane thì không ai đụng tới,
+    nên chúng vẫn giãn ngang trong khi chiều cao giữ nguyên.
+
+    Bản design không gặp chuyện này vì nó không vẽ chữ trong pane: trục là một cột
+    HTML 72px bên cạnh. Đó cũng là lý do hợp đồng thị giác cấm thẳng `<text>` dưới
+    `preserveAspectRatio="none"` thay vì đặt ra một mức méo cho phép.
+    """
+    # Độ méo phụ thuộc bề rộng: đo ở 1440px thì pane chỉ giãn 1,011 lần và phép
+    # kiểm gần như không còn gì để bắt. Đo ở khổ mà bản design dựng cho.
+    skin_page.set_viewport_size({"width": 1900, "height": 1000})
+    _stub_mv(skin_page, _market_view())
+    open_realtime(skin_page, skin_server)
+    skin_page.click('[data-mv-inner="Price context"]')
+    skin_page.wait_for_selector(".market-view-section .mv-svg text", timeout=15_000)
+    skin_page.wait_for_timeout(400)
+    r = skin_page.evaluate(_LABEL_ASPECT)
+
+    # Hai chốt: có nhãn để đo, và pane THẬT SỰ đang kéo LỆCH. Thiếu chốt thứ hai
+    # thì một ngày nào đó pane phóng đều, mọi độ lệch bằng 1, và test vẫn xanh
+    # trong khi nó không còn kiểm được điều gì.
+    assert r["labels"] >= 5, f"không có nhãn nào để đo: {r}"
+    assert r["par"] == "none" and r["skew"] > 1.05, (
+        f"pane không còn kéo lệch — phép kiểm này đã hết việc, xem lại: {r}")
+
+    # Ngưỡng lấy từ hai con số đã đo, không phải chọn cho vừa: nền nhiễu của phép
+    # đo là 2,6% — hằng số, đo được y hệt ở skew 1,0 lẫn 1,471, nên nó không phải
+    # độ méo — còn tín hiệu cần bắt là +47%. Gỡ bản sửa ra thì mọi nhãn nhảy lên
+    # 1,606–1,627 và phép kiểm này đỏ; đã dựng lại đúng như vậy trước khi ghim.
+    skewed = [o for o in r["aspects"] if abs(o["aspect"] - 1) > 0.05]
+    assert skewed == [], (
+        f"pane kéo lệch {r['skew']:.3f} lần và nhãn đi theo (1 = đúng dáng): "
+        + ", ".join(f"{o['txt']!r}={o['aspect']:.3f}" for o in skewed))

@@ -95,6 +95,35 @@ BASE_PAYLOADS: dict[str, dict] = {
         "source": "runner_persisted_positions", "observed_at": "2026-08-14T18:06:00Z",
         "error": None, "payload": {"schema_version": 1, "positions": []},
     },
+    # Stage 5AB. The page fetches this now, and an endpoint missing from this table is a
+    # 404 the console-error test catches — which is how this entry came to exist.
+    "/api/v1/track1-runtime": {
+        "source": "track1_runtime", "route": "track1_candidate",
+        "book": {"present": False}, "checkpoint": {"present": False},
+        "window_coverage": {"present": True, "days": [], "latest": {}},
+        "slot_timing": {"present": True, "days": {}},
+        "explanations": {"present": False},
+        "gates": {"blocking_now": ["B1_broker_account_or_legacy_retirement"],
+                  "orders_possible": False, "orders_detail": []},
+        "safety": {"jobs": [], "positions_path": "live_positions.track1.json",
+                   "stop_path": "STOP_TRADING.track1", "client_id": 90, "note": ""},
+    },
+    # Stage 5ZZL. Present so the shared healthy-page fixture does not 404 on the market
+    # view -- an unstubbed endpoint shows up as a console error and fails the healthy-page
+    # test for a reason that has nothing to do with the page being healthy.
+    "/api/v1/track1-market-view": {
+        "market_view": {"schema": "track1_market_view/1", "route": "track1_candidate",
+                        "session_date": "2026-08-14", "now_et": "13:00",
+                        "levels_note": "entry levels not exposed by sleeve evidence yet",
+                        "sleeves": {}},
+        "regime": {"status": "UNKNOWN", "code": "no_record", "label": None,
+                   "label_date": None, "age_hours": None, "detail": "no record",
+                   "recent": [], "context": [], "score": None, "shift_threshold": None,
+                   "score_note": "not exposed by model",
+                   "threshold_note": "not exposed by model",
+                   "line": "Regime label UNKNOWN: no record",
+                   "verification": {"status": "UNKNOWN"}},
+    },
     "/api/v1/session-events/": {
         "source": "live_log", "day": "2026-08-14",
         "observed_at": "2026-08-14T18:06:00Z", "events": [], "error": None,
@@ -501,15 +530,53 @@ def test_open_issues_coverage_names_stale_evidence_end(realtime_server, browser_
 
 
 def test_broker_account_delta_is_visible_in_equity_header(realtime_server, browser_page):
-    """M4: broker account equity can diverge sharply from the runner ledger."""
+    """M4, rewritten in Stage 5ZZF. The CONCERN is unchanged: a sharp divergence around the
+    account must be visible rather than quietly averaged away. What changed is where the
+    divergence is measured from.
+
+    The original asserted the delta `996,312 - 1,000,480 = 4,168` appeared in the header. That
+    subtraction crossed a currency boundary — the starting figure's own note reads
+    "connect_test_paper.py, DUR125337, CAD" and the equity carried no currency at all — and it
+    was drawn from a runner payload that stood 76.8 hours old while its envelope reported
+    `not_expected_yet`, because in track1-only mode the legacy runner is never scheduled and
+    nothing ever calls it stale. It said `Broker acct $996,731 / -$3,749` for three days after
+    the account had been reset to USD 250,817.91.
+
+    So the divergence is now measured between the RECORDED BASELINE and the legacy figure, and
+    the legacy figure may appear only under its own name and only with its age. This test holds
+    that, on the same scenario the original used.
+    """
     runner = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/runner-state"]))
     runner["payload"]["meta"]["broker_equity"] = 996312.42
-    runner["payload"]["meta"]["paper_start"] = {"date": "2026-08-10", "equity": 1000480.0}
-    stub_api(browser_page, {"/api/v1/runner-state": runner})
+    runner["payload"]["meta"]["paper_start"] = {
+        "date": "2026-08-10", "equity": 1000480.0,
+        "note": "connect_test_paper.py, DUR125337, CAD"}
+    runner["age_seconds"] = 276575.0
+    t1 = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/track1-runtime"]))
+    t1["paper_account"] = {"status": "PASS", "code": "account_flat_and_funded",
+                           "currency": "USD", "equity": 250817.91,
+                           "account_id": "DUR125337", "expected_equity": 250000.0,
+                           "expected_currency": "USD", "line": "",
+                           "separate_from_shadow_evidence": True}
+    stub_api(browser_page, {"/api/v1/runner-state": runner, "/api/v1/track1-runtime": t1})
     open_realtime(browser_page, realtime_server)
     text = browser_page.eval_on_selector("#brokerAccountContext", "el => el.textContent")
-    assert "996,312" in text
-    assert "4,168" in text
+
+    # the account the route would actually start from
+    assert "250,818" in text, text
+    # the divergence is stated, and the legacy number wears its own name and its age
+    # Stage 5ZZH restated 5ZZF's pin. The clause became "Legacy runner state stale:" so it
+    # says WHY the figure is not the account rather than only that it is old. The
+    # invariant is unchanged and is what is asserted here: the legacy figure appears
+    # under its own name, and never without its age.
+    assert "legacy runner state" in text.lower(), text
+    assert "ago" in text.lower(), "the legacy figure must never appear without its age"
+    assert " ago ago" not in text.lower(), text
+    assert "996,312" in text, text
+    assert "ago" in text.lower(), text
+    # and the cross-currency subtraction is gone in every spelling
+    assert "4,168" not in text, text
+    assert "Broker acct" not in text, text
     assert browser_page.eval_on_selector(
         "#brokerAccountContext", "el => el.classList.contains('negative')") is True
 
@@ -933,3 +1000,524 @@ def test_a_position_only_the_runner_believes_in_raises_an_incident(realtime_serv
     assert "runner-only position" in text, text
     assert "OPEN" in monitor_statuses(browser_page)
     assert "nominal" not in rail_text(browser_page).lower()
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Stage 5ZZF — the account line, driven with the exact numbers that were on the page
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _t1_with_account(equity=250817.91, status="PASS", currency="USD"):
+    """The Track 1 runtime payload carrying a recorded baseline."""
+    base = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/track1-runtime"]))
+    base["paper_account"] = {
+        "status": status, "code": "account_flat_and_funded", "currency": currency,
+        "equity": equity, "account_id": "DUR125337",
+        "expected_equity": 250000.0, "expected_currency": "USD",
+        "line": f"Paper account baseline: {currency} {equity:,.0f} — broker reconcile flat",
+        "separate_from_shadow_evidence": True,
+    }
+    return base
+
+
+def _runner_with_legacy_equity(equity=996730.93):
+    """The runner-state payload as it actually stood: three days old, carrying a CAD-era start
+    and an unlabelled equity, with a freshness that says `not_expected_yet` rather than stale."""
+    rs = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/runner-state"]))
+    rs["freshness"] = "not_expected_yet"
+    rs["age_seconds"] = 276575.0
+    rs.setdefault("payload", {}).setdefault("meta", {})
+    rs["payload"]["meta"]["broker_equity"] = equity
+    rs["payload"]["meta"]["paper_start"] = {
+        "date": "2026-07-08", "equity": 1000480.0,
+        "note": "connect_test_paper.py, DUR125337, CAD"}
+    return rs
+
+
+def test_5zzf_the_account_line_shows_the_track1_baseline_not_the_stale_legacy_number(
+        realtime_server, browser_page):
+    """The page said `Broker acct $996,731 / -$3,749 since 2026-07-08` for three days after the
+    account was reset to USD 250,817.91."""
+    stub_api(browser_page, {
+        "/api/v1/track1-runtime": _t1_with_account(),
+        "/api/v1/runner-state": _runner_with_legacy_equity(),
+    })
+    open_realtime(browser_page, realtime_server)
+    text = browser_page.inner_text("#brokerAccountContext")
+
+    assert "250,818" in text, text
+    import re as _re
+    # The figure may appear ONLY inside the legacy clause. Cutting that clause out and
+    # then looking for the number again is what makes this an assertion and not a wish.
+    assert "996,731" not in _re.sub(r"Legacy runner state[^·]*", "", text), text
+    assert "Broker acct" not in text, text
+    # the old cross-currency delta is gone in every spelling
+    assert "-3,749" not in text and "3,749" not in text, text
+
+
+def test_5zzf_a_material_divergence_from_the_legacy_number_is_called_out(
+        realtime_server, browser_page):
+    stub_api(browser_page, {
+        "/api/v1/track1-runtime": _t1_with_account(),
+        "/api/v1/runner-state": _runner_with_legacy_equity(),
+    })
+    open_realtime(browser_page, realtime_server)
+    text = browser_page.inner_text("#brokerAccountContext")
+    # Stage 5ZZH restated 5ZZF's pin. The clause became "Legacy runner state stale:" so it
+    # says WHY the figure is not the account rather than only that it is old. The
+    # invariant is unchanged and is what is asserted here: the legacy figure appears
+    # under its own name, and never without its age.
+    assert "legacy runner state" in text.lower(), text
+    assert "ago" in text.lower(), "the legacy figure must never appear without its age"
+    assert " ago ago" not in text.lower(), text
+    # and it says how old that number is, rather than presenting it as current
+    assert "ago" in text.lower(), text
+    cls = browser_page.get_attribute("#brokerAccountContext", "class") or ""
+    assert "negative" in cls, "a 299% divergence rendered as an ordinary line"
+
+
+def test_5zzf_a_fresh_broker_reading_sits_beside_the_baseline_not_inside_it(
+        realtime_server, browser_page):
+    """`/api/v1/broker` is allowed as the current broker figure and must not be confused with
+    the recorded baseline. Here they differ by ordinary live drift."""
+    brk = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/broker"]))
+    brk["payload"]["equity"] = 250818.18
+    stub_api(browser_page, {
+        "/api/v1/track1-runtime": _t1_with_account(250817.91),
+        "/api/v1/broker": brk,
+        "/api/v1/runner-state": _runner_with_legacy_equity(250800.0),   # not material
+    })
+    open_realtime(browser_page, realtime_server)
+    text = browser_page.inner_text("#brokerAccountContext")
+    assert "Paper account" in text and "250,818" in text, text
+    assert "broker now" in text.lower(), text
+    # a small legacy difference is not shouted about
+    # Stage 5ZZH: the clause is now "Legacy runner state stale:". A small legacy
+    # difference is still not shouted about, which is what this has always asserted.
+    assert "legacy runner state" not in text.lower(), text
+
+
+def test_5zzf_without_a_baseline_the_legacy_number_appears_only_under_its_own_name(
+        realtime_server, browser_page):
+    t1 = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/track1-runtime"]))
+    t1.pop("paper_account", None)
+    brk = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/broker"]))
+    brk["freshness"] = "stale"
+    stub_api(browser_page, {
+        "/api/v1/track1-runtime": t1,
+        "/api/v1/broker": brk,
+        "/api/v1/runner-state": _runner_with_legacy_equity(),
+    })
+    open_realtime(browser_page, realtime_server)
+    text = browser_page.inner_text("#brokerAccountContext")
+    assert "Legacy runner state" in text, text
+    assert "not the current account" in text, text
+    assert "Broker acct" not in text, text
+
+
+def test_5zzf_open_issues_carry_their_route_scope_as_a_chip(realtime_server, browser_page):
+    issues = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/open-issues"]))
+    issues["issues"] = [
+        {"key": "paper:pnl:paper_flex_total_mismatch", "status": "incident",
+         "component": "runner", "title": "Paper vs Flex P&L total mismatch",
+         "problem": "x", "first_seen": "2026-08-20T00:00:00Z",
+         "last_seen": "2026-08-27T00:00:00Z", "occurrences": 1, "impact": "x",
+         "action": "x", "resolution_evidence": "x", "evidence": "x",
+         "route_scope": "legacy",
+         "scope_reason": "compares the LEGACY paper ledger; it reads no Track 1 artefact",
+         "track1_readiness_blocker": False},
+    ]
+    stub_api(browser_page, {"/api/v1/open-issues": issues})
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector("#openIssueList .issue-scope", timeout=10_000)
+    chips = browser_page.eval_on_selector_all(
+        "#openIssueList .issue-scope", "els => els.map(e => e.textContent.trim())")
+    assert "LEGACY" in chips, chips
+    # the issue is still listed — labelled, not removed
+    rows = browser_page.eval_on_selector_all(
+        "#openIssueList .issue-list-row", "els => els.length")
+    assert rows == 1, rows
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════
+# Stage 5ZZY — the market view's setup lanes and the regime monitor.
+#
+# The shared fixture serves `sleeves: {}`, so every test above this line renders the market
+# view as an empty panel and none of them touches the code that draws it. These build a
+# sleeve that looks like the real one — the shape is copied from a measured payload, not
+# invented — and check the three claims the panel makes that could be false.
+# ══════════════════════════════════════════════════════════════════════════════════════
+def _mv_slots(n: int, decided: int, *, signal_at: int | None = None,
+              missed_at: int | None = None) -> list[dict]:
+    out = []
+    for i in range(n):
+        hh, mm = divmod(70 + i * 5, 60)
+        if i == missed_at:
+            st, why = "missed", "no record was written for this slot"
+        elif i == signal_at:
+            st, why = "signal", "decided"
+        elif i < decided:
+            st, why = "no_signal", "decided"
+        else:
+            st, why = "future", "has not fired yet"
+        out.append({"slot_id": f"TRACK1_NKD_{hh:02d}{mm:02d}", "time_et": f"{hh:02d}:{mm:02d}",
+                    "status": st, "reason": why, "candidate_count": 0})
+    return out
+
+
+def _mv_lane(rule: str, label: str, threshold: str, slots: list[dict], *,
+             gate: bool = False) -> dict:
+    """One lane, built the way the backend builds it: cells follow the slots.
+
+    `values_published` is 0 on every lane, which is what every stored session measured —
+    the detectors return a verdict and not the number behind it.
+    """
+    cells, passed, failed = [], 0, 0
+    for s in slots:
+        if s["status"] == "future":
+            state = "future"
+        elif s["status"] == "missed":
+            state = "no_record"
+        elif gate:
+            state, passed = "pass", passed + 1
+        else:
+            state = "not_published"
+        cells.append({"slot_id": s["slot_id"], "time_et": s["time_et"],
+                      "state": state, "value": None})
+    decided = passed + failed
+    return {"rule": rule, "label": label, "threshold_display": threshold,
+            "comparator": "", "detail": "", "cells": cells,
+            "values_published": 0, "slots_decided": decided,
+            "passed": passed, "failed": failed,
+            "state_display": (f"{passed}/{decided} pass" if decided
+                              else "value not published by the detector")}
+
+
+def _market_view(*, decided: int = 22, n: int = 22, signal_at=None, missed_at=None,
+                 status: str = "complete") -> dict:
+    slots = _mv_slots(n, decided, signal_at=signal_at, missed_at=missed_at)
+    bars = [{"time": f"2026-08-27 {(i // 12):02d}:{(i % 12) * 5:02d}",
+             "open": 66800.0 + i, "high": 66820.0 + i, "low": 66780.0 + i,
+             "close": 66810.0 + i, "volume": 100 + i} for i in range(24)]
+    sleeve = {
+        "label": "NKD", "instrument": "MNKD", "bar_interval": "5m", "clock": "Asia/Tokyo",
+        "range": {"context_start_et": "00:00", "window_start_et": "01:10",
+                  "window_end_et": "02:55", "context_end_et": "03:05"},
+        "status": status,
+        "summary": "Complete · 22/22 slots observed · no signal",
+        "coverage": {"sleeve": "global_nkd", "outcome": status,
+                     "expected_slots": n, "observed_slots": decided},
+        "bars": bars, "bars_session_date": "2026-08-27", "bars_note": "",
+        "volume_status": "present", "slots": slots, "levels": [],
+        "rule_lanes": [
+            _mv_lane("gate_allow", "gate allow", "no refusal codes", slots, gate=True),
+            _mv_lane("ema10_filter", "ema10 filter", "ema period 10", slots),
+            _mv_lane("regime_lag_1", "regime lag 1", "lag 1", slots),
+        ],
+        "levels_note": "Strategy levels unavailable",
+        "strategy": {"rules": [], "detail": "", "status": "not_computed_until_entry"},
+        "setup_boundary": {
+            "schema": "track1_setup_boundary/1", "sleeve": "global_nkd",
+            "boundary_type": "entry_after_setup_only",
+            "boundary_proof": "the entry comes from a per-bar signal function",
+            "status": "not_applicable", "price_levels": [], "metrics": [],
+            "levels_armed": False, "nearest_failed_condition": None,
+            "summary": "This sleeve publishes an entry only after a setup bar forms."},
+        "levels_detail": "The strategy has not published entry/reference levels yet.",
+        "data_status": {"provider": "ibkr", "ok": True,
+                        "latest_bar_et": "2026-08-28 15:54:00+09:00",
+                        "live_rows_fetched": 1910, "splice_result": "ok",
+                        "provider_reason": None},
+    }
+    return {"schema": "track1_market_view/1", "route": "track1_candidate",
+            "session_date": "2026-08-28", "now_et": "10:42",
+            "levels_note": "Strategy levels unavailable",
+            "sleeves": {"global_nkd": sleeve}}
+
+
+def _regime(label: str = "Calm", run: int = 21, total: int = 60) -> dict:
+    ctx = ([{"date": f"2026-06-{i % 28 + 1:02d}", "label": "Normal"}
+            for i in range(total - run)] +
+           [{"date": f"2026-08-{i % 28 + 1:02d}", "label": label} for i in range(run)])
+    return {"status": "PASS", "code": "labelled", "detail": "", "label": label,
+            "label_date": "2026-08-27", "checked_at": "2026-08-28T07:34:37Z",
+            "age_hours": 7.14, "recent": ctx[-5:], "context": ctx,
+            "inputs": {}, "score": 0.998354,
+            "score_name": "posterior probability of the labelled state",
+            "shift_threshold": None, "margin": 0.996711,
+            "margin_name": "probability margin over the next most likely state",
+            "runner_up": "Normal",
+            "state_probabilities": {"Calm": 0.998354, "Normal": 0.001643, "Stress": 3e-06},
+            "posterior_agrees_with_label": True,
+            "entropy_bits": 0.017627, "max_entropy_bits": 1.584963,
+            "features": [
+                {"name": "log_return", "label": "SPY 1-day log return",
+                 "display_value": "+0.65%", "percentile_60d": 76.7,
+                 "z_score_60d": 0.72, "leans": "mixed"},
+                {"name": "realised_vol", "label": "Realised volatility, 5-day annualised",
+                 "display_value": "5.8% annualised", "percentile_60d": 0.0,
+                 "z_score_60d": -1.391, "leans": "Calm"}],
+            "score_note": "", "threshold_note": "not published",
+            "line": "Regime Calm as of 2026-08-27",
+            "verification": {"status": "PASS", "counts": {"compared": 1761, "changed": 0}}}
+
+
+def _stub_mv(page, market_view: dict, regime: dict | None = None) -> None:
+    stub_api(page, {"/api/v1/track1-market-view": {
+        "market_view": market_view, "regime": regime or _regime()}})
+
+
+def test_every_rule_lane_draws_one_cell_per_declared_slot(realtime_server, browser_page):
+    """A lane with fewer cells than slots silently shifts every cell after the gap, so a
+    verdict would be read against the wrong minute. Asserted per lane, and the lane list is
+    asserted non-empty first: a page that rendered no lanes at all would otherwise pass a
+    loop over nothing."""
+    _stub_mv(browser_page, _market_view())
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector("#marketViewLanes .mv2-lane")
+    counts = browser_page.eval_on_selector_all(
+        "#marketViewLanes .mv2-lanes .mv2-lane",
+        "els => els.map(e => e.querySelectorAll('.mv2-cell').length)")
+    assert counts, "the panel drew no rule lanes at all"
+    assert counts == [22] * 3, counts
+
+
+def test_a_lane_never_shows_a_value_the_detector_did_not_publish(realtime_server, browser_page):
+    """The panel's whole claim. Measured on every stored session, every strategy rule
+    carries a null value, so a lane that printed a number would be printing an invented
+    one — and on this page an invented number reads as the strategy's own."""
+    _stub_mv(browser_page, _market_view())
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector("#marketViewLanes .mv2-lane")
+    rows = browser_page.eval_on_selector_all(
+        "#marketViewLanes .mv2-lanes .mv2-lane .mv2-lane-value",
+        "els => els.map(e => [e.textContent.trim(), e.getAttribute('title') || ''])")
+    assert rows, "no lane value column rendered"
+    # The gate lane DID publish verdicts and says so; the detector lanes did not. The column
+    # carries the short form and the full reason stays on hover, so BOTH are asserted — a
+    # column shortened to the point of saying nothing would otherwise pass.
+    assert "22/22 pass" in [text for text, _ in rows]
+    unpublished = [(text, title) for text, title in rows if "pass" not in text]
+    assert unpublished, "no lane exercised the unpublished path"
+    assert all(text == "no verdict" for text, _ in unpublished), unpublished
+    assert all(title == "value not published by the detector"
+               for _, title in unpublished), unpublished
+
+
+def test_a_slot_that_left_no_record_does_not_draw_as_a_decided_slot(realtime_server, browser_page):
+    """`missed` and `no_signal` are different facts: one is a slot that ran and found
+    nothing, the other is a slot nobody watched. Drawing them alike is how absence comes to
+    read as a quiet result."""
+    _stub_mv(browser_page, _market_view(missed_at=9))
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector("#marketViewLanes .mv2-lane")
+    classes = browser_page.eval_on_selector_all(
+        "#marketViewLanes .mv2-lanes .mv2-lane:nth-child(2) .mv2-cell",
+        "els => els.map(e => e.className)")
+    assert sum("norec" in c for c in classes) == 1, classes
+    assert sum("muted" in c for c in classes) == 21, classes
+
+
+def test_held_days_says_at_least_when_the_run_fills_the_whole_strip(realtime_server, browser_page):
+    """The context strip is 60 days. A run that reaches its start began earlier than the
+    payload can see, so the exact figure is not knowable here and must not be printed as
+    one."""
+    _stub_mv(browser_page, _market_view(), _regime(run=60, total=60))
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector("#regimeFacts .rg2-held")
+    text = browser_page.eval_on_selector("#regimeFacts .rg2-held", "el => el.textContent")
+    assert "at least 60 days" in text, text
+
+
+def test_held_days_is_exact_when_the_run_starts_inside_the_strip(realtime_server, browser_page):
+    """The other half of the pair above. Without this, a bug that always said 'at least'
+    would pass the test that matters."""
+    _stub_mv(browser_page, _market_view(), _regime(run=21, total=60))
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector("#regimeFacts .rg2-held")
+    text = browser_page.eval_on_selector("#regimeFacts .rg2-held", "el => el.textContent")
+    assert text.strip() == "held 21 days", text
+
+
+def test_the_regime_legend_names_only_states_this_model_can_produce(realtime_server, browser_page):
+    """The fitted model has three states. A legend key for a fourth would show a label the
+    decode can never return, and somebody would go looking for why it never appears."""
+    _stub_mv(browser_page, _market_view())
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector("#regimeStrip .regime-legend")
+    names = browser_page.eval_on_selector_all(
+        "#regimeStrip .regime-legend-item", "els => els.map(e => e.textContent.trim())")
+    assert names == ["Calm", "Normal", "Stress"], names
+
+
+def test_switching_to_price_context_swaps_the_card_and_keeps_the_verdict(realtime_server,
+                                                                        browser_page):
+    """The tab changes which card is built; it must not change the answer above them."""
+    _stub_mv(browser_page, _market_view())
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector("#marketViewLanes .mv2-lane")
+    before = browser_page.eval_on_selector("#marketViewVerdict", "el => el.innerText")
+    browser_page.click('[data-mv-inner="Price context"]')
+    browser_page.wait_for_selector("#marketViewChart .mv2-card")
+    assert browser_page.eval_on_selector("#marketViewLanes", "el => el.innerHTML") == ""
+    after = browser_page.eval_on_selector("#marketViewVerdict", "el => el.innerText")
+    assert after == before, (before, after)
+
+
+def test_a_sleeve_with_no_rule_evidence_says_so_instead_of_drawing_an_empty_grid(
+        realtime_server, browser_page):
+    """Waiting is the normal morning state for two of the three sleeves. An empty lane grid
+    there reads as a panel that failed to load."""
+    mv = _market_view(decided=0, status="waiting")
+    mv["sleeves"]["global_nkd"]["rule_lanes"] = []
+    _stub_mv(browser_page, mv)
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector("#marketViewLanes .mv-empty")
+    # Lower-cased before matching: the empty-state heading is upper-cased by CSS, so
+    # `innerText` returns it upper-cased and a literal match here would pin the styling
+    # rather than the sentence.
+    text = browser_page.eval_on_selector("#marketViewLanes", "el => el.innerText")
+    assert "no rule evidence for this session" in text.lower(), text
+    assert "01:10 ET" in text, text
+
+
+@pytest.mark.parametrize("width,height", [(1440, 900), (1024, 900), (390, 844)])
+def test_the_populated_market_view_does_not_overflow_or_clip(realtime_server, browser_page,
+                                                             width, height):
+    """The two overflow tests above run against `sleeves: {}`, so the panel they measure is
+    an empty box — the lane grid, the 24-cell strip and the four regime metric cells never
+    exist in them. A three-column grid with two fixed columns is exactly the shape that
+    survives at 1440 and breaks at 390, so it is measured with the panel populated."""
+    browser_page.set_viewport_size({"width": width, "height": height})
+    _stub_mv(browser_page, _market_view())
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector("#marketViewLanes .mv2-lane")
+    overflow = browser_page.evaluate(
+        "() => document.documentElement.scrollWidth > document.documentElement.clientWidth")
+    assert overflow is False, f"page overflows horizontally at {width}x{height}"
+    # Scoped to the two sections this test is about. Measured on 2026-08-28, the page
+    # HEADER already clips at 1024 (`module-nav`, `header-live-context`) with the market
+    # view empty, so an unscoped assertion here would fail on a defect that predates this
+    # panel and belongs to every dashboard that shares the header.
+    clipped = [c for c in browser_page.evaluate(_CLIPPED_CONTENT)
+               if not c.startswith(("NAV.", "DIV.header-", "SPAN.runner-header", "B.warning"))]
+    assert clipped == [], f"panel content clipped off-screen at {width}x{height}: {clipped}"
+
+
+def test_a_rejected_slot_is_not_reported_as_no_signal(realtime_server, browser_page):
+    """The verdict word and the reason printed beside it must be the same fact.
+
+    Before this, the status word knew about signals and about a refused SLEEVE but not about
+    a rejected SLOT, so a session where the gate refused a candidate read `NO SIGNAL · gate
+    refused at 02:25 ET` — a pill contradicting itself in six words, and pointing an
+    operator at the setup when the refusal came from the order gate."""
+    mv = _market_view()
+    slots = mv["sleeves"]["global_nkd"]["slots"]
+    slots[15] = dict(slots[15], status="rejected", reason="admission_cap")
+    _stub_mv(browser_page, mv)
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector("#marketViewVerdict .mv2-pill")
+    text = browser_page.eval_on_selector("#marketViewVerdict", "el => el.innerText")
+    assert "REJECTED" in text, text
+    assert "NO SIGNAL" not in text, text
+    assert "gate refused at 02:25 ET" in text, text
+
+
+def test_no_live_bars_points_at_the_last_slot_that_saw_data(realtime_server, browser_page):
+    """A refused slot leaves a row but no observation. Reading the last ROW as the last bar
+    named a minute when there were already no bars — the number was real and measured the
+    wrong thing."""
+    mv = _market_view(decided=10)
+    sleeve = mv["sleeves"]["global_nkd"]
+    sleeve["slots"] = [dict(s, status="refused", reason="no_bar_provider")
+                       if i >= 10 else s for i, s in enumerate(sleeve["slots"])]
+    sleeve["data_status"] = {"provider": "ibkr", "ok": False, "latest_bar_et": None,
+                             "live_rows_fetched": 0, "splice_result": "unknown",
+                             "provider_reason": "the provider returned no rows"}
+    _stub_mv(browser_page, mv)
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector("#marketViewVerdict .mv2-pill")
+    text = browser_page.eval_on_selector("#marketViewVerdict", "el => el.innerText")
+    # slot 9 is the last that decided; slot 21 is the last that left a row.
+    assert "no live bars since 01:55 ET" in text, text
+
+
+def _with_slot_series(mv: dict, *, series_day: str) -> dict:
+    """`_market_view()` plus a per-slot series, which the price-context pane needs.
+
+    The builder does not carry one: every sleeve it makes is refused before a rule reads a
+    number, which is the common case and also the case where this pane draws nothing.
+    """
+    s = mv["sleeves"]["global_nkd"]
+    # Nến phải phủ HẾT các slot, nếu không chart giá chỉ vẽ mark cho phần slot nằm trong
+    # khoảng bar và span bị từ chối vì lệch SỐ ĐẾM — phép kiểm khi đó xanh/đỏ vì một lý do
+    # không liên quan gì tới ngày. Đo được ở bản đầu: 10 mark cho 22 slot.
+    s["bars"] = [{"time": f"{s['bars_session_date']} {row['time_et']}",
+                  "open": 66800.0 + i, "high": 66820.0 + i, "low": 66780.0 + i,
+                  "close": 66810.0 + i, "volume": 100 + i}
+                 for i, row in enumerate(s["slots"])]
+    s["strategy"] = dict(s["strategy"])
+    s["strategy"]["slot_series"] = [
+        {"time_et": row["time_et"], "close": 66800.0 + i, "ema": 66795.0 + i,
+         "volume": 100 + i, "avg_volume": 95 + i}
+        for i, row in enumerate(s["slots"])]
+    s["strategy"]["slot_series_session"] = series_day
+    return mv
+
+
+def _xspan(page) -> str:
+    return page.eval_on_selector(".mv2-sc-svg", "el => el.getAttribute('data-xspan')")
+
+
+def _axis_state(page) -> dict:
+    """Everything the sharing decision reads, so a failure names the reason itself."""
+    return page.evaluate("""() => ({
+        xspan: (document.querySelector('.mv2-sc-svg')||{}).dataset?.xspan ?? null,
+        xaxis: document.querySelector('.market-view-section')?.getAttribute('data-xaxis'),
+        marks: document.querySelectorAll('.mv-mark').length,
+        seriesPts: document.querySelectorAll('.mv2-sc-dot, .mv2-sc-svg circle').length,
+        priceSvg: !!document.querySelector('.mv-svg'),
+      })""")
+
+
+def _open_price_context(page, server, mv):
+    _stub_mv(page, mv)
+    open_realtime(page, server)
+    page.click('[data-mv-inner="Price context"]')
+    page.wait_for_selector(".mv2-sc-svg", timeout=20_000)
+    page.wait_for_timeout(500)
+
+
+def test_the_two_chart_panes_share_one_axis_when_they_are_the_same_session(
+        realtime_server, browser_page):
+    """The guard for the test below: without it, a rule that never shares would pass it.
+
+    Same session, same slot count -> the series adopts the candle chart's slot span so a
+    reader can follow one minute down from a candle to the close line.
+    """
+    # `_market_view()` builds its bars for 2026-08-27; name the series the same day.
+    _open_price_context(browser_page, realtime_server,
+                        _with_slot_series(_market_view(), series_day="2026-08-27"))
+    assert _xspan(browser_page) == "shared", _axis_state(browser_page)
+
+
+def test_the_panes_refuse_one_axis_when_the_candles_are_a_different_session(
+        realtime_server, browser_page):
+    """Đo được 2026-09-02: nến 09-01 nằm dưới các slot của 09-02, chung một trục.
+
+    Kho bar được append mỗi ngày một lần, nên trong lúc một phiên đang chạy, bar mới nhất
+    của kho là của hôm trước. Số slot vẫn khớp — 22 dù ngày nào — nên phép kiểm cũ, vốn chỉ
+    đếm slot, đã nhận span và dóng slot hôm nay lên nến hôm qua, một trục, một crosshair
+    đồng bộ. Câu ghi chú ngay dưới head lại viết "the crosshair matches within each pane,
+    not across them": đúng về ý định, sai về thứ đang hiện ra.
+
+    Luật 8 của hợp đồng thị giác: không hover chung khi hai chart không chung trục.
+    """
+    _open_price_context(browser_page, realtime_server,
+                        _with_slot_series(_market_view(), series_day="2026-08-28"))
+    assert _xspan(browser_page) == "own"
+    assert browser_page.eval_on_selector(
+        ".market-view-section", "el => el.getAttribute('data-xaxis')") == "own"
+    # Và người đọc phải THẤY điều đó, không phải suy ra từ một thuộc tính.
+    label = browser_page.eval_on_selector(
+        ".mv2-slotchart .mv2-sc-head",
+        "el => getComputedStyle(el, '::after').content")
+    assert "trục riêng" in label, label

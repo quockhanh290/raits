@@ -165,10 +165,6 @@
 .primary-column > .decision-section    { order: 1; }
 .primary-column > .orders-section      { order: 2; }
 
-/* Now Monitor is moved into the header by next.js, so it needs to sit in the same
-   order group as the strips there rather than keep a workspace order. */
-.overview-header > .now-monitor { order: -1; }
-
 /* ═══ One two-column grid, from the top ═════════════════════════════════════
    next.js lifts the status rail and the journal column out to be direct children
    of <main>, so the whole page can run as a single grid instead of a full-width
@@ -394,3 +390,819 @@
   .broker-account-line { white-space: normal; overflow-wrap: anywhere; }
   .broker-account-line a { display: inline-block; margin-top: 4px; }
 }
+
+/* ── Group bands ─────────────────────────────────────────────────────────────
+   Three headers that split the workspace column into Operations, Book and
+   Market. Inserted by next.js (groupBands), which also reorders the sections so
+   each one sits under the band that names it.
+
+   Fonts come from var(--mono)/var(--sans), never a literal family: the header's
+   font control rewrites --font-ui, and a hardcoded stack here would be the one
+   place on the page the control cannot reach.
+
+   The accent is carried by the bottom border AND by the number's colour, so the
+   grouping survives for a reader who cannot separate the three hues. */
+.group-band {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 16px 22px 13px;
+  margin: 14px 0 0;
+  border-top: 1px solid #262d36;
+  border-bottom: 2px solid var(--group-accent);
+  background: linear-gradient(180deg, var(--group-tint) 0%, #0a0c10 100%);
+}
+.group-band[data-group="ops"]    { --group-accent: #5b9cf0; --group-tint: #0d1219; }
+.group-band[data-group="book"]   { --group-accent: #5fd3b2; --group-tint: #0b1512; }
+.group-band[data-group="market"] { --group-accent: #9d8cf5; --group-tint: #100e1a; }
+
+.group-band .group-num {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--group-accent);
+}
+.group-band .group-name {
+  font-family: var(--sans);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -.02em;
+  color: #e8ebf0;
+}
+/* The subtitle is the first thing to go when the column narrows: it explains the
+   group but never carries a number, so losing it costs nothing operationally. */
+.group-band .group-note {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-style: normal;
+  color: #798394;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-band .group-count {
+  margin-left: auto;
+  padding-left: 12px;
+  font-family: var(--mono);
+  font-style: normal;
+  font-size: 11px;
+  color: #4b5563;
+  white-space: nowrap;
+}
+
+/* The first band opens the column, so it needs no rule above it separating it
+   from the figures row that already ends in one. */
+.primary-column > .group-band:first-child { margin-top: 0; border-top: 0; }
+
+/* 680px, not a rounder number of my choosing: this file's own rule 3 makes that
+   value a contract with realtime.js, which holds a matchMedia at the same width
+   to decide whether the first issue auto-opens. Any other value opens a band
+   where the page lays out narrow while the script still behaves wide. */
+@media (max-width: 680px) {
+  .group-band { padding: 13px 14px 11px; gap: 10px; flex-wrap: wrap; }
+  .group-band .group-note { display: none; }
+}
+
+/* ── Design alignment: density and the two rows the design draws differently ──
+   These sit in this sheet, not in the skin, because the skin file is carrying
+   another session's uncommitted work. The skin loads AFTER this one, so every
+   rule below is written one level more specific than the skin's, which is what
+   makes it win rather than load order. */
+
+/* Sections are 18/22 in the design; the skin sets 24/26 and reads looser. */
+.primary-column > .section-band { padding: 18px 22px; }
+
+/* Now Monitor's four cells: the hues are already right, the edge is not. The
+   design runs the accent down the LEFT of each cell so the colour sits beside
+   the label it belongs to; the skin lays it across the top, where four separate
+   accents read as one broken rule. Same variables, moved edge.
+
+   One hue per cell, held in a variable so the accent edge and the label read the
+   same colour from one place. The skin paints all four labels with the single
+   --d-exposure token, which makes the accents look positional and the labels
+   look uniform — two different stories about the same four cells. */
+.now-monitor .now-schedule-facts > .schedule-fact              { --cell-hue: var(--d-exposure); }
+.now-monitor .now-schedule-facts > .schedule-fact:nth-child(2) { --cell-hue: var(--d-runner); }
+.now-monitor .now-schedule-facts > .schedule-fact:nth-child(3) { --cell-hue: var(--d-job-late); }
+.now-monitor .now-schedule-facts > .schedule-fact:nth-child(4) { --cell-hue: var(--d-dec-late); }
+
+/* The design runs each cell as ONE line — label, name, then clock and distance
+   pushed to the right edge. The skin stacks them, which is why the strip stood
+   nearly twice as tall as the design's. */
+.now-monitor .now-schedule-facts > .schedule-fact {
+  border-top: 0;
+  border-left: 2px solid var(--cell-hue);
+  display: flex; align-items: baseline; gap: 9px;
+  padding: 8px 14px;
+}
+.now-monitor .now-schedule-facts > .schedule-fact > span {
+  flex: 0 0 auto;
+  font-size: 10px; letter-spacing: .11em;
+  color: var(--cell-hue);
+}
+.now-monitor .now-schedule-facts > .schedule-fact > div {
+  flex: 1 1 auto; min-width: 0;
+  justify-content: flex-start; gap: 9px;
+}
+.now-monitor .now-schedule-facts > .schedule-fact > div > b { font-size: 12px; font-weight: 500; }
+/* Clock and distance travel together on the right, as one pair, rather than
+   being spread across the row by space-between. */
+.now-monitor .now-schedule-facts > .schedule-fact > div > time { margin-left: auto; }
+
+/* One figures row, equity given the extra width the design gives it.
+   next.js empties and hides `.metrics-figures` to feed this.
+   Two across by default, four only where there is room for four. The design puts
+   all four on one row, but its own root declares `min-width: 1900px`; at 1440x900
+   four across measured "0.00%" from Risk printed on top of "Protection" from
+   Exposure, and the overlap test caught it. Copying the design's columns without
+   the design's width is not the design, it is a collision.
+
+   1600px is a wide-side threshold like the 1051px one above, not a narrow-screen
+   one, so rule 3's 680px contract is untouched. */
+#metrics .metrics-lead { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+@media (min-width: 1600px) {
+  #metrics .metrics-lead { grid-template-columns: 1.25fr 1fr 1fr 1fr; }
+}
+@media (max-width: 680px) {
+  #metrics .metrics-lead { grid-template-columns: minmax(0, 1fr); }
+  .primary-column > .section-band { padding: 14px 16px; }
+}
+
+/* ── Design alignment · round 2 ──────────────────────────────────────────────*/
+
+/* The rail is 380px in the design. This sheet asked for minmax(420px, 450px),
+   which measured 452px — 72px taken from the workspace column, where every wide
+   table and chart lives. Same media query as the rule it corrects, so the narrow
+   layout below 1051px is untouched.
+
+   `body main` rather than plain `main`: the skin sets 452px on `main.is-two-column`
+   at equal specificity and loads after this sheet, so a matching selector here
+   loses on order alone. One extra element selector settles it without !important. */
+@media (min-width: 1051px) {
+  body main.is-two-column { grid-template-columns: minmax(0, 1fr) 380px; }
+}
+
+/* Three panels the design draws as cards and this page leaves bare: the decision
+   of record, the positions grid and the orders table all sat on the page
+   background with square corners while every neighbouring panel was a card.
+
+   `overflow` is deliberately NOT set here. The design's own orders container
+   clips, but on this page `.table-wrap` is the element that scrolls a wide table
+   sideways, and the suite has a test whose whole point is that content may only
+   pass the right edge inside something that scrolls. Clipping it would satisfy
+   the border and break the contract.
+
+   The skin ALREADY asks for both of these to be cards — `.decision-shell` and
+   `.table-wrap` each declare a border, a radius and a background further down its
+   own file. Both lose to `.section-band > .section-body`, which is more specific
+   and strips all three. So this is not a new opinion about how they should look;
+   it restores the skin's own intent at a specificity that survives. Three classes
+   beats that two-class rule regardless of load order. */
+.primary-column > .decision-section > .decision-shell {
+  background: var(--card);
+  border: 1px solid var(--line-card);
+  border-radius: 8px;
+}
+/* Orders takes the frame but NOT a background: its header cells and body cells
+   already paint their own, and the design's orders panel is likewise a frame
+   around two differently-shaded rows rather than one flat fill. */
+.primary-column > .orders-section > .table-wrap {
+  border: 1px solid var(--line-card);
+  border-radius: 8px;
+}
+.positions-section .position-grid {
+  background: var(--card);
+  border: 1px solid var(--line-card);
+  border-radius: 8px;
+}
+
+/* ── Calm · phases paired inside each instrument ─────────────────────────────
+   realtime.js now builds one card per instrument with DECIDE and OBSERVE as
+   adjacent columns (mvCalmByInstrument). These are the styles for that shape.
+
+   They live here rather than in the skin because skin-e.css is carrying another
+   session's uncommitted work, and because the skin has no rules for these class
+   names yet — nothing here is overriding anything, it is the first opinion. */
+.mv2-calm-paired .mv2-calm-phases {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+}
+.mv2-calm-phases .mv2-calm-phase { display: flex; align-items: baseline; gap: 8px; }
+.mv2-calm-phases .mv2-calm-sep {
+  width: 1px; height: 11px; background: var(--line-strong); display: inline-block;
+}
+
+/* auto-fit rather than a fixed count: a basket of three must not be forced onto
+   one row at 1440px, which is how the figures row printed one number on top of
+   another earlier in this same redesign. */
+.mv2-calm-ivs {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(430px, 1fr));
+}
+
+.mv2-calm-inst-head { display: flex; align-items: baseline; gap: 9px; }
+/* The tally sits at the right edge of the instrument's own header, so it reads as
+   a property of that instrument and not of the card. */
+.mv2-calm-tally {
+  margin-left: auto;
+  font-family: var(--mono); font-size: 11px; color: var(--green);
+  white-space: nowrap;
+}
+
+/* One label column plus one column per phase. The count comes from the renderer
+   as --calm-cols; hard-coding 2 here would silently mis-lay a day that recorded
+   only one of the two phases. */
+.mv2-calm-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(var(--calm-cols, 2), minmax(74px, 108px));
+  gap: 0 10px;
+  align-items: baseline;
+  margin-top: 8px;
+}
+.mv2-calm-colhead {
+  font-size: 9px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--t-faint, #4b5563); text-align: right;
+}
+.mv2-calm-rowlabel { padding: 5px 0; border-top: 1px solid var(--line-hair); min-width: 0; }
+.mv2-calm-cell {
+  padding: 5px 0; border-top: 1px solid var(--line-hair);
+  text-align: right; font-family: var(--mono); font-size: 12px;
+  color: var(--t-primary); white-space: nowrap;
+}
+/* An em dash for "this phase does not carry that row" — dimmed, so it is legible
+   as a deliberate blank rather than as a value that failed to arrive. */
+.mv2-calm-cell.empty { color: var(--line-strong); }
+
+.mv2-calm-gateshead {
+  margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line-card);
+  font-size: 9px; font-weight: 600; letter-spacing: .12em; color: var(--t-faint, #4b5563);
+}
+
+@media (max-width: 680px) {
+  .mv2-calm-ivs { grid-template-columns: minmax(0, 1fr); }
+  .mv2-calm-grid { grid-template-columns: minmax(0, 1fr) repeat(var(--calm-cols, 2), minmax(64px, 92px)); }
+}
+
+/* The skin lays `.mv2-calm-cards` as two columns — one per phase card. The paired
+   card is a SINGLE card that already carries both phases, so it has to take the
+   whole width. Left alone it sat in one half at 800px, its instrument grid
+   measured 798px, auto-fit fell back to one column, and MES stacked above MNQ —
+   which is the side-by-side comparison this whole change exists to create. */
+.mv2-calm-cards:has(> .mv2-calm-paired) { grid-template-columns: minmax(0, 1fr); }
+
+/* The skin separates stacked instrument blocks with a top rule and a margin —
+   right when they sat one above the other inside a phase card. Side by side in
+   the grid that separator only pushes the second panel 19px below the first, so
+   the two DECIDE/OBSERVE header rows stop lining up and the columns no longer
+   read as comparable. The grid's own gap already does the separating. */
+.mv2-calm-ivs > .mv2-calm-inst + .mv2-calm-inst {
+  margin-top: 0; padding-top: 0; border-top: 0;
+}
+
+/* The regime metric tile that restates the footnote below it. next.js marks it by
+   reading its label, not by position, so a reordered metric row cannot hide the
+   wrong tile. Hidden and kept, never removed. */
+#regimeMetrics > .is-restated { display: none; }
+
+/* The Calm card's shape line, right-aligned in the phase strip. */
+.mv2-calm-phases .mv2-calm-shape {
+  margin-left: auto;
+  font-family: var(--mono); font-size: 11px; color: var(--t-faint, #4b5563);
+  white-space: nowrap;
+}
+
+/* Slot column highlight + readout. The outline sits on top of whatever the cell
+   already paints, so a passed cell stays green and a failed one stays red — the
+   hover says WHERE you are, never WHAT the verdict was. */
+.mv2-lane-track .is-slot-hot {
+  outline: 1px solid var(--blue, #8dc0f7);
+  outline-offset: 1px;
+}
+.mv2-slot-readout {
+  margin: 0 0 8px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
+  color: var(--dim);
+  min-height: 1.4em;                 /* reserve the line so hovering cannot reflow the lanes */
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mv2-cell, .mv2-slot { cursor: crosshair; }
+
+/* Sits under the job list, only while a job is open. */
+.journal-collapse-all {
+  display: block; margin: 10px 0 0 auto;
+  padding: 5px 11px;
+  background: transparent; border: 1px solid var(--line-strong); border-radius: 5px;
+  font-family: var(--mono); font-size: 11px; color: var(--dim);
+  cursor: pointer;
+}
+.journal-collapse-all:hover { color: var(--text); border-color: var(--line-card); }
+
+/* G4/G5. Verdict block: pill, câu lý do, rồi MỘT hàng meta.
+   Không còn cột phải: hai vùng cùng nói một chuyện ở hai cỡ chữ khiến người đọc
+   phải quét hai chỗ mới ghép được một câu. Một hàng, đọc trái sang phải. */
+#marketViewVerdict { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px 0; }
+#marketViewVerdict > .mv2-reason {
+  margin: 0;
+  font-size: 13px; color: #a8b1c0; text-wrap: pretty;
+  max-width: 88ch;
+}
+
+/* Mỗi ô ngăn nhau bằng một vạch dọc chứ không bằng dấu chấm giữa dòng: vạch không
+   đọc thành ký tự, nên hàng vẫn quét được bằng mắt khi có ô bị bỏ đi. */
+.mv2-verdict-meta {
+  display: flex; flex-wrap: wrap; align-items: baseline; row-gap: 4px;
+  font-family: var(--mono); font-size: 11px;
+}
+.mv2-verdict-meta > span {
+  padding: 0 11px;
+  border-left: 1px solid #1e242c;
+  color: var(--dim);
+  white-space: nowrap;
+}
+/* Ô đầu không có vạch — vạch ở mép trái hàng sẽ trông như viền của một khối. */
+.mv2-verdict-meta > span:first-child { padding-left: 0; border-left: 0; }
+.mv2-verdict-meta > .mv2-vm-num  { color: #a8b1c0; }
+.mv2-verdict-meta > .mv2-vm-rule { color: #f0b429; }
+.mv2-verdict-meta > .mv2-vm-prov { color: #4b5563; }
+
+/* G3. Khi hai pane KHÔNG chung trục, nói ra ngay trên pane chuỗi. Người vừa rê
+   chuột trên chart giá mà thấy bên dưới không nhúc nhích cần biết vì sao, thay vì
+   kết luận là hover hỏng. */
+.market-view-section[data-xaxis="own"] .mv2-slotchart .mv2-sc-head::after {
+  content: "trục riêng — không dóng theo chart giá";
+  margin-left: auto;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+  color: var(--t-faint);
+}
+
+/* The crosshair, and the line that reads it out. Drawn per chart at that chart's
+   own x for the slot — see next.js for why a shared fraction is wrong here. */
+.mv2-xhair { stroke: var(--blue, #8dc0f7); stroke-width: 1; opacity: .75; pointer-events: none; }
+.mv-mark { cursor: crosshair; }
+.mv2-chart-readout {
+  /* Design bọc dòng này trong một khung riêng chứ không để chữ trần: nó là
+     vùng ĐỌC, không phải chú thích, nên phải nhìn ra là một ô có thể thay đổi
+     nội dung khi rê chuột. */
+  margin: 7px 0 0;
+  padding: 7px 12px;
+  border: 1px solid var(--line-hair);
+  border-radius: 6px;
+  background: var(--deep);
+  font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--dim);
+  min-height: 1.4em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Model Inputs as the card's first row, the way the design runs it: a strip along
+   the top of the regime card, on the card's darker ground, divided from the label
+   below by a hairline rather than floating above the frame. */
+.rg2-card > #modelInputsZone {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0;
+  padding: 9px 15px; margin: 0;
+  background: var(--deep);
+  border: 0; border-bottom: 1px solid var(--line-hair); border-radius: 8px 8px 0 0;
+}
+.rg2-card > #modelInputsZone > .zone-title { margin-right: 6px; }
+.rg2-card > #modelInputsZone > .model-input-item {
+  padding: 0 15px; border-left: 1px solid var(--line-hair);
+}
+.rg2-card > #modelInputsZone > .model-input-item:first-of-type { border-left: 0; }
+
+/* ── Đo được: bốn chỗ đệm/typo lệch design ───────────────────────────────────
+   Tất cả lấy từ phép đo trực tiếp trên bản design render ở cùng viewport (2033),
+   không lấy từ bảng so section — bảng đó đo nhầm phần tử cha cho ba thẻ chỉ số. */
+
+/* Cả bốn thẻ chỉ số dùng chung một đệm trong design. Live đang cho equity một
+   đệm riêng (16/18) và ba thẻ kia một đệm khác (12/16), nên hàng bốn thẻ không
+   có một nhịp chung — chữ trong thẻ đầu bắt đầu ở một mức, ba thẻ sau ở mức khác. */
+#metrics .header-zone { padding: 11px 15px; }
+
+/* Now Monitor mở đầu cột nên design cho nó đệm trên hẹp hơn các mục khác. */
+.primary-column > .now-monitor.section-band { padding: 16px 22px; }
+
+/* Open Orders đóng nhóm 01, và design cho nó thêm 6px dưới để khoảng nghỉ trước
+   dải 02 rộng hơn khoảng giữa hai mục cùng nhóm. */
+.primary-column > .orders-section.section-band { padding: 18px 22px 24px; }
+
+/* Source Clocks là mục phụ trong rail, design đặt tiêu đề nhỏ hơn tiêu đề mục
+   chính (15px so với 17px) để nó không tranh chấp với Job journal ngay trên nó. */
+.source-section .section-heading h2 { font-size: 15px; }
+
+/* ── Hệ chữ: độ đậm và cỡ, đo từ bản design ──────────────────────────────────
+   Design chỉ dùng hai độ đậm: 500 cho nhãn chữ hoa nhỏ, 600 cho tên và chip.
+   Live dùng 700 ở 22 chỗ — một bậc nặng hơn toàn bộ hệ, nên các nhãn phụ đòi
+   nhiều chú ý ngang với tiêu đề mục. */
+.issue-problem > span, .issue-impact > span, .issue-action > span,
+.issue-evidence > span, .issue-detail-body span[class=""] { font-weight: 500; }
+/* Nâng specificity: luật hai-class thua một luật khác trong skin, nên chip cổng
+   vẫn ở 700. Thêm container để thắng bằng specificity, không bằng thứ tự nạp. */
+/* Luật thắng là `#track1Facts .t1-gate` — một ID, nên mọi selector ba-class
+   đều thua. Đo ra mới biết; hai lần trước tôi đoán specificity và cả hai lần
+   đều sai. Dùng lại chính cặp selector đó. */
+#track1Facts .t1-gate, #regimeFacts .t1-gate { font-weight: 500; }
+.mv-summary > .mv-chip { font-weight: 600; }
+.mv2-mono > b, .mv2-calm-inst-head > b { font-weight: 600; }
+
+/* Cỡ chữ lẻ là dấu hiệu em chồng em: 9.92px và 9.16667px không phải giá trị ai
+   chọn, chúng rơi ra từ phép nhân. Design đặt bậc nhỏ nhất ở 9px và 10px. */
+.mv2-card-head .mv2-src { font-size: 10px; }
+.journal-schedule .fact-scheduler > small { font-size: 10px; }
+
+/* Con số equity: design 30px. Live vẽ 40px vì skin-e đặt `font: 500 40px/1` trên
+   `.equity-line > b` — CÙNG specificity với luật 26px của chính file này nhưng
+   nạp sau, nên luật kia vô hiệu từ đầu. Đúng cái bẫy mà đầu file đã cảnh báo.
+   Thêm #metrics để thắng bằng specificity chứ không bằng thứ tự nạp. */
+#metrics .equity-line > b { font-size: 30px; }
+/* Con số rủi ro: design 24px. */
+#metrics .risk-zone .metric-dd-value > b { font-size: 24px; }
+
+/* Bốn nhãn cuối trong khối đánh giá của Open Issues, và dòng "Closes when:".
+   Cùng vai với Problem/Evidence ở trên nên cùng độ đậm — chúng là nhãn, không
+   phải kết luận. */
+.issue-assessment > div > span { font-weight: 500; }
+.issue-evidence > p > b { font-weight: 600; }
+
+/* Dòng phán quyết theo design: 15px/500/-.005em.
+   Ghi lại vì đây là ĐẢO một quyết định có đo đạc ở trên trong chính file này:
+   khối E1 hạ hai con số lớn xuống vì "cả hai đều nói fine trong khi kết luận sức
+   khoẻ ở 13px". Bản design đặt dòng kết luận ở 15px và số equity ở 30px, tức
+   chấp nhận số lớn hơn chữ. Chủ dự án đã quyết theo design.
+   Phần bù lại vẫn còn: hình dạng chấm trạng thái và nhãn OK/WARN/FAIL ở khối A2
+   giữ nguyên, nên trạng thái vẫn đọc được mà không cần dựa vào cỡ chữ. */
+.status-rail .system-conclusion { font-size: 15px; line-height: 1.45; letter-spacing: -.005em; }
+.status-rail .system-conclusion b { font-weight: 500; }
+
+/* ── Thanh ba tab trong Market View ──────────────────────────────────────────
+   Đo được bốn chỗ lệch: nền thanh, đệm tab, và cả gap lẫn đệm của hàng chứa
+   thanh + dòng chú thích. Hàng đang có đệm 0 nên thanh dính sát mép thẻ, trong
+   khi design cho nó cùng nhịp 8/15 với các dải khác trong thẻ. */
+.mv2-innertabs { padding: 8px 15px; gap: 12px; }
+.mv2-innertabs > .mv2-tabset { background: var(--deep); }
+.mv2-innertabs > .mv2-tabset > .mv2-tab { padding: 5px 13px; }
+
+/* ── Pane "Setup rules" ──────────────────────────────────────────────────────
+   Lưới lane: design 246px cho cột nhãn và 110px cho cột tổng; live đang 212/126,
+   nên nhãn luật bị bó và con số tổng thừa chỗ. */
+.mv2-lanes .mv2-lane { grid-template-columns: 246px minmax(0, 1fr) 110px; }
+/* Ô 10px như design; 12px làm mỗi lane cao thêm và cả khối dày hơn một dòng. */
+.mv2-lane-track .mv2-cell { height: 10px; }
+/* Vạch ngăn giữa các lane: design dùng tông tối hơn một bậc. */
+.mv2-lanes .mv2-lane { border-bottom-color: #171b22; }
+/* Chú giải: design 7px 15px / gap 18px; live 11px 18px / gap 16px. */
+.mv2-card > .mv2-legend { padding: 7px 15px; gap: 18px; }
+
+/* ── Pane "Detector rules" ───────────────────────────────────────────────────
+   Cùng class .mv2-lane với Setup rules nhưng design cho nó thang nhỏ hơn: một ô
+   là một BAR chứ không phải một slot, và có nhiều bar hơn slot, nên ô hẹp hơn và
+   bo nhẹ hơn để hàng không vỡ thành một dãy viên thuốc. */
+.mv2-bargrid .mv2-lane { grid-template-columns: 246px minmax(0, 1fr) 110px; }
+.mv2-bargrid .mv2-lane-track .mv2-cell { height: 9px; border-radius: 1px; }
+
+/* ── Chart "Across the session": màu và nét theo design ──────────────────────
+   Đo cạnh nhau: live dùng tím cho EMA và XANH LÁ cho đường trung bình khối
+   lượng. Xanh lá trên bảng này đã mang nghĩa "đạt" ở lane và ở nến, nên một
+   đường xanh lá không mang phán quyết nào là mượn nhầm nghĩa. Design để nó xám.
+   EMA về xanh dương cùng họ với close, vì hai đường này được đọc CÙNG NHAU. */
+.mv2-sc-ema     { stroke: #5b9cf0; stroke-width: 1.3px; }
+.mv2-sc-close   { stroke: #8dc0f7; stroke-width: 1.8px; }
+.mv2-sc-avgv    { stroke: #4b5563; stroke-width: 1.3px; }
+.mv2-sc-volline { stroke: #e0913c; stroke-width: 1.3px; }
+/* Chấm trên hai đường lấy cùng màu với đường của nó. */
+.mv2-sc-vol     { fill: #e0913c; }
+/* Vùng tô dưới đường close. Gradient khai báo ngay trong svg vì nó tham chiếu
+   bằng url(#id) — không đặt được từ stylesheet. */
+.mv2-sc-closefill { fill: url(#mv2CloseFill); stroke: none; }
+
+/* ── Thang màu xám, theo design ──────────────────────────────────────────────
+   Design chỉ dùng hai tông mờ: #798394 cho nhãn phụ và #4b5563 cho tông mờ nhất
+   (36 lần riêng trong tab Price context). Live có #798394 sẵn dưới tên
+   --t-label, nhưng --dim lại là #728392 và --t-faint thì CHƯA TỒN TẠI — nên mọi
+   chỗ đáng mờ nhất đang mượn tông sáng hơn, và ba tông xám khác nhau cùng xuất
+   hiện trên một thẻ.
+
+   Đổi --dim sang giá trị của design cũng KHÔNG hạ tương phản: #798394 (121,131,148)
+   sáng hơn #728392 (114,131,146) trên nền tối, nên khối A5 phía trên vẫn được
+   tôn trọng — đây là nâng, không phải hoàn nguyên. */
+:root { --dim: #798394; --t-faint: #4b5563; }
+
+/* Chú giải của chart chuỗi: bốn khoá thật ở tông nhãn, riêng "surge threshold —
+   not compared" ở tông mờ nhất, vì nó nói một thứ KHÔNG được so. */
+.mv2-sc-key { color: var(--t-label); }
+.mv2-sc-key.mv2-sc-key-off { color: var(--t-faint); }
+.mv2-sc-day { color: var(--muted); }
+
+/* ── gap: các giá trị live dùng nhiều mà design không có ─────────────────────
+   Không ép mù cả thang: design có ~17 giá trị gap khác nhau, không phải một bộ
+   token chặt. Chỉ chỉnh những vai trò đếm được và map được sang design.
+
+   .section-heading là cái đáng nhất: 8 đầu mục dùng nó, nên nó đặt nhịp ngang
+   cho toàn trang. 20px làm tiêu đề và dòng nguồn bên phải rời nhau hơn design. */
+.section-heading { gap: 12px; }
+
+/* Chú giải: 5px làm chấm dính vào chữ. Design 7px cho chú giải chart và price,
+   6px cho chú giải regime (chấm ở đó vuông và nhỏ hơn nên cần ít khoảng hơn). */
+.mv-legend-item, .mv2-sc-key { gap: 7px; }
+.regime-legend-item { gap: 6px; }
+
+/* Hàng chip: trong thẻ sự cố và trong mỗi dòng job. .job-trigger là 29 phần tử,
+   nhiều nhất trang, nên 3px lệch ở đây đọc thành cả cột lệch nhịp. */
+.issue-badges, .job-trigger { gap: 7px; }
+
+/* ── letterSpacing: các vai trò nằm ngoài thang của design ───────────────────
+   Đo theo EM chứ không theo px — px khác nhau chỉ vì cỡ chữ khác nhau, và diff
+   theo px lúc đầu báo hàng chục chỗ lệch mà phần lớn là dương tính giả.
+   Theo em thì chỉ còn 17 phần tử thật sự ngoài thang. */
+
+/* Nhãn nhóm trong Open Issues và tab sleeve: cùng vai "nhãn chữ hoa nhỏ" với mọi
+   nhãn khác trên trang, design cho vai đó .1em. */
+.issue-scope, .mv-tab { letter-spacing: .1em; }
+/* Huy hiệu nguồn (RECORDED/…): design .12em, cùng bậc với các chip mono 9px. */
+.mv2-src { letter-spacing: .12em; }
+/* Chip ngày và hai dòng đọc hover: design .06em. Hai dòng đọc là của tôi thêm ở
+   lượt trước và tôi đã đặt .04em — không có trong thang design. */
+.mv2-sc-day, .mv2-chart-readout, .mv2-slot-readout { letter-spacing: .06em; }
+
+/* `.issue-list-row > .issue-badges` trong skin (0,2,0) thắng luật một-class ở
+   trên, nên phải nhắm cùng mức. Đo mới biết — không leo thang bằng cảm giác. */
+/* Ngang specificity với skin mà skin nạp sau, nên vẫn thua — thêm một tổ tiên.
+   Đây là lần thứ ba trong phiên tôi mắc đúng lỗi này. */
+.open-issue-list .issue-list-row > .issue-badges { gap: 7px; }
+
+/* Các danh sách dọc: design cho danh sách sự cố và danh sách monitor 8px, hàng
+   chip phiên 6px, và hàng đồng hồ 12px giữa nhãn với giá trị. */
+.now-monitor-list, .open-issue-list { gap: 8px; }
+.mv2-daybar { gap: 6px; }
+#sourceClocks .rail-clock { gap: 12px; }
+
+/* ── Marker trên bốn đường của chart chuỗi ───────────────────────────────────
+   Design phân hai loại: điểm ĐO thì tô đặc (close, bar volume), đường DẪN XUẤT
+   thì rỗng ruột viền màu (trend filter, trung bình 10 bar). Nhìn vào là biết
+   chấm nào là số đọc được và chấm nào là kết quả tính. */
+.mv2-sc-dot-close { fill: #8dc0f7; stroke: none; }
+.mv2-sc-dot-ema   { fill: var(--card); stroke: #5b9cf0; stroke-width: 1; }
+.mv2-sc-dot-avgv  { fill: var(--card); stroke: #4b5563; stroke-width: 1; }
+
+/* Ô mẫu trong chú giải: design 10x4px. Live đang 11x9.
+   Giữ nguyên cách live dựng — ô mẫu dùng CHÍNH class .mv2-cell nên đổi màu ô
+   thật là chú giải tự theo, không phải sửa hai nơi — chỉ đổi kích thước. */
+.mv2-legend .mv2-cell { width: 10px; height: 4px; }
+
+/* ══ Vòng 2 · giá trị lấy từ DESIGN_SPEC muc 4.2, 4.3, 4.7 ══════════════════
+   Chép số từ spec, không suy từ file design. Mọi rule dưới đây nằm trong
+   .market-view-section hoặc dưới #marketViewVerdict, nên không chạm bốn
+   dashboard khác đang dùng chung realtime.css. */
+
+/* --mv-dim và --mv-fg KHÔNG được định nghĩa ở đâu cả: 15 chỗ trong realtime.css
+   dùng chúng và cả 15 rơi vào fallback #8b929c / #d7dbe0 — đúng hai bậc xám nằm
+   ngoài bốn bậc của muc 1, và là nguồn của 9 trong 10 lần vi phạm luật 1. Khai ở
+   đây, giới hạn trong section, sửa cả 15 chỗ bằng một chỗ thay vì vá từng rule.
+   Ngoài section thì fallback cũ giữ nguyên, nên không có thay đổi ngoài ý muốn. */
+:root { --mv-dim: #798394; --mv-fg: #a8b1c0; }
+/* Khai o :root chu khong trong section: chỗ thứ 15 là .decision-retired ở
+   Today's Decision, cùng một token chưa khai, nên thu hẹp phạm vi sẽ để lại
+   đúng một lần vi phạm luật 1 vì một lý do không liên quan gì tới phạm vi. */
+
+/* muc 4.2 · session picker. Chip đang chọn của repo đang là nền SÁNG (#d7dbe0)
+   chữ gần đen; spec cho nó nền xanh tối và chữ xanh. Đảo lại theo spec. */
+.market-view-section .mv2-day-label { color: #4b5563; }
+.market-view-section .mv2-day {
+  padding: 4px 10px; border-radius: 5px;
+  color: #a8b1c0; border-color: #1e242c;
+}
+.market-view-section .mv2-day.thin { color: #4b5563; }
+.market-view-section .mv2-day.on {
+  color: #8ae6cc; background: #14251f; border-color: #1e3a30;
+}
+.market-view-section .mv2-day i {
+  font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
+  color: #5fd3b2; opacity: 1;
+}
+
+/* muc 4.7 · chip ngày trên hai pane chart. Nó đang thừa hưởng stack sans của
+   trang; spec muốn mono, và mono ở repo này là var(--mono). */
+.market-view-section .mv2-sc-day {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+  padding: 2px 8px; border: 1px solid #262d36; border-radius: 4px;
+  color: #a8b1c0;
+}
+
+/* muc 4.3 · pill. Chữ trong pill là mono 12px/600 .1em, không phải sans 14px. */
+#marketViewVerdict > .mv2-pill { padding: 4px 12px; border-radius: 5px; }
+#marketViewVerdict > .mv2-pill > b {
+  font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: .1em;
+}
+
+/* ══ Vòng 2b · SECTION_ANATOMY ══════════════════════════════════════════════
+   Bảng tra accent ở cuối anatomy là hợp đồng đếm được: 10 section, 8 đúng, 2 lệch.
+   Cả hai lệch vì cùng một cơ chế — skin-e cấp var(--d-exposure) cho MỌI heading,
+   rồi .journal-column h2::before phủ tím lên TOÀN BỘ cột phải. Sửa theo đúng
+   khuôn skin-e đã dùng cho .orders-section, và phải cụ thể hơn một bậc vì
+   skin-e nạp SAU next.css. */
+.section-band.track1-section .section-heading h2::before { background: var(--d-risk); }
+.journal-column .source-section .section-heading h2::before { background: var(--d-exposure); }
+
+/* Anatomy, phần Header: "chỉ dot Live nhấp nháy. Dot 'On schedule' tĩnh: nó là
+   trạng thái, không phải nhịp tim." Rule của skin-e nhắm .runner-header-state i
+   nên bắt cả dot On schedule lẫn dot Scheduler — comment ngay trên nó viết "the
+   live dot breathes", số ít, nên đây là hệ quả của selector rộng chứ không phải
+   báo động có chủ đích (dot Scheduler màu #798394 xám mờ, không phải màu báo).
+   Dot Live nằm dưới .header-live-context nên vẫn thở. */
+header .runner-header-state i { animation: none; }
+
+/* ══ Vòng 2c · ba mục anatomy đã đọc mà chưa đo ═════════════════════════════ */
+
+/* Nhãn regime: anatomy cho Calm màu #8ae6cc, đang là primary. CHỈ tô .regime-calm
+   — anatomy chỉ vẽ trạng thái Calm, ba regime kia mục 8 không nói thì không chạm,
+   và .rg2-label hiện dùng CHUNG một rule màu cho cả bốn. */
+.rg2-label.regime-calm { color: #8ae6cc; }
+
+/* Evidence của Open Issues: mono 11px, line-height 1.75. Anatomy nói thẳng vì sao
+   nó cao hơn phần còn lại — "nó là log, đọc theo dòng, không đọc theo câu". Đang
+   là 12px/1.4. */
+#openIssueDetail .issue-evidence { font-size: 11px; line-height: 1.75; }
+
+/* Hàng Source Clocks: flex baseline. Đang là flex nhưng align-items:normal, nên
+   nhãn và giá trị khác cỡ chữ không đứng chung đường chân chữ. */
+#sourceClocks > div { align-items: baseline; }
+
+/* ══ Vòng 3 · so ảnh design với trang thật ══════════════════════════════════
+   Mọi rule dưới đây chỉ cần hơn realtime.css một bậc: skin-e không khai cái nào
+   trong số này (đã grep). Ẩn thì display:none, node và id giữ nguyên. */
+
+/* Ô lane: đo được ô rộng 35,2px mà KHE giữa hai ô 21,6px — khe chiếm 61% bề rộng
+   ô, nên lưới đọc thành những vạch rời rạc thay vì một dải liên tục như design.
+   Track đang là display:block với ô inline. Chuyển sang grid chia đều để ô nở ra
+   lấp chỗ trống. Hàng chấm slot dùng CÙNG lưới, nếu không hai hàng lệch cột. */
+/* KHÔNG dùng grid ở đây: .mv2-cell là position:absolute (realtime.css:1353) nên
+   ô nằm ngoài luồng và mọi giá trị lưới đều vô hiệu — đã thử, ô vẫn 35,2px. Bề
+   rộng ô do realtime.js tính, và đã sửa ở đó. */
+
+/* Design không có chấm trước tên lane — nó đánh dấu lane trượt bằng VẠCH dọc
+   suốt bên trái cả hàng, đọc được từ xa hơn một chấm 5px. */
+.mv2-lane-name .mv2-dot { display: none; }
+.mv2-lanes .mv2-lane { border-left: 2px solid transparent; }
+.mv2-lanes .mv2-lane:has(.mv2-dot.bad)  { border-left-color: #f2555a; }
+.mv2-lanes .mv2-lane:has(.mv2-dot.warn) { border-left-color: #f0b429; }
+
+/* Hàng bảy chip: design không có hàng này, và cả bảy nội dung đã nằm trong hàng
+   metadata ngay trên nó — đây là bản sao thứ hai, đọc ở hai chỗ hai cỡ chữ.
+   Cũng chính là 5 chip vi phạm luật 7. Tooltip boundary_proof không mất: nó còn
+   được dựng ở setup card (realtime.js:2963). */
+#marketViewSummary { display: none; }
+
+/* Trục giờ dưới lưới lane: design chỉ đặt trục ở tab Price context. */
+.mv2-lane-axis { display: none; }
+
+/* SLOT DECISIONS là nhãn, không phải tên lane. */
+.mv2-lane-slots .mv2-lane-label {
+  text-transform: uppercase; font-size: 11px; letter-spacing: .1em;
+  font-weight: 500; color: #798394;
+}
+
+/* Sleeve tab đang chọn: design nền xanh lục, không phải viền xanh dương. Cùng
+   cặp màu với chip ngày và nav header — ba chỗ này là "đang chọn" cùng một cấp. */
+.mv-tabs .mv-tab.on {
+  background: #14251f; color: #8ae6cc; border-color: #1e3a30;
+}
+
+/* Ghi chú session: design để xám nhãn. Hổ phách ở đây đọc thành cảnh báo, mà câu
+   này chỉ đang mô tả cách bày ngày trên đĩa. */
+.mv2-daybar .mv2-day-note { color: #798394; }
+
+/* Gợi ý hover: design canh phải trên chính hàng head, màu xanh. */
+.mv2-card-head .mv2-slot-readout {
+  margin-left: auto; text-align: right; color: #5b9cf0;
+}
+
+/* Card của Market View — giá trị lấy nguyên từ DESIGN_SPEC muc 3 "Card". */
+.mv2-shell {
+  border: 1px solid #1e242c; border-radius: 8px;
+  background: #0e1116; overflow: hidden;
+}
+/* Luật 3 cấm lồng card. Lưới lane vốn tự dựng .mv2-card; nay nó nằm TRONG shell
+   nên phải bỏ khung của chính nó, chia bằng vạch trong như spec nói. */
+.mv2-shell #marketViewLanes > .mv2-card,
+.mv2-shell #marketViewChart > .mv2-card,
+.mv2-shell #marketViewSetup > .mv2-card {
+  border: 0; border-radius: 0; background: transparent;
+}
+.mv2-shell #marketViewLanes + #marketViewChart:not(:empty) { border-top: 1px solid #1a1f26; }
+
+/* muc 4.3 · verdict là HÀNG ĐẦU trong card: nền inset, vạch đáy, padding riêng.
+   Và hàng 1 là MỘT dòng — chip đứng cùng dòng với câu lý do, không phải chip một
+   dòng rồi câu xuống dòng. Hàng metadata bị ép chiếm trọn dòng dưới. */
+.mv2-shell > #marketViewVerdict {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: 9px; padding: 11px 15px;
+  background: #0b0d11; border-bottom: 1px solid #1a1f26;
+}
+.mv2-shell > #marketViewVerdict > .mv2-reason { margin: 0; flex: 1 1 auto; }
+.mv2-shell > #marketViewVerdict > .mv2-verdict-meta { flex: 1 0 100%; }
+
+/* muc 4.4 · hàng inner tab, cũng là một hàng trong card. */
+.mv2-shell > #marketViewInnerTabs {
+  padding: 8px 15px; border-bottom: 1px solid #1a1f26; margin: 0;
+}
+
+/* Cột phải của verdict — muc 4.3 giữ nó, và ảnh design cũng có. Hai dòng, canh
+   phải: tally của lane chặn, rồi bằng chứng đến từ đâu. */
+.mv2-shell > #marketViewVerdict > .mv2-verdict-side {
+  margin-left: auto; flex: 0 0 auto; text-align: right;
+  font-family: var(--mono); font-size: 11px;
+}
+.mv2-vs-detail { color: #798394; }
+.mv2-vs-prov   { color: #4b5563; margin-top: 4px; }
+
+/* Khối Declared: comment ở realtime.js nói rõ nó được tách khỏi lưới lane CÓ CHỦ
+   ĐÍCH — ba tên này từng nằm trong lane và báo "value not published" ở mọi slot.
+   Nên giữ nguyên chỗ đứng, chỉ cho nó dáng FOOTER của card như design, thay vì
+   dáng một hàng lane nữa. */
+.mv2-shell .mv2-lane-config {
+  background: #0b0d11; border-top: 1px solid #1a1f26;
+}
+
+/* muc 4.5 · lane đang chặn mang HAI dấu hiệu, không phải một: vạch trái 3px VÀ
+   nền hàng. Hai dấu cho một sự thật, để nó không mất với người không phân biệt
+   được màu. Vạch nằm trên ô NHÃN theo spec. */
+.mv2-lanes .mv2-lane { border-left: 0; }
+.mv2-lanes .mv2-lane .mv2-lane-name { border-left: 3px solid transparent; }
+.mv2-lanes .mv2-lane:has(.mv2-dot.bad) { background: #100f12; }
+.mv2-lanes .mv2-lane:has(.mv2-dot.bad) .mv2-lane-name { border-left-color: #f2555a; }
+.mv2-lanes .mv2-lane:has(.mv2-dot.warn) .mv2-lane-name { border-left-color: #f0b429; }
+
+/* muc 4.5 · readout của tab này là dòng duy nhất, nằm trên head, màu #8dc0f7. */
+.mv2-card-head .mv2-slot-readout { color: #8dc0f7; }
+
+/* muc 4.5 · swatch legend là chữ nhật 10x4, mô phỏng hình CELL trong lane —
+   không phải dot slot. Hai thứ khác nhau thì không được vẽ giống nhau. */
+.mv2-legend .mv2-legend-item .mv2-cell {
+  position: static; transform: none;
+  width: 10px; height: 4px; border-radius: 2px; flex: 0 0 10px;
+}
+
+/* muc 4.5 · hàng legend: nền inset, và phần "declared ·" đẩy sang phải trong
+   CÙNG hàng đó. Mỗi item vẫn là node cũ nên tooltip lý do còn nguyên. */
+.mv2-shell .mv2-legend {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 18px;
+  padding: 7px 15px; background: #0b0d11;
+}
+.mv2-legend-declared {
+  margin-left: auto; display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 11px; color: #4b5563;
+}
+.mv2-legend-declared .mv2-config-item { font-size: 11px; }
+
+/* "N of M rules publish no verdict" là nội dung repo mà design không vẽ. Bỏ đẩy
+   phải để nó đứng cạnh câu "one cell per slot", nhường mép phải cho readout —
+   chỗ mà muc 4.5 dành riêng cho slot đang hover. */
+.mv2-card-head .mv2-head-right { margin-left: 0; }
+
+/* muc 4.5 · lane chỉ có vạch NGANG giữa các hàng. Repo còn hai vạch DỌC —
+   .mv2-lane-name{border-right} và .mv2-lane-track{border-right} — chia mỗi hàng
+   thành ba ngăn, làm ba cột đọc thành ba bảng rời thay vì một hàng. */
+.mv2-shell .mv2-lane-name  { border-right: 0; }
+.mv2-shell .mv2-lane-track { border-right: 0; }
+
+/* Tally "22/22 pass" nằm đúng giữa hàng như ô lane. Trước: ô grid bị kéo cao hết
+   hàng (align-items mặc định là stretch) rồi padding-top 11px đẩy chữ lên đỉnh,
+   trong khi .mv2-cell là absolute top:50% nên luôn ở giữa — hai thứ cùng hàng mà
+   neo theo hai mốc khác nhau. Căn giữa chính nội dung, KHÔNG đổi align-items của
+   cả grid: ô nhãn phải giữ chiều cao đầy hàng thì vạch accent 3px mới chạy suốt. */
+.mv2-shell .mv2-lane-value {
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 8px 15px;
+}
+
+/* ── Ba chỗ chỉ ra trên ảnh ──────────────────────────────────────────────── */
+
+/* 1. Dải 60 ngày thiếu lề trong. Mọi hàng khác của .rg2-card đưa nội dung vào
+   L=41 nhờ ô con có padding; #regimeStrip không có ô con nào nên chữ và thanh
+   nằm ngay ở L=23, sát mép card. Anatomy hàng 4 ghi padding 13px 18px. */
+#regimeStrip { padding: 13px 18px; }
+
+/* 2. Câu "regime 'Calm'; this sleeve trades Normal" — bản design không có dòng
+   này, và nó nằm ngoài card, canh phải, nên đọc như một chú thích mồ côi.
+   Ẩn chứ không xoá: id còn nguyên cho realtime.js ghi vào. */
+#marketViewNote { display: none; }
+
+/* 3. Card Calm: head có padding 12px 18px nhưng thân thì không, nên "No setup
+   recorded…" và cả bảng gate chạy sát mép card trong khi tiêu đề thụt vào 18px.
+   Muc 4.8 cho thân là padding 9px 14px 10px; ở đây dùng 18px ngang để chữ thân
+   thẳng cột với chữ trên head. */
+.mv2-calm-cards > .mv2-card > .mv-setup-note { padding: 0 18px; }
+.mv2-calm-cards > .mv2-card > .mv2-calm-gates { padding: 8px 18px 12px; }
+
+/* Chart cao thêm. Phải đổi CẢ chiều cao CSS lẫn H của viewBox trong realtime.js
+   (:1602 và :2693): hai số đó đang bằng nhau nên sy = 1. Đổi mỗi CSS thì sy lệch
+   khỏi 1 và toàn bộ nội dung svg — kể cả chữ — bị kéo cao theo. */
+#marketViewChart .mv-svg { height: 380px; }
+.mv2-sc-svg { height: 250px; }
+@media (max-width: 560px) { .mv2-sc-svg { height: 200px; } }
+
+/* Hai chỗ lệch lề trên tab Price context: đầu pane chuỗi và hai dòng ghi chú nằm
+   ở x=23, sát mép card, trong khi mọi chữ khác của card ở x=41 vì head có
+   padding 18px. Hộp readout cũng lệch. Đưa cả ba về cùng cột. */
+#marketViewChart .mv2-sc-head,
+#marketViewChart .mv2-tabnote { padding-left: 18px; padding-right: 18px; }
+#marketViewChart .mv2-chart-readout { margin-left: 18px; margin-right: 18px; }
