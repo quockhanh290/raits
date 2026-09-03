@@ -61,21 +61,33 @@ def skin_page():
             browser.close()
 
 
-# ── Phần tử bị che khuất thì không va chạm với ai ──────────────────────────────
-# `Range.getClientRects()` trả hình học cho cả dòng đã bị cắt và không bao giờ
-# được vẽ. Bỏ qua bước này thì mọi thẻ tóm tắt dùng `-webkit-line-clamp` đều bị
-# báo là chữ đè chữ, và mọi dòng cuộn khỏi mép một khung `overflow:auto` cũng vậy.
-# Danh sách phải đủ bốn: hidden, clip, auto, scroll.
-_OUT_OF_VIEW = """
+# ── Chỉ so phần chữ NGƯỜI ĐỌC THẤY ĐƯỢC ───────────────────────────────────────
+# `Range.getClientRects()` trả hình học cho cả phần đã bị cắt và không bao giờ
+# được vẽ. Bỏ qua bước này thì mọi thẻ tóm tắt dùng `-webkit-line-clamp` bị báo là
+# chữ đè chữ, và mọi dòng cuộn khỏi mép một khung `overflow:auto` cũng vậy.
+#
+# Bản đầu hỏi "hình này có nằm HOÀN TOÀN ngoài khung cắt không" và bỏ qua nếu có.
+# Nó bỏ sót đúng cái ca ở giữa: một nhãn bị cắt MỘT NỬA vẫn giữ nguyên hình học và
+# đè lên nhãn bên cạnh bằng phần mực không ai vẽ ra. Đo trên dải chạy regime ở
+# 390px: 3 cặp bị báo, đúng 3 nhãn bị cắt, và số cặp có HỘP đè nhau là 0.
+#
+# Nên bây giờ GIAO hình với mọi khung cắt rồi so bằng phần giao. Một luật bao trùm
+# cả hai ca: nằm hoàn toàn ngoài thì phần giao rỗng. Cắt theo TỪNG TRỤC, vì
+# overflow-y không cắt chiều ngang — chỗ mà bản đầu gộp hai trục lại.
+_VISIBLE_RECT = """
   (el, rect) => {
+    let top = rect.top, bottom = rect.bottom, left = rect.left, right = rect.right;
     for (let p = el; p && p !== document.body; p = p.parentElement) {
       const cs = getComputedStyle(p);
-      if (!/hidden|clip|auto|scroll/.test(cs.overflowY + ' ' + cs.overflowX)) continue;
+      const clipX = cs.overflowX !== 'visible';
+      const clipY = cs.overflowY !== 'visible';
+      if (!clipX && !clipY) continue;
       const b = p.getBoundingClientRect();
-      if (rect.top >= b.bottom - 1 || rect.bottom <= b.top + 1) return true;
-      if (rect.left >= b.right - 1 || rect.right <= b.left + 1) return true;
+      if (clipY) { top = Math.max(top, b.top); bottom = Math.min(bottom, b.bottom); }
+      if (clipX) { left = Math.max(left, b.left); right = Math.min(right, b.right); }
     }
-    return false;
+    if (right - left < 1 || bottom - top < 1) return null;
+    return { top, bottom, left, right, width: right - left, height: bottom - top };
   }
 """
 
@@ -97,7 +109,7 @@ _TEXT_COLLISIONS = """
     }
     return false;
   };
-  const outOfView = %s;
+  const visibleRect = %s;
   const leaves = [];
   const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let n;
@@ -107,8 +119,9 @@ _TEXT_COLLISIONS = """
     const r = document.createRange(); r.selectNodeContents(n);
     for (const rect of r.getClientRects()) {
       if (rect.width < 1 || rect.height < 1) continue;
-      if (outOfView(n.parentElement, rect)) continue;
-      leaves.push({ t: n.nodeValue.trim().slice(0, 30), el: n.parentElement, rect });
+      const vis = visibleRect(n.parentElement, rect);
+      if (!vis) continue;
+      leaves.push({ t: n.nodeValue.trim().slice(0, 30), el: n.parentElement, rect: vis });
     }
   }
   const hits = [];
@@ -122,7 +135,7 @@ _TEXT_COLLISIONS = """
     }
   return { measured: leaves.length, hits };
 }
-""" % _OUT_OF_VIEW
+""" % _VISIBLE_RECT
 
 
 def test_realtime_serves_the_skin_it_was_designed_with(skin_server, skin_page):
@@ -203,6 +216,25 @@ def test_no_text_sits_on_top_of_other_text(skin_server, skin_page, width, height
         "một khẳng định 'không va chạm' trên đó không kiểm gì cả")
     assert result["hits"] == [], (
         f"chữ đè chữ ở {width}x{height}: {result['hits'][:6]}")
+
+    # Phép kiểm này kỳ vọng 0, nên tự nó không phân biệt được "trang sạch" với "bộ dò
+    # không còn dò gì". Dựng đúng một ca đè THẬT — hai dòng chữ không nằm trong khung
+    # cắt nào — và đòi nó bị bắt, rồi dọn đi.
+    proved = skin_page.evaluate("""(js) => {
+        const box = document.createElement('div');
+        box.id = 'collisionSelfCheck';
+        box.style.cssText = 'position:fixed;top:140px;left:140px;z-index:9999';
+        box.innerHTML = '<span style="position:absolute;left:0;top:0;font-size:14px">AAAAAAAA</span>'
+                      + '<span style="position:absolute;left:9px;top:0;font-size:14px">BBBBBBBB</span>';
+        document.body.appendChild(box);
+        box.getBoundingClientRect();
+        const found = eval('(' + js + ')')().hits.filter(
+          h => h.includes('AAAAAAAA') || h.includes('BBBBBBBB'));
+        box.remove();
+        return found;
+      }""", _TEXT_COLLISIONS)
+    assert proved, ("bộ dò không bắt được một ca đè chữ dựng sẵn — con số 0 ở trên "
+                    "không nói lên điều gì")
 
 
 def test_the_font_control_actually_changes_the_font(skin_server, skin_page):

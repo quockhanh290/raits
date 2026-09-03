@@ -14986,3 +14986,39 @@ nhưng vẽ tách rời khỏi cột thì mắt đọc thành hai thanh chồng 
 Sửa: đổi thành KHE CẮT nằm bên trong đỉnh cột, tô màu nền card. Ký hiệu quy ước
 cho "còn tiếp ngoài khung", và không thể nhầm là dữ liệu vì nó không THÊM gì —
 nó lấy đi. Ghim: dấu phải nằm trong cột; mutation trả về vị trí lơ lửng -> đỏ.
+
+── 3 va chạm @390: GIẢI QUYẾT XONG — 2026-09-03 ──────────────────────────────
+Mục này tôi mang từ đầu phiên với nhãn CHƯA GIẢI QUYẾT. Giờ tái hiện ổn định nên
+đo được, và ra ba việc khác nhau:
+
+1. HAI trong ba là DƯƠNG TÍNH GIẢ CỦA THƯỚC. Đo dải chạy regime ở bề rộng 340px:
+   số cặp có MỰC đè nhau = 3, số cặp có HỘP đè nhau = 0, và đúng 3 nhãn bị cắt
+   (Calm·11d mực 60 trong hộp 53 · 1d: 12 trong 4,8 · Normal·9d: 66 trong 43,4).
+   Chúng đè nhau bằng phần chữ đã bị overflow:hidden cắt bỏ và không ai vẽ ra.
+   Luật cũ chỉ bỏ chữ nằm HOÀN TOÀN ngoài khung cắt — bỏ sót ca ở giữa.
+   Sửa: GIAO hình chữ nhật với mọi khung cắt rồi so bằng phần giao; cắt theo từng
+   trục vì overflow-y không cắt chiều ngang. Một luật bao trùm cả hai ca.
+   Áp cho CẢ HAI thước: measure_dashboards.py và _VISIBLE_RECT trong suite skin.
+   Kết quả: /realtime@390 đè 3 -> 0; bốn dashboard kia không đổi (0 -> 0).
+
+2. "CẮT MÉP 3" thì là LỖI THẬT, và của tôi. Công cụ không nói phần tử nào nên con
+   số đứng đó cả phiên mà không ai lần ra. Thêm clippedSample: ba phần tử đều là
+   khối `declared` tôi dời vào hàng legend, vượt mép 193px, insideHiddenBox=True —
+   không tràn ra ngoài trang, nhưng chữ bị cắt nên không đọc được.
+   Sửa: cho nó flex-wrap + min-width:0, và ở <=680px bỏ margin-left:auto để nó
+   chiếm trọn một dòng. muc 4.5 vốn cho hàng legend wrap; margin-left:auto của
+   tôi là thứ đã ghim nó lại.
+
+3. TỰ KIỂM CHO CHÍNH BỘ DÒ. test_no_text_sits_on_top_of_other_text luôn kỳ vọng 0
+   nên tự nó không phân biệt "trang sạch" với "bộ dò hết dò". Thêm: dựng đúng một
+   ca đè THẬT (hai dòng chữ ngoài mọi khung cắt) và đòi nó bị bắt, rồi dọn đi.
+   Không có bước này thì việc tôi vừa nới luật lọc là việc không ai kiểm được.
+
+SAU CÙNG: cả năm dashboard, cả hai khổ — đè 0, cắt 0, tràn 0. Lần đầu trong phiên.
+Mốc DASHBOARD_BASELINE đã sinh lại bằng luật mới và commit cùng công cụ, đúng như
+docstring của nó nói. 316 passed.
+
+BỐN LẦN BẢN MÔ PHỎNG CỦA TÔI KHÁC CÔNG CỤ THẬT — đừng viết lại, hãy chạy nó
+Tôi viết lại logic của thước trong trình duyệt để đo nhanh, và nó thiếu chốt
+`el.contains(el)` mà công cụ thật có, nên ra 3 cặp "nhãn đè lên chính nó" —
+getClientRects trả nhiều hình cho một text node. Ba lần trước cũng cùng dạng.

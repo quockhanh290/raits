@@ -1147,9 +1147,19 @@ header .runner-header-state i { animation: none; }
   display: flex; flex-wrap: wrap; align-items: center; gap: 18px;
   padding: 7px 15px; background: #0b0d11;
 }
+/* `flex-wrap` và `min-width:0` là điều kiện để nó XUỐNG DÒNG thay vì bị cắt.
+   Đo ở 390px: khối này vượt mép 193px và cả ba phần tử của nó bị khung card cắt —
+   không tràn ra ngoài trang, nhưng chữ thì không đọc được. muc 4.5 cho hàng legend
+   `flex-wrap: wrap`; `margin-left:auto` của tôi là thứ đã ghim nó lại một dòng. */
 .mv2-legend-declared {
   margin-left: auto; display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap; min-width: 0;
   font-family: var(--mono); font-size: 11px; color: #4b5563;
+}
+/* Ở màn hẹp thì bỏ luôn việc đẩy sang phải: nó chiếm trọn một dòng riêng, và
+   680px là ngưỡng duy nhất được dùng cho màn nhỏ (hợp đồng với realtime.js:11). */
+@media (max-width: 680px) {
+  .mv2-legend-declared { margin-left: 0; flex-basis: 100%; }
 }
 .mv2-legend-declared .mv2-config-item { font-size: 11px; }
 

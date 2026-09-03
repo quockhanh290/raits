@@ -73,15 +73,27 @@ PROBE = r"""
     }
     return false;
   };
-  const outOfView = (el, rect) => {
+  /* Hình chữ nhật NGƯỜI ĐỌC THẤY ĐƯỢC: hộp của chữ giao với mọi khung cắt của tổ tiên.
+     Luật cũ chỉ bỏ chữ nằm HOÀN TOÀN ngoài mép — đúng cái ca mà comment của nó mô tả — còn
+     một nhãn bị cắt MỘT NỬA thì vẫn giữ nguyên hình học và đè lên nhãn bên cạnh bằng phần
+     mực không ai vẽ ra. Đo trên dải chạy regime ở 390px: công cụ báo 3 cặp đè nhau, đúng 3
+     nhãn bị cắt, và số cặp có HỘP đè nhau là 0. Giao hình xử lý cả hai ca bằng một luật:
+     nằm hoàn toàn ngoài thì phần giao rỗng.
+     Cắt theo TỪNG TRỤC: overflow-y không cắt chiều ngang, và luật cũ gộp hai trục lại. */
+  const visibleRect = (el, rect) => {
+    let top = rect.top, bottom = rect.bottom, left = rect.left, right = rect.right;
     for (let p = el; p && p !== document.body; p = p.parentElement) {
       const cs = getComputedStyle(p);
-      if (!/hidden|clip|auto|scroll/.test(cs.overflowY + ' ' + cs.overflowX)) continue;
+      const clipX = cs.overflowX !== 'visible';
+      const clipY = cs.overflowY !== 'visible';
+      if (!clipX && !clipY) continue;
       const b = p.getBoundingClientRect();
-      if (rect.top >= b.bottom - 1 || rect.bottom <= b.top + 1) return true;
-      if (rect.left >= b.right - 1 || rect.right <= b.left + 1) return true;
+      if (clipY) { top = Math.max(top, b.top); bottom = Math.min(bottom, b.bottom); }
+      if (clipX) { left = Math.max(left, b.left); right = Math.min(right, b.right); }
     }
-    return false;
+    if (right - left < 1 || bottom - top < 1) return null;
+    return { top, bottom, left, right,
+             width: right - left, height: bottom - top };
   };
   const lum = c => {
     const p = (c || '').match(/[\d.]+/g); if (!p) return null;
@@ -133,8 +145,9 @@ PROBE = r"""
     }
     for (const rect of r.getClientRects()) {
       if (rect.width < 1 || rect.height < 1) continue;
-      if (outOfView(el, rect)) continue;
-      leaves.push({ t: n.nodeValue.trim().slice(0, 26), el, rect });
+      const vis = visibleRect(el, rect);
+      if (!vis) continue;
+      leaves.push({ t: n.nodeValue.trim().slice(0, 26), el, rect: vis });
     }
   }
 
@@ -155,11 +168,37 @@ PROBE = r"""
     }
     return false;
   };
+  /* Con số này vô dụng nếu không nói ĐƯỢC phần tử nào: 3 ở 390px đứng suốt một phiên
+     rà soát mà không ai lần ra được nó là gì. Kèm mẫu, và kèm luôn thông tin quyết
+     định — phần tử có bị một tổ tiên overflow:hidden cắt hay không. `scroller()` chỉ
+     miễn cho tổ tiên CUỘN ĐƯỢC, nên một phần tử vượt mép nhưng đã bị khung ẩn cắt vẫn
+     bị đếm, và ở đó không có gì hiện ra ngoài mép để mà nhìn thấy. */
   let clipped = 0;
+  const clippedSample = [];
+  const hiddenAncestor = el => {
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      const cs = getComputedStyle(p);
+      if (cs.overflowX === 'hidden' || cs.overflowX === 'clip') {
+        const b = p.getBoundingClientRect();
+        if (b.right <= innerWidth + 1) return true;
+      }
+    }
+    return false;
+  };
   document.querySelectorAll('main *, header *').forEach(el => {
     const r = el.getBoundingClientRect();
     if (r.width < 1) return;
-    if (r.right > innerWidth + 1 && !scroller(el)) clipped++;
+    if (r.right > innerWidth + 1 && !scroller(el)) {
+      clipped++;
+      if (clippedSample.length < 6)
+        clippedSample.push({
+          tag: el.tagName.toLowerCase(),
+          cls: String(el.className || '').slice(0, 34),
+          txt: (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 26),
+          pastBy: Math.round(r.right - innerWidth),
+          insideHiddenBox: hiddenAncestor(el),
+        });
+    }
   });
 
   return {
@@ -167,6 +206,7 @@ PROBE = r"""
     collisions: collisions.length,
     collisionSample: collisions.slice(0, 4),
     clippedPastRightEdge: clipped,
+    clippedSample,
     pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     contrastCounted, belowAA,
     distinctFontSizes: [...sizes].length,
