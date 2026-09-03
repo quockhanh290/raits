@@ -190,6 +190,78 @@ def record(row: dict, *, root: str | Path = ".", day: str | None = None) -> Path
     return p
 
 
+#: Where the bars a slot decided on are kept. A sibling of the observation stream, dated the
+#: same way, because it answers for the same slot on the same session.
+BARS_DIR = "global_index/track1_runtime/session_bars"
+
+
+def bars_path_for(root: str | Path = ".", day: str | None = None, inst: str = "") -> Path:
+    d = (day or _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d")).replace("-", "")
+    return Path(root) / BARS_DIR / f"{str(inst).upper()}_{d}.parquet"
+
+
+def _around(frame: Any, day: str) -> Any:
+    """The session and a day either side of it, not the eight years behind it.
+
+    Measured before this existed: the joined frame is the FROZEN history with the live half
+    spliced on, so one call wrote 2,052,686 rows spanning 2018-01-02 to today -- 28 MB, per
+    instrument, per slot. Twenty-two slots across three instruments is about 1.8 GB of disk
+    written per session window, to keep three hours of bars.
+
+    A day either side rather than the day alone: the index carries the instrument's own clock
+    and `day` is the session date on that clock, so an off-by-one between the two would
+    otherwise cut away the very rows this exists to keep. Three days is still four thousand
+    rows, and a wrong margin costs nothing while a wrong cut costs everything.
+
+    Returns the frame unchanged when the index cannot be read as dates -- keeping too much is
+    a cost, keeping nothing is a defect.
+    """
+    try:
+        import datetime as _d
+        import pandas as pd
+
+        d = _d.date.fromisoformat(str(day))
+        idx = pd.DatetimeIndex(frame.index)
+        dates = pd.Index(idx.date)
+        lo, hi = d - _d.timedelta(days=1), d + _d.timedelta(days=1)
+        return frame[(dates >= lo) & (dates <= hi)]
+    except Exception:                                          # noqa: BLE001
+        return frame
+
+
+def record_bars(frame: Any, *, root: str | Path = ".", day: str, inst: str) -> "Path | None":
+    """Keep the bars the slot actually decided on, so something other than this process can read them.
+
+    The join splices the live half of a session onto the frozen store IN MEMORY, and the store
+    itself is appended once a day by the 13:45 ET pre-flight chain. So between an overnight
+    window and that append -- eleven hours for the Japan sleeve -- today's bars exist nowhere
+    but inside this process, and a panel asking "what did price do in the window" could only
+    answer with the previous session. That is the wrong answer printed under today's label.
+
+    One file per instrument per session, OVERWRITTEN rather than appended: every call carries
+    the same session with more of it, so the last write is the complete one and twenty-two
+    slots do not leave twenty-two copies. Written to a temporary name and moved into place, so
+    a reader polling every eight seconds never opens a half-written file.
+
+    Returns the path, or None when there was nothing to write. NEVER raises. This is
+    bookkeeping on the slot path, and bookkeeping must not cost a slot its entry.
+    """
+    try:
+        if frame is None or len(frame) == 0 or not str(inst).strip():
+            return None
+        frame = _around(frame, day)
+        if frame is None or len(frame) == 0:
+            return None
+        p = bars_path_for(root, day, inst)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_name(p.name + ".tmp")
+        frame.to_parquet(tmp)
+        tmp.replace(p)
+        return p
+    except Exception:                                          # noqa: BLE001
+        return None
+
+
 def read(*, root: str | Path = ".", day: str) -> "tuple[list, list]":
     """`(rows, malformed)` for one session date."""
     p = path_for(root, day)

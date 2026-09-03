@@ -14794,3 +14794,64 @@ parquet append đo được lúc 11:47). Tôi KHÔNG tự chọn.
   đọc từ chính bản ghi của slot, và pane dưới đang vẽ nó. Hôm nay nó rỗng vì cả
   22 slot bị cổng regime chặn trước khi rule nào đọc số — không phải vì thiếu
   đường dữ liệu.
+
+════════════════════════════════════════════════════════════════════════════
+"NGÀY NÀO HIỆN NẾN NGÀY ĐÓ" — ba bước, 2026-09-03
+════════════════════════════════════════════════════════════════════════════
+Baseline trước khi làm: 05f339c (9 file). 21 file đã theo dõi của phiên/người
+khác KHÔNG đưa vào — git status có 709 mục, chỉ 9 là của cuộc trò chuyện này.
+
+BƯỚC 1 · runner giữ lại bar (global_index)
+- track1_data_observation.py: thêm BARS_DIR, bars_path_for(), record_bars().
+  Một file mỗi instrument mỗi phiên, GHI ĐÈ chứ không nối (22 slot không để lại
+  22 bản). Ghi ra tên tạm rồi move vào chỗ, nên người đọc poll 8s không bao giờ
+  mở phải bản nửa vời. KHÔNG BAO GIỜ ném lỗi.
+- run_live_day_track1.py: gọi ngay sau instrument_row, trong vòng lặp đã có sẵn
+  jf.frame. Bọc try/except RIÊNG dù caller đã bọc cả hàm: lỗi ở đây không được
+  làm hụt obs.record phía dưới. Mất bức tranh là một giá; mất bằng chứng slot đã
+  nhìn vào dữ liệu là giá khác hẳn.
+- Mutation: gỡ lớp bọc riêng -> test "slot vẫn ghi bằng chứng khi ghi bar hỏng"
+  đỏ với RuntimeError; khôi phục đúng hash 1f4bc06a2b9e.
+
+BƯỚC 2 · dashboard đọc file đó (monitor/backend/track1_market_view.py)
+- Tách _bars_for_day(): bar của ĐÚNG ngày được hỏi hoặc rỗng, không bao giờ ngày
+  khác. Dùng chung cho cả hai nguồn.
+- _sliced() nhận thêm root, hỏi hai nguồn theo thứ tự: khung của chính slot ->
+  kho parquet ngày. BỎ HẲN việc lùi về phiên gần nhất.
+- Đo trực tiếp: hỏi 09-02/09-01/08-25 trả đúng ngày đó 36 bar; hỏi 07-04 và
+  2099-01-01 trả 0 bar, session_day=None, kèm lý do. Không lần nào trả ngày khác.
+- Mutation: khôi phục việc thay ngày -> test đỏ; file về hash 7729943fd7d6.
+
+BƯỚC 3 · trạng thái rỗng nói lý do (realtime.js)
+- mvChartSvg: bỏ nhánh "Latest stored session <date>" — nó là code chết SAU khi
+  hết thay ngày, và nó phát biểu một điều không còn xảy ra được nữa.
+- mvPriceHead: dùng bars_note thay cho câu cứng "no bars for this window".
+- test_dashboard_backend: test ghim tên mvDeclaredConfig đã sửa theo cấu trúc
+  mới (mvDeclaredInline trong hàng legend), và ghim thêm rằng tooltip lý do còn
+  nguyên — đó là thứ dễ mất nhất khi dời một khối.
+
+CÒN LẠI: backend Flask đang chạy vẫn là code cũ (kiểm bằng endpoint: nó còn trả
+"showing the most recent stored session"). Cần restart tiến trình đó mới thấy
+trên trang. Tôi không tự tắt tiến trình của chủ dự án.
+
+NGHIỆM THU: 309 passed (skin + dom + backend + session_bars). /realtime @1900 và
+@390: đè 0->0, cắt 0->0, tràn 0->0, cỡ chữ 12->12 và 11->11, họ chữ 2->2.
+
+── Bổ sung 2026-09-03: một lỗi của tôi, tìm ra khi kiểm "đã làm chưa" ──────────
+Tôi nói file bar sẽ "vài KB". Đo thật: 28,3 MB, 2.052.686 dòng, trải từ 2018-01-02
+— nguyên kho 8 năm, mỗi slot, mỗi công cụ. Khoảng 1,8 GB ghi đĩa mỗi cửa sổ phiên
+để giữ ba tiếng bar. Nguyên nhân: tôi tưởng jf.frame là khung của phiên; nó là
+lịch sử đã đông cộng nửa live nối vào.
+Sửa: _around(frame, day) cắt còn ngày đó cộng một ngày mỗi bên. Lấy một ngày đệm
+mỗi bên vì index mang đồng hồ của công cụ còn `day` là ngày phiên — lệch một ngày
+giữa hai thứ đó sẽ cắt mất đúng phần cần giữ; ba ngày vẫn chỉ ~4 nghìn dòng.
+Đo lại trên khung thật: 2.051.958 -> 1.067 dòng, 0,022 MB (nhỏ hơn 1.278 lần).
+Mutation: gỡ lệnh cắt -> test đỏ; hash khôi phục 2c07b54620a3.
+File 28 MB đã ghi ra trước đó: nén tại chỗ còn 0,041 MB, vẫn đủ 09-02 và 09-03.
+Docstring đầu module còn mô tả hành vi thay-ngày đã bị gỡ -> viết lại.
+
+ĐÃ CHẠY THẬT, qua server đang chạy:
+  hỏi hôm nay 2026-09-03 -> 36 bar CỦA 09-03 (00:10->03:05). Kho parquet chưa có
+  09-03 (append lúc 13:45 ET), nên số bar này đến từ khung của chính slot.
+  hỏi 2026-07-04 -> 0 bar, bars_session_date=None, kèm lý do. Không thay ngày.
+310 passed.

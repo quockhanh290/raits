@@ -490,6 +490,19 @@ def _write_data_observation(*, sleeve, day, slot_id, joined, refusal, decided, r
             tradable_symbol=_tradable_symbol_for(inst),
             data_path=path,
             data_identity=(_tp.file_identity(path) if path else "")))
+        # The frame this slot decided on, kept instead of discarded. `instrument_row` above
+        # reads only its edges; the bars themselves were thrown away with the process, which
+        # is why a panel asking what price did in the window could only answer with the
+        # previous session until the 13:45 append.
+        #
+        # Wrapped SEPARATELY even though the caller wraps this whole function: a failure here
+        # must not skip the `obs.record` below it. Losing the picture is a cost; losing the
+        # proof that a slot looked at data is a different order of cost.
+        try:
+            obs.record_bars(getattr(jf, "frame", None),
+                            root=root, day=str(day), inst=inst)
+        except Exception:                                      # noqa: BLE001
+            pass
 
     outcome = obs.DECIDED if decided else obs.REFUSED
     row = obs.build_row(session_date=str(day), sleeve=sleeve, slot_id=slot_id,

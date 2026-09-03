@@ -4666,13 +4666,23 @@ def test_rules_that_cannot_have_an_entry_verdict_leave_the_lanes(tmp_path):
     assert all(c["reason"] for c in cfg), "each has to say WHY it carries no verdict"
 
 
-def test_the_page_draws_the_declared_config_row():
+def test_the_page_draws_the_declared_config():
+    """Nó không còn là một HÀNG LANE nữa — muc 4.5 đặt phần này ở cuối hàng legend.
+
+    Điều phải giữ không đổi là ba thứ: nó vẫn được dựng, vẫn đọc `declared_config`, và mỗi
+    mục vẫn mang lý do trên hover. Cái cuối là điểm dễ mất nhất khi dời một khối: nếu thay
+    bằng một dòng chữ trần thì trang trông giống design hơn mà người đọc mất đường hỏi
+    "vì sao cái này không phải điều kiện vào lệnh".
+    """
     js = _realtime_js()
-    css = (DASH / "realtime" / "realtime.css").read_text(encoding="utf-8")
-    assert "function mvDeclaredConfig(s)" in js
-    assert "${mvDeclaredConfig(s)}" in js, "the block is defined but never drawn"
+    css = (DASH / "realtime-next" / "next.css").read_text(encoding="utf-8")
+    assert "function mvDeclaredInline(s)" in js
+    assert "${mvLaneLegend(mvDeclaredInline(s))}" in js, "the block is defined but never drawn"
     assert "s.declared_config" in js
-    assert ".mv2-lane-track.config" in css, "the row has no layout and would stack on the cells"
+    assert "mvDeclaredConfig" not in js, "hàm cũ còn sót lại thì có hai bản để trôi khỏi nhau"
+    # Tooltip là cơ chế cố ý, không phải trang trí.
+    assert 'data-tooltip="${mvEsc(c.reason)}"' in js
+    assert ".mv2-legend-declared" in css, "phần đuôi không có layout và sẽ rơi xuống dòng"
 
 
 # --- Stage 5ZZZ-AM: the verdict belongs to the BAR, never to the slot --------------------

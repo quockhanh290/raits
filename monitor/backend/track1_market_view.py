@@ -25,17 +25,23 @@ Where each field comes from — measured on 2026-08-27
                 level nobody published is a line an operator would trade against.
     data status the data-observation row, including the provider error Stage 5ZZI wired in
 
-The honest state of the bars, and why the empty case is the normal one
-----------------------------------------------------------------------
-The parquet is appended once a day, and the live half of each session is spliced in memory
-inside the slot process and then thrown away. So **today's bars are not persisted anywhere**:
-measured on 2026-08-27 the newest bar in every instrument store was 2026-08-26 17:44, while the
-overnight sleeve had fetched and used nearly two thousand of today's. A chart of "today" would
-therefore be empty on every normal day, which is a chart nobody would trust.
+Where today's bars come from, and why there are two stores
+----------------------------------------------------------
+The parquet is appended once a day by the 13:45 ET pre-flight, and the live half of each
+session used to be spliced in memory inside the slot process and then thrown away. So today's
+bars were not persisted anywhere: measured on 2026-08-27 the newest bar in every instrument
+store was 2026-08-26 17:44, while the overnight sleeve had fetched and used nearly two
+thousand of today's.
 
-So a sleeve reports the most recent session the store actually covers, says which session that
-is, and says plainly when it is not today. An empty answer names the reason instead of being
-drawn as a blank rectangle.
+This panel answered that by reporting the most recent session the store covered and naming the
+date. It is not what it does now, and the reason is on the page: the Japan window runs 01:10
+to 02:55 ET, eleven hours ahead of the append, so every morning it drew yesterday's candles
+under today's slots. Twenty-two slots either way, so even the axis lined them up.
+
+The slot now KEEPS the frame it decided on -- one small file per instrument per session -- and
+this module asks that first and the daily parquet second. Neither is ever substituted for the
+other's date. A day with no bars in either returns none and says which day it was asked about,
+because old numbers under a card labelled with today's session are worse than none.
 """
 from __future__ import annotations
 
@@ -245,68 +251,97 @@ def _store_path(inst: str) -> "str | None":
         return None
 
 
-def _sliced(inst: str, day: str, spec: dict) -> tuple:
-    """`(bars, session_day, note)` for one instrument, from the persisted store only.
+def _bars_for_day(path, day: str, spec: dict) -> list:
+    """Bars for EXACTLY `day` out of one store, or an empty list. Never another day's.
 
-    `session_day` is the day the bars are actually FROM, which is not always the day asked
-    for — see the module docstring. Returned rather than silently substituted.
+    Split out because there are now two stores to ask and the rule must be the same for both:
+    the day asked for, sliced to the sleeve's context window, or nothing.
     """
     import pandas as pd
 
-    path = _store_path(inst)
-    if not path or not Path(path).exists():
-        return [], None, f"no persisted bar store for {inst}"
+    frame = pd.read_parquet(path)
+    idx = pd.DatetimeIndex(frame.index)
+    if idx.tz is not None:
+        idx = idx.tz_convert(spec["clock"]).tz_localize(None)
+    frame = frame.copy()
+    frame.index = idx
+    want = pd.Timestamp(day).date()
+    days = pd.Index(idx.date)
+    if want not in set(days):
+        return []
+    sel = frame[days == want]
+    start = pd.Timestamp(f"{want} {spec['context_start']}")
+    end = pd.Timestamp(f"{want} {spec['context_end']}")
+    sel = sel[(pd.DatetimeIndex(sel.index) >= start) & (pd.DatetimeIndex(sel.index) <= end)]
+    if not len(sel):
+        return []
+    # Stage 5ZZP. Volume, when the store has it — and it does, in every instrument.
+    # Stage 5ZZL aggregated only OHLC and so reported no volume at all; the column was
+    # there the whole time. Summed across the 5-minute bucket, which is the only
+    # correct aggregation for a traded quantity.
+    has_volume = "volume" in sel.columns
+    how = {"open": "first", "high": "max", "low": "min", "close": "last"}
+    if has_volume:
+        how["volume"] = "sum"
+    agg = sel.resample(f"{BAR_MINUTES}min").agg(how).dropna(
+        subset=["open", "high", "low", "close"])
+    return [{"time": pd.Timestamp(t).strftime("%Y-%m-%d %H:%M"),
+             "open": round(float(r.open), 4), "high": round(float(r.high), 4),
+             "low": round(float(r.low), 4), "close": round(float(r.close), 4),
+             **({"volume": int(r.volume)} if has_volume and r.volume == r.volume else {})}
+            for t, r in agg.iterrows()]
+
+
+def _sliced(inst: str, day: str, spec: dict, root: str | Path = ".") -> tuple:
+    """`(bars, session_day, note)` for one instrument, for the day ASKED FOR and no other.
+
+    Two stores, asked in this order, never mixed:
+
+        the slot's own frame   what the sleeve actually decided on, written per session by
+                               the runner. This is the only place today's bars exist while
+                               a session is live.
+        the persisted store    the daily parquet, appended by the 13:45 ET pre-flight. It
+                               carries every past session and, after that hour, today too.
+
+    What changed, and why: this used to fall back to the newest session the store covered
+    when the day asked for was absent, and hand back that other date. During an overnight
+    window that meant yesterday's candles drawn under today's slots — the same asymmetry the
+    detector branch settled with "old numbers under a card labelled with today's session are
+    worse than none". The substitution is gone. A day with no bars returns none, and says so.
+    """
+    from global_index import track1_data_observation as _obs
+
+    sources = []
+    try:
+        live = Path(_obs.bars_path_for(root, day, inst))
+        if live.exists():
+            sources.append(live)
+    except Exception:                                             # noqa: BLE001
+        pass
+    store = _store_path(inst)
+    if store and Path(store).exists():
+        sources.append(Path(store))
+
+    if not sources:
+        return [], None, f"no bar store on disk for {inst}"
 
     try:
-        mtime = Path(path).stat().st_mtime
-        key = (str(path), mtime, day, spec["context_start"], spec["context_end"])
+        key = (day, spec["context_start"], spec["context_end"],
+               tuple((str(s), s.stat().st_mtime) for s in sources))
         if key in _bar_cache:
             return _bar_cache[key]
-        frame = pd.read_parquet(path)
-        idx = pd.DatetimeIndex(frame.index)
-        if idx.tz is not None:
-            idx = idx.tz_convert(spec["clock"]).tz_localize(None)
-        frame = frame.copy()
-        frame.index = idx
-        want = pd.Timestamp(day).date()
-        have = idx.normalize().date if hasattr(idx.normalize(), "date") else None
-        days = pd.Index(idx.date)
-        if want not in set(days):
-            # The normal case, and it is stated rather than papered over: fall back to the
-            # newest session the store DOES cover, and hand the caller its date so the page
-            # can say which day it is looking at.
-            newest = max(set(days))
-            note = (f"no persisted bars for {day}; showing the most recent stored session "
-                    f"{newest.isoformat()}")
-            want = newest
+        bars = []
+        for path in sources:
+            bars = _bars_for_day(path, day, spec)
+            if bars:
+                break
+        if bars:
+            out = (bars, day, "")
         else:
-            note = ""
-        sel = frame[days == want]
-        start = pd.Timestamp(f"{want} {spec['context_start']}")
-        end = pd.Timestamp(f"{want} {spec['context_end']}")
-        sel = sel[(pd.DatetimeIndex(sel.index) >= start) & (pd.DatetimeIndex(sel.index) <= end)]
-        if not len(sel):
-            out = ([], want.isoformat(),
-                   note or f"the stored session {want.isoformat()} has no bars between "
-                           f"{spec['context_start']} and {spec['context_end']}")
-        else:
-            # Stage 5ZZP. Volume, when the store has it — and it does, in every instrument.
-            # Stage 5ZZL aggregated only OHLC and so reported no volume at all; the column was
-            # there the whole time. Summed across the 5-minute bucket, which is the only
-            # correct aggregation for a traded quantity.
-            has_volume = "volume" in sel.columns
-            how = {"open": "first", "high": "max", "low": "min", "close": "last"}
-            if has_volume:
-                how["volume"] = "sum"
-            agg = sel.resample(f"{BAR_MINUTES}min").agg(how).dropna(
-                subset=["open", "high", "low", "close"])
-            bars = [{"time": pd.Timestamp(t).strftime("%Y-%m-%d %H:%M"),
-                     "open": round(float(r.open), 4), "high": round(float(r.high), 4),
-                     "low": round(float(r.low), 4), "close": round(float(r.close), 4),
-                     **({"volume": int(r.volume)} if has_volume and r.volume == r.volume
-                        else {})}
-                    for t, r in agg.iterrows()]
-            out = (bars, want.isoformat(), note)
+            out = ([], None,
+                   f"no bars recorded for {day} between {spec['context_start']} and "
+                   f"{spec['context_end']}. The sleeve writes its own frame while the window "
+                   f"runs; the daily store is appended by the 13:45 ET pre-flight.")
         if len(_bar_cache) >= _CACHE_MAX:
             _bar_cache.clear()
         _bar_cache[key] = out
@@ -1868,7 +1903,7 @@ def build(root: str | Path = ".", *, day: str | None = None, now: Any = None,
     for sleeve, spec in SLEEVES.items():
         try:
             slots = _slots_for(sleeve, rows, now_hhmm)  # noqa: E501  (settled below)
-            bars, session_day, note = _sliced(spec["instrument"], asked, spec)
+            bars, session_day, note = _sliced(spec["instrument"], asked, spec, root)
             levels = _levels(rows, sleeve)
             data = _data_status(root, asked, sleeve, spec["instrument"])
             status = _sleeve_status(slots, cov.get(sleeve) or {}, spec, now_hhmm)

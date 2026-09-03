@@ -1587,10 +1587,12 @@
   function mvChartSvg(sleeve) {
     const bars = sleeve.bars || [];
     if (!bars.length) {
-      return mvEmpty('No bars available for this session',
-        sleeve.bars_session_date
-          ? `Latest stored session ${sleeve.bars_session_date}.`
-          : (mvPhrase(sleeve.bars_note) || 'The bar store holds nothing for this window.'));
+      /* "Latest stored session <date>" used to be the second half of this: the backend
+         substituted the newest session it had when the day asked for was missing. It no
+         longer substitutes, so `bars_session_date` is either the day on screen or nothing,
+         and the only thing left worth saying is WHY the day on screen has none. */
+      return mvEmpty(`No bars recorded yet for this session`,
+        mvPhrase(sleeve.bars_note) || 'The bar store holds nothing for this window.');
     }
     // Stage 5ZZM. Room on every side, and a LANE for the markers.
     //
@@ -2280,7 +2282,8 @@
     if (!bars.length) {
       return `<div class="mv2-card-head">
         <span class="mv2-kicker">Price</span>${dayChip}
-        <span class="mv2-mono dim">no bars for this window</span></div>`;
+        <span class="mv2-mono dim">${mvEsc(
+          mvPhrase(s.bars_note) || 'no bars for this window')}</span></div>`;
     }
     const b = bars[bars.length - 1];
     const p = bars.length > 1 ? bars[bars.length - 2] : null;
