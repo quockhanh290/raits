@@ -1206,7 +1206,20 @@ header .runner-header-state i { animation: none; }
 /* Chart cao thêm. Phải đổi CẢ chiều cao CSS lẫn H của viewBox trong realtime.js
    (:1602 và :2693): hai số đó đang bằng nhau nên sy = 1. Đổi mỗi CSS thì sy lệch
    khỏi 1 và toàn bộ nội dung svg — kể cả chữ — bị kéo cao theo. */
-#marketViewChart .mv-svg { height: 380px; }
+/* Nâng KHUNG, không nâng svg. `.mv2-plot > .mv-svg { height: 100% }` đã có sẵn, nên
+   svg tự theo khung và chỉ còn MỘT con số điều khiển chiều cao. Trước đó tôi ghim
+   chiều cao lên chính svg: khung vẫn 320px, `overflow:hidden`, và svg 420px thò ra
+   101px — đúng 101px cuối là pane volume, nên cả 36 cột bị cắt đáy. Nhìn ra thành
+   "volume chỉ có một cột", trong khi thang đã đúng từ trước.
+   Chiều cao cố định là CÓ CHỦ ĐÍCH (realtime.css:1650): một phiên không có bar
+   không được làm co panel. Nên nâng, không chuyển sang auto.
+   Số này phải bằng H của viewBox trong realtime.js — có test ghim sy == 1. */
+#marketViewChart .mv2-plot { height: 420px; }
+/* Và svg BÁM theo khung. `.mv2-plot > .mv-svg { height:100% }` có sẵn nhưng thua
+   `#marketViewChart .mv-svg { height:320px }` ở realtime.css:1555 — một id đấu với
+   hai class. Nên phải nói lại bằng độ cụ thể cao hơn, chứ không ghim thêm một con
+   số nữa: chiều cao chỉ được khai một chỗ. */
+#marketViewChart .mv2-plot > .mv-svg { height: 100%; }
 .mv2-sc-svg { height: 250px; }
 @media (max-width: 560px) { .mv2-sc-svg { height: 200px; } }
 
@@ -1220,9 +1233,6 @@ header .runner-header-state i { animation: none; }
 /* Cột volume vượt trần: vẽ hết chiều cao pane rồi đội một nắp mỏng, để người đọc
    biết cột này CAO HƠN khung chứ không phải bằng đúng trần. Sáng hơn thân cột,
    vì nó là chú thích chứ không phải dữ liệu. */
-/* Khe cắt: màu NỀN của card, nên nó là chỗ bị lấy đi chứ không phải lớp thêm vào.
-   Bản trước tô xám sáng và đặt lơ lửng trên đỉnh cột — đọc thành hai thanh. */
-.mv-vol-clip { fill: var(--card, #0e1116); }
 
 /* muc 4.7 · cột volume TỐI HƠN nến: xanh #1f6b4c, đỏ #7a2b30. Chúng đang ăn chung
    .mv-up/.mv-down với thân nến nên vẽ ra đúng #3ecf8e/#f2555a — một dải màu mạnh

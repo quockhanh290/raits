@@ -1605,14 +1605,17 @@
     // rather than as a row of outcomes. `padB` now carries a marker lane above the time
     // axis: the dots sit on their own baseline, which is what makes them a row instead of
     // noise.
-    const W = 1000, H = 380, padL = MV_PAD.L, padR = MV_PAD.R, padT = 16, padB = 46;
+    const W = 1000, H = 420, padL = MV_PAD.L, padR = MV_PAD.R, padT = 16, padB = 46;
     const laneH = 16;
     // Stage 5ZZP. The volume pane takes its height from the SAME box, so adding it
     // cannot move the panel — the property the tab-switch test pins.
     const hasVol = bars.some(b => typeof b.volume === 'number');
-    //: 58px, the height muc 4.7 gives this pane. It was 44, and on a thin instrument the
-    //: fourteen missing pixels are the difference between a column and a smudge.
-    const volH = hasVol ? 58 : 0;
+    /* Tall enough to draw the real range instead of cutting it.
+       At 58px the scale had to stop at the ninetieth percentile, and then 110, 37 and 33
+       all rendered at exactly the same height -- three different sessions of trading drawn
+       as one. Height is what buys the difference back: at 120 the true peak fits, every
+       value is distinct, and the median minute still stands 9.2px tall. */
+    const volH = hasVol ? 120 : 0;
     const iw = W - padL - padR, ih = H - padT - padB - volH;
     const laneY = padT + ih + volH + 13;
     let lo = Infinity, hi = -Infinity;
@@ -1758,31 +1761,24 @@
          minute that traded must never draw as a minute that did not. Zero keeps its own
          height of zero -- that distinction is the whole point of the volume pane. */
       const vols = bars.map(b => (typeof b.volume === 'number' ? b.volume : null));
-      const traded = vols.filter(v => v).sort((a, b) => a - b);
       const vpeak = Math.max(...vols.map(v => v || 0), 1);
-      const vhi = traded.length
-        ? Math.max(traded[Math.min(traded.length - 1, Math.floor(traded.length * 0.9))], 1)
-        : vpeak;
       const vTop = padT + ih + 6;
       const usable = volH - 8;
       vol = bars.map((b, i) => {
         if (typeof b.volume !== 'number') return '';
-        const over = b.volume > vhi;
+        /* Tuyến tính, vì cột cao gấp mười hai lần thì phải TRÔNG gấp mười hai lần.
+           Đường vòng qua đây dài và đáng ghi lại: cột trông như chỉ có một là do KHUNG
+           chứa bị ghim 320px trong khi svg đã 420px, nên 101px cuối — đúng pane volume —
+           bị cắt đáy. Chữa triệu chứng bằng cách cắt trần ở phân vị 90 thì 110, 37 và 33
+           vẽ bằng nhau; chữa bằng căn bậc hai thì cột 110 chỉ còn cao gấp 3,4 lần trung vị
+           thay vì 12. Sửa đúng chỗ là khung, rồi thang trả về đúng tỉ lệ. */
         const h = b.volume <= 0 ? 0
-          : Math.max(2, Math.min(1, b.volume / vhi) * usable);
+          : Math.max(2, (b.volume / vpeak) * usable);
         const y = vTop + usable - h;
         return `<rect class="mv-vol ${b.close >= b.open ? 'mv-up' : 'mv-down'}"
           x="${(x(i) - bw / 2).toFixed(1)}" y="${y.toFixed(1)}"
           width="${bw.toFixed(1)}" height="${h.toFixed(1)}"><title>volume ${
-            b.volume}${over ? ' — taller than the pane' : ''}</title></rect>`
-          /* A break INSIDE the column, not a second bar above it.
-             The first version drew a pale cap floating 0.9 units clear of the top, and it
-             read as two stacked bars rather than as one bar cut off -- three of thirty-six
-             columns, and all three were asked about. A slit in the column's own colour of
-             background is the ordinary way to say "this continues past the frame", and it
-             cannot be mistaken for data because nothing is added: something is taken out. */
-          + (over ? `<rect class="mv-vol-clip" x="${(x(i) - bw / 2).toFixed(1)}"
-              y="${(y + 2.4).toFixed(1)}" width="${bw.toFixed(1)}" height="1.6"></rect>` : '');
+            b.volume}</title></rect>`;
       }).join('') +
       `<text class="mv-axis mv-vol-label" x="${padL}" y="${(vTop + 8).toFixed(1)}">Volume</text>`
       /* The ceiling label sits BELOW the price axis's last one. Both want the right
@@ -1791,7 +1787,9 @@
          through "64127.80". Twenty units down clears it and still reads as the top of
          this pane rather than the bottom of the one above. */
       + `<text class="mv-axis mv-vol-ax" x="${W - padR + 6}" y="${(vTop + 20).toFixed(1)}">${
-          mvEsc(String(vhi))}${vpeak > vhi ? `  peak ${mvEsc(String(vpeak))}` : ''}</text>`
+          mvEsc(String(vpeak))}</text>`
+      + `<text class="mv-axis mv-vol-ax" x="${W - padR + 6}" y="${
+          (vTop + usable / 2 + 3).toFixed(1)}">${mvEsc(String(Math.round(vpeak / 2)))}</text>`
       + `<text class="mv-axis mv-vol-ax" x="${W - padR + 6}" y="${
           (vTop + usable).toFixed(1)}">0</text>`
       /* A floor to stand on. Without it the columns hang in the gap between two panes and

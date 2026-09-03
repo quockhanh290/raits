@@ -15022,3 +15022,28 @@ BỐN LẦN BẢN MÔ PHỎNG CỦA TÔI KHÁC CÔNG CỤ THẬT — đừng vi�
 Tôi viết lại logic của thước trong trình duyệt để đo nhanh, và nó thiếu chốt
 `el.contains(el)` mà công cụ thật có, nên ra 3 cặp "nhãn đè lên chính nó" —
 getClientRects trả nhiều hình cho một text node. Ba lần trước cũng cùng dạng.
+
+── "volume vẫn khó coi" — GỐC THẬT, tìm ra sau ba lần chữa triệu chứng ────────
+Đo: .mv2-plot bị ghim height:320px + overflow:hidden, trong khi svg đã 420px sau
+hai lần tôi nâng chart. Svg thò ra 101px, và ĐÚNG 101px cuối là pane volume —
+cả 36 cột bị cắt đáy. Trên màn hình đọc thành "volume chỉ có một cột".
+Ba lần chữa trước đều nhắm vào THANG, đều là triệu chứng:
+  - trần phân vị 90  -> 110, 37, 33 vẽ bằng nhau, mất thứ tự
+  - căn bậc hai      -> cột 110 chỉ cao gấp 3,4 lần trung vị thay vì 12
+Sửa đúng chỗ: nâng khung lên 420 (giữ chiều cao CỐ ĐỊNH — realtime.css:1650 nói
+rõ đó là chủ đích: phiên không có bar không được làm co panel), và cho svg BÁM
+theo khung bằng `#marketViewChart .mv2-plot > .mv-svg { height:100% }` — phải nói
+lại vì `#marketViewChart .mv-svg{height:320px}` (một id) thắng
+`.mv2-plot > .mv-svg{height:100%}` (hai class). Chiều cao chỉ khai MỘT chỗ.
+Rồi thang trả về TUYẾN TÍNH. Đo lại: tỉ lệ chiều cao đỉnh/trung vị = 12,2 đúng
+bằng tỉ lệ giá trị 12,2; trục 110/55/0 (mốc giữa đúng nửa => tuyến tính);
+0 cột bị cắt đáy; 0 giá trị vẽ giống nhau.
+Ghim: test_the_plot_box_is_as_tall_as_the_chart_drawn_into_it — assert sy == 1 và
+svg không thò ra khỏi khung. Thông điệp lỗi in luôn danh sách rule đang set
+height, chính nhờ vậy mà lần này tìm ra thủ phạm trong một lượt chạy.
+
+BÀI HỌC: "hai con số ở hai ngôn ngữ" lần thứ hai trong phiên (lần đầu là lề
+hover 8/62 vs plot 34/68). Cả hai lần đều là một quyết định được chép làm hai
+bản, và bản thứ hai trôi. Lần này bản CSS còn thắng cả bản JS.
+
+317 passed. Cả năm dashboard, cả hai khổ: đè 0, cắt 0, tràn 0.

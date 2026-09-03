@@ -1556,29 +1556,24 @@ def test_a_thin_instruments_volume_is_not_flattened_by_its_own_busiest_minute(
     # Cột trung vị phải NHÌN THẤY được. Chia theo đỉnh thì nó ra 2,9px.
     med = sorted(traded)[len(traded) // 2]
     assert med >= 6, f"cột trung vị chỉ {med}px — vẫn bị đỉnh nuốt"
-    # Và cột vượt trần phải được đánh dấu, không được lặng lẽ bằng trần.
-    marks = browser_page.evaluate("""() => {
-        const vols = [...document.querySelectorAll('.mv-vol')];
-        return [...document.querySelectorAll('.mv-vol-clip')].map(c => {
-          const v = vols.find(v => Math.abs(+v.getAttribute('x') - +c.getAttribute('x')) < 0.6);
-          if (!v) return { orphan: true };
-          const vy = +v.getAttribute('y'), vh = +v.getAttribute('height');
-          const cy = +c.getAttribute('y'), ch = +c.getAttribute('height');
-          return { inside: cy >= vy && cy + ch <= vy + vh,
-                   fill: getComputedStyle(c).fill };
-        });
-      }""")
-    assert marks, "không cột nào bị đánh dấu là vượt trần"
-    # Dấu phải nằm TRONG cột. Bản đầu vẽ một nắp sáng lơ lửng phía trên đỉnh, và nó đọc
-    # thành hai thanh chồng nhau — ba trên ba mươi sáu cột, và cả ba đều bị hỏi tới.
-    for m in marks:
-        assert not m.get("orphan"), m
-        assert m["inside"], f"dấu nằm ngoài cột, sẽ đọc thành lớp thứ hai: {m}"
+    # Điều quan trọng hơn cả chiều cao: HAI GIÁ TRỊ KHÁC NHAU KHÔNG ĐƯỢC VẼ BẰNG NHAU.
+    # Bản trước cắt trần ở phân vị 90, và 110, 37, 33 cùng ra một chiều cao — ba phiên
+    # giao dịch khác nhau thành một hình. Đó là lý do pane được nâng lên thay vì cắt.
+    pairs = browser_page.evaluate("""() => [...document.querySelectorAll('.mv-vol')]
+        .map(e => [ (e.querySelector('title')||{}).textContent || '',
+                    +e.getAttribute('height') ])""")
+    byval = {}
+    for title, h in pairs:
+        byval.setdefault(title, set()).add(round(h, 1))
+    gop = {}
+    for title, h in pairs:
+        gop.setdefault(round(h, 1), set()).add(title)
+    dinh = {h: v for h, v in gop.items() if len(v) > 1 and h > 2.01}
+    assert not dinh, f"nhiều giá trị volume khác nhau vẽ cùng chiều cao: {dinh}"
 
     # Trục phải nói cả trần lẫn đỉnh thật, nếu không nhãn đang nói dối về thang.
     ax = browser_page.eval_on_selector_all(".mv-vol-ax", "els => els.map(e => e.textContent)")
-    assert any("peak" in a for a in ax), ax
-    assert any("110" in a for a in ax), ax
+    assert any("110" in a for a in ax), f"trục không in đỉnh thật: {ax}"
 
 
 def test_a_minute_that_did_not_trade_is_not_drawn_as_one_that_did(
@@ -1658,3 +1653,42 @@ def test_the_hover_rule_stands_on_the_candle_it_is_reading(realtime_server, brow
     assert got["off"] is not None and got["off"] < 0.6, got
     # Một đường mỗi pane là muc 4.7; đường cũ chỉ phủ pane giá nên nó là bản thừa.
     assert got["legacy"] == "none", got
+
+
+def test_the_plot_box_is_as_tall_as_the_chart_drawn_into_it(realtime_server, browser_page):
+    """Hai con số ở hai ngôn ngữ: H của viewBox nằm trong realtime.js, chiều cao khung nằm
+    trong CSS. Khi tôi nâng chart, tôi nâng mỗi svg — khung vẫn 320px và `overflow:hidden`,
+    nên svg thò ra 101px và ĐÚNG 101px cuối là pane volume: cả 36 cột bị cắt đáy. Trên màn
+    hình nó đọc thành "volume chỉ có một cột", trong khi thang đã đúng từ trước.
+
+    Ghim bằng tỉ lệ dọc: vẽ đúng cỡ thì sy = 1. Lệch một con số là test đỏ.
+    """
+    _open_price_context(browser_page, realtime_server,
+                        _with_slot_series(_market_view(), series_day="2026-08-27"))
+    got = browser_page.evaluate("""() => {
+        const svg = document.querySelector('#marketViewChart .mv-svg');
+        if (!svg) return null;
+        const vb = (svg.getAttribute('viewBox') || '').trim().split(/\s+/).map(Number);
+        const box = svg.getBoundingClientRect();
+        const plot = svg.closest('.mv2-plot');
+        const p = plot && plot.getBoundingClientRect();
+        const hits = [];
+        for (const sh of document.styleSheets) { let rs;
+          try { rs = sh.cssRules; } catch (e) { continue; }
+          for (const r of rs) { if (!r.selectorText) continue;
+            let m = false; try { m = plot && plot.matches(r.selectorText); } catch (e) {}
+            if (m && r.style.getPropertyValue('height'))
+              hits.push((sh.href || 'inline').split('/').pop() + ' :: ' + r.selectorText
+                        + ' = ' + r.style.getPropertyValue('height')); } }
+        return { vbH: vb[3], svgH: box.height, plotH: p ? p.height : null,
+                 spill: p ? box.bottom - p.bottom : 0,
+                 sheets: [...document.styleSheets].map(s => (s.href || 'inline').split('/').pop()),
+                 heightRules: hits };
+      }""")
+    assert got, "không dựng được chart"
+    assert got["vbH"] > 0
+    sy = got["svgH"] / got["vbH"]
+    assert abs(sy - 1) < 0.02, (
+        f"svg vẽ ở tỉ lệ dọc {sy:.3f}: viewBox {got['vbH']} nhưng cao {got['svgH']} — {got}")
+    assert got["spill"] <= 0.6, (
+        f"svg thò ra khỏi khung {got['spill']:.0f}px — phần thò ra là đáy pane volume: {got}")
