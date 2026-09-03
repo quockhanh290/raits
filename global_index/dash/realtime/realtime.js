@@ -2779,6 +2779,17 @@
         noStore ? `No per-slot record exists for this session — the per-slot store begins `
                   + `2026-08-31. The conditions above were replayed over the bars on disk, `
                   + `which is why they are there and this line is not.`
+        /* Two different silences, and the old sentence gave the same reason for both.
+           "The line starts when the entry window opens" is true only while the window is
+           shut. Measured on the Stress sleeve at 11:53 ET, an hour into a window that opens
+           at 10:35 with sixteen of twenty-four slots already run: it recorded on every one
+           of them and published no price on any, because its detector does not measure one.
+           It answers in basket counts -- how many instruments sit below open and VWAP, how
+           many gapped down -- and this pane only knows how to read a close. Blaming the
+           window there sends the reader to wait for something that has already happened. */
+        : ran && withPrice.length === 0
+            ? `${ran} slot${ran === 1 ? '' : 's'} recorded and none published a close price. `
+              + `What this sleeve's detector does publish is in the Detector rules tab.`
         : ran ? `${ran} slot${ran === 1 ? '' : 's'} recorded, ${withPrice.length} carrying `
               + `numbers — the line starts when the entry window opens and the detector has `
               + `bars to walk.`

@@ -1719,7 +1719,14 @@ def test_a_series_of_slots_that_recorded_nothing_says_so_instead_of_drawing_noth
     assert browser_page.eval_on_selector_all(".mv2-sc-svg", "e => e.length") == 0, (
         "vẽ chart trong khi không slot nào mang số")
     msg = browser_page.eval_on_selector(".mv2-slotchart-empty", "el => el.textContent")
-    assert "0 carrying numbers" in msg, msg
+    # Phải NÓI RA có bao nhiêu slot đã ghi — con số đó là thứ phân biệt "chưa tới lượt" với
+    # "hỏng". Ghim con số, không ghim câu chữ.
+    ran = len(mv["sleeves"]["global_nkd"]["strategy"]["slot_series"])
+    assert str(ran) in msg, f"không nói bao nhiêu slot đã ghi: {msg}"
+    # Và KHÔNG được đổ lỗi cho cửa sổ. Đo được trên rổ Stress lúc 11:53 ET, một tiếng sau
+    # khi cửa sổ mở lúc 10:35 với 16/24 slot đã chạy: câu cũ vẫn bảo người đọc chờ cửa sổ mở.
+    assert "entry window opens" not in msg, (
+        f"đổ lỗi cho cửa sổ trong khi slot đã chạy: {msg}")
     # Và không được in Infinity ra bất cứ đâu.
     body = browser_page.eval_on_selector("#marketViewChart", "el => el.textContent")
     assert "∞" not in body and "Infinity" not in body, body[:200]

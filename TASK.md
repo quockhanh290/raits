@@ -15111,3 +15111,22 @@ tab chờ `.mv2-sc-svg` — đúng cái svg mà phép kiểm đòi KHÔNG đư�
 giây rồi đỏ bất kể đúng sai. Chờ `.mv2-card` thay thế.
 
 319 passed. Cả năm dashboard: đè 0, cắt 0, tràn 0.
+
+── "stress đang chạy mà" — câu báo rỗng đổ lỗi sai chỗ — 2026-09-03 ──────────
+Chủ dự án bác đúng: lúc 11:53 ET, cửa sổ Stress 10:35–12:30 ĐANG MỞ và 16/24 slot
+đã chạy, mà pane vẫn bảo "the line starts when the entry window opens".
+Đào: hai sleeve ghi HAI BỘ TỪ VỰNG khác nhau.
+  NKD    : Close used · Trend filter (EMA 10) · ATR · Volume · Average volume
+  Stress : Instruments below open and VWAP · Instruments gapped down ·
+           Instruments with a wide range · Average basket gap
+_SERIES_LABELS chỉ đi tìm bộ của NKD. Stress KHÔNG công bố giá — nó đo đếm rổ,
+không đo giá — nên mọi tra cứu trượt và pane tưởng là "chưa có số".
+Sửa câu: khi có slot đã ghi mà không slot nào có close, nói đúng điều đó và chỉ
+sang tab Detector rules, thay vì bảo người đọc chờ một việc đã xảy ra rồi.
+Ghim ý nghĩa chứ không ghim chuỗi: phải nêu SỐ slot đã ghi, và không được chứa
+"entry window opens". Mutation: trả lại câu cũ -> đỏ.
+
+CÒN MỞ, cần chủ dự án quyết: bốn số đo của Stress CÓ TỒN TẠI và có nghĩa, chỉ là
+không phải giá. Vẽ chúng thành chuỗi riêng là thiết kế mới — muc 4.7 định nghĩa
+pane này cho giá, và phần B nói design chưa từng vẽ price context của Stress.
+Tôi không tự vẽ.
