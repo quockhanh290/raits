@@ -15077,3 +15077,37 @@ Mutation: quay lại cắt theo spec["clock"] -> đỏ.
 MỘT FIXTURE PHẢI SỬA THEO, và nó nói lên điều đáng nhớ: fixture cũ dựng index
 NAIVE từ nhãn ET rồi ghi thẳng. Chỗ ghi quy về UTC, chỗ đọc quy về ET, nên một
 index không khai múi giờ là một fixture không nói nó đang ở đồng hồ nào.
+
+── Ba chỗ chủ dự án chỉ ra — 2026-09-03 ──────────────────────────────────────
+1. CHẤM SLOT LỆCH SO VỚI Ô LANE. Đo: lệch tâm trung bình -31px, min -39,5.
+   Gốc: HAI HÀNG DÙNG HAI LƯỚI. Lane 246px/1250,4/110; hàng slot 212/1268,4/126 —
+   track lệch gốc 34px và rộng hơn 18px, nên chấm không thể trùng cột. Rule đặt
+   lưới design chỉ nhắm `.mv2-lanes .mv2-lane`, mà hàng slot là ANH EM của
+   .mv2-lanes chứ không nằm trong nó. muc 4.5 nói cả hai cùng một lưới.
+   Cộng thêm: chấm đặt ở left = i*w + w*0.31, lệch sang trái một phần ba ô.
+   Sửa: mở rộng selector lưới; chấm đặt ở tâm ô + translateX(-50%) nên đúng bất
+   kể chấm to nhỏ. Đo lại: lệch tối đa 1,01px.
+
+2. "ACROSS THE SESSION" CỦA STRESS KHÔNG HIỆN GÌ. Không phải thiếu pane: svg CÓ,
+   nhưng 0 polyline, 0 chấm, và trục giá in "-∞" / "∞".
+   Gốc: 18 điểm slot đều chỉ có slot_time, mọi số đọc là null — mà bộ lọc viết
+   `Number.isFinite(Number(p.close))`. `Number(null)` là 0 và `isFinite(0)` là
+   true, nên cả 18 điểm rỗng lọt qua như thể close = 0. Chart vẽ trên tập rỗng.
+   ĐÚNG CÁI BẪY MÀ FILE NÀY TỰ CẢNH BÁO ở một chỗ khác, cách đó ba mươi dòng.
+   Sửa: kiểm `p.close != null` TRƯỚC. Giờ hiện đúng câu cần hiện —
+   "18 slots recorded, 0 carrying numbers — the line starts when the entry window
+   opens and the detector has bars to walk." Đó chính là thông tin chủ dự án hỏi.
+   Ghim + mutation: bỏ điều kiện null -> đỏ.
+
+3. DETECTOR RULES DỒN CỤC. `detail` của gate viết cho dòng log, không cho trang:
+   ba điều kiện nối bằng dấu chấm phẩy thành một câu chạy, dính luôn câu giải
+   thích, và một số thô 0.004344608523355387 — mười tám chữ số.
+   Sửa: tách theo chính dấu chấm phẩy người viết đã đặt, mỗi điều kiện một dòng;
+   cắt thập phân còn bốn chữ số nhưng GIỮ giá trị đủ trong title — làm tròn cho
+   mắt không được thành làm tròn bằng chứng.
+
+MỘT PHÉP KIỂM SUÝT DỐI: test cho mục 2 lúc đầu đỏ ở CẢ HAI chiều, vì helper mở
+tab chờ `.mv2-sc-svg` — đúng cái svg mà phép kiểm đòi KHÔNG được vẽ. Nó treo 20
+giây rồi đỏ bất kể đúng sai. Chờ `.mv2-card` thay thế.
+
+319 passed. Cả năm dashboard: đè 0, cắt 0, tràn 0.

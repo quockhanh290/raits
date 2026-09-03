@@ -1573,6 +1573,25 @@
     return i < 0 ? s : s.slice(i + 1, i + 6);
   }
 
+  /* A gate's `detail` is written for a log line, not for a page: the conditions arrive as
+     one run-on string joined by semicolons, and the numbers arrive at full float width.
+     Measured on the Stress sleeve: "Instruments below open and VWAP 2 (needs >= 4);
+     Instruments gapped down 0 (needs >= 3); Average basket gap 0.004344608523355387
+     (needs <= -0.001)" -- three separate readings crammed into one sentence, one of them
+     carrying eighteen significant digits nobody can read and nobody needs.
+
+     Split on the semicolons the writer already put there, and trim decimals to four. The
+     full value stays available on the element's title, because rounding for the eye must
+     not become rounding of the evidence. */
+  function mvConditionLines(text) {
+    const raw = String(text == null ? '' : text).trim();
+    if (!raw) return [];
+    return raw.split(';').map(s => s.trim()).filter(Boolean).map(s => ({
+      full: s,
+      shown: s.replace(/-?\d+\.\d{5,}/g, m => String(Number(Number(m).toFixed(4)))),
+    }));
+  }
+
   function mvEmpty(message, detail) {
     return `<div class="mv-empty"><b>${mvEsc(message)}</b>` +
            (detail ? `<span>${mvEsc(detail)}</span>` : '') + `</div>`;
@@ -2160,7 +2179,7 @@
     const strip = slots.map((sl, i) => {
       const m = MV_MARK[sl.status] || MV_MARK.unknown;
       const why = sl.reason ? ' · ' + mvPhrase(sl.reason) : '';
-      return `<i class="mv2-slot" style="left:${(i * w + w * 0.31).toFixed(3)}%;` +
+      return `<i class="mv2-slot" style="left:${(i * w + w / 2).toFixed(3)}%;` +
         `background:${m.hollow ? 'transparent' : m.fill};border-color:${m.fill}" ` +
         `title="${mvEsc(sl.time_et)} · ${mvEsc(m.word + why)}"></i>`;
     }).join('');
@@ -2235,9 +2254,15 @@
         <span class="mv2-kicker">Detector rules, per bar</span>
         <span class="mv2-mono">no bar evaluated</span>
       </div>` + mvEmpty('No bar was evaluated',
-        (why ? mvPhrase(why) + ' ' : '')
-        + 'The detector returned before it scanned the window, so there is no per-bar verdict '
-        + 'to show. The slot-level rules beside this tab say where it stopped.') + `</div>`;
+        'The detector returned before it scanned the window, so there is no per-bar verdict '
+        + 'to show. The slot-level rules beside this tab say where it stopped.')
+      + (() => {
+          const lines = mvConditionLines(mvPhrase(why));
+          return lines.length
+            ? `<ul class="mv2-cond-list">` + lines.map(l =>
+                `<li title="${mvEsc(l.full)}">${mvEsc(l.shown)}</li>`).join('') + `</ul>`
+            : '';
+        })() + `</div>`;
   }
 
   function mvBarGrid(s) {
@@ -2731,7 +2756,16 @@
 
   function mvSlotChart(s) {
     const series = ((s.strategy || {}).slot_series) || [];
-    const withPrice = series.filter(p => Number.isFinite(Number(p.close)));
+    /* `p.close != null` FIRST. `Number(null)` is 0 and `Number.isFinite(0)` is true, so a
+       bare Number() counts a slot that recorded nothing as one that closed at zero -- the
+       same trap this file already names thirty lines further down, and the guard here was
+       written without it.
+       Measured on the Stress sleeve, 2026-09-03: eighteen slots, every reading null, and all
+       eighteen passed this filter. The pane then drew a chart of nothing -- no line, no dot,
+       and a price axis running from -Infinity to Infinity -- instead of saying that no slot
+       has carried a number yet. */
+    const withPrice = series.filter(
+      p => p && p.close != null && Number.isFinite(Number(p.close)));
     if (withPrice.length < 2) {
       const ran = series.length;
       // Stage 5ZZZ-BQ. On a session opened from the bar, an empty chart usually means the

@@ -1692,3 +1692,34 @@ def test_the_plot_box_is_as_tall_as_the_chart_drawn_into_it(realtime_server, bro
         f"svg vẽ ở tỉ lệ dọc {sy:.3f}: viewBox {got['vbH']} nhưng cao {got['svgH']} — {got}")
     assert got["spill"] <= 0.6, (
         f"svg thò ra khỏi khung {got['spill']:.0f}px — phần thò ra là đáy pane volume: {got}")
+
+
+def test_a_series_of_slots_that_recorded_nothing_says_so_instead_of_drawing_nothing(
+        realtime_server, browser_page):
+    """Đo được 2026-09-03 trên rổ Stress: 18 slot, MỌI số đọc là null, và cả 18 lọt qua bộ
+    lọc "có giá". `Number(null)` là 0 và `Number.isFinite(0)` là true — đúng cái bẫy mà file
+    này đã tự cảnh báo ở một chỗ khác, mà bộ lọc ở đây lại viết không có nó.
+
+    Hậu quả không phải một dòng sai mà là một CÁI CHART CỦA HƯ KHÔNG: không đường, không
+    chấm, và trục giá chạy từ -Infinity tới Infinity. Câu cần hiện là "bao nhiêu slot đã ghi,
+    bao nhiêu mang số" — người đọc mới biết là chưa tới lượt chứ không phải hỏng.
+    """
+    mv = _with_slot_series(_market_view(), series_day="2026-08-27")
+    for p in mv["sleeves"]["global_nkd"]["strategy"]["slot_series"]:
+        for k in ("close", "ema", "volume", "avg_volume"):
+            p[k] = None
+    # KHÔNG dùng _open_price_context: nó chờ `.mv2-sc-svg`, mà đúng cái svg đó là thứ
+    # phép kiểm này đòi KHÔNG được vẽ. Chờ nó thì test treo 20 giây rồi đỏ dù đúng hay sai.
+    _stub_mv(browser_page, mv)
+    open_realtime(browser_page, realtime_server)
+    browser_page.click('[data-mv-inner="Price context"]')
+    browser_page.wait_for_selector("#marketViewChart .mv2-card", timeout=20_000)
+    browser_page.wait_for_timeout(600)
+
+    assert browser_page.eval_on_selector_all(".mv2-sc-svg", "e => e.length") == 0, (
+        "vẽ chart trong khi không slot nào mang số")
+    msg = browser_page.eval_on_selector(".mv2-slotchart-empty", "el => el.textContent")
+    assert "0 carrying numbers" in msg, msg
+    # Và không được in Infinity ra bất cứ đâu.
+    body = browser_page.eval_on_selector("#marketViewChart", "el => el.textContent")
+    assert "∞" not in body and "Infinity" not in body, body[:200]

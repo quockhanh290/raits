@@ -3,8 +3,8 @@
 Sinh bởi `global_index/dash/tools/measure_dashboards.py`. **Đừng sửa tay**:
 chạy lại script để cập nhật, nếu không con số sẽ rời khỏi thứ nó mô tả.
 
-- **measured_at_utc**: `2026-09-03 15:31:27Z`
-- **commit**: `aaf7bdf`
+- **measured_at_utc**: `2026-09-03 16:08:03Z`
+- **commit**: `cf28b1b`
 - **branch**: `future/incorporation`
 - **dash_tree_state**: `M global_index/dash/paper/index.html
  M global_index/dash/realtime-next/index.html
@@ -29,12 +29,12 @@ chạy lại script để cập nhật, nếu không con số sẽ rời khỏi 
 
 | Trang | Rộng | Node vẽ ra | Chữ đè chữ | Cắt ngoài mép | Tràn trang | Dưới AA | Cỡ chữ | Họ chữ |
 |---|---|---|---|---|---|---|---|---|
-| /realtime | 1900 | 291 | 0 | 0 | 0 | 7/568 | 12 | 2 |
-| /realtime | 390 | 817 | 0 | 0 | 0 | 19/712 | 13 | 2 |
+| /realtime | 1900 | 291 | 0 | 0 | 0 | 7/624 | 12 | 2 |
+| /realtime | 390 | 880 | 0 | 0 | 0 | 19/768 | 13 | 2 |
 | /paper · Overview ⚠ | 1900 | 22 | 0 | 0 | 0 | 0/22 | 6 | 2 |
 | /paper · Gates | 1900 | 46 | 0 | 0 | 0 | 0/46 | 6 | 2 |
 | /paper · Coverage ⚠ | 1900 | 19 | 0 | 0 | 0 | 0/19 | 6 | 2 |
-| /paper · Gaps | 1900 | 90 | 0 | 0 | 0 | 0/78 | 7 | 2 |
+| /paper · Gaps ⚠ | 1900 | 18 | 0 | 0 | 0 | 0/18 | 5 | 2 |
 | /paper · Overview | 390 | 173 | 0 | 0 | 0 | 0/113 | 7 | 2 |
 | /paper · Gates | 390 | 543 | 0 | 0 | 0 | 0/345 | 10 | 2 |
 | /paper · Coverage | 390 | 449 | 0 | 0 | 0 | 0/338 | 10 | 2 |
@@ -62,5 +62,6 @@ chạy lại script để cập nhật, nếu không con số sẽ rời khỏi 
 
 - /paper · Overview @1900px: chỉ 22 node được vẽ — trang chưa dựng xong, mọi số 0 ở dòng này không kiểm gì
 - /paper · Coverage @1900px: chỉ 19 node được vẽ — trang chưa dựng xong, mọi số 0 ở dòng này không kiểm gì
+- /paper · Gaps @1900px: chỉ 18 node được vẽ — trang chưa dựng xong, mọi số 0 ở dòng này không kiểm gì
 - / @1900px: chỉ 19 node được vẽ — trang chưa dựng xong, mọi số 0 ở dòng này không kiểm gì
 - / @390px: chỉ 26 node được vẽ — trang chưa dựng xong, mọi số 0 ở dòng này không kiểm gì

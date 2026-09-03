@@ -844,7 +844,12 @@
 /* ── Pane "Setup rules" ──────────────────────────────────────────────────────
    Lưới lane: design 246px cho cột nhãn và 110px cho cột tổng; live đang 212/126,
    nên nhãn luật bị bó và con số tổng thừa chỗ. */
-.mv2-lanes .mv2-lane { grid-template-columns: 246px minmax(0, 1fr) 110px; }
+.mv2-lanes .mv2-lane,
+.mv2-lane-slots,
+.mv2-lane-axis { grid-template-columns: 246px minmax(0, 1fr) 110px; }
+/* Hàng "Slot decisions" là ANH EM của .mv2-lanes, không nằm trong nó, nên rule cũ
+   bỏ sót và nó giữ lưới cũ 212/126: track lệch gốc 34px và rộng hơn 18px, thành ra
+   chấm không thể nào trùng cột với ô lane. muc 4.5 nói cả hai CÙNG một lưới. */
 /* Ô 10px như design; 12px làm mỗi lane cao thêm và cả khối dày hơn một dòng. */
 .mv2-lane-track .mv2-cell { height: 10px; }
 /* Vạch ngăn giữa các lane: design dùng tông tối hơn một bậc. */
@@ -1258,3 +1263,19 @@ header .runner-header-state i { animation: none; }
 /* Vạch đáy của pane volume — chia bằng vạch trong, đúng màu muc 3 dành cho vạch
    trong card. */
 .mv-vol-base { stroke: #1a1f26; stroke-width: 1; }
+
+/* Chấm slot đặt đúng TÂM ô của nó. Trước là left = i*w + w*0.31 — một phần ba lệch
+   sang trái — rồi cộng thêm bề rộng chấm nữa. Dùng tâm cộng translateX(-50%) thì
+   đúng bất kể chấm to nhỏ thế nào. */
+.mv2-lane-track.slots > .mv2-slot { transform: translateX(-50%); }
+
+/* Các điều kiện của gate: mỗi cái một dòng, canh theo lề chữ của card. Trước đó
+   chúng bị nối thành một câu chạy dài bằng dấu chấm phẩy. */
+.mv2-cond-list {
+  list-style: none; margin: 9px 0 0; padding: 0 18px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.mv2-cond-list > li {
+  font-family: var(--mono); font-size: 11px; color: #a8b1c0;
+  padding-left: 11px; border-left: 2px solid #262d36;
+}
