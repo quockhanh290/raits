@@ -14855,3 +14855,28 @@ Docstring đầu module còn mô tả hành vi thay-ngày đã bị gỡ -> vi�
   09-03 (append lúc 13:45 ET), nên số bar này đến từ khung của chính slot.
   hỏi 2026-07-04 -> 0 bar, bars_session_date=None, kèm lý do. Không thay ngày.
 310 passed.
+
+── Bổ sung 2: lệch 9 tiếng giữa hai nguồn bar — 2026-09-03 ────────────────────
+Tìm ra khi trả lời "làm sao biết chart đúng". Phép tự kiểm: nến dựng từ khung của
+slot, đường close dựng từ sổ ghi của slot — hai nguồn khác nhau, khớp thì tin được.
+Chúng KHÔNG khớp: 0/13 điểm nằm trong biên độ nến, lệch tới 1.190 điểm.
+
+Đào tới đáy, bỏ mọi giả định về đồng hồ: quét mọi độ lệch giờ rồi khớp theo GIÁ.
+  lệch -9,0 giờ : 100,0% khớp trên 1.546 mốc
+  mọi độ lệch khác : dưới 2%
+Tokyo là UTC+9 => index của kho ngày là UTC KHÔNG múi giờ, còn khung slot mang
+Asia/Tokyo. _bars_for_day quy chuẩn cái có múi giờ về spec["clock"] (Tokyo) và để
+yên cái naive, nên hai nguồn bị cắt lệch nhau 9 tiếng. LỖI DO TÔI GÂY RA khi thêm
+nguồn thứ hai — trước đó chỉ một nguồn nên không lộ.
+
+Sửa ở CHỖ GHI (_as_store_clock): ghi ra tz-naive UTC, cùng quy ước với kho. Một
+đáp án trên đĩa thay vì một quy tắc mọi người đọc phải nhớ.
+Đo lại: 100,0% khớp trên 1.067 mốc chồng lấn (trước: 0,0%).
+Mutation: gỡ chuẩn hoá -> test đỏ; khôi phục hash 1e42d4632589. 311 passed.
+
+BA LẦN TÔI SUÝT KẾT LUẬN SAI TRÊN ĐƯỜNG NÀY
+1. "lệch 1.190 điểm, không phải nhiễu" — vội. Ngày khác chỉ lệch ±205, đổi dấu.
+2. "bar đang hình thành so với bar đã đóng" — nghe hợp lý, nhưng bar đang hình
+   thành BUỘC phải nằm trong biên độ bar đóng; 0/13 thì không phải cơ chế đó.
+3. "điều chỉnh hợp đồng liên tục" — nếu vậy chênh lệch phải là hằng số; std 320.
+Chỉ phép quét không giả định (thử mọi độ lệch, khớp theo giá) mới ra đáp án.

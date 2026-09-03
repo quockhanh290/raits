@@ -110,6 +110,32 @@ def test_the_slot_still_records_that_it_looked_at_data_when_the_bar_write_fails(
     assert (rows[0].get("instruments") or []), "dòng ghi ra nhưng không mang instrument nào"
 
 
+def test_the_file_is_written_on_the_same_clock_as_the_daily_store(tmp_path):
+    """Đo được 2026-09-03: hai nguồn lệch nhau đúng 9 tiếng và không mốc nào khớp.
+
+    Quét mọi độ lệch giờ rồi khớp theo giá: 100% của 1.546 mốc trùng khít ở đúng -9,0 giờ,
+    dưới 2% ở mọi độ lệch khác. Tokyo là UTC+9, nên index của kho ngày là UTC không múi giờ
+    còn khung của slot mang Asia/Tokyo. Bên đọc quy chuẩn một cái về đồng hồ của rổ và để yên
+    cái kia, nên hai nguồn bị cắt lệch nhau 9 tiếng — và trang sẽ vẽ cửa sổ của nguồn này lên
+    dữ liệu của nguồn kia.
+
+    Chuẩn hoá ở CHỖ GHI chứ không ở chỗ đọc: một đáp án trên đĩa, thay vì một quy tắc mà mọi
+    người đọc phải nhớ.
+    """
+    idx = pd.date_range("2026-09-02 09:00", periods=12, freq="5min", tz="Asia/Tokyo")
+    frame = pd.DataFrame({"open": 1.0, "high": 1.0, "low": 1.0, "close": 1.0, "volume": 1},
+                         index=idx)
+    out = obs.record_bars(frame, root=tmp_path, day="2026-09-02", inst=INST)
+    assert out is not None
+    back = pd.read_parquet(out)
+
+    got = pd.DatetimeIndex(back.index)
+    assert got.tz is None, f"vẫn còn múi giờ: {got.tz}"
+    # Cùng khoảnh khắc, viết theo UTC — 09:00 Tokyo là 00:00 UTC.
+    assert str(got.min()) == "2026-09-02 00:00:00", str(got.min())
+    assert (got == idx.tz_convert("UTC").tz_localize(None)).all()
+
+
 def test_only_the_session_is_kept_not_the_history_behind_it(tmp_path):
     """Đo được 2026-09-03: một lần ghi ra 2.052.686 dòng, 28 MB, trải từ 2018-01-02.
 
