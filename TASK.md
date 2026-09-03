@@ -15150,3 +15150,42 @@ BÀI HỌC: trước khi làm đẹp một khối chữ, hỏi "khối này có 
 Tôi đã dành một vòng để trình bày lại thứ lẽ ra phải xoá.
 
 319 passed.
+
+── Calm hai pha: gộp thành MỘT bảng — 2026-09-03 ─────────────────────────────
+Chủ dự án chỉ ra lề sai và nhãn hàng lặp theo mã. Đo trên 08-31 (phiên DUY NHẤT
+trong dữ liệu tại chỗ có nhiều hơn một mã):
+  - lề: nhãn hàng ở x=23 sát mép panel, chữ head ở x=41 — lệch 18px
+  - 7 nhãn hàng + 7 câu giải thích, in lại nguyên vẹn cho từng mã
+  - 3 hàng in cùng một số ở cả hai pha (59,70/59,70 · 89,54/89,54 · 447,72/447,72)
+
+Chủ dự án đoán Calm trade 4-5 mã. ĐO: track1_calm_a.py:59 `instruments: ("MES",
+"MNQ")`, và tên chiến lược cũng nói: `..._MES_MNQ__not_deep_gap`. ĐÚNG HAI MÃ, cố
+định. Điều đó lật ngược lựa chọn: phản đối của tôi với "một bảng chung" là "thêm
+mã thì thêm cột, sẽ tràn" — không áp dụng, vì số cột là hằng số 2 mã × 2 pha.
+
+Đã làm:
+  1. padding 9px 14px 10px cho panel (muc 4.8) — trước khi gộp bảng
+  2. hàng không đổi giữa hai pha in dấu void ở cột sau (muc 4.8, "nói lại là nói
+     dư"); giá trị đủ giữ trong title. Ô dấu: 8/28 -> 14/28
+  3. MỘT bảng chung: nhãn in một lần. 22 lần in nhãn -> 11. Gates cũng gộp:
+     nhãn một lần, một cột mỗi mã.
+Đo lại: bảng rộng 1606 (trọn khổ), GATES nằm DƯỚI bảng, cột nhãn 1162px (trước
+~85px), mọi hàng cao đều 48px (trước chữ xuống 6 dòng).
+
+MỘT LỖI BỐ CỤC TỰ GÂY: .mv2-calm-ivs là lưới hai cột để đặt hai panel cạnh nhau.
+Bỏ panel rồi mà để nguyên lưới thì bảng và GATES bị xếp cạnh nhau, bóp cột nhãn.
+
+HAI TEST PHẢI VIẾT LẠI, và lý do đáng nhớ: chúng tìm "một phần tử chứa riêng mã
+này và mang cả hai pha" — tức ghim BỐ CỤC panel, dù docstring của helper tự nói
+là "viết theo thứ quan sát được chứ không theo tên class". Bất biến thật là "hai
+pha của cùng một mã nằm CẠNH NHAU", và bảng chung vẫn giữ. Viết lại bằng hình
+học: các cột pha nằm trong khoảng ngang của tiêu đề mã.
+Và bản viết lại đầu tiên cũng sai: nó nhặt luôn tiêu đề cột của bảng GATES làm
+tiêu đề mã, nên cắt mất cột OBSERVE của mã cuối. Chỉ lấy hàng tiêu đề trên cùng.
+
+CHƯA XEM ĐƯỢC ẢNH: hai screenshot chủ dự án gửi đều bị API từ chối —
+"image dimensions exceed max allowed size for many-image requests: 2000 pixels";
+ảnh là 2022x932 và 2009x432. Bảng này là tôi SUY từ muc 4.8 + số đo trùng lặp,
+KHÔNG phải từ ảnh. Cần ảnh <=2000px để đối chiếu.
+
+319 passed. Cả năm dashboard: đè 0, cắt 0, tràn 0.

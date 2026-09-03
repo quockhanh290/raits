@@ -538,31 +538,60 @@ def test_each_type_rule_reaches_the_value_it_declares(skin_server, skin_page):
 CALM_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "track1_market_view_20260831.json"
 
 
-def _calm_instrument_panels(page, names):
-    """Với mỗi mã, đếm phần tử chứa RIÊNG mã đó và mang cả hai pha.
+def _calm_phase_columns(page, names):
+    """Với mỗi mã: các cột pha nằm trong khoảng ngang của tiêu đề mã đó.
 
-    Viết theo thứ quan sát được chứ không theo tên class, để test không phải sửa
-    lại mỗi lần lớp trình bày đổi tên — và để nó vẫn đỏ đúng lý do khi cấu trúc
-    còn chia theo pha.
+    Đo bằng HÌNH HỌC, không bằng tên class. Bản đầu tìm "một phần tử chứa riêng mã này và
+    mang cả hai pha", tức nó ghim bố cục panel-mỗi-mã. Bố cục đổi sang một bảng chung thì
+    phần tử ấy không còn tồn tại — nhưng điều test bảo vệ thì vẫn còn nguyên: DECIDE và
+    OBSERVE của cùng một mã phải NẰM CẠNH NHAU, để đọc được cái gì đã đổi mà không phải so
+    chéo qua hơn một màn hình. Hỏi đúng câu đó thì cả hai bố cục đều trả lời được.
     """
     return page.evaluate(
         """(names) => {
           const root = document.getElementById('calmSection');
           if (!root) return null;
+          // Tên mã xuất hiện ở HAI hàng tiêu đề: hàng của bảng chính và hàng của bảng
+          // GATES bên dưới. Lấy cả hai thì tiêu đề GATES nằm bên phải sẽ cắt mất cột
+          // OBSERVE của mã cuối. Chỉ giữ hàng TRÊN CÙNG.
+          let heads = [...root.querySelectorAll('*')].filter(el => {
+            const own = [...el.childNodes].filter(n => n.nodeType === 3)
+              .map(n => n.textContent).join('').trim();
+            return names.includes(own);
+          });
+          if (heads.length) {
+            const top = Math.min(...heads.map(e => e.getBoundingClientRect().top));
+            heads = heads.filter(e => e.getBoundingClientRect().top < top + 6);
+          }
+          const cols = [...root.querySelectorAll('*')].filter(el => {
+            const own = [...el.childNodes].filter(n => n.nodeType === 3)
+              .map(n => n.textContent).join('').trim().toUpperCase();
+            return own === 'DECIDE' || own === 'OBSERVE';
+          }).map(el => {
+            const r = el.getBoundingClientRect();
+            return { txt: el.textContent.trim().toUpperCase(),
+                     mid: r.left + r.width / 2, top: r.top };
+          });
           const out = {};
           for (const name of names) {
-            out[name] = [...root.querySelectorAll('*')].filter(el => {
-              const t = el.textContent || '';
-              if (!t.includes(name)) return false;
-              // Panel của MỘT mã: không được chứa mã kia.
-              if (names.some(o => o !== name && t.includes(o))) return false;
-              return /DECIDE/i.test(t) && /OBSERVE/i.test(t);
-            }).length;
+            const h = heads.find(e => {
+              const own = [...e.childNodes].filter(n => n.nodeType === 3)
+                .map(n => n.textContent).join('').trim();
+              return own === name;
+            });
+            if (!h) { out[name] = null; continue; }
+            // Khoảng ngang mà mã này chiếm: từ tiêu đề của nó tới tiêu đề mã kế tiếp.
+            const hr = h.getBoundingClientRect();
+            const nexts = heads.map(e => e.getBoundingClientRect())
+              .filter(r => r.left > hr.left + 1).map(r => r.left);
+            const right = nexts.length ? Math.min(...nexts) : Infinity;
+            out[name] = cols
+              .filter(c => c.mid >= hr.left - 1 && c.mid < right && c.top >= hr.top - 1)
+              .map(c => c.txt);
           }
           return out;
         }""",
-        names,
-    )
+        names)
 
 
 def test_calm_shows_both_phases_inside_one_instrument_panel(skin_server, skin_page):
@@ -583,21 +612,18 @@ def test_calm_shows_both_phases_inside_one_instrument_panel(skin_server, skin_pa
     payload = json.loads(CALM_FIXTURE.read_text(encoding="utf-8"))
     stub_api(skin_page, {"/api/v1/track1-market-view": payload})
     open_realtime(skin_page, skin_server)
-    skin_page.wait_for_selector("#calmSection .mv2-calm-inst", timeout=30_000)
+    skin_page.wait_for_selector("#calmSection", timeout=30_000)
+    skin_page.wait_for_timeout(900)
 
     names = ["MES", "MNQ"]
-    # Chốt chặn: nếu thẻ Calm rỗng thì mọi assert bên dưới đạt mà không kiểm gì.
-    rendered = skin_page.eval_on_selector_all(
-        "#calmSection .mv2-calm-inst", "els => els.length")
-    assert rendered >= len(names), (
-        f"thẻ Calm chỉ dựng {rendered} khối mã — test sẽ đạt rỗng, không phải đạt thật")
-
-    panels = _calm_instrument_panels(skin_page, names)
-    assert panels is not None, "không có #calmSection trên trang"
-    missing = [n for n in names if not panels.get(n)]
-    assert not missing, (
-        "không có panel nào mang riêng một mã kèm CẢ HAI pha: "
-        f"{missing} — đếm được {panels}")
+    cols = _calm_phase_columns(skin_page, names)
+    assert cols is not None, "không có #calmSection trên trang"
+    # Chốt chặn: không tìm được tiêu đề mã nào thì mọi assert dưới đây đạt rỗng.
+    assert all(cols.get(n) is not None for n in names), (
+        f"không thấy tiêu đề của mã nào trên thẻ Calm: {cols}")
+    for n in names:
+        assert [c for c in cols[n] if c == "DECIDE"] and [c for c in cols[n] if c == "OBSERVE"], (
+            f"{n} không có CẢ HAI pha cạnh nhau; đọc được {cols}")
 
 
 def test_calm_instrument_panel_states_how_many_gates_it_met(skin_server, skin_page):
@@ -617,7 +643,8 @@ def test_calm_instrument_panel_states_how_many_gates_it_met(skin_server, skin_pa
 
     stub_api(skin_page, {"/api/v1/track1-market-view": payload})
     open_realtime(skin_page, skin_server)
-    skin_page.wait_for_selector("#calmSection .mv2-calm-inst", timeout=30_000)
+    skin_page.wait_for_selector("#calmSection", timeout=30_000)
+    skin_page.wait_for_timeout(900)
 
     text = skin_page.eval_on_selector(
         "#calmSection", "el => el.textContent.replace(/\s+/g, ' ')")
