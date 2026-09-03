@@ -14954,3 +14954,26 @@ BA LẦN PHÉP KIỂM CỦA TÔI KHÔNG KIỂM GÌ — bắt bằng mutation
 
 @390 so với lần chạy đầy đủ trước đó: đè 3->3, cắt 3->3, cỡ chữ 13->13 — KHÔNG
 tăng. 316 passed.
+
+── Volume vẫn khó coi — vòng hai — 2026-09-03 ─────────────────────────────────
+Vòng trước sửa THANG (trần theo phân vị 90). Lần này là ba thứ về HÌNH:
+
+1. CỘT VOLUME ĐANG DÙNG ĐÚNG MÀU CỦA NẾN. Đo: #3ecf8e / #f2555a, y hệt thân nến.
+   Muc 4.7 cho volume #1f6b4c / #7a2b30 kèm lý do: "tối hơn nến, vì volume là
+   phụ". Không có rule .mv-vol nào nên nó ăn chung .mv-up/.mv-down với nến — một
+   dải màu mạnh ngang chart giá, đặt ngay dưới nó, tranh mắt với thứ nó đi kèm.
+2. PANE CAO 44px, spec 58px. Với công cụ mỏng, 14px thiếu là khác biệt giữa một
+   cột và một vết. Sàn 1,5 -> 2px. Cột trung vị 10,1 -> 14,1px.
+3. HAI LỖI HÌNH ĐO ĐƯỢC, không phải cảm giác:
+   - nhãn "32 peak 110" ĐÈ nhãn giá "64127.80" — cả hai cùng đòi cột phải, mà
+     plot giá kết thúc đúng chỗ pane volume bắt đầu. Dời xuống 20 đơn vị.
+   - không có VẠCH ĐÁY: cột treo lơ lửng giữa hai pane, mắt không có gì để đọc
+     chiều cao dựa vào. Thêm vạch #1a1f26.
+
+ĐIỂM MÙ CỦA THƯỚC NGHIỆM THU — ghi lại để không tin nhầm
+measure_dashboards.py báo "đè 0" ở 1900 NGAY CẢ KHI "32 peak 110" đang in chồng
+lên "64127.80". Nó không nhìn vào bên trong SVG. Mọi chồng chữ trong chart phải
+tự đo bằng getBoundingClientRect trên chính các <text>, không được dựa vào con số
+0 của công cụ.
+
+316 passed. @390 vẫn đúng 3 va chạm dải regime, không tăng.

@@ -1610,7 +1610,9 @@
     // Stage 5ZZP. The volume pane takes its height from the SAME box, so adding it
     // cannot move the panel — the property the tab-switch test pins.
     const hasVol = bars.some(b => typeof b.volume === 'number');
-    const volH = hasVol ? 44 : 0;
+    //: 58px, the height muc 4.7 gives this pane. It was 44, and on a thin instrument the
+    //: fourteen missing pixels are the difference between a column and a smudge.
+    const volH = hasVol ? 58 : 0;
     const iw = W - padL - padR, ih = H - padT - padB - volH;
     const laneY = padT + ih + volH + 13;
     let lo = Infinity, hi = -Infinity;
@@ -1767,7 +1769,7 @@
         if (typeof b.volume !== 'number') return '';
         const over = b.volume > vhi;
         const h = b.volume <= 0 ? 0
-          : Math.max(1.5, Math.min(1, b.volume / vhi) * usable);
+          : Math.max(2, Math.min(1, b.volume / vhi) * usable);
         const y = vTop + usable - h;
         return `<rect class="mv-vol ${b.close >= b.open ? 'mv-up' : 'mv-down'}"
           x="${(x(i) - bw / 2).toFixed(1)}" y="${y.toFixed(1)}"
@@ -1777,10 +1779,19 @@
               y="${(y - 2.5).toFixed(1)}" width="${bw.toFixed(1)}" height="1.6"></rect>` : '');
       }).join('') +
       `<text class="mv-axis mv-vol-label" x="${padL}" y="${(vTop + 8).toFixed(1)}">Volume</text>`
-      + `<text class="mv-axis mv-vol-ax" x="${W - padR + 6}" y="${(vTop + 8).toFixed(1)}">${
+      /* The ceiling label sits BELOW the price axis's last one. Both want the right
+         column and the price plot ends exactly where this pane starts, so at the top of
+         the pane they land on the same line: measured, "32  peak 110" printed straight
+         through "64127.80". Twenty units down clears it and still reads as the top of
+         this pane rather than the bottom of the one above. */
+      + `<text class="mv-axis mv-vol-ax" x="${W - padR + 6}" y="${(vTop + 20).toFixed(1)}">${
           mvEsc(String(vhi))}${vpeak > vhi ? `  peak ${mvEsc(String(vpeak))}` : ''}</text>`
       + `<text class="mv-axis mv-vol-ax" x="${W - padR + 6}" y="${
-          (vTop + usable).toFixed(1)}">0</text>`;
+          (vTop + usable).toFixed(1)}">0</text>`
+      /* A floor to stand on. Without it the columns hang in the gap between two panes and
+         the eye has nothing to read their height against. */
+      + `<line class="mv-vol-base" x1="${padL}" x2="${W - padR}" y1="${
+          (vTop + usable).toFixed(1)}" y2="${(vTop + usable).toFixed(1)}"></line>`;
     }
 
     return `<svg class="mv-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"

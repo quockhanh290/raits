@@ -1210,7 +1210,14 @@ header .runner-header-state i { animation: none; }
 /* Cột volume vượt trần: vẽ hết chiều cao pane rồi đội một nắp mỏng, để người đọc
    biết cột này CAO HƠN khung chứ không phải bằng đúng trần. Sáng hơn thân cột,
    vì nó là chú thích chứ không phải dữ liệu. */
-.mv-vol-clip { fill: #e8ebf0; opacity: .55; }
+.mv-vol-clip { fill: #a8b1c0; opacity: .7; }
+
+/* muc 4.7 · cột volume TỐI HƠN nến: xanh #1f6b4c, đỏ #7a2b30. Chúng đang ăn chung
+   .mv-up/.mv-down với thân nến nên vẽ ra đúng #3ecf8e/#f2555a — một dải màu mạnh
+   bằng chính chart giá, đặt ngay dưới nó, tranh mắt với thứ nó chỉ đi kèm.
+   Volume là phụ; spec nói vậy bằng cách hạ độ sáng chứ không bằng cách thu nhỏ. */
+.mv-vol.mv-up   { fill: #1f6b4c; }
+.mv-vol.mv-down { fill: #7a2b30; }
 
 /* Nhãn trần/0 của pane volume — muc 4.7 cấp cho cột phải của pane 2 và 5. */
 .mv-vol-ax { fill: #4b5563; font-size: 10px; }
@@ -1225,3 +1232,7 @@ header .runner-header-state i { animation: none; }
    kết thúc ở 705. Số của cây nến giờ nằm trong ô đọc phía trên, đúng muc 4.7.
    Ẩn dải, giữ node và listener: chính nó vẫn là chỗ realtime.js đọc O/H/L/C ra. */
 #marketViewChart .mv-tip { display: none !important; }
+
+/* Vạch đáy của pane volume — chia bằng vạch trong, đúng màu muc 3 dành cho vạch
+   trong card. */
+.mv-vol-base { stroke: #1a1f26; stroke-width: 1; }
