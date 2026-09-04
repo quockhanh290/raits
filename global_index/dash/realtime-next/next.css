@@ -1310,8 +1310,14 @@ header .runner-header-state i { animation: none; }
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   margin-top: 10px; padding-top: 9px; border-top: 1px solid #1a1f26;
 }
+/* Chữ GATES giờ là một CHIP trong hàng flex, không còn là khối riêng. Rule cũ ở
+   trên vẫn cho nó margin-top 10px, padding-top 9px và một border-top của riêng nó —
+   trong một hàng `align-items:center` thì ba thứ đó đẩy nó lệch khỏi các chip bên
+   cạnh và vẽ thêm một đoạn vạch thừa. Hàng đã mang sẵn cả ba. */
 .mv2-calm-gaterow > .mv2-calm-gateshead {
+  margin: 0; padding: 0; border-top: 0;
   font: 600 9px/1.3 var(--sans); letter-spacing: .12em; color: #4b5563;
+  align-self: center;
 }
 .mv2-calm-gate { display: flex; align-items: center; gap: 6px; }
 .mv2-calm-gate > .mv2-dot { width: 4px; height: 4px; flex: 0 0 4px; }

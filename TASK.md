@@ -15233,3 +15233,18 @@ nhưng mọi con số về bố cục lần này là GIÁ TRỊ trong file desig
 tôi đo trên trang.
 
 BÀI HỌC: trước khi xin ảnh của người khác, tìm bản gốc trong repo.
+
+── GATES lệch dòng — 2026-09-03 ──────────────────────────────────────────────
+Rule CŨ ở next.css:637 vẫn còn: .mv2-calm-gateshead { margin-top:10px;
+padding-top:9px; border-top:1px solid }. Đúng khi GATES còn là một khối riêng.
+Giờ nó là một CHIP trong hàng flex align-items:center, nên ba thuộc tính hộp đó
+đẩy chữ lệch khỏi các chip bên cạnh VÀ vẽ thêm một đoạn vạch thừa phía trên —
+trong khi hàng .mv2-calm-gaterow đã mang sẵn cả margin, padding lẫn border.
+Sửa: vô hiệu ba thuộc tính hộp khi nó nằm trong hàng.
+
+Cùng một dạng lỗi đã gặp ba lần trong phiên: đổi vai một phần tử mà để nguyên
+rule cũ của vai trước. Trước đó là .mv2-calm-ivs (lưới hai cột sau khi bỏ panel)
+và mv2-calm-gates. Khi đổi cấu trúc, phải tìm MỌI rule đang nhắm class ấy chứ
+không chỉ viết rule mới.
+
+Chưa đo được trên trang (devtools vẫn mất kết nối). 83 passed (skin + dom).
