@@ -1276,10 +1276,19 @@ header .runner-header-state i { animation: none; }
   display: grid; align-items: baseline;
   padding: 9px 14px 10px; margin-top: 8px;
 }
-.mv2-calm-table    { grid-template-columns: minmax(0, 1fr) repeat(var(--calm-cols, 4), 104px); }
-.mv2-calm-gatetable { grid-template-columns: minmax(0, 1fr) repeat(var(--calm-insts, 2), 104px); }
+/* Cột nhãn có TRẦN, và bảng chỉ rộng bằng nội dung của nó.
+   Trước: minmax(0, 1fr) ăn hết 1162px cho những nhãn chưa tới 200px, nên con số bị
+   đẩy sang tận mép phải và mắt phải đi qua một khoảng trống dài mới tới nó. */
+.mv2-calm-table,
+.mv2-calm-gatetable { width: max-content; max-width: 100%; }
+.mv2-calm-table    { grid-template-columns: minmax(180px, 300px) repeat(var(--calm-cols, 4), 96px); }
+.mv2-calm-gatetable { grid-template-columns: minmax(180px, 300px) repeat(var(--calm-insts, 2), 96px); }
 .mv2-calm-table > *,
-.mv2-calm-gatetable > * { padding: 5px 0 5px 10px; border-top: 1px solid #171b22; }
+.mv2-calm-gatetable > * { padding: 4px 0 4px 10px; border-top: 1px solid #171b22; }
+/* Nhãn hàng: một dòng, cắt bằng ellipsis. Câu giải thích nằm trong tooltip. */
+.mv2-calm-table > .mv2-calm-rowlabel > .mv2-cond-label {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 /* Hai hàng tiêu đề không có vạch trên: vạch ở đó đọc thành một hàng dữ liệu rỗng. */
 .mv2-calm-table > :nth-child(-n + var(--calm-cols)) { border-top: 0; }
 .mv2-calm-insthead {

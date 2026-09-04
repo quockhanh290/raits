@@ -15189,3 +15189,25 @@ CHƯA XEM ĐƯỢC ẢNH: hai screenshot chủ dự án gửi đều bị API t�
 KHÔNG phải từ ảnh. Cần ảnh <=2000px để đối chiếu.
 
 319 passed. Cả năm dashboard: đè 0, cắt 0, tràn 0.
+
+── Calm: làm compact — 2026-09-03 ────────────────────────────────────────────
+Số đã đo ở vòng trước: cột nhãn 1162px cho những nhãn dài chưa tới 200px, mỗi
+hàng 48px chỉ vì câu giải thích chiếm hẳn một dòng dưới nhãn.
+Sửa:
+  - cột nhãn có TRẦN: minmax(180px, 300px), và bảng width:max-content nên nó chỉ
+    rộng bằng nội dung thay vì kéo con số ra tận mép phải
+  - câu giải thích từng hàng -> tooltip (cơ chế repo đã dùng sẵn: "the sentence
+    stays one hover away"), nhãn còn một dòng, ellipsis
+  - ngưỡng của GATE thì GIỮ trên dòng: "needs <= 0.3333" là một phần của phép đọc
+    con số bên cạnh, không phải lời giải thích thêm
+  - padding hàng 5px -> 4px, cột giá trị 104 -> 96px
+
+CHƯA KIỂM ĐƯỢC TRÊN TRANG: chrome-devtools MCP rớt kết nối giữa chừng
+("recent failure cached, retries in 15 min"), nên vòng này chỉ có test + code,
+không có số đo render. Các con số trên là GIÁ TRỊ CSS, chưa phải kết quả đo.
+
+VÀ VẪN CHƯA XEM ĐƯỢC ẢNH: quét TEMP, Downloads, Pictures, .claude, C:\tmp —
+không có ảnh nào chủ dự án dán; chúng chỉ nằm trong cuộc trò chuyện, mà API chặn
+ở 2000px. Cần một ĐƯỜNG DẪN file thì tôi tự thu nhỏ được bằng shell.
+
+319 passed.

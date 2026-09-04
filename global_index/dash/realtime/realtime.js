@@ -2553,10 +2553,16 @@
     const phaseHead = perInst.map(() => present.map(([, title]) =>
       `<div class="mv2-calm-colhead">${mvEsc(title)}</div>`).join('')).join('');
 
+    /* Câu giải thích đi vào tooltip, không chiếm một dòng riêng.
+       Đo được: cột nhãn 1162px cho những nhãn dài chưa tới 200px, và mỗi hàng cao 48px
+       chỉ vì câu giải thích nằm dưới nhãn. Hai mã thì cả bảng chỉ cần chừng 840px —
+       phần còn lại là chỗ trống, và mắt phải đi hết nó mới tới con số.
+       Đây là cơ chế repo đã dùng sẵn: "the sentence stays one hover away". Câu không mất,
+       nó chỉ thôi chiếm chỗ của thứ người đọc tới đây để xem. */
     const body = labels.map(label =>
-      `<div class="mv2-calm-rowlabel"><div class="mv2-cond-label">${mvEsc(label)}</div>` +
-      (detail[label] ? `<div class="mv2-lane-thr">${mvEsc(detail[label])}</div>` : '') +
-      `</div>` +
+      `<div class="mv2-calm-rowlabel"${detail[label]
+          ? ` title="${mvEsc(detail[label])}" tabindex="0"` : ''}>` +
+      `<div class="mv2-cond-label">${mvEsc(label)}</div></div>` +
       perInst.map(pi => {
         /* The void dash is per INSTRUMENT: a row is unchanged between that instrument's own
            two phases. Comparing across instruments would say MNQ repeats MES, which is a
@@ -2591,6 +2597,8 @@
     });
     const gateOf = (pi, k) => (pi.cols.reduce((a, c) => (a.length ? a : (c.gates || [])), [])
       .find(g => String(g.gate || '').replace(/_/g, ' ') === k)) || null;
+    /* Ngưỡng của gate thì GIỮ trên dòng: nó là một phần của phép đọc con số bên cạnh
+       ("needs <= 0.3333" cạnh "0.1555"), không phải lời giải thích thêm. */
     const gateBody = gateLabels.map(k =>
       `<div class="mv2-calm-rowlabel"><div class="mv2-cond-label">${mvEsc(k)}</div>` +
       (gateThr[k] ? `<div class="mv2-lane-thr">needs ${mvEsc(gateThr[k])}</div>` : '') +
