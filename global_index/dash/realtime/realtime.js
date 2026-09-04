@@ -2513,62 +2513,38 @@
       `<span class="mv2-mono">${mvEsc(at)}</span>${mvSourceBadge(phases[k])}</span>`
     ).join('<i class="mv2-calm-sep"></i>');
 
-    /* ONE table, not one per instrument.
-       Calm trades exactly two instruments and always the same two -- `instruments: ("MES",
-       "MNQ")` in track1_calm_a, and the strategy's own name carries them. Both carry the
-       SAME seven row labels and the SAME four gates; only the numbers differ (daily ATR
-       59.70 against 401.20). Giving each instrument its own table printed those eleven
-       labels and their eleven explanation sentences twice -- twenty-two lines of heading
-       for eleven pieces of information.
-       Sharing the label column costs nothing here, because the column count is fixed: two
-       instruments times two phases. It would be the wrong shape for a basket that grew. */
-    const perInst = names.map(name => ({
-      name,
-      cols: present.map(([k]) => forName(phases[k], name)),
-    }));
-    const labels = [];
-    const detail = {};
-    perInst.forEach(pi => pi.cols.forEach(c => (c.rows || []).forEach(r => {
-      const label = r.label || '';
-      if (!labels.includes(label)) labels.push(label);
-      if (!detail[label] && r.detail) detail[label] = r.detail;
-    })));
-    const valueAt = (c, label) => {
-      const hit = (c.rows || []).find(r => (r.label || '') === label);
-      return hit ? (hit.display_value || '') : '';
-    };
-    const cols = perInst.length * present.length;
-
-    const instHead = perInst.map(pi => {
-      const direction = pi.cols.reduce((a, c) => a || c.direction, '');
-      const gates = pi.cols.reduce((a, c) => (a.length ? a : (c.gates || [])), []);
+    /* Panel một mã, cạnh nhau — đúng bản design, đọc từ chính file .dc.html.
+       Tôi đã đi vòng qua một bảng chung để bỏ nhãn lặp, và đó là chữa sai bệnh: thứ làm
+       khối này dài không phải nhãn lặp mà là CHIỀU CAO HÀNG. Design đặt nhãn và câu phụ
+       trên CÙNG một dòng, câu phụ cắt bằng ellipsis, nên mỗi hàng cao một dòng và năm
+       hàng vẫn gọn. Nhãn lặp giữa hai panel là cái giá design chấp nhận để mỗi panel tự
+       đứng một mình. */
+    const panels = names.map(name => {
+      const cols = present.map(([k]) => forName(phases[k], name));
+      const labels = [];
+      const detail = {};
+      cols.forEach(c => (c.rows || []).forEach(r => {
+        const label = r.label || '';
+        if (!labels.includes(label)) labels.push(label);
+        if (!detail[label] && r.detail) detail[label] = r.detail;
+      }));
+      const valueAt = (c, label) => {
+        const hit = (c.rows || []).find(r => (r.label || '') === label);
+        return hit ? (hit.display_value || '') : '';
+      };
+      const direction = cols.reduce((a, c) => a || c.direction, '');
+      const gates = cols.reduce((a, c) => (a.length ? a : (c.gates || [])), []);
       const met = gates.filter(g => g && g.passed === true).length;
-      return `<div class="mv2-calm-insthead" style="grid-column: span ${present.length}">` +
-        `<b>${mvEsc(pi.name)}</b>` +
-        (direction ? `<span class="mv2-mono">${mvEsc(direction)}</span>` : '') +
-        (gates.length
-          ? `<span class="mv2-calm-tally">${met} / ${gates.length} gates met</span>` : '') +
-        `</div>`;
-    }).join('');
-    const phaseHead = perInst.map(() => present.map(([, title]) =>
-      `<div class="mv2-calm-colhead">${mvEsc(title)}</div>`).join('')).join('');
 
-    /* Câu giải thích đi vào tooltip, không chiếm một dòng riêng.
-       Đo được: cột nhãn 1162px cho những nhãn dài chưa tới 200px, và mỗi hàng cao 48px
-       chỉ vì câu giải thích nằm dưới nhãn. Hai mã thì cả bảng chỉ cần chừng 840px —
-       phần còn lại là chỗ trống, và mắt phải đi hết nó mới tới con số.
-       Đây là cơ chế repo đã dùng sẵn: "the sentence stays one hover away". Câu không mất,
-       nó chỉ thôi chiếm chỗ của thứ người đọc tới đây để xem. */
-    const body = labels.map(label =>
-      `<div class="mv2-calm-rowlabel"${detail[label]
-          ? ` title="${mvEsc(detail[label])}" tabindex="0"` : ''}>` +
-      `<div class="mv2-cond-label">${mvEsc(label)}</div></div>` +
-      perInst.map(pi => {
-        /* The void dash is per INSTRUMENT: a row is unchanged between that instrument's own
-           two phases. Comparing across instruments would say MNQ repeats MES, which is a
-           different claim and a false one. */
+      const colHead = present.map(([, title]) =>
+        `<div class="mv2-calm-colhead">${mvEsc(title)}</div>`).join('');
+
+      const body = labels.map(label => {
+        /* Hàng không đổi giữa hai pha thì cột sau mang dấu void. Muc 4.8, và lý do nằm
+           trong chính chữ của nó: dấu ấy không phải "chưa có giá trị", nó là "cùng giá
+           trị với cột bên trái, và nói lại là nói dư". */
         let prev = null;
-        return pi.cols.map(c => {
+        const cells = cols.map(c => {
           const v = valueAt(c, label);
           const same = prev !== null && v !== '' && v === prev;
           prev = v === '' ? prev : v;
@@ -2577,55 +2553,41 @@
                 mvEsc(String(present[0][1]))}: ${mvEsc(v)}">—</div>`
             : `<div class="mv2-calm-cell${v ? '' : ' empty'}">${mvEsc(v || '—')}</div>`;
         }).join('');
-      }).join('')
-    ).join('');
+        return `<div class="mv2-calm-rowlabel">` +
+          `<div class="mv2-cond-label">${mvEsc(label)}</div>` +
+          (detail[label]
+            ? `<div class="mv2-calm-sub" title="${mvEsc(detail[label])}">${
+                mvEsc(detail[label])}</div>` : '') +
+          `</div>${cells}`;
+      }).join('');
 
-    /* Gates share their labels too, and they are not per phase -- one column per
-       instrument, not one per phase. */
-    const gateLabels = [];
-    const gateThr = {};
-    perInst.forEach(pi => {
-      const gs = pi.cols.reduce((a, c) => (a.length ? a : (c.gates || [])), []);
-      gs.forEach(g => {
-        const k = String(g.gate || '').replace(/_/g, ' ');
-        if (!gateLabels.includes(k)) gateLabels.push(k);
-        if (!gateThr[k]) {
-          gateThr[k] = _threshWord({ threshold: g.display_threshold || g.threshold,
-                                     comparator: g.comparator || '' });
-        }
-      });
-    });
-    const gateOf = (pi, k) => (pi.cols.reduce((a, c) => (a.length ? a : (c.gates || [])), [])
-      .find(g => String(g.gate || '').replace(/_/g, ' ') === k)) || null;
-    /* Ngưỡng của gate thì GIỮ trên dòng: nó là một phần của phép đọc con số bên cạnh
-       ("needs <= 0.3333" cạnh "0.1555"), không phải lời giải thích thêm. */
-    const gateBody = gateLabels.map(k =>
-      `<div class="mv2-calm-rowlabel"><div class="mv2-cond-label">${mvEsc(k)}</div>` +
-      (gateThr[k] ? `<div class="mv2-lane-thr">needs ${mvEsc(gateThr[k])}</div>` : '') +
-      `</div>` +
-      perInst.map(pi => {
-        const g = gateOf(pi, k);
-        if (!g) return `<div class="mv2-calm-cell empty">—</div>`;
-        const tone = g.passed === true ? 'ok' : g.passed === false ? 'bad' : 'muted';
-        const val = g.display_value || (g.value == null ? '' : String(g.value));
-        return `<div class="mv2-calm-cell ${tone}">` +
-               `<i class="mv2-dot ${tone}"></i>${mvEsc(val || (g.passed ? 'met' : 'not met'))}` +
-               `</div>`;
-      }).join('')
-    ).join('');
+      /* GATES là MỘT hàng chip cuốn dòng, không phải một bảng nữa: chấm 4px, nhãn, giá
+         trị. Bốn cổng nằm gọn trên một hai dòng thay vì bốn hàng bảng. */
+      const gateRow = gates.length
+        ? `<div class="mv2-calm-gaterow"><span class="mv2-calm-gateshead">GATES</span>` +
+          gates.map(g => {
+            const tone = g.passed === true ? 'ok' : g.passed === false ? 'bad' : 'muted';
+            const val = g.display_value || (g.value == null ? '' : String(g.value));
+            const thr = _threshWord({ threshold: g.display_threshold || g.threshold,
+                                      comparator: g.comparator || '' });
+            return `<span class="mv2-calm-gate"${thr ? ` title="needs ${mvEsc(thr)}"` : ''}>` +
+              `<i class="mv2-dot ${tone}"></i>` +
+              `<span class="mv2-calm-gate-name">${
+                mvEsc(String(g.gate).replace(/_/g, ' '))}</span>` +
+              `<b>${mvEsc(val || (g.passed ? 'met' : 'not met'))}</b></span>`;
+          }).join('') + `</div>`
+        : '';
 
-    const panels = `<div class="mv2-calm-table" style="--calm-cols:${cols}">
-        <div></div>${instHead}
-        <div></div>${phaseHead}
-        ${body}
-      </div>` +
-      (gateLabels.length
-        ? `<div class="mv2-calm-gateshead">GATES</div>` +
-          `<div class="mv2-calm-gatetable" style="--calm-insts:${perInst.length}">` +
-          `<div></div>` + perInst.map(pi =>
-            `<div class="mv2-calm-colhead">${mvEsc(pi.name)}</div>`).join('') +
-          gateBody + `</div>`
-        : '');
+      return `<div class="mv2-calm-inst">
+        <div class="mv2-calm-inst-head"><b>${mvEsc(name)}</b>` +
+        (direction ? `<span class="mv2-mono">${mvEsc(direction)}</span>` : '') +
+        (gates.length
+          ? `<span class="mv2-calm-tally">${met} / ${gates.length} gates met</span>` : '') +
+        `</div>
+        <div class="mv2-calm-grid" style="--calm-cols:${present.length}">
+          <div></div>${colHead}${body}
+        </div>${gateRow}</div>`;
+    }).join('');
 
     const warn = present.map(([k]) => {
       const b = phases[k];

@@ -15211,3 +15211,25 @@ không có ảnh nào chủ dự án dán; chúng chỉ nằm trong cuộc trò 
 ở 2000px. Cần một ĐƯỜNG DẪN file thì tôi tự thu nhỏ được bằng shell.
 
 319 passed.
+
+── Đọc file design thay vì đoán — 2026-09-03 ─────────────────────────────────
+Chủ dự án: "sao ko đọc file html phần đó". Đúng, và tôi đã đi vòng rất xa: hai
+lượt xin ảnh, một lượt quét ổ đĩa tìm ảnh, trong khi bản design nằm sẵn trong
+repo tại global_index/dash/Realtime Dashboard.dc.html, phần `mv.showCalm`.
+
+ĐỌC RA: bảng chung của tôi SAI HƯỚNG. Design giữ PANEL THEO MÃ cạnh nhau
+(auto-fit minmax(430px,1fr)). Thứ làm nó gọn nằm ở chỗ khác hẳn:
+  - ô nhãn là flex một dòng: nhãn (12px, nowrap) + câu phụ (11px #4b5563) ĐẶT
+    CẠNH NHAU, câu phụ cắt bằng ellipsis. Mỗi hàng cao MỘT dòng.
+  - GATES là một hàng chip cuốn dòng (chấm 4px + nhãn + giá trị), không phải bảng
+  - bảng 1fr 108px 108px, gap 0 10px, panel padding 9px 14px 10px
+Tôi chẩn đoán sai bệnh: thứ làm khối này dài không phải NHÃN LẶP mà là CHIỀU CAO
+HÀNG (48px vì câu phụ nằm dưới nhãn). Nhãn lặp giữa hai panel là cái giá design
+chấp nhận để mỗi panel tự đứng một mình.
+Đã dựng lại theo đúng markup đó. Bỏ luôn bảng chung và bảng gates.
+
+CHƯA ĐO ĐƯỢC KẾT QUẢ RENDER: chrome-devtools MCP vẫn mất kết nối. 319 passed,
+nhưng mọi con số về bố cục lần này là GIÁ TRỊ trong file design, không phải số
+tôi đo trên trang.
+
+BÀI HỌC: trước khi xin ảnh của người khác, tìm bản gốc trong repo.
