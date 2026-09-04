@@ -284,6 +284,9 @@ class IBKRBarProvider:
         # trims to `through`. Handing it an aware instant raises inside pandas.
         try:
             bars = broker.fetch_bars(fetch_as, as_provider_clock(through))
+            # Stage 5ZZZ-CD. Carried out to where the frame checks live. The broker knows which
+            # contract it resolved and nothing downstream can see through this wrapper to it.
+            self.last_bars_contract = str(getattr(broker, "last_bars_contract", "") or "")
         finally:
             if _handler is not None:
                 try:
@@ -423,7 +426,51 @@ def frozen_frame(inst: str, path: str | Path) -> Any:
     idx = pd.to_datetime(df.index, utc=True)
     df = df.set_index(idx).sort_index()
     df.index = df.index.tz_convert(session_tz(inst))
-    return df[list(REQUIRED_COLUMNS)]
+    df = df[list(REQUIRED_COLUMNS)]
+
+    # Stage 5ZZZ-CC. Brought onto the LIVE price scale, in memory, before anything reads it.
+    #
+    # The stored series is anchored where it was built -- difference-adjusted to a 2024
+    # contract -- and the appender keeps it there: on a roll it lifts the NEW bars up to match
+    # the file rather than moving the file, and records the running offset. So the day IBKR
+    # rolls its continuous series, the file and a raw fetch stop being the same scale.
+    #
+    # WHICH WAY, and this is the whole decision. Both directions silence the overlap check --
+    # simulated against the real appender on copies, 2026-09-04: a store one roll-spread low
+    # plus a sidecar naming another contract produced "CONTRACT ROLLED NKDM6 -> NKDU6 --
+    # re-anchored", offset -530, and afterwards BOTH `store - offset` and `live + offset`
+    # agreed on all 1,828 shared minutes. The comparison cannot choose between them.
+    #
+    # The price the strategy reads can. Measured in the same run:
+    #
+    #     real market            65,115
+    #     store lowered           65,070   (the last stored bar, minutes older -- same scale)
+    #     live lifted             64,585   (a whole roll-spread below the market)
+    #
+    # Entry is a MarketOrder and carries no price, but the stop does: `place_stop` sends the
+    # number the strategy computed from these bars. Lifting the live half would put every stop
+    # a roll-spread from where it belongs. So the store comes down to the market, and both
+    # halves -- and every price derived from them -- are in the scale orders are filled at.
+    #
+    # A constant shift leaves ATR untouched and moves EMA with price, so nothing about the
+    # rules changes; only the level does, onto the level the market is actually at.
+    #
+    # Today every offset is 0.0 and this is a no-op. That is the point of landing it now.
+    #
+    # The lookup REFUSES rather than assuming zero when it cannot answer -- see
+    # `stored_anchor`. The parquet on disk is never written: the past stays as it was recorded.
+    from global_index.update_ibkr_daily import SpliceAnchorUnavailable, stored_anchor
+
+    try:
+        offset, _anchor_contract = stored_anchor(inst)
+    except SpliceAnchorUnavailable as exc:
+        raise LiveSourceRefused("frozen_anchor_unknown", str(exc)) from exc
+    if offset:
+        df = df.copy()
+        for _c in ("open", "high", "low", "close"):
+            if _c in df.columns:
+                df[_c] = df[_c] - offset
+    return df
 
 
 def on_frozen_clock(inst: str, live: Any, frozen: Any) -> Any:
@@ -607,6 +654,46 @@ def _refuse_bars_from_the_future(inst: str, aligned: Any, through) -> None:
             f"session zone instead of being localised to {PROVIDER_CLOCK} and converted")
 
 
+def _refuse_series_rolled(inst: str, provider: Any) -> str:
+    """Refuse by NAME when IBKR's continuous series has moved off the contract the store holds.
+
+    Stage 5ZZZ-CD. Without this the symptom arrives as `overlap_disagreement` -- "a clock, a
+    contract or a source error" -- which is true and useless, and it took most of a night to
+    take apart the first time. The roll is knowable a sentence earlier: the appender records
+    which contract the file is anchored on, and the fetch just resolved which one the series
+    is on now. When those differ the cause is not a mystery.
+
+    It is also the only place that learns the roll DATE. IBKR does not publish one and the
+    series does not roll on our calendar, so "when did it happen" has no answer until
+    something notices, and the something is this.
+
+    Returns the contract the bars came from, so the caller can record it on a day nothing is
+    wrong -- a trail through the quarter is what makes the change visible before it bites.
+    Returns "" when the provider does not report one, which is not a refusal: a mock or a file
+    provider has no contract to name and must keep working.
+    """
+    fetched = str(getattr(provider, "last_bars_contract", "") or "")
+    if not fetched:
+        return ""
+    try:
+        from global_index.update_ibkr_daily import stored_anchor
+
+        _offset, anchored = stored_anchor(inst)
+    except Exception as exc:                                       # noqa: BLE001
+        # `frozen_frame` already refused on an unreadable anchor before this runs, so reaching
+        # here means something else; do not invent a second refusal for it.
+        return fetched
+    if anchored and fetched != anchored:
+        raise LiveSourceRefused(
+            "series_rolled",
+            f"{inst}: the bars came from {fetched} and the stored history is anchored on "
+            f"{anchored} — IBKR has rolled its continuous series and the file has not been "
+            f"re-anchored yet. The daily append does that at 13:45 ET and records the new "
+            f"offset; until it has run, the two halves are different contracts and no "
+            f"comparison between them means anything. This is the roll date for {inst}.")
+    return fetched
+
+
 def _refuse_overlap_disagreement(inst: str, aligned: Any, frozen: Any) -> int:
     """Where the live half and history share a timestamp, the prices must match. Returns the
     number of timestamps compared.
@@ -674,6 +761,10 @@ def live_frame(inst: str, *, frozen: Any, provider: BarProvider, through) -> Joi
     # `column_mismatch`, and the refusal was correct.
     aligned, dropped = project_to_frozen_columns(inst, aligned, frozen)
     _refuse_bars_from_the_future(inst, aligned, through)
+    # Stage 5ZZZ-CD. BEFORE the overlap check, because a roll makes the overlap disagree and
+    # the generic refusal would then be the only thing on the record. The specific cause is
+    # knowable here and the generic one is not worth taking apart twice.
+    bars_contract = _refuse_series_rolled(inst, provider)
     checked = _refuse_overlap_disagreement(inst, aligned, frozen)
     frame, report = guard.splice(frozen, aligned)
     return JoinedFrame(inst, frame, report,

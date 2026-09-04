@@ -130,6 +130,148 @@ REANCHOR_MIN_PCT: float = 0.20        # of price
 REANCHOR_MAX_PCT: float = 2.00
 
 # ── Instruments: (runner_name, ibkr_symbol, parquet_path) ────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# Stage 5Q-5 — the boundary bar, and why it was frozen partial for ever (B-5R-F)
+#
+# The append keeps `new_bars[new_bars.index > last_existing]` — STRICTLY newer. So the bar the
+# previous fetch stopped on is never re-fetched, never compared and never rewritten. If that
+# fetch caught the minute while it was still open, the file keeps a snapshot of a partial
+# minute permanently, and the dedupe below never sees a duplicate to prefer because the
+# filter already removed it.
+#
+# Measured 2026-08-24: MNQ `2026-08-21 13:45 ET` holds `low = 29400.25` while twelve
+# independent live fetches all report `29395.75`. The feed's low is LOWER, which is the only
+# direction a partial bar's low can be wrong in — the minute had not finished falling.
+#
+# The replacement rule, and why it needs no threshold to tune
+# ------------------------------------------------------------
+# A partial bar can only be COMPLETED, never contradicted. Over the rest of its minute:
+#
+#     open    cannot change     — it is fixed by the first tick
+#     low     can only fall     — more trades can only extend the range downward
+#     high    can only rise
+#     volume  can only grow
+#     close   may move anywhere — it is simply the last tick so far
+#
+# So "is this a completion of the same bar, or a disagreement about which bar it is?" is
+# decidable from the two rows alone, with no tolerance to pick. Anything that violates the
+# monotonicity is REFUSED: two sources describing the same minute differently is a contract,
+# clock or feed question, and this function has no business guessing which.
+#
+# The percentage bound on top is a second, cruder net for the case where every monotonic rule
+# happens to hold but the bar is from a different instrument entirely.
+# ══════════════════════════════════════════════════════════════════════════════
+
+#: How far a completed bar may sit from its partial version, as a share of the stored close.
+#: A net, not a threshold: a real completion of one minute moves a fraction of a percent, and a
+#: wrong contract moves whole percents. Nothing legitimate sits near this line.
+BOUNDARY_REPLACE_MAX_PCT = 0.5
+
+BOUNDARY_COLS = ("open", "high", "low", "close", "volume")
+
+
+def boundary_replacement(existing, fetched, *, last_existing):
+    """`(row_or_None, reason)` — the completed version of the final stored bar, or why not.
+
+    Pure: two frames in, one row out. No IO, no broker, no clock — so the rule can be
+    exercised without a Gateway, which is the only way a rule that runs once a day at 13:45
+    ever gets tested.
+
+    `reason` is always a name, never None, so a run can say why it did nothing.
+    """
+    if last_existing not in fetched.index:
+        return None, "not_offered: the fetch does not cover the final stored bar"
+    old = existing.loc[last_existing]
+    new = fetched.loc[last_existing]
+    cols = [c for c in BOUNDARY_COLS if c in existing.columns and c in fetched.columns]
+    if len(cols) < len(BOUNDARY_COLS):
+        return None, f"schema: only {cols} are common to both halves"
+
+    diffs = {c: (float(old[c]), float(new[c])) for c in cols
+             if abs(float(old[c]) - float(new[c])) > 1e-6}
+    if not diffs:
+        return None, "identical: the stored bar already matches the feed"
+
+    # A completion, or a disagreement? The monotonic rules decide it.
+    if abs(float(new["open"]) - float(old["open"])) > 1e-6:
+        return None, (f"open_changed: {float(old['open'])} -> {float(new['open'])}. The open "
+                      f"is fixed by the first tick, so this is not the same bar")
+    if float(new["low"]) > float(old["low"]) + 1e-6:
+        return None, (f"low_rose: {float(old['low'])} -> {float(new['low'])}. A minute's low "
+                      f"can only fall as it completes")
+    if float(new["high"]) < float(old["high"]) - 1e-6:
+        return None, (f"high_fell: {float(old['high'])} -> {float(new['high'])}. A minute's "
+                      f"high can only rise as it completes")
+    if float(new["volume"]) < float(old["volume"]) - 1e-6:
+        return None, (f"volume_shrank: {float(old['volume'])} -> {float(new['volume'])}. A "
+                      f"minute's volume can only grow")
+
+    base = abs(float(old["close"])) or 1.0
+    worst = max(abs(float(new[c]) - float(old[c])) for c in ("open", "high", "low", "close"))
+    if 100.0 * worst / base > BOUNDARY_REPLACE_MAX_PCT:
+        return None, (f"moved_too_far: {100.0 * worst / base:.3f}% > "
+                      f"{BOUNDARY_REPLACE_MAX_PCT}% of {base:.4f}. A completion of one minute "
+                      f"does not move this much; a different contract does")
+
+    return fetched.loc[[last_existing]], f"completed: {sorted(diffs)}"
+
+
+import datetime as _dt
+import pathlib  # noqa: E402  (Stage 5Q-5 snapshot stamp)
+
+
+#: One bar. A minute stamped T covers [T, T+1min), so it is finished only once T+BAR_SECONDS
+#: has passed. Named rather than written as 60 in three places.
+BAR_SECONDS = 60
+
+TAIL_KEPT = "kept: final bar had closed before the fetch"
+TAIL_NO_BARS = "nothing fetched"
+
+
+def drop_open_final_bar(fetched, *, observed_utc) -> "tuple":
+    """`(bars, dropped_timestamp_or_None, reason)` — never persist a minute still in progress.
+
+    Stage 5R-0, closing B-5R-H. `--repair-boundary` (above) repairs the partial bar the
+    PREVIOUS run left behind. It cannot help the one the CURRENT run is about to create: the
+    fetch asks for "now", IBKR answers with the minute in progress, and the append stores that
+    snapshot as if it were a finished bar. Measured 2026-08-24: one 13:45 pre-flight left
+    partial bars in three of five instruments, and repairing them at 20:20 immediately left
+    three more at 20:20 and 20:21. Repairing moves the defect; only refusing to store it
+    removes it.
+
+    The rule has no threshold to tune. A bar stamped T covers [T, T+1min), so it is complete
+    exactly when the observation instant has reached T+1min. Nothing about prices is inspected
+    — a partial bar is not detectably wrong from its own values, which is what let this survive
+    every price check the route has.
+
+    **`observed_utc` must be taken BEFORE the request goes out**, and that is not fussiness.
+    The data snapshot IBKR answers with is at or after the moment we asked; taking the instant
+    afterwards instead would let a bar that closed DURING the round trip look complete, and the
+    row we hold for it would still be the partial one the snapshot contained. Using the earlier
+    instant means every bar kept had already closed before we asked, so the value we have for
+    it is final. The cost is at most one just-closed minute deferred to the next run, which
+    appends it as an ordinary new bar.
+
+    Only the FINAL bar is ever a candidate. An interior bar cannot be in progress, and a
+    function that could drop one would be a filter rather than a tail guard.
+    """
+    if fetched is None or len(fetched) == 0:
+        return fetched, None, TAIL_NO_BARS
+    idx = pd.DatetimeIndex(fetched.index)
+    obs = pd.Timestamp(observed_utc)
+    if obs.tzinfo is not None:
+        obs = obs.tz_convert("UTC").tz_localize(None)
+    if idx.tz is not None:
+        # The frame is on a zone; compare on the same one rather than stripping either side.
+        obs = obs.tz_localize("UTC").tz_convert(idx.tz)
+    last = idx[-1]
+    if obs >= last + pd.Timedelta(seconds=BAR_SECONDS):
+        return fetched, None, TAIL_KEPT
+    return (fetched.iloc[:-1], last,
+            f"dropped: {last} is still open at {obs} "
+            f"(complete at {last + pd.Timedelta(seconds=BAR_SECONDS)})")
+
+
 def _build_jobs(data_dir: Path, nkd_path: Path) -> list[dict]:
     jobs = []
     _EXCHANGE = {"MYM": "CBOT"}  # MYM (Micro Dow) is on CBOT, not CME
@@ -150,6 +292,84 @@ def _build_jobs(data_dir: Path, nkd_path: Path) -> list[dict]:
     return jobs
 
 
+def history_ibkr_symbol(inst: str) -> str:
+    """The IBKR symbol the STORED HISTORY for `inst` was fetched under.
+
+    Stage 5Q-7. A live fetch that wants to be comparable with the parquet has to ask the
+    broker for the same thing the parquet was built from, and this is the only function in
+    the repo that knows what that is — because `_build_jobs` above is the code that fetched
+    it. Anywhere else the answer would be a copy, and a copy is what the identity split
+    keeps getting caught by.
+
+    It is NOT `Contract.data_symbol`. That field is the file stem and the two disagree on
+    four of five instruments:
+
+        inst   data_symbol   fetched as   file
+        MES    ES            MES          ES_continuous_1m_8y.parquet
+        MNQ    NQ            MNQ          NQ_continuous_1m_8y.parquet
+        MYM    YM            MYM          YM_continuous_1m_8y.parquet
+        M2K    RTY           M2K          RTY_continuous_1m_8y.parquet
+        MNKD   NKD           NKD          NKD_continuous_1m_8y.parquet
+
+    Reaching for `data_symbol` would have sent the four basket instruments at the full-size
+    E-mini contracts to fix the one that needed it.
+
+    It is also NOT `Contract.ibkr` / `_RAITS_TO_IBKR`. That map answers a different question
+    — what ticker goes on an ORDER — and for MNKD the two answers are deliberately different:
+    orders go to the $0.50 micro MNK, bars come from the full-size NKD, because micro history
+    starts in 2024 Q4 and the backtest runs from 2018. Measured 2026-08-24: fetching MNK and
+    comparing it against this history disagreed on 1,155 of 1,186 shared minutes, median gap
+    one tick, signed median zero — two order books on one index, not a clock error. Fetching
+    NKD disagreed on 0 of 1,186.
+
+    Unknown instruments answer with their own name, which is what every caller did before
+    this function existed.
+    """
+    for job in _build_jobs(Path("."), Path(".")):
+        if job["name"] == inst:
+            return str(job["ibkr_symbol"])
+    return inst
+
+
+#: Where the splice sidecar lives. Named once: it was only a CLI default, so a reader
+#: elsewhere had to retype the path and a retyped path is a path that drifts.
+SPLICE_OFFSETS_PATH = "global_index/data/_ibkr_splice_offsets.json"
+
+
+def stored_anchor(inst: str, path: "str | None" = None) -> "tuple[float, str]":
+    """(offset, contract) the stored history for `inst` is anchored on. Raises if unreadable.
+
+    Stage 5ZZZ-CC. The offset is "how much to ADD to a raw IBKR fetch to reach the stored
+    frame" -- that is exactly how the appender applies it, `new_bars + stored_offset`, and any
+    reader that gets the sign backwards puts a stop order a roll-spread from where it belongs.
+
+    RAISES rather than returning zero when the file is missing, unparseable, or has no entry
+    for `inst`. Zero is not a safe default here: it means "no conversion needed", which is
+    indistinguishable from "the conversion could not be looked up" and would silently restore
+    today's behaviour on the one day the conversion starts to matter. A measuring function has
+    three answers -- a value, a known zero, and "could not tell" -- and folding the third into
+    the second is how a guard fails open.
+    """
+    p = Path(path or SPLICE_OFFSETS_PATH)
+    try:
+        raw = json.loads(p.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise SpliceAnchorUnavailable(
+            f"splice offsets not found at {p}; the stored frame for {inst!r} cannot be "
+            f"converted and a fetch must not be compared against it") from exc
+    except (ValueError, OSError) as exc:
+        raise SpliceAnchorUnavailable(f"splice offsets at {p} are unreadable: {exc}") from exc
+    if inst not in raw:
+        raise SpliceAnchorUnavailable(
+            f"no splice anchor recorded for {inst!r} in {p}; the appender writes one on its "
+            f"first run for an instrument, and until it has there is nothing to convert with")
+    return _split_entry(raw[inst])
+
+
+class SpliceAnchorUnavailable(RuntimeError):
+    """The stored frame's anchor could not be read. Never downgraded to a zero offset."""
+
+
 def _split_entry(entry) -> "tuple[float, str]":
     """(offset, contract) from a splice-offsets sidecar entry.
 
@@ -165,8 +385,12 @@ def _split_entry(entry) -> "tuple[float, str]":
 
 
 def _fetch_contfuture(ib, ibkr_symbol: str, exchange: str,
-                      duration: str = "3 D") -> "tuple[pd.DataFrame, str]":
-    """Fetch 1m bars from IBKR ContFuture, with the contract they came from.
+                      duration: str = "3 D") -> "tuple[pd.DataFrame, str, object]":
+    """`(bars, contract, requested_at)` — 1m bars from IBKR ContFuture, UTC-naive.
+
+    `requested_at` is the UTC-naive instant the request went out, and it travels with the
+    bars because only the caller can decide what to do with a still-open final minute — but
+    only this function knows when the data was asked for. See `drop_open_final_bar`.
 
     qualifyContracts resolves a ContFuture to the expiry it currently tracks and
     fills in localSymbol — 'MESU6' today, 'MESZ6' after the September roll. That is
@@ -179,6 +403,11 @@ def _fetch_contfuture(ib, ibkr_symbol: str, exchange: str,
     contract = ibi.ContFuture(ibkr_symbol, exchange=exchange)
     ib.qualifyContracts(contract)
     resolved = contract.localSymbol or contract.lastTradeDateOrContractMonth or ""
+    # Stage 5R-0. Stamped BEFORE the request, not after. The snapshot IBKR answers with is at
+    # or after this instant, so a bar that had already closed by now is one whose values are
+    # final. Stamping afterwards would let a minute that closed during the round trip look
+    # complete while the row we hold for it is still the partial one. See drop_open_final_bar.
+    requested_at = _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None)
     bars = ib.reqHistoricalData(
         contract,
         endDateTime="",             # "" = now
@@ -189,10 +418,10 @@ def _fetch_contfuture(ib, ibkr_symbol: str, exchange: str,
         formatDate=1,
     )
     if not bars:
-        return pd.DataFrame(), resolved
+        return pd.DataFrame(), resolved, requested_at
     df = ibi.util.df(bars)
     if df is None or df.empty:
-        return pd.DataFrame(), resolved
+        return pd.DataFrame(), resolved, requested_at
     df = df.set_index("date")
     df.index = pd.to_datetime(df.index)
     # P2: ib_insync formatDate=1 returns tz-aware US/Central for CME.
@@ -214,7 +443,7 @@ def _fetch_contfuture(ib, ibkr_symbol: str, exchange: str,
         df.index = df.index.tz_convert("UTC").tz_localize(None)
     df.columns = [c.lower() for c in df.columns]
     keep = [c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]
-    return df[keep].sort_index(), resolved
+    return df[keep].sort_index(), resolved, requested_at
 
 
 def assert_utc_convention(df: "pd.DataFrame", label: str, sample_days: int = 5) -> None:
@@ -312,6 +541,11 @@ def main() -> None:
                     help="Subset to update, e.g. --symbols MES NKD")
     ap.add_argument("--duration",      default="3 D",
                     help="IBKR durationStr for ContFuture fetch (default: '3 D')")
+    ap.add_argument("--repair-boundary", action="store_true",
+                    help="re-fetch and REPLACE the final stored bar when the feed shows it "
+                         "was captured mid-minute. OFF by default: it is the only path here "
+                         "that rewrites a bar the file already has, and the 13:45 job runs "
+                         "unattended. See boundary_replacement() for the rule.")
     ap.add_argument("--dry-run",       action="store_true",
                     help="Connect + check coverage, no writes")
     a = ap.parse_args()
@@ -367,6 +601,10 @@ def main() -> None:
     log.info("Connected.")
     offsets_dirty = False
     failed = []
+    #: Stage 5R-0. Final minutes deliberately NOT stored because they were still open when the
+    #: fetch went out. Reported at the end so an operator sees the skip was a decision rather
+    #: than a gap — a silently shorter file is exactly how a missing bar becomes a mystery.
+    dropped_tails: dict = {}
 
     try:
         for j in jobs:
@@ -376,9 +614,18 @@ def main() -> None:
             log.info("[%s] Fetching ContFuture bars (duration=%s) ...", name, a.duration)
 
             try:
-                new_bars, fetched_contract = _fetch_contfuture(
+                new_bars, fetched_contract, requested_at = _fetch_contfuture(
                     ib, j["ibkr_symbol"], j["exchange"], duration=a.duration)
                 ib.sleep(0.5)  # pacing: IBKR allows ~50 requests/10min
+
+                # Stage 5R-0 — B-5R-H. Before anything else looks at these bars: the last one
+                # may be the minute still in progress, and storing it is what has been
+                # freezing a partial bar into history on every intraday run.
+                new_bars, dropped_tail, tail_why = drop_open_final_bar(
+                    new_bars, observed_utc=requested_at)
+                log.info("  %s: final-bar check — %s", name, tail_why)
+                if dropped_tail is not None:
+                    dropped_tails[name] = str(dropped_tail)
 
                 if new_bars.empty:
                     log.warning("  %s: no bars returned — IBKR may be in maintenance", name)
@@ -546,7 +793,18 @@ def main() -> None:
 
                 # Keep only NEW bars (after existing last bar)
                 new_only = new_bars_adj[new_bars_adj.index > last_existing]
-                if new_only.empty:
+
+                # Stage 5Q-5. The one bar the filter above always drops: the minute the LAST
+                # fetch stopped on. Off unless --repair-boundary, because it is the only path
+                # in this file that rewrites a bar the parquet already has, and this job runs
+                # unattended at 13:45.
+                boundary, boundary_why = (None, "off: --repair-boundary not given")
+                if a.repair_boundary:
+                    boundary, boundary_why = boundary_replacement(
+                        existing, new_bars_adj, last_existing=last_existing)
+                log.info("  %s: boundary bar %s — %s", name, last_existing, boundary_why)
+
+                if new_only.empty and boundary is None:
                     log.info("  %s: already up to date (no new bars after %s)",
                              name, last_existing)
                     continue
@@ -633,7 +891,14 @@ def main() -> None:
                 # Concat + sort + dedup
                 keep_cols = [c for c in ["open", "high", "low", "close", "volume"]
                              if c in existing.columns]
-                updated = pd.concat([existing[keep_cols], new_only[keep_cols]])
+                # The replacement sits BETWEEN history and the new bars, so `keep="last"`
+                # prefers it over the stored copy of the same timestamp — which is exactly the
+                # mechanism the strictly-newer filter had been preventing from ever engaging.
+                _parts = [existing[keep_cols]]
+                if boundary is not None:
+                    _parts.append(boundary[keep_cols])
+                _parts.append(new_only[keep_cols])
+                updated = pd.concat(_parts)
                 updated = updated[~updated.index.duplicated(keep="last")].sort_index()
 
                 # History invariant: existing bars must be UNCHANGED after append.
@@ -644,6 +909,12 @@ def main() -> None:
                 # (equals() is dtype-strict; values are identical when Rows with diff=[]).
                 check_n   = min(200, len(existing))
                 old_tail  = existing[keep_cols].tail(check_n)
+                # Stage 5Q-5: the boundary bar is the ONE timestamp allowed to change, and it
+                # is excluded here by name rather than by widening the comparison. Every other
+                # bar in the tail is still required to come out untouched, and a replacement
+                # that moved anything else is caught below.
+                if boundary is not None:
+                    old_tail = old_tail.drop(index=[last_existing], errors="ignore")
                 new_tail  = updated[keep_cols].reindex(old_tail.index)
                 old_f     = old_tail.astype("float64")
                 new_f     = new_tail.astype("float64")
@@ -660,8 +931,38 @@ def main() -> None:
                 # read was four hours off.
                 assert_utc_convention(updated, name)
 
+                # A replacement rewrites a bar the file already had, so it gets the two
+                # things an append does not need: a snapshot to go back to, and a re-read to
+                # prove the write landed. The repo has already lost a baseline to an in-place
+                # parquet write with neither.
+                _backup = None
+                if boundary is not None:
+                    _stamp = _dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+                    _backup = parquet_path.with_suffix(
+                        parquet_path.suffix + f".pre5q5-{_stamp}.bak")
+                    if _backup.exists():
+                        log.error("  %s: snapshot %s already exists — NOT writing.",
+                                  name, _backup)
+                        failed.append(name)
+                        continue
+                    _backup.write_bytes(parquet_path.read_bytes())
+                    log.info("  %s: snapshot -> %s", name, _backup.name)
+
                 parquet_path.parent.mkdir(parents=True, exist_ok=True)
                 updated.to_parquet(parquet_path)
+
+                if boundary is not None:
+                    _after = pd.read_parquet(parquet_path)
+                    _want = boundary[keep_cols].iloc[0].astype("float64")
+                    _got = _after.loc[last_existing, keep_cols].astype("float64")
+                    if not _got.equals(_want) or len(_after) != len(updated):
+                        log.error("  %s: BOUNDARY REPAIR DID NOT LAND — restore %s",
+                                  name, _backup)
+                        failed.append(name)
+                        continue
+                    log.info("  %s: boundary bar %s replaced and verified by re-read",
+                             name, last_existing)
+
                 log.info("  %s: saved %s  (%d bars total, history-check OK)",
                          name, parquet_path.name, len(updated))
 
@@ -681,6 +982,14 @@ def main() -> None:
         log.info("Splice offsets saved: %s", offsets_path)
 
     print(f"\n{'='*72}")
+    # Stage 5R-0. The per-instrument log line already names each skip; this repeats them
+    # together on stdout, where the pre-flight captures them, so an operator reading only the
+    # summary still sees that a shorter file was a decision rather than a gap.
+    if dropped_tails:
+        print("IN-PROGRESS FINAL MINUTES NOT STORED (Stage 5R-0, intentional):")
+        for _n, _ts in sorted(dropped_tails.items()):
+            print(f"  {_n:<5} {_ts}  — still open at fetch; it arrives on the next run")
+        print("-" * 72)
     if failed:
         print(f"COMPLETED WITH ERRORS: {failed}")
         print("=" * 72)

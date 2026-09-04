@@ -731,6 +731,10 @@ class IBKRBroker(Broker):
             # one, and the two halves of the frame stop being the same instrument. See
             # `_bars_contract` for the measurement.
             contract = _bars_contract(ib, ibi, inst)
+            # Stage 5ZZZ-CD. Remembered so a caller can tell whether the continuous series has
+            # moved under it. Nothing decides on this here; it is evidence, and the one place
+            # that knows it is the line that resolved it.
+            self.last_bars_contract = str(getattr(contract, "localSymbol", "") or "")
 
             bars = ib.reqHistoricalData(
                 contract,
