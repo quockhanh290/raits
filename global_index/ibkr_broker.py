@@ -45,7 +45,10 @@ from typing import Callable, Optional
 import pandas as pd
 
 from futures.basket import BASKET
-from global_index.broker import Broker, Order, Fill, BrokerPosition
+import datetime as _dt
+
+from global_index.broker import (Broker, BrokerPosition, Fill, Order,
+                                 OrderReceipt, OrderReceiptRefused)
 from global_index.specs import SPECS
 
 log = logging.getLogger(__name__)
@@ -394,6 +397,68 @@ class ContractResolutionError(RuntimeError):
     """Raised when an instrument cannot be resolved to exactly one listed contract."""
 
 
+def _continuous_month(ib, ibi, ibkr_symbol: str) -> str:
+    """Which contract month IBKR's continuous series for `ibkr_symbol` is currently stitched on.
+
+    Asked, never inferred. `qualifyContracts` fills the ContFuture in with the expiry it
+    actually tracks -- 'NKDU6', lastTradeDateOrContractMonth '20260910' -- and that is the only
+    authority on where the continuous series sits today. Our own roll calendar answers a
+    different question (which contract an ORDER should go to) and on a roll date the two
+    disagree by design.
+    """
+    contract = ibi.ContFuture(ibkr_symbol, exchange=ibkr_symbol_and_exchange(ibkr_symbol)[1])
+    ib.qualifyContracts(contract)
+    ltd = str(getattr(contract, "lastTradeDateOrContractMonth", "") or "")
+    if len(ltd) < 6 or not ltd[:6].isdigit():
+        raise ContractResolutionError(
+            f"continuous future {ibkr_symbol!r} did not qualify to a month "
+            f"(lastTradeDateOrContractMonth={ltd!r}); IBKR leaves an unresolved contract at "
+            f"conId {getattr(contract, 'conId', 0)} and a bar request against it would go out "
+            f"unconfirmed")
+    return ltd[:6]
+
+
+def _bars_contract(ib, ibi, inst: str):
+    """The contract BARS are read from -- the month the stored history is on, not the order's.
+
+    Stage 5ZZZ-CB. The second half of Stage 5Q-7, and it has the same fingerprint.
+
+    5Q-7 found that `fetch_bars("MNKD")` resolved through the ORDER map and fetched the $0.50
+    micro MNK while the parquet holds full-size NKD: "1,155 of 1,186 shared minutes disagreed".
+    It fixed WHICH INSTRUMENT by routing the live fetch through `history_ibkr_symbol`. It did
+    not fix WHICH MONTH, and on 2026-09-04 that half arrived:
+
+        our roll calendar moved NKD to 202612 on the roll date (5 bdays before the 09-11 LTD)
+        IBKR's continuous series, which the parquet is built from, was still on 202609
+        -> 1,069 of 1,080 shared minutes disagreed, 12 NKD slots refused
+
+    Same shape, one layer down. The rule was already written at the top of the roll section in
+    this file -- "Backtest uses continuous (roll-adjusted) parquet. Live needs the specific
+    front-month contract" -- two different things for two different jobs, and the bar fetch had
+    taken the order half of that sentence.
+
+    Measured the same night before any change: a continuous-series fetch against the stored
+    parquet shared 2,564 minutes and disagreed on ZERO of them, at every percentile.
+
+    WHY NOT JUST FETCH THE ContFuture. Because a bar request against one cannot carry an end
+    time -- IBKR answers error 10339, "setting end date/time for continuous future security
+    type is not allowed" -- and the live slot must chop its history at its own instant or it
+    reads bars from after the moment it is deciding at. So the continuous contract is asked
+    which month it is on, and a SPECIFIC contract for that month is what the request goes to.
+    Same prices, and `endDateTime` still works.
+
+    Orders are untouched. `_front_month_contract` still resolves them and must: an order has to
+    name a contract that trades, and five business days before expiry that is the next month.
+    """
+    from global_index.update_ibkr_daily import history_ibkr_symbol
+
+    # The symbol the HISTORY was fetched under -- delegated, never re-derived. That module is
+    # the one that wrote the files; a table here could disagree with the one that built them.
+    # It is idempotent, so a caller that already translated is not translated twice.
+    sym = history_ibkr_symbol(inst)
+    return _month_contract(ib, ibi, sym, _continuous_month(ib, ibi, sym))
+
+
 def _front_month_contract(ib, ibi, inst: str):
     """Build the qualified front-month contract for a runner instrument, or raise.
 
@@ -659,9 +724,13 @@ class IBKRBroker(Broker):
         try:
             import ib_insync as ibi  # type: ignore
 
-            # Resolves symbol, exchange and front month, and raises if the result is not
-            # a single listed contract. See _front_month_contract.
-            contract = _front_month_contract(ib, ibi, inst)
+            # Stage 5ZZZ-CB. BARS come from the continuous series, not the order contract.
+            #
+            # This line read `_front_month_contract` and that is the order-side resolution: on
+            # a roll date it names next month while the stored history is still on the current
+            # one, and the two halves of the frame stop being the same instrument. See
+            # `_bars_contract` for the measurement.
+            contract = _bars_contract(ib, ibi, inst)
 
             bars = ib.reqHistoricalData(
                 contract,
@@ -695,7 +764,7 @@ class IBKRBroker(Broker):
             log.error("IBKRBroker._fetch_raw(%s) failed: %s", inst, exc)
             return pd.DataFrame()
 
-    def send_order(self, order: Order) -> Fill:
+    def send_order(self, order: Order, *, on_submit=None) -> Fill:
         """
         Submit a futures market order to IBKR. BLOCKING — returns after fill confirmation.
 
@@ -754,10 +823,14 @@ class IBKRBroker(Broker):
                         self._positions.pop(i)
                         self._equity += order.pnl_sized
                         break
+            # No `on_submit` and no order_id: test mode places nothing, so there is no
+            # broker id to report. Inventing one here would put a fabricated identifier into
+            # a journal that a reconcile later treats as authoritative.
             return Fill(order.inst, order.action, order.direction,
                         order.contracts, order.cluster, order.pnl_sized)
 
         ib = self._require_connection()
+        trade = None      # bound only once placeOrder returns — see the except handler
         try:
             import ib_insync as ibi  # type: ignore
 
@@ -816,10 +889,35 @@ class IBKRBroker(Broker):
             ibkr_order.tif = "DAY"
             t0 = time.time()
             trade = ib.placeOrder(contract, ibkr_order)
+            _oid = str(getattr(trade.order, "orderId", "") or "")
             log.info(
-                "send_order: placed %s %s %s ×%d cluster=%s",
+                "send_order: placed %s %s %s ×%d cluster=%s orderId=%s",
                 order.action, ibkr_action, order.inst, order.contracts, order.cluster,
+                _oid or "(none)",
             )
+
+            # The receipt goes out HERE — the order is live and the poll below can block for
+            # 30 seconds. A crash inside that window used to leave a process holding an order
+            # it could not name; the whole point of this callback is that the id is durable
+            # before the wait, not after it.
+            if on_submit is not None:
+                try:
+                    on_submit(OrderReceipt(
+                        order_id=_oid, inst=order.inst, action=order.action,
+                        contracts=order.contracts,
+                        perm_id=getattr(trade.order, "permId", None) or None,
+                        client_id=getattr(trade.order, "clientId", None),
+                        contract_month=getattr(
+                            contract, "lastTradeDateOrContractMonth", None),
+                        submitted_at=_dt.datetime.now(
+                            _dt.timezone.utc).replace(microsecond=0).isoformat()))
+                except Exception as _exc:
+                    # Deliberately its own type, so the broad handler below re-raises it
+                    # instead of turning a LIVE order into Fill(status="CANCELLED").
+                    raise OrderReceiptRefused(
+                        f"the receipt for orderId={_oid or chr(40) + chr(41)} was refused "
+                        f"({type(_exc).__name__}: {_exc}). The order IS live at the broker "
+                        f"and must not be reported as cancelled.") from _exc
 
             # Poll until terminal state or timeout
             deadline = t0 + timeout_secs
@@ -838,7 +936,7 @@ class IBKRBroker(Broker):
                     )
                     return Fill(order.inst, order.action, order.direction,
                                 order.contracts, order.cluster,
-                                status="CANCELLED",
+                                status="CANCELLED", order_id=_oid,
                                 error_msg=f"entry timeout after {timeout_secs}s")
                 else:
                     log.error(
@@ -847,7 +945,7 @@ class IBKRBroker(Broker):
                     )
                     return Fill(order.inst, order.action, order.direction,
                                 order.contracts, order.cluster,
-                                status="FAILED",
+                                status="FAILED", order_id=_oid,
                                 error_msg=f"exit timeout after {timeout_secs}s")
 
             status, actual_filled, avg_price = self._verified_status(ib, trade)
@@ -865,6 +963,7 @@ class IBKRBroker(Broker):
                                 order.contracts, order.cluster,
                                 status="PARTIAL", filled_qty=actual_filled,
                                 avg_price=avg_price, commission=commission,
+                                order_id=_oid,
                                 # A partial fill is still a fill, on a real contract.
                                 # Omitting this put the position in the book with an
                                 # unknown month — unreachable at one lot per order, and
@@ -880,7 +979,7 @@ class IBKRBroker(Broker):
                             order.contracts, order.cluster,
                             # pnl_sized=0: live equity tracked via get_equity(), not pnl accumulation
                             pnl_sized=0.0, status="FILLED", avg_price=avg_price,
-                            commission=commission,
+                            commission=commission, order_id=_oid,
                             # The month this order actually went to, read off the
                             # contract that was sent rather than derived again.
                             contract_month=getattr(
@@ -894,7 +993,8 @@ class IBKRBroker(Broker):
                 )
                 return Fill(order.inst, order.action, order.direction,
                             order.contracts, order.cluster,
-                            status="CANCELLED", error_msg=f"order status: {status}")
+                            status="CANCELLED", order_id=_oid,
+                            error_msg=f"order status: {status}")
             else:
                 log.error(
                     "send_order: CLOSE %s %s not filled — status=%s (will retry next day)",
@@ -902,19 +1002,31 @@ class IBKRBroker(Broker):
                 )
                 return Fill(order.inst, order.action, order.direction,
                             order.contracts, order.cluster,
-                            status="FAILED", error_msg=f"exit order status: {status}")
+                            status="FAILED", order_id=_oid,
+                            error_msg=f"exit order status: {status}")
 
-        except IBKRConnectionError:
+        except (IBKRConnectionError, OrderReceiptRefused):
+            # OrderReceiptRefused travels with IBKRConnectionError deliberately. Both mean
+            # the caller must NOT be handed a tidy Fill: one because the connection is gone,
+            # the other because an order is live and unrecorded.
             raise
         except Exception as exc:
+            placed = trade is not None
             log.error(
-                "send_order(%s %s %s ×%d) failed: %s",
-                order.action, order.inst, order.direction, order.contracts, exc,
+                "send_order(%s %s %s ×%d) failed after%s placement: %s",
+                order.action, order.inst, order.direction, order.contracts,
+                "" if placed else " NO", exc,
             )
             fail_status = "CANCELLED" if order.action == "OPEN" else "FAILED"
+            # `order_id` is the only thing separating two situations this handler used to
+            # report identically: the order never reached IBKR, and the order reached IBKR
+            # and something afterwards threw. The second leaves live exposure, and a caller
+            # that cannot tell them apart has to assume the worse one every time.
             return Fill(order.inst, order.action, order.direction,
                         order.contracts, order.cluster,
-                        status=fail_status, error_msg=str(exc))
+                        status=fail_status, error_msg=str(exc),
+                        order_id=(str(getattr(getattr(trade, "order", None), "orderId", "")
+                                      or "") or None) if placed else None)
 
     def _verified_status(self, ib, trade) -> "tuple[str, int, float]":
         """Read (status, filled, avg_price) off a Trade, refusing to trust a bare
@@ -1497,6 +1609,46 @@ class IBKRBroker(Broker):
             working.setdefault(_to_runner(t.contract.symbol), []).append(
                 str(t.order.orderId))
         return working
+
+    def get_open_orders(self) -> "list | None":
+        """Every order working at IBKR, across all clients — or None if we cannot say.
+
+        Added for Track 1 (Stage 5X) and called by NOTHING in the legacy route. It is a thin
+        read over `reqAllOpenOrders()`, which this file already issues at five other sites,
+        so the API surface was never the gap — only a method that returns the whole list
+        rather than filtering it down to stops (`get_working_stops`) or to one id
+        (`get_order_status`).
+
+        Why Track 1 needs the unfiltered list: after a crash it holds a journal row that says
+        SUBMITTED and no order id, because `broker.Fill` carries none. Both existing lookups
+        require an id. This is the only read that can answer "is anything of ours still
+        working" without one.
+
+        `None` when offline, never `[]` — the same contract `get_working_stops` states and
+        for the same reason: the caller must be able to tell "nothing working" from "cannot
+        say". `[]` here is a real answer meaning the book is clear.
+
+        Not filtered by clientId. An order placed by another client on this account is still
+        exposure on this account, and Stage 5U's shared-account finding is that Track 1
+        cannot assume otherwise.
+        """
+        if self._raw_fetcher is not None:
+            return None  # offline / test mode — cannot testify
+
+        ib = self._require_connection()
+        out: list = []
+        for t in ib.reqAllOpenOrders():
+            out.append({
+                "order_id": str(t.order.orderId),
+                "perm_id": getattr(t.order, "permId", None),
+                "client_id": getattr(t.order, "clientId", None),
+                "instrument": _to_runner(t.contract.symbol),
+                "action": str(getattr(t.order, "action", "") or ""),
+                "order_type": str(getattr(t.order, "orderType", "") or ""),
+                "quantity": int(abs(float(getattr(t.order, "totalQuantity", 0) or 0))),
+                "status": str(getattr(t.orderStatus, "status", "") or ""),
+            })
+        return out
 
     def find_execution(self, order_id: str, inst: str | None = None) -> "dict | None":
         """The execution record for order_id, or None.
