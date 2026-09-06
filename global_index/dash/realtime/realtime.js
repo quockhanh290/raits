@@ -417,13 +417,12 @@
     // runner's snapshot - so in track1-only shadow, where nothing writes that file, the panel
     // was showing a label from whenever legacy last ran, presented as today's. The legacy
     // reading stays as a fallback for a machine with no Track 1 record.
-    const t1Label = state.marketView?.regime?.label;
-    const regime = t1Label || snap?.regime || 'Unknown';
-    $('sessionRegime').textContent = regime;
-    $('sessionRegime').className = /stress/i.test(regime) ? 'stress' : /unknown/i.test(regime) ? 'unknown' : '';
-    $('sessionRegime').title = t1Label
-      ? `Track 1 regime record, session ${state.marketView?.regime?.label_date || 'unknown'}`
-      : 'no Track 1 regime record; showing the legacy runner snapshot';
+    // Stage 5ZZZ-CM. Ô `Regime` trong hàng Model inputs đã bỏ: nó là ĐẦU RA của mô hình,
+    // không phải đầu vào, và nó đã hiện to hơn ngay dòng dưới kèm "held N days".
+    //
+    // Khối ghi vào nó bị GỠ HẲN chứ không canh `null`. Bản canh null làm hai phép kiểm hợp
+    // đồng đỏ, và chúng đúng: đọc một id mà không trang nào dựng thì mọi nhánh dựa vào nó là
+    // mã chết, và một `if` bọc ngoài chỉ khiến mã chết trông như mã phòng xa.
     const ops = state.runner?.payload?.meta?.operational_status || snap?.operational_status || {};
     const regimeStatus = ops.regime_freshness?.status;
     // Stage 5ZZW. The SPY date this panel shows is the one the TRACK 1 regime record was
@@ -446,23 +445,82 @@
       ? `Track 1 regime record — ${t1Regime.status || 'unknown'}, checked ${t1Regime.age_hours ?? '?'}h ago`
       : 'no Track 1 regime record; showing the legacy runner reading';
     const modelStatus = ops.model_age?.status;
-    const modelMonths = ops.model_age?.months_old;
+    // Stage 5ZZY. The month count is derived from the Track 1 record's own `fit_end`, not
+    // read from the legacy runner's `months_old`. That field stops advancing the day legacy
+    // stops running — measured 2026-09-03, the snapshot carrying it was 10.9 days old — so a
+    // fit that keeps ageing would keep reporting the age it had when legacy last wrote.
+    // Same arithmetic as `runner.py`, on a date the live route owns.
+    //
+    // The OK / WARN / URGENT state is deliberately NOT derived. It comes from the stale
+    // guard's own notification flags, not from any month threshold, and Track 1 publishes
+    // no equivalent — so it is still the legacy status, and the title says whose it is.
+    const t1FitEnd = t1Regime?.inputs?.fit_end;
+    const monthsSinceFit = iso => {
+      const fit = new Date(`${iso}T00:00:00`);
+      if (Number.isNaN(fit.getTime())) return null;
+      const now = new Date();
+      return Math.max(0, (now.getFullYear() - fit.getFullYear()) * 12 + (now.getMonth() - fit.getMonth()));
+    };
+    const modelMonths = (t1FitEnd ? monthsSinceFit(t1FitEnd) : null) ?? ops.model_age?.months_old;
     // Hai dòng phụ dưới Model age / HMM fit đã bỏ khỏi header — chúng lặp lại điều mà
     // giá trị và màu đã nói, và đẩy cả thanh header cao thêm một dòng. Chi tiết không mất:
     // chuyển sang title, hover vẫn đọc được.
     $('modelInputAge').textContent = modelStatus === 'OK' ? 'Current' : `${modelMonths ?? '?'} mo stale`;
     $('modelInputAge').className = modelStatus === 'OK' ? 'positive' : 'warning';
-    $('modelInputAge').title = modelStatus === 'OK' ? 'Fit current' : 'Known debt / G2 HARD';
+    // Stage 5ZZZ-CM. Câu về việc ĐÓNG BĂNG LẠI nhập vào đây. Nó từng chiếm một cột riêng
+    // để nói "none" gần như mọi ngày, và nó cùng chủ đề với tuổi mô hình: mô hình cũ bao
+    // nhiêu, và có ai đang chờ quyết định đóng băng lại không.
+    const refreeze = state.runner?.payload?.meta?.operational_status?.refreeze?.pending;
+    $('modelInputAge').title = (modelStatus === 'OK' ? 'Fit current' : 'Known debt / G2 HARD')
+      + (t1FitEnd
+          ? ` — age measured from the Track 1 fit end ${t1FitEnd}; the gate state is the legacy runner's own.`
+          : " — no Track 1 fit end; both the age and the gate state are the legacy runner's.")
+      + (refreeze === true
+          ? ' A re-freeze decision is outstanding.'
+          : refreeze === false
+            ? ' No re-freeze decision is outstanding.'
+            : ' Whether a re-freeze is outstanding was not reported.');
+    // Stage 5ZZY. HMM fit, from the Track 1 regime record rather than from the legacy
+    // runner's session log. `hmm_fit_diagnostic` is grouped out of `live_day_MMDD.log`, a
+    // file only `run_live_day.py` writes — Track 1 lists that file's siblings among the
+    // paths it must never touch. So in track1-only shadow this tile reported whatever day
+    // legacy last ran, presented as today's: measured 2026-09-03, it was printing a fit
+    // from the 24 August log, eleven days stale, and today's own log does not exist.
+    //
+    // The count itself does not survive the move either. `22/22 complete / 22 warn` is the
+    // legacy runner refitting once per slot across one day. Track 1 does not refit per
+    // session at all — it reads one frozen fit — so there is no per-session convergence
+    // count to report, and inventing one would be worse than the stale number. What the
+    // record does own is the shape of that fit, which is what this tile now says. Its
+    // health check is on `Fit end` beside it, coloured by the same record's verification.
+    //
+    // The legacy reading stays as a fallback for a machine with no Track 1 record, the
+    // same shape as `Regime`, `SPY data` and `Fit end` above.
     const fitDiagnostic = [...(state.sessionEvents?.events || [])].reverse()
       .find(event => event.kind === 'hmm_fit_diagnostic');
     const fitWarnings = Number(fitDiagnostic?.non_convergence_count || 0);
-    $('modelFitStatus').textContent = fitDiagnostic
-      ? `${fitDiagnostic.completed_fits}/${fitDiagnostic.attempts} complete${fitWarnings ? ` / ${fitWarnings} warn` : ''}`
-      : 'Not observed';
-    $('modelFitStatus').className = fitDiagnostic?.completed_fits === fitDiagnostic?.attempts && fitWarnings === 0 ? 'positive' : 'warning';
-    $('modelFitStatus').title = fitDiagnostic
-      ? `${fitWarnings} convergence warning(s) / no documented gate failure`
-      : 'No retained fit evidence';
+    const t1States = t1Regime?.inputs?.n_states;
+    const t1Labels = t1Regime?.inputs?.labels;
+    if (t1States != null) {
+      $('modelFitStatus').textContent = `${t1States} states`
+        + (t1Labels != null ? ` / ${Number(t1Labels).toLocaleString('en-US')} labels` : '');
+      $('modelFitStatus').className = t1RegimeOk ? 'positive' : 'warning';
+      $('modelFitStatus').title = `Track 1 reads one frozen fit (fit end ${t1Regime?.inputs?.fit_end || 'unknown'}), `
+        + 'so there is no per-session refit and no per-session convergence count. '
+        + 'The label check for that fit is on Fit end.';
+    } else if (t1Regime) {
+      $('modelFitStatus').textContent = 'Track 1 unavailable';
+      $('modelFitStatus').className = 'warning';
+      $('modelFitStatus').title = 'the Track 1 regime record carries no fit inputs';
+    } else {
+      $('modelFitStatus').textContent = fitDiagnostic
+        ? `${fitDiagnostic.completed_fits}/${fitDiagnostic.attempts} complete${fitWarnings ? ` / ${fitWarnings} warn` : ''}`
+        : 'Not observed';
+      $('modelFitStatus').className = fitDiagnostic?.completed_fits === fitDiagnostic?.attempts && fitWarnings === 0 ? 'positive' : 'warning';
+      $('modelFitStatus').title = fitDiagnostic
+        ? `no Track 1 regime record; legacy runner log — ${fitWarnings} convergence warning(s) / no documented gate failure`
+        : 'No retained fit evidence';
+    }
     // Stage 5ZZW. HMM fit end and the label check, from the Track 1 regime record rather than
     // from runner session events. `inputs.fit_end` is the end of the fitted window the label
     // was produced with, and `verification` is the route's own label check.
@@ -544,9 +602,55 @@
     const equity = snapshot?.equity ?? meta.final_equity;
     const unreal = state.broker?.payload?.unrealized_pnl;
     const realized = snapshot?.decision?.realized_today;
-    const drawdown = Number(snapshot?.drawdown_pct);
-    const drawdownDollars = Number(snapshot?.drawdown_dollars);
-    const hardDrawdown = Number(meta.hard_dd_pct);
+    // Stage 5ZZZ-CG. Rủi ro đọc sổ của Track 1, không đọc ảnh chụp của tuyến đã nghỉ hưu.
+    //
+    // Đo được 2026-09-05: ba con số của ô Risk và con số Gross đều lấy từ ảnh chụp cuối cùng
+    // của runner cũ, 289,8 giờ — 12,1 ngày — trước đó. Cả bốn đều là SỐ KHÔNG:
+    //
+    //     drawdown_pct 0.0 · drawdown_dollars 0.0 · max_dd_pct 0.0 · hard_dd_pct 0.15
+    //
+    // Một số không từ nguồn đã chết không phân biệt được với một ngày yên bình, và cái đọc
+    // được từ màn hình là "chúng ta còn xa giới hạn rủi ro" trong khi sự thật là "12 ngày rồi
+    // không ai đo rủi ro".
+    //
+    // Track 1 giữ sổ riêng và sổ ấy đang sống — chốt 2026-09-04 15:55 ET. Nhưng nội dung là
+    // `equity 0.0 · peak_equity 0.0 · positions []`, vì tuyến này chưa từng gửi lệnh nào. Nên
+    // chuyển nguồn KHÔNG làm ô nào sáng lên: nó đổi một số không mượn thành một câu đúng.
+    // Đó là điều đáng đổi — đỉnh bằng 0 nghĩa là mức sụt KHÔNG XÁC ĐỊNH, không phải bằng 0.
+    //
+    // Không có đường lui về legacy khi Track 1 lỗi: quay về một con số 12 ngày tuổi lúc nguồn
+    // mới im lặng chính là cơ chế đã tạo ra sự nhầm lẫn này ngay từ đầu.
+    //
+    // CÔNG TẮC là `legacyRunnerStale()`, không phải "endpoint Track 1 có trả lời". Bản đầu
+    // dùng vế sau và ba phép kiểm sẵn có đỏ ngay — đúng: khi runner cũ còn SỐNG thì Sharpe,
+    // Calmar và mức sụt của nó là của chính nó và được phép hiện. Trang đã có sẵn một khái
+    // niệm "tuyến cũ đã nghỉ" và các khối khác đều dùng nó; dựng thêm một khái niệm thứ hai
+    // là tạo ra hai câu trả lời cho cùng một câu hỏi, rồi chúng sẽ lệch nhau.
+    // Và điều kiện là CHỈ "tuyến cũ đã nghỉ" — không kèm "Track 1 đã trả lời".
+    //
+    // Bản trước đòi cả hai, và ảnh chụp trang thật bắt được hậu quả: `track1-runtime` là
+    // lời gọi chậm nhất trang (đo được 0,67–9,04s, lâu nhất ở lần gọi đầu sau khi khởi
+    // động), nên trong suốt khoảng đó ô Risk vẫn in `0.0% of 15.00% hard limit` của tuyến
+    // đã im 12 ngày. Mỗi lần tải nguội là một lần nháy con số sai.
+    //
+    // Không cần chờ: một tuyến đã nghỉ thì con số của nó không dùng được, bất kể nguồn thay
+    // thế đã kịp trả lời hay chưa. Nhánh "sổ chưa về" bên dưới đã nói đúng câu cần nói.
+    const t1mode = legacyRunnerStale();
+    const t1book = (!state.track1?.error && state.track1?.book?.present)
+      ? (state.track1.book.payload || null) : null;
+    const t1peak = t1book ? Number(t1book.peak_equity) : NaN;
+    const t1equity = t1book ? Number(t1book.equity) : NaN;
+    const t1curve = Number.isFinite(t1peak) && t1peak > 0 && Number.isFinite(t1equity);
+    const drawdown = t1mode
+      ? (t1curve ? (t1peak - t1equity) / t1peak : NaN)
+      : Number(snapshot?.drawdown_pct);
+    const drawdownDollars = t1mode
+      ? (t1curve ? t1peak - t1equity : NaN)
+      : Number(snapshot?.drawdown_dollars);
+    // Track 1 không công bố trần rút vốn ở đâu cả — đã quét `safety`, `gates`, `route`,
+    // `checkpoint`. Con số 15% là `RISK["max_drawdown_pct"]` của cấu hình rủi ro futures mà
+    // runner cũ đọc; chưa đo được rằng nó áp cho tuyến này, nên không gán bừa cho nó.
+    const hardDrawdown = t1mode ? NaN : Number(meta.hard_dd_pct);
     const gaugePct = Number.isFinite(drawdown) && Number.isFinite(hardDrawdown) && hardDrawdown > 0
       ? Math.min(100, Math.max(0, drawdown / hardDrawdown * 100)) : 0;
     $('metrics').classList.toggle('broker-stale', !brokerUsable());
@@ -578,11 +682,15 @@
       decisionSection.classList.toggle('runner-stale', legacyStale);
       const retired = $('decisionRetired');
       const t1line = state.track1?.reporting?.headline;
+      const t1detail = state.track1?.reporting?.headline_detail || '';
       if (retired) {
         retired.hidden = !legacyStale;
         retired.textContent = legacyStale
           ? (t1line || 'The legacy runner snapshot is retired; Track 1 publishes its own state.')
           : '';
+        // Stage 5ZZZ-CM. Kiểm kê chứng minh câu trên đứng ngay sau nó, một cú rê chuột —
+        // không chiếm chỗ của câu, và không biến mất.
+        retired.title = legacyStale ? t1detail : '';
       }
       // Everything else here is done by the CLASS, not by touching nodes. A first attempt
       // set `hidden`, cleared the summary text and rewrote the source note; all three came
@@ -634,6 +742,17 @@
     } else {
       setMetric('metricEquity', equity == null ? '--' : `$${Number(equity).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
     }
+    /* Bậc 30px của thang chữ được hợp đồng dành cho "số paper equity" — một CON SỐ.
+       Khi không có số, ô này giữ một lời từ chối có tên ("not measured", "baseline
+       UNKNOWN"), và lời từ chối ấy là đúng: không để trống, không mượn số của tuyến khác.
+       Nhưng đo được 2026-09-04, nó trở thành CHỮ TO NHẤT TOÀN TRANG — 30px cho một sự
+       vắng mặt, trong khi câu trả lời "hệ thống có khoẻ không" là 15px và dòng
+       "ORDERS POSSIBLE: no" là 11px. Hệ thống phân cấp đang tiêu hai chỗ đắt nhất cho một
+       giá trị vắng mặt và một số không.
+       Nhận diện theo NỘI DUNG chứ không theo nhánh nào vừa chạy: có chữ số thì là con số,
+       không có thì là câu — nên thêm một nhánh mới cũng không cần sửa chỗ này. */
+    const eqEl = $('metricEquity');
+    if (eqEl) eqEl.classList.toggle('is-refusal', !/\d/.test(eqEl.textContent || ''));
     // Realised P&L belongs to whoever traded. In Track 1 mode that is nobody — the route has
     // sent no orders — so the legacy runner's realised figure must not sit beside a Track 1
     // headline wearing the same styling as if it were this route's day.
@@ -644,6 +763,34 @@
       ? `$${Math.abs(drawdownDollars).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--';
     $('metricDrawdownLimit').textContent = Number.isFinite(hardDrawdown)
       ? `${gaugePct.toFixed(1)}% of ${pct(hardDrawdown)} hard limit` : 'hard limit unavailable';
+    // Sự vắng mặt phải có TÊN. `--` cạnh một thanh đo bằng 0 vẫn đọc như "trong hạn".
+    //
+    // NHÃN NGẮN, LÝ DO ĐẦY ĐỦ Ở TOOLTIP. Bản đầu đổ nguyên câu giải thích vào ô nhãn và đo
+    // được nó tràn 231–462px sang ô Performance ở cả ba bề rộng — đúng cái lỗi mà bản sửa
+    // ngay phía trên vừa dọn cho thẻ Paper equity, tôi lặp lại nó ở thẻ bên cạnh trong cùng
+    // một lượt. Ô này là NHÃN: bản thiết kế dành cho nó chuỗi `of 15.00% limit`, 25 ký tự.
+    if (t1mode) {
+      const why = !t1book
+        ? ['unavailable', 'book unavailable',
+           "Track 1's own book did not answer, and the legacy figure is not substituted"
+           + ' for it.']
+        : !t1curve
+          ? ['not traded', 'no equity booked yet',
+             'Track 1 has booked no equity, so there is no curve to draw down from.'
+             + ' A zero peak means undefined, not zero.']
+          : [null, 'no published limit',
+             "Measured against Track 1's own booked equity. This route publishes no"
+             + ' drawdown limit, so there is no scale to gauge against.'];
+      if (why[0]) $('metricDrawdown').textContent = why[0];
+      $('metricDrawdownLimit').textContent = why[1];
+      $('metricDrawdown').title = why[2];
+      $('metricDrawdownLimit').title = why[2];
+    } else {
+      $('metricDrawdown').title = '';
+      $('metricDrawdownLimit').title = '';
+    }
+    $('metricDrawdown').classList.toggle('is-refusal',
+      !/\d/.test($('metricDrawdown').textContent || ''));
     $('metricDrawdownFill').style.width = `${gaugePct}%`;
     $('metricDrawdownFill').className = gaugePct >= 100 ? 'bad' : gaugePct >= 66 ? 'watch' : '';
     $('metricDrawdownFill').parentElement.setAttribute('aria-valuenow', gaugePct.toFixed(1));
@@ -651,6 +798,60 @@
     $('metricDrawdownFill').parentElement.setAttribute('aria-valuemax', '100');
     $('metricPositions').textContent = state.broker?.payload ? String(brokerPositions().length) : '--';
     $('metricStops').textContent = state.broker?.payload ? String(workingOrders().length) : '--';
+
+    // Stage 5ZZZ-CG. Ô Gross được viết Ở ĐÂY, và trước đây không ai viết nó trên trang này.
+    //
+    // Người viết duy nhất của nó nằm trong lớp phủ giao diện của bản thiết kế lại, nên trên
+    // `/realtime` ô này in `--` vĩnh viễn, còn trên `/realtime-next` nó đọc `cluster_exposure`
+    // của ảnh chụp runner đã nghỉ hưu — 289,8 giờ tuổi, và khoá theo ĐÚNG TÊN ba sleeve của
+    // Track 1: `global_nkd`, `roska4_stress`, `roska4_swing`, mỗi cái `gross_pct: 0.0`. Nên
+    // nó in "0.0%" trông như đang báo cáo Track 1, và sẽ còn in thế mãi kể cả sau khi Track 1
+    // bắt đầu giao dịch, vì ảnh chụp ấy đã đóng băng.
+    //
+    // Chuyển về đây vì `state.track1` sống ở đây, và vì chính file kia đã ghi lại bài học của
+    // nó: hai nơi cùng viết một ô thì nơi chạy sau thắng, và không gì trên màn hình cho thấy
+    // có xung đột.
+    //
+    // Phần trăm cần một mẫu số. Khi có vị thế mà sổ chưa ghi vốn nào, ô này in số ĐẾM chứ
+    // không in phần trăm: một tỉ lệ chia cho không là một con số bịa.
+    const grossEl = $('metricGrossExposure');
+    if (grossEl) {
+      const held = t1book && Array.isArray(t1book.positions) ? t1book.positions.length : null;
+      if (!t1mode) {
+        // Tuyến cũ còn sống: con số của nó là của chính nó. Nhánh này giữ lại đúng phép
+        // tính mà lớp phủ giao diện từng làm, để bản sửa không lặng lẽ xoá một số đang đúng
+        // — nó chỉ thôi được dùng khi tuyến ấy đã nghỉ.
+        const byCluster = snapshot?.cluster_exposure;
+        let total = 0, seen = 0;
+        if (byCluster && typeof byCluster === 'object') {
+          for (const entry of Object.values(byCluster)) {
+            const g = Number(entry?.gross_pct);
+            if (Number.isFinite(g)) { total += g; seen += 1; }
+          }
+        }
+        grossEl.textContent = seen ? `${total.toFixed(1)}%` : '--';
+        grossEl.title = seen ? "the legacy runner's own per-cluster figures" : '';
+      } else if (held === null) {
+        grossEl.textContent = 'n/a';
+        grossEl.title = "Track 1's own book did not answer; the legacy figure is not"
+          + ' substituted for it';
+      } else if (!held) {
+        grossEl.textContent = '0.0%';
+        grossEl.title = 'Track 1 holds nothing, read from its own book';
+      } else if (!t1curve) {
+        grossEl.textContent = `${held} held`;
+        grossEl.title = 'Track 1 holds positions but has booked no equity to express them as'
+          + ' a percentage of';
+      } else {
+        let gross = 0;
+        for (const pos of t1book.positions) {
+          const v = Math.abs(Number(pos?.notional ?? pos?.market_value ?? NaN));
+          if (Number.isFinite(v)) gross += v;
+        }
+        grossEl.textContent = gross ? `${(gross / t1equity * 100).toFixed(1)}%` : `${held} held`;
+        grossEl.title = "against Track 1's own booked equity";
+      }
+    }
 
     const protection = brokerUsable() ? protectionSummary() : null;
     $('metricStopsCovered').textContent = protection == null ? '--'
@@ -694,15 +895,29 @@
     }
     performanceValue('performanceCalmar', enoughSample && running.calmar != null ? Number(running.calmar).toFixed(2) : '--');
     performanceValue('performanceSharpe', enoughSample && running.sharpe != null ? Number(running.sharpe).toFixed(2) : '--', enoughSample ? running.sharpe : null);
-    $('performanceCalmar').title = enoughSample ? '' : sampleNote;
-    $('performanceSharpe').title = enoughSample ? '' : sampleNote;
+    // Stage 5ZZZ-CG. `n=11 trading day(s); needs 20` đếm ngày của RUNNER CŨ. Ở chế độ Track 1
+    // câu đó trả lời một câu hỏi không ai hỏi: vấn đề không phải mẫu còn ngắn, mà là tuyến
+    // này chưa có đường cong vốn nào để lấy mẫu. (Ảnh chụp ấy còn giữ Sharpe 8.52 trên 11
+    // ngày với tổng lợi nhuận +0,8% — cổng cỡ mẫu đang giữ đúng một con số vô nghĩa.)
+    const perfNote = t1mode
+      ? 'Track 1 has sent no orders, so it has no equity curve to measure a ratio on'
+      : sampleNote;
+    $('performanceCalmar').title = (t1mode || !enoughSample) ? perfNote : '';
+    $('performanceSharpe').title = (t1mode || !enoughSample) ? perfNote : '';
+    if (t1mode) {
+      performanceValue('performanceCalmar', '--');
+      performanceValue('performanceSharpe', '--');
+    }
     // Stage 5ZZH. Guarded: without the branch this line runs AFTER the Track 1 block above
     // and puts the legacy runner's return straight back onto a Track 1 card. The bug the
     // whole stage is about, one assignment further down the same function.
     if (!t1acct) {
       performanceValue('performanceReturn', running.total_return == null ? '--' : `${Number(running.total_return) >= 0 ? '+' : ''}${pct(running.total_return)}`, running.total_return);
     }
-    performanceValue('performanceMaxDd', meta.max_dd_pct == null ? '--' : pct(meta.max_dd_pct), meta.max_dd_pct == null ? null : -Number(meta.max_dd_pct));
+    performanceValue('performanceMaxDd',
+      t1mode || meta.max_dd_pct == null ? '--' : pct(meta.max_dd_pct),
+      t1mode || meta.max_dd_pct == null ? null : -Number(meta.max_dd_pct));
+    $('performanceMaxDd').title = t1mode ? perfNote : '';
     // Stage 5ZZF. This line said "Broker acct $996,731 / -$3,749 since 2026-07-08" for three
     // days after the paper account was reset to USD 250,817.91. Two separate faults, both
     // measured before this was rewritten:
@@ -929,6 +1144,21 @@
     if (stripBreakerBad) stripConditions.push(`risk breaker ${stripBreaker}`);
     if (stripEntriesBlocked) stripConditions.push('entries blocked: regime input unreliable');
     if (stripDeadSources.length) stripConditions.push(`${stripDeadSources.join(', ')} unreachable`);
+    /* Sự thật vận hành lớn nhất của trang, và nó vốn nằm ở 11px cách đầu trang 400px:
+       tuyến CÓ đặt được lệnh hay không, và cổng nào đang chặn. Một bản rà độc lập đọc
+       trang này bằng mắt mới gọi đây là việc số một, và phép đo đồng ý — năm thứ to nhất
+       trong màn hình đầu đều là TÊN KHUNG CHỨA, không cái nào là trạng thái.
+       Chỉ thêm dòng khi câu trả lời là KHÔNG. Ngày bình thường dải đầu giữ nguyên sự tiết
+       chế mà bản thiết kế cố ý để lại; ngày không đặt được lệnh thì người đọc biết ngay
+       ở dòng đầu tiên thay vì phải cuộn.
+       Tên cổng lấy qua `GATE_NAMES` — cùng bảng dịch mà panel Track 1 dùng, để hai chỗ
+       không thể gọi một cổng bằng hai tên. */
+    const stripGates = state.track1?.gates || {};
+    if (stripGates.orders_possible === false) {
+      const names = (stripGates.blocking_now || []).map(id => GATE_NAMES[id] || id);
+      stripConditions.push(
+        'no orders possible' + (names.length ? ` — ${names.slice(0, 3).join(' · ')}` : ''));
+    }
     if (!stripConditions.length && stripUnknown) stripConditions.push('some telemetry is unavailable');
     const stripStatus = stripConditions.length
       ? stripConditions.join(' / ')
@@ -1197,7 +1427,10 @@
     // routes, so the honest word for that column is the one that says so.
     // Stage 5ZZW: `DEBT` said what KIND of entry it is; it did not say what it is about, and
     // the row sat under a heading that said "Legacy". It is a model fact.
-    return ({ track1: 'TRACK 1', legacy: 'LEGACY', scheduler: 'SHARED',
+    // Stage 5ZZZ-CM. `SHARED` không nói gì với người đọc — nó là từ của người viết mã, và
+    // nghĩa thật ("bộ lập lịch và lịch hợp đồng phục vụ CẢ HAI tuyến") chỉ nằm trong tooltip.
+    // Nhãn phải tự nói được nghĩa của nó khi không ai rê chuột.
+    return ({ track1: 'TRACK 1', legacy: 'LEGACY', scheduler: 'BOTH ROUTES',
               known_debt: 'MODEL' })[scope] || '';
   }
 
@@ -1300,6 +1533,25 @@
     track1_safety_max_hold: 'Track 1 max-hold exit check',
     track1_window_audit: 'Track 1 window audit'
   };
+
+  /* Tuyến của một job, SUY từ tiền tố loại chứ không viết cứng danh sách.
+     Đo được 2026-09-04: bốn cặp job chạy cùng một phút — `STOP_REPAIR_0420` (12s) và
+     `TRACK1_STOP_REPAIR_0420` (14s), rồi ba cặp nữa. Đó là HAI job thật của hai tuyến,
+     không phải một job ghi hai lần; nhưng trên màn hình chúng đọc như bản sao, vì không
+     dòng nào nói tuyến.
+     55 trên 65 hàng đã mang tiền tố `TRACK1_` ngay trong job id nên tự nói được. Mười hàng
+     legacy thì không, và đúng chúng là những hàng ghép đôi. Chỉ đánh dấu mười hàng ấy.
+     KHÔNG đổi tên job: comment ở `renderScheduleFacts` đã dặn giữ nguyên job id của
+     scheduler, vì "một từ vựng dashboard không tồn tại ở đâu khác trong hệ thống là một
+     bước dịch dưới áp lực". Thêm một sự thật, không thay một cái tên. */
+  function jobRouteChip(job) {
+    const type = String((job && job.job_type) || '');
+    if (!type || type.startsWith('track1_')) return '';
+    return `<span class="issue-scope legacy has-tip" tabindex="0" data-tooltip="Tuyến legacy. `
+      + `Nhiều job bảo trì chạy theo cặp — một lượt cho mỗi tuyến, cùng một phút — nên hai `
+      + `hàng cùng giờ là hai lần chạy thật, không phải một lần ghi đôi.">`
+      + `${esc(issueScope('legacy'))}</span>`;
+  }
 
   function jobLabel(job) {
     const base = MV_JOB_NAMES[job && job.job_type];
@@ -1567,8 +1819,24 @@
   //: rather than by `new Date`: these stamps are wall-clock on the sleeve's own exchange
   //: clock, and handing them to a Date would reinterpret them in the viewer's zone — which
   //: is exactly the thirteen-hour class of error this project already paid for once.
+  /* Cắt 'HH:MM' ra khỏi một chuỗi thời gian — nhưng chỉ khi chuỗi ấy KHÔNG mang offset.
+     Đo được 2026-09-04: `data_status.latest_bar_et` trả về "2026-09-04 15:54:00+09:00" —
+     giờ Tokyo, offset ghi rõ — và bản cũ cắt thẳng "15:54" rồi panel nối thêm chữ " ET".
+     Kết quả: "Latest bar 15:54 ET" nằm trong một panel khai "window 01:10–02:55 ET", tức
+     một mốc rơi ngoài hẳn cửa sổ của chính nó. Mốc thì ĐÚNG (15:54 Tokyo = 02:54 ET, nằm
+     gọn trong cửa sổ); chỉ có cách trình bày là sai.
+     Cùng lớp lỗi với chuyện biểu đồ vẽ nến tương lai vì lẫn UTC/ET đã sửa trước đó — chart
+     được sửa, dòng data-health thì không.
+     Chuỗi KHÔNG offset đi đúng đường cũ: nó vốn đã ở đồng hồ mà người gọi muốn hiển thị. */
   function mvClock(t) {
     const s = String(t || '');
+    if (/[+-]\d{2}:\d{2}$|Z$/.test(s)) {
+      const when = new Date(s.replace(' ', 'T'));
+      if (!Number.isNaN(when.getTime())) {
+        return new Intl.DateTimeFormat('en-GB', {
+          timeZone: ET_ZONE, hour: '2-digit', minute: '2-digit', hour12: false }).format(when);
+      }
+    }
     const i = s.indexOf(' ');
     return i < 0 ? s : s.slice(i + 1, i + 6);
   }
@@ -1589,6 +1857,12 @@
   let mvSlotX = null;
 
   function mvChartSvg(sleeve) {
+    /* Xoá khi VÀO, không chỉ ghi khi thành công. Nhánh thoát sớm ngay dưới đây làm một
+       sleeve không có bar không vẽ chart nào cả, và bản đồ của sleeve vẽ TRƯỚC nó vẫn
+       sống sót — nên pane chuỗi bên dưới đặt slot của mã NÀY lên các phút của nến mã
+       KHÁC, trên một trục mà nó có mọi lý do để tin là đang dùng chung. */
+    mvSlotSpan = null;
+    mvSlotX = null;
     const bars = sleeve.bars || [];
     if (!bars.length) {
       /* "Latest stored session <date>" used to be the second half of this: the backend
@@ -1617,6 +1891,33 @@
        value is distinct, and the median minute still stands 9.2px tall. */
     const volH = hasVol ? 120 : 0;
     const iw = W - padL - padR, ih = H - padT - padB - volH;
+    /* Luật 5 của hợp đồng: KHÔNG vẽ <text> trong một SVG có preserveAspectRatio="none".
+       Bản design không có một thẻ <text> nào trong toàn bộ file — trục của nó là HTML bên
+       cạnh, nến và dot là <div> định vị tuyệt đối — nên không chỗ nào méo được, và luật
+       cấm thẳng CẤU TRÚC thay vì đặt một mức méo cho phép.
+       Bản trước chống méo bằng cách phản-co từng nhãn theo tỉ lệ đo được. Nó chữa được
+       triệu chứng nhưng phải chạy lại mỗi lần khung đổi kích thước, và vẫn để lại đúng
+       cấu trúc mà luật cấm.
+       Giờ chữ ra một lớp HTML phủ lên SVG. SVG kéo giãn lấp đầy khung, nên toạ độ viewBox
+       quy sang phần trăm là ánh xạ CHÍNH XÁC — không phải xấp xỉ. Chữ HTML thì không bao
+       giờ bị kéo, vì nó không nằm trong hệ toạ độ bị kéo.
+       `y` của SVG là ĐƯỜNG CƠ SỞ của chữ, còn `top` của HTML là mép trên hộp; -0.75em đưa
+       hộp lên cho đường cơ sở rơi đúng chỗ cũ. */
+    const axisText = [];
+    const ANCHOR = { start: '0', middle: '-50%', end: '-100%' };
+    /* Stage 5ZZZ-CN. MỘT cách viết số cho cả hai biểu đồ chồng nhau.
+       Đo được trên trang: pane nến in `65204.20`, pane slot ngay dưới in `65,043.54` — cùng
+       một loại giá, cùng một cột, hai cách viết. Ở mức năm chữ số, thiếu dấu phân cách là
+       thiếu đúng thứ giúp đọc bậc độ lớn trong một liếc. */
+    const axPrice = v => Number(v).toLocaleString('en-US',
+      { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const axCount = v => Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 });
+    const mvLab = (px, py, cls, txt, anchor) => {
+      axisText.push(`<span class="mv-lab ${cls}" style="left:${(px / W * 100).toFixed(3)}%;`
+        + `top:${(py / H * 100).toFixed(3)}%;--ax:${ANCHOR[anchor || 'start']}">`
+        + `${txt}</span>`);
+      return '';
+    };
     const laneY = padT + ih + volH + 13;
     let lo = Infinity, hi = -Infinity;
     bars.forEach(b => { lo = Math.min(lo, b.low); hi = Math.max(hi, b.high); });
@@ -1645,8 +1946,7 @@
         width="${bwid.toFixed(1)}" height="${ih}"></rect>`
         // Labelled only when the band is wide enough to hold the word without sitting on a
         // candle. Below that it stays an unlabelled tint, which still reads as "this part".
-        + (bwid > 90 ? `<text class="mv-axis mv-band-label" x="${(bx + 5).toFixed(1)}"
-             y="${padT + 12}">Window</text>` : '');
+        + (bwid > 90 ? mvLab(bx + 5, padT + 12, 'mv-band-label', 'Window', 'start') : '');
     }
 
     const candles = bars.map((b, i) => {
@@ -1664,15 +1964,13 @@
     // collide at narrow widths.
     const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => {
       const v = lo + (hi - lo) * f;
+      mvLab(W - padR + 6, y(v) + 3.5, '', mvEsc(axPrice(v)), 'start');
       return `<line class="mv-grid" x1="${padL}" x2="${W - padR}"
-                y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"></line>
-              <text class="mv-axis" x="${W - padR + 6}" y="${(y(v) + 3.5).toFixed(1)}"
-                >${v.toFixed(2)}</text>`;
+                y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"></line>`;
     }).join('');
     const every = Math.max(1, Math.ceil(bars.length / 8));
     const times = bars.map((b, i) => (i % every ? '' :
-      `<text class="mv-axis mv-time" x="${x(i).toFixed(1)}" y="${H - 8}"
-        >${mvEsc(mvClock(b.time))}</text>`)).join('');
+      mvLab(x(i), H - 8, 'mv-time', mvEsc(mvClock(b.time)), 'middle'))).join('');
 
     // Slot markers along the foot of the plot, positioned by their own time against the bar
     // clock. A slot outside the drawn range is dropped rather than clamped to the edge: a
@@ -1709,7 +2007,10 @@
     }).join('');
     // Published only once the row is complete, so a half-built span is never read.
     mvSlotSpan = _slotSpan;
-    mvSlotX = _slotX;
+    /* Đóng dấu nó được dựng TỪ đâu. Pane chuỗi kiểm dấu này trước khi nhận, nên một bản
+       đồ không bao giờ bị đọc nhầm sang mã khác hoặc phiên khác — đúng hai kiểu hỏng làm
+       cho câu "chung trục" trở thành một lời khai sai. */
+    mvSlotX = { key: `${sleeve.instrument || ''}|${sleeve.bars_session_date || ''}`, x: _slotX };
     // The lane's own baseline. Without it the dots float; with it they read as a row of
     // outcomes running under the session.
     const laneRule = `<line class="mv-lane" x1="${padL}" x2="${W - padR}"
@@ -1735,11 +2036,11 @@
         const yy = y(Number(l.price)).toFixed(1);
         const cls = (l.armed === true && armed) ? 'mv-level armed' : 'mv-level muted';
         const suffix = (l.armed === true && armed) ? '' : ' · not armed';
+        mvLab(padL + 4, Number(yy) - 4,
+          `mv-level-label ${cls.includes('armed') ? 'armed' : 'muted'}`,
+          mvEsc(l.label) + suffix, 'start');
         return `<line class="${cls} mv-level-${mvEsc(l.kind)}" x1="${padL}" x2="${W - padR}"
-            y1="${yy}" y2="${yy}"></line>
-          <text class="mv-axis mv-level-label ${cls.includes('armed') ? 'armed' : 'muted'}"
-            x="${padL + 4}" y="${(Number(yy) - 4).toFixed(1)}"
-            >${mvEsc(l.label)}${suffix}</text>`;
+            y1="${yy}" y2="${yy}"></line>`;
       }).join('');
 
     // Volume bars, drawn only where the store actually carried the column. Never
@@ -1780,18 +2081,16 @@
           width="${bw.toFixed(1)}" height="${h.toFixed(1)}"><title>volume ${
             b.volume}</title></rect>`;
       }).join('') +
-      `<text class="mv-axis mv-vol-label" x="${padL}" y="${(vTop + 8).toFixed(1)}">Volume</text>`
+      mvLab(padL, vTop + 8, 'mv-vol-label', 'Volume', 'start')
       /* The ceiling label sits BELOW the price axis's last one. Both want the right
          column and the price plot ends exactly where this pane starts, so at the top of
          the pane they land on the same line: measured, "32  peak 110" printed straight
          through "64127.80". Twenty units down clears it and still reads as the top of
          this pane rather than the bottom of the one above. */
-      + `<text class="mv-axis mv-vol-ax" x="${W - padR + 6}" y="${(vTop + 20).toFixed(1)}">${
-          mvEsc(String(vpeak))}</text>`
-      + `<text class="mv-axis mv-vol-ax" x="${W - padR + 6}" y="${
-          (vTop + usable / 2 + 3).toFixed(1)}">${mvEsc(String(Math.round(vpeak / 2)))}</text>`
-      + `<text class="mv-axis mv-vol-ax" x="${W - padR + 6}" y="${
-          (vTop + usable).toFixed(1)}">0</text>`
+      + mvLab(W - padR + 6, vTop + 20, 'mv-vol-ax', mvEsc(axCount(vpeak)), 'start')
+      + mvLab(W - padR + 6, vTop + usable / 2 + 3, 'mv-vol-ax',
+              mvEsc(axCount(Math.round(vpeak / 2))), 'start')
+      + mvLab(W - padR + 6, vTop + usable, 'mv-vol-ax', '0', 'start')
       /* A floor to stand on. Without it the columns hang in the gap between two panes and
          the eye has nothing to read their height against. */
       + `<line class="mv-vol-base" x1="${padL}" x2="${W - padR}" y1="${
@@ -1804,6 +2103,7 @@
         ${ticks}${band}${candles}${levels}${vol}${laneRule}${marks}${times}
         <line class="mv-cross" x1="0" x2="0" y1="${padT}" y2="${padT + ih}" style="display:none"></line>
       </svg>
+      <div class="mv-labels">${axisText.join('')}</div>
       <div class="mv-tip" hidden></div>`;
   }
 
@@ -1873,9 +2173,14 @@
     }
     if (sig) return `candidate at ${sig.time_et} ET`;
     if (rej) return `gate refused at ${rej.time_et} ET`;
-    if (cov.observed_slots != null && cov.expected_slots != null) {
-      return `${cov.observed_slots} / ${cov.expected_slots} slots observed`;
-    }
+    /* "N / M slots observed" trả về RỖNG chứ không bị xoá khỏi chuỗi. Nó nói đúng hai
+       con số mà câu tóm tắt của panel đã nói, dưới đúng điều kiện câu ấy chạy, nên ô chip
+       bị `.filter(c => c.txt)` loại bỏ.
+       Phải là `return ''` chứ không phải bỏ hẳn nhánh: bỏ hẳn thì hàm rơi xuống nhánh dự
+       phòng ngay dưới và in "gate allow failed 19 of 22" — đúng nửa SAU của cùng câu ấy.
+       Đo được: xoá nhánh xong, chip cũ biến mất và một chip trùng khác hiện ra thế chỗ.
+       Nhánh dự phòng đó tồn tại cho trường hợp sổ không ghi gì, và nó phải ở nguyên đó. */
+    if (cov.observed_slots != null && cov.expected_slots != null) return '';
     // Nothing fired and the ledger said nothing: name the unmet rule rather than leaving the
     // operator to guess which of nine conditions was the blocker.
     const lane = (s.rule_lanes || []).find(L => L.failed > 0);
@@ -1912,9 +2217,16 @@
     const observed = Number(cov.observed_slots);
     const parts = [];
     if (Number.isFinite(expected) && Number.isFinite(observed) && expected > 0) {
+      /* "observed", không phải "decided". `coverage.observed_slots` là số slot THẬT SỰ
+         BÁO CÁO — docstring của `record_window_observation` nói đúng chữ đó, và nó đếm
+         `len(slot_ids)` với slot_ids là "the list of slots that actually reported".
+         Số slot đã QUYẾT nằm ở chỗ khác: `rule_lanes[].slots_decided`, hôm nay là 22.
+         Dùng nhầm chữ làm câu này tự mâu thuẫn trong chính nó — đo được 2026-09-04 nó in
+         "3 of 22 slots decided ... gate allow failed on 19 of 22 decided slots": ba slot
+         đã quyết, mà mười chín trên hai mươi hai slot đã quyết lại trượt. */
       parts.push(observed >= expected
-        ? 'Every slot decided'
-        : `${observed} of ${expected} slots decided`);
+        ? 'Every slot reported'
+        : `${observed} of ${expected} slots reported`);
     }
     if (cov.signal === 'no_signal') parts.push('none fired');
     let out = parts.length ? parts.join(' and ') + '.' : '';
@@ -2002,8 +2314,14 @@
        this says how often it missed. Same two facts at two grains, and the design puts
        the coarse one where the eye lands last. Dropped entirely when either is absent
        -- never a dash. */
+    /* Dòng đếm của làn chặn đã bỏ khỏi cột phải. Câu tóm tắt ngay TRÊN nó nói đúng
+       điều đó bằng nhiều chữ hơn — "gate allow failed on 19 of 22 decided slots" — và đo
+       được hai dòng cách nhau 3px. Comment cũ ở đây tự nhận là "same two facts at two
+       grains"; ở khoảng cách 3px thì hai độ mịn không còn là hai thứ nữa.
+       Xuất xứ bằng chứng thì giữ: "recorded while the slots ran" không có ở đâu khác, và
+       nó trả lời một câu hỏi khác hẳn — số liệu này do slot ghi lúc chạy hay dựng lại từ
+       bar trên đĩa. */
     const sideLines = [];
-    if (blocked) sideLines.push(`${blocked.label} failed ${blocked.fails} of ${blocked.decided}`);
     if (provenance) sideLines.push(provenance);
     const side = sideLines.length
       ? `<div class="mv2-verdict-side">` + sideLines.map((l, i) =>
@@ -2089,6 +2407,31 @@
     'has not run yet': 'not yet run',
     'no verdict recorded': 'no verdict'
   };
+
+  /* Chú giải cho hàng SLOT DECISIONS, tách khỏi chú giải làn luật.
+     Đo được 2026-09-04: chú giải in ngay dưới mô tả sáu ô của LÀN LUẬT — pass/fail/
+     not-reached/no-verdict/no-record/not-yet — trong khi hàng slot bên trên vẽ 19 chấm
+     hổ phách và 3 chấm xám, hai màu KHÔNG có trong chú giải ấy. Một chú giải, hai hệ
+     nghĩa: `MV_MARK` là kết quả của SLOT, còn ô làn là kết quả của LUẬT.
+     Chỉ liệt kê trạng thái thật sự có mặt trong phiên, và suy thẳng từ `MV_MARK` để hai
+     bên không thể trôi khỏi nhau. */
+  function mvSlotLegend(slots) {
+    const seen = [];
+    (slots || []).forEach(sl => {
+      const key = MV_MARK[sl.status] ? sl.status : 'unknown';
+      if (!seen.includes(key)) seen.push(key);
+    });
+    if (!seen.length) return '';
+    return `<div class="mv2-legend mv2-legend-slots">`
+      + `<span class="mv2-legend-lead">slot decisions</span>`
+      + seen.map(k => {
+          const m = MV_MARK[k];
+          return `<span class="mv2-legend-item"><i class="mv2-slot-key" style="`
+            + `background:${m.hollow ? 'transparent' : m.fill};border-color:${m.fill}"></i>`
+            + `${mvEsc(m.word)}</span>`;
+        }).join('')
+      + `</div>`;
+  }
 
   function mvLaneLegend(tail) {
     const items = [
@@ -2200,6 +2543,7 @@
         <div class="mv2-lane-track">${axis}</div>
         <div class="mv2-lane-value"></div>
       </div>
+      ${mvSlotLegend(slots)}
       ${mvLaneLegend(mvDeclaredInline(s))}
     </div>`;
   }
@@ -2355,15 +2699,32 @@
       chg = stale ? 'frozen'
         : `${dv >= 0 ? '+' : ''}${fmt(dv)} (${dv >= 0 ? '+' : ''}${pct.toFixed(2)}%)`;
     }
-    const note = (s.setup_boundary || {}).levels_armed === true
-      ? 'levels published for this candidate'
-      : 'no levels published — lines omitted';
+    /* Stage 5ZZZ-CM. Đầu thẻ nói CÁCH ĐỌC, không đọc hộ một cây nến.
+
+       Bản cũ in O/H/L/C của cây nến CUỐI và không đổi khi rê chuột qua các cây khác — đọc
+       lên như một ô giá đang sống, và nó đứng yên. Cùng chỗ ấy còn có dòng
+       "no levels published — lines omitted": người đọc không biết "levels" là gì, cũng
+       không biết "lines" nào bị bỏ.
+
+       Không mất gì: bốn con số của cây cuối và tình trạng đường vào lệnh chuyển vào tooltip
+       của chính chữ "Price", còn giá theo từng phút thì rê chuột đọc được.
+
+       Câu "hover a slot to read both charts at the same minute" KHÔNG đặt ở đây: nó đã là
+       nội dung mặc định của dòng đọc-slot ngay dưới hai biểu đồ, và dòng ấy còn biến thành
+       số đọc thật khi rê chuột. Đặt cả hai chỗ thì cùng một câu hiện hai lần cách nhau
+       100px — đo được trên trang sau bản sửa đầu, và đó là lỗi tôi tự tạo ra. */
+    const levels = (s.setup_boundary || {}).levels_armed === true
+      ? 'Entry and stop levels are published for this candidate, so they are drawn on the '
+        + 'chart.'
+      : 'No entry or stop levels were published for this candidate, so none are drawn.';
+    const tip = `Last candle on the chart — open ${fmt(b.open)}, high ${fmt(b.high)}, `
+      + `low ${fmt(b.low)}, close ${fmt(b.close)}`
+      + (chg ? ` (${chg === 'frozen' ? 'the feed was stale when this was read' : chg} `
+             + `against the candle before it)` : '')
+      + `. ${levels}`;
     return `<div class="mv2-card-head">
-      <span class="mv2-kicker">Price</span>${dayChip}
-      <span class="mv2-ohlc${stale ? ' dim' : ''}">O ${fmt(b.open)} H ${fmt(b.high)} ` +
-        `L ${fmt(b.low)} C ${fmt(b.close)}</span>
-      <span class="mv2-chg ${chgCls}">${mvEsc(chg)}</span>
-      <span class="mv2-mono mv2-head-right">${mvEsc(note)}</span>
+      <span class="mv2-kicker has-tip tip-bottom" tabindex="0"
+            data-tooltip="${mvEsc(tip)}">Price</span>${dayChip}
     </div>`;
   }
 
@@ -2745,11 +3106,26 @@
        actually on the row, so the line never explains a state nobody can see, and
        only when the past-session notice is not already occupying the same slot. */
     const thin = sessions.some(row => !row.has_diagnostics);
-    el.innerHTML = `<span class="mv2-day-label">Session</span>${chips}`
+    /* Stage 5ZZZ-CM. Câu về ngày mờ chuyển vào tooltip của chính chữ "Session".
+
+       Nó từng chiếm cả một dòng bên phải hàng chip để giải thích một chi tiết mà người đọc
+       chỉ cần khi họ đã để ý thấy vài chip mờ. Lo ngại ghi ở chú thích cũ vẫn đúng — "tooltip
+       chỉ được đọc bởi người đã nghi ngờ điều gì" — nên chỗ đặt mới là chữ ĐẦU HÀNG, thứ mắt
+       đi qua trước khi tới các chip, và nó có gạch chân chấm để lộ ra là hover được.
+
+       Thông báo "đang xem phiên cũ" thì Ở LẠI trên dòng: đó không phải chú thích, đó là
+       trạng thái của thứ đang hiện — bỏ nó đi thì cả băng nói về một ngày khác mà không
+       nói ra. */
+    const label = thin
+      ? `<span class="mv2-day-label has-tip tip-bottom" tabindex="0" data-tooltip="`
+        + mvEsc('These are the sessions on disk. A dimmed day recorded no per-slot '
+                + 'diagnostics: its condition rows are replayed from the bars on disk and '
+                + 'labelled RECONSTRUCTED, and its session chart stays empty because there '
+                + 'is no per-slot record to draw.') + `">Session</span>`
+      : `<span class="mv2-day-label">Session</span>`;
+    el.innerHTML = label + chips
       + (past ? `<span class="mv2-day-note">Reviewing a past session — this band only. `
-              + `The job list and open issues below stay on the live day.</span>`
-         : thin ? `<span class="mv2-day-note">Sessions on disk. Dim days recorded no `
-              + `per-slot diagnostics; their conditions are replayed from bars.</span>` : '');
+              + `The job list and open issues below stay on the live day.</span>` : '');
     el.querySelectorAll('[data-mvday]').forEach(b => {
       b.onclick = () => {
         const d = b.getAttribute('data-mvday');
@@ -2804,6 +3180,16 @@
             : 'No slot has recorded a reading for this session yet.')}</div>`;
     }
     const W = 1000, H = 250, padL = 52, padR = 12, padT = 14, padB = 24;
+    /* Cùng lý do và cùng cách với biểu đồ nến ở trên: luật 5 cấm <text> trong một SVG
+       kéo lệch, nên chữ ra một lớp HTML phủ lên, định vị bằng phần trăm của viewBox. */
+    const scText = [];
+    const SC_ANCHOR = { start: '0', middle: '-50%', end: '-100%' };
+    const scLab = (px, py, txt, anchor) => {
+      scText.push(`<span class="mv2-sc-lab" style="left:${(px / W * 100).toFixed(3)}%;`
+        + `top:${(py / H * 100).toFixed(3)}%;--ax:${SC_ANCHOR[anchor || 'start']}">`
+        + `${txt}</span>`);
+      return '';
+    };
     const priceH = 104, gap = 18;
     const volTop = padT + priceH + gap, volH = H - padB - volTop;
     const n = series.length;
@@ -2836,9 +3222,22 @@
        Reading the minute is both safer and looser: every point lands where the candle above
        it stands, and a point whose minute the price chart never drew makes the whole pane
        fall back rather than putting one dot in a place it does not belong. */
-    const mapped = (sameSession && mvSlotX && n > 1)
-      ? series.map(p => mvSlotX[String(p.slot_time || '')]) : null;
-    const shared = (mapped && mapped.every(v => typeof v === 'number')) ? mapped : null;
+    const _wantKey = `${s.instrument || ''}|${_barsDay}`;
+    const _slotMap = (mvSlotX && mvSlotX.key === _wantKey) ? mvSlotX.x : null;
+    const mapped = (sameSession && _slotMap && n > 1)
+      ? series.map(p => _slotMap[String(p.slot_time || '')]) : null;
+    /* Một phút thiếu từng làm mất cả trục. `every` nghĩa là chỉ cần MỘT slot mà biểu đồ
+       nến không vẽ là cả pane quay về trải đều các điểm ra hết chiều ngang — nên những
+       slot ĐÃ chạy bị đẩy khỏi cây nến ngay trên đầu chúng, và hai pane thôi dóng được
+       với nhau đúng vào lúc người đọc cần đối chiếu nhất.
+       Lời từ chối ấy nhắm đúng mối nguy (một điểm vẽ vào chỗ nó không thuộc về) nhưng trả
+       giá bằng mọi điểm còn lại. Giờ giữ trục và bỏ đúng slot không đặt được: một phút
+       biểu đồ nến không vẽ thì ở đây cũng là một chỗ trống, còn mọi điểm còn lại vẫn nằm
+       dưới cây nến của nó. Sàn là hai điểm đặt được — một điểm không mô tả nổi một span. */
+    const placedCount = mapped ? mapped.filter(v => typeof v === 'number').length : 0;
+    const shared = (mapped && placedCount >= 2) ? mapped : null;
+    const unplaced = i => shared !== null && typeof shared[i] !== 'number';
+    const droppedSlots = shared ? series.filter((_, i) => unplaced(i)) : [];
     const x = i => shared
       ? shared[i]
       : padL + (n < 2 ? 0 : i * (W - padL - padR) / (n - 1));
@@ -2853,7 +3252,10 @@
       const n = Number(v);
       return Number.isFinite(n) ? n : null;
     };
-    const pick = k => series.map(p => num(p[k]));
+    // Một slot mà trục chung không có chỗ cho nó là một CHỖ TRỐNG trong mọi chuỗi, chứ
+    // không phải một điểm ở một x bịa ra: đường gãy ở đó đúng như nó gãy ở một slot không
+    // có giá.
+    const pick = k => series.map((p, i) => unplaced(i) ? null : num(p[k]));
     const close = pick('close'), ema = pick('ema');
     const avgv = pick('avg_volume'), vol = pick('volume');
     const thr = pick('surge_threshold');
@@ -2930,19 +3332,42 @@
     const fmtP = v => Number(v).toLocaleString('en-US',
       { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const ticks = [
-      `<text class="mv2-sc-ax" x="4" y="${(padT + 8).toFixed(1)}">${mvEsc(fmtP(pHi))}</text>`,
-      `<text class="mv2-sc-ax" x="4" y="${(padT + priceH).toFixed(1)}">${mvEsc(fmtP(pLo))}</text>`,
-      `<text class="mv2-sc-ax" x="4" y="${(volTop + 8).toFixed(1)}">${mvEsc(String(Math.round(vHi)))}</text>`,
-      `<text class="mv2-sc-ax" x="4" y="${(volTop + volH).toFixed(1)}">0</text>`,
+      scLab(4, padT + 8, mvEsc(fmtP(pHi)), 'start'),
+      scLab(4, padT + priceH, mvEsc(fmtP(pLo)), 'start'),
+      scLab(4, volTop + 8, mvEsc(Number(Math.round(vHi)).toLocaleString('en-US')), 'start'),
+      scLab(4, volTop + volH, '0', 'start'),
     ].join('');
-    const at = [0, Math.floor((n - 1) / 2), n - 1];
-    const times = at.map((i, k) => {
-      const t = (series[i] || {}).slot_time || '';
-      if (!t) return '';
-      const anchor = k === 0 ? 'start' : k === 2 ? 'end' : 'middle';
-      return `<text class="mv2-sc-ax" text-anchor="${anchor}" x="${x(i).toFixed(1)}" `
-           + `y="${(H - 6).toFixed(1)}">${mvEsc(t)}</text>`;
-    }).join('');
+    const drawn = series.map((_, i) => i).filter(i => !unplaced(i));
+    /* Nhãn thời gian mô tả TRỤC, không mô tả chuỗi.
+       Khi trục là của biểu đồ nến, các điểm của chuỗi có thể chỉ chiếm một góc của nó.
+       Đo được trên phiên đang chạy: 22 slot trải hết bề ngang, nhưng chỉ 3 slot ghi được
+       số liệu và cả ba nằm ở cuối cửa sổ — khoảng 10% chiều ngang. Lấy mốc từ chúng thì
+       ba nhãn dồn vào mép phải, đè nhau 13,3px, và không ai đọc được trục bắt đầu từ đâu.
+       Lấy từ chính trục thì nhãn trải đúng bề ngang mà cây nến ở trên đang trải.
+       Khi KHÔNG chung trục, trục là của riêng pane này nên mốc vẫn lấy từ chuỗi. */
+    const tickPts = (shared && _slotMap)
+      ? Object.keys(_slotMap).map(t => ({ t, cx: _slotMap[t] }))
+          .filter(q => typeof q.cx === 'number').sort((a, b) => a.cx - b.cx)
+      : drawn.map(i => ({ t: String((series[i] || {}).slot_time || ''), cx: x(i) }));
+    /* Ba mốc, rồi lọc. Hai chuyện phải lọc, cả hai đã đo được trên trang thật:
+       - Trùng chỉ số thì trùng nhãn. Với hai điểm, [đầu, giữa, cuối] là [0, 0, 1] nên nhãn
+         đầu được vẽ HAI lần khít lên nhau — đo được 41,7px đè nhau.
+       - Hai mốc quá gần nhau thì chữ đè nhau dù chỉ số khác. Nhãn "02:45" đo được rộng
+         28px trong một pane 1013px với viewBox 1000, tức ~28 đơn vị viewBox. 70 là hai
+         nửa nhãn cộng một khoảng thở, không phải một con số chọn cho vừa mắt.
+       Bỏ mốc GIỮA trước, giữ hai đầu: hai đầu là thứ nói trục chạy từ đâu đến đâu. */
+    const MIN_TICK_GAP = 70;
+    const three = tickPts.length < 2 ? tickPts.slice(0, 1)
+      : [tickPts[0], tickPts[Math.floor((tickPts.length - 1) / 2)], tickPts[tickPts.length - 1]];
+    const at = [];
+    three.forEach(q => {
+      if (!q.t) return;
+      const prev = at[at.length - 1];
+      if (prev && Math.abs(q.cx - prev.cx) < MIN_TICK_GAP) return;
+      at.push(q);
+    });
+    const times = at.map((q, k) => scLab(q.cx, H - 6, mvEsc(q.t),
+      k === 0 ? 'start' : k === at.length - 1 ? 'end' : 'middle')).join('');
 
     const forming = series.some(p => p.last_bar_complete === false);
 
@@ -3002,8 +3427,18 @@
         + `${mvEsc(chartDay)}. The crosshair matches within each pane, not across them.`
         + `</div>` : '';
 
+    /* Bản sửa làm BỚT hiển thị thì phải nói thứ bị bớt đi đâu. Không có dòng này, một
+       slot biến mất khỏi chart trông y hệt một slot chưa chạy. */
+    const droppedNote = droppedSlots.length
+      ? `<div class="mv2-tabnote">${droppedSlots.length} slot`
+        + `${droppedSlots.length === 1 ? '' : 's'} not drawn here — `
+        + mvEsc(droppedSlots.map(p => String(p.slot_time || '?')).join(', '))
+        + ` ${droppedSlots.length === 1 ? 'has' : 'have'} no candle above `
+        + `${droppedSlots.length === 1 ? 'it' : 'them'}. Every other slot keeps the price `
+        + `chart's axis, so the two panes still line up minute for minute.</div>`
+      : '';
     return `<div class="mv2-slotchart">
-      ${dayMismatch}
+      ${dayMismatch}${droppedNote}
       <div class="mv2-sc-head">
         <span class="mv2-kicker">Across the session</span>
         ${chartDay ? `<span class="mv2-sc-day">slots · ${mvEsc(chartDay)}</span>` : ''}
@@ -3018,6 +3453,7 @@
       <!-- data-xspan says whether this pane adopted the price chart's slot span.
            Stated rather than left to be inferred: a reader of the DOM cannot tell a
            shared axis from a coincidence, and the crosshair layer must not guess. -->
+      <div class="mv2-sc-frame">
       <svg class="mv2-sc-svg" data-xspan="${shared ? 'shared' : 'own'}"
            viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
         <line class="mv2-sc-rule" x1="${padL}" x2="${W - padR}" y1="${(volTop - gap / 2).toFixed(1)}" y2="${(volTop - gap / 2).toFixed(1)}"></line>
@@ -3027,14 +3463,17 @@
         </linearGradient></defs>
         ${closeArea(close)}${path(ema, 'mv2-sc-ema')}${path(close, 'mv2-sc-close')}${volPath()}${avgvDots}${emaDots}${closeDots}${volDots}${ticks}${times}
       </svg>
-      ${refused ? `<div class="mv2-tabnote">Regime ${mvEsc(refusedLabel)} — the regime gate `
-        + `refused on all ${judged.length} slot${judged.length === 1 ? '' : 's'} that recorded `
-        + `a verdict, so the detector returned before any rule read these numbers. They are `
-        + `measurements of the session, not a decision path, and no surge threshold exists `
-        + `because nothing was compared.</div>` : ''}
-      ${forming ? `<div class="mv2-tabnote">Each dot is the bar the slot was reading, which had `
-        + `only just opened — the line above it is the ten-bar average, measured on closed bars.`
-        + `</div>` : ''}
+      <div class="mv2-sc-labels">${scText.join('')}</div>
+      </div>
+      ${refused ? `<div class="mv2-tabnote">The market was in ${mvEsc(refusedLabel)}, and `
+        + `that is the first thing every slot checks. All ${judged.length} slot`
+        + `${judged.length === 1 ? '' : 's'} that reached a verdict stopped right there, so no `
+        + `rule after it ever read these numbers. What the chart shows is what the session `
+        + `did — not the path to a decision. Nothing was measured against a threshold, so no `
+        + `threshold line is drawn.</div>` : ''}
+      ${forming ? `<div class="mv2-tabnote">Each dot is the bar the slot was looking at, and `
+        + `that bar had only just opened. The line above it is the average of the ten bars `
+        + `before it, all of which had closed.</div>` : ''}
     </div>`;
   }
 
@@ -3365,6 +3804,18 @@
     const held = regimeHeld(r);
     const cls = mvEsc(String(r.label || '').toLowerCase());
     const checkPass = String(v.status || '').toUpperCase() === 'PASS';
+    /* Stage 5ZZZ-CN. Độ bất định về TRONG khối nhãn.
+
+       Nó là một tính chất CỦA CHÍNH cái nhãn — "Calm, và mô hình chắc đến mức nào" — chứ
+       không phải một số đo thứ tư đứng ngang hàng với Confidence / Runner-up / Lead. Đứng
+       riêng một ô, nó đọc như một chỉ số độc lập; đứng trong khối nhãn, nó nói đúng điều
+       nó nói. */
+    const uncertain = r.entropy_bits == null ? null
+      : (r.entropy_bits < 0.2 ? 'low' : r.entropy_bits < 0.8 ? 'moderate' : 'high');
+    const uncertainNote = r.entropy_bits == null ? 'Spread of the model\'s opinion was not published.'
+      : `Spread of the model's opinion: ${r.entropy_bits.toFixed(3)} of a possible `
+        + `${Number(r.max_entropy_bits).toFixed(3)}, where 0 means completely sure and the `
+        + `maximum means it cannot tell the states apart.`;
     // Stage 5ZZY. The label, how long it has held, and whether the check behind it passed —
     // one block, because those three are read together or the first one is misread.
     host.innerHTML = r.label
@@ -3376,11 +3827,19 @@
                ? `held ${held.capped ? 'at least ' : ''}${held.days} day${held.days === 1 ? '' : 's'}`
                : ''}</span>
            </div>
+           ${uncertain ? `<div class="rg2-uncertain has-tip tip-bottom" tabindex="0"
+                data-tooltip="${mvEsc(uncertainNote)}">
+                <i class="mv2-dot ${uncertain === 'low' ? 'ok' : uncertain === 'moderate'
+                  ? 'warn' : 'bad'}"></i>
+                <span>${mvEsc(uncertain)} uncertainty</span></div>` : ''}
            <div class="rg2-check ${checkPass ? 'ok' : 'warn'}">
              <i class="mv2-dot ${checkPass ? 'ok' : 'warn'}"></i>
              <span>${mvEsc(regimeCheckLine(v))}</span>
            </div>
-           <div class="rg2-asof">as of ${mvEsc(r.label_date)}${age ? ` · ${mvEsc(age)}` : ''}</div>
+           <!-- Dòng "as of <ngày> · checked <n>h ago" đã bỏ khỏi đây. Dòng nguồn của
+                section, ngay đầu thẻ, in ĐÚNG câu ấy: "daily label · <ngày> · checked <n>h
+                ago". Đo được hai câu cách nhau 176px, cùng ngày cùng số giờ. Giữ bản ở dòng
+                nguồn vì đó là chỗ mọi section khác của trang đặt xuất xứ của mình. -->
          </div>`
       : `<div class="rg2-anchor warn"><div class="rg2-label-row">
            <b class="rg2-label">Not measured</b></div>
@@ -3419,12 +3878,6 @@
           note: r.shift_threshold == null
             ? (r.threshold_note || 'No published shift threshold.')
             : 'Published by the model record.' },
-        { label: 'Uncertainty',
-          value: r.entropy_bits == null ? '--'
-            : (r.entropy_bits < 0.2 ? 'Low' : r.entropy_bits < 0.8 ? 'Moderate' : 'High'),
-          note: r.entropy_bits == null ? 'Entropy not published'
-            : `Entropy ${r.entropy_bits.toFixed(3)} of a possible ${
-                Number(r.max_entropy_bits).toFixed(3)}.` }
       ].map(m => `<div class="rg2-metric">
           <div class="mv2-kicker">${mvEsc(m.label)}</div>
           <div class="rg2-metric-val">${mvEsc(m.value)}</div>
@@ -3446,23 +3899,50 @@
     if (post) {
       const sp = r.state_probabilities || {};
       const names = Object.keys(sp);
+      /* Một chữ số thập phân, GIỐNG ô chỉ số ngay trên. Trước đây bảng in `91.07%` còn ô
+         CONFIDENCE in `91.1%` — cùng một xác suất, hai cách làm tròn, cách nhau 12px, và
+         người đọc phải dừng lại tự hỏi hai con số ấy có phải một không. Quyết định của chủ
+         dự án 2026-09-05: thống nhất một chữ số.
+         Ngưỡng "dưới mức in được" đi theo: 0,005 → 0,05, và dấu hiệu đổi từ `<0.01` sang
+         `<0.1`. Nguyên tắc giữ nguyên — không bao giờ in một số 0 do làm tròn, vì đó là
+         một lời khai khác hẳn về mô hình. */
       // A state at three parts in a million rounds to `0.00%`, which reads as exactly zero
       // — a different claim about the model. Below the printable resolution it says so.
       // The bar is drawn to a FLOOR of 0.4% so a state at three parts in a million is still
       // visible as a row that exists and reads as ~0. A zero-width bar and an absent state
       // draw identically, and this model has three states, not four.
-      post.innerHTML = names.length
-        ? `<div class="mv2-kicker">State probabilities</div><div class="regime-post">` +
-          names.map(n => {
-            const v = Math.max(0, Math.min(1, Number(sp[n]) || 0));
-            const faint = v < 0.01;
-            return `<div class="regime-post-row${faint ? ' faint' : ''}">
+      /* Bốn chế độ là từ vựng của HỆ THỐNG — Calm / Normal / Stress / Crisis. Mô hình
+         đang chạy trên tuyến này chỉ fit BA: `inputs.n_states` là 3 và posterior chưa
+         bao giờ mang Crisis. Dòng Crisis vẫn hiện, để người đọc thấy đủ bốn tên và biết
+         cái thứ tư đang ở đâu — nhưng KHÔNG in phần trăm cho nó.
+         In "0.00%" là khai rằng mô hình đã tính ra một xác suất và nó bằng không. Mô hình
+         không tính gì cả: trạng thái đó không nằm trong bản fit. Hai câu đó dẫn tới hai
+         quyết định vận hành khác hẳn nhau, nên dòng này nói ra câu đúng.
+         Danh sách suy từ posterior chứ không viết cứng thứ tự: mô hình nào fit đủ bốn
+         trạng thái thì dòng thứ tư tự thành một dòng bình thường, không phải sửa gì. */
+      const SYSTEM_STATES = ['Calm', 'Normal', 'Stress', 'Crisis'];
+      const absent = SYSTEM_STATES.filter(nm => !(nm in sp));
+      const bar = n => {
+        const v = Math.max(0, Math.min(1, Number(sp[n]) || 0));
+        const faint = v < 0.01;
+        return `<div class="regime-post-row${faint ? ' faint' : ''}">
               <span><i class="rg2-key regime-${mvEsc(n.toLowerCase())}"></i>${mvEsc(n)}</span>
               <span class="regime-post-track"><i class="regime-${mvEsc(n.toLowerCase())}"
                  style="width:${Math.max(v * 100, 0.4).toFixed(2)}%"></i></span>
-              <b>${v > 0 && v * 100 < 0.005 ? '&lt;0.01' : (v * 100).toFixed(2)}%</b>
+              <b>${v > 0 && v * 100 < 0.05 ? '&lt;0.1' : (v * 100).toFixed(1)}%</b>
             </div>`;
-          }).join('') + `</div>`
+      };
+      const noState = n => `<div class="regime-post-row regime-post-absent"
+              title="${mvEsc(n)} is part of the system's regime vocabulary but not of the
+ model running here, which is fitted on ${mvEsc(String(r.inputs?.n_states ?? '?'))} states.
+ No probability is published for it — that is different from a probability of zero.">
+              <span><i class="rg2-key regime-${mvEsc(n.toLowerCase())}"></i>${mvEsc(n)}</span>
+              <span class="regime-post-nostate">not in this model</span>
+              <b>&mdash;</b>
+            </div>`;
+      post.innerHTML = names.length
+        ? `<div class="mv2-kicker">State probabilities</div><div class="regime-post">`
+          + names.map(bar).join('') + absent.map(noState).join('') + `</div>`
         : '';
     }
     const feats = $('regimeFeatures');
@@ -3533,20 +4013,31 @@
     if (note) {
       // Said once, under the panel, rather than repeated beside both empty fields.
       // One sentence, and it changes with what the model actually gave us.
-      // Stage 5ZZY. A lead line and the explanation under it, because the question this
-      // answers ("how close are we to a shift?") is one somebody arrives with, and the
-      // answer is that the question has no number — not that the number is missing.
-      const lead = r.margin == null || !r.runner_up ? ''
-        : ` Today ${r.label} leads ${r.runner_up} by ${(r.margin * 100).toFixed(1)} ` +
-          `percentage points.`;
+      /* Stage 5ZZY thêm vào đây một câu nữa: "Today <nhãn> leads <á quân> by <n>
+         percentage points", có chủ đích — để trả lời câu "còn cách một lần đổi chế độ bao
+         xa?" mà người đọc mang sẵn tới. Từ đó tới nay bốn ô chỉ số đã lên ngay phía trên
+         và trả lời đúng câu ấy bằng đúng những con số ấy: ô LEAD in "82.1 pp — probability
+         margin over the next most likely state", ô RUNNER-UP in "Normal 8.9% — closest
+         competing state". Đo được cùng số 82.1 ở hai chỗ cách nhau 361px, và cặp trạng
+         thái cũng đã được gọi tên ở trên. Nên câu ấy bỏ.
+         Nửa còn lại — "không có ngưỡng cố định để vượt" — KHÔNG có ở đâu khác trên trang,
+         và nó là thứ trả lời một câu hỏi khác hẳn: người đọc đi tìm một con số ngưỡng sẽ
+         không tìm thấy, và cần biết là vì không có, chứ không phải vì thiếu. Giữ. */
       note.innerHTML = r.score == null
         ? `<b>The regime confidence could not be read.</b>` +
           `<span>The label itself is unaffected.</span>`
-        : `<b>No fixed shift threshold: the model selects the most likely state by comparing ` +
-          `posteriors.</b><span>A shift is recorded when a different state takes the lead, so ` +
-          `there is no cutoff number to breach.${mvEsc(lead)}` +
+        // Stage 5ZZZ-CM. Viết lại cho người không có nền. Bản cũ dùng "posteriors" — từ
+        // của người dựng mô hình — và nói cùng một điều hai lần bằng hai cách trừu tượng:
+        //   "No fixed shift threshold: the model selects the most likely state by comparing
+        //    posteriors. A shift is recorded when a different state takes the lead, so there
+        //    is no cutoff number to breach."
+        // Cái người đọc cần biết là: đừng đi tìm một con số, vì không có con số nào.
+        : `<b>There is no level for the market to cross.</b>` +
+          `<span>Each day the model gives all three states a score and the highest score ` +
+          `becomes the label. So the label changes when a different state scores highest — ` +
+          `not when some number is breached.` +
           (r.posterior_agrees_with_label === false
-            ? ' The most likely state this bar differs from the decoded label.' : '') +
+            ? ' Today the highest-scoring state is not the one on the label.' : '') +
           `</span>`;
     }
   }
@@ -3587,7 +4078,7 @@
       const selected = issue.key === state.selectedIssueKey;
       return `<div class="issue-list-item">
         <button class="issue-list-row ${esc(issue.status)} ${selected ? 'selected' : ''}" type="button" role="option" aria-selected="${selected}" aria-expanded="${selected}" data-issue-key="${esc(issue.key)}">
-          <span class="issue-badges"><span class="issue-origin ${esc(issue.component)}">${esc(issue.component || 'unknown')}</span><span class="issue-status">${esc(issueStatus(issue.status))}</span>${issue.route_scope ? `<span class="issue-scope ${esc(issue.route_scope)} has-tip" tabindex="0" data-tooltip="${esc(issue.scope_reason || '')}">${esc(issueScope(issue.route_scope))}</span>` : ''}</span>
+          <span class="issue-badges"><span class="issue-origin ${esc(issue.component)}">${esc(issue.component || 'unknown')}</span><span class="issue-status">${esc(issueStatus(issue.status))}</span></span>
           <span class="issue-list-copy"><b>${esc(issue.title)}</b><small>${esc(issue.problem)}</small><em>Last ${esc(etDateTime(issue.last_seen))}</em></span>
           <span class="issue-count">${esc(issue.occurrences)}x</span>
         </button>
@@ -3613,23 +4104,33 @@
     // issue nobody can go back to.
     const groupOpensClosed = g => g.items.length > 0
       && g.items.every(it => it.counts_as_active === false);
+    // Stage 5ZZZ-CM. Tiêu đề nhóm chỉ còn ở phần THU LẠI ĐƯỢC.
+    //
+    // Bốn nhóm sinh ra bốn dải phân cách kèm số đếm, mà mỗi nhóm thường chỉ có MỘT mục —
+    // nên người đọc phải bước qua một tiêu đề để tới một dòng. Tệ hơn, hai trong bốn nhãn
+    // ("Shared", "Model / Regime") là từ của người viết mã: nghĩa của chúng nằm trong
+    // tooltip, tức không tồn tại với người không rê chuột.
+    //
+    // Cái KHÔNG bỏ: nhóm nào mà mọi mục đều đã nghỉ hưu vẫn mở ra ở trạng thái ĐÓNG. Đó là
+    // cơ chế có chủ đích (xem chú thích ngay trên), và nó cần một tiêu đề để bấm vào. Phần
+    // còn lại thành danh sách phẳng.
+    //
+    // Không mất thông tin nào: phạm vi của từng mục vẫn nằm trên chip của chính dòng đó,
+    // ngay chỗ mắt đang đọc, thay vì trên một tiêu đề cách đó vài dòng.
     $('openIssueList').innerHTML = issues.length
       ? groupIssues(issues).map(g => {
-          const head = `<b>${esc(g.label)}</b><span>${g.items.length}</span>`;
           const body = g.items.map(issueRow).join('');
-          return groupOpensClosed(g)
-            ? `<details class="issue-group issue-group-${esc(g.key)} issue-group-retired">`
-              + `<summary class="issue-group-head has-tip tip-right" tabindex="0" `
-              + `data-tooltip="${esc(g.note)}">${head}</summary>${body}</details>`
-            : `<div class="issue-group issue-group-${esc(g.key)}">`
-              + `<div class="issue-group-head has-tip tip-right" tabindex="0" `
-              + `data-tooltip="${esc(g.note)}">${head}</div>${body}</div>`;
+          if (!groupOpensClosed(g)) return body;
+          const head = `<b>${esc(g.label)}</b><span>${g.items.length}</span>`;
+          return `<details class="issue-group issue-group-${esc(g.key)} issue-group-retired">`
+            + `<summary class="issue-group-head has-tip tip-right" tabindex="0" `
+            + `data-tooltip="${esc(g.note)}">${head}</summary>${body}</details>`;
         }).join('')
       : '<div class="clear-state"><span class="status-dot"></span><b>Clear</b><span>No unresolved issue found in retained evidence</span></div>';
     const selected = issues.find(issue => issue.key === state.selectedIssueKey);
     $('openIssueDetail').innerHTML = selected ? `
       <article class="issue-detail-panel ${esc(selected.status)}">
-        <div class="issue-detail-head"><div><span class="issue-origin ${esc(selected.component)}">${esc(selected.component || 'unknown')}</span><span class="issue-status">${esc(issueStatus(selected.status))}</span>${selected.route_scope ? `<span class="issue-scope ${esc(selected.route_scope)} has-tip" tabindex="0" data-tooltip="${esc(selected.scope_reason || '')}">${esc(issueScope(selected.route_scope))}</span>` : ''}<h3>${esc(selected.title)}</h3></div><b>${esc(selected.occurrences)} occurrences</b></div>
+        <div class="issue-detail-head"><div><span class="issue-origin ${esc(selected.component)}">${esc(selected.component || 'unknown')}</span><span class="issue-status">${esc(issueStatus(selected.status))}</span><h3>${esc(selected.title)}</h3></div><b>${esc(selected.occurrences)} occurrences</b></div>
         <div class="issue-problem"><span>Problem</span><p>${esc(selected.problem)}</p></div>
         <div class="issue-timing"><span>First ${esc(etDateTime(selected.first_seen))}</span><span>Last ${esc(etDateTime(selected.last_seen))}</span></div>
         <div class="issue-assessment"><div><span>Impact</span><p>${esc(selected.impact)}</p></div><div><span>Action</span><p>${esc(selected.action)}</p></div></div>
@@ -3739,9 +4240,22 @@
     // the sleeves is what the operator is actually asking for here.
     const latestDay = covDays ? cov.days[cov.days.length - 1] : '--';
     const sleeves = cov.latest && typeof cov.latest === 'object' ? Object.entries(cov.latest) : [];
+    /* MỘT mẫu số cho cả khối. Ba hàng dưới đây đếm ba TẬP CON khác nhau của cùng một
+       nhóm sleeve — đã báo tín hiệu / đã ghi giải thích / đã phủ hết cửa sổ — nhưng cả ba
+       chỉ ghi "N sleeve(s)". Đo được 2026-09-04: cùng một ngày, cùng một trang, ba con số
+       3 · 2 · 4, và không có gì trên màn hình nói chúng là ba tập khác nhau chứ không
+       phải ba lần đếm sai. Người đọc không dựng nổi một mô hình.
+       Mẫu số suy từ HỢP của mọi tập mà payload biết, chứ không viết cứng: thêm một sleeve
+       thì con số tự đi theo. */
+    const sleeveNames = new Set([
+      ...Object.keys((cov.latest && typeof cov.latest === 'object') ? cov.latest : {}),
+      ...Object.keys(((t1.signals || {}).sleeves) || {}),
+    ]);
+    const sleeveTotal = sleeveNames.size;
+    const ofAll = n => sleeveTotal ? `${n} of ${sleeveTotal} sleeves` : `${n} sleeve(s)`;
     const complete = sleeves.filter(([, st]) => st && st.outcome === 'complete').length;
     const coverageSummary = sleeves.length
-      ? `${complete}/${sleeves.length} sleeves complete`
+      ? `${ofAll(complete)} complete`
       : 'no sleeve status yet';
     const timingDayKeys = tim.days ? Object.keys(tim.days) : [];
     const lastTiming = timingDayKeys.length ? tim.days[timingDayKeys[timingDayKeys.length - 1]] : null;
@@ -3761,7 +4275,7 @@
       const latest = days[days.length - 1];
       const n = ex.days[latest];
       const a = (ex.attribution || {})[latest];
-      const who = a ? ` across ${a.sleeves.length} sleeve(s) / ${a.slots} slot(s)` : '';
+      const who = a ? ` — ${ofAll(a.sleeves.length)} wrote rows, ${a.slots} slot(s)` : '';
       return `${days.length} day(s), latest ${latest}: ${n} row(s)${who}`;
     }
 
@@ -3876,7 +4390,7 @@
       const parts = order.filter(k => totals[k]).map(k => `${words[k]} ${totals[k]}`);
       if (!parts.length) return 'file present, no sleeve has reported yet';
       const n = Object.values(sig.sleeves || {}).filter(v => v && v.observed).length;
-      return `${parts.join(' · ')} across ${n} sleeve(s)`;
+      return `${parts.join(' · ')} — ${ofAll(n)} reported`;
     }
 
     function signalsTone() {
@@ -3918,15 +4432,27 @@
       t1Fact('Signals today', signalsRow(), signalsTone()),
       t1Fact('Audit verdict', auditRow(), auditTone),
       t1Fact('Audit reasons', auditReasons() || (aud.present ? 'none recorded' : 'no audit has run')),
-      t1Fact('Safety positions', safety.positions_path || '--'),
-      t1Fact('Safety client id', safety.client_id != null ? String(safety.client_id) : '--')
+      // Stage 5ZZZ-CM. Ô này từng in TÊN TỆP, và câu giải thích nó thì trôi ở đáy panel
+      // không gắn vào đâu — đọc lên không biết đang nói về cái gì. Giờ ô nói việc, và cả
+      // câu giải thích lẫn đường dẫn thật nằm trong tooltip của chính nó: người vận hành
+      // vẫn lấy được đường dẫn khi cần, người đọc không phải bước qua nó khi không cần.
+      t1Fact('Safety positions',
+             safety.positions_path ? 'kept separate from the retired route' : '--',
+             '',
+             safety.positions_path
+               ? `${safety.note || ''} File: ${safety.positions_path}`.trim() : ''),
+      t1Fact('Safety client id', safety.client_id != null ? String(safety.client_id) : '--',
+             '', 'The broker connection id these protective jobs use. It is theirs alone, so '
+                 + 'a job can never be mistaken for the trading route on the broker side.')
     ];
     host.innerHTML = rows.join('');
 
     const note = $('track1Note');
     if (note) {
+      // Dòng chân panel giờ CHỈ nói khi có điều gì đúng ở cấp panel. Câu về vị thế an toàn
+      // đã về đúng ô của nó ở trên; để lại đây thì nó là một chú thích không có chủ ngữ.
       note.textContent = observed
-        ? (safety.note || '')
+        ? ''
         : 'Track 1 runtime not yet observed — no slot has written coverage or timing yet. '
           + 'This is the expected state before the first slot of a shadow period fires.';
     }
@@ -3946,7 +4472,12 @@
     // reader to take it for Track 1 state.
     $('positionSource').textContent = `${brokerPositions().length} IBKR position(s) / ${persistedMatches} legacy(drain) runner qty from persisted state / ${age(state.broker.age_seconds)}`;
     if (!brokerPositions().length) {
-      grid.innerHTML = '<div class="empty-state">No broker positions.</div>';
+      // Stage 5ZZZ-CF. Menh de thu hai la menh de quan trong, va SECTION_ANATOMY
+      // (## Open Positions) ghi ro dieu do: o trong khong noi duoc vi sao no trong.
+      // "Khong co vi the" va "co vi the ma khong ai bao ve" doc giong nhau khi bang
+      // rong, va o che do bong thi cai thu hai moi la cai dang so.
+      grid.innerHTML = '<div class="empty-state">No broker positions. '
+        + 'Nothing to protect, so no protection is asserted.</div>';
       return;
     }
     grid.innerHTML = brokerPositions().map(pos => {
@@ -4439,7 +4970,10 @@
     };
   }
 
-  function renderJobDetails(job, snap, presentation) {
+  /* `rowShowsProblem` — hàng đang mở ở ngay trên có in sẵn câu vấn đề hay không. Không
+     suy ở đây được: nó phụ thuộc việc DANH SÁCH có gộp câu hằng số hay không, mà đó là
+     quyết định của cả danh sách chứ không của một hàng. Truyền vào thay vì đoán lại. */
+  function renderJobDetails(job, snap, presentation, rowShowsProblem) {
     const exits = new Map((snap?.decision?.exits || []).map(exit => [rootOf(exit.inst), exit]));
     const evidence = (job.events || []).map(event => {
       let message = event.message || '';
@@ -4451,12 +4985,43 @@
       const knownDebt = String(message).includes('G2 HARD');
       return `<div class="job-diagnostic ${knownDebt ? 'known-debt' : 'incident-diagnostic'}"><b>${knownDebt ? 'KNOWN DEBT' : 'ERROR EVIDENCE'}</b><p>${esc(message)}</p></div>`;
     }).join('');
-    return `<div class="job-detail">
-      <dl><div><dt>Started</dt><dd>${esc(etDateTime(job.started_at))}</dd></div><div><dt>Completed</dt><dd>${esc(etDateTime(job.ended_at))}</dd></div><div><dt>Duration</dt><dd>${esc(duration(job.duration_seconds))}</dd></div><div><dt>Outcome</dt><dd>${esc(presentation.statusLabel)}</dd></div></dl>
-      <div class="issue-problem"><span>Problem</span><p>${esc(presentation.problem)}</p></div>
+    /* Ba trường của bảng thời gian đã bỏ, vì hàng ĐANG MỞ ở ngay trên nó in đúng ba
+       biểu thức đó: `.job-time` là `etDateTime(job.started_at)`, `.job-duration` là
+       `duration(job.duration_seconds)`, và chip trạng thái là `presentation.statusLabel`.
+       Không phải so chuỗi để đoán trùng — cùng một biểu thức, hai chỗ. Đo được trong MỘT
+       hàng đang mở: giờ in 3 lần, "12s" 2 lần, "COMPLETED" 2 lần.
+       Giờ kết thúc thì GIỮ, vì hàng trên không có nó và nó là thứ duy nhất trong bảng ấy
+       mà người đọc không suy ra được. */
+    const startedAt = etDateTime(job.started_at);
+    const endedAt = job.ended_at ? etDateTime(job.ended_at) : '';
+    /* ...và chỉ in khi nó KHÁC giờ bắt đầu ở hàng trên. Cả hai in tới phút, nên một lượt
+       chạy 12 giây hiển thị hai giờ giống hệt nhau — đo được `09-04, 06:20 ET` hai lần
+       trong cùng một hàng. Giống nhau thì hàng trên đã nói rồi. */
+    const times = endedAt && endedAt !== startedAt
+      ? `<dl><div><dt>Ended</dt><dd>${esc(endedAt)}</dd></div></dl>` : '';
+    /* Hợp đồng năm phần — vấn đề / tác động / hành động / bằng chứng / cách đóng — được
+       viết cho một SỰ CỐ. Một lượt chạy xong sạch không phải sự cố, và khi ấy cả năm phần
+       cùng nói một điều: không có gì xảy ra. Đo được trên một hàng như vậy: khối chi tiết
+       cao 490px để nói đúng câu ấy bốn lần.
+       Điều kiện gộp là điều kiện CẤU TRÚC, không phải so chuỗi: chạy xong, không sự kiện
+       nào, không chẩn đoán nào. Bất kỳ hàng nào khác — hỏng, bỏ lỡ, bỏ qua, đang chạy, nợ
+       tuổi mô hình, hay chạy xong mà CÓ sự kiện — giữ nguyên đủ năm phần. */
+    const settled = job.status === 'completed' && !evidence && !diagnostics;
+    /* Câu vấn đề chỉ in ở ĐÚNG MỘT chỗ. Hàng in nó khi danh sách không gộp; khối chi
+       tiết in nó khi hàng không in. Đo được trước bản sửa: hàng RECOVERED in
+       "Windows denied the runner-state publication for this slot." rồi khối ngay dưới in
+       lại nguyên câu ấy. */
+    const problemBlock = rowShowsProblem ? ''
+      : `<div class="issue-problem"><span>Problem</span><p>${esc(presentation.problem)}</p></div>`;
+    const body = settled
+      ? problemBlock
+      : problemBlock + `
       <div class="job-assessment"><div class="job-impact"><b>IMPACT</b><p>${esc(presentation.impact)}</p></div><div class="job-action"><b>ACTION</b><p>${esc(presentation.action)}</p></div></div>
-      <div class="job-evidence-list">${evidence || '<p class="job-empty">No trade or protection changes emitted by this run.</p>'}${diagnostics}</div>
-      <div class="job-resolution"><b>EVIDENCE / RESOLUTION</b><p>${esc(presentation.evidence)}</p><p>${esc(presentation.resolution)}</p></div>
+      <div class="job-evidence-list">${evidence || '<p class="job-empty">No events were recorded for this execution.</p>'}${diagnostics}</div>
+      <div class="job-resolution"><b>EVIDENCE / RESOLUTION</b><p>${esc(presentation.evidence)}</p><p>${esc(presentation.resolution)}</p></div>`;
+    return `<div class="job-detail${settled ? ' job-detail-settled' : ''}">
+      ${times}
+      ${body}
       ${operationalDetails(job)}${signalDetails(job)}
     </div>`;
   }
@@ -4571,23 +5136,52 @@
     // the label always names the day the rows actually came from. Taking it from the
     // snapshot is how the header came to read "14 jobs / 2026-08-17" while the rows
     // underneath belonged to a different anchor entirely.
+    /* Stage 5ZZZ-CA. Một câu giống hệt nhau trên mọi hàng thì không phân biệt được hàng
+       nào với hàng nào. Đo được 2026-09-04: 29 hàng, ĐÚNG HAI câu khác nhau — 28 hàng nói
+       "không có gì thay đổi", và một hàng nói Windows chặn ghi runner-state. Hàng có sự cố
+       duy nhất của ngày đang nằm lẫn giữa 28 dòng chữ giống nhau; riêng câu ấy chiếm
+       1.008px trên một trang cao 3.734px.
+       Chỉ gộp ĐÚNG câu hằng số đó. Chín câu còn lại — hỏng, bỏ lỡ, bỏ qua, đang chạy, nợ
+       tuổi mô hình, xong-mà-có-thay-đổi — nằm nguyên trên hàng của chúng. Nên một slot có
+       vấn đề trở thành hàng DUY NHẤT còn mang chữ, thay vì một dòng giống hệt 28 dòng kia.
+       Dòng gộp nói RÕ nó phủ bao nhiêu hàng, chứ không nói trống: một ngày 12 im lặng /
+       17 có chuyện phải đọc ra được tỉ lệ, không được dẫn sang kết luận "hôm nay êm".
+       Dưới hai hàng thì không gộp — gộp một hàng không tiết kiệm gì mà lại đẩy câu ra xa
+       hàng nó mô tả. */
+    const QUIET_ROW = 'The execution completed without trade or protection changes.';
+    const presented = jobs.map(job => ({ job, presentation: jobPresentation(job) }));
+    const quietCount = presented.filter(o => o.presentation.problem === QUIET_ROW).length;
+    const foldQuiet = quietCount >= 2;
+    /* Câu gộp KHÔNG đặt ở dòng nguồn. Đo được: dòng ấy có 208px, còn câu đầy đủ cần
+       387px — gần một nửa bị cắt ở mọi khổ, và người đọc chỉ thấy "30 with …". Một dòng
+       gộp mà không đọc được nó phủ bao nhiêu hàng thì đúng bằng không gộp gì.
+       Chỗ đúng của nó là đầu DANH SÁCH, nơi có trọn chiều ngang cột và nơi nó đứng cạnh
+       chính những hàng nó nói về. */
     $('journalSource').textContent = state.jobJournal?.day
       ? `${jobs.length} jobs / ${state.jobJournal.day}`
       : 'scheduler evidence unavailable';
-    $('journalSource').dataset.tooltip = `Scheduler evidence observed ${etDateTime(state.jobJournal?.observed_at)}. One row per execution; click a job to inspect its operational evidence.`;
-    const jobRows = jobs.map(job => {
+    $('journalSource').dataset.tooltip = `Scheduler evidence observed ${etDateTime(state.jobJournal?.observed_at)}. One row per execution; click a job to inspect its operational evidence.`
+      + (foldQuiet ? ` ${quietCount} of ${jobs.length} executions completed without changing a trade or a protective order; that sentence is stated here once instead of on each of those rows. Every row that says anything else is a row where something else happened.` : '');
+    const jobRows = presented.map(({ job, presentation }) => {
       const selected = job.id === state.selectedJobId;
-      const presentation = jobPresentation(job);
+      const rowProblem = foldQuiet && presentation.problem === QUIET_ROW ? '' : presentation.problem;
       const tone = presentation.status === 'recovered' ? 'success' : presentation.status === 'known_debt' ? 'cleanup' : jobTone(job.status);
       return `<li class="job-row tone-${esc(tone)} status-${esc(presentation.status)} ${selected ? 'selected' : ''}">
         <button class="job-trigger" type="button" data-job-id="${esc(job.id)}" aria-expanded="${selected}">
           <span class="job-time">${esc(etDateTime(job.started_at))}</span><span class="job-duration">${esc(duration(job.duration_seconds))}</span><span class="job-chevron" aria-hidden="true">${selected ? '−' : '+'}</span>
-          <span class="job-badges"><span class="issue-origin ${esc(presentation.component)}">${esc(presentation.component)}</span><span class="event-status ${esc(presentation.status)}">${esc(presentation.statusLabel)}</span>${signalLine(job)}</span>
-          <span class="job-name" title="${esc(job.job_id)}">${esc(jobLabel(job))}</span><span class="job-summary">${esc(presentation.problem)}</span>
-        </button>${selected ? renderJobDetails(job, snap, presentation) : ''}
+          <span class="job-badges"><span class="issue-origin ${esc(presentation.component)}">${esc(presentation.component)}</span><span class="event-status ${esc(presentation.status)}">${esc(presentation.statusLabel)}</span>${jobRouteChip(job)}${signalLine(job)}</span>
+          <span class="job-name" title="${esc(job.job_id)}">${esc(jobLabel(job))}</span><span class="job-summary">${esc(rowProblem)}</span>
+        </button>${selected ? renderJobDetails(job, snap, presentation, Boolean(rowProblem)) : ''}
       </li>`;
     }).join('');
-    $('journal').innerHTML = jobRows || '<li><div class="journal-message">No scheduler jobs observed for this session.</div></li>';
+    const foldNote = foldQuiet
+      ? `<li class="journal-fold-note">${quietCount} of ${jobs.length} execution`
+        + `${jobs.length === 1 ? '' : 's'} completed with no trade or protection change. `
+        + `Every row that says anything else is a row where something else happened.</li>`
+      : '';
+    $('journal').innerHTML = jobRows
+      ? foldNote + jobRows
+      : '<li><div class="journal-message">No scheduler jobs observed for this session.</div></li>';
     document.querySelectorAll('.job-trigger').forEach(button => button.addEventListener('click', () => {
       state.selectedJobId = state.selectedJobId === button.dataset.jobId ? null : button.dataset.jobId;
       renderJournal(snap);
@@ -4712,6 +5306,42 @@
     renderOpenIssues();
   });
   $('openIssuesShell').addEventListener('toggle', event => { state.issuesSectionOpen = event.currentTarget.open; });
+
+  // Stage 5ZZZ-CE/CI. Mỗi mục dashboard trỏ tới một neo trong trang trợ giúp qua chính
+  // dòng `source-note` của nó. Không thêm pixel nào: không icon `?`, không hàng mới.
+  //
+  // KHÔNG bám vào một lớp CSS, và đó mới là bản sửa. Bản đầu gắn `help-link` vào từng phần
+  // tử lúc khởi tạo và tô kiểu theo lớp đó. Đo trên trang thật: 2 trong 11 —
+  // `openIssuesSource` và `marketViewSource` — mất lớp ngay sau lượt vẽ đầu, vì bộ dựng của
+  // chúng gán đè `el.className = '...'`.
+  //
+  // Chính xác chúng mất gì: chúng vẫn BẤM ĐƯỢC (bộ nghe gắn vào phần tử không bị `className`
+  // xoá), nhưng mất gạch chân và con trỏ tay — không còn gì trên màn hình nói rằng bấm được.
+  // Một lối vào không ai nhìn thấy là một lối vào không ai dùng. Đột biến bắt tôi ở chỗ này:
+  // tôi đã viết "hai liên kết chết", và nó không đúng.
+  //
+  // Nên bản sửa thật nằm ở CSS: tô theo `[data-help]`, thuộc tính thì `className` không xoá
+  // được. Bộ nghe uỷ quyền bên dưới là phòng xa cho một bộ dựng nào đó dựng lại cả phần tử —
+  // hôm nay chưa có cái nào làm thế, đo được, nên nó chưa sửa cái gì cả.
+  //
+  // Thuộc tính thì không bị `className` xoá, nên: CSS tô theo `[data-help]`, và một bộ
+  // nghe DUY NHẤT trên document lo mọi cú bấm. Không còn gì để mất.
+  //
+  // Mở tab mới: dashboard đang poll, điều hướng khỏi nó là mất mạch dữ liệu đang chạy.
+  const openHelp = anchor => window.open('/realtime/help#' + anchor, '_blank', 'noopener');
+  document.querySelectorAll('[data-help]').forEach(el => {
+    el.setAttribute('role', 'link');
+    if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
+  });
+  document.addEventListener('click', event => {
+    const el = event.target.closest?.('[data-help]');
+    if (el) openHelp(el.dataset.help);
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const el = event.target.closest?.('[data-help]');
+    if (el) { event.preventDefault(); openHelp(el.dataset.help); }
+  });
 
   window.setInterval(renderRailClock, 1000);
 

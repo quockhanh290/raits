@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Realtime dashboard — what each panel means</title>
+<style>
+  :root {
+    --bg: #090d11; --panel: #0e141a; --hair: #202b34; --fg: #d7e0e7;
+    --dim: #8998a5; --accent: #58a3ff; --amber: #dda33a; --green: #36bf69; --red: #f05b61;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 15px/1.65 -apple-system, "Segoe UI", system-ui, sans-serif; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 32px 22px 90px; }
+  a { color: var(--accent); }
+  h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .lede { color: var(--dim); margin: 0 0 30px; }
+  h2 { font-size: 17px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  section.help { border-top: 1px solid var(--hair); padding: 26px 0 4px; scroll-margin-top: 18px; }
+  section.help:target h2 { color: var(--accent); }
+  .q { font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+       color: var(--dim); margin: 18px 0 5px; }
+  p { margin: 0 0 11px; }
+  dl { margin: 0 0 11px; }
+  dt { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 13px;
+       color: var(--fg); margin-top: 10px; }
+  dd { margin: 2px 0 0 0; color: var(--dim); }
+  .care { border-left: 2px solid var(--amber); padding: 2px 0 2px 12px; color: var(--fg); }
+  .vocab { background: var(--panel); border: 1px solid var(--hair); border-radius: 6px;
+           padding: 14px 18px; margin: 0 0 8px; }
+  .vocab dt { margin-top: 8px; }
+  nav.toc { background: var(--panel); border: 1px solid var(--hair); border-radius: 6px;
+            padding: 12px 18px; margin: 0 0 8px; }
+  nav.toc a { display: inline-block; margin: 3px 14px 3px 0; font-size: 13px; }
+  .back { display: inline-block; margin-bottom: 20px; font-size: 13px; }
+  code { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 13px;
+         color: var(--fg); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<a class="back" href="/realtime">&larr; back to the dashboard</a>
+
+<h1>What each panel means</h1>
+<p class="lede">Every panel below answers three questions in the same order: what it is for,
+where its numbers come from, and when you should not believe it. The third one is the reason
+this page exists — most numbers here are honest about being absent and quiet about being
+stale.</p>
+
+<nav class="toc">
+  <a href="#vocabulary">Words used everywhere</a>
+  <a href="#now-monitor">Now Monitor</a>
+  <a href="#open-issues">Open Issues</a>
+  <a href="#track1-runtime">Track 1 Runtime</a>
+  <a href="#market-view">Track 1 Market View</a>
+  <a href="#calm">Calm · two phases</a>
+  <a href="#regime">Regime Monitor</a>
+  <a href="#positions">Open Positions</a>
+  <a href="#decision">Today's Decision</a>
+  <a href="#orders">Open Orders</a>
+  <a href="#journal">Job Journal</a>
+  <a href="#clocks">Source Clocks</a>
+</nav>
+
+<section class="help" id="vocabulary">
+<h2>Words used everywhere</h2>
+<p>Five words appear on nearly every panel. They are worth reading once.</p>
+<dl class="vocab">
+  <dt>sleeve</dt>
+  <dd>One trading strategy with its own instrument and its own hours. There are four, and their
+  hours never overlap. All times below are New York time, which is the only clock this
+  dashboard uses. <b>NKD</b> trades a Japanese index while the US is asleep, 01:10&ndash;02:55.
+  <b>Calm</b> decides at 09:32 and reads its price at 10:02. <b>Stress</b> runs
+  10:35&ndash;12:30, <b>Swing</b> 14:05&ndash;15:55.</dd>
+
+  <dt>slot</dt>
+  <dd>One scheduled moment when a sleeve looks at the market and decides. Slots repeat every
+  five minutes inside the sleeve's hours &mdash; 71 of them across the whole day, about twenty
+  per sleeve. Each one leaves a record whether or not it found anything.</dd>
+
+  <dt>regime</dt>
+  <dd>One word for the kind of market we are in — Calm, Normal, or Stress. It is worked out
+  once a day from the S&amp;P 500. Each sleeve is only allowed to trade in certain regimes,
+  so this word decides whether a sleeve even looks.</dd>
+
+  <dt>shadow</dt>
+  <dd>The system is running for real but <b>cannot place an order</b>. It watches, decides and
+  writes everything down; the last step is switched off deliberately while the record is being
+  built up. Anything the dashboard calls a decision is a decision that was not acted on.</dd>
+
+  <dt>gate</dt>
+  <dd>A condition that must be true before an order could ever be sent. Gates are listed on
+  the Runtime panel. While any gate is closed, orders are impossible no matter what the
+  strategies decide.</dd>
+</dl>
+</section>
+
+<section class="help" id="now-monitor">
+<h2>Now Monitor</h2>
+<p class="q">What this answers</p>
+<p>Is anything wrong <i>right now</i> that a person should act on. When nothing is, this panel
+is empty and says CLEAR — that is the normal state, not a panel that failed to load.</p>
+
+<p class="q">Where the numbers come from</p>
+<p>It is assembled in the browser from several live readings: whether the broker connection
+dropped, whether the positions the broker reports match the ones the system thinks it holds,
+whether a scheduled job is unresolved, and whether the price input the strategies depend on
+has gone stale. Each item carries its own problem, impact and suggested action.</p>
+
+<p class="q">When not to trust it</p>
+<p class="care">It only knows about things that report themselves. A job that never started
+raises nothing here — its absence shows up on the Job journal instead. Treat an empty Now
+Monitor as "nothing has complained", not as "everything has been checked".</p>
+</section>
+
+<section class="help" id="open-issues">
+<h2>Open Issues</h2>
+<p class="q">What this answers</p>
+<p>What is still unresolved, going back weeks. Unlike Now Monitor, this is a standing ledger:
+an item stays until there is positive evidence it was fixed.</p>
+
+<p class="q">Where the numbers come from</p>
+<p>Reconstructed from the scheduler's own logs — the record of every job that ran, failed, or
+was missed. Nothing is written by hand.</p>
+<dl>
+  <dt>2 open / 3 retired legacy</dt>
+  <dd>Two items still count against the system. Three belong to the older trading route that
+  has been switched off; they are kept for history and collapsed by default.</dd>
+  <dt>evidence 2026-07-30 to 2026-09-05</dt>
+  <dd>The span of logs this was built from. Anything outside that window is not missing —
+  it was never looked at.</dd>
+</dl>
+
+<p class="q">When not to trust it</p>
+<p class="care">An item disappearing does not always mean it was fixed. It can also mean the
+log it was reconstructed from has aged out of the window above. Check the span before reading
+a shorter list as progress.</p>
+</section>
+
+<section class="help" id="track1-runtime">
+<h2>Track 1 Runtime</h2>
+<p class="q">What this answers</p>
+<p>Could this system place an order right now, and if not, what is stopping it. This is the
+panel that says how close the project is to trading with real money.</p>
+
+<p class="q">Where the numbers come from</p>
+<p>Read from the files the system writes about itself as it runs — one per day, kept
+permanently.</p>
+<dl>
+  <dt>Orders possible: no</dt>
+  <dd>The plain answer. Below it are the specific conditions holding it shut.</dd>
+  <dt>Window coverage — 10 day(s), latest … 2/4 sleeves complete</dt>
+  <dd>How many days have a full, vouched-for record, and how many sleeves finished cleanly on
+  the most recent one. A sleeve that has not reached its hours yet is not a failure.</dd>
+  <dt>Slot timing — p95 168.3s over 71 record(s)</dt>
+  <dd>How long a slot takes from start to finish. "p95" means 95 out of 100 finished faster
+  than this; it is a way of describing the slow ones without letting a single outlier set the
+  number. Slots are five minutes apart, so anything approaching 300s is worth attention.</dd>
+  <dt>Paper account baseline</dt>
+  <dd>The account value the system compares against. It has a shelf life, and the panel says
+  so when it has passed it.</dd>
+</dl>
+
+<p class="q">When not to trust it</p>
+<p class="care">This panel is the slowest read on the page — on a fresh load it can sit
+saying "reading" for several seconds. That is not a failure. What matters is whether the
+gates listed here match what you expect; a gate quietly opening is a bigger event than any
+number on this page.</p>
+</section>
+
+<section class="help" id="market-view">
+<h2>Track 1 Market View</h2>
+<p class="q">What this answers</p>
+<p>For one sleeve, on one session: what did each of its rules see, slot by slot, and why did
+it or did it not produce a trade. This is where you go to answer "why did nothing happen
+today".</p>
+
+<p class="q">Where the numbers come from</p>
+<dl>
+  <dt>The session bar (09-05, 09-04, …)</dt>
+  <dd>Which trading day the panel is describing. Days are listed only if something was
+  actually recorded for them — a dashed one has slot outcomes but no detailed diagnostics, so
+  its conditions are re-derived from stored prices rather than read from what the slot wrote.
+  Only this band follows the day you pick; everything else on the page stays on today.</dd>
+  <dt>Progress and outcome chips</dt>
+  <dd>Two separate facts, deliberately kept apart. The first says where the session is —
+  WAITING before the sleeve's hours, LIVE during, COMPLETE after. The second says what it
+  found. "No signal" on a live sleeve is an interim reading; on a complete one it is the
+  session's answer.</dd>
+  <dt>Rule lanes — one cell per slot</dt>
+  <dd>Each row is one rule, each cell one slot: passed, failed, or never reached because an
+  earlier rule stopped first. "3/22 pass" counts slots, not bars.</dd>
+  <dt>Conditions and Readings</dt>
+  <dd>Conditions carry a verdict. Readings are measurements the detector took but did not
+  judge — they are shown because they explain the verdict, not because they are one.</dd>
+  <dt>RECORDED / RECONSTRUCTED</dt>
+  <dd>The most important label on the panel. RECORDED means the slot wrote this down while it
+  ran. RECONSTRUCTED means the slot wrote nothing and the same logic was replayed afterwards
+  over stored prices — real, reproducible, but not evidence that the live route did it.</dd>
+  <dt>The candle chart</dt>
+  <dd>Prices from the stored history, which is refreshed once a day in the early afternoon.
+  Before that refresh it shows the previous session, and says so on its own chip. The line
+  chart beneath it is a different thing: one point per slot, written as each slot ran, so it
+  shows today while the candles still show yesterday. Both are labelled with their date.</dd>
+</dl>
+
+<p class="q">When not to trust it</p>
+<p class="care">Check the two dates before comparing the charts to each other — they are
+routinely a day apart and both are correct. And a RECONSTRUCTED card is not proof the route
+ran: it is proof the rules, replayed now, would have said this.</p>
+</section>
+
+<section class="help" id="calm">
+<h2>Calm · two phases</h2>
+<p class="q">What this answers</p>
+<p>This sleeve decides in two steps rather than one, so it gets its own panel. At 09:32 it
+decides whether a setup exists. At 10:02 it reads the price that setup would trade at. Both
+steps are shown because a setup with no price is a normal, expected state, not half a result.</p>
+
+<p class="q">Where the numbers come from</p>
+<p>From what each phase recorded at the time. This sleeve can act on several instruments at
+once, so when more than one is involved each gets its own block with its own numbers — an
+earlier version showed only the last one.</p>
+
+<p class="q">When not to trust it</p>
+<p class="care">A stop price shown against the 09:32 phase would be invented: at half past
+nine the entry price it is measured from does not exist yet. If you ever see one there,
+something is wrong with the panel, not with the strategy.</p>
+</section>
+
+<section class="help" id="regime">
+<h2>Regime Monitor</h2>
+<p class="q">What this answers</p>
+<p>Markets behave differently at different times — some stretches are quiet, some choppy, some
+violent. This panel says which kind of stretch the system currently believes we are in, and
+how sure it is. It matters because each sleeve is only allowed to trade in certain
+stretches.</p>
+
+<p class="q">Where the numbers come from</p>
+<p>Every trading day the system takes the S&amp;P 500 ETF's closing prices and measures two
+things: how much it moved that day, and how jumpy the last five days have been. A statistical
+model turns those two numbers into one word — Calm, Normal, or Stress. The word is worked out
+once a day by a scheduled job and written down; <b>this panel reads what was written, it does
+not work it out itself</b>.</p>
+<dl>
+  <dt>Confidence 91.1%</dt>
+  <dd>How strongly the model favours the word it chose. Above roughly 95% is not a close
+  call.</dd>
+  <dt>Runner-up Normal 8.9%</dt>
+  <dd>The next most likely word and how much support it has. When this climbs, the picture is
+  becoming mixed.</dd>
+  <dt>Lead 82.1 pp</dt>
+  <dd>The gap between those two, in percentage points.</dd>
+  <dt>Uncertainty — Entropy 0.435 of a possible 1.585</dt>
+  <dd>One number for how spread out the model's opinion is. Zero means completely sure. The
+  maximum, 1.585, means it cannot tell the three possibilities apart at all. So 0.435 is about
+  a quarter of the way to having no opinion.</dd>
+  <dt>Held 18 days</dt>
+  <dd>How long the current word has been unchanged.</dd>
+  <dt>Model fitted through Dec 31, 2024 · 21 mo stale</dt>
+  <dd>The model's settings were frozen on that date and have not been re-learned since. This
+  is deliberate: a model that re-learns itself moves the goalposts every time it is measured.
+  The age is shown so the choice stays visible, not because it is a fault.</dd>
+  <dt>Shift threshold — none published</dt>
+  <dd>There is no cut-off number to cross. The model picks whichever word fits best, so a
+  change happens when a different word takes the lead, not when a level is breached.</dd>
+</dl>
+
+<p class="q">When not to trust it</p>
+<p class="care">The word is written down by a job, not read live. If that job does not run,
+this panel keeps showing yesterday's word and <b>nothing here looks wrong</b> — the date beside
+the label is the only clue. Check that it is the last trading day. If it is behind, every
+sleeve gated on the regime is deciding on an old answer.</p>
+</section>
+
+<section class="help" id="positions">
+<h2>Open Positions</h2>
+<p class="q">What this answers</p>
+<p>What the broker says is actually held, next to what the older trading route's own records
+say. The two are shown together because a disagreement between them is the thing worth
+seeing.</p>
+
+<p class="q">Where the numbers come from</p>
+<p>The left side is the broker, read live. The right side is the older route's saved state.
+The panel is labelled "legacy / drain" because that route is being wound down — it is not
+expected to open anything new.</p>
+
+<p class="q">When not to trust it</p>
+<p class="care">"No broker positions" and "the broker could not be reached" are different
+facts. If the broker is unavailable the panel says so; an empty table with no warning means
+genuinely nothing is held.</p>
+</section>
+
+<section class="help" id="decision">
+<h2>Today's Decision</h2>
+<p class="q">What this answers</p>
+<p>What the older trading route did on its most recent active day: how many trades it
+considered, took, and closed.</p>
+
+<p class="q">Where the numbers come from</p>
+<p>The last snapshot that route wrote. That route is switched off, so this snapshot stops
+advancing — when it is old enough, the counters are hidden and replaced by a line saying so,
+because zeros from a retired route read exactly like a quiet day.</p>
+
+<p class="q">When not to trust it</p>
+<p class="care">If you are looking for what happened today, this is the wrong panel — use
+Track 1 Market View. This one describes a route that is no longer trading.</p>
+</section>
+
+<section class="help" id="orders">
+<h2>Open Orders</h2>
+<p class="q">What this answers</p>
+<p>Which orders are sitting at the broker right now, waiting. In practice these are protective
+stop orders attached to open positions.</p>
+
+<p class="q">Where the numbers come from</p>
+<p>Read live from the broker each time the page polls.</p>
+
+<p class="q">When not to trust it</p>
+<p class="care">While the system is in shadow mode it cannot place orders, so an empty table
+is the expected state and says nothing about whether the strategies found anything.</p>
+</section>
+
+<section class="help" id="journal">
+<h2>Job Journal</h2>
+<p class="q">What this answers</p>
+<p>Every scheduled task that ran today, in order, with what it did. This is where you look
+when a panel is empty and you want to know whether the work behind it happened at all.</p>
+
+<p class="q">Where the numbers come from</p>
+<p>The scheduler's own record, one row per execution. Clicking a row opens what that run left
+behind — the decision it reached, and the evidence for it.</p>
+
+<p class="q">When not to trust it</p>
+<p class="care">A task that was never scheduled leaves no row, and no row looks the same as a
+quiet day. The Runtime panel's coverage count is the check for that: it says how many slots
+were expected, not just how many appeared.</p>
+</section>
+
+<section class="help" id="clocks">
+<h2>Source Clocks</h2>
+<p class="q">What this answers</p>
+<p>How old each piece of information on this page is. Every other panel shows values; this one
+shows their age.</p>
+
+<p class="q">Where the numbers come from</p>
+<dl>
+  <dt>Runner observed</dt>
+  <dd>When the older route last wrote a snapshot. On a machine running only the new route this
+  is deliberately old, and the row says "legacy route, retired" when it is.</dd>
+  <dt>Schedule freshness</dt>
+  <dd>Whether another scheduled slot is still due today. It is <b>not</b> a statement about
+  the route's health — it can read "fresh" beside an observation from last week, and both are
+  correct.</dd>
+  <dt>Expected next</dt>
+  <dd>When the next scheduled task is due.</dd>
+  <dt>Broker observed</dt>
+  <dd>When the broker was last read successfully.</dd>
+  <dt>Browser poll</dt>
+  <dd>How often this page re-asks for everything.</dd>
+</dl>
+
+<p class="q">When not to trust it</p>
+<p class="care">All times here are in US market time, not your local clock, and not the
+machine's. Times on this page never mean anything else.</p>
+</section>
+
+</div>
+</body>
+</html>

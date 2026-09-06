@@ -30,7 +30,10 @@
    hue preserved: 4.55:1 on the lightest panel, 5.0:1 on the darkest background.
    Scoped to this route for now. The real fix belongs in the base stylesheet,
    because all five pages share this token. */
-:root { --dim: #728392; }
+/* CK. `--dim` từng được khai ở đây là #728392 và bị CHÍNH file này khai đè bằng
+   #798394 ở dưới. Đo tách từng luật ở năm khổ: tắt nó đi không gì đổi, ở mọi khổ.
+   Đây là luật thừa thật duy nhất trong 21 mục nghi ngờ — và #728392 còn là một bậc
+   xám thứ bảy, tức xoá nó cũng gỡ một màu ngoài thang đang nằm chờ. */
 
 
 /* ═══ A1 · The header row must not print text over text ═════════════════════
@@ -59,10 +62,13 @@
    `.broker-account-line { white-space: normal }` — this bug was fixed once. But it
    loses to `.equity-zone > small { nowrap }`, which is more specific, so that fix
    has been sitting in the file with no effect. The selector must be specific
-   enough or it does nothing. */
-.equity-zone > small.broker-account-line {
-  white-space: normal; overflow-wrap: anywhere; line-height: 1.5;
-}
+   enough or it does nothing.
+
+   Bản vá ấy nay đã bỏ: đo 2026-09-05, xoá nó đi thì `white-space | overflow-wrap |
+   line-height | display` giữ nguyên `normal | anywhere | 18px | flex`. skin-e.css đã viết
+   lại `.equity-zone > small` và bỏ `nowrap` khỏi đó, nên `normal` giờ là giá trị khởi tạo
+   chứ không phải thứ luật này giành lại được. Lời cảnh báo ở trên vẫn đúng và vẫn đáng
+   đọc — chỉ có bản vá là hết việc. */
 
 
 /* ═══ E1 · The verdict moves to the top ═════════════════════════════════════
@@ -73,11 +79,8 @@
 .overview-header { display: flex; flex-direction: column; }
 .overview-header > .status-rail { order: -1; }
 
-.status-rail {
-  padding: 18px 28px;
-  border-bottom: 1px solid var(--line);
-  align-items: flex-start;
-}
+/* Đã xoá ở vòng rà 2026-09-04: đo ra không đổi gì — skin-e.css nạp sau và quyết
+   giá trị. Danh sách đầy đủ và cách đo ở DESIGN_AUDIT_2026-09-04.md. */
 
 /* Tier 1 — the operational verdict. */
 .system-conclusion {
@@ -91,8 +94,13 @@
    conclusion. Not removed, just no longer the largest thing: paper equity is
    still the biggest figure because it is legitimate context, but it no longer
    competes with the verdict band above it. */
-.equity-line > b { font-size: 26px; }
-.risk-zone .metric-dd-value > b { font-size: 22px; }
+/* CL. Hai dòng `font-size: 26px` và `22px` từng ở đây đã được XOÁ.
+   Chúng chưa từng có tác dụng một ngày nào: `skin-e.css` nạp sau và đặt 40px, rồi hai luật
+   `#metrics ...` ở cuối file này thắng bằng specificity và đặt 30px / 24px — đúng con số
+   hợp đồng (SECTION_ANATOMY: Paper equity "số 30px", Risk "số mono 24px/500").
+   Xoá không phải để dọn dẹp. Chúng ĐÁNH LỪA người đọc: một lượt rà đọc thấy 26px trong
+   file và 30px trên màn hình đã kết luận rằng có một quyết định thiết kế đang treo, trong
+   khi dự án đã chốt xong từ lâu. Ý định ở đoạn dưới vẫn giữ nguyên, chỉ bỏ hai dòng chết. */
 
 /* Tier 2 — the open-issue count, SEPARATED from the verdict sentence.
    These two facts are independent by design: operational state deliberately does
@@ -136,10 +144,13 @@
 .system-conclusion.watch .status-dot { margin-right: 48px; }
 .system-conclusion.bad   .status-dot { margin-right: 44px; }
 
-/* The whole rail takes a severity tint — always alongside the shape above, never
-   as the only signal. */
-.status-rail:has(.system-conclusion.watch) { background: rgba(221, 163, 58, .07); }
-.status-rail:has(.system-conclusion.bad)   { background: rgba(240, 91, 97, .09); }
+/* Sắc nền theo mức nghiêm trọng cho cả thanh — luôn đi KÈM hình dạng ở trên, không
+   bao giờ là tín hiệu duy nhất. Hai luật ấy đã xoá khỏi đây: skin-e.css khai đúng hai
+   selector này bằng một gradient và nạp sau, nên bản ở đây chưa từng có tác dụng.
+   Ý đồ không mất — nó nằm ở skin-e:81-82. Phép kiểm tự động bắt ra chỗ này, không phải
+   lượt rà tay: hai luật chỉ có element khớp khi thanh ở trạng thái `watch`/`bad`, mà
+   lúc rà tay trang đang bình thường. Đúng cái giới hạn "103 luật chưa xác minh được"
+   ghi trong DESIGN_AUDIT_2026-09-04.md, hiện ra thành một ca thật. */
 
 
 /* The grouped incident card that lived here has been removed. realtime.js
@@ -252,12 +263,9 @@
    collisions measured on the first pass. The cell is also a `nowrap`
    space-between flex row, so an appended node becomes a third flex item and gets
    PUSHED RIGHT, as far as the journal column; hence the full-width basis. */
-.now-schedule-facts { overflow: visible; }
 .schedule-fact { height: auto; }
-.schedule-fact > div { flex-wrap: wrap; }
-.next-when { flex: 0 0 100%; width: 100%; }
-.next-when { display: block; margin-top: 4px; font: 500 11px/1.45 var(--mono); }
-.next-when > b { display: block; color: var(--blue); font-weight: 700; }
+/* Đã xoá ở vòng rà 2026-09-04: đo ra không đổi gì — skin-e.css nạp sau và quyết
+   giá trị. Danh sách đầy đủ và cách đo ở DESIGN_AUDIT_2026-09-04.md. */
 
 @media (max-width: 680px) { .window-bar { padding: 10px 18px; } }
 
@@ -303,6 +311,27 @@
   align-items: baseline;
 }
 .model-input-item > b { white-space: normal; overflow-wrap: anywhere; }
+/* Stage 5ZZZ-CH. Và một luật NỮA, cùng nội dung, chỉ khác độ cụ thể — vì luật ngay trên
+   đây đã nằm trong file mà KHÔNG có tác dụng nào.
+
+   `skin-e.css` nạp sau và khai `.model-inputs-zone > .model-input-item > b { nowrap }`:
+   ba class, thắng hai class ở trên bất kể thứ tự. Nên bản sửa cùng với số đo của nó
+   ("giá trị chạy quá hàng 46px — đó là cái đọc ra thành chữ in đè lên chữ") đã ngồi im
+   trong file, và lỗi vẫn còn. Đo lại trên trang thật 2026-09-05: `3 states / 2,180 labels`
+   rộng 202px trong ô 70px, và `22/22 complete / 22 warn` rộng 211px trong ô 151px.
+
+   Đây là lần thứ BA trong file này một bản vá thua vì độ cụ thể — xem cảnh báo ở thẻ
+   equity phía trên. Luật: viết xong thì ĐO trên trang, đừng tin là nó đã áp.
+
+   Một `#` thắng mọi số lượng class, nên luật này thắng mà không phải đụng vào skin-e —
+   file đang mang việc dở của phiên khác.
+
+   KHÔNG được thêm tiền tố `#metrics`: `next.js` DI CHUYỂN khối này ra khỏi hàng metrics
+   vào thẻ Regime Monitor (bản thiết kế nói nó thuộc về đó), nên một selector neo vào
+   `#metrics` không khớp gì cả sau lượt dựng lại. Đã mắc đúng lỗi này một lần. */
+#modelInputsZone > .model-input-item > b {
+  white-space: normal; overflow-wrap: anywhere; min-width: 0;
+}
 
 
 /* ═══ E4 · Separate prose type from figure type ═════════════════════════════
@@ -340,15 +369,9 @@
    66% and 100% are NOT thresholds invented here — they are the values realtime.js
    already uses to switch the bar's class (>=100 'bad', >=66 'watch'). Use the
    system's thresholds, do not mint new ones. */
-.dd-gauge {
-  height: 9px; border-radius: 2px; overflow: hidden;
-  background:
-    linear-gradient(to right,
-      rgba(54,191,105,.18) 0 66%,
-      rgba(221,163,58,.22) 66% 100%,
-      rgba(240,91,97,.28) 100%);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
+/* Khối vẽ nền ba dải của thanh đo đã xoá: đo ra không đổi gì, skin-e quyết chiều
+   cao và nền. `position: relative` ngay dưới thì GIỮ — `::after` vẽ vạch 66%
+   dựa vào nó, và một khai báo đang chống lưng cho thứ khác thì không phải rác. */
 /* tick at 66% — the "watch" boundary */
 .dd-gauge { position: relative; }
 .dd-gauge::after {
@@ -379,16 +402,13 @@
 /* ═══ Narrow screens ════════════════════════════════════════════════════════
    680px — EXACTLY the breakpoint realtime.js uses. Do not introduce another. */
 @media (max-width: 680px) {
-  .status-rail { padding: 14px 18px; }
   .system-conclusion { font-size: 16px; align-items: flex-start; }
   .system-conclusion .status-dot { margin-top: 4px; }
-  /* A7 · touch targets big enough for a finger.
-     Keep the base's `overflow-x: auto` so the bar still scrolls when cramped. */
-  .module-nav a { display: flex; align-items: center; min-height: 44px; padding: 0 12px; }
-  .module-nav { height: 46px; }
+  /* A7 (vùng bấm ≥44px cho ngón tay) đã xoá khỏi đây: đo trên khổ 390px ra ĐÚNG 44px
+     mà không cần luật này — skin-e đã lo, và ở 1900px là 28px, đúng cho chuột. Ý định
+     vẫn được thoả, luật thì thừa. */
   /* A6 · the broker reconcile line was cut by 41px with no way to scroll to it. */
   .broker-account-line { white-space: normal; overflow-wrap: anywhere; }
-  .broker-account-line a { display: inline-block; margin-top: 4px; }
 }
 
 /* ── Group bands ─────────────────────────────────────────────────────────────
@@ -506,9 +526,8 @@
   justify-content: flex-start; gap: 9px;
 }
 .now-monitor .now-schedule-facts > .schedule-fact > div > b { font-size: 12px; font-weight: 500; }
-/* Clock and distance travel together on the right, as one pair, rather than
-   being spread across the row by space-between. */
-.now-monitor .now-schedule-facts > .schedule-fact > div > time { margin-left: auto; }
+/* Đã xoá ở vòng rà 2026-09-04: đo ra không đổi gì — skin-e.css nạp sau và quyết
+   giá trị. Danh sách đầy đủ và cách đo ở DESIGN_AUDIT_2026-09-04.md. */
 
 /* One figures row, equity given the extra width the design gives it.
    next.js empties and hides `.metrics-figures` to feed this.
@@ -576,6 +595,30 @@
   background: var(--card);
   border: 1px solid var(--line-card);
   border-radius: 8px;
+}
+/* Stage 5ZZZ-CF. Khung o tren duoc ve o day; phan long trong no thi khong bao gio
+   duoc thut vao, nen chu "No broker positions." nam ep vao duong vien trai.
+
+   `.empty-state` khai `padding: 28px 0` -- chi doc, khong ngang. Dieu do dung khi
+   `.position-grid` chua co vien: chu thang hang voi tieu de section. Khung duoc
+   them vao sau, va khong ai them phan thut tuong ung. Ba container duoc ve khung
+   trong file nay; hai cai kia la `.section-body` nen an theo luat khac, con
+   `.position-grid` thi khong -- no la container duy nhat mat phan thut.
+
+   Con so lay tu SECTION_ANATOMY (## Open Positions): "card padding 14px 16px, flex
+   gap 11px, dot 5px #4b5563, cau sans 14px secondary". Khong phai gia tri tu chon. */
+/* `--muted` là token của bảng màu CŨ: nó ĐÃ được khai, nhưng giá trị #8998a5 nằm ngoài
+   thang bốn bậc xám. Khác lớp với năm lỗi token trước — chúng chưa khai nên rơi về giá trị
+   dự phòng; cái này khai rồi, chỉ là khai sai bảng. Chỉ lộ ra ở trạng thái RỖNG (không có
+   vị thế nào), nên năm lượt rà trước không gặp. Câu ở đây là câu giải thích → bậc secondary. */
+.positions-section .empty-state {
+  display: flex; align-items: center; gap: 11px;
+  padding: 14px 16px;
+  font: 14px/1.5 var(--sans); color: var(--t-secondary, #a8b1c0);
+}
+.positions-section .empty-state::before {
+  content: ""; flex: none; width: 5px; height: 5px; border-radius: 50%;
+  background: #4b5563;
 }
 
 /* ── Calm · phases paired inside each instrument ─────────────────────────────
@@ -758,14 +801,45 @@
    the top of the regime card, on the card's darker ground, divided from the label
    below by a hairline rather than floating above the frame. */
 .rg2-card > #modelInputsZone {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 0;
-  padding: 9px 15px; margin: 0;
+  /* Stage 5ZZZ-CM. LƯỚI, không phải flex — và sửa tại đây chứ không thêm luật mới, vì đây
+     là luật đang thắng (`.rg2-card > #id` = 1 id + 1 class). Một bản vá viết ở nơi khác đã
+     nằm im trong file với `grid-template-columns` khai đúng mà hộp vẫn là flex.
+
+     Cột lấy đúng của hàng metric ngay dưới. Đo ở 1900px: vùng bắt đầu ở x=23, đệm trái 15
+     nên nội dung bắt đầu ở 38; bốn metric bên dưới bắt đầu ở 323 · 616 · 910 · 1203. Vậy
+     cột nhãn phải rộng 323 − 38 = 285px, rồi bốn cột đều. */
+  display: grid;
+  grid-template-columns: 285px repeat(4, minmax(0, 1fr));
+  align-items: center; gap: 0;
+  /* Đệm phải = 0 chứ không 15. Với 15, bốn cột trên hụt tổng cộng 15px so với bốn cột
+     dưới, và sai số dồn: đo được lệch 0 · 3 · 8 · 11px từ trái sang phải. Chữ trong ô
+     cuối vẫn không chạm mép vì mỗi ô tự có đệm 15px của nó. */
+  padding: 9px 0 9px 15px; margin: 0;
   background: var(--deep);
   border: 0; border-bottom: 1px solid var(--line-hair); border-radius: 8px 8px 0 0;
 }
-.rg2-card > #modelInputsZone > .zone-title { margin-right: 6px; }
+/* Nhãn ở ĐÚNG cột 1. skin-e cho nó `grid-column: 1 / -1`, và như thế nó trải cả hàng
+   rồi bốn ô dồn sang trái một cột — dóng hụt đúng một khoảng. */
+.rg2-card > #modelInputsZone > .zone-title { margin-right: 6px; grid-column: 1; }
+
+/* Lưới 285px + bốn cột chỉ có nghĩa khi còn chỗ cho nó. Ở 390px nó nhồi năm cột vào một
+   màn hình hẹp và các ô in đè lên nhau — đo được: "SPY data X 20 mo stale" và
+   "Model age X Track 1 unavailable". Ở khổ hẹp không có hàng metric nào bên dưới để dóng
+   theo, nên lý do tồn tại của lưới ấy cũng không còn: xuống một cột. */
+@media (max-width: 900px) {
+  .rg2-card > #modelInputsZone {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 9px 15px;
+    row-gap: 8px;
+  }
+  .rg2-card > #modelInputsZone > .zone-title { grid-column: 1; margin-bottom: 2px; }
+  .rg2-card > #modelInputsZone > .model-input-item {
+    padding: 0; border-left: 0;
+  }
+}
 .rg2-card > #modelInputsZone > .model-input-item {
   padding: 0 15px; border-left: 1px solid var(--line-hair);
+  min-width: 0;
 }
 .rg2-card > #modelInputsZone > .model-input-item:first-of-type { border-left: 0; }
 
@@ -1123,9 +1197,9 @@ header .runner-header-state i { animation: none; }
    ĐÍCH — ba tên này từng nằm trong lane và báo "value not published" ở mọi slot.
    Nên giữ nguyên chỗ đứng, chỉ cho nó dáng FOOTER của card như design, thay vì
    dáng một hàng lane nữa. */
-.mv2-shell .mv2-lane-config {
-  background: #0b0d11; border-top: 1px solid #1a1f26;
-}
+/* Đã xoá ở lượt quét đa trạng thái 2026-09-05: không có gì trong repo tạo ra lớp
+   này — 0 lần xuất hiện trong mọi file JS và HTML — nên luật chưa từng và sẽ không
+   bao giờ áp được. Đây là code CHẾT, khác với 'chưa xác minh được'. */
 
 /* muc 4.5 · lane đang chặn mang HAI dấu hiệu, không phải một: vạch trái 3px VÀ
    nền hàng. Hai dấu cho một sự thật, để nó không mất với người không phân biệt
@@ -1232,7 +1306,13 @@ header .runner-header-state i { animation: none; }
    ở x=23, sát mép card, trong khi mọi chữ khác của card ở x=41 vì head có
    padding 18px. Hộp readout cũng lệch. Đưa cả ba về cùng cột. */
 #marketViewChart .mv2-sc-head,
-#marketViewChart .mv2-tabnote { padding-left: 18px; padding-right: 18px; }
+/* Stage 5ZZZ-CM. Đệm ngang có, đệm DỌC thì không — nên câu cuối nằm sát mép dưới của
+   thẻ, đọc như bị tràn ra khỏi khung chứ không như một chú thích thuộc về nó. Thêm khoảng
+   thở dưới, và tách hai câu khỏi nhau khi cả hai cùng hiện. */
+#marketViewChart .mv2-tabnote {
+  padding: 0 18px 14px;
+}
+#marketViewChart .mv2-tabnote + .mv2-tabnote { padding-top: 8px; }
 #marketViewChart .mv2-chart-readout { margin-left: 18px; margin-right: 18px; }
 
 /* Cột volume vượt trần: vẽ hết chiều cao pane rồi đội một nắp mỏng, để người đọc
@@ -1269,13 +1349,10 @@ header .runner-header-state i { animation: none; }
    đúng bất kể chấm to nhỏ thế nào. */
 .mv2-lane-track.slots > .mv2-slot { transform: translateX(-50%); }
 
-/* Calm: MỘT bảng, nhãn in một lần. Cột giá trị = số mã × số pha, và Calm cố định
-   hai mã nên đây là hằng số 4 cột. Nhãn hàng chiếm phần còn lại. */
-.mv2-calm-table,
-.mv2-calm-gatetable {
-  display: grid; align-items: baseline;
-  padding: 9px 14px 10px; margin-top: 8px;
-}
+/* Hai luật cho `.mv2-calm-table` / `.mv2-calm-gatetable` đã xoá. Chúng viết cho bản
+   Calm dùng MỘT bảng chung; bản ấy đã được thay bằng panel-theo-mã lấy từ file
+   design, nên hai lớp kia không còn được sinh ra ở đâu. Luật sống sót qua một lần
+   đổi hình dạng — đúng dạng lỗi 'lời mô tả rời khỏi thứ nó mô tả', lần này là CSS. */
 /* Calm — giá trị lấy nguyên từ file design, phần `mv.showCalm`.
    Panel một mã: border-left + padding 9px 14px 10px; bảng 1fr 108px 108px, gap 0 10px. */
 .mv2-calm-inst { border-left: 1px solid #1a1f26; padding: 9px 14px 10px; }
@@ -1326,8 +1403,408 @@ header .runner-header-state i { animation: none; }
   font: 400 11px/1.3 var(--mono); color: #a8b1c0;
 }
 
-/* Bảng chung chiếm TRỌN chiều ngang, và khối GATES nằm DƯỚI nó.
-   .mv2-calm-ivs vốn là lưới hai cột để đặt hai panel-theo-mã cạnh nhau. Giờ trong
-   nó là hai khối khác hẳn — bảng và gates — nên hai cột ấy đặt chúng cạnh nhau,
-   bóp cột nhãn còn ~85px và làm mỗi câu giải thích xuống sáu dòng. */
-.mv2-calm-ivs:has(> .mv2-calm-table) { display: block; }
+/* Luật `.mv2-calm-ivs:has(> .mv2-calm-table)` đã xoá cùng lý do: nó chờ một bảng
+   chung không còn được dựng nữa. */
+
+/* Nhóm issue của tuyến legacy đã nghỉ: không liệt kê nữa.
+   Backend đã đánh dấu đúng — active_count 1, retired_history_count 3, mỗi mục mang
+   counts_as_active:false và lý do bằng chữ. Front-end đã gập chúng lại thành một
+   <details>, với lý do ghi trong code: "an issue that vanishes is an issue nobody can
+   go back to". Chủ dự án quyết bỏ hẳn khỏi danh sách.
+   Không mất dấu: dòng đầu panel vẫn in "N open / 3 retired legacy", các mục vẫn đi
+   nguyên trong payload, và node vẫn còn trên trang — chỉ display:none, đúng luật
+   "ẩn thì display:none, không xoá node". */
+#openIssueList > .issue-group-retired { display: none; }
+
+/* Hộp State probabilities và bảng feature cạnh nó: bỏ margin-top thừa.
+   realtime.css:1085 đặt `margin-top: 10px` cho `#regimePosterior` và `#regimeFeatures`
+   từ hồi hai khối này còn là block độc lập dưới `.mv-setup`. Giờ chúng là ô của lưới
+   trong thẻ regime, nơi mọi ô anh em đều margin bằng 0 — nên cái margin cũ vừa đẩy cả
+   hàng rời khỏi đường viền của chính nó, vừa làm mép trên dày hơn mép dưới.
+   Đo trên trang thật (1440px): mọi ô khác margin-top 0px; hai ô này 10px, kicker cách
+   mép trên 13px nhưng lớp padding thật thành 23px, còn dưới vẫn 13px. */
+#regimePosterior, #regimeFeatures { margin-top: 0; }
+
+/* Hàng feature: nhãn không được để bị bóp còn 76px.
+   `.rg2-feat` là `1fr auto auto`, và MỖI hàng là một lưới riêng — nên hai cột `auto`
+   của hàng nào rộng thì nhãn hàng đó hẹp lại. Đo trên trang thật: cùng bề ngang
+   331,5px, nhãn hàng một được 161,3px và cao 16,9px; nhãn hàng hai chỉ được 76,2px
+   nên "Realised volatility, 5-day annualised" xuống bốn dòng, cao 67,6px. Một nhãn bị
+   bóp kéo cả hàng thẻ lên 77,6px, và đó là lý do hộp State probabilities bên cạnh có
+   13px phía trên nhưng 52,2px trống phía dưới — nó bị kéo cao theo hàng xóm.
+   Hai cột: nhãn và số cùng dòng, hạng phần trăm xuống dòng dưới. Hai hàng cao bằng
+   nhau và nhãn không còn xuống dòng. */
+.rg2-feat { grid-template-columns: 1fr auto; row-gap: 5px; }
+
+/* Dãy bar xác suất không được dính vào dòng tiêu đề của nó.
+   Đo trên trang thật: khoảng cách từ đáy chữ "STATE PROBABILITIES" xuống hàng bar đầu
+   tiên là 0px. `.mv2-kicker` có line-height bằng đúng cỡ chữ (11px/11px) nên hộp chữ ôm
+   sát glyph, không còn chút đệm nào, và `.regime-post` không tự đặt lề trên.
+   6px là quy ước có sẵn trong CHÍNH thẻ này cho cùng loại tiêu đề: mỗi `.rg2-metric` đặt
+   `margin-top: 6px` giữa kicker và giá trị của nó. Không phải con số chọn cho vừa mắt. */
+#regimePosterior > .regime-post { margin-top: 6px; }
+
+/* Các dòng xác suất đang dính nhau: khe 3px trên hàng cao 15,6px, tức 19% một dòng chữ.
+   6px là đơn vị đã có sẵn trong chính thẻ này — cùng khoảng cách giữa tiêu đề và nội dung
+   ở mỗi ô chỉ số, và giữa tiêu đề với dãy bar ngay trên đây. Một nhịp cho cả thẻ. */
+#regimePosterior .regime-post { row-gap: 6px; }
+
+/* Dòng của một trạng thái KHÔNG có trong mô hình đang chạy.
+   Nó không phải một xác suất bằng 0, nên không được trông giống một dòng có số: không
+   thanh bar, chữ mờ, và chấm màu cũng mờ theo — chấm đỏ của Crisis ở đây sẽ đọc thành
+   một cảnh báo, trong khi điều đang nói là mô hình không fit trạng thái này. */
+.regime-post-row.regime-post-absent > span:first-child,
+.regime-post-row.regime-post-absent > b { color: var(--t-null); }
+.regime-post-row.regime-post-absent .rg2-key { background: var(--t-null); }
+/* `.regime-post-row > span` trong realtime.css có specificity (0,1,1), cao hơn một class
+   đơn, nên bản đầu của luật này THUA và dòng "not in this model" nhận màu bậc NHÃN
+   (#798394) thay vì bậc KHÔNG-CÓ-GIÁ-TRỊ (#4b5563) — đọc nặng ngang một nhãn thật, đúng
+   cái nó không được phép trông giống. Đo ra bằng phép kiểm bật/tắt từng sheet. */
+.regime-post-row > .regime-post-nostate { color: var(--t-null); font: 400 11px/1.3 var(--sans); }
+
+/* Chi tiết một job phải là PHẦN CỦA hàng, không phải một thẻ thứ hai bên trong nó.
+   Đo được: khối chi tiết mang `margin: 0 10px 12px 18px` và một viền TRÁI riêng, trên một
+   nền khác nền hàng — nên nó trôi lơ lửng bên trong thẻ hàng với đường bao của chính mình.
+   Ba dấu hiệu ấy cộng lại là thứ đọc ra thành "thẻ lồng thẻ".
+   Bản thiết kế (SECTION_ANATOMY, "Job journal — chi tiết khi mở") tả nó bằng đúng một câu:
+   "border-top divider, bg #0b0d11" — một vạch ngăn phía trên, không lề, không viền trái.
+   Bỏ lề đi thì đệm ngang của khối con trùng khít đệm ngang của phần bấm phía trên, nên
+   chữ trong khối mở thẳng hàng với chữ ở hàng đóng — cả hai là 15px.
+
+   Ghi lại một điều đã đo, để người sau khỏi đi lại: mọi luật khác mà tôi thêm ở đây —
+   làm phẳng `.job-assessment`, bỏ nền `.job-impact`, đổi đệm `.job-evidence-list` — đều
+   THUA, vì skin-e.css nạp sau next.css và đã làm đúng những việc đó từ trước. Chúng đã bị
+   xoá thay vì để lại nằm im. */
+.job-detail { margin: 0; border-left: 0; }
+
+/* Hàng job đóng: trả về đúng mức đệm bản thiết kế ghi, và bỏ khe của một ô đã rỗng.
+   Bản thiết kế ("Job journal — hàng job") ghi "phần bấm padding 10px 13px"; đang chạy là
+   13px 15px. Và ô tóm tắt giờ rỗng trên mọi hàng im lặng — nó không còn chữ nhưng vẫn là
+   một hàng của lưới, nên vẫn ăn một khe 7px.
+   KHÔNG gộp dòng tên vào dòng badge: đo được tên "TRACK1_STOP_REPAIR_0420" cần ~175px và
+   hai badge cần 146px trên một cột rộng 280px — gộp lại thì tên bị cắt cụt, mà tên là thứ
+   duy nhất phân biệt hàng này với hàng khác. Và 22 trên 29 hàng mang BA badge chứ không
+   phải hai, nên cách gộp kia còn không tiết kiệm được gì. */
+/* Chỉ giảm đệm DỌC. Bản thiết kế ghi "padding 10px 13px" cho phần bấm và "11px 13px"
+   cho khối chi tiết — 13 ở cả hai. skin-e dùng 15 ở cả hai. Cách nào cũng nhất quán trong
+   chính nó; trộn hai cách thì không. Lấy 13 cho phần bấm trong khi khối con vẫn 15 làm chữ
+   hai bên lệch nhau 2px — đo được, và chính phép kiểm thẳng hàng bắt được. */
+.job-row > .job-trigger { padding: 10px 15px; }
+.job-summary:empty { display: none; }
+/* `display:none` trên ô tóm tắt vẫn KHÔNG bỏ được hàng thứ tư của lưới, vì nút +/− khai
+   `grid-row: 1 / 5` và tự nó buộc bốn hàng phải tồn tại. Đo được: ô rỗng, `display` là
+   `none`, mà lưới vẫn là "15.4px 19.5px 18.2px 0px" và hàng vẫn cao 100,1px — một khe 7px
+   trả cho một hàng không còn gì. Cho nút bám ba hàng thật. */
+.job-chevron { grid-row: 1 / 4; }
+
+/* ═══ Rà hệ thống thiết kế 2026-09-04 · đưa trang về đúng thang ══════════════
+   Đo trên trang chạy: 11 màu đang hiện mà không tài liệu nào — DESIGN_SPEC,
+   SECTION_ANATOMY, hay chính file design — nhắc tới. Tất cả đến từ realtime.css,
+   bảng nền dùng chung, và là bảng màu TRƯỚC lần redesign. Chi tiết và cách đo ở
+   DESIGN_AUDIT_2026-09-04.md. */
+
+/* `--accent` chưa từng được khai ở đâu cả, nên SÁU chỗ viết `var(--accent, #4ea1ff)`
+   trong realtime.css đều rơi về giá trị dự phòng — trong đó có chấm chế độ Normal,
+   một chỗ mà màu LÀ thông điệp, đang tô một sắc xanh thứ hai cạnh --blue của hợp
+   đồng. Cùng hình dạng với lỗi --mv-dim/--mv-fg đã sửa trước đó: một token không tồn
+   tại thì mọi chỗ dùng nó lặng lẽ dùng giá trị dự phòng. Khai một lần, chữa cả sáu. */
+:root { --accent: var(--blue, #5b9cf0); }
+
+/* Ba bậc xám thừa trong chữ. Hợp đồng dựng ĐÚNG BỐN bậc và nói thẳng lý do:
+   "Bản Ops Console cũ có 8 bậc xám gần giống nhau và đó chính là thứ lần redesign
+   này bỏ đi." Ba màu dưới đây là bậc thứ năm đến bảy đang sống lại.
+   Ánh xạ theo VAI, không theo độ sáng: nhãn và caption về bậc `label`; giá trị phụ
+   trong một dòng meta về bậc `secondary`. */
+.font-control { color: var(--t-label, #798394); }
+.system-facts small { color: var(--t-label, #798394); }
+.equity-zone > small em { color: var(--t-secondary, #a8b1c0); }
+.equity-zone > small strong { color: var(--t-secondary, #a8b1c0); }
+
+/* Bán kính 7px là bậc duy nhất ngoài thang (8 · 5 · 4 · 3 · 2). Thẻ thì dùng 8px. */
+.position-card { border-radius: 8px; }
+
+/* Vòng hai: tám màu còn lại, từng chỗ một.
+   Ánh xạ theo VAI mà hợp đồng gán cho token, không theo màu nào nhìn gần giống nhất. */
+
+/* Bậc xám thứ năm còn sót ở hai chỗ nữa: đồng hồ thanh trạng thái và dòng nhỏ dưới
+   lịch. Cùng là caption → bậc `label`. */
+/* Luật `.rail-clock > span` đã xoá: skin-e.css:93 đặt sẵn đúng `var(--t-label)` cho cùng
+   selector, nên bản của tôi không đổi gì. Bộ cô lập từng luật bắt được — phép tắt/bật cả
+   file thì không, vì cả hai đều nằm trong next.css.
+   `#56697e` mà lượt rà màu đuổi theo thật ra chỉ ở `.day-shift` và ba chỗ khác, không ở
+   đây. Đã dọn luật của người khác cả ngày thì không để lại luật chết của mình. */
+/* `.day-shift` — dấu "+1d/-1d" cạnh đồng hồ, chỉ hiện khi một múi giờ đã sang ngày khác,
+   nên ba lượt đo trước không gặp. `#71849a` là bậc xám thứ năm; nó là chú thích cạnh một
+   giá trị, tức bậc `label`. */
+.rail-clock .day-shift { color: var(--t-label, #798394); }
+.journal-schedule small { color: var(--t-label, #798394); }
+
+/* Vạch giữa hai section và vạch trên khối metrics dùng hai màu KHÔNG có trong thang
+   năm bậc viền (`#191d24` và `#202b34`, cái sau là `--line` của bảng màu cũ). Cả hai
+   ngăn hai dải cấp trang → `--line-page`. */
+.section-band + .section-band { border-top-color: var(--line-page, #1b2027); }
+.primary-column > #metrics { border-top-color: var(--line-page, #1b2027); }
+
+/* Nền cấp trang và nền của một control: về đúng hai bậc nền có tên. */
+.overview-header { background: var(--page, #08090c); }
+.font-control select { background: var(--deep, #0b0d11); }
+
+/* Chip cảnh báo của Market View đang tự chế một cặp nền/viền (`#0f0e0b` / `#2a2620`).
+   Hợp đồng đã có tone `warn` sẵn: nền #1b1608, viền #3a2f14. */
+.mv2-pill.warn { background: #1b1608; border-color: #3a2f14; }
+
+/* Bán kính 7px — bậc duy nhất ngoài thang 8·5·4·3·2, và nó cũng sai hình học.
+   Đo cả hai khối: đệm 3px, vành trong (nút) 5px. Vành ngoài đúng là 5+3 = 8px, nếu
+   không thì góc trong phình ra khỏi góc ngoài. Bản đầu của luật này đặt 5px cho
+   `.mv2-tabset` — vừa đúng thang vừa SAI hình học, vì vành ngoài bằng vành trong.
+   `.journal-view-toggle` cần specificity cao hơn: skin-e ghim 7px và nạp sau next.css. */
+.mv2-tabset { border-radius: 8px; }
+.journal-shell > .journal-view-toggle { border-radius: 8px; }
+
+/* `.issue-problem` tô nền bằng `rgba(88,163,255,.025)` — sắc xanh của bảng màu CŨ viết
+   cứng, trong khi `--blue` của hợp đồng nay là #5b9cf0. Giữ nguyên độ mờ 2,5%, chỉ đổi
+   sắc. Ghi lại một giới hạn của phép đo: bộ rà báo màu này là "#58a3ff" vì nó bỏ qua
+   kênh alpha — đây là một lớp phủ 2,5%, không phải một mảng màu đặc. */
+.issue-problem { background: rgba(91, 156, 240, .025); }
+
+/* Câu gộp của Job journal đứng đầu danh sách, không phải ở dòng nguồn.
+   Đo được: dòng nguồn rộng 208px, câu đầy đủ cần 387px — bị cắt gần một nửa ở cả
+   1440, 1600 lẫn 1900px. Ở đây nó có trọn chiều ngang cột và đứng cạnh những hàng nó
+   nói về. Không phải một hàng job: không viền thẻ, không nền, chỉ là một câu. */
+.journal > .journal-fold-note {
+  margin: 8px 0 2px; padding: 0 15px; list-style: none;
+  color: var(--t-label, #798394); font: 400 12px/1.45 var(--sans);
+  text-wrap: pretty;
+}
+.journal > .journal-fold-note::before { content: none; }
+
+/* Cột phải phải có ĐÚNG MỘT mép nội dung.
+   Đo thẳng trên file design: mọi thứ trong cột phải bắt đầu ở x=1538 — thẻ job, thanh
+   tab, và cả hàng Source Clocks; chỉ chữ tiêu đề lùi thêm 15px vì vạch accent 3px cộng
+   gap 12px. Hai tiêu đề "Job journal" và "Source Clocks" nằm CÙNG một x.
+   Bản đang chạy có HAI mép: 23px cho nhật ký và 49px cho Source Clocks, nên hai tiêu đề
+   lệch nhau 26px và mắt quét dọc cột thấy răng cưa.
+   Nguyên nhân: `.section-band` mặc định `padding: 24px 26px`; `.journal-section` khai
+   `padding: 0` để nhường phần đệm cho chính cột (`.journal-column` đã có `20px 22px`),
+   còn `.source-section` thì không được khai nên giữ nguyên 26px. Cho nó theo hàng xóm.
+   Đệm dọc giữ nguyên — chỉ mép NGANG là thứ mắt so được giữa hai section xếp chồng. */
+.journal-column > .source-section { padding-left: 0; padding-right: 0; }
+
+/* Hai token cuối chưa được khai ở đâu — lần thứ ba trong ngày cùng một hình dạng lỗi,
+   sau `--mv-dim`/`--mv-fg` và `--accent`. Một token không tồn tại thì mọi chỗ dùng nó
+   lặng lẽ lấy giá trị dự phòng, và giá trị dự phòng ở đây nằm ngoài thang:
+     --ok       → #4a9d6e, một sắc xanh lá thứ tư cạnh ba sắc hợp đồng có
+     --mv-hair  → #23262d, một bậc viền thứ sáu cạnh năm bậc hợp đồng có
+   `--ok` tô chữ chip "recorded while the slots ran" — giá trị OK trên chip, tức bậc
+   `green-text` của hợp đồng. `--mv-hair` là vạch trong thẻ, tức bậc `hairline`.
+   Ghi lại vì sao mãi mới thấy: chip ấy chỉ hiện khi phiên CÓ ghi chẩn đoán runtime, nên
+   ba lượt đo trước trang không ở trạng thái đó. Cùng lớp với `.status-rail:has(.watch)`
+   mà phép kiểm tự động bắt được — một lượt rà chỉ thấy trạng thái nó tình cờ gặp. */
+/* `--t-ok` không tồn tại — bậc xanh-chữ #8ae6cc của hợp đồng chưa có token riêng, nên
+   viết thẳng giá trị thay vì trỏ vào một tên không ai khai. `--green` (#3ecf8e) là màu
+   CHẤM, không phải màu chữ trên chip, nên không dùng được ở đây. */
+:root { --ok: #8ae6cc; --mv-hair: var(--line-hair, #1a1f26); }
+
+/* ═══ Luật 5 · chữ trục ra khỏi SVG kéo lệch ═════════════════════════════════
+   Hợp đồng cấm `<text>` bên trong một `<svg preserveAspectRatio="none">`, và cấm thẳng
+   CẤU TRÚC chứ không đặt mức méo cho phép — vì bản design không có một thẻ `<text>` nào
+   trong toàn bộ file: trục của nó là HTML, nến và dot là `<div>` định vị tuyệt đối, nên
+   không chỗ nào méo được.
+   Chữ giờ nằm ở một lớp HTML phủ lên SVG. SVG kéo giãn lấp đầy khung, nên toạ độ viewBox
+   quy sang phần trăm là ánh xạ chính xác. Lớp này không nhận chuột: crosshair và tooltip
+   vẫn đọc trực tiếp trên SVG bên dưới. */
+.mv-labels, .mv2-sc-labels {
+  position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+}
+.mv-lab, .mv2-sc-lab {
+  position: absolute; white-space: nowrap;
+  /* `y` của SVG là ĐƯỜNG CƠ SỞ; `top` của HTML là mép trên hộp. -0.75em đưa hộp lên để
+     đường cơ sở rơi đúng chỗ nó vốn ở. `--ax` mang nghĩa của `text-anchor`. */
+  transform: translate(var(--ax, 0), -0.75em);
+}
+/* Dáng chữ giữ nguyên như bản SVG: `.mv-axis` là mono 11px tông mờ. */
+.mv-lab { color: var(--t-label, #798394); font: 400 11px/1 var(--mono); }
+.mv-lab.mv-band-label {
+  color: var(--t-label, #798394); text-transform: uppercase;
+  letter-spacing: .1em; font: 500 9px/1 var(--sans);
+}
+.mv-lab.mv-vol-ax { color: var(--t-null, #4b5563); font-size: 10px; }
+.mv-lab.mv-level-label.armed { color: var(--amber, #f0b429); }
+.mv-lab.mv-level-label.muted { color: var(--t-label, #798394); }
+/* Nhãn "Volume" nằm đè lên vùng cột, nên bản SVG cho nó một viền nền bằng `paint-order:
+   stroke`. Bản HTML dùng bóng chữ cùng màu nền thẻ — cùng mục đích, tách chữ khỏi cột. */
+.mv-lab.mv-vol-label {
+  text-shadow: 0 0 3px var(--card, #0e1116), 0 0 3px var(--card, #0e1116),
+               0 0 3px var(--card, #0e1116);
+}
+.mv2-sc-lab { color: var(--mv-dim, #798394); font: 400 10px/1 var(--mono); }
+
+/* Lớp phủ phải lấy mốc từ KHUNG SVG, không phải từ cả khối.
+   Ở biểu đồ nến, SVG lấp đầy `.mv2-plot` nên `inset: 0` trùng khít. Pane chuỗi thì SVG
+   chỉ là một phần của `.mv2-slotchart` — bên trên còn head và ghi chú — nên lớp phủ trải
+   theo cả khối và chữ rơi ra ngoài vùng vẽ, mất hẳn khỏi màn hình. Một khung riêng bọc
+   đúng SVG và lớp phủ của nó. */
+.mv2-sc-frame { position: relative; }
+.mv2-sc-frame > .mv2-sc-svg { display: block; width: 100%; }
+
+/* Chú giải hàng slot: cùng khuôn với chú giải làn, nhưng chấm tròn như chính hàng nó tả.
+   Và ô mẫu của chú giải làn phải CAO hơn: đo được 10×4px, ở kích thước ấy một viền 1px
+   nét đứt (#2a323d, "Not yet run") và một viền 1px nét liền (#3a424f, "Not reached") là
+   hai hộp gần như giống hệt nhau — hai sắc xám sát nhau, khác nhau ở nét đứt dài 10px.
+   NHƯNG 10×4 là số của HỢP ĐỒNG: mục 4.5 ghi "swatch legend là chữ nhật 10x4, mô phỏng
+   hình CELL trong lane", và hai luật khác trong file này đã chép đúng con số ấy. Nên ô mẫu
+   giữ nguyên, và chuyện hai trạng thái không phân biệt được ở kích thước đó được GHI LẠI
+   như một xung đột giữa hợp đồng và khả năng đọc — người quyết là chủ dự án, không phải
+   một bản vá lặng lẽ ghi đè con số họ đã chọn. */
+.mv2-legend-slots { margin-top: 2px; }
+.mv2-legend-lead {
+  color: var(--t-null, #4b5563); font: 400 11px/1 var(--mono);
+  letter-spacing: .04em; margin-right: 2px;
+}
+.mv2-slot-key {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  border: 1px solid transparent; vertical-align: middle;
+}
+
+/* Ô paper equity khi nó giữ một LỜI TỪ CHỐI thay vì một con số.
+   Thang chữ của hợp đồng dành bậc 30px cho "số paper equity"; bậc 15px là của "câu status
+   band". `not measured` là một câu, không phải một số, nên nó thuộc bậc 15px.
+   Đo được trước khi sửa: `not measured` là chữ to nhất toàn trang (30px), trong khi câu
+   trả lời "hệ thống có khoẻ không" là 15px và `ORDERS POSSIBLE: no` là 11px.
+   Lời từ chối KHÔNG bị làm mờ đi — nó giữ màu chữ chính và đứng nguyên chỗ cũ. Chỉ thôi
+   chiếm bậc chữ mà thang dành cho một con số. */
+/* Phải mang ID: bậc 30px được đặt bởi `#metrics .equity-line > b` (1,1,1), cao hơn một
+   selector chỉ có class. Đo ra bằng cách nhìn giá trị tính toán vẫn là 30px sau khi class
+   đã gắn đúng — luật đầu tiên của tôi ở đây thua, im lặng, như mọi lần. */
+#metrics .equity-line > b.is-refusal {
+  font: 500 15px/1.3 var(--sans); letter-spacing: 0; white-space: normal;
+}
+
+/* Ô mẫu chú giải cao 9px thay vì 4px.
+   10×4 là con số HỢP ĐỒNG ghi rõ (mục 4.5: "swatch legend là chữ nhật 10x4, mô phỏng hình
+   CELL trong lane"), và ở vòng rà trước tôi đã rút lại đúng bản sửa này vì không được phép
+   tự ghi đè một con số chủ dự án đã chọn.
+   Lần này là quyết định của chủ dự án, 2026-09-05, sau khi đọc phép đo: ở 10×4px, một viền
+   1px NÉT ĐỨT (#2a323d, "Not yet run") và một viền 1px NÉT LIỀN (#3a424f, "Not reached")
+   là hai hộp gần như giống hệt — hai sắc xám sát nhau, khác nhau ở nét đứt dài 10px, tức
+   vài chấm. Sáu trạng thái mà hai trong số đó không phân biệt được thì chú giải không làm
+   được việc của nó.
+   Chỉ đổi ô MẪU. Ô thật trong lane giữ nguyên hình dạng hợp đồng. */
+.mv2-legend .mv2-legend-item .mv2-cell { height: 9px; }
+
+
+/* ═══ CK · 21 luật "không đổi gì", và vì sao chỉ MỘT bị xoá ══════════════════════════
+   `DESIGN_AUDIT_2026-09-04.md` đo bằng cách tắt/bật CẢ stylesheet, ghi rõ rằng cách ấy
+   không tách được "thừa thật" khỏi "bị một luật KHÁC cùng file che", nên con số 12 của họ
+   là TRẦN TRÊN và họ không xoá gì. Vòng này đo tách TỪNG luật qua CSSOM, ở năm khổ
+   (1900 · 1440 · 1050 · 680 · 390), có hai luật đối chứng bắt buộc phân loại đúng ở mỗi
+   khổ trước khi nhận kết quả. Ra 21 luật không đổi gì.
+
+   Xoá được ĐÚNG MỘT. Ba lý do, và mỗi lý do là một bài học khác nhau:
+
+   [1] PHÉP ĐO KHÔNG NHÌN THẤY TRẠNG THÁI — `.has-tip { outline: revert }`
+       Đo ra "không đổi gì" vì element lúc đo KHÔNG được focus, mà cả `none` lẫn `revert`
+       đều tính ra `none` khi không focus. Đọc comment ngay trên nó thì rõ: nó gỡ dòng
+       `outline: none` của bảng nền để `.has-tip:focus-visible` vẽ được vòng focus cho 21
+       phần tử. Xoá nó là xoá vòng focus của cả 21 chỗ. Cùng hình dạng với ca
+       `.module-nav { min-height: 44px }` mà bản rà trước đã dừng lại đúng lúc.
+       Cùng loại: `.system-conclusion .status-dot { margin-right: 34px }` chỉ bị che khi
+       thanh trạng thái đang ở `watch` — lúc đo nó đang watch.
+
+   [2] LƯỚI DỰ PHÒNG, ĐO ĐƯỢC — bốn luật `.primary-column > .*-section { order }`
+       Chặn `skin-e.css` và `next.js` rồi đo lại: `.primary-column` vẫn là flex và bốn
+       section nhận đúng thứ tự -2 · -1 · 1 · 2. Chúng là thứ tự cột khi lớp gom nhóm của
+       bản thiết kế lại không chạy — và lớp ấy nằm trong `try/catch` "must never take the
+       page down", nên đường đó có thật. Ở đường bình thường, `groupBands` ghi thứ tự
+       inline nên bốn luật này im. Một khai báo đang chống lưng cho một đường khác thì
+       không phải rác.
+
+   [3] BA MỤC TÔI TỪNG GỌI LÀ "MÂU THUẪN CHƯA AI GIẢI" — KHÔNG MỤC NÀO LÀ VẬY
+       Và cách tôi nhầm cả ba đáng ghi hơn kết luận: tôi đọc luật BỊ ĐÈ cùng tài liệu
+       thiết kế, rồi kết luận, mà không đọc chú thích của luật ĐÈ LÊN. Ba lần, cùng một
+       hình dạng, trong một phiên.
+
+           26px -> 30px   `.equity-line > b`
+           22px -> 24px   `.risk-zone .metric-dd-value > b`
+               Luật đè có lý do riêng và dẫn thẳng hợp đồng: "Con số equity: design 30px…
+               Live vẽ 40px vì skin-e đặt font 40px". SECTION_ANATOMY xác nhận 30px và
+               24px. Hai dòng 26/22 là tàn dư của một quyết định ĐÃ ĐƯỢC dự án sửa lại, và
+               chúng chưa từng có tác dụng. Đã xoá (khối CL ở trên).
+
+           4px -> 9px     `.mv2-legend .mv2-cell`  (ô mẫu chú giải)
+               KHÔNG XOÁ, KHÔNG SỬA. Luật đè ghi rõ đây là quyết định của chủ dự án ngày
+               2026-09-05 sau khi đọc phép đo: ở 10×4px, viền 1px nét đứt (#2a323d, "Not
+               yet run") và viền 1px nét liền (#3a424f, "Not reached") thành hai hộp gần
+               như giống hệt — hai sắc xám sát nhau, khác nhau ở vài chấm. Sáu trạng thái
+               mà hai cái không phân biệt được thì chú giải hỏng. Chính chú thích ấy còn
+               ghi rằng bản sửa về 10×4 ĐÃ bị rút lại một lần ở vòng rà trước, vì cùng lý
+               do. Đây là lần thứ hai suýt bị lật; xem cổng ở
+               `scratch/test_track1_stage5zzz_cl_legend_swatch_20260905.py`.
+
+   Còn lại là những luật khai lại đúng giá trị bảng nền đã có. Chúng im hôm nay, và sẽ hết
+   im đúng ngày bảng nền đổi. Bản rà trước đã đặt luật cho việc này và luật ấy vẫn đúng:
+   không xoá theo bằng chứng không đủ.
+
+   Phép đo còn giới hạn của nó, và giới hạn ấy làm hỏng đúng mục [1]: nó chỉ thấy trạng
+   thái ĐANG hiện. Focus, hover, `<details>` đóng, tab chưa mở — không mục nào trong đó
+   nằm trong lượt đo. */
+
+/* ═══ CJ · Bốn màu ngoài thang, đưa về thang ════════════════════════════════════════════
+   `DESIGN_AUDIT_2026-09-04.md` đóng trục này ở 0. Đo lại một ngày sau: 4. Nó trôi lại vì
+   trục màu là trục DUY NHẤT của bản rà ấy không được ghim thành cổng — ba trục kia đã có
+   test và cả ba vẫn xanh.
+
+   Sửa ở ĐÂY chứ không ở `realtime.css`, vì `realtime.css` là bảng nền của SÁU trang
+   (analytics · paper · reports · index · realtime · realtime-next) còn hợp đồng thiết kế
+   này chỉ nói cho dashboard realtime. `/realtime` nạp đúng cùng bộ sheet với
+   `/realtime-next`, nên một bản đè ở đây phủ cả hai mà không đụng bốn trang kia.
+
+   Đã kiểm `skin-e.css` TRƯỚC khi viết: nó không khai bốn selector đầu, nên các luật một
+   class ở đây thắng bằng thứ tự nạp. Riêng khung Model Inputs thì skin-e CÓ khai, nên luật
+   ấy phải thắng bằng `#id`. Hôm nay đã có ba bản vá `white-space` thua vì đúng chuyện này;
+   không viết bản thứ tư rồi mới đo. */
+
+/* Bậc xám thứ năm (#687c92) → `label`. Vai: dòng meta, caption. */
+.system-facts,
+.journal-schedule { color: var(--t-label); }
+
+/* Bậc xám thứ sáu (#9ab0c5) → `secondary`. Vai: giá trị phụ trong dòng meta. */
+.system-facts b,
+.journal-schedule b,
+.font-control select { color: var(--t-secondary); }
+
+/* Chip CLEAR tự pha nền và viền từ #36bf69 — sắc lục của bảng NỀN. `tokens.css` ghi thẳng
+   rằng sắc lục tham chiếu là #3ecf8e, và `--green` ở đó đã trỏ đúng; chỉ hai giá trị rgba
+   gõ tay trong `.clear-state` là còn sót. Giữ nguyên độ mờ .04/.22 — chúng là ý đồ. */
+.clear-state {
+  background: rgba(62, 207, 142, .04);
+  border-color: rgba(62, 207, 142, .22);
+}
+
+/* Viền khung Model Inputs (#251f36) → #2e2745, bậc viền tím mà `SECTION_ANATOMY` quy định
+   (cùng bậc với viền badge lane). `#id` để thắng `.model-inputs-zone` của skin-e nạp sau. */
+#modelInputsZone,
+#modelInputsZone.watch,
+#modelInputsZone.bad { border-color: #2e2745; }
+
+
+/* ═══ CM · Hàng Model inputs dóng theo hàng metric ngay dưới nó ═════════════════════════
+   Đo được ở 1900px trước khi sửa: hàng dưới chia đều bốn cột, mép trái ở 323 · 616 · 910 ·
+   1203. Hàng Model inputs dùng `max-content` nên các ô rơi ở 249 · 429 · 618 · 860 · 1207 ·
+   1404 — không một vạch nào trùng, và hai hàng nằm trong CÙNG một thẻ.
+
+   Hai ô đã bỏ để còn đúng bốn, chứ không phải để cho gọn:
+
+     `Regime`     là ĐẦU RA của mô hình, không phải đầu vào — và nó đã hiện to hơn ngay
+                  dòng dưới kèm "held 18 days" và kết quả kiểm nhãn. Một hàng tên là
+                  "Model inputs" mà chứa chính kết quả thì tự mâu thuẫn.
+     `Re-freeze`  cùng chủ đề với `Model age` (mô hình cũ bao nhiêu, và có phải đóng băng
+                  lại không). Giá trị của nó gần như luôn là "none", tức nó chiếm một cột
+                  để nói "không có gì". Chuyển vào tooltip của Model age.
+
+   `SECTION_ANATOMY` mô tả hàng này là flex sáu ô, tức bản thiết kế KHÔNG đòi dóng cột. Đây
+   là yêu cầu của chủ dự án 2026-09-06, ghi lại để lần rà sau không "sửa" nó về lại. */
+/* Khối CM từng ở đây khai `grid-template-columns` cho `#modelInputsZone` và đã bị
+   `.rg2-card > #modelInputsZone` phía trên che — hộp vẫn là flex nên các track không
+   làm gì cả. Đã gỡ và sửa thẳng vào luật đang thắng. */
+

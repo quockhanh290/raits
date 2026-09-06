@@ -146,6 +146,13 @@ def dashboard_realtime():
     return send_from_directory(DASH_ROOT / "realtime", "index.html")
 
 
+@app.get("/realtime/help")
+def dashboard_realtime_help():
+    # Stage 5ZZZ-CE. Mot trang tinh, khong goi API nao. Moi muc tren dashboard tro toi
+    # mot neo o day qua chinh dong `source-note` cua no -- khong them icon `?` nao.
+    return send_from_directory(DASH_ROOT / "realtime", "help.html")
+
+
 @app.get("/realtime-next")
 def dashboard_realtime_next():
     # Bản nháp thiết kế lại của /realtime. Tồn tại để sửa giao diện mà không đụng

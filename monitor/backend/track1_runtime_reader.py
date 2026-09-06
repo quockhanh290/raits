@@ -469,8 +469,15 @@ def _safety() -> dict:
             "stop_path": ts.TRACK1_STOP_PATH,
             "maxhold_marker": ts.TRACK1_MAXHOLD_STATE,
             "client_id": ts.TRACK1_SAFETY_CLIENT_ID,
-            "note": "registered in track1-only mode; legacy safety keeps draining "
-                    "live_positions.json separately"}
+            # Stage 5ZZZ-CM. Câu này hiện trên màn hình cho người vận hành đọc, nên nó
+            # phải nói được nghĩa mà không cần biết tên tệp. Bản cũ —
+            # "registered in track1-only mode; legacy safety keeps draining
+            # live_positions.json separately" — gồm một trạng thái đăng ký nội bộ và hai
+            # tên tệp, và trôi ở đáy panel không gắn vào ô nào.
+            "note": ("Track 1's protective jobs read and write only Track 1's own list of "
+                     "positions. The retired route keeps a separate list, wound down by its "
+                     "own jobs. The two are never merged, so neither route can act on the "
+                     "other's positions.")}
 
 
 def _audits(root: Path) -> dict:
@@ -610,6 +617,7 @@ def _reporting(root: Path) -> dict:
 
         r = tr.report(root)
         return {"present": True, "headline": r["headline"],
+                "headline_detail": r.get("headline_detail", ""),
                 "trade_log": r["trade_log"], "book": r["book"],
                 "order_journal": r["order_journal"], "broker": r["broker"],
                 "open_position_parity": r["open_position_parity"],

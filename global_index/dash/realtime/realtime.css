@@ -72,7 +72,27 @@ button, input, select { font: inherit; }
 .equity-line { display: flex; align-items: baseline; gap: 13px; }
 .equity-line > b { color: var(--bright); font: 500 37px/1 var(--mono); white-space: nowrap; }
 .equity-line > strong { color: var(--green); font: 500 16px/1 var(--mono); white-space: nowrap; }
-.equity-zone > small { display: block; margin-top: 9px; color: #667b92; font: 11px/1.4 var(--mono); white-space: nowrap; }
+/* Stage 5ZZZ-CF. `normal`, khong phai `nowrap`.
+
+   Cung mot loi da bi bat MOT LAN o phan tu anh em ngay duoi: dong doi soat broker
+   la `nowrap`, rong 232px chua 413px noi dung, tran 181px sang the Model Inputs va
+   in de len "Model age" -- ba va cham chu do duoc o 1440px. Lan do chi
+   `.broker-account-line` duoc sua.
+
+   Dong nay thi khong, va no la dong nhan CAU chu khong nhan so: nhanh Track 1 do
+   `headline_reason` vao day, hom nay dai 72 ky tu -- "status UNKNOWN — say so plainly;
+   do not substitute another route's figure" -- trong mot o ma nhanh legacy chi viet
+   `since 2026-08-24`, 16 ky tu. Khong co `overflow` chan, nen no in de len the
+   Performance ben canh, dung ngay chu "Sharpe".
+
+   `nowrap` da tung duoc go, nhung chi trong `@media (max-width: 1100px)`: nguoi sua
+   do o 720px va vet ra dung pham vi ho do. Nen loi nay chi hien o man hinh RONG --
+   nguoc voi truc giac, va vi the song sot.
+
+   SECTION_ANATOMY (## Hang bon block) mo ta dong nay la "cau trang thai mono 11px
+   label, margin-top 9px, TEXT-WRAP PRETTY" -- ban thiet ke von da dinh cho no xuong
+   dong. `nowrap` la thu mau thuan voi ban thiet ke, khong phai cau van dai. */
+.equity-zone > small { display: block; margin-top: 9px; color: #667b92; font: 11px/1.4 var(--mono); white-space: normal; overflow-wrap: anywhere; text-wrap: pretty; }
 .equity-zone > small em { color: #7194c2; font-style: normal; }
 .equity-zone > small strong { color: #7891ad; font-weight: 500; }
 .broker-account-line { display: block; margin-top: 4px; opacity: .8; white-space: normal; overflow-wrap: anywhere; }
@@ -741,25 +761,35 @@ tbody tr:last-child td { border-bottom: 0; }
   .event-status.signal-good, .event-status.signal-warn { white-space: normal; }
 }
 
-/* Stage 5ZZF — whose route an open issue belongs to. Same pill geometry as `.issue-status`
-   beside it, so the badge lane keeps one shape and only the colour carries the meaning. The
-   legacy and debt lanes are deliberately quieter than TRACK 1: they must stay visible without
-   competing with a live Track 1 incident for the eye. */
+/* Stage 5ZZF/5ZZZ-CM — whose route an open issue belongs to.
+
+   Chú thích cũ ở đây khai "same pill geometry as `.issue-status`". Đo ra thì không, và đó
+   chính là thứ đọc lên thành lạc lõng trên màn hình — bốn khác biệt cùng lúc:
+
+       padding          1px 6px      so voi  3px 6px
+       font             600 10px     so voi  700 11px/1
+       ho chu           thua sans    so voi  mono
+       letter-spacing   .04em        so voi  khong co
+
+   Một lời mô tả đã rời khỏi thứ nó mô tả. Giờ hình học và kiểu chữ lấy ĐÚNG của
+   `.issue-status`, và chỉ MÀU mang nghĩa — đúng điều câu ấy vẫn luôn nói.
+
+   Bỏ luôn `opacity`: ý định "quieter than TRACK 1" đã do màu lo (`--muted` cạnh `--accent`),
+   còn làm mờ thêm một lớp nữa lên chữ 11px chỉ khiến nó khó đọc chứ không khiến nó khiêm
+   tốn hơn. Một trục cho một việc. */
 .issue-scope {
   display: inline-block;
   margin-left: 6px;
-  padding: 1px 6px;
+  padding: 3px 6px;
   border-radius: 3px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: .04em;
+  font: 700 11px/1 var(--mono);
   border: 1px solid currentColor;
-  opacity: .85;
+  white-space: nowrap;
 }
-.issue-scope.track1    { color: var(--accent, #4ea1ff); opacity: 1; }
+.issue-scope.track1    { color: var(--accent, #4ea1ff); }
 .issue-scope.scheduler { color: var(--muted, #8a94a6); }
-.issue-scope.legacy    { color: var(--muted, #8a94a6); opacity: .7; }
-.issue-scope.known_debt{ color: var(--muted, #8a94a6); opacity: .6; }
+.issue-scope.legacy    { color: var(--dim); }
+.issue-scope.known_debt{ color: var(--dim); }
 
 
 /* Stage 5ZZH. Group headings in the open-issue list — Track 1 / Shared / Legacy.
@@ -810,7 +840,6 @@ tbody tr:last-child td { border-bottom: 0; }
 @media (max-width: 1100px) {
   .equity-line { flex-wrap: wrap; row-gap: 4px; }
   .equity-line > b { min-width: 0; overflow-wrap: anywhere; }
-  .equity-zone > small { white-space: normal; overflow-wrap: anywhere; }
 }
 @media (max-width: 560px) {
   /* Below this the figure alone is wider than the column at 31px. */
@@ -1857,11 +1886,18 @@ details.issue-group-retired > summary b { opacity: .72; font-weight: 500; }
 /* Stage 5ZZZ-BQ. The session bar. A day with no per-slot record is drawn thinner rather than
    hidden: it can still be opened, it just has less in it, and hiding it would make the gap
    in the store invisible. */
+/* Stage 5ZZZ-CM. Đệm dưới 2px làm hàng chip dính vào mép trên của thẻ ngay dưới nó — hai
+   thứ khác cấp nội dung mà không có khoảng thở nào giữa chúng. 12px, cùng bậc với khoảng
+   cách giữa các khối khác trong băng này. */
 .mv2-daybar { display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
-  padding: 6px 0 2px; }
+  padding: 6px 0 12px; }
 .mv2-daybar.loading { opacity: .5; }
 .mv2-day-label { font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
   color: var(--mv-dim, #8b929c); margin-right: 3px; }
+/* Chỉ khi nó thực sự mang tooltip — một gạch chân trên chữ không giải thích gì là một lời
+   hứa suông. */
+.mv2-day-label.has-tip { cursor: help; text-decoration: underline dotted;
+  text-underline-offset: 3px; text-decoration-color: var(--dim); }
 .mv2-day { font: inherit; font-size: 11px; line-height: 1.6; cursor: pointer;
   color: var(--mv-fg, #d7dbe0); background: transparent; padding: 1px 7px;
   border: 1px solid var(--mv-hair, #23262d); border-radius: 3px; }
@@ -1871,3 +1907,27 @@ details.issue-group-retired > summary b { opacity: .72; font-weight: 500; }
   border-color: var(--mv-fg, #d7dbe0); }
 .mv2-day i { font-style: normal; font-size: 9px; opacity: .7; margin-left: 4px; }
 .mv2-day-note { font-size: 11px; color: var(--amber, #c9a227); margin-left: 6px; }
+
+/* Stage 5ZZZ-CE. Dong `source-note` nao co neo tro toi trang tro giup thi tro thanh mot
+   lien ket. Gach chan cham -- du de biet la bam duoc, khong du de tranh cho voi so lieu. */
+.source-note[data-help] {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--dim);
+}
+.source-note[data-help]:hover,
+.source-note[data-help]:focus-visible {
+  color: var(--blue);
+  text-decoration-color: var(--blue);
+}
+
+/* Stage 5ZZZ-CN. Độ bất định, trong khối nhãn chứ không thành một ô đo riêng: nó nói về
+   chính cái nhãn ở trên nó. Cùng hình dạng với dòng kiểm nhãn ngay dưới để hai dòng phụ
+   đọc như một cặp. */
+.rg2-uncertain {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 6px; cursor: help;
+  font: 400 12px/1.4 var(--sans); color: var(--t-label, #798394);
+  text-transform: lowercase;
+}

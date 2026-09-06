@@ -78,50 +78,58 @@
     return el;
   };
 
-  /* Three figures the payload already carries and no panel showed.
+  /* Two figures the payload already carries and no panel showed.
 
      Read from /api/v1/runner-state, the same source realtime.js uses for the
      rest of Model Inputs — not scraped off the page, and not derived from
      anything displayed.
 
-       Fit end     `operational_status.model_age.model_name` arrives as
-                   "fit_end=2024-12-31". "20 mo stale" says how OLD the fit is;
-                   this says what it is anchored TO, which is the half needed to
-                   judge whether the staleness matters.
        Re-freeze   `operational_status.refreeze.pending` — reported by the
-                   runner, never inferred from model age here.
+                   runner, never inferred from model age here. This one has no
+                   Track 1 equivalent: the live route publishes no re-freeze
+                   decision, so it is still the legacy runner's answer and the
+                   title beside it says whose answer it is.
        Gross       cluster_exposure[*].gross_pct summed. Read as a percentage of
                    equity per cluster; if that aggregation is wrong the label is
                    one line to change, and the figure is not used for anything
                    else on the page.
 
-     Every one writes "--" when its source is absent, so a missing field reads as
-     unknown rather than as zero. */
-  const FIT_END = /fit_end\s*=\s*([0-9]{4}-[0-9]{2}-[0-9]{2})/i;
+     Both write "--" when the source is absent, so a missing field reads as
+     unknown rather than as zero.
+
+     `Fit end` used to be the third, parsed out of `model_age.model_name`. It has
+     been removed from here, not moved: realtime.js now fills that tile from the
+     Track 1 regime record's own `inputs.fit_end` and colours it by that record's
+     label check. Writing it here too made two writers for one element, and the
+     later one won — which meant the legacy string quietly replaced a value the
+     other route had already verified. The two happen to agree today
+     (2024-12-31), so nothing on screen would have shown the conflict. */
   const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
 
   const renderModelExtras = () => {
     const ops = runner?.payload?.meta?.operational_status;
-    if (!ops) { setText('modelFitEnd', '--'); setText('modelRefreeze', '--'); return; }
-    const name = ops.model_age?.model_name;
-    const match = name ? FIT_END.exec(String(name)) : null;
-    setText('modelFitEnd', match ? match[1] : (name || '--'));
+    // Stage 5ZZZ-CM. Ô `Re-freeze` đã gộp vào tooltip của Model age (realtime.js), nên
+    // phần tử này thường không còn tồn tại. Lối ra sớm sẵn có là đúng — giữ nguyên, chỉ
+    // ghi lại lý do để lần sau không ai tưởng nó chết mà xoá.
+    const el = document.getElementById('modelRefreeze');
+    if (!el) return;
+    if (!ops) { el.textContent = '--'; el.title = 'no runner snapshot'; return; }
     const pending = ops.refreeze?.pending;
-    setText('modelRefreeze', pending === true ? 'pending' : pending === false ? 'none' : '--');
+    el.textContent = pending === true ? 'pending' : pending === false ? 'none' : '--';
+    el.title = "the legacy runner's own re-freeze decision; Track 1 publishes no equivalent";
   };
 
-  const renderGrossExposure = () => {
-    const snaps = runner?.payload?.snapshots;
-    const latest = Array.isArray(snaps) && snaps.length ? snaps[snaps.length - 1] : null;
-    const byCluster = latest?.cluster_exposure;
-    if (!byCluster || typeof byCluster !== 'object') { setText('metricGrossExposure', '--'); return; }
-    let total = 0, seen = 0;
-    for (const entry of Object.values(byCluster)) {
-      const g = Number(entry?.gross_pct);
-      if (Number.isFinite(g)) { total += g; seen += 1; }
-    }
-    setText('metricGrossExposure', seen ? `${total.toFixed(1)}%` : '--');
-  };
+  /* Stage 5ZZZ-CG. `renderGrossExposure` đã chuyển sang realtime.js.
+
+     Nó đọc `cluster_exposure` của ảnh chụp runner đã nghỉ hưu — 289,8 giờ tuổi đo được
+     2026-09-05 — và khoá theo đúng tên ba sleeve của Track 1, nên ô này in "0.0%" trông
+     như đang báo cáo tuyến đang chạy. Nguồn đúng là sổ của chính Track 1, và sổ ấy chỉ
+     với tới được từ realtime.js.
+
+     Gỡ hẳn chứ không để lại: giữ cả hai thì nơi chạy sau thắng, và trên màn hình không có
+     gì cho thấy đang có hai người viết — đúng cái bẫy đã ghi ở `renderModelExtras` ngay
+     phía trên. Đây cũng sửa luôn một lỗi khác: trên `/realtime` ô này chưa từng có ai
+     viết, nên nó in `--` vĩnh viễn. */
 
   const clearMarks = (root) =>
     root.querySelectorAll('.' + MARK).forEach(n => n.remove());
@@ -132,7 +140,17 @@
   const FIELD_BY_LABEL = {
     'next job': s => s.next_scheduled_job?.at,
     'next decision': s => s.next_decision_job?.at,
-    'latest decision': s => s.latest_expected_at,
+    /* 'latest decision' ĐÃ BỎ. Nó từng trỏ vào `latest_expected_at` — slot gần nhất mà bộ
+       lập lịch MONG ĐỢI, không phải lúc quyết định kia xảy ra. Hàng ấy in giờ tuyệt đối từ
+       nhật ký job còn chuỗi "x ago" từ đồng hồ slot, nên hai nửa của cùng một dòng nói về
+       hai thời điểm khác nhau.
+       Đo được 2026-09-04: ô ghi "MAX_HOLD_EXIT · 09:31 ET · 1m ago" trong khi đồng hồ trang
+       là 12:16 ET — lệch 2 giờ 45 phút. Và "x ago" còn TỰ NHÍCH mỗi 5 phút trong khi 09:31
+       đứng yên, vì `latest_expected_at` tiến theo lịch. Trong chính endpoint đó
+       `latest_decision_job` là null, nên không có mốc nào để lấy.
+       Đúng cái comment ngay trên bảng này đã dặn: "Latest job" không có trường tương ứng
+       nên để yên, thay vì điền một mốc gần đó chỉ vì nó trông có vẻ đúng. Dòng này đã vi
+       phạm chính câu ấy. Giờ để yên cho tới khi API công bố mốc thật. */
   };
 
   const decorateFacts = () => {
@@ -367,7 +385,6 @@
     if (!readout) return;
     clearSlotHot();
     let clock = '';
-    const said = [];
     document.querySelectorAll('.mv2-lane-track').forEach(track => {
       const kids = track.querySelectorAll('.mv2-cell, .mv2-slot');
       if (kids.length !== count) return;               // a lane that runs a different grid
@@ -376,11 +393,16 @@
       hit.classList.add('is-slot-hot');
       const p = partsOf(hit);
       if (!clock && p[0]) clock = p[0];
-      if (p.length >= 3) said.push(p[1] + ': ' + p.slice(2).join(' · '));
     });
-    readout.textContent = `slot ${index + 1} / ${count}`
-      + (clock ? ` · ${clock} ET` : '')
-      + (said.length ? ' — ' + said.join(' · ') : '');
+    /* Stage 5ZZZ-CM. Dòng này nói CHỖ, không nói phán quyết — đúng như luật CSS ngay trên
+       `.is-slot-hot` đã ghi. Bản cũ nối phán quyết của cả bốn làn vào một dòng `nowrap`
+       nằm trong đầu thẻ, nên nó bị cắt cụt gần như mọi lần: một gợi ý bị cắt không còn là
+       gợi ý, và nó đọc như một dòng log.
+
+       Phán quyết từng luật không mất — chúng là chính các ô đang được viền sáng ngay dưới,
+       mỗi làn một ô, ở đúng cột vừa rê tới. Đọc ở đó rõ hơn đọc trong một chuỗi nối. */
+    readout.textContent = (clock ? `${clock} ET` : 'this slot')
+      + ` · slot ${index + 1} of ${count}`;
   };
 
   /* The same minute, in both charts.
@@ -427,22 +449,13 @@
         const want = (ry * sy / sx).toFixed(3);
         if (el.getAttribute('rx') !== want) el.setAttribute('rx', want);
       });
-      /* Glyphs stretch on the same axis the dots did. The design keeps its axis
-         labels out of the pane entirely (an HTML column beside it), which is why
-         the spec forbids <text> under preserveAspectRatio="none" outright; the repo
-         draws them inside the SVG, so undo the stretch per label instead. Scaling
-         about the label's own x leaves the anchor where it was for start AND middle,
-         so nothing moves -- only the glyph aspect changes. */
-      const k = sy / sx;
-      svg.querySelectorAll('text[x]').forEach(el => {
-        const x = parseFloat(el.getAttribute('x'));
-        if (!Number.isFinite(x)) return;
-        const want2 = Math.abs(k - 1) < 0.001 ? ''
-          : `translate(${(x * (1 - k)).toFixed(3)} 0) scale(${k.toFixed(5)} 1)`;
-        if ((el.getAttribute('transform') || '') === want2) return;
-        if (want2) el.setAttribute('transform', want2);
-        else el.removeAttribute('transform');
-      });
+      /* Phần phản-co cho `<text>` đã bỏ khỏi đây. Nó tồn tại vì repo vẽ nhãn trục bên
+         TRONG một SVG kéo lệch, còn bản design giữ nhãn ra ngoài hẳn — và đó chính là lý
+         do hợp đồng cấm thẳng cấu trúc ấy thay vì đặt một mức méo cho phép.
+         Nhãn giờ là span HTML phủ lên SVG, định vị bằng phần trăm của viewBox, nên chúng
+         không nằm trong hệ toạ độ bị kéo và không có gì để phản-co. Đo được sau khi
+         chuyển: `svg[preserveAspectRatio="none"] text` trả về 0.
+         Phần chỉnh `rx` của ellipse thì GIỮ — chấm vẫn là hình trong SVG, vẫn bị kéo. */
     });
   };
 
@@ -875,7 +888,7 @@
        out, hide the shell, and then let the bar be built inside the hidden shell
        — added to the page and visible nowhere. */
     try { restructure(); wrapMarketViewCard(); decorateFacts(); renderWindowBar(); renderGaugeScale(); matchFigureLayout(); foldRestatedThreshold(); wireSlotHover(); undoPaneStretch(); publishAxisMode(); collapseJobControl(); groupBands(); foldEmptyHeader(); compactProtection(); dedupeJobEvidence(); dropRepeatedFacts();
-            renderModelExtras(); renderGrossExposure(); }
+            renderModelExtras(); }
     catch (e) { /* must never take the page down */ }
   };
 

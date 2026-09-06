@@ -283,6 +283,28 @@ def lifecycle(root: str | Path = ".") -> dict:
     }
 
 
+def _headline(trades, book, journal, broker, parity) -> str:
+    """Một câu, và nó phải đúng ở cả ba trạng thái — chưa vào lệnh, đã vào, và không đọc được.
+
+    `NO_ORDERS_YET` là trạng thái của hôm nay và là điều duy nhất đáng nói. Khi nó hết đúng,
+    câu này phải đổi theo chứ không được im lặng nói tiếp điều cũ.
+    """
+    reasons = list(broker.get("reasons") or [])
+    if NO_ORDERS_YET in reasons:
+        return ("Track 1 has placed no orders, so there is no profit or loss to report.")
+    if not reasons:
+        return "Track 1's profit and loss is verified against the broker."
+    return ("Track 1's profit and loss is not verified against the broker yet — "
+            "hover for what is missing.")
+
+
+def _headline_detail(trades, book, journal, broker, parity) -> str:
+    """Phần kiểm kê, để dành cho tooltip. Cùng dữ liệu, khác chỗ đứng."""
+    return (f"Trade log {trades['state']} ({trades['rows']} row(s)) · "
+            f"book {book['state']} · order journal {journal['state']} "
+            f"({journal['rows']} intended row(s)) · open-position parity {parity['status']}.")
+
+
 def report(root: str | Path = ".") -> dict:
     """Everything Track 1 can honestly say about its own trading right now."""
     root = Path(root)
@@ -297,10 +319,21 @@ def report(root: str | Path = ".") -> dict:
         "broker": broker, "open_position_parity": parity,
         "lifecycle": lifecycle(root),
         # The single sentence a reader who scrolls no further must not be able to misread.
-        "headline": (
-            f"Track 1 has no broker-verified P&L: {'; '.join(broker['reasons'])}. "
-            f"Trade log {trades['state']} ({trades['rows']} row(s)); "
-            f"book {book['state']}; order journal {journal['state']} "
-            f"({journal['rows']} INTENDED row(s)); parity {parity['status']}."),
+        #
+        # Stage 5ZZZ-CM. MỘT câu, một điều. Bản cũ ghép năm mệnh đề và hai mã máy:
+        #
+        #   "Track 1 has no broker-verified P&L: no_track1_orders_have_been_placed;
+        #    route_unattributed. Trade log empty (0 row(s)); book empty; order journal
+        #    not_produced (0 INTENDED row(s)); parity PASS."
+        #
+        # Bốn mệnh đề sau là KIỂM KÊ chứng minh mệnh đề đầu, không phải tin tức: bốn kho
+        # rỗng nói đúng một điều mà mệnh đề đầu đã nói. Người đọc lướt qua nhận được năm
+        # thứ và không thứ nào trả lời "hôm nay tuyến này làm gì".
+        #
+        # Kiểm kê không bị bỏ — nó vẫn nằm nguyên trong `trade_log`, `book`, `order_journal`,
+        # `broker` và `open_position_parity` của chính payload này, và mặt hiển thị dựng
+        # tooltip từ đó. Câu này chỉ thôi đọc hộ chúng.
+        "headline": _headline(trades, book, journal, broker, parity),
+        "headline_detail": _headline_detail(trades, book, journal, broker, parity),
         "reads_legacy_paths": False,
     }

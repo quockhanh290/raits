@@ -8,6 +8,7 @@ lọt qua. Harness này dựng Flask trên cổng tạm (static assets là thậ
 from __future__ import annotations
 
 import json
+import re
 import threading
 from pathlib import Path
 from urllib.parse import urlparse
@@ -132,6 +133,14 @@ BASE_PAYLOADS: dict[str, dict] = {
         "source": "scheduler_log", "day": "2026-08-14",
         "observed_at": "2026-08-14T18:06:00Z", "jobs": [], "monitor_events": [],
         "error": None,
+    },
+    # Thế giới MẶC ĐỊNH của bộ test là một thế giới lành: tuyến đặt được lệnh, không cổng
+    # nào chặn. Không có mục này, `stub_api` để request đi thẳng xuống backend thật, và
+    # trạng thái thật hôm nay — không đặt được lệnh — làm dải đầu thôi nói "nominal" trong
+    # năm phép kiểm về chuyện KHÁC HẲN. Phép kiểm nào muốn trạng thái chặn thì tự ghim.
+    "/api/v1/track1-runtime": {
+        "route": "track1_candidate",
+        "gates": {"orders_possible": True, "blocking_now": []},
     },
     "/api/v1/execution-quality/": {
         "source": "trade_log.jsonl", "day": "2026-08-14",
@@ -501,18 +510,81 @@ def test_sharpe_is_shown_once_the_sample_is_long_enough(realtime_server, browser
         "#performanceSharpe", "el => el.textContent").strip() == "0.88"
 
 
-def test_hmm_fit_is_not_green_while_every_fit_warns(realtime_server, browser_page):
-    stub_api(browser_page, {"/api/v1/session-events/": _session_events({
-        "kind": "hmm_fit_diagnostic", "status": "diagnostic", "level": "WARN",
-        "category": "MODEL / HMM FIT", "component": "runner", "sequence": 1,
-        "ts": "2026-08-14T17:00:00Z", "attempts": 22, "completed_fits": 22,
-        "non_convergence_count": 22, "message": "22/22 fits warned",
-    })})
+def _all_fits_warned() -> dict:
+    """A legacy session log where every one of 22 fits warned — the real 2026-08-24 shape."""
+    return {"kind": "hmm_fit_diagnostic", "status": "diagnostic", "level": "WARN",
+            "category": "MODEL / HMM FIT", "component": "runner", "sequence": 1,
+            "ts": "2026-08-14T17:00:00Z", "attempts": 22, "completed_fits": 22,
+            "non_convergence_count": 22, "message": "22/22 fits warned"}
+
+
+def _view_with_fit_inputs() -> dict:
+    view = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/track1-market-view"]))
+    view["regime"].update({
+        "status": "PASS", "code": "labelled", "label": "Calm", "label_date": "2026-08-14",
+        "inputs": {"start": "2018-01-01", "fit_end": "2024-12-31",
+                   "n_states": 3, "labels": 2179},
+    })
+    return view
+
+
+def test_hmm_fit_describes_the_frozen_fit_not_the_legacy_session_count(
+        realtime_server, browser_page):
+    """The tile must describe the fit the live route reads, and must not print the legacy
+    runner's per-session convergence count even while that log is being served.
+
+    `hmm_fit_diagnostic` is grouped out of `live_day_MMDD.log`, a file only the legacy
+    runner writes — Track 1 lists its siblings among the paths it must never touch. So in
+    track1-only shadow the tile was reporting whatever day legacy last ran as today's.
+    The count does not survive the move either: 22 attempts in one day is the legacy runner
+    refitting per slot, and Track 1 reads one frozen fit without refitting per session.
+
+    Reads with the test below it: that one proves this same fixture DOES produce "22 warn"
+    when no Track 1 record exists, so the absence asserted here cannot pass vacuously.
+    """
+    stub_api(browser_page, {"/api/v1/track1-market-view": _view_with_fit_inputs(),
+                            "/api/v1/session-events/": _session_events(_all_fits_warned())})
+    open_realtime(browser_page, realtime_server)
+    text = browser_page.eval_on_selector("#modelFitStatus", "el => el.textContent")
+    assert "3 states" in text and "2,179" in text
+    assert "22" not in text
+    assert "frozen fit" in browser_page.eval_on_selector("#modelFitStatus", "el => el.title")
+
+
+def test_hmm_fit_falls_back_to_the_legacy_log_when_no_track_1_record_exists(
+        realtime_server, browser_page):
+    """Nothing was deleted: a machine with no Track 1 regime record reads exactly as before,
+    and a day where every fit warned still must not read green."""
+    view = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/track1-market-view"]))
+    view["regime"] = None
+    stub_api(browser_page, {"/api/v1/track1-market-view": view,
+                            "/api/v1/session-events/": _session_events(_all_fits_warned())})
     open_realtime(browser_page, realtime_server)
     assert browser_page.eval_on_selector(
         "#modelFitStatus", "el => el.className") != "positive"
     assert "22 warn" in browser_page.eval_on_selector(
         "#modelFitStatus", "el => el.textContent")
+
+
+def test_fit_end_keeps_the_track_1_value_and_is_not_rewritten_by_next_js(
+        realtime_server, browser_page):
+    """One element, one writer. next.js used to fill `#modelFitEnd` from the legacy
+    `model_age.model_name`, so whichever renderer ran last decided the value — and the
+    legacy string could silently replace one the other route had already verified. The two
+    agree in production (both 2024-12-31), which is why nothing on screen showed it; here
+    the legacy fixture names a different year so a rewrite would be visible.
+    """
+    view = _view_with_fit_inputs()
+    runner = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/runner-state"]))
+    runner["payload"]["meta"]["operational_status"]["model_age"]["model_name"] = "fit_end=2019-01-01"
+    stub_api(browser_page, {"/api/v1/track1-market-view": view,
+                            "/api/v1/runner-state": runner})
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_timeout(1200)
+    text = browser_page.eval_on_selector("#modelFitEnd", "el => el.textContent")
+    assert "2019" not in text, f"legacy value rewrote the Track 1 one: {text!r}"
+    assert "Dec 31" in text
+    assert "PASS" in browser_page.eval_on_selector("#modelFitEnd", "el => el.title")         or "label check" in browser_page.eval_on_selector("#modelFitEnd", "el => el.title")
 
 
 def test_open_issues_coverage_names_stale_evidence_end(realtime_server, browser_page):
@@ -870,9 +942,25 @@ def test_numbers_from_a_dead_source_are_not_shown_as_current(realtime_server, br
     browser_page.wait_for_function(
         "() => document.getElementById('metricEquity').textContent.trim() === '--'",
         timeout=20_000)
+    # Stage 5ZZZ-CG. Ghim MỤC ĐÍCH — "không con số nào" — chứ không ghim chuỗi `--`.
+    #
+    # Khi test này được viết, `--` là từ vựng duy nhất của trang cho sự vắng mặt. Từ đó
+    # trang có thêm những lời từ chối CÓ TÊN: ô equity in "not measured" / "baseline
+    # UNKNOWN", và ô mức sụt giờ in "unavailable" kèm lý do ở dòng dưới. Cả hai đều không
+    # phải con số, nên đều thoả điều mục đích của test nói: người vận hành không được đọc
+    # một con số trông sống động từ một nguồn đã chết.
+    #
+    # Bản assert cũ sẽ đỏ trước một cải thiện, và đã sắp đỏ vì lý do khác: ô equity sẽ in
+    # "not measured" ngay khi Track 1 công bố mốc tài khoản, hoàn toàn không liên quan tới
+    # nguồn nào chết. Bản mới chặt hơn ở chiều đáng chặt: bất kỳ CHỮ SỐ nào cũng đỏ, và một
+    # lời từ chối có tên thì phải nói được vì sao.
     for metric in ("metricEquity", "metricRealized", "metricDrawdown", "performanceNet"):
         value = browser_page.eval_on_selector(f"#{metric}", "el => el.textContent").strip()
-        assert value == "--", f"{metric} hien '{value}' tu nguon da chet"
+        assert value, f"{metric} de trong, khong noi gi"
+        assert not re.search(r"\d", value), f"{metric} hien '{value}' tu nguon da chet"
+        if value != "--":
+            reason = browser_page.eval_on_selector(f"#{metric}", "el => el.title")
+            assert len(reason.strip()) > 20, f"{metric} tu choi '{value}' ma khong noi vi sao"
     # Nguồn broker vẫn sống nên số của nó KHÔNG được bị xoá theo.
     assert browser_page.eval_on_selector("#metricPositions", "el => el.textContent").strip() != "--"
     # Và trang vẫn phải nói ra nguồn nào hỏng.
@@ -1113,7 +1201,22 @@ def test_5zzf_without_a_baseline_the_legacy_number_appears_only_under_its_own_na
     assert "Broker acct" not in text, text
 
 
-def test_5zzf_open_issues_carry_their_route_scope_as_a_chip(realtime_server, browser_page):
+def test_5zzf_a_legacy_scoped_issue_is_still_listed_and_carries_no_scope_chip(
+        realtime_server, browser_page):
+    """Hai nửa, và chỉ một nửa đổi.
+
+    GIỮ NGUYÊN — một mục thuộc tuyến cũ vẫn phải NẰM TRONG danh sách. Đó là bất biến gốc
+    của Stage 5ZZF: gắn nhãn, không giấu đi. Một mục biến mất là một mục không ai quay lại
+    được.
+
+    ĐÃ ĐỔI — không còn chip phạm vi. Quyết định của chủ dự án 2026-09-06. Ba chip trên một
+    dòng hai dòng chữ là quá nhiều, và hai trong ba nhãn ("Shared", "Model") là từ của
+    người viết mã: người đọc nhìn vào không biết chúng nghĩa gì. Phân biệt duy nhất thật sự
+    đổi cách đọc — đã nghỉ hưu hay chưa — vẫn còn, ở tiêu đề nhóm thu gọn được.
+
+    Ghim theo cả hai chiều để lần rà sau không "khôi phục" chip ấy: nó đã ở đây một lần rồi.
+    """
+
     issues = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/open-issues"]))
     issues["issues"] = [
         {"key": "paper:pnl:paper_flex_total_mismatch", "status": "incident",
@@ -1127,14 +1230,20 @@ def test_5zzf_open_issues_carry_their_route_scope_as_a_chip(realtime_server, bro
     ]
     stub_api(browser_page, {"/api/v1/open-issues": issues})
     open_realtime(browser_page, realtime_server)
-    browser_page.wait_for_selector("#openIssueList .issue-scope", timeout=10_000)
-    chips = browser_page.eval_on_selector_all(
-        "#openIssueList .issue-scope", "els => els.map(e => e.textContent.trim())")
-    assert "LEGACY" in chips, chips
-    # the issue is still listed — labelled, not removed
+    browser_page.wait_for_selector("#openIssueList .issue-list-row", timeout=10_000)
+    # Nửa giữ nguyên: mục vẫn nằm trong danh sách.
     rows = browser_page.eval_on_selector_all(
         "#openIssueList .issue-list-row", "els => els.length")
     assert rows == 1, rows
+    # Nửa đã đổi: không chip phạm vi nào, ở cả danh sách lẫn khối chi tiết.
+    scope = browser_page.eval_on_selector_all(
+        ".issue-scope", "els => els.map(e => e.textContent.trim())")
+    assert scope == [], f"chip phạm vi đã quay lại: {scope}"
+    # Và hai chip còn lại vẫn nói được nguồn và trạng thái.
+    kept = browser_page.eval_on_selector_all(
+        "#openIssueList .issue-origin, #openIssueList .issue-status",
+        "els => els.map(e => e.textContent.trim())")
+    assert len(kept) == 2, kept
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════
@@ -1730,3 +1839,653 @@ def test_a_series_of_slots_that_recorded_nothing_says_so_instead_of_drawing_noth
     # Và không được in Infinity ra bất cứ đâu.
     body = browser_page.eval_on_selector("#marketViewChart", "el => el.textContent")
     assert "∞" not in body and "Infinity" not in body, body[:200]
+
+
+def _series_x_positions(page) -> list[float]:
+    """Toạ độ x của mọi chấm giá đóng cửa trên pane chuỗi, theo thứ tự vẽ."""
+    return page.eval_on_selector_all(
+        ".mv2-sc-svg .mv2-sc-dot-close",
+        "els => els.map(e => Number(e.getAttribute('cx')))")
+
+
+def _price_slot_positions(page) -> list[float]:
+    """Toạ độ x của mọi mark slot trên biểu đồ nến."""
+    return page.eval_on_selector_all(
+        ".mv-svg .mv-mark", "els => els.map(e => Number(e.getAttribute('cx')))")
+
+
+def test_one_unplaceable_slot_drops_that_slot_and_not_the_shared_axis(
+        realtime_server, browser_page):
+    """Thiếu một phút thì bỏ đúng slot đó, không bỏ cả trục.
+
+    Luật cũ là `every`: chỉ cần MỘT slot mang phút mà biểu đồ nến không vẽ là cả pane
+    quay về trải đều các điểm ra hết chiều ngang. Hậu quả rơi vào những slot KHÔNG hỏng —
+    chúng bị đẩy khỏi cây nến ngay trên đầu chúng, đúng vào lúc người đọc cần đối chiếu
+    hai pane nhất.
+
+    Phép kiểm dựng đúng ca đó: một điểm mang phút không có trong biểu đồ nến. Mọi điểm
+    còn lại phải nằm nguyên trên toạ độ mà biểu đồ nến đã đặt cho phút của nó.
+    """
+    mv = _with_slot_series(_market_view(), series_day="2026-08-27")
+    series = mv["sleeves"]["global_nkd"]["strategy"]["slot_series"]
+    # Chốt chặn: phải có đủ điểm để bỏ một cái mà vẫn còn một trục.
+    assert len(series) >= 4, f"chuỗi quá ngắn để phép kiểm này có nghĩa: {len(series)}"
+    alien = series[2]["slot_time"]
+    series[2] = dict(series[2], slot_time="03:07")  # phút không slot nào có
+
+    _open_price_context(browser_page, realtime_server, mv)
+    assert _xspan(browser_page) == "shared", (
+        f"một phút thiếu vẫn làm mất cả trục chung: {_axis_state(browser_page)}")
+
+    drawn = _series_x_positions(browser_page)
+    marks = _price_slot_positions(browser_page)
+    assert len(marks) >= len(series) - 1, f"biểu đồ nến chỉ vẽ {len(marks)} mark"
+    assert len(drawn) == len(series) - 1, (
+        f"phải bỏ đúng MỘT điểm: vẽ {len(drawn)} trên {len(series)} slot")
+    # Mọi điểm còn lại phải trùng toạ độ của mark cùng phút trên biểu đồ nến.
+    for cx in drawn:
+        assert any(abs(cx - m) < 0.6 for m in marks), (
+            f"điểm ở x={cx} không nằm trên mark nào của biểu đồ nến: {marks[:6]}…")
+    # Và người đọc phải ĐỌC ĐƯỢC là có slot bị bỏ, chứ không phải tự suy ra.
+    note = browser_page.eval_on_selector(
+        ".mv2-slotchart", "el => el.innerText")
+    assert "not drawn here" in note and "03:07" in note, (
+        f"không nói ra slot nào bị bỏ; nhãn gốc là {alien!r}. Đọc được: {note[:180]!r}")
+
+
+def test_a_sleeve_with_no_candles_does_not_inherit_the_previous_sleeve_axis(
+        realtime_server, browser_page):
+    """Bản đồ toạ độ slot phải chết cùng chart đã dựng ra nó.
+
+    Hàm vẽ nến chỉ GHI bản đồ khi thành công, và thoát sớm khi sleeve không có bar — nên
+    bản đồ của sleeve vẽ trước vẫn sống. Sleeve thứ hai không có nến nào để dóng vào lại
+    tuyên bố `data-xspan="shared"` và đặt slot của mã NÀY lên các phút của nến mã KHÁC.
+    Không có gì trên màn hình nói ra điều đó: trục trông vẫn bình thường.
+
+    Bản đồ giờ bị xoá khi VÀO hàm và mang dấu mã + phiên nó được dựng từ đó.
+    """
+    mv = _with_slot_series(_market_view(), series_day="2026-08-27")
+    first = mv["sleeves"]["global_nkd"]
+    # Sleeve thứ hai: cùng các phút slot, cùng chuỗi — nhưng KHÔNG có bar nào.
+    second = json.loads(json.dumps(first))
+    second.update({"label": "R4S", "instrument": "MES", "bars": [],
+                   "summary": "No bars recorded yet for this session"})
+    mv["sleeves"]["roska4_stress"] = second
+
+    _open_price_context(browser_page, realtime_server, mv)
+    # Chốt chặn: sleeve ĐẦU phải đang chung trục, nếu không phép kiểm dưới đây đạt rỗng
+    # — một trang không bao giờ chung trục cũng sẽ qua.
+    assert _xspan(browser_page) == "shared", (
+        f"sleeve đầu chưa chung trục nên chưa có gì để kế thừa: {_axis_state(browser_page)}")
+
+    browser_page.click('[data-mv-tab="roska4_stress"]')
+    browser_page.wait_for_timeout(600)
+    assert browser_page.query_selector(".mv-svg .mv-mark") is None, (
+        "sleeve thứ hai vẫn vẽ mark, nên nó có nến — dựng sai ca cần kiểm")
+    assert _xspan(browser_page) == "own", (
+        "sleeve không có nến vẫn nhận trục của sleeve trước: "
+        f"{_axis_state(browser_page)}")
+
+
+def _posterior_rows(page) -> list[dict]:
+    return page.eval_on_selector_all(
+        "#regimePosterior .regime-post-row",
+        """els => els.map(e => ({
+             name: (e.querySelector('span') || {}).textContent?.trim() || '',
+             value: (e.querySelector('b') || {}).textContent?.trim() || '',
+             absent: e.classList.contains('regime-post-absent'),
+             hasBar: !!e.querySelector('.regime-post-track')}))""")
+
+
+def test_a_regime_the_model_does_not_fit_is_shown_without_a_probability(
+        realtime_server, browser_page):
+    """Crisis phải hiện, nhưng không được mang một con số mô hình chưa từng tính.
+
+    Hệ thống nói về bốn chế độ — Calm / Normal / Stress / Crisis — còn mô hình chạy trên
+    tuyến này fit BA: `inputs.n_states` là 3 và posterior chỉ có ba khoá. Bỏ hẳn dòng
+    Crisis thì người đọc không biết cái thứ tư đi đâu; in "0.00%" thì lại khai rằng mô
+    hình đã tính ra một xác suất và nó bằng không. Hai câu đó dẫn tới hai quyết định vận
+    hành khác nhau.
+
+    Dòng phải có mặt, phải tự nhận là không thuộc mô hình, và phải KHÔNG mang phần trăm.
+    """
+    stub_api(browser_page, {"/api/v1/track1-market-view": {
+        "market_view": {"session_date": "2026-08-27", "sleeves": {}},
+        "regime": _regime()}})
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector("#regimePosterior .regime-post-row", timeout=20_000)
+
+    rows = _posterior_rows(browser_page)
+    # Chốt chặn: fixture phải đúng là mô hình BA trạng thái, nếu không phép kiểm này
+    # đang đo một thế giới khác.
+    priced = [r for r in rows if not r["absent"]]
+    assert len(priced) == 3, f"fixture không còn là mô hình ba trạng thái: {rows}"
+
+    crisis = [r for r in rows if r["name"].startswith("Crisis")]
+    assert len(crisis) == 1, f"không có dòng Crisis: {[r['name'] for r in rows]}"
+    assert crisis[0]["absent"], "dòng Crisis đang trông như một dòng có số"
+    assert "%" not in crisis[0]["value"], (
+        f"dòng Crisis in một xác suất mô hình chưa từng tính: {crisis[0]['value']!r}")
+    assert not crisis[0]["hasBar"], "dòng Crisis vẫn vẽ thanh bar"
+    # Và ba dòng kia vẫn phải giữ nguyên phần trăm của chúng.
+    assert all("%" in r["value"] for r in priced), (
+        f"một trạng thái có fit lại mất phần trăm: {priced}")
+
+
+def _time_labels(page) -> list[dict]:
+    """Nhãn thời gian của pane chuỗi, nay là span HTML chứ không còn `<text>` trong SVG.
+
+    Luật 5 của hợp đồng cấm vẽ chữ bên trong một SVG `preserveAspectRatio="none"`, nên
+    nhãn ra lớp phủ HTML và mang toạ độ dưới dạng `left: N%` của viewBox. `cx` quy ngược
+    về đơn vị viewBox (W = 1000) để so được với toạ độ mark của biểu đồ nến.
+    """
+    return page.eval_on_selector_all(
+        ".mv2-sc-labels .mv2-sc-lab",
+        r"""els => els.filter(e => /^\d\d:\d\d$/.test(e.textContent))
+             .map(e => { const r = e.getBoundingClientRect();
+               return {t: e.textContent, cx: +(parseFloat(e.style.left) * 10).toFixed(1),
+                       left: r.left, right: r.right}; })""")
+
+
+def test_the_time_axis_labels_describe_the_axis_not_a_corner_of_it(
+        realtime_server, browser_page):
+    """Nhãn thời gian phải nói trục chạy từ đâu đến đâu, và không được đè lên nhau.
+
+    Khi pane dùng trục của biểu đồ nến, các điểm của chuỗi có thể chỉ chiếm một góc trục:
+    đo được trên phiên thật, 22 slot trải hết bề ngang nhưng chỉ 3 slot ghi được số liệu
+    và cả ba nằm ở cuối cửa sổ. Lấy mốc từ chuỗi khi đó sinh ra hai lỗi cùng lúc —
+    `[đầu, giữa, cuối]` của hai điểm là `[0, 0, 1]` nên nhãn đầu vẽ HAI lần khít lên nhau
+    (đo được 41,7px đè), và ba nhãn dồn hết vào mép phải (đè thêm 13,3px), không ai đọc
+    được trục bắt đầu từ đâu.
+
+    Phép kiểm dựng đúng ca đó: chuỗi chỉ giữ ba slot cuối.
+    """
+    mv = _with_slot_series(_market_view(), series_day="2026-08-27")
+    strategy = mv["sleeves"]["global_nkd"]["strategy"]
+    strategy["slot_series"] = strategy["slot_series"][-3:]
+
+    _open_price_context(browser_page, realtime_server, mv)
+    # Chốt chặn: phải đang dùng trục chung, nếu không đây là một ca khác hẳn.
+    assert _xspan(browser_page) == "shared", _axis_state(browser_page)
+
+    labels = _time_labels(browser_page)
+    marks = _price_slot_positions(browser_page)
+    assert len(labels) >= 2, f"không đủ nhãn thời gian để đo: {labels}"
+    assert len(marks) >= 3, f"biểu đồ nến chỉ vẽ {len(marks)} mark"
+
+    texts = [o["t"] for o in labels]
+    assert len(set(texts)) == len(texts), f"một nhãn được vẽ nhiều lần: {texts}"
+    for a, b in zip(labels, labels[1:]):
+        assert a["right"] <= b["left"], (
+            f"nhãn {a['t']!r} đè lên {b['t']!r} {a['right'] - b['left']:.1f}px")
+
+    # Và hai đầu phải là hai đầu của TRỤC — đúng mark đầu và mark cuối của biểu đồ nến.
+    assert abs(labels[0]["cx"] - min(marks)) < 0.6, (
+        f"nhãn đầu ở {labels[0]['cx']} trong khi trục bắt đầu ở {min(marks)}")
+    assert abs(labels[-1]["cx"] - max(marks)) < 0.6, (
+        f"nhãn cuối ở {labels[-1]['cx']} trong khi trục kết thúc ở {max(marks)}")
+
+
+def test_two_points_do_not_make_the_same_label_twice(realtime_server, browser_page):
+    """Hai điểm thì `[đầu, giữa, cuối]` là `[0, 0, 1]` — nhãn đầu vẽ HAI lần khít lên nhau.
+
+    Đúng thứ đã thấy trên trang: hai chữ "02:45" chồng nhau ở cùng một toạ độ, một cái căn
+    trái một cái căn giữa, đo được 41,7px đè. Ca này chạy trên nhánh KHÔNG chung trục, nơi
+    mốc vẫn lấy từ chuỗi, nên nó chạm được đúng đoạn lọc trùng — nhánh chung trục lấy mốc
+    từ 22 slot của biểu đồ nến nên không bao giờ sinh ra cặp trùng.
+    """
+    mv = _with_slot_series(_market_view(), series_day="2026-08-28")  # khác phiên -> trục riêng
+    strategy = mv["sleeves"]["global_nkd"]["strategy"]
+    strategy["slot_series"] = strategy["slot_series"][:2]
+
+    _open_price_context(browser_page, realtime_server, mv)
+    # Chốt chặn: phải đúng là nhánh trục riêng, nếu không ca này không chạm đoạn cần kiểm.
+    assert _xspan(browser_page) == "own", _axis_state(browser_page)
+
+    labels = _time_labels(browser_page)
+    texts = [o["t"] for o in labels]
+    assert len(labels) == 2, f"hai điểm phải cho đúng hai nhãn: {texts}"
+    assert len(set(texts)) == 2, f"một nhãn được vẽ hai lần: {texts}"
+    assert labels[0]["right"] <= labels[1]["left"], (
+        f"hai nhãn đè nhau {labels[0]['right'] - labels[1]['left']:.1f}px: {texts}")
+
+
+def _quiet_job(index: int) -> dict:
+    """Một lượt chạy xong mà không đụng tới lệnh nào — hàng in câu hằng số."""
+    minute = index * 5
+    return {
+        "id": f"quiet-{index}", "job_id": f"TRACK1_NKD_01{minute:02d}",
+        "job_type": "live_day", "status": "completed",
+        "started_at": f"2026-08-14T18:{minute:02d}:00Z",
+        "ended_at": f"2026-08-14T18:{minute:02d}:05Z",
+        "duration_seconds": 5, "reason": None, "diagnostics": [], "events": [],
+    }
+
+
+def _failed_job() -> dict:
+    return {
+        "id": "broken", "job_id": "TRACK1_NKD_0200", "job_type": "live_day",
+        "status": "failed", "started_at": "2026-08-14T18:40:00Z",
+        "ended_at": "2026-08-14T18:40:09Z", "duration_seconds": 9,
+        "reason": "IBKR refused the order", "diagnostics": [], "events": [],
+    }
+
+
+def _job_row_sentences(page) -> list[str]:
+    return page.eval_on_selector_all(
+        ".job-row .job-summary", "els => els.map(e => e.textContent.trim())")
+
+
+def test_the_quiet_sentence_is_stated_once_and_a_broken_slot_keeps_its_own(
+        realtime_server, browser_page):
+    """Câu "chạy xong, không đụng gì" nói một lần; slot có vấn đề giữ nguyên câu của nó.
+
+    Đo được 2026-09-04: 29 hàng, ĐÚNG HAI câu khác nhau — 28 hàng nói câu hằng số và một
+    hàng nói Windows chặn ghi runner-state. Hàng có sự cố duy nhất của ngày nằm lẫn giữa
+    28 dòng giống hệt nhau; riêng câu ấy chiếm 1.008px, và danh sách dài 4.228px.
+
+    Phép kiểm dựng đúng hình dạng đó: nhiều hàng im lặng, một hàng hỏng. Hàng hỏng phải là
+    hàng DUY NHẤT còn mang chữ, và dòng nguồn phải NÓI RÕ nó phủ bao nhiêu hàng — nói
+    trống thì một ngày 12 im lặng / 17 có chuyện sẽ đọc thành "hôm nay êm".
+    """
+    journal = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/job-journal/"]))
+    journal["jobs"] = [_quiet_job(i) for i in range(6)] + [_failed_job()]
+    stub_api(browser_page, {"/api/v1/job-journal/": journal})
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector(".job-row", timeout=20_000)
+
+    sentences = _job_row_sentences(browser_page)
+    # Chốt chặn: phải có đủ hàng, nếu không mọi assert dưới đây đạt rỗng.
+    assert len(sentences) == 7, f"dựng 7 hàng nhưng đọc được {len(sentences)}"
+
+    spoken = [s for s in sentences if s]
+    assert len(spoken) == 1, f"phải còn đúng một hàng mang chữ, đang có {len(spoken)}: {spoken}"
+    assert "failed" in spoken[0].lower(), f"hàng còn chữ không phải hàng hỏng: {spoken[0]!r}"
+
+    note = browser_page.eval_on_selector_all(
+        ".journal-fold-note", "els => els.map(e => e.textContent.trim())")
+    assert len(note) == 1, f"phải có đúng một câu gộp, đang có {len(note)}: {note}"
+    assert "6 of 7 executions" in note[0], (
+        f"câu gộp không nói nó phủ bao nhiêu hàng: {note[0]!r}")
+    # Và phải ĐỌC ĐƯỢC HẾT. Bản đầu đặt câu này ở dòng nguồn, chỗ chỉ rộng 208px trong
+    # khi câu cần 387px — người đọc thấy "30 with …" và không biết nó phủ bao nhiêu hàng,
+    # tức là gộp mà không nói gì, đúng bằng không gộp.
+    fits = browser_page.eval_on_selector(
+        ".journal-fold-note",
+        "el => el.scrollWidth <= Math.ceil(el.getBoundingClientRect().width) + 1")
+    assert fits, "câu gộp bị cắt — người đọc không biết nó phủ bao nhiêu hàng"
+
+
+def test_a_day_where_nothing_repeats_keeps_every_sentence_on_its_row(
+        realtime_server, browser_page):
+    """Chỉ gộp khi CÓ lặp. Một hàng im lặng thì không gộp.
+
+    Gộp một hàng không tiết kiệm gì mà lại đẩy câu ra xa hàng nó mô tả. Phép kiểm này là
+    chốt chặn cho phép kiểm trên: thiếu nó, một bản sửa gộp-mọi-lúc vẫn qua được cả hai.
+    """
+    journal = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/job-journal/"]))
+    journal["jobs"] = [_quiet_job(0), _failed_job()]
+    stub_api(browser_page, {"/api/v1/job-journal/": journal})
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector(".job-row", timeout=20_000)
+
+    sentences = _job_row_sentences(browser_page)
+    assert len(sentences) == 2, f"dựng 2 hàng nhưng đọc được {len(sentences)}"
+    assert all(sentences), f"một hàng bị gộp mất chữ dù chỉ có một hàng im lặng: {sentences}"
+    assert browser_page.query_selector(".journal-fold-note") is None, (
+        "danh sách gộp dù chỉ có một hàng im lặng")
+
+
+def test_the_label_date_is_stated_once_in_the_regime_card(realtime_server, browser_page):
+    """Ngày nhãn và tuổi bản đọc nói một lần, ở dòng nguồn của section.
+
+    Đo được: `daily label · 2026-09-03 · checked 5.29h ago` ở dòng nguồn, và
+    `as of 2026-09-03 · checked 5.29h ago` trong ô neo — cùng ngày, cùng số giờ, cách nhau
+    176px. Dòng nguồn là chỗ mọi section khác của trang đặt xuất xứ của mình, nên bản trong
+    ô neo là bản đi.
+    """
+    stub_api(browser_page, {"/api/v1/track1-market-view": {
+        "market_view": {"session_date": "2026-08-27", "sleeves": {}},
+        "regime": _regime()}})
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector("#regimePosterior .regime-post-row", timeout=20_000)
+
+    card = browser_page.eval_on_selector(".rg2-card", "el => el.innerText")
+    src = browser_page.eval_on_selector(".regime-section .source-note", "el => el.textContent")
+    # Chốt chặn: dòng nguồn phải THẬT SỰ mang ngày nhãn, nếu không "chỉ một lần" là vì
+    # cả hai bản đều biến mất.
+    assert "daily label" in src, f"dòng nguồn không mang ngày nhãn: {src!r}"
+    assert "as of" not in card, f"ô neo vẫn nhắc lại xuất xứ: {card[:160]!r}"
+
+    note = browser_page.eval_on_selector(".regime-section .mv2-note, .rg2-foot",
+                                         "el => el.innerText")
+    assert "percentage points" not in note, (
+        f"chân thẻ vẫn nhắc lại biên xác suất mà ô LEAD đã in: {note!r}")
+    # Stage 5ZZZ-CM. Ghim NGHĨA, không ghim câu chữ. Bản cũ đòi đúng cụm "no cutoff number";
+    # câu đã được viết lại cho người không có nền ("not when some number is breached") và
+    # test đỏ dù điều nó bảo vệ vẫn nguyên. Điều phải đúng là: dòng này nói KHÔNG có ngưỡng
+    # nào để vượt qua — bằng chữ gì cũng được.
+    assert ("no cutoff" in note or "no level" in note.lower()
+            or "not when some number" in note), (
+        f"đã xoá nhầm nửa KHÔNG trùng ở đâu khác: {note!r}")
+
+
+def test_the_market_view_chips_do_not_restate_the_sentence_above_them(
+        realtime_server, browser_page):
+    """Hàng chip không được nhắc lại đúng câu nằm ngay trên nó.
+
+    Đo được hai chip cách câu tóm tắt 3px: `3 / 22 slots observed` và
+    `gate allow failed 19 of 22`, trong khi câu ấy đã nói "3 of 22 slots ... gate allow
+    failed on 19 of 22 decided slots". Xuất xứ bằng chứng thì phải GIỮ — nó không có ở đâu
+    khác và trả lời một câu hỏi khác hẳn.
+    """
+    mv = _with_slot_series(_market_view(), series_day="2026-08-27")
+    sleeve = mv["sleeves"]["global_nkd"]
+    sleeve["coverage"]["observed_slots"] = 3
+    # Làn chặn phải được đọc ra từ CHÍNH các ô mà detector ghi — `mvBlockingLane` đếm
+    # `state === 'fail'`, không đọc trường `failed`. Dựng tay bằng cách sửa trường tổng sẽ
+    # cho một fixture mà code thật không bao giờ nhìn tới.
+    lane = sleeve["rule_lanes"][0]
+    for cell in lane["cells"][3:]:
+        cell["state"] = "fail"
+    # Xuất xứ bằng chứng đọc từ hàng phiên trên đĩa, không suy từ sự có mặt của lane —
+    # và `sessions` nằm cùng cấp với `market_view` trong phản hồi, không nằm bên trong nó.
+    stub_api(browser_page, {"/api/v1/track1-market-view": {
+        "market_view": mv, "regime": _regime(),
+        "sessions": [{"day": sleeve["bars_session_date"], "has_diagnostics": True}]}})
+    open_realtime(browser_page, realtime_server)
+    browser_page.click('[data-mv-inner="Price context"]')
+    browser_page.wait_for_selector(".mv2-sc-svg", timeout=20_000)
+    browser_page.wait_for_timeout(500)
+    summary = browser_page.eval_on_selector(".mv2-reason", "el => el.textContent.trim()")
+    chips = browser_page.eval_on_selector_all(
+        ".mv2-verdict-meta span, .mv2-verdict-side div", "els => els.map(e => e.textContent.trim())")
+    # Chốt chặn: phải có câu VÀ có chip, nếu không so sánh dưới đây không kiểm gì.
+    assert summary and "slots" in summary, f"không đọc được câu tóm tắt: {summary!r}"
+    assert chips, "không đọc được chip nào"
+
+    lane = re.search(r"([a-z ]+) failed on (\d+) of (\d+)", summary)
+    assert lane, f"câu tóm tắt không nêu làn chặn nên phép kiểm chưa đúng ca: {summary!r}"
+    echo = f"{lane.group(1).strip()} failed {lane.group(2)} of {lane.group(3)}"
+    assert echo not in chips, f"chip lặp lại nguyên câu trên nó: {echo!r} trong {chips}"
+    assert not any(c.endswith("slots observed") for c in chips), (
+        f"chip vẫn nhắc lại hai con số của câu: {chips}")
+    assert any("recorded while the slots ran" in c or "replayed over stored bars" in c
+               for c in chips), f"xoá nhầm xuất xứ bằng chứng: {chips}"
+
+
+def test_the_open_detail_does_not_repeat_what_the_row_header_already_shows(
+        realtime_server, browser_page):
+    """Khối mở không được in lại ba thứ hàng đã in.
+
+    Hàng in `etDateTime(job.started_at)`, `duration(job.duration_seconds)` và
+    `presentation.statusLabel`. Bảng thời gian trong khối mở in ĐÚNG ba biểu thức đó —
+    không phải hai chuỗi tình cờ giống nhau, mà cùng một biểu thức ở hai chỗ. Đo được
+    trong một hàng đang mở: giờ 3 lần, "12s" 2 lần, "COMPLETED" 2 lần.
+    """
+    journal = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/job-journal/"]))
+    journal["jobs"] = [_failed_job()]
+    stub_api(browser_page, {"/api/v1/job-journal/": journal})
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector(".job-row", timeout=20_000)
+    browser_page.click(".job-row .job-trigger")
+    browser_page.wait_for_selector(".job-detail", timeout=10_000)
+
+    head = browser_page.eval_on_selector(".job-row .job-trigger", "el => el.innerText")
+    body = browser_page.eval_on_selector(".job-row .job-detail", "el => el.innerText")
+    # Chốt chặn: hàng phải THẬT SỰ mang ba thứ đó, nếu không "không lặp" là vô nghĩa.
+    assert "9s" in head, f"hàng không in thời lượng: {head!r}"
+    assert "OPEN" in head, f"hàng không in trạng thái: {head!r}"
+
+    for token in ("9s", "OPEN"):
+        assert token not in body, f"khối mở in lại {token!r} mà hàng đã in: {body!r}"
+    assert "Started" not in body and "Duration" not in body and "Outcome" not in body, (
+        f"bảng thời gian vẫn giữ trường hàng đã in: {body!r}")
+
+
+def test_a_settled_run_opens_to_one_block_and_a_broken_one_keeps_the_contract(
+        realtime_server, browser_page):
+    """Hợp đồng năm phần viết cho một SỰ CỐ, không cho một lượt chạy sạch.
+
+    Điều kiện là CẤU TRÚC — chạy xong, không sự kiện, không chẩn đoán — chứ không so chuỗi.
+    Đo được trước bản sửa: khối chi tiết của một lượt như vậy cao 490px để nói cùng một
+    điều bốn lần.
+    """
+    journal = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/job-journal/"]))
+    journal["jobs"] = [_quiet_job(0), _quiet_job(1), _failed_job()]
+    stub_api(browser_page, {"/api/v1/job-journal/": journal})
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector(".job-row", timeout=20_000)
+
+    browser_page.click(".job-row.status-completed .job-trigger")
+    browser_page.wait_for_selector(".job-detail", timeout=10_000)
+    quiet_body = browser_page.eval_on_selector(".job-detail", "el => el.innerText")
+    assert "IMPACT" not in quiet_body and "EVIDENCE / RESOLUTION" not in quiet_body, (
+        f"lượt chạy sạch vẫn mở ra cả hợp đồng: {quiet_body!r}")
+    assert "PROBLEM" in quiet_body, f"lượt chạy sạch không nói gì cả: {quiet_body!r}"
+
+    browser_page.click(".job-row.status-open .job-trigger")
+    browser_page.wait_for_timeout(400)
+    broken_body = browser_page.eval_on_selector(".job-row.status-open .job-detail",
+                                                "el => el.innerText")
+    # Chốt chặn ngược: hàng hỏng PHẢI giữ đủ, nếu không bản sửa đang giấu mất bằng chứng.
+    for part in ("IMPACT", "ACTION", "EVIDENCE / RESOLUTION"):
+        assert part in broken_body, f"hàng hỏng mất phần {part}: {broken_body!r}"
+
+
+def test_a_relative_time_agrees_with_the_absolute_time_beside_it(
+        realtime_server, browser_page):
+    """Hai nửa của cùng một dòng không được nói về hai thời điểm khác nhau.
+
+    Đo được 2026-09-04: ô Now Monitor ghi "MAX_HOLD_EXIT · 09:31 ET · 1m ago" trong khi
+    đồng hồ trang là 12:16 ET — lệch 2 giờ 45 phút. Chuỗi "x ago" còn TỰ NHÍCH mỗi 5 phút
+    trong khi 09:31 đứng yên, vì nó tính từ `latest_expected_at` — slot gần nhất bộ lập
+    lịch MONG ĐỢI — chứ không phải từ lúc quyết định kia xảy ra.
+
+    Lỗi này bốn lượt rà thiết kế không bắt được: hợp đồng quản HÌNH, còn đây là chuyện
+    ĐÚNG SAI. Một mốc tương đối sai làm hỏng lòng tin vào mọi mốc tương đối khác trên
+    trang, kể cả "updated 7s ago" ở header.
+
+    Payload được GHIM chứ không đọc dữ liệu sống: bản đầu của phép kiểm này so một mốc
+    tương đối tính từ `server_now` của backend với đồng hồ ET đang chạy của trang, nên nó
+    xanh khi chạy riêng và đỏ khi chạy trong bộ — một phép kiểm nhấp nháy còn tệ hơn không
+    có, vì nó dạy người ta bỏ qua màu đỏ.
+    """
+    schedule = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/schedule-status"]))
+    # `server_now` 18:07:00Z = 14:07 ET. Mọi mốc dưới đây neo vào đúng con số đó.
+    schedule["next_scheduled_job"] = {"job_id": "LIVE_DAY_1410", "at": "2026-08-14T18:10:00Z"}
+    schedule["next_decision_job"] = {"job_id": "LIVE_DAY_1425", "at": "2026-08-14T18:25:00Z"}
+    # Ô "Latest decision" lấy GIỜ TUYỆT ĐỐI từ nhật ký job, không từ payload lịch. Phải
+    # dựng một job quyết định ở một mốc RÕ RÀNG KHÁC `latest_expected_at`, nếu không ô ấy
+    # hiện "--" và phép kiểm không chạm được đúng chỗ đã hỏng.
+    journal = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/job-journal/"]))
+    journal["jobs"] = [{
+        "id": "dec-1", "job_id": "MAX_HOLD_EXIT", "job_type": "max_hold",
+        "status": "completed", "started_at": "2026-08-14T13:31:00Z",
+        "ended_at": "2026-08-14T13:31:20Z", "duration_seconds": 20,
+        "reason": None, "diagnostics": [], "events": [],
+    }]
+    stub_api(browser_page, {"/api/v1/schedule-status": schedule,
+                            "/api/v1/job-journal/": journal})
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector(".now-schedule-facts .schedule-fact", timeout=20_000)
+    browser_page.wait_for_timeout(900)
+
+    rows = browser_page.eval_on_selector_all(
+        ".now-schedule-facts .schedule-fact",
+        r"""els => els.map(e => {
+              const t = e.querySelector('time');
+              return {label: ((e.querySelector('span') || {}).textContent || '').trim(),
+                      abs: t ? t.textContent.trim() : null,
+                      txt: (e.textContent || '').replace(/\s+/g, ' ').trim()};
+            })""")
+    # Chốt chặn: phải có ô mang CẢ giờ tuyệt đối lẫn mốc tương đối, nếu không "không mâu
+    # thuẫn" đạt được bằng cách không có gì để so.
+    # `innerText` nối các nút không chèn khoảng trắng, nên chuỗi ra là "ETin 3m" — biên từ
+    # không tồn tại. Bắt theo HÌNH DẠNG của mốc thời lượng thay vì theo chữ.
+    SPAN = re.compile(r"(?:in|ago)?\s*(?:(\d+)h)?\s*(?:(\d+)m)")
+    paired = [r for r in rows if r["abs"] and re.search(r"\d+[hm]", r["txt"])]
+    assert len(paired) >= 2, f"không đủ ô có cả hai loại mốc: {rows}"
+
+    NOW = 14 * 60 + 7          # 18:07:00Z = 14:07 ET, chính là `server_now` đã ghim
+    bad = []
+    for r in paired:
+        # `abs` có thể mang tiền tố thứ trong tuần ("Fri 14:10 ET") khi mốc không phải hôm nay.
+        a = re.search(r"(\d{2}):(\d{2})", r["abs"])
+        if not a:
+            continue
+        want = int(a.group(1)) * 60 + int(a.group(2))
+        span = SPAN.search(r["txt"].split("ET")[-1])
+        mins = (int(span.group(1) or 0) * 60 + int(span.group(2) or 0)) if span else 0
+        if "ago" in r["txt"]:
+            mins = -mins
+        if abs((NOW + mins) - want) > 1:
+            bad.append(f"{r['label']}: giờ tuyệt đối {r['abs']}, nhưng mốc tương đối trong "
+                       f"{r['txt'][-24:]!r} trỏ tới {(NOW + mins) // 60:02d}:{(NOW + mins) % 60:02d}")
+    assert bad == [], ("mốc tương đối không khớp mốc tuyệt đối cạnh nó: "
+                       + " | ".join(bad))
+def test_the_latest_bar_falls_inside_the_window_the_panel_declares(
+        realtime_server, browser_page):
+    """Mốc bar cuối phải nằm trong cửa sổ mà chính panel ấy khai, cả hai đều nói ET.
+
+    Đo được 2026-09-04: panel khai "window 01:10–02:55 ET" và ngay dưới ghi
+    "Latest bar 15:54 ET" — rơi ngoài hẳn cửa sổ của chính nó. Nguyên nhân: backend trả
+    `latest_bar_et = "2026-09-04 15:54:00+09:00"`, tức giờ TOKYO có offset ghi rõ, còn bộ
+    cắt chuỗi lấy thẳng 'HH:MM' và panel nối thêm chữ " ET". Mốc thì đúng — 15:54 Tokyo là
+    02:54 ET, nằm gọn trong cửa sổ — chỉ cách trình bày là sai.
+
+    Cùng lớp với lỗi biểu đồ vẽ nến tương lai vì lẫn UTC/ET: chart đã sửa, dòng data-health
+    thì không. Phép kiểm này bắt cả hai vế cùng lúc, vì nó so hai con số PHẢI có quan hệ
+    với nhau thay vì ghim một chuỗi.
+    """
+    _open_price_context(browser_page, realtime_server,
+                        _with_slot_series(_market_view(), series_day="2026-08-27"))
+    text = browser_page.eval_on_selector(
+        ".market-view-section", "el => el.innerText.replace(/\s+/g, ' ')")
+
+    win = re.search(r"window (\d{2}):(\d{2})[–-](\d{2}):(\d{2}) ET", text)
+    bar = re.search(r"Latest bar (\d{2}):(\d{2})", text)
+    # Chốt chặn: thiếu một trong hai thì không có gì để so, và test sẽ đạt rỗng.
+    assert win, f"panel không khai cửa sổ ET: {text[:150]!r}"
+    assert bar, f"panel không in mốc bar cuối: {text[:150]!r}"
+
+    lo = int(win.group(1)) * 60 + int(win.group(2))
+    hi = int(win.group(3)) * 60 + int(win.group(4))
+    at = int(bar.group(1)) * 60 + int(bar.group(2))
+    # Cửa sổ có thể vắt qua nửa đêm; khi đó "trong cửa sổ" là ngoài đoạn [hi, lo].
+    inside = (lo <= at <= hi) if lo <= hi else (at >= lo or at <= hi)
+    assert inside, (
+        f"bar cuối {bar.group(0)!r} rơi ngoài cửa sổ {win.group(0)!r} — "
+        "hai con số này cùng nói ET nên chúng phải khớp nhau")
+
+
+def test_every_sleeve_count_shares_one_denominator(realtime_server, browser_page):
+    """Ba hàng đếm ba TẬP CON của cùng một nhóm sleeve, nên chúng phải nói cùng một nền.
+
+    Đo được 2026-09-04, cùng một ngày trên cùng một trang: `across 3 sleeve(s)` ·
+    `across 2 sleeve(s)` · `1/4 sleeves complete`. Không con số nào sai — chúng đếm
+    "đã báo tín hiệu", "đã ghi giải thích", "đã phủ hết cửa sổ" — nhưng cả ba chỉ ghi
+    "sleeve(s)", nên người đọc thấy 2, 3, 4 và không thể biết đó là ba tập khác nhau hay
+    ba lần đếm sai. Phần giải thích ngày hôm nay lại là phần làm ngày hôm nay khó hiểu.
+    """
+    # Ghim payload: ba hàng dưới đây đếm ba tập con, và mỗi tập chỉ tồn tại khi ngày đó
+    # thật sự có dữ liệu. Đọc sống thì phép kiểm treo vào một ngày chưa chạy gì — đúng lỗi
+    # đã làm năm phép kiểm khác đỏ lúc ngày ET vừa sang.
+    runtime = {
+        "route": "track1_candidate",
+        "window_coverage": {"days": ["2026-08-14"], "latest": {
+            "global_nkd": {"outcome": "complete"}, "roska4_calm": {"outcome": "complete"},
+            "roska4_stress": {"outcome": "partial"}, "roska4_swing": {"outcome": "partial"}}},
+        "signals": {"present": True, "sleeves": {
+            "global_nkd": {"observed": True, "counts": {"NO_SIGNAL": 26}},
+            "roska4_calm": {"observed": True, "counts": {"SLOT_REFUSED": 19}},
+            "roska4_stress": {"observed": True, "counts": {}},
+            "roska4_swing": {"observed": False, "counts": {}}}},
+        "explanations": {"present": True, "days": {"20260814": 24},
+                         "attribution": {"20260814": {"sleeves": ["global_nkd", "roska4_stress"],
+                                                      "slots": 24}}},
+    }
+    stub_api(browser_page, {"/api/v1/track1-runtime": runtime})
+    open_realtime(browser_page, realtime_server)
+    # Khối này tự nói "the slowest read on the page": đợi ĐÚNG nội dung, không đợi khung.
+    browser_page.wait_for_selector(".track1-section .fact", timeout=30_000)
+    browser_page.wait_for_timeout(800)
+    text = browser_page.eval_on_selector(
+        ".track1-section", "el => el.innerText.replace(/\s+/g, ' ')")
+
+    pairs = re.findall(r"(\d+) of (\d+) sleeves", text)
+    # Chốt chặn: dưới hai chỗ thì "cùng mẫu số" đạt được vì không có gì để so.
+    assert len(pairs) >= 2, (
+        f"chỉ tìm được {len(pairs)} chỗ đếm sleeve — phép kiểm chưa chạm gì: {text[:200]!r}")
+    # Và không được còn chỗ nào đếm mà KHÔNG nêu mẫu số.
+    bare = re.findall(r"(?<!of )\b\d+ sleeve\(s\)", text)
+    assert bare == [], f"còn chỗ đếm sleeve không nêu mẫu số: {bare}"
+
+    denoms = {int(d) for _, d in pairs}
+    assert len(denoms) == 1, (
+        "các hàng đếm sleeve dùng nhiều mẫu số khác nhau: "
+        + ", ".join(f"{n}/{d}" for n, d in pairs))
+
+
+def _runtime_with_gates(orders_possible: bool, blocking=()) -> dict:
+    return {"route": "track1_candidate",
+            "gates": {"orders_possible": orders_possible, "blocking_now": list(blocking)}}
+
+
+def test_the_top_band_says_when_no_order_can_be_placed(realtime_server, browser_page):
+    """Dải đầu phải nói ra sự thật vận hành lớn nhất: tuyến có đặt được lệnh không.
+
+    Đo được 2026-09-04: `ORDERS POSSIBLE: no` và ba cổng đang chặn nằm ở 11px, thấp hơn
+    màn hình đầu 400px, trong khi năm thứ to nhất trong màn hình đầu đều là TÊN KHUNG
+    CHỨA — "Operations", "Now Monitor", "Open Issues". Một bản rà độc lập đọc trang bằng
+    mắt mới gọi đây là việc số một, và phép đo đồng ý.
+
+    Chỉ thêm dòng khi câu trả lời là KHÔNG — ngày bình thường dải đầu giữ nguyên sự tiết
+    chế bản thiết kế cố ý để lại. Phép kiểm ghim CẢ HAI vế, vì thiếu vế thứ hai thì một
+    bản sửa in dòng ấy mọi lúc cũng qua được.
+    """
+    stub_api(browser_page, {"/api/v1/track1-runtime": _runtime_with_gates(
+        False, ["account_legacy_retirement", "shadow_evidence"])})
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_timeout(1200)
+    rail = browser_page.eval_on_selector(".system-conclusion b", "el => el.textContent")
+    assert "no orders possible" in rail, f"dải đầu không nói tuyến đang chặn: {rail!r}"
+    assert "shadow_evidence" in rail or "Shadow evidence" in rail, (
+        f"dải đầu không nêu cổng nào đang chặn: {rail!r}")
+
+    # Vế ngược: đặt được lệnh thì KHÔNG thêm dòng.
+    stub_api(browser_page, {"/api/v1/track1-runtime": _runtime_with_gates(True)})
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_timeout(1200)
+    rail2 = browser_page.eval_on_selector(".system-conclusion b", "el => el.textContent")
+    assert "no orders possible" not in rail2, (
+        f"dải đầu vẫn báo chặn dù tuyến đặt được lệnh: {rail2!r}")
+
+
+def test_the_metric_tile_and_the_table_print_the_same_probability(
+        realtime_server, browser_page):
+    """Cùng một xác suất thì hai chỗ phải in ra cùng một con số.
+
+    Đo được 2026-09-04: ô CONFIDENCE in `91.1%` còn bảng STATE PROBABILITIES in `91.07%`,
+    cách nhau 12px. Không con số nào sai — nhưng người đọc phải dừng lại tự hỏi hai con số
+    ấy có phải một không, và đó là chi phí không ai trả cho.
+
+    Phép kiểm ghim QUAN HỆ chứ không ghim một định dạng: dù sau này chọn mấy chữ số, hai
+    chỗ vẫn phải nói giống nhau.
+    """
+    stub_api(browser_page, {"/api/v1/track1-market-view": {
+        "market_view": {"session_date": "2026-08-27", "sleeves": {}}, "regime": _regime()}})
+    open_realtime(browser_page, realtime_server)
+    browser_page.wait_for_selector("#regimePosterior .regime-post-row", timeout=20_000)
+
+    conf = browser_page.eval_on_selector(".rg2-metric-val", "el => el.textContent.trim()")
+    label = browser_page.eval_on_selector(
+        "#regimePosterior .regime-post-row", "el => el.textContent")
+    top = browser_page.eval_on_selector(
+        "#regimePosterior .regime-post-row b", "el => el.textContent.trim()")
+    # Chốt chặn: cả hai phải là số phần trăm, nếu không so sánh dưới đây vô nghĩa.
+    assert conf.endswith("%") and top.endswith("%"), f"không đọc được hai giá trị: {conf!r} {top!r}"
+    assert "Calm" in label, f"hàng đầu bảng không phải Calm: {label!r}"
+
+    assert conf == top, (
+        f"ô chỉ số in {conf!r} còn bảng in {top!r} cho cùng một xác suất")

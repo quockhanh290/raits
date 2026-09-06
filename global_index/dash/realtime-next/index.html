@@ -83,9 +83,6 @@
 
       <div class="header-zone model-inputs-zone runner-derived" id="modelInputsZone">
         <span class="zone-title has-tip tip-bottom" tabindex="0" data-tooltip="Regime, SPY source date, and fitted-model age used by the runner. Input freshness is separate from scheduler timing.">Model Inputs</span>
-        <div class="model-input-item model-input-regime">
-          <span>Regime</span><b id="sessionRegime">--</b>
-        </div>
         <div class="model-input-item model-input-spy">
           <span>SPY data</span><b id="regimeInputDate">--</b>
         </div>
@@ -93,13 +90,10 @@
           <span>Model age</span><b id="modelInputAge">--</b>
         </div>
         <div class="model-input-item model-input-fit">
-          <span class="has-tip tip-bottom" tabindex="0" data-tooltip="Daily HMM fit evidence grouped from runner logs. Convergence warnings are diagnostic unless a documented decision gate fails.">HMM fit</span><b id="modelFitStatus">--</b>
+          <span class="has-tip tip-bottom" tabindex="0" data-tooltip="The shape of the frozen fit the live route reads: how many states it has, and how many sessions it has labelled. Track 1 does not refit per session, so there is no daily convergence count here. Whether that fit still agrees with the data is on Fit end.">HMM fit</span><b id="modelFitStatus">--</b>
         </div>
         <div class="model-input-item model-input-fitend">
           <span class="has-tip tip-bottom" tabindex="0" data-tooltip="The last date in the data the live HMM was fitted on. `Model age` says how old that fit is; this says what it is anchored to.">Fit end</span><b id="modelFitEnd">--</b>
-        </div>
-        <div class="model-input-item model-input-refreeze">
-          <span class="has-tip tip-bottom" tabindex="0" data-tooltip="Whether a model re-freeze decision is outstanding. Reported by the runner, not inferred from model age.">Re-freeze</span><b id="modelRefreeze">--</b>
         </div>
       </div>
 
@@ -145,7 +139,7 @@
       <div class="primary-column">
         <section class="now-monitor section-band" id="now-monitor">
           <div class="section-heading">
-            <div class="now-monitor-title"><h1>Now Monitor</h1><span class="monitor-clear-indicator" id="monitorClearIndicator" hidden><i class="status-dot"></i><b>CLEAR</b></span></div>
+            <div class="now-monitor-title"><h1>Now Monitor</h1><span class="source-note" data-help="now-monitor">What this panel means</span><span class="monitor-clear-indicator" id="monitorClearIndicator" hidden><i class="status-dot"></i><b>CLEAR</b></span></div>
             <div class="now-monitor-heading-status">
               <p class="summary" id="incidentSummary">Waiting for sources</p>
             </div>
@@ -162,7 +156,7 @@
         <section class="section-band open-issues-section">
           <div class="section-heading compact">
             <h2>Open Issues</h2>
-            <span class="source-note has-tip tip-right" id="openIssuesSource" tabindex="0" data-tooltip="Issues reconstructed from retained read-only scheduler evidence. Known debt remains open until positive resolution evidence exists.">Loading retained evidence</span>
+            <span class="source-note has-tip tip-right" id="openIssuesSource" data-help="open-issues" tabindex="0" data-tooltip="Issues reconstructed from retained read-only scheduler evidence. Known debt remains open until positive resolution evidence exists.">Loading retained evidence</span>
           </div>
           <details class="open-issues-shell" id="openIssuesShell">
             <summary id="openIssuesToggle">Open issue list</summary>
@@ -173,10 +167,22 @@
           </details>
         </section>
 
+        <!-- Track 1 runtime. The ids match the ones realtime.js fills; this route adds no
+             second fetch and no second renderer, because two copies of the same panel are
+             two things to drift. -->
+        <section class="section-band track1-section">
+          <div class="section-heading compact">
+            <h2>Track 1 Runtime</h2>
+            <span class="source-note" id="track1Source" data-help="track1-runtime">Track 1 runtime not yet observed</span>
+          </div>
+          <div class="now-schedule-facts" id="track1Facts"></div>
+          <p class="source-note" id="track1Note"></p>
+        </section>
+
         <section class="section-band positions-section">
           <div class="section-heading compact">
-            <h2>Open Positions</h2>
-            <span class="source-note" id="positionSource">IBKR unavailable</span>
+            <h2>Open Positions <span class="source-note">legacy / drain</span></h2>
+            <span class="source-note" id="positionSource" data-help="positions">IBKR unavailable</span>
           </div>
           <div class="position-grid" id="positionGrid"></div>
         </section>
@@ -184,7 +190,7 @@
         <section class="section-band decision-section runner-derived">
           <div class="section-heading compact">
             <h2>Today's Decision</h2>
-            <span class="source-note has-tip tip-right" id="decisionSource" tabindex="0" data-tooltip="Entries, closes, and rejected signals emitted in the decision block of the newest runner snapshot.">Session unavailable</span>
+            <span class="source-note has-tip tip-right" id="decisionSource" data-help="decision" tabindex="0" data-tooltip="Entries, closes, and rejected signals emitted in the decision block of the newest runner snapshot.">Session unavailable</span>
           </div>
           <div class="section-body decision-shell">
             <div class="decision-summary" id="decisionSummary"></div>
@@ -209,7 +215,7 @@
         <section class="section-band orders-section">
           <div class="section-heading compact">
             <h2>Open Orders</h2>
-            <span class="source-note" id="ordersSource">IBKR unavailable</span>
+            <span class="source-note" id="ordersSource" data-help="orders">IBKR unavailable</span>
           </div>
           <div class="table-wrap section-body table-shell">
             <table>
@@ -224,7 +230,7 @@
         <section class="section-band journal-section">
           <div class="section-heading compact">
             <h2 id="journalTitle">Job Journal</h2>
-            <span class="source-note journal-source has-tip tip-right" id="journalSource" tabindex="0" data-tooltip="One row per scheduler execution. Click a job to inspect its stop, order, fill, and diagnostic evidence. Operational events outside a job remain standalone.">Session unavailable</span>
+            <span class="source-note journal-source has-tip tip-right" id="journalSource" data-help="journal" tabindex="0" data-tooltip="One row per scheduler execution. Click a job to inspect its stop, order, fill, and diagnostic evidence. Operational events outside a job remain standalone.">Session unavailable</span>
           </div>
           <div class="journal-schedule" id="journalSchedule"></div>
           <div class="section-body journal-shell">
@@ -236,7 +242,7 @@
           </div>
         </section>
         <section class="section-band source-section">
-          <div class="section-heading compact"><h2>Source Clocks</h2></div>
+          <div class="section-heading compact"><h2>Source Clocks</h2><span class="source-note" data-help="clocks">All times are US market time</span></div>
           <div class="section-body source-shell"><dl id="sourceClocks"></dl></div>
         </section>
       </aside>
