@@ -337,10 +337,16 @@ def api_v1_track1_market_view():
     asked = (request.args.get("day") or "").strip()
     if not re.fullmatch(r"20\d{2}-\d{2}-\d{2}", asked):
         asked = ""
-    payload = build(ROOT, day=asked or None)
+    # Stage 5ZZZ-CO. Công cụ nào của sleeve đang được vẽ. Một mã sai được ĐỜ QUA chứ không
+    # trả lỗi, cùng lý do như `day`: endpoint này nuôi một trang phải tiếp tục vẽ được.
+    inst = (request.args.get("inst") or "").strip().upper()
+    if not re.fullmatch(r"[A-Z0-9]{1,8}", inst or ""):
+        inst = ""
+    payload = build(ROOT, day=asked or None, instrument=inst or None)
     return jsonify({"market_view": payload, "regime": regime(ROOT),
                     "sessions": available_sessions(ROOT, today=payload.get("today_et")),
-                    "requested_day": asked or None})
+                    "requested_day": asked or None,
+                    "requested_instrument": inst or None})
 
 
 @app.get("/api/v1/runner-positions")

@@ -1931,3 +1931,18 @@ details.issue-group-retired > summary b { opacity: .72; font-weight: 500; }
   font: 400 12px/1.4 var(--sans); color: var(--t-label, #798394);
   text-transform: lowercase;
 }
+
+/* Stage 5ZZZ-CO. Hàng chip công cụ, cùng khuôn với hàng chip phiên ở đầu băng: cùng cỡ,
+   cùng bo góc, cùng cách đánh dấu cái đang chọn — hai hàng chọn thứ khác nhau nhưng đọc
+   như một cặp. */
+.mv2-instbar { display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
+  padding: 0 0 10px; }
+.mv2-inst-label { font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--mv-dim, #8b929c); margin-right: 3px; }
+.mv2-inst { font: inherit; font-size: 11px; line-height: 1.6; cursor: pointer;
+  color: var(--mv-fg, #d7dbe0); background: transparent; padding: 1px 7px;
+  border: 1px solid var(--mv-hair, #23262d); border-radius: 3px; }
+.mv2-inst:hover { border-color: var(--mv-dim, #8b929c); }
+.mv2-inst.on { color: var(--bg, #0b0c0e); background: var(--mv-fg, #d7dbe0);
+  border-color: var(--mv-fg, #d7dbe0); cursor: default; }
+.mv2-inst-note { font-size: 11px; color: var(--t-label, #798394); margin-left: 6px; }

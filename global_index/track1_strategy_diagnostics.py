@@ -773,7 +773,31 @@ def read(*, root=".", day: str) -> list:
     return out
 
 
-def recorded_series(root, day: str, sleeve: str) -> list:
+def instruments_recorded(root, day: str, sleeve: str) -> list:
+    """Những công cụ sleeve này THẬT SỰ ghi lại trong ngày, theo thứ tự xuất hiện đầu tiên.
+
+    Stage 5ZZZ-CO. Bảng cấu hình của panel gán cho mỗi sleeve đúng MỘT công cụ. Đo trên cây
+    bằng chứng ngày 2026-09-04:
+
+        global_nkd     MNKD                          1 công cụ   bảng đúng
+        roska4_stress  MNQ                           1 công cụ   bảng đúng
+        roska4_calm    MES · MNQ                     2 công cụ
+        roska4_swing   M2K · MES · MNQ · MYM         4 công cụ   bảng chỉ nói MES
+
+    Cùng hình dạng với ngày nào cũng vậy trong cả năm phiên đo được. Một bảng ghi cứng không
+    trả lời nổi câu này; chỉ bằng chứng trả lời được.
+    """
+    out = []
+    for block in read(root=root, day=day):
+        if block.get("diagnostics_source") != RECORDED or block.get("sleeve") != sleeve:
+            continue
+        inst = str(block.get("instrument") or "").strip()
+        if inst and inst not in out:
+            out.append(inst)
+    return out
+
+
+def recorded_series(root, day: str, sleeve: str, instrument: str = "") -> list:
     """EVERY recorded slot for one sleeve on one day, oldest first -- a session, not a snapshot.
 
     Stage 5ZZZ-AX. `recorded_for` returns the LAST block, which is the right answer for "what
@@ -793,6 +817,19 @@ def recorded_series(root, day: str, sleeve: str) -> list:
     seen: dict = {}
     for block in read(root=root, day=day):
         if block.get("diagnostics_source") != RECORDED or block.get("sleeve") != sleeve:
+            continue
+        # Stage 5ZZZ-CO. LỌC theo công cụ, không gộp.
+        #
+        # Khoá gộp là `slot_id`, nên với một rổ nhiều công cụ, bốn khối của cùng một slot
+        # chồng lên nhau và chỉ khối GHI CUỐI sống sót — chuỗi trả về là của một công cụ
+        # không ai chọn, mang tên của cả sleeve. Đo được 2026-09-04: sleeve Swing ghi
+        # M2K · MES · MNQ · MYM, mỗi cái 23 slot, và chuỗi này trả về M2K ở mức ~2.979 trong
+        # khi biểu đồ nến ngay trên nó vẽ MES ở ~7.724 — hai chỉ số khác nhau, chung một trục
+        # và một con trỏ chữ thập.
+        #
+        # Đúng họ lỗi mà `recorded_by_instrument` đã được viết ra để chữa cho Calm ở
+        # Stage 5ZZZ-BJ; nó chỉ chưa được chữa ở đây.
+        if instrument and str(block.get("instrument") or "") != instrument:
             continue
         key = block.get("slot_id") or block.get("slot_time") or len(seen)
         seen[key] = block
@@ -847,11 +884,17 @@ def recorded_by_instrument(root, day: str, sleeve: str, slot_id: str) -> dict:
     return out
 
 
-def recorded_for(root, day: str, sleeve: str, slot_id: str = "") -> "dict | None":
+def recorded_for(root, day: str, sleeve: str, slot_id: str = "",
+                 instrument: str = "") -> "dict | None":
     """The most recent RECORDED block for a slot, or None.
 
     `slot_id` narrows when given. The LAST matching block wins, matching how every other
     reader on this route treats a repeated row.
+
+    Stage 5ZZZ-CO. `instrument` narrows too, and for a basket it must. Without it "the last
+    matching block" means "whichever instrument the writer happened to finish with" — the
+    card then shows one member's numbers under the sleeve's name, which is exactly the fault
+    `recorded_by_instrument` was written for at Stage 5ZZZ-BJ.
     """
     hit = None
     for block in read(root=root, day=day):
@@ -860,6 +903,8 @@ def recorded_for(root, day: str, sleeve: str, slot_id: str = "") -> "dict | None
         if block.get("sleeve") != sleeve:
             continue
         if slot_id and block.get("slot_id") != slot_id:
+            continue
+        if instrument and str(block.get("instrument") or "") != instrument:
             continue
         hit = block
     return hit

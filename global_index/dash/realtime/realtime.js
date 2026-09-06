@@ -327,7 +327,12 @@
       // stores, so a backend that has not been restarted since it was added must leave the
       // rest of the page untouched rather than taking the poll down with it.
       fetchJson('/api/v1/track1-market-view'
-                + (state.mvDay ? '?day=' + encodeURIComponent(state.mvDay) : ''))
+                + (() => {
+                    const q = [];
+                    if (state.mvDay) q.push('day=' + encodeURIComponent(state.mvDay));
+                    if (state.mvInst) q.push('inst=' + encodeURIComponent(state.mvInst));
+                    return q.length ? '?' + q.join('&') : '';
+                  })())
     ]);
     // Named bindings rather than results[5] / results[6]: the numeric index has to be
     // re-counted by hand every time the list changes, and the one panel most likely to be
@@ -1810,7 +1815,13 @@
         aria-selected="${on}" data-mv-tab="${mvEsc(k)}">${mvEsc(sleeves[k].label)}</button>`;
     }).join('');
     host.querySelectorAll('[data-mv-tab]').forEach(b => b.addEventListener('click', () => {
-      state.mvTab = b.dataset.mvTab;
+      const next = b.dataset.mvTab;
+      // Stage 5ZZZ-CO. Công cụ đã chọn thuộc về SLEEVE đã chọn nó. MYM là của rổ Swing;
+      // mang nó sang NKD thì backend lùi về công cụ ghi được của NKD — đúng, nhưng chip
+      // vẫn nhớ một lựa chọn không còn nghĩa gì, và lần quay lại sẽ không phải lựa chọn cũ.
+      // Quên nó ở ranh giới sleeve, chỗ nó thôi có nghĩa.
+      if (next !== state.mvTab) state.mvInst = null;
+      state.mvTab = next;
       renderMarketView();
     }));
   }
@@ -2670,6 +2681,38 @@
   //: before it. Both come from the payload's bars; neither is a quote. When the sleeve
   //: reported no live bars the numbers are shown dimmed and named `frozen`, because a stale
   //: OHLC printed in the live colour is the one thing this card must never do.
+  /* Stage 5ZZZ-CO. Công cụ nào của sleeve đang được vẽ.
+
+     Cần vì bảng cấu hình của panel gán mỗi sleeve đúng MỘT công cụ, và với hai trong bốn
+     sleeve điều đó sai: Calm chạy hai, Swing chạy bốn, ngày nào cũng vậy. Hậu quả đo được
+     trên trang 2026-09-04: nến MES ~7.724 xếp chồng lên đường M2K ~2.979, chung một trục
+     và một con trỏ chữ thập, không dòng nào nói ra.
+
+     Một chip khi sleeve chỉ chạy một công cụ — không có gì để chọn, và chính điều đó là
+     thông tin: nó nói sleeve này chỉ đọc một thị trường. Không chip nào khi ngày ấy không
+     có bằng chứng per-slot (Stress không ghi diagnostics), và lúc đó dòng nói rõ rằng công
+     cụ đang vẽ đến từ bảng cấu hình chứ không từ quan sát. */
+  function mvInstBar(s) {
+    const all = s.instruments || [];
+    const cur = s.instrument || '';
+    const src = s.instrument_source || '';
+    if (!all.length) {
+      return `<div class="mv2-instbar"><span class="mv2-inst-label">Instrument</span>`
+        + `<span class="mv2-inst on">${mvEsc(cur)}</span>`
+        + `<span class="mv2-inst-note">from the panel's configuration — this session `
+        + `recorded no per-slot evidence to read it from</span></div>`;
+    }
+    const chips = all.map(i =>
+      `<button type="button" class="mv2-inst${i === cur ? ' on' : ''}" `
+      + `data-mvinst="${mvEsc(i)}">${mvEsc(i)}</button>`).join('');
+    return `<div class="mv2-instbar"><span class="mv2-inst-label">Instrument</span>${chips}`
+      + (all.length === 1
+          ? `<span class="mv2-inst-note">the only one this sleeve read today</span>`
+          : `<span class="mv2-inst-note">${all.length} read today · both charts follow `
+            + `this choice</span>`)
+      + `</div>`;
+  }
+
   function mvPriceHead(s) {
     const bars = s.bars || [];
     const d = s.data_status || {};
@@ -3734,10 +3777,17 @@
          under Detector rules. Both were rendering on all three, so whichever tab was
          chosen the reader got the same two panels underneath and the tabs looked
          decorative. */
-      host.innerHTML = `<div class="mv2-card">` + mvPriceHead(s) + mvDataHealth(s) +
+      host.innerHTML = mvInstBar(s) + `<div class="mv2-card">` + mvPriceHead(s) + mvDataHealth(s) +
         `<div class="mv2-plot">` + mvChartSvg(s) +
           ((s.bars || []).length ? mvLegend() : '') + `</div>` + `</div>`
         + (hasInner ? mvSlotChart(s) : '');
+      host.querySelectorAll('[data-mvinst]').forEach(b => {
+        b.onclick = () => {
+          state.mvInst = b.getAttribute('data-mvinst');
+          host.classList.add('loading');
+          poll();
+        };
+      });
       mvBindHover(host);
     }
     // Outside the chart's fixed box, so the panel keeps its pinned height.

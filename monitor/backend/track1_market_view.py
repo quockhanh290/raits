@@ -802,14 +802,14 @@ _SERIES_LABELS = {
 }
 
 
-def _slot_series(root, day: str, sleeve: str) -> list:
+def _slot_series(root, day: str, sleeve: str, instrument: str = "") -> list:
     """One point per recorded slot, carrying only what the chart draws.
 
     Kept narrow on purpose. The blocks hold gates, grids and price levels, and shipping those
     per slot would multiply the payload of an endpoint that is polled.
     """
     out = []
-    for rec in _sd.recorded_series(root, day, sleeve):
+    for rec in _sd.recorded_series(root, day, sleeve, instrument):
         vals = rec.get("values") or {}
         ema = next((v for k, v in vals.items() if str(k).startswith("Trend filter")), None)
         # Stage 5ZZZ-BO. The threshold the surge gate actually compared against, copied from
@@ -1361,7 +1361,8 @@ def _apply_stress_block(out: dict, block: dict) -> dict:
     return out
 
 
-def _strategy(root: Path, sleeve: str, day: str, spec: dict, *, now=None) -> dict:
+def _strategy(root: Path, sleeve: str, day: str, spec: dict, *, now=None,
+              instrument: str = "") -> dict:
     """The sleeve's own rule values for this session, from the detector.
 
     Only Stress is wired here, and that is a scope statement rather than an oversight:
@@ -1416,13 +1417,13 @@ def _strategy(root: Path, sleeve: str, day: str, spec: dict, *, now=None) -> dic
             # Read on every call rather than cached: the file is one small block per slot per
             # sleeve, and a cache here would serve a session's early slots after later ones
             # had been written. The replay is the expensive path and keeps its cache.
-            recorded = _sd.recorded_for(root, day, sleeve)
+            recorded = _sd.recorded_for(root, day, sleeve, instrument=instrument)
             if recorded and (recorded.get("rows") or []):
                 blk = _apply_r4_block(dict(out), recorded)
                 # Stage 5ZZZ-AX. The SESSION beside the snapshot. Same file, same read, one
                 # small block per slot -- so this costs an extra pass over a list already in
                 # memory, and the panel stops having to infer a session from one slot.
-                blk["slot_series"] = _slot_series(root, day, sleeve)
+                blk["slot_series"] = _slot_series(root, day, sleeve, instrument)
                 blk["slot_series_session"] = day
                 return blk
             if now is not None:
@@ -1466,10 +1467,10 @@ def _strategy(root: Path, sleeve: str, day: str, spec: dict, *, now=None) -> dic
     # recorded: the store is appended after a session closes, so during a live session its
     # newest bars are the previous day's. Same asymmetry the Normal-R4 branch settled -- old
     # numbers under a card labelled with today's session are worse than none.
-    recorded = _sd.recorded_for(root, day, sleeve)
+    recorded = _sd.recorded_for(root, day, sleeve, instrument=instrument)
     if recorded and (recorded.get("rows") or []):
         blk = _apply_stress_block(dict(out), recorded)
-        blk["slot_series"] = _slot_series(root, day, sleeve)
+        blk["slot_series"] = _slot_series(root, day, sleeve, instrument)
         blk["slot_series_session"] = day
         return blk
     try:
@@ -1846,8 +1847,36 @@ def _is_session(day: str) -> bool:
         return True
 
 
+def _pick_instrument(root, day: str, sleeve: str, spec: dict,
+                     asked: str = "") -> tuple:
+    """`(chosen, recorded, source)` — công cụ để vẽ cho sleeve này, và vì sao là nó.
+
+    Stage 5ZZZ-CO. `SLEEVES` gán mỗi sleeve đúng MỘT công cụ, và với hai trong bốn sleeve
+    điều đó sai: Calm chạy hai, Swing chạy bốn, ngày nào cũng vậy. Hậu quả đo được trên
+    trang 2026-09-04 là hai biểu đồ xếp chồng vẽ hai chỉ số khác nhau dưới một con trỏ chữ
+    thập — nến MES ~7.724 trên đường M2K ~2.979 — và không dòng nào nói ra.
+
+    Ba kết cục, không gộp:
+
+        recorded    bằng chứng của ngày hôm ấy nói sleeve chạy công cụ nào
+        asked       người đọc chọn một trong số đó
+        declared    KHÔNG có bằng chứng nào (Stress không ghi diagnostics), lùi về bảng —
+                    và nói rằng đây là bảng chứ không phải quan sát
+    """
+    recorded = []
+    try:
+        recorded = _sd.instruments_recorded(root, day, sleeve)
+    except Exception:                                              # noqa: BLE001
+        recorded = []
+    if asked and asked in recorded:
+        return asked, recorded, "asked"
+    if recorded:
+        return recorded[0], recorded, "recorded"
+    return spec["instrument"], [], "declared"
+
+
 def build(root: str | Path = ".", *, day: str | None = None, now: Any = None,
-          coverage: dict | None = None) -> dict:
+          coverage: dict | None = None, instrument: str | None = None) -> dict:
     """The whole payload. Read-only, offline, and it never raises: a panel that 500s tells the
     operator less than a panel that says which part it could not read."""
     import pandas as pd
@@ -1916,12 +1945,23 @@ def build(root: str | Path = ".", *, day: str | None = None, now: Any = None,
     for sleeve, spec in SLEEVES.items():
         try:
             slots = _slots_for(sleeve, rows, now_hhmm)  # noqa: E501  (settled below)
-            bars, session_day, note = _sliced(spec["instrument"], asked, spec, root)
+            # Stage 5ZZZ-CO. MỘT công cụ cho cả hai pane. Trước đây nến lấy từ bảng ghi cứng
+            # và đường lấy từ khối ghi cuối cùng của ngày — hai lựa chọn độc lập, không ai
+            # đối chiếu, và với một rổ bốn công cụ chúng gần như chắc chắn khác nhau.
+            inst, inst_all, inst_src = _pick_instrument(root, asked, sleeve, spec,
+                                                        instrument or "")
+            bars, session_day, note = _sliced(inst, asked, spec, root)
             levels = _levels(rows, sleeve)
-            data = _data_status(root, asked, sleeve, spec["instrument"])
+            data = _data_status(root, asked, sleeve, inst)
             status = _sleeve_status(slots, cov.get(sleeve) or {}, spec, now_hhmm)
             out["sleeves"][sleeve] = {
-                "label": spec["label"], "instrument": spec["instrument"],
+                "label": spec["label"], "instrument": inst,
+                # Mọi công cụ sleeve này ghi trong ngày, và công cụ đang vẽ đến từ đâu.
+                # Danh sách rỗng nghĩa là ngày ấy không có bằng chứng per-slot nào — không
+                # phải sleeve chỉ chạy một công cụ.
+                "instruments": inst_all,
+                "instrument_source": inst_src,
+                "declared_instrument": spec["instrument"],
                 "bar_interval": f"{BAR_MINUTES}m", "clock": spec["clock"],
                 "range": {"context_start_et": spec["context_start"],
                           "window_start_et": spec["window_start"],
@@ -1945,7 +1985,7 @@ def build(root: str | Path = ".", *, day: str | None = None, now: Any = None,
                 "declared_config": _declared_config(rows, sleeve),
                 "levels_note": None if levels else LEVELS_NOT_EXPOSED,
                 # Stage 5ZZP. The sleeve's own rule values, where the detector publishes them.
-                "strategy": _strategy(root, sleeve, asked, spec, now=now),  # the CALLER's instant, not the derived one:
+                "strategy": _strategy(root, sleeve, asked, spec, now=now, instrument=inst),  # the CALLER's instant, not the derived one:
                 #   `ref` is never None, so passing it made every request look like a
                 #   caller naming an instant and bypass the cache entirely.
                 # Stage 5ZZQ. What would have to happen for a candidate to exist. Built from
