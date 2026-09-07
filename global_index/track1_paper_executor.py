@@ -331,6 +331,21 @@ class Track1OrderExecutor:
         return fn().isoformat(timespec="seconds")
 
     def _record(self, *, key, state, order, ref_day, slot_id, candidate_id, **kw):
+        # `qty` is the size this row is ABOUT — what was asked for, not what came back.
+        # It is filled from the order here rather than at each call site, so every state a
+        # row can carry has it: an INTENDED row nobody answered still says how large the
+        # intent was, which is the only thing that makes an UNKNOWN outcome sizeable.
+        #
+        # The journal defined this field to make a partial fill checkable against intent,
+        # and nothing filled it — so a row read back said `filled_qty=3, qty=0`, i.e. three
+        # contracts out of nothing. With both numbers present the shortfall is arithmetic
+        # rather than an inference, which matters because Track 1 does NOT send one contract
+        # per order: the Stress sleeve sends 7, and the reason the legacy audit could leave
+        # partial fills alone was a one-contract order that cannot fill partially.
+        #
+        # setdefault, not assignment: a caller that already knows the size for its row means
+        # it, and this is the wrong place to overrule it.
+        kw.setdefault("qty", int(getattr(order, "contracts", 0) or 0))
         return journal.JournalRecord(
             idempotency_key=key, state=state, ref_day=str(ref_day),
             sleeve=order.cluster, instrument=order.inst,
