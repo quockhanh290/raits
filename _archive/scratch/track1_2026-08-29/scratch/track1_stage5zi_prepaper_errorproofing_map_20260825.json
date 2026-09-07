@@ -1,0 +1,1006 @@
+{
+  "stage": "5ZI",
+  "title": "Track 1 pre-paper error-proofing map",
+  "kind": "audit / documentation / map only - NO code implemented",
+  "checked_at": {
+    "utc": "2026-08-26T02:20",
+    "et": "2026-08-25T22:20 EDT",
+    "calgary": "2026-08-25T20:20 MDT",
+    "tokyo": "2026-08-26T11:20 JST"
+  },
+  "verdicts": {
+    "next_shadow_window": "READY - nothing on this map blocks it except the machine sleeping",
+    "paper": "NOT_READY",
+    "top_3_stages_in_order": [
+      "5ZJ make 5ZG live",
+      "5ZK checkpoint frames",
+      "5ZL regime verification tri-state"
+    ],
+    "requires_paper_broker_evidence_cannot_be_finished_in_shadow": [
+      "broker stop placement and its reconcile",
+      "partial fills",
+      "the SUBMITTED->outcome restart path",
+      "Flex statement reconcile",
+      "position attribution under a shared account"
+    ],
+    "runtime_or_live_file_touched": false,
+    "ibkr_call_made": false,
+    "anything_restarted": false
+  },
+  "s1_current_operational_state": {
+    "scheduler_pid": 48604,
+    "scheduler_started_et": "2026-08-25 01:07",
+    "backend_pid": 7872,
+    "backend_port": 5002,
+    "track1_mode": "track1-only-shadow",
+    "orders_possible": false,
+    "blocking": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "artefacts": {
+      "live_positions.track1.json": {
+        "exists": true,
+        "mtime": "2026-08-25 13:56:19",
+        "bytes": 284,
+        "schema_version": 2,
+        "route": "track1_candidate",
+        "window": "live",
+        "cut_instant": "2026-08-25T15:55:01.009095-04:00",
+        "positions": 0,
+        "equity": 0.0
+      },
+      "replay_checkpoint.track1.json": {
+        "exists": true,
+        "mtime": "2026-08-25 13:56:19",
+        "bytes": 315,
+        "schema_version": 2,
+        "routes": [
+          "track1_candidate"
+        ],
+        "sleeves": 4,
+        "instrument_entries": 0
+      },
+      "global_index/track1_runtime/orders/": {
+        "exists": false,
+        "meaning": "no order has ever been journalled"
+      },
+      "global_index/track1_runtime/trade_log.track1.jsonl": {
+        "exists": false,
+        "meaning": "5ZG's destination, not yet created"
+      },
+      "track1_go_live_confirmation.json": {
+        "exists": false
+      },
+      "global_index/maxhold_state.track1.json": {
+        "exists": true,
+        "mtime": "2026-08-24",
+        "meaning": "the 09:31 Track 1 max-hold job did NOT run on the 25th"
+      }
+    },
+    "audit_records_on_disk": {
+      "2026-08-24": {
+        "roska4_calm": "FAIL",
+        "roska4_stress": "FAIL",
+        "roska4_swing": "FAIL",
+        "global_nkd": "NOT_ENOUGH_DATA_YET"
+      },
+      "2026-08-25": {
+        "roska4_calm": "FAIL",
+        "roska4_stress": "FAIL",
+        "roska4_swing": "FAIL",
+        "global_nkd": "FAIL"
+      }
+    },
+    "swing_2026_08_25_re_evaluated_now": {
+      "verdict": "PASS",
+      "slots": "23/23 decided",
+      "candidates": 0,
+      "p95_s": 78.5,
+      "checkpoint": "ok",
+      "caveat": "the RECORD on disk still says FAIL - written 20:15Z before 5ZH, and the readiness gate reads records, not fresh evaluations. Re-running that day's audit is an operator action and would write runtime evidence; not done."
+    },
+    "why_the_other_three_failed": {
+      "cause": "the machine slept - 16 missed-job warnings in one burst at 09:11:35 Calgary",
+      "examples": [
+        "Stop repair sweep 08:20 ET missed by 2:51:35",
+        "MAX_HOLD exit 09:31 ET missed by 1:40:35",
+        "Track1 roska4_calm 10:00 ET missed by 1:11:35"
+      ],
+      "roska4_calm": "its single slot was inside the sleep -> unobserved",
+      "roska4_stress": "lost 1035-1105, 7 of 24",
+      "global_nkd": "slots ran but were gate-refused as stale - a DIFFERENT cause, and the one genuine data problem of the day"
+    },
+    "paper_gate_measured": {
+      "judgeable_days": "2 of 5",
+      "no_failing_days": "2 FAIL days, 0 allowed",
+      "warn_days": "ok",
+      "evidence_is_recent": "ok, 0 days old",
+      "every_sleeve_passed_at_least_once": "passed: [] - reads records; nothing on record"
+    }
+  },
+  "s2_route_aware_safety_reporting": {
+    "status_after_5zg": "CLOSED in code and test; NOT live",
+    "track1_trade_log_path": "global_index/track1_runtime/trade_log.track1.jsonl",
+    "route_tag": "track1_candidate",
+    "proof_not_live": "the live scheduler log at 18:20 shows the Track 1 stop-repair argv with NO --trade-log-path and NO --route; the argv is built inside pid 48604, started 01:07, which predates the change",
+    "measured_side_effect_of_the_book_appearing": {
+      "before_13:56 (no book)": "sweeps took 1 s (early return)",
+      "after_13:56 (book present)": "sweeps took 13 s - they now take the lock and connect to IB Gateway on every sweep, 13x/day, on client id 90",
+      "assessment": "not a defect - the safety net doing its job the moment there is a book; but it is new load that began today"
+    },
+    "remaining": [
+      {
+        "item": "operator restarts the scheduler so 5ZG's argv goes live",
+        "shadow": false,
+        "paper": true,
+        "live": true
+      },
+      {
+        "item": "after restart, verify the live argv carries both flags",
+        "shadow": false,
+        "paper": true,
+        "live": true
+      },
+      {
+        "item": "verify the empty log file is created and stays empty on a no-op sweep",
+        "shadow": false,
+        "paper": true,
+        "live": true
+      },
+      {
+        "item": "verify no legacy-log write during a Track 1 no-op sweep",
+        "shadow": false,
+        "paper": true,
+        "live": true
+      },
+      {
+        "item": "verify a real safety close lands in the Track 1 log, tagged",
+        "shadow": false,
+        "paper": false,
+        "live": true,
+        "needs_broker": true
+      }
+    ],
+    "stage": "5ZJ"
+  },
+  "s3_order_execution_lifecycle": {
+    "built": {
+      "state_machine": "track1_order_state.py",
+      "journal_writer": "track1_order_journal.py (fail-closed)",
+      "executor": "track1_paper_executor.py",
+      "order_builder": "track1_paper_order.py",
+      "broker_read_side": "track1_broker_read.py",
+      "callsite_dry_run": "track1_paper_callsite.py"
+    },
+    "wired_into_production": false,
+    "live_broker_in_shadow": "NoOrderBroker - send_order/cancel_order/get_equity all raise",
+    "states": [
+      "INTENDED",
+      "SUBMITTED",
+      "FILLED",
+      "PARTIAL",
+      "REJECTED",
+      "UNKNOWN"
+    ],
+    "executor_methods_present": [
+      "open_position",
+      "unresolved",
+      "reconcile_at_startup"
+    ],
+    "executor_methods_MISSING_vs_protocol": [
+      "close_position",
+      "place_protective_stop",
+      "switch_same_symbol"
+    ],
+    "who_does_them_today": {
+      "place_protective_stop": "the safety job, B4 inside FuturesRunner.__init__ - NO journal row",
+      "close_position_max_hold": "the safety job - writes the trade log, not the journal",
+      "close_position_strategy_exit": "NOBODY - the sleeves' own exits have no path to a broker",
+      "switch_same_symbol": "track1_switch is imported by NOTHING; it calls send_order twice with no journal"
+    },
+    "unit_testable_today": [
+      "INTENDED before anything, SUBMITTED before send",
+      "journal write failure stops the order",
+      "unrecognised broker status -> UNKNOWN",
+      "order id arrives on a receipt mid-flight",
+      "disconnect/timeout mid-send against fakes"
+    ],
+    "requires_paper_evidence": [
+      "restart between SUBMITTED and outcome (a real orphan)",
+      "partial fill",
+      "real disconnect/timeout behaviour",
+      "receipt shape against real IBKR"
+    ],
+    "blocks": {
+      "shadow": false,
+      "paper": true,
+      "live": true
+    },
+    "stage": "5ZN"
+  },
+  "s4_stop_lifecycle": {
+    "assessment": "the widest gap on the map",
+    "strategy_computes_a_stop": true,
+    "Order_fields": [
+      "inst",
+      "action",
+      "direction",
+      "contracts",
+      "cluster",
+      "ref_day",
+      "exit_day",
+      "pnl_sized",
+      "contract_month"
+    ],
+    "Order_has_stop_field": false,
+    "OrderRecord_fields": [
+      "trade_id",
+      "sleeve",
+      "instrument",
+      "tradable_symbol",
+      "direction",
+      "qty",
+      "state",
+      "ref_day",
+      "idempotency_key",
+      "broker_order_id",
+      "filled_qty",
+      "avg_price",
+      "detail"
+    ],
+    "OrderRecord_has_stop_field": false,
+    "who_places_the_stop": "B4 inside FuturesRunner.__init__, reached through the safety sweep - a different process, a different schedule, no journal row",
+    "consequence": "the planned stop and the placed stop are never written down in the same place, so there is NOTHING to reconcile a broker working-stop against; side, quantity, price, bracket/OCO and orphan detection all inherit that",
+    "historical_precedent": "a max-hold close on 2026-08-10 left an orphaned STP on MYM #12; an orphaned STP that fills OPENS a position in the opposite direction - this is why the client id must be shared",
+    "route_awareness": {
+      "stop_repair": "already route-scoped (5O): own book, switch, lock, id 90",
+      "max_hold": "already route-scoped, own marker"
+    },
+    "unit_testable": [
+      "carry the stop through candidate_to_order into the journal",
+      "planned-vs-placed comparison against a fake broker"
+    ],
+    "requires_paper_evidence": [
+      "IBKR actually holds the stop at the asked price and quantity",
+      "cancel-on-close works from client id 90",
+      "orphan STP detection"
+    ],
+    "stages": [
+      "5ZN journal the planned stop",
+      "5ZO the live reconcile"
+    ]
+  },
+  "s5_position_reconcile": {
+    "built": "track1_order_state.reconcile - MATCH / MISMATCH / UNKNOWN",
+    "entries_blocked_on": [
+      "MISMATCH",
+      "UNKNOWN"
+    ],
+    "exits": "allowed in all three - refusing to REDUCE exposure while the book is confused is the wrong failure direction",
+    "startup_hook": "Track1OrderExecutor.reconcile_at_startup takes broker positions as an ARGUMENT rather than fetching them - testable without a socket",
+    "wired_into_the_live_path": false,
+    "B1_shared_account": {
+      "strongest_available_statement": "broker_net(contract) == track1_net(contract) + legacy_net(contract)",
+      "detects_disagreement": true,
+      "can_attribute_it": false,
+      "failure_mode": "equal-and-opposite errors (legacy long 1, Track 1 short 1) cancel in the broker's net and read as agreement",
+      "resolution": "a dedicated account, or a proven-flat legacy book"
+    },
+    "restart_cases": [
+      "book written, no fill",
+      "fill, no book write",
+      "fill, book write, crash before journal"
+    ],
+    "why_recoverable": "the journal is written BEFORE the broker call, and resolve_submitted asks working orders first, executions second, positions last and never alone",
+    "blocks": {
+      "shadow": false,
+      "paper": true,
+      "live": true
+    }
+  },
+  "s6_route_aware_pnl_flex_report": {
+    "corruption_risk": "closed in code by 5ZG; goes live with the scheduler restart",
+    "re_verified_by_ast_today": {
+      "global_index/session_report.py": {
+        "knows_track1": false,
+        "reads": [
+          "live_positions.json"
+        ]
+      },
+      "monitor/flex_pull.py": {
+        "knows_track1": false,
+        "reads": []
+      },
+      "monitor/paper_pnl_compare.py": {
+        "knows_track1": false,
+        "reads": [
+          "live_positions.json",
+          "trade_log.jsonl"
+        ]
+      }
+    },
+    "missing_pieces": [
+      {
+        "n": 1,
+        "piece": "Track 1 order journal -> a PnL reader",
+        "blocks_paper_orders": true
+      },
+      {
+        "n": 2,
+        "piece": "live_positions.track1.json -> open-position parity",
+        "blocks_paper_orders": true
+      },
+      {
+        "n": 3,
+        "piece": "Track 1 fills -> Flex statement reconcile",
+        "blocks_paper_orders": false,
+        "blocks_paper_evaluation": true,
+        "needs_broker": true
+      },
+      {
+        "n": 4,
+        "piece": "route-aware session report or a separate Track 1 report",
+        "blocks_paper_orders": false,
+        "blocks_paper_evaluation": true
+      },
+      {
+        "n": 5,
+        "piece": "prevention of Track 1 rows folding into legacy reporting readers (paper_evidence_reader aggregates the whole trade log and splits on nothing)",
+        "blocks_paper_orders": true
+      }
+    ],
+    "conservative_answer": "items 1, 2 and 5 block paper ORDERS - not because an order cannot be sent without them, but because an order sent without them cannot be ACCOUNTED FOR, and evidence is the entire purpose of the paper stage. Items 3 and 4 block paper EVALUATION.",
+    "stage": "5ZM"
+  },
+  "s7_regime_verification": {
+    "labels_persisted": false,
+    "both_spy_refreshes_sufficient": "yes, by construction (verified in 5ZF)",
+    "correction_to_5zf": "5ZF recorded 'every path returns 0'. Not exact: the DRIFT path returns n_diff. The precise defect is (a) three 'could not verify' paths return 0, the same value as 'verified, no drift', and (b) the single call site at update_spy_csv.py:300 DISCARDS the return value.",
+    "consequence": "a 50-label drift logs a WARNING, returns a number nobody reads, and the job exits 0. The scheduler keeps only CRITICAL/ERROR from a child that exited 0, so the warning does not reach the journal either. A drift is currently INVISIBLE END TO END.",
+    "required_behaviour": [
+      "PASS / DRIFT / UNKNOWN",
+      "UNKNOWN fails closed",
+      "the result reaches the exit status -> a child failure the journal and dashboard can show",
+      "never green a verification that could not run"
+    ],
+    "files": [
+      "global_index/update_spy_csv.py",
+      "the job wrapper that surfaces child failure"
+    ],
+    "requires_broker_evidence": false,
+    "blocks": {
+      "shadow": false,
+      "paper": true,
+      "live": true
+    },
+    "stage": "5ZL"
+  },
+  "s8_signal_rule_detail_exposure": {
+    "measured_over_the_whole_signals_journal": {
+      "rows": 32,
+      "all_status": "NO_SIGNAL",
+      "by_sleeve": {
+        "roska4_swing": 23,
+        "roska4_stress": 9
+      },
+      "rule_check_sources": {
+        "measured": 64,
+        "not_reached": 50,
+        "not_exposed_by_sleeve": 210
+      },
+      "unexposed_share": "64.8%"
+    },
+    "unexposed_rules": {
+      "roska4_swing": [
+        "ema50_filter",
+        "r4_prior_range_filter",
+        "entry_bar_volume_filter",
+        "spy_d1_close_below_sma50_short_filter",
+        "fixed_stop_2x_daily_atr",
+        "stop_arm_rule"
+      ],
+      "roska4_stress": [
+        "no_regime_label_required",
+        "breadth_down_count",
+        "gapdown_count",
+        "avg_gap",
+        "mnq_only_short_setup",
+        "pre_high_stop_reference",
+        "stop_within_max_pct",
+        "rr_target_computed"
+      ]
+    },
+    "dashboard_must_not_recompute": "a second implementation of the strategy beside the one that trades would make 'not measured' and 'measured and fine' indistinguishable",
+    "fix": "detectors return the measured values; re-run artifact reproduction afterwards to prove the returns changed no decisions",
+    "blocks": {
+      "shadow": false,
+      "paper": false,
+      "live": false,
+      "blocks_explainability_and_operator_confidence": true
+    },
+    "stage": "5ZP"
+  },
+  "s9_operational_resilience": {
+    "windows_sleep": {
+      "state": "the dominant live problem",
+      "evidence": "16 missed-job warnings in one burst on 2026-08-25; three of four sleeves failed because of it"
+    },
+    "scheduler_heartbeat": "present - 60 s beat, 30 s tolerance, hourly throttle, STALLED marker, journal reader marks recovery",
+    "missed_slot_alert": "present - unexplained_overdue names the slots",
+    "dashboard_stale_runner_label": "fixed in 5ZF, NOT live until backend restart",
+    "spy_refresh_pm_failure_visibility": "fixed in 5ZF, NOT live until backend restart",
+    "backend_reload": "use_reloader=False - a source change needs a restart",
+    "ops_process_discovery": {
+      "shape": "ProcessScan carries `ok`; scheduler_processes() DISCARDS it; start_scheduler then does `if existing: return None`, which on a failed probe reads as 'nothing is running'",
+      "is_it_a_live_defect": false,
+      "why_not": "both CLI paths guard it first - `restart --scheduler` goes through ensure_single whose Decision refuses on scan.ok == False, and `up` checks scan.ok inline and prints REFUSING. The inner guard is a redundant second check that happens to be the weaker one.",
+      "residual_risk": "a trap for the next caller - the first person to call start_scheduler from anywhere else inherits the fail-open",
+      "priority": "low hygiene; recorded because a latent fail-open on the duplicate-scheduler guard is the class that already cost six entry slots"
+    },
+    "operator_actions": [
+      {
+        "n": 1,
+        "action": "fix the sleep - a power setting, not code",
+        "note": "currently the largest single cause of failed windows; it blocks the evidence gate more effectively than anything else on this map"
+      },
+      {
+        "n": 2,
+        "action": "restart the backend to pick up 5ZE / 5ZF / 5ZH dashboard fixes",
+        "command": "python monitor\\\\ops.py restart --no-scheduler --track1-only-shadow"
+      },
+      {
+        "n": 3,
+        "action": "restart the scheduler to pick up 5ZG's safety argv",
+        "note": "higher risk; do it outside a window"
+      }
+    ]
+  },
+  "s10_checkpoint_restart_semantics": {
+    "reader_fixed_by_5zh": true,
+    "quiet_window_contract": "Option C - checkpoint plus companion book, both from one call",
+    "swing_2026_08_25_re_evaluated": "PASS",
+    "named_blocker": {
+      "statement": "the checkpoint cannot resume anything",
+      "cause": "the single production call site passes no `frames`, so checkpoint_entries skips every instrument and the entry map is empty WHATEVER the day did",
+      "consequence": "get_entry -> {} -> usable refuses no_entry -> every run replays in full"
+    },
+    "what_an_entry_should_contain": [
+      "route",
+      "sleeve",
+      "last_day",
+      "frame fingerprint",
+      "readable params",
+      "params hash",
+      "data source",
+      "engine-shaped position: direction, entry, stop, entry day"
+    ],
+    "frames_needed": {
+      "roska4_swing": [
+        "MES",
+        "MNQ",
+        "MYM",
+        "M2K"
+      ],
+      "global_nkd": [
+        "MNKD"
+      ]
+    },
+    "performance_budget_measured": {
+      "global_nkd": {
+        "n": 22,
+        "p50_s": 2.5,
+        "p95_s": 2.7,
+        "max_s": 3.0,
+        "headroom_s": 297.0
+      },
+      "roska4_stress": {
+        "n": 36,
+        "p50_s": 3.2,
+        "p95_s": 19.7,
+        "max_s": 20.8,
+        "headroom_s": 279.2
+      },
+      "roska4_swing": {
+        "n": 46,
+        "p50_s": 39.8,
+        "p95_s": 78.5,
+        "max_s": 78.9,
+        "headroom_s": 221.1
+      }
+    },
+    "budget_assessment": "the checkpoint is written only at window close, so the cost lands on ONE slot per sleeve; Swing still has 221 s against the 300 s ceiling and 161 s against the 240 s target",
+    "unmeasured_and_must_not_be_assumed": "whether the closing slot can reuse the in-memory frames or must reload them - the FIRST thing 5ZK should measure",
+    "testable_without_a_fill": [
+      "entries are written when frames are supplied",
+      "usable accepts a same-day entry and refuses a drifted one",
+      "the close-time cost stays inside the budget"
+    ],
+    "requires_an_open_position": [
+      "a resume actually rebuilds the right book",
+      "restart mid-window with a position open"
+    ],
+    "stage": "5ZK"
+  },
+  "s11_paper_readiness_gate": {
+    "open_machine_gates": {
+      "PAPER_SHADOW_EVIDENCE": "2 of 5 judgeable days; 2 FAIL days against 0 allowed; no sleeve has PASSED on record",
+      "B1_broker_account_or_legacy_retirement": "open - operator decision, cannot be closed by code",
+      "order_path": "not enabled; NoOrderBroker raises; no confirmation file; no orders dir"
+    },
+    "additional_requirements_this_map_argues_for": [
+      "5ZG's safety argv live and verified after restart",
+      "route-aware PnL and open-position parity present, or EXPLICITLY WAIVED IN WRITING for a deliberately tiny probe - a waiver is acceptable, silence is not",
+      "regime verification no longer warn-only, UNKNOWN failing closed",
+      "checkpoint resume semantics resolved, or an explicit statement that Track 1 replays in full every day and that this is accepted",
+      "the entry's planned stop journalled, so a placed stop has something to be compared against",
+      "broker/account state verified under whichever B1 answer is chosen"
+    ],
+    "rule": "no confirmation file until every machine gate passes. B1 comes FIRST in time, because a shared account cannot attribute a mismatch to a route - which is the one thing paper evidence is supposed to establish."
+  },
+  "s12_recommended_stage_order": [
+    {
+      "n": 1,
+      "stage": "5ZJ",
+      "name": "make 5ZG live",
+      "goal": "operator restarts the scheduler; verify the live argv carries --trade-log-path and --route; verify the empty log appears and no legacy write happens on a no-op sweep",
+      "blocks_paper": true,
+      "needs_broker": false,
+      "why_first": "the only one already finished in code; needs a restart that must happen anyway; until it lands the route has a known-wrong reporting destination in the running system; costs an operator minute, not a stage"
+    },
+    {
+      "n": 2,
+      "stage": "5ZK",
+      "name": "checkpoint writer frames / usable entries",
+      "goal": "measure the close-time cost FIRST, then supply frames so entries are real; prove usable accepts them",
+      "blocks_paper": true,
+      "needs_broker": false,
+      "why_here": "cheap, and it has a measurement gate in front of it - if the frame cost is large the stage changes shape, so start it early"
+    },
+    {
+      "n": 3,
+      "stage": "5ZL",
+      "name": "regime verification tri-state / child failure",
+      "goal": "PASS / DRIFT / UNKNOWN, UNKNOWN fails closed, result reaches the exit status and the journal",
+      "blocks_paper": true,
+      "needs_broker": false
+    },
+    {
+      "n": 4,
+      "stage": "5ZM",
+      "name": "route-aware PnL / parity / report",
+      "goal": "journal -> PnL, book -> open-position parity, keep Track 1 rows out of legacy readers; Flex left for when a statement exists",
+      "blocks_paper": true,
+      "needs_broker": "partly",
+      "dependency_correction": "5ZM depends on 5ZN more than the suggested order implies - a PnL reader over the order journal reads a journal that no production code writes today. RECOMMENDED: keep 5ZM at 4 and have it consume the DRY RUN's journal output rather than waiting for real orders."
+    },
+    {
+      "n": 5,
+      "stage": "5ZN",
+      "name": "paper execution callsite",
+      "goal": "journal the planned stop with the entry; build close_position and place_protective_stop on the executor; wire the dry run; STILL NO ORDERS",
+      "blocks_paper": true,
+      "needs_broker": false
+    },
+    {
+      "n": 6,
+      "stage": "5ZO",
+      "name": "stop lifecycle reconcile",
+      "goal": "planned vs placed, working-stop reconcile, orphan STP detection",
+      "blocks_paper": false,
+      "blocks_live": true,
+      "needs_broker": true
+    },
+    {
+      "n": 7,
+      "stage": "5ZP",
+      "name": "sleeve rule exposure",
+      "goal": "detectors return measured values; re-run artifact reproduction",
+      "blocks_paper": false,
+      "needs_broker": false
+    }
+  ],
+  "not_on_the_critical_path": [
+    "sleeve rule exposure (section 8)",
+    "ops.py process-scan hygiene (section 9)"
+  ],
+  "ranked_map": [
+    {
+      "rank": 1,
+      "item": "machine sleep",
+      "current_status": "live, unmitigated",
+      "why_it_matters": "three of four sleeves failed on 2026-08-25 because of it",
+      "what_can_go_wrong": "windows go unobserved; the evidence gate never fills",
+      "blocks_next_shadow_window": true,
+      "blocks_paper_orders": true,
+      "blocks_live_orders": true,
+      "files": [
+        "Windows power settings"
+      ],
+      "minimum_fix_shape": "operator: disable sleep",
+      "tests_required": [
+        "none - operational"
+      ],
+      "requires_broker_or_paper_evidence": false,
+      "stage": "operator"
+    },
+    {
+      "rank": 2,
+      "item": "B1 account decision",
+      "current_status": "open, USER_DECISION_GATE",
+      "why_it_matters": "a shared login means one net position per contract for both routes",
+      "what_can_go_wrong": "equal-and-opposite errors cancel in the broker net and read as agreement",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": true,
+      "blocks_live_orders": true,
+      "files": [
+        "track1_gates.py",
+        "track1_order_state.reconcile"
+      ],
+      "minimum_fix_shape": "operator: retire legacy, or fund a dedicated account; record in the confirmation file",
+      "tests_required": [
+        "reconcile under shared_account=False is exact"
+      ],
+      "requires_broker_or_paper_evidence": true,
+      "stage": "operator"
+    },
+    {
+      "rank": 3,
+      "item": "5ZG argv not live",
+      "current_status": "closed in code, not in the running process",
+      "why_it_matters": "the running scheduler still calls the safety jobs the old way",
+      "what_can_go_wrong": "a Track 1 safety close would still land in the legacy trade log",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": true,
+      "blocks_live_orders": true,
+      "files": [
+        "run_scheduler.py"
+      ],
+      "minimum_fix_shape": "operator restart + a post-restart argv verification",
+      "tests_required": [
+        "read the live argv out of the scheduler log and assert both flags"
+      ],
+      "requires_broker_or_paper_evidence": false,
+      "stage": "5ZJ"
+    },
+    {
+      "rank": 4,
+      "item": "checkpoint cannot resume",
+      "current_status": "named in 5ZH, unfixed",
+      "why_it_matters": "the checkpoint records that a window completed and nothing that could resume it",
+      "what_can_go_wrong": "a day holding an open position writes the same empty file; every run replays in full",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": true,
+      "blocks_live_orders": true,
+      "files": [
+        "run_live_day_track1.write_route_checkpoint",
+        "track1_bootstrap.checkpoint_entries"
+      ],
+      "minimum_fix_shape": "measure the close-time frame cost, then pass frames",
+      "tests_required": [
+        "entries written when frames supplied",
+        "usable accepts same-day, refuses drifted",
+        "close-time cost inside the budget"
+      ],
+      "requires_broker_or_paper_evidence": false,
+      "stage": "5ZK"
+    },
+    {
+      "rank": 5,
+      "item": "regime verification warn-only",
+      "current_status": "live",
+      "why_it_matters": "the gate that decides which sleeve may trade cannot report a failure",
+      "what_can_go_wrong": "a label drift is invisible end to end - warning discarded, exit 0",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": true,
+      "blocks_live_orders": true,
+      "files": [
+        "update_spy_csv.py"
+      ],
+      "minimum_fix_shape": "tri-state return + honour it at the call site + child failure",
+      "tests_required": [
+        "UNKNOWN != PASS",
+        "drift fails the job",
+        "call site consumes the return"
+      ],
+      "requires_broker_or_paper_evidence": false,
+      "stage": "5ZL"
+    },
+    {
+      "rank": 6,
+      "item": "order journal -> PnL",
+      "current_status": "missing",
+      "why_it_matters": "a paper fill nobody can price produces no evidence",
+      "what_can_go_wrong": "orders sent and not accounted for",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": true,
+      "blocks_live_orders": true,
+      "files": [
+        "monitor/paper_pnl_compare.py"
+      ],
+      "minimum_fix_shape": "a route-scoped reader over the order journal",
+      "tests_required": [
+        "journal rows -> PnL",
+        "legacy reader unaffected"
+      ],
+      "requires_broker_or_paper_evidence": false,
+      "stage": "5ZM"
+    },
+    {
+      "rank": 7,
+      "item": "book -> open-position parity",
+      "current_status": "missing",
+      "why_it_matters": "no check that the route's book matches what is reported",
+      "what_can_go_wrong": "a drifted book goes unnoticed until a stop is placed against nothing",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": true,
+      "blocks_live_orders": true,
+      "files": [
+        "monitor/paper_pnl_compare.py",
+        "global_index/session_report.py"
+      ],
+      "minimum_fix_shape": "parity reader over live_positions.track1.json",
+      "tests_required": [
+        "parity match/mismatch/unknown"
+      ],
+      "requires_broker_or_paper_evidence": false,
+      "stage": "5ZM"
+    },
+    {
+      "rank": 8,
+      "item": "Track 1 rows folding into legacy readers",
+      "current_status": "open",
+      "why_it_matters": "paper_evidence_reader aggregates the whole trade log and splits on nothing",
+      "what_can_go_wrong": "Track 1 rows enter legacy's fill-quality and PnL gates",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": true,
+      "blocks_live_orders": true,
+      "files": [
+        "monitor/backend/paper_evidence_reader.py"
+      ],
+      "minimum_fix_shape": "split on the route tag 5ZG already writes",
+      "tests_required": [
+        "a tagged row is excluded from the legacy aggregate"
+      ],
+      "requires_broker_or_paper_evidence": false,
+      "stage": "5ZM"
+    },
+    {
+      "rank": 9,
+      "item": "planned stop not journalled",
+      "current_status": "open",
+      "why_it_matters": "the planned stop and the placed stop are never written in the same place",
+      "what_can_go_wrong": "nothing to reconcile a broker working-stop against",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": true,
+      "blocks_live_orders": true,
+      "files": [
+        "track1_paper_order.py",
+        "track1_order_state.py",
+        "global_index/broker.py"
+      ],
+      "minimum_fix_shape": "carry the stop onto the Order and the OrderRecord",
+      "tests_required": [
+        "stop survives candidate -> order -> journal",
+        "legacy Order shape unchanged"
+      ],
+      "requires_broker_or_paper_evidence": false,
+      "stage": "5ZN"
+    },
+    {
+      "rank": 10,
+      "item": "close_position / place_protective_stop unbuilt",
+      "current_status": "open",
+      "why_it_matters": "three of four lifecycle verbs do not exist on the real executor",
+      "what_can_go_wrong": "exits and stops happen outside the journal, or not at all",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": true,
+      "blocks_live_orders": true,
+      "files": [
+        "track1_paper_executor.py"
+      ],
+      "minimum_fix_shape": "build them on the executor behind the same fail-closed rules as open_position",
+      "tests_required": [
+        "INTENDED before anything",
+        "SUBMITTED before send",
+        "UNKNOWN on ambiguity"
+      ],
+      "requires_broker_or_paper_evidence": false,
+      "stage": "5ZN"
+    },
+    {
+      "rank": 11,
+      "item": "executor unwired",
+      "current_status": "by design, until now",
+      "why_it_matters": "nothing in production can place a Track 1 order",
+      "what_can_go_wrong": "correct today; becomes the blocker the moment paper is wanted",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": true,
+      "blocks_live_orders": true,
+      "files": [
+        "run_live_day_track1.py",
+        "track1_paper_callsite.py"
+      ],
+      "minimum_fix_shape": "wire the dry run first; the real call site behind every gate",
+      "tests_required": [
+        "orders remain impossible without the confirmation file"
+      ],
+      "requires_broker_or_paper_evidence": false,
+      "stage": "5ZN"
+    },
+    {
+      "rank": 12,
+      "item": "evidence: 0 clean days",
+      "current_status": "2 of 5 judgeable, both FAIL",
+      "why_it_matters": "the gate asks for five clean judgeable days",
+      "what_can_go_wrong": "nothing - it is time plus item 1",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": true,
+      "blocks_live_orders": true,
+      "files": [
+        "track1_paper_readiness.py"
+      ],
+      "minimum_fix_shape": "fix the sleep and let days accumulate",
+      "tests_required": [
+        "none"
+      ],
+      "requires_broker_or_paper_evidence": false,
+      "stage": "time + item 1"
+    },
+    {
+      "rank": 13,
+      "item": "Flex reconcile",
+      "current_status": "missing",
+      "why_it_matters": "the broker's own statement is the only external check on fills",
+      "what_can_go_wrong": "fills disagree with the statement and nobody notices",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": false,
+      "blocks_live_orders": true,
+      "files": [
+        "monitor/flex_pull.py"
+      ],
+      "minimum_fix_shape": "route-scoped Flex reconcile",
+      "tests_required": [
+        "fills vs statement"
+      ],
+      "requires_broker_or_paper_evidence": true,
+      "stage": "5ZM / later"
+    },
+    {
+      "rank": 14,
+      "item": "route-aware session report",
+      "current_status": "missing",
+      "why_it_matters": "the daily report does not mention the route that is running",
+      "what_can_go_wrong": "a day's Track 1 activity leaves no readable summary",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": false,
+      "blocks_live_orders": true,
+      "files": [
+        "global_index/session_report.py"
+      ],
+      "minimum_fix_shape": "a Track 1 section or a separate report",
+      "tests_required": [
+        "report names the route"
+      ],
+      "requires_broker_or_paper_evidence": false,
+      "stage": "5ZM"
+    },
+    {
+      "rank": 15,
+      "item": "broker working-stop reconcile",
+      "current_status": "missing",
+      "why_it_matters": "no proof the broker holds the stop the strategy asked for",
+      "what_can_go_wrong": "an unprotected position believed protected",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": false,
+      "blocks_live_orders": true,
+      "files": [
+        "track1_broker_read.py"
+      ],
+      "minimum_fix_shape": "compare journalled stop against open orders",
+      "tests_required": [
+        "planned vs placed"
+      ],
+      "requires_broker_or_paper_evidence": true,
+      "stage": "5ZO"
+    },
+    {
+      "rank": 16,
+      "item": "orphan STP detection",
+      "current_status": "missing",
+      "why_it_matters": "an orphaned STP that fills OPENS a position in the opposite direction",
+      "what_can_go_wrong": "measured precedent: MYM #12, 2026-08-10",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": false,
+      "blocks_live_orders": true,
+      "files": [
+        "track1_broker_read.py",
+        "run_stop_repair.py"
+      ],
+      "minimum_fix_shape": "detect stops with no matching route position",
+      "tests_required": [
+        "orphan detected and named"
+      ],
+      "requires_broker_or_paper_evidence": true,
+      "stage": "5ZO"
+    },
+    {
+      "rank": 17,
+      "item": "partial fill handling",
+      "current_status": "classification only",
+      "why_it_matters": "PARTIAL is a state the journal can hold and nothing has ever produced",
+      "what_can_go_wrong": "a partial is treated as a whole, or not at all",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": false,
+      "blocks_live_orders": true,
+      "files": [
+        "track1_paper_executor.py"
+      ],
+      "minimum_fix_shape": "handle the residual explicitly",
+      "tests_required": [
+        "partial leaves a resolvable journal"
+      ],
+      "requires_broker_or_paper_evidence": true,
+      "stage": "5ZO"
+    },
+    {
+      "rank": 18,
+      "item": "shared-account attribution",
+      "current_status": "unprovable while B1 is open",
+      "why_it_matters": "a mismatch cannot be pinned on a route",
+      "what_can_go_wrong": "the paper evidence proves less than it appears to",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": true,
+      "blocks_live_orders": true,
+      "files": [
+        "track1_order_state.reconcile"
+      ],
+      "minimum_fix_shape": "close B1",
+      "tests_required": [
+        "reconcile is exact with shared_account=False"
+      ],
+      "requires_broker_or_paper_evidence": true,
+      "stage": "B1"
+    },
+    {
+      "rank": 19,
+      "item": "sleeve rule exposure (65% unexposed)",
+      "current_status": "by design, honestly labelled",
+      "why_it_matters": "on a day the route declines to trade, nobody can say which rule declined",
+      "what_can_go_wrong": "no correctness risk; an explainability gap",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": false,
+      "blocks_live_orders": false,
+      "files": [
+        "the four sleeve detectors",
+        "track1_signals.py"
+      ],
+      "minimum_fix_shape": "detectors return measured values",
+      "tests_required": [
+        "a measured value replaces not_exposed_by_sleeve",
+        "artifact reproduction unchanged"
+      ],
+      "requires_broker_or_paper_evidence": false,
+      "stage": "5ZP"
+    },
+    {
+      "rank": 20,
+      "item": "scheduler_processes drops the third answer",
+      "current_status": "latent, NOT reachable today",
+      "why_it_matters": "both CLI paths guard scan.ok before reaching it",
+      "what_can_go_wrong": "the next caller of start_scheduler inherits a fail-open",
+      "blocks_next_shadow_window": false,
+      "blocks_paper_orders": false,
+      "blocks_live_orders": false,
+      "files": [
+        "monitor/ops.py"
+      ],
+      "minimum_fix_shape": "carry the third answer, or delete the redundant inner guard",
+      "tests_required": [
+        "a failed probe refuses rather than starting"
+      ],
+      "requires_broker_or_paper_evidence": false,
+      "stage": "hygiene"
+    }
+  ]
+}

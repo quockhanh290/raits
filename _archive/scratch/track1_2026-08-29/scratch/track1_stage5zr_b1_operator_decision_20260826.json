@@ -1,0 +1,245 @@
+{
+  "stage": "5ZR",
+  "title": "Record the B1 operator decision safely — prepared, previewed, deliberately not recorded",
+  "checked_at": {
+    "utc": "2026-08-26T12:50",
+    "et": "2026-08-26T08:50 EDT",
+    "calgary": "2026-08-26T06:50 MDT",
+    "window": "ET 08:20-09:00"
+  },
+  "answers": {
+    "1_recorded_or_templated": {
+      "answer": "TEMPLATED ONLY — Option 1",
+      "and_the_reason_is_measured_not_cautious": "The stage offers Option 1 when unsure the code can hold a partial B1 decision safely. It can — proved by simulation below, orders_possible stays false in every shape. The refusal is on the MERITS: neither decision is TRUE today.",
+      "template": "scratch/track1_b1_decision_template_20260826.json",
+      "not_placed_at": "track1_go_live_confirmation.json (absent, still)"
+    },
+    "2_which_decision_type": {
+      "answer": "NEITHER can be recorded today",
+      "legacy_retired_confirmed": "says legacy has stopped trading. MEASURED: legacy is DORMANT, not retired. track1-only-shadow registers 0 legacy strategy jobs; the default mode registers 45. The difference is ONE command-line flag, so this claim is falsified by a plain restart while the gate goes on reading it as true. Retiring legacy is the ordered procedure in the switch-over runbook section 3, which has not been executed — and its 11 drain jobs are still scheduled, which this stage was told not to disable.",
+      "separate_account_confirmed": "says Track 1 has its own IBKR login. There is one account (equity 996,883) and nothing in this system has ever observed a second one.",
+      "whose_call": "the operator's. The runbook says the confirmation file is written by a person, never by a script — and that includes this one."
+    },
+    "3_which_measurement_record": {
+      "path": "global_index/track1_b1/track1_b1_20260826.jsonl",
+      "checked_at": "2026-08-26T10:15:51.623970+00:00 (06:15:51 ET)",
+      "status": "PASS (legacy_and_broker_flat)",
+      "contents": {
+        "legacy_book": 0,
+        "track1_book": 0,
+        "broker_positions": 0,
+        "working_orders": 0,
+        "orphans": 0
+      },
+      "age_at_this_stage": "2.2 h",
+      "counts_until": "2026-08-27T10:15:51Z",
+      "note": "the 24h expiry is deliberate: an account flat yesterday is not evidence about the account now, so the gate closes again on its own"
+    },
+    "4_b1_released_or_pending": {
+      "answer": "PENDING — still blocking",
+      "why": "the measured half passes; the decided half is empty"
+    },
+    "5_other_blockers": {
+      "PAPER_SHADOW_EVIDENCE": "still blocking",
+      "REGIME_LABEL_VERIFICATION": "still blocking",
+      "proved_structurally": "both are MEASURED_GATEs with released_by == (), and self_check refuses a MEASURED_GATE that any confirmation flag could open. No decision file can reach them."
+    },
+    "6_orders_possible": {
+      "answer": false,
+      "simulated_every_shape_in_memory_writing_nothing": {
+        "nothing": false,
+        "legacy_retired_confirmed": false,
+        "separate_account_confirmed": false,
+        "decision + waiver": false
+      }
+    },
+    "7_order_or_broker_action": {
+      "answer": false,
+      "did_not": [
+        "connect to IBKR",
+        "place/cancel/modify an order",
+        "touch account state"
+      ]
+    },
+    "8_runtime_or_live_file_changed": {
+      "answer": false,
+      "written": [
+        "scratch/track1_b1_decision_template_20260826.json (a template, inert)",
+        "scratch deliverables"
+      ],
+      "untouched": [
+        "live_positions.json",
+        "live_positions.track1.json",
+        "trade_log.jsonl",
+        "trade_log.track1.jsonl",
+        "replay_checkpoint.track1.json",
+        "track1_runtime/*",
+        "track1_b1/*",
+        "track1_go_live_confirmation.json"
+      ]
+    },
+    "9_legacy_drain_safety": {
+      "answer": "STILL SCHEDULED",
+      "jobs": 11,
+      "and_a_decision_cannot_change_that": "the scheduler is built from command-line flags and never reads the confirmation file — asserted by AST, so recording a decision cannot remove the drain"
+    },
+    "10_before_a_tiny_paper_probe": [
+      {
+        "n": 1,
+        "item": "the B1 decision — and the state of the world that makes it true",
+        "class": "operator"
+      },
+      {
+        "n": 2,
+        "item": "five clean judgeable shadow days (today: 2 judgeable, both FAIL)",
+        "class": "time"
+      },
+      {
+        "n": 3,
+        "item": "the regime gate's first PASS",
+        "class": "time"
+      },
+      {
+        "n": 4,
+        "item": "machine sleep",
+        "class": "operator"
+      },
+      {
+        "n": 5,
+        "item": "THE ORDER PATH — run_live_day_track1 constructs NoOrderBroker and never constructs IBKRBroker, asserted by AST here",
+        "class": "code, unwritten"
+      }
+    ]
+  },
+  "what_was_built": {
+    "global_index/track1_b1_decision.py": "a read-only previewer: given a candidate decision file it reports what would open, what would stay shut, whether orders would become possible, the live measurement and when it expires, and whether the RUNNING scheduler can still open a legacy position. It has no code path that writes anything — asserted behaviourally by watching every file opened for writing, and again by AST, and it never names the live confirmation path.",
+    "scratch/track1_b1_decision_template_20260826.json": "inert by construction. A verbatim copy to the live path is refused for TWO independent reasons — unknown underscore keys, and an empty confirmed_by — and a test proves the plural by ablation: each defence is removed in turn and refusal must survive.",
+    "global_index/track1_paper_readiness.py": "its closing paragraph said B1 was released by 'a confirmation file'. True until 5ZQ and quietly wrong afterwards. It now reports B1 as TWO halves — decision pending/recorded, measurement PASS/stale/missing — and states that no gate builds an order path."
+  },
+  "the_finding_that_settled_option_1": {
+    "measured": {
+      "track1-only-shadow": {
+        "total_jobs": 101,
+        "track1": 86,
+        "legacy_strategy": 0,
+        "legacy_safety": 11
+      },
+      "default_mode": {
+        "total_jobs": 61,
+        "track1": 0,
+        "legacy_entry_jobs": 45,
+        "legacy_safety": 12
+      }
+    },
+    "so": "legacy's dormancy is a runtime flag, not a retirement. Recording legacy_retired_confirmed today would freeze a claim that `ops.py restart --scheduler` (without the flag) silently falsifies.",
+    "what_was_done_about_it": "the previewer says this at the moment of decision — the only moment it helps — rather than folding it into PASS/FAIL, because for a SEPARATE ACCOUNT decision legacy entry jobs running is correct, not a fault"
+  },
+  "two_of_my_own_tests_proved_nothing_until_the_sweep_caught_them": [
+    {
+      "test": "the template refuses for more than one reason",
+      "was": "stripped the underscore keys and checked it still refused",
+      "why_it_proved_nothing": "it performed the very mutation it was meant to detect — remove the underscore guard from the template and this test stays green, because it removes it itself",
+      "now": "ablation: each defence removed IN TURN, refusal must survive every removal, plus a control that must validate so the ablations cannot pass for an unknown reason"
+    },
+    {
+      "test": "legacy entry capability has three values",
+      "was": "AST inventory of the constants returned anywhere in the function",
+      "why_it_proved_nothing": "changing the no-scheduler branch from UNKNOWN to NONE left all three constants present — the exception handler still returned UNKNOWN — so the function began reporting 'legacy cannot enter' about a scheduler it could not see, and the test stayed green",
+      "now": "the branch is EXERCISED, not inventoried: three parametrised cases drive scheduler_processes and assert the answer"
+    }
+  ],
+  "tests": {
+    "file": "scratch/test_track1_stage5zr_b1_decision_20260826.py",
+    "count": 30,
+    "style": "structured payloads, AST, and observed file access. No prose greps.",
+    "mutations": {
+      "attempted": 12,
+      "red": 12,
+      "note": "two were STILL GREEN on the first sweep; both tests were rewritten and the sweep re-run"
+    }
+  },
+  "claims_deliberately_NOT_made": [
+    "that B1 is closed",
+    "that a decision was recorded",
+    "that legacy is retired",
+    "that Track 1 is ready for paper",
+    "that opening B1 would bring paper closer than the order path, which does not exist"
+  ],
+  "regression": {
+    "targeted": {
+      "suites": "5ZR + 5ZQ + 5X + dashboard wiring + 5C + monitor ops/backend",
+      "passed": 407,
+      "failed": 4,
+      "note": "the 4 are the known 5C slot-count family, measured pre-existing in 5ZQ"
+    },
+    "gate_and_readiness_sweep": {
+      "suites": 33,
+      "passed": 1196,
+      "failed": 30,
+      "skipped": 3
+    },
+    "what_the_sweep_uncovered": "three failures in the LEDGER suites, which the 5ZQ bisect had not covered because those suites were not among the 14 it ran. One of the three is mine.",
+    "gate_and_readiness_sweep_AFTER_the_fixes": {
+      "passed": 1201,
+      "failed": 25,
+      "skipped": 3,
+      "was_before": 30,
+      "five_went_green": [
+        "3B test_ledger_matches_the_registry_exactly",
+        "3B test_ledger_releasing_every_gate_would_open_the_route",
+        "3B test_ledger_the_markdown_names_every_blocker",
+        "4B test_the_registry_is_structurally_sound_and_the_ledger_agrees",
+        "4C test_the_ledger_on_disk_still_agrees_with_the_registry"
+      ],
+      "all_five_were_ledger_parity": "three fixed by regenerating the record and the document, one by teaching the satisfiability test the second kind of measurement, and two more that were reading the same record"
+    }
+  },
+  "the_one_this_stage_caused_and_the_test_was_right": {
+    "test": "test_ledger_releasing_every_gate_would_open_the_route",
+    "what_it_asserts": "the whole blocker set must be SATISFIABLE, and not by signatures alone: hold each measurement shut in turn and exactly the gates depending on it must be the ones still refusing",
+    "why_it_fired": "Stage 5ZQ introduced a SECOND KIND of measurement. `released_by_measurement` is an OR — passing OPENS the gate. The new `also_requires_measurement` is an AND — passing is REQUIRED even once the gate is signed. The loop only knew the first kind, so `legacy_broker_flat` came back as 'releases no order-blocking gate'. The test was correct on its own terms.",
+    "fix": "both kinds are covered now, with the same claim for each: hold the measurement shut and exactly the gates that depend on it must refuse. For an AND-measurement that is the STRONGER statement, because the gate refuses with every signature already granted.",
+    "and_it_got_stronger": "a new assertion was added while I was in there — granting ONLY the waiver flags, with every measurement held shut, must open nothing. The escape hatch built for 'the broker could not be reached' must never become a way in."
+  },
+  "the_ledger_had_been_stale_for_a_whole_stage": {
+    "artefacts": [
+      "scratch/track1_blocking_ledger_20260822.json",
+      "scratch/track1_blocking_ledger_20260822.md"
+    ],
+    "json_was_stale_since": "Stage 5ZL — `blocking_now` listed 2 blockers where the registry has 3",
+    "md_was_stale_since": "Stage 5ZL — it did not mention REGIME_LABEL_VERIFICATION AT ALL, a gate the operator is currently held by. Last updated 2026-08-23.",
+    "and_5zq_added_to_it": "three row keys (also_requires_measurement, waiver_flag, required_measurement_now) and one confirmation flag",
+    "done": {
+      "json": "regenerated from the registry, which is what its own failure message instructs — the ledger is GENERATED, never edited beside the code",
+      "md": "the missing gate written up from the registry's own text, plus a section recording that B1 now needs a decision AND a proof. A ledger that omits a live gate is worse than no ledger, because it reads as complete."
+    },
+    "the_process_gap_left_open": "`as_ledger()` has NO WRITER anywhere in the repo. 'Generated from the registry' is true in intent and manual in practice, which is why it went a whole stage without being regenerated. A regeneration step belongs in whatever stage next touches the registry; naming it here rather than adding another module to a stage about the B1 decision."
+  },
+  "still_red_and_not_mine": {
+    "count": 25,
+    "measured_in": "the Stage 5ZQ bisect — every 5ZQ edit reverted and the suites re-run",
+    "families": [
+      "roster pins (the exact blocker list) — stale since 5S and 5ZL",
+      "absence proxies on live_positions.track1.json — stale since 5ZN",
+      "slot-count pins (25 slots, 'the two windows') — stale since 5N",
+      "two in 5ZO and three in the freshness suite — NOT traced; naming a cause would be a guess"
+    ],
+    "left_deliberately": "a stage of its own, which should also put scratch/ into a regression set somebody runs",
+    "the_four_suites_the_5zq_bisect_never_covered": {
+      "checked_individually_this_stage": [
+        "4B",
+        "4C",
+        "5AB",
+        "5B"
+      ],
+      "verdict": "same two families, nothing new",
+      "evidence": {
+        "4B test_the_live_frame_gate_cannot_be_opened_by_a_signature": "expects the MEASURED_GATE set to be {LIVE_FRAME_ADAPTER_VERIFICATION} alone; got three because 5S added PAPER_SHADOW_EVIDENCE and 5ZL added REGIME_LABEL_VERIFICATION. My legacy_broker_flat is NOT in that set — it is an AND-measurement on a USER_DECISION_GATE.",
+        "4C test_the_order_gate_still_refuses_without_a_confirmation": "roster pin, stale since 5ZL",
+        "5AB test_b1_is_the_only_blocker_again": "roster pin, stale since 5S",
+        "5AB / 5B absence proxies": "assert no window_coverage_*.jsonl exists — the shadow route has been writing them since 2026-08-24. Stale since the shadow period began.",
+        "5B test_shadow_mode_does_not_remove_a_single_legacy_entry_slot": "slot-count pin, stale since 5N"
+      }
+    }
+  }
+}

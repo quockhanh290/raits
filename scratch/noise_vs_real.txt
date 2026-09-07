@@ -1,0 +1,24 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  MES xong
+  MNQ xong
+  MYM xong
+  M2K xong
+
+================================================================================================
+CHAM STOP TRONG QUANG TRAN ROI SAO? (vu trang D+1 14:05, stop co dinh)
+================================================================================================
+  nhom                                         lenh       %    P&L engine    P&L da sua
+  ----------------------------------------------------------------------------------------
+  A. khong cham stop                            440   22.2%        65,439        65,439
+  B. cham roi HOI (nhieu)                       900   45.4%        66,333        66,333
+  C. cham va VAN o ben kia luc vu trang         642   32.4%       -28,964      -125,591
+  ----------------------------------------------------------------------------------------
+  TONG                                         1982               102,808         6,181
+  (36 lenh khong phan loai duoc — khong co trong bang tin hieu)
+
+  --- ly do thoat tung nhom ---
+  A. khong cham stop                         {'MAX_HOLD': 216, 'GAP': 12, 'CHANDELIER': 212}
+  B. cham roi HOI (nhieu)                    {'CHANDELIER': 535, 'MAX_HOLD': 281, 'GAP': 84}
+  C. cham va VAN o ben kia luc vu trang      {'CHANDELIER': 636, 'GAP': 4, 'MAX_HOLD': 2}
+
+  => trong so lenh CO cham stop: 58.4% la nhieu (hoi lai), 41.6% di tiep

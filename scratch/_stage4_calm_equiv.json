@@ -1,0 +1,47 @@
+{
+ "vault2026": {
+  "MES": {
+   "ref": 14,
+   "mine": 14,
+   "missing": [],
+   "extra": []
+  },
+  "MNQ": {
+   "ref": 14,
+   "mine": 14,
+   "missing": [],
+   "extra": []
+  },
+  "secs": 201.2
+ },
+ "vault2025": {
+  "MES": {
+   "ref": 26,
+   "mine": 26,
+   "missing": [],
+   "extra": []
+  },
+  "MNQ": {
+   "ref": 18,
+   "mine": 18,
+   "missing": [],
+   "extra": []
+  },
+  "secs": 160.4
+ },
+ "floor": {
+  "MES": {
+   "ref": 164,
+   "mine": 164,
+   "missing": [],
+   "extra": []
+  },
+  "MNQ": {
+   "ref": 185,
+   "mine": 185,
+   "missing": [],
+   "extra": []
+  },
+  "secs": 143.2
+ }
+}

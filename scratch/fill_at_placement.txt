@@ -1,0 +1,16 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+cache xong
+
+=== CONG (ratchet=True, vu trang ranh gioi ngay == engine) ===
+  MES   615t -> MATCH
+  MNQ   618t -> MATCH
+  MYM   644t -> MATCH
+  M2K   619t -> MATCH
+
+=== KHOP TAI GIA THI TRUONG LUC DAT LENH (ratchet=False = luat live) ===
+  moc dat lenh               lenh      P&L tho   n sua     tong sua    P&L da sua   tv lech
+  --------------------------------------------------------------------------------------------
+  14:00 (luat vu trang)      2027      108,086     664      100,562         7,524        98
+  14:05 (job that)           2018      109,000     645       99,502         9,497        99
+  14:10                      2009      108,815     667      104,174         4,642       102
+  14:30                      1965      105,334     636      100,811         4,523       106

@@ -1,0 +1,257 @@
+{
+  "stage": "5Q-2",
+  "title": "Track 1 live explanation evidence: durable, attributable, structurally proved",
+  "date": "2026-08-24",
+  "route": "track1_candidate",
+  "verdict": "EXPLANATION_EVIDENCE_REPAIRED",
+  "claim": "Both Stage 5Q-1 evidence blockers are closed and each fix has been observed failing when removed. The first live slot of the day found a separate, larger blocker upstream of them.",
+  "safety_statement": {
+    "scheduler_started_or_stopped_by_this_work": false,
+    "scheduler_pid_now": 28696,
+    "scheduler_started_local": "2026-08-24 07:25:31",
+    "scheduler_started_et": "2026-08-24 09:25:31",
+    "scheduler_pid_changed_between_sessions": true,
+    "scheduler_pid_change_cause": "the OPERATOR restarted it again (33868 -> 6880 -> 28696); this session ran no start/stop command",
+    "backend_restarted": false,
+    "ibkr_connected_by_this_work": false,
+    "orders_enabled": false,
+    "allow_orders_used": false,
+    "track1_orders_approved_set": false,
+    "confirmation_file_created": false,
+    "stop_trading_files_touched": false,
+    "live_positions_written": false,
+    "route_checkpoint_written": false,
+    "test_writes_outside_tmp_path": false,
+    "trading_decision_logic_changed": false,
+    "order_gate_changed": false,
+    "job_inventory_changed": false,
+    "committed": false
+  },
+  "evidence_layout": {
+    "option": "B - per sleeve, per slot",
+    "path": "global_index/track1_runtime/shadow/explanations/live_<YYYY-MM-DD>/<sleeve>/<slot_id>/explanations_<YYYYMMDD>.jsonl",
+    "owner": "track1_explain.live_window (builder) and track1_explain.explanation_files (reader)",
+    "write_mode": "truncate, scoped to the slot's own file",
+    "rerun_semantics": "a re-run of one slot REPLACES that slot's rows and nothing else; a day holds at most one record set per slot",
+    "why_not_option_a": "truncation was never the bug - it is what stops a re-run doubling a slot's own rows, and the decision file beside it opens 'w' for the same reason. A shared path was the bug. Per-slot files need no read-modify-write, no dedupe pass and no shared-file window",
+    "traversal": "refused, not sanitised - a name that needs cleaning is a name a caller got wrong",
+    "replay_path": "untouched and explicitly scoped: scratch/track1_shadow/explanations/<window>/ - a replay writes one window from one process",
+    "reader_compatibility": [
+      "flat explanations_<day>.jsonl",
+      "live_<date>/explanations_<day>.jsonl (5Q)",
+      "live_<date>/<sleeve>/<slot>/explanations_<day>.jsonl (5Q-2)"
+    ],
+    "attribution": {
+      "from_path": [
+        "session_date",
+        "sleeve",
+        "slot_id",
+        "shape"
+      ],
+      "from_row": [
+        "route",
+        "sleeve",
+        "session_date",
+        "inputs_summary.slot_id",
+        "explain_id"
+      ],
+      "unrecognised_path": "all None with shape='outside' - a third answer, not a default"
+    }
+  },
+  "previous_live_rows": {
+    "existed": false,
+    "measured_at_et": "09:30",
+    "state": "global_index/track1_runtime held only two empty directories; no coverage file, no timing file, no explanations",
+    "migration_needed": false,
+    "older_shapes_still_readable": true
+  },
+  "freshness_proof": {
+    "was": "\"freshness\" in json.dumps(row).lower() - a substring test over the whole record including free text",
+    "now": "structural, defined in track1_explain (the module that BUILDS the records); the acceptance gate calls check_freshness_proof and holds no copy",
+    "rules": {
+      "accepted_binding": "must cite GATE.FRESHNESS (from ACCEPTED_PROOF_RULES_BY_MODE) and carry a boolean freshness_allow feature that passed",
+      "accepted_replay": "owes nothing - the gate reads today's inputs and did not govern an admission taken months ago (Stage 5Z)",
+      "rejected": "owes the feature only if a cited rule declares it; a cap refusal never reached the gate",
+      "any_decision_record": "must carry inputs_summary['freshness_allow'] as a boolean - the run's verdict as a typed field",
+      "no_action_context": "must carry a boolean freshness_allow feature - the record a day's freshness verdict is audited from",
+      "unrecognisable_row": "fails closed"
+    },
+    "correction_to_5q1": {
+      "was_claimed": "the substring check was ALSO too strict - a real rejected decision contained the word nowhere",
+      "is": "wrong, and wrong because the probe was unfaithful: it built the record with an empty inputs_summary and the real writer always passes {'freshness_allow': <bool>, ...}",
+      "actual_defect": "one-directional, too loose only"
+    }
+  },
+  "5q1_semantics_preserved": {
+    "slot_classes": [
+      "observed_decision",
+      "observed_no_action",
+      "observed_window_shut",
+      "observed_hard_refusal",
+      "unobserved"
+    ],
+    "clock_only_refusal": "WARN / window_shut, not a false FAIL",
+    "quiet_no_candidate_day": "not failed by the committed daily gate",
+    "missing_timing_or_ledger": "FAIL, both directions",
+    "verified_by": "the whole 5Q-1 mutation harness re-run, 15/15",
+    "one_line_changed": "a sleeve whose slots wrote nothing at all no longer prints 'it observed its window and found nothing to admit' - seen live beside three correct FAIL reasons for a slot that had crashed before reporting"
+  },
+  "dashboard": {
+    "endpoint": "/api/v1/track1-runtime",
+    "explanations_block": [
+      "days",
+      "attribution per day: files, sleeves, slots, shapes"
+    ],
+    "ui_row": "Explanations: N day(s), latest <day>: N row(s) across N sleeve(s) / N slot(s)",
+    "imports_the_writer": false,
+    "path_resolution": "delegated to track1_shadow_acceptance, which delegates to track1_explain",
+    "read_only": true,
+    "legacy_explanation_paths_read": false,
+    "absent_audit_is_a_pass": false
+  },
+  "first_live_day": {
+    "calm_slot_et": "10:00",
+    "outcome": "crashed inside track1_live_frame.splice",
+    "error": "SpliceRefused: column_mismatch: frozen ['open','high','low','close','volume'] != live ['open','high','low','close','volume','average','barcount']",
+    "ledger_rows_written": [
+      "window_open"
+    ],
+    "slot_observed_written": false,
+    "audit_job_et": "10:10",
+    "audit_job_exit": "completed OK",
+    "audit_verdict": "FAIL",
+    "audit_reasons": [
+      "coverage_unobserved",
+      "missing_slot_ids",
+      "no_timing_records"
+    ],
+    "scheduler_start_source": "argv",
+    "false_reasons": 0
+  },
+  "blockers_before_5r": [
+    {
+      "id": "B-5R-A",
+      "new": true,
+      "what": "the live frame cannot be spliced - column mismatch",
+      "detail": "frozen frames carry open/high/low/close/volume; the IBKR live fetch returns those plus average and barcount. track1_live_frame.splice refuses rather than concatenating into NaN holes, which is correct",
+      "impact": "every sleeve hits this on every slot; no shadow day can be judged until the live fetch is projected onto the frozen columns (or the frozen frames widened)",
+      "owner": "runner"
+    },
+    {
+      "id": "B-5R-B",
+      "new": true,
+      "what": "SpliceRefused crashes the slot instead of being recorded as a named refusal",
+      "detail": "observe_live_slot catches ShadowRefused, FreshnessRefused, LiveSourceRefused and NotImplementedError; SpliceRefused is none of them, so no slot_observed row is written at all",
+      "measured": "the Calm slot left a window_open line and nothing else",
+      "why_not_fixed_here": "it changes slot error handling, which this stage was told not to touch",
+      "owner": "runner"
+    },
+    {
+      "id": "B-5R-C",
+      "new": false,
+      "what": "NKD after 2026-11-01: 12 of 22 ET slots fall outside the Tokyo decision band",
+      "audit_handling": "WARN, not FAIL",
+      "owner": "unowned rule decision"
+    },
+    {
+      "id": "B1",
+      "new": false,
+      "what": "the order gate remains open by design; orders are impossible",
+      "owner": "project owner"
+    }
+  ],
+  "blockers_closed_by_this_stage": [
+    "B-5R-1 writer truncation",
+    "B-5R-2 substring freshness check"
+  ],
+  "tests": {
+    "stage_5q2": {
+      "file": "scratch/test_track1_stage5q2_explanation_integrity_20260824.py",
+      "passed": 29
+    },
+    "stage_5q2_mutations": {
+      "detected": 12,
+      "total": 12,
+      "restores_verified_byte_for_byte": true
+    },
+    "stage_5q1_mutations_rerun": {
+      "detected": 15,
+      "total": 15,
+      "restores_verified_byte_for_byte": true
+    },
+    "stage_5q_mutations_rerun": {
+      "detected": 16,
+      "total": 16,
+      "restores_verified_byte_for_byte": true
+    },
+    "track1_scratch_regression": {
+      "files": 21,
+      "passed": 792,
+      "skipped": 2
+    },
+    "monitor_production": {
+      "files": 6,
+      "passed": 313
+    },
+    "not_run": [
+      "global_index/test_event_playback.py (known hang)"
+    ]
+  },
+  "unfaithful_mutation_recorded": {
+    "id": "S1",
+    "first_form": "aimed at a test that drives emit_explanations directly",
+    "why_it_proved_nothing": "the mutation edits the CALL SITE in observe_live_slot, and a test of the writer cannot see a call site (0/0/0)",
+    "fix": "two new tests run the real observe_live_slot with only the bar source and the intraday gate stubbed",
+    "lesson": "check the call site, not the implementation"
+  },
+  "guards_repaired_not_left_attributable": [
+    {
+      "guard": "test_no_monitor_or_dashboard_file_mentions_the_module",
+      "state": "already red since 2026-08-23",
+      "cause": "it counted a monitor TEST file that names track1_explain in order to assert it is not imported",
+      "fix": "scan production files only"
+    },
+    {
+      "guard": "test_no_switch_or_state_file_was_created (5O, 5P) and test_no_switch_or_state_file_exists (5P operator text)",
+      "cause": "global_index/maxhold_state.track1.json was written by the LIVE scheduler at 07:31 local ([TRACK1_MAX_HOLD_EXIT] completed OK) - exactly what Stage 5O built the marker for",
+      "fix": "absence was standing in for 'no test wrote it'; replaced with an mtime check against module-import time, which is stronger than absence ever was"
+    },
+    {
+      "guard": "the 5Q / 5Q-1 explanation fixtures",
+      "cause": "they carried a `proofs` key no producer in this repo has ever emitted, so every test using them checked a shape that does not exist",
+      "fix": "rows are now built through track1_explain's own record builders"
+    }
+  ],
+  "operator": {
+    "action_required": "none for this stage",
+    "scheduler_restart_required": false,
+    "scheduler_restart_reason": "each slot spawns a fresh run_live_day_track1 that imports the current modules from disk, so the next slot picks up the writer change without one",
+    "backend_restart": {
+      "required_for_correctness": false,
+      "effect": "serves the new Explanations row; the audit records are written and readable either way",
+      "command": "python monitor\\ops.py restart --no-scheduler --track1-only-shadow",
+      "cli_verified": "python monitor\\ops.py restart --help - there is no --backend flag"
+    },
+    "what_actually_needs_someone": "blocker B-5R-A, the live-frame column mismatch"
+  },
+  "corrections_5q3": {
+    "appended": "2026-08-24 (Stage 5Q-3). The record above is left as written.",
+    "items": [
+      {
+        "was": "B-5R-A (the column mismatch) was the thing standing between the route and a judgeable day: 'every sleeve will hit this on every slot'",
+        "is": "it was one of TWO live-frame blockers. overlap_disagreement runs BEFORE the splice, so a sleeve whose instrument disagrees with stored history never reaches the column check. Calm reached the splice; Stress refuses earlier, with or without the schema fix",
+        "new_blocker": "B-5R-D - one MNQ history bar (2026-08-21 13:45 ET, 'low') disagrees with the live feed by 4.5 points. A stored-history question, not a code one"
+      },
+      {
+        "closed": "B-5R-A - the live half is projected onto the frozen frame's columns before the join, by track1_live_source.live_frame, the only caller of the splice guard"
+      },
+      {
+        "closed": "B-5R-B - SpliceRefused is caught and written as `live_frame_refused` with the guard's own code in detail"
+      },
+      {
+        "found_after": "run_live_day_track1.py had NEVER imported slot_telemetry: slot_timing/ existed, RAITS_TELEMETRY_DIR was exported, and no Track 1 strategy slot had ever written a row, so no_timing_records was unsatisfiable and the p95 check could never run. Wired now; first measured runtimes ~2.7s against a 240s target"
+      }
+    ],
+    "follow_up_report": "scratch/track1_stage5q3_live_frame_splice_report_20260824.md"
+  }
+}

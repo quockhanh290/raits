@@ -1,0 +1,161 @@
+{
+  "all_red": true,
+  "results": [
+    {
+      "id": "M1",
+      "mutation": "the collapsed row loses its signal chip",
+      "test": "test_28_dom_every_strategy_job_shows_a_signal_chip",
+      "outcome": "RED"
+    },
+    {
+      "id": "M2",
+      "mutation": "seven colours nobody can act on",
+      "test": "test_31_dom_every_chip_carries_a_plain_english_tooltip[NO SIGNAL-no setup matched]",
+      "outcome": "RED"
+    },
+    {
+      "id": "M3",
+      "mutation": "the ledger-row line dropped",
+      "test": "test_16_a_healthy_slot_reports_run_budget_ledger_freshness_and_shadow_expectation",
+      "outcome": "RED"
+    },
+    {
+      "id": "M4",
+      "mutation": "breadth_down_count back in front of an operator",
+      "test": "test_9_no_operator_line_anywhere_contains_a_raw_field_name",
+      "outcome": "RED"
+    },
+    {
+      "id": "M5",
+      "mutation": "a threshold blob in the panel",
+      "test": "test_10_no_operator_line_contains_a_json_threshold_blob",
+      "outcome": "RED"
+    },
+    {
+      "id": "M6",
+      "mutation": "thirty mapped names with no numbers beside them",
+      "test": "test_11_no_wall_of_unknown_rows",
+      "outcome": "RED"
+    },
+    {
+      "id": "M7",
+      "mutation": "the developer table reinstated",
+      "test": "test_40_the_render_path_has_no_rule_grid_left",
+      "outcome": "RED"
+    },
+    {
+      "id": "M8",
+      "mutation": "developer variables in the browser",
+      "test": "test_32_dom_expanded_no_signal_shows_operator_text_and_no_raw_names",
+      "outcome": "RED"
+    },
+    {
+      "id": "M9",
+      "mutation": "the runtime questions unanswered again",
+      "test": "test_33_dom_expanded_operational_answers_the_runtime_questions",
+      "outcome": "RED"
+    },
+    {
+      "id": "M10",
+      "mutation": "two copies for the operator to reconcile",
+      "test": "test_34_dom_expanded_refused_points_at_operational_and_does_not_repeat_it",
+      "outcome": "RED"
+    },
+    {
+      "id": "M11",
+      "mutation": "a dead end for the operator",
+      "test": "test_14_a_refused_row_points_at_operational_and_does_not_repeat_the_evidence",
+      "outcome": "RED"
+    },
+    {
+      "id": "M12",
+      "mutation": "a stop-repair row wearing a NO SIGNAL chip",
+      "test": "test_25_a_non_strategy_job_gets_neither",
+      "outcome": "RED"
+    },
+    {
+      "id": "M12b",
+      "mutation": "the page fabricates a chip for a job with no signal object",
+      "test": "test_29_dom_a_non_strategy_job_shows_no_chip",
+      "outcome": "RED"
+    },
+    {
+      "id": "M13",
+      "mutation": "a duration printed with nothing to judge it against",
+      "test": "test_17_the_runtime_budget_is_flagged_when_breached",
+      "outcome": "RED"
+    },
+    {
+      "id": "M14",
+      "mutation": "the audit cannot count it, and nobody is told",
+      "test": "test_18_a_missing_ledger_row_is_stated_not_omitted",
+      "outcome": "RED"
+    },
+    {
+      "id": "M15",
+      "mutation": "gate_refused printed at an operator",
+      "test": "test_19_a_refusal_is_reported_in_operator_words",
+      "outcome": "RED"
+    },
+    {
+      "id": "M16",
+      "mutation": "the 33 pre-journal slots lose their diagnostics",
+      "test": "test_22_operational_falls_back_to_the_ledger_when_no_signal_row_exists",
+      "outcome": "RED"
+    },
+    {
+      "id": "M17",
+      "mutation": "an absence with no explanation",
+      "test": "test_20_a_missed_slot_says_the_scheduler_never_started_it",
+      "outcome": "RED"
+    },
+    {
+      "id": "M18",
+      "mutation": "an operator reading `family_cap`",
+      "test": "test_12_a_rejection_names_the_layer_in_human_words_and_shows_the_candidate",
+      "outcome": "RED"
+    },
+    {
+      "id": "M19",
+      "mutation": "a mapper that has fallen behind the catalogue",
+      "test": "test_3_every_declared_sleeve_rule_has_a_label",
+      "outcome": "RED"
+    },
+    {
+      "id": "M20",
+      "mutation": "REFUSED and MISSED become indistinguishable",
+      "test": "test_6_the_seven_labels_are_distinct",
+      "outcome": "RED"
+    },
+    {
+      "id": "M21",
+      "mutation": "an admission that looks like a refusal",
+      "test": "test_7_tone_separates_admitted_from_declined_from_missed",
+      "outcome": "RED"
+    },
+    {
+      "id": "M22",
+      "mutation": "a fact row that grows all day",
+      "test": "test_39_the_panel_row_reports_counts_and_no_per_slot_wall",
+      "outcome": "RED"
+    },
+    {
+      "id": "M23",
+      "mutation": "a second chip language on one page",
+      "test": "test_41_the_chip_reuses_the_existing_visual_language",
+      "outcome": "RED"
+    },
+    {
+      "id": "M24",
+      "mutation": "the page scrolls sideways on a phone",
+      "test": "test_38_dom_nothing_in_a_job_row_overflows_at_narrow_width",
+      "outcome": "RED"
+    },
+    {
+      "id": "M25",
+      "mutation": "thirty unscannable rows",
+      "test": "test_37_dom_the_collapsed_row_does_not_carry_the_paragraph",
+      "outcome": "RED"
+    }
+  ]
+}

@@ -1,0 +1,282 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-M",
+ "title": "Swing artifact regeneration parameter obedience",
+ "route": "track1_candidate",
+ "date": "2026-08-29",
+ "verdict": "NOT_A_DISOBEDIENCE - a deliberate, unrecorded substitution",
+ "root_cause": {
+  "where": "scratch/harness.py, inside patched_engine's replacement for backtest_swing_tf",
+  "code": "if cfg.ema is not None and ema_period == 30: ema_period = cfg.ema",
+  "caller": "scratch/normal_promotion_regen_audit_20260821.py builds Cfg(..., ema=50, stop_basis=2.0)",
+  "effect": "a request for ema_period=30 is rewritten to 50; every other value passes through",
+  "therefore": "the 'ema=30 default' artifact and the 'ema=50' artifact are the SAME RUN, not two runs that coincide",
+  "actual_defect": "nothing recorded that the parameter had been translated - a reporting defect, not an engine one"
+ },
+ "questions": {
+  "1_reaches_public_entry_point": true,
+  "1_evidence": "the run records 'engine actually received (ema, mult, hold): [(50, 2.0, 5)]' at the call site",
+  "2_reaches_artifact_engine": true,
+  "2_note": "and that engine is where the substitution happens",
+  "3_reaches_detector": true,
+  "3_note": "carrying the SUBSTITUTED value; TrendFollowStrategy is built with the rewritten ema",
+  "4_ema30_and_ema50_equivalent": false,
+  "4_answer": "they were never both run - a request for 30 IS a run at 50",
+  "5_cache_involved": true,
+  "5_cache": {
+   "name": "futures._validated_core._swing_cache",
+   "key": "id(df)",
+   "holds": [
+    "daily ATR",
+    "day list",
+    "per-day OHLC arrays",
+    "per-day 5m frames"
+   ],
+   "parameter_dependent_contents": false,
+   "key_complete_for_contents": true,
+   "is_the_cause": false,
+   "asserted_two_ways": [
+    "AST source check that no ema/chandelier/hold-derived value enters it",
+    "behavioural: the same frame object at ema 10 and ema 50 still yields different trades"
+   ]
+  },
+  "6_metadata_records_effective_params": false,
+  "6_before_fix": "the artifact carries argv, nkd_instrument and slippage_ticks - the REQUEST, never the RESULT",
+  "7_digest_changes_on_decision_affecting_param": {
+   "ema_period": true,
+   "ema_evidence": "10, 20 and 50 each produce a distinct artifact",
+   "chandelier_atr_mult": false,
+   "chandelier_is_correct_not_broken": "with ratchet=False and stop_basis=2.0 the day loop never recomputes the stop, so the multiple only reaches the strategy config - documented in NormalR4Params and now measured (ema 50 at mult 2.0 and 2.5 give the same artifact)"
+  },
+  "9_next_safe_measurement": [
+   "the range_max / rel_volume_max second pass Stage 5ZZZ-L planned and could not reach",
+   "a day-level bootstrap on the OOS windows"
+  ]
+ },
+ "reproduction": {
+  "A_default": {
+   "requested": {
+    "ema": 30,
+    "mult": 2.5,
+    "hold": 5
+   },
+   "artifact_sha16": "1ee198a9f10387c8",
+   "engine_line": "engine actually received (ema, mult, hold): [(30, 2.5, 5)]",
+   "filtered_counts": {
+    "MES": 21,
+    "MNQ": 18,
+    "MYM": 23,
+    "M2K": 19,
+    "MNKD": 26
+   }
+  },
+  "B_wfo_winner": {
+   "requested": {
+    "ema": 50,
+    "mult": 2.0,
+    "hold": 5
+   },
+   "artifact_sha16": "1ee198a9f10387c8",
+   "engine_line": "engine actually received (ema, mult, hold): [(50, 2.0, 5)]",
+   "filtered_counts": {
+    "MES": 21,
+    "MNQ": 18,
+    "MYM": 23,
+    "M2K": 19,
+    "MNKD": 26
+   }
+  },
+  "C_ema10": {
+   "requested": {
+    "ema": 10,
+    "mult": 2.0,
+    "hold": 5
+   },
+   "artifact_sha16": "b878f9fd39cb7171",
+   "engine_line": "engine actually received (ema, mult, hold): [(10, 2.0, 5)]",
+   "filtered_counts": {
+    "MES": 22,
+    "MNQ": 20,
+    "MYM": 24,
+    "M2K": 23,
+    "MNKD": 26
+   }
+  },
+  "D_ema20": {
+   "requested": {
+    "ema": 20,
+    "mult": 2.0,
+    "hold": 5
+   },
+   "artifact_sha16": "ef3ef40d10f36315",
+   "engine_line": "engine actually received (ema, mult, hold): [(20, 2.0, 5)]",
+   "filtered_counts": {
+    "MES": 22,
+    "MNQ": 19,
+    "MYM": 24,
+    "M2K": 23,
+    "MNKD": 26
+   }
+  }
+ },
+ "substitution_rule_evaluated": {
+  "30": 50,
+  "50": 50,
+  "10": 10,
+  "20": 20
+ },
+ "harness_cfg": {
+  "ema": 50,
+  "stop_basis": 2.0,
+  "ratchet": false
+ },
+ "fix": {
+  "kind": "additive only",
+  "what": "a sidecar `<artifact>.params.json` recording the EFFECTIVE parameters next to each generated artifact",
+  "why_not_in_the_artifact": "the promotion artifacts are hash-pinned baselines; adding a key would break every reproduction that depends on them",
+  "guard_corrected": "Stage 5ZZZ-L's guard compared hashes and fired on a true equivalence; it now asserts artifacts match IF AND ONLY IF the effective parameters match",
+  "baselines_byte_identical": true,
+  "baseline_sha16": {
+   "floor": "f4d8eea7cd051b3d",
+   "vault2025": "c7eb5dd2e375316b",
+   "vault2026": "b1e85b2c9ab7019d"
+  }
+ },
+ "record_correction": {
+  "nothing_measured_is_invalid": true,
+  "what_was_wrong": "the label, not the number",
+  "corrections": [
+   {
+    "said": "Stage 5ZZZ-H/I/L 'D-1 old params, ema=30'",
+    "actually": "effective ema = 50, stop basis 2.0"
+   },
+   {
+    "said": "Stage 5ZZZ-I 'narrow retune, ema=10'",
+    "actually": "genuinely ema = 10 - correct as measured"
+   },
+   {
+    "said": "Stage 5ZZZ-L 'WFO winner ema=50 / mult=2.0'",
+    "actually": "the same configuration as the D-1 old arm"
+   },
+   {
+    "said": "Stage 5ZZZ-L 'full-stack numbers could not be produced faithfully'",
+    "actually": "WITHDRAWN - they can, and they are the D-1 arm's"
+   },
+   {
+    "said": "Stage 5ZZZ-L 'Stage 5ZZZ-I is provisional'",
+    "actually": "LIFTED - its comparison stands"
+   }
+  ],
+  "stage_I_needs_rerun": false,
+  "stage_L_needs_rerun": false,
+  "both_need": "the label correction this stage supplies",
+  "also_worth_stating": "SWING_TF_PARAM's ema_period=30 is NOT what the Track 1 artifacts run; they run 50, which is NormalR4Params.ema_period's own value"
+ },
+ "stage_L_thresholds_now_evaluable": {
+  "why": "the WFO winner IS the D-1 old arm, proven by identical artifacts, so its full-stack numbers are that arm's",
+  "T1_net_vs_d1_old": {
+   "result": "PASS",
+   "detail": "identical in all four OOS cells"
+  },
+  "T2_swing_contribution_nonneg_both_oos": {
+   "result": "FAIL",
+   "detail": "2025 +$3,906, 2026 -$464"
+  },
+  "T3_calmar_vs_no_swing": {
+   "result": "FAIL",
+   "detail": "42% in 2025 (3.36 vs 8.05) and 42% in 2026 (3.76 vs 8.92)"
+  },
+  "T4_maxdd": {
+   "result": "PASS",
+   "detail": "identical to D-1 old"
+  },
+  "T5_fold_stability": {
+   "result": "PASS",
+   "detail": "5/10, five consecutive"
+  },
+  "outcome": "two of five fail - Swing still not promoted, but now on evidence rather than a blocked apparatus",
+  "cleaner_headline_for_stage_L": "the full 48-candidate causal-D-1 search converged on the configuration the route already runs"
+ },
+ "tests": {
+  "suite": "scratch/test_track1_stage5zzzm_param_obedience_20260829.py",
+  "passed": 17,
+  "failed": 0,
+  "covers": [
+   "the substitution rule and that it is the harness's rule",
+   "artifacts identical IF AND ONLY IF effective params match, both directions",
+   "the chandelier is a no-op in this pipeline, asserted on artifacts",
+   "the sidecar records effective not requested",
+   "cache-key completeness, source and behavioural",
+   "the baselines are untouched"
+  ],
+  "self_correction": "one test scanned _swing_cache's whole source for 'chandelier' and matched the word inside its docstring; rewritten as an AST walk with the docstring stripped - the same trap as Stage 5ZZZ-G"
+ },
+ "mutation_harness": {
+  "caught": 6,
+  "total": 6,
+  "restored_byte_identical": true,
+  "mutations": [
+   {
+    "id": "M1",
+    "change": "effective ema reported as the requested one",
+    "verdict": "RED"
+   },
+   {
+    "id": "M2",
+    "change": "sidecar echoes the request instead of the effective value",
+    "verdict": "RED"
+   },
+   {
+    "id": "M3",
+    "change": "substitution threshold moved off 30",
+    "verdict": "RED"
+   },
+   {
+    "id": "M4",
+    "change": "chandelier claimed to change decisions",
+    "verdict": "RED"
+   },
+   {
+    "id": "M5",
+    "change": "substituted ema reported as un-substituted",
+    "verdict": "RED"
+   },
+   {
+    "id": "M6",
+    "change": "the cache starts holding a parameter-dependent series",
+    "verdict": "RED"
+   }
+  ]
+ },
+ "safety": {
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "scheduler_restarted": false,
+  "scheduler_pids": [
+   3000
+  ],
+  "broker_connected": false,
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "confirmation_file_modified": false,
+  "runtime_evidence_modified": false,
+  "live_route_params_changed": false,
+  "swing_tf_param_changed": false,
+  "gate_opened": false,
+  "baseline_artifacts_sha256_unchanged": true
+ },
+ "files_added": [
+  "scratch/track1_stage5zzzm_param_trace_20260829.py",
+  "scratch/track1_stage5zzzm_param_trace_20260829.json",
+  "scratch/test_track1_stage5zzzm_param_obedience_20260829.py",
+  "scratch/track1_stage5zzzm_swing_artifact_param_obedience_20260829.md",
+  "scratch/track1_stage5zzzm_swing_artifact_param_obedience_20260829.json",
+  "scratch/normal_promotion_trades_vault2026_m_*_20260829.json (four trace cases)",
+  "scratch/*.params.json sidecars"
+ ],
+ "files_changed": [
+  "scratch/track1_stage5zzzh_swing_d1_regen_20260829.py (effective_params + sidecar + corrected guard)"
+ ]
+}

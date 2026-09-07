@@ -1,0 +1,189 @@
+======================================================================================================================
+NORMAL SLEEVE - POSITION/CAP POLICY PROBE (scratch only)
+======================================================================================================================
+Selection/read uses floor only. 2025/2026 are sanity only. Corrected trade tables loaded from scratch.
+Candidate flag: 15% latch, no halted/blocked trades, >=1.0pp safety to 15%, net>0, PF>=1.20.
+
+######################################################################################################################
+WINDOW: floor
+######################################################################################################################
+  15% LATCH GRID - top rows by candidate/calmar/net
+  variant              scenario                  sg    sn  nkdc       net$    PF  Sharpe  Calmar   MaxDD%   ret/yr  taken    rej   block  cand
+  R4 + NKD corrected   strict_025_nkd030       2.5%  2.5%  3.0%     21,474  1.36    1.84    0.76     8.3%     6.3%    574    493       0  True
+  R4 + NKD corrected   strict_025_nkd040       2.5%  2.5%  4.0%     21,308  1.35    1.82    0.75     8.3%     6.2%    575    492       0  True
+  R4 + NKD corrected   strict_025_nkd020       2.5%  2.5%  2.0%     21,275  1.36    1.85    0.73     8.5%     6.2%    568    499       0  True
+  R4 + NKD corrected   strict_025              2.5%  2.5%  6.0%     20,285  1.33    1.71    0.68     8.7%     5.9%    577    490       0  True
+  R4 + NKD corrected   strict_025_nkd050       2.5%  2.5%  5.0%     20,285  1.33    1.71    0.68     8.7%     5.9%    577    490       0  True
+  R4 + NKD corrected   strict_030_nkd030       3.0%  3.0%  3.0%     25,203  1.35    1.71    0.63    11.6%     7.4%    628    439       0  True
+  R4 only              strict_015              1.5%  1.5%  6.0%      9,307  1.42    2.21    0.63     4.3%     2.7%    230    609       0  True
+  R4 + NKD corrected   strict_030_nkd040       3.0%  3.0%  4.0%     25,036  1.35    1.69    0.63    11.6%     7.3%    629    438       0  True
+  R4 + NKD corrected   strict_030_nkd020       3.0%  3.0%  2.0%     25,004  1.35    1.71    0.63    11.6%     7.3%    622    445       0  True
+  R4 + NKD corrected   strict_030              3.0%  3.0%  6.0%     24,013  1.33    1.61    0.60    11.6%     7.0%    631    436       0  True
+  R4 + NKD corrected   strict_030_nkd050       3.0%  3.0%  5.0%     24,013  1.33    1.61    0.60    11.6%     7.0%    631    436       0  True
+  R4 only              strict_020              2.0%  2.0%  6.0%     13,121  1.45    2.24    0.56     6.9%     3.8%    294    545       0  True
+  R4 + NKD corrected   strict_020              2.0%  2.0%  6.0%     17,019  1.32    1.64    0.55     9.0%     5.0%    522    545       0  True
+  R4 only              strict_030              3.0%  3.0%  6.0%     20,115  1.41    2.01    0.55    10.8%     5.9%    403    436       0  True
+  R4 + NKD corrected   strict_035              3.5%  3.5%  6.0%     26,551  1.33    1.61    0.54    14.4%     7.8%    690    377       0  True
+  R4 + NKD corrected   strict_045              4.5%  4.5%  6.0%     34,090  1.38    1.77    0.54    18.6%    10.0%    800    267       0  True
+  R4 + NKD corrected   current_5g_44n_nkd6     5.0%  4.4%  6.0%     33,176  1.36    1.73    0.52    18.5%     9.7%    799    268       0  True
+  R4 + NKD corrected   strict_015              1.5%  1.5%  6.0%     13,205  1.28    1.51    0.51     7.6%     3.9%    458    609       0  True
+  R4 only              strict_025              2.5%  2.5%  6.0%     16,387  1.44    2.26    0.48    10.0%     4.8%    349    490       0  True
+  R4 + NKD corrected   strict_040              4.0%  4.0%  6.0%     27,329  1.31    1.52    0.47    16.9%     8.0%    747    320       0  True
+  R4 only              strict_035              3.5%  3.5%  6.0%     22,653  1.40    1.98    0.38    17.4%     6.6%    462    377       0  True
+  R4 + NKD corrected   strict_050              5.0%  5.0%  6.0%     35,455  1.36    1.69    0.54    19.1%    10.4%    858    209       0 False
+  R4 only              strict_045              4.5%  4.5%  6.0%      8,833  1.21    1.12    0.18    22.8%     4.2%    351    134     354 False
+  R4 only              current_5g_44n_nkd6     5.0%  4.4%  6.0%      8,570  1.21    1.10    0.18    22.7%     4.1%    350    135     354 False
+  R4 only              strict_050              5.0%  5.0%  6.0%      7,864  1.17    0.91    0.16    23.3%     3.7%    378    107     354 False
+  R4 only              strict_040              4.0%  4.0%  6.0%      5,869  1.15    0.81    0.14    20.1%     2.8%    320    165     354 False
+
+  DEPLOY-CLEAN CANDIDATES UNDER THIS MECHANICAL GATE: 21
+    R4 + NKD corrected   strict_025_nkd030      net $  21,474 PF 1.36 Calmar 0.76 MaxDD 8.3% safety 7.4% taken 574 rejected 493
+    R4 + NKD corrected   strict_025_nkd040      net $  21,308 PF 1.35 Calmar 0.75 MaxDD 8.3% safety 7.4% taken 575 rejected 492
+    R4 + NKD corrected   strict_025_nkd020      net $  21,275 PF 1.36 Calmar 0.73 MaxDD 8.5% safety 7.4% taken 568 rejected 499
+    R4 + NKD corrected   strict_025             net $  20,285 PF 1.33 Calmar 0.68 MaxDD 8.7% safety 7.4% taken 577 rejected 490
+    R4 + NKD corrected   strict_025_nkd050      net $  20,285 PF 1.33 Calmar 0.68 MaxDD 8.7% safety 7.4% taken 577 rejected 490
+    R4 + NKD corrected   strict_030_nkd030      net $  25,203 PF 1.35 Calmar 0.63 MaxDD 11.6% safety 4.7% taken 628 rejected 439
+    R4 only              strict_015             net $   9,307 PF 1.42 Calmar 0.63 MaxDD 4.3% safety 11.1% taken 230 rejected 609
+    R4 + NKD corrected   strict_030_nkd040      net $  25,036 PF 1.35 Calmar 0.63 MaxDD 11.6% safety 4.7% taken 629 rejected 438
+    R4 + NKD corrected   strict_030_nkd020      net $  25,004 PF 1.35 Calmar 0.63 MaxDD 11.6% safety 4.7% taken 622 rejected 445
+    R4 + NKD corrected   strict_030             net $  24,013 PF 1.33 Calmar 0.60 MaxDD 11.6% safety 4.7% taken 631 rejected 436
+    R4 + NKD corrected   strict_030_nkd050      net $  24,013 PF 1.33 Calmar 0.60 MaxDD 11.6% safety 4.7% taken 631 rejected 436
+    R4 only              strict_020             net $  13,121 PF 1.45 Calmar 0.56 MaxDD 6.9% safety 9.0% taken 294 rejected 545
+
+  YEARLY NET$ - top floor rows
+  variant              scenario                    2018      2019      2020      2021      2022      2023      2024
+  R4 + NKD corrected   strict_025_nkd030         -1,049     3,694       498     2,353     1,373    10,443     4,163
+  R4 + NKD corrected   strict_025_nkd040         -1,049     3,694       498     2,353     1,373    10,443     3,996
+  R4 + NKD corrected   strict_025_nkd020         -1,049     3,694       498     2,353     1,373    10,443     3,964
+  R4 + NKD corrected   strict_025                -1,049     3,694       498     2,353     1,373    10,443     2,973
+  R4 + NKD corrected   strict_025_nkd050         -1,049     3,694       498     2,353     1,373    10,443     2,973
+  R4 + NKD corrected   strict_030_nkd030             56     3,273       -85     3,841       330    12,550     5,238
+  R4 only              strict_015                 1,300     2,434       848     1,201       325     1,951     1,246
+  R4 + NKD corrected   strict_030_nkd040             56     3,273       -85     3,841       330    12,550     5,072
+  R4 + NKD corrected   strict_030_nkd020             56     3,273       -85     3,841       330    12,550     5,039
+  R4 + NKD corrected   strict_030                    56     3,273       -85     3,841       330    12,550     4,049
+  R4 + NKD corrected   strict_030_nkd050             56     3,273       -85     3,841       330    12,550     4,049
+  R4 only              strict_020                 1,789     2,490       588     1,833    -1,252     6,038     1,636
+
+######################################################################################################################
+WINDOW: vault2025
+######################################################################################################################
+  15% LATCH GRID - top rows by candidate/calmar/net
+  variant              scenario                  sg    sn  nkdc       net$    PF  Sharpe  Calmar   MaxDD%   ret/yr  taken    rej   block  cand
+  R4 only              strict_040              4.0%  4.0%  6.0%      5,482  1.71    2.84    2.63     4.5%    11.9%     51     62       0  True
+  R4 only              strict_035              3.5%  3.5%  6.0%      4,686  1.67    2.62    2.34     4.4%    10.2%     52     61       0  True
+  R4 + NKD corrected   strict_030_nkd020       3.0%  3.0%  2.0%      5,446  1.56    2.43    2.06     5.7%    11.8%     65     79       0  True
+  R4 + NKD corrected   strict_040              4.0%  4.0%  6.0%      7,685  1.59    2.62    1.98     8.4%    16.6%     82     62       0  True
+  R4 + NKD corrected   strict_035              3.5%  3.5%  6.0%      6,889  1.56    2.47    1.96     7.6%    14.9%     83     61       0  True
+  R4 only              strict_030              3.0%  3.0%  6.0%      3,633  1.57    2.27    1.85     4.3%     7.9%     46     67       0  True
+  R4 only              current_5g_44n_nkd6     5.0%  4.4%  6.0%      4,654  1.55    2.39    1.64     6.2%    10.1%     52     61       0  True
+  R4 + NKD corrected   strict_030              3.0%  3.0%  6.0%      5,836  1.50    2.25    1.55     8.1%    12.6%     77     67       0  True
+  R4 + NKD corrected   strict_030_nkd040       3.0%  3.0%  4.0%      5,836  1.50    2.25    1.55     8.1%    12.6%     77     67       0  True
+  R4 + NKD corrected   strict_030_nkd050       3.0%  3.0%  5.0%      5,836  1.50    2.25    1.55     8.1%    12.6%     77     67       0  True
+  R4 + NKD corrected   current_5g_44n_nkd6     5.0%  4.4%  6.0%      6,857  1.51    2.33    1.47    10.1%    14.8%     83     61       0  True
+  R4 + NKD corrected   strict_025_nkd020       2.5%  2.5%  2.0%      4,393  1.48    2.08    1.47     6.5%     9.5%     59     85       0  True
+  R4 + NKD corrected   strict_030_nkd030       3.0%  3.0%  3.0%      5,241  1.45    2.08    1.39     8.1%    11.3%     74     70       0  True
+  R4 only              strict_025              2.5%  2.5%  6.0%      2,580  1.44    1.75    1.38     4.1%     5.6%     40     73       0  True
+  R4 + NKD corrected   strict_015              1.5%  1.5%  6.0%      3,587  1.45    2.19    1.37     5.6%     7.8%     60     84       0  True
+  R4 + NKD corrected   strict_045              4.5%  4.5%  6.0%      6,184  1.40    1.93    1.33    10.1%    13.4%     84     60       0  True
+  R4 only              strict_015              1.5%  1.5%  6.0%      1,384  1.50    2.08    1.32     2.3%     3.0%     29     84       0  True
+  R4 + NKD corrected   strict_025              2.5%  2.5%  6.0%      4,783  1.43    1.95    1.31     7.9%    10.3%     71     73       0  True
+  R4 + NKD corrected   strict_025_nkd040       2.5%  2.5%  4.0%      4,783  1.43    1.95    1.31     7.9%    10.3%     71     73       0  True
+  R4 + NKD corrected   strict_025_nkd050       2.5%  2.5%  5.0%      4,783  1.43    1.95    1.31     7.9%    10.3%     71     73       0  True
+  R4 + NKD corrected   strict_050              5.0%  5.0%  6.0%      6,106  1.37    1.78    1.15    11.5%    13.2%     91     53       0  True
+  R4 + NKD corrected   strict_025_nkd030       2.5%  2.5%  3.0%      4,187  1.38    1.76    1.14     7.9%     9.1%     68     76       0  True
+  R4 only              strict_045              4.5%  4.5%  6.0%      3,980  1.40    1.87    1.12     7.7%     8.7%     53     60       0  True
+  R4 + NKD corrected   strict_020              2.0%  2.0%  6.0%      3,412  1.36    1.85    1.08     6.9%     7.4%     64     80       0  True
+  R4 only              strict_050              5.0%  5.0%  6.0%      3,903  1.34    1.66    0.95     8.9%     8.5%     60     53       0  True
+  R4 only              strict_020              2.0%  2.0%  6.0%      1,208  1.29    1.45    0.87     3.0%     2.6%     33     80       0  True
+
+  DEPLOY-CLEAN CANDIDATES UNDER THIS MECHANICAL GATE: 26
+    R4 only              strict_040             net $   5,482 PF 1.71 Calmar 2.63 MaxDD 4.5% safety 10.5% taken 51 rejected 62
+    R4 only              strict_035             net $   4,686 PF 1.67 Calmar 2.34 MaxDD 4.4% safety 10.7% taken 52 rejected 61
+    R4 + NKD corrected   strict_030_nkd020      net $   5,446 PF 1.56 Calmar 2.06 MaxDD 5.7% safety 9.4% taken 65 rejected 79
+    R4 + NKD corrected   strict_040             net $   7,685 PF 1.59 Calmar 1.98 MaxDD 8.4% safety 8.0% taken 82 rejected 62
+    R4 + NKD corrected   strict_035             net $   6,889 PF 1.56 Calmar 1.96 MaxDD 7.6% safety 8.5% taken 83 rejected 61
+    R4 only              strict_030             net $   3,633 PF 1.57 Calmar 1.85 MaxDD 4.3% safety 11.1% taken 46 rejected 67
+    R4 only              current_5g_44n_nkd6    net $   4,654 PF 1.55 Calmar 1.64 MaxDD 6.2% safety 9.5% taken 52 rejected 61
+    R4 + NKD corrected   strict_030             net $   5,836 PF 1.50 Calmar 1.55 MaxDD 8.1% safety 8.0% taken 77 rejected 67
+    R4 + NKD corrected   strict_030_nkd040      net $   5,836 PF 1.50 Calmar 1.55 MaxDD 8.1% safety 8.0% taken 77 rejected 67
+    R4 + NKD corrected   strict_030_nkd050      net $   5,836 PF 1.50 Calmar 1.55 MaxDD 8.1% safety 8.0% taken 77 rejected 67
+    R4 + NKD corrected   current_5g_44n_nkd6    net $   6,857 PF 1.51 Calmar 1.47 MaxDD 10.1% safety 6.7% taken 83 rejected 61
+    R4 + NKD corrected   strict_025_nkd020      net $   4,393 PF 1.48 Calmar 1.47 MaxDD 6.5% safety 8.6% taken 59 rejected 85
+
+######################################################################################################################
+WINDOW: vault2026
+######################################################################################################################
+  15% LATCH GRID - top rows by candidate/calmar/net
+  variant              scenario                  sg    sn  nkdc       net$    PF  Sharpe  Calmar   MaxDD%   ret/yr  taken    rej   block  cand
+  R4 + NKD corrected   strict_020              2.0%  2.0%  6.0%      7,601  1.90    3.85    4.26     6.5%    27.5%     50     64       0  True
+  R4 + NKD corrected   strict_015              1.5%  1.5%  6.0%      6,498  1.86    3.82    3.80     6.2%    23.5%     35     79       0  True
+  R4 only              strict_020              2.0%  2.0%  6.0%      1,594  1.72    3.29    2.55     2.3%     5.8%     26     62       0  True
+  R4 + NKD corrected   strict_025              2.5%  2.5%  6.0%      5,183  1.48    2.36    1.94     9.7%    18.7%     53     61       0  True
+  R4 + NKD corrected   strict_030              3.0%  3.0%  6.0%      5,273  1.46    2.33    1.86    10.2%    19.1%     57     57       0  True
+  R4 + NKD corrected   strict_035              3.5%  3.5%  6.0%      3,805  1.28    1.55    0.99    13.9%    13.8%     61     53       0  True
+  R4 only              strict_015              1.5%  1.5%  6.0%        490  1.41    2.09    0.92     1.9%     1.8%     11     77       0  True
+  R4 + NKD corrected   strict_025_nkd050       2.5%  2.5%  5.0%      2,342  1.25    1.33    0.84    10.0%     8.5%     45     69       0  True
+  R4 + NKD corrected   strict_030_nkd050       3.0%  3.0%  5.0%      2,431  1.24    1.33    0.83    10.6%     8.8%     49     65       0  True
+  R4 + NKD corrected   strict_045              4.5%  4.5%  6.0%      7,032  1.48    2.52    1.74    14.6%    25.4%     72     42       0 False
+  R4 + NKD corrected   current_5g_44n_nkd6     5.0%  4.4%  6.0%      6,743  1.46    2.43    1.62    15.0%    24.4%     70     44       0 False
+  R4 + NKD corrected   strict_050              5.0%  5.0%  6.0%      5,884  1.37    2.05    1.43    14.8%    21.3%     70     44       0 False
+  R4 + NKD corrected   strict_040              4.0%  4.0%  6.0%      5,256  1.35    1.90    1.16    16.4%    19.0%     66     48       0 False
+  R4 only              strict_045              4.5%  4.5%  6.0%      1,024  1.12    0.69    0.31    12.1%     3.7%     48     40       0 False
+  R4 only              current_5g_44n_nkd6     5.0%  4.4%  6.0%        736  1.09    0.50    0.21    12.7%     2.7%     46     42       0 False
+  R4 + NKD corrected   strict_030_nkd040       3.0%  3.0%  4.0%        174  1.02    0.14    0.07     8.5%     0.6%     42     72       0 False
+  R4 + NKD corrected   strict_025_nkd040       2.5%  2.5%  4.0%         84  1.01    0.07    0.04     8.0%     0.3%     38     76       0 False
+  R4 only              strict_050              5.0%  5.0%  6.0%       -123  0.99   -0.08   -0.04    12.2%    -0.4%     46     42       0 False
+  R4 + NKD corrected   strict_030_nkd030       3.0%  3.0%  3.0%       -363  0.93   -0.43   -0.18     7.5%    -1.3%     35     79       0 False
+  R4 only              strict_040              4.0%  4.0%  6.0%       -751  0.92   -0.54   -0.19    14.1%    -2.7%     42     46       0 False
+  R4 + NKD corrected   strict_025_nkd030       2.5%  2.5%  3.0%       -452  0.90   -0.61   -0.23     7.0%    -1.6%     31     83       0 False
+  R4 only              strict_030              3.0%  3.0%  6.0%       -735  0.86   -0.91   -0.36     7.5%    -2.7%     33     55       0 False
+  R4 + NKD corrected   strict_030_nkd020       3.0%  3.0%  2.0%       -735  0.86   -0.91   -0.36     7.5%    -2.7%     33     81       0 False
+  R4 only              strict_025              2.5%  2.5%  6.0%       -824  0.82   -1.15   -0.42     7.0%    -3.0%     29     59       0 False
+  R4 + NKD corrected   strict_025_nkd020       2.5%  2.5%  2.0%       -824  0.82   -1.15   -0.42     7.0%    -3.0%     29     85       0 False
+  R4 only              strict_035              3.5%  3.5%  6.0%     -2,203  0.70   -2.16   -0.69    11.6%    -8.0%     37     51       0 False
+
+  DEPLOY-CLEAN CANDIDATES UNDER THIS MECHANICAL GATE: 9
+    R4 + NKD corrected   strict_020             net $   7,601 PF 1.90 Calmar 4.26 MaxDD 6.5% safety 8.6% taken 50 rejected 64
+    R4 + NKD corrected   strict_015             net $   6,498 PF 1.86 Calmar 3.80 MaxDD 6.2% safety 8.9% taken 35 rejected 79
+    R4 only              strict_020             net $   1,594 PF 1.72 Calmar 2.55 MaxDD 2.3% safety 12.8% taken 26 rejected 62
+    R4 + NKD corrected   strict_025             net $   5,183 PF 1.48 Calmar 1.94 MaxDD 9.7% safety 5.5% taken 53 rejected 61
+    R4 + NKD corrected   strict_030             net $   5,273 PF 1.46 Calmar 1.86 MaxDD 10.2% safety 4.9% taken 57 rejected 57
+    R4 + NKD corrected   strict_035             net $   3,805 PF 1.28 Calmar 0.99 MaxDD 13.9% safety 1.3% taken 61 rejected 53
+    R4 only              strict_015             net $     490 PF 1.41 Calmar 0.92 MaxDD 1.9% safety 13.1% taken 11 rejected 77
+    R4 + NKD corrected   strict_025_nkd050      net $   2,342 PF 1.25 Calmar 0.84 MaxDD 10.0% safety 5.1% taken 45 rejected 69
+    R4 + NKD corrected   strict_030_nkd050      net $   2,431 PF 1.24 Calmar 0.83 MaxDD 10.6% safety 4.6% taken 49 rejected 65
+
+######################################################################################################################
+CROSS-WINDOW SANITY FOR FLOOR-SELECTED CANDIDATES
+######################################################################################################################
+  variant              scenario               window           net$    PF  Sharpe  Calmar   MaxDD%   ret/yr  safety   block
+  R4 + NKD corrected   strict_025_nkd030      floor          21,474  1.36    1.84    0.76     8.3%     6.3%    7.4%       0
+  R4 + NKD corrected   strict_025_nkd030      vault2025       4,187  1.38    1.76    1.14     7.9%     9.1%    8.1%       0
+  R4 + NKD corrected   strict_025_nkd030      vault2026        -452  0.90   -0.61   -0.23     7.0%    -1.6%    8.0%       0
+  R4 + NKD corrected   strict_025_nkd040      floor          21,308  1.35    1.82    0.75     8.3%     6.2%    7.4%       0
+  R4 + NKD corrected   strict_025_nkd040      vault2025       4,783  1.43    1.95    1.31     7.9%    10.3%    8.1%       0
+  R4 + NKD corrected   strict_025_nkd040      vault2026          84  1.01    0.07    0.04     8.0%     0.3%    7.2%       0
+  R4 + NKD corrected   strict_025_nkd020      floor          21,275  1.36    1.85    0.73     8.5%     6.2%    7.4%       0
+  R4 + NKD corrected   strict_025_nkd020      vault2025       4,393  1.48    2.08    1.47     6.5%     9.5%    8.6%       0
+  R4 + NKD corrected   strict_025_nkd020      vault2026        -824  0.82   -1.15   -0.42     7.0%    -3.0%    8.0%       0
+  R4 + NKD corrected   strict_025             floor          20,285  1.33    1.71    0.68     8.7%     5.9%    7.4%       0
+  R4 + NKD corrected   strict_025             vault2025       4,783  1.43    1.95    1.31     7.9%    10.3%    8.1%       0
+  R4 + NKD corrected   strict_025             vault2026       5,183  1.48    2.36    1.94     9.7%    18.7%    5.5%       0
+  R4 + NKD corrected   strict_025_nkd050      floor          20,285  1.33    1.71    0.68     8.7%     5.9%    7.4%       0
+  R4 + NKD corrected   strict_025_nkd050      vault2025       4,783  1.43    1.95    1.31     7.9%    10.3%    8.1%       0
+  R4 + NKD corrected   strict_025_nkd050      vault2026       2,342  1.25    1.33    0.84    10.0%     8.5%    5.1%       0
+  R4 + NKD corrected   strict_030_nkd030      floor          25,203  1.35    1.71    0.63    11.6%     7.4%    4.7%       0
+  R4 + NKD corrected   strict_030_nkd030      vault2025       5,241  1.45    2.08    1.39     8.1%    11.3%    8.0%       0
+  R4 + NKD corrected   strict_030_nkd030      vault2026        -363  0.93   -0.43   -0.18     7.5%    -1.3%    7.6%       0
+  R4 only              strict_015             floor           9,307  1.42    2.21    0.63     4.3%     2.7%   11.1%       0
+  R4 only              strict_015             vault2025       1,384  1.50    2.08    1.32     2.3%     3.0%   12.7%       0
+  R4 only              strict_015             vault2026         490  1.41    2.09    0.92     1.9%     1.8%   13.1%       0
+  R4 + NKD corrected   strict_030_nkd040      floor          25,036  1.35    1.69    0.63    11.6%     7.3%    4.7%       0
+  R4 + NKD corrected   strict_030_nkd040      vault2025       5,836  1.50    2.25    1.55     8.1%    12.6%    8.0%       0
+  R4 + NKD corrected   strict_030_nkd040      vault2026         174  1.02    0.14    0.07     8.5%     0.6%    6.6%       0
+
+VERDICT: candidate_exists_mechanical_floor_only
+  Do not promote from this pass alone. The pass identifies mechanical cap policies that avoid
+  the 15% latch on floor; final promotion still requires choosing policy ex-ante, then re-running
+  production-equivalent anchors after the NKD fill law is fixed in the engine.

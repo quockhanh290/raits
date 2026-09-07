@@ -1,0 +1,72 @@
+{
+  "MNQ": {
+    "sha256": "a13167b1fd502853d1368e314c30fbfd0acea6a9b0210d516c8b542d4c7877c1",
+    "last_bar": "2026-08-25 03:25:00",
+    "tz": "None",
+    "columns": "open,high,low,close,volume",
+    "mtime": "2026-08-24T21:26:32",
+    "changed": true,
+    "columns_unchanged": true,
+    "tz_unchanged": true
+  },
+  "MYM": {
+    "sha256": "f2af776ad28eff78bcc8870ba672320f894b233bdd25d068c40fe7cdbab12ebd",
+    "last_bar": "2026-08-25 03:25:00",
+    "tz": "None",
+    "columns": "open,high,low,close,volume",
+    "mtime": "2026-08-24T21:26:59",
+    "changed": true,
+    "columns_unchanged": true,
+    "tz_unchanged": true
+  },
+  "M2K": {
+    "sha256": "86009f82160e9914f0f45b68daa1a117e4dbfe771e682ccce4e20251ad0b15ef",
+    "last_bar": "2026-08-25 03:25:00",
+    "tz": "None",
+    "columns": "open,high,low,close,volume",
+    "mtime": "2026-08-24T21:27:23",
+    "changed": true,
+    "columns_unchanged": true,
+    "tz_unchanged": true
+  },
+  "MES": {
+    "sha256": "99da6feb97ea1a28abb9ffae748cc8fda1e8cd4bfb5a529ba27e534b5faf8d9c",
+    "last_bar": "2026-08-24 17:44:00",
+    "tz": "None",
+    "columns": "open,high,low,close,volume",
+    "mtime": "2026-08-24T11:45:24",
+    "changed": false,
+    "columns_unchanged": true,
+    "tz_unchanged": true
+  },
+  "MNKD": {
+    "sha256": "a761a36b2018f82f0869bfb9ac5e9f9caacd776f2b5ed687785485da3f296010",
+    "last_bar": "2026-08-24 17:46:00",
+    "tz": "None",
+    "columns": "open,high,low,close,volume",
+    "mtime": "2026-08-24T11:46:46",
+    "changed": false,
+    "columns_unchanged": true,
+    "tz_unchanged": true
+  },
+  "spy_csv": {
+    "sha256": "c5d8cdd90eaac4cbbf09007f17ac3dcf9e5b6a845e889148aeb62ce871238773",
+    "last_bar": "-",
+    "tz": "-",
+    "columns": "-",
+    "mtime": "2026-08-24T11:46:48",
+    "changed": false,
+    "columns_unchanged": true,
+    "tz_unchanged": true
+  },
+  "preflight": {
+    "sha256": "fcfb392383844ea1bb6a5179885918ee3f68a9911f44677a3055c68f64f181e3",
+    "last_bar": "-",
+    "tz": "-",
+    "columns": "-",
+    "mtime": "2026-08-24T11:47:04",
+    "changed": false,
+    "columns_unchanged": true,
+    "tz_unchanged": true
+  }
+}

@@ -1,0 +1,444 @@
+{
+  "n_tickers": 62,
+  "failed": [],
+  "old_events_2017_2022": 1098,
+  "exact_match": 387,
+  "match_pct": 35.2,
+  "per_ticker": [
+    {
+      "ticker": "AAPL",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 18,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "ABBV",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 7.0
+    },
+    {
+      "ticker": "ADBE",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 12.0
+    },
+    {
+      "ticker": "AMAT",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 6.0
+    },
+    {
+      "ticker": "AMD",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 11,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "AMGN",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 23,
+      "exact_match": 17,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "AMZN",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 18,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "AVGO",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 4,
+      "median_offset_days": 6.0
+    },
+    {
+      "ticker": "BA",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 23,
+      "exact_match": 17,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "BAC",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 23,
+      "exact_match": 0,
+      "median_offset_days": 14.0
+    },
+    {
+      "ticker": "BIIB",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 16,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "BMY",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 18,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "C",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 19.0
+    },
+    {
+      "ticker": "CAT",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 8.0
+    },
+    {
+      "ticker": "COST",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 6.0
+    },
+    {
+      "ticker": "CRM",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 8,
+      "median_offset_days": 1.0
+    },
+    {
+      "ticker": "CSCO",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 5.0
+    },
+    {
+      "ticker": "CVX",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 6.0
+    },
+    {
+      "ticker": "DE",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 10.0
+    },
+    {
+      "ticker": "EBAY",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 17,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "GE",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 13,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "GILD",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 6.0
+    },
+    {
+      "ticker": "GOOGL",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 17,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "GS",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 17.0
+    },
+    {
+      "ticker": "HD",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 7.0
+    },
+    {
+      "ticker": "HON",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 18,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "INTC",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 15,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "INTU",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 2,
+      "median_offset_days": -1.0
+    },
+    {
+      "ticker": "JNJ",
+      "old_2017_2022": 15,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 14.0
+    },
+    {
+      "ticker": "JPM",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 20.0
+    },
+    {
+      "ticker": "KO",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 2,
+      "median_offset_days": 1.5
+    },
+    {
+      "ticker": "LLY",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 4,
+      "median_offset_days": 1.5
+    },
+    {
+      "ticker": "LOW",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 10.0
+    },
+    {
+      "ticker": "MA",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 23,
+      "exact_match": 17,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "MCD",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 1,
+      "median_offset_days": 8.5
+    },
+    {
+      "ticker": "META",
+      "old_2017_2022": 2,
+      "yahoo_2017_2022": 24,
+      "exact_match": 2,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "MMM",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 23,
+      "exact_match": 7,
+      "median_offset_days": 1.0
+    },
+    {
+      "ticker": "MRK",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 8.0
+    },
+    {
+      "ticker": "MS",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 18.5
+    },
+    {
+      "ticker": "MSFT",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": -1.0
+    },
+    {
+      "ticker": "MU",
+      "old_2017_2022": 19,
+      "yahoo_2017_2022": 24,
+      "exact_match": 13,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "NFLX",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 1.0
+    },
+    {
+      "ticker": "NKE",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 13.0
+    },
+    {
+      "ticker": "NOW",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 9,
+      "median_offset_days": 0.5
+    },
+    {
+      "ticker": "NVDA",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "ORCL",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 8,
+      "median_offset_days": 0.5
+    },
+    {
+      "ticker": "PANW",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 16,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "PEP",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 23,
+      "exact_match": 17,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "PFE",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 9.0
+    },
+    {
+      "ticker": "PG",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 17,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "PYPL",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 16,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "QCOM",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 1,
+      "median_offset_days": -1.0
+    },
+    {
+      "ticker": "REGN",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 18,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "SBUX",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 1.5
+    },
+    {
+      "ticker": "TGT",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 7.0
+    },
+    {
+      "ticker": "TSLA",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 22,
+      "exact_match": 1,
+      "median_offset_days": 4.0
+    },
+    {
+      "ticker": "TXN",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 9,
+      "median_offset_days": 3.0
+    },
+    {
+      "ticker": "V",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 5,
+      "median_offset_days": 1.0
+    },
+    {
+      "ticker": "VRTX",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 15,
+      "median_offset_days": 0.0
+    },
+    {
+      "ticker": "WFC",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 21.0
+    },
+    {
+      "ticker": "WMT",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 16.0
+    },
+    {
+      "ticker": "XOM",
+      "old_2017_2022": 18,
+      "yahoo_2017_2022": 24,
+      "exact_match": 0,
+      "median_offset_days": 5.0
+    }
+  ],
+  "intraday_announcements_dropped": 47
+}

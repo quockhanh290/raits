@@ -1,0 +1,113 @@
+{
+  "all_red": true,
+  "results": [
+    {
+      "id": "M1",
+      "mutation": "__post_init__ accepts any gate",
+      "test": "test_1_construction_refused_without_an_armed_gate",
+      "outcome": "RED"
+    },
+    {
+      "id": "M1b",
+      "mutation": "same mutation, against the REAL blocker table",
+      "test": "test_36_the_real_order_gate_still_refuses_to_arm",
+      "outcome": "RED"
+    },
+    {
+      "id": "M2",
+      "mutation": "send_order precedes the SUBMITTED record",
+      "test": "test_5_submitted_is_on_disk_BEFORE_the_broker_is_called",
+      "outcome": "RED"
+    },
+    {
+      "id": "M3",
+      "mutation": "unknown status folded into REJECTED",
+      "test": "test_9_anything_unrecognised_is_UNKNOWN_never_REJECTED",
+      "outcome": "RED"
+    },
+    {
+      "id": "M4",
+      "mutation": "the exception never reaches the caller",
+      "test": "test_10_a_broker_that_raises_leaves_UNKNOWN_and_the_exception_propagates",
+      "outcome": "RED"
+    },
+    {
+      "id": "M5",
+      "mutation": "the executor treats a journal refusal as best-effort",
+      "test": "test_6_a_journal_that_will_not_write_stops_the_order_reaching_the_broker",
+      "outcome": "RED"
+    },
+    {
+      "id": "M5b",
+      "mutation": "same mutation, against the SECOND write",
+      "test": "test_7_the_second_write_failing_also_stops_the_send",
+      "outcome": "RED"
+    },
+    {
+      "id": "M6",
+      "mutation": "read_book fails OPEN",
+      "test": "test_25_an_unreadable_book_is_NOT_an_empty_book",
+      "outcome": "RED"
+    },
+    {
+      "id": "M7",
+      "mutation": "live_positions.track1.json written by the executor",
+      "test": "test_23_a_fill_does_not_create_or_change_the_book_file",
+      "outcome": "RED"
+    },
+    {
+      "id": "M7b",
+      "mutation": "a writer appears in the module source",
+      "test": "test_22_the_module_contains_no_write_to_the_track1_book",
+      "outcome": "RED"
+    },
+    {
+      "id": "M8",
+      "mutation": "tradable_symbol replaced by history_symbol",
+      "test": "test_18_MNKD_journals_the_runner_name_and_the_ORDER_symbol_side_by_side",
+      "outcome": "RED"
+    },
+    {
+      "id": "M9",
+      "mutation": "a fresh key on every record",
+      "test": "test_19_the_idempotency_key_is_the_same_on_all_four_rows",
+      "outcome": "RED"
+    },
+    {
+      "id": "M10",
+      "mutation": "invalid lines silently discarded",
+      "test": "test_30_a_corrupt_journal_line_refuses_the_whole_reconcile",
+      "outcome": "RED"
+    },
+    {
+      "id": "M11",
+      "mutation": "an import of track1_paper_executor added to a production module",
+      "test": "test_33_nothing_in_production_imports_the_executor",
+      "outcome": "RED"
+    },
+    {
+      "id": "M12",
+      "mutation": "the flag added to a slot argv",
+      "test": "test_38_no_caller_ever_passes_allow_orders",
+      "outcome": "RED"
+    },
+    {
+      "id": "M13",
+      "mutation": "ARMED no longer binds freshness",
+      "test": "test_40_arming_changes_only_the_recorded_mode_not_whether_freshness_binds",
+      "outcome": "RED"
+    },
+    {
+      "id": "M14",
+      "mutation": "mode handed to a second call as well",
+      "test": "test_41_the_mode_label_reaches_the_explanation_writer_and_nothing_else",
+      "outcome": "RED"
+    },
+    {
+      "id": "M15",
+      "mutation": "NoOrderBroker replaced by IBKRBroker",
+      "test": "test_42_the_broker_is_still_NoOrderBroker_on_the_run_path",
+      "outcome": "RED"
+    }
+  ]
+}

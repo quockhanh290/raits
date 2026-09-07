@@ -1,0 +1,985 @@
+{
+  "scale": {
+    "roska4_swing": 0.8,
+    "global_nkd": 0.8
+  },
+  "windows": {
+    "floor": {
+      "self_checks": {
+        "SC1_same_candidate_count": true,
+        "SC2_control_sleeves_unchanged": true,
+        "SC3_proxy_ratio_is_exactly_0_8": true,
+        "SC4_the_arms_actually_differ": true
+      },
+      "measured": true,
+      "candidates": 1379,
+      "artifact_basis": {
+        "n_decisions": 1379,
+        "counters": {
+          "taken:roska4_swing": 545,
+          "rejected:roska4_swing": 190,
+          "taken:roska4_calm": 338,
+          "rejected:roska4_calm": 4,
+          "taken:roska4_stress": 49,
+          "rejected:roska4_stress": 1,
+          "taken:global_nkd": 228,
+          "rejected:global_nkd": 0,
+          "take": 1160,
+          "reject_cap": 190,
+          "reject_family_cap": 5,
+          "suppress_same_symbol": 22,
+          "suppress_same_sleeve": 0,
+          "reject_window": 0,
+          "halt_breaker": 2,
+          "double_booked": 0,
+          "forced_closes": 14
+        },
+        "settlements": 1160,
+        "booked_pnl": 64902.91,
+        "open_at_end": 1160,
+        "peaks": {
+          "cluster_gross": {
+            "roska4_calm": 0.03445,
+            "global_nkd": 0.042063,
+            "roska4_swing": 0.049041,
+            "roska4_stress": 0.083563
+          },
+          "cluster_net": {
+            "roska4_calm": 0.03445,
+            "global_nkd": 0.042063,
+            "roska4_swing": 0.048887,
+            "roska4_stress": 0.083563
+          },
+          "family_gross": 0.049041,
+          "family_net": 0.048887
+        },
+        "impossible_peaks": [],
+        "net_overshoot_post_settlement": [
+          "roska4_swing net 0.0489 > cap 0.0440 (post-settlement)",
+          "family net 0.0489 > cap 0.0440 (post-settlement)"
+        ]
+      },
+      "true_stop_distance": {
+        "n_decisions": 1379,
+        "counters": {
+          "taken:roska4_swing": 618,
+          "rejected:roska4_swing": 116,
+          "taken:roska4_calm": 339,
+          "rejected:roska4_calm": 3,
+          "taken:roska4_stress": 49,
+          "rejected:roska4_stress": 1,
+          "taken:global_nkd": 228,
+          "rejected:global_nkd": 0,
+          "take": 1234,
+          "reject_cap": 117,
+          "reject_family_cap": 3,
+          "suppress_same_symbol": 23,
+          "suppress_same_sleeve": 0,
+          "reject_window": 0,
+          "halt_breaker": 2,
+          "double_booked": 0,
+          "forced_closes": 17
+        },
+        "settlements": 1234,
+        "booked_pnl": 71981.8,
+        "open_at_end": 1234,
+        "peaks": {
+          "cluster_gross": {
+            "roska4_calm": 0.03445,
+            "global_nkd": 0.03365,
+            "roska4_swing": 0.047773,
+            "roska4_stress": 0.083563
+          },
+          "cluster_net": {
+            "roska4_calm": 0.03445,
+            "global_nkd": 0.03365,
+            "roska4_swing": 0.043956,
+            "roska4_stress": 0.083563
+          },
+          "family_gross": 0.047773,
+          "family_net": 0.043956
+        },
+        "impossible_peaks": [],
+        "net_overshoot_post_settlement": []
+      },
+      "changed_admissions": {
+        "normal_filtered_MYM_1": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_7": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_11": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_12": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_16": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_15": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MYM_14": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_19": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_33": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_31": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_42": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_45": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_43": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_46": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MYM_44": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_47": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_45": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_M2K_44": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_45": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_53": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_49": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MNQ_54": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_55": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_54": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MES_55": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_56": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_58": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_60": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_60": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MNQ_61": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_60": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MES_64": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_63": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_67": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_64": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_M2K_65": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_71": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_72": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_72": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MES_73": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_74": [
+          "reject_family_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_76": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_82": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_79": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_M2K_77": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_89": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_87": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_88": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_88": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MYM_89": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_83": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_96": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_94": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_97": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_87": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MES_99": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_90": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MYM_101": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_99": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_102": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MYM_103": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MNQ_100": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_103": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MYM_104": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MNQ_101": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_94": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_105": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_M2K_97": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_112": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_115": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_104": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_115": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_107": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_109": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_120": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_122": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_M2K_111": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_114": [
+          "reject_cap",
+          "take"
+        ],
+        "calm_a_atr15_floor_MES_212": [
+          "reject_family_cap",
+          "take"
+        ],
+        "normal_filtered_MES_125": [
+          "reject_cap",
+          "suppress_same_symbol"
+        ],
+        "normal_filtered_MYM_128": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_128": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_120": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_121": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_136": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_130": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_126": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_135": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_140": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_M2K_130": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_144": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_137": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_140": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MNQ_139": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_148": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_144": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_145": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_146": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_146": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_147": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_152": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_160": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_161": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_163": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_164": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_153": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_167": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_176": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_179": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_172": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_165": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_175": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_185": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_168": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_177": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_178": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MES_179": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_192": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_182": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_193": [
+          "take",
+          "reject_cap"
+        ],
+        "calm_a_atr15_floor_MES_316": [
+          "take",
+          "suppress_same_symbol"
+        ],
+        "normal_filtered_MNQ_181": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_173": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MYM_196": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_185": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_198": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MNQ_185": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_186": [
+          "take",
+          "reject_cap"
+        ],
+        "calm_a_atr15_floor_MES_336": [
+          "suppress_same_symbol",
+          "take"
+        ]
+      },
+      "n_changed_admissions": 129,
+      "pnl_delta": 7078.89,
+      "settlement_delta": 74
+    },
+    "vault2025": {
+      "self_checks": {
+        "SC1_same_candidate_count": true,
+        "SC2_control_sleeves_unchanged": true,
+        "SC3_proxy_ratio_is_exactly_0_8": true,
+        "SC4_the_arms_actually_differ": true
+      },
+      "measured": true,
+      "candidates": 183,
+      "artifact_basis": {
+        "n_decisions": 183,
+        "counters": {
+          "taken:roska4_swing": 55,
+          "rejected:roska4_swing": 48,
+          "taken:roska4_calm": 39,
+          "rejected:roska4_calm": 3,
+          "taken:roska4_stress": 3,
+          "rejected:roska4_stress": 0,
+          "taken:global_nkd": 31,
+          "rejected:global_nkd": 0,
+          "take": 128,
+          "reject_cap": 48,
+          "reject_family_cap": 3,
+          "suppress_same_symbol": 4,
+          "suppress_same_sleeve": 0,
+          "reject_window": 0,
+          "halt_breaker": 0,
+          "double_booked": 0,
+          "forced_closes": 1
+        },
+        "settlements": 128,
+        "booked_pnl": 13236.11,
+        "open_at_end": 128,
+        "peaks": {
+          "cluster_gross": {
+            "global_nkd": 0.033902,
+            "roska4_swing": 0.049552,
+            "roska4_calm": 0.040269,
+            "roska4_stress": 0.079554
+          },
+          "cluster_net": {
+            "global_nkd": 0.033902,
+            "roska4_swing": 0.043812,
+            "roska4_calm": 0.040269,
+            "roska4_stress": 0.079554
+          },
+          "family_gross": 0.049552,
+          "family_net": 0.043812
+        },
+        "impossible_peaks": [],
+        "net_overshoot_post_settlement": []
+      },
+      "true_stop_distance": {
+        "n_decisions": 183,
+        "counters": {
+          "taken:roska4_swing": 71,
+          "rejected:roska4_swing": 32,
+          "taken:roska4_calm": 39,
+          "rejected:roska4_calm": 3,
+          "taken:roska4_stress": 3,
+          "rejected:roska4_stress": 0,
+          "taken:global_nkd": 31,
+          "rejected:global_nkd": 0,
+          "take": 144,
+          "reject_cap": 32,
+          "reject_family_cap": 3,
+          "suppress_same_symbol": 4,
+          "suppress_same_sleeve": 0,
+          "reject_window": 0,
+          "halt_breaker": 0,
+          "double_booked": 0,
+          "forced_closes": 1
+        },
+        "settlements": 144,
+        "booked_pnl": 16584.81,
+        "open_at_end": 144,
+        "peaks": {
+          "cluster_gross": {
+            "global_nkd": 0.027121,
+            "roska4_swing": 0.048091,
+            "roska4_calm": 0.040269,
+            "roska4_stress": 0.079554
+          },
+          "cluster_net": {
+            "global_nkd": 0.027121,
+            "roska4_swing": 0.043855,
+            "roska4_calm": 0.040269,
+            "roska4_stress": 0.079554
+          },
+          "family_gross": 0.048091,
+          "family_net": 0.043855
+        },
+        "impossible_peaks": [],
+        "net_overshoot_post_settlement": []
+      },
+      "changed_admissions": {
+        "normal_filtered_MYM_0": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_1": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_2": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_3": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_5": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_8": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_9": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_11": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_12": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_12": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MYM_13": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_14": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_15": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_18": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_18": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_20": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_21": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_23": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_24": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_25": [
+          "take",
+          "reject_cap"
+        ]
+      },
+      "n_changed_admissions": 20,
+      "pnl_delta": 3348.7,
+      "settlement_delta": 16
+    },
+    "vault2026": {
+      "self_checks": {
+        "SC1_same_candidate_count": true,
+        "SC2_control_sleeves_unchanged": true,
+        "SC3_proxy_ratio_is_exactly_0_8": true,
+        "SC4_the_arms_actually_differ": true
+      },
+      "measured": true,
+      "candidates": 139,
+      "artifact_basis": {
+        "n_decisions": 139,
+        "counters": {
+          "taken:roska4_swing": 45,
+          "rejected:roska4_swing": 36,
+          "taken:roska4_calm": 19,
+          "rejected:roska4_calm": 8,
+          "taken:roska4_stress": 3,
+          "rejected:roska4_stress": 1,
+          "taken:global_nkd": 24,
+          "rejected:global_nkd": 2,
+          "take": 91,
+          "reject_cap": 37,
+          "reject_family_cap": 10,
+          "suppress_same_symbol": 1,
+          "suppress_same_sleeve": 0,
+          "reject_window": 0,
+          "halt_breaker": 0,
+          "double_booked": 0,
+          "forced_closes": 0
+        },
+        "settlements": 91,
+        "booked_pnl": 8259.85,
+        "open_at_end": 91,
+        "peaks": {
+          "cluster_gross": {
+            "roska4_calm": 0.041174,
+            "global_nkd": 0.059179,
+            "roska4_swing": 0.048425,
+            "roska4_stress": 0.085399
+          },
+          "cluster_net": {
+            "roska4_calm": 0.041174,
+            "global_nkd": 0.059179,
+            "roska4_swing": 0.040057,
+            "roska4_stress": 0.085399
+          },
+          "family_gross": 0.048425,
+          "family_net": 0.041174
+        },
+        "impossible_peaks": [],
+        "net_overshoot_post_settlement": []
+      },
+      "true_stop_distance": {
+        "n_decisions": 139,
+        "counters": {
+          "taken:roska4_swing": 50,
+          "rejected:roska4_swing": 31,
+          "taken:roska4_calm": 19,
+          "rejected:roska4_calm": 8,
+          "taken:roska4_stress": 3,
+          "rejected:roska4_stress": 1,
+          "taken:global_nkd": 26,
+          "rejected:global_nkd": 0,
+          "take": 98,
+          "reject_cap": 30,
+          "reject_family_cap": 10,
+          "suppress_same_symbol": 1,
+          "suppress_same_sleeve": 0,
+          "reject_window": 0,
+          "halt_breaker": 0,
+          "double_booked": 0,
+          "forced_closes": 1
+        },
+        "settlements": 98,
+        "booked_pnl": 5871.6,
+        "open_at_end": 98,
+        "peaks": {
+          "cluster_gross": {
+            "roska4_calm": 0.041174,
+            "global_nkd": 0.048279,
+            "roska4_swing": 0.049073,
+            "roska4_stress": 0.085399
+          },
+          "cluster_net": {
+            "roska4_calm": 0.041174,
+            "global_nkd": 0.048279,
+            "roska4_swing": 0.049073,
+            "roska4_stress": 0.085399
+          },
+          "family_gross": 0.049073,
+          "family_net": 0.049073
+        },
+        "impossible_peaks": [],
+        "net_overshoot_post_settlement": [
+          "roska4_swing net 0.0491 > cap 0.0440 (post-settlement)",
+          "family net 0.0491 > cap 0.0440 (post-settlement)"
+        ]
+      },
+      "changed_admissions": {
+        "normal_filtered_MES_0": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_3": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_M2K_1": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MYM_8": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_6": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_9": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_7": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_9": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_M2K_9": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_16": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_18": [
+          "take",
+          "reject_cap"
+        ],
+        "nkd_filtered_MNKD_19": [
+          "reject_cap",
+          "take"
+        ],
+        "nkd_filtered_MNKD_20": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MNQ_15": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MES_19": [
+          "take",
+          "reject_cap"
+        ],
+        "normal_filtered_MES_20": [
+          "reject_cap",
+          "take"
+        ],
+        "normal_filtered_MYM_23": [
+          "take",
+          "reject_cap"
+        ]
+      },
+      "n_changed_admissions": 17,
+      "pnl_delta": -2388.25,
+      "settlement_delta": 7
+    }
+  },
+  "total_changed_admissions": 166,
+  "total_pnl_delta": 8039.34,
+  "self_check_failures": [],
+  "verdict": "admissions_change"
+}

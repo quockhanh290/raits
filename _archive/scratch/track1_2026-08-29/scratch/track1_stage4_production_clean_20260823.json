@@ -1,0 +1,358 @@
+{
+  "artifact": "track1_stage4_production_clean",
+  "date": "2026-08-23",
+  "stage": "4 \u2014 promote Normal-R4 and Calm A into production-clean code; prepare route wiring",
+  "contract": {
+    "scheduler_or_service_started": false,
+    "ibkr_connected": false,
+    "live_order_sent": false,
+    "dashboard_written": false,
+    "committed": false,
+    "legacy_retired": false,
+    "test_event_playback_run": false
+  },
+  "verdict": {
+    "code": "A",
+    "label": "PRODUCTION-CLEAN BLOCKERS CLOSED \u2014 ready for shadow scheduler wiring",
+    "blockers_closed": 7,
+    "blockers_remaining": 1,
+    "remaining": [
+      "B1_broker_account_or_legacy_retirement"
+    ],
+    "safety_note": "Because B1 is now the last blocker, a valid confirmation file plus TRACK1_ORDERS_APPROVED=1 genuinely ARMS the order gate. Before this stage, releasing B1 still left three gates shut. That is the designed end state, but it means the confirmation file has stopped being one safeguard among several and has become THE safeguard. A test asserts both halves: the file alone does not arm the gate, and both factors together do. The file still does not exist and nothing here creates it."
+  },
+  "normal_r4": {
+    "module": "global_index/track1_normal_r4.py",
+    "monkeypatching": "none",
+    "monkeypatch_proof": "a test captures id() of futures._validated_core.backtest_swing_tf, _swing_cache, raits.strategies.trend_follow.TrendFollowStrategy.generate_signal, futures.swing_tf.SwingTFEngine, futures.stress_mid.StressMidEngine and a copy of trend_follow.DEFAULT_CONFIG, runs the generator, and requires all six unchanged. Identity rather than equality, because the scratch path restores them in a finally and would pass an afterwards-only check.",
+    "equivalence": {
+      "compared_on": [
+        "day",
+        "exit_day",
+        "direction",
+        "entry",
+        "exit",
+        "pnl"
+      ],
+      "floor": {
+        "MES": 188,
+        "MNQ": 186,
+        "MYM": 200,
+        "M2K": 178,
+        "MNKD": 228,
+        "total": 980,
+        "exact": true
+      },
+      "vault2025": {
+        "MES": 26,
+        "MNQ": 27,
+        "MYM": 26,
+        "M2K": 26,
+        "MNKD": 31,
+        "total": 136,
+        "exact": true
+      },
+      "vault2026": {
+        "MES": 22,
+        "MNQ": 18,
+        "MYM": 24,
+        "M2K": 17,
+        "MNKD": 26,
+        "total": 107,
+        "exact": true
+      },
+      "grand_total_rows": 1223
+    },
+    "replacements": [
+      {
+        "scratch": "tf.TrendFollowStrategy.generate_signal = gated_generate (class level)",
+        "promoted": "make_signal_fn() \u2014 the caller gates the strategy's own return value"
+      },
+      {
+        "scratch": "a second instance-level wrapper for the stop basis",
+        "promoted": "the same callable re-anchors the stop, so the cache path AND the rescan path both get it"
+      },
+      {
+        "scratch": "tf.DEFAULT_CONFIG['allowed_regimes'] = ['Normal']",
+        "promoted": "ALLOWED_REGIMES, a local constant"
+      },
+      {
+        "scratch": "force_all_bars_gappable() replacing _swing_cache",
+        "promoted": "_cache_for() post-processes a COPY; the production cache is left as found"
+      },
+      {
+        "scratch": "model_sameday_stop.run_loop (root-level script)",
+        "promoted": "_replay(), carrying only the branches this sleeve reaches"
+      },
+      {
+        "scratch": "ST.SwingTFEngine / SM.StressMidEngine replaced",
+        "promoted": "not needed \u2014 nothing has to be silenced"
+      }
+    ],
+    "filters": {
+      "action": "PROMOTED, not re-derived",
+      "module": "global_index/track1_normal_filters.py",
+      "why": "the scratch library's header says there is exactly one implementation on purpose; a re-derivation would have broken that",
+      "proof": "a test requires the promoted copy and the scratch original to return the same verdict for every 5-minute bar of a real instrument (>5000 bars) and the same block counters, and asserts the filter neither passes everything nor nothing"
+    },
+    "divergences_found_and_fixed": [
+      {
+        "what": "same-day re-entry after an exit",
+        "measured": "MES exits MAX_HOLD at 09:30 on 2026-01-26 and re-enters at 15:20 the same session; the first pass produced 20 trades where the record has 22",
+        "cause": "run_loop rescans the window AFTER the exit rather than reading the signal cache, because avgv is positional inside the 14:00-15:55 window so a truncated window gives different averages"
+      },
+      {
+        "what": "the daily-ATR warm-up",
+        "measured": "without it vault2025 gained trades on 2025-01-02 and 2025-01-10; the record's first trade is 2025-01-21, about fourteen sessions in",
+        "cause": "the cache builder DROPS a day with no usable daily ATR while the signal wrapper KEEPS it; almost every entry comes through the cache, so dropping is the effective rule"
+      },
+      {
+        "what": "MNKD ema",
+        "measured": "the first run gave MNKD ema_period=50 and it produced a LONG where the record says SHORT",
+        "cause": "mine \u2014 MNKD runs at ema 10; generate() now takes labels and params per instrument"
+      }
+    ],
+    "fill_law": {
+      "parameter": true,
+      "default": "artifact_all_bars_gappable \u2014 what the committed rows were built under",
+      "open_item": "track1_params.fill_law declares production_gap_after_15min_break while the rows every Track 1 number rests on were built under the artifact law. Immaterial in P&L ($0 to +$6 over seven years, measured in the three-blockers report) but the declared identity and the actual data disagree."
+    }
+  },
+  "calm_a": {
+    "module": "global_index/track1_calm_a.py",
+    "reads_frozen_csv": false,
+    "guard": "a test replaces builtins.open and pandas.read_csv and fails the run if the detector path touches scratch/calm_pcloc_not_deep_gap_trade_list.csv",
+    "equivalence": {
+      "floor": {
+        "MES": 164,
+        "MNQ": 185,
+        "exact": true
+      },
+      "vault2025": {
+        "MES": 26,
+        "MNQ": 18,
+        "exact": true
+      },
+      "vault2026": {
+        "MES": 14,
+        "MNQ": 14,
+        "exact": true
+      },
+      "grand_total_rows": 421,
+      "feature_columns_matched_to": "1e-9",
+      "columns": [
+        "gap_from_prev_rth_close",
+        "prev_close_loc",
+        "prev_rth_ret",
+        "open_loc_prev_range"
+      ],
+      "why_features_too": "matching the same DAYS could happen with a slightly wrong feature and a compensating threshold; matching the recorded values cannot"
+    },
+    "rule": {
+      "regime": "SPY HMM label at the PRIOR session is Calm",
+      "pcloc": "(prior close - prior low) / prior range <= 1/3",
+      "down": "prior close / prior open - 1 <= 0",
+      "not_deep": "current RTH open / prior RTH close - 1 >= -0.010",
+      "trade": "LONG only, MES and MNQ, entry at the 10:00 OPEN, exit at the 15:55 OPEN"
+    },
+    "thresholds_source": "read off the artifact, not fitted \u2014 prev_close_loc tops out at exactly 0.333333 and prev_rth_ret at exactly 0.000000 across all 421 rows; the audit states the gap filter verbatim",
+    "conventions_discovered": [
+      {
+        "what": "entry and exit are bar OPENs",
+        "evidence": "MNQ 2018-01-05: the 10:00 bar's open is 8753.00 and the 15:55 bar's open is 8791.75, matching the row exactly"
+      },
+      {
+        "what": "the prior session's RTH window ends at 15:59, not 16:00",
+        "evidence": "the frozen row implies a prior close of 8724.50; [09:30,16:00] closes at 8725.75 and [09:30,15:59] at 8724.50, moving close-location from 0.3675 to 0.3248 \u2014 across the 1/3 threshold"
+      },
+      {
+        "what": "a session counts only if it RAN TO that close",
+        "evidence": "the record's prev_session_day column: 2019-12-26 -> 2019-12-23 (Christmas Eve), 2020-12-28 -> 2020-12-23, 2023-11-27 -> 2023-11-22 (Black Friday), 2025-02-18 -> 2025-02-14 (Presidents' Day)",
+        "rejected_alternative": "raits.live.trading_calendar calls Christmas Eve and Black Friday trading days, which they are \u2014 the exchange is open. With the calendar rule floor lost 5 rows and gained 2; with the ran-to-close rule it is exact."
+      },
+      {
+        "what": "the window is a filter on the RESULT, not a slice of the frame",
+        "evidence": "clipping the start lost 2026-01-02 (no prior session); clipping the end lost 2026-08-19 (the end clip is a midnight boundary, so the last day has no 10:00 bar)"
+      }
+    ]
+  },
+  "wiring": {
+    "default_off": true,
+    "scheduler": {
+      "flag": "--track1-shadow / make_scheduler(track1_shadow=...)",
+      "jobs_off": 60,
+      "jobs_on": 84,
+      "added_on": 25,
+      "removed_on": [
+        "stop_repair_1220"
+      ],
+      "entry_window_added": [
+        [
+          10,
+          35
+        ],
+        [
+          12,
+          30
+        ]
+      ]
+    },
+    "dashboard_mirror": {
+      "gate": "RAITS_TRACK1_SHADOW=1",
+      "rows_off": 58,
+      "rows_on": 82
+    },
+    "one_constant": "run_scheduler._TRACK1_STRESS_WINDOW, asserted equal to track1_slots.REQUIRED_ENTRY_WINDOW and schedule_status.TRACK1_STRESS_WINDOW \u2014 the window exists once, not three times",
+    "parity": {
+      "off": true,
+      "on": true,
+      "flips_both_sides_together": true,
+      "still_goes_red_when_one_side_moves": true
+    },
+    "track1_slot_command": "python -m global_index.run_live_day_track1 --regime-csv spy_daily_live.csv \u2014 no --allow-orders, no broker port",
+    "legacy_argv_byte_identical": true,
+    "scope": "this closes the WIRING, not the running of it. No scheduler was started and no Track 1 slot has ever fired."
+  },
+  "gates_after": {
+    "B1_broker_account_or_legacy_retirement": "USER_DECISION_GATE",
+    "B3_intraday_freshness": "CLOSED",
+    "SLEEVE_normal_r4": "CLOSED",
+    "SLEEVE_nkd_mnkd": "CLOSED",
+    "SLEEVE_calm_a": "CLOSED",
+    "SLEEVE_stress_mnq": "CLOSED",
+    "CHECKPOINT_bootstrap_under_track1_params": "CLOSED",
+    "WIRING_scheduler_dashboard_paper": "CLOSED"
+  },
+  "confirmation_flags_removed": [
+    "normal_generator_isolation_accepted",
+    "calm_a_detector_accepted_frozen",
+    "scheduler_wiring_approved"
+  ],
+  "confirmation_flags_remaining": [
+    "legacy_retired_confirmed",
+    "separate_account_confirmed"
+  ],
+  "tests": [
+    {
+      "suite": "scratch/test_track1_stage4_production_clean_20260823.py (vault2026)",
+      "result": "25 passed in 484.47s"
+    },
+    {
+      "suite": "scratch/test_track1_stage4_production_clean_20260823.py (TRACK1_STAGE4_ALL=1, all three windows)",
+      "result": "32 passed in 1004.23s",
+      "note": "the first all-window run was 30 passed / 1 failed; the failure was a stale test of mine that still named the superseded Calm A parameter exclude_non_trading_days. Replaced by two tests asserting the shipped ran-to-close rule in both directions, and this is the rerun."
+    },
+    {
+      "suite": "scratch/test_track1_stage3b_blockers_20260822.py",
+      "result": "72 passed, 1 skipped in 24.16s"
+    },
+    {
+      "suite": "scratch/test_track1_stage3_route_20260822.py",
+      "result": "41 passed, 1 skipped in 31.94s"
+    },
+    {
+      "suite": "the eight that must stay green",
+      "result": "156 passed in 5.74s",
+      "baseline": "156 \u2014 unchanged since Stage 2D"
+    },
+    {
+      "suite": "global_index/test_event_playback.py",
+      "result": "NOT RUN \u2014 known to hang"
+    }
+  ],
+  "stage3b_tests_rewritten": [
+    {
+      "test": "test_b1_a_valid_confirmation_closes_b1_and_the_others_still_block",
+      "now": "test_b1_is_now_the_only_thing_between_the_route_and_an_armed_gate \u2014 asserts exactly B1 moves (against the registry, not a hand-written list), that nothing else blocks, and that the file alone does NOT arm while both factors do"
+    },
+    {
+      "test": "test_sleeves_each_one_has_a_named_call_chain_and_a_verdict",
+      "now": "expects all four sleeves live-ready, every kind computed_from_bars, and no side effect that replaces a futures./raits. symbol"
+    },
+    {
+      "test": "test_sleeves_calm_a_names_the_frozen_file_that_stops_it",
+      "now": "test_sleeves_calm_a_no_longer_depends_on_the_frozen_file \u2014 asserts it is not an input any more, and that the CSV still exists as the anchor"
+    },
+    {
+      "test": "test_sleeves_normal_r4_names_every_symbol_it_replaces",
+      "now": "test_sleeves_normal_r4_replaces_nothing_any_more \u2014 asserts nothing is replaced and model_sameday_stop is out of the chain"
+    }
+  ],
+  "assertion_narrowed_on_purpose": "the blanket 'no side effects' fired on Stress, which sets one scratch constant for a call and restores it in a finally. That is a different thing from replacing a production function for a run, so the assertion now bans replacements of futures./raits. symbols rather than side effects in general \u2014 banning both would have made the test say something it does not mean.",
+  "files": {
+    "created_production": [
+      {
+        "path": "global_index/track1_normal_r4.py",
+        "lines": 424
+      },
+      {
+        "path": "global_index/track1_normal_filters.py",
+        "lines": 213
+      },
+      {
+        "path": "global_index/track1_calm_a.py",
+        "lines": 261
+      }
+    ],
+    "created_scratch": [
+      {
+        "path": "scratch/test_track1_stage4_production_clean_20260823.py",
+        "lines": 474
+      },
+      {
+        "path": "scratch/_stage4_legacy_baseline.json"
+      },
+      {
+        "path": "scratch/_stage4_normal_equiv.json"
+      },
+      {
+        "path": "scratch/_stage4_calm_equiv.json"
+      }
+    ],
+    "changed_legacy_additive_and_gated": [
+      {
+        "path": "global_index/run_scheduler.py",
+        "diff": "+81/-1",
+        "change": "track1_shadow parameter, --track1-shadow flag, _TRACK1_STRESS_WINDOW, the gated slot block. Default path unchanged \u2014 60 jobs, same ids, byte-identical argv, all asserted."
+      },
+      {
+        "path": "monitor/backend/schedule_status.py",
+        "diff": "+37/-2",
+        "change": "track1_shadow_enabled(), TRACK1_STRESS_WINDOW, _stop_repair_slots(). Default path unchanged \u2014 asserted."
+      }
+    ],
+    "changed_track1": [
+      "global_index/track1_gates.py",
+      "global_index/track1_live_sleeves.py",
+      "scratch/track1_blocking_ledger_20260822.md",
+      "scratch/track1_blocking_ledger_20260822.json",
+      "scratch/test_track1_stage3b_blockers_20260822.py"
+    ],
+    "legacy_untouched": "every runtime-state artifact and every other legacy code file is byte- and mtime-identical to the pre-Stage-4 snapshot; runner.pid, STOP_TRADING and track1_go_live_confirmation.json are still absent"
+  },
+  "confidence_labels": {
+    "verified_reproduced_with_a_number": [
+      "every test result listed",
+      "1,223 Normal-R4 rows reproduced exactly across three windows",
+      "421 Calm A rows reproduced exactly across three windows, plus four feature columns to 1e-9",
+      "object-identity proof that no production symbol is replaced",
+      "bar-for-bar agreement between the promoted filters and the scratch originals",
+      "60-job default schedule, byte-identical legacy argv, parity green in both modes"
+    ],
+    "reasoned_from_the_code_path_not_executed": [
+      "that the promoted sleeves behave identically on a LIVE frame \u2014 one with today's partial session spliced onto the parquet \u2014 as on the measured frames. Every reproduction here is on historical frames, and the splice is the seam that has bitten this project before."
+    ],
+    "not_examined": [
+      "whether track1_params.fill_law should change to the artifact law or the committed rows be regenerated under the production law; they disagree, immaterially in P&L but not in identity"
+    ],
+    "out_of_scope_and_not_started": "retiring legacy, starting any scheduler, firing any Track 1 slot, creating any confirmation file"
+  },
+  "stale_test_found_by_the_long_gate": {
+    "test": "test_b_the_calendar_decides_which_session_is_prior",
+    "why_it_mattered": "the vault2026-only gate passed 30 tests without touching it, so the short gate could not have caught it; and it was asserting the REJECTED design (the calendar), which is the kind of test that keeps a superseded idea alive",
+    "replaced_by": [
+      "test_b_only_sessions_that_ran_to_the_close_count_as_prior",
+      "test_b_the_presidents_day_case_is_the_one_that_was_measured"
+    ]
+  }
+}

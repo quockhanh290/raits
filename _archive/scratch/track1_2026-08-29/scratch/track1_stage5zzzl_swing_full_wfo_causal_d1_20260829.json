@@ -1,0 +1,869 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-L",
+ "title": "Full WFO grid search for Swing under causal D-1",
+ "route": "track1_candidate",
+ "date": "2026-08-29",
+ "decision": "KEEP_RESEARCH_ONLY",
+ "decision_rationale": [
+  "the wider grid found a MORE STABLE optimum the old grid could not reach: ema=50 mult=2.0 hold=5, 5/10 folds, meeting the pre-committed T5",
+  "it cannot be promoted because the artifact-regeneration path cannot be shown to honour the parameter it is given, so the OOS evidence the promotion bar requires cannot be produced honestly",
+  "that also makes Stage 5ZZZ-I's retuned arm provisional",
+  "no live-tradable Swing arm beats the no-Swing route in 2026 on any metric"
+ ],
+ "apparatus_findings": {
+  "engine_mismatch": {
+   "artifact_engine": "futures._validated_core.backtest_swing_tf (via SwingTFEngine.backtest)",
+   "tuning_engine_used_by_pooled_swing_wfo_and_stage_I": "futures.swing_tf_harness.backtest_swing_tf",
+   "same_object": false,
+   "measured_difference_MES_floor_d1": [
+    {
+     "params": "ema=30 mult=2.5 hold=5",
+     "validated_core": {
+      "trades": 555,
+      "pnl": 7855.72
+     },
+     "harness": {
+      "trades": 564,
+      "pnl": 10015.76
+     }
+    },
+    {
+     "params": "ema=10 mult=2.5 hold=5",
+     "validated_core": {
+      "trades": 556,
+      "pnl": 13269.01
+     },
+     "harness": {
+      "trades": 563,
+      "pnl": 14742.88
+     }
+    },
+    {
+     "params": "ema=50 mult=3.0 hold=5",
+     "validated_core": {
+      "trades": 503,
+      "pnl": 5854.15
+     },
+     "harness": {
+      "trades": 509,
+      "pnl": 6811.41
+     }
+    }
+   ],
+   "this_stage_tuned_on": "futures._validated_core.backtest_swing_tf",
+   "likely_explains": "why Stage 5ZZZ-I could not reproduce the frozen ema30/mult2.5 provenance"
+  },
+  "override_not_reflected": {
+   "what": "the artifact regeneration produces byte-identical output for ema=30 and ema=50 while responding to ema=10 and ema=20",
+   "proof_engine_received_the_params": "(50, 2.0, 5), recorded at the SwingTFEngine.backtest call site",
+   "floor_hashes": {
+    "d1_ema30_mult2.5": "2474723814ae3e92",
+    "d1f_ema50_mult2.0": "2474723814ae3e92",
+    "d1r_ema10_mult2.5": "c504a83b82c57de9"
+   },
+   "vault2026_hashes": {
+    "ema30_mult2.5": "1ee198a9f10387c8",
+    "ema50_mult2.0": "1ee198a9f10387c8",
+    "ema50_mult2.5": "1ee198a9f10387c8",
+    "ema20_mult2.5": "ef3ef40d10f36315",
+    "ema10_mult2.5": "b878f9fd39cb7171"
+   },
+   "why_not_coincidence": "identical over the 7-year floor window with ~190 trades per instrument",
+   "suspected_locus": "the regeneration installs its own engine via patched_engine(Cfg(..., ema=50, stop_basis=2.0)); the interaction with the requested parameters is not a pass-through and was not resolved in this stage",
+   "consequence": [
+    "full-stack numbers for the WFO winner could not be produced faithfully and are NOT reported",
+    "Stage 5ZZZ-I's D-1 retuned arm is PROVISIONAL"
+   ],
+   "guard_added": "the regen now aborts if a parameter override produces an artifact identical to the unoverridden run"
+  }
+ },
+ "precommitment": {
+  "file": "scratch/track1_stage5zzzl_precommit_20260829.md",
+  "written_before_any_oos_number": true,
+  "grid": {
+   "ema_period": [
+    10,
+    20,
+    30,
+    50
+   ],
+   "chandelier_atr_mult": [
+    2.0,
+    2.5,
+    3.0,
+    3.5
+   ],
+   "max_hold_days": [
+    3,
+    5,
+    10
+   ]
+  },
+  "candidates_evaluated": 48,
+  "also_searched": {
+   "vol_feature": [
+    "rvol_slot20",
+    "rvol_prevbar"
+   ]
+  },
+  "not_searched": {
+   "range_max / rel_volume_max": "planned second pass; NOT REACHED - blocked by the override defect",
+   "stop_basis_atr_mult / spy_short_filter": "belong to track1_normal_r4's own replay, not the path that makes these artifacts",
+   "fill law / ratchet / arm_hours": "fixed by the brief or not reached by this engine"
+  },
+  "thresholds": {
+   "T1": "net >= D-1 old in >=3 of 4 OOS cells, behind by >$500 in none",
+   "T2": "Swing contribution >= $0 in BOTH OOS windows",
+   "T3": "full-stack Calmar >= no-Swing in >=1 OOS window and >=60% in both",
+   "T4": "MaxDD <= 115% of D-1 old in either OOS window",
+   "T5": "winner wins >= 50% of folds"
+  },
+  "threshold_outcomes": {
+   "T5": "MET (5/10, five consecutive)",
+   "T1_T4": "NOT EVALUABLE - blocked by the override defect"
+  }
+ },
+ "wfo": {
+  "engine": "futures._validated_core.backtest_swing_tf",
+  "labels": "RegimeLabels(lag_days=1) - causal D-1",
+  "region": "floor only; 2025 and 2026 never read",
+  "n_folds": 10,
+  "folds": [
+   {
+    "test_from": "2019-07-01",
+    "test_to": "2020-01-01",
+    "ema": 50,
+    "mult": 2.0,
+    "hold": 5,
+    "oos_n": 102,
+    "oos_pnl": 355.0,
+    "oos_calmar": 3.74
+   },
+   {
+    "test_from": "2020-01-01",
+    "test_to": "2020-07-01",
+    "ema": 50,
+    "mult": 2.0,
+    "hold": 5,
+    "oos_n": 175,
+    "oos_pnl": 10294.0,
+    "oos_calmar": 24.15
+   },
+   {
+    "test_from": "2020-07-01",
+    "test_to": "2021-01-01",
+    "ema": 50,
+    "mult": 2.0,
+    "hold": 5,
+    "oos_n": 192,
+    "oos_pnl": 6326.0,
+    "oos_calmar": 13.25
+   },
+   {
+    "test_from": "2021-01-01",
+    "test_to": "2021-07-01",
+    "ema": 50,
+    "mult": 2.0,
+    "hold": 5,
+    "oos_n": 154,
+    "oos_pnl": 2311.0,
+    "oos_calmar": 4.21
+   },
+   {
+    "test_from": "2021-07-01",
+    "test_to": "2022-01-01",
+    "ema": 50,
+    "mult": 2.0,
+    "hold": 5,
+    "oos_n": 101,
+    "oos_pnl": 3940.0,
+    "oos_calmar": 5.9
+   },
+   {
+    "test_from": "2022-01-01",
+    "test_to": "2022-07-01",
+    "ema": 10,
+    "mult": 2.0,
+    "hold": 3,
+    "oos_n": 335,
+    "oos_pnl": 8782.0,
+    "oos_calmar": 7.4
+   },
+   {
+    "test_from": "2022-07-01",
+    "test_to": "2023-01-01",
+    "ema": 10,
+    "mult": 2.0,
+    "hold": 3,
+    "oos_n": 352,
+    "oos_pnl": 733.0,
+    "oos_calmar": 0.28
+   },
+   {
+    "test_from": "2023-01-01",
+    "test_to": "2023-07-01",
+    "ema": 10,
+    "mult": 2.5,
+    "hold": 10,
+    "oos_n": 184,
+    "oos_pnl": 3676.0,
+    "oos_calmar": 3.3
+   },
+   {
+    "test_from": "2023-07-01",
+    "test_to": "2024-01-01",
+    "ema": 10,
+    "mult": 2.5,
+    "hold": 10,
+    "oos_n": 103,
+    "oos_pnl": 5694.0,
+    "oos_calmar": 8.64
+   },
+   {
+    "test_from": "2024-01-01",
+    "test_to": "2024-07-01",
+    "ema": 50,
+    "mult": 2.0,
+    "hold": 3,
+    "oos_n": 90,
+    "oos_pnl": 4020.0,
+    "oos_calmar": 25.05
+   }
+  ],
+  "selection_counts": {
+   "ema50_mult2.0_hold5": 5,
+   "ema10_mult2.0_hold3": 2,
+   "ema10_mult2.5_hold10": 2,
+   "ema50_mult2.0_hold3": 1
+  },
+  "winner": {
+   "ema_period": 50,
+   "chandelier_atr_mult": 2.0,
+   "max_hold_days": 5
+  },
+  "winner_fold_share": "5/10",
+  "observation": "every winning combination uses mult in {2.0, 2.5} and eight of ten use mult=2.0, which the old grid's floor of 2.5 excluded entirely"
+ },
+ "measured_arms": {
+  "base": {
+   "floor": {
+    "repaired_mechanics_family_cap_5_44": {
+     "net": 74409.78,
+     "pf": 1.6718,
+     "sharpe": 2.1181,
+     "calmar": 2.1405,
+     "maxdd": 4973.38,
+     "trades_taken": 1690,
+     "trades_rejected": 195,
+     "swing_taken": 545,
+     "swing_rejected": 190,
+     "swing_pnl": 25676.61,
+     "pnl_by_cluster": {
+      "roska4_calm": 9162.47,
+      "global_nkd": 13405.17,
+      "roska4_swing": 25676.61,
+      "roska4_stress": 26165.53
+     }
+    },
+    "risk_clean_no_calm_nkd_family_cap_5_44": {
+     "net": 64902.91,
+     "pf": 1.6172,
+     "sharpe": 2.3421,
+     "calmar": 1.9179,
+     "maxdd": 4845.31,
+     "trades_taken": 1160,
+     "trades_rejected": 195,
+     "swing_taken": 545,
+     "swing_rejected": 190,
+     "swing_pnl": 25676.61,
+     "pnl_by_cluster": {
+      "roska4_calm": 9162.47,
+      "global_nkd": 3898.3,
+      "roska4_swing": 25676.61,
+      "roska4_stress": 26165.53
+     }
+    }
+   },
+   "vault2025": {
+    "repaired_mechanics_family_cap_5_44": {
+     "net": 16997.2,
+     "pf": 2.2571,
+     "sharpe": 2.7592,
+     "calmar": 4.4455,
+     "maxdd": 3900.89,
+     "trades_taken": 214,
+     "trades_rejected": 51,
+     "swing_taken": 55,
+     "swing_rejected": 48,
+     "swing_pnl": 4690.22,
+     "pnl_by_cluster": {
+      "global_nkd": 5964.13,
+      "roska4_swing": 4690.22,
+      "roska4_calm": 1811.89,
+      "roska4_stress": 4530.96
+     }
+    },
+    "risk_clean_no_calm_nkd_family_cap_5_44": {
+     "net": 13236.11,
+     "pf": 1.9956,
+     "sharpe": 2.9622,
+     "calmar": 3.0882,
+     "maxdd": 4631.53,
+     "trades_taken": 128,
+     "trades_rejected": 51,
+     "swing_taken": 55,
+     "swing_rejected": 48,
+     "swing_pnl": 4690.22,
+     "pnl_by_cluster": {
+      "global_nkd": 2203.04,
+      "roska4_swing": 4690.22,
+      "roska4_calm": 1811.89,
+      "roska4_stress": 4530.96
+     }
+    }
+   },
+   "vault2026": {
+    "repaired_mechanics_family_cap_5_44": {
+     "net": 9288.24,
+     "pf": 1.6161,
+     "sharpe": 2.4745,
+     "calmar": 3.4117,
+     "maxdd": 4342.3,
+     "trades_taken": 129,
+     "trades_rejected": 48,
+     "swing_taken": 45,
+     "swing_rejected": 36,
+     "swing_pnl": 718.73,
+     "pnl_by_cluster": {
+      "roska4_calm": 702.19,
+      "global_nkd": 7035.86,
+      "roska4_swing": 718.73,
+      "roska4_stress": 831.46
+     }
+    },
+    "risk_clean_no_calm_nkd_family_cap_5_44": {
+     "net": 8259.85,
+     "pf": 1.5486,
+     "sharpe": 2.5681,
+     "calmar": 2.7461,
+     "maxdd": 4797.44,
+     "trades_taken": 91,
+     "trades_rejected": 47,
+     "swing_taken": 45,
+     "swing_rejected": 36,
+     "swing_pnl": 718.73,
+     "pnl_by_cluster": {
+      "roska4_calm": 702.19,
+      "global_nkd": 6007.47,
+      "roska4_swing": 718.73,
+      "roska4_stress": 831.46
+     }
+    }
+   }
+  },
+  "d1": {
+   "floor": {
+    "repaired_mechanics_family_cap_5_44": {
+     "net": 66796.31,
+     "pf": 1.5867,
+     "sharpe": 1.9069,
+     "calmar": 1.9215,
+     "maxdd": 4973.38,
+     "trades_taken": 1696,
+     "trades_rejected": 203,
+     "swing_taken": 564,
+     "swing_rejected": 197,
+     "swing_pnl": 18428.52,
+     "pnl_by_cluster": {
+      "roska4_calm": 8797.09,
+      "global_nkd": 13405.17,
+      "roska4_swing": 18428.52,
+      "roska4_stress": 26165.53
+     }
+    },
+    "risk_clean_no_calm_nkd_family_cap_5_44": {
+     "net": 57289.44,
+     "pf": 1.5297,
+     "sharpe": 2.0828,
+     "calmar": 1.6694,
+     "maxdd": 4913.68,
+     "trades_taken": 1166,
+     "trades_rejected": 203,
+     "swing_taken": 564,
+     "swing_rejected": 197,
+     "swing_pnl": 18428.52,
+     "pnl_by_cluster": {
+      "roska4_calm": 8797.09,
+      "global_nkd": 3898.3,
+      "roska4_swing": 18428.52,
+      "roska4_stress": 26165.53
+     }
+    }
+   },
+   "vault2025": {
+    "repaired_mechanics_family_cap_5_44": {
+     "net": 16180.57,
+     "pf": 2.0549,
+     "sharpe": 2.4964,
+     "calmar": 3.3591,
+     "maxdd": 4914.52,
+     "trades_taken": 215,
+     "trades_rejected": 53,
+     "swing_taken": 57,
+     "swing_rejected": 48,
+     "swing_pnl": 3905.85,
+     "pnl_by_cluster": {
+      "global_nkd": 5964.13,
+      "roska4_swing": 3905.85,
+      "roska4_calm": 1779.63,
+      "roska4_stress": 4530.96
+     }
+    },
+    "risk_clean_no_calm_nkd_family_cap_5_44": {
+     "net": 12419.48,
+     "pf": 1.8218,
+     "sharpe": 2.6345,
+     "calmar": 2.3774,
+     "maxdd": 5645.16,
+     "trades_taken": 129,
+     "trades_rejected": 52,
+     "swing_taken": 57,
+     "swing_rejected": 47,
+     "swing_pnl": 3905.85,
+     "pnl_by_cluster": {
+      "global_nkd": 2203.04,
+      "roska4_swing": 3905.85,
+      "roska4_calm": 1779.63,
+      "roska4_stress": 4530.96
+     }
+    }
+   },
+   "vault2026": {
+    "repaired_mechanics_family_cap_5_44": {
+     "net": 8105.04,
+     "pf": 1.5196,
+     "sharpe": 2.1439,
+     "calmar": 3.7629,
+     "maxdd": 3435.49,
+     "trades_taken": 127,
+     "trades_rejected": 50,
+     "swing_taken": 43,
+     "swing_rejected": 38,
+     "swing_pnl": -464.47,
+     "pnl_by_cluster": {
+      "roska4_calm": 702.19,
+      "global_nkd": 7035.86,
+      "roska4_swing": -464.47,
+      "roska4_stress": 831.46
+     }
+    },
+    "risk_clean_no_calm_nkd_family_cap_5_44": {
+     "net": 7076.65,
+     "pf": 1.4527,
+     "sharpe": 2.1858,
+     "calmar": 1.9284,
+     "maxdd": 5853.15,
+     "trades_taken": 89,
+     "trades_rejected": 49,
+     "swing_taken": 43,
+     "swing_rejected": 38,
+     "swing_pnl": -464.47,
+     "pnl_by_cluster": {
+      "roska4_calm": 702.19,
+      "global_nkd": 6007.47,
+      "roska4_swing": -464.47,
+      "roska4_stress": 831.46
+     }
+    }
+   }
+  },
+  "d1r": {
+   "floor": {
+    "repaired_mechanics_family_cap_5_44": {
+     "net": 64374.24,
+     "pf": 1.5465,
+     "sharpe": 1.8257,
+     "calmar": 1.7759,
+     "maxdd": 5185.88,
+     "trades_taken": 1710,
+     "trades_rejected": 219,
+     "swing_taken": 580,
+     "swing_rejected": 211,
+     "swing_pnl": 16883.22,
+     "pnl_by_cluster": {
+      "roska4_calm": 7920.32,
+      "global_nkd": 13405.17,
+      "roska4_swing": 16883.22,
+      "roska4_stress": 26165.53
+     }
+    },
+    "risk_clean_no_calm_nkd_family_cap_5_44": {
+     "net": 54867.37,
+     "pf": 1.4948,
+     "sharpe": 2.0007,
+     "calmar": 1.5532,
+     "maxdd": 5057.81,
+     "trades_taken": 1180,
+     "trades_rejected": 219,
+     "swing_taken": 580,
+     "swing_rejected": 211,
+     "swing_pnl": 16883.22,
+     "pnl_by_cluster": {
+      "roska4_calm": 7920.32,
+      "global_nkd": 3898.3,
+      "roska4_swing": 16883.22,
+      "roska4_stress": 26165.53
+     }
+    }
+   },
+   "vault2025": {
+    "repaired_mechanics_family_cap_5_44": {
+     "net": 10039.84,
+     "pf": 1.6558,
+     "sharpe": 2.1615,
+     "calmar": 2.5196,
+     "maxdd": 4065.45,
+     "trades_taken": 221,
+     "trades_rejected": 45,
+     "swing_taken": 62,
+     "swing_rejected": 42,
+     "swing_pnl": -2189.64,
+     "pnl_by_cluster": {
+      "global_nkd": 5964.13,
+      "roska4_swing": -2189.64,
+      "roska4_calm": 1734.39,
+      "roska4_stress": 4530.96
+     }
+    },
+    "risk_clean_no_calm_nkd_family_cap_5_44": {
+     "net": 6278.75,
+     "pf": 1.4177,
+     "sharpe": 1.8408,
+     "calmar": 1.4147,
+     "maxdd": 4796.09,
+     "trades_taken": 135,
+     "trades_rejected": 45,
+     "swing_taken": 62,
+     "swing_rejected": 42,
+     "swing_pnl": -2189.64,
+     "pnl_by_cluster": {
+      "global_nkd": 2203.04,
+      "roska4_swing": -2189.64,
+      "roska4_calm": 1734.39,
+      "roska4_stress": 4530.96
+     }
+    }
+   },
+   "vault2026": {
+    "repaired_mechanics_family_cap_5_44": {
+     "net": 6946.02,
+     "pf": 1.4298,
+     "sharpe": 1.871,
+     "calmar": 3.0405,
+     "maxdd": 3643.72,
+     "trades_taken": 132,
+     "trades_rejected": 53,
+     "swing_taken": 48,
+     "swing_rejected": 41,
+     "swing_pnl": -1623.49,
+     "pnl_by_cluster": {
+      "roska4_calm": 702.19,
+      "global_nkd": 7035.86,
+      "roska4_swing": -1623.49,
+      "roska4_stress": 831.46
+     }
+    },
+    "risk_clean_no_calm_nkd_family_cap_5_44": {
+     "net": 5917.63,
+     "pf": 1.3476,
+     "sharpe": 1.8021,
+     "calmar": 1.4262,
+     "maxdd": 6617.99,
+     "trades_taken": 94,
+     "trades_rejected": 52,
+     "swing_taken": 48,
+     "swing_rejected": 41,
+     "swing_pnl": -1623.49,
+     "pnl_by_cluster": {
+      "roska4_calm": 702.19,
+      "global_nkd": 6007.47,
+      "roska4_swing": -1623.49,
+      "roska4_stress": 831.46
+     }
+    }
+   }
+  },
+  "d1pb": {
+   "floor": {
+    "repaired_mechanics_family_cap_5_44": {
+     "net": 64476.76,
+     "pf": 1.5476,
+     "sharpe": 1.8149,
+     "calmar": 1.647,
+     "maxdd": 5600.91,
+     "trades_taken": 1719,
+     "trades_rejected": 207,
+     "swing_taken": 587,
+     "swing_rejected": 201,
+     "swing_pnl": 16225.47,
+     "pnl_by_cluster": {
+      "roska4_calm": 8680.59,
+      "global_nkd": 13405.17,
+      "roska4_swing": 16225.47,
+      "roska4_stress": 26165.53
+     }
+    },
+    "risk_clean_no_calm_nkd_family_cap_5_44": {
+     "net": 54969.89,
+     "pf": 1.4915,
+     "sharpe": 1.9777,
+     "calmar": 1.1146,
+     "maxdd": 7061.46,
+     "trades_taken": 1189,
+     "trades_rejected": 207,
+     "swing_taken": 587,
+     "swing_rejected": 201,
+     "swing_pnl": 16225.47,
+     "pnl_by_cluster": {
+      "roska4_calm": 8680.59,
+      "global_nkd": 3898.3,
+      "roska4_swing": 16225.47,
+      "roska4_stress": 26165.53
+     }
+    }
+   },
+   "vault2025": {
+    "repaired_mechanics_family_cap_5_44": {
+     "net": 17757.56,
+     "pf": 2.1858,
+     "sharpe": 2.9051,
+     "calmar": 5.3248,
+     "maxdd": 3402.42,
+     "trades_taken": 217,
+     "trades_rejected": 53,
+     "swing_taken": 59,
+     "swing_rejected": 48,
+     "swing_pnl": 5482.84,
+     "pnl_by_cluster": {
+      "global_nkd": 5964.13,
+      "roska4_swing": 5482.84,
+      "roska4_calm": 1779.63,
+      "roska4_stress": 4530.96
+     }
+    },
+    "risk_clean_no_calm_nkd_family_cap_5_44": {
+     "net": 13996.47,
+     "pf": 1.949,
+     "sharpe": 3.1725,
+     "calmar": 3.6595,
+     "maxdd": 4133.06,
+     "trades_taken": 131,
+     "trades_rejected": 53,
+     "swing_taken": 59,
+     "swing_rejected": 48,
+     "swing_pnl": 5482.84,
+     "pnl_by_cluster": {
+      "global_nkd": 2203.04,
+      "roska4_swing": 5482.84,
+      "roska4_calm": 1779.63,
+      "roska4_stress": 4530.96
+     }
+    }
+   },
+   "vault2026": {
+    "repaired_mechanics_family_cap_5_44": {
+     "net": 6917.79,
+     "pf": 1.4152,
+     "sharpe": 1.8146,
+     "calmar": 3.0219,
+     "maxdd": 3651.22,
+     "trades_taken": 127,
+     "trades_rejected": 52,
+     "swing_taken": 43,
+     "swing_rejected": 40,
+     "swing_pnl": -1651.72,
+     "pnl_by_cluster": {
+      "roska4_calm": 702.19,
+      "global_nkd": 7035.86,
+      "roska4_swing": -1651.72,
+      "roska4_stress": 831.46
+     }
+    },
+    "risk_clean_no_calm_nkd_family_cap_5_44": {
+     "net": 5889.4,
+     "pf": 1.3622,
+     "sharpe": 1.8157,
+     "calmar": 1.2911,
+     "maxdd": 7275.66,
+     "trades_taken": 89,
+     "trades_rejected": 51,
+     "swing_taken": 43,
+     "swing_rejected": 40,
+     "swing_pnl": -1651.72,
+     "pnl_by_cluster": {
+      "roska4_calm": 702.19,
+      "global_nkd": 6007.47,
+      "roska4_swing": -1651.72,
+      "roska4_stress": 831.46
+     }
+    }
+   }
+  },
+  "noswing": {
+   "floor": {
+    "repaired_mechanics_family_cap_5_44": {
+     "net": 49413.78,
+     "pf": 1.8202,
+     "sharpe": 2.1878,
+     "calmar": 1.84,
+     "maxdd": 3842.17,
+     "trades_taken": 1156,
+     "trades_rejected": 1,
+     "swing_taken": 0,
+     "swing_rejected": 0,
+     "swing_pnl": 0.0,
+     "pnl_by_cluster": {
+      "roska4_calm": 9843.08,
+      "global_nkd": 13405.17,
+      "roska4_stress": 26165.53
+     }
+    },
+    "risk_clean_no_calm_nkd_family_cap_5_44": {
+     "net": 39906.91,
+     "pf": 1.7347,
+     "sharpe": 2.447,
+     "calmar": 1.4305,
+     "maxdd": 3994.17,
+     "trades_taken": 626,
+     "trades_rejected": 1,
+     "swing_taken": 0,
+     "swing_rejected": 0,
+     "swing_pnl": 0.0,
+     "pnl_by_cluster": {
+      "roska4_calm": 9843.08,
+      "global_nkd": 3898.3,
+      "roska4_stress": 26165.53
+     }
+    }
+   },
+   "vault2025": {
+    "repaired_mechanics_family_cap_5_44": {
+     "net": 12377.27,
+     "pf": 3.0085,
+     "sharpe": 3.9015,
+     "calmar": 8.0543,
+     "maxdd": 1567.85,
+     "trades_taken": 163,
+     "trades_rejected": 1,
+     "swing_taken": 0,
+     "swing_rejected": 0,
+     "swing_pnl": 0.0,
+     "pnl_by_cluster": {
+      "global_nkd": 5964.13,
+      "roska4_calm": 1882.18,
+      "roska4_stress": 4530.96
+     }
+    },
+    "risk_clean_no_calm_nkd_family_cap_5_44": {
+     "net": 8616.18,
+     "pf": 2.506,
+     "sharpe": 4.2691,
+     "calmar": 6.2238,
+     "maxdd": 1496.01,
+     "trades_taken": 77,
+     "trades_rejected": 1,
+     "swing_taken": 0,
+     "swing_rejected": 0,
+     "swing_pnl": 0.0,
+     "pnl_by_cluster": {
+      "global_nkd": 2203.04,
+      "roska4_calm": 1882.18,
+      "roska4_stress": 4530.96
+     }
+    }
+   },
+   "vault2026": {
+    "repaired_mechanics_family_cap_5_44": {
+     "net": 8731.29,
+     "pf": 2.0199,
+     "sharpe": 3.4646,
+     "calmar": 8.9233,
+     "maxdd": 1560.66,
+     "trades_taken": 87,
+     "trades_rejected": 10,
+     "swing_taken": 0,
+     "swing_rejected": 0,
+     "swing_pnl": 0.0,
+     "pnl_by_cluster": {
+      "roska4_calm": 863.97,
+      "global_nkd": 7035.86,
+      "roska4_stress": 831.46
+     }
+    },
+    "risk_clean_no_calm_nkd_family_cap_5_44": {
+     "net": 7702.9,
+     "pf": 1.8264,
+     "sharpe": 3.4637,
+     "calmar": 3.2449,
+     "maxdd": 3786.21,
+     "trades_taken": 49,
+     "trades_rejected": 9,
+     "swing_taken": 0,
+     "swing_rejected": 0,
+     "swing_pnl": 0.0,
+     "pnl_by_cluster": {
+      "roska4_calm": 863.97,
+      "global_nkd": 6007.47,
+      "roska4_stress": 831.46
+     }
+    }
+   }
+  }
+ },
+ "measurable_note": "only the vol_feature arm could be produced without a parameter override - it is a swap of trade tables already present in each artifact, so it is unaffected by the override defect",
+ "prevbar_reading": {
+  "vault2025": "the only arm that has ever beaten the same-day reference OOS: $17,758 vs $16,997, Swing +$5,483, smaller drawdown than D-1 old",
+  "vault2026": "worse than D-1 old and worse than no-Swing on every risk metric",
+  "verdict": "one good window and one bad one - the same instability every previous arm has shown"
+ },
+ "answers": {
+  "exact_grid": "ema {10,20,30,50} x mult {2.0,2.5,3.0,3.5} x hold {3,5,10} = 48, plus vol_feature {slot20, prevbar}",
+  "baseline_controls_reproduced": true,
+  "selected_params": {
+   "ema_period": 50,
+   "chandelier_atr_mult": 2.0,
+   "max_hold_days": 5
+  },
+  "stability": "5/10 folds (50%), five consecutive - meets pre-committed T5",
+  "full_stack_for_winner": "could not be produced faithfully; not reported",
+  "vs_d1_old": "not measurable for the winner; the prevbar arm beats it in 2025 (+$1,577) and loses in 2026 (-$1,187)",
+  "vs_no_swing": "no live-tradable Swing arm beats no-Swing in 2026 on any metric",
+  "recommended_paper_treatment": "keep Swing in shadow/research; do NOT make it paper-orderable",
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ]
+ },
+ "before_this_can_be_settled": [
+  "establish why the regeneration ignores ema=50 and ema=30 alike while responding to 10 and 20",
+  "re-run Stage 5ZZZ-I's retuned arm once fixed - its conclusion is provisional",
+  "then evaluate ema=50/mult=2.0/hold=5 against T1-T4, and run the range_max / rel_volume_max second pass",
+  "a day-level bootstrap was NOT run; with 43-62 Swing trades per OOS window nothing here has been tested against noise"
+ ],
+ "safety": {
+  "scheduler_restarted": false,
+  "scheduler_pids": [
+   3000
+  ],
+  "broker_connected": false,
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "confirmation_file_modified": false,
+  "runtime_evidence_modified": false,
+  "live_route_code_changed": false,
+  "swing_tf_param_changed": false,
+  "gate_opened": false,
+  "baseline_artifacts_sha256_unchanged": true
+ }
+}

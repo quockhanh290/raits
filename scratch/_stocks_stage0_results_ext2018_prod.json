@@ -1,0 +1,770 @@
+{
+  "window": [
+    "2018-01-02",
+    "2022-12-30"
+  ],
+  "is_end": "2020-07-01",
+  "labels": "production",
+  "lag": 1,
+  "ema": 50,
+  "symbols": [
+    "AAPL",
+    "ABBV",
+    "ADBE",
+    "AMAT",
+    "AMD",
+    "AMGN",
+    "AMZN",
+    "AVGO",
+    "BA",
+    "BAC",
+    "BIIB",
+    "BMY",
+    "C",
+    "CAT",
+    "COST",
+    "CRM",
+    "CSCO",
+    "CVX",
+    "DE",
+    "EBAY",
+    "GE",
+    "GILD",
+    "GLD",
+    "GOOGL",
+    "GS",
+    "HD",
+    "HON",
+    "INTC",
+    "INTU",
+    "IWM",
+    "JNJ",
+    "JPM",
+    "KO",
+    "LLY",
+    "LOW",
+    "MA",
+    "MCD",
+    "META",
+    "MMM",
+    "MRK",
+    "MS",
+    "MSFT",
+    "MU",
+    "NFLX",
+    "NKE",
+    "NOW",
+    "NVDA",
+    "ORCL",
+    "PANW",
+    "PEP",
+    "PFE",
+    "PG",
+    "PYPL",
+    "QCOM",
+    "QQQ",
+    "REGN",
+    "SBUX",
+    "SPY",
+    "TGT",
+    "TSLA",
+    "TXN",
+    "V",
+    "VRTX",
+    "WFC",
+    "WMT",
+    "XLB",
+    "XLE",
+    "XLF",
+    "XLI",
+    "XLK",
+    "XLP",
+    "XLU",
+    "XLV",
+    "XLY",
+    "XOM"
+  ],
+  "universe_rejected": {},
+  "results": {
+    "B": {
+      "config": "spy_short_gate",
+      "config_hash": "sha256:4f60b4ec037e3987afcd1ce48656507f061e9e3d18d7c0b0bd3f6ae2e5dfe08f",
+      "config_readable": "universe_definition=polygon_5min_cache_tickers_history>=250_sessions;universe_size=75;universe_is_point_in_time=False;data_source_identity=polygon_5min_split_div_adjusted_ETnaive_rth_0930_1555;bar_interval=5min;adjusted=True;session=RTH_0930_1555;timezone=America/New_York;calendar_source=SPY_cached_session_files;ema_period=50;max_hold_days=5;entry_window=14:00-15:55;signal_rule=trend_follow_ema_pullback_volume_resume;stop_basis=fixed_entry_atr;stop_multiple=2;stop_anchor=entry;ratchet=False;arm_hour=14:05;arm_timezone=America/New_York;atr_basis=daily_atr14_rth_shift1_causal;fill_law=production_gap_after_15min_break;regime_model=spy_gaussian_hmm_3state;regime_fit_end=2024-12-31;regime_label_lag_days=1;regime_csv_identity=spy_daily_live.csv;spy_short_filter=below_sma50;spy_short_lookback=50;spy_short_lag_days=1;r4_context_filter=None;r4_range_threshold=None;r4_range_derivation_window=None;r4_rel_volume_max=None;execution_model=entry_at_resume_bar_close;stop_exit_at_stop;gap_exit_at_open;maxhold_exit_at_0930_bar_open;sizing_basis=risk_pct_of_initial_plus_realised/|entry-stop|;risk_pct=0.005;max_position_notional_pct=0.2;max_gross_notional_pct=1;max_concurrent_positions=8;commission_per_share=0.005;min_commission_per_order=1;slippage_bps_per_side=3;stop_exit_extra_bps=5;borrow_bps_per_year=50;min_price=5;min_adv_usd=20000000;min_history_sessions=250;max_pct_of_adv_shares=0.01;max_pct_of_entry_bar_volume=0.1;initial_capital=100000;window=2018-01-02..2022-12-30",
+      "config_fields": {
+        "universe_definition": "polygon_5min_cache_tickers_history>=250_sessions",
+        "universe_size": 75,
+        "universe_is_point_in_time": false,
+        "data_source_identity": "polygon_5min_split_div_adjusted_ETnaive_rth_0930_1555",
+        "bar_interval": "5min",
+        "adjusted": true,
+        "session": "RTH_0930_1555",
+        "timezone": "America/New_York",
+        "calendar_source": "SPY_cached_session_files",
+        "ema_period": 50,
+        "max_hold_days": 5,
+        "entry_window": "14:00-15:55",
+        "signal_rule": "trend_follow_ema_pullback_volume_resume",
+        "stop_basis": "fixed_entry_atr",
+        "stop_multiple": 2.0,
+        "stop_anchor": "entry",
+        "ratchet": false,
+        "arm_hour": "14:05",
+        "arm_timezone": "America/New_York",
+        "atr_basis": "daily_atr14_rth_shift1_causal",
+        "fill_law": "production_gap_after_15min_break",
+        "regime_model": "spy_gaussian_hmm_3state",
+        "regime_fit_end": "2024-12-31",
+        "regime_label_lag_days": 1,
+        "regime_csv_identity": "spy_daily_live.csv",
+        "spy_short_filter": "below_sma50",
+        "spy_short_lookback": 50,
+        "spy_short_lag_days": 1,
+        "r4_context_filter": "None",
+        "r4_range_threshold": null,
+        "r4_range_derivation_window": null,
+        "r4_rel_volume_max": null,
+        "execution_model": "entry_at_resume_bar_close;stop_exit_at_stop;gap_exit_at_open;maxhold_exit_at_0930_bar_open",
+        "sizing_basis": "risk_pct_of_initial_plus_realised/|entry-stop|",
+        "risk_pct": 0.005,
+        "max_position_notional_pct": 0.2,
+        "max_gross_notional_pct": 1.0,
+        "max_concurrent_positions": 8,
+        "commission_per_share": 0.005,
+        "min_commission_per_order": 1.0,
+        "slippage_bps_per_side": 3.0,
+        "stop_exit_extra_bps": 5.0,
+        "borrow_bps_per_year": 50.0,
+        "min_price": 5.0,
+        "min_adv_usd": 20000000.0,
+        "min_history_sessions": 250,
+        "max_pct_of_adv_shares": 0.01,
+        "max_pct_of_entry_bar_volume": 0.1,
+        "initial_capital": 100000.0,
+        "window": "2018-01-02..2022-12-30"
+      },
+      "overall": {
+        "candidates": 9388,
+        "trades": 1259,
+        "rejected": 8129,
+        "net": 3672.3,
+        "gross": 16527.91,
+        "costs": 12855.61,
+        "cost_pct_of_gross": 77.8,
+        "return_pct": 3.67,
+        "cagr_pct": 0.74,
+        "win_rate": 51.2,
+        "avg_win": 267.61,
+        "avg_loss": -274.26,
+        "profit_factor": 1.02,
+        "expectancy": 2.92,
+        "max_dd": 19324.68,
+        "calmar": 0.04,
+        "sharpe_per_trade": 0.008,
+        "avg_hold_days": 5.73,
+        "median_hold_days": 6.0,
+        "turnover_notional": 14761825.85,
+        "turnover_x_capital": 147.6,
+        "years": 4.9
+      },
+      "is_window": {
+        "candidates": 3652,
+        "trades": 479,
+        "rejected": 3173,
+        "net": 6774.22,
+        "gross": 11491.98,
+        "costs": 4717.76,
+        "cost_pct_of_gross": 41.1,
+        "return_pct": 6.77,
+        "cagr_pct": 2.76,
+        "win_rate": 51.4,
+        "avg_win": 269.2,
+        "avg_loss": -255.15,
+        "profit_factor": 1.11,
+        "expectancy": 14.14,
+        "max_dd": 8660.54,
+        "calmar": 0.33,
+        "sharpe_per_trade": 0.042,
+        "avg_hold_days": 5.78,
+        "median_hold_days": 6.0,
+        "turnover_notional": 5324622.8,
+        "turnover_x_capital": 53.2,
+        "years": 2.41
+      },
+      "oos_window": {
+        "candidates": 5736,
+        "trades": 780,
+        "rejected": 4956,
+        "net": -3101.92,
+        "gross": 5035.93,
+        "costs": 8137.85,
+        "cost_pct_of_gross": 161.6,
+        "return_pct": -3.1,
+        "cagr_pct": -1.27,
+        "win_rate": 51.0,
+        "avg_win": 266.62,
+        "avg_loss": -285.91,
+        "profit_factor": 0.97,
+        "expectancy": -3.98,
+        "max_dd": 19816.73,
+        "calmar": -0.06,
+        "sharpe_per_trade": -0.011,
+        "avg_hold_days": 5.7,
+        "median_hold_days": 6.0,
+        "turnover_notional": 9437203.05,
+        "turnover_x_capital": 94.4,
+        "years": 2.47
+      },
+      "breakdowns": {
+        "by_year": {
+          "2018": {
+            "trades": 201,
+            "net": 3032.39,
+            "win_rate": 53.2
+          },
+          "2019": {
+            "trades": 183,
+            "net": 5839.94,
+            "win_rate": 53.0
+          },
+          "2020": {
+            "trades": 271,
+            "net": -1195.9,
+            "win_rate": 51.7
+          },
+          "2021": {
+            "trades": 267,
+            "net": 7793.99,
+            "win_rate": 55.8
+          },
+          "2022": {
+            "trades": 337,
+            "net": -11798.12,
+            "win_rate": 44.8
+          }
+        },
+        "by_symbol": {
+          "PEP": {
+            "trades": 17,
+            "net": 3909.56
+          },
+          "CSCO": {
+            "trades": 12,
+            "net": 3036.41
+          },
+          "HON": {
+            "trades": 15,
+            "net": 2281.14
+          },
+          "MS": {
+            "trades": 17,
+            "net": 2251.3
+          },
+          "ORCL": {
+            "trades": 19,
+            "net": 1917.11
+          },
+          "PANW": {
+            "trades": 24,
+            "net": 1764.04
+          },
+          "COST": {
+            "trades": 23,
+            "net": 1689.6
+          },
+          "INTU": {
+            "trades": 15,
+            "net": 1662.81
+          },
+          "CVX": {
+            "trades": 10,
+            "net": 1645.55
+          },
+          "XLP": {
+            "trades": 15,
+            "net": 1536.56
+          },
+          "XLE": {
+            "trades": 16,
+            "net": 1515.4
+          },
+          "ABBV": {
+            "trades": 21,
+            "net": 1379.99
+          },
+          "MA": {
+            "trades": 16,
+            "net": 1342.11
+          },
+          "XLV": {
+            "trades": 26,
+            "net": 1294.98
+          },
+          "META": {
+            "trades": 3,
+            "net": 1229.07
+          },
+          "XLU": {
+            "trades": 20,
+            "net": 1196.02
+          },
+          "PYPL": {
+            "trades": 24,
+            "net": 1122.6
+          },
+          "HD": {
+            "trades": 19,
+            "net": 989.93
+          },
+          "SBUX": {
+            "trades": 8,
+            "net": 971.19
+          },
+          "JNJ": {
+            "trades": 18,
+            "net": 896.24
+          },
+          "LLY": {
+            "trades": 23,
+            "net": 887.62
+          },
+          "MMM": {
+            "trades": 18,
+            "net": 873.1
+          },
+          "XLY": {
+            "trades": 11,
+            "net": 841.06
+          },
+          "ADBE": {
+            "trades": 24,
+            "net": 734.74
+          },
+          "TSLA": {
+            "trades": 10,
+            "net": 720.67
+          },
+          "DE": {
+            "trades": 16,
+            "net": 697.79
+          },
+          "LOW": {
+            "trades": 12,
+            "net": 610.38
+          },
+          "XLI": {
+            "trades": 20,
+            "net": 567.1
+          },
+          "XOM": {
+            "trades": 13,
+            "net": 449.08
+          },
+          "EBAY": {
+            "trades": 12,
+            "net": 433.34
+          },
+          "GE": {
+            "trades": 18,
+            "net": 422.37
+          },
+          "AMD": {
+            "trades": 1,
+            "net": 178.87
+          },
+          "WMT": {
+            "trades": 15,
+            "net": 117.24
+          },
+          "PG": {
+            "trades": 16,
+            "net": 93.11
+          },
+          "BMY": {
+            "trades": 14,
+            "net": 66.65
+          },
+          "QCOM": {
+            "trades": 19,
+            "net": 36.98
+          },
+          "BA": {
+            "trades": 17,
+            "net": 29.88
+          },
+          "MU": {
+            "trades": 12,
+            "net": -154.13
+          },
+          "AMAT": {
+            "trades": 16,
+            "net": -160.35
+          },
+          "BAC": {
+            "trades": 17,
+            "net": -179.32
+          },
+          "VRTX": {
+            "trades": 25,
+            "net": -184.32
+          },
+          "AMZN": {
+            "trades": 11,
+            "net": -200.02
+          },
+          "NVDA": {
+            "trades": 10,
+            "net": -310.93
+          },
+          "XLF": {
+            "trades": 18,
+            "net": -347.9
+          },
+          "BIIB": {
+            "trades": 19,
+            "net": -353.62
+          },
+          "MCD": {
+            "trades": 21,
+            "net": -443.37
+          },
+          "KO": {
+            "trades": 12,
+            "net": -507.2
+          },
+          "XLB": {
+            "trades": 18,
+            "net": -529.87
+          },
+          "GILD": {
+            "trades": 21,
+            "net": -558.54
+          },
+          "V": {
+            "trades": 19,
+            "net": -575.22
+          },
+          "AVGO": {
+            "trades": 10,
+            "net": -579.75
+          },
+          "TGT": {
+            "trades": 22,
+            "net": -606.58
+          },
+          "AAPL": {
+            "trades": 11,
+            "net": -643.83
+          },
+          "PFE": {
+            "trades": 19,
+            "net": -663.41
+          },
+          "JPM": {
+            "trades": 15,
+            "net": -678.38
+          },
+          "NOW": {
+            "trades": 18,
+            "net": -688.52
+          },
+          "GLD": {
+            "trades": 28,
+            "net": -800.2
+          },
+          "WFC": {
+            "trades": 13,
+            "net": -937.56
+          },
+          "GOOGL": {
+            "trades": 15,
+            "net": -945.46
+          },
+          "CAT": {
+            "trades": 20,
+            "net": -958.0
+          },
+          "CRM": {
+            "trades": 17,
+            "net": -1147.05
+          },
+          "AMGN": {
+            "trades": 22,
+            "net": -1161.95
+          },
+          "C": {
+            "trades": 19,
+            "net": -1233.77
+          },
+          "SPY": {
+            "trades": 11,
+            "net": -1252.44
+          },
+          "MSFT": {
+            "trades": 9,
+            "net": -1290.25
+          },
+          "TXN": {
+            "trades": 16,
+            "net": -1349.2
+          },
+          "IWM": {
+            "trades": 28,
+            "net": -1388.96
+          },
+          "NFLX": {
+            "trades": 20,
+            "net": -1438.43
+          },
+          "REGN": {
+            "trades": 30,
+            "net": -1472.22
+          },
+          "XLK": {
+            "trades": 14,
+            "net": -1819.96
+          },
+          "INTC": {
+            "trades": 7,
+            "net": -1827.09
+          },
+          "MRK": {
+            "trades": 17,
+            "net": -1875.58
+          },
+          "GS": {
+            "trades": 20,
+            "net": -2085.22
+          },
+          "QQQ": {
+            "trades": 25,
+            "net": -3100.97
+          },
+          "NKE": {
+            "trades": 17,
+            "net": -3269.72
+          }
+        },
+        "top10_winners": [
+          {
+            "symbol": "QCOM",
+            "entry_ts": "2020-07-29 14:15:00",
+            "direction": "LONG",
+            "shares": 109,
+            "net_pnl": 1565.41,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "ORCL",
+            "entry_ts": "2021-12-09 14:20:00",
+            "direction": "LONG",
+            "shares": 128,
+            "net_pnl": 1421.79,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "JNJ",
+            "entry_ts": "2020-02-25 15:20:00",
+            "direction": "SHORT",
+            "shares": 141,
+            "net_pnl": 1352.87,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "CSCO",
+            "entry_ts": "2019-05-13 14:35:00",
+            "direction": "LONG",
+            "shares": 275,
+            "net_pnl": 1217.66,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "BIIB",
+            "entry_ts": "2020-08-03 14:15:00",
+            "direction": "LONG",
+            "shares": 42,
+            "net_pnl": 1213.65,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "GE",
+            "entry_ts": "2021-05-24 14:15:00",
+            "direction": "LONG",
+            "shares": 198,
+            "net_pnl": 1031.37,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "COST",
+            "entry_ts": "2018-12-13 14:15:00",
+            "direction": "SHORT",
+            "shares": 45,
+            "net_pnl": 1018.1,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "XLI",
+            "entry_ts": "2020-06-02 14:25:00",
+            "direction": "LONG",
+            "shares": 140,
+            "net_pnl": 994.34,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "MA",
+            "entry_ts": "2022-01-24 14:25:00",
+            "direction": "LONG",
+            "shares": 26,
+            "net_pnl": 992.35,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "HON",
+            "entry_ts": "2018-12-03 14:20:00",
+            "direction": "SHORT",
+            "shares": 100,
+            "net_pnl": 983.9,
+            "exit_reason": "MAX_HOLD"
+          }
+        ],
+        "top10_losers": [
+          {
+            "symbol": "NKE",
+            "entry_ts": "2020-09-21 14:10:00",
+            "direction": "SHORT",
+            "shares": 94,
+            "net_pnl": -1659.91,
+            "exit_reason": "GAP"
+          },
+          {
+            "symbol": "INTC",
+            "entry_ts": "2020-10-21 14:10:00",
+            "direction": "LONG",
+            "shares": 231,
+            "net_pnl": -1303.0,
+            "exit_reason": "GAP"
+          },
+          {
+            "symbol": "XLI",
+            "entry_ts": "2020-06-08 14:10:00",
+            "direction": "LONG",
+            "shares": 137,
+            "net_pnl": -901.22,
+            "exit_reason": "GAP"
+          },
+          {
+            "symbol": "GS",
+            "entry_ts": "2022-06-07 14:15:00",
+            "direction": "LONG",
+            "shares": 32,
+            "net_pnl": -769.21,
+            "exit_reason": "GAP"
+          },
+          {
+            "symbol": "CRM",
+            "entry_ts": "2018-01-31 14:10:00",
+            "direction": "LONG",
+            "shares": 155,
+            "net_pnl": -743.97,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "XLY",
+            "entry_ts": "2022-06-07 14:30:00",
+            "direction": "LONG",
+            "shares": 103,
+            "net_pnl": -740.92,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "GS",
+            "entry_ts": "2021-09-20 14:15:00",
+            "direction": "SHORT",
+            "shares": 41,
+            "net_pnl": -653.98,
+            "exit_reason": "GAP"
+          },
+          {
+            "symbol": "LOW",
+            "entry_ts": "2020-10-23 14:10:00",
+            "direction": "LONG",
+            "shares": 65,
+            "net_pnl": -629.23,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "MRK",
+            "entry_ts": "2021-09-20 14:15:00",
+            "direction": "SHORT",
+            "shares": 260,
+            "net_pnl": -627.89,
+            "exit_reason": "CHANDELIER"
+          },
+          {
+            "symbol": "GOOGL",
+            "entry_ts": "2021-09-20 14:20:00",
+            "direction": "SHORT",
+            "shares": 151,
+            "net_pnl": -625.49,
+            "exit_reason": "CHANDELIER"
+          }
+        ],
+        "by_exit_reason": {
+          "CHANDELIER": {
+            "trades": 125,
+            "net": -67988.01
+          },
+          "GAP": {
+            "trades": 13,
+            "net": -9821.61
+          },
+          "MAX_HOLD": {
+            "trades": 1121,
+            "net": 81481.92
+          }
+        },
+        "by_direction": {
+          "LONG": {
+            "trades": 1012,
+            "net": 12685.62
+          },
+          "SHORT": {
+            "trades": 247,
+            "net": -9013.32
+          }
+        },
+        "concentration": {
+          "top1_share_pct": 106.5,
+          "top5_share_pct": 364.8,
+          "n_symbols_traded": 75
+        },
+        "reject_reasons": {
+          "max_concurrent_positions": 7899,
+          "gross_notional_cap": 198,
+          "price_below_floor": 23,
+          "adv_below_floor": 9
+        }
+      },
+      "self_check": {
+        "LC0_candidates_nonempty": true,
+        "LC1_rows_match_candidates": true,
+        "LC_taken_nonempty": true,
+        "LC2_shares_positive": true,
+        "LC3_net_equals_gross_minus_cost": true,
+        "LC4_stop_distance_is_2x_daily_atr_frac": 1.0,
+        "LC4_pass": true,
+        "LC5_gross_within_engine_rounding": true,
+        "LC6_regime_is_normal_only": true,
+        "LC7_entry_inside_window": true,
+        "LC8_exit_not_before_entry": true,
+        "LC9_equity_basis_positive": true,
+        "LC10_adv_participation_respected": true,
+        "LC11_liquidity_floor_respected": true
+      },
+      "filter_stats_symbols": 0,
+      "filter_stats_total": {},
+      "skipped_symbols": {},
+      "ledger": "D:\\raits\\scratch\\_stocks_stage0_ledger_ext2018_prod.csv",
+      "candidate_stream": "D:\\raits\\scratch\\_stocks_stage0_candidates_ext2018_prod.pkl"
+    }
+  }
+}

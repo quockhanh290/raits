@@ -1,0 +1,85 @@
+{
+  "task": "ops status reported the wrong Track 1 mode after the operator started track1-only",
+  "date": "2026-08-24",
+  "verdict": "FIXED_STATUS_CORRECT_NO_ROUTE_LOGIC_CHANGED",
+  "root_cause": {
+    "what": "a rename boundary, one field wide",
+    "chain": [
+      "the PowerShell query selects CommandLine",
+      "scan_processes maps that field onto a dataclass attribute named `command`",
+      "scheduler_processes emits dicts keyed `command`",
+      "track1_status asked for `CommandLine` - the name on the FAR side of the boundary - and got None"
+    ],
+    "why_silent": "None became '', and an empty string contains no flags, which parses as legacy-only. Searching an empty string is a perfectly successful operation, so nothing raised and nothing looked wrong",
+    "symptom": "with the scheduler genuinely running --track1-only-shadow, status printed track1_mode=legacy-only and track1_safety_routes=['legacy']",
+    "why_no_test_caught_it": "the Stage 5K status test builds its fixture with the key CommandLine - the key the BUGGY READER wanted, not the key the producer emits. Test and bug agreed with each other; production disagreed with both"
+  },
+  "files_changed": {
+    "monitor/ops.py": [
+      "new process_command(proc): reads `command`, falls back to `CommandLine` - one home for the key, with the rename boundary documented",
+      "new scheduler_command_lines(procs=None): the single joiner, so a second consumer cannot reintroduce the key mistake independently",
+      "track1_status() now calls scheduler_command_lines(procs)",
+      "scheduler_track1_shadow now answers 'are the Track 1 slots registered' (track1_only implies it in make_scheduler) instead of 'is this literal flag on the argv'; the literal flag kept as scheduler_track1_shadow_flag",
+      "typing import extended with Mapping, Sequence (the annotations are evaluated)"
+    ],
+    "scratch/test_track1_ops_status_mode_20260824.py": "NEW - 13 tests",
+    "scratch/test_track1_stage5m_d_track1_only_shadow_20260823.py": "the cmd_up test now redirects TRACK1_LEDGER_DIR/TRACK1_TELEMETRY_DIR to tmp_path",
+    "scratch/test_track1_stage5k_ops_startup_20260823.py": "the runtime-root guard re-pointed: it asserted ABSENCE, which is wrong once an operator has legitimately started a session"
+  },
+  "second_finding": {
+    "what": "global_index/track1_runtime/ was created by MY OWN Stage 5O mutation harness",
+    "when": "2026-08-24 00:28:17 - before the operator's scheduler start at 02:08:42",
+    "how": "the D4 mutation deliberately neuters cmd_up's both-flags refusal; the un-refused cmd_up then ran TRACK1_LEDGER_DIR.mkdir(parents=True) against the real tree",
+    "lesson": "a test whose safety depends on the code under test taking an early return leaks the day someone deliberately removes that return",
+    "state": "two EMPTY directories; no evidence files were written by any test",
+    "not_deleted": "the running track1-only scheduler now depends on them - window_ledger refuses when its directory is not a dir, so deleting them would make every slot hard-refuse ledger_not_configured and destroy the live shadow session's evidence collection",
+    "fixed_at_source": "the cmd_up test redirects both dirs to tmp_path, so even a mutated cmd_up cannot reach the real ones"
+  },
+  "measured_before_and_after": {
+    "scheduler_pid": 44904,
+    "scheduler_started": "2026-08-24 02:08:42",
+    "scheduler_argv": "C:\\Users\\quock\\AppData\\Local\\Programs\\Python\\Python311\\pythonw.exe -m global_index.run_scheduler --port 4002 --shadow-resume --track1-only-shadow",
+    "before": {
+      "track1_mode": "legacy-only",
+      "track1_safety_routes": [
+        "legacy"
+      ],
+      "resolved_cmdline": ""
+    },
+    "after": {
+      "track1_mode": "track1-only-shadow",
+      "track1_safety_routes": [
+        "legacy",
+        "track1"
+      ],
+      "scheduler_track1_only": true,
+      "scheduler_track1_shadow": true,
+      "scheduler_track1_shadow_flag": false
+    }
+  },
+  "mutation_check": {
+    "ran": 3,
+    "detected": 3,
+    "ops_py_restored_byte_for_byte": true,
+    "cases": [
+      "M1 read CommandLine only - reproduces the ORIGINAL bug; the new test reds",
+      "M2 the fallback dropped - the legacy-key test reds",
+      "M3 track1_only stops implying the slots are registered"
+    ]
+  },
+  "tests": {
+    "new_status_suite": "13 passed",
+    "sweep (status + 5P text + 5K + 5P readiness + 5O + 5M-D + test_ops + dashboard backend + mirror)": "367 passed",
+    "not_run": "global_index/test_event_playback.py - known hang"
+  },
+  "no_side_effects": [
+    "scheduler NOT restarted or stopped - pid 44904 unchanged, still the process started at 02:08:42",
+    "no backend started",
+    "no IBKR connection made by this work",
+    "no order",
+    "no STOP_TRADING or STOP_TRADING.track1 created or removed",
+    "no confirmation file",
+    "no commit",
+    "no route/scheduler/start/restart logic changed"
+  ]
+}

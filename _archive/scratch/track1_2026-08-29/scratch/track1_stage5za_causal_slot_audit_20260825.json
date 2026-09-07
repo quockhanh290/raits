@@ -1,0 +1,51 @@
+{
+  "stage": "5ZA",
+  "verdict": "READY_FOR_NEXT_SHADOW_WINDOW_WITH_CAUSAL_SLOT_GUARD",
+  "date": "2026-08-25",
+  "scope": {
+    "strategy_slots": 70,
+    "sleeves": {
+      "roska4_calm": 1,
+      "roska4_stress": 24,
+      "roska4_swing": 23,
+      "global_nkd": 22
+    }
+  },
+  "finding_fixed": {
+    "code": "calm_dispatch_latency_too_late",
+    "before": {
+      "10:00:00": "allow",
+      "10:00:01": "too_late",
+      "10:00:03": "too_late"
+    },
+    "after": {
+      "10:00:03": "allow",
+      "10:01:01": "too_late"
+    },
+    "fix": "track1_intraday.Requirement.decision_grace_seconds = 60"
+  },
+  "seams_pinned": [
+    "every live-source sleeve fetches through=now",
+    "Stress entry scan truncates to the current slot",
+    "Normal-R4 and NKD scans truncate to the frame clock at the current slot",
+    "Calm live path uses the entry-only detector, not the full-day replay",
+    "paper callsite seam is observe_live_slot, not run_shadow"
+  ],
+  "tests": {
+    "scratch/test_track1_stage5za_causal_slot_audit_20260825.py": "9 passed",
+    "scratch/test_track1_stage5v1_intraday_causality_20260825.py": "31 passed",
+    "combined": "40 passed"
+  },
+  "pending_operational_audit": [
+    "5ZA mutation pass before paper",
+    "runtime verification after the next judgeable window",
+    "first-paper safety-job watch"
+  ],
+  "side_effects": {
+    "scheduler_restarted": false,
+    "backend_restarted": false,
+    "ibkr_connection": false,
+    "orders": false,
+    "runtime_evidence_edited": false
+  }
+}

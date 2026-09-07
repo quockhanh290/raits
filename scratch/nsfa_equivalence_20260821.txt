@@ -1,0 +1,16 @@
+﻿
+================================================================================================
+EQUIVALENCE PROOF - post-hoc corrected fill vs engine with the time-break
+requirement removed.   window = vault2026
+================================================================================================
+
+  inst     n_post    n_eng  same keys   px match    post net$     eng net$
+  MES          23       23        YES        YES           30           30
+  MNQ          20       20        YES        YES         -244         -244
+  MYM          24       24        YES        YES       -1,822       -1,822
+  M2K          21       21        YES        YES          981          981
+  MNKD         26       26        YES        YES        4,292        4,292
+
+  VERDICT: PASS - the post-hoc correction IS the engine-level rule change
+
+

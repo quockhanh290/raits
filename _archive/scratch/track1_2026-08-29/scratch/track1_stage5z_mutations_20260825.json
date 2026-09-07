@@ -1,0 +1,143 @@
+{
+  "all_red": true,
+  "results": [
+    {
+      "id": "M1",
+      "mutation": "the wrong function reported as the call site",
+      "test": "test_1_the_seam_is_in_observe_live_slot_not_run_shadow",
+      "outcome": "RED"
+    },
+    {
+      "id": "M2",
+      "mutation": "two seams answered as one",
+      "test": "test_5_the_seam_refuses_to_guess_if_the_anchor_becomes_ambiguous",
+      "outcome": "RED"
+    },
+    {
+      "id": "M3",
+      "mutation": "the broker passed as an argument",
+      "test": "test_2_run_shadow_never_hands_its_broker_to_anything",
+      "outcome": "RED"
+    },
+    {
+      "id": "M4",
+      "mutation": "a broker appears inside observe_live_slot",
+      "test": "test_4_the_live_slot_path_still_has_no_broker_and_no_gate",
+      "outcome": "RED"
+    },
+    {
+      "id": "M5",
+      "mutation": "a rehearsal that silently produces fills",
+      "test": "test_6_the_refusing_broker_cannot_send",
+      "outcome": "RED"
+    },
+    {
+      "id": "M6",
+      "mutation": "the wall testifies and answers concretely",
+      "test": "test_7_every_read_from_the_wall_is_cannot_say",
+      "outcome": "RED"
+    },
+    {
+      "id": "M7",
+      "mutation": "the supplied-broker check skipped",
+      "test": "test_8_a_broker_that_would_accept_is_refused",
+      "outcome": "RED"
+    },
+    {
+      "id": "M8",
+      "mutation": "rehearsal rows into the real journal",
+      "test": "test_10_the_production_journal_root_is_refused",
+      "outcome": "RED"
+    },
+    {
+      "id": "M9",
+      "mutation": "a parent of the production root slips through",
+      "test": "test_11_a_parent_of_the_production_root_is_refused_too",
+      "outcome": "RED"
+    },
+    {
+      "id": "M9b",
+      "mutation": "a child of the production root slips through",
+      "test": "test_12_a_child_of_the_production_root_is_refused",
+      "outcome": "RED"
+    },
+    {
+      "id": "M10",
+      "mutation": "both guards removed: boundary stage forced ok, property no longer requires reached_boundary",
+      "test": "test_24_a_run_that_never_reached_the_wall_is_NOT_ok",
+      "outcome": "RED"
+    },
+    {
+      "id": "M10b",
+      "mutation": "same mutation, against the empty-list case",
+      "test": "test_25_an_empty_decision_list_is_not_a_successful_rehearsal",
+      "outcome": "RED"
+    },
+    {
+      "id": "M11",
+      "mutation": "an unmapped order still reports a pass",
+      "test": "test_26_a_mapping_refusal_is_captured_not_raised",
+      "outcome": "RED"
+    },
+    {
+      "id": "M12",
+      "mutation": "the rehearsal's own gate reported as production's",
+      "test": "test_16_the_gate_stage_reports_the_REAL_answer_not_the_synthetic_one",
+      "outcome": "RED"
+    },
+    {
+      "id": "M13",
+      "mutation": "'never asked' answered as 'flat'",
+      "test": "test_18_the_precheck_says_entries_would_be_blocked",
+      "outcome": "RED"
+    },
+    {
+      "id": "M14",
+      "mutation": "the cap gate's refusal ignored",
+      "test": "test_20_a_rejected_decision_never_reaches_the_journal",
+      "outcome": "RED"
+    },
+    {
+      "id": "M15",
+      "mutation": "the stub-scope finding invalidated",
+      "test": "test_32_the_track1_safety_jobs_already_cover_stops_and_max_hold",
+      "outcome": "RED"
+    },
+    {
+      "id": "M16",
+      "mutation": "the one uncovered bypass goes unnamed",
+      "test": "test_36_the_coverage_table_names_the_gap_it_found",
+      "outcome": "RED"
+    },
+    {
+      "id": "M17",
+      "mutation": "the no-op precondition gone",
+      "test": "test_34_they_no_op_only_because_the_book_file_does_not_exist",
+      "outcome": "RED"
+    },
+    {
+      "id": "M18",
+      "mutation": "an import added to a production module",
+      "test": "test_37_nothing_in_production_imports_the_dry_run_or_the_executor",
+      "outcome": "RED"
+    },
+    {
+      "id": "M19",
+      "mutation": "--allow-orders in a slot argv",
+      "test": "test_38_no_scheduler_or_ops_path_can_trigger_a_send",
+      "outcome": "RED"
+    },
+    {
+      "id": "M20",
+      "mutation": "arming stops being only a label",
+      "test": "test_30_the_mode_label_still_reaches_only_the_explanation_writer",
+      "outcome": "RED"
+    },
+    {
+      "id": "M21",
+      "mutation": "PAPER_SHADOW_EVIDENCE opened",
+      "test": "test_40_the_evidence_gate_still_blocks_and_reports_zero_days",
+      "outcome": "RED"
+    }
+  ]
+}

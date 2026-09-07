@@ -1,0 +1,1138 @@
+{
+ "inputs": {
+  "scheduler_logs": [
+   "scheduler_0730.log",
+   "scheduler_0731.log",
+   "scheduler_0803.log",
+   "scheduler_0804.log",
+   "scheduler_0805.log",
+   "scheduler_0806.log",
+   "scheduler_0807.log",
+   "scheduler_0808.log",
+   "scheduler_0809.log",
+   "scheduler_0810.log",
+   "scheduler_0811.log",
+   "scheduler_0812.log",
+   "scheduler_0813.log",
+   "scheduler_0814.log",
+   "scheduler_0815.log",
+   "scheduler_0816.log",
+   "scheduler_0817.log",
+   "scheduler_0818.log",
+   "scheduler_0819.log",
+   "scheduler_0820.log",
+   "scheduler_0821.log",
+   "scheduler_0822.log"
+  ],
+  "n_completed_runs": 968,
+  "days_covered": [
+   "2026-07-31",
+   "2026-08-03",
+   "2026-08-04",
+   "2026-08-05",
+   "2026-08-06",
+   "2026-08-07",
+   "2026-08-09",
+   "2026-08-10",
+   "2026-08-11",
+   "2026-08-12",
+   "2026-08-13",
+   "2026-08-14",
+   "2026-08-16",
+   "2026-08-17",
+   "2026-08-18",
+   "2026-08-19",
+   "2026-08-20",
+   "2026-08-21"
+  ],
+  "unclosed_running_lines": {
+   "NKD night run 01:10 ET": 1
+  }
+ },
+ "runtime_overall": {
+  "n": 968,
+  "median": 72.0,
+  "p75": 185.0,
+  "p90": 207.30000000000007,
+  "p95": 334.65,
+  "max": 172879.0,
+  "over_300s": 74,
+  "pct_over_300s": 0.07644628099173553
+ },
+ "runtime_by_family": {
+  "Bao cao phien (luoi an toan 23:55 ET)": {
+   "n": 8,
+   "median": 0.0,
+   "p75": 0.0,
+   "p90": 6.599999999999996,
+   "p95": 14.299999999999988,
+   "max": 22.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  },
+  "Continuous run": {
+   "n": 352,
+   "median": 190.0,
+   "p75": 205.0,
+   "p90": 340.0,
+   "p95": 357.45,
+   "max": 538.0,
+   "over_300s": 63,
+   "pct_over_300s": 0.17897727272727273
+  },
+  "Daily run": {
+   "n": 16,
+   "median": 196.5,
+   "p75": 333.5,
+   "p90": 341.0,
+   "p95": 346.5,
+   "max": 363.0,
+   "over_300s": 5,
+   "pct_over_300s": 0.3125
+  },
+  "Heartbeat 60s": {
+   "n": 237,
+   "median": 0.0,
+   "p75": 0.0,
+   "p90": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  },
+  "MAX_HOLD exit": {
+   "n": 10,
+   "median": 11.5,
+   "p75": 12.75,
+   "p90": 17.2,
+   "p95": 18.099999999999998,
+   "max": 19.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  },
+  "NKD night run": {
+   "n": 239,
+   "median": 83.0,
+   "p75": 114.0,
+   "p90": 148.20000000000002,
+   "p95": 173.2,
+   "max": 532.0,
+   "over_300s": 3,
+   "pct_over_300s": 0.012552301255230125
+  },
+  "Pre-flight update": {
+   "n": 16,
+   "median": 148.0,
+   "p75": 196.5,
+   "p90": 247.5,
+   "p95": 254.25,
+   "max": 273.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  },
+  "Stop repair sweep": {
+   "n": 87,
+   "median": 11.0,
+   "p75": 12.0,
+   "p90": 17.0,
+   "p95": 18.0,
+   "max": 19.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  }
+ },
+ "excluded_not_runtimes": {
+  "rule": "runtime > _SLOT_TIMEOUT_SECS (1200s), the ceiling at which run_scheduler._run kills the child",
+  "n": 3,
+  "rows": [
+   {
+    "job": "NKD night run 01:10 ET",
+    "start": "2026-08-17 23:10:00",
+    "end": "2026-08-18 23:11:30",
+    "runtime_s": 86490.0,
+    "log": "scheduler_0817.log",
+    "mechanism": "pairing_artifact",
+    "stalled_s": 1380,
+    "stall_explains_pct": 1.6
+   },
+   {
+    "job": "NKD night run 02:40 ET",
+    "start": "2026-08-19 00:40:00",
+    "end": "2026-08-19 01:16:14",
+    "runtime_s": 2174.0,
+    "log": "scheduler_0819.log",
+    "mechanism": "machine_sleep",
+    "stalled_s": 2160,
+    "stall_explains_pct": 99.4
+   },
+   {
+    "job": "NKD night run 01:10 ET",
+    "start": "2026-08-18 23:10:00",
+    "end": "2026-08-20 23:11:19",
+    "runtime_s": 172879.0,
+    "log": "scheduler_0818.log",
+    "mechanism": "pairing_artifact",
+    "stalled_s": 13080,
+    "stall_explains_pct": 7.6
+   }
+  ]
+ },
+ "noop_runs_excluded": {
+  "n": 76,
+  "by_day": {
+   "2026-08-04": 23,
+   "2026-08-05": 11,
+   "2026-08-06": 11,
+   "2026-08-07": 11,
+   "2026-08-10": 11,
+   "2026-07-31": 9
+  },
+  "note": "Running/executed pairs whose body returned immediately (pre-flight skip or mutex skip); excluded from every runtime figure below"
+ },
+ "runtime_live_day_slots": {
+  "n": 292,
+  "median": 192.0,
+  "p75": 279.25,
+  "p90": 343.0,
+  "p95": 359.45,
+  "max": 538.0,
+  "over_300s": 68,
+  "pct_over_300s": 0.2328767123287671
+ },
+ "runtime_by_slot_et": {
+  "14:05": {
+   "n": 14,
+   "median": 206.0,
+   "p75": 334.5,
+   "p90": 341.0,
+   "p95": 348.7,
+   "max": 363.0,
+   "over_300s": 5,
+   "pct_over_300s": 0.35714285714285715
+  },
+  "14:10": {
+   "n": 10,
+   "median": 189.5,
+   "p75": 190.75,
+   "p90": 206.2,
+   "p95": 211.6,
+   "max": 217.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  },
+  "14:15": {
+   "n": 14,
+   "median": 198.0,
+   "p75": 334.0,
+   "p90": 340.7,
+   "p95": 348.7,
+   "max": 363.0,
+   "over_300s": 5,
+   "pct_over_300s": 0.35714285714285715
+  },
+  "14:20": {
+   "n": 10,
+   "median": 190.0,
+   "p75": 191.75,
+   "p90": 202.2,
+   "p95": 203.1,
+   "max": 204.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  },
+  "14:25": {
+   "n": 14,
+   "median": 203.5,
+   "p75": 327.25,
+   "p90": 344.2,
+   "p95": 351.25,
+   "max": 361.0,
+   "over_300s": 5,
+   "pct_over_300s": 0.35714285714285715
+  },
+  "14:30": {
+   "n": 10,
+   "median": 189.5,
+   "p75": 192.0,
+   "p90": 201.3,
+   "p95": 202.65,
+   "max": 204.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  },
+  "14:35": {
+   "n": 14,
+   "median": 196.0,
+   "p75": 327.0,
+   "p90": 353.1,
+   "p95": 357.35,
+   "max": 358.0,
+   "over_300s": 5,
+   "pct_over_300s": 0.35714285714285715
+  },
+  "14:40": {
+   "n": 10,
+   "median": 189.0,
+   "p75": 192.0,
+   "p90": 205.5,
+   "p95": 207.75,
+   "max": 210.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  },
+  "14:45": {
+   "n": 14,
+   "median": 196.0,
+   "p75": 326.25,
+   "p90": 342.4,
+   "p95": 348.6,
+   "max": 359.0,
+   "over_300s": 5,
+   "pct_over_300s": 0.35714285714285715
+  },
+  "14:50": {
+   "n": 11,
+   "median": 190.0,
+   "p75": 196.0,
+   "p90": 205.0,
+   "p95": 341.5,
+   "max": 478.0,
+   "over_300s": 1,
+   "pct_over_300s": 0.09090909090909091
+  },
+  "14:55": {
+   "n": 15,
+   "median": 193.0,
+   "p75": 325.5,
+   "p90": 339.6,
+   "p95": 345.4,
+   "max": 358.0,
+   "over_300s": 5,
+   "pct_over_300s": 0.3333333333333333
+  },
+  "15:00": {
+   "n": 11,
+   "median": 190.0,
+   "p75": 198.0,
+   "p90": 219.0,
+   "p95": 350.0,
+   "max": 481.0,
+   "over_300s": 1,
+   "pct_over_300s": 0.09090909090909091
+  },
+  "15:05": {
+   "n": 15,
+   "median": 192.0,
+   "p75": 325.5,
+   "p90": 345.6,
+   "p95": 350.5,
+   "max": 361.0,
+   "over_300s": 5,
+   "pct_over_300s": 0.3333333333333333
+  },
+  "15:10": {
+   "n": 11,
+   "median": 191.0,
+   "p75": 194.0,
+   "p90": 205.0,
+   "p95": 348.0,
+   "max": 491.0,
+   "over_300s": 1,
+   "pct_over_300s": 0.09090909090909091
+  },
+  "15:15": {
+   "n": 15,
+   "median": 192.0,
+   "p75": 326.0,
+   "p90": 345.4,
+   "p95": 349.7,
+   "max": 356.0,
+   "over_300s": 5,
+   "pct_over_300s": 0.3333333333333333
+  },
+  "15:20": {
+   "n": 11,
+   "median": 191.0,
+   "p75": 192.5,
+   "p90": 206.0,
+   "p95": 303.5,
+   "max": 401.0,
+   "over_300s": 1,
+   "pct_over_300s": 0.09090909090909091
+  },
+  "15:25": {
+   "n": 15,
+   "median": 193.0,
+   "p75": 324.0,
+   "p90": 341.8,
+   "p95": 349.5,
+   "max": 360.0,
+   "over_300s": 5,
+   "pct_over_300s": 0.3333333333333333
+  },
+  "15:30": {
+   "n": 11,
+   "median": 190.0,
+   "p75": 195.0,
+   "p90": 203.0,
+   "p95": 294.0,
+   "max": 385.0,
+   "over_300s": 1,
+   "pct_over_300s": 0.09090909090909091
+  },
+  "15:35": {
+   "n": 15,
+   "median": 193.0,
+   "p75": 323.0,
+   "p90": 343.6,
+   "p95": 348.79999999999995,
+   "max": 360.0,
+   "over_300s": 5,
+   "pct_over_300s": 0.3333333333333333
+  },
+  "15:40": {
+   "n": 11,
+   "median": 189.0,
+   "p75": 194.5,
+   "p90": 203.0,
+   "p95": 299.0,
+   "max": 395.0,
+   "over_300s": 1,
+   "pct_over_300s": 0.09090909090909091
+  },
+  "15:45": {
+   "n": 15,
+   "median": 193.0,
+   "p75": 324.0,
+   "p90": 340.4,
+   "p95": 346.79999999999995,
+   "max": 358.0,
+   "over_300s": 5,
+   "pct_over_300s": 0.3333333333333333
+  },
+  "15:50": {
+   "n": 11,
+   "median": 190.0,
+   "p75": 196.0,
+   "p90": 204.0,
+   "p95": 298.0,
+   "max": 392.0,
+   "over_300s": 1,
+   "pct_over_300s": 0.09090909090909091
+  },
+  "15:55": {
+   "n": 15,
+   "median": 291.0,
+   "p75": 322.5,
+   "p90": 362.59999999999997,
+   "p95": 422.49999999999983,
+   "max": 538.0,
+   "over_300s": 6,
+   "pct_over_300s": 0.4
+  }
+ },
+ "runtime_by_day_live": {
+  "2026-07-31": {
+   "n": 14,
+   "median": 206.5,
+   "p75": 399.5,
+   "p90": 480.1,
+   "p95": 484.5,
+   "max": 491.0,
+   "over_300s": 7,
+   "pct_over_300s": 0.5
+  },
+  "2026-08-03": {
+   "n": 23,
+   "median": 339.0,
+   "p75": 343.0,
+   "p90": 344.8,
+   "p95": 345.9,
+   "max": 347.0,
+   "over_300s": 12,
+   "pct_over_300s": 0.5217391304347826
+  },
+  "2026-08-05": {
+   "n": 12,
+   "median": 330.5,
+   "p75": 333.25,
+   "p90": 334.0,
+   "p95": 334.45,
+   "max": 335.0,
+   "over_300s": 12,
+   "pct_over_300s": 1.0
+  },
+  "2026-08-06": {
+   "n": 12,
+   "median": 318.5,
+   "p75": 321.0,
+   "p90": 331.8,
+   "p95": 336.15,
+   "max": 340.0,
+   "over_300s": 12,
+   "pct_over_300s": 1.0
+  },
+  "2026-08-07": {
+   "n": 12,
+   "median": 342.0,
+   "p75": 346.25,
+   "p90": 356.0,
+   "p95": 364.2,
+   "max": 373.0,
+   "over_300s": 12,
+   "pct_over_300s": 1.0
+  },
+  "2026-08-10": {
+   "n": 12,
+   "median": 360.0,
+   "p75": 361.5,
+   "p90": 363.0,
+   "p95": 441.7499999999999,
+   "max": 538.0,
+   "over_300s": 12,
+   "pct_over_300s": 1.0
+  },
+  "2026-08-11": {
+   "n": 23,
+   "median": 205.0,
+   "p75": 206.0,
+   "p90": 207.0,
+   "p95": 213.29999999999998,
+   "max": 311.0,
+   "over_300s": 1,
+   "pct_over_300s": 0.043478260869565216
+  },
+  "2026-08-12": {
+   "n": 23,
+   "median": 185.0,
+   "p75": 186.0,
+   "p90": 186.8,
+   "p95": 187.9,
+   "max": 278.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  },
+  "2026-08-13": {
+   "n": 23,
+   "median": 191.0,
+   "p75": 192.0,
+   "p90": 193.8,
+   "p95": 197.6,
+   "max": 288.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  },
+  "2026-08-14": {
+   "n": 23,
+   "median": 191.0,
+   "p75": 192.0,
+   "p90": 193.0,
+   "p95": 193.9,
+   "max": 289.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  },
+  "2026-08-17": {
+   "n": 23,
+   "median": 192.0,
+   "p75": 193.5,
+   "p90": 194.8,
+   "p95": 196.8,
+   "max": 292.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  },
+  "2026-08-18": {
+   "n": 23,
+   "median": 183.0,
+   "p75": 183.5,
+   "p90": 184.0,
+   "p95": 186.7,
+   "max": 275.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  },
+  "2026-08-19": {
+   "n": 23,
+   "median": 176.0,
+   "p75": 176.5,
+   "p90": 177.0,
+   "p95": 180.6,
+   "max": 267.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  },
+  "2026-08-20": {
+   "n": 23,
+   "median": 189.0,
+   "p75": 190.0,
+   "p90": 191.8,
+   "p95": 205.49999999999997,
+   "max": 283.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  },
+  "2026-08-21": {
+   "n": 23,
+   "median": 200.0,
+   "p75": 209.0,
+   "p90": 216.6,
+   "p95": 218.8,
+   "max": 291.0,
+   "over_300s": 0,
+   "pct_over_300s": 0.0
+  }
+ },
+ "mutex_skips": {
+  "total": 44,
+  "by_slot": {
+   "LIVE_DAY_1410": 4,
+   "LIVE_DAY_1420": 4,
+   "LIVE_DAY_1430": 4,
+   "LIVE_DAY_1440": 4,
+   "LIVE_DAY_1450": 4,
+   "LIVE_DAY_1500": 4,
+   "LIVE_DAY_1510": 4,
+   "LIVE_DAY_1520": 4,
+   "LIVE_DAY_1530": 4,
+   "LIVE_DAY_1540": 4,
+   "LIVE_DAY_1550": 4
+  },
+  "by_day": {
+   "2026-08-05": 11,
+   "2026-08-06": 11,
+   "2026-08-07": 11,
+   "2026-08-10": 11
+  }
+ },
+ "all_skip_reasons": {
+  "pre-flight failed for 2026-08-04": 26,
+  "no pre-flight record for 2026-07-31 (scheduler restart or mi": 1,
+  "pre-flight ran but FAILED for 2026-08-04": 1
+ },
+ "misfires": {
+  "total": 52,
+  "worst_s": 12858.5214,
+  "median_s": 3650.6450919999997,
+  "on_nkd_night": 43,
+  "not_nkd_night": 9,
+  "covered_by_machine_sleep": 33,
+  "trading_job_misfires": [
+   {
+    "ts": "2026-08-04 08:12:15",
+    "job_short": "MAX_HOLD exit 09:31 ET",
+    "missed_by_s": "2475.506018"
+   }
+  ],
+  "non_nkd_detail": [
+   {
+    "ts": "2026-08-04 08:12:15",
+    "job_short": "MAX_HOLD exit 09:31 ET",
+    "missed_by_s": "2475.506018",
+    "stall_covered_s": NaN
+   },
+   {
+    "ts": "2026-08-11 21:34:35",
+    "job_short": "Stop repair sweep 22:20 ET",
+    "missed_by_s": "4475.439122",
+    "stall_covered_s": "5880.0"
+   },
+   {
+    "ts": "2026-08-11 22:26:12",
+    "job_short": "Stop repair sweep 00:20 ET",
+    "missed_by_s": "372.46579",
+    "stall_covered_s": "1080.0"
+   },
+   {
+    "ts": "2026-08-19 06:29:56",
+    "job_short": "Stop repair sweep 08:20 ET",
+    "missed_by_s": "596.477894",
+    "stall_covered_s": "1140.0"
+   },
+   {
+    "ts": "2026-08-19 21:45:03",
+    "job_short": "Stop repair sweep 22:20 ET",
+    "missed_by_s": "5103.40994",
+    "stall_covered_s": "5460.0"
+   },
+   {
+    "ts": "2026-08-20 01:29:18",
+    "job_short": "Bao cao phien",
+    "missed_by_s": "12858.5214",
+    "stall_covered_s": "13080.0"
+   },
+   {
+    "ts": "2026-08-20 01:29:18",
+    "job_short": "Stop repair sweep 00:20 ET",
+    "missed_by_s": "11358.523111",
+    "stall_covered_s": "13080.0"
+   },
+   {
+    "ts": "2026-08-20 06:33:41",
+    "job_short": "Stop repair sweep 08:20 ET",
+    "missed_by_s": "821.756716",
+    "stall_covered_s": "1380.0"
+   },
+   {
+    "ts": "2026-08-20 22:01:24",
+    "job_short": "Bao cao phien",
+    "missed_by_s": "384.236617",
+    "stall_covered_s": "1320.0"
+   }
+  ],
+  "by_job": {
+   "NKD night run 01:10 ET": 2,
+   "NKD night run 01:15 ET": 2,
+   "NKD night run 01:20 ET": 2,
+   "NKD night run 01:25 ET": 2,
+   "NKD night run 01:30 ET": 2,
+   "NKD night run 01:35 ET": 2,
+   "NKD night run 01:40 ET": 2,
+   "NKD night run 01:45 ET": 2,
+   "NKD night run 01:50 ET": 2,
+   "NKD night run 01:55 ET": 2,
+   "NKD night run 02:00 ET": 2,
+   "NKD night run 02:05 ET": 2,
+   "NKD night run 02:10 ET": 2,
+   "NKD night run 02:15 ET": 2,
+   "NKD night run 02:20 ET": 2,
+   "NKD night run 02:25 ET": 2,
+   "NKD night run 02:30 ET": 2,
+   "NKD night run 02:35 ET": 2,
+   "Stop repair sweep 22:20 ET": 2,
+   "Stop repair sweep 00:20 ET": 2,
+   "NKD night run 02:45 ET": 2,
+   "NKD night run 02:50 ET": 2,
+   "NKD night run 02:55 ET": 2,
+   "Stop repair sweep 08:20 ET": 2,
+   "Bao cao phien": 2,
+   "MAX_HOLD exit 09:31 ET": 1,
+   "NKD night run 02:40 ET": 1
+  }
+ },
+ "machine_sleep_stalls": {
+  "n": 28,
+  "total_stalled_s": 61920,
+  "worst_s": 13080,
+  "days": [
+   "2026-08-07",
+   "2026-08-09",
+   "2026-08-10",
+   "2026-08-11",
+   "2026-08-12",
+   "2026-08-14",
+   "2026-08-15",
+   "2026-08-17",
+   "2026-08-18",
+   "2026-08-19",
+   "2026-08-20",
+   "2026-08-21",
+   "2026-08-22"
+  ]
+ },
+ "regimes": {
+  "before_2026_08_11": {
+   "n": 85,
+   "median": 337.0,
+   "p75": 347.0,
+   "p90": 369.0000000000001,
+   "p95": 399.79999999999995,
+   "max": 538.0,
+   "over_300s": 67,
+   "pct_over_300s": 0.788235294117647
+  },
+  "from_2026_08_11": {
+   "n": 207,
+   "median": 191.0,
+   "p75": 195.0,
+   "p90": 206.0,
+   "p95": 216.39999999999998,
+   "max": 311.0,
+   "over_300s": 1,
+   "pct_over_300s": 0.004830917874396135
+  }
+ },
+ "shadow": {
+  "per_day": {
+   "live_day_0806.log": {
+    "match": 0,
+    "diverged": 0,
+    "no_checkpoint": 16,
+    "checkpoint_not_advanced": 0
+   },
+   "live_day_0807.log": {
+    "match": 6,
+    "diverged": 0,
+    "no_checkpoint": 48,
+    "checkpoint_not_advanced": 0
+   },
+   "live_day_0810.log": {
+    "match": 5,
+    "diverged": 0,
+    "no_checkpoint": 0,
+    "checkpoint_not_advanced": 0
+   },
+   "live_day_0811.log": {
+    "match": 10,
+    "diverged": 0,
+    "no_checkpoint": 0,
+    "checkpoint_not_advanced": 0
+   },
+   "live_day_0812.log": {
+    "match": 10,
+    "diverged": 0,
+    "no_checkpoint": 0,
+    "checkpoint_not_advanced": 0
+   },
+   "live_day_0813.log": {
+    "match": 10,
+    "diverged": 0,
+    "no_checkpoint": 0,
+    "checkpoint_not_advanced": 0
+   },
+   "live_day_0814.log": {
+    "match": 10,
+    "diverged": 0,
+    "no_checkpoint": 0,
+    "checkpoint_not_advanced": 0
+   },
+   "live_day_0817.log": {
+    "match": 10,
+    "diverged": 0,
+    "no_checkpoint": 0,
+    "checkpoint_not_advanced": 0
+   },
+   "live_day_0818.log": {
+    "match": 10,
+    "diverged": 0,
+    "no_checkpoint": 0,
+    "checkpoint_not_advanced": 0
+   },
+   "live_day_0819.log": {
+    "match": 5,
+    "diverged": 0,
+    "no_checkpoint": 0,
+    "checkpoint_not_advanced": 0
+   },
+   "live_day_0820.log": {
+    "match": 5,
+    "diverged": 0,
+    "no_checkpoint": 0,
+    "checkpoint_not_advanced": 0
+   },
+   "live_day_0821.log": {
+    "match": 10,
+    "diverged": 0,
+    "no_checkpoint": 0,
+    "checkpoint_not_advanced": 0
+   }
+  },
+  "totals": {
+   "match": 91,
+   "diverged": 0,
+   "no_checkpoint": 64,
+   "checkpoint_not_advanced": 0
+  }
+ },
+ "clearance_1555_vs_1620": [
+  {
+   "day": "2026-08-10",
+   "end_1555": "2026-08-10 14:03:58",
+   "start_1620": "2026-08-10 14:20:00",
+   "clearance_s": 962.0,
+   "runtime_1555_s": 538.0
+  },
+  {
+   "day": "2026-08-11",
+   "end_1555": "2026-08-11 14:00:11",
+   "start_1620": "2026-08-11 14:20:00",
+   "clearance_s": 1189.0,
+   "runtime_1555_s": 311.0
+  },
+  {
+   "day": "2026-08-12",
+   "end_1555": "2026-08-12 13:59:38",
+   "start_1620": "2026-08-12 14:20:00",
+   "clearance_s": 1222.0,
+   "runtime_1555_s": 278.0
+  },
+  {
+   "day": "2026-08-13",
+   "end_1555": "2026-08-13 13:59:48",
+   "start_1620": "2026-08-13 14:20:00",
+   "clearance_s": 1212.0,
+   "runtime_1555_s": 288.0
+  },
+  {
+   "day": "2026-08-14",
+   "end_1555": "2026-08-14 13:59:49",
+   "start_1620": "2026-08-14 14:20:00",
+   "clearance_s": 1211.0,
+   "runtime_1555_s": 289.0
+  },
+  {
+   "day": "2026-08-17",
+   "end_1555": "2026-08-17 13:59:52",
+   "start_1620": "2026-08-17 14:20:00",
+   "clearance_s": 1208.0,
+   "runtime_1555_s": 292.0
+  },
+  {
+   "day": "2026-08-18",
+   "end_1555": "2026-08-18 13:59:35",
+   "start_1620": "2026-08-18 14:20:00",
+   "clearance_s": 1225.0,
+   "runtime_1555_s": 275.0
+  },
+  {
+   "day": "2026-08-19",
+   "end_1555": "2026-08-19 13:59:27",
+   "start_1620": "2026-08-19 14:20:00",
+   "clearance_s": 1233.0,
+   "runtime_1555_s": 267.0
+  },
+  {
+   "day": "2026-08-20",
+   "end_1555": "2026-08-20 13:59:43",
+   "start_1620": "2026-08-20 14:20:00",
+   "clearance_s": 1217.0,
+   "runtime_1555_s": 283.0
+  },
+  {
+   "day": "2026-08-21",
+   "end_1555": "2026-08-21 13:59:51",
+   "start_1620": "2026-08-21 14:20:00",
+   "clearance_s": 1209.0,
+   "runtime_1555_s": 291.0
+  }
+ ],
+ "simulation": {
+  "note": "slots are SKIPPED not queued, matching run_scheduler.py:235 _run_guarded; runtimes cycled from the measured live-day sample, no randomness",
+  "runtime_sample_n": 207,
+  "runtime_sample_p90": 206.0,
+  "runtime_sample_max": 311.0,
+  "scenarios": [
+   {
+    "label": "CURRENT regime | current window only",
+    "n_slots": 23,
+    "offsets_tried": 207,
+    "skipped_median": 0.0,
+    "skipped_p90": 1.0,
+    "skipped_max": 1,
+    "skip_pct_max": 0.043478260869565216,
+    "max_gap_min_worst": 10,
+    "worst_case_skipped_slots": [
+     955
+    ]
+   },
+   {
+    "label": "CURRENT regime | Track1 window alone",
+    "n_slots": 25,
+    "offsets_tried": 207,
+    "skipped_median": 0.0,
+    "skipped_p90": 1.0,
+    "skipped_max": 1,
+    "skip_pct_max": 0.04,
+    "max_gap_min_worst": 35,
+    "worst_case_skipped_slots": [
+     745
+    ]
+   },
+   {
+    "label": "CURRENT regime | current + Track1 windows",
+    "n_slots": 48,
+    "offsets_tried": 207,
+    "skipped_median": 0.0,
+    "skipped_p90": 1.0,
+    "skipped_max": 1,
+    "skip_pct_max": 0.020833333333333332,
+    "max_gap_min_worst": 100,
+    "worst_case_skipped_slots": [
+     745
+    ]
+   },
+   {
+    "label": "CURRENT regime | all windows incl NKD night",
+    "n_slots": 70,
+    "offsets_tried": 207,
+    "skipped_median": 0.0,
+    "skipped_p90": 1.0,
+    "skipped_max": 1,
+    "skip_pct_max": 0.014285714285714285,
+    "max_gap_min_worst": 430,
+    "worst_case_skipped_slots": [
+     175
+    ]
+   },
+   {
+    "label": "PRE-08-11 regime | current window only",
+    "n_slots": 23,
+    "offsets_tried": 85,
+    "skipped_median": 11.0,
+    "skipped_p90": 11.0,
+    "skipped_max": 11,
+    "skip_pct_max": 0.4782608695652174,
+    "max_gap_min_worst": 10,
+    "worst_case_skipped_slots": [
+     850,
+     865,
+     875,
+     885,
+     895,
+     905,
+     915,
+     925,
+     935,
+     945,
+     955
+    ]
+   },
+   {
+    "label": "PRE-08-11 regime | current + Track1 windows",
+    "n_slots": 48,
+    "offsets_tried": 85,
+    "skipped_median": 21.0,
+    "skipped_p90": 23.0,
+    "skipped_max": 23,
+    "skip_pct_max": 0.4791666666666667,
+    "max_gap_min_worst": 100,
+    "worst_case_skipped_slots": [
+     640,
+     650,
+     660,
+     670,
+     680,
+     690,
+     700,
+     710,
+     720,
+     730,
+     740,
+     750,
+     850,
+     860,
+     870,
+     880,
+     890,
+     900,
+     910,
+     920
+    ]
+   }
+  ],
+  "fixed_runtime_bounds": [
+   {
+    "label": "fixed p95 of current regime (216s) | current + Track1",
+    "n_slots": 48,
+    "ran": 48,
+    "skipped": 0,
+    "skip_pct": 0.0,
+    "max_gap_min": 95,
+    "median_gap_min": 5.0,
+    "skipped_slots": []
+   },
+   {
+    "label": "fixed max of current regime (311s) | current + Track1",
+    "n_slots": 48,
+    "ran": 25,
+    "skipped": 23,
+    "skip_pct": 0.4791666666666667,
+    "max_gap_min": 100,
+    "median_gap_min": 10.0,
+    "skipped_slots": [
+     640,
+     650,
+     660,
+     670,
+     680,
+     690,
+     700,
+     710,
+     720,
+     730,
+     740,
+     750,
+     850,
+     860,
+     870,
+     880,
+     890,
+     900,
+     910,
+     920,
+     930,
+     940,
+     950
+    ]
+   },
+   {
+    "label": "fixed p95 of PRE-08-11 regime (400s) | current + Track1",
+    "n_slots": 48,
+    "ran": 25,
+    "skipped": 23,
+    "skip_pct": 0.4791666666666667,
+    "max_gap_min": 100,
+    "median_gap_min": 10.0,
+    "skipped_slots": [
+     640,
+     650,
+     660,
+     670,
+     680,
+     690,
+     700,
+     710,
+     720,
+     730,
+     740,
+     750,
+     850,
+     860,
+     870,
+     880,
+     890,
+     900,
+     910,
+     920,
+     930,
+     940,
+     950
+    ]
+   },
+   {
+    "label": "fixed 5.5 min (the figure written in run_scheduler.py) | current + Track1",
+    "n_slots": 48,
+    "ran": 25,
+    "skipped": 23,
+    "skip_pct": 0.4791666666666667,
+    "max_gap_min": 100,
+    "median_gap_min": 10.0,
+    "skipped_slots": [
+     640,
+     650,
+     660,
+     670,
+     680,
+     690,
+     700,
+     710,
+     720,
+     730,
+     740,
+     750,
+     850,
+     860,
+     870,
+     880,
+     890,
+     900,
+     910,
+     920,
+     930,
+     940,
+     950
+    ]
+   }
+  ]
+ }
+}

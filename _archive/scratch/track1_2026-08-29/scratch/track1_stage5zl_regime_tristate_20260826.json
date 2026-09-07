@@ -1,0 +1,285 @@
+{
+  "stage": "5ZL",
+  "title": "Regime verification tri-state, fail closed, and visible end to end",
+  "checked_at": {
+    "utc": "2026-08-26T05:51",
+    "et": "2026-08-26T01:51 EDT",
+    "calgary": "2026-08-25T23:51 MDT",
+    "window": "ET 01:30-02:15"
+  },
+  "read_first_naming_note": "The 5ZK report is dated 20260826, not 20260825. There is no track1_stage5q5_freshness_boundary_20260824.md - the nearest are track1_stage5q5_freshness_boundary_report_20260824.md and ..._fix_20260824.md, which is what was read.",
+  "INCIDENT_a_test_of_mine_overwrote_a_production_file": {
+    "severity": "must be read before anything else in this report",
+    "file": "global_index/preflight_state.json",
+    "when": "2026-08-25 23:42:02 Calgary",
+    "cause": "the first version of the scheduler-job test helper fired the pre-flight job body with the SUBPROCESS RUNNER replaced but not the STATE PATH. The job then did what it is built to do and wrote its own state. Replacing the process runner does not make a job body safe when the persistence happens in the parent.",
+    "before": {
+      "2026-08-17": true,
+      "2026-08-18": true,
+      "2026-08-19": true,
+      "2026-08-20": true,
+      "2026-08-21": true,
+      "2026-08-24": true,
+      "2026-08-25": true
+    },
+    "after": {
+      "2026-08-26": true
+    },
+    "why_it_matters": "the second file is not merely shorter - it asserts that TODAY's pre-flight passed, and today's pre-flight has not run (it fires 13:45 ET). A fabricated clearance for a day nothing has checked.",
+    "caught_by": "this suite's own 'no production file was written' test - the only reason it was noticed",
+    "blast_radius": "the running scheduler (pid 18096) loaded the real seven days at startup and reads the file only at startup, so it is unaffected; its own save at 13:45 ET rewrites the file correctly from memory. THE FILE SELF-HEALS IN ABOUT TWELVE HOURS. The exposure is a scheduler restart before then, which would load the fabricated clearance and let today's slots run without a pre-flight.",
+    "what_i_did": "fixed the helper so it cannot recur - every state path is redirected into tmp_path first, with the incident recorded in the test's own docstring",
+    "what_i_could_not_do": "attempted to restore the file; the action was BLOCKED, correctly - it is production runtime state and the standing constraint forbids editing it. I did not work around the block.",
+    "restoration_is_reconstructed_not_guessed": "the file's mtime was 11:47:28 on 08-25, the instant of that day's [PRE-FLIGHT] OK; _save_preflight_state keeps the last _PREFLIGHT_KEEP = 7 sorted days; every pre-flight that ran was OK (no FAILED line in any of those days' logs); and the last seven OK days ending 2026-08-25 are exactly the seven the scheduler reported restoring at 22:03:38.",
+    "restoration_command": "python -c \"import json,os; from pathlib import Path; p=Path('global_index/preflight_state.json'); d={k:True for k in ['2026-08-17','2026-08-18','2026-08-19','2026-08-20','2026-08-21','2026-08-24','2026-08-25']}; t=p.with_suffix('.tmp'); open(t,'w',encoding='utf-8').write(json.dumps(d,indent=2)); os.replace(t,p); print(p.read_text(encoding='utf-8'))\"",
+    "note": "2026-08-26 deliberately absent - today's pre-flight has not run. Doing nothing is also defensible: the file heals at 13:45 ET, provided the scheduler is not restarted first."
+  },
+  "answers": {
+    "1_statuses": {
+      "values": [
+        "PASS",
+        "DRIFT",
+        "UNKNOWN"
+      ],
+      "codes": 10,
+      "rule": "every code belongs to exactly one status; the constructor refuses a mismatch"
+    },
+    "2_old_collapses_and_their_fixes": [
+      {
+        "path": "futures._validated_core cannot be imported",
+        "old": 0,
+        "now": "UNKNOWN / engine_unavailable"
+      },
+      {
+        "path": "either CSV fails to load",
+        "old": 0,
+        "now": "UNKNOWN / inputs_unreadable"
+      },
+      {
+        "path": "label_regimes raises",
+        "old": 0,
+        "now": "UNKNOWN / labelling_failed"
+      },
+      {
+        "path": "no overlapping dates",
+        "old": "0, logged 'HMM stable'",
+        "now": "UNKNOWN / no_overlapping_dates",
+        "note": "the subtlest: the old code took the INFO branch and printed 'Regime labels unchanged (0 dates verified) - HMM stable'. A statement about nothing, phrased as reassurance."
+      },
+      {
+        "path": "no snapshot to compare against",
+        "old": "did not exist as a branch",
+        "now": "UNKNOWN / no_snapshot",
+        "note": "the FIFTH collapse, found while writing this stage"
+      }
+    ],
+    "2b_and_the_result_went_nowhere": "the one call site discarded it; __main__ called main() bare so the return value never reached the exit code; the scheduler keeps only CRITICAL and ERROR from a child that exited 0, and the drift line was a WARNING. Invisible end to end.",
+    "3_drift_blocks_readiness": true,
+    "4_unknown_blocks_readiness": true,
+    "4b_no_record_at_all": "UNKNOWN - absence is never a pass",
+    "5_reaches_job_status_or_exit_code": {
+      "16:20 post-close refresh": "YES - exit 1 on DRIFT or UNKNOWN, job shows failed",
+      "13:45 pre-flight": "NO, deliberately - see the judgement call"
+    },
+    "6_post_close_failure_visible_on_its_own": {
+      "yes": true,
+      "does_not_write_preflight_state": "asserted by AST",
+      "three_distinct_messages": "label drift / could not be verified / the series is still short - three different operator actions"
+    },
+    "7_freshness_semantics_changed": {
+      "changed": false,
+      "proof": "track1_freshness.py was not touched (mtime 2026-08-24 10:24) and a passing test asserts it does not import regime_verify"
+    },
+    "8_runtime_or_live_file_changed": {
+      "count": 1,
+      "file": "global_index/preflight_state.json",
+      "cause": "a test of mine - see the incident block",
+      "everything_else_at_baseline": [
+        "spy_daily_live.csv",
+        "replay_checkpoint.track1.json",
+        "live_positions.track1.json",
+        "every audit record"
+      ]
+    },
+    "9_orders_still_impossible": true,
+    "10_next_shadow_window_ready": {
+      "yes": true,
+      "note": "tonight's NKD window (01:10-02:55 ET) ran through this stage untouched; 9 slots observed, all decided, none refused on freshness"
+    },
+    "11_remaining_and_next": {
+      "next_stage": "5ZM route-aware reporting / PnL",
+      "remaining": [
+        {
+          "n": 1,
+          "item": "machine sleep",
+          "class": "operator"
+        },
+        {
+          "n": 2,
+          "item": "B1 account decision",
+          "class": "operator"
+        },
+        {
+          "n": 3,
+          "item": "route-aware PnL / parity / legacy-reader split",
+          "stage": "5ZM"
+        },
+        {
+          "n": 4,
+          "item": "planned stop not journalled; close_position and place_protective_stop unbuilt; no cross-day book",
+          "stage": "5ZN"
+        }
+      ],
+      "plus": "the new gate itself, which is a machine gate rather than work - it opens the first time the 16:20 job records a PASS",
+      "removed_by_this_stage": "regime verification is warn-only and its return is discarded",
+      "5zi_dependency_correction_still_stands": "have 5ZM read the dry run's journal output rather than waiting for real orders"
+    }
+  },
+  "the_contract": {
+    "module": "global_index/regime_verify.py",
+    "route_neutral_because": "the check is shared infra - legacy's pre-flight runs the same verification",
+    "result": [
+      "status",
+      "code",
+      "detail",
+      "checked_at",
+      "inputs (paths only, never contents)",
+      "counts (compared, changed, up to ten dates)"
+    ],
+    "constructor_refuses": "a code that belongs to another status - a code that can mean two things is a code nobody can act on",
+    "record": "global_index/regime_verify/regime_verify_YYYYMMDD.jsonl, append-only and dated",
+    "why_a_record": "a verification whose answer exists only in a log line is a verification nobody can gate on",
+    "latest_returns_unknown_for": [
+      "no record",
+      "unreadable record",
+      "foreign status",
+      "older than 7 days"
+    ],
+    "module_decides_nothing": "whether a DRIFT stops a job, skips a day or holds the paper gate is each caller's decision, stated out loud"
+  },
+  "where_it_blocks": {
+    "paper_readiness": {
+      "DRIFT": "blocks",
+      "UNKNOWN": "blocks"
+    },
+    "post_close_refresh_1620": {
+      "DRIFT": "exit 1",
+      "UNKNOWN": "exit 1"
+    },
+    "preflight_1345": {
+      "DRIFT": "recorded, exit unchanged",
+      "UNKNOWN": "recorded, exit unchanged"
+    },
+    "shadow_slot_execution": "no effect",
+    "freshness_gate": "untouched",
+    "the_judgement_call": "the pre-flight exclusion is the one judgement call in the stage and it is written into the --verify-strict help text, the scheduler comment and the blocker's own evidence. A verification that could not run must not skip every slot of a trading day - the brief is explicit that UNKNOWN must not block shadow execution - and the 16:20 job runs after everything today has finished, so a non-zero exit there costs a visible failure and no trading."
+  },
+  "new_gate": {
+    "id": "REGIME_LABEL_VERIFICATION",
+    "blocks_orders": true,
+    "status": "MEASURED_GATE",
+    "released_by_measurement": "regime_labels_verified",
+    "released_by": "() - no confirmation flag can wave it through",
+    "fails_closed_on_exception": true,
+    "measured_now": "UNKNOWN (no_record): no verification has been recorded - a check that never ran is not a check that passed",
+    "blocking_now": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE",
+      "REGIME_LABEL_VERIFICATION"
+    ]
+  },
+  "dashboard": {
+    "block": "regime_verify on /api/v1/track1-runtime",
+    "fields": [
+      "present",
+      "status",
+      "code",
+      "detail",
+      "checked_at",
+      "counts",
+      "blocks_paper",
+      "reading"
+    ],
+    "never_collapsed": "a DRIFT is a finding about the data and an UNKNOWN is the absence of one, and an operator acts differently on each",
+    "caveat": "the running backend still serves the OLD reader; the block appears after a backend restart"
+  },
+  "live_finding_in_this_stages_own_subject": {
+    "what": "the 16:20 job logged 'OK - the daily series now covers 2026-08-25' and the series ends on 2026-08-24",
+    "measured": "spy_daily_live.csv last row 2026-08-24, mtime 14:20:01 - written by that very run",
+    "mechanism": "the job printed the sentence on any exit-0 having checked nothing. Polygon's SPY daily aggregate is not always final at 16:20 ET, so the run genuinely succeeded and genuinely added nothing.",
+    "class": "the same defect this stage exists to remove, one job over",
+    "fixed": "the branch reads the series' last date and either confirms the coverage or says the close was not available yet, with the consequence stated. An unreadable file returns '' meaning 'could not tell', never 'up to date'.",
+    "harm": "none - tonight's nine NKD slots all decided, none refused on freshness, because the requirement at 01:10 ET on the 26th is the 24th and the series has it"
+  },
+  "tests": {
+    "file": "scratch/test_track1_stage5zl_regime_tristate_20260826.py",
+    "count": 48,
+    "engine_stubbed_for_pass_and_drift": "so the outcome is CHOSEN rather than hoped for - a test that passes because today's data happens to be clean would go green for the wrong reason and stay green through a real drift",
+    "cli_cases_run_in_a_subprocess": "an exit code cannot be asserted in-process",
+    "structural_assertions_use_ast": [
+      "the call site no longer discards the result",
+      "__main__ is sys.exit(main())",
+      "the post-close job does not touch the pre-flight record",
+      "the pre-flight does not run strict",
+      "the freshness module does not import the verifier"
+    ]
+  },
+  "regression": {
+    "passed": 523,
+    "failed": 0,
+    "suites": [
+      "5ZL",
+      "5ZF",
+      "5S",
+      "5Q5",
+      "5ZK",
+      "5ZG",
+      "5ZH",
+      "5O",
+      "monitor/test_dashboard_backend.py",
+      "monitor/test_realtime_contract.py"
+    ],
+    "tripwires_inverted": [
+      "5ZF test_26 carried 'if this now raises, the finding is closed and the report needs updating' - it did, a day later",
+      "5ZF test_27 said a drift is not visible as a job failure, no longer true for the post-close job"
+    ],
+    "tests_updated_because_this_stage_added_a_measured_gate": [
+      "5S test_with_evidence_AND_a_confirmation_the_order_gate_would_arm",
+      "5S test_removing_the_evidence_blocker_is_what_the_defect_looked_like"
+    ],
+    "test_narrowed": "5ZK's runtime-tree scan asked whether ANYTHING under the runtime root was written during the run - true only when nothing else is running, and the live NKD window was open and writing",
+    "not_caused_by_this_stage_cause_NOT_established": {
+      "tests": [
+        "5Z freshness_root x3"
+      ],
+      "proof_of_non_causation": "track1_freshness.py was not touched (mtime 2026-08-24 10:24) and a passing test asserts it does not import regime_verify",
+      "likely": "the tests pin a fixed instant against the live SPY series, which has moved",
+      "honesty": "cause not established; recorded rather than waved at"
+    }
+  },
+  "liveness": {
+    "restarted": false,
+    "live_now": "the verification and the strict exit - both SPY jobs are spawned as subprocesses and import current source; today's 13:45 pre-flight will be the first to record a status",
+    "NOT_live_until_a_scheduler_restart": "the --verify-strict flag and the corrected success line live in the scheduler's own job bodies, pid 18096",
+    "NOT_live_until_a_backend_restart": "the dashboard regime_verify block",
+    "why_not_restarted": "the NKD window was open and neither change is urgent enough to interrupt it"
+  },
+  "files_changed": {
+    "new": [
+      "global_index/regime_verify.py",
+      "scratch/test_track1_stage5zl_regime_tristate_20260826.py"
+    ],
+    "modified": [
+      "global_index/update_spy_csv.py",
+      "global_index/run_scheduler.py",
+      "global_index/track1_gates.py",
+      "monitor/backend/track1_runtime_reader.py",
+      "scratch/test_track1_stage5zf_ops_report_completeness_20260825.py",
+      "scratch/test_track1_stage5s_paper_readiness_20260825.py",
+      "scratch/test_track1_stage5zk_checkpoint_frames_resume_20260826.py"
+    ],
+    "runtime_files_changed": [
+      "global_index/preflight_state.json (by a test of mine - see the incident block)"
+    ]
+  }
+}

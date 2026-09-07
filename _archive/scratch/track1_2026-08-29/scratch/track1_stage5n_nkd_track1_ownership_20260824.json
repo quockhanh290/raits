@@ -1,0 +1,194 @@
+{
+  "stage": "5N",
+  "title": "NKD/MNKD Track 1 ownership",
+  "date": "2026-08-24",
+  "verdict": "READY_FOR_5O_ROUTE_AWARE_SAFETY",
+  "claim": "Track1 owns all four strategy sleeves at slot/source level in track1-only shadow.",
+  "claim_limits": [
+    "NOT legacy-independent: stop repair x10 and maxhold_exit still carry --positions-path live_positions.json (Stage 5O)",
+    "NOT paper/live ready",
+    "NOT safe to delete the legacy route (5O + 5P)"
+  ],
+  "legacy_nkd_inventory": {
+    "jobs": 22,
+    "ids": "nkd_night_0110 .. nkd_night_0255",
+    "cadence_minutes": 5,
+    "argv": "run_live_day --clusters nkd --port 4002 (clientId 1 default)",
+    "preflight": "reads the PREVIOUS business day's flag (prev_preflight=True)",
+    "state": "live_positions.json / replay_checkpoint.json"
+  },
+  "built": {
+    "window_et": [
+      "01:10",
+      "02:55"
+    ],
+    "session_window": [
+      "14:10",
+      "15:55"
+    ],
+    "session_clock": "Asia/Tokyo",
+    "slots": 22,
+    "slot_ids": "TRACK1_NKD_0110 .. TRACK1_NKD_0255",
+    "provider": "staged - none in transitional, ibkr in track1-only, same env override",
+    "source": "LiveTrack1Source._nkd_candidates -> NR.detect_entry_for_slot(ema_period=10, fill_law=LIVE_FILL_LAW, apply_context_filter=False), labels via RegimeLabels(lag_days=1) - the promoted engine, no second implementation",
+    "candidate_stamp": "aware Tokyo signal-bar timestamp (+09:00), matching the committed replay rows; the signal layer's window gate converts instants",
+    "requirement": {
+      "clock": "Asia/Tokyo",
+      "bar_minutes": 5,
+      "today": [
+        "14:00",
+        "15:55"
+      ],
+      "decide": [
+        "14:10",
+        "15:55"
+      ],
+      "needs_prior_rth": false
+    },
+    "ledger": {
+      "expected_slots": 22,
+      "session_date": "ET date == Tokyo date across the whole band, both DST regimes"
+    },
+    "freshness": "D-1 for all 22 slots (01:10-02:55 ET < 13:45), measured per slot",
+    "checkpoint": "CHECKPOINTED_SLEEVES already carried global_nkd; proven to close over a Tokyo frame under a temp path - no schema gap"
+  },
+  "defects_found_and_fixed": [
+    {
+      "id": "5N-1",
+      "where": "track1_normal_r4.detect_entry_for_slot",
+      "what": "truncated the scan at `now` converted to ET unconditionally; the MNKD frame is Tokyo-clocked, a 13-hour error",
+      "fix": "truncate on the frame's own clock; naive frames keep the ET assumption",
+      "found_by": "reading the code while wiring the sleeve - the same one-keystroke family that once overwrote 1,050 frozen NKD bars"
+    },
+    {
+      "id": "5N-2",
+      "where": "track1_signal_layer window gate",
+      "what": "judged candidate entry stamps as bare wall-clock text against the ET slot band; the committed NKD rows are stamped +09:00 in the Tokyo session window",
+      "measured_impact": "26 of the replay's NKD rows silently rejected; accepted tail 91 -> 67",
+      "fix": "SESSION_WINDOWS/SESSION_WINDOW_CLOCKS in track1_params; _hhmm_on converts aware stamps to the window's clock; live NKD candidates carry the aware Tokyo stamp",
+      "restored": "replay tail 91, reject_window 0, pinned by a full-replay test"
+    },
+    {
+      "id": "5N-3",
+      "where": "track1_intraday._index_checks",
+      "what": "hard-required the ET clock of every frame; the Tokyo frame was refused tz_mismatch",
+      "fix": "the check accepts the requirement's own declared clock and still refuses a WRONG clock without converting"
+    }
+  ],
+  "dst_note": "the ET slot band equals the Tokyo session band in summer only; in winter the late ET slots fire after the session window closes and the gate refuses them TOO_LATE. That drift is legacy's own fixed-ET cron behaviour, inherited deliberately - fixing it would be a rule change dressed as plumbing",
+  "inventory": {
+    "slots": {
+      "roska4_calm": 1,
+      "roska4_stress": 24,
+      "roska4_swing": 23,
+      "global_nkd": 22
+    },
+    "total": 70,
+    "jobs": {
+      "default": 60,
+      "track1_shadow": 129,
+      "track1_only": 84
+    },
+    "legacy_nkd_in_track1_only": 0,
+    "providers_track1_only": "ibkr on all 70",
+    "providers_transitional": "ibkr on Calm+Stress (25), none on the staged 45"
+  },
+  "parity": {
+    "default": "60/58 true",
+    "track1_shadow": "129/127 true",
+    "track1_only": "84/82 true"
+  },
+  "mutations": {
+    "mutations": [
+      {
+        "mutation": "M1 the 22 NKD slots removed",
+        "guard": "test_the_window_is_declared_and_mirrors_the_legacy_cadence",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "M2 the NKD window removed (parser choices lose the sleeve)",
+        "guard": "test_the_parser_accepts_the_sleeve",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "M3 the live source stops serving global_nkd",
+        "guard": "test_a_candidate_is_produced_from_a_tokyo_frame",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "M4 the NKD ledger window removed",
+        "guard": "test_ledger_expected_slots_matches_the_registered_slots",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "M5 legacy nkd_night jobs registered in track1-only",
+        "guard": "test_legacy_nkd_jobs_absent_in_track1_only_present_in_transitional",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "M6 --allow-orders added to the NKD slot body",
+        "guard": "test_nkd_slot_argv_in_track1_only",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "M7 ops slot count hardcoded to the previous stage's 48",
+        "guard": "test_ops_count_is_derived_and_covers_the_new_sleeve",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "M8 the NKD decision path names the legacy positions file",
+        "guard": "test_nkd_decisions_never_read_the_legacy_book",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "M9 the gate reads the Tokyo stamp as bare wall text again",
+        "guard": "test_an_aware_stamp_is_an_instant_not_a_wall_text",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      }
+    ],
+    "files_restored": true
+  },
+  "no_side_effects": [
+    "no scheduler/backend/dashboard started or stopped",
+    "no real IBKR (frame providers only)",
+    "no order",
+    "no STOP_TRADING or STOP_TRADING.track1 touched",
+    "no confirmation file",
+    "no live state written",
+    "no commit"
+  ],
+  "tests": {
+    "stage5n": "31 passed",
+    "mutations": "9/9 detected, on-disk mutations restored",
+    "regression_5md_5mc_5mb_5l_3b_ops_mirror": "267 passed, 1 skipped",
+    "regression_route_and_live_path": "230 passed, 2 skipped",
+    "not_run": "global_index/test_event_playback.py - known hang"
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "all_red": true,
+  "results": [
+    {
+      "id": "M1",
+      "mutation": "accepts_receipt always False",
+      "test": "test_15_a_fill_journals_intended_submitted_amended_then_filled",
+      "outcome": "RED"
+    },
+    {
+      "id": "M1b",
+      "mutation": "same mutation, against the in-flight proof",
+      "test": "test_17_the_amendment_is_written_while_send_order_is_still_in_flight",
+      "outcome": "RED"
+    },
+    {
+      "id": "M2",
+      "mutation": "OrderReceipt moved below the poll loop",
+      "test": "test_11_the_receipt_fires_BEFORE_the_fill_poll",
+      "outcome": "RED"
+    },
+    {
+      "id": "M3",
+      "mutation": "outcome_id falls back to nothing",
+      "test": "test_30_the_receipt_id_survives_a_Fill_that_forgot_it",
+      "outcome": "RED"
+    },
+    {
+      "id": "M4",
+      "mutation": "the FILLED return drops order_id",
+      "test": "test_9_every_post_placement_Fill_carries_the_order_id",
+      "outcome": "RED"
+    },
+    {
+      "id": "M5",
+      "mutation": "order_id moved ahead of contract_month",
+      "test": "test_1_order_id_is_the_LAST_field_and_defaults_to_None",
+      "outcome": "RED"
+    },
+    {
+      "id": "M6",
+      "mutation": "a fabricated identifier enters the journal",
+      "test": "test_10_test_mode_invents_no_id_and_fires_no_receipt",
+      "outcome": "RED"
+    },
+    {
+      "id": "M7",
+      "mutation": "the missing id defaulted to a placeholder instead of empty",
+      "test": "test_27_an_exception_BEFORE_the_receipt_records_UNKNOWN_with_NO_id",
+      "outcome": "RED"
+    },
+    {
+      "id": "M8",
+      "mutation": "instrument+action consulted after an id mismatch",
+      "test": "test_33_a_DIFFERENT_id_is_not_ours_and_the_weaker_match_is_not_consulted",
+      "outcome": "RED"
+    },
+    {
+      "id": "M9",
+      "mutation": "two ids under one key accepted",
+      "test": "test_19_an_id_may_never_be_replaced",
+      "outcome": "RED"
+    },
+    {
+      "id": "M10",
+      "mutation": "a duplicate send looks like a legal history",
+      "test": "test_18_an_amendment_that_adds_no_id_is_refused",
+      "outcome": "RED"
+    },
+    {
+      "id": "M11",
+      "mutation": "a different order wearing a borrowed key",
+      "test": "test_20_an_amendment_may_not_move_anything_else",
+      "outcome": "RED"
+    },
+    {
+      "id": "M12",
+      "mutation": "the amendment turned into a real transition",
+      "test": "test_21_the_state_machine_still_forbids_submitted_to_submitted",
+      "outcome": "RED"
+    },
+    {
+      "id": "M13",
+      "mutation": "an empty receipt id still writes a row",
+      "test": "test_31_an_empty_receipt_id_writes_no_amendment",
+      "outcome": "RED"
+    },
+    {
+      "id": "M14",
+      "mutation": "OrderReceiptRefused caught by the broad handler",
+      "test": "test_12_a_refused_receipt_is_re_raised_not_turned_into_a_cancelled_fill",
+      "outcome": "RED"
+    },
+    {
+      "id": "M15",
+      "mutation": "live exposure and no exposure reported identically",
+      "test": "test_13_the_except_path_separates_placed_from_never_placed",
+      "outcome": "RED"
+    },
+    {
+      "id": "M16",
+      "mutation": "the keyword-only marker removed",
+      "test": "test_4_on_submit_is_keyword_only_with_a_default_everywhere",
+      "outcome": "RED"
+    },
+    {
+      "id": "M17",
+      "mutation": "a legacy call site changed",
+      "test": "test_43_no_legacy_caller_passes_the_new_keyword",
+      "outcome": "RED"
+    },
+    {
+      "id": "M18",
+      "mutation": "the verify path's fills list broken",
+      "test": "test_6_MockBroker_still_returns_a_Fill_and_now_names_it",
+      "outcome": "RED"
+    },
+    {
+      "id": "M19",
+      "mutation": "an oversized close allowed under UNKNOWN",
+      "test": "test_41_an_oversized_close_is_still_blocked",
+      "outcome": "RED"
+    },
+    {
+      "id": "M20",
+      "mutation": "an import added to a production module",
+      "test": "test_47_the_executor_is_still_imported_by_nothing",
+      "outcome": "RED"
+    },
+    {
+      "id": "M21",
+      "mutation": "the writer and the reader disagree again",
+      "test": "test_52_a_journal_containing_an_amendment_still_resolves",
+      "outcome": "RED"
+    },
+    {
+      "id": "M22",
+      "mutation": "a duplicate send reads as lawful on read-back",
+      "test": "test_57_a_hand_written_double_submitted_with_no_id_is_still_impossible",
+      "outcome": "RED"
+    },
+    {
+      "id": "M23",
+      "mutation": "two ids under one key accepted by the shared rule",
+      "test": "test_56_is_amendment_refuses_everything_that_is_not_one",
+      "outcome": "RED"
+    }
+  ]
+}

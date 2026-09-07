@@ -1,0 +1,26 @@
+
+========================================================================
+DEPLOY-REALISTIC SIM | Rổ 4 + STRESS + NKD | $50,000
+========================================================================
+slippage 2 tick/side | NKD gated ema=10 mult=2.5
+
+SIZER (combined 3-cluster, DD-capped):
+  1-micro combined MaxDD : $4,624  (9.2% of account)
+  dd_scale 1.08 | margin_scale 3.23 → binding: FIXED (--n-contracts override)
+  → CONTRACTS: 1 micro each  (projected DD 9.2%, hard cap 15%)
+
+DEPLOY METRICS at 1 micro:
+  net $4,998  |  Calmar 1.11  |  PF 1.24  |  Sharpe 1.11
+  MaxDD $4,624 (9.2%)  |  return ≈ 10.3%/yr on $50,000
+
+  per-cluster entries taken / rejected (REAL risk$):
+    roska4_swing   taken  141  rejected 124
+    roska4_stress  taken    7  rejected  31
+    global_nkd     taken   70  rejected   0
+    circuit-breaker halts: 0
+
+per-year net$ (deploy size):
+  2025  $     4,998
+------------------------------------------------------------------------
+NOTE: upper bound. Live MNKD slips >1 tick (rerun --slippage-ticks 2-3 to see), fills partial, unseen events absent. Paper trade is the real test.
+

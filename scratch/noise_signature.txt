@@ -1,0 +1,53 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  MES xong
+  MNQ xong
+  MYM xong
+  M2K xong
+
+============================================================================================
+TY LE HOI THEO DO SAU (do sau tinh bang ATR NGAY, quan sat tai moc kiem tra)
+============================================================================================
+
+  --- moc kiem tra: 2 gio sau khi vao lenh (con 21.3 gio toi luc vu trang) ---
+    do sau           n      % HOI  % khong hoi
+    0-0.05         140      51.4%        48.6%
+    0.05-0.1        85      48.2%        51.8%
+    0.1-0.2         95      44.2%        55.8%
+    0.2-0.35        56      23.2%        76.8%
+    0.35-0.6        28      28.6%        71.4%
+
+  --- moc kiem tra: 5 gio sau khi vao lenh (con 18.4 gio toi luc vu trang) ---
+    do sau           n      % HOI  % khong hoi
+    0-0.05         125      50.4%        49.6%
+    0.05-0.1       112      54.5%        45.5%
+    0.1-0.2        115      44.3%        55.7%
+    0.2-0.35        61      21.3%        78.7%
+    0.35-0.6        34      38.2%        61.8%
+    >0.6            14      14.3%        85.7%
+
+  --- moc kiem tra: 10 gio sau khi vao lenh (con 13.4 gio toi luc vu trang) ---
+    do sau           n      % HOI  % khong hoi
+    0-0.05          97      54.6%        45.4%
+    0.05-0.1        79      48.1%        51.9%
+    0.1-0.2        116      48.3%        51.7%
+    0.2-0.35       103      35.0%        65.0%
+    0.35-0.6        51      13.7%        86.3%
+    >0.6            26      11.5%        88.5%
+
+=== THEO REGIME (moc 5 gio) ===
+  Normal   n=341   ty le HOI 46.9%
+  Stress   n=120   ty le HOI 35.8%
+
+=== THEO HUONG (moc 5 gio) ===
+  LONG   n=242   ty le HOI 44.6%
+  SHORT  n=219   ty le HOI 43.4%
+
+=== DOI CHUNG HINH HOC: do sau chuan hoa theo thoi gian con lai ===
+  (neu chi la khuech tan, ty le hoi se la ham tron cua depth/sqrt(gio con lai))
+    z                n      % HOI
+    0-0.1          574      51.6%
+    0.1-0.2        300      46.3%
+    0.2-0.35       247      34.4%
+    0.35-0.6       142      28.2%
+    0.6-1.0         66      13.6%
+    >1.0            14      28.6%

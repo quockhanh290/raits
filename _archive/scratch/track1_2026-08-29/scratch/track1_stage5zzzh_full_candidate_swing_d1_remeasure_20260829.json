@@ -1,0 +1,142 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZZ-H",
+  "title": "Full Track 1 candidate remeasure with Swing causal D-1",
+  "route": "track1_candidate",
+  "date": "2026-08-29",
+  "decision": "NEEDS_RETUNE",
+  "decision_rationale": [
+    "same-day Swing is not live-tradable: the label is computed from the session's close and does not exist during the 14:05-15:55 window",
+    "so the choice is D-1 or nothing, not same-day vs D-1",
+    "under D-1 the sleeve is weaker in every window and turns negative in the most recent OOS window (2026: -$464 vs +$719)",
+    "but its parameters AND its R4 context filter thresholds were selected under the same-day labels, so this is new labels through an old filter",
+    "not good enough to enter paper as it stands; not established as worthless either"
+  ],
+
+  "baseline_reproduced": true,
+  "baseline_source": "scratch/combined_repaired_replay_20260822.py (named in docs/futures/NORMAL_STRESS_CALM_HANDOFF_2026-08-22.md lines 169-186)",
+  "baseline_match": "30 of 30 numbers, from a fresh run",
+
+  "confirmed_inputs": {
+    "account": 50000.0,
+    "family_cap_gross": 0.050,
+    "family_cap_net": 0.044,
+    "contracts": 1,
+    "slippage_ticks_per_side": 2.0,
+    "sleeves": ["roska4_swing", "roska4_stress", "roska4_calm", "global_nkd"],
+    "hmm_fit_end": {"floor": "2022-12-31", "vault2025": "2024-12-31", "vault2026": "2024-12-31"},
+    "window_end": {"floor": "2024-12-31", "vault2025": "2025-12-31", "vault2026": "2026-08-19"},
+    "calm_nkd_switch": {"full_stack": true, "risk_clean": false},
+    "source": "each window's own recorded argv inside the promotion artifact, not a CLI default"
+  },
+
+  "variant": {
+    "changed": "the labels object handed to SwingTFEngine.backtest_basket, wrapped in RegimeLabels(lag_days=1)",
+    "unchanged": ["NKD labels", "Stress", "Calm", "caps", "fill law", "costs", "HMM fit schedule", "data dirs", "contracts"],
+    "self_checks": {
+      "nkd_trade_list_byte_identical": {"floor": true, "vault2025": true, "vault2026": true},
+      "at_least_one_r4_instrument_changed": {"floor": true, "vault2025": true, "vault2026": true},
+      "argv_identical": true,
+      "slippage_identical": true,
+      "baseline_artifacts_restored_sha256": true
+    }
+  },
+
+  "results": {
+    "full_stack_calm_nkd_on": {
+      "floor": {"baseline": {"net": 74410, "pf": 1.67, "sharpe": 2.12, "calmar": 2.14, "maxdd": 4973, "swing_taken": 545, "swing_rejected": 190},
+                "d1": {"net": 66796, "pf": 1.59, "sharpe": 1.91, "calmar": 1.92, "maxdd": 4973, "swing_taken": 564, "swing_rejected": 197},
+                "delta": {"net": -7613, "net_pct": -10.2, "pf": -0.09, "sharpe": -0.21, "calmar": -0.22, "maxdd": 0}},
+      "vault2025": {"baseline": {"net": 16997, "pf": 2.26, "sharpe": 2.76, "calmar": 4.45, "maxdd": 3901, "swing_taken": 55, "swing_rejected": 48},
+                    "d1": {"net": 16181, "pf": 2.05, "sharpe": 2.50, "calmar": 3.36, "maxdd": 4915, "swing_taken": 57, "swing_rejected": 48},
+                    "delta": {"net": -817, "net_pct": -4.8, "pf": -0.20, "sharpe": -0.26, "calmar": -1.09, "maxdd": 1014}},
+      "vault2026": {"baseline": {"net": 9288, "pf": 1.62, "sharpe": 2.47, "calmar": 3.41, "maxdd": 4342, "swing_taken": 45, "swing_rejected": 36},
+                    "d1": {"net": 8105, "pf": 1.52, "sharpe": 2.14, "calmar": 3.76, "maxdd": 3435, "swing_taken": 43, "swing_rejected": 38},
+                    "delta": {"net": -1183, "net_pct": -12.7, "pf": -0.10, "sharpe": -0.33, "calmar": 0.35, "maxdd": -907}}
+    },
+    "risk_clean_no_calm_nkd": {
+      "floor": {"baseline": {"net": 64903, "pf": 1.62, "sharpe": 2.34, "calmar": 1.92, "maxdd": 4845},
+                "d1": {"net": 57289, "pf": 1.53, "sharpe": 2.08, "calmar": 1.67, "maxdd": 4914},
+                "delta": {"net": -7613, "net_pct": -11.7, "pf": -0.09, "sharpe": -0.26, "calmar": -0.25, "maxdd": 68}},
+      "vault2025": {"baseline": {"net": 13236, "pf": 2.00, "sharpe": 2.96, "calmar": 3.09, "maxdd": 4632},
+                    "d1": {"net": 12419, "pf": 1.82, "sharpe": 2.63, "calmar": 2.38, "maxdd": 5645},
+                    "delta": {"net": -817, "net_pct": -6.2, "pf": -0.17, "sharpe": -0.33, "calmar": -0.71, "maxdd": 1014}},
+      "vault2026": {"baseline": {"net": 8260, "pf": 1.55, "sharpe": 2.57, "calmar": 2.75, "maxdd": 4797},
+                    "d1": {"net": 7077, "pf": 1.45, "sharpe": 2.19, "calmar": 1.93, "maxdd": 5853},
+                    "delta": {"net": -1183, "net_pct": -14.3, "pf": -0.10, "sharpe": -0.38, "calmar": -0.82, "maxdd": 1056}}
+    },
+    "arithmetic_check": "the net delta is the same dollar figure under both policies in every window; the Calm-NKD switch adds a contribution this change does not touch"
+  },
+
+  "sleeve_contribution_booked_after_caps": {
+    "floor": {"baseline": {"swing": 25677, "stress": 26166, "calm": 9162, "nkd": 13405},
+              "d1": {"swing": 18429, "stress": 26166, "calm": 8797, "nkd": 13405},
+              "delta": {"swing": -7248, "stress": 0, "calm": -365, "nkd": 0}},
+    "vault2025": {"baseline": {"swing": 4690, "stress": 4531, "calm": 1812, "nkd": 5964},
+                  "d1": {"swing": 3906, "stress": 4531, "calm": 1780, "nkd": 5964},
+                  "delta": {"swing": -784, "stress": 0, "calm": -32, "nkd": 0}},
+    "vault2026": {"baseline": {"swing": 719, "stress": 831, "calm": 702, "nkd": 7036},
+                  "d1": {"swing": -464, "stress": 831, "calm": 702, "nkd": 7036},
+                  "delta": {"swing": -1183, "stress": 0, "calm": 0, "nkd": 0}},
+    "note": "Stress and NKD move by exactly zero in all six cells; Calm moves slightly through same-symbol interaction with Swing, which is real and not leakage"
+  },
+
+  "swing_specifics": {
+    "floor": {"shared": 633, "only_same_day": 119, "only_d1": 136, "churn_pct": 28.72,
+              "pnl_delta_pre_caps": -14136.91, "pnl_delta_post_caps": -7248},
+    "vault2025": {"shared": 71, "only_same_day": 34, "only_d1": 34, "churn_pct": 48.92,
+                  "pnl_delta_pre_caps": 1081.47, "pnl_delta_post_caps": -784},
+    "vault2026": {"shared": 59, "only_same_day": 22, "only_d1": 22, "churn_pct": 42.72,
+                  "pnl_delta_pre_caps": -3814.68, "pnl_delta_post_caps": -1183},
+    "sign_inversion": "2025 is BETTER by $1,081 before portfolio caps and WORSE by $784 after them; judging the sleeve standalone would have inverted the answer",
+    "ordering_changed": true,
+    "ordering_deltas": {
+      "floor": {"taken": 6, "rejected": 8, "family_rejected": 0, "same_symbol_suppressions": -8},
+      "vault2025": {"taken": 1, "rejected": 2, "family_rejected": 2, "same_symbol_suppressions": -2},
+      "vault2026": {"taken": -2, "rejected": 2, "family_rejected": -3, "same_symbol_suppressions": 0}
+    },
+    "double_booked": 0
+  },
+
+  "answers": {
+    "baseline_reproduced": true,
+    "same_day_swing_live_tradable": false,
+    "same_day_reason": "the label is computed from the session's close and is published after the 14:05-15:55 window ends",
+    "d1_swing_worth_keeping": "not established - positive in floor and 2025, negative in 2026, and untuned under the causal label",
+    "paper_route_recommendation": "disable Swing, retune under D-1 before reconsidering",
+    "disable_is_operationally_neutral": "Stage 5ZZZ-G measured that live Swing already refuses every session; disabling makes an existing silence explicit",
+    "retune_is_not_curve_fitting": "the original selection was made on an information set the live route cannot have; re-running the same walk-forward on valid inputs is redoing it, not fitting it. No parameter values are proposed.",
+    "orders_possible": false,
+    "blockers": ["PAPER_SHADOW_EVIDENCE"]
+  },
+
+  "caveats": [
+    "floor is in-sample and carries the largest delta - the weakest evidence",
+    "2026 is eight months and 45 taken trades; no confidence interval was computed",
+    "the R4 context filter thresholds were fit under same-day labels, so this is new labels through an old filter and is not a fair test of D-1 as a design",
+    "one regeneration per window; no bootstrap, no sensitivity sweep",
+    "a concurrency mistake produced a spurious baseline floor of $66,796 when the replay was re-run while the regeneration was overwriting shared artifacts; caught by sha256, repeated cleanly, all thirty numbers returned"
+  ],
+
+  "safety": {
+    "scheduler_restarted": false, "scheduler_pids": [3000], "broker_connected": false,
+    "orders_dir_present": false, "TRACK1_ORDERS_APPROVED_set": false,
+    "confirmation_file_modified": false, "runtime_evidence_modified": false,
+    "baseline_artifacts_sha256_unchanged": true,
+    "only_baseline_script_edit": "an additive per-cluster P&L accumulator, read by nothing in the control flow; proved harmless by re-running and matching all thirty baseline numbers"
+  },
+
+  "files_added": [
+    "scratch/track1_stage5zzzh_swing_d1_regen_20260829.py",
+    "scratch/track1_stage5zzzh_swing_churn_20260829.py",
+    "scratch/track1_stage5zzzh_full_replay_20260829.py",
+    "scratch/track1_stage5zzzh_compare_20260829.py",
+    "scratch/normal_promotion_trades_floor_d1_20260829.json",
+    "scratch/normal_promotion_trades_vault2025_d1_20260829.json",
+    "scratch/normal_promotion_trades_vault2026_d1_20260829.json",
+    "scratch/track1_stage5zzzh_full_replay_base_20260829.json",
+    "scratch/track1_stage5zzzh_full_replay_d1_20260829.json",
+    "scratch/track1_stage5zzzh_swing_churn_20260829.json",
+    "scratch/track1_stage5zzzh_compare_20260829.json"
+  ]
+}

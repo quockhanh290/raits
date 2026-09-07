@@ -1,0 +1,171 @@
+{
+  "stage": "5O",
+  "title": "route-aware safety",
+  "date": "2026-08-24",
+  "verdict": "READY_FOR_5P_FULL_FOUR_SLEEVE_SHADOW",
+  "claim": "Track1-only mode is legacy-independent at strategy + safety scheduler wiring level.",
+  "claim_limits": [
+    "NOT paper/live ready",
+    "NOT safe to delete legacy before the 5P shadow period passes",
+    "broker-flat / orphan-STP cleanliness NOT measured against IBKR - those are account-level statements and nothing here consulted the broker"
+  ],
+  "closes": "audit blocker L3; the one legacy dependency the 5M-D removability probe measured",
+  "legacy_safety_inventory": {
+    "jobs": "maxhold_exit 09:31 + stop_repair sweeps (10 weekday-equivalent) + Sunday 18:30",
+    "argv": "--positions-path live_positions.json --port 4002 (clientId 1, lock runner.pid)",
+    "marker": "global_index/maxhold_state.json + _catch_up_maxhold on scheduler start",
+    "fate_in_track1_only": "KEPT - drain. Any open legacy position keeps its stop repair and five-day exit. Removing it is part of deleting legacy, gated on 5P"
+  },
+  "track1_safety": {
+    "jobs": 11,
+    "shape": "max-hold 09:31 (the backtest's 09:30-bar exit convention, unchanged) + 9 weekday sweeps at :20 + Sunday 18:30",
+    "sweep_hours": [
+      0,
+      4,
+      6,
+      8,
+      10,
+      16,
+      18,
+      20,
+      22
+    ],
+    "sweep_derivation": "from REQUIRED_ENTRY_WINDOWS - no sweep inside any Track 1 entry window; excludes hours 2 (NKD band), 12 (Stress), 14 (swing)",
+    "paths": {
+      "positions": "live_positions.track1.json",
+      "stop": "STOP_TRADING.track1",
+      "lock": "runner.track1.pid",
+      "client_id": 90,
+      "maxhold_marker": "global_index/maxhold_state.track1.json"
+    },
+    "path_identity": "TRACK1_POSITIONS_PATH/STOP_PATH asserted equal to the entry point's own POSITIONS_PATH/STOP_FILE constants",
+    "client_id_reasoning": "legacy safety dials 1; Track 1 data slots dial 89; a sweep firing while the 10:00 Calm slot still holds 89 must not collide - so 90",
+    "registered": "track1-only mode ONLY. Transitional mode unchanged: legacy safety already watches the only book that can hold positions there",
+    "shadow_cost": "run_maxhold_exit returns before connecting when the positions file is absent, so a pure shadow period costs one short-lived process per job",
+    "catch_up": "_catch_up_maxhold_track1, reading ONLY the Track 1 marker; fires only when the job exists (track1-only)"
+  },
+  "marker_separation": {
+    "files": [
+      "global_index/maxhold_state.json (legacy)",
+      "global_index/maxhold_state.track1.json (track1, gitignored)"
+    ],
+    "proven": [
+      "the Track 1 run records into its own file and leaves legacy's untouched",
+      "the legacy marker does NOT suppress the Track 1 catch-up",
+      "the Track 1 marker DOES suppress its own catch-up",
+      "outside track1-only the catch-up is a no-op"
+    ],
+    "why": "a shared already-ran-today file is how one route's run silently suppresses the other's sweep and a five-day position stays open - the audit's named failure"
+  },
+  "inventory": {
+    "jobs": {
+      "default": 60,
+      "track1_shadow": 129,
+      "track1_only": 95
+    },
+    "track1_only_breakdown": {
+      "strategy_slots": 70,
+      "track1_safety": 11,
+      "legacy_safety_drain": 11,
+      "shared_infra": 3
+    },
+    "parity": {
+      "default": "60/58 true",
+      "track1_shadow": "129/127 true",
+      "track1_only": "95/93 true"
+    }
+  },
+  "ops": {
+    "status": "track1_safety_routes reports which route's safety net is scheduled, read from the RUNNING process's command line; track1-only-shadow mode is distinguished from the transitional mode"
+  },
+  "harness_defect_found": {
+    "what": "the first mutation run reported 4/8 detected - S1-S4 (on-disk edits of run_scheduler.py) all UNDETECTED",
+    "why": "the harness ran pytest.main in-process; the mutated module was already cached in sys.modules, so the tests exercised pre-mutation code while the disk said otherwise. The mutation was unfaithful, not the tests",
+    "fix": "on-disk mutations now run pytest in a FRESH subprocess, as an operator's pytest would; in-process monkeypatch mutations keep pytest.main (a subprocess would never see them). 8/8 after the split"
+  },
+  "mutations": {
+    "mutations": [
+      {
+        "mutation": "S1 Track 1 stop repair points at live_positions.json again",
+        "guard": "test_track1_safety_watches_track1s_book_and_only_track1s",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "S2 Track 1 max-hold writes the shared maxhold_state.json again",
+        "guard": "test_the_track1_maxhold_records_into_its_own_file",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "S3 the legacy marker suppresses the Track 1 catch-up",
+        "guard": "test_legacy_marker_does_not_suppress_the_track1_catchup",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "S4 the route env vanishes from the Track 1 safety children",
+        "guard": "test_track1_safety_watches_track1s_book_and_only_track1s",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "S5 the Track 1 safety jobs are absent from track1-only",
+        "guard": "test_track1_safety_exists_only_in_track1_only_mode",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "S6 a legacy strategy job survives track1-only",
+        "guard": "test_no_legacy_strategy_job_in_track1_only",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "S7 a hardcoded '== 11' count returns to the wiring",
+        "guard": "test_no_hardcoded_job_count_in_the_new_wiring",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "S8 a sweep lands inside a Track 1 entry window",
+        "guard": "test_the_sweep_hours_are_derived_from_track1s_own_windows",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      }
+    ],
+    "files_restored": true
+  },
+  "tests": {
+    "stage5o": "26 passed",
+    "mutations": "8/8 detected, run_scheduler.py restored byte-for-byte",
+    "full_sweep_5o_5n_5md_5mc_5mb_5l_3b_ops_mirror": "324 passed, 1 skipped",
+    "stale_updates": "5 assertions in the 5M-D suite scoped to strategy slots (the safety argv is a different contract: no --sleeve, --port legitimate) and bucket/mirror counts extended by the safety jobs",
+    "not_run": "global_index/test_event_playback.py - known hang"
+  },
+  "no_side_effects": [
+    "no scheduler/backend/dashboard started or stopped",
+    "no real IBKR",
+    "no order",
+    "no STOP_TRADING or STOP_TRADING.track1 touched",
+    "no confirmation file",
+    "no live state written - maxhold_state.track1.json does NOT exist; every marker test ran against tmp_path",
+    "no commit"
+  ]
+}

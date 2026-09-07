@@ -1,0 +1,49 @@
+########## A: QUET TOI NEN DUNG CHIEU (co cong mo neo) ##########
+====================================================================================
+CONG MO NEO — moi co TAT, phai tai tao dung so ghim trong INVARIANTS
+====================================================================================
+  baseline    ghim $  42,459/1.72  |  do lai $  42,459/1.72  -> MATCH
+  floor       ghim $  42,565/1.65  |  do lai $  42,565/1.65  -> MATCH
+  vault2324   ghim $  10,757/2.86  |  do lai $  10,757/2.86  -> MATCH
+  vault2025   ghim $   7,404/2.54  |  do lai $   7,404/2.54  -> MATCH
+
+  KET LUAN CONG: PASS — duoc phep doc ket qua phia sau
+
+====================================================================================
+CAU HINH: vu trang 14.0833h + stop co dinh + QUET TOI nen resume dung chieu + SUA KHOP LENH
+MOC     : baseline
+====================================================================================
+  net $12,832  |  Calmar 0.24
+  [sua khop lenh] 762 lenh, $101,974 (co so 1 hop dong, truoc sizing)
+  MaxDD $7,808 (15.6%)  |  return ≈ 3.7%/yr on $50,000
+  circuit-breaker halts: 0
+
+########## B: STOP NEO VAO GIA VAO ##########
+====================================================================================
+CAU HINH: vu trang 14.0833h + stop co dinh + stop neo vao GIA VAO + SUA KHOP LENH
+MOC     : baseline
+====================================================================================
+  net $2,991  |  Calmar 0.07
+  [sua khop lenh] 832 lenh, $114,662 (co so 1 hop dong, truoc sizing)
+  MaxDD $9,395 (18.8%)  |  return ≈ 1.4%/yr on $50,000
+  circuit-breaker halts: 1032
+
+########## C: CA HAI ##########
+====================================================================================
+CAU HINH: vu trang 14.0833h + stop co dinh + QUET TOI nen resume dung chieu + stop neo vao GIA VAO + SUA KHOP LENH
+MOC     : baseline
+====================================================================================
+  net $10,779  |  Calmar 0.19
+  [sua khop lenh] 753 lenh, $99,408 (co so 1 hop dong, truoc sizing)
+  MaxDD $8,065 (16.1%)  |  return ≈ 3.1%/yr on $50,000
+  circuit-breaker halts: 1
+
+########## D: MUC DUNG THAM HOA 2x ##########
+====================================================================================
+CAU HINH: vu trang 14.0833h + stop co dinh + tham hoa 2x + SUA KHOP LENH
+MOC     : baseline
+====================================================================================
+  net $10,967  |  Calmar 0.20
+  [sua khop lenh] 18 lenh, $639 (co so 1 hop dong, truoc sizing)
+  MaxDD $8,106 (16.2%)  |  return ≈ 3.2%/yr on $50,000
+  circuit-breaker halts: 0

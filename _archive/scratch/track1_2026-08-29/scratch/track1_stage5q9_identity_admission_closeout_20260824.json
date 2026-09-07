@@ -1,0 +1,184 @@
+{
+  "stage": "5Q-9",
+  "title": "Close the Track 1 identity and admission blockers before paper orders",
+  "generated_et": "2026-08-25T00:40:00-04:00",
+  "verdict": "IDENTITY_MATCH_CONFIRMED",
+  "verdict_reason": "I-1, I-2 and I-3 are all closed: global_nkd declares the rule it runs, the sizing basis was measured on both sides and the route aligned to the basis its published numbers were admitted under, and the params hash now covers the tradable identity, point value, tick and sizing basis. Signal reproduction is unchanged and still exact. B1 still blocks orders. Paper orders remain blocked by the operational items from Stage 5Q-7, none of which is an identity question.",
+
+  "safety": {
+    "scheduler_or_backend_touched": false,
+    "ibkr_connection": false,
+    "parquet_csv_or_runtime_evidence_written": false,
+    "orders_enabled": false,
+    "confirmation_file_created": false,
+    "track1_orders_approved_env_set": false,
+    "b1_still_blocking": true,
+    "overlap_guard_weakened": false,
+    "signal_rules_changed": false
+  },
+
+  "part_a_i1": {
+    "status": "CLOSED",
+    "file": "global_index/track1_params.py sleeve_config('global_nkd')",
+    "corrected": {
+      "stop_basis": {"was": "chandelier_atr", "now": "fixed_entry_atr"},
+      "stop_multiple": {"was": 2.5, "now": 2.0},
+      "stop_anchor": {"was": "extreme_through_prior_bar", "now": "entry"},
+      "ratchet": {"was": true, "now": false},
+      "arm_hour": {"was": "14:00", "now": "14:05"}
+    },
+    "unchanged_because_already_correct": {
+      "arm_timezone": "Asia/Tokyo",
+      "ema_period": 10, "max_hold_days": 5, "label_lag_days": 1,
+      "data_identity": "NKD_continuous_1m_8y.parquet", "tradable_symbol": "MNK",
+      "point_value": 0.5
+    },
+    "why_the_code_was_right": "the committed MNKD artifact reproduces exactly under NormalR4Params(ema_period=10) — 228 / 31 / 26 rows across floor, vault2025 and vault2026",
+    "also_repaired": "four SOURCES entries still described legacy NKD ('MNKD keeps 2.5', 'the promoted MNKD sleeve keeps it on', 'MNKD unchanged at 14:00 JST')",
+    "hash_change": {"before": "sha256:95e7bd876765e62a97be9df75c50dc2b25314da8ddc8a43c8c554ab129308ae2",
+                    "after": "sha256:19eef4ecde08b3c12d805715e7c8764f31dfc726cdcee23c9144333c9217b8f9"},
+    "checkpoints_invalidated": 0,
+    "checkpoints_invalidated_evidence": "replay_checkpoint.track1.json does not exist; the legacy global_index/replay_checkpoint.json holds zero params_hash entries",
+    "xfail_removed": "test_global_nkd_declares_the_rule_it_runs",
+    "bound_test": "test_the_nkd_mismatch_is_now_zero_fields (was 'exactly five fields')"
+  },
+
+  "part_b_i3": {
+    "status": "CLOSED by measurement",
+    "method": "the committed candidate stream run through the real Track1Book twice, changing nothing but risk_dollars; no gate re-implemented",
+    "bases": {
+      "artifact_basis": "2.5 x daily ATR x point_value x qty (ROSKA4_MULT / NKD_MULT)",
+      "true_stop_distance": "|entry - stop| x pv x qty = 2.0 x daily ATR x pv x qty"
+    },
+    "applies_to": ["roska4_swing", "global_nkd"],
+    "control_arm": {"roska4_calm": "28 of 28 exact", "roska4_stress": "4 of 4 exact", "ratio": 1.0},
+    "results": [
+      {"window": "floor", "candidates": 1379, "taken_artifact": 1160, "taken_true_stop": 1234,
+       "pnl_artifact": 64902.91, "pnl_true_stop": 71981.80, "pnl_delta": 7078.89,
+       "changed_admissions": 129},
+      {"window": "vault2025", "candidates": 183, "taken_artifact": 128, "taken_true_stop": 144,
+       "pnl_artifact": 13236.11, "pnl_true_stop": 16584.81, "pnl_delta": 3348.70,
+       "changed_admissions": 20},
+      {"window": "vault2026", "candidates": 139, "taken_artifact": 91, "taken_true_stop": 98,
+       "pnl_artifact": 8259.85, "pnl_true_stop": 5871.60, "pnl_delta": -2388.25,
+       "changed_admissions": 17}
+    ],
+    "total_changed_admissions": 166,
+    "total_pnl_delta": 8039.34,
+    "direction_of_change": {"reject_cap -> take": 128, "take -> reject_cap": 33,
+                            "reject_family_cap -> take": 2,
+                            "reject_cap -> suppress_same_symbol": 1,
+                            "take -> suppress_same_symbol": 1,
+                            "suppress_same_symbol -> take": 1},
+    "changed_by_sleeve": {"normal": 161, "calm": 3, "nkd": 2},
+    "second_mechanism": "process_instant sorts same-instant candidates by risk high-first, so shrinking two sleeves and not the other two reorders the queue; three of the moved rows are Calm A, whose own risk never changed",
+    "decision": "keep artifact_basis for the two ATR-stop sleeves and ALIGN THE LIVE ROUTE TO IT",
+    "decision_reason": "every published Calmar, MaxDD and net figure was measured under it; switching is a re-rate, not a refinement — vault2026 takes 7 more trades for $2,388 less",
+    "peak_cap_usage": {
+      "gross_formula": "max(long, short) / account — what MultiClusterGuard.admits and family_verdict both use",
+      "floor": {"roska4_swing": [0.049041, 0.047773], "global_nkd": [0.042063, 0.03365],
+                "family_gross": [0.049041, 0.047773], "family_net": [0.048887, 0.043956]},
+      "vault2025": {"roska4_swing": [0.049552, 0.048091], "global_nkd": [0.033902, 0.027121],
+                    "family_gross": [0.049552, 0.048091], "family_net": [0.043812, 0.043855]},
+      "vault2026": {"roska4_swing": [0.048425, 0.049073], "global_nkd": [0.059179, 0.048279],
+                    "family_gross": [0.048425, 0.049073], "family_net": [0.041174, 0.049073]}
+    },
+    "instrument_failures_found_and_fixed": [
+      {"what": "the first harness summed long+short and reported peak roska4_swing gross 0.0903 against a 0.050 cap",
+       "caught_by": "a usage figure above the cap the guard enforces is impossible by construction",
+       "fix": "max(long, short), plus SC6 asserting the bound rather than trusting it"},
+      {"what": "a settlement detector sampled inside _book, before settle_due removes the position from the book, so it could never observe the change it was looking for",
+       "consequence": "two instrumentations disagreed and neither was published until the disagreement was resolved"}
+    ],
+    "net_overshoot_explained": {
+      "observation": "two windows show a NET peak above the 0.044 cap, on BOTH bases",
+      "verified": "zero admissions and zero forced closes ever leave roska4_swing net above cap; the peak is reached at an unrelated instant after a scheduled close",
+      "meaning": "the cap gates NEW RISK; it is not an invariant of the book afterwards, and nothing can un-take a position because another one closed",
+      "related_to_this_decision": false
+    }
+  },
+
+  "part_c_i2": {
+    "status": "CLOSED",
+    "new_fields": ["tradable_symbol", "point_value", "tick", "sizing_basis"],
+    "group": "instrument",
+    "sources": {
+      "tradable_symbol": "Contract.ibkr — the same attribute ibkr_broker._RAITS_TO_IBKR is built from, read one step earlier so the two cannot disagree",
+      "point_value": "the same Contract record",
+      "tick": "the same Contract record; slippage is already hashed as ticks-per-side, so tick SIZE decides what that costs",
+      "sizing_basis": "track1_params.SIZING_BASIS"
+    },
+    "concrete_case_now_caught": {
+      "date": "2026-08-14",
+      "what": "MNKD orders routed to the full-size NKD contract at ten times the intended size",
+      "measured": "-$1,400.00 at the broker against -$140.00 in the sleeve ledger, exactly 10.0000x",
+      "before": "moved no params hash at all",
+      "after": "moves two fields; rp.diff names them"
+    },
+    "signature_defect_found": "sleeve_config(sleeve, inst, ...) has always taken `inst` and until 2026-08-24 never used it — the instrument reached the hash only through the data path",
+    "consequence": "the four R4 instruments no longer share one identity with the data pinned; pin the CONTRACT as well and they collapse again, and the Stage 2 test now asserts both halves",
+    "hashes_after": {
+      "roska4_swing/MES": "sha256:5a74de463a33aaa483a07996a402fb9a767ad72dc5188030124ffc6ba170332d",
+      "roska4_swing/MNQ": "sha256:d5e700c37bcd9ac566f66e897342cacaf7fbfa7591f4051bf61dbcf451035cb4",
+      "roska4_swing/MYM": "sha256:56c4ad078705bc6280a09dc341fb37e59baffa898ca56afeca78b21f99647b50",
+      "roska4_swing/M2K": "sha256:1b6effc84e255caf26656a5d93461a889a7d77a55d33b206687280cc353f1b4b",
+      "global_nkd/MNKD": "sha256:19eef4ecde08b3c12d805715e7c8764f31dfc726cdcee23c9144333c9217b8f9",
+      "roska4_calm/MES": "sha256:50768f105ae6bd126baf4d5586eef220326afcea9e3c2f560d9763efc2261742",
+      "roska4_calm/MNQ": "sha256:c08f7cfb3be7d84cc9f4e5326539e52141b947be1c6031ee332714f848db121e",
+      "roska4_stress/MNQ": "sha256:2f8a44208af5dc44f1f48c271922a4e3f97502e5655a8101fe7b71802d77c76a"
+    },
+    "audit_sources_clean": true
+  },
+
+  "part_d_regression": {
+    "stage4_three_window": "32 passed (17m09s)",
+    "identity_checkpoint_route_livesource_13_files": "446 passed, 3 skipped",
+    "explain_audit_freshness_dashboard_10_files": "436 passed",
+    "stage5q9_new": "17 passed",
+    "stage5q8_updated": "19 passed",
+    "reproduction_after_all_changes": {
+      "normal_r4_incl_mnkd": "1223 / 1223",
+      "calm_a": "421 / 421",
+      "stress_mnq": "50 / 3 / 4, P&L to the cent"
+    },
+    "tests_changed": [
+      {"what": "5Q-8 xfail(strict) removed and the bound test inverted to zero differing fields", "why": "I-1 closed"},
+      {"what": "5Q-8 sizing test inverted", "why": "two sleeves correctly no longer record true_stop_distance"},
+      {"what": "Stage 1 checkpoint fixture + pinned field list gained the four new names", "why": "I-2; the parametrised mutation test then covers them automatically"},
+      {"what": "Stage 2 pinned field set + the legacy bootstrap sleeve_configs", "why": "I-2; derived from the same contract table the route reads"},
+      {"what": "Stage 2 log anchor: EXPECTED_ALL_DAYS matched 91 -> a floor, window stays exactly 85",
+       "why": "NOT a regression — it read 96 tonight because the live_day logs gain lines every trading day; an all-days total pinned to a literal expires by construction, and bumping the number would only move the expiry date"},
+      {"what": "Stage 4 job-count pin 60 -> 61", "why": "Stage 5Q-5 added spy_refresh_pm; second copy of the same stale literal"}
+    ]
+  },
+
+  "production_changes": {
+    "global_index/track1_params.py": ["global_nkd declaration corrected (I-1)",
+                                      "SIZING_BASIS + risk_dollars() + _contract() (I-3)",
+                                      "four new identity fields and their SOURCES (I-2)",
+                                      "four stale SOURCES entries repaired"],
+    "global_index/route_params.py": ["FIELDS gains the 'instrument' group (I-2)"],
+    "global_index/track1_live_source.py": ["the two proxy sleeves size through tp.risk_dollars and record the basis they used instead of a literal (I-3)"]
+  },
+
+  "live_behaviour_change": {
+    "what": "roska4_swing and global_nkd candidates now report risk 25% larger than this morning",
+    "effect": "the live route will admit FEWER positions — the conservative direction, and the one that matches the measured book",
+    "measured_over": "three windows, 1701 candidate rows",
+    "never_run_on_a_live_slot": true,
+    "first_exercise": "the next shadow session"
+  },
+
+  "still_blocking_paper_orders": [
+    {"id": "B-5R-H", "what": "the appender stores the in-progress minute; --repair-boundary fixes the previous one", "from": "5Q-7"},
+    {"id": "B-5R-E/F", "what": "spy_refresh_pm and --repair-boundary are source-only; the restart was blocked", "from": "5Q-7"},
+    {"id": "B-5R-I", "what": "the legacy route still fetches MNKD bars through the order map", "from": "5Q-7"},
+    {"id": "B-5R-C", "what": "the NKD window leaves the Tokyo band after 2026-11-01", "from": "5Q-2"},
+    {"id": "B1", "what": "the order gate", "note": "by design; orders remain impossible"}
+  ],
+
+  "open_option_not_a_defect": {
+    "what": "switching to true_stop_distance",
+    "note": "arguably the more honest number; taking it means re-rating Track 1 first — 166 admissions and a $2,388 swing on vault2026 — and sizing_basis in the hash is what stops it happening by accident"
+  }
+}

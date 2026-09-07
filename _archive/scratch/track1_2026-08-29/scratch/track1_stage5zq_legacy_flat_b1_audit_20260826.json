@@ -1,0 +1,240 @@
+{
+  "stage": "5ZQ",
+  "title": "Legacy flat / B1 closure audit before Track 1 paper",
+  "checked_at": {
+    "utc": "2026-08-26T10:30",
+    "et": "2026-08-26T06:30 EDT",
+    "calgary": "2026-08-26T04:30 MDT",
+    "window": "ET 06:00-07:00"
+  },
+  "answers": {
+    "1_legacy_file_book_flat": {
+      "answer": true,
+      "verdict": "LEGACY_FILE_FLAT",
+      "path": "live_positions.json (repo root, NOT global_index/)",
+      "positions": 0,
+      "size_bytes": 481,
+      "mtime_et": "2026-08-24 09:31",
+      "note": "carries a breaker block: system_equity 50408.25 against last_broker_equity 996730.93 — the account is far larger than the epoch this route sizes from"
+    },
+    "2_broker_flat": {
+      "answer": true,
+      "verdict": "BROKER_FLAT",
+      "positions": 0,
+      "working_orders": 0,
+      "equity": 996883.65,
+      "asked_at_et": "2026-08-26 06:15:51",
+      "how": "IBKRBroker read-only on client id 97 — the class the safety jobs already use. get_positions() (ib.positions(), unfiltered, retry-until-stable) and get_open_orders() (reqAllOpenOrders, ALL clients, None-not-empty on failure).",
+      "corroboration": "the dashboard's own reader on client id 99 reported the same 0/0 and equity 996883.66 — two client ids, two code paths, one answer",
+      "attribution": "not needed. Attribution only matters when something is NONZERO; zero positions and zero working orders is unambiguous however many routes share the login. That is the one shape of B1 a shared account can answer."
+    },
+    "3_orphan_orders": {
+      "answer": false,
+      "why": "there are no working orders at all, so no order can be orphaned and no position can be naked — there are no positions either"
+    },
+    "4_track1_book_flat": {
+      "answer": true,
+      "positions": 0,
+      "schema": 2,
+      "cut_instant": "2026-08-26T02:55:01-04:00",
+      "path": "live_positions.track1.json (repo root)"
+    },
+    "5_can_b1_be_closed_by_measurement": {
+      "measured_half": "PASS",
+      "gate": "STILL OPEN — and that is correct",
+      "why": "B1 is a DECISION about which route owns the login. Proving the account flat at 06:15 does not stop legacy opening a position at 14:05, and no measurement can. The gate now requires BOTH: the operator's recorded decision AND a passing measurement. Before this stage it required only the signature."
+    },
+    "6_what_remains_for_b1": [
+      "the operator records the choice in track1_go_live_confirmation.json — either legacy_retired_confirmed or separate_account_confirmed",
+      "the B1 audit must have a PASS newer than 24h at the moment the gate is read (re-run `python -m global_index.b1_audit --broker ibkr --record`)"
+    ],
+    "7_any_broker_or_order_action": {
+      "answer": false,
+      "did": [
+        "read positions",
+        "read every working order across all clients",
+        "read equity"
+      ],
+      "did_not": [
+        "place an order",
+        "cancel an order",
+        "modify an order",
+        "close a position",
+        "write any account state"
+      ]
+    },
+    "8_runtime_or_live_file_changed": {
+      "answer": "one, by design",
+      "written": "global_index/track1_b1/track1_b1_20260826.jsonl — the audit's own evidence record, created by --record",
+      "untouched": [
+        "live_positions.json",
+        "live_positions.track1.json",
+        "trade_log.jsonl",
+        "trade_log.track1.jsonl",
+        "replay_checkpoint.track1.json",
+        "window_coverage/",
+        "slot_timing/",
+        "signals/",
+        "audits/"
+      ]
+    },
+    "9_orders_still_impossible": {
+      "answer": true,
+      "blocking": [
+        "B1_broker_account_or_legacy_retirement",
+        "PAPER_SHADOW_EVIDENCE",
+        "REGIME_LABEL_VERIFICATION"
+      ],
+      "confirmation_file": false,
+      "track1_orders_approved": false
+    },
+    "10_next_shadow_window_ready": {
+      "answer": true,
+      "scheduler_pid": 18780,
+      "backend_pid": 48760,
+      "restarted": false,
+      "next_track1_window": "roska4_calm 10:00 ET"
+    },
+    "11_before_a_tiny_paper_probe": [
+      {
+        "n": 1,
+        "item": "the B1 decision, recorded",
+        "class": "operator"
+      },
+      {
+        "n": 2,
+        "item": "five clean judgeable shadow days",
+        "class": "time"
+      },
+      {
+        "n": 3,
+        "item": "the regime gate's first PASS",
+        "class": "time"
+      },
+      {
+        "n": 4,
+        "item": "machine sleep",
+        "class": "operator"
+      },
+      {
+        "n": 5,
+        "item": "THE ORDER PATH ITSELF — run_shadow constructs NoOrderBroker unconditionally and IBKRBroker is never constructed in that module. No code on this route can place an order.",
+        "class": "code, unwritten"
+      }
+    ]
+  },
+  "the_defect_that_made_the_cheap_path_unusable": {
+    "where": "monitor/backend/ibkr_reader.py",
+    "shape": "both collectors build their list inside try/except; the handler logs a warning and leaves the list EMPTY, and the payload is then published with connected: true and error: null",
+    "consequence": "an empty positions/orders list meant EITHER 'the account holds nothing' OR 'the call raised', with no way to tell — fail-open, on the exact question B1 asks. The dashboard has been showing 0/0 all along and that 0/0 was never decision-grade.",
+    "fixed": "positions_ok / orders_ok / per-section error now travel on the payload; both start False; both are cleared when the connection drops so a stale True cannot keep testifying",
+    "live": false,
+    "needs": "a backend restart before the snapshot path can answer B1. Until then the audit must be run with --broker ibkr."
+  },
+  "a_method_written_in_5X_that_had_no_caller": {
+    "what": "IBKRBroker.get_open_orders()",
+    "contract": "None when it cannot testify, never []; not filtered by clientId, because an order placed by another client is still exposure on this account",
+    "callers_before": 0,
+    "callers_now": 1,
+    "note": "its docstring names Stage 5U's shared-account finding. The honest reader existed for a year of stages and nothing asked it anything."
+  },
+  "the_legacy_trade_log_cannot_prove_flatness": {
+    "rows": 28,
+    "opens": 18,
+    "closes": 10,
+    "net_unmatched": 8,
+    "span": "2026-08-05 -> 2026-08-11",
+    "book_last_written": "2026-08-24",
+    "the_suspicious_block": "6 MES SHORT 'OPEN' rows on entry_day 2026-08-07 at 19:10, 19:20, 19:30, 19:40, 19:50 and 20:01 UTC — ten minutes apart, every one with order_id null and perm_id null. Six identical opens at a ten-minute cadence is a job re-logging, not six fills.",
+    "so": "18 OPEN rows are not 18 positions, and the log stops 13 days before the book was last written. The BOOK and the BROKER are the authorities here; the trade log is not evidence of flatness in either direction.",
+    "related": "the known exit-path gap — three of five close paths book money and write no trade-log row, which is why exit_path_coverage reads MAX_HOLD = 0"
+  },
+  "a_check_in_the_runbook_that_can_never_fail": {
+    "where": "TRACK1_SHADOW_WINDOW_RUNBOOK.md 2.7, 'what must NOT exist'",
+    "names": "global_index/live_positions.track1.json",
+    "actual": "track1_slots.TRACK1_POSITIONS_PATH == 'live_positions.track1.json' — repo root",
+    "so": "the path it forbids is one the code never writes, so that line can never fire",
+    "and_substantively": "the book is now EXPECTED in shadow — Stage 5ZN gave it the cross-day breaker/day state — so the test is `positions: []`, not absence"
+  },
+  "two_things_caught_in_my_own_work": {
+    "an_unreachable_branch": "measure() had a `position_without_stop` result that could never be returned: any nonzero broker position fails on the line above it. An unreachable branch reads, to anyone auditing the table, as a check that runs. The status was removed; the detection survives as a FINDING on the broker-positions failure.",
+    "the_live_frame_gate_closed_on_me": "the audit tool was first written as global_index/track1_b1_audit.py, and the live-frame gate — which scans every global_index/track1_*.py for IBKRBroker and requires the splice guard — shut immediately. A FOURTH blocker appeared. The gate was right; the file was in the wrong category. It moved to global_index/b1_audit.py beside run_stop_repair and run_maxhold_exit, which connect to IBKR and are outside that namespace for the same reason. The gate was not touched, and a test pins both directions."
+  },
+  "gate_change": {
+    "before": "B1.released(conf) == any(legacy_retired_confirmed, separate_account_confirmed)",
+    "after": "signed AND (measurement passes OR an explicit waiver flag is set)",
+    "direction": "strictly tighter — a signature alone no longer opens it",
+    "new_field": "Blocker.also_requires_measurement (an AND, where released_by_measurement is an OR) plus Blocker.waiver_flag",
+    "waiver": "b1_measurement_waived — releases NOTHING on its own, and load_confirmations refuses it without a `note` saying why the account could not be asked",
+    "unchanged_for_everything_else": "every other blocker has both new fields empty, asserted",
+    "self_check": "clean; two new structural rules added (a waiver with nothing to waive, and a flag that would bypass itself)"
+  },
+  "tests": {
+    "file": "scratch/test_track1_stage5zq_legacy_flat_b1_20260826.py",
+    "count": 46,
+    "style": "structured payloads and AST; no prose greps",
+    "mutations": {
+      "attempted": 11,
+      "red": 11,
+      "guard": "the harness checks pytest actually COLLECTED tests — an exit code of 5 means nothing ran, and reading that as red is how a sweep certifies itself"
+    }
+  },
+  "a_stale_pin_found_in_a_suite_no_regression_set_included": {
+    "test": "scratch/test_track1_dashboard_runtime_wiring_20260824.py",
+    "pinned": "t1Fact('Blocking gate')",
+    "renders": "t1Fact('Blocking gates')",
+    "datable": false,
+    "why_not": "the whole Track 1 panel is uncommitted work on this branch, so there is no earlier revision to compare against. Which stage pluralised the label cannot be established and is not guessed at.",
+    "what_is_measurable": "this suite was in no stage's regression set, so whichever stage renamed it, nothing was watching",
+    "fixed": "the label list corrected AND completed — it pinned 10 of the 13 facts the panel renders, so three could have vanished unnoticed. A second test now checks the other direction."
+  },
+  "claims_deliberately_NOT_made": [
+    "that B1 is closed",
+    "that Track 1 is ready for paper",
+    "that the account will still be flat later today",
+    "that the trade log proves anything about flatness",
+    "that the dashboard's 0/0 was evidence before the reader fix"
+  ],
+  "regression": {
+    "targeted": {
+      "suites": "5ZQ + monitor/ (all) + the two dashboard suites",
+      "passed": 447,
+      "failed": 0
+    },
+    "full_scratch_sweep": {
+      "passed": 2359,
+      "failed": 43,
+      "skipped": 4,
+      "minutes": 18.5,
+      "note": "the same 14 suites run ALONE give 28 failures, so 15 of the 43 are order-dependent — cross-suite state leakage, a separate problem this stage did not chase"
+    },
+    "bisect": {
+      "method": "every 5ZQ edit reverted and both new modules moved aside, in a subprocess, then the same 14 suites re-run and everything restored and digest-verified",
+      "with_5zq": 27,
+      "without_5zq": 26,
+      "caused_by_this_stage": 1,
+      "which": "test_41_get_open_orders_is_CALLED_by_nothing_in_the_legacy_route",
+      "why": "5ZQ gave the method its first caller. The test's NAME says nothing in the LEGACY ROUTE calls it; its ASSERTION said nothing ANYWHERE does — a stronger claim than the intent behind it, and the reason the method sat uncalled for several stages. It now names its allowed callers, still fails on any unnamed one, and a second test requires the allowed caller to actually call it.",
+      "fixed": true
+    },
+    "pre_existing_when_this_stage_began": 26,
+    "repaired_here_anyway": 2,
+    "still_red": 24
+  },
+  "twenty_six_tests_were_already_red_and_no_regression_set_included_them": {
+    "measured": "reverting every 5ZQ change leaves 26 of the 27 failing — they predate this stage. The baseline this stage recorded at 06:03 ET proves the two biggest causes independently: three blockers, and live_positions.track1.json already on disk from the 02:55 NKD close.",
+    "categories_diagnosed": {
+      "roster pins": "tests assert the EXACT blocker list — one blocker, then two. Stale since Stage 5S added PAPER_SHADOW_EVIDENCE and 5ZL added REGIME_LABEL_VERIFICATION. None of these tests is ABOUT the roster; pinning it means every new blocker breaks unrelated suites.",
+      "absence proxies": "tests assert live_positions.track1.json does not exist. Stale since Stage 5ZN deliberately gave the route a cross-day book. Same defect as the runbook line above.",
+      "slot-count pins": "tests expect 25 Track 1 slots and 'the two windows'. Stale since Stage 5N gave the route all four sleeves (70 strategy slots).",
+      "substring-over-prose": "ONE test reported 'a Track 1 slot asks for orders' — matching a COMMENT in the slot builder that says *Still no --allow-orders*. The comment asserting the absence read as the presence."
+    },
+    "not_diagnosed": "the two in 5ZO and the three in 5Z-freshness were not traced. Saying which stage stranded them would be a guess.",
+    "repaired_here_and_why": [
+      "the substring-over-prose one — a red test claiming a shadow slot can request orders is the one alarm nobody should have to re-derive, and it was false",
+      "one roster pin, rewritten to assert its own claim (orders impossible, B1 among the reasons) instead of the roster — which is the repair the whole family needs"
+    ],
+    "deliberately_left": "the other 24. Fixing them is a stage of its own, and doing it half way inside this one would be worse than naming them precisely.",
+    "recommended": "a dedicated sweep: stop pinning rosters, replace absence proxies with mtime-vs-import, and add scratch/ to the regression set some stage runs"
+  }
+}

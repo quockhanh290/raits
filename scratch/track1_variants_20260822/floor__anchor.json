@@ -1,0 +1,41 @@
+{
+ "rows": [
+  {
+   "inst": "M2K",
+   "committed": 178,
+   "regenerated": 178,
+   "ok": true,
+   "first_diff": null
+  },
+  {
+   "inst": "MES",
+   "committed": 188,
+   "regenerated": 188,
+   "ok": true,
+   "first_diff": null
+  },
+  {
+   "inst": "MNKD",
+   "committed": 228,
+   "regenerated": 228,
+   "ok": true,
+   "first_diff": null
+  },
+  {
+   "inst": "MNQ",
+   "committed": 186,
+   "regenerated": 186,
+   "ok": true,
+   "first_diff": null
+  },
+  {
+   "inst": "MYM",
+   "committed": 200,
+   "regenerated": 200,
+   "ok": true,
+   "first_diff": null
+  }
+ ],
+ "all_ok": true,
+ "committed_total": 980
+}

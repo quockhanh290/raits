@@ -1,0 +1,9 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+====================================================================================
+CAU HINH: vu trang 0h
+MOC     : baseline
+====================================================================================
+  net $42,459  |  Calmar 1.72
+  MaxDD $3,574 (7.1%)  |  return ≈ 12.3%/yr on $50,000
+  circuit-breaker halts: 0

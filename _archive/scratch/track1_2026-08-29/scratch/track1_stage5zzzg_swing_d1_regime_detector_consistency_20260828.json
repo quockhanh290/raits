@@ -1,0 +1,129 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZZ-G",
+  "title": "Swing D-1 regime detector consistency - investigated, corrected, not switched",
+  "route": "track1_candidate",
+  "date": "2026-08-29",
+  "measurement_session": "2026-08-28",
+  "clocks": {"machine": "America/Edmonton", "operator": "Asia/Ho_Chi_Minh", "market": "America/New_York"},
+
+  "verdict": "premise half-confirmed; the proposed fix was NOT implemented because it breaks the parity the brief also requires",
+
+  "brief_premise_checked": {
+    "outer_live_gate_uses_causal_regime_label": true,
+    "inner_detector_calls_labels_get_day": true,
+    "swing_detector_receives_raw_labels": true,
+    "swing_detector_sees_same_day_or_none_while_causal_d1_exists": true,
+    "track1_swing_backtest_identity_is_d1_causal": false,
+    "backtest_identity_evidence": [
+      "track1_normal_r4.generate docstring: 'R4 reads the SPY labels directly at ema 50, while MNKD reads them through RegimeLabels(lag_days=1) at ema 10'",
+      "scan_signals and _replay both gate on labels.get(day)",
+      "deploy_sim and run_live_day pass the raw map for the swing basket and RegimeLabels(lag_days=1) for NKD",
+      "futures/swing_tf_harness.backtest_swing_tf line 172: reg = labels.get(day)"
+    ]
+  },
+
+  "measurements": {
+    "label_map_last_entry_on_2026_08_28_evening": "2026-08-27",
+    "day_2026_08_28": {
+      "same_day_raw": null,
+      "causal_d1": "Calm",
+      "regime_labels_lag1": "Calm",
+      "detector_gate_with_raw": {"value": null, "passed": false},
+      "detector_gate_with_lag1": {"value": "Calm", "passed": false},
+      "note": "both refuse today: the sleeve trades Normal only and the label is Calm; only the REASON differs"
+    },
+    "label_object_disagreement": {"days_differing": 238, "days_total": 2175, "share": 0.109},
+    "backtest_run_twice_full_store": {
+      "raw_labels": {"trades": 186, "pnl": -4345.29},
+      "regime_labels_lag1": {"trades": 191, "pnl": -7401.32},
+      "entries_only_in_raw": 44,
+      "entries_only_in_lag1": 49,
+      "entries_shared": 142
+    },
+    "live_impact_measurable": false,
+    "live_impact_note": "swing produced no signal in every recorded shadow session, but the regime was Calm throughout and the sleeve trades Normal only; the confound is total and no live impact is claimed"
+  },
+
+  "why_not_switched": [
+    "the brief requires historical decision parity to remain unchanged; switching moves 93 of 235 entries",
+    "the brief forbids changing trading behaviour; switching changes which days the sleeve trades",
+    "the real defect is the opposite of the one described: the BACKTEST reads a label built from D's close to decide a 14:00 entry, and live fails closed instead of reproducing it",
+    "re-earning the sleeve's numbers under a causal label is a decision about the strategy's justification and belongs to the operator"
+  ],
+
+  "implemented": {
+    "what": "diagnostics report which regime object the detector was handed",
+    "api": "track1_strategy_diagnostics.regime_basis(labels)",
+    "values": {
+      "global_nkd": "previous session (lag 1)",
+      "roska4_swing": "this session's own label"
+    },
+    "properties": [
+      "derived from the object's own lag attribute, never from the sleeve name",
+      "the Regime row equals the detector's regime GATE value, not a second display lookup",
+      "absent rather than guessed when no caller supplied it"
+    ],
+    "detector_arguments_changed": false,
+    "runtime_files_touched": ["global_index/track1_live_source.py"],
+    "runtime_touch_scope": "passes the labels object it already held into the diagnostics stash as a descriptive string; no detector argument changed"
+  },
+
+  "verification": {
+    "swing_backtest_and_live_use_same_semantics": true,
+    "semantics": "both call labels.get(day) on the raw map; they differ only because the row is present in history and absent live",
+    "nkd_and_swing_disagreement_now_explained_on_the_page": true,
+    "missing_label_still_fails_closed": true,
+    "thresholds_schedules_gates_orders_changed": false,
+    "historical_decision_parity_unchanged": true,
+    "dashboard_reports_detector_used_regime": true
+  },
+
+  "tests": {
+    "new_suite": "scratch/test_track1_stage5zzzg_swing_d1_regime_20260829.py",
+    "new_suite_result": {"passed": 18, "failed": 0},
+    "regression_result": {"passed": 184, "failed": 0},
+    "guard": "test_no_sleeve_changed_which_object_it_hands_the_detector fails if any sleeve swaps its labels object, carrying the 44/49 measurement in its message"
+  },
+
+  "mutation_harness": {
+    "method": "source-level, subprocess, restored byte-identical; baseline proved green first",
+    "caught": 8, "total": 8, "restored_byte_identical": true,
+    "harness_broken_on_first_run": [
+      {"id": "M2", "why": "anchor matched 2x (two identical return statements); reported as HARNESS BROKEN, not as a pass; retargeted then red"}
+    ]
+  },
+
+  "safety": {
+    "scheduler_restarted": false,
+    "scheduler_pids": [3000],
+    "broker_connected": false,
+    "orders_dir_created": false,
+    "orders_dir_present": false,
+    "TRACK1_ORDERS_APPROVED_set": false,
+    "confirmation_file_modified": false,
+    "confirmation_file_present": true,
+    "orders_possible": false,
+    "blockers": ["PAPER_SHADOW_EVIDENCE"]
+  },
+
+  "files_changed": [
+    "global_index/track1_strategy_diagnostics.py",
+    "monitor/backend/track1_market_view.py",
+    "global_index/track1_live_source.py",
+    "scratch/test_track1_stage5zzzg_swing_d1_regime_20260829.py"
+  ],
+
+  "decision_left_open": {
+    "question": "which regime label should the Swing sleeve decide on",
+    "options": [
+      {"id": "A", "what": "make Swing causal D-1 and re-earn the numbers",
+       "cost": "93 of 235 entries move; the raw-vs-lag1 run is a first read, not a verdict"},
+      {"id": "B", "what": "keep the identity and accept that live Swing refuses whenever D's row is missing",
+       "cost": "the sleeve trades on a rule the live route can never execute"},
+      {"id": "C", "what": "establish whether D's row can legitimately exist before 14:05",
+       "cost": "reopens the earlier partial-daily-bar question; if it cannot, option B is a sleeve that never fires"}
+    ],
+    "owner": "operator - the choice moves a gate"
+  }
+}

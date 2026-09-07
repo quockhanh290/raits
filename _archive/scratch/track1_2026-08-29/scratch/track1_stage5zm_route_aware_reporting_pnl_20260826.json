@@ -1,0 +1,264 @@
+{
+  "stage": "5ZM",
+  "title": "Track 1 route-aware reporting, PnL, Flex/statement surface, and legacy-reader split",
+  "checked_at": {
+    "utc": "2026-08-26T06:22",
+    "et": "2026-08-26T02:22 EDT",
+    "calgary": "2026-08-26T00:22 MDT",
+    "window": "ET 02:20-03:05"
+  },
+  "naming_note": "the 5ZJ and 5ZK reports are dated 20260826, not 20260825; and the callsite dry-run report is track1_stage5z_callsite_dryrun_20260825.md, not ..._paper_callsite_dryrun_...",
+  "operator_restoration_verified": {
+    "file": "global_index/preflight_state.json",
+    "days": [
+      "2026-08-17",
+      "2026-08-18",
+      "2026-08-19",
+      "2026-08-20",
+      "2026-08-21",
+      "2026-08-24",
+      "2026-08-25"
+    ],
+    "2026_08_26_present": false,
+    "pinned_by_a_test": true,
+    "note": "today's real 13:45 ET pre-flight remains the only thing that can add today"
+  },
+  "answers": {
+    "1_readers_found_and_classified": {
+      "scanned": "global_index, monitor, futures by AST over string literals - 34 files mention one of the four artefact families; 9 of them REPORT",
+      "classes": {
+        "1_legacy_only_by_design": [
+          "global_index/reconcile_statement.py",
+          "monitor/backend/entry_time_reader.py",
+          "monitor/backend/execution_quality_reader.py",
+          "monitor/backend/runner_positions_reader.py",
+          "monitor/backend/report_reader.py"
+        ],
+        "2_already_track1_aware": [
+          "monitor/backend/track1_runtime_reader.py"
+        ],
+        "3_shared_route_split_required": [
+          "monitor/backend/paper_evidence_reader.py",
+          "monitor/paper_pnl_compare.py"
+        ],
+        "4_missing_track1_implementation": [
+          "global_index/session_report.py"
+        ],
+        "5_cannot_verify_until_broker_evidence": [
+          "monitor/flex_pull.py"
+        ]
+      }
+    },
+    "2_made_track1_aware": {
+      "new": "global_index/track1_report.py - the Track 1 reporting reader",
+      "split": [
+        "monitor/backend/paper_evidence_reader.py",
+        "monitor/paper_pnl_compare.py"
+      ],
+      "extended": "monitor/backend/track1_runtime_reader.py (a `reporting` block)"
+    },
+    "3_track1_ever_falls_back_to_legacy": {
+      "answer": false,
+      "asserted_three_ways": [
+        "AST over short string literals, so a docstring mentioning a legacy file is not mistaken for code that reads one",
+        "BEHAVIOURALLY - the whole report runs with `open` and `Path.read_text` wrapped and every path it touches is recorded; a literal check alone would miss a path built by concatenation",
+        "in its own payload: reads_legacy_paths: false"
+      ]
+    },
+    "4_legacy_reports_unchanged": {
+      "output": "unchanged - all 28 existing rows are untagged and all kept, verified",
+      "what_changed": "both aggregates now EXCLUDE foreign-route rows and SAY HOW MANY",
+      "design_point": "the filter excludes FOREIGN routes rather than SELECTING legacy ones. Every row written before 5ZG carries no tag, so 'keep only rows tagged legacy' would have silently emptied both aggregates of their entire history - a failure that would have looked exactly like a working filter. Pinned by a test."
+    },
+    "5_dry_run_can_feed_expected_reporting": {
+      "answer": true,
+      "labelled": "source: dry_run, and the reading says 'INTENDED, not sent'",
+      "why_named_not_inferred": "a rehearsal and a real send produce the same row shape; the only honest way to tell them apart is which gate was open"
+    },
+    "6_broker_or_flex_pnl_verified": {
+      "answer": false,
+      "reasons": [
+        "no_track1_orders_have_been_placed",
+        "route_unattributed"
+      ],
+      "statements_on_disk": 3,
+      "measured_not_assumed": "the newest Flex statement has 37 fields and NONE is a route, a strategy, an order reference or a client id - only ClientAccountID, one account. So even once fills exist, a statement cannot say which route made them while one login serves both. A test asserts the field list against the real file, so the claim decays if the format changes.",
+      "consequence": "a second, sharper reason B1 must be closed BEFORE paper rather than alongside it"
+    },
+    "7_open_position_parity": {
+      "status": "PASS",
+      "code": "both_flat",
+      "detail": "the book holds nothing and no order has been journalled - the two agree, and both are empty for the same reason",
+      "attribution": "attribution_unknown",
+      "attribution_note": "file-level agreement only; while one IB login serves both routes a broker position cannot be attributed to one of them - see B1",
+      "the_five_outcomes": {
+        "book missing/unreadable": "UNKNOWN",
+        "both flat": "PASS (with the attribution caveat in the same payload)",
+        "book flat, journal rows": "FAIL journal_without_book",
+        "book positions, no journal": "FAIL book_without_journal - 'a position nobody can account for'",
+        "both populated": "UNKNOWN not_comparable_yet - matching per instrument needs real fills"
+      },
+      "rule": "UNKNOWN is never PASS"
+    },
+    "8_runtime_or_live_file_changed": {
+      "answer": false,
+      "verified_by_mtime": [
+        "trade_log.jsonl 2026-08-15",
+        "trade_log.track1.jsonl 2026-08-25 22:20 (5ZJ's probe)",
+        "both books unchanged",
+        "paper_pnl_compare.json unchanged",
+        "preflight_state.json still the operator's seven days"
+      ],
+      "no_report_written_to_disk": "track1_report.report() returns a payload and writes nothing"
+    },
+    "9_orders_still_impossible": {
+      "answer": true,
+      "blocking": [
+        "B1_broker_account_or_legacy_retirement",
+        "PAPER_SHADOW_EVIDENCE",
+        "REGIME_LABEL_VERIFICATION"
+      ]
+    },
+    "10_next_shadow_window_ready": {
+      "answer": true,
+      "note": "tonight's NKD window (01:10-02:55 ET) ran throughout, untouched"
+    },
+    "11_remaining_and_next": {
+      "next_stage": "5ZN planned stop / executor lifecycle",
+      "why": "the stop is the widest remaining gap - neither the order nor the journal row has anywhere to record it, so there is nothing for a live working stop to be compared against. The parity work here ends at UNKNOWN for the same underlying reason: the route has no book it carries across a day.",
+      "remaining": [
+        {
+          "n": 1,
+          "item": "machine sleep",
+          "class": "operator"
+        },
+        {
+          "n": 2,
+          "item": "B1 - and the Flex measurement gives it a second, sharper reason",
+          "class": "operator"
+        },
+        {
+          "n": 3,
+          "item": "planned stop not journalled; close_position and place_protective_stop unbuilt; no cross-day book",
+          "stage": "5ZN"
+        }
+      ],
+      "machine_gates_that_open_by_themselves": [
+        "PAPER_SHADOW_EVIDENCE as clean days accumulate",
+        "REGIME_LABEL_VERIFICATION the first time the 16:20 job records a PASS"
+      ],
+      "removed_by_this_stage": "route-aware PnL, open-position parity, legacy-reader split",
+      "two_honest_qualifications": [
+        "a route-aware SESSION REPORT was NOT built: session_report.py is a legacy-book report and giving Track 1 a section before Track 1 has anything to report would be a page that says nothing. Still classified as missing.",
+        "FLEX RECONCILE cannot be built, not merely was not - see answer 6"
+      ]
+    }
+  },
+  "artefact_states": {
+    "three_not_two": {
+      "not_produced": "the artefact does not exist; nothing has written it yet",
+      "empty": "it exists and holds nothing; something ran and had nothing to say",
+      "available": "it exists and holds rows"
+    },
+    "why": "a trade log that exists with zero rows means the route swept and closed nothing; a missing one means no sweep has ever proved its destination writable. Different facts, never printed the same.",
+    "book_variant": "a missing book reports positions: None, not 0"
+  },
+  "route_tag_rule": {
+    "required": "route == 'track1_candidate' on every row",
+    "a_row_without_it": "INVALID, counted separately, never included in a total",
+    "why": "the tag is written by the runner (5ZG) so a row that ended up in the wrong file still names its route - and a row in the RIGHT file that does not name it is legacy's, hand-edited, or written by something that has not been taught the contract. None of those is Track 1 PnL."
+  },
+  "live_report_right_now": {
+    "headline": "Track 1 has no broker-verified P&L: no_track1_orders_have_been_placed; route_unattributed. Trade log empty (0 row(s)); book empty; order journal not_produced (0 INTENDED row(s)); parity PASS.",
+    "trade_log": {
+      "state": "empty",
+      "rows": 0,
+      "invalid_rows": 0
+    },
+    "book": {
+      "state": "empty",
+      "positions": 0,
+      "cut_instant": "2026-08-25T15:55:01-04:00"
+    },
+    "order_journal": {
+      "state": "not_produced",
+      "rows": 0
+    },
+    "broker": {
+      "broker_verified": false,
+      "reasons": [
+        "no_track1_orders_have_been_placed",
+        "route_unattributed"
+      ]
+    },
+    "parity": {
+      "status": "PASS",
+      "code": "both_flat",
+      "attribution": "attribution_unknown"
+    }
+  },
+  "dashboard": {
+    "block": "reporting on /api/v1/track1-runtime",
+    "carries": [
+      "the artefact states",
+      "the counts",
+      "the parity",
+      "broker_verified: false with reasons",
+      "paper_ready: false"
+    ],
+    "sentence": "reporting readiness is not paper readiness; the order gate is held by its own blockers",
+    "fails_closed_if_the_reader_raises": true,
+    "caveat": "the running backend still serves the OLD reader; the block appears after a backend restart, which was not performed"
+  },
+  "tests": {
+    "file": "scratch/test_track1_stage5zm_route_aware_reporting_20260826.py",
+    "count": 41,
+    "all_eleven_brief_items_covered": true,
+    "notable": "the file-watching test. Asserting 'no legacy literal' is a TEXTUAL claim; running the reader with open and Path.read_text wrapped and checking what it actually touched is a BEHAVIOURAL one, and it is the one that survives a path built by concatenation.",
+    "extra_branches": [
+      "a book naming another route is refused",
+      "a malformed line is counted, not swallowed",
+      "broker_verified is never true anywhere in the payload",
+      "the back-compatible three-tuple helper still exists for its callers",
+      "the preflight record still holds the operator's seven days"
+    ]
+  },
+  "regression": {
+    "passed": 570,
+    "failed": 0,
+    "suites": [
+      "5ZM",
+      "5ZL",
+      "5ZF",
+      "5ZG",
+      "5S",
+      "5ZK",
+      "the whole monitor/ suite including both Flex suites and the dashboard DOM"
+    ],
+    "tripwire_fired_and_split": {
+      "test": "5ZF test_15_the_report_flex_and_pnl_paths_are_not_route_aware",
+      "what_happened": "it covered three modules; two are still route-blind and remain pinned, and paper_pnl_compare came off the list",
+      "the_distinction": "it does not READ Track 1 paths - it still reads only legacy's book and log - but it now EXCLUDES tagged rows, so it names track1_candidate and the original assertion could not tell the two apart. A new test draws exactly that distinction."
+    }
+  },
+  "files_changed": {
+    "new": [
+      "global_index/track1_report.py",
+      "scratch/test_track1_stage5zm_route_aware_reporting_20260826.py"
+    ],
+    "modified": [
+      "monitor/backend/paper_evidence_reader.py",
+      "monitor/paper_pnl_compare.py",
+      "monitor/backend/track1_runtime_reader.py",
+      "scratch/test_track1_stage5zf_ops_report_completeness_20260825.py"
+    ],
+    "runtime_files_changed": []
+  },
+  "claims_deliberately_NOT_made": [
+    "paper readiness",
+    "any broker-verified PnL",
+    "a route-aware session report",
+    "a Flex reconcile",
+    "that file-level parity says anything about broker attribution"
+  ]
+}

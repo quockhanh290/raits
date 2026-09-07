@@ -1,0 +1,247 @@
+{
+  "stage": "5",
+  "date": "2026-08-23",
+  "kind": "read-only pre-switch audit / dry-run",
+  "verdict": "READY_FOR_SHADOW_SCHEDULER_ONLY",
+  "verdict_reason": "Two runbook preconditions have no evidence at all (a measured shadow period, and a bootstrapped Track 1 checkpoint), one is ambiguous (its check reports green while the live source still refuses to produce a candidate), and the broker half of 'legacy is flat' is forbidden here. Legacy's LOCAL state is already flat and its scheduler is not running, so there is nothing to drain today.",
+  "not_claimed": [
+    "ready for live orders",
+    "legacy verified flat at the broker",
+    "Track 1 can produce a live decision today"
+  ],
+  "preconditions": [
+    {
+      "n": 1,
+      "text": "Every Track 1 blocker is CLOSED or has its confirmation on file",
+      "check": "track1_gates.may_enable_orders(load_confirmations()[0])",
+      "read_only_now": true,
+      "result": "False - ['B1_broker_account_or_legacy_retirement']",
+      "status": "FAIL_BY_DESIGN",
+      "note": "B1 is the decision this whole stage is about; nothing else blocks"
+    },
+    {
+      "n": 2,
+      "text": "The four sleeves can produce a live decision",
+      "check": "track1_live_sleeves.readiness()['blocked'] == []",
+      "read_only_now": true,
+      "result": "blocked=[] - the check reads PASS",
+      "status": "AMBIGUOUS",
+      "note": "the check does not measure the claim: load_source('live').candidates() still raises NotImplementedError, the Stress sleeve's live chain runs through 4 scratch modules and Calm A's through 1, and the route's own prerequisite list still names today's regime label, a cost object and Calm A stop-risk sizing as missing"
+    },
+    {
+      "n": 3,
+      "text": "Track 1 slots exist in the scheduler and in the dashboard mirror",
+      "check": "track1_slots.parity_report()['in_parity']",
+      "read_only_now": true,
+      "result": "True with shadow OFF and True with shadow ON",
+      "status": "PASS",
+      "note": "construction-level only; no scheduler was started"
+    },
+    {
+      "n": 4,
+      "text": "_ENTRY_WINDOWS contains ((10,35),(12,30))",
+      "check": "as written: run_scheduler._ENTRY_WINDOWS",
+      "read_only_now": false,
+      "result": "the named check CANNOT be run",
+      "status": "PASS_BY_EFFECT",
+      "note": "_ENTRY_WINDOWS is a local variable inside make_scheduler, not a module attribute, so the runbook's check raises AttributeError. Verified by its observable effect instead: shadow ON drops stop_repair_1220 (10 sweeps vs 11) and track1_slots.REQUIRED_ENTRY_WINDOW == run_scheduler._TRACK1_STRESS_WINDOW"
+    },
+    {
+      "n": 5,
+      "text": "Track 1 has run shadow for a measured period with the window ledger on",
+      "check": "window_coverage_*.jsonl shows complete for both windows every trading day",
+      "read_only_now": true,
+      "result": "no window_coverage_*.jsonl exists anywhere in the repo",
+      "status": "FAIL",
+      "note": "scratch/track1_shadow holds replay outputs for vault2025/vault2026 only. A replay of a measured window cannot testify that a window was WATCHED on a given day, which is what this precondition asks for"
+    },
+    {
+      "n": 6,
+      "text": "The Track 1 checkpoint is bootstrapped under track1_params",
+      "check": "track1_bootstrap.accepts(...) returns Resumed, not a Refusal",
+      "read_only_now": true,
+      "result": "Refusal(no_entry) - global_index/replay_checkpoint.track1.json does not exist",
+      "status": "FAIL"
+    },
+    {
+      "n": 7,
+      "text": "Legacy is flat",
+      "check": "live_positions.json positions == [] AND IBKR reports no position",
+      "read_only_now": "half",
+      "result": "file half PASS: positions == [] (0 rows)",
+      "status": "PARTIAL",
+      "note": "the broker half is NOT_CHECKED - connecting to IBKR is forbidden in this stage"
+    },
+    {
+      "n": 8,
+      "text": "The route can build today's frame, and only through the guard",
+      "check": "track1_gates.live_frame_wiring()",
+      "read_only_now": true,
+      "result": "released=True - track1_live_source fetches and joins through the guard",
+      "status": "PASS"
+    }
+  ],
+  "gate_state": {
+    "confirmation_file_exists": false,
+    "self_check": [],
+    "ledger_matches_registry": true,
+    "blocking": [
+      "B1_broker_account_or_legacy_retirement"
+    ],
+    "allow_orders_exit_code": 2,
+    "allow_orders_named": [
+      "B1_broker_account_or_legacy_retirement",
+      "TRACK1_ORDERS_APPROVED not set to 1"
+    ],
+    "named_live_frame_blocker": false
+  },
+  "scheduler_dry_run": {
+    "started": false,
+    "off": {
+      "jobs": 60,
+      "track1_slots": 0,
+      "stop_repair_1220": true
+    },
+    "on": {
+      "jobs": 84,
+      "track1_slots": 25,
+      "stop_repair_1220": false
+    },
+    "delta_on": {
+      "added": 25,
+      "removed": [
+        "stop_repair_1220"
+      ]
+    },
+    "track1_slot_argv": [
+      "python",
+      "-m",
+      "global_index.run_live_day_track1",
+      "--regime-csv",
+      "<csv>"
+    ],
+    "track1_slot_has_allow_orders": false,
+    "track1_slot_has_broker_port": false,
+    "window_constants_agree": true,
+    "parity_off": true,
+    "parity_on": true,
+    "CRITICAL": "--track1-shadow does NOT isolate Track 1. With it ON the scheduler still registers 59 legacy jobs including 23 legacy live_day entry slots, so starting it resumes LEGACY TRADING unless STOP_TRADING is created first"
+  },
+  "route_state_isolation": {
+    "track1_files_present": [],
+    "track1_files_absent": [
+      "live_positions.track1.json",
+      "runner.track1.pid",
+      "global_index/replay_checkpoint.track1.json",
+      "STOP_TRADING.track1"
+    ],
+    "legacy_files_present": {
+      "live_positions.json": "2026-08-21 13:59",
+      "global_index/replay_checkpoint.json": "2026-08-21 12:06",
+      "trade_log.jsonl": "2026-08-15 10:11",
+      "global_index/live_state_data.js": "2026-08-21 13:59"
+    },
+    "legacy_files_absent": [
+      "runner.pid",
+      "STOP_TRADING"
+    ],
+    "shadow_run_changed_legacy": false,
+    "shadow_run_evidence": "md5 of all four legacy files identical before and after the dry-run",
+    "shadow_run_summary": {
+      "candidates": 139,
+      "settlements": 91,
+      "net": 8259.85,
+      "days": 65,
+      "send_order_calls": 0,
+      "written_to": "scratch/track1_shadow/"
+    }
+  },
+  "legacy_local_state": {
+    "positions": 0,
+    "instruments": [],
+    "clusters": [],
+    "exit_pending": 0,
+    "stop_order_id": 0,
+    "STOP_TRADING_present": false,
+    "cur_day": "2026-08-21",
+    "system_epoch": "2026-08-10",
+    "system_equity": 50408.25,
+    "last_broker_equity": 996708.81,
+    "scheduler_running": false,
+    "runner_pid_file": "absent",
+    "recent_events": {
+      "file": "global_index/runner_events_20260821.jsonl",
+      "rows": 135,
+      "levels": {
+        "INFO": 90,
+        "ALERT": 45
+      },
+      "mismatch_or_critical": 0,
+      "only_alert": "G2: model age URGENT - schedule re-freeze immediately"
+    },
+    "hmm_G1_spy_csv": {
+      "last_row": "2026-08-20",
+      "business_days_stale": 1,
+      "soft_gt_2": false,
+      "hard_gt_5": false,
+      "note": "clean today, but nothing refreshes it while the scheduler is down"
+    },
+    "hmm_G2_model_age": {
+      "fit_end": "2024-12-31",
+      "months": 19.7,
+      "soft_gt_12": true,
+      "hard_gt_18": true,
+      "halts": false,
+      "note": "warn-only by design"
+    }
+  },
+  "not_performed": [
+    "IBKR connection of any kind - so 'legacy is flat at the broker' is NOT_CHECKED",
+    "check_open_orders - orphan working STPs at the broker are NOT_CHECKED",
+    "starting or restarting any scheduler or service",
+    "creating track1_go_live_confirmation.json or STOP_TRADING, or setting TRACK1_ORDERS_APPROVED",
+    "global_index/test_event_playback.py - the known hang, excluded by instruction"
+  ],
+  "runbook_defects": [
+    {
+      "where": "S4 confirmation template",
+      "severity": "high",
+      "problem": "names scheduler_wiring_approved, normal_generator_isolation_accepted and calm_a_detector_accepted_frozen, all removed in Stage 4. The file refuses unknown keys whole, so copying the template grants ZERO flags",
+      "measured": "load_confirmations() on the exact template -> REFUSED, flags={}"
+    },
+    {
+      "where": "precondition 2 check",
+      "severity": "high",
+      "problem": "readiness() reports blocked=[] while the live source still refuses to produce a candidate - the check and the claim measure different things"
+    },
+    {
+      "where": "S1 / S5 sequencing",
+      "severity": "high",
+      "problem": "the runbook does not say that enabling the Track 1 shadow scheduler also starts 59 legacy jobs including 23 entry slots, so S1 must precede any scheduler start, not just precede S5"
+    },
+    {
+      "where": "precondition 4 check",
+      "severity": "medium",
+      "problem": "_ENTRY_WINDOWS is a local inside make_scheduler; the check raises AttributeError"
+    }
+  ],
+  "tests_run": {
+    "stage4c": "46 passed",
+    "stage4b": "30 passed",
+    "stage4_default": "25 passed, 1 skipped (7:00)",
+    "stage3b": "72 passed, 1 skipped",
+    "stage3_route": "41 passed, 1 skipped",
+    "the_eight": "156 passed",
+    "stage4_all_windows": "NOT re-run - Stage 4C ran it to 32 passed after the last code change and this stage changed no code",
+    "not_run": "global_index/test_event_playback.py - the known hang, excluded by instruction"
+  },
+  "next_action": [
+    "1. Answer why the scheduler is down - it was running days ago and is not now",
+    "2. Decide B1 explicitly before any file is written",
+    "3. Create STOP_TRADING BEFORE starting any scheduler, not merely before S5",
+    "4. Start the scheduler with --track1-shadow; it is the only thing that can move preconditions 5 and 6",
+    "5. Fix the three high-severity runbook defects",
+    "6. Only then revisit the drain and the broker checks"
+  ],
+  "verdict_would_change_when": "preconditions 5 and 6 hold and precondition 2 either passes honestly or is rewritten to say what it measures; the broker check is then the only thing left, checked at execution time"
+}

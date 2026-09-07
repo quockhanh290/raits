@@ -1,0 +1,77 @@
+{
+ "A_default": {
+  "requested": {
+   "ema": 30,
+   "mult": 2.5,
+   "hold": 5
+  },
+  "artifact_sha16": "1ee198a9f10387c8",
+  "engine_line": "engine actually received (ema, mult, hold): [(30, 2.5, 5)]",
+  "filtered_counts": {
+   "MES": 21,
+   "MNQ": 18,
+   "MYM": 23,
+   "M2K": 19,
+   "MNKD": 26
+  }
+ },
+ "B_wfo_winner": {
+  "requested": {
+   "ema": 50,
+   "mult": 2.0,
+   "hold": 5
+  },
+  "artifact_sha16": "1ee198a9f10387c8",
+  "engine_line": "engine actually received (ema, mult, hold): [(50, 2.0, 5)]",
+  "filtered_counts": {
+   "MES": 21,
+   "MNQ": 18,
+   "MYM": 23,
+   "M2K": 19,
+   "MNKD": 26
+  }
+ },
+ "C_ema10": {
+  "requested": {
+   "ema": 10,
+   "mult": 2.0,
+   "hold": 5
+  },
+  "artifact_sha16": "b878f9fd39cb7171",
+  "engine_line": "engine actually received (ema, mult, hold): [(10, 2.0, 5)]",
+  "filtered_counts": {
+   "MES": 22,
+   "MNQ": 20,
+   "MYM": 24,
+   "M2K": 23,
+   "MNKD": 26
+  }
+ },
+ "D_ema20": {
+  "requested": {
+   "ema": 20,
+   "mult": 2.0,
+   "hold": 5
+  },
+  "artifact_sha16": "ef3ef40d10f36315",
+  "engine_line": "engine actually received (ema, mult, hold): [(20, 2.0, 5)]",
+  "filtered_counts": {
+   "MES": 22,
+   "MNQ": 19,
+   "MYM": 24,
+   "M2K": 23,
+   "MNKD": 26
+  }
+ },
+ "_substitution_rule": {
+  "30": 50,
+  "50": 50,
+  "10": 10,
+  "20": 20
+ },
+ "_cfg": {
+  "ema": 50,
+  "stop_basis": 2.0,
+  "ratchet": false
+ }
+}

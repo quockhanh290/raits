@@ -1,0 +1,82 @@
+import json, sys
+from pathlib import Path
+sys.path.insert(0, str(Path.cwd()))
+from global_index import track1_gates as g
+
+out = {
+ "stage": "5B", "date": "2026-08-23",
+ "kind": "runbook + check fixes only; no scheduler, no broker, no orders",
+ "verdict": "RUNBOOK_FIXED_READY_FOR_MANUAL_STOP_TRADING_THEN_SHADOW_START",
+ "verdict_meaning": ("all four Stage 5 defects are fixed in the runbook and pinned by tests. "
+                     "The next step is a human one: decide the scheduler-down question, then "
+                     "place STOP_TRADING, then start the scheduler with --track1-shadow. This "
+                     "stage did none of those."),
+ "runbook_changes": [
+   {"defect": "S4 confirmation template refused by the schema",
+    "fix": ("template reduced to schema_version / confirmed_by / confirmed_at / "
+            "legacy_retired_confirmed (or separate_account_confirmed) / optional note; the "
+            "three removed flags are named only in the prose that explains their removal"),
+    "plus": "a do-not-write-this-file-yet warning above the template, and a verify snippet",
+    "verified": "the template now parses and grants the flag; measured on a temp copy"},
+   {"defect": "STOP_TRADING placed before the scheduler SWAP, not before any START",
+    "fix": ("new section 2 (S0a/S0b) placed BEFORE all steps, with the measured job table "
+            "showing shadow ON keeps 59 legacy jobs and all 23 legacy entry slots, and the "
+            "explicit order STOP_TRADING -> start -> watch"),
+    "plus": "S1 now cross-references S0b for the scheduler-is-down case"},
+   {"defect": "precondition 4 named _ENTRY_WINDOWS, a local variable",
+    "fix": ("row rewritten to 'no stop-repair sweep lands inside the Stress window', with a "
+            "runnable effect-based snippet: build both schedulers, assert stop_repair_1220 in "
+            "off and not in on, off-on == {stop_repair_1220}, 24 stress slots 10:35..12:30, "
+            "and the three window constants equal plus parity true in both modes"),
+    "note": ("the one surviving mention of _ENTRY_WINDOWS is the paragraph explaining why it "
+             "cannot be used; a test pins that it is the only one and that it says so")},
+   {"defect": "precondition 2 claimed a live decision the route cannot take",
+    "fix": ("split into 2a (generators promoted, readiness green — PASS) and 2b (a live "
+            "decision is actually produced — FAIL), with a paragraph saying the honest "
+            "statement is 'the sleeves are promoted', never 'Track 1 can trade today'")},
+   {"defect": "preconditions 5 and 6 read as regressions",
+    "fix": ("a status table marks them EXPECTED to fail before the first shadow run and says "
+            "starting is what fixes them, not fixing before starting")},
+   {"defect": "local flat read as broker flat",
+    "fix": ("precondition 7 row now says 'at the broker, not only on disk' and adds the "
+            "orphan-STP condition; a new block says legacy is not flat until IBKR has been "
+            "asked; S3 gains a warning that neither check has ever been run and that the "
+            "account holds more than this system, so 'no position' means no position on the "
+            "five symbols, not an empty account")},
+ ],
+ "answers": {
+   "s4_template_passes_schema": True,
+   "stop_trading_before_start_explicit": True,
+   "precondition_4_now_effect_based": True,
+   "precondition_2_no_longer_overclaims": True,
+ },
+ "gate_state_unchanged": {
+   "confirmation_file_exists": Path(g.CONFIRMATION_PATH).exists(),
+   "self_check": g.self_check(),
+   "blocking": [b.id for b in g.blocking()],
+ },
+ "remaining_unknowns": [
+   {"what": "why the scheduler is down", "status": "UNKNOWN",
+    "note": ("it was running days earlier and is not now; no record says who stopped it. If "
+             "accidental, the system has been silently not trading since 2026-08-21")},
+   {"what": "is legacy flat at the broker", "status": "NOT_CHECKED",
+    "note": "requires IBKR, forbidden in Stage 5 and 5B. Local file flat is not broker flat"},
+   {"what": "are there orphan working STP orders", "status": "NOT_CHECKED",
+    "note": "requires IBKR; step S3 exists because such an order fills into a new position"},
+   {"what": "shadow window coverage (precondition 5)", "status": "ABSENT_AS_EXPECTED",
+    "note": "no window_coverage_*.jsonl; only a shadow scheduler run can produce it"},
+   {"what": "Track 1 checkpoint (precondition 6)", "status": "ABSENT_AS_EXPECTED",
+    "note": "Refusal(no_entry); the first real shadow slot bootstraps it"},
+   {"what": "can Track 1 produce a live decision (precondition 2b)", "status": "NO",
+    "note": "load_source('live').candidates() still raises; needs regime label, cost, sizing"},
+ ],
+ "constraints_held": [
+   "no scheduler started or restarted", "no IBKR connection", "no order",
+   "no dashboard runtime file written", "STOP_TRADING not created",
+   "track1_go_live_confirmation.json not created", "TRACK1_ORDERS_APPROVED not set",
+   "no commit", "global_index/test_event_playback.py not run",
+ ],
+}
+Path("scratch/track1_stage5b_runbook_fix_20260823.json").write_text(
+    json.dumps(out, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+print("verdict:", out["verdict"])

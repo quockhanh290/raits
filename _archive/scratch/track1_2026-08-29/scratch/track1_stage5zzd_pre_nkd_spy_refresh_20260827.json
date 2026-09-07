@@ -1,0 +1,155 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZD",
+  "title": "Pre-NKD last-chance SPY refresh, and the Monday nobody was covering",
+  "when_et": "2026-08-27T06:35:00-04:00/2026-08-27T06:50:00-04:00",
+
+  "verdicts": {
+    "pre_nkd_last_chance_built": true,
+    "required_date_logic": "the previous TRADING day, asked of track1_freshness rather than restated; verified across weekends and Labor Day",
+    "no_op_when_covered": true,
+    "final_missing_is_loud": true,
+    "scheduler_restart_required": true,
+    "orders_possible": false,
+    "production_spy_csv_touched": false,
+    "runtime_files_touched": false
+  },
+
+  "the_job": {
+    "id": "spy_last_chance_pre_nkd",
+    "label": "SPY_LAST_CHANCE_PRE_NKD",
+    "at_et": "00:45",
+    "days": "mon-fri",
+    "first_nkd_slot_et": "01:10",
+    "clearance_minutes": 25,
+    "slot_was_free": true,
+    "argv": ["--csv <regime_csv>", "--verify-strict", "--require-through <previous trading day>",
+             "--skip-if-covered"],
+    "protects": ["the overnight NKD window at 01:10",
+                 "Calm DECIDE at 09:32", "Calm OBSERVE at 10:02"],
+    "why_those": "everything that runs before the 13:45 pre-flight reads this file and refuses if it is short"
+  },
+
+  "required_date": {
+    "rule": "the previous trading day at the ET session date",
+    "source": "track1_freshness.required_daily_close_through, asked rather than restated",
+    "clock": "_et_today(), not date.today()",
+    "why_the_clock_matters": "that helper's docstring records the measurement: on any machine west of ET the 01:10-02:55 slots land on the PREVIOUS local date; a job at 00:45 would ask for the wrong session by one day exactly when it matters most",
+    "verified_over": "2026-08-24 to 2026-09-08, sixteen consecutive days",
+    "agreement_with_what_nkd_needs_at_0110": "every day",
+    "samples": {
+      "2026-08-27 Thu": "2026-08-26",
+      "2026-08-31 Mon": "2026-08-28 (the Friday)",
+      "2026-09-08 Tue": "2026-09-04 (skips Labor Day 2026-09-07)"
+    },
+    "the_gap_this_job_exists_for": {
+      "when": "Monday 00:45",
+      "why": "the previous trading day is the Friday, and the last evening rung ran Friday 17:15 — thirty-one hours earlier",
+      "before_this_stage": "nothing between Friday 17:15 and Monday 01:10 ever looked"
+    }
+  },
+
+  "three_outcomes": {
+    "already_covered": {
+      "message": "nothing to do — the daily series covers <day>, which is what the overnight window and both Calm phases will ask for.",
+      "launcher_called": false,
+      "api_key_used": false,
+      "can_fail": false,
+      "comparison": ">= not ==; a file already ahead of the requirement is not short"
+    },
+    "recovered": {
+      "message": "RECOVERED at the last look — <day> arrived after the evening ladder had given up. The 17:15 rung is running before the provider is ready on at least some days.",
+      "level": "WARNING",
+      "why_not_info": "a last chance that keeps saving the evening is an evening schedule that wants moving"
+    },
+    "still_missing": {
+      "message": "SPY daily file is missing <day>; NKD/Calm freshness-bound slots will refuse unless manually refreshed. ... This is the LAST attempt before the overnight window at 01:10 — nothing else looks until the 13:45 pre-flight, which is after both Calm phases.",
+      "level": "ERROR",
+      "carries_the_command": true,
+      "label_distinct_from_evening": "SPY_LAST_CHANCE_PRE_NKD vs SPY_REFRESH_PM_R2",
+      "why_distinct": "same shortfall, two moments: the evening rung says a morning is at risk, this one says the morning is lost unless somebody acts now"
+    },
+    "dry_run": "reports that nothing was attempted and returns; it does not judge itself against a file nothing touched"
+  },
+
+  "status_and_dashboard": {
+    "changed_by_this_stage": false,
+    "why_not_needed": "both compute the requirement from the same freshness module, so at 00:45 they already name the same day",
+    "ops_status": "spy_daily_coverage=covers_required_day last=2026-08-26 required=2026-08-26",
+    "dashboard_row": "SPY daily",
+    "kept_apart_from_slot_verdict": true,
+    "evidence": "on 2026-08-27 the NKD audit read PASS on 22 of 22 slots while its per-slot diagnostics said the inputs were stale — two true facts about different things"
+  },
+
+  "tests": {
+    "file": "scratch/test_track1_stage5zzd_pre_nkd_spy_refresh_20260827.py",
+    "count": 21,
+    "result": "21 passed",
+    "network_calls": 0,
+    "writes_outside_tmp_path": 0,
+    "production_series": "read, never modified",
+    "real_mutations": [
+      "the calendar replaced so the requirement becomes the session's own day",
+      "the calendar replaced so the holiday stops being skipped"
+    ],
+    "source_guards": [
+      "the final shortfall is still logged at ERROR",
+      "the no-op comparison has not been inverted or narrowed to equality"
+    ],
+    "guard_vs_mutation": "the guarded branches live inside a closure that cannot be reached from outside to be broken, so they assert a property of the source. A source guard catches an edit, not a behaviour — weaker, and labelled so nobody counts four mutations here."
+  },
+
+  "pin_i_broke_and_repaired": {
+    "what": "the previous stage's test asserted the scheduler's TOTAL size (63/133/104)",
+    "broken_by": "this stage adding one job unrelated to the ladder",
+    "why_it_matters": "the roster anti-pattern already on this project's record — a pin that fails for something it is not about teaches whoever reads it that the failure is noise",
+    "repair": "expressed as a property: the ladder is the three named rungs in every mode",
+    "and_prospectively": "this stage's own equivalent test was rewritten the same way before it could rot — the SPY family is four named jobs"
+  },
+
+  "inventory_measured": {
+    "method": "real make_scheduler construction",
+    "legacy": {"before": 63, "after": 64},
+    "transitional": {"before": 133, "after": 134},
+    "track1_only": {"before": 104, "after": 105},
+    "delta": 1,
+    "spy_family": ["spy_refresh_pm", "spy_refresh_pm_r1", "spy_refresh_pm_r2",
+                   "spy_last_chance_pre_nkd"],
+    "note": "recorded as a measurement; the TESTS assert the family, not these totals"
+  },
+
+  "restart": {
+    "required": true,
+    "same_restart_as": "5ZZC — one restart brings both the retry rungs and this job live",
+    "running_scheduler_pid": 5856,
+    "running_scheduler_started_et": "2026-08-27T04:08:09-04:00",
+    "nothing_worse_meanwhile": "tonight's 16:20 refresh behaves as it did yesterday, status says whether the file is short, and today's file already covers what the morning asks for",
+    "window_et": "12:40-13:45",
+    "window_length_minutes": 65,
+    "command": "python monitor\\ops.py restart --scheduler --track1-only-shadow --yes",
+    "argv_verified": "--shadow-resume is the default on that path, so the replacement starts byte-identical to PID 5856",
+    "run_by_this_stage": false
+  },
+
+  "unchanged": {
+    "track1_slot_logic": true,
+    "order_gate": true,
+    "paper_blockers": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "orders_dir": "ABSENT",
+    "shadow_intent_dir": "ABSENT",
+    "confirmation_file": "ABSENT",
+    "spy_csv_md5": "80f062531f4b61bc131005c0e9da376e",
+    "live_positions_track1_mtime_et": "2026-08-27T02:55:42-04:00",
+    "replay_checkpoint_mtime_et": "2026-08-27T02:55:42-04:00"
+  },
+
+  "still_pending_from_5zzc": {
+    "calm_decide_observed": false,
+    "calm_observe_observed": false,
+    "at_et": ["09:32", "10:02"],
+    "recorded_at_et": "2026-08-27T06:49:17-04:00",
+    "note": "nothing in this stage touches those phases"
+  },
+
+  "suites_after": "206 passed across the SPY, ops, dashboard and Calm shadow-intent set"
+}

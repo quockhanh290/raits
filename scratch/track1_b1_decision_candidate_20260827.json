@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "confirmed_by": "kevindo290",
+  "confirmed_at": "2026-08-27",
+  "legacy_retired_confirmed": true,
+  "note": "Operator decision, Stage 5ZZJ. Legacy is retired FOR THIS PAPER LOGIN (IBKR paper account DUR125337): legacy entry jobs must not use this login, and track1_candidate is the sole paper trading route on it. Evidence: B1 audit record global_index/track1_b1/track1_b1_20260827.jsonl (PASS legacy_and_broker_flat, checked 2026-08-27T16:04:17Z, broker 0 positions / 0 working orders, legacy book 0, Track 1 book 0 schema_version 2 route track1_candidate) and account baseline global_index/track1_runtime/account_baseline (PASS account_flat_and_funded, USD 250,817.91, checked 2026-08-27T11:29:47Z). This decision does not enable orders and does not waive the measurement."
+}

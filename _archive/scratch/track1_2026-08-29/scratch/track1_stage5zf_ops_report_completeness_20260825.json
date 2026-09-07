@@ -1,0 +1,307 @@
+{
+  "stage": "5ZF",
+  "title": "ops and report completeness before paper",
+  "naming_note": "Stage 5ZE (job-view chip and operator diagnostics) is COMPLETE, not running. This stage neither overwrote nor extended its UI.",
+  "checked_at": {
+    "utc": "17:10",
+    "et": "2026-08-25 13:10 EDT",
+    "calgary": "11:10 MDT",
+    "tokyo": "2026-08-26 02:10 JST"
+  },
+  "verdicts": {
+    "next_shadow_window": "READY",
+    "paper": "NOT_READY",
+    "spy_refresh_pm_failure_visible_correctly": "now yes - was visible but unactionable; fixed",
+    "dashboard_stale_runner_label": "FIXED (backend + rail, tested)",
+    "track1_flex_pnl_report": "MISSING - not partial",
+    "regime_labelling_consistent_with_two_spy_updates": "yes, by construction, with one caveat",
+    "live_or_runtime_file_touched": false,
+    "scheduler_restarted": false,
+    "backend_restarted_by_this_stage": false
+  },
+  "q1_job_inventory": {
+    "method": "constructed the real scheduler in dry-run and enumerated it",
+    "total": 101,
+    "by_class": {
+      "shared_infra": 4,
+      "legacy_drain_safety": 11,
+      "track1_strategy": 70,
+      "track1_safety": 11,
+      "track1_audit": 5
+    },
+    "unclassified": [],
+    "legacy_strategy_jobs": 0,
+    "scheduler_log_line": "45 legacy strategy jobs not scheduled",
+    "shared_infra_ids": [
+      "heartbeat",
+      "preflight",
+      "session_report_fallback",
+      "spy_refresh_pm"
+    ],
+    "legacy_drain_ids": [
+      "maxhold_exit",
+      "stop_repair_0020",
+      "stop_repair_0420",
+      "stop_repair_0620",
+      "stop_repair_0820",
+      "stop_repair_1020",
+      "stop_repair_1620",
+      "stop_repair_1820",
+      "stop_repair_2020",
+      "stop_repair_2220",
+      "stop_repair_sun_1830"
+    ],
+    "runtime": {
+      "scheduler_pid": 48604,
+      "scheduler_since_et": "2026-08-25T01:07",
+      "backend_pid": 35592,
+      "backend_since_et": "2026-08-25T12:14",
+      "backend_restarted_by": "the operator, before this stage"
+    }
+  },
+  "q2_spy_refresh_pm": {
+    "emits_normal_job_evidence": true,
+    "run_call_sites": 1,
+    "mirrored_in_schedule_status": true,
+    "mirror_slot_et": "16:20",
+    "writes_preflight_state": false,
+    "measured_by": "AST - job_spy_refresh_pm never calls _save_preflight_state nor touches _preflight_ok",
+    "was_typed_as": "other (the catch-all)",
+    "old_impact": "The job emitted an unclassified error; completion and operational effects cannot be confirmed from this evidence.",
+    "fix": "a spy_refresh_pm job type with a real impact/action for failed AND missed",
+    "now_typed_as": "spy_refresh_pm",
+    "separate_evidence_system_built": false
+  },
+  "q3_stale_runner_label": {
+    "root_cause_confirmed": true,
+    "chain": [
+      "LIVE_STATE_PATH (legacy runner state)",
+      "observed_at",
+      "stale_against_latest",
+      "freshness = stale",
+      "stripFreshness === 'stale'",
+      "stripScheduleBad",
+      "scheduler attention required"
+    ],
+    "why": "in track1-only shadow the 45 legacy strategy jobs are deliberately not registered, so nothing ever writes that file",
+    "measured_live_age_hours": 34.1,
+    "defect_class": "an alarm that never turns off - same as the open_incidents fix",
+    "fix": {
+      "backend": "a stale legacy snapshot no longer sets freshness when track1_only_enabled(); every other branch reads the scheduler LOG, which in this mode holds the Track 1 slots",
+      "demoted_not_hidden": "new legacy_runner block + route_mode",
+      "frontend": "the rail no longer fires on stale/missing when legacy is inactive by design",
+      "legacy_route_unchanged": true
+    },
+    "result_measured": {
+      "before": "stale",
+      "after": "late",
+      "why_late_is_correct": "unexplained_overdue names TRACK1_CALM_1000 and TRACK1_STRESS_1035 - the slots the machine slept through"
+    },
+    "false_alarm_i_nearly_reported": "track1_only_enabled() returned False in my shell, which would have made the fix inert. It reads RAITS_TRACK1_ONLY, which monitor/ops.py:177 sets on the BACKEND's environment. The live backend reports state_slot_count=70, only possible if it has the flag. Measured before reporting"
+  },
+  "q4_signal_diagnostics_placement": {
+    "stage_5zd": "implemented the diagnostics journal",
+    "stage_5ze": "COMPLETE - chip, operator language, Operational block",
+    "contract": {
+      "covers_only_70_strategy_slots": true,
+      "enforced_in": [
+        "SignalRow.__post_init__ sleeve allow-list",
+        "job view prefix test before the legacy prefixes"
+      ],
+      "non_strategy_jobs_use_operations_health": true,
+      "no_expanded_card_per_slot": true,
+      "track1_panel": "compact Signals today, counts only",
+      "job_view": "one chip with a required plain-English tooltip",
+      "rule_checks": "stricter than asked - on the payload under debug, and NO code path renders them, because every sleeve rule returns unmeasured",
+      "no_raw_developer_names_in_operator_view": true,
+      "tested_against": "rendered output in a real browser, not the file",
+      "no_duplicated_runtime_detail": "REFUSED/MISSED/NO DIAGNOSTICS point at Operational rather than repeating it"
+    }
+  },
+  "q5_route_aware_report_flex_pnl": {
+    "verdict": "MISSING - not partial",
+    "method": "AST over string literals and imports, docstrings excluded",
+    "modules": {
+      "global_index/session_report.py": {
+        "track1_imports": [],
+        "track1_paths": [],
+        "legacy_paths": [
+          "live_positions.json"
+        ]
+      },
+      "monitor/flex_pull.py": {
+        "track1_imports": [],
+        "track1_paths": [],
+        "legacy_paths": []
+      },
+      "monitor/paper_pnl_compare.py": {
+        "track1_imports": [],
+        "track1_paths": [],
+        "legacy_paths": [
+          "live_positions.json",
+          "trade_log.jsonl"
+        ]
+      }
+    },
+    "prompt_expectation_was_understated": "not one of the three knows Track 1 exists",
+    "sharpest_gap": {
+      "what": "run_maxhold_exit.py:171 and run_stop_repair.py:180 hardcode trade_log_path=_CWD/'trade_log.jsonl' with no route scoping",
+      "why_it_matters": "both are TRACK 1's safety jobs - the scheduler passes them --positions-path live_positions.track1.json - so the first Track 1 fill a safety job later exits writes a CLOSE row into the LEGACY trade log, indistinguishable from a legacy row",
+      "trade_logs_on_disk": 1
+    },
+    "track1_entry_point_clean": "trade_log.jsonl appears in run_live_day_track1.py only inside LEGACY_PATHS, the list it must never write",
+    "missing_pieces_before_paper": [
+      {
+        "n": 1,
+        "piece": "Track 1 order journal -> P&L reader",
+        "state": "missing"
+      },
+      {
+        "n": 2,
+        "piece": "live_positions.track1.json -> open-position parity",
+        "state": "missing"
+      },
+      {
+        "n": 3,
+        "piece": "Track 1 fills -> Flex statement reconcile",
+        "state": "missing"
+      },
+      {
+        "n": 4,
+        "piece": "Track 1 safety exits -> route-scoped reporting path",
+        "state": "missing, and ACTIVELY WRONG - they write the legacy log",
+        "do_first": true
+      },
+      {
+        "n": 5,
+        "piece": "route-aware session report section or separate Track 1 report",
+        "state": "missing"
+      },
+      {
+        "n": 6,
+        "piece": "prevention of Track 1 rows folding into the legacy trade log",
+        "state": "missing - see #4"
+      }
+    ],
+    "implemented_here": false,
+    "why_not": "six pieces is a stage of its own; #4 is the one to do first because it is the only one that CORRUPTS an existing artefact rather than omitting a new one",
+    "negative_findings_pinned_by_tests": 5
+  },
+  "q6_regime_labels_and_spy_refreshes": {
+    "spy_csv_is": "a close series only - date,close, 2424 rows",
+    "labels_persisted_anywhere": false,
+    "labels_computed_on_read": true,
+    "measured_by": "regime.py has zero persistence calls; load_spy_regime runs the HMM decode per read",
+    "therefore": "both refresh times are sufficient BY CONSTRUCTION - there is no materialisation step that could lag behind a SPY update",
+    "1345_refresh": "runs before the close and can never carry today's bar; the gate does not ask for it - required_daily_close_through is the last trading day BEFORE today, the same answer all day",
+    "1620_refresh": "writes today's close, which is exactly what the next morning needs",
+    "monday_reads_friday": true,
+    "verified_by": "RegimeLabels.get uses asof(day - lag); Monday lag 1 asks Sunday, gets Friday",
+    "friday_1620_enough_for_monday": true,
+    "holidays": "required_daily_close_through uses prev_trading_day, the same trading calendar",
+    "caveat": {
+      "what": "verify_regime_labels ONLY warns - every path returns 0",
+      "paths": [
+        "ImportError -> warn, return 0",
+        "CSV load failure -> warn, return 0",
+        "label_regimes failure -> warn, return 0",
+        "labels actually changed -> warn, return count"
+      ],
+      "consequence_1": "a label drift does not fail the job; update_spy_csv succeeds, the journal shows success, the dashboard shows nothing",
+      "consequence_2": "'verified, no drift' and 'could not verify' both return 0 - the tri-state defect this route removed from its broker reads, still standing here",
+      "acceptable_for_shadow": true,
+      "acceptable_for_paper": false,
+      "recommendation": "make it a child failure, visible as the same job's failure, before the first paper order",
+      "changed_here": false,
+      "why_not": "a behaviour change to a shared job; this stage's remit was reader-level"
+    }
+  },
+  "q7_blockers": [
+    {
+      "blocker": "PAPER_SHADOW_EVIDENCE (0 of 5 judgeable days)",
+      "class": "evidence",
+      "blocks_next_shadow_window": false,
+      "blocks_paper": true,
+      "blocks_live": true
+    },
+    {
+      "blocker": "B1_broker_account_or_legacy_retirement",
+      "class": "operator",
+      "blocks_next_shadow_window": false,
+      "blocks_paper": true,
+      "blocks_live": true
+    },
+    {
+      "blocker": "Track 1 route-aware P&L / Flex / report (6 pieces)",
+      "class": "code",
+      "blocks_next_shadow_window": false,
+      "blocks_paper": true,
+      "blocks_live": true
+    },
+    {
+      "blocker": "Track 1 safety exits writing the legacy trade log",
+      "class": "code",
+      "blocks_next_shadow_window": false,
+      "blocks_paper": true,
+      "blocks_live": true
+    },
+    {
+      "blocker": "regime label verification is warn-only",
+      "class": "code",
+      "blocks_next_shadow_window": false,
+      "blocks_paper": true,
+      "blocks_live": true
+    },
+    {
+      "blocker": "machine sleep (33 stalls, 22.1h)",
+      "class": "operator",
+      "blocks_next_shadow_window": true,
+      "blocks_paper": true,
+      "blocks_live": true
+    },
+    {
+      "blocker": "SPY_REFRESH_PM unactionable impact",
+      "class": "ui_ops",
+      "blocks_next_shadow_window": false,
+      "blocks_paper": false,
+      "blocks_live": false,
+      "status": "FIXED"
+    },
+    {
+      "blocker": "stale runner label",
+      "class": "ui_ops",
+      "blocks_next_shadow_window": false,
+      "blocks_paper": false,
+      "blocks_live": false,
+      "status": "FIXED"
+    }
+  ],
+  "orders": {
+    "orders_possible": false,
+    "blocking": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "confirmation_file": false,
+    "track1_orders_approved_env": false,
+    "allow_orders_added": false,
+    "order_journal_dir": false,
+    "track1_book": false
+  },
+  "tests": {
+    "stage_5zf": 33,
+    "regression_8_files": "487 passed, 0 failed"
+  },
+  "files": [
+    "monitor/backend/job_journal_reader.py",
+    "monitor/backend/schedule_status.py",
+    "global_index/dash/realtime/realtime.js",
+    "scratch/test_track1_stage5zf_ops_report_completeness_20260825.py"
+  ],
+  "not_touched": [
+    "any strategy file",
+    "any scheduler file",
+    "any gate file",
+    "any runtime evidence"
+  ]
+}

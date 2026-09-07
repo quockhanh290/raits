@@ -1,0 +1,41 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+
+==========================================================================================
+### 8 LIVE 14:05 (job that) + stop CO DINH + KHOP TAI GIA THI TRUONG
+==========================================================================================
+========================================================================
+DEPLOY-REALISTIC SIM | Rổ 4 + NKD | $50,000
+========================================================================
+slippage 2 tick/side | NKD gated ema=10 mult=2.5
+
+SIZER (combined 3-cluster, DD-capped):
+  1-micro combined MaxDD : $9,603  (19.2% of account)
+  dd_scale 0.52 | margin_scale 3.23 → binding: FIXED (--n-contracts override)
+  → CONTRACTS: 1 micro each  (projected DD 19.2%, hard cap 15%)
+
+DEPLOY METRICS at 1 micro:
+  net $3,716  |  Calmar 0.09  |  PF 1.04  |  Sharpe 0.21
+  MaxDD $9,603 (19.2%)  |  return ≈ 1.7%/yr on $50,000
+
+  per-cluster entries taken / rejected (REAL risk$):
+    roska4_swing   taken  891  rejected 297
+    roska4_stress  taken    0  rejected   0
+    global_nkd     taken  331  rejected   0
+    circuit-breaker halts: 1072
+
+per-year net$ (deploy size):
+  2018  $     5,409
+  2019  $    -3,702
+  2020  $    11,368
+  2021  $    -4,466
+  2022  $    -4,893
+------------------------------------------------------------------------
+NOTE: upper bound. Live MNKD slips >1 tick (rerun --slippage-ticks 2-3 to see), fills partial, unseen events absent. Paper trade is the real test.
+
+  [sua] 876 lenh, tong $123,527 (tren co so 1 hop dong, truoc sizing)
+
+==========================================================================================
+### TOM TAT — dong ket qua cua tung lan
+==========================================================================================
+  8 LIVE 14:05 (job that) + stop CO DINH + KHOP TAI GIA THI TRUONG net $3,716  |  Calmar 0.09  |  PF 1.04  |  Sharpe 0.21

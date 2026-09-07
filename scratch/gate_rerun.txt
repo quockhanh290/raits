@@ -1,0 +1,77 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+cache xong
+
+=== MO NEO ===
+  MES   615t $     6,276 -> MATCH
+  MNQ   618t $    16,275 -> MATCH
+  MYM   644t $     6,140 -> MATCH
+  M2K   619t $     4,002 -> MATCH
+  quet ranh gioi ngay xong
+  quet 1.17h xong
+  quet 5h xong
+  quet 9.52h xong
+  quet 12h xong
+  quet 14h xong
+  quet 16h xong
+  quet 20h xong
+
+========================================================================================================
+CUA 1 + 2 + 3 — CHAY LAI TREN THUOC DO DA HIEU CHINH
+========================================================================================================
+              moc |  n sua |     P&L tho P&L h/chinh |   nam+ nam+hc |     IS tho      IS hc |  VAULT tho   VAULT hc
+  ----------------------------------------------------------------------------------------------------------------------
+   ranh gioi ngay |      0 |      32,694      32,694 |    0/7    0/7 |     24,655     24,655 |      8,038      8,038
+            1.17h |    580 |      35,806      -3,974 |    5/7    0/7 |     27,743     -4,428 |      8,063        454
+               5h |    609 |      49,092      -5,637 |    7/7    0/7 |     39,965     -4,012 |      9,127     -1,625
+            9.52h |    672 |      69,056       4,947 |    7/7    0/7 |     52,492      3,249 |     16,563      1,698
+              12h |    691 |      96,685       1,728 |    7/7    0/7 |     71,712         28 |     24,973      1,700
+              14h |    665 |     108,041       7,388 |    7/7    1/7 |     76,776     -1,370 |     31,265      8,758
+              16h |    558 |     100,125       3,964 |    7/7    3/7 |     68,161     -6,398 |     31,964     10,362
+              20h |    464 |      84,641       8,272 |    7/7    3/7 |     56,673     -2,172 |     27,968     10,444
+
+  P&L tung nam tai moc 14h: tho -> hieu chinh  (nen so voi ranh gioi ngay)
+    2018  tho    11,787 -> hc     2,835   | ranh gioi ngay     5,533
+    2019  tho     5,479 -> hc    -2,222   | ranh gioi ngay     1,666
+    2020  tho    25,777 -> hc     7,370   | ranh gioi ngay    13,953
+    2021  tho    11,798 -> hc      -613   | ranh gioi ngay     4,127
+    2022  tho    21,935 -> hc    -8,740   | ranh gioi ngay      -623
+    2023  tho    18,072 -> hc     8,615   | ranh gioi ngay     6,462
+    2024  tho    13,193 -> hc       143   | ranh gioi ngay     1,576
+
+========================================================================================================
+CUA 4 — DOI CHUNG 'NOI DO RONG STOP' (kich hoat giu nguyen 1,17h, dung nhu ban goc)
+========================================================================================================
+   x do rong |      n |  n sua |      P&L tho  P&L h/chinh
+  ------------------------------------------------------------
+        1.0x |   2488 |    580 |       35,806       -3,974
+        2.0x |   2194 |    300 |       16,554       -3,043
+        6.0x |   1530 |     54 |      -27,933      -31,761
+
+========================================================================================================
+WALK-FORWARD — chon h* tren cac nam TRUOC, do o nam SAU (dung cach model_peak_is_real)
+========================================================================================================
+
+  -- THO (nhu dot 09/08) --
+       nam | h* chon tu qua khu |   P&L nam do
+      2020 |              16h |       23,073
+      2021 |              14h |       11,798
+      2022 |              14h |       21,935
+      2023 |              14h |       18,072
+      2024 |              14h |       13,193
+    TONG ngoai mau: $88,071   | h* da chon: 16h, 14h, 14h, 14h, 14h
+
+  -- HIEU CHINH --
+       nam | h* chon tu qua khu |   P&L nam do
+      2020 |   ranh gioi ngay |       13,953
+      2021 |   ranh gioi ngay |        4,127
+      2022 |   ranh gioi ngay |         -623
+      2023 |   ranh gioi ngay |        6,462
+      2024 |   ranh gioi ngay |        1,576
+    TONG ngoai mau: $25,495   | h* da chon: ranh gioi ngay, ranh gioi ngay, ranh gioi ngay, ranh gioi ngay, ranh gioi ngay
+
+=== SELF-CHECKS ===
+  [PASS] SC1 mo neo trung khit engine
+  [PASS] SC2 moc 'ranh gioi ngay' khong bi hieu chinh (doi chung)
+  [PASS] SC3 tong theo nam = tong chung
+  [PASS] SC4 ty le lenh bi sua tang theo do tre (1,17h -> 14h)
+  [PASS] SC5 hieu chinh khong bao gio lam P&L TANG

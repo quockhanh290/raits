@@ -1,0 +1,92 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.719531673847 is not greater than 6772.924509067358. Delta is -0.2049773935104895
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+============================================================================================
+CONG MO NEO
+============================================================================================
+====================================================================================
+CONG MO NEO — moi co TAT, phai tai tao dung so ghim trong INVARIANTS
+====================================================================================
+  baseline    ghim $  42,459/1.72  |  do lai $  42,459/1.72  -> MATCH
+  floor       ghim $  42,565/1.65  |  do lai $  42,565/1.65  -> MATCH
+  vault2324   ghim $  10,757/2.86  |  do lai $  10,757/2.86  -> MATCH
+  vault2025   ghim $   7,404/2.54  |  do lai $   7,404/2.54  -> MATCH
+
+  KET LUAN CONG: PASS — duoc phep doc ket qua phia sau
+
+============================================================================================
+QUET TRUC STOP — TANG DEPLOY, ky IS 2018-2024, 1 micro, 2-tick
+============================================================================================
+  cau hinh                               net   Calmar     MaxDD    phanh
+  ------------------------------------------------------------------------
+  vu trang 0h (ranh gioi ngay)        -2,119    -0.05     17.3%      925
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  vu trang 5h                           -526    -0.01     17.7%     1290
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  vu trang 9.52h                        -280    -0.01     17.7%      901
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  vu trang 12h                         1,826     0.04     19.1%     1120
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  vu trang 14:05  (LUAT LIVE)          3,716     0.09     19.2%     1072
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  vu trang 16h                         2,961     0.07     19.7%      916
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  vu trang 20h                         2,680     0.06     20.7%      894
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  + tham hoa 2x                       10,967     0.20     16.2%        0
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  + tham hoa 3x                       13,600     0.27     14.7%        0
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  + tham hoa 5x                        2,557     0.06     19.1%      788
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  + tham hoa 8x                        2,653     0.07     18.8%     1074
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  stop 0.25 x ATRngay                  3,554     0.08     19.8%      992
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  stop 0.5 x ATRngay                  -1,705    -0.05     17.2%      982
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  stop 1.0 x ATRngay                  -3,082    -0.08     17.9%      823
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  stop 2.5 x ATRngay                    -230    -0.01     19.7%      810
+
+============================================================================================
+AP QUY TAC CHON DA CAM KET TRUOC
+============================================================================================
+  buoc 1 — cau hinh co phanh no = 0: 2 / 15
+     + tham hoa 2x                  net     10,967  Calmar 0.20
+     + tham hoa 3x                  net     13,600  Calmar 0.27
+
+  buoc 2 — trong so do, P&L cao nhat: + tham hoa 3x  (net $13,600, Calmar 0.27)
+  buoc 3 — cao nguyen? cac o ke ben:
+     + tham hoa 2x                  net     10,967  (-19% so voi o duoc chon)
+     + tham hoa 5x                  net      2,557  (-81% so voi o duoc chon)
+     -> DINH NHON (khong dat cam ket)

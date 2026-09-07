@@ -1,0 +1,332 @@
+{
+  "stage": "5ZH",
+  "title": "Track 1 quiet-window checkpoint audit",
+  "checked_at": {
+    "utc": "2026-08-26T01:55",
+    "et": "2026-08-25T21:55 EDT",
+    "calgary": "2026-08-25T19:55 MDT",
+    "tokyo": "2026-08-26T10:55 JST",
+    "window": "ET 21:10-22:00"
+  },
+  "verdicts": {
+    "checkpoint_wrong_route_route_is_None": "LIVE DEFECT in the acceptance READER - reproduced on demand; not stale, not expected quiet-window behaviour",
+    "swing_window_2026_08_25_operationally_valid": true,
+    "swing_window_audit_after_this_stage": "PASS",
+    "future_quiet_complete_swing_passes": true,
+    "runtime_or_live_file_touched": false,
+    "paper_readiness_changed": false,
+    "scheduler_or_backend_restarted": false
+  },
+  "q5_reproduced_read_only_first": {
+    "evaluate_day_checkpoint": {
+      "status": "fail",
+      "detail": "route is None"
+    },
+    "evaluate_sleeve_roska4_swing": {
+      "verdict": "FAIL",
+      "reasons": [
+        "all_slots_observed_no_action",
+        "checkpoint_wrong_route"
+      ]
+    },
+    "matches_the_jsonl_record": true,
+    "classification": "current, reproducible - NOT a stale audit artefact",
+    "symptom_changed_during_the_day": {
+      "16:40Z": "global_index/replay_checkpoint.track1.json does not exist",
+      "20:05Z_and_20:15Z": "route is None",
+      "meaning": "the file was created between the two runs, at 15:56:19 ET"
+    }
+  },
+  "q2_writer_path": {
+    "function": "run_live_day_track1.write_route_checkpoint",
+    "production_call_sites": 1,
+    "guard": "only when slots_decided >= expected (a COMPLETE window)",
+    "called_after_roska4_swing_closed": true,
+    "wrote_the_file": true,
+    "evidence_the_guard_held": {
+      "global_nkd": {
+        "closed_et": "02:55",
+        "complete": false,
+        "checkpoint": "no"
+      },
+      "roska4_stress": {
+        "closed_et": "12:30",
+        "complete": false,
+        "checkpoint": "no"
+      },
+      "roska4_swing": {
+        "closed_et": "15:55",
+        "complete": true,
+        "checkpoint": "yes, 15:56:19 ET"
+      }
+    },
+    "writes_route_track1_candidate_correctly": true,
+    "on_disk_shape": "schema_version 2 + routes.track1_candidate.sleeves.*.instruments",
+    "loads_through_route_checkpoint_load": true,
+    "empty_instruments_intentional": true,
+    "design_quotes": [
+      "empty_payload still creates them, because present-but-empty says 'accounted for' where absent would say 'nobody thought about it'",
+      "a checkpoint recording that nothing was open is as valid as one recording a position"
+    ]
+  },
+  "q3_reader_path": {
+    "root_cause": "the acceptance check read payload['route'] and payload['cut_instant'] - FLAT schema-1 keys that the schema-2 writer has never produced",
+    "reading_the_wrong_file": false,
+    "right_file_wrong_schema": true,
+    "expecting_legacy_flat_route_field": true,
+    "treating_empty_instruments_as_no_route": false,
+    "stale_audit_record": false,
+    "never_could_have_passed": true,
+    "why_nothing_caught_it": {
+      "suites_building_the_invented_fixture": 3,
+      "fixture": "{'schema_version': 2, 'route': 'track1_candidate', 'cut_instant': ..., 'sleeves': {}}",
+      "measured": "route_checkpoint.load() returns {} for it - the route module REFUSES it, because it has no `routes` key",
+      "pattern": "fixture follows the code: reader and fixture written together, writer never consulted"
+    }
+  },
+  "second_instance_same_defect": {
+    "file": "monitor/backend/track1_runtime_reader.py :: _checkpoint",
+    "before": {
+      "route": null,
+      "sleeves": [],
+      "cut_instant": null
+    },
+    "after": {
+      "route": "track1_candidate",
+      "routes": [
+        "track1_candidate"
+      ],
+      "sleeves": 4,
+      "entry_count": 0,
+      "cut_instant": null
+    },
+    "why_fixed_here": "one defect read twice, and this copy is the one an operator looks at"
+  },
+  "q1_and_q4_quiet_window_contract": {
+    "option_chosen": "C - a complete cross-day window writes BOTH the checkpoint and the book",
+    "already_implemented_by_the_writer": true,
+    "rationale": "track1_bootstrap.write produces both artefacts in ONE call, atomically beside each other; only the acceptance rule had to learn it",
+    "should_a_quiet_complete_window_write_a_checkpoint": "yes",
+    "is_an_empty_checkpoint_valid": "yes, by design",
+    "is_absence_of_live_positions_track1_json_valid_after_a_quiet_day": "no - it is written in the same call, and its cut_instant is the ONLY day proof an empty checkpoint has",
+    "rule": [
+      {
+        "condition": "file absent",
+        "verdict": "FAIL checkpoint_missing"
+      },
+      {
+        "condition": "unparseable / not schema 2 / no routes map",
+        "verdict": "FAIL checkpoint_unreadable"
+      },
+      {
+        "condition": "routes lacks track1_candidate",
+        "verdict": "FAIL checkpoint_wrong_route, naming what it DID hold"
+      },
+      {
+        "condition": "entries present, all last_day == judged day",
+        "verdict": "OK (book not consulted)"
+      },
+      {
+        "condition": "entries present, any other day",
+        "verdict": "FAIL checkpoint_wrong_day"
+      },
+      {
+        "condition": "no entries, book cut on the judged day",
+        "verdict": "OK - quiet pass"
+      },
+      {
+        "condition": "no entries, book cut elsewhere",
+        "verdict": "FAIL checkpoint_wrong_day"
+      },
+      {
+        "condition": "no entries, no/unreadable/undated book",
+        "verdict": "FAIL checkpoint_day_unverifiable"
+      }
+    ],
+    "unchanged": [
+      "a checkpoint is only demanded of a COMPLETE window",
+      "a passing checkpoint never rescues anything - it can only add a failure"
+    ],
+    "also_removed": "reason classification by substring on the detail sentence ('route is' in detail) - now a structured code and a code->reason table",
+    "new_reason_codes": [
+      "checkpoint_unreadable",
+      "checkpoint_day_unverifiable"
+    ]
+  },
+  "q6_what_was_fixed": {
+    "reader": true,
+    "writer": false,
+    "acceptance_rule": "narrowed and documented",
+    "runtime_evidence_rewritten": false,
+    "backfilled": false
+  },
+  "result_after_the_fix": {
+    "roska4_swing": {
+      "verdict": "PASS",
+      "reasons": [
+        "all_slots_observed_no_action"
+      ],
+      "checkpoint": "ok - route ok, no entries (a quiet window admitted nothing), book cut 2026-08-25"
+    },
+    "roska4_stress": {
+      "verdict": "FAIL",
+      "reasons": [
+        "coverage_incomplete",
+        "missing_slot_ids"
+      ]
+    },
+    "roska4_calm": {
+      "verdict": "FAIL",
+      "reasons": [
+        "coverage_unobserved",
+        "missing_slot_ids",
+        "no_timing_records"
+      ]
+    },
+    "global_nkd": {
+      "verdict": "FAIL",
+      "reasons": [
+        "coverage_incomplete",
+        "slot_could_not_evaluate",
+        "no_candidates_to_explain"
+      ]
+    },
+    "note": "the first Track 1 sleeve window ever to PASS. The other three fail on their own grounds - the machine slept through Calm and Stress's first seven slots, NKD's slots were gate-refused as stale. None touched."
+  },
+  "named_not_fixed": {
+    "finding": "the checkpoint cannot resume anything",
+    "detail": "the single production call site passes no `frames`, so checkpoint_entries skips every instrument and the entry map is empty WHATEVER the day did - a day with an open Swing position would write the same empty file",
+    "consequence": "get_entry returns {} -> usable refuses with no_entry -> every run replays in full. Five instruments' identity never recorded.",
+    "why_not_fixed_here": "loading four Swing frames plus MNKD at window close is real work inside a 78.5s p95 budget; the stage's remit is the audit reader",
+    "harmless_while": "in shadow, because there is nothing to resume",
+    "not_harmless_once": "the route holds a position overnight"
+  },
+  "tests": {
+    "file": "scratch/test_track1_stage5zh_quiet_checkpoint_audit_20260825.py",
+    "count": 46,
+    "every_checkpoint_produced_by_the_writer": true,
+    "anti_recurrence_guard": "a hand-built payload must equal empty_payload's output byte for byte",
+    "brief_items_covered": {
+      "1_schema2_routes_accepted": "test_schema_2_with_routes_track1_candidate_is_accepted",
+      "2_empty_instruments": "test_empty_instruments_under_a_valid_route_pass_when_the_book_agrees",
+      "3_wrong_route_fails": "test_a_checkpoint_for_another_route_still_fails",
+      "4_missing_only_when_required": "test_a_checkpoint_is_only_required_of_a_window_that_completed",
+      "5_wrong_day_fails": "test_entries_cut_on_another_day_fail_even_if_the_book_says_today + test_the_same_window_with_yesterdays_book_fails_as_wrong_day",
+      "6_quiet_complete_swing": "test_the_quiet_complete_swing_window_passes",
+      "7_incomplete_cannot_pass": "test_an_incomplete_window_still_fails_with_a_valid_checkpoint + test_a_hard_refused_window_still_fails_with_a_valid_checkpoint",
+      "8_no_real_runtime_write": "test_no_production_artefact_was_written_by_this_run (mtime)"
+    },
+    "mutations": {
+      "file": "scratch/track1_stage5zh_mutations_20260825.py",
+      "count": 15,
+      "red": 15,
+      "one_survivor_on_the_first_pass": "removing the schema guard changed nothing because the `routes` guard caught every fixture behind it - a real gap, now covered by a routes-shaped payload of another schema"
+    }
+  },
+  "repaired_neighbours": {
+    "reason": "six tests in four suites depended on the invented flat payload",
+    "changes": [
+      "5Q build_green_day -> save_route + companion book",
+      "5Q test_a_checkpoint_naming_another_route_fails -> unlink first (save_route merges scoped)",
+      "5Q test_a_checkpoint_cut_on_another_day_fails -> moves the BOOK's day",
+      "5Q1 and 5Q2 fixtures -> save_route + book",
+      "5P test_a_wrong_checkpoint_fails -> three real ways to be wrong",
+      "5P test_the_reader_reports_a_green_day -> the book is present now"
+    ],
+    "absence_proxies_repaired": [
+      "5P asserted live_positions.track1.json absent; the live 15:55 close writes it by design. Moved onto the mtime check three lines below it.",
+      "5Q2 asserted no real-tree file has today's date in its name; 40 live explanation files do. Now asked by mtime."
+    ]
+  },
+  "regression": {
+    "combined": {
+      "passed": 836,
+      "failed": 0
+    },
+    "stage_5zh": {
+      "passed": 46,
+      "mutations_red": "15/15"
+    },
+    "test_event_playback_run": false,
+    "pre_existing_failures_in_untouched_suites": {
+      "count": 3,
+      "tests": [
+        "stage3_route::test_8c_persisting_the_book_writes_the_route_path_and_never_legacy",
+        "stage4b::test_the_registry_is_structurally_sound_and_the_ledger_agrees",
+        "stage4b::test_the_live_frame_gate_cannot_be_opened_by_a_signature"
+      ],
+      "causes": [
+        "live_positions.track1.json exists (written 13:56 Calgary by the live system, hours before any edit here)",
+        "both stage4b tests expect a blocker list without PAPER_SHADOW_EVIDENCE, a gate added after that stage, defined in files this stage never opened"
+      ],
+      "fixed_here": false,
+      "why_not": "untouched suites; the brief says not to chase them"
+    }
+  },
+  "runtime_evidence_untouched": {
+    "global_index/replay_checkpoint.track1.json": "2026-08-25 13:56:19",
+    "live_positions.track1.json": "2026-08-25 13:56:19",
+    "global_index/track1_runtime/audits/track1_audit_20260825.jsonl": "2026-08-25 14:15:03",
+    "global_index/track1_runtime/window_coverage/window_coverage_20260825.jsonl": "2026-08-25 13:56:19",
+    "earliest_source_edit_by_this_stage": "2026-08-25 19:37:28"
+  },
+  "paper_readiness": {
+    "verdict": "NOT_READY - unchanged",
+    "open": [
+      {
+        "blocker": "PAPER_SHADOW_EVIDENCE",
+        "class": "evidence",
+        "thresholds": {
+          "required_judgeable_days": 5,
+          "max_fail_days": 0,
+          "max_warn_days": 1,
+          "max_evidence_age_days": 21
+        },
+        "state": "0 of 5; today is a FAIL day (Calm, Stress and NKD all failed)"
+      },
+      {
+        "blocker": "B1_broker_account_or_legacy_retirement",
+        "class": "operator"
+      },
+      {
+        "blocker": "route-aware PnL / Flex / session report",
+        "class": "code",
+        "remaining_of_six": 5
+      },
+      {
+        "blocker": "verify_regime_labels warn-only",
+        "class": "code"
+      },
+      {
+        "blocker": "checkpoint cannot resume anything",
+        "class": "code",
+        "new": "named by this stage"
+      }
+    ],
+    "measured": {
+      "orders_possible": false,
+      "track1_blocking": [
+        "B1_broker_account_or_legacy_retirement",
+        "PAPER_SHADOW_EVIDENCE"
+      ],
+      "confirmation_file": false,
+      "orders_dir": false
+    },
+    "what_actually_moved": "CORRECTED 2026-08-25 by Stage 5ZI: nothing moved on the gate. It reads the audit RECORDS on disk, and the 2026-08-25 Swing record was written at 20:15Z before this fix and still says FAIL. Measured now: every_sleeve_passed_at_least_once reports passed: []. Re-running the audit for that day would write a corrected record; this stage did not, because that is writing runtime evidence. What changed is that a Track 1 window CAN now pass at all, which before tonight it could not, whatever it did."
+  },
+  "files_touched": {
+    "modified": [
+      "global_index/track1_shadow_acceptance.py",
+      "monitor/backend/track1_runtime_reader.py",
+      "scratch/test_track1_stage5q_post_window_audit_20260824.py",
+      "scratch/test_track1_stage5q1_audit_semantics_20260824.py",
+      "scratch/test_track1_stage5q2_explanation_integrity_20260824.py",
+      "scratch/test_track1_stage5p_full_shadow_readiness_20260824.py"
+    ],
+    "new": [
+      "scratch/test_track1_stage5zh_quiet_checkpoint_audit_20260825.py",
+      "scratch/track1_stage5zh_mutations_20260825.py"
+    ],
+    "runtime_or_live_files_written": []
+  }
+}

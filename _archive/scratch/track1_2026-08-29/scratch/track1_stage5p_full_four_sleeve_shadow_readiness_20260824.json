@@ -1,0 +1,162 @@
+{
+  "stage": "5P",
+  "title": "full four-sleeve shadow readiness + dashboard cutover",
+  "date": "2026-08-24",
+  "verdict": "READY_FOR_OPERATOR_TRACK1_ONLY_SHADOW_START",
+  "claim": "Track1-only full four-sleeve shadow is ready to be started by operator.",
+  "claim_limits": [
+    "NOT paper/live ready",
+    "NOT broker-flat / orphan-STP clean (account-level, unmeasured against IBKR)",
+    "NOT safe to delete legacy before the measured shadow period passes",
+    "slot runtimes against a live Gateway remain UNMEASURED - the first shadow session IS the measurement, judged by the acceptance gate"
+  ],
+  "inventory": {
+    "default": 60,
+    "track1_shadow": 129,
+    "track1_only": {
+      "total": 95,
+      "strategy_slots": 70,
+      "per_sleeve": {
+        "roska4_calm": 1,
+        "roska4_stress": 24,
+        "roska4_swing": 23,
+        "global_nkd": 22
+      },
+      "track1_safety": 11,
+      "legacy_drain_safety": 11,
+      "shared_infra": 3,
+      "legacy_strategy": 0
+    },
+    "parity": {
+      "default": "60/58 true",
+      "track1_shadow": "129/127 true",
+      "track1_only": "95/93 true"
+    },
+    "argv_probe": "all 81 track1 children fired with the runner mocked: route=track1_candidate on every one; 70 strategy slots all ibkr, no --allow-orders/--port/--window; 11 safety jobs all on live_positions.track1.json"
+  },
+  "acceptance_gate": {
+    "module": "global_index/track1_shadow_acceptance.py",
+    "committed": "before any shadow day exists, so thresholds cannot drift toward the first day's results",
+    "checks": {
+      "coverage": "per sleeve, window COMPLETE with close record: 1/24/23/22 decided",
+      "slot_gaps": "every registered slot id has a ledger row (a count hides one silent + one doubled; the ids do not)",
+      "runtime_p95": "required < 300s (the cadence), target < 240s (warn only)",
+      "stalls": "no single slot at or over 300s",
+      "no_orders": "no order mark in any record, B1 open, no confirmation file",
+      "freshness_proofs": "every explanation row carries a freshness proof",
+      "explanations": "present for the day",
+      "checkpoint": "exists, route=track1_candidate, cut on the judged day",
+      "checkpoint_identity": "NOT_CHECKED_HERE by name - params-hash acceptance needs frames (route_checkpoint.usable); a green day cannot be read as having verified it",
+      "no_telemetry": "FAILS the day - a day nobody measured cannot be accepted as in budget"
+    },
+    "period": "evaluate_period accepts only when every day is accepted"
+  },
+  "dashboard_cutover": {
+    "before": "the dashboard had NO Track 1 reader; /api/v1/runner-positions serves live_positions.json with no route label",
+    "new_reader": "monitor/backend/track1_runtime_reader.py - reads live_positions.track1.json, replay_checkpoint.track1.json, track1_runtime/window_coverage, track1_runtime/slot_timing, track1_runtime/shadow explanations, the gate registry and the safety table. Read-only (AST-verified: no open/write/mkdir)",
+    "endpoint": "/api/v1/track1-runtime (additive)",
+    "legacy_labelled": "/api/v1/runner-positions payload now carries route=legacy and a note pointing at the Track 1 endpoint",
+    "never_reads_legacy_book": "asserted by AST scan of the reader's source; mutation P1 re-arms it and the scan reds",
+    "absence_is_data": "a missing Track 1 book reads as the EXPECTED shadow state, not an error"
+  },
+  "operator": {
+    "command": "python monitor/ops.py restart --scheduler --track1-only-shadow",
+    "env_set_by_ops": {
+      "RAITS_TRACK1_ONLY": "1",
+      "RAITS_TRACK1_SHADOW": "1",
+      "RAITS_WINDOW_LEDGER_DIR": "global_index/track1_runtime/window_coverage",
+      "RAITS_TELEMETRY_DIR": "global_index/track1_runtime/slot_timing",
+      "TRACK1_ORDERS_APPROVED": "stripped from the child"
+    },
+    "no_order_path": "B1 open, no --allow-orders anywhere, no confirmation file, order env stripped by the launcher; enabling orders is NOT part of 5P",
+    "legacy_drain": "legacy safety keeps watching live_positions.json until that book drains",
+    "runbook": "section 12"
+  },
+  "legacy_removable": "with global_index.run_live_day unimportable (meta-path block): the 95-job schedule builds, the dashboard reader renders a green day, and the acceptance gate accepts it",
+  "format_drift_guard": "one row written through the REAL window_ledger and slot_telemetry APIs parses in the gate's readers",
+  "mutations": {
+    "mutations": [
+      {
+        "mutation": "P1 the Track 1 reader opens live_positions.json",
+        "guard": "test_the_reader_never_opens_the_legacy_book",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "P2 the gate stops judging one sleeve's coverage",
+        "guard": "test_the_gate_judges_all_four_sleeves",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "P3 the gate reads legacy's replay_checkpoint.json",
+        "guard": "test_the_reader_and_the_gate_read_the_same_paths",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "P4 Track 1 safety points at legacy's book",
+        "guard": "test_a_fully_green_day_is_accepted",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "P5 a legacy strategy job survives track1-only",
+        "guard": "test_the_full_inventory_in_all_three_modes",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "P6 the safety job table loses a job (count drift)",
+        "guard": "test_the_full_inventory_in_all_three_modes",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "P7 --allow-orders on a Track 1 strategy slot",
+        "guard": "test_every_track1_child_argv_and_env_in_track1_only",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "P8 the gate's coverage path points into scratch",
+        "guard": "test_the_reader_paths_point_at_the_durable_runtime_not_scratch",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      }
+    ],
+    "files_restored": true
+  },
+  "harness_note": "P3's first form moved fixture and judge together (they share the constant) and went undetected 0/0/0; repointed at the cross-module path-equality guard, which the mutation does not move. 8/8 after",
+  "no_side_effects": [
+    "no scheduler/backend/dashboard started or stopped",
+    "no real IBKR",
+    "no order",
+    "no STOP_TRADING or STOP_TRADING.track1 touched",
+    "no confirmation file",
+    "no live state written",
+    "no commit"
+  ],
+  "tests": {
+    "stage5p": "35 passed",
+    "mutations": "8/8 detected, both production files restored byte-for-byte",
+    "full_sweep": "545 passed, 1 skipped; the one failure was a pre-existing stale start_scheduler stub in monitor/test_dashboard_backend.py (signature grew in 5K/5M-D) - widened, then 187 passed",
+    "not_run": "global_index/test_event_playback.py - known hang"
+  }
+}

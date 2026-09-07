@@ -1,0 +1,241 @@
+{
+  "audit": "track1_production_behavior_port_audit",
+  "date": "2026-08-24",
+  "mode": "read_only_static_audit",
+  "writes": [
+    "scratch/track1_production_behavior_port_audit_20260824.md",
+    "scratch/track1_production_behavior_port_audit_20260824.json"
+  ],
+  "non_actions": [
+    "no_scheduler_restart_or_stop",
+    "no_backend_restart_or_stop",
+    "no_ibkr_connection",
+    "no_orders",
+    "no_confirmation_file_created",
+    "TRACK1_ORDERS_APPROVED_not_set",
+    "no_commit"
+  ],
+  "verdict": {
+    "track1_only_shadow": "READY_WITH_EXISTING_RUNTIME_GATES",
+    "paper_live_orders": "BLOCKED",
+    "primary_blocker": "B1_broker_account_or_legacy_retirement",
+    "broker_required_status": "UNKNOWN_BROKER_REQUIRED"
+  },
+  "classifications": {
+    "already_ported_and_tested": [
+      "scheduler default/transitional/track1-only job sets",
+      "70 Track1 strategy slots",
+      "Track1 route-scoped safety job table",
+      "shared preflight/heartbeat/session-report fallback classification",
+      "four computed-from-bars sleeve generators",
+      "slot window and first-signal semantics",
+      "route-scoped checkpoint/resume",
+      "live frame splice guard offline",
+      "route-scoped state paths",
+      "dashboard schedule-status and track1-runtime wiring",
+      "shadow acceptance audit module"
+    ],
+    "ported_but_not_tested_on_real_ibkr_feed": [
+      "IBKRBarProvider live bar path",
+      "Track1 strategy slots with ibkr provider in track1-only",
+      "Track1 route-scoped stop repair/maxhold against live Gateway",
+      "rollover mechanism on real paper account",
+      "partial fill/timeout/cancel behavior under Track1 arming"
+    ],
+    "not_ported_but_not_needed_in_track1": [
+      "legacy strategy jobs in track1-only",
+      "root STOP_TRADING as Track1 kill switch",
+      "legacy live_state_data.js as Track1 state sink",
+      "legacy paper_history.json as Track1 runtime state"
+    ],
+    "not_ported_and_blocking_paper_live": [
+      "latest audit verdict display is not first-class dashboard data",
+      "shared trade_log/paper_evidence route split must be solved before Track1 writes shared fills"
+    ],
+    "account_level_cannot_be_route_scoped": [
+      "IBKR net positions",
+      "IBKR equity",
+      "broker-flat check",
+      "orphan working stop check",
+      "open order inventory",
+      "actual order permissions"
+    ]
+  },
+  "blockers": [
+    {
+      "id": "B1",
+      "severity": "CRITICAL",
+      "production_behavior": "One IB login/account is one net position book",
+      "legacy_implementation": "Unfiltered IBKR account positions/equity",
+      "track1_implementation": "Route files exist, but same IBKR login remains account-level",
+      "evidence": [
+        "global_index/track1_gates.py:195",
+        "docs/futures/TRACK1_SWITCHOVER_RUNBOOK.md:17"
+      ],
+      "status": "BLOCKING_PAPER_LIVE",
+      "required_fix_test": "Retire legacy and verify broker-flat, or confirm dedicated Track1 account"
+    },
+    {
+      "id": "B2",
+      "severity": "HIGH",
+      "production_behavior": "Real live bar feed produces causal complete frames",
+      "legacy_implementation": "IBKRBroker.fetch_bars",
+      "track1_implementation": "IBKRBarProvider plus splice guard",
+      "evidence": [
+        "global_index/track1_live_source.py:131",
+        "global_index/track1_live_source.py:275"
+      ],
+      "status": "UNKNOWN_BROKER_REQUIRED",
+      "required_fix_test": "Run track1-only shadow on real IBKR feed and pass acceptance audit"
+    },
+    {
+      "id": "B3",
+      "severity": "HIGH",
+      "production_behavior": "Real broker order path readiness",
+      "legacy_implementation": "FuturesRunner + IBKRBroker.send_order",
+      "track1_implementation": "OrderGate can arm only after B1/env/confirmation",
+      "evidence": [
+        "global_index/run_live_day_track1.py:136",
+        "global_index/ibkr_broker.py:698"
+      ],
+      "status": "BLOCKING_PAPER_LIVE",
+      "required_fix_test": "After B1 and shadow pass, run controlled paper arming drill"
+    },
+    {
+      "id": "B4",
+      "severity": "HIGH",
+      "production_behavior": "Close-confirm-open switch/force-close",
+      "legacy_implementation": "Runner close/open lifecycle",
+      "track1_implementation": "Admission layer records force-close; live valuer refuses without broker",
+      "evidence": [
+        "global_index/track1_signal_layer.py:391",
+        "global_index/track1_live_source.py"
+      ],
+      "status": "UNKNOWN_BROKER_REQUIRED",
+      "required_fix_test": "Track1 paper or injected-broker test for same-symbol/switch case"
+    },
+    {
+      "id": "B5",
+      "severity": "HIGH",
+      "production_behavior": "Stop placement/repair/cancel-before-close",
+      "legacy_implementation": "live_positions.json, STOP_TRADING, runner.pid, clientId 1",
+      "track1_implementation": "live_positions.track1.json, STOP_TRADING.track1, runner.track1.pid, clientId 90",
+      "evidence": [
+        "global_index/track1_slots.py:216",
+        "global_index/run_scheduler.py:1368"
+      ],
+      "status": "PORTED_NOT_LIVE_TESTED",
+      "required_fix_test": "Controlled Track1 paper position verifies stop placement, repair, cancel, contract month"
+    },
+    {
+      "id": "B6",
+      "severity": "HIGH",
+      "production_behavior": "Contract rollover close/open/migrate/repair",
+      "legacy_implementation": "ROLL_SCHEDULE, _handle_rollover, contract_month",
+      "track1_implementation": "Reuses broker/runner rollover once real broker path is armed",
+      "evidence": [
+        "global_index/ibkr_broker.py:197",
+        "global_index/ibkr_broker.py:1593",
+        "global_index/runner.py:1403"
+      ],
+      "status": "UNKNOWN_BROKER_REQUIRED",
+      "required_fix_test": "Verify front contracts and run rollover drill before holding through roll"
+    },
+    {
+      "id": "B7",
+      "severity": "MEDIUM",
+      "production_behavior": "Post-window audit result",
+      "legacy_implementation": "Manual reports/session report",
+      "track1_implementation": "Acceptance module + scratch script, not scheduled",
+      "evidence": [
+        "global_index/track1_shadow_acceptance.py:253",
+        "scratch/track1_shadow_audit_20260824.py:55"
+      ],
+      "status": "RECOMMENDED_BEFORE_PAPER",
+      "required_fix_test": "Persist latest audit JSON under global_index/track1_runtime/audits and optionally schedule 16:10 ET"
+    },
+    {
+      "id": "B8",
+      "severity": "MEDIUM",
+      "production_behavior": "Dashboard latest audit verdict display",
+      "legacy_implementation": "Dashboard readers show paper/live audit surfaces",
+      "track1_implementation": "track1-runtime endpoint exists but no latest acceptance verdict field",
+      "evidence": [
+        "monitor/backend/track1_runtime_reader.py:159",
+        "global_index/dash/realtime/realtime.js:941"
+      ],
+      "status": "GAP_OBSERVABILITY",
+      "required_fix_test": "Add latest acceptance audit reader and frontend display"
+    },
+    {
+      "id": "B9",
+      "severity": "MEDIUM",
+      "production_behavior": "Trade log/paper evidence route split",
+      "legacy_implementation": "paper_evidence_reader reads legacy trade_log surfaces",
+      "track1_implementation": "Policy says separate file until reader splits on route",
+      "evidence": [
+        "global_index/track1_slots.py:261",
+        "monitor/backend/paper_evidence_reader.py:240"
+      ],
+      "status": "BLOCKING_IF_TRACK1_WRITES_SHARED_TRADE_LOG",
+      "required_fix_test": "Keep separate Track1 trade log or make paper readers route-aware"
+    },
+    {
+      "id": "B10",
+      "severity": "MEDIUM",
+      "production_behavior": "Broker-flat and orphan STP clearance",
+      "legacy_implementation": "Broker/order inspection tools exist",
+      "track1_implementation": "Cannot infer from files",
+      "evidence": [
+        "global_index/check_open_orders.py:216",
+        "global_index/ibkr_broker.py:1410"
+      ],
+      "status": "UNKNOWN_BROKER_REQUIRED",
+      "required_fix_test": "Read-only IBKR inspection immediately before arming"
+    }
+  ],
+  "recommended_next_stage_plan": [
+    {
+      "stage": "5Q",
+      "name": "Shadow acceptance day(s)",
+      "can_do_while_shadow_running": true,
+      "requires_restart": false,
+      "blocks_paper_live": true
+    },
+    {
+      "stage": "5R",
+      "name": "Dashboard latest audit verdict integration",
+      "can_do_while_shadow_running": true,
+      "requires_restart": "backend_only",
+      "blocks_paper_live": false
+    },
+    {
+      "stage": "5S",
+      "name": "Broker read-only clearance",
+      "can_do_while_shadow_running": true,
+      "requires_restart": false,
+      "blocks_paper_live": true
+    },
+    {
+      "stage": "5T",
+      "name": "B1 resolution and confirmation",
+      "can_do_while_shadow_running": false,
+      "requires_restart": "scheduler_order_arming_session",
+      "blocks_paper_live": true
+    },
+    {
+      "stage": "5U",
+      "name": "Controlled paper order arming drill",
+      "can_do_while_shadow_running": false,
+      "requires_restart": "order_armed_scheduler_or_manual_controlled_process",
+      "blocks_paper_live": true
+    },
+    {
+      "stage": "5V",
+      "name": "Rollover drill before holding across roll",
+      "can_do_while_shadow_running": true,
+      "requires_restart": false,
+      "blocks_paper_live": "blocks_holding_through_roll"
+    }
+  ]
+}

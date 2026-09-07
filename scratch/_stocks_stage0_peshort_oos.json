@@ -1,0 +1,82 @@
+{
+  "note": "trong m\u1eabu = Polygon 5 ph\u00fat; ngo\u00e0i m\u1eabu = Databento bar ng\u00e0y. Hai nh\u00e0 cung c\u1ea5p v\u00e0 hai khung bar c\u00f9ng \u0111\u1ed5i; kh\u00f4ng c\u00f3 phi\u00ean n\u00e0o ch\u1ed3ng nhau \u0111\u1ec3 \u0111\u1ed1i chi\u1ebfu ch\u00e9o.",
+  "in_sample_events": 541,
+  "A_daily_proxy_earnings_62": {
+    "n": 43,
+    "entry_days": 41,
+    "win_pct": 72.1,
+    "mean_r": 0.389,
+    "total_r": 16.7,
+    "mean_pnl_bps": 133.6,
+    "p": 0.0002,
+    "ci95": [
+      6.96,
+      26.35
+    ]
+  },
+  "C_earnings_62": {
+    "n": 43,
+    "entry_days": 41,
+    "win_pct": 72.1,
+    "mean_r": 0.389,
+    "total_r": 16.7,
+    "mean_pnl_bps": 133.6,
+    "p": 0.0002,
+    "ci95": [
+      6.96,
+      26.35
+    ]
+  },
+  "C_nonearnings_62": {
+    "n": 447,
+    "entry_days": 167,
+    "win_pct": 31.3,
+    "mean_r": -0.25,
+    "total_r": -111.9,
+    "mean_pnl_bps": -248.3,
+    "p": 0.9939,
+    "ci95": [
+      -245.91,
+      -10.6
+    ]
+  },
+  "C_nonearnings_all75": {
+    "n": 498,
+    "entry_days": 167,
+    "win_pct": 29.5,
+    "mean_r": -0.269,
+    "total_r": -134.2,
+    "mean_pnl_bps": -259.8,
+    "p": 0.9958,
+    "ci95": [
+      -295.12,
+      -12.81
+    ]
+  },
+  "C_all_gaps_75": {
+    "n": 541,
+    "entry_days": 203,
+    "win_pct": 32.9,
+    "mean_r": -0.217,
+    "total_r": -117.5,
+    "mean_pnl_bps": -228.5,
+    "p": 0.9814,
+    "ci95": [
+      -282.66,
+      4.62
+    ]
+  },
+  "oos_window": [
+    "2023-03-28",
+    "2024-12-19"
+  ],
+  "oos_earnings_events_available": 344,
+  "B_oos": {
+    "n": 2,
+    "entry_days": 2,
+    "win_pct": 50.0,
+    "mean_r": -0.374,
+    "total_r": -0.7,
+    "mean_pnl_bps": -120.8
+  }
+}

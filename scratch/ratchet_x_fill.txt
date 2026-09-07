@@ -1,0 +1,30 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+cache xong
+
+=== CONG ===
+  MES   615t $     6,276 -> MATCH
+  MNQ   618t $    16,275 -> MATCH
+  MYM   644t $     6,140 -> MATCH
+  M2K   619t $     4,002 -> MATCH
+
+=== LUOI (1 hop dong, 2-tick, IS 2018-2024) ===
+        vu trang   ratchet |   lenh      P&L tho |  n sua    tong sua    P&L da sua
+  --------------------------------------------------------------------------------------------
+  ranh gioi ngay        CO |   2496       32,694 |    591      38,904        -6,210
+  ranh gioi ngay KHONG (live) |   2494       32,789 |    591      38,904        -6,115
+             14h        CO |   2030      108,041 |    665     100,653         7,388
+             14h KHONG (live) |   2027      108,086 |    664     100,562         7,524
+
+=== LY DO THOAT ===
+  vu trang ranh gioi ngay  ratchet CO           {'CHANDELIER': 1980, 'MAX_HOLD': 383, 'GAP': 133}
+  vu trang ranh gioi ngay  ratchet KHONG        {'CHANDELIER': 1975, 'MAX_HOLD': 386, 'GAP': 133}
+  vu trang 14h             ratchet CO           {'CHANDELIER': 1406, 'MAX_HOLD': 516, 'GAP': 108}
+  vu trang 14h             ratchet KHONG        {'CHANDELIER': 1399, 'MAX_HOLD': 520, 'GAP': 108}
+
+=== DOC ===
+  Tai moc vu trang 14h (luat live):
+    ratchet CO   : tho $108,041 | sua 665 lenh $100,653 | con $7,388
+    ratchet KHONG: tho $108,086 | sua 664 lenh $100,562 | con $7,524
+    => bo ratchet lam sai lech khop lenh GIAM $91
+    => cell gan live nhat (stop co dinh + khop dung + 14h) = $7,524
+  Doi chieu, ratchet CO vs KHONG khi khop THO (nhu dot do cu): $32,694 vs $32,789 = chenh $+95

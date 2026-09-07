@@ -1,0 +1,188 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZK",
+  "title": "B1 confirmation recognition / readiness gate parity",
+  "when_et": "2026-08-27",
+
+  "root_cause": {
+    "one_line": "blocking() defaulted to NO_CONFIRMATIONS, so with no argument it answered a question nobody was asking: what would still block if the operator had signed nothing?",
+    "classification": "another hidden predicate - more precisely, the reader never read the file; a default argument stood in for a decision nobody loaded",
+    "not": ["schema mismatch", "stale evidence", "account/evidence reference mismatch",
+            "B1 decision intentionally separate from go-live confirmation",
+            "paper readiness ignoring a new schema"],
+    "family": "an empty/default value standing in for a real answer - fourth occurrence in this project",
+    "failed_closed": true,
+    "why_it_still_mattered": "a gate that cannot be seen to open is a gate nobody can finish"
+  },
+
+  "part_a_reproduced": {
+    "confirmation": true,
+    "track1_blocking": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "orders_possible": false,
+    "b1_measurement": {"status": "PASS", "code": "legacy_and_broker_flat",
+                       "checked_at": "2026-08-27T16:04:17.115797+00:00"},
+    "paper_baseline": {"status": "PASS", "code": "account_flat_and_funded",
+                       "checked_at": "2026-08-27T11:29:47.831562+00:00"},
+    "sha256_match": true,
+    "sha256_prefix": "67504a1c8a31a6a4",
+    "confirmation_top_level_keys": ["confirmed_at", "confirmed_by",
+                                    "legacy_retired_confirmed", "note", "schema_version"]
+  },
+
+  "part_b_trace": {
+    "load_confirmations_errors": [],
+    "flags": {"legacy_retired_confirmed": true},
+    "blocker_released_with_conf": true,
+    "blocker_released_without_conf": false,
+    "blocking_with_conf": ["PAPER_SHADOW_EVIDENCE"],
+    "blocking_default": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "callers_passing_confirmations": ["global_index/run_live_day_track1.py:181"],
+    "callers_blind": ["monitor/ops.py:735", "monitor/ops.py:774",
+                      "global_index/track1_paper_readiness.py:442",
+                      "monitor/backend/track1_runtime_reader.py:246",
+                      "global_index/track1_paper_executor.py:188",
+                      "global_index/track1_gates.py as_ledger"],
+    "consequence": "the status command, the readiness report, the dashboard, the ledger and the order executor were all blind to anything the operator ever signed"
+  },
+
+  "part_c_fix": {
+    "default_now_reads_the_file": true,
+    "new_function": "track1_gates.current_confirmations",
+    "unreadable_file_grants": "nothing - every gated blocker stays shut",
+    "unsigned_view_still_available": "blocking(NO_CONFIRMATIONS)",
+    "b1_measurement_widened": {
+      "from": "legacy_broker_flat",
+      "to": "b1_decision_evidence",
+      "strictly_stronger": true,
+      "clauses": ["B1 audit PASS, inside its own age policy",
+                  "Track 1 book stamped track1_candidate, read from the file the audit names",
+                  "paper account baseline PASS, inside its own age policy",
+                  "the baseline names an account; compared with the audit's when the audit has one"],
+      "newly_checked_by_this_stage": ["the route stamp", "the account baseline"]
+    },
+    "check_that_could_never_fail": {
+      "what": "the first version took route and account_id FROM THE AUDIT RECORD; neither field is recorded there",
+      "shape": "both clauses were `if value and value != expected` - skipped every time, appearing in the reasons list exactly like a check that passed",
+      "found_by": "printing the detail and noticing two clauses had produced no words",
+      "fix": "the route is read from the book file the audit names; a missing or wrong stamp is a refusal"
+    },
+    "clause_deliberately_not_made": {
+      "what": "audit-to-baseline account cross-check",
+      "why": "the B1 audit records no account id",
+      "how_reported": "as an unchecked clause in the detail, NOT counted as a passing one",
+      "detail_text": "NOT CHECKED: the B1 audit records no account id, so the two records cannot be cross-checked"
+    },
+    "preview_baseline_corrected": {
+      "was": "blocking() - which, once the default read the file, compared the signed state against itself and reported the candidate would release nothing",
+      "now": "blocking(NO_CONFIRMATIONS) - a preview answers 'what does THIS file grant', measured from zero"
+    },
+    "confirmation_schema_changed": false,
+    "operator_had_to_re_sign": false
+  },
+
+  "part_d_verified": {
+    "confirmation": true,
+    "track1_blocking": ["PAPER_SHADOW_EVIDENCE"],
+    "orders_possible": false,
+    "track1_orders_approved": false,
+    "orders_dir": "ABSENT",
+    "b1_line": "PASS (legacy_and_broker_flat) legacy_book=0 track1_book=0 broker_positions=0 working_orders=0",
+    "all_expected_values_met": true
+  },
+
+  "part_e_tests": {
+    "new_file": "scratch/test_track1_stage5zzk_b1_confirmation_recognition_20260827.py",
+    "new_count": 28,
+    "mutations": {
+      "total": 8, "red": 8, "restored_byte_identical": true,
+      "exit_2_to_5_named": "BROKE THE FILE - proves nothing, never green",
+      "list": ["the default stops reading the signed file (the original bug)",
+               "B1 goes back to asking only whether the account is flat",
+               "a book stamped with another route is tolerated",
+               "the account baseline's status stops mattering",
+               "a baseline naming no account is tolerated",
+               "an account mismatch between the two records is tolerated",
+               "an unreadable confirmation file grants its flags anyway",
+               "the preview baselines against the already-signed state again"],
+      "one_was_green_on_the_first_run": {
+        "which": "an unreadable confirmation file grants its flags anyway",
+        "why_not_a_sleeping_guard": "it rewrote the body of an `except` that never fires - load_confirmations answers bad JSON by returning nothing-granted rather than by raising, so the mutation was rewriting UNREACHABLE code and could not have changed any outcome",
+        "why_that_is_worse": "an unreachable guard looks like a safety net in the source, and a real failure later finds nothing underneath it",
+        "fix": "not retargeting the mutation - making the guard reachable on purpose: a test now forces the loader itself to raise and asserts the gate still grants nothing",
+        "result": "the original mutation turns red, because there is finally a path that runs it"
+      }
+    },
+    "items_covered": 11,
+    "canonical_fixture": "the operator's real file, read off disk, with a test asserting it still matches",
+    "item_11_shown_not_claimed": "the preview parses through track1_gates.load_confirmations and is asserted never to parse the confirmation itself",
+    "bugs_in_my_own_fix_found_by_tests": [
+      {"what": "path: str | Path = CONFIRMATION_PATH bound the constant at DEFINITION time",
+       "consequence": "patching CONFIRMATION_PATH changed nothing while appearing to; three refusal tests were reading the PRODUCTION file and passing for the wrong reason",
+       "fix": "resolved at call time",
+       "note": "identical trap to Stage 5ZZE's MAX_RECORD_AGE_HOURS, two days earlier"},
+      {"what": "a test read prose instead of behaviour",
+       "detail": "'the gate registry must not read the approval variable' searched the source for TRACK1_ORDERS_APPROVED, which appears in the registry's own evidence text describing that variable",
+       "fix": "rewritten behaviourally - set the variable, assert the blockers do not move"},
+      {"what": "a blanket string replace rewrote the new helper into a call to itself",
+       "consequence": "RecursionError across 11 tests",
+       "fix": "helper body restored"}
+    ],
+    "seams_repointed": {
+      "count": 10,
+      "where": ["scratch/test_track1_stage5zr_b1_decision_20260826.py",
+                "scratch/test_track1_stage5zq_legacy_flat_b1_20260826.py"],
+      "plus": "the whole 5ZZJ fixture, routed through a _use helper",
+      "why": "widening B1's required measurement meant monkeypatch.setitem(MEASUREMENTS, 'legacy_broker_flat', ...) no longer reached the gate - the patch sat there while the gate consulted the real evidence past it",
+      "without_it": "five tests named 'a decision without a usable measurement still blocks' would have gone on passing for reasons they had not chosen"
+    },
+    "restated_because_the_world_changed": [
+      {"test": "5ZR 23", "was": "no confirmation file exists",
+       "now": "this stage created none; if one exists it must validate"},
+      {"test": "5ZR 24", "was": "orders impossible AND B1 blocks",
+       "now": "orders impossible, and the evidence gate is why"},
+      {"test": "5ZQ 32", "was": "ledger publishes legacy_broker_flat",
+       "now": "publishes the composite, and the name resolves"},
+      {"test": "5ZQ 35", "was": "orders impossible, no confirmation file",
+       "now": "orders impossible; that never depended on the file's absence"},
+      {"test": "5ZQ 36", "was": "B1 still blocks today",
+       "now": "B1 is closed - and never by a signature alone: remove the measurement and it returns",
+       "note": "a better test than the one it replaced"}
+    ],
+    "suites": {"5ZZK + 5ZZJ + 5ZR + 5ZQ + ops + ops-status + dashboard backend + realtime contract": "379 passed"},
+    "pre_existing_failures": 0,
+    "pre_existing_failures_note": "none; the ten seam repoints and five restatements were all caused by this stage's own change and are itemised"
+  },
+
+  "part_f_safety": {
+    "orders_dir_before": "ABSENT", "orders_dir_after": "ABSENT",
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "setting_it_moves_no_blocker": "tested",
+    "allow_orders_in_scheduler_or_ops": false,
+    "scheduler_restarts": 0,
+    "broker_connections": 0,
+    "runtime_trading_files_edited": "none - the confirmation was placed by the operator in 5ZZJ",
+    "orders_possible_before": false,
+    "orders_possible_after": false,
+    "b1_weakened": false,
+    "visible_is_not_sufficient": "orders additionally require the approval variable out of band, --allow-orders on the command line, and PAPER_SHADOW_EVIDENCE, which is measured and cannot be signed for"
+  },
+
+  "final_report": {
+    "root_cause": "blocking() defaulted to NO_CONFIRMATIONS and never read the signed file; one caller of seven passed confirmations",
+    "before_blockers": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "after_blockers": ["PAPER_SHADOW_EVIDENCE"],
+    "schema_accepted": {
+      "version": 1,
+      "keys": ["schema_version", "confirmed_by", "confirmed_at",
+               "legacy_retired_confirmed", "note"],
+      "unchanged_deliberately": "the operator's file is valid; re-signing was never necessary"
+    },
+    "schema_rejected": ["wrong schema_version", "missing or blank confirmed_by",
+                        "missing or blank confirmed_at", "unknown or misspelled keys",
+                        "non-boolean flags", "a waiver with no reason"],
+    "any_error_yields": "no confirmations at all",
+    "b1_closed": true,
+    "b1_closed_by": "a decision AND a passing composite measurement",
+    "orders_still_impossible": true
+  }
+}

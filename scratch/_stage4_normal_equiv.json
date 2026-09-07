@@ -1,0 +1,140 @@
+{
+ "vault2026": {
+  "all_ok": true,
+  "secs": 34.8,
+  "per_inst": {
+   "MES": {
+    "committed": 22,
+    "mine": 22,
+    "ok": true,
+    "first_diff": null,
+    "committed_row": null,
+    "mine_row": null
+   },
+   "MNQ": {
+    "committed": 18,
+    "mine": 18,
+    "ok": true,
+    "first_diff": null,
+    "committed_row": null,
+    "mine_row": null
+   },
+   "MYM": {
+    "committed": 24,
+    "mine": 24,
+    "ok": true,
+    "first_diff": null,
+    "committed_row": null,
+    "mine_row": null
+   },
+   "M2K": {
+    "committed": 17,
+    "mine": 17,
+    "ok": true,
+    "first_diff": null,
+    "committed_row": null,
+    "mine_row": null
+   },
+   "MNKD": {
+    "committed": 26,
+    "mine": 26,
+    "ok": true,
+    "first_diff": null,
+    "committed_row": null,
+    "mine_row": null
+   }
+  }
+ },
+ "vault2025": {
+  "all_ok": true,
+  "secs": 40.0,
+  "per_inst": {
+   "MES": {
+    "committed": 26,
+    "mine": 26,
+    "ok": true,
+    "first_diff": null,
+    "committed_row": null,
+    "mine_row": null
+   },
+   "MNQ": {
+    "committed": 27,
+    "mine": 27,
+    "ok": true,
+    "first_diff": null,
+    "committed_row": null,
+    "mine_row": null
+   },
+   "MYM": {
+    "committed": 26,
+    "mine": 26,
+    "ok": true,
+    "first_diff": null,
+    "committed_row": null,
+    "mine_row": null
+   },
+   "M2K": {
+    "committed": 26,
+    "mine": 26,
+    "ok": true,
+    "first_diff": null,
+    "committed_row": null,
+    "mine_row": null
+   },
+   "MNKD": {
+    "committed": 31,
+    "mine": 31,
+    "ok": true,
+    "first_diff": null,
+    "committed_row": null,
+    "mine_row": null
+   }
+  }
+ },
+ "floor": {
+  "all_ok": true,
+  "secs": 233.4,
+  "per_inst": {
+   "MES": {
+    "committed": 188,
+    "mine": 188,
+    "ok": true,
+    "first_diff": null,
+    "committed_row": null,
+    "mine_row": null
+   },
+   "MNQ": {
+    "committed": 186,
+    "mine": 186,
+    "ok": true,
+    "first_diff": null,
+    "committed_row": null,
+    "mine_row": null
+   },
+   "MYM": {
+    "committed": 200,
+    "mine": 200,
+    "ok": true,
+    "first_diff": null,
+    "committed_row": null,
+    "mine_row": null
+   },
+   "M2K": {
+    "committed": 178,
+    "mine": 178,
+    "ok": true,
+    "first_diff": null,
+    "committed_row": null,
+    "mine_row": null
+   },
+   "MNKD": {
+    "committed": 228,
+    "mine": 228,
+    "ok": true,
+    "first_diff": null,
+    "committed_row": null,
+    "mine_row": null
+   }
+  }
+ }
+}

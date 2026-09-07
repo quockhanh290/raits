@@ -1,0 +1,321 @@
+{
+ "vault2026": {
+  "anchor": {
+   "net": 6743.0,
+   "calmar": 1.62,
+   "pf": 1.46,
+   "sharpe": 2.43,
+   "maxdd": 7520.0
+  },
+  "anchor_ok": true,
+  "rows": [
+   {
+    "label": "R4 only (NKD excluded)",
+    "net": 735.9899999999998,
+    "pf": 1.0881345986887405,
+    "sharpe": 0.5029096273229922,
+    "calmar": 0.20984513828192833,
+    "maxdd": 6341.789999999999,
+    "maxdd_pct": 0.12683579999999997,
+    "ret_yr": 0.026615875990099003,
+    "trades": 88,
+    "taken": 46,
+    "rejected": 42,
+    "halted": 0,
+    "yearly": {
+     "2026": 735.9899999999998
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "NKD only, original",
+    "net": 6007.47,
+    "pf": 1.9456665979287313,
+    "sharpe": 4.324585110409293,
+    "calmar": 4.3543792021016,
+    "maxdd": 2507.03,
+    "maxdd_pct": 0.05014060000000001,
+    "ret_yr": 0.2183311858208955,
+    "trades": 26,
+    "taken": 24,
+    "rejected": 2,
+    "halted": 0,
+    "yearly": {
+     "2026": 6007.47
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "NKD only, corrected",
+    "net": 6007.47,
+    "pf": 1.9456665979287313,
+    "sharpe": 4.324585110409293,
+    "calmar": 4.3543792021016,
+    "maxdd": 2507.03,
+    "maxdd_pct": 0.05014060000000001,
+    "ret_yr": 0.2183311858208955,
+    "trades": 26,
+    "taken": 24,
+    "rejected": 2,
+    "halted": 0,
+    "yearly": {
+     "2026": 6007.47
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "R4 + NKD, original",
+    "net": 6743.460000000001,
+    "pf": 1.4638780392842061,
+    "sharpe": 2.4330988539480076,
+    "calmar": 1.6215112687469462,
+    "maxdd": 7519.719999999998,
+    "maxdd_pct": 0.15039439999999996,
+    "ret_yr": 0.24386621435643568,
+    "trades": 114,
+    "taken": 70,
+    "rejected": 44,
+    "halted": 0,
+    "yearly": {
+     "2026": 6743.460000000001
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "R4 + NKD, corrected NKD",
+    "net": 6743.460000000001,
+    "pf": 1.4638780392842061,
+    "sharpe": 2.4330988539480076,
+    "calmar": 1.6215112687469462,
+    "maxdd": 7519.719999999998,
+    "maxdd_pct": 0.15039439999999996,
+    "ret_yr": 0.24386621435643568,
+    "trades": 114,
+    "taken": 70,
+    "rejected": 44,
+    "halted": 0,
+    "yearly": {
+     "2026": 6743.460000000001
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "R4 + NKD, corrected both",
+    "net": 6743.460000000001,
+    "pf": 1.4638780392842061,
+    "sharpe": 2.4330988539480076,
+    "calmar": 1.6215112687469462,
+    "maxdd": 7519.719999999998,
+    "maxdd_pct": 0.15039439999999996,
+    "ret_yr": 0.24386621435643568,
+    "trades": 114,
+    "taken": 70,
+    "rejected": 44,
+    "halted": 0,
+    "yearly": {
+     "2026": 6743.460000000001
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   }
+  ],
+  "corrected_repricing": {
+   "MES": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "MNQ": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "MYM": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "M2K": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "MNKD": {
+    "n": 0,
+    "dollars": 0.0
+   }
+  },
+  "audit_original": {
+   "MES": {
+    "inst": "MES",
+    "n": 23,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNQ": {
+    "inst": "MNQ",
+    "n": 20,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MYM": {
+    "inst": "MYM",
+    "n": 24,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "M2K": {
+    "inst": "M2K",
+    "n": 21,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNKD": {
+    "inst": "MNKD",
+    "n": 26,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   }
+  },
+  "audit_corrected": {
+   "MES": {
+    "inst": "MES",
+    "n": 23,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNQ": {
+    "inst": "MNQ",
+    "n": 20,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MYM": {
+    "inst": "MYM",
+    "n": 24,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "M2K": {
+    "inst": "M2K",
+    "n": 21,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNKD": {
+    "inst": "MNKD",
+    "n": 26,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   }
+  },
+  "samples": [],
+  "fix_n": 0,
+  "fix_tot": 0.0
+ }
+}

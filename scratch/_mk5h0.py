@@ -1,0 +1,103 @@
+import json, sys
+from pathlib import Path
+sys.path.insert(0, str(Path.cwd()))
+from global_index import track1_gates as g
+ok, _d = g.live_frame_wiring()
+
+G = lambda **kw: kw
+gaps = [
+ G(id="G-A", surface="live slot bypasses admission, caps, freshness and explain",
+   expected=("a shadow day must exercise the same admission the replay does, or it proves the "
+             "detector fires rather than that the route would have traded"),
+   found=("observe_live_slot calls NONE of fresh.evaluate / run_candidates / make_guard / "
+          "emit_explanations; run_shadow calls all four. Confirmed by AST and by tracing a "
+          "slot with a stub provider: track1_signal_layer, track1_freshness, track1_explain "
+          "and track1_switch are NEVER entered"),
+   status="new_gap", priority="MUST_FIX_BEFORE_SHADOW_START",
+   risk=("with a provider added, slots would record decided=true having applied no cluster "
+         "cap, no family cap, no same-symbol suppression and no freshness gate, and would "
+         "leave no explanation trail; the collected evidence would not describe the route "
+         "that would trade"),
+   action="fold into Stage 5I's definition of done, or a stage immediately after and before shadow start"),
+ G(id="G-B", surface="window ledger rows are stamped route=legacy",
+   expected="Track 1 coverage evidence must be attributable to track1_candidate",
+   found=("the scheduler sets RAITS_ROUTE=legacy for Track 1 slots; window_ledger.route() "
+          "reads it, so window_open/slot_observed/window_closed all carry route='legacy'. "
+          "Only window_open carries route_hint='track1_candidate'; the other two carry no "
+          "route identity at all"),
+   status="new_gap", priority="MUST_FIX_BEFORE_SHADOW_START",
+   risk=("precondition 5 evidence is filed under legacy; anything splitting by route folds "
+         "Track 1 in, which is the documented 'route field added but downstream aggregation "
+         "folds Track1 into legacy' pattern"),
+   action="set RAITS_ROUTE for Track 1 slots, or have the ledger take the route explicitly"),
+ G(id="G-C", surface="--bar-provider wiring", expected="a slot can obtain today's bars",
+   found=("main()'s live-shadow branch calls observe_live_slot without a provider; the entry "
+          "point's nine flags contain no --bar-provider; build_bar_provider has no caller on "
+          "the scheduler path"),
+   status="known_gap", priority="MUST_FIX_BEFORE_SHADOW_START",
+   risk="every slot records no_bar_provider; no coverage, no checkpoint",
+   action="Stage 5I - confirmed, and it is not the whole of 5I"),
+ G(id="G-D", surface="provider lifecycle / disconnect",
+   expected="a connected broker is released when the slot ends",
+   found="build_bar_provider returns (provider, broker) for that purpose; no caller, so no finally exists",
+   status="known_gap", priority="MUST_FIX_BEFORE_SHADOW_START",
+   risk="a leaked IB connection per slot, 25 slots a day, competing for client id",
+   action="Stage 5I must add the finally alongside the wire"),
+ G(id="G-E", surface="ledger filename is UTC, records are ET session day",
+   expected="an operator can find today's coverage file",
+   found=("session 2026-08-24 wrote window_coverage_20260823.jsonl; read_day() filters on the "
+          "record's own date field, so code is correct and only the human view is confusing"),
+   status="covered", priority="DOC_ONLY",
+   risk="an operator concludes no coverage was written",
+   action="already noted in the Stage 5H report; keep in the runbook"),
+ G(id="G-F", surface="_catch_up_maxhold reads the broker before sched.start()",
+   expected="the operator knows a start is not inert",
+   found="runs before start; on a weekday after 09:31 ET it reads the broker; STOP_TRADING does not prevent it",
+   status="covered", priority="OPERATOR_ONLY",
+   risk="an unexpected broker read at start",
+   action="documented in Stage 5H; keep in the operator checklist"),
+ G(id="G-G", surface="broker flat / orphan STP", expected="legacy verified flat at the broker",
+   found="requires IBKR; never performed", status="offline_operator_check",
+   priority="MUST_FIX_BEFORE_PAPER_LIVE",
+   risk="a working stop with no position fills into a position nobody asked for",
+   action="operator, at execution time"),
+ G(id="G-H", surface="monitor/dashboard guard test failing",
+   expected="track1_explain must not reach monitor/dashboard files",
+   found=("monitor/test_schedule_status_track1_20260823.py, created by another session, "
+          "mentions track1_explain and trips that session's own guard"),
+   status="ambiguous", priority="OUT_OF_SCOPE",
+   risk="none for Track 1 runtime; a red suite obscures real reds",
+   action="owned by the session that created the monitor file"),
+]
+
+out = {
+ "stage": "5H0", "date": "2026-08-23", "kind": "missed-surfaces audit before Stage 5I",
+ "verdict": "PROCEED_TO_5I_PROVIDER_WIRING",
+ "verdict_condition": ("proceed ONLY with Stage 5I's definition of done widened to cover G-A, "
+                       "G-B and G-D as well as G-C. A provider-only 5I would reproduce exactly "
+                       "the narrow-fix pattern this audit exists to break."),
+ "gate_state": {"live_frame_released": ok, "blocking": [b.id for b in g.blocking()],
+                "self_check": g.self_check(), "allow_orders_exit": 2,
+                "confirmation_file": Path(g.CONFIRMATION_PATH).exists()},
+ "gaps": gaps,
+ "gaps_by_priority": {
+   "MUST_FIX_BEFORE_5I": [],
+   "MUST_FIX_BEFORE_SHADOW_START": ["G-A", "G-B", "G-C", "G-D"],
+   "MUST_FIX_BEFORE_PAPER_LIVE": ["G-G"],
+   "DOC_ONLY": ["G-E"], "OPERATOR_ONLY": ["G-F"], "OUT_OF_SCOPE": ["G-H"],
+ },
+ "stage5i_must_include": [
+   "--bar-provider {none,ibkr} parsed and used by the live-shadow branch (G-C)",
+   "broker released in a finally (G-D)",
+   "the live slot exercising the same admission/caps/freshness the replay does, or an "
+   "explicit written decision that a shadow day deliberately measures detection only (G-A)",
+   "Track 1 ledger rows carrying route=track1_candidate (G-B)",
+ ],
+ "no_side_effects": ["no scheduler start/stop", "no IBKR connection", "no order",
+                     "no dashboard runtime write", "no STOP_TRADING", "no STOP_TRADING.track1",
+                     "no confirmation file", "no commit", "no production behaviour changed"],
+}
+Path("scratch/track1_stage5h0_missed_surfaces_audit_20260823.json").write_text(
+    json.dumps(out, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+print("verdict:", out["verdict"])
+print("new gaps:", [x["id"] for x in gaps if x["status"] == "new_gap"])

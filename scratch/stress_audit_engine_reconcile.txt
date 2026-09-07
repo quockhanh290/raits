@@ -1,0 +1,35 @@
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865149 is not greater than 7310.956641261866. Delta is -0.21902339671669324
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+
+floor/breadth3:
+  report harness : n=84 net=$2,749
+  deploy engine  : n=84 net=$2,749
+  only-in-report=0  only-in-engine=0  pnl_mismatches=0
+  trade dates n=44 first=2018-02-08 last=2022-11-16
+    episode 2020-04-03..2020-04-22 days=8 trades=14 net=$-304
+    episode 2018-12-26..2019-01-08 days=6 trades=12 net=$-667
+    episode 2018-02-08..2018-02-15 days=4 trades=8 net=$159
+    episode 2022-04-29..2022-05-09 days=4 trades=8 net=$1,485
+    episode 2022-10-05..2022-10-10 days=4 trades=8 net=$-316
+    episode 2018-03-28..2018-04-03 days=3 trades=6 net=$-185
+
+floor/wide_range3:
+  report harness : n=61 net=$2,588
+  deploy engine  : n=61 net=$2,588
+  only-in-report=0  only-in-engine=0  pnl_mismatches=0
+
+vault2025/breadth3:
+  report harness : n=19 net=$4,095
+  deploy engine  : n=19 net=$4,095
+  only-in-report=0  only-in-engine=0  pnl_mismatches=0
+  trade dates n=10 first=2025-03-10 last=2025-04-21
+    episode 2025-04-10..2025-04-21 days=6 trades=12 net=$2,603
+    episode 2025-03-10..2025-03-11 days=2 trades=3 net=$926
+    episode 2025-04-03..2025-04-04 days=2 trades=4 net=$566
+
+vault2025/wide_range3:
+  report harness : n=15 net=$3,622
+  deploy engine  : n=15 net=$3,622
+  only-in-report=0  only-in-engine=0  pnl_mismatches=0

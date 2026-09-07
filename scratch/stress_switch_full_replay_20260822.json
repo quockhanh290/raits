@@ -1,0 +1,1247 @@
+{
+ "floor": {
+  "base": {
+   "net": 29045.980000000003,
+   "pf": 1.4930931097125286,
+   "sharpe": 2.2484747157895337,
+   "calmar": 0.6842967068722254,
+   "maxdd": 6208.880000000023,
+   "ret_pct": 0.5809196000000001,
+   "ret_yr": 0.08497432274729677,
+   "win_day": 0.5191082802547771
+  },
+  "base_state": {
+   "taken": {
+    "roska4_swing": 546,
+    "roska4_stress": 0
+   },
+   "rejected": {
+    "roska4_swing": 206,
+    "roska4_stress": 0
+   },
+   "halted": 0,
+   "closed_for_switch": 0,
+   "switch_delta": 0.0,
+   "suppressed_normal": 0,
+   "suppressed_normal_pnl": 0.0,
+   "stress_attempts": 0,
+   "first_halt_day": null
+  },
+  "scenarios": [
+   {
+    "scenario": "mnq_only_g3_q7",
+    "stress_cap": 0.025,
+    "metrics": {
+     "net": 32578.95525000002,
+     "pf": 1.5531649576284219,
+     "sharpe": 2.4776368639087845,
+     "calmar": 0.7675303704992057,
+     "maxdd": 6208.880000000048,
+     "ret_pct": 0.6515791050000004,
+     "ret_yr": 0.0953100793357029,
+     "win_day": 0.525
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 546,
+      "roska4_stress": 6
+     },
+     "rejected": {
+      "roska4_swing": 206,
+      "roska4_stress": 44
+     },
+     "halted": 0,
+     "closed_for_switch": 2,
+     "switch_delta": 440.92999999999995,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 50,
+     "first_halt_day": null
+    },
+    "stress_legs": 50
+   },
+   {
+    "scenario": "mnq_only_g3_q7",
+    "stress_cap": 0.05,
+    "metrics": {
+     "net": 46188.81674999997,
+     "pf": 1.7353978627443685,
+     "sharpe": 2.9892888910799624,
+     "calmar": 1.311558642737624,
+     "maxdd": 5151.34699999998,
+     "ret_pct": 0.9237763349999993,
+     "ret_yr": 0.13512587359181008,
+     "win_day": 0.5400593471810089
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 549,
+      "roska4_stress": 32
+     },
+     "rejected": {
+      "roska4_swing": 197,
+      "roska4_stress": 18
+     },
+     "halted": 2,
+     "closed_for_switch": 8,
+     "switch_delta": 2277.35,
+     "suppressed_normal": 4,
+     "suppressed_normal_pnl": 2689.54,
+     "stress_attempts": 50,
+     "first_halt_day": "2020-09-21"
+    },
+    "stress_legs": 50
+   },
+   {
+    "scenario": "mnq_only_g3_q7",
+    "stress_cap": 0.075,
+    "metrics": {
+     "net": 49723.91924999999,
+     "pf": 1.717796362310859,
+     "sharpe": 2.85458190277353,
+     "calmar": 1.094449714140045,
+     "maxdd": 6645.707500000004,
+     "ret_pct": 0.9944783849999999,
+     "ret_yr": 0.1454678534726672,
+     "win_day": 0.5485714285714286
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 551,
+      "roska4_stress": 47
+     },
+     "rejected": {
+      "roska4_swing": 192,
+      "roska4_stress": 3
+     },
+     "halted": 2,
+     "closed_for_switch": 11,
+     "switch_delta": 1279.2099999999998,
+     "suppressed_normal": 7,
+     "suppressed_normal_pnl": 1723.32,
+     "stress_attempts": 50,
+     "first_halt_day": "2020-09-21"
+    },
+    "stress_legs": 50
+   },
+   {
+    "scenario": "mnq_only_g3_q7",
+    "stress_cap": 0.1,
+    "metrics": {
+     "net": 52139.05924999999,
+     "pf": 1.7526604424682461,
+     "sharpe": 2.9673401728712707,
+     "calmar": 1.1476082205988496,
+     "maxdd": 6645.707500000004,
+     "ret_pct": 1.0427811849999997,
+     "ret_yr": 0.15253337117390864,
+     "win_day": 0.5511363636363636
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 551,
+      "roska4_stress": 49
+     },
+     "rejected": {
+      "roska4_swing": 192,
+      "roska4_stress": 1
+     },
+     "halted": 2,
+     "closed_for_switch": 11,
+     "switch_delta": 1279.2099999999998,
+     "suppressed_normal": 7,
+     "suppressed_normal_pnl": 1723.32,
+     "stress_attempts": 50,
+     "first_halt_day": "2020-09-21"
+    },
+    "stress_legs": 50
+   },
+   {
+    "scenario": "r4_basket_g3_q1each",
+    "stress_cap": 0.025,
+    "metrics": {
+     "net": 33084.862124999985,
+     "pf": 1.5571142616328466,
+     "sharpe": 2.490831684479084,
+     "calmar": 0.7499095495223482,
+     "maxdd": 6458.625749999988,
+     "ret_pct": 0.6616972424999997,
+     "ret_yr": 0.0968677025343186,
+     "win_day": 0.5402985074626866
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 536,
+      "roska4_stress": 201
+     },
+     "rejected": {
+      "roska4_swing": 192,
+      "roska4_stress": 1
+     },
+     "halted": 0,
+     "closed_for_switch": 42,
+     "switch_delta": 2286.4599999999887,
+     "suppressed_normal": 24,
+     "suppressed_normal_pnl": 2105.5300000000007,
+     "stress_attempts": 202,
+     "first_halt_day": null
+    },
+    "stress_legs": 202
+   },
+   {
+    "scenario": "r4_basket_g3_q1each",
+    "stress_cap": 0.05,
+    "metrics": {
+     "net": 32739.622124999987,
+     "pf": 1.5481143325702553,
+     "sharpe": 2.46182870639266,
+     "calmar": 0.7420842555284083,
+     "maxdd": 6458.625749999988,
+     "ret_pct": 0.6547924424999998,
+     "ret_yr": 0.09585688962850698,
+     "win_day": 0.5402985074626866
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 536,
+      "roska4_stress": 202
+     },
+     "rejected": {
+      "roska4_swing": 192,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 42,
+     "switch_delta": 2286.4599999999887,
+     "suppressed_normal": 24,
+     "suppressed_normal_pnl": 2105.5300000000007,
+     "stress_attempts": 202,
+     "first_halt_day": null
+    },
+    "stress_legs": 202
+   },
+   {
+    "scenario": "r4_basket_g3_q1each",
+    "stress_cap": 0.075,
+    "metrics": {
+     "net": 32739.622124999987,
+     "pf": 1.5481143325702553,
+     "sharpe": 2.46182870639266,
+     "calmar": 0.7420842555284083,
+     "maxdd": 6458.625749999988,
+     "ret_pct": 0.6547924424999998,
+     "ret_yr": 0.09585688962850698,
+     "win_day": 0.5402985074626866
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 536,
+      "roska4_stress": 202
+     },
+     "rejected": {
+      "roska4_swing": 192,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 42,
+     "switch_delta": 2286.4599999999887,
+     "suppressed_normal": 24,
+     "suppressed_normal_pnl": 2105.5300000000007,
+     "stress_attempts": 202,
+     "first_halt_day": null
+    },
+    "stress_legs": 202
+   },
+   {
+    "scenario": "r4_basket_g3_q1each",
+    "stress_cap": 0.1,
+    "metrics": {
+     "net": 32739.622124999987,
+     "pf": 1.5481143325702553,
+     "sharpe": 2.46182870639266,
+     "calmar": 0.7420842555284083,
+     "maxdd": 6458.625749999988,
+     "ret_pct": 0.6547924424999998,
+     "ret_yr": 0.09585688962850698,
+     "win_day": 0.5402985074626866
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 536,
+      "roska4_stress": 202
+     },
+     "rejected": {
+      "roska4_swing": 192,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 42,
+     "switch_delta": 2286.4599999999887,
+     "suppressed_normal": 24,
+     "suppressed_normal_pnl": 2105.5300000000007,
+     "stress_attempts": 202,
+     "first_halt_day": null
+    },
+    "stress_legs": 202
+   },
+   {
+    "scenario": "r4_basket_g3_q2each",
+    "stress_cap": 0.025,
+    "metrics": {
+     "net": 35065.84825,
+     "pf": 1.5271122888270374,
+     "sharpe": 2.4244894026242143,
+     "calmar": 0.9462368959821538,
+     "maxdd": 5425.055000000002,
+     "ret_pct": 0.7013169650000001,
+     "ret_yr": 0.1026677440746493,
+     "win_day": 0.5389048991354467
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 542,
+      "roska4_stress": 153
+     },
+     "rejected": {
+      "roska4_swing": 193,
+      "roska4_stress": 49
+     },
+     "halted": 0,
+     "closed_for_switch": 32,
+     "switch_delta": 1673.5299999999932,
+     "suppressed_normal": 17,
+     "suppressed_normal_pnl": 3240.920000000001,
+     "stress_attempts": 202,
+     "first_halt_day": null
+    },
+    "stress_legs": 202
+   },
+   {
+    "scenario": "r4_basket_g3_q2each",
+    "stress_cap": 0.05,
+    "metrics": {
+     "net": 39518.13424999999,
+     "pf": 1.5994720414967107,
+     "sharpe": 2.6327429098706228,
+     "calmar": 0.7504726643562316,
+     "maxdd": 7708.701499999977,
+     "ret_pct": 0.7903626849999997,
+     "ret_yr": 0.11570339506863724,
+     "win_day": 0.5402985074626866
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 536,
+      "roska4_stress": 201
+     },
+     "rejected": {
+      "roska4_swing": 192,
+      "roska4_stress": 1
+     },
+     "halted": 0,
+     "closed_for_switch": 42,
+     "switch_delta": 2286.4599999999887,
+     "suppressed_normal": 24,
+     "suppressed_normal_pnl": 2105.5300000000007,
+     "stress_attempts": 202,
+     "first_halt_day": "2022-01-10"
+    },
+    "stress_legs": 202
+   },
+   {
+    "scenario": "r4_basket_g3_q2each",
+    "stress_cap": 0.075,
+    "metrics": {
+     "net": 38827.654249999985,
+     "pf": 1.5828924051849582,
+     "sharpe": 2.5777744082172136,
+     "calmar": 0.7373600421355939,
+     "maxdd": 7708.701499999977,
+     "ret_pct": 0.7765530849999998,
+     "ret_yr": 0.113681769257014,
+     "win_day": 0.5402985074626866
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 536,
+      "roska4_stress": 202
+     },
+     "rejected": {
+      "roska4_swing": 192,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 42,
+     "switch_delta": 2286.4599999999887,
+     "suppressed_normal": 24,
+     "suppressed_normal_pnl": 2105.5300000000007,
+     "stress_attempts": 202,
+     "first_halt_day": "2022-01-10"
+    },
+    "stress_legs": 202
+   },
+   {
+    "scenario": "r4_basket_g3_q2each",
+    "stress_cap": 0.1,
+    "metrics": {
+     "net": 38827.654249999985,
+     "pf": 1.5828924051849582,
+     "sharpe": 2.5777744082172136,
+     "calmar": 0.7373600421355939,
+     "maxdd": 7708.701499999977,
+     "ret_pct": 0.7765530849999998,
+     "ret_yr": 0.113681769257014,
+     "win_day": 0.5402985074626866
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 536,
+      "roska4_stress": 202
+     },
+     "rejected": {
+      "roska4_swing": 192,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 42,
+     "switch_delta": 2286.4599999999887,
+     "suppressed_normal": 24,
+     "suppressed_normal_pnl": 2105.5300000000007,
+     "stress_attempts": 202,
+     "first_halt_day": "2022-01-10"
+    },
+    "stress_legs": 202
+   }
+  ]
+ },
+ "vault2025": {
+  "base": {
+   "net": 5394.6500000000015,
+   "pf": 1.582440362118947,
+   "sharpe": 1.9394413073666432,
+   "calmar": 1.5562573938965776,
+   "maxdd": 3768.1899999999996,
+   "ret_pct": 0.10789300000000003,
+   "ret_yr": 0.1172854709821429,
+   "win_day": 0.5
+  },
+  "base_state": {
+   "taken": {
+    "roska4_swing": 55,
+    "roska4_stress": 0
+   },
+   "rejected": {
+    "roska4_swing": 50,
+    "roska4_stress": 0
+   },
+   "halted": 0,
+   "closed_for_switch": 0,
+   "switch_delta": 0.0,
+   "suppressed_normal": 0,
+   "suppressed_normal_pnl": 0.0,
+   "stress_attempts": 0,
+   "first_halt_day": "2025-04-03"
+  },
+  "scenarios": [
+   {
+    "scenario": "mnq_only_g3_q7",
+    "stress_cap": 0.025,
+    "metrics": {
+     "net": 5394.6500000000015,
+     "pf": 1.582440362118947,
+     "sharpe": 1.9394413073666432,
+     "calmar": 1.5562573938965776,
+     "maxdd": 3768.1899999999996,
+     "ret_pct": 0.10789300000000003,
+     "ret_yr": 0.1172854709821429,
+     "win_day": 0.5
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 55,
+      "roska4_stress": 0
+     },
+     "rejected": {
+      "roska4_swing": 50,
+      "roska4_stress": 3
+     },
+     "halted": 0,
+     "closed_for_switch": 0,
+     "switch_delta": 0.0,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 3,
+     "first_halt_day": "2025-04-03"
+    },
+    "stress_legs": 3
+   },
+   {
+    "scenario": "mnq_only_g3_q7",
+    "stress_cap": 0.05,
+    "metrics": {
+     "net": 5394.6500000000015,
+     "pf": 1.582440362118947,
+     "sharpe": 1.9394413073666432,
+     "calmar": 1.5562573938965776,
+     "maxdd": 3768.1899999999996,
+     "ret_pct": 0.10789300000000003,
+     "ret_yr": 0.1172854709821429,
+     "win_day": 0.5
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 55,
+      "roska4_stress": 0
+     },
+     "rejected": {
+      "roska4_swing": 50,
+      "roska4_stress": 3
+     },
+     "halted": 0,
+     "closed_for_switch": 0,
+     "switch_delta": 0.0,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 3,
+     "first_halt_day": "2025-04-03"
+    },
+    "stress_legs": 3
+   },
+   {
+    "scenario": "mnq_only_g3_q7",
+    "stress_cap": 0.075,
+    "metrics": {
+     "net": 10329.360000000002,
+     "pf": 2.4194842816387334,
+     "sharpe": 3.585909429373094,
+     "calmar": 3.171553405991253,
+     "maxdd": 3540.3999999999996,
+     "ret_pct": 0.20658720000000005,
+     "ret_yr": 0.22457135357142863,
+     "win_day": 0.5333333333333333
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 55,
+      "roska4_stress": 2
+     },
+     "rejected": {
+      "roska4_swing": 50,
+      "roska4_stress": 1
+     },
+     "halted": 0,
+     "closed_for_switch": 1,
+     "switch_delta": 241.06999999999994,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 3,
+     "first_halt_day": null
+    },
+    "stress_legs": 3
+   },
+   {
+    "scenario": "mnq_only_g3_q7",
+    "stress_cap": 0.1,
+    "metrics": {
+     "net": 10166.680000000002,
+     "pf": 2.3665774135965765,
+     "sharpe": 3.485953349581101,
+     "calmar": 3.121603718102879,
+     "maxdd": 3540.3999999999996,
+     "ret_pct": 0.20333360000000003,
+     "ret_yr": 0.2210345160714286,
+     "win_day": 0.5217391304347826
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 55,
+      "roska4_stress": 3
+     },
+     "rejected": {
+      "roska4_swing": 50,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 1,
+     "switch_delta": 241.06999999999994,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 3,
+     "first_halt_day": null
+    },
+    "stress_legs": 3
+   },
+   {
+    "scenario": "r4_basket_g3_q1each",
+    "stress_cap": 0.025,
+    "metrics": {
+     "net": 4487.789499999986,
+     "pf": 1.6672586486010688,
+     "sharpe": 3.038176441272609,
+     "calmar": 1.2271972986624968,
+     "maxdd": 3975.291999999995,
+     "ret_pct": 0.08975578999999972,
+     "ret_yr": 0.09756935207589255,
+     "win_day": 0.5777777777777777
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 55,
+      "roska4_stress": 14
+     },
+     "rejected": {
+      "roska4_swing": 50,
+      "roska4_stress": 1
+     },
+     "halted": 0,
+     "closed_for_switch": 5,
+     "switch_delta": -2544.1400000000003,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 15,
+     "first_halt_day": null
+    },
+    "stress_legs": 15
+   },
+   {
+    "scenario": "r4_basket_g3_q1each",
+    "stress_cap": 0.05,
+    "metrics": {
+     "net": 4464.549499999986,
+     "pf": 1.6638032523545452,
+     "sharpe": 3.0227854299027292,
+     "calmar": 1.2208422623532142,
+     "maxdd": 3975.291999999995,
+     "ret_pct": 0.08929098999999972,
+     "ret_yr": 0.09706408957589256,
+     "win_day": 0.5777777777777777
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 55,
+      "roska4_stress": 15
+     },
+     "rejected": {
+      "roska4_swing": 50,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 5,
+     "switch_delta": -2544.1400000000003,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 15,
+     "first_halt_day": null
+    },
+    "stress_legs": 15
+   },
+   {
+    "scenario": "r4_basket_g3_q1each",
+    "stress_cap": 0.075,
+    "metrics": {
+     "net": 4464.549499999986,
+     "pf": 1.6638032523545452,
+     "sharpe": 3.0227854299027292,
+     "calmar": 1.2208422623532142,
+     "maxdd": 3975.291999999995,
+     "ret_pct": 0.08929098999999972,
+     "ret_yr": 0.09706408957589256,
+     "win_day": 0.5777777777777777
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 55,
+      "roska4_stress": 15
+     },
+     "rejected": {
+      "roska4_swing": 50,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 5,
+     "switch_delta": -2544.1400000000003,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 15,
+     "first_halt_day": null
+    },
+    "stress_legs": 15
+   },
+   {
+    "scenario": "r4_basket_g3_q1each",
+    "stress_cap": 0.1,
+    "metrics": {
+     "net": 4464.549499999986,
+     "pf": 1.6638032523545452,
+     "sharpe": 3.0227854299027292,
+     "calmar": 1.2208422623532142,
+     "maxdd": 3975.291999999995,
+     "ret_pct": 0.08929098999999972,
+     "ret_yr": 0.09706408957589256,
+     "win_day": 0.5777777777777777
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 55,
+      "roska4_stress": 15
+     },
+     "rejected": {
+      "roska4_swing": 50,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 5,
+     "switch_delta": -2544.1400000000003,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 15,
+     "first_halt_day": null
+    },
+    "stress_legs": 15
+   },
+   {
+    "scenario": "r4_basket_g3_q2each",
+    "stress_cap": 0.025,
+    "metrics": {
+     "net": 8026.238999999974,
+     "pf": 1.9601540746596235,
+     "sharpe": 3.445272739359858,
+     "calmar": 1.978364569389685,
+     "maxdd": 4410.183999999989,
+     "ret_pct": 0.16052477999999948,
+     "ret_yr": 0.17449903540178516,
+     "win_day": 0.5652173913043478
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 55,
+      "roska4_stress": 10
+     },
+     "rejected": {
+      "roska4_swing": 50,
+      "roska4_stress": 5
+     },
+     "halted": 0,
+     "closed_for_switch": 4,
+     "switch_delta": 600.6099999999997,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 15,
+     "first_halt_day": null
+    },
+    "stress_legs": 15
+   },
+   {
+    "scenario": "r4_basket_g3_q2each",
+    "stress_cap": 0.05,
+    "metrics": {
+     "net": 6125.068999999974,
+     "pf": 1.855384406119928,
+     "sharpe": 3.4728783106054837,
+     "calmar": 1.5097506434417285,
+     "maxdd": 4410.183999999989,
+     "ret_pct": 0.12250137999999948,
+     "ret_yr": 0.133165562633928,
+     "win_day": 0.5777777777777777
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 55,
+      "roska4_stress": 14
+     },
+     "rejected": {
+      "roska4_swing": 50,
+      "roska4_stress": 1
+     },
+     "halted": 0,
+     "closed_for_switch": 5,
+     "switch_delta": -2544.1400000000003,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 15,
+     "first_halt_day": null
+    },
+    "stress_legs": 15
+   },
+   {
+    "scenario": "r4_basket_g3_q2each",
+    "stress_cap": 0.075,
+    "metrics": {
+     "net": 6078.5889999999745,
+     "pf": 1.84889333357912,
+     "sharpe": 3.448216038004686,
+     "calmar": 1.4982939219081148,
+     "maxdd": 4410.183999999989,
+     "ret_pct": 0.12157177999999949,
+     "ret_yr": 0.13215503763392802,
+     "win_day": 0.5777777777777777
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 55,
+      "roska4_stress": 15
+     },
+     "rejected": {
+      "roska4_swing": 50,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 5,
+     "switch_delta": -2544.1400000000003,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 15,
+     "first_halt_day": null
+    },
+    "stress_legs": 15
+   },
+   {
+    "scenario": "r4_basket_g3_q2each",
+    "stress_cap": 0.1,
+    "metrics": {
+     "net": 6078.5889999999745,
+     "pf": 1.84889333357912,
+     "sharpe": 3.448216038004686,
+     "calmar": 1.4982939219081148,
+     "maxdd": 4410.183999999989,
+     "ret_pct": 0.12157177999999949,
+     "ret_yr": 0.13215503763392802,
+     "win_day": 0.5777777777777777
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 55,
+      "roska4_stress": 15
+     },
+     "rejected": {
+      "roska4_swing": 50,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 5,
+     "switch_delta": -2544.1400000000003,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 15,
+     "first_halt_day": null
+    },
+    "stress_legs": 15
+   }
+  ]
+ },
+ "vault2026": {
+  "base": {
+   "net": 1058.7399999999996,
+   "pf": 1.1576726038005605,
+   "sharpe": 0.8694432847321346,
+   "calmar": 0.4698118975165225,
+   "maxdd": 4074.7799999999997,
+   "ret_pct": 0.02117479999999999,
+   "ret_yr": 0.038287602475247505,
+   "win_day": 0.59375
+  },
+  "base_state": {
+   "taken": {
+    "roska4_swing": 46,
+    "roska4_stress": 0
+   },
+   "rejected": {
+    "roska4_swing": 35,
+    "roska4_stress": 0
+   },
+   "halted": 0,
+   "closed_for_switch": 0,
+   "switch_delta": 0.0,
+   "suppressed_normal": 0,
+   "suppressed_normal_pnl": 0.0,
+   "stress_attempts": 0,
+   "first_halt_day": null
+  },
+  "scenarios": [
+   {
+    "scenario": "mnq_only_g3_q7",
+    "stress_cap": 0.025,
+    "metrics": {
+     "net": 1058.7399999999996,
+     "pf": 1.1576726038005605,
+     "sharpe": 0.8694432847321346,
+     "calmar": 0.4698118975165225,
+     "maxdd": 4074.7799999999997,
+     "ret_pct": 0.02117479999999999,
+     "ret_yr": 0.038287602475247505,
+     "win_day": 0.59375
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 46,
+      "roska4_stress": 0
+     },
+     "rejected": {
+      "roska4_swing": 35,
+      "roska4_stress": 4
+     },
+     "halted": 0,
+     "closed_for_switch": 0,
+     "switch_delta": 0.0,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 4,
+     "first_halt_day": null
+    },
+    "stress_legs": 4
+   },
+   {
+    "scenario": "mnq_only_g3_q7",
+    "stress_cap": 0.05,
+    "metrics": {
+     "net": 1058.7399999999996,
+     "pf": 1.1576726038005605,
+     "sharpe": 0.8694432847321346,
+     "calmar": 0.4698118975165225,
+     "maxdd": 4074.7799999999997,
+     "ret_pct": 0.02117479999999999,
+     "ret_yr": 0.038287602475247505,
+     "win_day": 0.59375
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 46,
+      "roska4_stress": 0
+     },
+     "rejected": {
+      "roska4_swing": 35,
+      "roska4_stress": 4
+     },
+     "halted": 0,
+     "closed_for_switch": 0,
+     "switch_delta": 0.0,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 4,
+     "first_halt_day": null
+    },
+    "stress_legs": 4
+   },
+   {
+    "scenario": "mnq_only_g3_q7",
+    "stress_cap": 0.075,
+    "metrics": {
+     "net": 2688.06,
+     "pf": 1.4003186989932692,
+     "sharpe": 1.970264300174683,
+     "calmar": 1.3294851953670983,
+     "maxdd": 3655.8999999999996,
+     "ret_pct": 0.0537612,
+     "ret_yr": 0.09720929851485148,
+     "win_day": 0.6060606060606061
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 46,
+      "roska4_stress": 1
+     },
+     "rejected": {
+      "roska4_swing": 35,
+      "roska4_stress": 3
+     },
+     "halted": 0,
+     "closed_for_switch": 0,
+     "switch_delta": 0.0,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 4,
+     "first_halt_day": null
+    },
+    "stress_legs": 4
+   },
+   {
+    "scenario": "mnq_only_g3_q7",
+    "stress_cap": 0.1,
+    "metrics": {
+     "net": 1890.1999999999998,
+     "pf": 1.2364529308304506,
+     "sharpe": 1.2120870060123379,
+     "calmar": 0.9348723303359632,
+     "maxdd": 3655.8999999999996,
+     "ret_pct": 0.037804,
+     "ret_yr": 0.06835599504950494,
+     "win_day": 0.6176470588235294
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 46,
+      "roska4_stress": 3
+     },
+     "rejected": {
+      "roska4_swing": 35,
+      "roska4_stress": 1
+     },
+     "halted": 0,
+     "closed_for_switch": 0,
+     "switch_delta": 0.0,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 4,
+     "first_halt_day": null
+    },
+    "stress_legs": 4
+   },
+   {
+    "scenario": "r4_basket_g3_q1each",
+    "stress_cap": 0.025,
+    "metrics": {
+     "net": 2153.055000000004,
+     "pf": 1.4115441591085043,
+     "sharpe": 1.9984443308960016,
+     "calmar": 1.3062008228233017,
+     "maxdd": 2980.4649999999956,
+     "ret_pct": 0.04306110000000008,
+     "ret_yr": 0.07786171670792094,
+     "win_day": 0.5757575757575758
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 47,
+      "roska4_stress": 14
+     },
+     "rejected": {
+      "roska4_swing": 34,
+      "roska4_stress": 2
+     },
+     "halted": 0,
+     "closed_for_switch": 5,
+     "switch_delta": 698.7900000000018,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 16,
+     "first_halt_day": null
+    },
+    "stress_legs": 16
+   },
+   {
+    "scenario": "r4_basket_g3_q1each",
+    "stress_cap": 0.05,
+    "metrics": {
+     "net": 1793.5750000000041,
+     "pf": 1.3207893574286427,
+     "sharpe": 1.6316226790341328,
+     "calmar": 0.970999668815324,
+     "maxdd": 3339.944999999996,
+     "ret_pct": 0.035871500000000084,
+     "ret_yr": 0.06486170977722787,
+     "win_day": 0.5757575757575758
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 47,
+      "roska4_stress": 16
+     },
+     "rejected": {
+      "roska4_swing": 34,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 5,
+     "switch_delta": 698.7900000000018,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 16,
+     "first_halt_day": null
+    },
+    "stress_legs": 16
+   },
+   {
+    "scenario": "r4_basket_g3_q1each",
+    "stress_cap": 0.075,
+    "metrics": {
+     "net": 1793.5750000000041,
+     "pf": 1.3207893574286427,
+     "sharpe": 1.6316226790341328,
+     "calmar": 0.970999668815324,
+     "maxdd": 3339.944999999996,
+     "ret_pct": 0.035871500000000084,
+     "ret_yr": 0.06486170977722787,
+     "win_day": 0.5757575757575758
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 47,
+      "roska4_stress": 16
+     },
+     "rejected": {
+      "roska4_swing": 34,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 5,
+     "switch_delta": 698.7900000000018,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 16,
+     "first_halt_day": null
+    },
+    "stress_legs": 16
+   },
+   {
+    "scenario": "r4_basket_g3_q1each",
+    "stress_cap": 0.1,
+    "metrics": {
+     "net": 1793.5750000000041,
+     "pf": 1.3207893574286427,
+     "sharpe": 1.6316226790341328,
+     "calmar": 0.970999668815324,
+     "maxdd": 3339.944999999996,
+     "ret_pct": 0.035871500000000084,
+     "ret_yr": 0.06486170977722787,
+     "win_day": 0.5757575757575758
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 47,
+      "roska4_stress": 16
+     },
+     "rejected": {
+      "roska4_swing": 34,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 5,
+     "switch_delta": 698.7900000000018,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 16,
+     "first_halt_day": null
+    },
+    "stress_legs": 16
+   },
+   {
+    "scenario": "r4_basket_g3_q2each",
+    "stress_cap": 0.025,
+    "metrics": {
+     "net": 2603.6699999999983,
+     "pf": 1.4408165960379047,
+     "sharpe": 2.1170497634446805,
+     "calmar": 1.287746820614663,
+     "maxdd": 3655.8999999999996,
+     "ret_pct": 0.052073399999999964,
+     "ret_yr": 0.0941574720297029,
+     "win_day": 0.6470588235294118
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 46,
+      "roska4_stress": 7
+     },
+     "rejected": {
+      "roska4_swing": 35,
+      "roska4_stress": 9
+     },
+     "halted": 0,
+     "closed_for_switch": 2,
+     "switch_delta": 644.29,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 16,
+     "first_halt_day": null
+    },
+    "stress_legs": 16
+   },
+   {
+    "scenario": "r4_basket_g3_q2each",
+    "stress_cap": 0.05,
+    "metrics": {
+     "net": 2633.320000000007,
+     "pf": 1.5424336305060744,
+     "sharpe": 2.4798294805590806,
+     "calmar": 1.9044419614747758,
+     "maxdd": 2500.1999999999925,
+     "ret_pct": 0.05266640000000014,
+     "ret_yr": 0.0952297158415844,
+     "win_day": 0.6060606060606061
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 47,
+      "roska4_stress": 14
+     },
+     "rejected": {
+      "roska4_swing": 34,
+      "roska4_stress": 2
+     },
+     "halted": 0,
+     "closed_for_switch": 5,
+     "switch_delta": 698.7900000000018,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 16,
+     "first_halt_day": null
+    },
+    "stress_legs": 16
+   },
+   {
+    "scenario": "r4_basket_g3_q2each",
+    "stress_cap": 0.075,
+    "metrics": {
+     "net": 1914.360000000007,
+     "pf": 1.3434692119994276,
+     "sharpe": 1.7131329246497526,
+     "calmar": 1.075275879114403,
+     "maxdd": 3219.1599999999926,
+     "ret_pct": 0.03828720000000014,
+     "ret_yr": 0.06922970198019827,
+     "win_day": 0.6060606060606061
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 47,
+      "roska4_stress": 16
+     },
+     "rejected": {
+      "roska4_swing": 34,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 5,
+     "switch_delta": 698.7900000000018,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 16,
+     "first_halt_day": null
+    },
+    "stress_legs": 16
+   },
+   {
+    "scenario": "r4_basket_g3_q2each",
+    "stress_cap": 0.1,
+    "metrics": {
+     "net": 1914.360000000007,
+     "pf": 1.3434692119994276,
+     "sharpe": 1.7131329246497526,
+     "calmar": 1.075275879114403,
+     "maxdd": 3219.1599999999926,
+     "ret_pct": 0.03828720000000014,
+     "ret_yr": 0.06922970198019827,
+     "win_day": 0.6060606060606061
+    },
+    "state": {
+     "taken": {
+      "roska4_swing": 47,
+      "roska4_stress": 16
+     },
+     "rejected": {
+      "roska4_swing": 34,
+      "roska4_stress": 0
+     },
+     "halted": 0,
+     "closed_for_switch": 5,
+     "switch_delta": 698.7900000000018,
+     "suppressed_normal": 0,
+     "suppressed_normal_pnl": 0.0,
+     "stress_attempts": 16,
+     "first_halt_day": null
+    },
+    "stress_legs": 16
+   }
+  ]
+ }
+}

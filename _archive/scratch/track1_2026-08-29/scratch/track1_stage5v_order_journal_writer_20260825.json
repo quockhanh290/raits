@@ -1,0 +1,161 @@
+{
+  "stage": "5V",
+  "title": "Implement the fail-closed Track 1 order journal writer — no broker, no orders",
+  "generated_et": "2026-08-25T02:20:00-04:00",
+  "verdict": "READY_FOR_PAPER_EXECUTOR_SKELETON",
+
+  "direct_answers": {
+    "journal_path": "global_index/track1_runtime/orders/track1_orders_YYYYMMDD.jsonl",
+    "writes_are_fail_closed": true,
+    "fail_closed_evidence": "append contains no exception handler at all (asserted by AST); the line is flushed and os.fsync'ed before append returns; a failure at any point reaches the caller",
+    "transitions_accepted": {
+      "(no record)": ["intended"],
+      "intended": ["submitted", "rejected", "unknown"],
+      "submitted": ["filled", "partial", "rejected", "unknown"],
+      "unknown": ["filled", "partial", "rejected"],
+      "partial": ["filled", "rejected"],
+      "filled": [],
+      "rejected": []
+    },
+    "transitions_refused_notable": ["intended -> filled", "any first record that is not intended",
+                                    "anything out of a terminal state"],
+    "production_order_path_exists": false,
+    "remains_before_executor": [
+      "Track1OrderExecutor itself",
+      "get_open_orders() and an executions lookup on IBKRBroker",
+      "live_positions.track1.json read-back and repair",
+      "the call sites"
+    ]
+  },
+
+  "safety": {
+    "window_open_during_stage": "global_nkd 01:10-02:55 ET — open throughout and NOT disturbed",
+    "scheduler_or_backend_restarted": false,
+    "ibkr_connection": false,
+    "orders_sent": 0,
+    "confirmation_file_created": false,
+    "track1_orders_approved_set": false,
+    "allow_orders_added_anywhere": false,
+    "runtime_files_written": "none — every journal in this stage was created under tmp_path",
+    "real_orders_dir_exists": false,
+    "window_ledger_semantics_changed": false,
+    "decided_semantics_changed": false
+  },
+
+  "contract": {
+    "window_ledger": "best-effort; swallows; never blocks a trading path. UNCHANGED",
+    "order_journal": "fail-closed; raises; a write that did not land must stop the order",
+    "why": "a failed write in the ledger would let an order go out with no record of intent — the one thing a write-ahead log exists to prevent",
+    "durability": {
+      "file": "written, flushed and os.fsync'ed before append returns",
+      "directory_entry": "NOT fsynced — no portable way on Windows",
+      "exposure": "a file created in the same instant as a crash, which is exactly the case the startup reconcile exists to catch",
+      "stated_rather_than_discovered": true
+    }
+  },
+
+  "design_hole_found_by_a_failing_test": {
+    "what": "Stage 5U said SUBMITTED meant 'handed to the broker', which never said whether the line is written before or after the call",
+    "the_hole": "if written after, a process dying inside send_order would leave a journal whose last state is INTENDED while a live order existed — and INTENDED is documented as 'nothing was sent'",
+    "resolution": "SUBMITTED is written BEFORE send_order is called; the same discipline track1_switch already follows ('Every stage emits BEFORE it acts')",
+    "cost": "the opposite error, and the cheap one: an order that was never sent looks unresolved until a reconcile says the broker has nothing",
+    "consequence": "INTENDED is genuinely safe to read as 'the broker was never reached' and is not in UNRESOLVED",
+    "found_by": "my own test expecting both INTENDED and SUBMITTED to count as unresolved; it failed and being wrong about it exposed the ambiguity"
+  },
+
+  "corruption_handling": {
+    "corrupt_line": "returned by read() as an invalid entry with file and line number — never dropped",
+    "corrupt_journal": "refuses to authorise another order (order_journal_unreadable)",
+    "impossible_history_on_disk": "resolve() raises rather than repairing — a reader that quietly fixes the journal is a reader that can be lied to"
+  },
+
+  "path_safety": {
+    "filename_built_from": "an eight-digit day",
+    "checks": ["shape check (len 8, all digits)", "resolved-parent check against the journal dir"],
+    "refused_cases": ["../../etc/passwd", "/abs", "2026-8-5", "20260825x", "..", "", "2026082", "202608255"],
+    "refusal_code": "order_journal_path_escape",
+    "creates_own_directory": "yes, and only inside the given root"
+  },
+
+  "api": {
+    "module": "global_index/track1_order_journal.py",
+    "JournalRecord": "18 flat scalar fields, validated at construction (state, required fields, route stamp, non-negative filled_qty)",
+    "fields": ["schema_version", "route", "ref_day", "sleeve", "slot_id", "instrument",
+               "tradable_symbol", "action", "candidate_id", "state", "idempotency_key",
+               "order_id", "fill_status", "filled_qty", "avg_price", "commission", "error",
+               "created_at"],
+    "idempotency_key": "deterministic, contains no timestamp, generated before the broker call",
+    "append": "transition-validated against what is already on disk, flushed, fsynced, catches nothing",
+    "read": "returns (records, invalid) — invalid never dropped",
+    "resolve": "refuses to answer on a journal it cannot read whole; delegates state rules to track1_order_state",
+    "as_order_record": "conversion to the reconcile view rather than a second dataclass — track1_order_state owns the state vocabulary, this module owns the wire format"
+  },
+
+  "tests": {
+    "file": "scratch/test_track1_stage5v_order_journal_20260825.py",
+    "count": 47,
+    "covers": ["write and read-back", "every declared field round-trips as a flat scalar",
+               "append ordering", "deterministic idempotency keys",
+               "write failure raises", "fsync failure raises", "append has no try at all",
+               "flush+fsync present", "first record must be INTENDED",
+               "INTENDED -> FILLED refused and not written", "nine legal histories",
+               "terminal states cannot transition", "two keys do not interfere",
+               "corrupt line reported", "corrupt journal refuses to authorise",
+               "impossible history on disk refused", "unknown state refused at construction",
+               "missing required field refused", "missing route stamp refused",
+               "eight path-escape cases", "directory created only inside the root",
+               "window ledger still best-effort", "classify_slot_row still order-free",
+               "module cannot reach a broker", "no production order path",
+               "journal wired into nothing", "no real runtime journal created"]
+  },
+
+  "mutations": {
+    "total": 10, "red": 10, "still_green": 0,
+    "detail": [
+      {"id": "M1", "mutation": "append swallows its write exception", "test": "behavioural"},
+      {"id": "M1b", "mutation": "a try/except wrapped around append's write", "test": "AST"},
+      {"id": "M2", "mutation": "ALLOWED_TRANSITIONS[INTENDED] gains FILLED", "test": "the refusal"},
+      {"id": "M3", "mutation": "JournalRecord.__post_init__ stops checking the route stamp", "test": "the route refusal"},
+      {"id": "M4", "mutation": "journal_path stops validating the day", "test": "eight path-escape cases"},
+      {"id": "M5", "mutation": "read() returns an empty invalid list", "test": "corruption reported"},
+      {"id": "M5b", "mutation": "read() returns an empty invalid list", "test": "refusal to authorise"},
+      {"id": "M5c", "mutation": "resolve_journal hides impossible histories", "test": "the resolve refusal"},
+      {"id": "M6", "mutation": "ib_insync imported into the journal", "test": "the no-broker check"},
+      {"id": "M7", "mutation": "os.fsync removed from append", "test": "durability"}
+    ],
+    "unfaithful_first_attempt": {
+      "id": "M3",
+      "what": "patched the module's SOURCE TEXT, which cannot change an already-imported __post_init__",
+      "result": "stayed green and proved nothing",
+      "lesson": "an unfaithful mutation is worse than no mutation — it reports a test as protective when it has not been shown to be",
+      "fix": "a real in-process replacement of __post_init__ with the route check removed"
+    }
+  },
+
+  "regression": {"result": "187 passed, 1 skipped", "suites": 5},
+
+  "wiring": {
+    "track1_order_journal_imported_by": [],
+    "track1_order_state_imported_by": ["track1_order_journal.py"],
+    "track1_paper_order_imported_by": [],
+    "asserted_by_test": true,
+    "note": "'imported by nothing' stopped being the right assertion the moment 5V built on 5U, so the importers are enumerated and every one must itself be unimported"
+  },
+
+  "live_nkd_window_observed_during_this_stage": {
+    "not_part_of_this_stage": true,
+    "window": "global_nkd 01:10-02:55 ET on 2026-08-25",
+    "slots_observed": 14,
+    "decided": 0,
+    "every_slot": "gate_refused: partial_coverage,stale",
+    "runtime": {"p50_s": 2.44, "max_s": 3.05, "all_outcomes": "ok"},
+    "cause_confirmed_by_running_the_freshness_gate": {
+      "regime_csv": "stale — last date 2026-08-21 is before the required 2026-08-24",
+      "preflight_consistency": "stale — the 13:45 job for 2026-08-24 says SUCCEEDED and regime_csv still does not satisfy the gate"
+    },
+    "why": "spy_refresh_pm was only registered at the 23:29 restart, after 16:20, so it has never run",
+    "first_firing": "today at 16:20 ET; from Wednesday morning the gate should pass",
+    "consequence": "tonight's NKD window will not produce a PASS and the readiness count stays at zero — the gate working on a real refusal, not a new fault",
+    "the_other_thing_it_showed": "slot cadence is healthy throughout"
+  }
+}

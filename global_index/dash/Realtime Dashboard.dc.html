@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#08090c;}
+  *{box-sizing:border-box;}
+  a{color:#5fd3b2;text-decoration:none;}
+  a:hover{color:#8ae6cc;}
+  @keyframes lp{0%,100%{opacity:1}50%{opacity:.32}}
+</style>
+</helmet>
+
+<div style="min-width:1900px;background:#08090c;color:#e8ebf0;font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums;">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:32px;padding:12px 22px;border-bottom:1px solid #1b2027;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div style="font-weight:600;font-size:13px;letter-spacing:.15em;text-transform:uppercase;">Raits Futures</div>
+      <div style="display:flex;align-items:center;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;padding:3px 9px;border:1px solid #262d36;border-radius:4px;color:#798394;">PAPER<span style="color:#4b5563;">·</span>NEXT</div>
+    </div>
+    <div style="display:flex;gap:4px;">
+      <div style="padding:7px 16px;border-radius:5px;background:#14251f;color:#8ae6cc;font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;">Realtime</div>
+      <div style="padding:7px 16px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#798394;">Historical</div>
+      <div style="padding:7px 16px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#798394;">Paper</div>
+      <div style="padding:7px 16px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#798394;">Reports</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:22px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#798394;">
+      <div style="color:#e8ebf0;">Aug 31, 2026</div>
+      <div style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:#3ecf8e;animation:lp 2.4s ease-in-out infinite;"></span><span style="color:#e8ebf0;">Live</span><span>updated 6s ago</span></div>
+      <div style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:#3ecf8e;"></span><span>On schedule · next 14:35 ET</span></div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:16px;padding:11px 22px;border-bottom:1px solid #1b2027;background:linear-gradient(90deg,#0c1512 0%,#0b0d11 42%);">
+    <div style="display:flex;align-items:center;gap:8px;"><span style="width:7px;height:7px;border-radius:50%;background:#3ecf8e;"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#8ae6cc;">OK</span></div>
+    <div style="font-size:15px;font-weight:500;letter-spacing:-.005em;">Legacy runner snapshot is stale because legacy entries are retired</div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;padding:3px 9px;border:1px solid #262d36;border-radius:4px;color:#798394;">2 ISSUES OPEN</div>
+    <div style="margin-left:auto;text-align:right;font-family:'IBM Plex Mono',monospace;">
+      <div style="font-size:14px;color:#e8ebf0;">13:11:06 EDT</div>
+      <div style="font-size:11px;color:#798394;margin-top:2px;">JST 02:11 · HAN 00:11 · YYC 11:11</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 380px;">
+    <div style="border-right:1px solid #1b2027;">
+
+      <div style="display:flex;align-items:baseline;gap:14px;padding:16px 22px 13px;border-top:1px solid #262d36;border-bottom:2px solid #5b9cf0;background:linear-gradient(180deg,#0d1219 0%,#0a0c10 100%);">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:#5b9cf0;">01</div>
+        <div style="font-size:20px;font-weight:600;letter-spacing:-.02em;color:#e8ebf0;">Operations</div>
+        <div style="font-size:13px;color:#798394;">What the system is doing, and what is still open</div>
+        <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;">4 sections</div>
+      </div>
+
+      <div style="padding:16px 22px;border-bottom:1px solid #1b2027;">
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:11px;">
+          <span style="width:3px;height:15px;border-radius:2px;background:#5b9cf0;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Now Monitor</div>
+          <div style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:#3ecf8e;"></span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#798394;">CLEAR</span></div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">0 incident · 0 telemetry gap</div>
+        </div>
+        <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;display:grid;grid-template-columns:repeat(4,1fr);overflow:hidden;">
+          <sc-for list="{{ monitor }}" as="m" hint-placeholder-count="4">
+            <div style="display:flex;align-items:baseline;gap:9px;min-width:0;padding:8px 14px;border-right:1px solid #1a1f26;border-left:2px solid {{ m.hue }};">
+              <div style="font-size:10px;font-weight:500;letter-spacing:.11em;text-transform:uppercase;color:{{ m.hue }};white-space:nowrap;">{{ m.label }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#e8ebf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ m.name }}</div>
+              <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;white-space:nowrap;">{{ m.at }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#a8b1c0;white-space:nowrap;">{{ m.rel }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:grid;grid-template-columns:352px 1fr;gap:14px;margin-top:12px;">
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <sc-for list="{{ monitorList }}" as="m" hint-placeholder-count="3">
+              <div style="border:1px solid #171b22;border-left:2px solid {{ m.accent }};border-radius:8px;background:#0b0d11;padding:9px 12px;">
+                <div style="display:flex;align-items:center;gap:7px;">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2a323d;border-radius:3px;color:{{ m.componentFg }};">{{ m.component }}</div>
+                  <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">{{ m.at }}</div>
+                </div>
+                <div style="font-size:13px;color:#e8ebf0;margin-top:7px;text-wrap:pretty;">{{ m.title }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;padding:11px 15px;align-self:start;">
+            <div style="display:flex;align-items:center;gap:9px;">
+              <span style="width:6px;height:6px;border-radius:50%;background:#3ecf8e;"></span>
+              <div style="font-size:14px;font-weight:500;">{{ monitorDetail.title }}</div>
+              <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">{{ monitorDetail.at }}</div>
+            </div>
+            <div style="font-size:13px;color:#a8b1c0;margin-top:9px;text-wrap:pretty;">{{ monitorDetail.problem }}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px;margin-top:12px;padding-top:11px;border-top:1px solid #1a1f26;">
+              <div>
+                <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Impact</div>
+                <div style="font-size:13px;color:#a8b1c0;margin-top:5px;text-wrap:pretty;">{{ monitorDetail.impact }}</div>
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Action</div>
+                <div style="font-size:13px;color:#a8b1c0;margin-top:5px;text-wrap:pretty;">{{ monitorDetail.action }}</div>
+              </div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;margin-top:11px;">{{ monitorDetail.evidence }}</div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:18px 22px;border-bottom:1px solid #1b2027;">
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:11px;">
+          <span style="width:3px;height:15px;border-radius:2px;background:#5b9cf0;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Open Issues</div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">2 open · 7 retired legacy · evidence 2026-07-30 → 2026-08-31</div>
+        </div>
+        <div style="display:grid;grid-template-columns:352px 1fr;gap:14px;">
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <sc-for list="{{ issues }}" as="i" hint-placeholder-count="4">
+              <div onClick="{{ i.pick }}" style="border:1px solid {{ i.border }};border-left:2px solid {{ i.accent }};border-radius:8px;background:{{ i.bg }};padding:10px 12px;cursor:pointer;" style-hover="border-color:#2a323d;">
+                <div style="display:flex;align-items:center;gap:7px;">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2a323d;border-radius:3px;color:{{ i.kindFg }};">{{ i.kind }}</div>
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2a323d;border-radius:3px;color:{{ i.stateFg }};">{{ i.state }}</div>
+                  <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">{{ i.count }}</div>
+                </div>
+                <div style="font-size:13px;font-weight:600;letter-spacing:-.005em;margin-top:8px;text-wrap:pretty;">{{ i.title }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;margin-top:6px;">{{ i.last }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;overflow:hidden;align-self:start;">
+            <div style="display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid #1a1f26;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2a323d;border-radius:3px;color:{{ detail.kindFg }};">{{ detail.kind }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2a323d;border-radius:3px;color:{{ detail.stateFg }};">{{ detail.state }}</div>
+              <div style="font-size:15px;font-weight:600;letter-spacing:-.005em;">{{ detail.title }}</div>
+              <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">{{ detail.occurrences }}</div>
+            </div>
+            <div style="padding:12px 16px;border-bottom:1px solid #1a1f26;">
+              <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;margin-bottom:7px;">Problem</div>
+              <div style="font-size:14px;color:#e8ebf0;text-wrap:pretty;">{{ detail.problem }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;margin-top:9px;">{{ detail.window }}</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #1a1f26;">
+              <div style="padding:12px 16px;border-right:1px solid #1a1f26;">
+                <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;margin-bottom:7px;">Impact</div>
+                <div style="font-size:13px;color:#a8b1c0;text-wrap:pretty;">{{ detail.impact }}</div>
+              </div>
+              <div style="padding:12px 16px;">
+                <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;margin-bottom:7px;">Action</div>
+                <div style="font-size:13px;color:#a8b1c0;text-wrap:pretty;">{{ detail.action }}</div>
+              </div>
+            </div>
+            <div style="padding:12px 16px;background:#0b0d11;">
+              <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;margin-bottom:7px;">Evidence</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#a8b1c0;line-height:1.75;text-wrap:pretty;">{{ detail.evidence }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;margin-top:9px;">{{ detail.closes }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:18px 22px;border-bottom:1px solid #1b2027;">
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;">
+          <span style="width:3px;height:15px;border-radius:2px;background:#e0913c;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Track 1 Runtime</div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">track1_candidate · 6 coverage day(s)</div>
+        </div>
+        <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;overflow:hidden;">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);">
+            <sc-for list="{{ runtime }}" as="r" hint-placeholder-count="8">
+              <div style="padding:11px 15px;border-right:1px solid #1a1f26;border-bottom:1px solid #1a1f26;">
+                <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">{{ r.label }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ r.fg }};margin-top:6px;line-height:1.6;text-wrap:pretty;">{{ r.value }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding:9px 15px;background:#0b0d11;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">registered in track1-only mode · legacy safety keeps draining live_positions.json separately</div>
+        </div>
+      </div>
+
+      <div style="padding:18px 22px 24px;">
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;">
+          <span style="width:3px;height:15px;border-radius:2px;background:#e0913c;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Open Orders</div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">0 working · 6s ago</div>
+        </div>
+        <div style="border:1px solid #1e242c;border-radius:8px;overflow:hidden;">
+          <div style="display:grid;grid-template-columns:1.2fr .7fr .7fr .5fr .9fr 1.1fr .6fr;gap:14px;padding:11px 22px;background:#0b0d11;font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">
+            <div>Contract</div><div>Type</div><div>Action</div><div>Qty</div><div style="text-align:right;">Stop</div><div>Status</div><div style="text-align:right;">ID</div>
+          </div>
+          <div style="padding:16px 18px;background:#0e1116;border-top:1px solid #1a1f26;text-align:center;font-size:13px;color:#798394;">No working orders observed.</div>
+        </div>
+      </div>
+      <div style="height:14px;background:#07080b;border-top:1px solid #161b22;"></div>
+      <div style="display:flex;align-items:baseline;gap:14px;padding:16px 22px 13px;border-top:1px solid #262d36;border-bottom:2px solid #5fd3b2;background:linear-gradient(180deg,#0b1512 0%,#0a0c10 100%);">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:#5fd3b2;">02</div>
+        <div style="font-size:20px;font-weight:600;letter-spacing:-.02em;color:#e8ebf0;">Book</div>
+        <div style="font-size:13px;color:#798394;">Money, positions and the decision of record</div>
+        <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;">3 sections</div>
+      </div>
+
+
+      <div style="padding:15px 22px;border-bottom:1px solid #1b2027;display:grid;grid-template-columns:1.25fr 1fr 1fr 1fr;gap:12px;">
+        <div style="border:1px solid #1c2a2b;border-radius:8px;background:#0e1116;padding:11px 15px;">
+          <div style="display:flex;align-items:baseline;gap:10px;">
+            <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#5fd3b2;">Paper equity</div>
+            <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;">base $50,000</div>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:12px;margin-top:9px;">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:500;letter-spacing:-.03em;line-height:1;">not measured</div>
+          </div>
+          <div style="margin-top:9px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;text-wrap:pretty;">Status UNKNOWN — no baseline to subtract another week's figure from.</div>
+          <div style="margin-top:11px;padding-top:10px;border-top:1px solid #1a1f26;display:flex;align-items:center;gap:9px;">
+            <span style="width:5px;height:5px;border-radius:50%;background:#f0b429;flex:0 0 5px;"></span>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#f0b429;white-space:nowrap;">Broker $50,231 · legacy epoch stale</div>
+            <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5fd3b2;white-space:nowrap;">Reconcile</div>
+          </div>
+        </div>
+
+        <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;padding:11px 15px;">
+          <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#5fd3b2;margin-bottom:11px;">Performance</div>
+          <sc-for list="{{ perf }}" as="p" hint-placeholder-count="4">
+            <div style="display:flex;align-items:baseline;gap:12px;padding:5px 0;border-bottom:1px solid #171b22;">
+              <div style="font-size:12px;color:#798394;white-space:nowrap;">{{ p.label }}</div>
+              <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:14px;color:{{ p.fg }};">{{ p.value }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;padding:11px 15px;">
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:11px;">
+            <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#e0913c;">Risk</div>
+            <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;white-space:nowrap;">of 15.00% limit</div>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:10px;">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:500;letter-spacing:-.02em;">0.00%</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#798394;">$0.00 drawdown</div>
+          </div>
+          <div style="margin-top:11px;height:3px;border-radius:2px;background:#1a1f26;overflow:hidden;"><div style="width:2px;height:100%;background:#3a424f;border-radius:2px;"></div></div>
+          <div style="margin-top:9px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">peak 0.00% · no closed trades yet</div>
+        </div>
+
+        <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;padding:11px 15px;">
+          <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#5b9cf0;margin-bottom:11px;">Exposure</div>
+          <sc-for list="{{ expo }}" as="e" hint-placeholder-count="4">
+            <div style="display:flex;align-items:baseline;gap:12px;padding:5px 0;border-bottom:1px solid #171b22;">
+              <div style="font-size:12px;color:#798394;white-space:nowrap;">{{ e.label }}</div>
+              <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:14px;color:{{ e.fg }};">{{ e.value }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="padding:18px 22px;border-bottom:1px solid #1b2027;">
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;">
+          <span style="width:3px;height:15px;border-radius:2px;background:#5fd3b2;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Open Positions</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;">legacy / drain</div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">0 IBKR position · 0 runner qty · 6s ago</div>
+        </div>
+        <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;padding:14px 16px;display:flex;align-items:center;gap:11px;">
+          <span style="width:5px;height:5px;border-radius:50%;background:#4b5563;"></span>
+          <div style="font-size:14px;color:#a8b1c0;">No broker positions. Nothing to protect, so no protection is asserted.</div>
+        </div>
+      </div>
+
+      <div style="padding:18px 22px;border-bottom:1px solid #1b2027;">
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;">
+          <span style="width:3px;height:15px;border-radius:2px;background:#9d8cf5;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Today's Decision</div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">2026-08-31 · runner 13:06 ET</div>
+        </div>
+        <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;overflow:hidden;">
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);">
+            <sc-for list="{{ decision }}" as="d" hint-placeholder-count="5">
+              <div style="padding:11px 16px;border-right:1px solid #1a1f26;">
+                <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">{{ d.label }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;color:{{ d.fg }};margin-top:5px;">{{ d.value }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #1a1f26;">
+            <sc-for list="{{ decisionGroups }}" as="g" hint-placeholder-count="3">
+              <div style="border-right:1px solid #1a1f26;">
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid #171b22;background:#0b0d11;">
+                  <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">{{ g.label }}</div>
+                  <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ g.countFg }};">{{ g.count }}</div>
+                </div>
+                <div style="padding:10px 16px;font-size:13px;color:#798394;text-wrap:pretty;">{{ g.empty }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding:10px 16px;background:#0b0d11;border-top:1px solid #1a1f26;font-size:12px;color:#798394;text-wrap:pretty;">Track 1 has no broker method for cluster codes, keeps blocked path prerequisites, and no signal fired today. Nothing was entered, closed or rejected — the day is decided and empty.</div>
+        </div>
+      </div>
+
+      <div style="height:14px;background:#07080b;border-top:1px solid #161b22;"></div>
+      <div style="display:flex;align-items:baseline;gap:14px;padding:16px 22px 13px;border-top:1px solid #262d36;border-bottom:2px solid #9d8cf5;background:linear-gradient(180deg,#100e1a 0%,#0a0c10 100%);">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:#9d8cf5;">03</div>
+        <div style="font-size:20px;font-weight:600;letter-spacing:-.02em;color:#e8ebf0;">Market</div>
+        <div style="font-size:13px;color:#798394;">Regime, the session Track 1 read, and the two-phase sleeve</div>
+        <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;">3 sections</div>
+      </div>
+
+      <div style="padding:18px 22px;border-bottom:1px solid #1b2027;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">
+          <span style="width:3px;height:15px;border-radius:2px;background:#9d8cf5;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Regime Monitor</div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">daily label · 2026-08-28 · checked 29.9h ago</div>
+        </div>
+        <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;overflow:hidden;">
+
+          <div style="display:flex;align-items:center;gap:0;border-bottom:1px solid #1a1f26;background:#0b0d11;">
+            <div style="padding:9px 15px;display:flex;align-items:center;gap:9px;">
+              <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#9d8cf5;">Model inputs</div>
+              <span style="width:5px;height:5px;border-radius:50%;background:#f0b429;"></span>
+            </div>
+            <sc-for list="{{ modelInputs }}" as="mi" hint-placeholder-count="5">
+              <div style="padding:9px 15px;border-left:1px solid #1a1f26;">
+                <div style="font-size:11px;color:#798394;">{{ mi.label }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:{{ mi.fg }};margin-top:3px;white-space:nowrap;">{{ mi.value }}</div>
+              </div>
+            </sc-for>
+            <div style="margin-left:auto;padding:9px 15px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5fd3b2;">Refit</div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:300px 1fr;border-bottom:1px solid #1a1f26;">
+            <div style="padding:11px 15px;border-right:1px solid #1a1f26;">
+              <div style="display:flex;align-items:center;gap:11px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:#3ecf8e;"></span>
+                <div style="font-size:23px;font-weight:600;letter-spacing:-.02em;color:#8ae6cc;line-height:1.1;">Calm</div>
+                <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5fd3b2;">held 24 days</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:9px;">
+                <span style="width:5px;height:5px;border-radius:50%;background:#3ecf8e;"></span>
+                <span style="font-size:12px;color:#8ae6cc;">Label check passed</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">1,761 days · no drift</span>
+              </div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;margin-top:8px;">as of 2026-08-28 · checked 29.9h ago</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);">
+              <sc-for list="{{ regimeMetrics }}" as="m" hint-placeholder-count="4">
+                <div style="padding:11px 15px;border-right:1px solid #1a1f26;">
+                  <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">{{ m.label }}</div>
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:500;letter-spacing:-.01em;margin-top:6px;color:{{ m.fg }};white-space:nowrap;">{{ m.value }}</div>
+                  <div style="font-size:12px;color:#798394;margin-top:6px;text-wrap:pretty;">{{ m.note }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:300px 1fr;border-bottom:1px solid #1a1f26;">
+            <div style="padding:11px 15px;border-right:1px solid #1a1f26;">
+              <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;margin-bottom:10px;">State probabilities</div>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <sc-for list="{{ posterior }}" as="p" hint-placeholder-count="4">
+                  <div style="display:grid;grid-template-columns:60px 1fr 50px;gap:11px;align-items:center;">
+                    <div style="display:flex;align-items:center;gap:7px;">
+                      <span style="width:6px;height:6px;border-radius:2px;background:{{ p.color }};"></span>
+                      <span style="font-size:12px;color:{{ p.labelFg }};">{{ p.name }}</span>
+                    </div>
+                    <div style="height:5px;border-radius:3px;background:#141920;overflow:hidden;"><div style="width:{{ p.width }};height:100%;background:{{ p.color }};border-radius:3px;"></div></div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ p.valueFg }};text-align:right;">{{ p.value }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="padding:11px 15px;">
+              <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;">
+                <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Why this label?</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">SPY features behind the 2026-08-28 label</div>
+                <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5fd3b2;cursor:pointer;">Show all 9</div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 22px;">
+                <sc-for list="{{ features }}" as="f" hint-placeholder-count="4">
+                  <div style="display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:baseline;padding:7px 0;border-bottom:1px solid #171b22;">
+                    <div style="font-size:13px;color:#a8b1c0;">{{ f.label }}</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#e8ebf0;white-space:nowrap;">{{ f.value }}</div>
+                    <div style="display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">{{ f.rank }}</span>
+                      <span style="width:1px;height:9px;background:#262d36;"></span>
+                      <span style="font-size:11px;color:#5fd3b2;">{{ f.leans }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:11px 15px;border-bottom:1px solid #1a1f26;">
+            <div style="display:flex;align-items:baseline;gap:12px;">
+              <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Last 60 trading days</div>
+              <div style="margin-left:auto;display:flex;gap:14px;">
+                <sc-for list="{{ regimeLegend }}" as="r" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <span style="width:8px;height:8px;border-radius:2px;background:{{ r.color }};"></span>
+                    <span style="font-size:12px;color:#a8b1c0;">{{ r.name }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex;gap:3px;margin-top:10px;">
+              <sc-for list="{{ regimeRuns }}" as="run" hint-placeholder-count="4">
+                <div style="flex:{{ run.flex }};min-width:0;">
+                  <div style="height:10px;border-radius:3px;background:{{ run.color }};"></div>
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#798394;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ run.short }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:flex-start;gap:11px;padding:10px 15px;background:#0b0d11;">
+            <span style="width:5px;height:5px;border-radius:50%;background:#798394;margin-top:7px;flex:0 0 5px;"></span>
+            <div>
+              <div style="font-size:13px;color:#e8ebf0;">No fixed shift threshold: the model selects the most likely state by comparing posteriors.</div>
+              <div style="font-size:12px;color:#a8b1c0;margin-top:5px;max-width:130ch;text-wrap:pretty;">A shift is recorded when a different state takes the lead, so there is no cutoff number to breach. Today Calm leads Normal by 99.7 percentage points.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:18px 22px;border-bottom:1px solid #1b2027;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">
+          <span style="width:3px;height:15px;border-radius:2px;background:#5b9cf0;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Track 1 Market View</div>
+          <div style="display:flex;gap:3px;padding:3px;border:1px solid #1e242c;border-radius:7px;background:#0e1116;">
+            <sc-for list="{{ sleeveTabs }}" as="t" hint-placeholder-count="3">
+              <div onClick="{{ t.pick }}" style="padding:5px 14px;border-radius:5px;background:{{ t.bg }};color:{{ t.fg }};font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;">{{ t.label }}</div>
+            </sc-for>
+          </div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">{{ mv.meta }}</div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+          <div style="font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#4b5563;margin-right:4px;">Session</div>
+          <sc-for list="{{ sessions }}" as="s" hint-placeholder-count="7">
+            <div onClick="{{ s.pick }}" style="display:flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid {{ s.border }};border-radius:5px;background:{{ s.bg }};font-family:'IBM Plex Mono',monospace;font-size:11px;color:{{ s.fg }};cursor:pointer;white-space:nowrap;">
+              <span>{{ s.label }}</span>
+              <sc-if value="{{ s.isToday }}" hint-placeholder-val="{{ false }}">
+                <span style="font-family:'IBM Plex Sans',sans-serif;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5fd3b2;">today</span>
+              </sc-if>
+            </div>
+          </sc-for>
+          <div style="margin-left:auto;font-size:12px;color:#798394;text-wrap:pretty;">{{ sessionNote }}</div>
+        </div>
+
+        <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;overflow:hidden;">
+          <div style="display:grid;grid-template-columns:1fr auto;gap:24px;align-items:center;padding:11px 15px;border-bottom:1px solid #1a1f26;background:#0b0d11;">
+            <div style="display:flex;flex-direction:column;gap:9px;">
+              <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">
+                <sc-for list="{{ mv.chips }}" as="c" hint-placeholder-count="2">
+                  <div style="display:flex;align-items:center;gap:8px;padding:4px 12px;border:1px solid {{ c.border }};border-radius:5px;background:{{ c.bg }};white-space:nowrap;">
+                    <span style="width:7px;height:7px;border-radius:50%;background:{{ c.dot }};"></span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;letter-spacing:.1em;color:{{ c.fg }};">{{ c.word }}</span>
+                  </div>
+                </sc-for>
+                <div style="font-size:13px;color:#a8b1c0;text-wrap:pretty;max-width:88ch;">{{ mv.reason }}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;">
+                <sc-for list="{{ mv.meta2 }}" as="m" hint-placeholder-count="5">
+                  <div style="padding:0 11px;border-left:1px solid #1e242c;font-family:'IBM Plex Mono',monospace;font-size:11px;color:{{ m.fg }};white-space:nowrap;">{{ m.text }}</div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;white-space:nowrap;">{{ mv.verdictDetail }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;margin-top:4px;white-space:nowrap;">{{ mv.boundaryProof }}</div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:12px;padding:8px 15px;border-bottom:1px solid #1a1f26;">
+            <div style="display:flex;gap:3px;padding:3px;border:1px solid #1e242c;border-radius:7px;background:#0b0d11;">
+              <sc-for list="{{ mvTabs }}" as="t" hint-placeholder-count="3">
+                <div onClick="{{ t.pick }}" style="padding:5px 13px;border-radius:5px;background:{{ t.bg }};color:{{ t.fg }};font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;">{{ t.label }}</div>
+              </sc-for>
+            </div>
+            <div style="font-size:12px;color:#798394;">{{ mv.tabNote }}</div>
+          </div>
+
+          <sc-if value="{{ mv.showRules }}" hint-placeholder-val="{{ true }}">
+            <div>
+              <div style="display:flex;align-items:center;gap:12px;padding:8px 15px;border-bottom:1px solid #1a1f26;">
+                <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">{{ mv.rulesTitle }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;">one cell per slot · {{ mv.window }}</div>
+                <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8dc0f7;">{{ hover.slot }}</div>
+              </div>
+              <sc-for list="{{ lanes }}" as="ln" hint-placeholder-count="4">
+                <div style="display:grid;grid-template-columns:246px 1fr 110px;align-items:center;border-bottom:1px solid #171b22;background:{{ ln.rowBg }};">
+                  <div style="padding:8px 15px 10px 15px;border-left:3px solid {{ ln.accent }};">
+                    <div style="font-size:13px;color:#e8ebf0;">{{ ln.label }}</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;margin-top:3px;">{{ ln.needs }}</div>
+                  </div>
+                  <div onMouseLeave="{{ price.leave }}" style="display:flex;gap:2px;padding:0 6px;">
+                    <sc-for list="{{ ln.cells }}" as="c" hint-placeholder-count="22">
+                      <div onMouseEnter="{{ c.enter }}" style="flex:1;height:{{ c.height }};border-radius:2px;background:{{ c.bg }};border:{{ c.border }};outline:{{ c.outline }};outline-offset:1px;cursor:crosshair;"></div>
+                    </sc-for>
+                  </div>
+                  <div style="padding:8px 15px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ ln.tallyFg }};white-space:nowrap;">{{ ln.tally }}</div>
+                </div>
+              </sc-for>
+              <div style="display:grid;grid-template-columns:246px 1fr 110px;align-items:center;border-bottom:1px solid #1a1f26;">
+                <div style="padding:7px 15px;font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Slot decisions</div>
+                <div style="display:flex;gap:2px;padding:0 6px;align-items:center;">
+                  <sc-for list="{{ slotCells }}" as="s" hint-placeholder-count="22">
+                    <div style="flex:1;display:flex;justify-content:center;"><span style="width:5px;height:5px;border-radius:50%;background:{{ s.bg }};"></span></div>
+                  </sc-for>
+                </div>
+                <div style="padding:7px 15px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#a8b1c0;">{{ mv.slotTally }}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:18px;padding:7px 15px;background:#0b0d11;flex-wrap:wrap;">
+                <sc-for list="{{ legend }}" as="l" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:7px;">
+                    <span style="width:10px;height:4px;border-radius:2px;background:{{ l.bg }};border:{{ l.border }};"></span>
+                    <span style="font-size:12px;color:#798394;">{{ l.label }}</span>
+                  </div>
+                </sc-for>
+                <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;">{{ mv.declared }}</div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ mv.showDetector }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <div>
+              <div style="display:flex;align-items:center;gap:12px;padding:8px 15px;border-bottom:1px solid #1a1f26;">
+                <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Per-bar verdicts</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;">{{ grid.note }}</div>
+                <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">{{ grid.tally }}</div>
+              </div>
+              <sc-for list="{{ grid.rows }}" as="gr" hint-placeholder-count="4">
+                <div style="display:grid;grid-template-columns:246px 1fr 110px;align-items:center;border-bottom:1px solid #171b22;">
+                  <div style="padding:7px 15px;">
+                    <div style="font-size:13px;color:#e8ebf0;">{{ gr.label }}</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;margin-top:2px;">{{ gr.needs }}</div>
+                  </div>
+                  <div style="display:flex;gap:1px;padding:0 6px;">
+                    <sc-for list="{{ gr.cells }}" as="c" hint-placeholder-count="40">
+                      <div style="flex:1;height:9px;border-radius:1px;background:{{ c.bg }};border:{{ c.border }};"></div>
+                    </sc-for>
+                  </div>
+                  <div style="padding:7px 15px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ gr.tallyFg }};white-space:nowrap;">{{ gr.tally }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:grid;grid-template-columns:1.15fr 1fr;border-top:1px solid #1a1f26;">
+              <div style="padding:11px 15px;border-right:1px solid #1a1f26;">
+                <div style="display:flex;align-items:baseline;gap:10px;">
+                  <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Conditions</div>
+                  <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">market ref <span style="color:#a8b1c0;">{{ mv.marketRef }}</span> · {{ mv.marketRefAt }} · <span style="color:#8ae6cc;">RECORDED</span></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr auto auto;gap:0 14px;align-items:baseline;margin-top:11px;padding-bottom:11px;border-bottom:1px solid #1a1f26;">
+                  <div>
+                    <div style="font-size:13px;color:#e8ebf0;">Regime</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;margin-top:3px;">needs Normal</div>
+                  </div>
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#e8ebf0;">Calm</div>
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500;letter-spacing:.1em;color:#ff8085;">FAIL</div>
+                </div>
+                <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#4b5563;margin:13px 0 3px;">Readings · no verdict published</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 22px;">
+                  <sc-for list="{{ readings }}" as="r" hint-placeholder-count="6">
+                    <div style="display:flex;align-items:baseline;gap:12px;padding:6px 0;border-bottom:1px solid #171b22;">
+                      <div style="font-size:13px;color:#a8b1c0;">{{ r.label }}</div>
+                      <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ r.fg }};white-space:nowrap;">{{ r.value }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="font-size:12px;color:#798394;margin-top:10px;text-wrap:pretty;">{{ mv.formingNote }}</div>
+              </div>
+              <div style="padding:11px 15px;display:flex;flex-direction:column;gap:14px;">
+                <div>
+                  <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Nearest miss</div>
+                  <div style="font-size:13px;color:#e8ebf0;margin-top:6px;text-wrap:pretty;">{{ mv.miss }}</div>
+                </div>
+                <div style="padding-top:13px;border-top:1px solid #1a1f26;">
+                  <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Trade levels</div>
+                  <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+                    <span style="width:5px;height:5px;border-radius:50%;background:#4b5563;"></span>
+                    <span style="font-size:13px;color:#a8b1c0;">{{ mv.levelsChip }}</span>
+                  </div>
+                  <div style="font-size:12px;color:#798394;margin-top:7px;text-wrap:pretty;">{{ mv.levelsWhy }}</div>
+                </div>
+              </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ mv.showPrice }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <div style="display:flex;align-items:center;gap:14px;padding:9px 15px 0;flex-wrap:wrap;">
+                <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Price</div>
+                <div style="flex:0 0 auto;white-space:nowrap;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;padding:2px 8px;border:1px solid #262d36;border-radius:4px;color:#a8b1c0;">bars · {{ price.day }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#a8b1c0;">{{ price.ohlc }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ price.chgFg }};">{{ price.chg }}</div>
+                <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;">{{ price.note }}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:18px;margin:7px 15px 0;padding:7px 12px;border:1px solid #1a1f26;border-radius:6px;background:#0b0d11;flex-wrap:wrap;">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#8dc0f7;white-space:nowrap;">{{ hover.slot }}</div>
+                <sc-for list="{{ hoverRead }}" as="h" hint-placeholder-count="6">
+                  <div style="display:flex;align-items:baseline;gap:7px;">
+                    <span style="font-size:11px;color:#4b5563;white-space:nowrap;">{{ h.label }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ h.fg }};white-space:nowrap;">{{ h.value }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div onMouseLeave="{{ price.leave }}" style="padding:7px 15px 4px;">
+                <div style="display:grid;grid-template-columns:1fr 72px;">
+                  <div style="position:relative;height:210px;border-bottom:1px solid #1a1f26;overflow:hidden;">
+                    <div style="position:absolute;top:0;bottom:0;left:{{ price.bandLeft }};width:{{ price.bandWidth }};background:#101a2c;border-left:1px solid #233348;"></div>
+                    <sc-if value="{{ hover.on }}" hint-placeholder-val="{{ false }}">
+                      <div style="position:absolute;top:0;bottom:0;left:{{ hover.priceLeft }};width:1px;background:#3a5a80;"></div>
+                    </sc-if>
+                    <div style="position:absolute;top:6px;left:{{ price.bandLabelLeft }};font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500;letter-spacing:.14em;color:#5b9cf0;">WINDOW</div>
+                    <sc-for list="{{ price.grid }}" as="g" hint-placeholder-count="5">
+                      <div style="position:absolute;left:0;right:0;top:{{ g.top }};border-top:1px solid #141920;"></div>
+                    </sc-for>
+                    <sc-for list="{{ price.bars }}" as="b" hint-placeholder-count="40">
+                      <div style="position:absolute;left:{{ b.mid }};top:{{ b.wickTop }};width:1px;height:{{ b.wickHeight }};background:{{ b.color }};"></div>
+                      <div style="position:absolute;left:{{ b.left }};top:{{ b.bodyTop }};width:{{ b.width }};height:{{ b.bodyHeight }};background:{{ b.color }};"></div>
+                    </sc-for>
+                    <sc-for list="{{ price.cols }}" as="c" hint-placeholder-count="22">
+                      <div onMouseEnter="{{ c.enter }}" style="position:absolute;top:0;bottom:0;left:{{ c.left }};width:{{ c.width }};background:{{ c.bg }};cursor:crosshair;"></div>
+                    </sc-for>
+                  </div>
+                  <div style="position:relative;height:210px;border-bottom:1px solid #1a1f26;">
+                    <sc-for list="{{ price.axis }}" as="a" hint-placeholder-count="3">
+                      <div style="position:absolute;left:8px;top:{{ a.top }};transform:translateY({{ a.shift }});font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;white-space:nowrap;">{{ a.label }}</div>
+                    </sc-for>
+                  </div>
+
+                  <div style="position:relative;height:58px;border-bottom:1px solid #1a1f26;overflow:hidden;">
+                    <div style="position:absolute;top:5px;left:0;font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#4b5563;">Volume</div>
+                    <div style="position:absolute;top:0;bottom:0;left:{{ price.bandLeft }};width:{{ price.bandWidth }};background:#101a2c;"></div>
+                    <sc-for list="{{ price.bars }}" as="b" hint-placeholder-count="40">
+                      <div style="position:absolute;left:{{ b.left }};bottom:0;width:{{ b.width }};height:{{ b.volHeight }};background:{{ b.volColor }};"></div>
+                    </sc-for>
+                    <sc-if value="{{ hover.on }}" hint-placeholder-val="{{ false }}">
+                      <div style="position:absolute;top:0;bottom:0;left:{{ hover.priceLeft }};width:1px;background:#3a5a80;"></div>
+                    </sc-if>
+                    <sc-for list="{{ price.cols }}" as="c" hint-placeholder-count="22">
+                      <div onMouseEnter="{{ c.enter }}" style="position:absolute;top:0;bottom:0;left:{{ c.left }};width:{{ c.width }};background:{{ c.bg }};cursor:crosshair;"></div>
+                    </sc-for>
+                  </div>
+                  <div style="position:relative;height:58px;border-bottom:1px solid #1a1f26;">
+                    <div style="position:absolute;left:8px;top:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">{{ price.volMax }}</div>
+                    <div style="position:absolute;left:8px;bottom:4px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;">0</div>
+                  </div>
+
+                  <div style="position:relative;height:24px;">
+                    <sc-for list="{{ price.marks }}" as="m" hint-placeholder-count="22">
+                      <div style="position:absolute;left:{{ m.left }};top:9px;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:{{ m.bg }};border:{{ m.border }};"></div>
+                    </sc-for>
+                    <div style="position:absolute;left:0;right:0;top:12px;border-top:1px solid #171b22;"></div>
+                  </div>
+                  <div style="position:relative;height:24px;">
+                    <div style="position:absolute;left:8px;top:5px;font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:#4b5563;">Slots</div>
+                  </div>
+
+                  <div style="grid-column:1 / -1;display:flex;align-items:center;gap:14px;padding:9px 0 6px;margin-top:6px;border-top:1px solid #1a1f26;flex-wrap:wrap;">
+                    <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Across the session</div>
+                    <div style="flex:0 0 auto;white-space:nowrap;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;padding:2px 8px;border:1px solid #262d36;border-radius:4px;color:#a8b1c0;">slots · {{ chart.day }}</div>
+                    <div style="margin-left:auto;display:flex;align-items:center;gap:14px;">
+                      <sc-for list="{{ chartKeys }}" as="k" hint-placeholder-count="5">
+                        <div style="display:flex;align-items:center;gap:7px;">
+                          <span style="flex:0 0 auto;width:{{ k.w }};height:{{ k.h }};border-radius:{{ k.radius }};background:{{ k.bg }};border-top:{{ k.dash }};"></span>
+                          <span style="font-size:12px;color:{{ k.fg }};">{{ k.label }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="position:relative;height:128px;border-bottom:1px solid #1a1f26;">
+                    <div style="position:absolute;left:0;right:0;top:0;border-top:1px solid #141920;"></div>
+                    <sc-for list="{{ chart.grid }}" as="g" hint-placeholder-count="3">
+                      <div style="position:absolute;left:0;right:0;top:{{ g.top }};border-top:1px solid #12161c;"></div>
+                    </sc-for>
+                    <div style="position:absolute;top:0;bottom:0;left:{{ chart.bandLeft }};width:{{ chart.bandWidth }};">
+                      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;">
+                        <defs><linearGradient id="closeFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stop-color="#8dc0f7" stop-opacity=".20"></stop>
+                          <stop offset="100%" stop-color="#8dc0f7" stop-opacity="0"></stop>
+                        </linearGradient></defs>
+                        <polygon points="{{ chart.closeArea }}" fill="url(#closeFill)" stroke="none"></polygon>
+                        <polyline points="{{ chart.ema }}" fill="none" stroke="#5b9cf0" stroke-width="1.3" stroke-dasharray="5 4" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></polyline>
+                        <polyline points="{{ chart.close }}" fill="none" stroke="#8dc0f7" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></polyline>
+                      </svg>
+                      <sc-for list="{{ chart.emaDots }}" as="d" hint-placeholder-count="13">
+                        <div style="position:absolute;left:{{ d.left }};top:{{ d.top }};width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;border:1px solid #5b9cf0;background:#0e1116;"></div>
+                      </sc-for>
+                      <sc-for list="{{ chart.closeDots }}" as="d" hint-placeholder-count="13">
+                        <div style="position:absolute;left:{{ d.left }};top:{{ d.top }};width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:#8dc0f7;"></div>
+                      </sc-for>
+                      <sc-if value="{{ hover.on }}" hint-placeholder-val="{{ false }}">
+                        <div>
+                          <div style="position:absolute;top:0;bottom:0;left:{{ hover.seriesLeft }};width:1px;background:#3a5a80;"></div>
+                          <sc-if value="{{ hover.hasClose }}" hint-placeholder-val="{{ false }}">
+                            <div style="position:absolute;left:{{ hover.seriesLeft }};top:{{ hover.dotTop }};width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:#8dc0f7;"></div>
+                          </sc-if>
+                        </div>
+                      </sc-if>
+                      <sc-for list="{{ seriesCols }}" as="c" hint-placeholder-count="22">
+                        <div onMouseEnter="{{ c.enter }}" style="position:absolute;top:0;bottom:0;left:{{ c.left }};width:{{ c.width }};background:{{ c.bg }};cursor:crosshair;"></div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="position:relative;height:128px;border-bottom:1px solid #1a1f26;">
+                    <sc-if value="{{ chart.showHi }}" hint-placeholder-val="{{ true }}">
+                      <div style="position:absolute;left:8px;top:0;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">{{ chart.hi }}</div>
+                    </sc-if>
+                    <div style="position:absolute;left:8px;top:{{ chart.lastTop }};transform:translateY(-50%);padding:1px 5px;border-radius:3px;background:#1b3454;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#bcd8f8;white-space:nowrap;">{{ chart.lastLabel }}</div>
+                    <sc-if value="{{ chart.showLo }}" hint-placeholder-val="{{ true }}">
+                      <div style="position:absolute;left:8px;bottom:2px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">{{ chart.lo }}</div>
+                    </sc-if>
+                  </div>
+                  <div style="position:relative;height:66px;">
+                    <div style="position:absolute;top:0;bottom:0;left:{{ chart.bandLeft }};width:{{ chart.bandWidth }};">
+                      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;">
+                        <polyline points="{{ chart.avgv }}" fill="none" stroke="#4b5563" stroke-width="1.3" vector-effect="non-scaling-stroke"></polyline>
+                        <polyline points="{{ chart.volLine }}" fill="none" stroke="#e0913c" stroke-width="1.3" vector-effect="non-scaling-stroke"></polyline>
+                      </svg>
+                      <sc-for list="{{ chart.avgvDots }}" as="d" hint-placeholder-count="13">
+                        <div style="position:absolute;left:{{ d.left }};top:{{ d.top }};width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;border:1px solid #4b5563;background:#0e1116;"></div>
+                      </sc-for>
+                      <sc-for list="{{ chart.vol }}" as="v" hint-placeholder-count="13">
+                        <div style="position:absolute;left:{{ v.left }};top:{{ v.top }};width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:#e0913c;"></div>
+                      </sc-for>
+                      <sc-if value="{{ hover.on }}" hint-placeholder-val="{{ false }}">
+                        <div>
+                          <div style="position:absolute;top:0;bottom:0;left:{{ hover.seriesLeft }};width:1px;background:#3a5a80;"></div>
+                          <sc-if value="{{ hover.hasVol }}" hint-placeholder-val="{{ false }}">
+                            <div style="position:absolute;left:{{ hover.seriesLeft }};top:{{ hover.volDotTop }};width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;border:1px solid #8dc0f7;background:#0e1116;"></div>
+                          </sc-if>
+                        </div>
+                      </sc-if>
+                      <sc-for list="{{ seriesCols }}" as="c" hint-placeholder-count="22">
+                        <div onMouseEnter="{{ c.enter }}" style="position:absolute;top:0;bottom:0;left:{{ c.left }};width:{{ c.width }};background:{{ c.bg }};cursor:crosshair;"></div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="position:relative;height:66px;">
+                    <div style="position:absolute;left:8px;top:0;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">{{ chart.vHi }}</div>
+                    <div style="position:absolute;left:8px;bottom:2px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;">0</div>
+                  </div>
+                  <div style="position:relative;height:22px;border-top:1px solid #1a1f26;">
+                    <sc-for list="{{ price.times }}" as="t" hint-placeholder-count="5">
+                      <div style="position:absolute;left:{{ t.left }};top:4px;transform:translateX({{ t.shift }});font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;white-space:nowrap;">{{ t.label }}</div>
+                    </sc-for>
+                  </div>
+                  <div style="border-top:1px solid #1a1f26;"></div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:16px;padding:0 15px 9px;flex-wrap:wrap;">
+                <sc-for list="{{ legend }}" as="l" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:7px;">
+                    <span style="width:8px;height:8px;border-radius:50%;background:{{ l.bg }};border:{{ l.border }};"></span>
+                    <span style="font-size:12px;color:#798394;">{{ l.label }}</span>
+                  </div>
+                </sc-for>
+                <div style="margin-left:auto;font-size:12px;color:#798394;">{{ mv.levelsChip }}</div>
+              </div>
+              <div style="padding:0 15px 7px;font-size:12px;color:#798394;text-wrap:pretty;">{{ chart.refusedNote }}</div>
+              <div style="padding:0 15px 11px;font-size:12px;color:#798394;text-wrap:pretty;">Each dot is the bar the slot was reading, which had only just opened — the line above it is the ten-bar average, measured on closed bars.</div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <sc-if value="{{ mv.showCalm }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:18px 22px;border-bottom:1px solid #1b2027;">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">
+            <span style="width:3px;height:15px;border-radius:2px;background:#3ecf8e;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Calm · two phases</div>
+            <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">09:32 decides · 10:02 reads the price</div>
+          </div>
+          <div style="border:1px solid #1e242c;border-radius:8px;background:#0e1116;overflow:hidden;">
+            <div style="display:flex;align-items:center;gap:14px;padding:7px 15px;border-bottom:1px solid #1a1f26;background:#0b0d11;flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:7px;">
+                <span style="font-size:10px;font-weight:600;letter-spacing:.12em;color:#e8ebf0;">DECIDE</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">09:32 · RECORDED</span>
+              </div>
+              <span style="width:1px;height:11px;background:#262d36;"></span>
+              <div style="display:flex;align-items:center;gap:7px;">
+                <span style="font-size:10px;font-weight:600;letter-spacing:.12em;color:#e8ebf0;">OBSERVE</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">10:02 · RECORDED</span>
+              </div>
+              <div style="font-size:12px;color:#798394;">Only the two priced rows change; the rest was fixed before the open.</div>
+              <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;">2 instruments · 5 rows · 4 gates each</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));">
+              <sc-for list="{{ instruments }}" as="iv" hint-placeholder-count="2">
+                <div style="border-left:1px solid #1a1f26;padding:9px 14px 10px;">
+                  <div style="display:flex;align-items:baseline;gap:9px;">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:#e8ebf0;">{{ iv.instrument }}</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#798394;">{{ iv.direction }}</div>
+                    <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8ae6cc;">{{ iv.gateTally }}</div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 108px 108px;gap:0 10px;margin-top:8px;">
+                    <div></div>
+                    <div style="font-size:9px;font-weight:600;letter-spacing:.12em;color:#4b5563;text-align:right;">DECIDE</div>
+                    <div style="font-size:9px;font-weight:600;letter-spacing:.12em;color:#4b5563;text-align:right;">OBSERVE</div>
+                    <sc-for list="{{ iv.rows }}" as="r" hint-placeholder-count="5">
+                      <div style="display:flex;align-items:baseline;gap:7px;min-width:0;padding:5px 0;border-top:1px solid #171b22;">
+                        <div style="font-size:12px;color:#e8ebf0;white-space:nowrap;">{{ r.label }}</div>
+                        <div style="font-size:11px;color:#4b5563;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r.sub }}</div>
+                      </div>
+                      <div style="padding:5px 0;border-top:1px solid #171b22;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ r.decideFg }};white-space:nowrap;">{{ r.decide }}</div>
+                      <div style="padding:5px 0;border-top:1px solid #171b22;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ r.observeFg }};white-space:nowrap;">{{ r.observe }}</div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:9px;border-top:1px solid #1a1f26;flex-wrap:wrap;">
+                    <div style="font-size:9px;font-weight:600;letter-spacing:.12em;color:#4b5563;">GATES</div>
+                    <sc-for list="{{ iv.gates }}" as="g" hint-placeholder-count="4">
+                      <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="width:4px;height:4px;border-radius:50%;background:{{ g.dot }};flex:0 0 4px;"></span>
+                        <span style="font-size:11px;color:#798394;">{{ g.label }}</span>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#a8b1c0;">{{ g.value }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="padding:7px 15px;background:#0b0d11;border-top:1px solid #1a1f26;font-size:12px;color:#798394;text-wrap:pretty;">A stop rule is a distance until the entry bar prints — that is why DECIDE carries no stop price. Gate values are rounded for display; recorded rows keep full precision.</div>
+          </div>
+        </div>
+      </sc-if>
+
+
+    </div>
+
+    <div style="background:#0a0c10;">
+      <div style="padding:16px 18px 0;">
+        <div style="display:flex;align-items:baseline;gap:12px;">
+          <span style="width:3px;height:15px;border-radius:2px;background:#9d8cf5;display:inline-block;"></span><div style="font-size:17px;font-weight:600;letter-spacing:-.01em;">Job journal</div>
+          <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">{{ journalMeta }}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:9px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:#3ecf8e;"></span>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#798394;">Scheduler</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#a8b1c0;">on schedule</div>
+        </div>
+        <div style="display:flex;gap:4px;margin-top:14px;padding:3px;border:1px solid #1e242c;border-radius:7px;background:#0e1116;">
+          <sc-for list="{{ journalTabs }}" as="t" hint-placeholder-count="2">
+            <div onClick="{{ t.pick }}" style="flex:1;text-align:center;padding:8px;border-radius:5px;background:{{ t.bg }};color:{{ t.fg }};font-size:12px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;">{{ t.label }}</div>
+          </sc-for>
+        </div>
+      </div>
+
+      <sc-if value="{{ showJobs }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:5px 18px 20px;">
+          <sc-for list="{{ jobs }}" as="j" hint-placeholder-count="8">
+            <div style="margin-top:8px;border:1px solid {{ j.cardBorder }};border-radius:8px;background:{{ j.cardBg }};overflow:hidden;">
+              <div onClick="{{ j.toggle }}" style="padding:10px 13px;cursor:pointer;" style-hover="background:#12161c;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">{{ j.time }}</div>
+                  <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">{{ j.dur }}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap;">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2e2745;border-radius:3px;color:#9d8cf5;">{{ j.lane }}</div>
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2a323d;border-radius:3px;color:{{ j.color }};">{{ j.state }}</div>
+                  <sc-if value="{{ j.hasTag }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2a323d;border-radius:3px;color:{{ j.tagFg }};">{{ j.tag }}</div>
+                  </sc-if>
+                  <div style="margin-left:auto;width:20px;height:20px;border:1px solid #262d36;border-radius:4px;color:#a8b1c0;font-size:12px;line-height:18px;text-align:center;">{{ j.sign }}</div>
+                </div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#e8ebf0;margin-top:8px;">{{ j.name }}</div>
+                <div style="font-size:12px;color:#798394;margin-top:4px;text-wrap:pretty;">{{ j.note }}</div>
+              </div>
+              <sc-if value="{{ j.open }}" hint-placeholder-val="{{ false }}">
+                <div style="border-top:1px solid #1a1f26;background:#0b0d11;">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #171b22;">
+                    <div style="padding:10px 13px;border-right:1px solid #171b22;">
+                      <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Started</div>
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#e8ebf0;margin-top:4px;">{{ j.started }}</div>
+                    </div>
+                    <div style="padding:10px 13px;">
+                      <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;">Exit</div>
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ j.color }};margin-top:4px;">{{ j.exit }}</div>
+                    </div>
+                  </div>
+                  <div style="padding:11px 13px;border-bottom:1px solid #171b22;">
+                    <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;margin-bottom:6px;">Outcome</div>
+                    <div style="font-size:12px;color:#e8ebf0;text-wrap:pretty;">{{ j.outcome }}</div>
+                  </div>
+                  <div style="padding:11px 13px;border-bottom:1px solid #171b22;">
+                    <div style="font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#798394;margin-bottom:7px;">Log</div>
+                    <sc-for list="{{ j.log }}" as="line" hint-placeholder-count="3">
+                      <div style="display:grid;grid-template-columns:62px 46px 1fr;gap:9px;padding:3px 0;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.6;">
+                        <div style="color:#798394;">{{ line.at }}</div>
+                        <div style="color:{{ line.lvColor }};">{{ line.lv }}</div>
+                        <div style="color:#a8b1c0;text-wrap:pretty;">{{ line.msg }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="padding:10px 13px;display:flex;align-items:center;gap:8px;">
+                    <div style="padding:6px 12px;border:1px solid #262d36;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#e8ebf0;">Full log</div>
+                    <div style="padding:6px 12px;border:1px solid #262d36;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#e8ebf0;">Artifacts</div>
+                    <div style="margin-left:auto;padding:6px 12px;border-radius:5px;background:#14251f;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8ae6cc;">Re-run</div>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+          <div style="padding-top:14px;display:flex;align-items:center;gap:14px;">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5fd3b2;cursor:pointer;">Show all 66 jobs</div>
+            <div onClick="{{ collapseAll }}" style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;cursor:pointer;" style-hover="color:#a8b1c0;">Collapse all</div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showEvents }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:5px 18px 20px;">
+          <sc-for list="{{ events }}" as="e" hint-placeholder-count="6">
+            <div style="margin-top:8px;border:1px solid #171b22;border-left:2px solid {{ e.accent }};border-radius:8px;background:#0b0d11;padding:10px 13px;">
+              <div style="display:flex;align-items:center;gap:9px;">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;color:#798394;">{{ e.category }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;padding:2px 7px;border:1px solid #2a323d;border-radius:3px;color:{{ e.statusFg }};">{{ e.status }}</div>
+                <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#798394;">{{ e.at }}</div>
+              </div>
+              <div style="font-size:13px;color:#e8ebf0;margin-top:8px;text-wrap:pretty;">{{ e.title }}</div>
+              <div style="font-size:12px;color:#798394;margin-top:4px;text-wrap:pretty;">{{ e.message }}</div>
+              <sc-if value="{{ e.hasTimes }}" hint-placeholder-val="{{ false }}">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;padding-top:9px;border-top:1px solid #171b22;">
+                  <div>
+                    <div style="font-size:9px;font-weight:600;letter-spacing:.12em;color:#4b5563;">INCURRED</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#a8b1c0;margin-top:3px;">{{ e.incurred }}</div>
+                  </div>
+                  <div>
+                    <div style="font-size:9px;font-weight:600;letter-spacing:.12em;color:#4b5563;">RECOVERED</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:{{ e.recoveredFg }};margin-top:3px;">{{ e.recovered }}</div>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+          <div style="padding-top:14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4b5563;">Structured events only — repeated observations are grouped, and an absence of log lines is never read as a recovery.</div>
+        </div>
+      </sc-if>
+
+      <div style="padding:0 18px 22px;">
+        <div style="border-top:1px solid #1b2027;padding-top:16px;">
+          <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;">
+            <span style="width:3px;height:13px;border-radius:2px;background:#5b9cf0;display:inline-block;"></span>
+            <div style="font-size:15px;font-weight:600;letter-spacing:-.01em;">Source Clocks</div>
+          </div>
+          <sc-for list="{{ clocks }}" as="c" hint-placeholder-count="6">
+            <div style="display:flex;align-items:baseline;gap:12px;padding:6px 0;border-bottom:1px solid #171b22;">
+              <div style="font-size:12px;color:#798394;">{{ c.label }}</div>
+              <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ c.fg }};white-space:nowrap;">{{ c.value }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1900,&quot;height&quot;:1600}}">
+class Component extends DCLogic {
+  state = { sleeve: "NKD", mvTab: "Setup rules", journal: "Jobs", openJob: "TRACK1_STRESS_1230", issue: "TRACK1_SWING_1555", hoverSlot: null, mvDay: null };
+
+  jobDetail(name, state) {
+    if (state === "RUNNING") return {
+      started: "13:10:02 ET", exit: "pending",
+      outcome: "Execution started at 13:10:02 and has not reported completion. No trade or protection change has been observed yet.",
+      log: [
+        { at: "13:10:02", lv: "INFO", lvColor: "#798394", msg: "runner.start — session=TRACK1, mode=paper" },
+        { at: "13:10:05", lv: "INFO", lvColor: "#798394", msg: "broker.connect — IBKR gateway ok, 0 positions, 0 orders" }
+      ]
+    };
+    return {
+      started: "12:30:04 ET", exit: "0 · completed",
+      outcome: "The execution completed without a trade or protection change. Every slot was decided and no signal fired, so nothing was sent to the broker.",
+      log: [
+        { at: "12:30:04", lv: "INFO", lvColor: "#798394", msg: "runner.start — session=TRACK1, sleeve=stress, mode=paper" },
+        { at: "12:30:22", lv: "INFO", lvColor: "#798394", msg: "regime.load — SPY through Aug 28, state=Calm" },
+        { at: "12:30:39", lv: "INFO", lvColor: "#798394", msg: "detector.slots — 22/22 decided, gate allow 22, regime lag 1 failed 14" },
+        { at: "12:30:52", lv: "INFO", lvColor: "#798394", msg: "runner.exit — code 0, no signal, protection unchanged" }
+      ]
+    };
+  }
+
+  renderVals() {
+    const green = "#3ecf8e", red = "#f2555a", amber = "#f0b429", blue = "#5b9cf0";
+    const sleeve = this.state.sleeve, tab = this.state.mvTab;
+
+    const cfg = {
+      NKD:    { inst: "MNKD", window: "01:20–02:55 ET", mid: "02:05", slots: 22, blocking: "regime lag 1", blockPass: 8,
+                ref: "66,680.00", refAt: "02:55 ET", base: 66240, span: 127, ema0: 66228, atr: "55.36", emaLabel: "EMA 10",
+                vAvg: [5.8, 7.2, 8.4, 10.1, 12.6, 14.0, 17.2, 21.4, 23.0, 25.8, 28.4, 30.2, 32.0],
+                vol: [0, 0, 0, 0, 5, 0, 6, 14, 0, 0, 4, 1, 0], formingAt: "2026-08-31 15:55 UTC" },
+      Stress: { inst: "MES",  window: "09:35–12:30 ET", mid: "11:00", slots: 24, blocking: "regime lag 1", blockPass: 10,
+                ref: "7,689.75", refAt: "12:30 ET", base: 7668.25, span: 44.25, ema0: 7665.10, atr: "59.70", emaLabel: "EMA 10",
+                vAvg: [61, 68, 74, 80, 88, 96, 104, 118, 126, 133, 141, 150, 158],
+                vol: [12, 0, 34, 18, 0, 27, 41, 9, 0, 63, 22, 5, 0], formingAt: "2026-08-31 16:30 UTC" },
+      Swing:  { inst: "M2K",  window: "09:35–12:30 ET", mid: "11:00", slots: 24, blocking: "pullback depth", blockPass: 6,
+                ref: "3,073.34", refAt: "12:30 ET", base: 3058.10, span: 23.30, ema0: 3056.40, atr: "18.42", emaLabel: "EMA 20",
+                vAvg: [24, 27, 31, 35, 38, 43, 47, 52, 55, 59, 63, 68, 72],
+                vol: [8, 0, 15, 6, 0, 11, 19, 3, 0, 26, 12, 2, 0], formingAt: "2026-08-31 16:30 UTC" }
+    }[sleeve];
+    const N = cfg.slots;
+    const sessionDay = "2026-" + (this.state.mvDay || "08-31");
+    const fmtP = v => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const laneDefs = [
+      { label: "gate allow", needs: "needs no refusal codes", pass: N, decided: N },
+      { label: "freshness allow", needs: "needs true", pass: N, decided: N },
+      { label: cfg.blocking, needs: sleeve === "Swing" ? "needs 0.6 ATR or deeper" : "needs Normal", pass: cfg.blockPass, decided: N, blocking: true },
+      { label: "admission cap result", needs: "no threshold published", decided: 0 }
+    ];
+    const hoverIdx = this.state.hoverSlot;
+    const laneEnter = i => () => { if (this.state.hoverSlot !== i) this.setState({ hoverSlot: i }); };
+    const lanes = laneDefs.map(L => ({
+      label: L.label, needs: L.needs,
+      cells: Array.from({ length: N }, (_, i) => Object.assign(
+        L.decided
+          ? { bg: i < L.pass ? green : red, border: "0", height: "10px" }
+          : { bg: "transparent", border: "1px solid #22282f", height: "9px" },
+        { enter: laneEnter(i), outline: hoverIdx === i ? "1px solid #8dc0f7" : "none" })),
+      accent: L.blocking ? red : "transparent",
+      rowBg: L.blocking ? "#100f12" : "transparent",
+      tally: L.decided ? L.pass + "/" + L.decided + " pass" : "not reached",
+      tallyFg: !L.decided ? "#4b5563" : L.pass === L.decided ? "#8ae6cc" : "#ff8085"
+    }));
+
+    // slot series — one entry per slot, nulls before the detector carried numbers
+    const shape = [0, 12, 8, 26, 41, 34, 58, 72, 65, 90, 104, 112, 127];
+    const k = cfg.span / 127;
+    const lead = N - shape.length;
+    const pad = a => Array.from({ length: lead }, () => null).concat(a);
+    const close = pad(shape.map(s => cfg.base + s * k));
+    const ema = pad(shape.map((s, i) => cfg.ema0 + (s * 0.82 + i * 1.1) * k));
+    const avgv = pad(cfg.vAvg), vol = pad(cfg.vol);
+    const lastClose = close[N - 1], lastEma = ema[N - 1];
+    const readings = [
+      { label: "Trend filter (" + cfg.emaLabel + ")", value: fmtP(lastEma) },
+      { label: "Close used", value: fmtP(lastClose) },
+      { label: "Close minus EMA", value: "+" + fmtP(lastClose - lastEma) },
+      { label: "Daily ATR", value: cfg.atr },
+      { label: "Bar volume", value: String(vol[N - 1]), fg: vol[N - 1] === 0 ? amber : "#e8ebf0" },
+      { label: "Average volume (10 bars)", value: String(avgv[N - 1]) }
+    ].map(r => Object.assign({ fg: "#e8ebf0" }, r));
+
+    const finite = a => a.filter(v => v !== null);
+    const X = i => ((i + 0.5) / N) * 100;
+    const sLo = Math.min.apply(null, finite(close).concat(finite(ema)));
+    const sHi = Math.max.apply(null, finite(close).concat(finite(ema)));
+    const PY = v => (1 - (v - sLo) / (sHi - sLo)) * 100;
+    const vMaxLine = Math.max.apply(null, finite(avgv));
+    const VY = v => (1 - v / vMaxLine) * 100;
+    const pts = (a, f) => a.map((v, i) => v === null ? null : X(i).toFixed(2) + "," + f(v).toFixed(2))
+      .filter(Boolean).join(" ");
+
+    // candle bars: pre-window context plus one bar per slot
+    const rnd = (s => () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648)(cfg.slots * 7 + 13);
+    const nBars = N + 10, firstSlotBar = 10;
+    const rawBars = [];
+    let px = cfg.base - cfg.span * 0.35;
+    for (let i = 0; i < nBars; i++) {
+      const o = px, drift = i < firstSlotBar ? 0.18 : 0.42;
+      px = px + (rnd() - 0.5 + drift * 0.5) * cfg.span * 0.16;
+      const c = px, wig = cfg.span * 0.05 * rnd();
+      rawBars.push({ o, c, h: Math.max(o, c) + wig, l: Math.min(o, c) - wig, v: 0.2 + rnd() * 0.8 });
+    }
+    const bHi = Math.max.apply(null, rawBars.map(b => b.h)), bLo = Math.min.apply(null, rawBars.map(b => b.l));
+    const bPad = (bHi - bLo) * 0.06, pTop = bHi + bPad, pBot = bLo - bPad, pRng = pTop - pBot;
+    const bY = v => (pTop - v) / pRng * 100;
+    const slotW = 100 / nBars, bodyW = slotW * 0.58;
+    const vMaxBar = Math.max.apply(null, rawBars.map(b => b.v));
+    const priceBars = rawBars.map((b, i) => {
+      const rising = b.c >= b.o;
+      const bt = bY(Math.max(b.o, b.c)), bb = bY(Math.min(b.o, b.c));
+      return {
+        left: (i * slotW + (slotW - bodyW) / 2).toFixed(3) + "%", width: bodyW.toFixed(3) + "%",
+        mid: (i * slotW + slotW / 2).toFixed(3) + "%",
+        color: rising ? green : red,
+        bodyTop: bt.toFixed(2) + "%", bodyHeight: Math.max(bb - bt, 0.6).toFixed(2) + "%",
+        wickTop: bY(b.h).toFixed(2) + "%", wickHeight: (bY(b.l) - bY(b.h)).toFixed(2) + "%",
+        volHeight: (b.v / vMaxBar * 82).toFixed(1) + "%",
+        volColor: rising ? "#1f6b4c" : "#7a2b30"
+      };
+    });
+    const lastB = rawBars[nBars - 1], prevB = rawBars[nBars - 2];
+    const chg = lastB.c - prevB.c;
+    // one shared slot index drives both charts
+    const hi = this.state.hoverSlot;
+    const hoverOn = hi !== null && hi !== undefined;
+    const winParts = cfg.window.replace(" ET", "").split("–");
+    const toMin = s => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
+    const winStart = toMin(winParts[0]), winEnd = toMin(winParts[1]);
+    const slotStep = (winEnd - winStart) / (N - 1);
+    const slotClock = i => {
+      const t = Math.round(winStart + i * slotStep);
+      return String(Math.floor(t / 60) % 24).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0");
+    };
+    const slotTicks = [0, Math.round((N - 1) * 0.25), Math.round((N - 1) * 0.5), Math.round((N - 1) * 0.75), N - 1];
+    const enter = i => () => { if (this.state.hoverSlot !== i) this.setState({ hoverSlot: i }); };
+    const leave = () => this.setState({ hoverSlot: null });
+    const priceCols = Array.from({ length: N }, (_, i) => ({
+      left: ((firstSlotBar + i) * slotW).toFixed(3) + "%", width: slotW.toFixed(3) + "%",
+      bg: hoverOn && hi === i ? "rgba(91,156,240,.07)" : "transparent", enter: enter(i)
+    }));
+    const seriesCols = Array.from({ length: N }, (_, i) => ({
+      left: (i / N * 100).toFixed(3) + "%", width: (100 / N).toFixed(3) + "%",
+      bg: hoverOn && hi === i ? "rgba(91,156,240,.07)" : "transparent", enter: enter(i)
+    }));
+    const hb = hoverOn ? rawBars[firstSlotBar + hi] : null;
+    const hover = {
+      on: hoverOn,
+      priceLeft: hoverOn ? ((firstSlotBar + hi) * slotW + slotW / 2).toFixed(3) + "%" : "-10%",
+      seriesLeft: hoverOn ? X(hi).toFixed(3) + "%" : "-10%",
+      slot: hoverOn ? "slot " + (hi + 1) + " / " + N + " · " + slotClock(hi) + " ET" : "hover a slot to read both charts at the same minute",
+      ohlc: hb ? "O " + fmtP(hb.o) + "  H " + fmtP(hb.h) + "  L " + fmtP(hb.l) + "  C " + fmtP(hb.c) : "—",
+      barVolBar: hb ? (hb.v / vMaxBar).toFixed(2) + " of peak" : "—",
+      close: hoverOn && close[hi] !== null ? fmtP(close[hi]) : "no reading",
+      ema: hoverOn && ema[hi] !== null ? fmtP(ema[hi]) : "no reading",
+      avgv: hoverOn && avgv[hi] !== null ? String(avgv[hi]) : "no reading",
+      vol: hoverOn && vol[hi] !== null ? String(vol[hi]) : "no reading",
+      valueFg: hoverOn ? "#e8ebf0" : "#4b5563",
+      hasClose: hoverOn && close[hi] !== null,
+      hasVol: hoverOn && avgv[hi] !== null,
+      dotTop: hoverOn && close[hi] !== null ? PY(close[hi]).toFixed(2) + "%" : "0%",
+      volDotTop: hoverOn && avgv[hi] !== null ? VY(avgv[hi]).toFixed(2) + "%" : "0%"
+    };
+
+    const price = {
+      cols: priceCols, leave,
+      ohlc: "O " + fmtP(lastB.o) + "  H " + fmtP(lastB.h) + "  L " + fmtP(lastB.l) + "  C " + fmtP(lastB.c),
+      chg: (chg >= 0 ? "+" : "−") + fmtP(Math.abs(chg)),
+      chgFg: chg >= 0 ? green : "#ff8085",
+      day: sessionDay,
+      note: nBars + " bars · " + cfg.inst + " 5m · levels not published",
+      bandLeft: (firstSlotBar * slotW).toFixed(2) + "%",
+      bandWidth: (100 - firstSlotBar * slotW).toFixed(2) + "%",
+      bandLabelLeft: (firstSlotBar * slotW + 0.8).toFixed(2) + "%",
+      grid: [0.25, 0.5, 0.75].map(f => ({ top: (f * 100).toFixed(1) + "%" })),
+      axis: [0, 0.5, 1].map((f, i) => ({
+        top: (f * 100).toFixed(1) + "%",
+        shift: i === 0 ? "0" : i === 2 ? "-100%" : "-50%",
+        label: fmtP(pTop - pRng * f)
+      })),
+      bars: priceBars,
+      volMax: "peak",
+      marks: Array.from({ length: N }, (_, i) => ({
+        left: ((firstSlotBar + i) * slotW + slotW / 2).toFixed(2) + "%",
+        bg: hoverOn && hi === i ? "#8dc0f7" : "#3a424f", border: "0"
+      })),
+      times: slotTicks.map((s, i) => ({
+        label: slotClock(s),
+        left: ((firstSlotBar + s) * slotW + slotW / 2).toFixed(2) + "%",
+        shift: i === 0 ? "0" : i === slotTicks.length - 1 ? "-100%" : "-50%"
+      }))
+    };
+
+    const same = v => ({ observe: "—", observeFg: "#2a323d" });
+    const mkRows = d => [
+      { label: "Entry reference", sub: "10:00 bar open", decide: "10:00 ET", decideFg: "#798394", observe: d.entry, observeFg: "#e8ebf0" },
+      { label: "Planned stop", sub: "rule resolved to a price", decide: "entry − 1.5 × ATR", decideFg: "#798394", observe: d.stop, observeFg: "#e8ebf0" },
+      Object.assign({ label: "Daily ATR", sub: "causal, fixed before the open", decide: d.atr, decideFg: "#e8ebf0" }, same()),
+      Object.assign({ label: "Stop distance", sub: "a distance, not a level", decide: d.dist, decideFg: "#e8ebf0" }, same()),
+      Object.assign({ label: "Risk if taken", sub: "at this instrument's point value", decide: d.risk, decideFg: "#e8ebf0" }, same())
+    ];
+    const mkGates = g => [
+      { label: "regime is calm d1", value: "Calm", dot: green },
+      { label: "prior nth close bottom third", value: g[0], dot: green },
+      { label: "prior nth down close", value: g[1], dot: green },
+      { label: "gap not deep", value: g[2], dot: green }
+    ];
+
+    const issueDefs = [
+      { id: "TRACK1_SWING_1555", kind: "SCHEDULER", state: "OPEN", kindFg: "#8dc0f7", stateFg: "#ff8085", accent: red, count: "10x",
+        title: "TRACK1_SWING_1555 FAILED", last: "last 08-28, 15:55 ET", occurrences: "10 occurrences",
+        problem: "TRACK1_SWING_1555 did not complete successfully: exited with code 1.",
+        window: "first 08-28, 14:55 ET · last 08-28, 15:55 ET",
+        impact: "The job emitted an unclassified error, so completion and operational effects cannot be confirmed from this evidence.",
+        action: "Review the diagnostics below and reconcile current broker state before taking any operational action.",
+        evidence: "exited with code 1",
+        closes: "closes when a later track1_strategy_slot:track1_swing run completes with clean evidence" },
+      { id: "SPY_REFRESH_PM_R2", kind: "SCHEDULER", state: "OPEN", kindFg: "#8dc0f7", stateFg: "#ff8085", accent: red, count: "3x",
+        title: "SPY_REFRESH_PM_R2 FAILED", last: "last 08-28, 17:15 ET", occurrences: "3 occurrences",
+        problem: "SPY_REFRESH_PM_R2 did not complete successfully: LAST ATTEMPT exited with code 1.",
+        window: "first 08-26, 17:15 ET · last 08-28, 17:15 ET",
+        impact: "The afternoon SPY refresh did not land, so regime inputs may lag the session by one day.",
+        action: "Re-run the refresh and confirm the SPY date advances before the next daily label.",
+        evidence: "2026-08-28 17:15:44 ERROR spy_refresh.pm — provider returned 0 rows for 2026-08-28",
+        closes: "closes when a later SPY_REFRESH run reports rows written" },
+      { id: "MODEL_HARD_STALE", kind: "RUNNER", state: "KNOWN DEBT", kindFg: "#9d8cf5", stateFg: amber, accent: amber, count: "49x",
+        title: "Model age remains HARD stale", last: "last 08-31, 02:50 ET", occurrences: "49 occurrences",
+        problem: "HMM fit ended 2024-12-31 and is 20 months old; G2 HARD remains active.",
+        window: "first 08-10, 14:05 ET · last 08-31, 02:50 ET",
+        impact: "The stale-model guard remains active. The runner continues trading, so this is debt rather than a newly inferred trading halt.",
+        action: "Keep out of the new-incident lane and complete the separately approved model re-freeze decision.",
+        evidence: "2026-08-31 02:50:41 ERROR global_index.hmm_stale_guard — G2 HARD: model 20 months old (fit_end=2024-12-31)",
+        closes: "closes when a later runner observation reports model age OK — absence of another log line is not enough" },
+      { id: "PAPER_LIFECYCLE", kind: "PAPER", state: "LEGACY", kindFg: "#a8b1c0", stateFg: "#4b5563", accent: "#3a424f", count: "7x",
+        title: "Paper lifecycle reconciliation unresolved", last: "last 08-31, 13:06 ET", occurrences: "7 occurrences",
+        problem: "Legacy paper epoch rows cannot be reconciled to the current runner ledger.",
+        window: "first 07-30, 09:12 ET · last 08-31, 13:06 ET",
+        impact: "Paper equity stays UNKNOWN rather than reporting a figure it cannot defend.",
+        action: "Retire the legacy epoch explicitly or restate the baseline; do not infer one from the newest rows.",
+        evidence: "paper_history.json — 7 legacy row(s) outside the active epoch",
+        closes: "closes when the epoch decision is recorded" }
+    ];
+    const detail = issueDefs.filter(i => i.id === this.state.issue)[0] || issueDefs[0];
+
+    const jobDefs = [
+      { time: "08-31, 13:10 ET", dur: "—", name: "Track 1 window audit", lane: "SCHEDULER", state: "RUNNING", color: green, note: "Execution has started and completion evidence has not arrived yet." },
+      { time: "08-31, 12:30 ET", dur: "48s", name: "TRACK1_STRESS_1230", lane: "RUNNER", state: "COMPLETED", color: "#a8b1c0", tag: "NO SIGNAL", tagFg: "#798394", note: "The execution completed without trade or protection changes." },
+      { time: "08-31, 12:25 ET", dur: "55s", name: "TRACK1_STRESS_1225", lane: "RUNNER", state: "COMPLETED", color: "#a8b1c0", tag: "NO SIGNAL", tagFg: "#798394", note: "The execution completed without trade or protection changes." },
+      { time: "08-31, 12:20 ET", dur: "52s", name: "TRACK1_STRESS_1220", lane: "RUNNER", state: "COMPLETED", color: "#a8b1c0", tag: "NO SIGNAL", tagFg: "#798394", note: "The execution completed without trade or protection changes." },
+      { time: "08-31, 12:15 ET", dur: "37s", name: "TRACK1_STRESS_1215", lane: "RUNNER", state: "COMPLETED", color: "#a8b1c0", tag: "NO SIGNAL", tagFg: "#798394", note: "The execution completed without trade or protection changes." },
+      { time: "08-31, 10:20 ET", dur: "14s", name: "Track 1 stop-repair sweep", lane: "SCHEDULER", state: "COMPLETED", color: "#a8b1c0", note: "Sweep found no unprotected position to repair." },
+      { time: "08-31, 09:32 ET", dur: "30s", name: "TRACK1_CALM_DECIDE_0932", lane: "RUNNER", state: "COMPLETED", color: "#a8b1c0", tag: "MAX SIGNAL", tagFg: "#8ae6cc", note: "Two setups recorded; entry price awaits the 10:00 bar." },
+      { time: "08-31, 02:50 ET", dur: "1m 34s", name: "MAX_HOLD_EXIT", lane: "RUNNER", state: "KNOWN DEBT", color: amber, note: "Runner completed, but the HMM model-age guard remains HARD stale." }
+    ];
+    const openJob = this.state.openJob;
+    const jobs = jobDefs.map(j => {
+      const isOpen = j.name === openJob;
+      return Object.assign({ tag: "", tagFg: "#798394" }, j, this.jobDetail(j.name, j.state), {
+        hasTag: !!j.tag, open: isOpen, sign: isOpen ? "–" : "+",
+        cardBorder: isOpen ? "#2a323d" : "#171b22",
+        cardBg: isOpen ? "#0e1116" : "#0b0d11",
+        toggle: () => this.setState({ openJob: isOpen ? null : j.name })
+      });
+    });
+
+    const events = [
+      { category: "SCHEDULER", status: "OPEN", statusFg: "#ff8085", accent: red, at: "08-28 15:55 ET",
+        title: "TRACK1_SWING_1555 failed with code 1",
+        message: "Unclassified runner error; no trade or protection effect could be confirmed.", hasTimes: false },
+      { category: "PROTECTION", status: "RECOVERED", statusFg: "#8ae6cc", accent: green, at: "08-31 10:20 ET",
+        title: "Stop-repair sweep completed clean",
+        message: "No unprotected position was found; the earlier orphan-stop condition is reconciled.",
+        hasTimes: true, incurred: "08-29 14:02 ET", recovered: "08-31 10:20 ET", recoveredFg: "#8ae6cc" },
+      { category: "DECISION", status: "ACTION", statusFg: "#8dc0f7", accent: blue, at: "08-31 09:32 ET",
+        title: "Calm recorded two setups",
+        message: "MES and MNQ setups were written at DECIDE; the entry reference resolved at 10:02.", hasTimes: false },
+      { category: "MODEL", status: "KNOWN DEBT", statusFg: amber, accent: amber, at: "08-31 02:50 ET",
+        title: "Model age remains HARD stale",
+        message: "Observed in 49 completed runner job(s); grouped as one known issue rather than a new incident.",
+        hasTimes: true, incurred: "08-10 14:05 ET", recovered: "not recovered", recoveredFg: "#f0b429" },
+      { category: "TELEMETRY", status: "INFO", statusFg: "#a8b1c0", accent: "#3a424f", at: "08-31 00:05 ET",
+        title: "Legacy runner snapshot retired",
+        message: "Legacy entries are retired, so the stale snapshot is expected and is not counted as a gap.", hasTimes: false },
+      { category: "DATA", status: "OPEN", statusFg: "#ff8085", accent: red, at: "08-28 17:15 ET",
+        title: "SPY afternoon refresh returned no rows",
+        message: "Provider returned 0 rows for 2026-08-28, so regime inputs may lag the session by one day.", hasTimes: false }
+    ];
+
+    const posteriorRaw = [
+      { name: "Calm", value: 99.8, color: green },
+      { name: "Normal", value: 0.2, color: blue },
+      { name: "Stress", value: 0.0, color: "#e0913c" },
+      { name: "Crisis", value: 0.0, color: red }
+    ];
+
+    return {
+      monitor: [
+        { label: "Next job", name: "PREFLIGHT", at: "13:45 ET", rel: "in 34m", hue: blue },
+        { label: "Next decision", name: "PREFLIGHT", at: "13:45 ET", rel: "in 34m", hue: "#9d8cf5" },
+        { label: "Latest job", name: "TRACK1_AUDIT_ROSKA4_STRESS", at: "13:10 ET", rel: "running", hue: "#3a6ea8" },
+        { label: "Latest decision", name: "MAX_HOLD_EXIT", at: "09:31 ET", rel: "40m ago", hue: "#6b5cb8" }
+      ],
+      perf: [
+        { label: "Open UPL", value: "—", fg: "#4b5563" },
+        { label: "Realized today", value: "$0", fg: "#e8ebf0" },
+        { label: "Sharpe", value: "n/a", fg: "#4b5563" },
+        { label: "Calmar", value: "n/a", fg: "#4b5563" }
+      ],
+      expo: [
+        { label: "Positions", value: "0", fg: "#e8ebf0" },
+        { label: "Working orders", value: "0", fg: "#e8ebf0" },
+        { label: "Protection", value: "—", fg: "#4b5563" },
+        { label: "Gross", value: "0.00", fg: "#e8ebf0" }
+      ],
+      issues: issueDefs.map(i => Object.assign({}, i, {
+        bg: i.id === this.state.issue ? "#0f1319" : "#0b0d11",
+        border: i.id === this.state.issue ? "#232c3d" : "#171b22",
+        pick: () => this.setState({ issue: i.id })
+      })),
+      detail,
+      runtime: [
+        { label: "Route", value: "track1_candidate", fg: "#e8ebf0" },
+        { label: "Orders possible", value: "no", fg: "#f0b429" },
+        { label: "Blocking gates", value: "account/legacy retirement · final_bar_divergence · shadow evidence", fg: "#f0b429" },
+        { label: "Blockers come from", value: "global_index.track1_gates.blocking()", fg: "#a8b1c0" },
+        { label: "Window coverage", value: "6 day(s), latest 2026-08-31 · 3/4 sleeves complete", fg: "#e8ebf0" },
+        { label: "Slot timing", value: "6 day(s), p95 61.3s over 48 record(s)", fg: "#e8ebf0" },
+        { label: "Signals today", value: "no signal · 48 across 3 sleeve(s)", fg: "#a8b1c0" },
+        { label: "Audit verdict", value: "all_slots_observed · no_action · no_candidates_to_explain", fg: "#a8b1c0" }
+      ],
+      sleeveTabs: ["NKD", "Stress", "Swing"].map(l => ({
+        label: l, bg: l === sleeve ? "#14251f" : "transparent", fg: l === sleeve ? "#8ae6cc" : "#798394",
+        pick: () => this.setState({ sleeve: l })
+      })),
+      mvTabs: ["Setup rules", "Detector rules", "Price context"].map(l => ({
+        label: l, bg: l === tab ? "#14251f" : "transparent", fg: l === tab ? "#8ae6cc" : "#798394",
+        pick: () => this.setState({ mvTab: l })
+      })),
+      mv: {
+        meta: cfg.inst + " · 5m · window " + cfg.window + " · session " + sessionDay,
+        window: cfg.window,
+        verdict: "No signal", dot: "#4b5563",
+        verdictDetail: cfg.blocking + " failed " + (N - cfg.blockPass) + " of " + N,
+        boundaryProof: this.state.mvDay ? "replayed over stored bars" : "recorded while the slots ran",
+        reason: "Every slot decided and none fired. " + cfg.blocking + " failed on " + (N - cfg.blockPass) + " of " + N + " decided slots.",
+        chips: [
+          { word: "COMPLETE", bg: "#0f1319", border: "#262d36", fg: "#a8b1c0", dot: "#4b5563" },
+          { word: "NO SIGNAL", bg: "#0f1319", border: "#262d36", fg: "#e8ebf0", dot: "#4b5563" }
+        ],
+        meta2: [
+          { text: N + "/" + N + " slots", fg: "#a8b1c0" },
+          { text: "latest " + cfg.refAt, fg: "#a8b1c0" },
+          { text: sleeve === "Swing" ? "entry after setup bar" : "basket gate then price trigger", fg: "#798394" },
+          { text: cfg.blocking + " → Calm", fg: amber },
+          { text: this.state.mvDay ? "reviewing " + sessionDay : "live session " + sessionDay, fg: "#4b5563" }
+        ],
+        showRules: tab === "Setup rules",
+        showDetector: tab === "Detector rules",
+        showPrice: tab === "Price context",
+        showCalm: sleeve !== "Swing",
+        tabNote: tab === "Setup rules"
+          ? "What each rule did, slot by slot — open Detector rules for the per-bar verdicts."
+          : tab === "Detector rules"
+            ? "One cell per bar, not per slot, plus the readings the detector returned."
+            : "No candidate in this session, so no levels are published — price context only.",
+        rulesTitle: sleeve.toUpperCase() + " setup rules",
+        rulesNote: "1 of 4 rules publishes no verdict",
+        slotTally: N + " / " + N,
+        declared: "declared · Japan session, clock Asia/Tokyo · max hold 5 days",
+        marketRef: cfg.ref, marketRefAt: cfg.refAt,
+        formingNote: this.state.mvDay
+          ? "Stored session — every bar is closed, so the volumes below are final."
+          : "Newest bar still forming — " + cfg.formingAt + " — so its volume is partial.",
+        miss: cfg.blocking + " failed on " + (N - cfg.blockPass) + " of " + N + " decided slots · needs " + (sleeve === "Swing" ? "0.6 ATR or deeper" : "Normal"),
+        levelsChip: "None published — entry forms after the setup bar",
+        levelsWhy: "This sleeve publishes no entry, stop or target until a setup bar forms, so the chart carries prices and slot outcomes only."
+      },
+      slotCells: Array.from({ length: N }, (_, i) => ({ bg: hoverIdx === i ? "#8dc0f7" : "#3a424f" })),
+      lanes, readings,
+      legend: [
+        { label: "Passed", bg: green, border: "0" },
+        { label: "Failed", bg: red, border: "0" },
+        { label: "Not reached", bg: "transparent", border: "1px solid #2a323d" },
+        { label: "No verdict published", bg: "#22282f", border: "0" },
+        { label: "No record", bg: "transparent", border: "1px dashed #3a424f" },
+        { label: "Not yet run", bg: "#141920", border: "0" }
+      ],
+      grid: (() => {
+        const nBar = N + 10;
+        const rows = [
+          { label: "bars scanned", needs: "one cell per bar", kind: "all" },
+          { label: "in entry window", needs: "needs the declared window", kind: "window" },
+          { label: "regime is normal d1", needs: "needs Normal", kind: "fail" },
+          { label: "trend filter above EMA", needs: "needs close > EMA", kind: "mixed" }
+        ];
+        return {
+          note: nBar + " bars in this session's window — one cell per bar, not per slot",
+          tally: "detector answered " + nBar + " times",
+          rows: rows.map(r => ({
+            label: r.label, needs: r.needs,
+            cells: Array.from({ length: nBar }, (_, i) => {
+              if (r.kind === "all") return { bg: green, border: "0" };
+              if (r.kind === "window") return i < 10
+                ? { bg: "transparent", border: "1px solid #2a323d" } : { bg: green, border: "0" };
+              if (r.kind === "fail") return i < 10
+                ? { bg: "transparent", border: "1px solid #2a323d" } : { bg: red, border: "0" };
+              return i < 10 ? { bg: "transparent", border: "1px solid #2a323d" }
+                : { bg: (i * 7) % 5 < 3 ? green : "#22282f", border: "0" };
+            }),
+            tally: r.kind === "all" ? nBar + " scanned"
+              : r.kind === "window" ? N + " in window"
+              : r.kind === "fail" ? "0/" + N + " pass" : "13/" + N + " pass",
+            tallyFg: r.kind === "fail" ? "#ff8085" : r.kind === "all" ? "#8ae6cc" : "#a8b1c0"
+          }))
+        };
+      })(),
+      chartKeys: [
+        { label: "close", bg: "#8dc0f7", w: "6px", h: "6px", radius: "50%", dash: "0", fg: "#798394" },
+        { label: "trend filter", bg: "transparent", w: "14px", h: "0", radius: "0", dash: "2px dashed #5b9cf0", fg: "#798394" },
+        { label: "10-bar volume", bg: "#4b5563", w: "14px", h: "2px", radius: "1px", dash: "0", fg: "#798394" },
+        { label: "bar volume", bg: "#e0913c", w: "6px", h: "6px", radius: "50%", dash: "0", fg: "#798394" },
+        { label: "surge threshold — not compared", bg: "transparent", w: "0", h: "0", radius: "0", dash: "0", fg: "#4b5563" }
+      ],
+      price, hover, seriesCols,
+      hoverRead: [
+        { label: "bar", value: hover.ohlc, fg: hover.valueFg },
+        { label: "bar vol", value: hover.barVolBar, fg: hover.valueFg },
+        { label: "close", value: hover.close, fg: hover.valueFg },
+        { label: cfg.emaLabel.toLowerCase(), value: hover.ema, fg: hover.valueFg },
+        { label: "10-bar vol", value: hover.avgv, fg: hover.valueFg },
+        { label: "slot vol", value: hover.vol, fg: hover.valueFg }
+      ],
+      chart: {
+        hi: fmtP(sHi), lo: fmtP(sLo), vHi: String(vMaxLine),
+        day: sessionDay,
+        refusedNote: "Regime Calm on " + sessionDay + " — the regime gate refused on all " + N + " slots that recorded a verdict, so the detector returned before any rule read these numbers. They are measurements of the session, not a decision path, and no surge threshold exists because nothing was compared.",
+        close: pts(close, PY), ema: pts(ema, PY), avgv: pts(avgv, VY), volLine: pts(vol, VY),
+        closeArea: (() => {
+          const p = close.map((v, i) => v === null ? null : X(i).toFixed(2) + "," + PY(v).toFixed(2)).filter(Boolean);
+          if (p.length < 2) return "";
+          const x0 = p[0].split(",")[0], x1 = p[p.length - 1].split(",")[0];
+          return x0 + ",100 " + p.join(" ") + " " + x1 + ",100";
+        })(),
+        grid: [25, 50, 75].map(t => ({ top: t + "%" })),
+        lastLabel: fmtP(lastClose),
+        lastTop: Math.min(Math.max(PY(lastClose), 9), 91).toFixed(2) + "%",
+        showHi: PY(lastClose) > 22,
+        showLo: PY(lastClose) < 78,
+        vol: vol.map((v, i) => v === null ? null : ({ left: X(i).toFixed(2) + "%", top: VY(v).toFixed(2) + "%" })).filter(Boolean),
+        closeDots: close.map((v, i) => v === null ? null : ({ left: X(i).toFixed(2) + "%", top: PY(v).toFixed(2) + "%" })).filter(Boolean),
+        emaDots: ema.map((v, i) => v === null ? null : ({ left: X(i).toFixed(2) + "%", top: PY(v).toFixed(2) + "%" })).filter(Boolean),
+        avgvDots: avgv.map((v, i) => v === null ? null : ({ left: X(i).toFixed(2) + "%", top: VY(v).toFixed(2) + "%" })).filter(Boolean),
+        bandLeft: price.bandLeft, bandWidth: price.bandWidth,
+        times: slotTicks.map((s, i) => ({
+          label: slotClock(s),
+          left: ((s + 0.5) / N * 100).toFixed(2) + "%",
+          shift: i === 0 ? "0" : i === slotTicks.length - 1 ? "-100%" : "-50%"
+        }))
+      },
+      instruments: [
+        { instrument: "MES", direction: "LONG", gateTally: "4 / 4 gates met",
+          rows: mkRows({ entry: "7,689.75", stop: "7,600.21", atr: "59.70", dist: "89.56", risk: "447.72" }),
+          gates: mkGates(["0.1555", "−0.0030", "−0.0028"]) },
+        { instrument: "MNQ", direction: "LONG", gateTally: "4 / 4 gates met",
+          rows: mkRows({ entry: "29,429.00", stop: "28,837.21", atr: "401.20", dist: "601.79", risk: "1,203.59" }),
+          gates: mkGates(["0.1581", "−0.0045", "−0.0020"]) }
+      ],
+      modelInputs: [
+        { label: "Regime", value: "Calm", fg: "#e8ebf0" },
+        { label: "SPY data", value: "Aug 28", fg: "#e8ebf0" },
+        { label: "Model age", value: "20 mo stale", fg: amber },
+        { label: "HMM fit", value: "22/22 · 22 warn", fg: "#e8ebf0" },
+        { label: "Fit end", value: "2024-12-31", fg: "#a8b1c0" },
+        { label: "Re-freeze", value: "none pending", fg: "#a8b1c0" }
+      ],
+      monitorList: [
+        { component: "SCHEDULER", componentFg: "#8dc0f7", accent: "#3a424f", at: "no open incident",
+          title: "No unresolved scheduler slot — every due slot published a record." },
+        { component: "BROKER", componentFg: "#8dc0f7", accent: "#3a424f", at: "13:10 ET",
+          title: "IBKR reachable, 0 positions and 0 working orders reported." },
+        { component: "RUNNER", componentFg: "#9d8cf5", accent: "#3a424f", at: "by design",
+          title: "Legacy snapshot stale because legacy entries are retired." }
+      ],
+      monitorDetail: {
+        title: "Systems nominal — no open incident", at: "13:11 ET",
+        problem: "No incident and no telemetry gap is open. The stale legacy snapshot is reported on its own line because nothing writes it any more, which is the intended steady state rather than a fault.",
+        impact: "Nothing is blocked. Exits and entries both run under the current route's own gates.",
+        action: "None. This panel lists only conditions that are still open, so a cleared alarm leaves it.",
+        evidence: "open_incidents=0 · unexplained_overdue=0 · route_mode=track1_only_shadow"
+      },
+      sessions: ["08-25", "08-26", "08-27", "08-28", "08-31"].map((d, i, a) => {
+        const isToday = i === a.length - 1;
+        const on = this.state.mvDay === d || (this.state.mvDay === null && isToday);
+        return {
+          label: d, isToday,
+          bg: on ? "#14251f" : "transparent",
+          border: on ? "#1e3a30" : "#1e242c",
+          fg: on ? "#8ae6cc" : i < 4 ? "#4b5563" : "#a8b1c0",
+          pick: () => this.setState({ mvDay: isToday ? null : d, hoverSlot: null })
+        };
+      }),
+      sessionNote: this.state.mvDay
+        ? "Reviewing a past session — this band only. The job list and open issues below stay on the live day."
+        : "Sessions on disk. Dim days recorded no per-slot diagnostics; their conditions are replayed from bars.",
+      decisionGroups: [
+        { label: "Entered", count: "0", countFg: "#a8b1c0", empty: "No open entries in this decision." },
+        { label: "Closed", count: "0", countFg: "#a8b1c0", empty: "No closes in this decision." },
+        { label: "Rejected / Halted", count: "0", countFg: "#a8b1c0", empty: "No rejected or halted entries." }
+      ],
+      regimeMetrics: [
+        { label: "Confidence", value: "99.8%", fg: "#e8ebf0", note: "Posterior mass on Calm." },
+        { label: "Runner-up", value: "Normal 0.2%", fg: "#e8ebf0", note: "Closest competing state." },
+        { label: "Lead", value: "99.7 pp", fg: "#8ae6cc", note: "Calm is the clear winner, not a close call." },
+        { label: "Uncertainty", value: "Low", fg: "#e8ebf0", note: "Entropy 0.017 of a possible 1.585." }
+      ],
+      posterior: posteriorRaw.map(p => ({
+        name: p.name, color: p.color, width: Math.max(p.value, 0.4) + "%", value: p.value.toFixed(1) + "%",
+        labelFg: p.value > 1 ? "#e8ebf0" : "#798394", valueFg: p.value > 1 ? "#e8ebf0" : "#4b5563"
+      })),
+      features: [
+        { label: "SPY 1-day return", value: "−0.23%", rank: "29th pct", leans: "leans Calm" },
+        { label: "Realized volatility, 5 day", value: "6.3% annualised", rank: "9th pct", leans: "leans Calm" },
+        { label: "Daily range", value: "0.51%", rank: "24th pct", leans: "leans Calm" },
+        { label: "Trend", value: "above SMA50", rank: "+2.4%", leans: "leans Calm" }
+      ],
+      regimeLegend: posteriorRaw.map(p => ({ name: p.name, color: p.color })),
+      regimeRuns: [
+        { name: "Normal", days: 31, color: blue },
+        { name: "Calm", days: 8, color: green },
+        { name: "Normal", days: 6, color: blue },
+        { name: "Calm", days: 15, color: green }
+      ].map(x => ({ flex: x.days, color: x.color, short: x.days >= 10 ? x.name + " · " + x.days + "d" : x.days + "d" })),
+      decision: [
+        { label: "Regime", value: "Calm", fg: "#e8ebf0" },
+        { label: "Realized", value: "$0", fg: "#e8ebf0" },
+        { label: "Taken", value: "0", fg: "#a8b1c0" },
+        { label: "Rejected", value: "0", fg: "#a8b1c0" },
+        { label: "Halted", value: "0", fg: "#a8b1c0" }
+      ],
+      journalMeta: "66 jobs · 2026-08-31",
+      journalTabs: ["Jobs", "Events"].map(l => ({
+        label: l, bg: l === this.state.journal ? "#1c1a2b" : "transparent",
+        fg: l === this.state.journal ? "#c9c0fb" : "#798394",
+        pick: () => this.setState({ journal: l })
+      })),
+      showJobs: this.state.journal === "Jobs",
+      showEvents: this.state.journal === "Events",
+      jobs, events,
+      collapseAll: () => this.setState({ openJob: null }),
+      clocks: [
+        { label: "Runner observed", value: "08-24, 02:50 ET", fg: "#f0b429" },
+        { label: "Runner freshness", value: "not expected yet", fg: "#a8b1c0" },
+        { label: "Expected next", value: "08-31, 14:05 ET", fg: "#e8ebf0" },
+        { label: "Schedule evidence", value: "executed / none", fg: "#a8b1c0" },
+        { label: "Broker observed", value: "08-31, 13:10 ET", fg: "#e8ebf0" },
+        { label: "Browser poll", value: "6s", fg: "#a8b1c0" }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

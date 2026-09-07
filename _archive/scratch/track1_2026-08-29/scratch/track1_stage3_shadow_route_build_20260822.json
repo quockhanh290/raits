@@ -1,0 +1,258 @@
+{
+  "artifact": "track1_stage3_shadow_route_build",
+  "date": "2026-08-22",
+  "stage": "3 — build the Track 1 route, shadow only",
+  "contract": {
+    "scheduler_or_service_started": false,
+    "ibkr_connected": false,
+    "dashboard_written": false,
+    "live_order_sent": false,
+    "committed": false,
+    "legacy_production_behaviour_changed": false,
+    "legacy_retired": false
+  },
+
+  "verdict": {
+    "shadow_route_build": "PASS",
+    "paper_or_live": "BLOCKED",
+    "summary": "The route exists, runs, and reproduces the measured Track 1 book event for event on all three windows. It cannot place an order: the gate refuses while any blocker is open, and three are. BLOCK-4 (per-sleeve quantity) is closed by this build; BLOCK-2 is answered structurally by the route having its own entry point."
+  },
+
+  "files_created": {
+    "production_package": [
+      {"path": "global_index/track1_params.py", "lines": 265,
+       "what": "route identity per sleeve in route_params' vocabulary, caps, per-sleeve quantity, detection windows, a source for every field"},
+      {"path": "global_index/track1_signal_layer.py", "lines": 483,
+       "what": "the admission layer — cluster caps, family cap, same-symbol invariant, Stress displacement, detection windows, per-candidate quantity"},
+      {"path": "global_index/track1_sleeves.py", "lines": 137,
+       "what": "sleeve-source boundary; LiveSleeveSource refuses and names the promotion list"},
+      {"path": "global_index/track1_freshness.py", "lines": 233,
+       "what": "fail-closed data-freshness gate encoding the D-1 13:45 ET contract"},
+      {"path": "global_index/track1_switch.py", "lines": 224,
+       "what": "close_then_open primitive; order sending off by default"},
+      {"path": "global_index/run_live_day_track1.py", "lines": 463,
+       "what": "the entry point — order gate, freshness gate, checkpoint report, shadow output"}
+    ],
+    "scratch": [
+      {"path": "scratch/track1_replay_source_20260822.py", "lines": 131,
+       "what": "candidates and early-exit valuer from the measured trade tables"},
+      {"path": "scratch/test_track1_stage3_route_20260822.py", "lines": 619,
+       "what": "the Stage 3 gate, 42 tests"},
+      {"path": "scratch/_stage3_legacy_baseline.json",
+       "what": "pre-build hash and mtime snapshot of every legacy artifact"},
+      {"path": "scratch/track1_shadow/",
+       "what": "8 output files: decisions, settlements, book state and summary for two windows"}
+    ]
+  },
+
+  "files_changed": [
+    {"path": "scratch/track1_stage2d_full_production_route_audit_20260822.md",
+     "change": "APPENDED 'ADDENDUM 1'. No earlier section was rewritten.",
+     "content": ["W5 superseded — Stage 2C bootstrap gate is closed (cut_instant, old-schema bootstrap refused, open_pos/equity/peak_equity/risk/day_start_equity/cluster all load-bearing, booked is a counter not an admission input)",
+                 "shadow/no-order route build may proceed",
+                 "order sending remains blocked on the same four things",
+                 "one correction: global_index/paper_history.json exists; an earlier check looked at the repo root",
+                 "late finding: the Stage 2B bootstrap pins the LEGACY engine identity, so a Track 1 Normal sleeve resuming from it is correctly refused"]}
+  ],
+
+  "legacy_production_files_modified": [],
+
+  "legacy_untouched_proof": {
+    "method": "content sha256 + mtime_ns snapshot taken BEFORE any write, compared after every run",
+    "result": "20 of 20 identical",
+    "runtime_state": ["live_positions.json", "slip_stats.json", "trade_log.jsonl",
+                      "global_index/replay_checkpoint.json", "global_index/live_state_data.js",
+                      "global_index/preflight_state.json", "global_index/maxhold_state.json",
+                      "global_index/paper_history.json"],
+    "legacy_code": ["global_index/signal_layer.py", "global_index/run_live_day.py",
+                    "global_index/runner.py", "global_index/run_scheduler.py",
+                    "global_index/ibkr_broker.py", "global_index/live_decision.py",
+                    "global_index/net_exposure_multi.py", "global_index/replay_checkpoint.py"],
+    "dashboard": ["monitor/backend/app.py", "monitor/backend/schedule_status.py"],
+    "absent_and_still_absent": ["runner.pid", "STOP_TRADING"],
+    "live_day_logs": "newest is live_day_0821.log, written by the real scheduler; no new one appeared",
+    "note": "global_index/deploy_sim.py, run_live_day.py and run_scheduler.py show as modified in git — they were ALREADY modified before Stage 3 by the earlier slot-telemetry work, and their hashes are unchanged in the snapshot."
+  },
+
+  "tests": {
+    "stage3_gate": {
+      "command": "python -m pytest scratch/test_track1_stage3_route_20260822.py -q",
+      "result": "41 passed, 1 skipped in 36.07s",
+      "skip_reason": "the floor window is opt-in at ~2.5 minutes; run separately below"
+    },
+    "stage3_floor_gate": {
+      "command": "TRACK1_EQUIV_FLOOR=1 python -m pytest scratch/test_track1_stage3_route_20260822.py -q -k \"floor or test_1_\"",
+      "result": "3 passed, 38 deselected in 142.26s"
+    },
+    "must_stay_green": {
+      "command": "python -m pytest scratch/test_track1_stage2_equivalence_bootstrap_20260822.py scratch/test_track1_route_checkpoint_stage1_20260822.py scratch/test_slot_telemetry_20260822.py global_index/test_slot_overlap.py global_index/test_log_hygiene.py global_index/test_scheduler_heartbeat.py global_index/test_dashboard_live_snapshot.py global_index/test_scheduler_shadow_verify.py -q",
+      "result": "156 passed in 6.63s",
+      "stage2d_baseline": "156 passed",
+      "unchanged": true
+    },
+    "not_run": ["global_index/test_event_playback.py — known to hang"]
+  },
+
+  "equivalence": {
+    "anchor": "scratch/track1_stage2c_book_bootstrap_20260822.py::replay",
+    "policy": "risk_clean_no_calm_nkd_family_cap_5_44",
+    "compared": "the ORDERED settlement stream, element for element — not counts, not sums",
+    "windows": [
+      {"window": "vault2026", "events": 91, "exact": true, "net_anchor": 8259.85, "net_port": 8259.85,
+       "branches": {"reject_family_cap": 10, "suppress_same_symbol": 1, "reject_cap": 37, "forced_closes": 0, "halt_breaker": 0}},
+      {"window": "vault2025", "events": 128, "exact": true, "net_anchor": 13236.11, "net_port": 13236.11,
+       "branches": {"reject_family_cap": 3, "suppress_same_symbol": 4, "reject_cap": 48, "forced_closes": 1, "halt_breaker": 0}},
+      {"window": "floor", "events": 1160, "exact": true, "net_anchor": 64902.91, "net_port": 64902.91,
+       "branches": {"reject_family_cap": 5, "suppress_same_symbol": 22, "reject_cap": 190, "forced_closes": 14, "halt_breaker": 2}}
+    ],
+    "per_sleeve_counters_match": true,
+    "new_rules_inert_on_the_anchor": {"suppress_same_sleeve": 0, "reject_window": 0,
+      "why_it_matters": "otherwise the equivalence could be passing because two new rules happened to cancel out"}
+  },
+
+  "mutations": {
+    "method": "each rule disabled in-process via monkeypatch, never by editing a file; the ordered stream must diverge",
+    "window_is_part_of_the_case": "a rule can only be shown load-bearing on a window where it binds; each pairing was chosen by measuring which windows the mutation moves",
+    "diverged": [
+      {"rule": "same-symbol suppression", "window": "vault2026"},
+      {"rule": "same-symbol suppression", "window": "vault2025"},
+      {"rule": "Stress displacement", "window": "vault2025"},
+      {"rule": "NKD cluster cap", "window": "vault2026"},
+      {"rule": "Normal+Calm family cap", "window": "vault2026"},
+      {"rule": "Normal+Calm family cap", "window": "vault2025"}
+    ],
+    "did_not_diverge_and_why": {
+      "rule": "Normal cluster cap (cap_roska4_swing)",
+      "finding": "completely subsumed by the family cap — the family carries the SAME 5.0%/4.4% over a strictly larger book (Normal + Calm), so it is always at least as tight. Loosening the Normal cluster cap alone changes nothing on any window.",
+      "not_a_defect": true,
+      "pinned_by": "test_1e_the_normal_cluster_cap_is_subsumed_by_the_family_cap — goes red if the family cap is ever widened, telling the next reader the cluster cap has become load-bearing again"
+    }
+  },
+
+  "required_tests_from_the_brief": [
+    {"n": 1, "requirement": "signal layer reproduces the scratch replay ordered events for a pinned window", "status": "PASS", "evidence": "three windows, 91 / 128 / 1160 events, all exact"},
+    {"n": 2, "requirement": "at most one position per instrument across Normal/NKD/Calm/Stress", "status": "PASS", "evidence": "T2 + T2b; unique instruments after a displacing Stress entry; a second same-sleeve position is refused with suppress_same_sleeve"},
+    {"n": 3, "requirement": "MNQ Normal qty 1 and MNQ Stress qty 7 both represented", "status": "PASS", "evidence": "T3 book holds exactly {roska4_stress: 7} after the switch; T3b every measured Stress row carries qty 7 and every Normal MNQ row carries 1"},
+    {"n": 4, "requirement": "SPY short gate causal D-1", "status": "PASS", "evidence": "T4 — scaling SPY's close at D by ten leaves D's verdict unchanged and moves only days after D; the test also asserts something changed so it cannot pass on a no-op mutation"},
+    {"n": 5, "requirement": "Calm A missed 10:00 does not enter late", "status": "PASS", "evidence": "T5 — 10:00 taken, 10:20 reject_window with 'one-shot' in the detail"},
+    {"n": 6, "requirement": "Stress inside window can enter; after 12:30 cannot", "status": "PASS", "evidence": "T6 — 10:34 no, 10:35 yes, 11:14 yes, 12:30 yes, 12:31 no, 14:05 no"},
+    {"n": 7, "requirement": "no-order default never calls send_order", "status": "PASS", "evidence": "T7 — 0 calls in a full shadow run; NoOrderBroker.send_order raises if reached; T7b --allow-orders exits 2"},
+    {"n": 8, "requirement": "Track 1 writes nothing under legacy paths", "status": "PASS", "evidence": "T8 hash+mtime identical before and after; T8c persistence lands on the route path only"},
+    {"n": 9, "requirement": "route_checkpoint refusal codes surface in the entry point", "status": "PASS", "evidence": "T9 — every code is one of route_checkpoint's seven; against the Stage 2B bootstrap the Normal sleeve refuses with params_mismatch carrying both hashes"},
+    {"n": 10, "requirement": "Stage 2C bootstrap tests remain green", "status": "PASS", "evidence": "156 passed across the eight suites, unchanged from the Stage 2D baseline"}
+  ],
+
+  "switch_primitive": {
+    "module": "global_index/track1_switch.py",
+    "wired_to_live_broker": false,
+    "order_sending_default": false,
+    "cases_measured": [
+      {"case": "default, no allow_orders", "result": "returns at switch_requested; zero broker calls"},
+      {"case": "stop cancel fails", "result": "aborts at stop_cancel_failed; NO close placed; old position intact and protected"},
+      {"case": "close returns FAILED", "result": "aborts at close_failed; only a CLOSE was sent"},
+      {"case": "close returns CANCELLED", "result": "aborts at close_failed; only a CLOSE was sent"},
+      {"case": "close returns PARTIAL", "result": "aborts at close_failed — a partly-closed leg plus a 7-lot opposite nets into a quantity neither sleeve believes it holds"},
+      {"case": "open fails after a filled close", "result": "open_failed_account_flat, account_flat=True, persist_flat callback WAS called"},
+      {"case": "happy path", "result": "CLOSE then OPEN, open leg carries 7, six stages emitted in order"},
+      {"case": "cross-symbol legs", "result": "refused, no order sent"}
+    ],
+    "emission_rule": "every stage emits BEFORE it acts, so a crash between two steps is attributable",
+    "admission_ordering": "a Stress candidate is capped against the book it would LEAVE BEHIND and refused before anything is closed; nothing is ever closed for an entry that then gets rejected"
+  },
+
+  "freshness": {
+    "option_taken": "Stage 2D option 2 — encode the D-1 13:45 ET contract explicitly. No pre-10:00 update job was added; that would touch IBKR.",
+    "rule": "every historical input must be no older than the most recent completed 13:45 ET pre-flight; before 13:45 ET that is the PREVIOUS business day's. Older, missing or unreadable is a refusal.",
+    "cases_measured": [
+      {"case": "11:00 ET Friday", "requires": "2026-08-20", "ok": true},
+      {"case": "14:00 ET", "requires": "same day", "ok": true},
+      {"case": "09:00 ET Monday", "requires": "previous Friday, not Sunday", "ok": true},
+      {"case": "SPY CSV stale", "verdict": "refuses"},
+      {"case": "SPY CSV missing", "verdict": "refuses"},
+      {"case": "no pre-flight record for the required date", "verdict": "refuses"},
+      {"case": "pre-flight record says FAILED", "verdict": "refuses"}
+    ],
+    "not_covered": {
+      "what": "the intraday bars a same-session sleeve decides on, which come from the broker at decision time",
+      "reported_as": "UNVERIFIED — neither a pass nor a failure",
+      "consequence": "one of the three open order blockers; the route stays shadow-only while it is true"
+    }
+  },
+
+  "route_state_paths": {
+    "positions": {"path": "live_positions.track1.json", "written_today": "only with --persist-book; off by default",
+                  "why_off": "a replay's end state is a book as of a historical window; writing it to a live-looking path is how a misleading artifact gets created and then believed"},
+    "lock": {"path": "runner.track1.pid", "written_today": false, "why": "the shadow route takes no lock because it touches no broker"},
+    "checkpoint": {"path": "global_index/replay_checkpoint.track1.json", "written_today": false, "read": true,
+                   "schema": 2, "isolation": "route-scoped keys, O_EXCL file lock, ScopeViolation on a merge that would touch another route"},
+    "kill_switch": {"path": "STOP_TRADING.track1", "read_only": true},
+    "window_ledger": {"route": "track1_candidate", "enabled_by": "RAITS_WINDOW_LEDGER_DIR",
+                      "driven_from_replay": false,
+                      "why_not": "the ledger's contract is 'did an observation happen at all'; a replay knows only the days a trade existed, not the days the window was watched and produced nothing. Emitting window_closed from a replay would manufacture the evidence the ledger exists to withhold."},
+    "shadow_output": {"path": "scratch/track1_shadow/", "files": 8}
+  },
+
+  "findings": [
+    {"id": "F1",
+     "title": "the existing Track 1 checkpoint cannot be resumed by this route, and that is correct",
+     "measured": {
+       "roska4_swing": {"genuine_strategy_differences": ["ema_period 30 -> 50", "stop_basis chandelier_atr -> fixed_entry_atr", "stop_multiple 2.5 -> 2.0", "stop_anchor extreme_through_prior_bar -> entry", "ratchet True -> False", "arm_hour 14:00 -> 14:05"],
+                        "encoding_differences": ["data_source_identity", "regime_csv_identity", "spy_short_source_identity"]},
+       "global_nkd": {"genuine_strategy_differences": [],
+                      "encoding_differences": ["arm_hour rendered 14 vs 14:00", "data_source_identity", "regime_csv_identity", "spy_short_source_identity"]}},
+     "action_taken": "the Calm gate wording was aligned to the audited sentence verbatim; the hash rendering was NOT loosened to match the scratch truncation",
+     "consequence": "the Stage 2B bootstrap must be regenerated under track1_params before any Track 1 sleeve can resume"},
+    {"id": "F2",
+     "title": "cap_roska4_swing is inert while the family cap carries the same numbers",
+     "measured": "loosening it to 50%/44% changes nothing on any window",
+     "pinned_by": "test_1e"},
+    {"id": "F3",
+     "title": "the two rules Track 1 adds beyond the anchor fire zero times on all three anchors",
+     "rules": ["same-sleeve same-instrument guard", "detection-window gate"],
+     "why_it_matters": "they change nothing about the measured result and close a hole that only exists live"}
+  ],
+
+  "blockers_open": [
+    {"id": "BLOCK-1_broker_account",
+     "text": "One IB Gateway login is one position book. IBKRBroker has no account dimension; get_positions() and get_equity() read the whole login. Two routes on one account net at the broker and both halt on the resulting mismatch.",
+     "closed_by": "a dedicated account for Track 1, or retiring legacy first — which is the stated end state and the cheaper of the two"},
+    {"id": "BLOCK-3_data_freshness",
+     "text": "Calm A and Stress open before the day's own 13:45 pre-flight. The D-1 contract is encoded and tested, but the intraday source is unverified by any gate.",
+     "closed_by": "a pre-10:00 freshness job, or an in-window bar-quality check that can fail closed"},
+    {"id": "LIVE_SLEEVE_SOURCE",
+     "text": "No sleeve has a promoted live signal generator. Normal-R4 alone runs through model_sameday_stop.run_loop, scratch/harness Cfg/patched_engine, a doubly-wrapped TrendFollowStrategy, force_all_bars_gappable and two scratch filter modules, with futures/_validated_core.backtest_swing_tf monkeypatched out of the way.",
+     "closed_by": "promoting each generator with its own equivalence proof; the list is in global_index/track1_sleeves.LIVE_SOURCE_PREREQUISITES"}
+  ],
+
+  "blockers_resolved_by_this_build": [
+    {"id": "BLOCK-4_per_sleeve_quantity", "how": "quantity is a field on Candidate, not a lookup by instrument; MNQ=1 under Normal and MNQ=7 under Stress are both expressible, tested, and exercised on real measured rows"},
+    {"id": "BLOCK-2_scheduler_invariant", "how": "answered structurally rather than closed: Track 1 has its own entry point and signal layer, never calls run_live_day, and so cannot breach the 10:20-14:05 invariant. It becomes a scheduling question again when Track 1 slots are added, which Stage 3 did not do."}
+  ],
+
+  "still_required_before_paper": [
+    "Track 1 slots in the scheduler, mirrored in monitor/backend/schedule_status.py IN THE SAME CHANGE — that file keeps a hand-written copy of the slot table and an unmirrored slot becomes a fake incident every day",
+    "((10,35),(12,30)) added to run_scheduler._ENTRY_WINDOWS so the 12:20 stop-repair sweep does not land inside the Stress window",
+    "a route field on runner events, and a decision about whether Track 1 shares trade_log.jsonl — if it does, paper_evidence_reader must be taught to split on it or Track 1 rows fold into legacy's gates",
+    "the Stage 2B bootstrap regenerated under track1_params (finding F1)"
+  ],
+
+  "confidence_labels": {
+    "verified_reproduced_with_a_number": [
+      "three-window ordered-event equivalence (91 / 128 / 1160)",
+      "six mutations diverge, one does not and why",
+      "41 passed + 1 skipped, then 3 passed on the floor gate",
+      "156 unchanged across the eight must-stay-green suites",
+      "20 of 20 legacy artifacts unchanged by hash AND mtime",
+      "zero send_order calls in a full shadow run",
+      "the field-by-field identity diff against the Stage 2B bootstrap"
+    ],
+    "reasoned_from_the_code_path_not_executed": [
+      "that the switch sequence behaves the same against a real IBKR broker as against the fake. The fake reproduces the Fill shape and status vocabulary but not ib_insync's client-side Cancelled mutation, partial-fill timing, or a cancel refused because it came from the wrong clientId — the three things that have actually gone wrong on this path before."
+    ],
+    "not_examined": [
+      "whether the Track 1 replay's fill law matches what live send_order would achieve; both laws were measured offline, no live-fill comparison exists",
+      "the dashboard's reaction to a Track 1 slot — no slot was added"
+    ],
+    "out_of_scope_and_not_started": "retiring legacy. Nothing in this build changes what the running scheduler does, and the live scheduler was not restarted, stopped or reconfigured."
+  }
+}

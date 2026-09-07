@@ -1,0 +1,172 @@
+{
+  "stage": "5S",
+  "title": "Paper readiness gate audit — define and verify the gate from shadow to paper, no orders",
+  "generated_et": "2026-08-25T00:20:00-04:00",
+  "verdict": "PAPER_NOT_READY_WAITING_FOR_SHADOW_EVIDENCE",
+  "verdict_before_this_stage": "NOT_READY_GATE_DEFECT",
+  "verdict_note": "measured: with a confirmation file releasing B1 and zero judgeable shadow days, may_enable_orders() returned True before this stage and returns False after it",
+
+  "safety": {
+    "windows_open_during_stage": [],
+    "scheduler_or_backend_restarted": false,
+    "ibkr_connection": false,
+    "orders_sent": 0,
+    "confirmation_file_created": false,
+    "track1_orders_approved_set": false,
+    "allow_orders_added_anywhere": false,
+    "parquet_csv_or_runtime_evidence_written": false
+  },
+
+  "q1_evidence_required": {
+    "module": "global_index/track1_paper_readiness.py",
+    "judgeable_days": {"value": 5, "constant": "REQUIRED_JUDGEABLE_DAYS",
+                       "definition": "a day whose DAY-scope audit reached a verdict at all — every sleeve's window both closed AND was covered by scheduler uptime"},
+    "all_four_sleeves_must_pass": {"value": true, "constant": "REQUIRED_SLEEVES",
+                                   "note": "each must reach PASS at least once inside the qualifying window"},
+    "no_candidate_days": "they count. A sleeve that observed its window and found nothing is observed_no_action — judged, not failed. That is why a DAY can pass on such a sleeve while the sleeve still owes its own PASS",
+    "fail_days_allowed": {"value": 0, "constant": "MAX_FAIL_DAYS"},
+    "warn_days_allowed": {"value": 1, "constant": "MAX_WARN_DAYS"},
+    "p95": {"hard_ceiling_s": 300.0, "target_s": 240.0,
+            "behaviour": "over the ceiling the acceptance gate FAILS the day; between target and ceiling it WARNs, which spends the single WARN allowance"},
+    "checkpoint_accepted": "required — already folded into the day verdict by evaluate_day",
+    "explanations_and_freshness_proof": "required — also folded in: a decision without an explanation, or an explanation without a freshness proof, fails the day",
+    "recency": {"value_days": 21, "constant": "MAX_EVIDENCE_AGE_DAYS",
+                "note": "the qualifying days are the most RECENT judgeable ones; the gate closes again if evidence goes stale"},
+    "thresholds_are_judgement_calls": true,
+    "thresholds_location": "one named block, so they move deliberately in one place"
+  },
+
+  "cannot_be_satisfied_by_stale_or_missing_evidence": [
+    "a missing audit directory, a missing day, an unparsable line, a NOT_ENOUGH_DATA_YET verdict and a record for another route all count AGAINST readiness",
+    "absence is never a pass — a day with no audit record is a day nobody watched",
+    "the qualifying days are the most recent judgeable ones and the newest must be inside the age limit",
+    "the gate closes again if the evidence goes stale",
+    "the measurement fails CLOSED on any exception (unknown is not the same as ready)"
+  ],
+
+  "current_readiness": {
+    "ready": false,
+    "checks": {
+      "audit_records_readable": "PASS",
+      "judgeable_days": "FAIL — 1 on record, 5 required",
+      "no_failing_days": "FAIL — 1 FAIL day in the qualifying window, 0 allowed",
+      "warn_days_within_allowance": "PASS",
+      "evidence_is_recent": "PASS",
+      "every_sleeve_passed_at_least_once": "FAIL — none of the four has PASSED"
+    }
+  },
+
+  "q2_what_blocks_paper": {
+    "code_measurements_nobody_can_sign": [
+      {"id": "PAPER_SHADOW_EVIDENCE", "status": "MEASURED_GATE", "state": "holding",
+       "new_in_this_stage": true, "released_by": [], "measurement": "shadow_evidence"},
+      {"id": "LIVE_FRAME_ADAPTER_VERIFICATION", "status": "MEASURED_GATE",
+       "state": "currently released by measurement"}
+    ],
+    "operator_decisions": [
+      {"id": "B1_broker_account_or_legacy_retirement", "status": "USER_DECISION_GATE",
+       "closes_by": "retire legacy or fund a separate IBKR account, recorded in track1_go_live_confirmation.json"},
+      {"id": "TRACK1_ORDERS_APPROVED=1", "kind": "environment, out of band"},
+      {"id": "--allow-orders", "kind": "argv, per invocation"}
+    ],
+    "named_but_NOT_machine_gates": {
+      "broker_flat_orphan_stp": "handled by the legacy safety jobs and the B1 decision; not a gate on the order path",
+      "legacy_drain_safety_state": "same — 11 legacy safety jobs still scheduled to drain the old book",
+      "note": "if these should be machine gates, that is a further blocker to add; the current table does not imply it"
+    }
+  },
+
+  "q3_accidental_go_live_path": {
+    "exists": false,
+    "reasons": [
+      "three independent deliberate acts are required: a schema-checked confirmation file, TRACK1_ORDERS_APPROVED=1, and --allow-orders — plus, now, the evidence gate",
+      "even fully armed, run_shadow constructs NoOrderBroker() unconditionally and its send_order raises; IBKRBroker is NEVER constructed in run_live_day_track1.py",
+      "neither run_scheduler.py nor monitor/ops.py builds an argv containing --allow-orders, and ops.py never assigns TRACK1_ORDERS_APPROVED"
+    ],
+    "pinned_by": "AST tests, not grep, so a docstring mentioning the flag cannot pass or fail them"
+  },
+
+  "q4_dashboard_exposure": {
+    "exposed": ["window coverage", "slot timing", "audits with their acceptance gate",
+                "explanations", "book", "checkpoint", "gate ledger", "safety state"],
+    "not_exposed": "the readiness roll-up itself — the operator sees the raw evidence and sees PAPER_SHADOW_EVIDENCE in blocking_now, but the per-check breakdown lives only in the CLI",
+    "fixed_here": false,
+    "why_not": "a dashboard row is a UI change; this stage was scoped to the gate. Named so it is a decision rather than an oversight"
+  },
+
+  "q5_durable_paths": {
+    "durable": true,
+    "paths": ["global_index/track1_runtime/window_coverage",
+              "global_index/track1_runtime/slot_timing",
+              "global_index/track1_runtime/audits"],
+    "none_under_scratch": true,
+    "asserted_by_test": true
+  },
+
+  "q6_paper_vs_shadow": {
+    "answer": "NO — paper mode is not implemented",
+    "detail": "arming changes exactly two things today: the recorded decision mode (armed instead of shadow_live) and the fact that the freshness gate binds. The broker is NoOrderBroker either way. The code that would swap in a real broker, place an order, reconcile the fill and book it does not exist in this route",
+    "consequence": "the gate currently guards a door that does not open onto anything. That is a safe state and it means the shadow period can be collected with no risk of an order, but 'turn the gate on and we are trading paper' is not true and nothing in the runbook said so",
+    "severity": "largest finding of the stage"
+  },
+
+  "q7_legacy_state_in_track1_decisions": {
+    "answer": "no",
+    "evidence": "run_live_day_track1.LEGACY_PATHS lists nine paths the route must never write (live_positions.json, global_index/replay_checkpoint.json, runner.pid, global_index/preflight_state.json and others) and it is asserted by test, not merely intended. No Track 1 decision path reads them either"
+  },
+
+  "q8_b5ri_relevance": {
+    "answer": "not relevant while legacy strategy jobs are omitted — measured, not assumed",
+    "defect_location": ["runner.py:1592", "run_live_day.py:677", "run_live_day.py:88 (NKD_INST='MNKD')"],
+    "all_strategy_paths": true,
+    "legacy_strategy_jobs_scheduled": 0,
+    "legacy_safety_jobs_scheduled": 11,
+    "measured": "run_stop_repair.py and run_maxhold_exit.py contain NO call to fetch_bars at all",
+    "becomes_relevant_again": "the moment a legacy strategy job is re-registered; it should be closed before that, not because of it"
+  },
+
+  "q9_sequence_to_paper": [
+    {"n": 1, "what": "python -m global_index.track1_paper_readiness — every check must read PASS. Cannot be signed, only earned"},
+    {"n": 2, "what": "record the B1 decision in global_index/track1_go_live_confirmation.json — written by a person, never a script; schema-checked and fails closed"},
+    {"n": 3, "what": "python monitor\\ops.py status — expect orders_possible=True, track1_blocking=[]"},
+    {"n": 4, "what": "BUILD AND PROVE A BROKER THAT CAN ACTUALLY PLACE AN ORDER — see finding 6. This does not exist", "is_a_project_not_a_command": true},
+    {"n": 5, "what": "only then, per invocation and never from the scheduler: TRACK1_ORDERS_APPROVED=1 and --allow-orders"}
+  ],
+
+  "changes": {
+    "production_new": ["global_index/track1_paper_readiness.py"],
+    "production_modified": ["global_index/track1_gates.py (shadow_evidence measurement + PAPER_SHADOW_EVIDENCE blocker)"],
+    "direction": "the blocker can ONLY refuse — it adds a condition to arming, removes none, and cannot arm anything by itself",
+    "cost": {"marginal_ms_per_blocking_call": 1.0,
+             "pre_existing_live_frame_wiring_ms": 106.3,
+             "note": "the first version cost 75 ms because it imported pandas for today's date; now stdlib"},
+    "tests_new": {"file": "scratch/test_track1_stage5s_paper_readiness_20260825.py", "count": 24},
+    "tests_updated": {
+      "count_files": 7,
+      "why": "they pinned 'B1 is the only blocker' — true when written, now legitimately false",
+      "notable": "the Stage 3B ledger tests had already been rewritten TWICE by a measured gate opening and closing, and their own comment says 'chasing the state is the wrong test'. They are now generalised over MEASUREMENTS: release every measurement and the route opens; hold each shut in turn and exactly its own gate must be the reason"
+    },
+    "artifacts_regenerated": ["scratch/track1_blocking_ledger_20260822.json"],
+    "docs_updated": ["scratch/track1_blocking_ledger_20260822.md (new blocker section)"]
+  },
+
+  "found_not_fixed": {
+    "count": 7,
+    "tests": ["test_track1_stage5b_runbook_fix_20260823.py (2)",
+              "test_track1_stage5c_shadow_readiness_20260823.py (4)",
+              "test_track1_stage5d_shadow_live_wiring_20260823.py (1)"],
+    "cause": "stale snapshots from before the route grew its four sleeves — they assert Track 1 shadow adds 25 slots (it adds 70) and that no runtime evidence exists yet (it does)",
+    "confirmed_not_caused_by_this_stage": "ran all seven with PAPER_SHADOW_EVIDENCE removed from the registry — all seven fail identically",
+    "why_not_fixed": "deciding what they should now assert is a separate call"
+  },
+
+  "regression": {"result": "409 passed, 1 skipped, 7 pre-existing failures", "suites": 12},
+
+  "direct_answers": {
+    "exact_evidence_count": "5 judgeable days, 0 FAIL, at most 1 WARN, every one of the four sleeves PASSED at least once, newest day within 21 days, p95 under 300 s throughout",
+    "operator_vs_code": "operator: B1, TRACK1_ORDERS_APPROVED, --allow-orders. Code measurements nobody can sign: PAPER_SHADOW_EVIDENCE, LIVE_FRAME_ADAPTER_VERIFICATION",
+    "accidental_go_live_path": "none",
+    "check_after_each_judgeable_window": "run the post-window audit, confirm the sleeve reached PASS rather than NOT_ENOUGH_DATA_YET, and re-run the readiness report to see the count move",
+    "next_runtime_audit_step": "the NKD window at 01:10 ET tonight is the first that should be judgeable; when it closes at 02:55, track1_audit_global_nkd fires at 03:05 and writes the first record that can count toward the five"
+  }
+}

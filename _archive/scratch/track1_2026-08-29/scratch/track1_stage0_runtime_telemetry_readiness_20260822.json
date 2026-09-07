@@ -1,0 +1,137 @@
+{
+ "stage": "track1_stage0_readiness",
+ "date": "2026-08-22",
+ "services_started": [],
+ "production_route_patched": false,
+ "committed": false,
+ "runtime_current_regime": {
+  "n": 207,
+  "median": 191.0,
+  "p90": 206.0,
+  "p95": 216.39999999999998,
+  "max": 311.0,
+  "over_300s": 1
+ },
+ "slot_spacing_s": 300,
+ "margin_to_spacing_s": 83.6,
+ "contention_simulation": {
+  "CURRENT regime | Track1 window alone": {
+   "slots": 25,
+   "worst_skips": 1,
+   "worst_skip_pct": 4.0,
+   "offsets_tried": 207
+  },
+  "CURRENT regime | current + Track1 windows": {
+   "slots": 48,
+   "worst_skips": 1,
+   "worst_skip_pct": 2.1,
+   "offsets_tried": 207
+  }
+ },
+ "gate": {
+  "hard_p95_s": 300,
+  "target_p95_s": 240,
+  "measured_after": "Track 1 signals wired in shadow"
+ },
+ "machine_sleep": {
+  "stalls": 28,
+  "days_with_stall": 13,
+  "days_total": 18,
+  "total_stalled_hours": 17.2,
+  "worst_stall_hours": 3.6,
+  "current_regime_trading_days": 9,
+  "current_regime_days_with_stall": 8,
+  "clean_days": [
+   "2026-08-13"
+  ],
+  "classification": "operational blocker before a second live continuous window",
+  "remedy": "powercfg /setdcvalueindex SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 0",
+  "gate_condition": "zero HEARTBEAT STALLED lines across the collection window"
+ },
+ "misfires": {
+  "total": 52,
+  "nkd_night": 43,
+  "other": 9,
+  "sleep_covered": 33,
+  "trading_job_incident": [
+   {
+    "ts": "2026-08-04 08:12:15",
+    "job_short": "MAX_HOLD exit 09:31 ET",
+    "missed_by_s": "2475.506018"
+   }
+  ],
+  "classification_note": "MAX_HOLD 09:31 ET 2026-08-04 late by 2476s with no stall covering it is a TRADING-job incident and belongs in a trading-risk log, NOT under NKD maintenance"
+ },
+ "shadow_resume": {
+  "match": 91,
+  "diverged": 0,
+  "no_checkpoint": 64,
+  "checkpoint_not_advanced": 0
+ },
+ "telemetry": {
+  "inert_by_default": true,
+  "enable_switch": "RAITS_TELEMETRY_DIR",
+  "identity_vars": [
+   "RAITS_SLOT_ID",
+   "RAITS_ROUTE"
+  ],
+  "route_default": "legacy",
+  "writes": "slot_timing_YYYYMMDD.jsonl (~70 lines/day)",
+  "filename_timezone": "UTC (runner_events_*.jsonl uses ET) \u2014 join on ts, not filename",
+  "tests_passed": 23,
+  "baseline_tests_passed": 44,
+  "excluded_test": "global_index/test_event_playback.py (pre-existing hang)"
+ },
+ "collection_plan": {
+  "min_trading_days": 10,
+  "reason": "current-regime sample is 10 days and has never contained a high-volatility session; ibkr_broker.py:730-737 models a 265s worst-case blocking peak, exceeding the 84s margin",
+  "also_required": "at least one skipped_mutex or skipped_preflight record from the parent"
+ },
+ "gates": [
+  {
+   "id": "G1",
+   "what": "legacy baseline collected",
+   "pass": ">=10 trading days, p95 from runner's own runtime_s"
+  },
+  {
+   "id": "G2",
+   "what": "legacy p95 confirms current regime",
+   "pass": "p95 near 216s"
+  },
+  {
+   "id": "G3",
+   "what": "machine sleep eliminated",
+   "pass": "zero HEARTBEAT STALLED over the window"
+  },
+  {
+   "id": "G4",
+   "what": "Track1 shadow runtime",
+   "pass": "p95 < 300s hard, < 240s target"
+  },
+  {
+   "id": "G5",
+   "what": "run_day attribution",
+   "pass": "phase markers added if run_day threatens G4"
+  },
+  {
+   "id": "G6",
+   "what": "slot outcome accounting closes",
+   "pass": "outcomes sum to scheduled slots/day"
+  },
+  {
+   "id": "G7",
+   "what": "legacy unchanged",
+   "pass": "artifact sha256 match, empty job/argv diff, 44 baseline tests"
+  }
+ ],
+ "unchanged_confirmed": [
+  "production route",
+  "scheduler job ids/triggers/times",
+  "child argv",
+  "event schema",
+  "monitor readers",
+  "runner.py",
+  "trading decisions / signals / guard / broker"
+ ],
+ "verdict": "Stage 0 ready to run. Slot contention is not a blocker (worst 1 skip in 48). The blocker is machine sleep on 8 of the 9 most recent trading days; fix and prove it before the collection window, or G1 and G3 must be re-run."
+}

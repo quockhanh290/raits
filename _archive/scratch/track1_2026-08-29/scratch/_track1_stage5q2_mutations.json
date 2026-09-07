@@ -1,0 +1,103 @@
+{
+  "results": [
+    {
+      "mutation": "S1 all sleeves share one file per session date again",
+      "guard": "scratch/test_track1_stage5q2_explanation_integrity_20260824.py::test_the_real_slot_path_gives_each_slot_its_own_file",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "S2 the sleeve level is dropped from the layout",
+      "guard": "scratch/test_track1_stage5q2_explanation_integrity_20260824.py::test_the_path_names_the_day_the_sleeve_and_the_slot",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "S3 the row loses its slot_id",
+      "guard": "scratch/test_track1_stage5q2_explanation_integrity_20260824.py::test_the_row_carries_the_slot_id_as_well_as_the_path",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "S4 a slot re-run appends instead of replacing its own rows",
+      "guard": "scratch/test_track1_stage5q2_explanation_integrity_20260824.py::test_rerunning_one_slot_replaces_only_its_own_rows",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "S5 the freshness proof is a substring match again",
+      "guard": "scratch/test_track1_stage5q2_explanation_integrity_20260824.py::test_a_row_whose_only_freshness_is_prose_fails",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "S6 a binding admission need not cite the freshness gate",
+      "guard": "scratch/test_track1_stage5q2_explanation_integrity_20260824.py::test_an_accepted_binding_decision_must_cite_the_gate_and_carry_the_feature",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "S7 an unreadable row passes the freshness check",
+      "guard": "scratch/test_track1_stage5q2_explanation_integrity_20260824.py::test_an_unreadable_row_cannot_pass_the_check",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "S8 the reader only looks at the flat path",
+      "guard": "scratch/test_track1_stage5q2_explanation_integrity_20260824.py::test_the_gate_and_the_dashboard_find_the_same_rows",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "S9 the dashboard reader reaches into the writer module",
+      "guard": "scratch/test_track1_stage5q2_explanation_integrity_20260824.py::test_the_gate_and_the_dashboard_find_the_same_rows",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "S10 a duplicate slot id masks a missing one",
+      "guard": "scratch/test_track1_stage5q1_audit_semantics_20260824.py::test_a_missing_slot_id_fails_even_though_a_duplicate_keeps_the_count",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "S11 the replay path is migrated to the live layout",
+      "guard": "scratch/test_track1_stage5q2_explanation_integrity_20260824.py::test_the_replay_path_keeps_its_flat_window_layout",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "S12 a traversing sleeve name is sanitised rather than refused",
+      "guard": "scratch/test_track1_stage5q2_explanation_integrity_20260824.py::test_a_slot_cannot_write_outside_its_own_directory",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    }
+  ],
+  "detected": 12,
+  "total": 12,
+  "restore_mismatch": []
+}

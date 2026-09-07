@@ -1,0 +1,115 @@
+{
+  "stage": "5H",
+  "status": "COMPLETE",
+  "closed_on": "2026-08-23",
+  "verdict": "NOT_READY_FOR_SHADOW_START",
+  "why_not_a_failure": "Stage 5H was a pre-shadow/B1 preflight audit. A preflight that returns 'not ready' has succeeded when the reason is specific, measured and actionable. It prevented an operator from freezing legacy and starting a scheduler that would have collected nothing.",
+  "blocker": {
+    "what": "main()'s live-shadow branch calls observe_live_slot without a provider, and the entry point has no --bar-provider flag, so track1_live_source.build_bar_provider has no caller on the scheduler path",
+    "kind": "code, not operator action",
+    "verified_by": [
+      "parsed main()'s call graph - build_bar_provider absent",
+      "parsed add_argument lines - no --bar-provider among the 9 flags",
+      "ran the slot command with a temp ledger dir"
+    ],
+    "slot_result": {
+      "decided": false,
+      "reason": "no_bar_provider",
+      "window_outcome": "incomplete",
+      "checkpoint_written": false,
+      "ledger_rows": [
+        "window_open",
+        "slot_observed",
+        "window_closed"
+      ],
+      "send_order_calls": 0
+    },
+    "probe_correction": "a first substring heuristic wrongly reported the flag as existing; re-checked by parsing add_argument, it does not"
+  },
+  "verified": {
+    "gate": {
+      "live_frame_released": true,
+      "blocking": [
+        "B1_broker_account_or_legacy_retirement",
+        "PAPER_SHADOW_EVIDENCE",
+        "REGIME_LABEL_VERIFICATION"
+      ],
+      "self_check": [],
+      "confirmation_file": false,
+      "allow_orders_exit": 2,
+      "names_b1": true,
+      "names_env": true,
+      "names_closed_blocker": false
+    },
+    "scheduler_built_only": {
+      "jobs_off": 60,
+      "jobs_on": 84,
+      "track1_slots": 25,
+      "calm": [
+        "track1_calm_1000"
+      ],
+      "stress_count": 24,
+      "stress_span": "track1_stress_1035..track1_stress_1230",
+      "stress_step_5min": true,
+      "legacy_entry_slots_off": 23,
+      "legacy_entry_slots_on": 23,
+      "removed_by_shadow": [
+        "stop_repair_1220"
+      ],
+      "dashboard_parity_off": true,
+      "dashboard_parity_on": true
+    },
+    "slot_argv": {
+      "includes": [
+        "--source live-shadow",
+        "--sleeve",
+        "--slot-id",
+        "--regime-csv"
+      ],
+      "excludes": [
+        "--allow-orders",
+        "--window",
+        "--port",
+        "--bar-provider"
+      ]
+    }
+  },
+  "next": [
+    "Stage 5H0 - missed-surfaces audit (sweep for present-but-uncalled code; this is the third instance of that pattern after record_window_observation and track1_bootstrap.write)",
+    "Stage 5I - add --bar-provider, call build_bar_provider, pass to observe_live_slot, release the broker in a finally (no disconnect path exists today)",
+    "only then the operator sequence from Stage 5H"
+  ],
+  "must_not": [
+    "start the shadow scheduler",
+    "write track1_go_live_confirmation.json",
+    "create STOP_TRADING",
+    "set TRACK1_ORDERS_APPROVED",
+    "claim ready for live orders",
+    "add --bar-provider in this stage"
+  ],
+  "no_side_effects": {
+    "scheduler_processes": 0,
+    "ibkr_connection": false,
+    "orders": 0,
+    "dashboard_runtime_write": false,
+    "live_state_data_js_mtime": "2026-08-21 13:59",
+    "live_positions_json_mtime": "2026-08-21 13:59",
+    "stop_trading": false,
+    "stop_trading_track1": false,
+    "confirmation_file": false,
+    "track1_orders_approved": "unset",
+    "commit": false,
+    "head": "601970b",
+    "files_written": [
+      "scratch/track1_stage5h_closeout_20260823.md",
+      "scratch/track1_stage5h_closeout_20260823.json"
+    ]
+  },
+  "known_out_of_scope_failure": "scratch/test_track1_explain_20260823.py::test_no_monitor_or_dashboard_file_mentions_the_module - a monitor/ file from another session; untouched",
+  "not_claimed": [
+    "ready for live orders",
+    "a broker provider works",
+    "a live day has been run"
+  ],
+  "final": "Stage 5H is closed. Proceed to Stage 5H0 missed-surfaces audit before Stage 5I provider wiring."
+}

@@ -1,0 +1,27 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  tin hieu goc 3356 | giu lai 1817 (54.1%) | loai 1539
+
+=== GOC — khong rang buoc huong nen resume ===
+  2018 lenh | P&L tho $109,000 | P&L DA SUA $9,497 | ty le thang 24.9%
+  ly do thoat: {'CHANDELIER': 1403, 'MAX_HOLD': 515, 'GAP': 100}
+
+=== DA LOC — nen resume phai dong dung chieu ===
+  1590 lenh | P&L tho $84,234 | P&L DA SUA $10,677 | ty le thang 26.0%
+  ly do thoat: {'CHANDELIER': 1086, 'MAX_HOLD': 427, 'GAP': 77}
+
+=== SO SANH ===
+  so lenh   2018 -> 1590
+  P&L da sua $9,497 -> $10,677   (+1,180)
+  P&L moi lenh $5 -> $7
+
+=== THEO NAM (P&L da sua) ===
+  nam      |        goc |     da loc |      chenh
+  2018     |      5,768 |      1,836 |     -3,932
+  2019     |     -2,501 |         59 |     +2,560
+  2020     |      7,030 |      6,135 |       -895
+  2021     |     -1,417 |     -1,667 |       -250
+  2022     |     -9,759 |     -6,617 |     +3,143
+  2023     |      8,215 |      8,173 |        -42
+  2024     |      2,161 |      2,758 |       +596
+
+  CUA KIEM: nua dau -2,517 | nua sau +3,697 -> DOI DAU

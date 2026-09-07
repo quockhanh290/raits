@@ -1,0 +1,727 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-N",
+ "title": "Canonical Track 1 baselines, reproduction proof, and final paper decision",
+ "route": "track1_candidate",
+ "date": "2026-08-29",
+ "git_commit": "601970bf97e23b200b8eb06cbcf22a240897133a",
+ "git_branch": "future/incorporation",
+ "final_labels": [
+  "TRACK1_REFERENCE_BASELINE_REPRODUCED",
+  "LIVE_TRADABLE_BASELINE_REPRODUCED",
+  "INCLUDE_SWING_IN_PAPER_BY_OPERATOR_OVERRIDE",
+  "NO_SWING_PARAMETER_PROMOTION",
+  "PAPER_NOT_READY",
+  "NO_ORDER_ACTIVATION"
+ ],
+ "decision_statement": "Swing is included in paper scope by explicit operator risk acceptance, using causal D-1 old/effective ema=50. This is not an evidence-based parameter promotion. Same-day Swing remains reference-only and not live-tradable.",
+ "swing_inclusion_is_operator_override": true,
+ "swing_inclusion_is_evidence_promotion": false,
+ "any_parameter_promotion_accepted": false,
+ "window_meta": {
+  "floor": {
+   "span": "2018-01-01..2024-12-31",
+   "sample": "IN_SAMPLE",
+   "partial": false
+  },
+  "vault2025": {
+   "span": "2025-01-01..2025-12-31",
+   "sample": "OUT_OF_SAMPLE",
+   "partial": false
+  },
+  "vault2026": {
+   "span": "2026-01-01..2026-08-19",
+   "sample": "OUT_OF_SAMPLE",
+   "partial": true,
+   "partial_note": "runs only to 2026-08-19"
+  }
+ },
+ "part_a_historical_reference": {
+  "reproduced": true,
+  "numbers_checked": 30,
+  "numbers_matched": 30,
+  "mode": "REPLAYED from existing artifacts; no regeneration",
+  "command": "python scratch/track1_stage5zzzh_full_replay_20260829.py --variant base",
+  "regime_basis": "same-day daily close",
+  "live_tradable": false,
+  "must_not_be_quoted_as": "the paper baseline - the same-day label needs the 16:00 close and cannot exist during the 14:05-15:55 Swing window",
+  "results": {
+   "floor": {
+    "full_stack": {
+     "net": 74409.78,
+     "pf": 1.6718,
+     "sharpe": 2.1181,
+     "calmar": 2.1405,
+     "maxdd": 4973.38,
+     "trades_taken": 1690,
+     "trades_rejected": 195,
+     "swing_taken": 545,
+     "swing_rejected": 190,
+     "swing_pnl": 25676.61,
+     "pnl_by_cluster": {
+      "roska4_calm": 9162.47,
+      "global_nkd": 13405.17,
+      "roska4_swing": 25676.61,
+      "roska4_stress": 26165.53
+     }
+    },
+    "risk_clean": {
+     "net": 64902.91,
+     "pf": 1.6172,
+     "sharpe": 2.3421,
+     "calmar": 1.9179,
+     "maxdd": 4845.31,
+     "trades_taken": 1160,
+     "trades_rejected": 195,
+     "swing_taken": 545,
+     "swing_rejected": 190,
+     "swing_pnl": 25676.61,
+     "pnl_by_cluster": {
+      "roska4_calm": 9162.47,
+      "global_nkd": 3898.3,
+      "roska4_swing": 25676.61,
+      "roska4_stress": 26165.53
+     }
+    }
+   },
+   "vault2025": {
+    "full_stack": {
+     "net": 16997.2,
+     "pf": 2.2571,
+     "sharpe": 2.7592,
+     "calmar": 4.4455,
+     "maxdd": 3900.89,
+     "trades_taken": 214,
+     "trades_rejected": 51,
+     "swing_taken": 55,
+     "swing_rejected": 48,
+     "swing_pnl": 4690.22,
+     "pnl_by_cluster": {
+      "global_nkd": 5964.13,
+      "roska4_swing": 4690.22,
+      "roska4_calm": 1811.89,
+      "roska4_stress": 4530.96
+     }
+    },
+    "risk_clean": {
+     "net": 13236.11,
+     "pf": 1.9956,
+     "sharpe": 2.9622,
+     "calmar": 3.0882,
+     "maxdd": 4631.53,
+     "trades_taken": 128,
+     "trades_rejected": 51,
+     "swing_taken": 55,
+     "swing_rejected": 48,
+     "swing_pnl": 4690.22,
+     "pnl_by_cluster": {
+      "global_nkd": 2203.04,
+      "roska4_swing": 4690.22,
+      "roska4_calm": 1811.89,
+      "roska4_stress": 4530.96
+     }
+    }
+   },
+   "vault2026": {
+    "full_stack": {
+     "net": 9288.24,
+     "pf": 1.6161,
+     "sharpe": 2.4745,
+     "calmar": 3.4117,
+     "maxdd": 4342.3,
+     "trades_taken": 129,
+     "trades_rejected": 48,
+     "swing_taken": 45,
+     "swing_rejected": 36,
+     "swing_pnl": 718.73,
+     "pnl_by_cluster": {
+      "roska4_calm": 702.19,
+      "global_nkd": 7035.86,
+      "roska4_swing": 718.73,
+      "roska4_stress": 831.46
+     }
+    },
+    "risk_clean": {
+     "net": 8259.85,
+     "pf": 1.5486,
+     "sharpe": 2.5681,
+     "calmar": 2.7461,
+     "maxdd": 4797.44,
+     "trades_taken": 91,
+     "trades_rejected": 47,
+     "swing_taken": 45,
+     "swing_rejected": 36,
+     "swing_pnl": 718.73,
+     "pnl_by_cluster": {
+      "roska4_calm": 702.19,
+      "global_nkd": 6007.47,
+      "roska4_swing": 718.73,
+      "roska4_stress": 831.46
+     }
+    }
+   }
+  }
+ },
+ "part_b_live_tradable_selected": {
+  "reproduced": true,
+  "mode": "REGENERATED from the engine, then replayed",
+  "commands": [
+   "python scratch/track1_stage5zzzh_swing_d1_regen_20260829.py --which floor vault2025 vault2026 --suffix d1repro",
+   "python scratch/track1_stage5zzzh_full_replay_20260829.py --variant d1repro"
+  ],
+  "regeneration_elapsed_seconds": 765.6,
+  "artifact_sha256_16": {
+   "floor": "2474723814ae3e92",
+   "vault2025": "c27ca3902b116912",
+   "vault2026": "1ee198a9f10387c8"
+  },
+  "matches_existing_d1_artifacts_byte_for_byte": true,
+  "effective_params": {
+   "asked_ema_period": 30,
+   "effective_ema_period": 50,
+   "ema_was_substituted": true,
+   "requested_differs_from_effective": true,
+   "effective_stop_basis_atr_mult": 2.0,
+   "ratchet": false,
+   "chandelier_affects_decisions": false,
+   "source": "sidecar *.params.json written by the regeneration for every window",
+   "substitution_rule": "scratch/harness.py: ema_period == 30 -> cfg.ema (50)"
+  },
+  "regime_basis_proof": {
+   "object": "RegimeLabels(lag_days=1)",
+   "label_change_sessions_in_floor": 147,
+   "returned_previous_session_label": 147,
+   "mismatches": 0,
+   "verdict": "causal D-1 confirmed on every session where same-day and previous-day disagree",
+   "artifact": "scratch/track1_stage5zzzn_regime_basis_proof_20260829.json"
+  },
+  "excluded_by_construction": [
+   "same-day label",
+   "proxy label",
+   "retuned params",
+   "prevbar promotion"
+  ],
+  "results": {
+   "floor": {
+    "full_stack": {
+     "net": 66796.31,
+     "pf": 1.5867,
+     "sharpe": 1.9069,
+     "calmar": 1.9215,
+     "maxdd": 4973.38,
+     "trades_taken": 1696,
+     "trades_rejected": 203,
+     "swing_taken": 564,
+     "swing_rejected": 197,
+     "swing_pnl": 18428.52,
+     "pnl_by_cluster": {
+      "roska4_calm": 8797.09,
+      "global_nkd": 13405.17,
+      "roska4_swing": 18428.52,
+      "roska4_stress": 26165.53
+     }
+    },
+    "risk_clean": {
+     "net": 57289.44,
+     "pf": 1.5297,
+     "sharpe": 2.0828,
+     "calmar": 1.6694,
+     "maxdd": 4913.68,
+     "trades_taken": 1166,
+     "trades_rejected": 203,
+     "swing_taken": 564,
+     "swing_rejected": 197,
+     "swing_pnl": 18428.52,
+     "pnl_by_cluster": {
+      "roska4_calm": 8797.09,
+      "global_nkd": 3898.3,
+      "roska4_swing": 18428.52,
+      "roska4_stress": 26165.53
+     }
+    }
+   },
+   "vault2025": {
+    "full_stack": {
+     "net": 16180.57,
+     "pf": 2.0549,
+     "sharpe": 2.4964,
+     "calmar": 3.3591,
+     "maxdd": 4914.52,
+     "trades_taken": 215,
+     "trades_rejected": 53,
+     "swing_taken": 57,
+     "swing_rejected": 48,
+     "swing_pnl": 3905.85,
+     "pnl_by_cluster": {
+      "global_nkd": 5964.13,
+      "roska4_swing": 3905.85,
+      "roska4_calm": 1779.63,
+      "roska4_stress": 4530.96
+     }
+    },
+    "risk_clean": {
+     "net": 12419.48,
+     "pf": 1.8218,
+     "sharpe": 2.6345,
+     "calmar": 2.3774,
+     "maxdd": 5645.16,
+     "trades_taken": 129,
+     "trades_rejected": 52,
+     "swing_taken": 57,
+     "swing_rejected": 47,
+     "swing_pnl": 3905.85,
+     "pnl_by_cluster": {
+      "global_nkd": 2203.04,
+      "roska4_swing": 3905.85,
+      "roska4_calm": 1779.63,
+      "roska4_stress": 4530.96
+     }
+    }
+   },
+   "vault2026": {
+    "full_stack": {
+     "net": 8105.04,
+     "pf": 1.5196,
+     "sharpe": 2.1439,
+     "calmar": 3.7629,
+     "maxdd": 3435.49,
+     "trades_taken": 127,
+     "trades_rejected": 50,
+     "swing_taken": 43,
+     "swing_rejected": 38,
+     "swing_pnl": -464.47,
+     "pnl_by_cluster": {
+      "roska4_calm": 702.19,
+      "global_nkd": 7035.86,
+      "roska4_swing": -464.47,
+      "roska4_stress": 831.46
+     }
+    },
+    "risk_clean": {
+     "net": 7076.65,
+     "pf": 1.4527,
+     "sharpe": 2.1858,
+     "calmar": 1.9284,
+     "maxdd": 5853.15,
+     "trades_taken": 89,
+     "trades_rejected": 49,
+     "swing_taken": 43,
+     "swing_rejected": 38,
+     "swing_pnl": -464.47,
+     "pnl_by_cluster": {
+      "roska4_calm": 702.19,
+      "global_nkd": 6007.47,
+      "roska4_swing": -464.47,
+      "roska4_stress": 831.46
+     }
+    }
+   }
+  },
+  "expected_vs_reproduced": {
+   "full_stack": {
+    "floor": [
+     66796,
+     66796
+    ],
+    "vault2025": [
+     16181,
+     16181
+    ],
+    "vault2026": [
+     8105,
+     8105
+    ]
+   },
+   "risk_clean": {
+    "floor": [
+     57289,
+     57289
+    ],
+    "vault2025": [
+     12419,
+     12419
+    ],
+    "vault2026": [
+     7077,
+     7077
+    ]
+   },
+   "swing": {
+    "floor": [
+     18429,
+     18429
+    ],
+    "vault2025": [
+     3906,
+     3906
+    ],
+    "vault2026": [
+     -464,
+     -464
+    ]
+   },
+   "all_matched": true
+  },
+  "baseline_artifacts": {
+   "modified": false,
+   "sha256_before": {
+    "floor": "f4d8eea7cd051b3d84a828f15382749097a17cc4c40168b3f045c6ad8a41c588",
+    "vault2025": "c7eb5dd2e375316b4edef32a42c2d8b36546c2971e6ff3eb3e083d23e8c86d27",
+    "vault2026": "b1e85b2c9ab7019dce54d37a70bbb3b7248078f63a71d2eec7a5321124f8991b"
+   },
+   "sha256_after_equals_before": true,
+   "note": "the regeneration writes to the shared filenames and restores from a backup in a finally; verified independently by hash"
+  }
+ },
+ "part_c_variants": [
+  {
+   "id": 1,
+   "name": "Historical same-day reference",
+   "regime_basis": "same-day daily close",
+   "requested_params": {
+    "ema_period": 30,
+    "chandelier_atr_mult": 2.5
+   },
+   "effective_params": {
+    "ema_period": 50,
+    "stop_basis_atr_mult": 2.0
+   },
+   "live_tradable": false,
+   "paper_selected": false,
+   "full_stack_net": {
+    "floor": 74410,
+    "vault2025": 16997,
+    "vault2026": 9288
+   },
+   "risk_clean_net": {
+    "floor": 64903,
+    "vault2025": 13236,
+    "vault2026": 8260
+   },
+   "swing_contribution": {
+    "floor": 25677,
+    "vault2025": 4690,
+    "vault2026": 719
+   },
+   "decision": "reference only",
+   "caveat": "the label is computed from the 16:00 close and cannot exist at 14:05"
+  },
+  {
+   "id": 2,
+   "name": "D-1 old / effective ema=50",
+   "regime_basis": "causal D-1",
+   "requested_params": {
+    "ema_period": 30,
+    "chandelier_atr_mult": 2.5
+   },
+   "effective_params": {
+    "ema_period": 50,
+    "stop_basis_atr_mult": 2.0,
+    "ratchet": false
+   },
+   "live_tradable": true,
+   "paper_selected": true,
+   "full_stack_net": {
+    "floor": 66796,
+    "vault2025": 16181,
+    "vault2026": 8105
+   },
+   "risk_clean_net": {
+    "floor": 57289,
+    "vault2025": 12419,
+    "vault2026": 7077
+   },
+   "swing_contribution": {
+    "floor": 18429,
+    "vault2025": 3906,
+    "vault2026": -464
+   },
+   "decision": "SELECTED for paper by operator override",
+   "caveat": "Swing is negative in 2026; this is not an evidence-based promotion"
+  },
+  {
+   "id": 3,
+   "name": "D-1 narrow retune (Stage 5ZZZ-I)",
+   "regime_basis": "causal D-1",
+   "requested_params": {
+    "ema_period": 10,
+    "chandelier_atr_mult": 2.5
+   },
+   "effective_params": {
+    "ema_period": 10,
+    "stop_basis_atr_mult": 2.0
+   },
+   "live_tradable": true,
+   "paper_selected": false,
+   "full_stack_net": {
+    "floor": 64374,
+    "vault2025": 10040,
+    "vault2026": 6946
+   },
+   "risk_clean_net": {
+    "floor": 54867,
+    "vault2025": 6279,
+    "vault2026": 5918
+   },
+   "swing_contribution": {
+    "floor": 16883,
+    "vault2025": -2190,
+    "vault2026": -1623
+   },
+   "decision": "rejected",
+   "caveat": "worse in both OOS windows; its WFO ran on the research engine, not the artifact engine"
+  },
+  {
+   "id": 4,
+   "name": "D-1 full-grid winner (Stage 5ZZZ-L)",
+   "regime_basis": "causal D-1",
+   "requested_params": {
+    "ema_period": 50,
+    "chandelier_atr_mult": 2.0,
+    "max_hold_days": 5
+   },
+   "effective_params": {
+    "ema_period": 50,
+    "stop_basis_atr_mult": 2.0
+   },
+   "live_tradable": true,
+   "paper_selected": "via variant 2",
+   "full_stack_net": {
+    "floor": 66796,
+    "vault2025": 16181,
+    "vault2026": 8105
+   },
+   "risk_clean_net": {
+    "floor": 57289,
+    "vault2025": 12419,
+    "vault2026": 7077
+   },
+   "swing_contribution": {
+    "floor": 18429,
+    "vault2025": 3906,
+    "vault2026": -464
+   },
+   "decision": "converged onto variant 2 - identical artifacts",
+   "caveat": "the chandelier multiple is a no-op here (ratchet off, stop basis set), so mult 2.0 and 2.5 are the same run"
+  },
+  {
+   "id": 5,
+   "name": "D-1 prevbar volume filter",
+   "regime_basis": "causal D-1",
+   "requested_params": {
+    "ema_period": 30,
+    "vol_feature": "rvol_prevbar"
+   },
+   "effective_params": {
+    "ema_period": 50,
+    "vol_feature": "rvol_prevbar"
+   },
+   "live_tradable": true,
+   "paper_selected": false,
+   "full_stack_net": {
+    "floor": 64477,
+    "vault2025": 17758,
+    "vault2026": 6918
+   },
+   "risk_clean_net": {
+    "floor": 54970,
+    "vault2025": 13996,
+    "vault2026": 5889
+   },
+   "swing_contribution": {
+    "floor": 16225,
+    "vault2025": 5483,
+    "vault2026": -1652
+   },
+   "decision": "not promoted",
+   "caveat": "the strongest 2025 of any arm, but weak 2026 and a worse drawdown - one good window is not evidence"
+  },
+  {
+   "id": 6,
+   "name": "SPY intraday proxy",
+   "regime_basis": "pre-14:00 SPY proxy, causal",
+   "requested_params": "not_measured",
+   "effective_params": "not_measured",
+   "live_tradable": true,
+   "paper_selected": false,
+   "full_stack_net": {
+    "floor": 45603,
+    "vault2025": "not_measured",
+    "vault2026": "not_measured"
+   },
+   "risk_clean_net": {
+    "floor": 36096,
+    "vault2025": "not_measured",
+    "vault2026": "not_measured"
+   },
+   "swing_contribution": {
+    "floor": -2433,
+    "vault2025": "not_measured",
+    "vault2026": "not_measured"
+   },
+   "decision": "rejected",
+   "caveat": "SPY intraday ends 2024-12-30 so no OOS is possible; in-sample it is below the no-Swing route"
+  },
+  {
+   "id": 7,
+   "name": "ES intraday proxy",
+   "regime_basis": "pre-14:00 ES proxy, causal",
+   "requested_params": "not_measured",
+   "effective_params": "not_measured",
+   "live_tradable": true,
+   "paper_selected": false,
+   "full_stack_net": {
+    "floor": "not_measured",
+    "vault2025": "not_measured",
+    "vault2026": "not_measured"
+   },
+   "risk_clean_net": {
+    "floor": "not_measured",
+    "vault2025": "not_measured",
+    "vault2026": "not_measured"
+   },
+   "swing_contribution": {
+    "floor": "not_measured",
+    "vault2025": "not_measured",
+    "vault2026": "not_measured"
+   },
+   "decision": "rejected",
+   "caveat": "label-recovery only, no backtest run: 81.9% vs D-1's 91.5% on floor, -5.2 pts in 2025 and -11.4 pts in 2026"
+  },
+  {
+   "id": 8,
+   "name": "no-Swing control",
+   "regime_basis": "n/a",
+   "requested_params": "n/a",
+   "effective_params": "n/a",
+   "live_tradable": true,
+   "paper_selected": false,
+   "full_stack_net": {
+    "floor": 49414,
+    "vault2025": 12377,
+    "vault2026": 8731
+   },
+   "risk_clean_net": {
+    "floor": 39907,
+    "vault2025": 8616,
+    "vault2026": 7703
+   },
+   "swing_contribution": {
+    "floor": 0,
+    "vault2025": 0,
+    "vault2026": 0
+   },
+   "decision": "control",
+   "caveat": "best risk-adjusted OOS of any arm - Calmar 8.05 in 2025 and 8.92 in 2026"
+  }
+ ],
+ "part_d_rationale": {
+  "why_variant_2": [
+   "it is the current effective route identity",
+   "the 48-candidate causal-D-1 full-grid WFO converged back onto it, on the engine that makes the artifacts"
+  ],
+  "retuned_d1": "rejected",
+  "spy_proxy": "rejected",
+  "es_proxy": "rejected",
+  "prevbar": "not promoted - 2026 is weak despite the strongest 2025",
+  "wfo_remains_the_validation_framework": true,
+  "stage_L_thresholds_scored_against_the_selected_arm": {
+   "T1_net_vs_d1_old": "PASS (identical)",
+   "T2_swing_nonnegative_both_oos": "FAIL - 2026 -$464",
+   "T3_calmar_vs_no_swing": "FAIL - 42% in both OOS windows",
+   "T4_maxdd": "PASS (identical)",
+   "T5_fold_stability": "PASS - 5/10, five consecutive",
+   "summary": "two of five fail; inclusion is an operator decision taken with that on the record"
+  }
+ },
+ "part_e_paper_scope": {
+  "global_nkd": {
+   "in_scope": true,
+   "live_tradable": true,
+   "identity": "RegimeLabels(lag_days=1), ema 10, context filter off",
+   "evidence": "pending"
+  },
+  "roska4_stress": {
+   "in_scope": true,
+   "live_tradable": true,
+   "identity": "basket gate decided 10:30 ET",
+   "evidence": "pending"
+  },
+  "roska4_calm": {
+   "in_scope": true,
+   "live_tradable": true,
+   "identity": "two-phase DECIDE 09:32 / OBSERVE 10:02, phases isolated",
+   "evidence": "pending"
+  },
+  "roska4_swing": {
+   "in_scope": true,
+   "live_tradable": true,
+   "included_by": "operator override",
+   "identity": "causal D-1, effective ema=50, stop basis 2.0",
+   "evidence": "pending"
+  },
+  "note": "all four are in scope by decision; no sleeve has paper evidence yet"
+ },
+ "part_f_safety": {
+  "orders_possible": false,
+  "blockers": [
+   "B1_broker_account_or_legacy_retirement",
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "paper_shadow_evidence_still_required": true,
+  "confirmation_file_present": true,
+  "confirmation_confirmed_by": "kevindo290",
+  "confirmation_approves_orders": false,
+  "confirmation_keys": [
+   "confirmed_at",
+   "confirmed_by",
+   "legacy_retired_confirmed",
+   "note",
+   "schema_version"
+  ],
+  "account_baseline_freshness": "not readable without a broker call; none was made",
+  "b1_reason": "reopens on the age of the account baseline record - the documented timer behaviour from Stage 5ZZZ-E, not caused by this stage",
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "scheduler_pid": 3000,
+  "scheduler_mode": "track1-only-shadow",
+  "scheduler_restarted": false,
+  "backend_pid": 10136,
+  "backend_restarted": false,
+  "broker_calls": 0,
+  "runtime_evidence_modified": false,
+  "live_route_params_changed": false,
+  "swing_tf_param_changed": false,
+  "order_sent": false
+ },
+ "answers": {
+  "historical_reference_reproduced": true,
+  "d1_old_effective_ema50_reproduced": true,
+  "final_paper_baseline": {
+   "full_stack": {
+    "floor": 66796,
+    "vault2025": 16181,
+    "vault2026": 8105
+   },
+   "risk_clean": {
+    "floor": 57289,
+    "vault2025": 12419,
+    "vault2026": 7077
+   },
+   "swing_contribution": {
+    "floor": 18429,
+    "vault2025": 3906,
+    "vault2026": -464
+   }
+  },
+  "swing_decision": "included by operator override on causal D-1 effective ema=50",
+  "swing_caveat": "not an evidence-based promotion - T2 and T3 fail, Swing is negative in 2026, and the no-Swing route is better risk-adjusted OOS in both windows",
+  "wfo_must_be_rerun_now": false,
+  "wfo_note": "the 48-candidate causal-D-1 search already converged on the selected identity on the correct engine; it remains the framework for future changes",
+  "remaining_before_paper_orders": [
+   "PAPER_SHADOW_EVIDENCE satisfied by real shadow sessions across all four sleeves",
+   "B1 closed on a fresh account baseline record",
+   "the operator override recorded in the route's own decision trail, not only in this report"
+  ]
+ }
+}

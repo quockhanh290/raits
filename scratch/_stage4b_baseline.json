@@ -1,0 +1,155 @@
+{
+ "live_positions.json": {
+  "exists": true,
+  "size": 481,
+  "mtime_ns": 1787342389131302300,
+  "sha256": "bd6ee7abcc13a852"
+ },
+ "runner.pid": {
+  "exists": false
+ },
+ "STOP_TRADING": {
+  "exists": false
+ },
+ "track1_go_live_confirmation.json": {
+  "exists": false
+ },
+ "slip_stats.json": {
+  "exists": true,
+  "size": 93,
+  "mtime_ns": 1786471709909480800,
+  "sha256": "89128f5588ffb028"
+ },
+ "trade_log.jsonl": {
+  "exists": true,
+  "size": 8486,
+  "mtime_ns": 1786810288052842400,
+  "sha256": "598e78fab099f290"
+ },
+ "global_index/replay_checkpoint.json": {
+  "exists": true,
+  "size": 960,
+  "mtime_ns": 1787335569394008600,
+  "sha256": "6f5592e966c05e35"
+ },
+ "global_index/live_state_data.js": {
+  "exists": true,
+  "size": 13474,
+  "mtime_ns": 1787342391178438100,
+  "sha256": "fd027c6d240c8512"
+ },
+ "global_index/preflight_state.json": {
+  "exists": true,
+  "size": 164,
+  "mtime_ns": 1787334481947118800,
+  "sha256": "c9bbe2927c307927"
+ },
+ "global_index/maxhold_state.json": {
+  "exists": true,
+  "size": 164,
+  "mtime_ns": 1787319070262058600,
+  "sha256": "71597028d88096c1"
+ },
+ "global_index/paper_history.json": {
+  "exists": true,
+  "size": 359,
+  "mtime_ns": 1787342389146324500,
+  "sha256": "d5f9fa7f312f461b"
+ },
+ "global_index/signal_layer.py": {
+  "exists": true,
+  "size": 23366,
+  "mtime_ns": 1786777689907149000,
+  "sha256": "af342ebbadb490c1"
+ },
+ "global_index/run_live_day.py": {
+  "exists": true,
+  "size": 46746,
+  "mtime_ns": 1787413586210716300,
+  "sha256": "dd3baee1714c925c"
+ },
+ "global_index/runner.py": {
+  "exists": true,
+  "size": 187882,
+  "mtime_ns": 1787025183109722600,
+  "sha256": "c59f420887248158"
+ },
+ "global_index/ibkr_broker.py": {
+  "exists": true,
+  "size": 92710,
+  "mtime_ns": 1786958356249921500,
+  "sha256": "1f07a9d27a36adf8"
+ },
+ "global_index/live_decision.py": {
+  "exists": true,
+  "size": 9981,
+  "mtime_ns": 1786846017184011900,
+  "sha256": "928faaaf5d977265"
+ },
+ "global_index/net_exposure_multi.py": {
+  "exists": true,
+  "size": 9485,
+  "mtime_ns": 1787318923416533200,
+  "sha256": "986414bf64c019cd"
+ },
+ "global_index/replay_checkpoint.py": {
+  "exists": true,
+  "size": 13632,
+  "mtime_ns": 1787011485579135700,
+  "sha256": "a1ba943ce4bdc630"
+ },
+ "model_sameday_stop.py": {
+  "exists": true,
+  "size": 25219,
+  "mtime_ns": 1787318894033584800,
+  "sha256": "4934476fb4b0334f"
+ },
+ "futures/_validated_core.py": {
+  "exists": true,
+  "size": 23371,
+  "mtime_ns": 1787318894032020700,
+  "sha256": "9c253cfe84ebc84e"
+ },
+ "futures/swing_tf.py": {
+  "exists": true,
+  "size": 8870,
+  "mtime_ns": 1787067682716346200,
+  "sha256": "a3e6d145dc6b8d44"
+ },
+ "futures/basket.py": {
+  "exists": true,
+  "size": 4342,
+  "mtime_ns": 1786774540754038700,
+  "sha256": "d784d993882f4342"
+ },
+ "monitor/backend/app.py": {
+  "exists": true,
+  "size": 13302,
+  "mtime_ns": 1786891089658035600,
+  "sha256": "a6ffcca3450f37ae"
+ },
+ "monitor/backend/job_journal_reader.py": {
+  "exists": true,
+  "size": 26383,
+  "mtime_ns": 1786844874735322500,
+  "sha256": "64f18621207ce95e"
+ },
+ "monitor/backend/paper_evidence_reader.py": {
+  "exists": true,
+  "size": 174973,
+  "mtime_ns": 1786810206420290400,
+  "sha256": "1282a129e39a1f1a"
+ },
+ "global_index/run_scheduler.py": {
+  "exists": true,
+  "size": 73768,
+  "mtime_ns": 1787467900053636600,
+  "sha256": "194bf116c6bc85f0"
+ },
+ "monitor/backend/schedule_status.py": {
+  "exists": true,
+  "size": 24806,
+  "mtime_ns": 1787467932419888400,
+  "sha256": "ff30cdf52b9e70c0"
+ }
+}

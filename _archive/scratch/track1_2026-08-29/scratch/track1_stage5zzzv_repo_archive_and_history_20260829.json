@@ -1,0 +1,159 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-V",
+ "title": "Repo-wide tracked artifact archive and Track 1 history report",
+ "route": "track1_candidate",
+ "date": "2026-08-29",
+ "the_brief_premise_was_wrong_and_it_changed_the_stage": {
+  "brief_said": "the working tree contains more than 1,000 TRACKED files accumulated from Track 1 stages, scratch reports, proofs, old baselines",
+  "measured": {
+   "tracked_files": 829,
+   "tracked_files_in_scratch": 3,
+   "tracked_scratch_files_that_are_track1": 0,
+   "untracked_files": 1158
+  },
+  "consequence": "every Track 1 stage report, the canonical index, the pipeline doc and BOTH decision records are UNTRACKED. The archive targets the brief describes are almost entirely not in git",
+  "the_3_tracked_scratch_files": [
+   "scratch/regime_index_relevance.json",
+   "scratch/tf_index_proxy_results.json",
+   "scratch/tf_rewfo_qqq_results.json"
+  ],
+  "note": "those three are stocks/TF research, unrelated to Track 1"
+ },
+ "part_a_inventory": {
+  "method": "git ls-files, not filesystem guessing",
+  "tracked_total": 829,
+  "classification": {
+   "RUNTIME_EVIDENCE": 16,
+   "UNKNOWN_KEEP": 126,
+   "CANONICAL_DOC": 3,
+   "GENERATED_TEMP": 105,
+   "ACTIVE_SOURCE": 383,
+   "ACTIVE_DOC": 40,
+   "ACTIVE_TEST": 110,
+   "DEFERRED_CANDIDATE": 46
+  },
+  "archive_candidates_found": 46,
+  "candidates_are_track1": false,
+  "what_they_actually_are": "old stocks/futures one-off diagnostics (check_*, diag_*, verify_*, measure_*), stale report .txt/.json, and a few superseded .md notes"
+ },
+ "a_detector_bug_i_caught_before_it_moved_anything": {
+  "what": "the first reference scan read .py/.md/.json/.js/.html and NOT .css, so all 18 global_index/dash/fonts/*.woff2 came back as unreferenced",
+  "consequence_if_shipped": "archiving the dashboard's entire font set",
+  "how_it_surfaced": "the candidate list was read rather than trusted - 18 font files in a list of stale diagnostics does not look right",
+  "proof_they_are_used": "all 18 are referenced from global_index/dash/fonts/fonts.css",
+  "fix": "the scan now includes css, txt, yaml, toml and ps1; candidates fell 63 -> 46"
+ },
+ "the_hard_fail_guard_fired": {
+  "what": "23 of the 46 candidates are top-level one-off .py diagnostics, which the classifier calls ACTIVE_SOURCE, and the brief forbids moving active source",
+  "what_i_did_not_do": "weaken the guard so the moves could proceed",
+  "what_i_did": "stopped and put the judgement to the operator"
+ },
+ "operator_decision": {
+  "asked_because": "the brief assumed Track 1 artifacts were tracked; measured, they are not, and 23 of the 46 tracked candidates tripped the brief own no-active-source hard fail",
+  "scope": "archive nothing yet - plan and history only",
+  "archive_convention_if_used_later": "_archive/{superseded,answered,dead,docs,scratch} + docs/futures/ARCHIVE_LOG.md",
+  "files_moved": 0
+ },
+ "part_b_to_e_moves": {
+  "files_moved": 0,
+  "reason": "operator chose plan-and-history only",
+  "hashes_recorded_for_later": 46,
+  "new_archive_roots_created": 0,
+  "convention_if_archiving_resumes": "_archive/{superseded,answered,dead,docs,scratch} with a docs/futures/ARCHIVE_LOG.md entry per file - the repo's own, chosen over the brief's new dated roots to avoid a second convention"
+ },
+ "a_precedent_that_supports_the_decision": {
+  "finding": "pytest collection has 2 pre-existing errors. tests/test_raits_vs_hold.py imports `raits_vs_hold`, and that module now lives at _archive/scratch/raits_scripts/raits_vs_hold.py",
+  "meaning": "an earlier archive move broke a test, and it has stayed broken since",
+  "aggravating": "docs/futures/ARCHIVE_LOG.md contains ZERO mentions of raits_vs_hold, so that move was never logged the way the futures moves were",
+  "second_error": "tests/integration/test_orb_integration.py imports raits.backtester.orb_session, also absent",
+  "caused_by_this_stage": false,
+  "proof": "zero files moved this stage; git status shows no deletions or renames",
+  "why_it_matters_here": "this is exactly the failure the reference check and the hard-fail guard exist to prevent, demonstrated in this repo"
+ },
+ "part_f_history_report": {
+  "path": "docs/futures/TRACK1_BASELINE_HISTORY_2026-08-29.md",
+  "sections": 13,
+  "covers": [
+   "original candidate baseline",
+   "runtime split and shadow isolation",
+   "B1 account baseline and legacy retirement",
+   "Calm two-phase correction",
+   "data observation and dashboard diagnostics",
+   "the Swing same-day problem",
+   "D-1 old/effective ema=50 reproduction",
+   "retune and full grid",
+   "SPY/ES proxy rejection",
+   "Stage M parameter translation",
+   "the operator override",
+   "canonical numbers",
+   "what remains before paper"
+  ],
+  "publishes_both_swing_figures": true
+ },
+ "part_g_validation": {
+  "suite": "scratch/test_track1_stage5zzzv_repo_archive_20260829.py",
+  "passed": 16,
+  "failed": 0,
+  "checks": [
+   "the plan parses and covers every tracked file",
+   "every entry carries a classification and a reason",
+   "deferred candidates keep their pre-move sha256",
+   "no file moved",
+   "every planned path is still where the plan says",
+   "the deferred candidates' hashes are unchanged",
+   "no second archive root was created",
+   "the history report covers all 13 required sections",
+   "history and index cross-link and the links resolve",
+   "no canonical doc claims orders are possible",
+   "same-day Swing still marked not live-tradable",
+   "the selected Swing identity is unchanged",
+   "the history publishes cluster P&L AND marginal",
+   "orders remain impossible"
+  ],
+  "pytest_collection": {
+   "tests_collected": 4402,
+   "errors": 2,
+   "errors_pre_existing": true
+  }
+ },
+ "canonical_paths": {
+  "index": "docs/futures/TRACK1_BASELINE_INDEX_2026-08-29.md",
+  "history": "docs/futures/TRACK1_BASELINE_HISTORY_2026-08-29.md",
+  "pipeline": "docs/futures/TRACK1_RUNTIME_PIPELINE_2026-08-24.md",
+  "baseline_artifact": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+  "decision_records": [
+   "track1_go_live_confirmation.json",
+   "track1_swing_paper_override.json"
+  ]
+ },
+ "unknown_keep": {
+  "count": 126,
+  "policy": "kept in place with the reason recorded. The brief's rule: if classification is uncertain, keep the file and explain why"
+ },
+ "safety": {
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "orders_sent": 0,
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "confirmation_present": true,
+  "confirmation_sha16": "67504a1c8a31a6a4",
+  "swing_override_present_and_valid": true,
+  "swing_override_grants": "nothing",
+  "broker_calls": 0,
+  "scheduler_restarted": false,
+  "backend_restarted": false,
+  "scheduler_pid_alive": true,
+  "files_moved": 0,
+  "files_deleted": 0,
+  "files_renamed": 0,
+  "git_reset_or_checkout_used": false,
+  "runtime_trading_files_touched": 0,
+  "strategy_logic_changed": false,
+  "params_changed": false,
+  "gates_changed": false
+ }
+}

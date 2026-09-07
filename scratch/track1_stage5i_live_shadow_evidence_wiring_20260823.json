@@ -1,0 +1,101 @@
+{
+  "stage": "5I",
+  "date": "2026-08-23",
+  "kind": "live-shadow evidence wiring",
+  "verdict": "READY_FOR_OPERATOR_STOP_TRADING_AND_SHADOW_START",
+  "verdict_scope": "shadow only. B1 still blocks orders and no broker provider has ever been connected - every test injects a fake.",
+  "gaps": {
+    "G-A": {
+      "what": "live slot bypassed freshness/admission/caps/explain",
+      "status": "CLOSED",
+      "how": "observe_live_slot now calls fresh.evaluate, make_guard, run_candidates and emit_explanations - the same four the replay path uses; proved by sys.settrace, not by reading",
+      "binding": "mode is shadow_live, so freshness BINDS: an admission taken while the gate refused raises FreshnessRefused and the slot records freshness_refused with the window left incomplete"
+    },
+    "G-B": {
+      "what": "ledger rows stamped route=legacy",
+      "status": "CLOSED",
+      "how": "_run takes an explicit route; the Track 1 slot passes track1_slots.EVENT_ROUTE_VALUE. window_open, slot_observed and window_closed all carry route=track1_candidate",
+      "legacy_preserved": "legacy children still stamp legacy, and an operator-exported RAITS_ROUTE still wins there - setdefault semantics unchanged"
+    },
+    "G-C": {
+      "what": "no --bar-provider wiring",
+      "status": "CLOSED",
+      "how": "--bar-provider {none,ibkr} default none; the live-shadow branch builds it and passes it to the slot; scheduler slots pass ibkr"
+    },
+    "G-D": {
+      "what": "no disconnect path",
+      "status": "CLOSED",
+      "how": "finally releases the broker when it exposes disconnect(); a fake broker is connected once and disconnected once"
+    }
+  },
+  "own_defect_found_and_fixed": {
+    "what": "the first draft wrote explanations straight into the real scratch/track1_shadow, so merely running a test left artefacts in the repo",
+    "caught_by": "another session's guard test asserting that directory is untouched (test_the_real_shadow_directory_is_not_written_by_this_suite)",
+    "fix": "out_dir/root are parameters on observe_live_slot; tests redirect with root=",
+    "stray_artefact": "inspected then removed; directory verified clean afterwards"
+  },
+  "order_of_checks_in_the_slot": [
+    "ledger configured (before any broker is built)",
+    "bar provider present",
+    "frames joined through the guard",
+    "intraday gate",
+    "candidates from the live source",
+    "freshness evaluated",
+    "cap guard built",
+    "admission layer run",
+    "explanations emitted",
+    "ledger row written",
+    "window closed on the last slot"
+  ],
+  "preserved": {
+    "live_frame_released": true,
+    "blocking": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE",
+      "REGIME_LABEL_VERIFICATION"
+    ],
+    "self_check": [],
+    "allow_orders_exit": 2,
+    "confirmation_file": false,
+    "jobs_off": 60,
+    "jobs_on": 84,
+    "track1_slots": 25,
+    "legacy_entry_slots_under_shadow": 23,
+    "removed_by_shadow": [
+      "stop_repair_1220"
+    ],
+    "dashboard_parity_off": true,
+    "dashboard_parity_on": true,
+    "replay_unchanged": "mode=replay, freshness_binding=False, no coverage written"
+  },
+  "tests": {
+    "stage5i_new": "19 passed",
+    "stage5e_5f": "60 passed, 1 skipped",
+    "g1_5b_5c_5d_4c_3b_stage3": "241 passed, 2 skipped",
+    "canonical_eight": "156 passed",
+    "explain_wiring_5z": "75 passed",
+    "three_tests_adjusted": "5E/5F slot tests asserted decided=True on a synthetic future date whose regime CSV is necessarily stale; freshness now binds, so they inject an allowing verdict to isolate the window/ledger property they were written for",
+    "known_out_of_scope": "test_slot_telemetry fails only when test_slot_overlap runs first - a pre-existing rs._run leak; alone it passes 23",
+    "not_run": "global_index/test_event_playback.py"
+  },
+  "still_open": [
+    "B1 - legacy retirement or a separate account (blocks orders)",
+    "the broker provider has never been connected; only fakes are tested",
+    "operator: STOP_TRADING before any start, RAITS_WINDOW_LEDGER_DIR exported"
+  ],
+  "no_side_effects": [
+    "no scheduler start/stop",
+    "no real IBKR connection",
+    "no order",
+    "no dashboard runtime write",
+    "no STOP_TRADING",
+    "no STOP_TRADING.track1",
+    "no confirmation file",
+    "no commit"
+  ],
+  "not_claimed": [
+    "ready for live orders",
+    "the broker provider works",
+    "a live day has been run"
+  ]
+}

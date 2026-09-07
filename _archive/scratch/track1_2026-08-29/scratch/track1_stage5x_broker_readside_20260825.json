@@ -1,0 +1,142 @@
+{
+  "stage": "5X",
+  "title": "broker read side and Track 1 reconcile readiness",
+  "date_et": "2026-08-25",
+  "verdict": "READY_FOR_PAPER_ORDER_CALLSITE_DESIGN",
+  "ibkr_connection_opened": false,
+  "orders": {
+    "sent": 0,
+    "orders_possible": false,
+    "blocking": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "confirmation_file": false,
+    "track1_orders_approved_env": false,
+    "allow_orders_passed_by_any_caller": false,
+    "runtime_orders_dir_created": false
+  },
+  "stage5w_correction": {
+    "claim": "get_open_orders and get_executions missing from IBKRBroker",
+    "finding": "both entries wrong",
+    "get_executions": "capability exists as find_execution(order_id, inst); 5W tested a name nobody proposed",
+    "get_open_orders": "absent as a method, but reqAllOpenOrders() already called at 5 sites in the same file",
+    "real_remaining_gap": "broker.Fill carries no order id, so neither id-keyed lookup works on an entry this route sent",
+    "MISSING_BROKER_METHODS_now": []
+  },
+  "collapses_measured": {
+    "get_positions": "returns the last unsettled read with a warning after 4 attempts",
+    "get_order_status": "returns NOT_FOUND from its own except Exception branch",
+    "find_execution": "returns None from 5 places: not-found, any error, and two indistinguishable matches",
+    "NoOrderBroker.get_positions": "returns [] which in shadow means never asked",
+    "house_convention_already_stated_in": "broker.py get_working_stops: None means cannot say, never {}"
+  },
+  "built": {
+    "new_module": "global_index/track1_broker_read.py",
+    "states": [
+      "known",
+      "unknown"
+    ],
+    "reasons": [
+      "broker_has_no_such_method",
+      "broker_cannot_testify",
+      "broker_read_raised",
+      "broker_answer_is_ambiguous",
+      "broker_read_did_not_settle"
+    ],
+    "reads": [
+      "positions",
+      "open_orders",
+      "order_status",
+      "execution"
+    ],
+    "additive_production_changes": {
+      "ibkr_broker.get_open_orders": "None offline, [] means clear, not filtered by clientId, called by nothing",
+      "NoOrderBroker.CAN_TESTIFY": false
+    },
+    "legacy_readers_modified": 0
+  },
+  "scenarios": {
+    "submitted_plus_working_order": {
+      "resolution": "still_working",
+      "blocks_entries": true
+    },
+    "submitted_no_order_no_execution_positions_unchanged": {
+      "resolution": "unknown",
+      "blocks_entries": true
+    },
+    "filled_execution_confirms_full": {
+      "resolution": "filled",
+      "blocks_entries": false
+    },
+    "partial_fill": {
+      "resolution": "partial",
+      "blocks_entries": true
+    },
+    "broker_read_raises": {
+      "resolution": "unknown",
+      "blocks_entries": true
+    },
+    "broker_states_cancelled": {
+      "resolution": "rejected",
+      "blocks_entries": false
+    },
+    "filled_without_execution_record": {
+      "resolution": "unknown",
+      "blocks_entries": true
+    },
+    "rejected_reachable_only_from": "a broker statement",
+    "question_order": [
+      "open_orders",
+      "order_status",
+      "execution",
+      "positions (last, never decisive alone)"
+    ]
+  },
+  "exits": {
+    "stage5u_wording": "exits always allowed",
+    "stage5x_wording": "exits allowed under UNKNOWN/MISMATCH only if they reduce exposure",
+    "why": "under an unresolved book an over-sized close opens the opposite side"
+  },
+  "book_readback": {
+    "quantity_key": "qty",
+    "pinned_against": "track1_bootstrap.snapshot_book source",
+    "missing_file_is_empty_book": true,
+    "live_book_exists_now": false,
+    "corrupt_file_blocks_entries_at_the_callsite": true
+  },
+  "tests": {
+    "stage_5x": 52,
+    "combined_regression_21_files": 546
+  },
+  "mutations": {
+    "count": 20,
+    "all_red": true,
+    "harness_fix": "expect_red now proves each test green BEFORE mutating; pytest exits non-zero on an unknown test id, and M13 had reported RED against a renamed test that was never exercised",
+    "unfaithful_first_attempts": [
+      "M13",
+      "M15"
+    ],
+    "unfaithful_reason": "source patched via Path.read_text while the tests used inspect.getsource, which reads the linecache"
+  },
+  "substring_over_prose": {
+    "occurrence_in_this_arc": 4,
+    "case": "test_41 text-scanned for get_open_orders and matched the corrected comment naming it",
+    "fix": "AST call nodes"
+  },
+  "runtime_untouched": {
+    "scheduler_pid": 48604,
+    "backend_pid": 35352,
+    "restarted": false,
+    "runtime_files_written": 0,
+    "ledger_rows_edited": 0,
+    "parquet_touched": 0
+  },
+  "remaining_before_callsite": [
+    "PAPER_SHADOW_EVIDENCE: 0 of 5 judgeable days; first fixed-gate NKD window 2026-08-26 01:10 ET",
+    "B1_broker_account_or_legacy_retirement: a user decision",
+    "broker.Fill carries no order id — closing it means send_order returning one, a write-path change (Stage 5Y)",
+    "the call site in run_shadow",
+    "close_position / place_protective_stop / switch_same_symbol still 5T stubs"
+  ]
+}

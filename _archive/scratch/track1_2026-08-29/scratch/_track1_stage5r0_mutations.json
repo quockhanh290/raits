@@ -1,0 +1,50 @@
+[
+  {
+    "id": "M1",
+    "mutation": "drop_open_final_bar -> identity",
+    "test": "test_1_a_fetch_ending_inside_the_final_minute_drops_that_bar",
+    "outcome": "RED"
+  },
+  {
+    "id": "M1b",
+    "mutation": "drop_open_final_bar -> identity",
+    "test": "test_8_a_repair_run_no_longer_leaves_a_fresh_partial_tail",
+    "outcome": "RED"
+  },
+  {
+    "id": "M2",
+    "mutation": "drop_open_final_bar -> always drop the tail",
+    "test": "test_a_fetch_whose_last_bar_has_closed_appends_it",
+    "outcome": "RED"
+  },
+  {
+    "id": "M2b",
+    "mutation": "drop_open_final_bar -> always drop the tail",
+    "test": "test_4_no_closed_bar_is_ever_dropped_however_late_the_observation",
+    "outcome": "RED"
+  },
+  {
+    "id": "M3",
+    "mutation": "boundary_replacement -> always (None, ...)",
+    "test": "test_3_repair_boundary_repairs_the_previous_bar_and_appends_only_closed_ones",
+    "outcome": "RED"
+  },
+  {
+    "id": "M4",
+    "mutation": "DataFrame.to_parquet -> localise the index first",
+    "test": "test_5c_the_written_parquet_stays_tz_naive_with_the_same_columns",
+    "outcome": "RED"
+  },
+  {
+    "id": "M5",
+    "mutation": "_refuse_overlap_disagreement -> no-op",
+    "test": "test_the_overlap_guard_still_refuses_a_disagreement",
+    "outcome": "RED"
+  },
+  {
+    "id": "M6",
+    "mutation": "requested_at stamped after reqHistoricalData",
+    "test": "test_the_clock_is_stamped_BEFORE_the_request_goes_out",
+    "outcome": "RED"
+  }
+]

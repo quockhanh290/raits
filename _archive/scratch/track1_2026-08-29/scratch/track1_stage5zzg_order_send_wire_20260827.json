@@ -1,0 +1,146 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZG",
+  "title": "The paper order SEND wire, gate-held",
+  "when_et": "2026-08-27T10:05:00-04:00/2026-08-27T10:45:00-04:00",
+
+  "answers": {
+    "send_wire_implemented": true,
+    "scheduler_can_reach_it": false,
+    "manual_live_shadow_can_reach_it_when_gates_open": true,
+    "any_broker_order_sent": false,
+    "runtime_order_journal_created": false,
+    "blockers_remaining": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "orders_possible": false
+  },
+
+  "the_module": {
+    "path": "global_index/track1_paper_send.py",
+    "entry": "maybe_send_orders(decisions, *, order_gate, broker, ref_day, slot_id, root)",
+    "gate_check_before_import": true,
+    "why_that_ordering": "a subprocess test asserts the executor module is not in sys.modules after a closed-gate call; that assertion only means something while the import sits below the check, and a second test pins the ordering by AST",
+    "constructs_a_broker": false,
+    "armed_with_no_broker": "refuses (SendRefused) rather than building one — a second connection on a second client id is how this project lost six entry slots in a morning",
+    "decides_anything": false,
+    "admitted_word_source": "track1_signal_layer.TAKE, asked rather than restated"
+  },
+
+  "closed_gate_behaviour": {
+    "status": "gate_closed",
+    "executor_built": false,
+    "broker_called": false,
+    "journal_rows": 0,
+    "orders_dir_created": false,
+    "order_layer_imported": false,
+    "fatal": false,
+    "printed": "send_order calls: 0 — the order gate is closed; no executor was built and no broker was called"
+  },
+
+  "hardcoded_claim_replaced": {
+    "was": "print(\"send_order calls: 0\")",
+    "why_it_was_wrong": "true every day it was printed, and true because nothing could send — not because anything had counted. A claim nobody measures is a claim that goes on being printed after it stops being true.",
+    "now": "the send pass's own summary"
+  },
+
+  "failure_is_never_a_rejection": {
+    "on_raise": "the executor writes UNKNOWN and re-raises; this module counts unknown, never rejected",
+    "run_marked": "fatal",
+    "main_exit_code": 3,
+    "message": "the journal holds an UNKNOWN row. This is NOT a rejection: the order may be live and simply invisible. Reconcile before the next slot.",
+    "one_bad_send_hides_a_good_one": false
+  },
+
+  "verified_against_the_real_entry_point": {
+    "armed_against_the_real_closed_gate": {"exit": 2, "mode": "armed_but_refused",
+                                           "refused_before_provider_or_broker": true,
+                                           "orders_dir": "ABSENT"},
+    "ordinary_shadow_slot": {"exit": 0, "slot": "TRACK1_STRESS_1035",
+                             "decided": false, "reason": "no_bar_provider",
+                             "printed": "send_order calls: 0 — the order gate is closed; no executor was built and no broker was called",
+                             "shadow_intent_md5_unchanged": true,
+                             "orders_dir": "ABSENT"}
+  },
+
+  "scheduler_safety": {
+    "run_scheduler_contains_order_flag": false,
+    "ops_contains_order_flag": false,
+    "track1_body_launcher_ast": "no allow-orders in any branch",
+    "slots_checked": 71,
+    "slots_with_order_flag": 0,
+    "TRACK1_ORDERS_APPROVED_required": true,
+    "TRACK1_ORDERS_APPROVED_in_session": null,
+    "live_frame_wiring": true,
+    "mutation": "adding the flag to the launcher turns the test red",
+    "comments_stripped_before_scanning": true
+  },
+
+  "old_invariants_restated_not_weakened": [
+    {"which": "5W test_33 'nothing in production imports the executor'",
+     "now": "the executor may be named by exactly the modules listed and by nothing else",
+     "note": "this scan EXCLUDES the dry-run callsite by name, so its allowed set is one entry; listing both would be a truer-sounding sentence about a scan that never looks at the second"},
+    {"which": "5W test_34 'observe_live_slot takes no order argument'",
+     "now": "the argument exists, DEFAULTS TO SHUT, and the scheduler passes nothing",
+     "why_it_matters_more": "nobody was watching the default before, because there was no default to watch"},
+    {"which": "5Z test_4 'the live slot path has no broker and no gate'",
+     "now": "the gate and broker arguments both default to None and a default gate is closed"},
+    {"which": "5Z test_37 'nothing imports the dry run or the executor'",
+     "now": "track1_paper_send is the one new allowed name; anything else is unexpected"}
+  ],
+  "full_picture_asserted_in": "the 5ZZG suite, over an unfiltered scan: two importers, one walled (RefusingBroker) and one gated",
+
+  "bug_i_introduced_and_bounded": {
+    "what": "the new parameter was added to the WRONG function — broker=None landed on emit_explanations",
+    "consequence": "main passed order_gate/broker to observe_live_slot, which did not accept them; every live-shadow slot would have raised TypeError",
+    "found_by": "running the real entry point, not by re-reading the patch",
+    "window_et": "roughly 10:10 to 10:26",
+    "last_live_shadow_slot_before_it_et": "10:02 (TRACK1_CALM_OBSERVE_1002, completed OK)",
+    "next_scheduled_et": "10:35 (the Stress window)",
+    "track1_failure_lines_in_todays_scheduler_log": 0,
+    "conclusion": "no live slot hit it — measured from the log, not inferred from the clock"
+  },
+
+  "live_calm_phases_this_morning": {
+    "listed_as_pending_by": ["5ZZC", "5ZZD", "5ZZE"],
+    "decide": {"at_et": "09:32:06", "result": "gate_refused",
+               "codes": ["missing_session", "stale", "partial_coverage"]},
+    "observe": {"at_et": "10:02:10", "result": "gate_refused",
+                "codes": ["missing_session", "entry_quote_absent", "stale", "partial_coverage"]},
+    "shadow_intent_rows": "DECIDE REFUSED gate_refused; OBSERVE REFUSED gate_refused",
+    "day_classification": "incomplete — it does not count",
+    "machinery_verdict": "working: the refusal IS the record",
+    "not_the_stale_daily_file": "that was fixed before the window, and freshness_refused is not among the reasons",
+    "cause_of_missing_session": "NOT TRACED. The next thing to investigate; no guess offered here.",
+    "my_own_misreading": "I took the time for 08:2x and briefly attributed these rows to my own test runs. They are the live scheduler's, timestamped 13:32:06Z and 14:02:10Z. Corrected by reading the row timestamps rather than trusting my sense of the hour."
+  },
+
+  "tests": {
+    "new_file": "scratch/test_track1_stage5zzg_order_send_wire_20260827.py",
+    "new_count": 33,
+    "broker_contacts": 0,
+    "journal_roots": "tmp_path only",
+    "arms_the_real_gate": false,
+    "sets_the_approval_flag": false,
+    "asserts_the_session_has_not_armed_it": true,
+    "mutations": ["the gate stops being checked",
+                  "an unknown outcome counted as a rejection",
+                  "unadmitted decisions sent",
+                  "the scheduler gaining the order flag"],
+    "all_mutations_red": true,
+    "stub_broker_note": "needed all five methods broker_capability_report names — the first version was missing two and every armed test failed at construction; and on_submit is a NAMED parameter, not swallowed by **kw, because accepts_receipt inspects the signature and a stub hiding it would make the receipt test skip while proving nothing",
+    "suites_after": {"order_layer_set": "221 passed", "ops_and_dashboard": "113 passed"},
+    "pre_existing_failures": {"count": 4, "where": "scratch/test_track1_stage5d_shadow_live_wiring_20260823.py",
+                              "bucket": "the Calm slot split",
+                              "classified_against": "the recorded failure list from three stages ago, not assumed"}
+  },
+
+  "safety_confirmed": {
+    "orders_possible": false,
+    "blocking": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "confirmation_file": "ABSENT",
+    "orders_dir": "ABSENT",
+    "TRACK1_ORDERS_APPROVED": null,
+    "live_frame_wiring": true,
+    "restarts": 0,
+    "runtime_writes_by_this_stage": "none — the shadow_intent rows dated today are the live scheduler's"
+  }
+}

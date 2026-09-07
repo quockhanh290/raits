@@ -1,0 +1,31 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+
+=== CO PHANH (nhu hien tai) (baseline) ===
+  net $3,716  |  Calmar 0.09
+  MaxDD $9,603 (19.2%)  |  return ≈ 1.7%/yr on $50,000
+  circuit-breaker halts: 1072
+  per-year net$ (deploy size):
+    2018  $     5,409
+    2019  $    -3,702
+    2020  $    11,368
+    2021  $    -4,466
+    2022  $    -4,893
+  [phanh] goi status 2736 lan | HALT 1116 lan | sut von sau nhat 15.2%
+  [phanh] lan HALT dau: ngay giao dich thu 811 | von $53,716 | sut 15.2% | HALT
+
+=== KHONG PHANH (do cai gia cua chot) (baseline) ===
+  net $10,855  |  Calmar 0.10
+  MaxDD $15,818 (31.6%)  |  return ≈ 3.1%/yr on $50,000
+  circuit-breaker halts: 0
+  per-year net$ (deploy size):
+    2018  $     5,409
+    2019  $    -3,702
+    2020  $    11,368
+    2021  $    -4,466
+    2022  $    -9,081
+    2023  $     7,269
+    2024  $     4,057
+  [phanh] goi status 0 lan | HALT 0 lan | sut von sau nhat 0.0%

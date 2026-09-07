@@ -1,0 +1,73 @@
+{
+ "schema_version": 2,
+ "routes": {
+  "track1_candidate": {
+   "sleeves": {
+    "roska4_swing": {
+     "instruments": {
+      "MES": {
+       "route": "track1_candidate",
+       "sleeve": "roska4_swing",
+       "last_day": "2026-08-20",
+       "fingerprint": "3367423:e36825ea00e221ae",
+       "params": "arm_hour=14;arm_timezone=America/New_York;calm_gate_definition=pcloc_bottom_third_of_prior_rth_range AND prior_rth_down_close_below_open AND gap_from_prev_rth_close>=-0.01 LONG MES,MNQ entry=10:00 exit=15:55 lag1;cap_family_normal_calm=0.05;cap_global_nkd=0.06;cap_roska4_calm=0.05;cap_roska4_stress=0.1;cap_roska4_swing=0.05;commission_basis=round_turn_per_contract;data_source_identity=ES_continuous_1m_8y.parquet:3396b1f25d7373ff;ema_period=30;fill_law=production_gap_after_15min_break;hmm_fit_end=2024-12-31;label_lag_days=0;max_hold_days=5;r4_range_derivation_window=floor_2018_2024_p90;r4_range_threshold=0.02652437135;r4_rel_volume_max=2;ratchet=True;regime_csv_identity=spy_daily_live.csv:442ca90caf8479e8;slippage_ticks_per_side=2;spy_short_filter=d1_spy_close_below_sma50_for_shorts_only;spy_short_lag_days=1;spy_short_lookback=50;spy_short_source_identity=spy_daily_live.csv:442ca90caf8479e8;stop_anchor=extreme_through_prior_bar;stop_basis=chandelier_atr;stop_multiple=2.5",
+       "params_hash": "sha256:c23b6be16ab51ced160ab0295f258711f5be489d98c1f19e142a56a7ef5a6610",
+       "data_source": "ES_continuous_1m_8y.parquet:3396b1f25d7373ff",
+       "pos": null
+      },
+      "MNQ": {
+       "route": "track1_candidate",
+       "sleeve": "roska4_swing",
+       "last_day": "2026-08-20",
+       "fingerprint": "3354954:60726efe8c56ca68",
+       "params": "arm_hour=14;arm_timezone=America/New_York;calm_gate_definition=pcloc_bottom_third_of_prior_rth_range AND prior_rth_down_close_below_open AND gap_from_prev_rth_close>=-0.01 LONG MES,MNQ entry=10:00 exit=15:55 lag1;cap_family_normal_calm=0.05;cap_global_nkd=0.06;cap_roska4_calm=0.05;cap_roska4_stress=0.1;cap_roska4_swing=0.05;commission_basis=round_turn_per_contract;data_source_identity=NQ_continuous_1m_8y.parquet:9021a99b8dd7986a;ema_period=30;fill_law=production_gap_after_15min_break;hmm_fit_end=2024-12-31;label_lag_days=0;max_hold_days=5;r4_range_derivation_window=floor_2018_2024_p90;r4_range_threshold=0.02652437135;r4_rel_volume_max=2;ratchet=True;regime_csv_identity=spy_daily_live.csv:442ca90caf8479e8;slippage_ticks_per_side=2;spy_short_filter=d1_spy_close_below_sma50_for_shorts_only;spy_short_lag_days=1;spy_short_lookback=50;spy_short_source_identity=spy_daily_live.csv:442ca90caf8479e8;stop_anchor=extreme_through_prior_bar;stop_basis=chandelier_atr;stop_multiple=2.5",
+       "params_hash": "sha256:656e87e26e47abaa27b87fa355d7ffded7662c98b43412f759f87f558e9cd611",
+       "data_source": "NQ_continuous_1m_8y.parquet:9021a99b8dd7986a",
+       "pos": null
+      },
+      "MYM": {
+       "route": "track1_candidate",
+       "sleeve": "roska4_swing",
+       "last_day": "2026-08-20",
+       "fingerprint": "3311833:924d671ee05e07fc",
+       "params": "arm_hour=14;arm_timezone=America/New_York;calm_gate_definition=pcloc_bottom_third_of_prior_rth_range AND prior_rth_down_close_below_open AND gap_from_prev_rth_close>=-0.01 LONG MES,MNQ entry=10:00 exit=15:55 lag1;cap_family_normal_calm=0.05;cap_global_nkd=0.06;cap_roska4_calm=0.05;cap_roska4_stress=0.1;cap_roska4_swing=0.05;commission_basis=round_turn_per_contract;data_source_identity=YM_continuous_1m_8y.parquet:a01fb3be925a6872;ema_period=30;fill_law=production_gap_after_15min_break;hmm_fit_end=2024-12-31;label_lag_days=0;max_hold_days=5;r4_range_derivation_window=floor_2018_2024_p90;r4_range_threshold=0.02652437135;r4_rel_volume_max=2;ratchet=True;regime_csv_identity=spy_daily_live.csv:442ca90caf8479e8;slippage_ticks_per_side=2;spy_short_filter=d1_spy_close_below_sma50_for_shorts_only;spy_short_lag_days=1;spy_short_lookback=50;spy_short_source_identity=spy_daily_live.csv:442ca90caf8479e8;stop_anchor=extreme_through_prior_bar;stop_basis=chandelier_atr;stop_multiple=2.5",
+       "params_hash": "sha256:157195f16589709d5ee3c57e369f8f3d1c9e4450878da22dd5754e5d14d1c567",
+       "data_source": "YM_continuous_1m_8y.parquet:a01fb3be925a6872",
+       "pos": null
+      },
+      "M2K": {
+       "route": "track1_candidate",
+       "sleeve": "roska4_swing",
+       "last_day": "2026-08-20",
+       "fingerprint": "2948839:10faea7a73f88fe7",
+       "params": "arm_hour=14;arm_timezone=America/New_York;calm_gate_definition=pcloc_bottom_third_of_prior_rth_range AND prior_rth_down_close_below_open AND gap_from_prev_rth_close>=-0.01 LONG MES,MNQ entry=10:00 exit=15:55 lag1;cap_family_normal_calm=0.05;cap_global_nkd=0.06;cap_roska4_calm=0.05;cap_roska4_stress=0.1;cap_roska4_swing=0.05;commission_basis=round_turn_per_contract;data_source_identity=RTY_continuous_1m_8y.parquet:09798ae2b7611013;ema_period=30;fill_law=production_gap_after_15min_break;hmm_fit_end=2024-12-31;label_lag_days=0;max_hold_days=5;r4_range_derivation_window=floor_2018_2024_p90;r4_range_threshold=0.02652437135;r4_rel_volume_max=2;ratchet=True;regime_csv_identity=spy_daily_live.csv:442ca90caf8479e8;slippage_ticks_per_side=2;spy_short_filter=d1_spy_close_below_sma50_for_shorts_only;spy_short_lag_days=1;spy_short_lookback=50;spy_short_source_identity=spy_daily_live.csv:442ca90caf8479e8;stop_anchor=extreme_through_prior_bar;stop_basis=chandelier_atr;stop_multiple=2.5",
+       "params_hash": "sha256:d0dbf6e13a716dde9ac73e2776d147c306a7761911ac69fc9e5b7f32dc0e912f",
+       "data_source": "RTY_continuous_1m_8y.parquet:09798ae2b7611013",
+       "pos": null
+      }
+     }
+    },
+    "global_nkd": {
+     "instruments": {
+      "MNKD": {
+       "route": "track1_candidate",
+       "sleeve": "global_nkd",
+       "last_day": "2026-08-20",
+       "fingerprint": "2039387:bb455f4d0c0e9d2d",
+       "params": "arm_hour=14;arm_timezone=Asia/Tokyo;calm_gate_definition=pcloc_bottom_third_of_prior_rth_range AND prior_rth_down_close_below_open AND gap_from_prev_rth_close>=-0.01 LONG MES,MNQ entry=10:00 exit=15:55 lag1;cap_family_normal_calm=0.05;cap_global_nkd=0.06;cap_roska4_calm=0.05;cap_roska4_stress=0.1;cap_roska4_swing=0.05;commission_basis=round_turn_per_contract;data_source_identity=NKD_continuous_1m_8y.parquet:e13e17bc1f090253;ema_period=10;fill_law=production_gap_after_15min_break;hmm_fit_end=2024-12-31;label_lag_days=1;max_hold_days=5;r4_range_derivation_window=floor_2018_2024_p90;r4_range_threshold=0.02652437135;r4_rel_volume_max=2;ratchet=True;regime_csv_identity=spy_daily_live.csv:442ca90caf8479e8;slippage_ticks_per_side=2;spy_short_filter=d1_spy_close_below_sma50_for_shorts_only;spy_short_lag_days=1;spy_short_lookback=50;spy_short_source_identity=spy_daily_live.csv:442ca90caf8479e8;stop_anchor=extreme_through_prior_bar;stop_basis=chandelier_atr;stop_multiple=2.5",
+       "params_hash": "sha256:e4c8ca773a587f32e45840b2bd271894954f66ff04c6ae6b503347235213d10a",
+       "data_source": "NKD_continuous_1m_8y.parquet:e13e17bc1f090253",
+       "pos": null
+      }
+     }
+    },
+    "roska4_calm": {
+     "instruments": {}
+    },
+    "roska4_stress": {
+     "instruments": {}
+    }
+   }
+  }
+ }
+}

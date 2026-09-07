@@ -1,0 +1,135 @@
+{
+  "results": [
+    {
+      "mutation": "P1 the daily series is asked for the intraday requirement again",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_the_measured_case_friday_afternoon_now_passes",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "P2 the daily requirement becomes today instead of the day before",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_the_two_requirements_at_each_instant",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "P3 holidays stop being skipped",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_the_day_after_a_holiday_does_not_ask_for_the_holiday",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "P4 a successful pre-flight over short data is no longer named",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_a_true_preflight_over_short_data_is_named_as_a_contradiction",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "P5 a failed pre-flight is reported as a contradiction too",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_the_consistency_check_is_silent_when_the_preflight_itself_failed",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "P6 the post-close SPY refresh job is removed",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_the_post_close_spy_job_exists_in_every_mode",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "P7 the SPY refresh is no longer shared infrastructure",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_the_new_job_is_classified_as_shared_infrastructure",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "P8 the post-close job also re-runs update_ibkr_daily",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_it_refreshes_spy_only_and_writes_no_preflight_record",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "P9 the boundary bar is never revisited",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_the_appender_is_off_by_default",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "P10 a bar whose open changed is accepted as a completion",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_anything_that_is_not_a_completion_refuses[feed0-open_changed]",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "P11 a low that ROSE is accepted as a completion",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_anything_that_is_not_a_completion_refuses[feed1-low_rose]",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "P12 a volume that SHRANK is accepted as a completion",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_anything_that_is_not_a_completion_refuses[feed3-volume_shrank]",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "P13 the percentage net on a completion is removed",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_anything_that_is_not_a_completion_refuses[feed4-moved_too_far]",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "P14 the history invariant is skipped whenever a replacement happens",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_the_history_invariant_exempts_only_the_boundary_timestamp",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "P15 a replacement writes with no snapshot and no verify",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_a_replacement_snapshots_and_verifies_by_re_reading",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "P16 the strictly-newer filter is dropped for everything",
+      "guard": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py::test_the_strictly_newer_filter_is_still_there_for_everything_else",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    }
+  ],
+  "detected": 16,
+  "total": 16,
+  "restore_mismatch": []
+}

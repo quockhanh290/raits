@@ -1,0 +1,246 @@
+{
+  "stage": "5M-0",
+  "title": "state repair preflight",
+  "date": "2026-08-23",
+  "verdict": "REPAIR_RECOMMENDED_BEFORE_RESTART",
+  "live_files_touched": false,
+  "current_state": {
+    "global_index/preflight_state.json": {
+      "2026-08-23": true
+    },
+    "global_index/maxhold_state.json": {
+      "2026-08-23": true
+    },
+    "both_mtime": "2026-08-23 20:03:21 local (same second)"
+  },
+  "scheduler": {
+    "processes": [
+      {
+        "pid": 36656,
+        "command": "C:\\Users\\quock\\AppData\\Local\\Programs\\Python\\Python311\\pythonw.exe -m global_index.run_scheduler --port 4002 --shadow-resume",
+        "started": "2026-08-20 06:35:53",
+        "age_seconds": 310734
+      }
+    ],
+    "queried_with": "monitor.ops.scheduler_processes() — covers python.exe and pythonw.exe",
+    "now_et": "2026-08-23T22:54:47-04:00"
+  },
+  "timeline_et": {
+    "monday_nkd_night_slots": "2026-08-24 01:10-02:55 — read prev business day 2026-08-21",
+    "monday_maxhold": "2026-08-24 09:31",
+    "monday_preflight": "2026-08-24 13:45 — the moment the live process rewrites the file",
+    "hours_to_first_night_slot": 2.25,
+    "hours_to_preflight": 14.84
+  },
+  "evidence": {
+    "preflight_runs_found": 16,
+    "preflight_ok": 14,
+    "preflight_failed": 2,
+    "preflight_no_outcome": 0,
+    "maxhold_runs_found": 15,
+    "maxhold_ok": 10,
+    "maxhold_failed": 2,
+    "maxhold_no_outcome": 3,
+    "quoted_preflight": [
+      {
+        "day": "2026-08-13",
+        "log": "scheduler_0813.log",
+        "line": "2026-08-13 11:47:35  INFO     run_scheduler — [PRE-FLIGHT] OK — parquet + spy CSV fresh. run_live_day cleared for 14:05."
+      },
+      {
+        "day": "2026-08-14",
+        "log": "scheduler_0814.log",
+        "line": "2026-08-14 11:47:25  INFO     run_scheduler — [PRE-FLIGHT] OK — parquet + spy CSV fresh. run_live_day cleared for 14:05."
+      },
+      {
+        "day": "2026-08-17",
+        "log": "scheduler_0817.log",
+        "line": "2026-08-17 11:47:32  INFO     run_scheduler — [PRE-FLIGHT] OK — parquet + spy CSV fresh. run_live_day cleared for 14:05."
+      },
+      {
+        "day": "2026-08-18",
+        "log": "scheduler_0818.log",
+        "line": "2026-08-18 11:47:23  INFO     run_scheduler — [PRE-FLIGHT] OK — parquet + spy CSV fresh. run_live_day cleared for 14:05."
+      },
+      {
+        "day": "2026-08-19",
+        "log": "scheduler_0819.log",
+        "line": "2026-08-19 11:47:19  INFO     run_scheduler — [PRE-FLIGHT] OK — parquet + spy CSV fresh. run_live_day cleared for 14:05."
+      },
+      {
+        "day": "2026-08-20",
+        "log": "scheduler_0820.log",
+        "line": "2026-08-20 11:47:28  INFO     run_scheduler — [PRE-FLIGHT] OK — parquet + spy CSV fresh. run_live_day cleared for 14:05."
+      },
+      {
+        "day": "2026-08-21",
+        "log": "scheduler_0821.log",
+        "line": "2026-08-21 11:48:01  INFO     run_scheduler — [PRE-FLIGHT] OK — parquet + spy CSV fresh. run_live_day cleared for 14:05."
+      }
+    ],
+    "quoted_maxhold": [
+      {
+        "day": "2026-08-12",
+        "log": "scheduler_0812.log",
+        "line": "2026-08-12 07:31:10  INFO     run_scheduler — [MAX_HOLD_EXIT] completed OK"
+      },
+      {
+        "day": "2026-08-14",
+        "log": "scheduler_0814.log",
+        "line": "2026-08-14 07:31:19  INFO     run_scheduler — [MAX_HOLD_EXIT] completed OK"
+      },
+      {
+        "day": "2026-08-17",
+        "log": "scheduler_0817.log",
+        "line": "2026-08-17 07:31:12  INFO     run_scheduler — [MAX_HOLD_EXIT] completed OK"
+      },
+      {
+        "day": "2026-08-18",
+        "log": "scheduler_0818.log",
+        "line": "2026-08-18 07:31:11  INFO     run_scheduler — [MAX_HOLD_EXIT] completed OK"
+      },
+      {
+        "day": "2026-08-19",
+        "log": "scheduler_0819.log",
+        "line": "2026-08-19 21:51:58  INFO     run_scheduler — [MAX_HOLD_EXIT_CATCHUP] completed OK"
+      },
+      {
+        "day": "2026-08-20",
+        "log": "scheduler_0820.log",
+        "line": "2026-08-20 07:31:10  INFO     run_scheduler — [MAX_HOLD_EXIT] completed OK"
+      },
+      {
+        "day": "2026-08-21",
+        "log": "scheduler_0821.log",
+        "line": "2026-08-21 07:31:10  INFO     run_scheduler — [MAX_HOLD_EXIT] completed OK"
+      }
+    ],
+    "refused_for_lack_of_a_success_line": [
+      {
+        "file": "preflight",
+        "day": "2026-07-31",
+        "verdict": "failed",
+        "log": "scheduler_0731.log"
+      },
+      {
+        "file": "preflight",
+        "day": "2026-08-04",
+        "verdict": "failed",
+        "log": "scheduler_0804.log"
+      },
+      {
+        "file": "maxhold",
+        "day": "2026-08-07",
+        "verdict": "no_outcome_line",
+        "log": "scheduler_0807.log"
+      },
+      {
+        "file": "maxhold",
+        "day": "2026-08-07",
+        "verdict": "no_outcome_line",
+        "log": "scheduler_0807.log"
+      },
+      {
+        "file": "maxhold",
+        "day": "2026-08-13",
+        "verdict": "no_outcome_line",
+        "log": "scheduler_0813.log"
+      },
+      {
+        "file": "maxhold",
+        "day": "2026-08-13",
+        "verdict": "failed",
+        "log": "scheduler_0813.log"
+      }
+    ]
+  },
+  "proposed": {
+    "global_index/preflight_state.json": {
+      "2026-08-13": true,
+      "2026-08-14": true,
+      "2026-08-17": true,
+      "2026-08-18": true,
+      "2026-08-19": true,
+      "2026-08-20": true,
+      "2026-08-21": true
+    },
+    "global_index/maxhold_state.json": {
+      "2026-08-12": true,
+      "2026-08-14": true,
+      "2026-08-17": true,
+      "2026-08-18": true,
+      "2026-08-19": true,
+      "2026-08-20": true,
+      "2026-08-21": true
+    }
+  },
+  "mutations": {
+    "mutations": [
+      {
+        "mutation": "N1 an unresolved launch counted as a completed run",
+        "guard": "test_maxhold_refuses_to_infer_a_day_whose_runs_never_completed",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "N2 a failed pre-flight recorded as True",
+        "guard": "test_a_failed_preflight_is_recorded_false_not_dropped",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "N3 an outcome line borrowed by the previous run",
+        "guard": "test_an_ok_line_belonging_to_the_next_run_is_not_borrowed_by_the_previous",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "N4 ET session day taken from the raw local stamp",
+        "guard": "test_a_local_stamp_after_2200_rolls_into_the_next_et_day",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "N5 the seven-entry prune removed",
+        "guard": "test_the_reconstruction_prunes_to_the_same_seven_the_writer_keeps",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "N6 an unattested key preserved through the repair",
+        "guard": "test_apply_writes_only_the_targets_it_was_given_and_never_the_real_files",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "N7 the dry-run default writes anyway",
+        "guard": "test_the_default_invocation_writes_nothing",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "N8 the expect-current guard ignored",
+        "guard": "test_apply_refuses_when_the_target_has_changed_since_the_plan",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      }
+    ],
+    "guarded_unchanged": true
+  }
+}

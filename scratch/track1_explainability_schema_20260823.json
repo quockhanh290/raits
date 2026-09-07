@@ -1,0 +1,1332 @@
+{
+  "_generated_by": "global_index/track1_explain.registry() \u2014 do not hand-edit; regenerate with scratch/gen (see the design note). A schema written beside the code is a description that will drift from it.",
+  "_generated_on_session": "2026-08-23",
+  "schema_version": "track1_explain/1",
+  "route": "track1_candidate",
+  "record_types": [
+    "SIGNAL",
+    "DECISION",
+    "EXECUTION",
+    "NO_SIGNAL",
+    "NO_ACTION"
+  ],
+  "statuses": [
+    "pass",
+    "fail",
+    "accepted",
+    "rejected",
+    "info"
+  ],
+  "status_for_type": {
+    "SIGNAL": [
+      "pass",
+      "fail",
+      "info"
+    ],
+    "DECISION": [
+      "accepted",
+      "rejected"
+    ],
+    "EXECUTION": [
+      "pass",
+      "fail",
+      "info"
+    ],
+    "NO_SIGNAL": [
+      "info"
+    ],
+    "NO_ACTION": [
+      "info"
+    ]
+  },
+  "reason_codes": [
+    "checkpoint_refused",
+    "decision_bar_absent",
+    "duplicate_timestamps",
+    "filter_blocked",
+    "freshness_fail",
+    "gap_in_coverage",
+    "halt_breaker",
+    "intraday_fail",
+    "kill_switch",
+    "live_frame_refused",
+    "missing",
+    "missing_session",
+    "no_bars",
+    "no_setup",
+    "none",
+    "not_a_frame",
+    "order_gate_refused",
+    "out_of_order",
+    "partial_coverage",
+    "reject_cap",
+    "reject_family_cap",
+    "reject_window",
+    "setup_detected",
+    "stale",
+    "suppress_same_sleeve",
+    "suppress_same_symbol",
+    "take",
+    "too_early",
+    "too_late",
+    "tz_mismatch",
+    "unknown_sleeve",
+    "unreadable",
+    "unverified",
+    "window_unobserved"
+  ],
+  "rejection_reasons": [
+    "checkpoint_refused",
+    "filter_blocked",
+    "freshness_fail",
+    "halt_breaker",
+    "intraday_fail",
+    "kill_switch",
+    "live_frame_refused",
+    "no_setup",
+    "order_gate_refused",
+    "reject_cap",
+    "reject_family_cap",
+    "reject_window",
+    "suppress_same_sleeve",
+    "suppress_same_symbol"
+  ],
+  "required_fields": [
+    "schema_version",
+    "explain_id",
+    "route",
+    "sleeve",
+    "instrument",
+    "session_date",
+    "candidate_id",
+    "record_type",
+    "decision_time",
+    "status",
+    "reason_code",
+    "rule_ids",
+    "code_refs",
+    "evidence_refs",
+    "feature_snapshot",
+    "thresholds",
+    "inputs_summary",
+    "outputs",
+    "track1_params_hash",
+    "fill_law",
+    "git_commit"
+  ],
+  "accepted_proof_rules": [
+    "GATE.CAP_CLUSTER",
+    "GATE.FRESHNESS",
+    "GATE.BREAKER"
+  ],
+  "shadow_root": "scratch/track1_shadow",
+  "sleeve_instruments": {
+    "roska4_swing": [
+      "MES",
+      "MNQ",
+      "MYM",
+      "M2K"
+    ],
+    "global_nkd": [
+      "MNKD"
+    ],
+    "roska4_calm": [
+      "MES",
+      "MNQ"
+    ],
+    "roska4_stress": [
+      "MNQ"
+    ]
+  },
+  "rules": {
+    "CALM.ATR15_DISASTER_STOP": {
+      "rule_id": "CALM.ATR15_DISASTER_STOP",
+      "description": "One disaster stop at entry - 1.5 x ATR15, placed at the fill and never moved. The cap denominator for this sleeve is the TRUE stop distance, not the mult x ATR x point-value proxy the other sleeves use.",
+      "scope": "roska4_calm",
+      "code_ref": {
+        "file": "global_index/track1_params.py",
+        "symbol": "sleeve_config",
+        "rule_id": "CALM.ATR15_DISASTER_STOP",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3b_blockers_20260822.py",
+          "note": "listed as the sleeve's remaining live prerequisite"
+        }
+      ],
+      "required_features": [
+        "atr15",
+        "stop_multiple",
+        "true_stop_risk_dollars"
+      ]
+    },
+    "CALM.D1_CALM_CAUSAL": {
+      "rule_id": "CALM.D1_CALM_CAUSAL",
+      "description": "The PRIOR session's regime label must be Calm. Causal by construction: the label read is the one from a session strictly before the traded one.",
+      "scope": "roska4_calm",
+      "code_ref": {
+        "file": "global_index/track1_calm_a.py",
+        "symbol": "detect",
+        "rule_id": "CALM.D1_CALM_CAUSAL",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "report",
+          "path": "docs/futures/CALM_PCLOC_NOT_DEEP_GAP_AUDIT_2026-08-21.md",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "prev_regime_label",
+        "regime_lag_sessions"
+      ]
+    },
+    "CALM.ENTRY_1000_OPEN": {
+      "rule_id": "CALM.ENTRY_1000_OPEN",
+      "description": "Entry is the OPEN of the 10:00 ET bar. One-shot: a missed 10:00 is not entered late, because a 10:20 entry is a different trade at a price that has moved.",
+      "scope": "roska4_calm",
+      "code_ref": {
+        "file": "global_index/track1_signal_layer.py",
+        "symbol": "window_verdict",
+        "rule_id": "CALM.ENTRY_1000_OPEN",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3_route_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "entry_time",
+        "entry_price"
+      ]
+    },
+    "CALM.EXIT_1555_OPEN": {
+      "rule_id": "CALM.EXIT_1555_OPEN",
+      "description": "Exit is the OPEN of the 15:55 ET bar, same session.",
+      "scope": "roska4_calm",
+      "code_ref": {
+        "file": "global_index/track1_calm_a.py",
+        "symbol": "detect",
+        "rule_id": "CALM.EXIT_1555_OPEN",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "report",
+          "path": "docs/futures/CALM_PCLOC_NOT_DEEP_GAP_AUDIT_2026-08-21.md",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "exit_time"
+      ]
+    },
+    "CALM.GAP_NOT_DEEP": {
+      "rule_id": "CALM.GAP_NOT_DEEP",
+      "description": "The gap from the prior RTH close to today's RTH open must be >= -1.0%. A deeper gap is a different setup and is not traded.",
+      "scope": "roska4_calm",
+      "code_ref": {
+        "file": "global_index/track1_calm_a.py",
+        "symbol": "detect",
+        "rule_id": "CALM.GAP_NOT_DEEP",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "report",
+          "path": "docs/futures/CALM_PCLOC_NOT_DEEP_GAP_AUDIT_2026-08-21.md",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "gap_from_prev_rth_close"
+      ]
+    },
+    "CALM.PCLOC_BOTTOM_THIRD": {
+      "rule_id": "CALM.PCLOC_BOTTOM_THIRD",
+      "description": "The prior session's RTH close must sit in the bottom third of its own RTH range: (close - low) / (high - low) <= 1/3.",
+      "scope": "roska4_calm",
+      "code_ref": {
+        "file": "global_index/track1_calm_a.py",
+        "symbol": "detect",
+        "rule_id": "CALM.PCLOC_BOTTOM_THIRD",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "report",
+          "path": "docs/futures/CALM_PCLOC_NOT_DEEP_GAP_AUDIT_2026-08-21.md",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "prev_close_loc"
+      ]
+    },
+    "CALM.PRIOR_FULL_RTH": {
+      "rule_id": "CALM.PRIOR_FULL_RTH",
+      "description": "The session used as PRIOR must have run to the RTH end (15:59). Read off the record rather than assumed, so a half session cannot silently become the reference.",
+      "scope": "roska4_calm",
+      "code_ref": {
+        "file": "global_index/track1_calm_a.py",
+        "symbol": "rth_sessions",
+        "rule_id": "CALM.PRIOR_FULL_RTH",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "report",
+          "path": "docs/futures/CALM_PCLOC_NOT_DEEP_GAP_AUDIT_2026-08-21.md",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "prev_session_last_bar"
+      ]
+    },
+    "CALM.PRIOR_RTH_DOWN": {
+      "rule_id": "CALM.PRIOR_RTH_DOWN",
+      "description": "The prior session's RTH return (close/open - 1) must be <= 0.",
+      "scope": "roska4_calm",
+      "code_ref": {
+        "file": "global_index/track1_calm_a.py",
+        "symbol": "detect",
+        "rule_id": "CALM.PRIOR_RTH_DOWN",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "report",
+          "path": "docs/futures/CALM_PCLOC_NOT_DEEP_GAP_AUDIT_2026-08-21.md",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "prev_rth_ret"
+      ]
+    },
+    "GATE.B1_ORDER": {
+      "rule_id": "GATE.B1_ORDER",
+      "description": "No order may be sent while any Stage 2D blocker is open. Arming needs BOTH an on-disk confirmation that schema-checks and TRACK1_ORDERS_APPROVED=1 in the environment; one flag on a command line is never enough to reach an exchange.",
+      "scope": "shared",
+      "code_ref": {
+        "file": "global_index/run_live_day_track1.py",
+        "symbol": "OrderGate",
+        "rule_id": "GATE.B1_ORDER",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3_route_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "open_blockers"
+      ]
+    },
+    "GATE.BREAKER": {
+      "rule_id": "GATE.BREAKER",
+      "description": "The circuit breaker is marked at every instant and its verdict decides whether NEW risk is allowed. Marked AFTER this instant's closes are booked, which is the ordering every measured Track 1 figure was produced under.",
+      "scope": "shared",
+      "code_ref": {
+        "file": "global_index/track1_signal_layer.py",
+        "symbol": "Track1Book.begin_instant",
+        "rule_id": "GATE.BREAKER",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "global_index/test_kill_switch.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "allow_new_entries"
+      ]
+    },
+    "GATE.CAP_CLUSTER": {
+      "rule_id": "GATE.CAP_CLUSTER",
+      "description": "A candidate's risk must fit its cluster's gross (and where declared, net) budget as a fraction of the account.",
+      "scope": "shared",
+      "code_ref": {
+        "file": "global_index/net_exposure_multi.py",
+        "symbol": "MultiClusterGuard.admits",
+        "rule_id": "GATE.CAP_CLUSTER",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "global_index/test_cluster_gate.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "cluster_gross_after"
+      ]
+    },
+    "GATE.CAP_FAMILY": {
+      "rule_id": "GATE.CAP_FAMILY",
+      "description": "Normal and Calm share ONE combined budget on top of their own, because Calm A is long MES/MNQ into the same session Normal is trend-following. No production equivalent exists: MultiClusterGuard checks a candidate against its own cluster only.",
+      "scope": "shared",
+      "code_ref": {
+        "file": "global_index/track1_signal_layer.py",
+        "symbol": "family_verdict",
+        "rule_id": "GATE.CAP_FAMILY",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3_route_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "family_gross"
+      ]
+    },
+    "GATE.CHECKPOINT": {
+      "rule_id": "GATE.CHECKPOINT",
+      "description": "A resumed position is accepted only when route, sleeve, instrument, schema, params hash and the frame fingerprint all match. Unknown is NOT equal: a missing field is a refusal, never a default.",
+      "scope": "shared",
+      "code_ref": {
+        "file": "global_index/route_checkpoint.py",
+        "symbol": "usable",
+        "rule_id": "GATE.CHECKPOINT",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_route_checkpoint_stage1_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "checkpoint_accepted"
+      ]
+    },
+    "GATE.FRESHNESS": {
+      "rule_id": "GATE.FRESHNESS",
+      "description": "Daily inputs (pre-flight record, regime CSV, each parquet) must already cover the required session. Fails CLOSED. `unverified` is a third state and is never reported as either a pass or a failure.",
+      "scope": "shared",
+      "code_ref": {
+        "file": "global_index/track1_freshness.py",
+        "symbol": "evaluate",
+        "rule_id": "GATE.FRESHNESS",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3_route_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "freshness_allow"
+      ]
+    },
+    "GATE.INTRADAY": {
+      "rule_id": "GATE.INTRADAY",
+      "description": "The same-session sleeves need this morning's bars: the contiguous span the decision reads, the decision bar itself, staleness against the decision instant, and the prior RTH where the rule reads it.",
+      "scope": "shared",
+      "code_ref": {
+        "file": "global_index/track1_intraday.py",
+        "symbol": "validate",
+        "rule_id": "GATE.INTRADAY",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3b_blockers_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "intraday_allow"
+      ]
+    },
+    "GATE.LIVE_FRAME": {
+      "rule_id": "GATE.LIVE_FRAME",
+      "description": "Today's bars are joined onto the frozen history through ONE splice, which refuses a tz mismatch, duplicate or out-of-order timestamps, a column mismatch, and any mutation of the frozen history.",
+      "scope": "shared",
+      "code_ref": {
+        "file": "global_index/track1_live_frame.py",
+        "symbol": "splice",
+        "rule_id": "GATE.LIVE_FRAME",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3b_blockers_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "frozen_rows",
+        "live_rows"
+      ]
+    },
+    "GATE.SAME_SLEEVE": {
+      "rule_id": "GATE.SAME_SLEEVE",
+      "description": "One sleeve may not hold the same instrument twice.",
+      "scope": "shared",
+      "code_ref": {
+        "file": "global_index/track1_signal_layer.py",
+        "symbol": "Track1Book.evaluate",
+        "rule_id": "GATE.SAME_SLEEVE",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3_route_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "held_by_same_sleeve"
+      ]
+    },
+    "GATE.SAME_SYMBOL": {
+      "rule_id": "GATE.SAME_SYMBOL",
+      "description": "A Normal or Calm candidate is suppressed when another sleeve already holds the same instrument. Stress is deliberately absent from this table: it displaces a holder rather than deferring to one.",
+      "scope": "shared",
+      "code_ref": {
+        "file": "global_index/track1_signal_layer.py",
+        "symbol": "SAME_SYMBOL_BLOCKERS",
+        "rule_id": "GATE.SAME_SYMBOL",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3_route_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "held_by_clusters"
+      ]
+    },
+    "GATE.WINDOW": {
+      "rule_id": "GATE.WINDOW",
+      "description": "The instant must sit inside the sleeve's declared detection window. Sleeves with no declared window (Normal, NKD) are always inside one \u2014 bounding them here would be inventing a rule.",
+      "scope": "shared",
+      "code_ref": {
+        "file": "global_index/track1_signal_layer.py",
+        "symbol": "window_verdict",
+        "rule_id": "GATE.WINDOW",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3_route_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "decision_hhmm"
+      ]
+    },
+    "GATE.WINDOW_LEDGER": {
+      "rule_id": "GATE.WINDOW_LEDGER",
+      "description": "Whether the window was WATCHED at all, which is a different fact from whether it produced a signal. Absence of a complete observation is itself the signal.",
+      "scope": "shared",
+      "code_ref": {
+        "file": "global_index/window_ledger.py",
+        "symbol": "status",
+        "rule_id": "GATE.WINDOW_LEDGER",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3b_blockers_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "observed_slots"
+      ]
+    },
+    "NKD.CHANDELIER_25": {
+      "rule_id": "NKD.CHANDELIER_25",
+      "description": "Chandelier stop at 2.5 x ATR anchored on the extreme through the prior bar, ratchet ON. Kept as legacy has it: Track 1 adopts the sleeve as it stands rather than re-deriving it.",
+      "scope": "global_nkd",
+      "code_ref": {
+        "file": "global_index/track1_params.py",
+        "symbol": "sleeve_config",
+        "rule_id": "NKD.CHANDELIER_25",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_route_checkpoint_stage1_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "stop_multiple",
+        "stop_anchor",
+        "ratchet"
+      ]
+    },
+    "NKD.EMA10": {
+      "rule_id": "NKD.EMA10",
+      "description": "The promoted MNKD sleeve runs at ema_period=10, unchanged from legacy.",
+      "scope": "global_nkd",
+      "code_ref": {
+        "file": "global_index/track1_params.py",
+        "symbol": "sleeve_config",
+        "rule_id": "NKD.EMA10",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3b_blockers_20260822.py",
+          "note": "MNKD rows reproduce exactly: 228 floor / 31 vault2025 / 26 vault2026"
+        }
+      ],
+      "required_features": [
+        "ema_period"
+      ]
+    },
+    "NKD.PRODUCTION_ENGINE": {
+      "rule_id": "NKD.PRODUCTION_ENGINE",
+      "description": "The sleeve is produced by the SAME generator as Normal-R4 at its own ema, with the R4 context filter OFF \u2014 that filter is an R4 rule and applying it to a Tokyo session would be inventing one. The SPY short gate DOES apply.",
+      "scope": "global_nkd",
+      "code_ref": {
+        "file": "global_index/track1_normal_r4.py",
+        "symbol": "run_instrument",
+        "rule_id": "NKD.PRODUCTION_ENGINE",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3b_blockers_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "ema_period",
+        "apply_context_filter"
+      ]
+    },
+    "NKD.REGIME_LAG1": {
+      "rule_id": "NKD.REGIME_LAG1",
+      "description": "Regime labels are read at lag 1 session, because the Tokyo power hour precedes the US close that produced the label.",
+      "scope": "global_nkd",
+      "code_ref": {
+        "file": "global_index/regime.py",
+        "symbol": "RegimeLabels",
+        "rule_id": "NKD.REGIME_LAG1",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_route_checkpoint_stage1_20260822.py",
+          "note": "label_lag_days mutation moves the hash"
+        }
+      ],
+      "required_features": [
+        "label_lag_days",
+        "regime_label"
+      ]
+    },
+    "R4.ARM_1405": {
+      "rule_id": "R4.ARM_1405",
+      "description": "The broker stop is armed at 14:05 America/New_York on the session AFTER the fill, not at the fill.",
+      "scope": "roska4_swing",
+      "code_ref": {
+        "file": "global_index/track1_params.py",
+        "symbol": "sleeve_config",
+        "rule_id": "R4.ARM_1405",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "global_index/test_arm_time_per_sleeve.py",
+          "note": "per-sleeve arming times"
+        }
+      ],
+      "required_features": [
+        "arm_hour",
+        "arm_timezone"
+      ]
+    },
+    "R4.EMA50": {
+      "rule_id": "R4.EMA50",
+      "description": "Normal-R4 trend filter runs at ema_period=50, not legacy's 10.",
+      "scope": "roska4_swing",
+      "code_ref": {
+        "file": "global_index/track1_normal_r4.py",
+        "symbol": "NormalR4Params",
+        "rule_id": "R4.EMA50",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3_route_20260822.py",
+          "note": "Normal-R4 rows reproduce the committed table exactly"
+        }
+      ],
+      "required_features": [
+        "ema_period"
+      ]
+    },
+    "R4.FILL_LAW": {
+      "rule_id": "R4.FILL_LAW",
+      "description": "Which fill law the run used. The promotion artifacts were produced with every bar gap-eligible; the production engine only fills at the open after a real >15-minute break. Same bars, different exits.",
+      "scope": "roska4_swing",
+      "code_ref": {
+        "file": "global_index/track1_params.py",
+        "symbol": "_base",
+        "rule_id": "R4.FILL_LAW",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "report",
+          "path": "scratch/track1_three_blockers_report_20260822.md",
+          "note": "twelve regenerations, both laws, all three windows"
+        }
+      ],
+      "required_features": [
+        "fill_law"
+      ]
+    },
+    "R4.MAX_HOLD_5": {
+      "rule_id": "R4.MAX_HOLD_5",
+      "description": "A position is closed once it has been held max_hold_days=5 sessions.",
+      "scope": "roska4_swing",
+      "code_ref": {
+        "file": "global_index/track1_normal_r4.py",
+        "symbol": "NormalR4Params",
+        "rule_id": "R4.MAX_HOLD_5",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "global_index/test_maxhold.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "max_hold_days"
+      ]
+    },
+    "R4.RANGE_P90": {
+      "rule_id": "R4.RANGE_P90",
+      "description": "Context filter: the PRIOR session's RTH range, as a fraction of its close, must be <= the p90 of the frozen 2018-2024 floor window. A MISSING value is a BLOCK, never a pass.",
+      "scope": "roska4_swing",
+      "code_ref": {
+        "file": "global_index/track1_normal_filters.py",
+        "symbol": "R4ContextFilter.allow",
+        "rule_id": "R4.RANGE_P90",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "report",
+          "path": "scratch/track1_three_blockers_report_20260822.md",
+          "note": "threshold frozen on the floor window"
+        }
+      ],
+      "required_features": [
+        "prev_range_pct"
+      ]
+    },
+    "R4.RATCHET_OFF": {
+      "rule_id": "R4.RATCHET_OFF",
+      "description": "The stop never moves after the fill. Legacy ratchets it.",
+      "scope": "roska4_swing",
+      "code_ref": {
+        "file": "global_index/track1_params.py",
+        "symbol": "sleeve_config",
+        "rule_id": "R4.RATCHET_OFF",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_route_checkpoint_stage1_20260822.py",
+          "note": "ratchet mutation moves the hash"
+        }
+      ],
+      "required_features": [
+        "ratchet"
+      ]
+    },
+    "R4.RVOL_MAX": {
+      "rule_id": "R4.RVOL_MAX",
+      "description": "Context filter: slot-relative volume must be <= 2.0. A MISSING value is a BLOCK.",
+      "scope": "roska4_swing",
+      "code_ref": {
+        "file": "global_index/track1_normal_filters.py",
+        "symbol": "R4ContextFilter.allow",
+        "rule_id": "R4.RVOL_MAX",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "report",
+          "path": "scratch/track1_three_blockers_report_20260822.md",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "rvol"
+      ]
+    },
+    "R4.SPY_SHORT_GATE": {
+      "rule_id": "R4.SPY_SHORT_GATE",
+      "description": "A SHORT is permitted only on a session where SPY's D-1 close was BELOW its 50-day SMA (both shifted one day). Applied unconditionally, ahead of the context filter, exactly as the generator that wrote the promotion artifacts applied it.",
+      "scope": "roska4_swing",
+      "code_ref": {
+        "file": "global_index/track1_normal_filters.py",
+        "symbol": "allowed_short_days",
+        "rule_id": "R4.SPY_SHORT_GATE",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "report",
+          "path": "scratch/track1_three_blockers_report_20260822.md",
+          "note": "removing the gate costs -11,663 to -14,143 at book level on the floor window and widens MaxDD by 31%"
+        }
+      ],
+      "required_features": [
+        "spy_below_sma50",
+        "direction"
+      ]
+    },
+    "R4.STOP_FIXED_ATR2": {
+      "rule_id": "R4.STOP_FIXED_ATR2",
+      "description": "Stop is entry +/- 2.0 x DAILY ATR, anchored at the ENTRY price. Legacy anchors on the running extreme through the prior bar; the two put the same multiple in a different place.",
+      "scope": "roska4_swing",
+      "code_ref": {
+        "file": "global_index/track1_normal_r4.py",
+        "symbol": "make_signal_fn",
+        "rule_id": "R4.STOP_FIXED_ATR2",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_route_checkpoint_stage1_20260822.py",
+          "note": "stop_basis / stop_multiple / stop_anchor each move the params hash when mutated"
+        }
+      ],
+      "required_features": [
+        "entry_price",
+        "daily_atr",
+        "stop_multiple",
+        "stop_price"
+      ]
+    },
+    "STRESS.DETECTOR_0930_1030": {
+      "rule_id": "STRESS.DETECTOR_0930_1030",
+      "description": "The low that must break is taken from the 09:30-10:30 ET pre-window. The intraday gate requires that whole span present before a decision is allowed.",
+      "scope": "roska4_stress",
+      "code_ref": {
+        "file": "global_index/track1_intraday.py",
+        "symbol": "REQUIREMENTS",
+        "rule_id": "STRESS.DETECTOR_0930_1030",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3b_blockers_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "pre_window_low",
+        "today_from",
+        "today_to"
+      ]
+    },
+    "STRESS.FORCE_CLOSE_ORDER": {
+      "rule_id": "STRESS.FORCE_CLOSE_ORDER",
+      "description": "A Stress entry may DISPLACE a Normal or Calm holder of the same symbol \u2014 but only after passing the cap gate against the book it would LEAVE BEHIND. Nothing is closed for an entry that is then refused.",
+      "scope": "roska4_stress",
+      "code_ref": {
+        "file": "global_index/track1_signal_layer.py",
+        "symbol": "Track1Book.evaluate",
+        "rule_id": "STRESS.FORCE_CLOSE_ORDER",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3_route_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "displaced_trade_ids",
+        "cap_checked_against"
+      ]
+    },
+    "STRESS.MNQ_ONLY_G3_Q7": {
+      "rule_id": "STRESS.MNQ_ONLY_G3_Q7",
+      "description": "The committed scenario: MNQ only, quantity 7, minimum gap 3, R:R 1.5, on a break of the pre-window low. NOT futures/stress_liquidation_1020.py, which is a different 10:20 candidate that says of itself it is deliberately not wired.",
+      "scope": "roska4_stress",
+      "code_ref": {
+        "file": "global_index/track1_live_sleeves.py",
+        "symbol": "SOURCES",
+        "rule_id": "STRESS.MNQ_ONLY_G3_Q7",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3b_blockers_20260822.py",
+          "note": "test_sleeves_stress_is_mnq_only_g3_q7_and_not_the_1020_candidate"
+        }
+      ],
+      "required_features": [
+        "qty",
+        "gap_min",
+        "rr"
+      ]
+    },
+    "STRESS.QTY_7": {
+      "rule_id": "STRESS.QTY_7",
+      "description": "Seven contracts, carried on the CANDIDATE. MNQ is 1 under Normal and 7 under Stress on the same day, which `contracts_by_inst[inst]` has no key to express.",
+      "scope": "roska4_stress",
+      "code_ref": {
+        "file": "global_index/track1_params.py",
+        "symbol": "SLEEVE_QTY",
+        "rule_id": "STRESS.QTY_7",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3_route_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "qty"
+      ]
+    },
+    "STRESS.WINDOW_1035_1230": {
+      "rule_id": "STRESS.WINDOW_1035_1230",
+      "description": "Entries are permitted only inside 10:35-12:30 ET inclusive. Inside it a missed slot costs nothing; outside it there is no entry at any price.",
+      "scope": "roska4_stress",
+      "code_ref": {
+        "file": "global_index/track1_signal_layer.py",
+        "symbol": "window_verdict",
+        "rule_id": "STRESS.WINDOW_1035_1230",
+        "line": null
+      },
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3_route_20260822.py",
+          "note": ""
+        }
+      ],
+      "required_features": [
+        "decision_hhmm"
+      ]
+    }
+  },
+  "field_documentation": {
+    "schema_version": "Which contract this row obeys. A reader that does not know the version must not guess.",
+    "explain_id": "sha256 over route|session_date|sleeve|instrument|candidate_id|record_type|stage|sequence. Stable across processes.",
+    "parent_explain_id": "The record this one descends from - a DECISION names its SIGNAL, an EXECUTION names its DECISION. null when there is none.",
+    "route": "track1_candidate. Present on every row so a reader can split Track 1 from legacy without inferring it.",
+    "sleeve": "roska4_swing | global_nkd | roska4_calm | roska4_stress.",
+    "instrument": "Must be one the sleeve is declared to trade.",
+    "session_date": "The trading session the record belongs to, YYYY-MM-DD ET.",
+    "candidate_id": "The trade/candidate this row is about. Non-trade rows use a stable label such as 'window'.",
+    "record_type": "SIGNAL | DECISION | EXECUTION | NO_SIGNAL | NO_ACTION.",
+    "stage": "Free label separating two records of the same tuple, e.g. 'detection' vs 'admission'. Part of the id.",
+    "sequence": "Integer separating repeated evaluations inside a window. Part of the id.",
+    "decision_time": "The instant the verdict was taken, ET.",
+    "data_time": "The instant the data used was current as of.",
+    "bar_timestamps": "The bar timestamps the rules actually read.",
+    "status": "pass | fail | accepted | rejected | info, constrained per record_type.",
+    "reason_code": "One code from the registry. Refusal codes are imported from the modules that own them.",
+    "rule_ids": "Which registered rules fired. An id not in the registry is refused.",
+    "code_refs": "Derived from rule_ids: file + symbol + rule_id, line optional. Never supplied by the caller.",
+    "evidence_refs": "Derived from rule_ids: the test/report/artifact that proves each rule.",
+    "feature_snapshot": "The measured values. Every entry carries value AND threshold AND whether it passed. value=null means the feature was ABSENT, which for the R4 context filter is a block.",
+    "thresholds": "The explicit threshold values in force for this record, beyond the per-feature ones.",
+    "inputs_summary": "Which bars / regime / checkpoint / freshness / window-ledger source fed the decision.",
+    "outputs": "direction, qty, entry basis, stop basis, risk, cap bucket.",
+    "rejection": "Refusal detail. Required when status=rejected.",
+    "track1_params_hash": "route_params.params_hash of the config the run used. What a checkpoint is accepted or refused on.",
+    "fill_law": "artifact_all_bars_gappable | production_gap_after_15min_break. No default.",
+    "data_source_identity": "path:sha256 of the bar file used.",
+    "regime_csv_identity": "path:sha256 of the regime CSV used.",
+    "git_commit": "HEAD when the record was built, or null meaning 'could not read it' - never a guess."
+  },
+  "examples": {
+    "DECISION_accepted": {
+      "schema_version": "track1_explain/1",
+      "explain_id": "t1x_cbe46bc3fce9fbe54a9a75ff09ad2039",
+      "parent_explain_id": null,
+      "route": "track1_candidate",
+      "sleeve": "roska4_stress",
+      "instrument": "MNQ",
+      "session_date": "2026-08-24",
+      "candidate_id": "T1-0001",
+      "record_type": "DECISION",
+      "stage": "",
+      "sequence": null,
+      "decision_time": "2026-08-24 10:35:00",
+      "data_time": null,
+      "bar_timestamps": [],
+      "status": "accepted",
+      "reason_code": "take",
+      "rule_ids": [
+        "GATE.CAP_CLUSTER",
+        "GATE.FRESHNESS",
+        "GATE.BREAKER"
+      ],
+      "code_refs": [
+        {
+          "file": "global_index/net_exposure_multi.py",
+          "symbol": "MultiClusterGuard.admits",
+          "rule_id": "GATE.CAP_CLUSTER",
+          "line": null
+        },
+        {
+          "file": "global_index/track1_freshness.py",
+          "symbol": "evaluate",
+          "rule_id": "GATE.FRESHNESS",
+          "line": null
+        },
+        {
+          "file": "global_index/track1_signal_layer.py",
+          "symbol": "Track1Book.begin_instant",
+          "rule_id": "GATE.BREAKER",
+          "line": null
+        }
+      ],
+      "evidence_refs": [
+        {
+          "kind": "test",
+          "path": "global_index/test_cluster_gate.py",
+          "note": "",
+          "rule_id": "GATE.CAP_CLUSTER"
+        },
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3_route_20260822.py",
+          "note": "",
+          "rule_id": "GATE.FRESHNESS"
+        },
+        {
+          "kind": "test",
+          "path": "global_index/test_kill_switch.py",
+          "note": "",
+          "rule_id": "GATE.BREAKER"
+        }
+      ],
+      "feature_snapshot": [
+        {
+          "name": "cluster_gross_after",
+          "value": 0.084,
+          "threshold": 0.1,
+          "op": "<=",
+          "passed": true,
+          "unit": "fraction",
+          "source": ""
+        },
+        {
+          "name": "freshness_allow",
+          "value": true,
+          "threshold": true,
+          "op": "==",
+          "passed": true,
+          "unit": "",
+          "source": ""
+        },
+        {
+          "name": "allow_new_entries",
+          "value": true,
+          "threshold": true,
+          "op": "==",
+          "passed": true,
+          "unit": "",
+          "source": ""
+        }
+      ],
+      "thresholds": {
+        "cluster_gross_cap": 0.1
+      },
+      "inputs_summary": {
+        "bars": "MNQ 5m 09:30-10:35",
+        "regime": "Stress",
+        "checkpoint": "accepted",
+        "window_ledger": "complete"
+      },
+      "outputs": {
+        "direction": "SHORT",
+        "qty": 7,
+        "entry_basis": "break_of_pre_window_low",
+        "stop_basis": "pre_low_break_rr",
+        "risk_dollars": 4200.0,
+        "cap_bucket": "roska4_stress"
+      },
+      "rejection": null,
+      "track1_params_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "fill_law": "artifact_all_bars_gappable",
+      "data_source_identity": "global_index/data/MNQ.parquet:deadbeef",
+      "regime_csv_identity": "spy_daily_live.csv:cafe",
+      "git_commit": "0000000000000000000000000000000000000000"
+    },
+    "DECISION_rejected": {
+      "schema_version": "track1_explain/1",
+      "explain_id": "t1x_0e9293cb7a896bdfa5e5cf066926b3a2",
+      "parent_explain_id": null,
+      "route": "track1_candidate",
+      "sleeve": "roska4_calm",
+      "instrument": "MES",
+      "session_date": "2026-08-24",
+      "candidate_id": "T1-0002",
+      "record_type": "DECISION",
+      "stage": "",
+      "sequence": null,
+      "decision_time": "2026-08-24 10:00:00",
+      "data_time": null,
+      "bar_timestamps": [],
+      "status": "rejected",
+      "reason_code": "reject_family_cap",
+      "rule_ids": [
+        "GATE.CAP_FAMILY"
+      ],
+      "code_refs": [
+        {
+          "file": "global_index/track1_signal_layer.py",
+          "symbol": "family_verdict",
+          "rule_id": "GATE.CAP_FAMILY",
+          "line": null
+        }
+      ],
+      "evidence_refs": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3_route_20260822.py",
+          "note": "",
+          "rule_id": "GATE.CAP_FAMILY"
+        }
+      ],
+      "feature_snapshot": [
+        {
+          "name": "family_gross",
+          "value": 0.0531,
+          "threshold": 0.05,
+          "op": "<=",
+          "passed": false,
+          "unit": "fraction",
+          "source": ""
+        }
+      ],
+      "thresholds": {
+        "family_gross_cap": 0.05,
+        "family_net_cap": 0.044
+      },
+      "inputs_summary": {
+        "bars": "MES 5m 09:30-10:00"
+      },
+      "outputs": {},
+      "rejection": {
+        "verdict": "reject_family_cap",
+        "detail": "family gross 5.31% > cap 5.00%",
+        "blocking_positions": [
+          "T1-0000"
+        ]
+      },
+      "track1_params_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "fill_law": "artifact_all_bars_gappable",
+      "data_source_identity": "global_index/data/MNQ.parquet:deadbeef",
+      "regime_csv_identity": "spy_daily_live.csv:cafe",
+      "git_commit": "0000000000000000000000000000000000000000"
+    },
+    "SIGNAL_filter_blocked": {
+      "schema_version": "track1_explain/1",
+      "explain_id": "t1x_ae281ba263966807ea6035d98ae199b6",
+      "parent_explain_id": null,
+      "route": "track1_candidate",
+      "sleeve": "roska4_swing",
+      "instrument": "MES",
+      "session_date": "2026-08-24",
+      "candidate_id": "T1-0003",
+      "record_type": "SIGNAL",
+      "stage": "",
+      "sequence": null,
+      "decision_time": "2026-08-24 14:05:00",
+      "data_time": null,
+      "bar_timestamps": [],
+      "status": "fail",
+      "reason_code": "filter_blocked",
+      "rule_ids": [
+        "R4.RANGE_P90",
+        "R4.RVOL_MAX"
+      ],
+      "code_refs": [
+        {
+          "file": "global_index/track1_normal_filters.py",
+          "symbol": "R4ContextFilter.allow",
+          "rule_id": "R4.RANGE_P90",
+          "line": null
+        },
+        {
+          "file": "global_index/track1_normal_filters.py",
+          "symbol": "R4ContextFilter.allow",
+          "rule_id": "R4.RVOL_MAX",
+          "line": null
+        }
+      ],
+      "evidence_refs": [
+        {
+          "kind": "report",
+          "path": "scratch/track1_three_blockers_report_20260822.md",
+          "note": "threshold frozen on the floor window",
+          "rule_id": "R4.RANGE_P90"
+        },
+        {
+          "kind": "report",
+          "path": "scratch/track1_three_blockers_report_20260822.md",
+          "note": "",
+          "rule_id": "R4.RVOL_MAX"
+        }
+      ],
+      "feature_snapshot": [
+        {
+          "name": "prev_range_pct",
+          "value": 0.0311,
+          "threshold": 0.02652437134968455,
+          "op": "<=",
+          "passed": false,
+          "unit": "",
+          "source": ""
+        },
+        {
+          "name": "rvol",
+          "value": 1.42,
+          "threshold": 2.0,
+          "op": "<=",
+          "passed": true,
+          "unit": "",
+          "source": ""
+        }
+      ],
+      "thresholds": {
+        "r4_range_threshold": 0.02652437134968455,
+        "r4_rel_volume_max": 2.0
+      },
+      "inputs_summary": {
+        "bars": "MES 1m -> 5m"
+      },
+      "outputs": {},
+      "rejection": null,
+      "track1_params_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "fill_law": "artifact_all_bars_gappable",
+      "data_source_identity": "global_index/data/MNQ.parquet:deadbeef",
+      "regime_csv_identity": "spy_daily_live.csv:cafe",
+      "git_commit": "0000000000000000000000000000000000000000"
+    },
+    "NO_SIGNAL_window_watched": {
+      "schema_version": "track1_explain/1",
+      "explain_id": "t1x_d4caf173f4e8abbc70e83124c34ebed4",
+      "parent_explain_id": null,
+      "route": "track1_candidate",
+      "sleeve": "roska4_stress",
+      "instrument": "MNQ",
+      "session_date": "2026-08-24",
+      "candidate_id": "window",
+      "record_type": "NO_SIGNAL",
+      "stage": "",
+      "sequence": null,
+      "decision_time": "2026-08-24 12:30:00",
+      "data_time": null,
+      "bar_timestamps": [],
+      "status": "info",
+      "reason_code": "no_setup",
+      "rule_ids": [
+        "GATE.WINDOW_LEDGER"
+      ],
+      "code_refs": [
+        {
+          "file": "global_index/window_ledger.py",
+          "symbol": "status",
+          "rule_id": "GATE.WINDOW_LEDGER",
+          "line": null
+        }
+      ],
+      "evidence_refs": [
+        {
+          "kind": "test",
+          "path": "scratch/test_track1_stage3b_blockers_20260822.py",
+          "note": "",
+          "rule_id": "GATE.WINDOW_LEDGER"
+        }
+      ],
+      "feature_snapshot": [
+        {
+          "name": "observed_slots",
+          "value": 24,
+          "threshold": 24,
+          "op": "==",
+          "passed": true,
+          "unit": "",
+          "source": ""
+        }
+      ],
+      "thresholds": {},
+      "inputs_summary": {
+        "window": "10:35-12:30 ET",
+        "expected_slots": 24
+      },
+      "outputs": {},
+      "rejection": null,
+      "track1_params_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "fill_law": "artifact_all_bars_gappable",
+      "data_source_identity": "global_index/data/MNQ.parquet:deadbeef",
+      "regime_csv_identity": "spy_daily_live.csv:cafe",
+      "git_commit": "0000000000000000000000000000000000000000"
+    }
+  },
+  "counts": {
+    "rules": 38,
+    "reason_codes": 34,
+    "required_fields": 21,
+    "rules_by_scope": {
+      "global_nkd": 4,
+      "roska4_calm": 8,
+      "roska4_stress": 5,
+      "roska4_swing": 9,
+      "shared": 12
+    }
+  }
+}

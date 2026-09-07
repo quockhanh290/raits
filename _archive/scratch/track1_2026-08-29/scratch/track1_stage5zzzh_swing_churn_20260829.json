@@ -1,0 +1,212 @@
+{
+ "floor": {
+  "window": "floor",
+  "per_instrument": {
+   "MES": {
+    "base_trades": 188,
+    "d1_trades": 194,
+    "shared": 160,
+    "only_base": 28,
+    "only_d1": 34,
+    "base_pnl": 5879.02,
+    "d1_pnl": 2869.25,
+    "pnl_delta": -3009.77
+   },
+   "MNQ": {
+    "base_trades": 186,
+    "d1_trades": 195,
+    "shared": 154,
+    "only_base": 32,
+    "only_d1": 41,
+    "base_pnl": 16986.65,
+    "d1_pnl": 7229.99,
+    "pnl_delta": -9756.66
+   },
+   "M2K": {
+    "base_trades": 178,
+    "d1_trades": 179,
+    "shared": 148,
+    "only_base": 30,
+    "only_d1": 31,
+    "base_pnl": 1551.85,
+    "d1_pnl": -58.25,
+    "pnl_delta": -1610.1
+   },
+   "MYM": {
+    "base_trades": 200,
+    "d1_trades": 201,
+    "shared": 171,
+    "only_base": 29,
+    "only_d1": 30,
+    "base_pnl": 3293.84,
+    "d1_pnl": 3533.46,
+    "pnl_delta": 239.62
+   }
+  },
+  "raw": {
+   "shared": 671,
+   "only_base": 168,
+   "only_d1": 177,
+   "union": 1016,
+   "churn_pct": 33.96,
+   "base_pnl_presize": 27481.41,
+   "d1_pnl_presize": 7984.82,
+   "pnl_delta_presize": -19496.59
+  },
+  "filtered": {
+   "shared": 633,
+   "only_base": 119,
+   "only_d1": 136,
+   "union": 888,
+   "churn_pct": 28.72,
+   "base_pnl_presize": 27711.36,
+   "d1_pnl_presize": 13574.45,
+   "pnl_delta_presize": -14136.91
+  },
+  "nkd_identical": true,
+  "nkd_instrument": "MNKD",
+  "any_r4_changed": true,
+  "argv_identical": true,
+  "slippage_identical": true
+ },
+ "vault2025": {
+  "window": "vault2025",
+  "per_instrument": {
+   "MES": {
+    "base_trades": 26,
+    "d1_trades": 27,
+    "shared": 20,
+    "only_base": 6,
+    "only_d1": 7,
+    "base_pnl": 5070.97,
+    "d1_pnl": 3138.48,
+    "pnl_delta": -1932.49
+   },
+   "MNQ": {
+    "base_trades": 27,
+    "d1_trades": 26,
+    "shared": 19,
+    "only_base": 8,
+    "only_d1": 7,
+    "base_pnl": -1414.98,
+    "d1_pnl": 563.26,
+    "pnl_delta": 1978.24
+   },
+   "M2K": {
+    "base_trades": 26,
+    "d1_trades": 25,
+    "shared": 17,
+    "only_base": 9,
+    "only_d1": 8,
+    "base_pnl": 447.26,
+    "d1_pnl": 1562.93,
+    "pnl_delta": 1115.67
+   },
+   "MYM": {
+    "base_trades": 26,
+    "d1_trades": 27,
+    "shared": 15,
+    "only_base": 11,
+    "only_d1": 12,
+    "base_pnl": 4647.69,
+    "d1_pnl": 4567.74,
+    "pnl_delta": -79.95
+   }
+  },
+  "raw": {
+   "shared": 74,
+   "only_base": 39,
+   "only_d1": 39,
+   "union": 152,
+   "churn_pct": 51.32,
+   "base_pnl_presize": 3301.56,
+   "d1_pnl_presize": 775.21,
+   "pnl_delta_presize": -2526.35
+  },
+  "filtered": {
+   "shared": 71,
+   "only_base": 34,
+   "only_d1": 34,
+   "union": 139,
+   "churn_pct": 48.92,
+   "base_pnl_presize": 8750.94,
+   "d1_pnl_presize": 9832.41,
+   "pnl_delta_presize": 1081.47
+  },
+  "nkd_identical": true,
+  "nkd_instrument": "MNKD",
+  "any_r4_changed": true,
+  "argv_identical": true,
+  "slippage_identical": true
+ },
+ "vault2026": {
+  "window": "vault2026",
+  "per_instrument": {
+   "MES": {
+    "base_trades": 22,
+    "d1_trades": 21,
+    "shared": 16,
+    "only_base": 6,
+    "only_d1": 5,
+    "base_pnl": 1238.61,
+    "d1_pnl": 528.6,
+    "pnl_delta": -710.01
+   },
+   "MNQ": {
+    "base_trades": 18,
+    "d1_trades": 18,
+    "shared": 16,
+    "only_base": 2,
+    "only_d1": 2,
+    "base_pnl": 1165.25,
+    "d1_pnl": -646.25,
+    "pnl_delta": -1811.5
+   },
+   "M2K": {
+    "base_trades": 17,
+    "d1_trades": 19,
+    "shared": 13,
+    "only_base": 4,
+    "only_d1": 6,
+    "base_pnl": 1066.92,
+    "d1_pnl": -176.06,
+    "pnl_delta": -1242.98
+   },
+   "MYM": {
+    "base_trades": 24,
+    "d1_trades": 23,
+    "shared": 14,
+    "only_base": 10,
+    "only_d1": 9,
+    "base_pnl": -937.12,
+    "d1_pnl": -987.31,
+    "pnl_delta": -50.19
+   }
+  },
+  "raw": {
+   "shared": 58,
+   "only_base": 30,
+   "only_d1": 26,
+   "union": 114,
+   "churn_pct": 49.12,
+   "base_pnl_presize": -1055.8,
+   "d1_pnl_presize": -2961.52,
+   "pnl_delta_presize": -1905.72
+  },
+  "filtered": {
+   "shared": 59,
+   "only_base": 22,
+   "only_d1": 22,
+   "union": 103,
+   "churn_pct": 42.72,
+   "base_pnl_presize": 2533.66,
+   "d1_pnl_presize": -1281.02,
+   "pnl_delta_presize": -3814.68
+  },
+  "nkd_identical": true,
+  "nkd_instrument": "MNKD",
+  "any_r4_changed": true,
+  "argv_identical": true,
+  "slippage_identical": true
+ }
+}

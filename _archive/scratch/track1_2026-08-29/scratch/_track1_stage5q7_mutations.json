@@ -1,0 +1,58 @@
+[
+  {
+    "id": "M1",
+    "mutation": "src.history_symbol -> identity",
+    "test": "test_the_live_provider_asks_the_broker_for_nkd_when_given_mnkd",
+    "outcome": "RED",
+    "message": "the provider asked for ['MNKD'] \u2014 handing the runner name straight to fetch_bars routes through the ORDER map "
+  },
+  {
+    "id": "M2",
+    "mutation": "history_ibkr_symbol -> data_symbol",
+    "test": "test_the_four_basket_instruments_are_asked_for_unchanged",
+    "outcome": "RED",
+    "message": "(bare assert)"
+  },
+  {
+    "id": "M3",
+    "mutation": "history_ibkr_symbol -> _RAITS_TO_IBKR",
+    "test": "test_the_live_provider_asks_the_broker_for_nkd_when_given_mnkd",
+    "outcome": "RED",
+    "message": "the provider asked for ['MNK'] \u2014 handing the runner name straight to fetch_bars routes through the ORDER map a"
+  },
+  {
+    "id": "M4",
+    "mutation": "_RAITS_TO_IBKR -> {}",
+    "test": "test_the_order_symbol_for_mnkd_is_still_mnk",
+    "outcome": "RED",
+    "message": "(bare assert)"
+  },
+  {
+    "id": "M5",
+    "mutation": "_RAITS_TO_IBKR['MNKD'] = 'NKD'",
+    "test": "test_the_two_identities_for_mnkd_are_different_strings",
+    "outcome": "RED",
+    "message": "(bare assert)"
+  },
+  {
+    "id": "M6",
+    "mutation": "_build_jobs -> a table that disagrees",
+    "test": "test_history_symbol_is_derived_from_the_job_table_that_built_the_files",
+    "outcome": "RED",
+    "message": "(bare assert)"
+  },
+  {
+    "id": "M7",
+    "mutation": "SPECS['MNKD'].point_value = 5.0",
+    "test": "test_point_value_still_describes_the_micro",
+    "outcome": "RED",
+    "message": "(bare assert)"
+  },
+  {
+    "id": "M8",
+    "mutation": "report says the NKD arm also disagreed",
+    "test": "test_the_measured_evidence_is_recorded_next_to_the_fix",
+    "outcome": "RED",
+    "message": "(bare assert)"
+  }
+]

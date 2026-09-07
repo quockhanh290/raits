@@ -1,0 +1,294 @@
+{
+  "stage": "5Q-7",
+  "title": "Apply the approved boundary repair, resolve the MNKD data-symbol blocker, restart",
+  "generated_et": "2026-08-24T20:50:00-04:00",
+  "verdict": "NOT_READY",
+  "verdict_reason": "MNKD (B-5R-G) is closed and the three boundary bars are repaired, but the scheduler/backend restart was blocked by the environment's permission gate, so spy_refresh_pm and --repair-boundary are still source-only; and a new blocker B-5R-H means the non-NKD windows are not yet cleanly judgeable.",
+
+  "safety": {
+    "orders_enabled": false,
+    "confirmation_file_created": false,
+    "track1_orders_approved_env_set": false,
+    "b1_still_blocking": true,
+    "overlap_guard_weakened": false,
+    "evidence_rows_deleted_or_rewritten": false,
+    "mnkd_parquet_repaired": false,
+    "multiplier_or_point_value_changed": false,
+    "scheduler_restarted": false,
+    "backend_restarted": false,
+    "run_window_et": "20:15-20:50, every Track 1 window closed, next window 01:10 ET",
+    "ibkr_connections": [
+      {"purpose": "approved boundary repair via update_ibkr_daily", "client_id": 2, "orders": 0},
+      {"purpose": "read-only two-arm MNKD measurement", "client_id": 95, "orders": 0},
+      {"purpose": "read-only live_frame verification", "client_id": 95, "orders": 0}
+    ]
+  },
+
+  "part_a_pre_action_snapshot": {
+    "et_now": "2026-08-24T20:17:00-04:00",
+    "open_window": null,
+    "next_window": "global_nkd 01:10-02:55 ET",
+    "scheduler": {
+      "pid": 28696,
+      "cmdline": "pythonw -m global_index.run_scheduler --port 4002 --shadow-resume --track1-only-shadow",
+      "started_et": "2026-08-24T09:25:31-04:00",
+      "job_count_logged": 100,
+      "spy_refresh_pm_present": false,
+      "spy_refresh_pm_occurrences_in_log": 0
+    },
+    "backend": {
+      "pid": 11720,
+      "cmdline": "monitor/start_backend.py --ibkr-port 4002 --api-port 5002",
+      "connected": true,
+      "freshness": "fresh",
+      "spy_refresh_pm_in_mirror": false
+    },
+    "gate": {
+      "track1_mode": "track1-only-shadow",
+      "track1_blocking": ["B1_broker_account_or_legacy_retirement"],
+      "orders_possible": false,
+      "track1_stop_trading": false,
+      "confirmation": false,
+      "track1_orders_approved": false
+    },
+    "running_preflight_argv_today": "-m global_index.update_ibkr_daily --port 4002",
+    "repair_boundary_in_running_argv": false,
+    "evidence": {
+      "window_coverage_rows": 52,
+      "slot_timing_rows": 42,
+      "audit_records": 8,
+      "explanations_dir": "absent (every slot refused, so nothing to explain)"
+    },
+    "parquet_sha256_before": {
+      "NQ_continuous_1m_8y.parquet": "d231a9574a5579acd073bd17",
+      "YM_continuous_1m_8y.parquet": "bda0c1fbb8e660a74c467072",
+      "RTY_continuous_1m_8y.parquet": "a4789be83483f85da5e160ae",
+      "ES_continuous_1m_8y.parquet": "99da6feb97ea1a28abb9ffae",
+      "NKD_continuous_1m_8y.parquet": "a761a36b2018f82f0869bfb9"
+    }
+  },
+
+  "part_b_boundary_repair": {
+    "command": "python -m global_index.update_ibkr_daily --repair-boundary --symbols MNQ MYM M2K",
+    "exit_code": 0,
+    "pre_check": {
+      "repairable": ["MNQ", "MYM", "M2K"],
+      "clean": ["MES"],
+      "excluded": ["MNKD"],
+      "outside_window_disagreements": 0
+    },
+    "results": [
+      {"inst": "MNQ", "bar": "2026-08-24 17:45:00", "completed": ["close", "high", "volume"],
+       "alignment_shared_bars": 2566, "alignment_median": 0.0, "alignment_iqr": 0.0,
+       "appended_bars": 335, "snapshot": "NQ_continuous_1m_8y.parquet.pre5q5-20260825T002116Z.bak",
+       "verified_by_reread": true, "history_check": "OK", "total_bars": 3357495,
+       "after": {"open": 29119.25, "high": 29125.0, "low": 29118.25, "close": 29125.0, "volume": 1801.0}},
+      {"inst": "MYM", "bar": "2026-08-24 17:45:00", "completed": ["volume"],
+       "alignment_shared_bars": 2566, "alignment_median": 0.0, "alignment_iqr": 0.0,
+       "appended_bars": 336, "snapshot": "YM_continuous_1m_8y.parquet.pre5q5-20260825T002141Z.bak",
+       "verified_by_reread": true, "history_check": "OK", "total_bars": 3314375,
+       "after": {"volume": 182.0}},
+      {"inst": "M2K", "bar": "2026-08-24 17:46:00", "completed": ["high", "volume"],
+       "alignment_shared_bars": 2567, "alignment_median": 0.0, "alignment_iqr": 0.0,
+       "appended_bars": 335, "snapshot": "RTY_continuous_1m_8y.parquet.pre5q5-20260825T002204Z.bak",
+       "verified_by_reread": true, "history_check": "OK", "total_bars": 2951381,
+       "after": {"high": 2997.7, "volume": 15.0}}
+    ],
+    "post_verification": {
+      "changed": ["NQ_continuous_1m_8y.parquet", "YM_continuous_1m_8y.parquet", "RTY_continuous_1m_8y.parquet"],
+      "unchanged": ["ES_continuous_1m_8y.parquet", "NKD_continuous_1m_8y.parquet"],
+      "snapshots_only_for_touched_files": true,
+      "index_convention_preserved": "tz-naive on all three",
+      "column_shape_preserved": ["open", "high", "low", "close", "volume"]
+    },
+    "declared_side_effect": "the updater is an appender: it also advanced each file ~335 bars to 20:20/20:21 ET, its ordinary function, stated before the run",
+    "reprobe": {
+      "verdict": "repairable_dry_run",
+      "note": "NOT nothing_to_repair. The 13:45/13:46 bars are clean; the fetch stopped mid-minute and left a NEW partial bar. This is B-5R-H.",
+      "new_partial_bars": [
+        {"inst": "MNQ", "bar": "2026-08-24 20:20", "stored_high": 29033.75, "feed_high": 29034.5},
+        {"inst": "MYM", "bar": "2026-08-24 20:21", "stored_high": 53467.0, "feed_high": 53469.0},
+        {"inst": "M2K", "bar": "2026-08-24 20:21", "stored_high": 2998.5, "feed_high": 2998.6}
+      ]
+    },
+    "live_frame_check_through_the_real_guard": {
+      "MES": {"result": "ok", "asks_for": "MES", "overlap_checked": 1185, "appended": 346},
+      "MNQ": {"result": "overlap_disagreement", "bad_of_shared": "1 of 1521", "at": "2026-08-24 20:20"},
+      "MYM": {"result": "overlap_disagreement", "bad_of_shared": "1 of 1522", "at": "2026-08-24 20:21"},
+      "M2K": {"result": "overlap_disagreement", "bad_of_shared": "1 of 1522", "at": "2026-08-24 20:21"},
+      "MNKD": {"result": "ok", "asks_for": "NKD", "overlap_checked": 1186, "appended": 341}
+    }
+  },
+
+  "part_c_mnkd_identity": {
+    "hypothesis": "history uses NKD while the live provider fetches MNK through the order map",
+    "status": "CONFIRMED by measurement; the clock alternative tested and refuted",
+    "identities": {
+      "runner_name": "MNKD",
+      "history_symbol": "NKD",
+      "history_authority": "update_ibkr_daily._build_jobs",
+      "order_symbol": "MNK",
+      "order_authority": "_RAITS_TO_IBKR (built from Contract.ibkr)",
+      "point_value_mnkd": 0.5,
+      "point_value_nkd": 5.0,
+      "session_tz": "Asia/Tokyo"
+    },
+    "measurement": {
+      "method": "two arms, same on_frozen_clock conversion keyed on MNKD, read-only, client id 95",
+      "through_naive_et": "2026-08-24 20:25",
+      "arms": {
+        "MNKD": {"broker_symbol": "MNK", "shared": 1186, "disagreeing_bars": 1155,
+                 "worst_gap": 375.0, "median_gap_where_bad": 25.0,
+                 "signed_close_median": 0.0, "signed_close_p95_abs": 110.0,
+                 "first": {"ts": "2026-08-24 07:01:00+09:00", "column": "open",
+                           "history": 65930.0, "feed": 65985.0}},
+        "NKD": {"broker_symbol": "NKD", "shared": 1186, "disagreeing_bars": 0,
+                "worst_gap": 0.0, "signed_close_median": 0.0, "signed_close_p95_abs": 0.0}
+      },
+      "clock_hypothesis_refuted_because": "signed close median is 0.0 and the median gap where bad is one tick (25 pts on a 5-pt grid); the 2026 Nikkei clock incident was a persistent one-directional offset of 900-1000 points",
+      "count_differs_from_5q6": "5Q-6 measured 1052, this measured 1155; the parquet and the fetch window both moved. The count was never the discriminating number - the gap magnitude was."
+    },
+    "trap_avoided": {
+      "what": "Contract.data_symbol is the FILE STEM, not the fetch symbol",
+      "table": {"MES": ["ES", "MES"], "MNQ": ["NQ", "MNQ"], "MYM": ["YM", "MYM"],
+                "M2K": ["RTY", "M2K"], "MNKD": ["NKD", "NKD"]},
+      "consequence_if_used": "all four basket instruments would have been sent at the full-size E-mini contracts to repair the one that needed repairing"
+    },
+    "fix": {
+      "global_index/update_ibkr_daily.py": "added history_ibkr_symbol(inst), DERIVED from _build_jobs",
+      "global_index/track1_live_source.py": "added history_symbol(inst) delegating to it; IBKRBarProvider.fetch_session_bars now fetches the history symbol instead of the runner name",
+      "order_routing_unchanged": true,
+      "point_value_unchanged": true,
+      "overlap_guard_unchanged": true
+    },
+    "end_to_end_proof": {
+      "call": "live_frame('MNKD')",
+      "code": "ok",
+      "overlap_checked": 1186,
+      "live_rows_appended": 341,
+      "provider_asked_for": "NKD"
+    },
+    "live_without_restart": {
+      "true": true,
+      "why": "run_scheduler.py:1281 spawns each Track 1 slot as a fresh subprocess (python -m global_index.run_live_day_track1), so slot children import the corrected source",
+      "consequence": "tonight's 01:10-02:55 ET NKD window should be judgeable"
+    },
+    "not_fixed_named_instead": {
+      "id": "B-5R-I",
+      "what": "runner.py:1592 and run_live_day.py:677 also call broker.fetch_bars(inst) with runner names, and run_live_day.py:88 sets NKD_INST='MNKD' - the legacy route has the same defect",
+      "why_not_fixed": "out of this stage's scope; legacy strategy jobs are not registered in track1-only mode and B1 blocks orders"
+    }
+  },
+
+  "part_d_restart": {
+    "performed": false,
+    "blocked_by": "environment permission gate (starts and stops live processes)",
+    "worked_around": false,
+    "commands_for_operator": [
+      "python monitor\\ops.py restart --scheduler --track1-only-shadow",
+      "python monitor\\ops.py restart --no-scheduler --track1-only-shadow",
+      "python monitor\\ops.py status"
+    ],
+    "recommended_time": "tonight, before the 01:10 ET NKD window",
+    "cost": "any future audit of 2026-08-24 reads its closed windows as window_closed_before_scheduler_start; read today's verdicts from the 8 records already written. Nothing is deleted.",
+    "post_restart_expected": {
+      "job_count_track1_only": 101,
+      "spy_refresh_pm": "present, 16:20 ET",
+      "backend_mirror_row": "SPY_REFRESH_PM present",
+      "repair_boundary_in_preflight_argv": true,
+      "legacy_strategy_jobs": 0,
+      "track1_strategy_safety_audit_jobs": [70, 11, 5],
+      "orders_possible": false,
+      "track1_blocking": ["B1_broker_account_or_legacy_retirement"]
+    }
+  },
+
+  "part_e_audit": {
+    "command": "python -m global_index.track1_shadow_audit --latest --all --dry-run",
+    "wrote_anything": false,
+    "false_pass": false,
+    "records_still": 8,
+    "records_mtime_unchanged": true,
+    "verdicts": {
+      "global_nkd": "NOT_ENOUGH_DATA_YET",
+      "roska4_calm": "FAIL",
+      "roska4_stress": "FAIL",
+      "roska4_swing": "FAIL",
+      "day": "FAIL"
+    }
+  },
+
+  "part_f_tests": {
+    "suites": 16,
+    "passed": 540,
+    "failed": 0,
+    "new_tests": 16,
+    "mutations": {"total": 8, "red": 8, "still_green": 0},
+    "stale_tests_repaired": [
+      {"test": "test_no_snapshot_appeared_beside_a_real_parquet",
+       "why": "an APPROVED repair legitimately created three .pre5q5-*.bak files; a guard reading 'none may exist' cannot tell that from 'this suite made one'",
+       "now": "anchored to the set present at import; the suite must add none",
+       "renamed_to": "test_this_suite_added_no_snapshot_beside_a_real_parquet"},
+      {"test": "three 5Q-3 ledger readers",
+       "why": "window_ledger names files by UTC date (window_ledger.py:121) and it was 00:36 UTC, so the ledger wrote window_coverage_20260825.jsonl while the tests read ..._20260824.jsonl",
+       "now": "the reader derives the stem by the ledger's own rule; the one line that writes a FIXTURE for the audit stays on the session day"},
+      {"test": "test_legacy_nkd_jobs_absent_in_track1_only_present_in_transitional",
+       "why": "pinned the default schedule at 60; Stage 5Q-5 deliberately made it 61 by adding spy_refresh_pm",
+       "now": "pinned at 61 plus an assertion naming the new job"}
+    ],
+    "production_data_files_changed": [
+      {"file": "data/cache/futures/NQ_continuous_1m_8y.parquet", "reason": "approved boundary repair + ordinary append"},
+      {"file": "data/cache/futures/YM_continuous_1m_8y.parquet", "reason": "approved boundary repair + ordinary append"},
+      {"file": "data/cache/futures/RTY_continuous_1m_8y.parquet", "reason": "approved boundary repair + ordinary append"}
+    ]
+  },
+
+  "blockers": [
+    {"id": "B-5R-G", "state": "CLOSED", "what": "MNKD fetched the order symbol MNK instead of the history symbol NKD"},
+    {"id": "B-5R-D", "state": "CLOSED", "what": "the three partial boundary bars of 2026-08-24 13:45/13:46"},
+    {"id": "B-5R-H", "state": "OPEN", "new": true,
+     "what": "update_ibkr_daily appends strictly-newer bars and the fetch always ends inside an open minute, so EVERY run stores one partial bar; --repair-boundary fixes the previous one at the next run, never reaching zero",
+     "evidence": "today the morning slots refused on Friday 13:45 and the swing slots on Friday 13:46, an interior bar nothing had repaired; tonight's repair moved the refusal from 13:45 to 20:20",
+     "proposed_cure": "drop the final bar when its minute has not closed - a behaviour change to the shared 13:45 job that also writes legacy's data, so it needs its own stage and its own measurement",
+     "expected_impact_tomorrow": "exactly one refusing bar per basket instrument in the morning windows, at 2026-08-24 20:20/20:21. MNKD unaffected."},
+    {"id": "B-5R-E", "state": "OPEN", "what": "spy_refresh_pm not registered", "next": "the restart"},
+    {"id": "B-5R-F", "state": "OPEN", "what": "--repair-boundary not in the running argv", "next": "the same restart"},
+    {"id": "B-5R-I", "state": "OPEN", "new": true, "what": "legacy fetch_bars('MNKD') has the same symbol defect", "next": "close before legacy is run against Nikkei again"},
+    {"id": "B-5R-C", "state": "OPEN", "what": "NKD window after 2026-11-01", "severity": "WARN"},
+    {"id": "B1", "state": "OPEN by design", "what": "the order gate; orders remain impossible"}
+  ],
+
+  "other_findings": [
+    {"what": "window_ledger names files by UTC date while the audit reads by session date",
+     "where": "global_index/window_ledger.py:121",
+     "impact_today": "none - no Track 1 window falls between 20:00 ET and midnight ET",
+     "risk": "a window moved into that band would write rows into a file the audit does not open"},
+    {"what": "_refuse_overlap_disagreement compares open/high/low/close only, not volume",
+     "impact": "a boundary bar that differs only in volume does not refuse; MYM's 13:45 bar was such a case"}
+  ],
+
+  "files": {
+    "changed_production_code": [
+      "global_index/update_ibkr_daily.py",
+      "global_index/track1_live_source.py"
+    ],
+    "changed_production_data": [
+      "data/cache/futures/NQ_continuous_1m_8y.parquet",
+      "data/cache/futures/YM_continuous_1m_8y.parquet",
+      "data/cache/futures/RTY_continuous_1m_8y.parquet"
+    ],
+    "changed_scratch": [
+      "scratch/test_track1_stage5q5_freshness_boundary_20260824.py",
+      "scratch/test_track1_stage5q3_live_frame_splice_20260824.py",
+      "scratch/test_track1_stage5n_nkd_track1_ownership_20260824.py"
+    ],
+    "added": [
+      "scratch/track1_stage5q7_mnkd_identity_probe_20260824.py",
+      "scratch/test_track1_stage5q7_mnkd_identity_20260824.py",
+      "scratch/track1_stage5q7_mutations_20260824.py",
+      "scratch/_track1_stage5q7_mnkd_identity.json",
+      "scratch/track1_stage5q7_apply_boundary_restart_mnkd_identity_20260824.md",
+      "scratch/track1_stage5q7_apply_boundary_restart_mnkd_identity_20260824.json"
+    ]
+  }
+}

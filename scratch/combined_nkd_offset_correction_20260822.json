@@ -1,0 +1,41 @@
+{
+ "floor": {
+  "offset_points": 100.0,
+  "forced_closes": 45,
+  "reported_switch_delta": 340.0,
+  "corrected_switch_delta": 1790.0,
+  "reported_net": 72731.86924999999,
+  "corrected_net": 74181.86924999999,
+  "net_shift": 1450.0,
+  "reported_maxdd": 4923.377499999988,
+  "corrected_maxdd": 4973.377499999991,
+  "reported_calmar": 2.1134940160614772,
+  "corrected_calmar": 2.1339574577026954
+ },
+ "vault2025": {
+  "offset_points": -10.0,
+  "forced_closes": 7,
+  "reported_switch_delta": 29.99999999999997,
+  "corrected_switch_delta": -5.000000000000057,
+  "reported_net": 17881.440000000002,
+  "corrected_net": 17846.440000000002,
+  "net_shift": -35.0,
+  "reported_maxdd": 3943.4,
+  "corrected_maxdd": 3948.4,
+  "reported_calmar": 4.6263539417959665,
+  "corrected_calmar": 4.611451558908807
+ },
+ "vault2026": {
+  "offset_points": 0.0,
+  "forced_closes": 5,
+  "reported_switch_delta": -3172.5,
+  "corrected_switch_delta": -3172.5,
+  "reported_net": 10132.209999999997,
+  "corrected_net": 10132.209999999997,
+  "net_shift": 0.0,
+  "reported_maxdd": 4342.299999999999,
+  "corrected_maxdd": 4342.299999999999,
+  "reported_calmar": 3.721680612280916,
+  "corrected_calmar": 3.721680612280916
+ }
+}

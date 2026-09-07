@@ -1,0 +1,214 @@
+{
+  "stage": "5ZB",
+  "title": "operational audit: causal slot guard + runtime readiness",
+  "date_et": "2026-08-25",
+  "run_at": {
+    "utc": "10:44",
+    "et": "06:44 EDT"
+  },
+  "verdicts": {
+    "next_shadow_window": "READY_FOR_NEXT_TRACK1_SHADOW_WINDOW_OPERATIONALLY_AUDITED",
+    "paper": "PAPER_NOT_READY",
+    "restart_or_operator_action_needed": false,
+    "live_or_runtime_file_touched": false,
+    "production_files_modified": 0
+  },
+  "clock_correction": {
+    "what": "TZ=America/New_York date returns UTC in this shell",
+    "cost": "a healthy scheduler read as six hours hung; a window 3.5h ahead read as 4h overdue",
+    "reports_corrected": [
+      "track1_stage5x_broker_readside_20260825.md",
+      "track1_stage5y_order_id_writepath_20260825.md",
+      "track1_stage5z_callsite_dryrun_20260825.md"
+    ],
+    "anchor": "zoneinfo, never the shell; the scheduler log stamps Calgary time"
+  },
+  "reverified_5za": {
+    "strategy_slots": 70,
+    "by_sleeve": {
+      "roska4_calm": 1,
+      "roska4_stress": 24,
+      "roska4_swing": 23,
+      "global_nkd": 22
+    },
+    "follows_now": [
+      "global_nkd",
+      "roska4_swing"
+    ],
+    "grace_seconds": {
+      "roska4_calm": 60,
+      "roska4_stress": 60,
+      "roska4_swing": 60,
+      "global_nkd": 60
+    },
+    "calm_grace_allow_at_seconds": [
+      0,
+      1,
+      3,
+      30,
+      59,
+      60
+    ],
+    "calm_grace_refuse_at_seconds": [
+      61,
+      120,
+      3600
+    ],
+    "strategy_identity_changed": false,
+    "identity_proof": "the gate module cannot import a sleeve rule module (structural, not a hash comparison)",
+    "fixture_defect_found_and_fixed": "the 70-slot sweep derived its frame from today_to_follows_now, the field under test; mutation M6 stayed green until it was rebuilt from the slot clock"
+  },
+  "mutations": {
+    "count": 24,
+    "all_red": true,
+    "found_weak_tests_not_weak_code": [
+      "M6 - the fixture followed the flag it was testing",
+      "M20 - the ledger sweep accepted an empty result"
+    ],
+    "why_targets_are_5ZB_not_5ZA": "5ZA seam tests use inspect.getsource, which reads the linecache and cannot be broken by a source mutation; the 5ZB versions read the file and walk the AST",
+    "prose_probe_satisfiable_today": false
+  },
+  "runtime": {
+    "scheduler_pid": 48604,
+    "backend_pid": 35352,
+    "scheduler_argv_track1_only_shadow": true,
+    "scheduler_argv_allow_orders": false,
+    "scheduler_started_et": "2026-08-25T01:07",
+    "scheduler_log_current": true,
+    "strategy_jobs": 70,
+    "track1_safety_jobs": 11,
+    "expected_total_jobs": 101,
+    "restart_needed": false,
+    "restart_reason": null
+  },
+  "orders": {
+    "orders_possible": false,
+    "blocking": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "confirmation_file": false,
+    "track1_orders_approved_env": false,
+    "allow_orders_in_any_argv": false,
+    "order_journal_dir_exists": false,
+    "track1_book_exists": false,
+    "dry_run_dir_exists": false
+  },
+  "ledger": {
+    "0260824": {
+      "slots": 47,
+      "reasons": {
+        "overlap_disagreement": 46,
+        "gate_refused": 1
+      },
+      "opened": [
+        "roska4_calm",
+        "roska4_stress",
+        "roska4_swing"
+      ],
+      "never_closed": [
+        "roska4_calm"
+      ],
+      "decided": 0
+    },
+    "0260825": {
+      "slots": 22,
+      "reasons": {
+        "gate_refused": 22
+      },
+      "opened": [
+        "global_nkd"
+      ],
+      "never_closed": [],
+      "decided": 0
+    }
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "what": "roska4_calm opened a window on 2026-08-24 that never closed",
+      "cause": "uncaught SpliceRefused column_mismatch - the IBKR feed adds average/barcount",
+      "status": "ALREADY FIXED by another session; Stage 5ZB pins both halves from the file"
+    },
+    {
+      "id": "F2",
+      "what": "46 of 47 Ro 4 slots on 2026-08-24 refused overlap_disagreement",
+      "cause": "the 13:45 ET daily append boundary, not the causal gate and not the feed",
+      "status": "parquets repaired manually at 08-24 23:26 ET, 7.5h AFTER those windows; the daily pre-flight now runs update_ibkr_daily --repair-boundary, first automatic run today 13:45 ET"
+    },
+    {
+      "id": "F3",
+      "what": "the next judgeable window is TODAY, not the 26th",
+      "cause": "earlier reports gave the NKD answer as the general answer",
+      "status": "Calm 10:00 ET, Stress 10:35-12:30, Swing 14:05-15:55 all ahead at 06:41 ET"
+    },
+    {
+      "id": "F4",
+      "what": "a 5Q4 live-invariant test fails until 13:45 ET each day",
+      "cause": "it expects preflight_state one business day ahead of the SPY csv; today's pre-flight has not run",
+      "status": "LEFT ALONE - another session's invariant about the runtime; loosening it to get a green run is how a real signal is removed"
+    }
+  ],
+  "todays_schedule_et": [
+    {
+      "et": "10:00",
+      "what": "roska4_calm (one shot)",
+      "first_time_with": "dispatch grace, SpliceRefused catch, column projection"
+    },
+    {
+      "et": "10:35-12:30",
+      "what": "roska4_stress (24)",
+      "first_time_with": "manually repaired history"
+    },
+    {
+      "et": "13:45",
+      "what": "pre-flight",
+      "first_time_with": "automatic --repair-boundary"
+    },
+    {
+      "et": "14:05-15:55",
+      "what": "roska4_swing (23)",
+      "first_time_with": "today's boundary repaired automatically"
+    },
+    {
+      "et": "16:20",
+      "what": "spy_refresh_pm",
+      "first_time_with": null
+    },
+    {
+      "et": "01:10-02:55 (26th)",
+      "what": "global_nkd (22)",
+      "first_time_with": "the 5V-1 causal fix on a full window"
+    }
+  ],
+  "blocked_by": {
+    "evidence": [
+      "PAPER_SHADOW_EVIDENCE: 0 of 5 judgeable days"
+    ],
+    "operator_decision": [
+      "B1_broker_account_or_legacy_retirement",
+      "first-fill watch on the 11 Track 1 safety jobs"
+    ],
+    "code_accepted_for_first_paper_day": [
+      "safety-job stops and exits write trade_log, not the order journal"
+    ],
+    "neither": [
+      "the paper executor and call site: designed, rehearsed, deliberately unwired"
+    ]
+  },
+  "evidence_gate": {
+    "released": false,
+    "detail": "judgeable_days: 1 judgeable day(s) on record, 5 required — a day with no audit record is not a day that went well; no_failing_days: 1 FAIL day(s) in the qualifying window, at most 0 allowed; every_sleeve_passed_at_least_once: never PASSED inside the window: ['roska4_swing', 'roska4_calm', 'roska4_stress', 'global_nkd']"
+  },
+  "tests": {
+    "stage_5zb": 32,
+    "stage_5zb_mutations": 24,
+    "combined_15_files": "504 passed, 1 failed",
+    "the_one_failure": "test_the_live_invariant_holds_on_the_real_files_right_now - see F4"
+  },
+  "deliverables": [
+    "docs/futures/TRACK1_SHADOW_WINDOW_RUNBOOK.md (new)",
+    "scratch/test_track1_stage5zb_operational_audit_20260825.py",
+    "scratch/track1_stage5zb_mutations_20260825.py"
+  ]
+}

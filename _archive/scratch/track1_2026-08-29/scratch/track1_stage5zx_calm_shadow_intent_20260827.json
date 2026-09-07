@@ -1,0 +1,284 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZX",
+  "title": "Calm shadow intent: two phases, one stream, no send",
+  "route": "track1_candidate",
+  "when_et": "2026-08-27T02:00:00-04:00/2026-08-27T03:10:00-04:00",
+  "verdict": {
+    "phases": "BUILT_AND_WIRED",
+    "calm_evidence": "decision_only",
+    "orders_possible": false,
+    "paper_readiness": "NOT_READY",
+    "strategy_identity": "UNCHANGED"
+  },
+  "hard_constraints_measured": {
+    "orders_possible_before": false,
+    "orders_possible_after": false,
+    "blocking_before": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "blocking_after": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "confirmation_file": false,
+    "track1_orders_approved": false,
+    "b1_decision_created_by_this_stage": false,
+    "send_job_built": false,
+    "place_order_added": false,
+    "ibkr_broker_constructed": false,
+    "orders_dir_written": false,
+    "orders_dir_state": "ABSENT",
+    "runtime_files_edited_by_hand": false,
+    "scheduler_or_backend_restarted": false,
+    "backtest_regenerated_or_rerated": false,
+    "calm_entry_time": "10:00"
+  },
+  "strategy_identity_proof": {
+    "method": "same detector, same frame, before and after the extraction; digest over day, direction, signal time, entry time, entry price, prior session and all four features",
+    "sessions_examined": 319,
+    "sessions_set_up": 84,
+    "sessions_no_setup": 235,
+    "digest_before": "a573a9e32e326b937a8350addff31b94ab74f6f31c7b489773bc9987f09203f5",
+    "digest_after": "a573a9e32e326b937a8350addff31b94ab74f6f31c7b489773bc9987f09203f5",
+    "identical": true,
+    "pre_entry_detector_agrees_on": 84,
+    "self_check": "asserted set-up count > 0 before comparing; an all-None baseline would pass any refactor",
+    "clock_note": "the digest window is the raw UTC parquet; the comparison is clock-independent because the same frame goes through both runs. The end-to-end run uses the route's own loader, which converts to New York.",
+    "params": {
+      "entry_time": "10:00",
+      "rth_start": "09:30",
+      "exit_time": "15:55",
+      "disaster_stop_atr_mult": 1.5,
+      "instruments": [
+        "MES",
+        "MNQ"
+      ],
+      "digest": "0d80b152f2f8a3746ed028642c9ac03db2048139146c755bd9ce54c6bee50568"
+    }
+  },
+  "scheduler_inventory": {
+    "method": "real make_scheduler construction in one process; the pre-stage slot table reconstructed in memory for the before row",
+    "before": {
+      "slots": 70,
+      "track1_only_total": 101,
+      "legacy_plus_track1_total": 130
+    },
+    "after": {
+      "slots": 71,
+      "track1_only_total": 102,
+      "legacy_plus_track1_total": 131
+    },
+    "expected_by_plan": 102,
+    "slots": [
+      {
+        "id": "TRACK1_CALM_DECIDE_0932",
+        "at_et": "09:32",
+        "phase": "DECIDE",
+        "reads": "bars closed by 09:30",
+        "records": "intent, never a price"
+      },
+      {
+        "id": "TRACK1_CALM_OBSERVE_1002",
+        "at_et": "10:02",
+        "phase": "OBSERVE",
+        "reads": "the closed 10:00 minute bar",
+        "records": "entry reference and stop level"
+      }
+    ],
+    "replaced": "TRACK1_CALM_1000",
+    "phase_passed_in_argv": "only for a slot that has one; the three unsplit sleeves' argv is byte-identical, measured"
+  },
+  "end_to_end_run": {
+    "driven_through": "observe_live_slot — the function the scheduler calls",
+    "session": "2026-08-21",
+    "frames": "route's own frozen_frame loader (America/New_York)",
+    "decide": {
+      "at": "09:32",
+      "decided": true,
+      "status": "RECORDED",
+      "reason": "ok",
+      "instrument": "MES",
+      "entry_reference_price": null,
+      "planned_stop": null
+    },
+    "observe": {
+      "at": "10:02",
+      "decided": true,
+      "status": "RECORDED",
+      "reason": "ok",
+      "instrument": "MES",
+      "entry_reference_price": 7680.75,
+      "planned_stop": 7577.919642857143
+    },
+    "arithmetic_cross_check": "7680.75 - 7577.9196 = 102.83 = 1.5 x 68.55 (daily ATR)",
+    "reference_equals_real_1000_open": true,
+    "classification": "decision_judgeable",
+    "files_written": [
+      "global_index/track1_runtime/shadow_intent/shadow_intent_20260821.jsonl",
+      "global_index/track1_runtime/signals/track1_signals_20260821.jsonl",
+      "ledger/window_coverage_20260827.jsonl"
+    ],
+    "files_not_written": [
+      "orders/",
+      "trade_log.track1.jsonl",
+      "live_positions.track1.json",
+      "replay_checkpoint.track1.json"
+    ]
+  },
+  "design_changes_forced_by_measurement": [
+    {
+      "finding": "the Calm detector returns nothing when today has no 10:00 bar",
+      "where": "track1_calm_a.detect_entry_for_day, the entry-bar guard",
+      "consequence_if_unfixed": "a DECIDE slot calling the ordinary candidate path receives an empty list every morning and records 'Calm did not set up today' on every day of its life",
+      "resolution": "the rule split at the point it actually divides; the full detector is built ON the shared pre-entry half rather than beside it"
+    },
+    {
+      "finding": "sleeves_at(09:32) and sleeves_at(10:02) are both empty; Calm's window is the single instant 10:00",
+      "consequence_if_unfixed": "both phases refuse no_sleeve_at_this_instant",
+      "resolution": "neither phase goes through the candidate path; OBSERVE runs no detector at all, because the setup was found half an hour earlier and written down"
+    },
+    {
+      "finding": "the first OBSERVE refusal row carried 'gate_refused' when the gate had passed and the source refused",
+      "consequence_if_unfixed": "a reader is sent to inspect a gate that was working",
+      "resolution": "refusal rows carry the slot's own vocabulary"
+    },
+    {
+      "finding": "the first draft passed --phase for every slot, including the three unsplit sleeves",
+      "caught_by": "regression: a test asserting Calm and Stress argv are unchanged",
+      "consequence_if_unfixed": "the command line of three sleeves this stage does not touch would have changed",
+      "resolution": "the phase appears only for a slot that has one; the reasoning about naming the half does not extend to a sleeve with no halves"
+    }
+  ],
+  "evidence_gate": {
+    "check_added": "calm_decision_evidence",
+    "counts": [
+      "decision_judgeable",
+      "no_setup"
+    ],
+    "does_not_count": [
+      "pre_shadow_intent_schema",
+      "incomplete",
+      "unreadable"
+    ],
+    "proves": "decision_only",
+    "does_not_prove": "acceptance_fill_or_slippage",
+    "execution_label_guard": "raises AssertionError rather than returning",
+    "current_days": {
+      "2026-08-24": "pre_shadow_intent_schema",
+      "2026-08-25": "pre_shadow_intent_schema",
+      "2026-08-26": "pre_shadow_intent_schema"
+    },
+    "judgeable_days_on_record": 3,
+    "judgeable_days_required": 5,
+    "calm_days_counted": 0
+  },
+  "dashboard": {
+    "backend_block": "calm_phases",
+    "states": [
+      "absent",
+      "present but no day recorded",
+      "per-day label"
+    ],
+    "current": "absent — the two Calm phases have not run",
+    "row": "Calm phases",
+    "wording_carries_the_limit": true
+  },
+  "tests": {
+    "file": "scratch/test_track1_stage5zx_calm_shadow_intent_20260827.py",
+    "cases": 15,
+    "mutations": 5,
+    "result": "20 passed",
+    "mutations_cover": [
+      "shadow intent written to the orders dir",
+      "planned_stop written in DECIDE",
+      "OBSERVE counted without DECIDE",
+      "DECIDE counted as execution proof",
+      "missing OBSERVE treated as PASS"
+    ],
+    "failures_while_writing": [
+      "a count over raw source read the function's own docstring as code; the reader now strips docstrings",
+      "the decide-row builder cannot be asked for a price at all, so the refusal lives one layer down; the test now proves both doors"
+    ],
+    "adjacent_suites": {
+      "monitor/test_realtime_contract.py": "26 passed",
+      "monitor/test_dashboard_backend.py": "194 passed"
+    }
+  },
+  "findings_recorded_not_fixed": [
+    {
+      "what": "signal diagnostics have never carried a parameter identity",
+      "why": "the reader guards on the parameter module having a hash function; it never had one. The real function lives in the route-params module and takes a full configuration rather than a sleeve name, refusing a partial one outright.",
+      "effect": "every diagnostics row since the field existed carries an empty identity; two rows compare equal because both are blank",
+      "owner": "whoever owns the signals channel"
+    },
+    {
+      "what": "the order journal's path is defined independently in three modules",
+      "carried_from": "5ZW",
+      "guard": "a test asserts they still agree"
+    }
+  ],
+  "live_runtime_during_stage": {
+    "live_positions.track1.json": "2026-08-27T02:55:42-04:00",
+    "replay_checkpoint.track1.json": "2026-08-27T02:55:42-04:00",
+    "cause": "the overnight Nikkei window closing; the route wrote its own state",
+    "classification": "live runtime, not stage output",
+    "book_after": {
+      "schema_version": 2,
+      "route": "track1_candidate",
+      "positions": 0,
+      "foreign_keys": [],
+      "ok": true
+    },
+    "note": "the fourth window close the Stage 5ZS book repair has survived"
+  },
+  "remaining_before_paper": [
+    "PAPER_SHADOW_EVIDENCE — 3 judgeable days of 5, and 0 of them carry Calm evidence",
+    "B1 — no decision recorded; its measurement expires 24h after it was taken",
+    "the SEND wire — does not exist and this stage did not build it",
+    "machine sleep — operator, unchanged"
+  ],
+  "regression": {
+    "full_scratch_corpus": {
+      "failed": 109,
+      "passed": 2460,
+      "skipped": 5
+    },
+    "caused_by_the_slot_split": 45,
+    "method": "the same failures re-run with the pre-stage slot table restored through a probe fixture; 45 went green",
+    "order_dependence_found": {
+      "observed": "the same set produced 109 failures then 98",
+      "meaning": "eleven tests pass or fail depending on what ran before them",
+      "scope": "a property of the corpus, not of this stage",
+      "implication": "any failure count from it carries about ten per cent of noise"
+    },
+    "repaired_because_not_stale_pins": [
+      {
+        "what": "two causal-path AST assertions (5ZU test_20, 5ZV test_7)",
+        "why": "the property moved rather than broke; the causal path is now two functions",
+        "repair": "counted across both halves AND per half",
+        "mutation_proof": "3 mutations confirmed red, including a 2/0 split that a total-only count would pass"
+      },
+      {
+        "what": "a _resample stub signature (5Q2)",
+        "why": "predates the requirement argument"
+      },
+      {
+        "what": "the paper-readiness fixtures (5S)",
+        "why": "a clean shadow period now includes Calm decision evidence",
+        "note": "they went red before the fixture grew it, which is the natural mutation proof that the new check can refuse",
+        "result": "24 passed"
+      }
+    ],
+    "left_red_and_listed": {
+      "kind": "slot count and identifier pins",
+      "examples": [
+        "assert len(slots) == 70",
+        "assert total == 101",
+        "tests driving TRACK1_CALM_1000 by name"
+      ],
+      "why_not_repaired": "the count pins are the roster anti-pattern already on record, and the tests that drive the old slot exercise 10:00 semantics that no longer exist — repairing them means deciding per test what the new Calm timing should mean, which would weaken assertions inside a stage nobody asked to weaken them in"
+    }
+  }
+}

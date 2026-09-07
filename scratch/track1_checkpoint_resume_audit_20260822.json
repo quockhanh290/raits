@@ -1,0 +1,138 @@
+{
+ "audit": "track1_checkpoint_resume_audit",
+ "date": "2026-08-22",
+ "mode": "read_only",
+ "services_started": [],
+ "production_modified": false,
+ "committed": false,
+
+ "checkpoint_today": {
+  "module": "global_index/replay_checkpoint.py",
+  "schema": 1,
+  "path": "global_index/replay_checkpoint.json",
+  "key_space": ["instrument"],
+  "fields": ["last_day", "fingerprint", "params", "pos"],
+  "params_covers": ["ema_period", "chandelier_atr_mult", "max_hold_days"],
+  "params_missing": [
+   "stop_basis", "ratchet", "arm_hour+tz", "filter set",
+   "regime identity (hmm_fit_end, regime csv, calm lag)",
+   "cluster caps / family cap", "slippage assumption", "data source identity"
+  ],
+  "save_semantics": "rewrites the whole entries dict, no per-key merge; sharing one file across routes is a lost-update bug",
+  "advanced_only_in": "the --shadow-resume block of run_live_day (:413-:574)"
+ },
+
+ "skip_analysis": {
+  "total_skips": 64,
+  "days": {"2026-08-06": 16, "2026-08-07": 48},
+  "coverage_by_day": {
+   "2026-08-06": 0.0,
+   "2026-08-07": 0.11,
+   "2026-08-10..2026-08-21 (10 trading days)": 1.0
+  },
+  "blended_coverage": 0.59,
+  "categories": {
+   "different_row_count": 48,
+   "old_message_no_diagnostic_fields": 12,
+   "same_rowcount_different_content_hash": 4
+  },
+  "row_count_deltas": [-554, -553, -552],
+  "instrument_split_2026_08_07_skipped": {"MES": 12, "MNQ": 12, "MYM": 12, "M2K": 12, "MNKD": 0},
+  "root_cause": "checkpoint advanced on the spliced live frame over a parquet day only half held; the next 13:45 ET append changed those ~554 rows and the fingerprint stopped matching",
+  "why_MNKD_survived": "Tokyo day closes 00:00 JST = 15:00 UTC, before the 13:45 ET append",
+  "documented_in": "replay_checkpoint.advance_day docstring (:133), which names the 2026-08-07 incident and the 554-row figure",
+  "status": "fixed; zero skips in 10 consecutive trading days since 2026-08-10",
+  "remaining_gaps": [
+   "the params-mismatch refusal branch of usable() has NEVER fired in production (added 2026-08-17, commit c91f14f); it must be exercised deliberately before resume goes primary",
+   "usable() returns None for four distinct conditions with no reason code; the categories above had to be reconstructed by string-diffing two hashes"
+  ],
+  "suggested_reason_codes": [
+   "no_entry", "bad_last_day", "fingerprint_rowcount", "fingerprint_content",
+   "params_mismatch", "route_mismatch", "schema_mismatch"
+  ]
+ },
+
+ "route_checkpoint_design": {
+  "path": "global_index/replay_checkpoint.track1.json, passed via the existing --checkpoint-path flag",
+  "schema": 2,
+  "key_space": ["route", "sleeve", "instrument"],
+  "new_fields": ["route", "sleeve", "params_hash", "data_source"],
+  "keep": "the readable params string alongside params_hash: the hash decides, the string explains a refusal",
+  "no_shared_mutable_state": true
+ },
+
+ "equivalence": {
+  "position_fields": ["instrument", "sleeve", "direction", "qty", "entry_day", "entry_time", "entry_price", "stop", "target", "extreme/ratchet state"],
+  "trade_fields": ["instrument", "sleeve", "direction", "qty", "entry_day", "entry_time", "entry_price", "exit_day", "exit_time", "exit_price", "exit_reason", "points", "pnl", "hold_days"],
+  "comparison": "ordered sequence, not set",
+  "tolerance": "exact to stored rounding, no epsilon; the current shadow achieves 91/91 exact",
+  "promotion_rule": "N consecutive clean days at 100% coverage; a SKIPPED comparison counts as not-clean rather than neutral; one divergence resets the counter to zero"
+ },
+
+ "fail_closed": {
+  "missing_checkpoint": "no entries; existing positions still managed from broker+file; distinct outcome; no silent full-replay fallback",
+  "stale_checkpoint": "as missing; one bounded repair allowed, measured against the runtime gate",
+  "param_hash_mismatch": "hard refusal, no repair, explicit bootstrap required",
+  "oracle_divergence": "block new entries for the route, keep managing open positions, alert",
+  "broker_state_mismatch": "existing B3 halt; route state must not claim a position the broker does not show",
+  "host_slept_window": "record the window as UNOBSERVED, distinguishable from no-signal",
+  "inversion_note": "today an unusable checkpoint is safe because only the shadow comparison is skipped; under resume-primary it becomes a trading event, so every row above changes from quiet to loud"
+ },
+
+ "sleeve_incrementality": {
+  "normal_r4_filtered": {
+   "cross_day": true, "needs_checkpoint": true,
+   "state": "open position (dir, entry, entry_day, stop, extreme) + daily ATR series + EMA-50 warmup",
+   "bars": "5-minute bars 14:00-15:55 since last_day, plus one lead-in session for gap flags",
+   "verdict": "yes - this is the existing resume path with 91/91 matches"
+  },
+  "current_nkd_mnkd": {
+   "cross_day": true, "needs_checkpoint": true,
+   "state": "same shape on the Tokyo clock",
+   "verdict": "yes - strongest case; the only instrument whose checkpoint survived 2026-08-07"
+  },
+  "stress_mnq_g3_q7": {
+   "cross_day": false, "needs_checkpoint": false,
+   "state": "today's 09:30-10:30 bars on all four R4 instruments + each instrument's prior RTH close",
+   "verdict": "yes trivially; the risk is the opposite - a window the host did not observe cannot be resumed at all"
+  },
+  "calm_a_pcloc_atr15": {
+   "cross_day": false, "needs_checkpoint": false,
+   "state": "prior completed RTH session aggregates + D-1 Calm label + today's 09:30 open",
+   "verdict": "yes; D-1 context is sufficient by construction because the gate is explicitly D-1 causal"
+  },
+  "summary": "two of four sleeves need no historical checkpoint at all; more of Track 1 is checkpoint-free than the legacy route is"
+ },
+
+ "telemetry": {
+  "today_enough_for": "the legacy baseline",
+  "new_phases_for_resume_primary": ["ckpt_load", "ckpt_verify", "bars_fetch_incremental", "sleeve_update", "ckpt_advance_write", "oracle_replay"],
+  "deeper_markers_trigger": "only when run_day alone threatens the p95 gate, which is gate G5 as already written"
+ },
+
+ "availability": {
+  "claim": "a checkpoint cannot repair an observation the host never made",
+  "recoverable": {
+   "normal_r4": "yes - idempotent state model; a suspend costs entry latency",
+   "current_nkd": "yes",
+   "calm_a": "partially - single-shot 10:00 ET; a later fill is a different price",
+   "stress_mnq": "NO - the entry is the break of the 09:30-10:30 low between 10:35 and 12:30"
+  },
+  "recording_proposals": [
+   "a window-coverage ledger written by the route itself: window_open / window_closed plus observed slot count; absence of window_closed is itself the signal",
+   "reconcile against HEARTBEAT STALLED, which matched a real OS suspend 28 of 28 this session",
+   "cross-check the Windows Power-Troubleshooter log, which showed 39 suspends against the scheduler's 28"
+  ],
+  "requirement": "a sleeve must be able to say 'this window was not observed', and that must be distinguishable from 'this window produced no signal'"
+ },
+
+ "verdict": {
+  "direction": "sound; the evidence is stronger than the plan credits",
+  "R1_correction": "R1 targets a problem that is already fixed. Replace 'skipped comparisons have reason codes' with '100% comparison coverage sustained over the declared window, with a skipped comparison counted as a failed day rather than neutral'",
+  "additions": [
+   "exercise the params-refusal path deliberately and observe it refuse before promotion",
+   "params_hash must cover stop basis, ratchet, arm hour, filter set, regime identity, caps and cost"
+  ],
+  "unchanged": "R0 host availability still governs; no checkpoint work substitutes for an always-on host"
+ }
+}

@@ -1,0 +1,82 @@
+import json, sys
+from pathlib import Path
+sys.path.insert(0, str(Path.cwd()))
+from global_index import track1_gates as g
+
+out = {
+ "stage": "5F", "date": "2026-08-23",
+ "kind": "Stress rule promoted out of scratch; offline/provider-injected",
+ "verdict": "READY_FOR_BROKER_PROVIDER_SHADOW",
+ "verdict_reason": ("Precondition 2b is now closed OFFLINE for both slotted sleeves. The "
+                    "Stress rule mnq_only_g3_q7 was promoted into "
+                    "global_index/track1_stress_mnq.py and reproduces the canonical scratch "
+                    "chain EXACTLY on all three windows. The live source answers in both "
+                    "windows instead of refusing. The only thing left before a shadow period "
+                    "can collect anything is a real bar provider, which cannot be built or "
+                    "tested without a broker."),
+ "not_claimed": ["a broker provider works - every test injects FrameBarProvider",
+                 "Track 1 can trade - B1 is still open",
+                 "a live day has been run"],
+
+ "canonical_rule": {
+   "name": "mnq_only_g3_q7", "source_of_truth": "docs/futures/NORMAL_STRESS_CANDIDATES_2026-08-22.md",
+   "implementation_traced_to": ["scratch/stress_open_search_20260821.py (Rule, build_day_cache, "
+                                "peer_features, first_low_break, exit_trade)",
+                                "scratch/stress_switch_full_replay_20260822.py (Scenario, "
+                                "make_rule, build_rule_with_levels, load_stress)"],
+   "reached_the_measured_book_via": ("stress_with_nkd_probe.load_r4_and_nkd -> full.load_stress "
+                                     "-> combined_stop_risk_audit.load_all -> "
+                                     "track1_replay_source.candidates"),
+   "instrument": "MNQ", "direction": "SHORT", "qty": 7,
+   "setup_time": "10:30", "known_time": "10:35",
+   "entry_window": "10:35-12:30", "exit_time": "15:55",
+   "breadth_min": 4, "gapdown_min": 3, "gapdown_at": -0.004, "avg_gap_max": -0.001,
+   "wide_min": 0, "rr": 1.5, "stop_pad": 0.001, "max_stop_pct": 0.02,
+   "stop": "pre_high * 1.001", "target": "entry - 1.5 * (stop - entry)",
+   "entry_fill": "min(bar open, pre_low) on the first 1-min bar breaking the 09:30-10:30 low",
+   "risk": "(stop - entry) * point_value * qty",
+   "regime_label_used": None,
+   "why_no_label": ("built deliberately to avoid the lag-0 daily Stress label an earlier "
+                    "candidate leaked on"),
+ },
+
+ "equivalence": {
+   "harness": "scratch/track1_stage5f_stress_equivalence_20260823.py",
+   "compared_fields": ["day", "instrument", "direction", "entry_time", "exit_time", "entry",
+                       "stop", "target", "exit", "exit_reason", "qty", "pnl_sized",
+                       "risk_sized"],
+   "windows": {
+     "vault2026": {"rows": 4, "pnl_sized": -405.72, "identical": True},
+     "vault2025": {"rows": 3, "pnl_sized": 4530.96, "identical": True},
+     "floor": {"rows": 50, "pnl_sized": 23748.85, "identical": True},
+   },
+   "total_rows": 57, "pnl_delta": 0.0, "verdict": "EQUIVALENT",
+ },
+
+ "causality": {
+   "setup_bar_is_left_labelled": True,
+   "why_entry_starts_1035": ("the 5-minute bar labelled 10:30 covers 10:30-10:35, so its close "
+                             "is not known until 10:35; the entry scan starts at the first "
+                             "1-minute bar stamped 10:35, which is the first bar not inside it"),
+   "slot_bounded_entry_scan": True,
+   "no_same_bar_exit": True,
+   "verified_on_a_real_day": {"day": "2026-02-05", "historical_entry": 25085.75,
+                              "historical_entry_time": "11:14",
+                              "live_slot_1035": "[]", "live_slot_1100": "[]",
+                              "live_slot_1114": "1 candidate, entry 25085.75, stop 25521.99650",
+                              "risk": 6107.45},
+ },
+
+ "remaining": [
+   {"what": "a real bar provider (IBKRBarProvider wrapping the runner's broker)",
+    "blocking": "the shadow period", "testable_offline": False},
+   {"what": "B1 - legacy retirement or a separate account", "blocking": "orders",
+    "testable_offline": False},
+ ],
+ "gate_state": {"blocking": [b.id for b in g.blocking()],
+                "self_check": g.self_check(),
+                "orders_possible": g.may_enable_orders()[0]},
+}
+Path("scratch/track1_stage5f_stress_live_source_20260823.json").write_text(
+    json.dumps(out, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+print("verdict:", out["verdict"], "| blocking:", out["gate_state"]["blocking"])

@@ -1,0 +1,530 @@
+{
+  "baseline_6y_continuous": {
+    "meta": {
+      "generated": "2026-07-08",
+      "data_source": "window_debug_5min.pkl + window_debug_daily.pkl",
+      "is_period": "2017-01-03 to 2022-12-30",
+      "account_equity": 50000,
+      "cb_semantics": {
+        "count_stop_hit": true,
+        "count_target_hit": true,
+        "count_time_stop": true,
+        "count_daily_drawdown_cb": true,
+        "count_safety_mode": false,
+        "count_eod": false
+      },
+      "engine": "BacktestEngine (engine.py) == RefactoredBacktestEngine (engine_refactored.py)",
+      "trade_count": 605,
+      "total_pnl": 15019.79,
+      "by_strategy": {
+        "GF_SHORT": {
+          "trades": 12,
+          "pnl": 283.39
+        },
+        "ORB": {
+          "trades": 75,
+          "pnl": 1214.72
+        },
+        "PE_SHORT": {
+          "trades": 29,
+          "pnl": 7137.79
+        },
+        "STRESS_MID": {
+          "trades": 28,
+          "pnl": 242.03
+        },
+        "STRESS_ORB": {
+          "trades": 108,
+          "pnl": 507.18
+        },
+        "TREND_FOLLOW": {
+          "trades": 353,
+          "pnl": 5634.67
+        }
+      },
+      "daily_cb_events_in_is": {
+        "days_fired": 13,
+        "positions_closed": 10,
+        "note": "3 days fired with 0 open positions at CB bar"
+      },
+      "vs_old_baseline": {
+        "old_trades": 604,
+        "old_pnl": 15952.15,
+        "old_cb_semantics": "ORIG: only STOP/TARGET/TIME_STOP counted",
+        "delta_trades": 1,
+        "delta_pnl": -932.36,
+        "note": "Same data source (window_debug_5min.pkl). Delta caused by CB semantics change only."
+      }
+    },
+    "total": 15019.79,
+    "trades": 605,
+    "by_strategy": [
+      {
+        "strategy": "PE_SHORT",
+        "trades": 29,
+        "entry_days": 28,
+        "net": 7137.79,
+        "per_trade": 246.13,
+        "win_rate": 69.0,
+        "gross": 7347.04,
+        "costs": 209.25,
+        "share_of_total": 47.5,
+        "bootstrap": {
+          "n_trades": 29,
+          "n_entry_days": 28,
+          "trades_per_day_mean": 1.04,
+          "trades_per_day_max": 2,
+          "observed_total": 7137.79,
+          "boot_ci95_low": 826.89,
+          "boot_median": 7150.23,
+          "boot_ci95_high": 13611.46,
+          "frac_boot_positive": 0.986,
+          "p_one_sided_vs_centred_null": 0.0139,
+          "n_boot": 10000,
+          "seed": 20260826
+        }
+      },
+      {
+        "strategy": "TREND_FOLLOW",
+        "trades": 353,
+        "entry_days": 203,
+        "net": 5634.67,
+        "per_trade": 15.96,
+        "win_rate": 48.4,
+        "gross": 7054.97,
+        "costs": 1420.29,
+        "share_of_total": 37.5,
+        "bootstrap": {
+          "n_trades": 353,
+          "n_entry_days": 203,
+          "trades_per_day_mean": 1.74,
+          "trades_per_day_max": 3,
+          "observed_total": 5634.67,
+          "boot_ci95_low": -4368.62,
+          "boot_median": 5575.78,
+          "boot_ci95_high": 15706.74,
+          "frac_boot_positive": 0.8599,
+          "p_one_sided_vs_centred_null": 0.1343,
+          "n_boot": 10000,
+          "seed": 20260826
+        }
+      },
+      {
+        "strategy": "ORB",
+        "trades": 75,
+        "entry_days": 59,
+        "net": 1214.72,
+        "per_trade": 16.2,
+        "win_rate": 53.3,
+        "gross": 1720.98,
+        "costs": 506.26,
+        "share_of_total": 8.1,
+        "bootstrap": {
+          "n_trades": 75,
+          "n_entry_days": 59,
+          "trades_per_day_mean": 1.27,
+          "trades_per_day_max": 2,
+          "observed_total": 1214.72,
+          "boot_ci95_low": -4706.07,
+          "boot_median": 1247.89,
+          "boot_ci95_high": 7059.4,
+          "frac_boot_positive": 0.6604,
+          "p_one_sided_vs_centred_null": 0.3411,
+          "n_boot": 10000,
+          "seed": 20260826
+        }
+      },
+      {
+        "strategy": "STRESS_ORB",
+        "trades": 108,
+        "entry_days": 69,
+        "net": 507.18,
+        "per_trade": 4.7,
+        "win_rate": 47.2,
+        "gross": 892.31,
+        "costs": 385.12,
+        "share_of_total": 3.4,
+        "bootstrap": {
+          "n_trades": 108,
+          "n_entry_days": 69,
+          "trades_per_day_mean": 1.57,
+          "trades_per_day_max": 3,
+          "observed_total": 507.18,
+          "boot_ci95_low": -922.5,
+          "boot_median": 499.02,
+          "boot_ci95_high": 1966.68,
+          "frac_boot_positive": 0.7597,
+          "p_one_sided_vs_centred_null": 0.2439,
+          "n_boot": 10000,
+          "seed": 20260826
+        }
+      },
+      {
+        "strategy": "GF_SHORT",
+        "trades": 12,
+        "entry_days": 10,
+        "net": 283.39,
+        "per_trade": 23.62,
+        "win_rate": 75.0,
+        "gross": 304.78,
+        "costs": 21.39,
+        "share_of_total": 1.9,
+        "bootstrap": {
+          "error": "ch\u1ec9 10 ng\u00e0y v\u00e0o l\u1ec7nh \u2014 d\u01b0\u1edbi ng\u01b0\u1ee1ng 20 \u0111\u00e3 \u0111\u1eb7t tr\u01b0\u1edbc",
+          "n_entry_days": 10
+        }
+      },
+      {
+        "strategy": "STRESS_MID",
+        "trades": 28,
+        "entry_days": 26,
+        "net": 242.03,
+        "per_trade": 8.64,
+        "win_rate": 46.4,
+        "gross": 522.2,
+        "costs": 280.17,
+        "share_of_total": 1.6,
+        "bootstrap": {
+          "n_trades": 28,
+          "n_entry_days": 26,
+          "trades_per_day_mean": 1.08,
+          "trades_per_day_max": 2,
+          "observed_total": 242.03,
+          "boot_ci95_low": -1568.68,
+          "boot_median": 252.43,
+          "boot_ci95_high": 2032.94,
+          "frac_boot_positive": 0.6056,
+          "p_one_sided_vs_centred_null": 0.4004,
+          "n_boot": 10000,
+          "seed": 20260826
+        }
+      }
+    ],
+    "self_check": {
+      "SC1": true,
+      "SC2": true
+    }
+  },
+  "by_strategy_year_net": {
+    "GF_SHORT": {
+      "2017": -12.33,
+      "2018": 19.7,
+      "2019": 0.0,
+      "2020": 54.56,
+      "2021": 42.21,
+      "2022": 179.24
+    },
+    "ORB": {
+      "2017": 1028.84,
+      "2018": -649.27,
+      "2019": 1417.88,
+      "2020": -382.06,
+      "2021": 580.17,
+      "2022": -780.84
+    },
+    "PE_SHORT": {
+      "2017": 527.36,
+      "2018": 151.03,
+      "2019": 1928.77,
+      "2020": 1042.02,
+      "2021": 2170.05,
+      "2022": 1318.55
+    },
+    "STRESS_MID": {
+      "2017": 0.0,
+      "2018": 100.59,
+      "2019": -203.67,
+      "2020": 743.28,
+      "2021": 144.73,
+      "2022": -542.9
+    },
+    "STRESS_ORB": {
+      "2017": 0.0,
+      "2018": 69.32,
+      "2019": -5.02,
+      "2020": 259.5,
+      "2021": 173.27,
+      "2022": 10.12
+    },
+    "TREND_FOLLOW": {
+      "2017": -32.63,
+      "2018": 4715.32,
+      "2019": 4076.12,
+      "2020": -1233.09,
+      "2021": -1824.17,
+      "2022": -66.87
+    }
+  },
+  "by_strategy_year_trades": {
+    "GF_SHORT": {
+      "2017": 1,
+      "2018": 2,
+      "2019": 0,
+      "2020": 3,
+      "2021": 1,
+      "2022": 5
+    },
+    "ORB": {
+      "2017": 12,
+      "2018": 19,
+      "2019": 8,
+      "2020": 13,
+      "2021": 16,
+      "2022": 7
+    },
+    "PE_SHORT": {
+      "2017": 1,
+      "2018": 4,
+      "2019": 6,
+      "2020": 7,
+      "2021": 6,
+      "2022": 5
+    },
+    "STRESS_MID": {
+      "2017": 0,
+      "2018": 1,
+      "2019": 5,
+      "2020": 5,
+      "2021": 6,
+      "2022": 11
+    },
+    "STRESS_ORB": {
+      "2017": 0,
+      "2018": 5,
+      "2019": 10,
+      "2020": 25,
+      "2021": 18,
+      "2022": 50
+    },
+    "TREND_FOLLOW": {
+      "2017": 39,
+      "2018": 63,
+      "2019": 64,
+      "2020": 58,
+      "2021": 59,
+      "2022": 70
+    }
+  },
+  "universes": {
+    "base_universe_size": 37,
+    "pe_short_calendar_size": 62,
+    "expanded_beyond_base": 25,
+    "pe_short_tickers_traded": 18,
+    "pe_short_tickers_outside_base": [
+      "CAT",
+      "GE",
+      "MRK",
+      "NOW",
+      "PANW",
+      "PYPL"
+    ],
+    "pe_short_trades_outside_base": 12,
+    "pe_short_pnl_outside_base": 3586.67,
+    "pe_short_pnl_outside_base_pct": 50.2,
+    "earnings_events_in_window": 1098,
+    "pe_short_fire_rate_pct": 2.64
+  },
+  "snapshot_20260707": {
+    "config": "t\u1eebng n\u0103m \u0111\u1eb7t l\u1ea1i $50k \u00b7 b\u1ed9 qu\u00e9t ch\u1ecdn m\u00e3 B\u1eacT \u00b7 PDT T\u1eaeT",
+    "total": 33550.18,
+    "trades": 1292,
+    "by_strategy": {
+      "TREND_FOLLOW": {
+        "trades": 656,
+        "net": 14725.31,
+        "per_trade": 22.45,
+        "share_pct": 43.9,
+        "positive_years": 5,
+        "active_years": 6
+      },
+      "PE_SHORT": {
+        "trades": 29,
+        "net": 6888.15,
+        "per_trade": 237.52,
+        "share_pct": 20.5,
+        "positive_years": 6,
+        "active_years": 6
+      },
+      "ORB": {
+        "trades": 80,
+        "net": 6681.64,
+        "per_trade": 83.52,
+        "share_pct": 19.9,
+        "positive_years": 5,
+        "active_years": 6
+      },
+      "STRESS_MID": {
+        "trades": 156,
+        "net": 5282.5,
+        "per_trade": 33.86,
+        "share_pct": 15.7,
+        "positive_years": 4,
+        "active_years": 5
+      },
+      "GF_SHORT": {
+        "trades": 33,
+        "net": 203.75,
+        "per_trade": 6.17,
+        "share_pct": 0.6,
+        "positive_years": 4,
+        "active_years": 5
+      },
+      "STRESS_ORB": {
+        "trades": 338,
+        "net": -231.17,
+        "per_trade": -0.68,
+        "share_pct": -0.7,
+        "positive_years": 2,
+        "active_years": 5
+      }
+    },
+    "by_strategy_year": {
+      "GF_SHORT": {
+        "2017": -63.56,
+        "2018": 19.7,
+        "2019": 0.0,
+        "2020": 17.94,
+        "2021": 24.4,
+        "2022": 205.26
+      },
+      "ORB": {
+        "2017": 1225.77,
+        "2018": 2263.3,
+        "2019": 930.58,
+        "2020": 1115.06,
+        "2021": 2441.45,
+        "2022": -1294.51
+      },
+      "PE_SHORT": {
+        "2017": 527.36,
+        "2018": 151.03,
+        "2019": 1678.74,
+        "2020": 1042.02,
+        "2021": 2170.05,
+        "2022": 1318.93
+      },
+      "STRESS_MID": {
+        "2017": 0.0,
+        "2018": 786.39,
+        "2019": -220.99,
+        "2020": 2056.34,
+        "2021": 458.91,
+        "2022": 2201.84
+      },
+      "STRESS_ORB": {
+        "2017": 0.0,
+        "2018": -336.41,
+        "2019": -118.6,
+        "2020": 499.08,
+        "2021": 46.46,
+        "2022": -321.7
+      },
+      "TREND_FOLLOW": {
+        "2017": 1058.84,
+        "2018": 4302.64,
+        "2019": 40.65,
+        "2020": 4150.12,
+        "2021": -42.69,
+        "2022": 5215.76
+      }
+    }
+  },
+  "config_comparison": {
+    "TREND_FOLLOW": {
+      "snapshot": {
+        "trades": 656,
+        "net": 14725.31,
+        "per_trade": 22.45,
+        "share_pct": 43.9,
+        "positive_years": 5,
+        "active_years": 6
+      },
+      "continuous": {
+        "trades": 353,
+        "net": 5634.67,
+        "positive_years": 2,
+        "active_years": 6
+      }
+    },
+    "PE_SHORT": {
+      "snapshot": {
+        "trades": 29,
+        "net": 6888.15,
+        "per_trade": 237.52,
+        "share_pct": 20.5,
+        "positive_years": 6,
+        "active_years": 6
+      },
+      "continuous": {
+        "trades": 29,
+        "net": 7137.79,
+        "positive_years": 6,
+        "active_years": 6
+      }
+    },
+    "ORB": {
+      "snapshot": {
+        "trades": 80,
+        "net": 6681.64,
+        "per_trade": 83.52,
+        "share_pct": 19.9,
+        "positive_years": 5,
+        "active_years": 6
+      },
+      "continuous": {
+        "trades": 75,
+        "net": 1214.72,
+        "positive_years": 3,
+        "active_years": 6
+      }
+    },
+    "STRESS_MID": {
+      "snapshot": {
+        "trades": 156,
+        "net": 5282.5,
+        "per_trade": 33.86,
+        "share_pct": 15.7,
+        "positive_years": 4,
+        "active_years": 5
+      },
+      "continuous": {
+        "trades": 28,
+        "net": 242.03,
+        "positive_years": 3,
+        "active_years": 5
+      }
+    },
+    "GF_SHORT": {
+      "snapshot": {
+        "trades": 33,
+        "net": 203.75,
+        "per_trade": 6.17,
+        "share_pct": 0.6,
+        "positive_years": 4,
+        "active_years": 5
+      },
+      "continuous": {
+        "trades": 12,
+        "net": 283.39,
+        "positive_years": 4,
+        "active_years": 5
+      }
+    },
+    "STRESS_ORB": {
+      "snapshot": {
+        "trades": 338,
+        "net": -231.17,
+        "per_trade": -0.68,
+        "share_pct": -0.7,
+        "positive_years": 2,
+        "active_years": 5
+      },
+      "continuous": {
+        "trades": 108,
+        "net": 507.18,
+        "positive_years": 4,
+        "active_years": 5
+      }
+    }
+  }
+}

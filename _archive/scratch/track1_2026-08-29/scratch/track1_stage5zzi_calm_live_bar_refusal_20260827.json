@@ -1,0 +1,171 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZI",
+  "title": "Calm live phase gate refusal — root cause",
+  "when_et": "2026-08-27",
+
+  "answers": {
+    "root_cause": "the bar feed returned no bars; the gate was handed a frame with no session in it",
+    "gate_conditions_failed": {
+      "DECIDE": ["missing_session", "stale", "partial_coverage"],
+      "OBSERVE": ["missing_session", "entry_quote_absent", "stale", "partial_coverage"]
+    },
+    "fix_class": ["PROVIDER_LAG", "EVIDENCE_BUG"],
+    "fix_class_note": "PROVIDER_LAG for the refusal — external, operator action, no code change. EVIDENCE_BUG for the record, fixed here.",
+    "refusal_was_correct": true,
+    "code_changed": "the evidence path only — provider, joined frame, observation row",
+    "requirement_threshold_or_strategy_changed": false,
+    "operator_action_required": true,
+    "orders_possible": false
+  },
+
+  "the_morning": {
+    "decide": {"at_et": "09:32:06", "codes": ["missing_session", "stale", "partial_coverage"]},
+    "observe": {"at_et": "10:02:10", "codes": ["missing_session", "entry_quote_absent",
+                                               "stale", "partial_coverage"]},
+    "recorded_row": {
+      "live_rows_fetched": 0, "live_rows_offered": 0, "live_rows_appended": 0,
+      "splice_result": "nothing_new", "splice_detail": "no live bars offered",
+      "provider_error": null, "error": null,
+      "final_frame_last_ts": "2026-08-26 13:44:00-04:00"
+    },
+    "join_dropped_anything": false,
+    "why_final_ts_is_yesterday_1344": "the parquet's own 13:45 ET append boundary — the frozen half with no live half on top"
+  },
+
+  "the_outage": {
+    "not_calm_specific": true,
+    "nkd_overnight_0110_0255_et": "1806 to 1910 rows per slot, normal",
+    "mes_mnq_from_0932_et": 0,
+    "stress_from_1035_et": 0,
+    "last_fetch_with_rows": {"ts": "2026-08-27T06:55:35+00:00", "slot": "TRACK1_NKD_0255",
+                             "inst": "MNKD", "rows": 1910},
+    "first_fetch_with_none": {"ts": "2026-08-27T07:05:10+00:00", "slot": "TRACK1_CALM_1000",
+                              "inst": "MES", "rows": 0},
+    "boundary_et": "between 02:55 and 03:05",
+    "yesterday_same_instruments": "fetched normally (MES 2340 at the Calm slot, MNQ through the Stress window)",
+    "roll_involved": false,
+    "roll_detail": "MES/MNQ front month 202609, rolled 2026-06-12, next 2026-09-11"
+  },
+
+  "the_probe": {
+    "read_only": true, "client_id": 95, "orders": 0, "writes": 0,
+    "ibkr_code": 162,
+    "message": "Historical Market Data Service error message: Trading TWS session is connected from a different IP address",
+    "rows": {"MES": 0, "MNQ": 0, "NKD": 0}
+  },
+
+  "the_evidence_defect": {
+    "where": "global_index/ibkr_broker.py::_fetch_raw",
+    "shape": "returns pd.DataFrame() both on `if not bars` and inside `except Exception`",
+    "consequence": "a refused request and a quiet market arrive identical; the difference is gone before anything can record it",
+    "family": "an empty answer standing in for an error — same shape as the scheduler process scan returning [] for both 'none running' and 'could not look'",
+    "why_fixed_at_the_provider": "ib_insync does not raise on 162; it emits on an event and returns an empty list. The event fires before either return, and it is the only place the difference still exists."
+  },
+
+  "the_fix": {
+    "hops": [
+      "IBKRBarProvider.fetch_session_bars listens on errorEvent during the request and keeps named historical-service refusals in last_error",
+      "JoinedFrame.provider_error carries it, and as_dict carries it out",
+      "the data observation row emits it, or None when the feed genuinely said nothing"
+    ],
+    "codes_collected": [162, 165, 200, 354, 366, 420, 10197],
+    "unrelated_chatter_collected": false,
+    "duplicates_collapsed": true,
+    "handler_removed_in_finally": true,
+    "fail_soft_when": ["broker has no _ib", "errorEvent will not take a handler",
+                       "the attribute itself raises"],
+    "shadow_paper_identity_preserved": true,
+    "strategy_meaning_changed": false
+  },
+
+  "reproduced": {
+    "offline": true, "network": false, "provider_connected": false,
+    "runtime_evidence_modified": false,
+    "silent_provider": {"DECIDE": {"allow": false, "codes_match_recorded": true},
+                        "OBSERVE": {"allow": false, "codes_match_recorded": true}},
+    "answering_provider_2d": {"DECIDE": {"allow": true, "codes": []},
+                              "OBSERVE": {"allow": true, "codes": []}},
+    "why_2d_matters": "the frozen parquet stops at yesterday 13:44, so yesterday's 13:45-16:00 close arrives on the same live fetch — a stub offering only today leaves partial_coverage standing and would 'find' a requirement bug that is really the stub's shape"
+  },
+
+  "cause_questions": {
+    "provider_returned_bars": false,
+    "join_dropped_them": false,
+    "requirement_asked_for_an_impossible_bar": false,
+    "clock_wrong": false,
+    "stale_daily_spy_file": false,
+    "calm_specific": false,
+    "roll": false,
+    "evidence_could_say_any_of_it": false
+  },
+
+  "verified_vs_inferred": {
+    "verified": [
+      "every fetch from 03:05 ET returned zero rows",
+      "the boundary at 06:55:35Z / 07:05:10Z",
+      "the recorded gate codes, and their offline reproduction",
+      "the probe on client id 95 received error 162 and zero rows on all three instruments"
+    ],
+    "inferred": [
+      "that error 162 was the answer to the 09:32 and 10:02 fetches specifically — the probe ran later, and those rows cannot say, BECAUSE THE FIELD DID NOT EXIST. Strong (one continuous outage, one boundary, one named cause at the same gateway) and exactly the inference nobody should have to make. From the next fetch onward the row says it outright."
+    ]
+  },
+
+  "operator_action": {
+    "code_can_fix_it": false,
+    "steps": [
+      "log out the other TWS or IB Gateway session holding this account — only one may hold it, and paper and live are the same login",
+      "confirm with a read-only fetch; a slot's own row now carries the reason if it is still refused",
+      "until the feed answers, every Track 1 slot refuses — correct behaviour, the day classifies incomplete and does not count"
+    ],
+    "restarts_needed": 0,
+    "runtime_evidence_should_be_cleared": false,
+    "why_keep_it": "the refusals are the record of a day the feed was down"
+  },
+
+  "tests": {
+    "new_file": "scratch/test_track1_stage5zzi_calm_live_bar_refusal_20260827.py",
+    "new_count": 19,
+    "broker_contacts": 0,
+    "runtime_writes": 0,
+    "named_by_the_stage": ["DECIDE asks only for bars it can causally have",
+                           "OBSERVE asks only for bars it can causally have",
+                           "missing provider bars still refuse",
+                           "available correct bars pass"],
+    "mutations": {
+      "total": 6, "red": 6,
+      "list": ["the listener stops collecting",
+               "the frame carries it but as_dict drops it",
+               "an absent message becomes an empty string in the row",
+               "the handler is left attached after the fetch",
+               "DECIDE may ask for the bar still forming at its own instant",
+               "OBSERVE stops needing the entry quote bar"],
+      "restored_byte_identical": true,
+      "exit_5_counted_as_red": false
+    },
+    "defects_the_tests_found_in_my_own_work": [
+      "as_dict did not carry the new field — a field added to a dataclass and shown to nobody",
+      "the mutation harness silently SKIPPED three mutations: these files are CRLF, so any anchor with a bare newline matched nothing, and a skipped mutation reads as 'we tried' while proving as much as not running it",
+      "hasattr only swallows AttributeError, so a property raising anything else took the whole fetch down — the attach is now guarded outright"
+    ],
+    "regression_suites": {"passed": 164, "pre_existing_failures": 7,
+                          "where": ["5ZA causal slot audit", "5ZB operational audit"],
+                          "family": "the deferred Calm slot-split roster pins",
+                          "evidence": ["71 == 70 slot count", "roska4_calm 2 vs pinned 1",
+                                       "DECIDE gated with the unsplit sleeve's 10:00 rule"],
+                          "neither_suite_reads_a_field_this_stage_touched": true}
+  },
+
+  "safety_confirmed": {
+    "orders_possible": false,
+    "blocking": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "confirmation_file": "ABSENT",
+    "orders_dir": "ABSENT",
+    "TRACK1_ORDERS_APPROVED": null,
+    "restarts": 0,
+    "runtime_evidence_modified_or_deleted": false,
+    "ibkr_connections": 1,
+    "ibkr_connection_purpose": "read-only probe, client id 95, reported before it ran"
+  }
+}

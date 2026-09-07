@@ -1,0 +1,37 @@
+{
+ "vault2026": {
+  "current_cap_enginefix": {
+   "net": 6743.0,
+   "calmar": 1.62,
+   "pf": 1.46,
+   "sharpe": 2.43,
+   "maxdd": 7520.0,
+   "maxdd_pct": 15.0,
+   "fix_n": 0,
+   "fix_dollars": 0.0,
+   "halts": 0
+  },
+  "strict025_enginefix": {
+   "net": 5183.0,
+   "calmar": 1.94,
+   "pf": 1.48,
+   "sharpe": 2.36,
+   "maxdd": 4844.0,
+   "maxdd_pct": 9.7,
+   "fix_n": 0,
+   "fix_dollars": 0.0,
+   "halts": 0
+  },
+  "strict030_enginefix": {
+   "net": 5273.0,
+   "calmar": 1.86,
+   "pf": 1.46,
+   "sharpe": 2.33,
+   "maxdd": 5116.0,
+   "maxdd_pct": 10.2,
+   "fix_n": 0,
+   "fix_dollars": 0.0,
+   "halts": 0
+  }
+ }
+}

@@ -1,0 +1,140 @@
+{
+ "floor": {
+  "MES": {
+   "range_checked": 119,
+   "range_bad": 0,
+   "range_mutation_caught": 119,
+   "vol_checked": 119,
+   "vol_bad": 0,
+   "vol_mutation_caught": 71,
+   "entrybar_bad": 0,
+   "ok": true,
+   "filter_stats": null
+  },
+  "MNQ": {
+   "range_checked": 119,
+   "range_bad": 0,
+   "range_mutation_caught": 119,
+   "vol_checked": 119,
+   "vol_bad": 0,
+   "vol_mutation_caught": 61,
+   "entrybar_bad": 0,
+   "ok": true,
+   "filter_stats": null
+  },
+  "MYM": {
+   "range_checked": 119,
+   "range_bad": 0,
+   "range_mutation_caught": 119,
+   "vol_checked": 119,
+   "vol_bad": 0,
+   "vol_mutation_caught": 67,
+   "entrybar_bad": 0,
+   "ok": true,
+   "filter_stats": null
+  },
+  "M2K": {
+   "range_checked": 119,
+   "range_bad": 0,
+   "range_mutation_caught": 119,
+   "vol_checked": 119,
+   "vol_bad": 0,
+   "vol_mutation_caught": 77,
+   "entrybar_bad": 0,
+   "ok": true,
+   "filter_stats": null
+  }
+ },
+ "vault2025": {
+  "MES": {
+   "range_checked": 119,
+   "range_bad": 0,
+   "range_mutation_caught": 119,
+   "vol_checked": 117,
+   "vol_bad": 0,
+   "vol_mutation_caught": 67,
+   "entrybar_bad": 0,
+   "ok": true,
+   "filter_stats": null
+  },
+  "MNQ": {
+   "range_checked": 119,
+   "range_bad": 0,
+   "range_mutation_caught": 119,
+   "vol_checked": 117,
+   "vol_bad": 0,
+   "vol_mutation_caught": 65,
+   "entrybar_bad": 0,
+   "ok": true,
+   "filter_stats": null
+  },
+  "MYM": {
+   "range_checked": 119,
+   "range_bad": 0,
+   "range_mutation_caught": 119,
+   "vol_checked": 117,
+   "vol_bad": 0,
+   "vol_mutation_caught": 81,
+   "entrybar_bad": 0,
+   "ok": true,
+   "filter_stats": null
+  },
+  "M2K": {
+   "range_checked": 119,
+   "range_bad": 0,
+   "range_mutation_caught": 119,
+   "vol_checked": 117,
+   "vol_bad": 0,
+   "vol_mutation_caught": 61,
+   "entrybar_bad": 0,
+   "ok": true,
+   "filter_stats": null
+  }
+ },
+ "vault2026": {
+  "MES": {
+   "range_checked": 119,
+   "range_bad": 0,
+   "range_mutation_caught": 119,
+   "vol_checked": 116,
+   "vol_bad": 0,
+   "vol_mutation_caught": 73,
+   "entrybar_bad": 0,
+   "ok": true,
+   "filter_stats": null
+  },
+  "MNQ": {
+   "range_checked": 119,
+   "range_bad": 0,
+   "range_mutation_caught": 119,
+   "vol_checked": 116,
+   "vol_bad": 0,
+   "vol_mutation_caught": 68,
+   "entrybar_bad": 0,
+   "ok": true,
+   "filter_stats": null
+  },
+  "MYM": {
+   "range_checked": 119,
+   "range_bad": 0,
+   "range_mutation_caught": 119,
+   "vol_checked": 116,
+   "vol_bad": 0,
+   "vol_mutation_caught": 73,
+   "entrybar_bad": 0,
+   "ok": true,
+   "filter_stats": null
+  },
+  "M2K": {
+   "range_checked": 119,
+   "range_bad": 0,
+   "range_mutation_caught": 119,
+   "vol_checked": 116,
+   "vol_bad": 0,
+   "vol_mutation_caught": 83,
+   "entrybar_bad": 0,
+   "ok": true,
+   "filter_stats": null
+  }
+ }
+}

@@ -1,0 +1,88 @@
+======================================================================================================================
+HOD_CONSOLIDATION_BREAKOUT_SCALP — Stage A + controls  [1min]
+======================================================================================================================
+  bars 17,754,609 | tickers 314 | sessions 839 | 2023-03-28 .. 2026-07-31
+  NOTE: a 5-bar consolidation is 5 min at this resolution.
+  NOTE: 1-min bars cover 09:30-10:44 only — one partial bucket.
+  marks: (5, 10, 15) bars = 5/10/15 minutes
+    scanned 25/314 tickers, 289,875 events
+    scanned 50/314 tickers, 685,367 events
+    scanned 75/314 tickers, 916,958 events
+    scanned 100/314 tickers, 1,280,997 events
+    scanned 125/314 tickers, 1,594,594 events
+    scanned 150/314 tickers, 1,984,426 events
+    scanned 175/314 tickers, 2,264,080 events
+    scanned 200/314 tickers, 2,594,205 events
+    scanned 225/314 tickers, 2,891,117 events
+    scanned 250/314 tickers, 3,101,811 events
+    scanned 275/314 tickers, 3,389,671 events
+    scanned 300/314 tickers, 3,647,502 events
+    scanned 314/314 tickers, 3,805,627 events
+  events cached -> hod_cons_events_1min.parquet
+  frame memory: 624 MB
+
+  SIGNAL FUNNEL (core config {'hod': 0.01, 'cons_bars': 5, 'max_range': 0.0035, 'vol_mult': 1.5})
+    consolidations near extreme, compressed, valid risk : 3,805,627
+      TREATED           71,655
+      C1_volfail        77,640
+      C2_nobreak     3,656,332
+
+  risk distance % (TREATED): mean 0.398 median 0.387 p10 0.225 p90 0.583
+    round-trip 2 bps = 0.040% of price = 10% of median risk
+    round-trip 5 bps = 0.100% of price = 26% of median risk   <-- COSTS DOMINATE
+    contraction ratio (cons/prev range): median 0.667
+
+======================================================================================================================
+STAGE A — excursion in R, signed return %, path probs (conservative bound)
+======================================================================================================================
+  group                           n   MFE5m  MFE10m  MFE15m   MAE5m  MAE10m  MAE15m   sret15    +.5R     +1R   +1.5R
+  TREATED                    71,655   0.463   0.676   0.828  -0.449  -0.644  -0.786   0.0115   45.8%   27.1%   13.5%
+  C1_volfail                 77,640   0.452   0.652   0.797  -0.438  -0.635  -0.777   0.0053   46.0%   26.5%   12.6%
+  C2_nobreak              3,656,332   2.668   3.972   4.935  -2.805  -4.035  -5.055   0.0017   45.3%   39.8%   28.2%
+
+  ambiguity rate (one bar spans +1R and -1R): 0.02%   LOW — the ordering caveat is immaterial here
+  P(+1R before -1R): conservative 27.1%  optimistic 27.1%
+
+  WHY THE CONTROL COMPARISON USES sret, NOT R:
+    C2_nobreak did not break out, so its entry sits inside the
+    consolidation and its risk denominator (entry - cons_low) is
+    tiny. That inflates its R-normalised MFE/MAE without meaning
+    anything. Signed return in % shares one denominator across all
+    three groups and is the only like-for-like measure here.
+
+  CONTROL COMPARISON — signed return at 15m (direction-adjusted)
+    TREATED        mean +0.0115%  95% CI [+0.0080,+0.0151]  P(<=0) 0.000
+    C1_volfail     mean +0.0053%  95% CI [+0.0023,+0.0083]  P(<=0) 0.000
+    C2_nobreak     mean +0.0016%  95% CI [+0.0001,+0.0033]  P(<=0) 0.020  [boot on 200,000 of 2,931,578]
+    TREATED minus C1_volfail   +0.0062%
+    TREATED minus C2_nobreak   +0.0099%
+
+======================================================================================================================
+BREAKDOWN — TREATED only
+======================================================================================================================
+  group                           n   MFE5m  MFE10m  MFE15m   MAE5m  MAE10m  MAE15m   sret15    +.5R     +1R   +1.5R
+  LONG                       36,261   0.463   0.676   0.828  -0.444  -0.638  -0.781   0.0135   45.7%   26.8%   13.3%
+  SHORT                      35,394   0.464   0.675   0.829  -0.454  -0.649  -0.791   0.0095   45.9%   27.5%   13.7%
+
+  09:45-11:00                65,884   0.462   0.675   0.830  -0.449  -0.644  -0.787   0.0120   45.7%   26.9%   13.4%
+  11:00-14:00              (none)
+  14:00-15:45              (none)
+
+  2023                       17,641   0.457   0.669   0.818  -0.440  -0.632  -0.776   0.0094   46.5%   26.8%   13.1%
+  2024                       24,151   0.464   0.672   0.823  -0.449  -0.645  -0.787   0.0120   45.6%   26.6%   13.3%
+  2025                       21,169   0.458   0.671   0.828  -0.448  -0.643  -0.784   0.0112   45.7%   27.5%   13.6%
+  2026                        8,694   0.488   0.708   0.865  -0.469  -0.663  -0.807   0.0154   45.3%   28.0%   14.6%
+
+  REGIME BREAKDOWN UNAVAILABLE for this resolution/period
+
+  ticker concentration: top5 4.8%  top10 9.2%
+    signed return 15m: all +0.0115%  excluding top5 +0.0114%
+
+======================================================================================================================
+KILL CRITERIA (spec section 21)
+======================================================================================================================
+  MFE ~ |MAE| and signed return ~ 0  -> diffusion, not direction
+  TREATED not beating C1_volfail     -> the volume rule adds nothing
+  TREATED not beating C2_nobreak     -> the breakout adds nothing
+======================================================================================================================
+EXIT=0

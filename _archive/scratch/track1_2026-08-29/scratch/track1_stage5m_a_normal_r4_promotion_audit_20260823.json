@@ -1,0 +1,164 @@
+{
+  "stage": "5M-A",
+  "title": "Normal-R4 promotion audit",
+  "date": "2026-08-23",
+  "kind": "read-only audit; no production code changed",
+  "verdict": "NOT_READY_BLOCKERS_FOUND",
+  "verdict_reason": "Normal-R4 has no Track 1 slot and no live candidate path. Six named code gaps must be closed in 5M-B before any shadow evidence can exist. The collision, IBKR and state risks are all manageable and none of them is a blocker; the blocker is that the sleeve is not wired at all.",
+  "job_inventory": {
+    "flag_off": 60,
+    "flag_on_now": 84,
+    "flag_on_after_5mb": 107,
+    "legacy_1405_1555": {
+      "count": 23,
+      "ids": "live_day, live_day_1410 .. live_day_1555",
+      "cadence_minutes": 5,
+      "body": "run_live_day --clusters all"
+    },
+    "track1_now": {
+      "roska4_calm": 1,
+      "roska4_stress": 24
+    },
+    "track1_after": {
+      "roska4_swing": 23,
+      "note": "mirrors the legacy cadence exactly"
+    }
+  },
+  "blockers": [
+    {
+      "id": "N1",
+      "where": "track1_params.WINDOWS_ET",
+      "measured": "keys are roska4_calm and roska4_stress only; sleeves_at('14:05') returns []",
+      "effect": "candidates() raises no_sleeve_at_this_instant at every swing slot instant"
+    },
+    {
+      "id": "N2",
+      "where": "track1_slots.TRACK1_SLOTS",
+      "measured": "25 slots, sleeves {roska4_calm, roska4_stress}; built by _calm_slots() + _stress_slots(), not derived from WINDOWS_ET generally",
+      "effect": "no swing slot exists to register, and the dashboard mirror reads this same tuple so neither side has one"
+    },
+    {
+      "id": "N3",
+      "where": "track1_live_source.LiveTrack1Source._for_sleeve",
+      "measured": "raises LiveSourceRefused(sleeve_not_live) for roska4_swing",
+      "effect": "there is no live candidate path for Normal-R4 at all"
+    },
+    {
+      "id": "N4",
+      "where": "track1_intraday.REQUIREMENTS",
+      "measured": "keys are roska4_calm and roska4_stress only",
+      "effect": "the admission gate has no bar-size, no decision window and no prior-RTH rule for swing, so window_verdict cannot pass or fail it"
+    },
+    {
+      "id": "N5",
+      "where": "window_ledger.WINDOWS",
+      "measured": "expected_slots('roska4_swing') is None",
+      "effect": "coverage can never be judged complete, so the runbook precondition a shadow period is measured against cannot turn green"
+    },
+    {
+      "id": "N6",
+      "where": "track1_slots.REQUIRED_ENTRY_WINDOW",
+      "measured": "((10,35),(12,30)) - the Stress window only",
+      "effect": "documentation gap only; the 14:20 stop-repair sweep is ALREADY excluded because hour 14 is the legacy R4 window",
+      "severity": "low"
+    }
+  ],
+  "collision_runtime": {
+    "mutexes": "SEPARATE. _slot_lock serialises legacy; a private _t1_lock serialises Track 1 against itself. Neither blocks the other - by design",
+    "legacy_runtime_measured": {
+      "n": 46,
+      "min_s": 187,
+      "median_s": 194,
+      "p90_s": 215,
+      "max_s": 291,
+      "cadence_s": 300,
+      "mutex_skips_in_4_days": 0,
+      "note": "the worst observed run uses 97% of the slot window"
+    },
+    "track1_swing_runtime": "NOT MEASURED - no Track 1 slot has ever run in production",
+    "risk": "two child processes at the same minute, each fetching history from one Gateway"
+  },
+  "ibkr_provider": {
+    "legacy_client_id": 1,
+    "track1_client_id": 89,
+    "port_both": 4002,
+    "collision": "none on client id - measured from the CLI defaults on both sides",
+    "stale_comment": "run_scheduler:1090 still says the Track 1 shadow route 'opens no broker connection'. Stage 5I wired --bar-provider ibkr and build_bar_provider calls broker.connect(). The comment is now false; the separate-mutex decision it justifies is still defensible on other grounds",
+    "residual": "historical-data pacing is per account, not per client id - unmeasured",
+    "disconnect": "the entry point disconnects in a finally, defensively"
+  },
+  "state_checkpoint": {
+    "positions": "live_positions.json (legacy) vs live_positions.track1.json - separate",
+    "checkpoint": "replay_checkpoint.json vs replay_checkpoint.track1.json - separate",
+    "checkpointed_sleeves": [
+      "roska4_swing",
+      "global_nkd"
+    ],
+    "good_news": "the route checkpoint ALREADY covers roska4_swing; no schema work needed",
+    "kill_switch": "Track 1 reads STOP_TRADING.track1, NOT the root STOP_TRADING. The root switch that stops legacy does NOT stop Track 1 shadow slots - which is what makes a clean shadow measurement possible, and is worth stating because it is the opposite of what an operator would assume",
+    "order_gate": "blocking_now = ['B1_broker_account_or_legacy_retirement']; orders impossible",
+    "route_env": "RAITS_ROUTE=track1_candidate is stamped by _run(route=...) on Track 1 children and defaults to 'legacy' otherwise"
+  },
+  "dashboard_ops": {
+    "mirror": "monitor/backend/schedule_status imports TRACK1_SLOTS directly, so adding swing slots there updates the scheduler and the mirror together",
+    "parity": "parity_report() true today with the flag off and on; must be re-run after 5M-B",
+    "stop_repair": "hours 2 and 14 already excluded; 12 excluded when Track 1 stress is live. A 14:05-15:55 swing window needs NO new exclusion",
+    "ops": "monitor/ops.py --track1-shadow needs no change; it passes a flag, not a slot list"
+  },
+  "stop_semantics": {
+    "arm": "entry day + 1 day + 14:05 in the sleeve's own session clock; hits strictly before that instant are DISCARDED, and the first bar at or after it arms permanently",
+    "matches_candidate": true,
+    "gap_fill_rule": "fill at the bar OPEN when the triggering bar is gap-eligible AND opened beyond the stop; otherwise fill at the stop price",
+    "measured_vault2026_swing": {
+      "trades_artifact": 81,
+      "trades_production": 81,
+      "trades_differing": 0
+    },
+    "measured_arm_bar_eligibility_MES": {
+      "sessions_with_a_1405_bar": 194,
+      "gap_eligible_under_production": 36,
+      "gap_eligible_under_artifact": 194
+    },
+    "correction": "I expected the 14:05 bar never to be gap-eligible under the production law, because a continuous session has no >15-minute break before it. Measured: 36 of 194 MES sessions. The hypothesis was wrong",
+    "residual_live_vs_backtest": "on the other 158 sessions the arm bar is NOT gap-eligible, so if the market is already through the stop at 14:05 the backtest books the STOP price while a live STP armed at that moment would fill at the prevailing market. Measured cost on this window: zero trades. Structurally present, and it belongs in the 5M-B execution-semantics section",
+    "identity_separation": "live/shadow uses production law via track1_params.LIVE_FILL_LAW; artifact reproduction asks for FILL_ARTIFACT by name (Stage 5M-1)"
+  },
+  "recommended_path": {
+    "chosen": "B - mirror the legacy cadence exactly, shadow only, separate mutex",
+    "why": "it is the only option that preserves the measured entry timing, and the timing IS the sleeve: the arm is defined at 14:05 and entries are taken on the resume bar",
+    "options": [
+      {
+        "option": "A direct slots at the same minutes",
+        "timing": "exact",
+        "ops_risk": "highest - two children per minute against one Gateway"
+      },
+      {
+        "option": "B same minutes, shadow only, separate mutex, provider none first",
+        "timing": "exact",
+        "ops_risk": "low first, then medium once the provider is on"
+      },
+      {
+        "option": "C offset by 1-2 minutes",
+        "timing": "off by one bar",
+        "ops_risk": "lower",
+        "cost": "no longer the measured rule"
+      },
+      {
+        "option": "D piggyback / serialise behind legacy",
+        "timing": "unbounded delay",
+        "ops_risk": "low",
+        "cost": "a slot that decides after the window has moved"
+      }
+    ]
+  },
+  "no_side_effects": [
+    "no scheduler/backend/dashboard started or stopped",
+    "no IBKR connection",
+    "no order",
+    "no STOP_TRADING or STOP_TRADING.track1 touched",
+    "no confirmation file",
+    "no live state file written",
+    "no production code changed",
+    "no commit"
+  ]
+}

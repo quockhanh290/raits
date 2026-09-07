@@ -1,0 +1,108 @@
+{
+  "tool": "stage5q7_mnkd_identity_probe",
+  "parquet": "global_index/data/NKD_continuous_1m_8y.parquet",
+  "through_naive_et": "2026-08-24 20:25:00",
+  "client_id": 95,
+  "identities": {
+    "MNKD": {
+      "inst": "MNKD",
+      "spec_name": "MNKD",
+      "spec_data_symbol": "NKD",
+      "spec_ibkr_symbol": "MNK",
+      "spec_point_value": 0.5,
+      "broker_order_symbol": "MNK",
+      "broker_exchange": "CME",
+      "session_tz": "Asia/Tokyo"
+    },
+    "NKD": {
+      "inst": "NKD",
+      "spec_name": "NKD",
+      "spec_data_symbol": "NKD",
+      "spec_ibkr_symbol": "NKD",
+      "spec_point_value": 5.0,
+      "broker_order_symbol": "NKD",
+      "broker_exchange": "CME",
+      "session_tz": "Asia/Tokyo"
+    }
+  },
+  "arms": {
+    "MNKD": {
+      "shared": 1186,
+      "columns": {
+        "open": {
+          "disagreeing": 1128,
+          "max_gap": 355.0,
+          "median_gap_where_bad": 25.0
+        },
+        "high": {
+          "disagreeing": 1128,
+          "max_gap": 250.0,
+          "median_gap_where_bad": 25.0
+        },
+        "low": {
+          "disagreeing": 1132,
+          "max_gap": 375.0,
+          "median_gap_where_bad": 25.0
+        },
+        "close": {
+          "disagreeing": 1133,
+          "max_gap": 270.0,
+          "median_gap_where_bad": 25.0
+        }
+      },
+      "worst_gap": 375.0,
+      "first_disagreement": {
+        "ts": "2026-08-24 07:01:00+09:00",
+        "column": "open",
+        "history": 65930.0,
+        "feed": 65985.0
+      },
+      "disagreeing_bars": 1155,
+      "signed_close_median": 0.0,
+      "signed_close_p95_abs": 110.0,
+      "fetched_bars": 1523,
+      "fetch_span": [
+        "2026-08-23 18:00:00",
+        "2026-08-24 20:25:00"
+      ],
+      "broker_symbol": "MNK"
+    },
+    "NKD": {
+      "shared": 1186,
+      "columns": {
+        "open": {
+          "disagreeing": 0,
+          "max_gap": 0.0,
+          "median_gap_where_bad": 0.0
+        },
+        "high": {
+          "disagreeing": 0,
+          "max_gap": 0.0,
+          "median_gap_where_bad": 0.0
+        },
+        "low": {
+          "disagreeing": 0,
+          "max_gap": 0.0,
+          "median_gap_where_bad": 0.0
+        },
+        "close": {
+          "disagreeing": 0,
+          "max_gap": 0.0,
+          "median_gap_where_bad": 0.0
+        }
+      },
+      "worst_gap": 0.0,
+      "first_disagreement": null,
+      "disagreeing_bars": 0,
+      "signed_close_median": 0.0,
+      "signed_close_p95_abs": 0.0,
+      "fetched_bars": 1522,
+      "fetch_span": [
+        "2026-08-23 18:01:00",
+        "2026-08-24 20:25:00"
+      ],
+      "broker_symbol": "NKD"
+    }
+  },
+  "verdict": "symbol_explains_it"
+}

@@ -1,0 +1,53 @@
+  MES xong  (2450 quan sat)
+  MNQ xong  (2450 quan sat)
+  MYM xong  (2449 quan sat)
+  M2K xong  (2290 quan sat)
+
+================================================================================================
+MAU: 9639 quan sat tren 2450 ngay, 4 ma
+  (so voi 642 quan sat cua phep do tren tap lenh — gap 15 lan)
+================================================================================================
+
+=== 1. CHAN SAU (r2) THEO DO LON CU DI NGUOC — don vi ATR ngay ===
+  di nguoc         n  E[chan sau]     trung vi    % duong
+  0-0.1         1772       0.0201       0.0237      51.1%
+  0.1-0.2       1579      -0.0264      -0.0217      48.6%
+  0.2-0.35      1838      -0.0044      -0.0205      49.6%
+  0.35-0.6      1934      -0.0002      -0.0367      48.6%
+  0.6-1.0       1531      -0.0126      -0.0345      48.5%
+  >1.0           895      -0.1309      -0.1312      44.5%
+
+=== 2. THEM KHOI LUONG (quang di nguoc / trung binh 20 phien) ===
+  di nguoc   khoi luong       n  E[chan sau]    % duong
+  0-0.1      KL thap        951       0.0034      50.5%
+  0-0.1      KL vua         491       0.0149      50.5%
+  0-0.1      KL cao         330       0.0759      53.6%
+  0.1-0.2    KL thap        778      -0.0427      47.4%
+  0.1-0.2    KL vua         465      -0.0017      50.5%
+  0.1-0.2    KL cao         336      -0.0227      48.8%
+  0.2-0.35   KL thap        689       0.0458      52.1%
+  0.2-0.35   KL vua         691      -0.0388      47.2%
+  0.2-0.35   KL cao         458      -0.0282      49.3%
+  0.35-0.6   KL thap        477       0.0286      48.4%
+  0.35-0.6   KL vua         764      -0.0264      47.3%
+  0.35-0.6   KL cao         693       0.0089      50.2%
+  0.6-1.0    KL thap        215       0.0336      46.5%
+  0.6-1.0    KL vua         559      -0.0394      44.5%
+  0.6-1.0    KL cao         757      -0.0060      51.9%
+  >1.0       KL vua         181      -0.1777      34.3%
+  >1.0       KL cao         673      -0.1011      48.3%
+
+=== 3. PHIEU QUYET DINH — bootstrap THEO NGAY, nguong 0.10 ATR ===
+  di nguoc 0.2-0.35   E[chan sau] -0.0041 ATR | KTC [-0.0610,+0.0529] | khong dat
+  di nguoc 0.35-0.6   E[chan sau] -0.0010 ATR | KTC [-0.0599,+0.0580] | khong dat
+  di nguoc 0.6-1.0    E[chan sau] -0.0127 ATR | KTC [-0.0855,+0.0596] | khong dat
+  di nguoc >1.0       E[chan sau] -0.1310 ATR | KTC [-0.3010,+0.0239] | khong dat
+
+  -- khoi luong CAO vs THAP, trong cac o di nguoc sau --
+    0.2-0.35   KL cao -0.0266 | KL thap +0.0457 | chenh -0.0724 ATR
+    0.35-0.6   KL cao +0.0093 | KL thap +0.0296 | chenh -0.0203 ATR
+    0.6-1.0    KL cao -0.0060 | KL thap +0.0330 | chenh -0.0390 ATR
+
+=== 4. DOI CHUNG: toan bo mau, khong dieu kien gi ===
+  E[chan sau] tren tat ca -0.0157 ATR | KTC [-0.0491,+0.0180]
+  (neu con so nay khac 0 dang ke thi do la XU HUONG CHUNG, khong phai dao chieu)

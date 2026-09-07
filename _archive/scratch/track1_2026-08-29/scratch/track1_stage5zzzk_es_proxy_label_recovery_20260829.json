@@ -1,0 +1,273 @@
+{
+ "coverage": {
+  "floor": {
+   "sessions_with_1400_bar": 1736,
+   "expected": 1763,
+   "share": 0.9847,
+   "hmm_fit_end": "2022-12-31",
+   "first": "2018-01-02",
+   "last": "2024-12-31"
+  },
+  "vault2025": {
+   "sessions_with_1400_bar": 250,
+   "expected": 251,
+   "share": 0.996,
+   "hmm_fit_end": "2024-12-31",
+   "first": "2025-01-02",
+   "last": "2025-12-31"
+  },
+  "vault2026": {
+   "sessions_with_1400_bar": 158,
+   "expected": 158,
+   "share": 1.0,
+   "hmm_fit_end": "2024-12-31",
+   "first": "2026-01-02",
+   "last": "2026-08-19"
+  }
+ },
+ "windows": {
+  "ALL": {
+   "scored": 1766,
+   "agreement_d1": 0.906,
+   "agreement_proxy": 0.8143,
+   "difference": -0.0917,
+   "d1_wrong": 166,
+   "proxy_fixed": 84,
+   "d1_right": 1600,
+   "proxy_broke": 246,
+   "net_sessions": -162,
+   "per_state_proxy": {
+    "Calm": {
+     "support": 748,
+     "precision": 0.8356,
+     "recall": 0.8222
+    },
+    "Normal": {
+     "support": 906,
+     "precision": 0.8108,
+     "recall": 0.8322
+    },
+    "Stress": {
+     "support": 112,
+     "precision": 0.69,
+     "recall": 0.6161
+    }
+   },
+   "per_state_d1": {
+    "Calm": {
+     "support": 748,
+     "precision": 0.9104,
+     "recall": 0.9104
+    },
+    "Normal": {
+     "support": 906,
+     "precision": 0.9084,
+     "recall": 0.9084
+    },
+    "Stress": {
+     "support": 112,
+     "precision": 0.8571,
+     "recall": 0.8571
+    }
+   },
+   "confusion": {
+    "Calm": {
+     "Calm": 615,
+     "Normal": 121,
+     "Stress": 0
+    },
+    "Normal": {
+     "Calm": 133,
+     "Normal": 754,
+     "Stress": 43
+    },
+    "Stress": {
+     "Calm": 0,
+     "Normal": 31,
+     "Stress": 69
+    }
+   }
+  },
+  "floor": {
+   "scored": 1358,
+   "agreement_d1": 0.9153,
+   "agreement_proxy": 0.8189,
+   "difference": -0.0965,
+   "d1_wrong": 115,
+   "proxy_fixed": 58,
+   "d1_right": 1243,
+   "proxy_broke": 189,
+   "net_sessions": -131,
+   "per_state_proxy": {
+    "Calm": {
+     "support": 571,
+     "precision": 0.8188,
+     "recall": 0.8704
+    },
+    "Normal": {
+     "support": 700,
+     "precision": 0.8388,
+     "recall": 0.8029
+    },
+    "Stress": {
+     "support": 87,
+     "precision": 0.6543,
+     "recall": 0.6092
+    }
+   },
+   "per_state_d1": {
+    "Calm": {
+     "support": 571,
+     "precision": 0.9178,
+     "recall": 0.9194
+    },
+    "Normal": {
+     "support": 700,
+     "precision": 0.9185,
+     "recall": 0.9171
+    },
+    "Stress": {
+     "support": 87,
+     "precision": 0.8736,
+     "recall": 0.8736
+    }
+   },
+   "confusion": {
+    "Calm": {
+     "Calm": 497,
+     "Normal": 110,
+     "Stress": 0
+    },
+    "Normal": {
+     "Calm": 74,
+     "Normal": 562,
+     "Stress": 34
+    },
+    "Stress": {
+     "Calm": 0,
+     "Normal": 28,
+     "Stress": 53
+    }
+   }
+  },
+  "vault2025": {
+   "scored": 250,
+   "agreement_d1": 0.876,
+   "agreement_proxy": 0.824,
+   "difference": -0.052,
+   "d1_wrong": 31,
+   "proxy_fixed": 13,
+   "d1_right": 219,
+   "proxy_broke": 26,
+   "net_sessions": -13,
+   "per_state_proxy": {
+    "Calm": {
+     "support": 113,
+     "precision": 0.9053,
+     "recall": 0.7611
+    },
+    "Normal": {
+     "support": 116,
+     "precision": 0.7647,
+     "recall": 0.8966
+    },
+    "Stress": {
+     "support": 21,
+     "precision": 0.8421,
+     "recall": 0.7619
+    }
+   },
+   "per_state_d1": {
+    "Calm": {
+     "support": 113,
+     "precision": 0.9018,
+     "recall": 0.8938
+    },
+    "Normal": {
+     "support": 116,
+     "precision": 0.8632,
+     "recall": 0.8707
+    },
+    "Stress": {
+     "support": 21,
+     "precision": 0.8095,
+     "recall": 0.8095
+    }
+   },
+   "confusion": {
+    "Calm": {
+     "Calm": 86,
+     "Normal": 9,
+     "Stress": 0
+    },
+    "Normal": {
+     "Calm": 27,
+     "Normal": 104,
+     "Stress": 5
+    },
+    "Stress": {
+     "Calm": 0,
+     "Normal": 3,
+     "Stress": 16
+    }
+   }
+  },
+  "vault2026": {
+   "scored": 158,
+   "agreement_d1": 0.8734,
+   "agreement_proxy": 0.7595,
+   "difference": -0.1139,
+   "d1_wrong": 20,
+   "proxy_fixed": 13,
+   "d1_right": 138,
+   "proxy_broke": 31,
+   "net_sessions": -18,
+   "per_state_proxy": {
+    "Calm": {
+     "support": 64,
+     "precision": 0.9412,
+     "recall": 0.5
+    },
+    "Normal": {
+     "support": 90,
+     "precision": 0.7097,
+     "recall": 0.9778
+    },
+    "Stress": {
+     "support": 4,
+     "precision": null,
+     "recall": 0.0
+    }
+   },
+   "per_state_d1": {
+    "Calm": {
+     "support": 64,
+     "precision": 0.8594,
+     "recall": 0.8594
+    },
+    "Normal": {
+     "support": 90,
+     "precision": 0.8889,
+     "recall": 0.8889
+    },
+    "Stress": {
+     "support": 4,
+     "precision": 0.75,
+     "recall": 0.75
+    }
+   },
+   "confusion": {
+    "Calm": {
+     "Calm": 32,
+     "Normal": 2,
+     "Stress": 0
+    },
+    "Normal": {
+     "Calm": 32,
+     "Normal": 88,
+     "Stress": 4
+    }
+   }
+  }
+ }
+}

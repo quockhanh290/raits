@@ -1,0 +1,2409 @@
+{
+ "spec": {
+  "instrument": "MNKD",
+  "parquet": "global_index/data/NKD_continuous_1m_8y.parquet",
+  "point_value": 0.5,
+  "tick": 5.0,
+  "commission_rt": 1.4,
+  "slippage_ticks_per_side": 2.0,
+  "engine": "futures._validated_core.backtest_swing_tf (raw, unpatched)",
+  "entry": "close of the 5-minute resume bar inside 14:00-15:55 in the frame's own timezone (Asia/Tokyo for MNKD)",
+  "initial_stop": "chandelier on the resume bar alone: bar extreme -+ mult x ATR14 of the 5-MINUTE bars, mult=2.5",
+  "ratchet": "ON, but trails on DAILY ATR (extreme -+ mult x daily ATR) and is combined with max()/min() against the initial stop, so the tight initial stop normally binds",
+  "arming": "none - the stop is live from the first bar of the session after entry (engine day-boundary convention), unlike the live sleeve's armed stop",
+  "gap_fill": "fill at the bar open when a real >15-minute time break precedes the triggering bar AND that bar opened beyond the stop; otherwise fill at stop",
+  "max_hold": "5 days; for a non-ET frame the exit is the FIRST BAR OF THE DAY",
+  "gate": "D-1 Calm, causal (RegimeLabels lag_days=1), presented to the signal as 'Normal'"
+ },
+ "windows": {
+  "IS_2018_2024": {
+   "anchor": {
+    "nkd_swing_d1calm_as_normal_ema5_mult2.5": {
+     "rebuilt": 550,
+     "on_disk": 550,
+     "exact": true,
+     "rebuilt_net": 7155.66,
+     "on_disk_net": 7155.66
+    },
+    "nkd_swing_d1calm_as_normal_ema10_mult2": {
+     "rebuilt": 565,
+     "on_disk": 565,
+     "exact": true,
+     "rebuilt_net": 4926.05,
+     "on_disk_net": 4926.05
+    },
+    "nkd_swing_d1calm_as_normal_ema10_mult2.5": {
+     "rebuilt": 560,
+     "on_disk": 560,
+     "exact": true,
+     "rebuilt_net": 3541.78,
+     "on_disk_net": 3541.78
+    },
+    "nkd_swing_d1calm_as_normal_ema10_mult3": {
+     "rebuilt": 542,
+     "on_disk": 542,
+     "exact": true,
+     "rebuilt_net": 3274.61,
+     "on_disk_net": 3274.61
+    },
+    "nkd_swing_d1calm_as_normal_ema15_mult2.5": {
+     "rebuilt": 548,
+     "on_disk": 548,
+     "exact": true,
+     "rebuilt_net": 4409.6,
+     "on_disk_net": 4409.6
+    },
+    "nkd_swing_d1calm_as_normal_ema20_mult2.5": {
+     "rebuilt": 556,
+     "on_disk": 556,
+     "exact": true,
+     "rebuilt_net": 5469.94,
+     "on_disk_net": 5469.94
+    }
+   },
+   "variants": {
+    "5": {
+     "metrics": {
+      "n": 550,
+      "net": 7155.66,
+      "ret_pct": 0.1431132,
+      "pf": 1.5525742721055649,
+      "sharpe": 1.6025235656016579,
+      "calmar": 0.7776915805132892,
+      "maxdd": 1317.930000000004,
+      "win_rate": 0.1290909090909091,
+      "avg_win": 283.1738028169013,
+      "avg_loss": -27.034822546972862,
+      "stop_rate": 0.8709090909090909,
+      "gap_rate": 0.014545454545454545,
+      "maxhold_rate": 0.1290909090909091
+     },
+     "stop_risk": {
+      "n_with_stop": 550,
+      "med_pts": 22.590000000000146,
+      "p90_pts": 56.286000000000065,
+      "max_pts": 244.63999999999942,
+      "med_ticks": 4.518000000000029,
+      "p90_ticks": 11.257200000000013,
+      "med_usd": 11.295000000000073,
+      "p90_usd": 28.143000000000033,
+      "max_usd": 122.31999999999971,
+      "declared_med_usd": 472.32142857142856,
+      "declared_over_true_med": 41.81685954594294
+     },
+     "concentration": {
+      "net": 7155.659999999996,
+      "top1": 1103.6,
+      "top3": 2573.2999999999997,
+      "top5": 3840.4999999999995,
+      "top1_pct_of_net": 0.1542275625169447,
+      "top3_pct_of_net": 0.3596174217332854,
+      "top5_pct_of_net": 0.5367080045726043,
+      "yearly": {
+       "2018": -117.45,
+       "2019": 558.76,
+       "2020": -121.58,
+       "2021": 3502.64,
+       "2022": 369.61,
+       "2023": 2120.43,
+       "2024": 843.25
+      },
+      "pos_years": 5,
+      "n_years": 7,
+      "best_year": 2021,
+      "best_year_pct_of_net": 0.4894922341195644,
+      "net_ex_best_year": 3653.019999999996
+     },
+     "slippage": [
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 0,
+       "net": 7155.66,
+       "pf": 1.5525742721055649,
+       "sharpe": 1.6025235656016579,
+       "calmar": 0.7776915805132892,
+       "maxdd": 1317.930000000004,
+       "win_rate": 0.1290909090909091
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 1,
+       "net": 5958.16,
+       "pf": 1.4213042119390358,
+       "sharpe": 1.3275879146223275,
+       "calmar": 0.566893711431284,
+       "maxdd": 1505.430000000004,
+       "win_rate": 0.1290909090909091
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 2,
+       "net": 4760.66,
+       "pf": 1.310413314102547,
+       "sharpe": 1.0554041459660202,
+       "calmar": 0.40278956323895027,
+       "maxdd": 1692.930000000004,
+       "win_rate": 0.12727272727272726
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 3,
+       "net": 3563.159999999999,
+       "pf": 1.2155373492576604,
+       "sharpe": 0.7859440954721476,
+       "calmar": 0.27141147002985205,
+       "maxdd": 1880.4300000000017,
+       "win_rate": 0.12727272727272726
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 5,
+       "net": 1168.1600000000012,
+       "pf": 1.0617371120290546,
+       "sharpe": 0.25508272198327614,
+       "calmar": 0.07123802721274149,
+       "maxdd": 2348.769999999999,
+       "win_rate": 0.12727272727272726
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 0,
+       "net": 7155.66,
+       "pf": 1.5525742721055649,
+       "sharpe": 1.6025235656016579,
+       "calmar": 0.7776915805132892,
+       "maxdd": 1317.930000000004,
+       "win_rate": 0.1290909090909091
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 1,
+       "net": 5780.66,
+       "pf": 1.408608641439495,
+       "sharpe": 1.2945897198484668,
+       "calmar": 0.5436852221008946,
+       "maxdd": 1522.930000000004,
+       "win_rate": 0.1290909090909091
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 2,
+       "net": 4405.66,
+       "pf": 1.2870787644364972,
+       "sharpe": 0.9866558740952756,
+       "calmar": 0.36520345493298434,
+       "maxdd": 1727.9300000000035,
+       "win_rate": 0.12727272727272726
+      }
+     ],
+     "fill": {
+      "n": 550,
+      "outside_entry_bar": 0,
+      "outside_exit_bar": 275,
+      "same_or_before_bar_exit": 0,
+      "missing_bars": 0,
+      "impossible_stop_fills": 290,
+      "impossible_stop_dollars": 13296.924999999992,
+      "signal_after_entry": 0
+     },
+     "cap": [
+      {
+       "min_charge": 0.0,
+       "med_charged": 11.295000000000073,
+       "max_charged": 122.31999999999971,
+       "concurrent_to_fill_6pct": 265.604249667993
+      },
+      {
+       "min_charge": 25.0,
+       "med_charged": 25.0,
+       "max_charged": 122.31999999999971,
+       "concurrent_to_fill_6pct": 120.0
+      },
+      {
+       "min_charge": 50.0,
+       "med_charged": 50.0,
+       "max_charged": 122.31999999999971,
+       "concurrent_to_fill_6pct": 60.0
+      },
+      {
+       "min_charge": 100.0,
+       "med_charged": 100.0,
+       "max_charged": 122.31999999999971,
+       "concurrent_to_fill_6pct": 30.0
+      },
+      {
+       "min_charge": 200.0,
+       "med_charged": 200.0,
+       "max_charged": 200.0,
+       "concurrent_to_fill_6pct": 15.0
+      },
+      {
+       "min_charge": 300.0,
+       "med_charged": 300.0,
+       "max_charged": 300.0,
+       "concurrent_to_fill_6pct": 10.0
+      }
+     ],
+     "mae": {
+      "med": 42.5,
+      "p90": 132.75000000000006,
+      "max": 1082.5,
+      "med_over_true_risk": 3.622313662097047,
+      "n_mae_gt_risk": 519
+     },
+     "mfe_med": 57.5
+    },
+    "10": {
+     "metrics": {
+      "n": 560,
+      "net": 3541.7800000000007,
+      "ret_pct": 0.07083560000000001,
+      "pf": 1.253723890856131,
+      "sharpe": 0.8798772516167178,
+      "calmar": 0.1722354553253146,
+      "maxdd": 2950.06000000001,
+      "win_rate": 0.12142857142857143,
+      "avg_win": 257.36720588235283,
+      "avg_loss": -28.372337398373983,
+      "stop_rate": 0.8803571428571428,
+      "gap_rate": 0.008928571428571428,
+      "maxhold_rate": 0.11964285714285715
+     },
+     "stop_risk": {
+      "n_with_stop": 560,
+      "med_pts": 25.709999999999127,
+      "p90_pts": 62.157999999999454,
+      "max_pts": 244.63999999999942,
+      "med_ticks": 5.141999999999825,
+      "p90_ticks": 12.43159999999989,
+      "med_usd": 12.854999999999563,
+      "p90_usd": 31.078999999999727,
+      "max_usd": 122.31999999999971,
+      "declared_med_usd": 476.11607142857144,
+      "declared_over_true_med": 37.03742290381856
+     },
+     "concentration": {
+      "net": 3541.779999999999,
+      "top1": 693.6,
+      "top3": 1990.8000000000002,
+      "top5": 3175.5,
+      "top1_pct_of_net": 0.1958337333205338,
+      "top3_pct_of_net": 0.5620902484061688,
+      "top5_pct_of_net": 0.8965830740475131,
+      "yearly": {
+       "2018": -157.78,
+       "2019": 107.42,
+       "2020": 690.72,
+       "2021": 2542.49,
+       "2022": 369.61,
+       "2023": 2394.51,
+       "2024": -2405.19
+      },
+      "pos_years": 5,
+      "n_years": 7,
+      "best_year": 2021,
+      "best_year_pct_of_net": 0.717856558001909,
+      "net_ex_best_year": 999.2899999999986
+     },
+     "slippage": [
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 0,
+       "net": 3541.7800000000007,
+       "pf": 1.253723890856131,
+       "sharpe": 0.8798772516167178,
+       "calmar": 0.1722354553253146,
+       "maxdd": 2950.06000000001,
+       "win_rate": 0.12142857142857143
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 1,
+       "net": 2309.2800000000007,
+       "pf": 1.152084503684424,
+       "sharpe": 0.5704694287869797,
+       "calmar": 0.10077080591658724,
+       "maxdd": 3287.560000000004,
+       "win_rate": 0.12142857142857143
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 2,
+       "net": 1076.7800000000007,
+       "pf": 1.0656131882032995,
+       "sharpe": 0.26451100380033904,
+       "calmar": 0.04261314683378278,
+       "maxdd": 3625.0600000000018,
+       "win_rate": 0.11964285714285715
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 3,
+       "net": -155.71999999999912,
+       "pf": 0.9911715999008985,
+       "sharpe": -0.038038901098195604,
+       "calmar": -0.005637679322607256,
+       "maxdd": 3962.5599999999995,
+       "win_rate": 0.11964285714285715
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 5,
+       "net": -2620.7199999999984,
+       "pf": 0.8695739374813681,
+       "sharpe": -0.6330757685211769,
+       "calmar": -0.0809940145396789,
+       "maxdd": 4641.9400000000005,
+       "win_rate": 0.11964285714285715
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 0,
+       "net": 3541.7800000000007,
+       "pf": 1.253723890856131,
+       "sharpe": 0.8798772516167178,
+       "calmar": 0.1722354553253146,
+       "maxdd": 2950.06000000001,
+       "win_rate": 0.12142857142857143
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 1,
+       "net": 2141.7800000000007,
+       "pf": 1.1410068608003452,
+       "sharpe": 0.5320780793746801,
+       "calmar": 0.09289641470932586,
+       "maxdd": 3307.560000000003,
+       "win_rate": 0.12142857142857143
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 2,
+       "net": 741.7800000000008,
+       "pf": 1.0451687113295653,
+       "sharpe": 0.18427890713264222,
+       "calmar": 0.02903526914565025,
+       "maxdd": 3665.0599999999995,
+       "win_rate": 0.11785714285714285
+      }
+     ],
+     "fill": {
+      "n": 560,
+      "outside_entry_bar": 0,
+      "outside_exit_bar": 299,
+      "same_or_before_bar_exit": 0,
+      "missing_bars": 0,
+      "impossible_stop_fills": 314,
+      "impossible_stop_dollars": 15278.984999999993,
+      "signal_after_entry": 0
+     },
+     "cap": [
+      {
+       "min_charge": 0.0,
+       "med_charged": 12.854999999999563,
+       "max_charged": 122.31999999999971,
+       "concurrent_to_fill_6pct": 233.37222870479206
+      },
+      {
+       "min_charge": 25.0,
+       "med_charged": 25.0,
+       "max_charged": 122.31999999999971,
+       "concurrent_to_fill_6pct": 120.0
+      },
+      {
+       "min_charge": 50.0,
+       "med_charged": 50.0,
+       "max_charged": 122.31999999999971,
+       "concurrent_to_fill_6pct": 60.0
+      },
+      {
+       "min_charge": 100.0,
+       "med_charged": 100.0,
+       "max_charged": 122.31999999999971,
+       "concurrent_to_fill_6pct": 30.0
+      },
+      {
+       "min_charge": 200.0,
+       "med_charged": 200.0,
+       "max_charged": 200.0,
+       "concurrent_to_fill_6pct": 15.0
+      },
+      {
+       "min_charge": 300.0,
+       "med_charged": 300.0,
+       "max_charged": 300.0,
+       "concurrent_to_fill_6pct": 10.0
+      }
+     ],
+     "mae": {
+      "med": 45.0,
+      "p90": 150.0,
+      "max": 1082.5,
+      "med_over_true_risk": 3.6052458845932667,
+      "n_mae_gt_risk": 529
+     },
+     "mfe_med": 48.75
+    },
+    "15": {
+     "metrics": {
+      "n": 548,
+      "net": 4409.599999999999,
+      "ret_pct": 0.08819199999999999,
+      "pf": 1.3234044300891672,
+      "sharpe": 1.0898938247393735,
+      "calmar": 0.32890155396034154,
+      "maxdd": 1923.38000000001,
+      "win_rate": 0.12956204379562045,
+      "avg_win": 254.1484507042252,
+      "avg_loss": -28.584779874213837,
+      "stop_rate": 0.8740875912408759,
+      "gap_rate": 0.009124087591240875,
+      "maxhold_rate": 0.1259124087591241
+     },
+     "stop_risk": {
+      "n_with_stop": 548,
+      "med_pts": 26.06999999999971,
+      "p90_pts": 59.77000000000046,
+      "max_pts": 166.61000000000058,
+      "med_ticks": 5.213999999999942,
+      "p90_ticks": 11.954000000000091,
+      "med_usd": 13.034999999999854,
+      "p90_usd": 29.88500000000023,
+      "max_usd": 83.30500000000029,
+      "declared_med_usd": 476.11607142857144,
+      "declared_over_true_med": 36.525974025974435
+     },
+     "concentration": {
+      "net": 4409.5999999999985,
+      "top1": 693.6,
+      "top3": 1990.8000000000002,
+      "top5": 3175.5,
+      "top1_pct_of_net": 0.15729317851959368,
+      "top3_pct_of_net": 0.45146952104499294,
+      "top5_pct_of_net": 0.720133345428157,
+      "yearly": {
+       "2018": -896.02,
+       "2019": 491.35,
+       "2020": 678.22,
+       "2021": 2749.72,
+       "2022": 369.61,
+       "2023": 2395.23,
+       "2024": -1378.51
+      },
+      "pos_years": 5,
+      "n_years": 7,
+      "best_year": 2021,
+      "best_year_pct_of_net": 0.623575834542816,
+      "net_ex_best_year": 1659.8799999999983
+     },
+     "slippage": [
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 0,
+       "net": 4409.599999999999,
+       "pf": 1.3234044300891672,
+       "sharpe": 1.0898938247393735,
+       "calmar": 0.32890155396034154,
+       "maxdd": 1923.38000000001,
+       "win_rate": 0.12956204379562045
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 1,
+       "net": 3212.1000000000004,
+       "pf": 1.2167052118274717,
+       "sharpe": 0.7895158328538975,
+       "calmar": 0.20495153211018866,
+       "maxdd": 2248.380000000007,
+       "win_rate": 0.12956204379562045
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 2,
+       "net": 2014.6000000000008,
+       "pf": 1.1258198651243017,
+       "sharpe": 0.49243920327294405,
+       "calmar": 0.1123095620062212,
+       "maxdd": 2573.380000000001,
+       "win_rate": 0.12773722627737227
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 3,
+       "net": 817.1000000000007,
+       "pf": 1.0475008981628642,
+       "sharpe": 0.19862611094430918,
+       "calmar": 0.04044377741539476,
+       "maxdd": 2898.379999999999,
+       "win_rate": 0.12773722627737227
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 5,
+       "net": -1577.8999999999992,
+       "pf": 0.9194199914410229,
+       "sharpe": -0.37936017786637993,
+       "calmar": -0.0637155492055314,
+       "maxdd": 3552.7599999999998,
+       "win_rate": 0.12773722627737227
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 0,
+       "net": 4409.599999999999,
+       "pf": 1.3234044300891672,
+       "sharpe": 1.0898938247393735,
+       "calmar": 0.32890155396034154,
+       "maxdd": 1923.38000000001,
+       "win_rate": 0.12956204379562045
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 1,
+       "net": 3039.600000000001,
+       "pf": 1.2049983004483575,
+       "sharpe": 0.7512793155111123,
+       "calmar": 0.19202336488634444,
+       "maxdd": 2270.880000000006,
+       "win_rate": 0.12956204379562045
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 2,
+       "net": 1669.6000000000008,
+       "pf": 1.104199041638426,
+       "sharpe": 0.4126648062828508,
+       "calmar": 0.0914769310986033,
+       "maxdd": 2618.379999999999,
+       "win_rate": 0.1259124087591241
+      }
+     ],
+     "fill": {
+      "n": 548,
+      "outside_entry_bar": 0,
+      "outside_exit_bar": 292,
+      "same_or_before_bar_exit": 0,
+      "missing_bars": 0,
+      "impossible_stop_fills": 303,
+      "impossible_stop_dollars": 14243.094999999994,
+      "signal_after_entry": 0
+     },
+     "cap": [
+      {
+       "min_charge": 0.0,
+       "med_charged": 13.034999999999854,
+       "max_charged": 83.30500000000029,
+       "concurrent_to_fill_6pct": 230.1495972382074
+      },
+      {
+       "min_charge": 25.0,
+       "med_charged": 25.0,
+       "max_charged": 83.30500000000029,
+       "concurrent_to_fill_6pct": 120.0
+      },
+      {
+       "min_charge": 50.0,
+       "med_charged": 50.0,
+       "max_charged": 83.30500000000029,
+       "concurrent_to_fill_6pct": 60.0
+      },
+      {
+       "min_charge": 100.0,
+       "med_charged": 100.0,
+       "max_charged": 100.0,
+       "concurrent_to_fill_6pct": 30.0
+      },
+      {
+       "min_charge": 200.0,
+       "med_charged": 200.0,
+       "max_charged": 200.0,
+       "concurrent_to_fill_6pct": 15.0
+      },
+      {
+       "min_charge": 300.0,
+       "med_charged": 300.0,
+       "max_charged": 300.0,
+       "concurrent_to_fill_6pct": 10.0
+      }
+     ],
+     "mae": {
+      "med": 42.5,
+      "p90": 150.0,
+      "max": 487.5,
+      "med_over_true_risk": 3.414285714285714,
+      "n_mae_gt_risk": 514
+     },
+     "mfe_med": 50.0
+    },
+    "20": {
+     "metrics": {
+      "n": 556,
+      "net": 5469.94,
+      "ret_pct": 0.10939879999999999,
+      "pf": 1.3965678740248817,
+      "sharpe": 1.2795468347756283,
+      "calmar": 0.48007696035867325,
+      "maxdd": 1634.570000000007,
+      "win_rate": 0.12949640287769784,
+      "avg_win": 267.5436111111111,
+      "avg_loss": -28.49834710743802,
+      "stop_rate": 0.8741007194244604,
+      "gap_rate": 0.008992805755395683,
+      "maxhold_rate": 0.12589928057553956
+     },
+     "stop_risk": {
+      "n_with_stop": 556,
+      "med_pts": 26.06999999999971,
+      "p90_pts": 61.42499999999927,
+      "max_pts": 166.61000000000058,
+      "med_ticks": 5.213999999999942,
+      "p90_ticks": 12.284999999999854,
+      "med_usd": 13.034999999999854,
+      "p90_usd": 30.712499999999636,
+      "max_usd": 83.30500000000029,
+      "declared_med_usd": 479.9107142857142,
+      "declared_over_true_med": 36.817085867719186
+     },
+     "concentration": {
+      "net": 5469.939999999997,
+      "top1": 768.6,
+      "top3": 2115.8,
+      "top5": 3395.5,
+      "top1_pct_of_net": 0.140513424278877,
+      "top3_pct_of_net": 0.3868049740947801,
+      "top5_pct_of_net": 0.6207563519892361,
+      "yearly": {
+       "2018": -773.46,
+       "2019": 8.68,
+       "2020": 528.04,
+       "2021": 3188.38,
+       "2022": 605.05,
+       "2023": 2405.23,
+       "2024": -491.98
+      },
+      "pos_years": 5,
+      "n_years": 7,
+      "best_year": 2021,
+      "best_year_pct_of_net": 0.5828912200133826,
+      "net_ex_best_year": 2281.5599999999968
+     },
+     "slippage": [
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 0,
+       "net": 5469.94,
+       "pf": 1.3965678740248817,
+       "sharpe": 1.2795468347756283,
+       "calmar": 0.48007696035867325,
+       "maxdd": 1634.570000000007,
+       "win_rate": 0.12949640287769784
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 1,
+       "net": 4254.94,
+       "pf": 1.2836967102718992,
+       "sharpe": 0.9899920501139517,
+       "calmar": 0.335933726399851,
+       "maxdd": 1817.0700000000065,
+       "win_rate": 0.12949640287769784
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 2,
+       "net": 3039.9399999999996,
+       "pf": 1.1875922552489835,
+       "sharpe": 0.7035145903596617,
+       "calmar": 0.21790177692990353,
+       "maxdd": 2001.4100000000026,
+       "win_rate": 0.12769784172661872
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 3,
+       "net": 1824.9400000000003,
+       "pf": 1.1048060765402399,
+       "sharpe": 0.42007980602296624,
+       "calmar": 0.11974263495921553,
+       "maxdd": 2186.4099999999994,
+       "win_rate": 0.12769784172661872
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 5,
+       "net": -605.0599999999995,
+       "pf": 0.9694838593189063,
+       "sharpe": -0.13779965507373484,
+       "calmar": -0.028353173723328972,
+       "maxdd": 3061.4599999999996,
+       "win_rate": 0.12769784172661872
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 0,
+       "net": 5469.94,
+       "pf": 1.3965678740248817,
+       "sharpe": 1.2795468347756283,
+       "calmar": 0.48007696035867325,
+       "maxdd": 1634.570000000007,
+       "win_rate": 0.12949640287769784
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 1,
+       "net": 4079.9399999999996,
+       "pf": 1.2719379865628664,
+       "sharpe": 0.9543933412568467,
+       "calmar": 0.32035419468972176,
+       "maxdd": 1827.0700000000056,
+       "win_rate": 0.12949640287769784
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 2,
+       "net": 2689.9399999999996,
+       "pf": 1.1658773442259827,
+       "sharpe": 0.6292398477380653,
+       "calmar": 0.1909061891897356,
+       "maxdd": 2021.4100000000003,
+       "win_rate": 0.12589928057553956
+      }
+     ],
+     "fill": {
+      "n": 556,
+      "outside_entry_bar": 0,
+      "outside_exit_bar": 302,
+      "same_or_before_bar_exit": 0,
+      "missing_bars": 0,
+      "impossible_stop_fills": 316,
+      "impossible_stop_dollars": 14329.529999999995,
+      "signal_after_entry": 0
+     },
+     "cap": [
+      {
+       "min_charge": 0.0,
+       "med_charged": 13.034999999999854,
+       "max_charged": 83.30500000000029,
+       "concurrent_to_fill_6pct": 230.1495972382074
+      },
+      {
+       "min_charge": 25.0,
+       "med_charged": 25.0,
+       "max_charged": 83.30500000000029,
+       "concurrent_to_fill_6pct": 120.0
+      },
+      {
+       "min_charge": 50.0,
+       "med_charged": 50.0,
+       "max_charged": 83.30500000000029,
+       "concurrent_to_fill_6pct": 60.0
+      },
+      {
+       "min_charge": 100.0,
+       "med_charged": 100.0,
+       "max_charged": 100.0,
+       "concurrent_to_fill_6pct": 30.0
+      },
+      {
+       "min_charge": 200.0,
+       "med_charged": 200.0,
+       "max_charged": 200.0,
+       "concurrent_to_fill_6pct": 15.0
+      },
+      {
+       "min_charge": 300.0,
+       "med_charged": 300.0,
+       "max_charged": 300.0,
+       "concurrent_to_fill_6pct": 10.0
+      }
+     ],
+     "mae": {
+      "med": 45.0,
+      "p90": 148.75,
+      "max": 487.5,
+      "med_over_true_risk": 3.411943495506458,
+      "n_mae_gt_risk": 520
+     },
+     "mfe_med": 47.5
+    }
+   }
+  },
+  "OOS_2025": {
+   "anchor": {
+    "nkd_swing_d1calm_as_normal_ema5_mult2.5": {
+     "rebuilt": 90,
+     "on_disk": 90,
+     "exact": true,
+     "rebuilt_net": 2477.28,
+     "on_disk_net": 2477.28
+    },
+    "nkd_swing_d1calm_as_normal_ema10_mult2": {
+     "rebuilt": 87,
+     "on_disk": 87,
+     "exact": true,
+     "rebuilt_net": 1618.2,
+     "on_disk_net": 1618.2
+    },
+    "nkd_swing_d1calm_as_normal_ema10_mult2.5": {
+     "rebuilt": 86,
+     "on_disk": 86,
+     "exact": true,
+     "rebuilt_net": 1249.24,
+     "on_disk_net": 1249.24
+    },
+    "nkd_swing_d1calm_as_normal_ema10_mult3": {
+     "rebuilt": 84,
+     "on_disk": 84,
+     "exact": true,
+     "rebuilt_net": 1095.95,
+     "on_disk_net": 1095.95
+    },
+    "nkd_swing_d1calm_as_normal_ema15_mult2.5": {
+     "rebuilt": 85,
+     "on_disk": 85,
+     "exact": true,
+     "rebuilt_net": 821.18,
+     "on_disk_net": 821.18
+    },
+    "nkd_swing_d1calm_as_normal_ema20_mult2.5": {
+     "rebuilt": 86,
+     "on_disk": 86,
+     "exact": true,
+     "rebuilt_net": 499.42,
+     "on_disk_net": 499.42
+    }
+   },
+   "variants": {
+    "5": {
+     "metrics": {
+      "n": 90,
+      "net": 2477.2800000000007,
+      "ret_pct": 0.049545600000000016,
+      "pf": 1.917572282596618,
+      "sharpe": 2.330506745158163,
+      "calmar": 3.433100217180478,
+      "maxdd": 736.2000000000003,
+      "win_rate": 0.12222222222222222,
+      "avg_win": 470.6454545454546,
+      "avg_loss": -34.174936708860756,
+      "stop_rate": 0.8777777777777778,
+      "gap_rate": 0.0,
+      "maxhold_rate": 0.12222222222222222
+     },
+     "stop_risk": {
+      "n_with_stop": 90,
+      "med_pts": 44.909999999999854,
+      "p90_pts": 86.03299999999946,
+      "max_pts": 378.0400000000009,
+      "med_ticks": 8.981999999999971,
+      "p90_ticks": 17.20659999999989,
+      "med_usd": 22.454999999999927,
+      "p90_usd": 43.01649999999973,
+      "max_usd": 189.02000000000044,
+      "declared_med_usd": 853.125,
+      "declared_over_true_med": 37.99265197060801
+     },
+     "concentration": {
+      "net": 2477.28,
+      "top1": 1151.1,
+      "top3": 2218.2999999999997,
+      "top5": 3252.9999999999995,
+      "top1_pct_of_net": 0.46466285603565194,
+      "top3_pct_of_net": 0.8954579215914227,
+      "top5_pct_of_net": 1.313133759607311,
+      "yearly": {
+       "2025": 2477.28
+      },
+      "pos_years": 1,
+      "n_years": 1,
+      "best_year": 2025,
+      "best_year_pct_of_net": 1.0,
+      "net_ex_best_year": 0.0
+     },
+     "slippage": [
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 0,
+       "net": 2477.2800000000007,
+       "pf": 1.917572282596618,
+       "sharpe": 2.330506745158163,
+       "calmar": 3.433100217180478,
+       "maxdd": 736.2000000000003,
+       "win_rate": 0.12222222222222222
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 1,
+       "net": 2279.7800000000007,
+       "pf": 1.7868581999917168,
+       "sharpe": 2.136382740969024,
+       "calmar": 2.708686070863257,
+       "maxdd": 858.7000000000003,
+       "win_rate": 0.12222222222222222
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 2,
+       "net": 2082.28,
+       "pf": 1.6728274988529221,
+       "sharpe": 1.9437521783751093,
+       "calmar": 2.1651539729028646,
+       "maxdd": 981.2,
+       "win_rate": 0.12222222222222222
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 3,
+       "net": 1884.7799999999997,
+       "pf": 1.5724777664382565,
+       "sharpe": 1.7526001882701758,
+       "calmar": 1.7422754619681988,
+       "maxdd": 1103.7000000000003,
+       "win_rate": 0.12222222222222222
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 5,
+       "net": 1489.7800000000002,
+       "pf": 1.4040278576310168,
+       "sharpe": 1.3746732319875212,
+       "calmar": 1.126974216429394,
+       "maxdd": 1348.7000000000003,
+       "win_rate": 0.12222222222222222
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 0,
+       "net": 2477.2800000000007,
+       "pf": 1.917572282596618,
+       "sharpe": 2.330506745158163,
+       "calmar": 3.433100217180478,
+       "maxdd": 736.2000000000003,
+       "win_rate": 0.12222222222222222
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 1,
+       "net": 2252.2800000000007,
+       "pf": 1.7773666698880348,
+       "sharpe": 2.1188374878838188,
+       "calmar": 2.6528420868649945,
+       "maxdd": 866.2000000000003,
+       "win_rate": 0.12222222222222222
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 2,
+       "net": 2027.28,
+       "pf": 1.6550558675464166,
+       "sharpe": 1.9071682306094742,
+       "calmar": 2.0762249060395983,
+       "maxdd": 996.2,
+       "win_rate": 0.12222222222222222
+      }
+     ],
+     "fill": {
+      "n": 90,
+      "outside_entry_bar": 0,
+      "outside_exit_bar": 54,
+      "same_or_before_bar_exit": 0,
+      "missing_bars": 0,
+      "impossible_stop_fills": 57,
+      "impossible_stop_dollars": 4021.869999999999,
+      "signal_after_entry": 0
+     },
+     "cap": [
+      {
+       "min_charge": 0.0,
+       "med_charged": 22.454999999999927,
+       "max_charged": 189.02000000000044,
+       "concurrent_to_fill_6pct": 133.60053440213804
+      },
+      {
+       "min_charge": 25.0,
+       "med_charged": 25.0,
+       "max_charged": 189.02000000000044,
+       "concurrent_to_fill_6pct": 120.0
+      },
+      {
+       "min_charge": 50.0,
+       "med_charged": 50.0,
+       "max_charged": 189.02000000000044,
+       "concurrent_to_fill_6pct": 60.0
+      },
+      {
+       "min_charge": 100.0,
+       "med_charged": 100.0,
+       "max_charged": 189.02000000000044,
+       "concurrent_to_fill_6pct": 30.0
+      },
+      {
+       "min_charge": 200.0,
+       "med_charged": 200.0,
+       "max_charged": 200.0,
+       "concurrent_to_fill_6pct": 15.0
+      },
+      {
+       "min_charge": 300.0,
+       "med_charged": 300.0,
+       "max_charged": 300.0,
+       "concurrent_to_fill_6pct": 10.0
+      }
+     ],
+     "mae": {
+      "med": 90.0,
+      "p90": 198.00000000000006,
+      "max": 485.0,
+      "med_over_true_risk": 4.423787565256729,
+      "n_mae_gt_risk": 85
+     },
+     "mfe_med": 70.0
+    },
+    "10": {
+     "metrics": {
+      "n": 86,
+      "net": 1249.24,
+      "ret_pct": 0.0249848,
+      "pf": 1.3974850931953702,
+      "sharpe": 1.2283781764404729,
+      "calmar": 1.8753422520321408,
+      "maxdd": 679.6299999999998,
+      "win_rate": 0.12790697674418605,
+      "avg_win": 399.2818181818182,
+      "avg_loss": -41.904799999999994,
+      "stop_rate": 0.8604651162790697,
+      "gap_rate": 0.0,
+      "maxhold_rate": 0.13953488372093023
+     },
+     "stop_risk": {
+      "n_with_stop": 86,
+      "med_pts": 49.284999999999854,
+      "p90_pts": 90.53499999999985,
+      "max_pts": 378.0400000000009,
+      "med_ticks": 9.856999999999971,
+      "p90_ticks": 18.10699999999997,
+      "med_usd": 24.642499999999927,
+      "p90_usd": 45.26749999999993,
+      "max_usd": 189.02000000000044,
+      "declared_med_usd": 860.9375,
+      "declared_over_true_med": 34.937100537689055
+     },
+     "concentration": {
+      "net": 1249.2399999999998,
+      "top1": 1171.1,
+      "top3": 2238.2999999999997,
+      "top5": 3147.9999999999995,
+      "top1_pct_of_net": 0.9374499695815056,
+      "top3_pct_of_net": 1.7917293714578464,
+      "top5_pct_of_net": 2.5199321187281867,
+      "yearly": {
+       "2025": 1249.24
+      },
+      "pos_years": 1,
+      "n_years": 1,
+      "best_year": 2025,
+      "best_year_pct_of_net": 1.0000000000000002,
+      "net_ex_best_year": -2.2737367544323206e-13
+     },
+     "slippage": [
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 0,
+       "net": 1249.24,
+       "pf": 1.3974850931953702,
+       "sharpe": 1.2283781764404729,
+       "calmar": 1.8753422520321408,
+       "maxdd": 679.6299999999998,
+       "win_rate": 0.12790697674418605
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 1,
+       "net": 1064.2400000000002,
+       "pf": 1.319797106849447,
+       "sharpe": 1.0431887753919862,
+       "calmar": 1.4729998051479598,
+       "maxdd": 737.1299999999998,
+       "win_rate": 0.12790697674418605
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 2,
+       "net": 879.24,
+       "pf": 1.2502917850412487,
+       "sharpe": 0.8591463357460659,
+       "calmar": 1.1288849376298744,
+       "maxdd": 794.6299999999998,
+       "win_rate": 0.12790697674418605
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 3,
+       "net": 694.2400000000005,
+       "pf": 1.18774101777785,
+       "sharpe": 0.6762465179962387,
+       "calmar": 0.8312104134450603,
+       "maxdd": 852.1299999999998,
+       "win_rate": 0.12790697674418605
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 5,
+       "net": 324.24000000000046,
+       "pf": 1.0797077578874397,
+       "sharpe": 0.31385688025256786,
+       "calmar": 0.3397624510590799,
+       "maxdd": 973.6399999999998,
+       "win_rate": 0.12790697674418605
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 0,
+       "net": 1249.24,
+       "pf": 1.3974850931953702,
+       "sharpe": 1.2283781764404729,
+       "calmar": 1.8753422520321408,
+       "maxdd": 679.6299999999998,
+       "win_rate": 0.12790697674418605
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 1,
+       "net": 1034.2400000000002,
+       "pf": 1.3105490097166674,
+       "sharpe": 1.01696859306602,
+       "calmar": 1.4314772217509453,
+       "maxdd": 737.1299999999998,
+       "win_rate": 0.12790697674418605
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 2,
+       "net": 819.24,
+       "pf": 1.2328802169500779,
+       "sharpe": 0.8055590096915668,
+       "calmar": 1.0518489790090286,
+       "maxdd": 794.6299999999998,
+       "win_rate": 0.12790697674418605
+      }
+     ],
+     "fill": {
+      "n": 86,
+      "outside_entry_bar": 0,
+      "outside_exit_bar": 48,
+      "same_or_before_bar_exit": 0,
+      "missing_bars": 0,
+      "impossible_stop_fills": 52,
+      "impossible_stop_dollars": 3630.635000000002,
+      "signal_after_entry": 0
+     },
+     "cap": [
+      {
+       "min_charge": 0.0,
+       "med_charged": 24.642499999999927,
+       "max_charged": 189.02000000000044,
+       "concurrent_to_fill_6pct": 121.7408947955771
+      },
+      {
+       "min_charge": 25.0,
+       "med_charged": 25.0,
+       "max_charged": 189.02000000000044,
+       "concurrent_to_fill_6pct": 120.0
+      },
+      {
+       "min_charge": 50.0,
+       "med_charged": 50.0,
+       "max_charged": 189.02000000000044,
+       "concurrent_to_fill_6pct": 60.0
+      },
+      {
+       "min_charge": 100.0,
+       "med_charged": 100.0,
+       "max_charged": 189.02000000000044,
+       "concurrent_to_fill_6pct": 30.0
+      },
+      {
+       "min_charge": 200.0,
+       "med_charged": 200.0,
+       "max_charged": 200.0,
+       "concurrent_to_fill_6pct": 15.0
+      },
+      {
+       "min_charge": 300.0,
+       "med_charged": 300.0,
+       "max_charged": 300.0,
+       "concurrent_to_fill_6pct": 10.0
+      }
+     ],
+     "mae": {
+      "med": 78.75,
+      "p90": 196.25,
+      "max": 522.5,
+      "med_over_true_risk": 3.3184213605115565,
+      "n_mae_gt_risk": 80
+     },
+     "mfe_med": 78.75
+    },
+    "15": {
+     "metrics": {
+      "n": 85,
+      "net": 821.1799999999998,
+      "ret_pct": 0.016423599999999997,
+      "pf": 1.2527936658437027,
+      "sharpe": 0.8419844636810447,
+      "calmar": 0.8563237616257904,
+      "maxdd": 978.3800000000003,
+      "win_rate": 0.12941176470588237,
+      "avg_win": 369.96363636363634,
+      "avg_loss": -43.89756756756756,
+      "stop_rate": 0.8588235294117647,
+      "gap_rate": 0.0,
+      "maxhold_rate": 0.1411764705882353
+     },
+     "stop_risk": {
+      "n_with_stop": 85,
+      "med_pts": 49.45999999999913,
+      "p90_pts": 95.10800000000019,
+      "max_pts": 378.0400000000009,
+      "med_ticks": 9.891999999999825,
+      "p90_ticks": 19.02160000000004,
+      "med_usd": 24.729999999999563,
+      "p90_usd": 47.554000000000094,
+      "max_usd": 189.02000000000044,
+      "declared_med_usd": 861.6071428571429,
+      "declared_over_true_med": 34.84056380336264
+     },
+     "concentration": {
+      "net": 821.18,
+      "top1": 1171.1,
+      "top3": 2210.7999999999997,
+      "top5": 2945.4999999999995,
+      "top1_pct_of_net": 1.4261185123846172,
+      "top3_pct_of_net": 2.6922233858593727,
+      "top5_pct_of_net": 3.5869115175722737,
+      "yearly": {
+       "2025": 821.18
+      },
+      "pos_years": 1,
+      "n_years": 1,
+      "best_year": 2025,
+      "best_year_pct_of_net": 1.0,
+      "net_ex_best_year": 0.0
+     },
+     "slippage": [
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 0,
+       "net": 821.1799999999998,
+       "pf": 1.2527936658437027,
+       "sharpe": 0.8419844636810447,
+       "calmar": 0.8563237616257904,
+       "maxdd": 978.3800000000003,
+       "win_rate": 0.12941176470588237
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 1,
+       "net": 638.6799999999997,
+       "pf": 1.1861541510731817,
+       "sharpe": 0.6528099250502483,
+       "calmar": 0.6367274736766134,
+       "maxdd": 1023.3800000000003,
+       "win_rate": 0.12941176470588237
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 2,
+       "net": 456.1799999999996,
+       "pf": 1.1262460494489985,
+       "sharpe": 0.4648105434080607,
+       "calmar": 0.43562990894897363,
+       "maxdd": 1068.3800000000003,
+       "win_rate": 0.12941176470588237
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 3,
+       "net": 273.6799999999997,
+       "pf": 1.0720984636135642,
+       "sharpe": 0.2779826872199983,
+       "calmar": 0.2507880528073404,
+       "maxdd": 1113.3799999999999,
+       "win_rate": 0.12941176470588237
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 5,
+       "net": -91.32000000000035,
+       "pf": 0.978052930601886,
+       "sharpe": -0.09217365285103209,
+       "calmar": -0.07742305634288404,
+       "maxdd": 1203.3799999999999,
+       "win_rate": 0.12941176470588237
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 0,
+       "net": 821.1799999999998,
+       "pf": 1.2527936658437027,
+       "sharpe": 0.8419844636810447,
+       "calmar": 0.8563237616257904,
+       "maxdd": 978.3800000000003,
+       "win_rate": 0.12941176470588237
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 1,
+       "net": 608.6799999999997,
+       "pf": 1.1772809618397984,
+       "sharpe": 0.6241008102406028,
+       "calmar": 0.606819187507799,
+       "maxdd": 1023.3800000000003,
+       "win_rate": 0.12941176470588237
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 2,
+       "net": 396.1799999999996,
+       "pf": 1.1094897773061172,
+       "sharpe": 0.40621715680016074,
+       "calmar": 0.3783328013665754,
+       "maxdd": 1068.3800000000003,
+       "win_rate": 0.12941176470588237
+      }
+     ],
+     "fill": {
+      "n": 85,
+      "outside_entry_bar": 0,
+      "outside_exit_bar": 47,
+      "same_or_before_bar_exit": 0,
+      "missing_bars": 0,
+      "impossible_stop_fills": 51,
+      "impossible_stop_dollars": 3489.2050000000017,
+      "signal_after_entry": 0
+     },
+     "cap": [
+      {
+       "min_charge": 0.0,
+       "med_charged": 24.729999999999563,
+       "max_charged": 189.02000000000044,
+       "concurrent_to_fill_6pct": 121.31014961585333
+      },
+      {
+       "min_charge": 25.0,
+       "med_charged": 25.0,
+       "max_charged": 189.02000000000044,
+       "concurrent_to_fill_6pct": 120.0
+      },
+      {
+       "min_charge": 50.0,
+       "med_charged": 50.0,
+       "max_charged": 189.02000000000044,
+       "concurrent_to_fill_6pct": 60.0
+      },
+      {
+       "min_charge": 100.0,
+       "med_charged": 100.0,
+       "max_charged": 189.02000000000044,
+       "concurrent_to_fill_6pct": 30.0
+      },
+      {
+       "min_charge": 200.0,
+       "med_charged": 200.0,
+       "max_charged": 200.0,
+       "concurrent_to_fill_6pct": 15.0
+      },
+      {
+       "min_charge": 300.0,
+       "med_charged": 300.0,
+       "max_charged": 300.0,
+       "concurrent_to_fill_6pct": 10.0
+      }
+     ],
+     "mae": {
+      "med": 72.5,
+      "p90": 202.00000000000006,
+      "max": 522.5,
+      "med_over_true_risk": 3.1666666666666665,
+      "n_mae_gt_risk": 79
+     },
+     "mfe_med": 80.0
+    },
+    "20": {
+     "metrics": {
+      "n": 86,
+      "net": 499.4200000000002,
+      "ret_pct": 0.009988400000000003,
+      "pf": 1.144588428756717,
+      "sharpe": 0.49587340626897214,
+      "calmar": 0.5103607369077571,
+      "maxdd": 998.3800000000003,
+      "win_rate": 0.11627906976744186,
+      "avg_win": 395.35,
+      "avg_loss": -45.44842105263157,
+      "stop_rate": 0.872093023255814,
+      "gap_rate": 0.0,
+      "maxhold_rate": 0.12790697674418605
+     },
+     "stop_risk": {
+      "n_with_stop": 86,
+      "med_pts": 48.83499999999913,
+      "p90_pts": 95.71500000000015,
+      "max_pts": 328.0400000000009,
+      "med_ticks": 9.766999999999825,
+      "p90_ticks": 19.14300000000003,
+      "med_usd": 24.417499999999563,
+      "p90_usd": 47.85750000000007,
+      "max_usd": 164.02000000000044,
+      "declared_med_usd": 862.0535714285714,
+      "declared_over_true_med": 35.304743377847316
+     },
+     "concentration": {
+      "net": 499.41999999999985,
+      "top1": 1171.1,
+      "top3": 2373.2999999999997,
+      "top5": 3107.9999999999995,
+      "top1_pct_of_net": 2.344920107324497,
+      "top3_pct_of_net": 4.752112450442514,
+      "top5_pct_of_net": 6.223218933963398,
+      "yearly": {
+       "2025": 499.42
+      },
+      "pos_years": 1,
+      "n_years": 1,
+      "best_year": 2025,
+      "best_year_pct_of_net": 1.0000000000000007,
+      "net_ex_best_year": -2.8421709430404007e-13
+     },
+     "slippage": [
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 0,
+       "net": 499.4200000000002,
+       "pf": 1.144588428756717,
+       "sharpe": 0.49587340626897214,
+       "calmar": 0.5103607369077571,
+       "maxdd": 998.3800000000003,
+       "win_rate": 0.11627906976744186
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 1,
+       "net": 311.9200000000002,
+       "pf": 1.0856551277192867,
+       "sharpe": 0.3088015391001493,
+       "calmar": 0.3050056696912518,
+       "maxdd": 1043.3799999999999,
+       "win_rate": 0.11627906976744186
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 2,
+       "net": 124.4200000000001,
+       "pf": 1.0324934449006027,
+       "sharpe": 0.1228164064520746,
+       "calmar": 0.1166317635117788,
+       "maxdd": 1088.38,
+       "win_rate": 0.11627906976744186
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 3,
+       "net": -63.07999999999966,
+       "pf": 0.9842950968236659,
+       "sharpe": -0.06208497406631131,
+       "calmar": -0.056783654291198284,
+       "maxdd": 1133.3799999999999,
+       "win_rate": 0.11627906976744186
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 5,
+       "net": -438.0799999999998,
+       "pf": 0.9002454697398201,
+       "sharpe": -0.4286489824982296,
+       "calmar": -0.3653417023684998,
+       "maxdd": 1223.3799999999999,
+       "win_rate": 0.11627906976744186
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 0,
+       "net": 499.4200000000002,
+       "pf": 1.144588428756717,
+       "sharpe": 0.49587340626897214,
+       "calmar": 0.5103607369077571,
+       "maxdd": 998.3800000000003,
+       "win_rate": 0.11627906976744186
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 1,
+       "net": 284.4200000000002,
+       "pf": 1.0780498781585477,
+       "sharpe": 0.28240021266873794,
+       "calmar": 0.2781152621620474,
+       "maxdd": 1043.38,
+       "win_rate": 0.11627906976744186
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 2,
+       "net": 69.4200000000001,
+       "pf": 1.018106038475984,
+       "sharpe": 0.06892701906850363,
+       "calmar": 0.06507456215228814,
+       "maxdd": 1088.38,
+       "win_rate": 0.11627906976744186
+      }
+     ],
+     "fill": {
+      "n": 86,
+      "outside_entry_bar": 0,
+      "outside_exit_bar": 51,
+      "same_or_before_bar_exit": 0,
+      "missing_bars": 0,
+      "impossible_stop_fills": 55,
+      "impossible_stop_dollars": 3928.130000000001,
+      "signal_after_entry": 0
+     },
+     "cap": [
+      {
+       "min_charge": 0.0,
+       "med_charged": 24.417499999999563,
+       "max_charged": 164.02000000000044,
+       "concurrent_to_fill_6pct": 122.86270093171102
+      },
+      {
+       "min_charge": 25.0,
+       "med_charged": 25.0,
+       "max_charged": 164.02000000000044,
+       "concurrent_to_fill_6pct": 120.0
+      },
+      {
+       "min_charge": 50.0,
+       "med_charged": 50.0,
+       "max_charged": 164.02000000000044,
+       "concurrent_to_fill_6pct": 60.0
+      },
+      {
+       "min_charge": 100.0,
+       "med_charged": 100.0,
+       "max_charged": 164.02000000000044,
+       "concurrent_to_fill_6pct": 30.0
+      },
+      {
+       "min_charge": 200.0,
+       "med_charged": 200.0,
+       "max_charged": 200.0,
+       "concurrent_to_fill_6pct": 15.0
+      },
+      {
+       "min_charge": 300.0,
+       "med_charged": 300.0,
+       "max_charged": 300.0,
+       "concurrent_to_fill_6pct": 10.0
+      }
+     ],
+     "mae": {
+      "med": 78.75,
+      "p90": 235.0,
+      "max": 522.5,
+      "med_over_true_risk": 3.252295278168142,
+      "n_mae_gt_risk": 82
+     },
+     "mfe_med": 78.75
+    }
+   }
+  },
+  "SANITY_2026": {
+   "anchor": {
+    "nkd_swing_d1calm_as_normal_ema5_mult2.5": {
+     "rebuilt": 44,
+     "on_disk": 44,
+     "exact": true,
+     "rebuilt_net": 1543.02,
+     "on_disk_net": 1543.02
+    },
+    "nkd_swing_d1calm_as_normal_ema10_mult2": {
+     "rebuilt": 40,
+     "on_disk": 40,
+     "exact": true,
+     "rebuilt_net": 5753.62,
+     "on_disk_net": 5753.62
+    },
+    "nkd_swing_d1calm_as_normal_ema10_mult2.5": {
+     "rebuilt": 40,
+     "on_disk": 40,
+     "exact": true,
+     "rebuilt_net": 6000.96,
+     "on_disk_net": 6000.96
+    },
+    "nkd_swing_d1calm_as_normal_ema10_mult3": {
+     "rebuilt": 39,
+     "on_disk": 39,
+     "exact": true,
+     "rebuilt_net": 5629.16,
+     "on_disk_net": 5629.16
+    },
+    "nkd_swing_d1calm_as_normal_ema15_mult2.5": {
+     "rebuilt": 41,
+     "on_disk": 41,
+     "exact": true,
+     "rebuilt_net": 4445.54,
+     "on_disk_net": 4445.54
+    },
+    "nkd_swing_d1calm_as_normal_ema20_mult2.5": {
+     "rebuilt": 43,
+     "on_disk": 43,
+     "exact": true,
+     "rebuilt_net": 2097.11,
+     "on_disk_net": 2097.11
+    }
+   },
+   "variants": {
+    "5": {
+     "metrics": {
+      "n": 44,
+      "net": 1543.0200000000004,
+      "ret_pct": 0.03086040000000001,
+      "pf": 1.5111741282324798,
+      "sharpe": 1.7105282201379706,
+      "calmar": 3.896968058636093,
+      "maxdd": 648.53,
+      "win_rate": 0.13636363636363635,
+      "avg_win": 760.2666666666665,
+      "avg_loss": -79.4363157894737,
+      "stop_rate": 0.8181818181818182,
+      "gap_rate": 0.0,
+      "maxhold_rate": 0.18181818181818182
+     },
+     "stop_risk": {
+      "n_with_stop": 44,
+      "med_pts": 87.23499999999694,
+      "p90_pts": 160.82399999999544,
+      "max_pts": 420.5400000000009,
+      "med_ticks": 17.446999999999388,
+      "p90_ticks": 32.16479999999909,
+      "med_usd": 43.61749999999847,
+      "p90_usd": 80.41199999999772,
+      "max_usd": 210.27000000000044,
+      "declared_med_usd": 2039.5089285714284,
+      "declared_over_true_med": 46.758959788422075
+     },
+     "concentration": {
+      "net": 1543.0199999999995,
+      "top1": 1163.6,
+      "top3": 2898.2999999999997,
+      "top5": 4405.5,
+      "top1_pct_of_net": 0.7541055851511972,
+      "top3_pct_of_net": 1.8783295096628694,
+      "top5_pct_of_net": 2.855115293385699,
+      "yearly": {
+       "2026": 1543.02
+      },
+      "pos_years": 1,
+      "n_years": 1,
+      "best_year": 2026,
+      "best_year_pct_of_net": 1.0000000000000002,
+      "net_ex_best_year": -2.2737367544323206e-13
+     },
+     "slippage": [
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 0,
+       "net": 1543.0200000000004,
+       "pf": 1.5111741282324798,
+       "sharpe": 1.7105282201379706,
+       "calmar": 3.896968058636093,
+       "maxdd": 648.53,
+       "win_rate": 0.13636363636363635
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 1,
+       "net": 1453.0200000000002,
+       "pf": 1.4674224243866971,
+       "sharpe": 1.6076271051300761,
+       "calmar": 3.559885691241859,
+       "maxdd": 668.53,
+       "win_rate": 0.13636363636363635
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 2,
+       "net": 1363.0200000000002,
+       "pf": 1.4261328464506122,
+       "sharpe": 1.5051174823247513,
+       "calmar": 3.242386050374819,
+       "maxdd": 688.53,
+       "win_rate": 0.13636363636363635
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 3,
+       "net": 1273.0200000000002,
+       "pf": 1.3871032482104735,
+       "sharpe": 1.4029986941260468,
+       "calmar": 2.94281082433098,
+       "maxdd": 708.53,
+       "win_rate": 0.13636363636363635
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 5,
+       "net": 1093.0200000000002,
+       "pf": 1.3151203085989076,
+       "sharpe": 1.199930895182553,
+       "calmar": 2.391686539698527,
+       "maxdd": 748.53,
+       "win_rate": 0.13636363636363635
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 0,
+       "net": 1543.0200000000004,
+       "pf": 1.5111741282324798,
+       "sharpe": 1.7105282201379706,
+       "calmar": 3.896968058636093,
+       "maxdd": 648.53,
+       "win_rate": 0.13636363636363635
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 1,
+       "net": 1433.0200000000002,
+       "pf": 1.4602483315026429,
+       "sharpe": 1.5885867649298868,
+       "calmar": 3.5108858744294014,
+       "maxdd": 668.53,
+       "win_rate": 0.13636363636363635
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 2,
+       "net": 1323.0200000000002,
+       "pf": 1.4123381682862821,
+       "sharpe": 1.4666453097218037,
+       "calmar": 3.1472330504078396,
+       "maxdd": 688.53,
+       "win_rate": 0.13636363636363635
+      }
+     ],
+     "fill": {
+      "n": 44,
+      "outside_entry_bar": 0,
+      "outside_exit_bar": 25,
+      "same_or_before_bar_exit": 0,
+      "missing_bars": 0,
+      "impossible_stop_fills": 26,
+      "impossible_stop_dollars": 5645.084999999992,
+      "signal_after_entry": 0
+     },
+     "cap": [
+      {
+       "min_charge": 0.0,
+       "med_charged": 43.61749999999847,
+       "max_charged": 210.27000000000044,
+       "concurrent_to_fill_6pct": 68.77973290537297
+      },
+      {
+       "min_charge": 25.0,
+       "med_charged": 43.61749999999847,
+       "max_charged": 210.27000000000044,
+       "concurrent_to_fill_6pct": 68.77973290537297
+      },
+      {
+       "min_charge": 50.0,
+       "med_charged": 50.0,
+       "max_charged": 210.27000000000044,
+       "concurrent_to_fill_6pct": 60.0
+      },
+      {
+       "min_charge": 100.0,
+       "med_charged": 100.0,
+       "max_charged": 210.27000000000044,
+       "concurrent_to_fill_6pct": 30.0
+      },
+      {
+       "min_charge": 200.0,
+       "med_charged": 200.0,
+       "max_charged": 210.27000000000044,
+       "concurrent_to_fill_6pct": 15.0
+      },
+      {
+       "min_charge": 300.0,
+       "med_charged": 300.0,
+       "max_charged": 300.0,
+       "concurrent_to_fill_6pct": 10.0
+      }
+     ],
+     "mae": {
+      "med": 203.75,
+      "p90": 610.0000000000001,
+      "max": 882.5,
+      "med_over_true_risk": 4.568049339358156,
+      "n_mae_gt_risk": 43
+     },
+     "mfe_med": 165.0
+    },
+    "10": {
+     "metrics": {
+      "n": 40,
+      "net": 6000.959999999999,
+      "ret_pct": 0.12001919999999998,
+      "pf": 3.994580676068146,
+      "sharpe": 5.157149733011977,
+      "calmar": 17.589660940194527,
+      "maxdd": 558.79,
+      "win_rate": 0.225,
+      "avg_win": 889.4333333333333,
+      "avg_loss": -64.64322580645161,
+      "stop_rate": 0.75,
+      "gap_rate": 0.0,
+      "maxhold_rate": 0.25
+     },
+     "stop_risk": {
+      "n_with_stop": 40,
+      "med_pts": 90.35499999999956,
+      "p90_pts": 174.0689999999988,
+      "max_pts": 256.070000000007,
+      "med_ticks": 18.070999999999913,
+      "p90_ticks": 34.81379999999976,
+      "med_usd": 45.17749999999978,
+      "p90_usd": 87.0344999999994,
+      "max_usd": 128.0350000000035,
+      "declared_med_usd": 1947.3214285714287,
+      "declared_over_true_med": 43.10378902266478
+     },
+     "concentration": {
+      "net": 6000.96,
+      "top1": 1923.6,
+      "top3": 4188.299999999999,
+      "top5": 5923.0,
+      "top1_pct_of_net": 0.320548712206047,
+      "top3_pct_of_net": 0.6979383298672212,
+      "top5_pct_of_net": 0.9870087452674239,
+      "yearly": {
+       "2026": 6000.96
+      },
+      "pos_years": 1,
+      "n_years": 1,
+      "best_year": 2026,
+      "best_year_pct_of_net": 1.0,
+      "net_ex_best_year": 0.0
+     },
+     "slippage": [
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 0,
+       "net": 6000.959999999999,
+       "pf": 3.994580676068146,
+       "sharpe": 5.157149733011977,
+       "calmar": 17.589660940194527,
+       "maxdd": 558.79,
+       "win_rate": 0.225
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 1,
+       "net": 5925.959999999999,
+       "pf": 3.85047187509019,
+       "sharpe": 5.082956921874447,
+       "calmar": 16.989768258713053,
+       "maxdd": 571.29,
+       "win_rate": 0.225
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 2,
+       "net": 5850.959999999999,
+       "pf": 3.7163987854814895,
+       "sharpe": 5.00903755828661,
+       "calmar": 16.41556515231343,
+       "maxdd": 583.79,
+       "win_rate": 0.225
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 3,
+       "net": 5775.959999999999,
+       "pf": 3.5913483539260813,
+       "sharpe": 4.935390564490866,
+       "calmar": 15.86543603283291,
+       "maxdd": 596.29,
+       "win_rate": 0.225
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 5,
+       "net": 5625.959999999999,
+       "pf": 3.3649020151832327,
+       "sharpe": 4.788909382388959,
+       "calmar": 14.808467514408273,
+       "maxdd": 622.2600000000001,
+       "win_rate": 0.225
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 0,
+       "net": 6000.959999999999,
+       "pf": 3.994580676068146,
+       "sharpe": 5.157149733011977,
+       "calmar": 17.589660940194527,
+       "maxdd": 558.79,
+       "win_rate": 0.225
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 1,
+       "net": 5900.959999999999,
+       "pf": 3.8350372818817737,
+       "sharpe": 5.071210987661034,
+       "calmar": 16.918093086003847,
+       "maxdd": 571.29,
+       "win_rate": 0.225
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 2,
+       "net": 5800.959999999999,
+       "pf": 3.6869482245916974,
+       "sharpe": 4.98527224231009,
+       "calmar": 16.275284197117074,
+       "maxdd": 583.79,
+       "win_rate": 0.225
+      }
+     ],
+     "fill": {
+      "n": 40,
+      "outside_entry_bar": 0,
+      "outside_exit_bar": 18,
+      "same_or_before_bar_exit": 0,
+      "missing_bars": 0,
+      "impossible_stop_fills": 20,
+      "impossible_stop_dollars": 3934.1949999999997,
+      "signal_after_entry": 0
+     },
+     "cap": [
+      {
+       "min_charge": 0.0,
+       "med_charged": 45.17749999999978,
+       "max_charged": 128.0350000000035,
+       "concurrent_to_fill_6pct": 66.40473687123047
+      },
+      {
+       "min_charge": 25.0,
+       "med_charged": 45.17749999999978,
+       "max_charged": 128.0350000000035,
+       "concurrent_to_fill_6pct": 66.40473687123047
+      },
+      {
+       "min_charge": 50.0,
+       "med_charged": 50.0,
+       "max_charged": 128.0350000000035,
+       "concurrent_to_fill_6pct": 60.0
+      },
+      {
+       "min_charge": 100.0,
+       "med_charged": 100.0,
+       "max_charged": 128.0350000000035,
+       "concurrent_to_fill_6pct": 30.0
+      },
+      {
+       "min_charge": 200.0,
+       "med_charged": 200.0,
+       "max_charged": 200.0,
+       "concurrent_to_fill_6pct": 15.0
+      },
+      {
+       "min_charge": 300.0,
+       "med_charged": 300.0,
+       "max_charged": 300.0,
+       "concurrent_to_fill_6pct": 10.0
+      }
+     ],
+     "mae": {
+      "med": 158.75,
+      "p90": 509.5,
+      "max": 692.5,
+      "med_over_true_risk": 4.078696812712694,
+      "n_mae_gt_risk": 36
+     },
+     "mfe_med": 208.75
+    },
+    "15": {
+     "metrics": {
+      "n": 41,
+      "net": 4445.54,
+      "ret_pct": 0.0889108,
+      "pf": 2.5774059171261694,
+      "sharpe": 3.675348110154649,
+      "calmar": 5.661283258873844,
+      "maxdd": 1286.16,
+      "win_rate": 0.1951219512195122,
+      "avg_win": 907.9749999999999,
+      "avg_loss": -85.40181818181819,
+      "stop_rate": 0.7560975609756098,
+      "gap_rate": 0.0,
+      "maxhold_rate": 0.24390243902439024
+     },
+     "stop_risk": {
+      "n_with_stop": 41,
+      "med_pts": 87.67999999999302,
+      "p90_pts": 172.13999999999942,
+      "max_pts": 256.070000000007,
+      "med_ticks": 17.5359999999986,
+      "p90_ticks": 34.427999999999884,
+      "med_usd": 43.83999999999651,
+      "p90_usd": 86.06999999999971,
+      "max_usd": 128.0350000000035,
+      "declared_med_usd": 1946.875,
+      "declared_over_true_med": 44.40864507299624
+     },
+     "concentration": {
+      "net": 4445.540000000001,
+      "top1": 1923.6,
+      "top3": 4188.299999999999,
+      "top5": 5923.0,
+      "top1_pct_of_net": 0.4327033386270283,
+      "top3_pct_of_net": 0.9421352636575081,
+      "top5_pct_of_net": 1.3323465765688756,
+      "yearly": {
+       "2026": 4445.54
+      },
+      "pos_years": 1,
+      "n_years": 1,
+      "best_year": 2026,
+      "best_year_pct_of_net": 0.9999999999999998,
+      "net_ex_best_year": 9.094947017729282e-13
+     },
+     "slippage": [
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 0,
+       "net": 4445.54,
+       "pf": 2.5774059171261694,
+       "sharpe": 3.675348110154649,
+       "calmar": 5.661283258873844,
+       "maxdd": 1286.16,
+       "win_rate": 0.1951219512195122
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 1,
+       "net": 4368.04,
+       "pf": 2.5084261126612697,
+       "sharpe": 3.605842183595427,
+       "calmar": 5.477414265511391,
+       "maxdd": 1306.16,
+       "win_rate": 0.1951219512195122
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 2,
+       "net": 4290.54,
+       "pf": 2.443042317187195,
+       "sharpe": 3.536534118219146,
+       "calmar": 5.2990911789282835,
+       "maxdd": 1326.16,
+       "win_rate": 0.1951219512195122
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 3,
+       "net": 4213.04,
+       "pf": 2.3809804769958958,
+       "sharpe": 3.467423713378694,
+       "calmar": 5.126066811266646,
+       "maxdd": 1346.16,
+       "win_rate": 0.1951219512195122
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 5,
+       "net": 4058.04,
+       "pf": 2.26585895388301,
+       "sharpe": 3.3297950503994795,
+       "calmar": 4.794996811529014,
+       "maxdd": 1386.16,
+       "win_rate": 0.1951219512195122
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 0,
+       "net": 4445.54,
+       "pf": 2.5774059171261694,
+       "sharpe": 3.675348110154649,
+       "calmar": 5.661283258873844,
+       "maxdd": 1286.16,
+       "win_rate": 0.1951219512195122
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 1,
+       "net": 4343.04,
+       "pf": 2.4972076283456746,
+       "sharpe": 3.590606283224546,
+       "calmar": 5.425296765934987,
+       "maxdd": 1311.16,
+       "win_rate": 0.1951219512195122
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 2,
+       "net": 4240.54,
+       "pf": 2.421444996413319,
+       "sharpe": 3.505864456294442,
+       "calmar": 5.198141045244172,
+       "maxdd": 1336.16,
+       "win_rate": 0.1951219512195122
+      }
+     ],
+     "fill": {
+      "n": 41,
+      "outside_entry_bar": 0,
+      "outside_exit_bar": 20,
+      "same_or_before_bar_exit": 0,
+      "missing_bars": 0,
+      "impossible_stop_fills": 22,
+      "impossible_stop_dollars": 3969.994999999999,
+      "signal_after_entry": 0
+     },
+     "cap": [
+      {
+       "min_charge": 0.0,
+       "med_charged": 43.83999999999651,
+       "max_charged": 128.0350000000035,
+       "concurrent_to_fill_6pct": 68.43065693431203
+      },
+      {
+       "min_charge": 25.0,
+       "med_charged": 43.83999999999651,
+       "max_charged": 128.0350000000035,
+       "concurrent_to_fill_6pct": 68.43065693431203
+      },
+      {
+       "min_charge": 50.0,
+       "med_charged": 50.0,
+       "max_charged": 128.0350000000035,
+       "concurrent_to_fill_6pct": 60.0
+      },
+      {
+       "min_charge": 100.0,
+       "med_charged": 100.0,
+       "max_charged": 128.0350000000035,
+       "concurrent_to_fill_6pct": 30.0
+      },
+      {
+       "min_charge": 200.0,
+       "med_charged": 200.0,
+       "max_charged": 200.0,
+       "concurrent_to_fill_6pct": 15.0
+      },
+      {
+       "min_charge": 300.0,
+       "med_charged": 300.0,
+       "max_charged": 300.0,
+       "concurrent_to_fill_6pct": 10.0
+      }
+     ],
+     "mae": {
+      "med": 175.0,
+      "p90": 507.5,
+      "max": 917.5,
+      "med_over_true_risk": 4.008016032064141,
+      "n_mae_gt_risk": 37
+     },
+     "mfe_med": 202.5
+    },
+    "20": {
+     "metrics": {
+      "n": 43,
+      "net": 2097.1099999999997,
+      "ret_pct": 0.04194219999999999,
+      "pf": 1.6722605297660837,
+      "sharpe": 1.8869465391679092,
+      "calmar": 2.6706167833417145,
+      "maxdd": 1286.16,
+      "win_rate": 0.13953488372093023,
+      "avg_win": 869.4333333333334,
+      "avg_loss": -84.31054054054053,
+      "stop_rate": 0.813953488372093,
+      "gap_rate": 0.0,
+      "maxhold_rate": 0.18604651162790697
+     },
+     "stop_risk": {
+      "n_with_stop": 43,
+      "med_pts": 87.67999999999302,
+      "p90_pts": 170.0699999999983,
+      "max_pts": 256.070000000007,
+      "med_ticks": 17.5359999999986,
+      "p90_ticks": 34.01399999999966,
+      "med_usd": 43.83999999999651,
+      "p90_usd": 85.03499999999914,
+      "max_usd": 128.0350000000035,
+      "declared_med_usd": 1947.7678571428573,
+      "declared_over_true_med": 44.42901133994098
+     },
+     "concentration": {
+      "net": 2097.11,
+      "top1": 1923.6,
+      "top3": 3875.7999999999997,
+      "top5": 5060.5,
+      "top1_pct_of_net": 0.9172623276795208,
+      "top3_pct_of_net": 1.8481624712103797,
+      "top5_pct_of_net": 2.413082766283123,
+      "yearly": {
+       "2026": 2097.11
+      },
+      "pos_years": 1,
+      "n_years": 1,
+      "best_year": 2026,
+      "best_year_pct_of_net": 0.9999999999999998,
+      "net_ex_best_year": 4.547473508864641e-13
+     },
+     "slippage": [
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 0,
+       "net": 2097.1099999999997,
+       "pf": 1.6722605297660837,
+       "sharpe": 1.8869465391679092,
+       "calmar": 2.6706167833417145,
+       "maxdd": 1286.16,
+       "win_rate": 0.13953488372093023
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 1,
+       "net": 2009.61,
+       "pf": 1.6266343206558176,
+       "sharpe": 1.8057035922312124,
+       "calmar": 2.5200013008384414,
+       "maxdd": 1306.16,
+       "win_rate": 0.13953488372093023
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 2,
+       "net": 1922.11,
+       "pf": 1.583431729949097,
+       "sharpe": 1.724679490624779,
+       "calmar": 2.3739287236408106,
+       "maxdd": 1326.16,
+       "win_rate": 0.13953488372093023
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 3,
+       "net": 1834.61,
+       "pf": 1.5424646435974088,
+       "sharpe": 1.6438742707587253,
+       "calmar": 2.2321965688951213,
+       "maxdd": 1346.16,
+       "win_rate": 0.13953488372093023
+      },
+      {
+       "kind": "stop_exits",
+       "extra_ticks": 5,
+       "net": 1659.61,
+       "pf": 1.466577077810171,
+       "sharpe": 1.4829205703146844,
+       "calmar": 1.961002025209625,
+       "maxdd": 1386.16,
+       "win_rate": 0.13953488372093023
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 0,
+       "net": 2097.1099999999997,
+       "pf": 1.6722605297660837,
+       "sharpe": 1.8869465391679092,
+       "calmar": 2.6706167833417145,
+       "maxdd": 1286.16,
+       "win_rate": 0.13953488372093023
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 1,
+       "net": 1989.61,
+       "pf": 1.619432190013045,
+       "sharpe": 1.790219732772179,
+       "calmar": 2.4854076173537223,
+       "maxdd": 1311.16,
+       "win_rate": 0.13953488372093023
+      },
+      {
+       "kind": "all_exits",
+       "extra_ticks": 2,
+       "net": 1882.11,
+       "pf": 1.569561414923332,
+       "sharpe": 1.6934929263764487,
+       "calmar": 2.3071291021107,
+       "maxdd": 1336.16,
+       "win_rate": 0.13953488372093023
+      }
+     ],
+     "fill": {
+      "n": 43,
+      "outside_entry_bar": 0,
+      "outside_exit_bar": 23,
+      "same_or_before_bar_exit": 0,
+      "missing_bars": 0,
+      "impossible_stop_fills": 25,
+      "impossible_stop_dollars": 4685.259999999998,
+      "signal_after_entry": 0
+     },
+     "cap": [
+      {
+       "min_charge": 0.0,
+       "med_charged": 43.83999999999651,
+       "max_charged": 128.0350000000035,
+       "concurrent_to_fill_6pct": 68.43065693431203
+      },
+      {
+       "min_charge": 25.0,
+       "med_charged": 43.83999999999651,
+       "max_charged": 128.0350000000035,
+       "concurrent_to_fill_6pct": 68.43065693431203
+      },
+      {
+       "min_charge": 50.0,
+       "med_charged": 50.0,
+       "max_charged": 128.0350000000035,
+       "concurrent_to_fill_6pct": 60.0
+      },
+      {
+       "min_charge": 100.0,
+       "med_charged": 100.0,
+       "max_charged": 128.0350000000035,
+       "concurrent_to_fill_6pct": 30.0
+      },
+      {
+       "min_charge": 200.0,
+       "med_charged": 200.0,
+       "max_charged": 200.0,
+       "concurrent_to_fill_6pct": 15.0
+      },
+      {
+       "min_charge": 300.0,
+       "med_charged": 300.0,
+       "max_charged": 300.0,
+       "concurrent_to_fill_6pct": 10.0
+      }
+     ],
+     "mae": {
+      "med": 192.5,
+      "p90": 559.5000000000002,
+      "max": 917.5,
+      "med_over_true_risk": 4.157156830779253,
+      "n_mae_gt_risk": 41
+     },
+     "mfe_med": 170.0
+    }
+   }
+  }
+ },
+ "anchor_all_ok": true
+}

@@ -1,0 +1,249 @@
+{
+  "stage": "5M-B",
+  "title": "Normal-R4 shadow slots, no provider",
+  "date": "2026-08-23",
+  "verdict": "READY_FOR_5M_C_SWING_PROVIDER_MEASUREMENT",
+  "claim_limits": "Normal-R4 slots exist and can produce no-provider shadow evidence safely. This is NOT full Track 1 shadow: the 23 swing slots refuse by name with no_bar_provider and no swing candidate has ever been produced from a live feed. NKD still has no slot at all.",
+  "blockers_closed": {
+    "N1": {
+      "where": "track1_params.WINDOWS_ET",
+      "now": [
+        "14:05",
+        "15:55"
+      ],
+      "test": "test_n1_the_swing_window_is_declared"
+    },
+    "N2": {
+      "where": "track1_slots.TRACK1_SLOTS",
+      "now": {
+        "roska4_calm": 1,
+        "roska4_stress": 24,
+        "roska4_swing": 23
+      },
+      "test": "test_n2_slot_inventory_by_sleeve"
+    },
+    "N3": {
+      "where": "LiveTrack1Source._for_sleeve / _swing_candidates",
+      "now": "serves roska4_swing; refuses no_bar_provider rather than sleeve_not_live",
+      "test": "test_n3_the_source_no_longer_refuses_the_sleeve_outright"
+    },
+    "N4": {
+      "where": "track1_intraday.REQUIREMENTS",
+      "now": {
+        "bar_minutes": 5,
+        "today_from": "14:00",
+        "today_to": "15:55",
+        "decide_from": "14:05",
+        "decide_to": "15:55",
+        "decision_bar": null,
+        "needs_prior_rth": false
+      },
+      "test": "test_n4_the_swing_requirement_exists_and_matches_the_window"
+    },
+    "N5": {
+      "where": "window_ledger.WINDOWS",
+      "now": 23,
+      "test": "test_n5_a_window_is_complete_only_at_23_decided_slots"
+    },
+    "N6": {
+      "where": "track1_slots.REQUIRED_ENTRY_WINDOWS",
+      "now": {
+        "roska4_stress": [
+          [
+            10,
+            35
+          ],
+          [
+            12,
+            30
+          ]
+        ],
+        "roska4_swing": [
+          [
+            14,
+            5
+          ],
+          [
+            15,
+            55
+          ]
+        ]
+      },
+      "note": "no new stop-repair exclusion needed; hour 14 already excluded",
+      "test": "test_n6_no_stop_repair_sweep_lands_inside_the_swing_window"
+    }
+  },
+  "inventory": {
+    "jobs_flag_off": 60,
+    "jobs_flag_on": 107,
+    "slots": {
+      "roska4_calm": 1,
+      "roska4_stress": 24,
+      "roska4_swing": 23
+    },
+    "providers": {
+      "roska4_calm:ibkr": 1,
+      "roska4_stress:ibkr": 24,
+      "roska4_swing:none": 23
+    }
+  },
+  "argv": {
+    "swing": "-m global_index.run_live_day_track1 --source live-shadow --sleeve roska4_swing --slot-id TRACK1_SWING_HHMM --bar-provider none --regime-csv spy_daily_live.csv",
+    "calm_stress": "unchanged from Stage 5I; still --bar-provider ibkr",
+    "absent_everywhere": [
+      "--allow-orders",
+      "--port",
+      "--window"
+    ],
+    "route_env": "RAITS_ROUTE=track1_candidate on all 48 Track 1 slots"
+  },
+  "preserved": {
+    "order_gate": "blocking_now == ['B1_broker_account_or_legacy_retirement']",
+    "fill_law_live": "production_gap_after_15min_break",
+    "fill_law_artifact_reproduction": "explicit FILL_ARTIFACT, unchanged",
+    "state_separation": [
+      "live_positions.track1.json",
+      "replay_checkpoint.track1.json"
+    ],
+    "no_legacy_borrow": "no production module outside run_live_day/run_scheduler references 'global_index.run_live_day'; asserted by AST scan"
+  },
+  "measured": {
+    "slot_detector_equals_full_day_scan": {
+      "window": "vault2026",
+      "inst": "MES",
+      "days_with_a_signal": 47,
+      "matched": 47,
+      "mismatched": 0,
+      "signals_from_the_future_when_asked_early": 0
+    },
+    "legacy_runtime_for_reference": {
+      "n": 46,
+      "median_s": 194,
+      "max_s": 291,
+      "cadence_s": 300
+    },
+    "swing_slot_runtime": "STILL NOT MEASURED - that is what 5M-C is for"
+  },
+  "new_finding": {
+    "what": "the 23 swing slots are the FIRST Track 1 slots that need the SAME-DAY 13:45 pre-flight",
+    "why": "they fire after 13:45, so track1_freshness.required_data_through returns today",
+    "measured": {
+      "roska4_calm": "1 slot, D-1",
+      "roska4_stress": "24 slots, D-1",
+      "roska4_swing": "23 slots, same-day"
+    },
+    "consequence": "a failed pre-flight now stops a Track 1 sleeve, not only legacy's. It raises the operational weight of Stage 5L blocker L6",
+    "found_by": "the Stage 5L test that asserted every Track 1 slot was a D-1 slot, which turned red exactly as its own docstring said it would"
+  },
+  "docs": [
+    "run_scheduler: corrected the 'opens no broker connection' comment",
+    "TRACK1_SWITCHOVER_RUNBOOK section 7: root STOP_TRADING does not stop Track 1"
+  ],
+  "mutations": {
+    "mutations": [
+      {
+        "mutation": "S1 roska4_swing removed from WINDOWS_ET",
+        "guard": "test_n1_the_swing_window_is_declared",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "S2 the 23 swing slots removed from TRACK1_SLOTS",
+        "guard": "test_n2_slot_inventory_by_sleeve",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "S3 LiveTrack1Source stops serving roska4_swing",
+        "guard": "test_n3_the_source_no_longer_refuses_the_sleeve_outright",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "S4 the swing entry removed from REQUIREMENTS",
+        "guard": "test_n4_every_sleeve_with_a_slot_has_a_requirement",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "S5 the swing window removed from the ledger",
+        "guard": "test_n5_every_slotted_sleeve_has_a_ledger_window",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "S6 swing slots given --bar-provider ibkr",
+        "guard": "test_the_swing_slots_are_launched_without_a_bar_provider",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "S7 --allow-orders added to the Track 1 slot body",
+        "guard": "test_no_track1_slot_carries_an_order_or_replay_flag[--allow-orders]",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      }
+    ],
+    "guarded_unchanged": true
+  },
+  "no_side_effects": [
+    "no scheduler/backend/dashboard started or stopped",
+    "no IBKR connection",
+    "no order",
+    "no STOP_TRADING or STOP_TRADING.track1 touched",
+    "no confirmation file",
+    "no live state file written",
+    "no commit"
+  ],
+  "second_finding": {
+    "what": "declaring the window made the route ENFORCE it",
+    "mechanism": "track1_signal_layer.window_verdict returns 'always inside' for a sleeve with no declared window. Adding roska4_swing to WINDOWS_ET moved Normal-R4 across that branch, so a swing candidate stamped outside 14:05-15:55 is now refused with reject_window before the same-symbol guard is consulted",
+    "intended": true,
+    "why_correct": "the measured rule scans from the 14:00 resume bar and takes the first admitted signal, so it cannot produce a candidate outside the window",
+    "surfaced_by": "two Stage 3 guard tests that built swing candidates at 10:00 and 11:00; one then passed its uniqueness assertion on an EMPTY list because every candidate was refused. The suppression counter reading 0 gave it away",
+    "fixed": [
+      "each candidate stamped inside its own sleeve's window",
+      "uniqueness assertion now requires a non-empty list first",
+      "window_verdict docstring corrected: global_nkd is the only slotless sleeve"
+    ]
+  },
+  "stale_tests_updated": {
+    "count": 11,
+    "note": "none was a regression; every one pinned a state rather than a property",
+    "items": [
+      "stage5l D-1 slot assertion -> per-sleeve contract table",
+      "stage3b unknown-sleeve fixture -> a name outside REQUIREMENTS",
+      "stage3b slot count == 25 -> derived from the window table",
+      "monitor mirror == 25 and == 70 -> derived relations kept, literals dropped",
+      "stage5d len(on) == 84 -> off-on and on-off set identities",
+      "stage5i len(on) == 84 and track1 count -> same",
+      "stage5i slot argv source-parse -> reads the argv the scheduler builds",
+      "stage5e/5f unslotted sleeve param -> global_nkd only",
+      "stage5e slotted-set table -> global_nkd only",
+      "stage4 len(added) == 25 -> derived plus non-empty",
+      "stage3 two guard tests -> candidates stamped in-window"
+    ]
+  },
+  "tests": {
+    "stage5m_b": "38 passed",
+    "stage5m_b_mutations": "7/7 detected",
+    "stage4_production_clean (artifact reproduction)": "25 passed, 1 skipped",
+    "track1 live-path sweep (3, 3b, 4c, 5d, 5e, 5f, 5i, 5l)": "255 passed, 2 skipped",
+    "monitor mirror + ops + 5m1 fill law": "52 passed",
+    "not_run": "global_index/test_event_playback.py — known hang"
+  }
+}

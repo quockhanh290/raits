@@ -1,0 +1,156 @@
+{
+ "route": "track1_candidate",
+ "window": "vault2026",
+ "source": "replay",
+ "fill_law": "artifact_all_bars_gappable",
+ "order_gate": {
+  "state": "shadow",
+  "requested": false,
+  "allow_orders": false,
+  "reasons": [],
+  "confirmations": {},
+  "confirmation_source": "track1_go_live_confirmation.json (absent)",
+  "confirmation_errors": []
+ },
+ "send_order_calls": 0,
+ "kill_switch_present": false,
+ "window_ledger": "not driven: a replay cannot testify to observation",
+ "freshness": {
+  "allow": false,
+  "reasons": [
+   "regime_csv: last date 2026-08-20 is before the required 2026-08-21"
+  ],
+  "unverified": [
+   "intraday_source"
+  ],
+  "checks": [
+   {
+    "name": "preflight_record",
+    "status": "ok",
+    "detail": "",
+    "observed": "2026-08-21",
+    "required": "2026-08-21"
+   },
+   {
+    "name": "regime_csv",
+    "status": "stale",
+    "detail": "last date 2026-08-20 is before the required 2026-08-21",
+    "observed": "2026-08-20",
+    "required": "2026-08-21"
+   },
+   {
+    "name": "parquet:MES",
+    "status": "ok",
+    "detail": "",
+    "observed": "2026-08-21",
+    "required": "2026-08-21"
+   },
+   {
+    "name": "parquet:MNQ",
+    "status": "ok",
+    "detail": "",
+    "observed": "2026-08-21",
+    "required": "2026-08-21"
+   },
+   {
+    "name": "parquet:MYM",
+    "status": "ok",
+    "detail": "",
+    "observed": "2026-08-21",
+    "required": "2026-08-21"
+   },
+   {
+    "name": "parquet:M2K",
+    "status": "ok",
+    "detail": "",
+    "observed": "2026-08-21",
+    "required": "2026-08-21"
+   },
+   {
+    "name": "parquet:MNKD",
+    "status": "ok",
+    "detail": "",
+    "observed": "2026-08-21",
+    "required": "2026-08-21"
+   },
+   {
+    "name": "intraday_source",
+    "status": "unverified",
+    "detail": "the bars a same-session sleeve decides on come from the broker at decision time; this gate cannot see them",
+    "observed": "None",
+    "required": "a broker fetch inside the window"
+   }
+  ]
+ },
+ "checkpoint": [
+  {
+   "sleeve": "roska4_swing",
+   "inst": "MES",
+   "params_hash": "sha256:aea56dbf568132996458d87c9b49e70ab5ec3a4efc6e07df3d47f1f0f23da4b9",
+   "resumed": false,
+   "code": "no_entry",
+   "detail": "no entry under routes/track1_candidate/sleeves/roska4_swing"
+  },
+  {
+   "sleeve": "roska4_swing",
+   "inst": "MNQ",
+   "params_hash": "sha256:3c5701ace3a1425bd47173e6d200b306438889445be69cf360143b01b9d1745a",
+   "resumed": false,
+   "code": "no_entry",
+   "detail": "no entry under routes/track1_candidate/sleeves/roska4_swing"
+  },
+  {
+   "sleeve": "roska4_swing",
+   "inst": "MYM",
+   "params_hash": "sha256:b4e67b96eb11172fcaee851626fafeba3c0ce7e89418eaba43fc0996c8614e33",
+   "resumed": false,
+   "code": "no_entry",
+   "detail": "no entry under routes/track1_candidate/sleeves/roska4_swing"
+  },
+  {
+   "sleeve": "roska4_swing",
+   "inst": "M2K",
+   "params_hash": "sha256:c46f387eaf299d792346560d578276e0fbeccc1e9279830d53966599ca1947fc",
+   "resumed": false,
+   "code": "no_entry",
+   "detail": "no entry under routes/track1_candidate/sleeves/roska4_swing"
+  },
+  {
+   "sleeve": "global_nkd",
+   "inst": "MNKD",
+   "params_hash": "sha256:555e61ad86a62d77ae8fcceed69c5855084d2c899a79aac22911422eb3d35bb8",
+   "resumed": false,
+   "code": "no_entry",
+   "detail": "no entry under routes/track1_candidate/sleeves/global_nkd"
+  }
+ ],
+ "candidates": 139,
+ "settlements": 91,
+ "net": 8259.85,
+ "days": 65,
+ "equity_end": 58259.85,
+ "counters": {
+  "taken:roska4_swing": 45,
+  "rejected:roska4_swing": 36,
+  "taken:roska4_calm": 19,
+  "rejected:roska4_calm": 8,
+  "taken:roska4_stress": 3,
+  "rejected:roska4_stress": 1,
+  "taken:global_nkd": 24,
+  "rejected:global_nkd": 2,
+  "take": 91,
+  "reject_cap": 37,
+  "reject_family_cap": 10,
+  "suppress_same_symbol": 1
+ },
+ "open_at_end": [],
+ "state_paths": {
+  "positions": "live_positions.track1.json",
+  "lock": "runner.track1.pid",
+  "checkpoint": "global_index/replay_checkpoint.track1.json",
+  "kill_switch": "STOP_TRADING.track1",
+  "shadow_dir": "scratch/track1_shadow"
+ },
+ "book_state_positions": 0,
+ "book_persisted_to": null
+}

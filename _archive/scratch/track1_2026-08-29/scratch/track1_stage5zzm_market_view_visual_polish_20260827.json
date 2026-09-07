@@ -1,0 +1,175 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZM",
+  "title": "Track 1 Market View / Regime Monitor visual polish",
+  "when_et": "2026-08-27",
+
+  "external_change_that_outranks_this_stage": {
+    "what": "the scheduler was restarted externally into legacy-only mode",
+    "scheduler_pid": {"before": 14344, "after": 11332},
+    "track1_mode": {"before": "track1-only-shadow", "after": "legacy-only"},
+    "legacy_entry_jobs": {"before": "not registered", "after": "REGISTERED"},
+    "b1_gate": "still closed",
+    "orders_possible": false,
+    "why_it_matters": "the B1 decision signed on 2026-08-27 asserts legacy is retired FOR THIS PAPER LOGIN; the running scheduler now registers legacy entry jobs on that same login, and the gate goes on reading the recorded decision as true",
+    "predicted_by": "the Stage 5ZZJ preview warning, verbatim: legacy is dormant because of a command-line flag, not because it has been retired",
+    "nothing_unsafe_can_execute": "PAPER_SHADOW_EVIDENCE still blocks, approval unset, no order path armed",
+    "test_that_caught_it": "scratch/test_track1_stage5zzj_b1_operator_decision_20260827.py::test_the_running_mode_registers_no_legacy_entry_jobs",
+    "left_red_on_purpose": true,
+    "why_left_red": "it is the only thing on the route that notices this; adjusting it to pass would remove the alarm while leaving the condition",
+    "caused_by_this_stage": false
+  },
+
+  "part_a_before": {
+    "page_horizontal_overflow": {"375": 0, "720": 0, "1440": 0},
+    "chart_height_per_tab": {"375": [240, 240, 240], "720": [240, 240, 240],
+                             "1440": [320, 320, 320]},
+    "height_spread_px": 0.0,
+    "chips_in_summary": 0,
+    "legends": 0,
+    "raw_phrase_visible": "entry levels not exposed by sleeve evidence yet",
+    "summary": "Complete - 3/3 slots observed - no signal - entry levels not exposed",
+    "footer": "entry levels not exposed by sleeve evidence yet - Latest bar 15:55",
+    "footer_repeats_the_summary": true,
+    "regime": "REGIME | Calm as of 2026-08-26 - read 0.3h ago | LABEL CHECK | PASS - 1761 compared, none changed | SCORE | not exposed by model",
+    "empty_state": "NO BARS TO SHOW / no persisted bars",
+    "assessment": "layout already sound; what was rough was everything a reader actually reads"
+  },
+
+  "part_a_after": {
+    "page_horizontal_overflow": {"375": 0, "720": 0, "1440": 0},
+    "container_overflow_all_widths": 0,
+    "containers_checked": [".market-view-section", "#marketViewChart", "#marketViewSummary",
+                           ".regime-section", "#regimeFacts", "#regimeStrip"],
+    "chart_height_per_tab": {"375": [240, 240, 240], "720": [240, 240, 240],
+                             "1440": [320, 320, 320]},
+    "height_spread_px": 0.0,
+    "chips_in_summary": 5,
+    "legends": 2,
+    "raw_phrase_visible": "none",
+    "summary_chips": ["NO SIGNAL", "1 slots", "Latest 15:55 ET",
+                      "Strategy levels unavailable", "Stored session 2026-08-26"],
+    "footer": "",
+    "regime": "Calm | as of 2026-08-26 | checked 0.3h ago | LABEL CHECK | Label check passed | SCORE | Score not published | SHIFT THRESHOLD | Shift threshold not published",
+    "empty_state": "NO BARS AVAILABLE FOR THIS SESSION / Latest stored session 2026-08-26."
+  },
+
+  "visual_changes": {
+    "summary": "became chips in the page's own idiom (3px 6px, 1px currentColor border, radius 3, 700/11 mono, uppercase) - the same shape .issue-status and .issue-origin wear; no second badge language",
+    "chip_tones": {"bad": "a refusal", "warn": "incomplete", "good": "a signal",
+                   "live": "in progress", "muted": "a fact with nothing to act on"},
+    "chart_padding": {"left": "8px -> 34px", "right": "62px -> 68px",
+                      "top": "12px -> 16px", "bottom": "30px -> 46px"},
+    "slot_markers": "moved off the plot floor onto their own baseline above the time axis - what turns them from stray ink into a row of outcomes",
+    "candle_width": "1.5-11px -> 2.5-9px: readable at 1440, still distinct at 375",
+    "window_band": "labelled `Window`, but only when the band is wide enough to hold the word without sitting on a candle",
+    "marker_legend": "No signal / Signal / Refused / No record / Not yet - laid OVER the chart's fixed box, not added below it, so height is unchanged",
+    "regime_anchor": "22px label coloured by regime, with `as of` and `checked Nh ago` beside it; never shown alone",
+    "regime_run": "10px tall at 80% opacity with a colour legend above and recent days spelled out below - sixty cells at full strength read as a barcode"
+  },
+
+  "copy_changes": [
+    {"was": "entry levels not exposed by sleeve evidence yet",
+     "now": "Strategy levels unavailable",
+     "tooltip": "The strategy has not published entry/reference levels for this sleeve yet. The chart only renders prices and slot outcomes."},
+    {"was": "splice_result", "now": "Data join"},
+    {"was": "not_exposed_by_sleeve", "now": "Not published"},
+    {"was": "provider_lag", "now": "Data delayed"},
+    {"was": "gate_refused", "now": "Gate refused"},
+    {"was": "PASS - 1761 compared, none changed",
+     "now": "Label check passed - 1,761 days compared - no drift"},
+    {"was": "not exposed by model",
+     "now": "Score not published / Shift threshold not published"},
+    {"was": "NO BARS TO SHOW / no persisted bars",
+     "now": "No bars available for this session / Latest stored session 2026-08-26."}
+  ],
+  "translation_is_in_one_place": true,
+  "unmapped_token_behaviour": "shown with underscores removed rather than folded into 'unknown' - a phrase nobody has translated should be visible so somebody translates it",
+  "footer_now_empty_on_the_ordinary_path": true,
+  "footer_reason": "it used to restate the levels note the chips carry, so one sentence appeared twice on one panel",
+
+  "still_unavailable": [
+    "entry / stop / target / reference price - every rule reads source: not_exposed_by_sleeve",
+    "regime score - the model returns label strings only",
+    "regime shift threshold - likewise",
+    "distance to a regime shift - nothing to measure against, and the panel says so",
+    "today's bars - not persisted until the daily append"
+  ],
+  "distance_to_shift_implied_anywhere": false,
+
+  "defects_introduced_and_measured_out": [
+    {"what": "the regime panel overflowed 178px at 720px and 111px at 1440px",
+     "cause": "the new anchor is a grid child, and a grid child without min-width:0 refuses to shrink below its content - this one holds a 22px figure plus two clauses",
+     "fix": "min-width: 0 and grid-column: 1 / -1, because the anchor is the panel's heading rather than one fact among several"},
+    {"what": "two tooltips pushed their panels sideways - 11px on the regime grid, 85px on the chip row",
+     "cause": "the rightmost cell of a fact grid and the last chip in the summary row open their bubble past the panel edge",
+     "fix": "the page already solves this for the header zones (.header-zone:last-child .has-tip::after { left:auto; right:0 }); the same flip was applied rather than a second remedy invented",
+     "instructive_detail": "the 85px one appeared ONLY AFTER the shorter copy let the chips reflow onto fewer lines - this class of overflow moves when the text does, which is why it is measured at three widths after every copy change"},
+    {"what": "the DOM fixture was pinning the OLD phrase",
+     "consequence": "the layout probe reported the old wording as still visible after the backend had stopped emitting it",
+     "fix": "the fixture now reads the backend constant and cannot drift from the copy the page receives"}
+  ],
+
+  "tests": {
+    "suite_file": "scratch/test_track1_stage5zzl_market_view_regime_20260827.py",
+    "total": 73,
+    "added_by_this_stage": 26,
+    "covers": ["chips replace the sentence", "status chip vocabulary",
+               "a data refusal outranks everything", "levels chip and its tooltip",
+               "the footer does not repeat a chip", "marker legend and lane baseline",
+               "window band label", "empty-state wording",
+               "stored session reads as muted metadata",
+               "regime anchor larger than a fact value",
+               "plain-English label check incl. drift and not-run branches",
+               "both not-published fields and their tooltip",
+               "no distance-to-shift implied", "regime legend",
+               "the run is quieter than the recent row"],
+    "restated_from_5ZZL": [
+      {"test": "levels are not exposed and say so",
+       "invariant_kept": "the summary still SAYS the levels are missing"},
+      {"test": "no raw field names in visible labels",
+       "invariant_kept": "the translation TABLE is excluded from the scan; the DOM test proves the render"},
+      {"test": "empty state is intentional",
+       "invariant_kept": "still one intentional state, still no SVG, and now names the stored session"},
+      {"test": "a provider refusal is shown",
+       "invariant_kept": "the reason is still FINDABLE - chip plus tooltip - rather than a sentence"},
+      {"test": "levels said in words", "invariant_kept": "still said, in the new words"},
+      {"test": "regime shows label and verification",
+       "invariant_kept": "the absent score is still NAMED"}
+    ],
+    "suites_run": "dashboard backend + realtime contract + realtime DOM + ops + 5ZZL/M + 5ZZH + 5ZZK + 5ZZJ",
+    "passed": 440,
+    "failed": 1,
+    "failure_classification": "the external scheduler-mode change, not a defect in this stage; left red on purpose",
+    "tests_weakened": 0
+  },
+
+  "safety": {
+    "orders_possible_before": false,
+    "orders_possible_after": false,
+    "track1_blocking_before": ["PAPER_SHADOW_EVIDENCE"],
+    "track1_blocking_after": ["PAPER_SHADOW_EVIDENCE"],
+    "confirmation_before": true,
+    "confirmation_after": true,
+    "confirmation_touched_by_this_stage": false,
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "orders_dir": "ABSENT",
+    "scheduler_restarted_by_this_stage": false,
+    "broker_order_calls": 0,
+    "strategy_gates_order_wire_touched": false,
+    "backend_restart_needed": true,
+    "backend_restart_reason": "/api/v1/track1-market-view is still a new route from Stage 5ZZL; this stage's backend copy changes ride along with it",
+    "backend_restart_run": false,
+    "backend_restart_command": "python monitor\\ops.py restart --backend"
+  },
+
+  "files_touched": {
+    "modified": ["monitor/backend/track1_market_view.py (copy only)",
+                 "global_index/dash/realtime/realtime.js",
+                 "global_index/dash/realtime/realtime.css",
+                 "scratch/test_track1_stage5zzl_market_view_regime_20260827.py"],
+    "new": ["scratch/track1_stage5zzm_market_view_visual_polish_20260827.md",
+            "scratch/track1_stage5zzm_market_view_visual_polish_20260827.json"],
+    "runtime_trading_files_written": "none"
+  }
+}

@@ -1,0 +1,243 @@
+{
+  "stage": "5Q-8",
+  "title": "Raw backtest identity audit — is the Track 1 paper path the same strategy as the backtest?",
+  "generated_et": "2026-08-24T22:10:00-04:00",
+  "verdict": "NOT_READY_IDENTITY_MISMATCH",
+  "verdict_reason": "The signal path is proven identical on all four sleeves (exact reproduction on three windows, on tonight's repaired parquets) and both intentional differences are explicit and measured. Two things between the strategy and the book are not: global_nkd's DECLARED identity names a stop rule the sleeve does not run (I-1), and the sizing basis differs from the artifact's by exactly 1.25x on roska4_swing and global_nkd, undeclared and never measured against the caps (I-3). Sizing basis is inside this stage's stated scope.",
+
+  "safety": {
+    "read_only": true,
+    "production_code_changed": false,
+    "scheduler_or_backend_touched": false,
+    "ibkr_connection": false,
+    "parquet_csv_or_runtime_evidence_written": false,
+    "orders_enabled": false,
+    "confirmation_file_created": false,
+    "b1_still_blocking": true,
+    "overlap_guard_weakened": false,
+    "files_edited": [
+      "scratch/test_track1_stage4_production_clean_20260823.py (stale job-count pin 60->61)",
+      "scratch/test_track1_stage5n_nkd_track1_ownership_20260824.py (stale job-count pin 60->61)"
+    ]
+  },
+
+  "identity_by_sleeve": [
+    {"sleeve": "roska4_swing", "instruments": ["MES", "MNQ", "MYM", "M2K"],
+     "backtest_files": ["ES_continuous_1m_8y.parquet", "NQ_continuous_1m_8y.parquet",
+                        "YM_continuous_1m_8y.parquet", "RTY_continuous_1m_8y.parquet"],
+     "history_fetched_as": {"MES": "MES", "MNQ": "MNQ", "MYM": "MYM", "M2K": "M2K"},
+     "live_signal_fetches": {"MES": "MES", "MNQ": "MNQ", "MYM": "MYM", "M2K": "M2K"},
+     "live_order_symbol": {"MES": "MES", "MNQ": "MNQ", "MYM": "MYM", "M2K": "M2K"},
+     "session_clock": "America/New_York", "match": true},
+    {"sleeve": "roska4_calm", "instruments": ["MES", "MNQ"],
+     "history_fetched_as": {"MES": "MES", "MNQ": "MNQ"},
+     "live_signal_fetches": {"MES": "MES", "MNQ": "MNQ"},
+     "live_order_symbol": {"MES": "MES", "MNQ": "MNQ"},
+     "session_clock": "America/New_York", "match": true},
+    {"sleeve": "roska4_stress", "instruments": ["MNQ"],
+     "history_fetched_as": {"MNQ": "MNQ"}, "live_signal_fetches": {"MNQ": "MNQ"},
+     "live_order_symbol": {"MNQ": "MNQ"}, "session_clock": "America/New_York", "match": true},
+    {"sleeve": "global_nkd", "instruments": ["MNKD"],
+     "backtest_files": ["NKD_continuous_1m_8y.parquet"],
+     "history_fetched_as": {"MNKD": "NKD"}, "live_signal_fetches": {"MNKD": "NKD"},
+     "live_order_symbol": {"MNKD": "MNK"}, "session_clock": "Asia/Tokyo",
+     "match": true, "note": "the only three-name split; intentional, see D-1"}
+  ],
+
+  "point_values": {"MES": 5.0, "MNQ": 2.0, "MYM": 0.5, "M2K": 5.0, "MNKD": 0.5, "NKD": 5.0},
+  "multiplier_applied_to_ohlc_anywhere": false,
+
+  "clocks": {
+    "global_nkd_scheduler_slots_et": ["01:10", "02:55"],
+    "entry_slots": 22,
+    "summer_jst": ["14:10", "15:55"],
+    "winter_jst": ["15:10", "16:55"],
+    "winter_note": "B-5R-C: the same ET slots leave the Tokyo band after 2026-11-01"
+  },
+
+  "exact_reproduction": {
+    "note": "all three committed windows end on or before 2026-08-19, so tonight's boundary repair (2026-08-24 13:45) and its 335-bar append cannot reach them; confirmed by re-running after the repair, not assumed",
+    "rows": [
+      {"sleeve": "Normal-R4 (incl MNKD)", "window": "floor", "expected": 980, "reproduced": 980, "mismatches": 0, "pnl_delta": 0.0},
+      {"sleeve": "Normal-R4 (incl MNKD)", "window": "vault2025", "expected": 136, "reproduced": 136, "mismatches": 0, "pnl_delta": 0.0},
+      {"sleeve": "Normal-R4 (incl MNKD)", "window": "vault2026", "expected": 107, "reproduced": 107, "mismatches": 0, "pnl_delta": 0.0},
+      {"sleeve": "Normal-R4 total", "window": "all three", "expected": 1223, "reproduced": 1223, "mismatches": 0, "pnl_delta": 0.0},
+      {"sleeve": "Calm A", "window": "floor", "expected": 349, "reproduced": 349, "mismatches": 0, "pnl_delta": 0.0},
+      {"sleeve": "Calm A", "window": "vault2025", "expected": 44, "reproduced": 44, "mismatches": 0, "pnl_delta": 0.0},
+      {"sleeve": "Calm A", "window": "vault2026", "expected": 28, "reproduced": 28, "mismatches": 0, "pnl_delta": 0.0},
+      {"sleeve": "Calm A total", "window": "all three", "expected": 421, "reproduced": 421, "mismatches": 0, "pnl_delta": 0.0},
+      {"sleeve": "Stress-MNQ", "window": "floor", "expected": 50, "reproduced": 50, "mismatches": 0, "pnl": 23748.85, "pnl_delta": 0.0},
+      {"sleeve": "Stress-MNQ", "window": "vault2025", "expected": 3, "reproduced": 3, "mismatches": 0, "pnl": 4530.96, "pnl_delta": 0.0},
+      {"sleeve": "Stress-MNQ", "window": "vault2026", "expected": 4, "reproduced": 4, "mismatches": 0, "pnl": -405.72, "pnl_delta": 0.0},
+      {"sleeve": "MNKD (inside Normal-R4)", "window": "floor", "expected": 228, "reproduced": 228, "mismatches": 0, "pnl_delta": 0.0},
+      {"sleeve": "MNKD (inside Normal-R4)", "window": "vault2025", "expected": 31, "reproduced": 31, "mismatches": 0, "pnl_delta": 0.0},
+      {"sleeve": "MNKD (inside Normal-R4)", "window": "vault2026", "expected": 26, "reproduced": 26, "mismatches": 0, "pnl_delta": 0.0}
+    ],
+    "vault2026_per_instrument": {"MES": "22/22", "MNQ": "18/18", "MYM": "24/24", "M2K": "17/17", "MNKD": "26/26"},
+    "calm_feature_columns_matched_to": 1e-9,
+    "suites": {"stage4_three_window": "31 passed", "stress_5F": "29 passed, 1 skipped"}
+  },
+
+  "intentional_differences": [
+    {
+      "id": "D-1",
+      "what": "MNKD signal reads NKD bars; MNKD orders route to MNK",
+      "measurement": {
+        "shared_minutes": 1186,
+        "fetch_as_MNK_disagreeing": 1155,
+        "fetch_as_NKD_disagreeing": 0,
+        "worst_gap_MNK": 375.0,
+        "median_gap_where_bad_MNK": 25.0,
+        "signed_close_median_MNK": 0.0,
+        "worst_gap_NKD": 0.0
+      },
+      "clock_hypothesis": "tested and refuted — a 13-hour error is a large persistent one-directional offset of 900-1000 points; here the signed median is 0.0 and the typical gap is one tick on a five-point grid",
+      "why_accepted": "micro MNK history starts 2024 Q4 while the backtest runs on full-size NKD from 2018; one index, two order books; the multiplier carries the size difference, never the bars",
+      "in_identity_hash": true, "hash_field": "data_source_identity"
+    },
+    {
+      "id": "D-2",
+      "what": "artifact ran artifact_all_bars_gappable; the live route runs production_gap_after_15min_break",
+      "measurement": {
+        "vault2026": {"instruments": 5, "identical": 4, "rows_differing": 1, "pnl_delta": 3.21, "differing": {"MNKD": 3.21}},
+        "vault2025": {"instruments": 5, "identical": 5, "rows_differing": 0, "pnl_delta": 0.0},
+        "floor": {"instruments": 5, "identical": 3, "rows_differing": 5, "pnl_delta": 5.57, "differing": {"M2K": 0.21, "MNKD": 5.36}},
+        "total_delta": 8.78,
+        "artifact_pnl_total": 49389.47
+      },
+      "why_accepted": "the production law is the more permissive of the two, so every published Track 1 number was measured under the more conservative one; nothing needs re-rating",
+      "in_identity_hash": true, "hash_field": "fill_law"
+    }
+  ],
+
+  "findings": [
+    {
+      "id": "I-1",
+      "severity": "blocks paper orders",
+      "title": "global_nkd declares a stop rule it does not run",
+      "declared": {"stop_basis": "chandelier_atr", "stop_multiple": 2.5,
+                   "stop_anchor": "extreme_through_prior_bar", "ratchet": true,
+                   "arm_hour": "14:00", "arm_timezone": "Asia/Tokyo"},
+      "executed": {"stop_basis": "entry +- 2.0 x daily ATR", "stop_multiple": 2.0,
+                   "stop_anchor": "entry", "ratchet": false,
+                   "arm_hour": "14:05", "arm_timezone": "the frame's own clock (Tokyo)"},
+      "fields_differing": 5,
+      "fields_agreeing": {"ema_period": 10, "max_hold_days": 5, "label_lag_days": 1},
+      "which_is_right": "the code. The committed artifact reproduces EXACTLY under NormalR4Params(ema_period=10) — 228/31/26 rows. The declaration describes legacy NKD.",
+      "consequences": [
+        "params_hash for global_nkd is computed over a rule nothing runs, so it would accept state from a genuinely different configuration",
+        "a live MNKD decision is explained to the operator as stop_basis=chandelier_atr while the stop placed is entry +- 2.0 x ATR (run_live_day_track1.py:932)"
+      ],
+      "fix": "correct sleeve_config('global_nkd') to fixed_entry_atr / 2.0 / entry / ratchet=False / 14:05 and remove the xfail marker; every stored global_nkd checkpoint hash changes, which is the point"
+    },
+    {
+      "id": "I-3",
+      "severity": "blocks paper orders",
+      "title": "the sizing basis differs from the artifact by exactly 1.25x on the two ATR-stop sleeves",
+      "live_basis": "|entry - stop| x point_value x qty, recorded as risk_basis='true_stop_distance' at all four call sites",
+      "artifact_basis_by_sleeve": {
+        "roska4_calm": {"carries_stop_price": true, "risk_equals_true_stop_distance": "28 of 28", "ratio": 1.0},
+        "roska4_stress": {"carries_stop_price": true, "risk_equals_true_stop_distance": "4 of 4", "ratio": 1.0},
+        "roska4_swing": {"carries_stop_price": false, "risk": "2.5 x daily ATR x pv x qty", "ratio": 1.25, "rows_checked": 938, "distinct_ratios": [1.25]},
+        "global_nkd": {"carries_stop_price": false, "risk": "2.5 x daily ATR x pv x qty", "ratio": 1.25, "rows_checked": 285, "distinct_ratios": [1.25]}
+      },
+      "constants": {"ROSKA4_MULT": 2.5, "NKD_MULT": 2.5, "live_stop": "2.0 x daily ATR"},
+      "consequence": "the live route reports 80% of the risk the artifact recorded for the same trade on those two sleeves; the caps are in the identity hash and unchanged, but the quantity they gate is computed on a different basis, so the same cap admits roughly 25% more than the measured book did",
+      "in_identity_hash": false,
+      "note": "which basis is RIGHT is a separate question and the true stop distance is arguably better; what is missing is the measurement of what it does to admissions under the caps",
+      "fix": "replay all three windows through the cap gate on both bases and report how many admissions change"
+    },
+    {
+      "id": "I-2",
+      "severity": "latent",
+      "title": "the identity hash carries no tradable identity, point value or sizing basis",
+      "evidence": "route_params.ALL_FIELDS contains no name matching ibkr / tradable / order_symbol / point_value / multiplier / risk_basis / sizing_basis",
+      "consequence": "the 2026-08-14 defect — MNKD routed to full-size NKD at ten times the intended size, -$1,400 at the broker against -$140 in the ledger — would not have moved a single params hash, and a checkpoint written before it would have been accepted after it",
+      "why_not_fixed_here": "adding a field invalidates every stored hash; that is a decision, not a tidy-up",
+      "pinned_by_test": true
+    }
+  ],
+
+  "checked_and_clean": {
+    "live_signal_source_different_from_backtest_source": "none",
+    "order_symbol_used_for_signal_data": "none (closed by Stage 5Q-7)",
+    "point_value_drift": "none",
+    "clock_conversion_drift": "none",
+    "multiplier_applied_to_ohlc": "none"
+  },
+
+  "per_sleeve_checklist": {
+    "roska4_swing": {"instruments": "MES MNQ MYM M2K", "entry_window_et": "14:05-15:55",
+      "ema_period": 50, "r4_range_threshold": 0.02652437134968455,
+      "r4_range_derivation_window": "floor_2018_2024_p90", "rel_volume_max": 2.0,
+      "vol_feature": "rvol_slot20",
+      "spy_short_filter": "d1_spy_close_below_sma50_for_shorts_only",
+      "spy_short_lookback": 50, "spy_short_lag_days": 1,
+      "stop": "entry +- 2.0 x daily ATR, anchored at entry", "ratchet": false,
+      "arm": "14:05 ET next session (ARM_HOURS = 14 + 5/60)", "max_hold_days": 5,
+      "qty": 1, "fill_law_declared_equals_run": true, "rows": "1223/1223",
+      "open_findings": ["I-3"]},
+    "roska4_calm": {"instruments": "MES MNQ", "entry": "10:00 ET one-shot", "exit": "15:55",
+      "regime": "D-1 Calm (regime_lag_sessions=1)", "close_loc_max": 0.3333333333333333,
+      "prev_ret_max": 0.0, "gap_min": -0.01,
+      "stop": "entry - 1.5 x ATR15, placed at the fill and never moved",
+      "no_late_entry_if_1000_missed": true, "rows": "421/421",
+      "feature_columns_matched_to": 1e-9, "sizing_basis_exact": true, "open_findings": []},
+    "roska4_stress": {"instruments": "MNQ only", "qty": 7, "regime_label_used": false,
+      "scan_window_et": "10:35-12:30",
+      "why_1035": "the 10:30 5-minute bar is left-labelled, so its close is not known until 10:35",
+      "breadth_min": 4, "breadth_basket": ["MES", "MNQ", "MYM", "M2K"],
+      "gapdown_min": 3, "gapdown_at": -0.004, "avg_gap_max": -0.001,
+      "stop": "pre_high x 1.001 (stop_pad=0.001)", "target": "entry - 1.5 x (stop - entry)",
+      "exit": "15:55", "rows": {"floor": 50, "vault2025": 3, "vault2026": 4},
+      "pnl": {"floor": 23748.85, "vault2025": 4530.96, "vault2026": -405.72},
+      "sizing_basis_exact": true, "open_findings": []},
+    "global_nkd": {"runner_instrument": "MNKD", "history_and_signal_bars": "NKD",
+      "live_provider_fetches": "NKD (since Stage 5Q-7)", "order_symbol": "MNK",
+      "point_value": 0.5, "multiplier_on_ohlc": false, "session_clock": "Asia/Tokyo",
+      "scheduler_slots_et": "01:10-02:55", "tokyo_window_summer": "14:10-15:55",
+      "ema_period": 10, "chandelier_2_5": "strategy config only, NOT the stop width",
+      "max_hold_days": 5, "regime_lag_days": 1,
+      "fill_law_delta": {"vault2026": 3.21, "vault2025": 0.0, "floor": 5.36},
+      "rows": {"floor": 228, "vault2025": 31, "vault2026": 26},
+      "open_findings": ["I-1", "I-3"]}
+  },
+
+  "tests": {
+    "file": "scratch/test_track1_stage5q8_identity_audit_20260824.py",
+    "result": "15 passed, 1 xfailed (strict)",
+    "xfail": {"test": "test_global_nkd_declares_the_rule_it_runs",
+              "reason": "finding I-1; strict so it turns into a failure the moment it is fixed, prompting removal of the marker"},
+    "asserts": [
+      "MNKD live signal provider asks for NKD",
+      "MNKD order routing asks for MNK",
+      "MNKD point_value is 0.5 and NKD is 5.0",
+      "every instrument fetches the symbol its parquet was built from",
+      "the data and order identities differ for MNKD only",
+      "roska4_swing / roska4_calm / roska4_stress declare the rule they run",
+      "the global_nkd mismatch is bounded at exactly five fields",
+      "the hash moves on data_source_identity and on fill_law",
+      "the hash does NOT yet move on the tradable identity (I-2, pinned as fact)",
+      "the NKD ET window is the Tokyo power hour in summer and leaves it in winter",
+      "each instrument is read on its own declared session clock",
+      "all four live sleeves record true_stop_distance (AST-parsed, not grepped)"
+    ],
+    "reproduction_reruns": {"stage4_three_window": "31 passed",
+                            "stress_5F": "29 passed, 1 skipped",
+                            "stage5q7_identity": "16 passed"}
+  },
+
+  "discarded_measurement": {
+    "what": "a two-arm comparison of backtest_swing_tf(ema=10, chandelier=2.5) against the live NormalR4 rule, which produced 62 vs 26 trades and a P&L sign flip",
+    "why_discarded": "the arm meant to reproduce the committed rows reproduced NONE of them (0 of 26 exact), so the instrument had failed before the comparison meant anything. Two causes: the frame was sliced at 2026-01-01 with no EMA/ATR warm-up, and generate_replay_snapshots.py is a LEGACY producer the Track 1 route does not consume",
+    "correct_artifact": "normal_promotion_trades_{window}_20260821.json, which carries MNKD alongside the four basket instruments and reproduces exactly under NormalR4Params(ema_period=10)"
+  },
+
+  "before_paper_orders": [
+    {"n": 1, "action": "correct sleeve_config('global_nkd') and remove the xfail marker", "finding": "I-1"},
+    {"n": 2, "action": "replay all three windows through the cap gate on both sizing bases and report how many admissions change", "finding": "I-3"},
+    {"n": 3, "action": "decide whether tradable identity, point value and sizing basis belong in route_params.ALL_FIELDS", "finding": "I-2"}
+  ],
+  "blocks_shadow_session": false,
+  "blocks_paper_orders": true
+}

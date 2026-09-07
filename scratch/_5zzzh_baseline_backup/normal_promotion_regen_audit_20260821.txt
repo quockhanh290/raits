@@ -1,0 +1,69 @@
+============================================================================================================================
+NORMAL PROMOTION AUDIT - REGENERATED FROM THE SIGNAL PATH   (scratch / read-only)
+============================================================================================================================
+Engine gap-through fix applied scratch-side (production does NOT contain it).
+R4 filter range_p90 <= 0.026524 AND rvol <= 2, installed inside generate_signal.
+NKD is never filtered. Stress disabled. 1 micro, $50,000, 2 ticks/side.
+
+############################################################################################################################
+WINDOW: vault2026
+############################################################################################################################
+  engine run 'raw' done (5 R4 + NKD trade lists)
+  engine run 'filtered' done (5 R4 + NKD trade lists)
+  engine run 'filtered_prevbar' done (5 R4 + NKD trade lists)
+
+  [ANCHOR] unfiltered engine-fix run vs stated corrected baseline: $6,743 vs $6,743 -> PASS
+  [SELF-CHECK] NKD trade list identical filtered vs raw: PASS
+
+  FILTER ACTION AT THE DECISION BAR (signals seen by the gate, not trades deleted)
+  inst       seen    passed blk range   blk vol blk missing
+  MES          66        50         0        16         0
+  MNQ          64        42         8        14         0
+  MYM          75        55         0        20         0
+  M2K          62        46         6        10         0
+
+  TRADE COUNTS - regenerated vs post-hoc deletion of the same rule
+  inst        raw      regen  posthoc-del regen-posthoc
+  MES          23         22           18          4
+  MNQ          20         18           14          4
+  MYM          24         24           20          4
+  M2K          21         17           13          4
+
+  FILL AUDIT - regenerated filtered book
+  inst    trades  out_exit_bar  out_exit_day    sig>entry  same_bar_exit   out_entry_bar_5m   out_entry_bar_1m
+  MES         22             0             0            0              0                  0                 13
+  MNQ         18             0             0            0              0                  0                 11
+  MYM         24             0             0            0              0                  0                 17
+  M2K         17             0             0            0              0                  0                 12
+  MNKD        26             0             0            0              0                  0                 19
+  FILL GATE (out_exit_bar=0, sig>entry=0, same_bar_exit=0, out_entry_bar_5m=0): PASS
+  note: out_entry_bar_1m counts entries outside the single 1-MINUTE bar labelled
+        entry_time. The entry is the CLOSE of the 5-minute bar starting there, so
+        a non-zero count here is the 5m/1m aggregation, not an infeasible fill.
+
+  PORTFOLIO REPLAY (deploy_sim risk layer, MultiClusterGuard + CircuitBreaker)
+  variant                      cap              net$     PF  Sharpe  Calmar    MaxDD$   MaxDD%  trades  taken   rej  halt
+  R4 raw + NKD (baseline)      current         6,743   1.46    2.43    1.62     7,520    15.0%     114     70    44     0
+  R4 raw + NKD (baseline)      strict025       5,183   1.48    2.36    1.94     4,844     9.7%     114     53    61     0
+  R4 filtered only             current         2,668   1.40    2.02    1.32     3,656     7.3%      81     46    35     0
+  R4 filtered only             strict025         247   1.06    0.36    0.15     3,027     6.1%      81     28    53     0
+  NKD only                     current         6,007   1.95    4.32    4.35     2,507     5.0%      26     24     2     0
+  NKD only                     strict025       6,007   1.95    4.32    4.35     2,507     5.0%      26     24     2     0
+  R4 filtered + NKD            current         8,675   1.67    3.26    3.48     4,511     9.0%     107     70    37     0
+  R4 filtered + NKD            strict025       6,254   1.61    2.82    2.60     4,351     8.7%     107     52    55     0
+  R4 filtered(prevbar) + NKD   current         6,545   1.46    2.42    1.64     7,225    14.4%     112     68    44     0
+  R4 filtered(prevbar) + NKD   strict025       5,963   1.56    2.68    2.24     4,822     9.6%     112     51    61     0
+  R4 posthoc-deleted + NKD     current         8,313   1.69    3.29    2.77     5,421    10.8%      91     62    29     0
+  R4 posthoc-deleted + NKD     strict025       7,810   1.87    3.71    4.22     3,344     6.7%      91     48    43     0
+
+  YEARLY NET$ (current cap)
+  variant                            2026
+  R4 raw + NKD (baseline)           6,743
+  R4 filtered only                  2,668
+  NKD only                          6,007
+  R4 filtered + NKD                 8,675
+  R4 filtered(prevbar) + NKD        6,545
+  R4 posthoc-deleted + NKD          8,313
+
+  trade tables written to scratch\normal_promotion_trades_vault2026_20260821.json
+

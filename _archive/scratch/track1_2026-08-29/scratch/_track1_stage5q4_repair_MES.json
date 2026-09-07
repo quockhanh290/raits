@@ -1,0 +1,18 @@
+{
+  "tool": "stage5q4_repair_boundary_bar",
+  "inst": "MES",
+  "path": "data/cache/futures/ES_continuous_1m_8y.parquet",
+  "ran_at_utc": "2026-08-24T23:48:41",
+  "parquet_sha256_before": "99da6feb97ea1a28abb9ffae748cc8fda1e8cd4bfb5a529ba27e534b5faf8d9c",
+  "parquet_rows": 3369628,
+  "parquet_last_bar": "2026-08-24 13:44:00-04:00",
+  "window_minutes": 120,
+  "window_start": "2026-08-24 11:44:00-04:00",
+  "feed_rows": 1489,
+  "shared_disagreements_total": 0,
+  "in_window": [],
+  "outside_window": [],
+  "applied": false,
+  "dry_run": true,
+  "verdict": "nothing_to_repair"
+}

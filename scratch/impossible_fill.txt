@@ -1,0 +1,33 @@
+da nap 4 ma
+
+=== prod_backtest ===
+  kiem duoc 2496 lenh
+  gia thoat NAM NGOAI bien do cua chinh bar thoat : 594 (23.8%)
+  gia thoat NAM NGOAI bien do CA NGAY hom do      : 116 (4.6%)
+  10 ca xa nhat (gia ghi so vs bien do ca ngay):
+    MNQ 2022-05-12 SHORT  ghi thoat @ 13809.10  | ca ngay chi chay 14055.00-14422.25  | cach 245.90 diem = $492
+    MES 2022-05-12 SHORT  ghi thoat @ 4388.79  | ca ngay chi chay 4453.75-4538.75  | cach 64.96 diem = $325
+    MYM 2018-12-27 SHORT  ghi thoat @ 24723.14  | ca ngay chi chay 25316.00-25731.00  | cach 592.86 diem = $296
+    MES 2024-02-21 SHORT  ghi thoat @ 5246.62  | ca ngay chi chay 5299.75-5375.75  | cach 53.13 diem = $266
+    MNQ 2020-03-23 SHORT  ghi thoat @ 8943.29  | ca ngay chi chay 9069.00-9570.75  | cach 125.71 diem = $251
+    MES 2020-03-31 LONG  ghi thoat @ 3010.52  | ca ngay chi chay 2864.25-2960.75  | cach 49.77 diem = $249
+    MYM 2024-11-05 SHORT  ghi thoat @ 42842.21  | ca ngay chi chay 43335.00-44504.00  | cach 492.79 diem = $246
+    MES 2018-12-27 SHORT  ghi thoat @ 2853.11  | ca ngay chi chay 2902.00-2952.25  | cach 48.89 diem = $244
+    MNQ 2018-12-27 SHORT  ghi thoat @ 8162.96  | ca ngay chi chay 8270.00-8428.75  | cach 107.04 diem = $214
+    MYM 2022-05-12 SHORT  ghi thoat @ 34695.86  | ca ngay chi chay 35116.00-35539.00  | cach 420.14 diem = $210
+
+=== prod_live14h ===
+  kiem duoc 2030 lenh
+  gia thoat NAM NGOAI bien do cua chinh bar thoat : 637 (31.4%)
+  gia thoat NAM NGOAI bien do CA NGAY hom do      : 91 (4.5%)
+  10 ca xa nhat (gia ghi so vs bien do ca ngay):
+    MNQ 2022-05-12 SHORT  ghi thoat @ 13809.10  | ca ngay chi chay 14055.00-14422.25  | cach 245.90 diem = $492
+    MYM 2018-12-27 SHORT  ghi thoat @ 24723.14  | ca ngay chi chay 25316.00-25731.00  | cach 592.86 diem = $296
+    MNQ 2020-03-23 SHORT  ghi thoat @ 8943.29  | ca ngay chi chay 9069.00-9570.75  | cach 125.71 diem = $251
+    MES 2020-03-31 LONG  ghi thoat @ 3010.52  | ca ngay chi chay 2864.25-2960.75  | cach 49.77 diem = $249
+    MYM 2024-11-05 SHORT  ghi thoat @ 42842.21  | ca ngay chi chay 43335.00-44504.00  | cach 492.79 diem = $246
+    MES 2018-12-27 SHORT  ghi thoat @ 2853.11  | ca ngay chi chay 2902.00-2952.25  | cach 48.89 diem = $244
+    MNQ 2018-12-27 SHORT  ghi thoat @ 8162.96  | ca ngay chi chay 8270.00-8428.75  | cach 107.04 diem = $214
+    MYM 2022-05-12 SHORT  ghi thoat @ 34695.86  | ca ngay chi chay 35116.00-35539.00  | cach 420.14 diem = $210
+    MES 2023-02-16 LONG  ghi thoat @ 4576.53  | ca ngay chi chay 4502.75-4537.50  | cach 39.03 diem = $195
+    M2K 2020-04-16 SHORT  ghi thoat @ 1330.15  | ca ngay chi chay 1369.00-1396.90  | cach 38.85 diem = $194

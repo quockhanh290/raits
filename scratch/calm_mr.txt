@@ -1,0 +1,33 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+=== CO SO DO ===
+  data-dir data/cache/futures/frozen_sim | regime-csv spy_daily_live.csv
+  nhan: train_end=2018-01-01  n=3  fit_end=2024-12-31  (KHUNG PRODUCTION)
+  nhan: 2167 ngay, Calm 883 (40.7%)
+  MES xong
+  MNQ xong
+  MYM xong
+  M2K xong
+
+=== KIEM CONG CU (chuoi da tron phai cho VR ~ 1) ===
+  VR6 tren chuoi tron: min 0.976 max 1.013
+  [PASS] moi VR6-tron nam trong [0.93, 1.07]
+
+=== VARIANCE RATIO theo regime (VR<1 dao chieu | >1 xu huong) ===
+  inst  regime   days   VR(30m)   VR(60m)  doc
+  M2K   Calm      708     0.940     0.938  ngau nhien
+  MES   Calm      708     0.939     0.932  ngau nhien
+  MNQ   Calm      708     0.975     0.972  ngau nhien
+  MYM   Calm      708     0.986     0.990  ngau nhien
+  M2K   Normal    787     0.980     0.974  ngau nhien
+  MES   Normal    787     0.981     0.988  ngau nhien
+  MNQ   Normal    787     0.987     0.992  ngau nhien
+  MYM   Normal    787     0.994     0.993  ngau nhien
+  M2K   Stress    263     0.901     0.875  ngau nhien
+  MES   Stress    263     0.910     0.884  ngau nhien
+  MNQ   Stress    263     0.950     0.955  ngau nhien
+  MYM   Stress    263     0.918     0.878  ngau nhien
+
+=== TRUNG BINH 4 MA ===
+  Calm    VR30m 0.960  VR60m 0.958  corr(gap,RTH) -0.156  corr(sang,chieu) -0.015
+  Normal  VR30m 0.985  VR60m 0.987  corr(gap,RTH) -0.022  corr(sang,chieu) -0.003
+  Stress  VR30m 0.920  VR60m 0.898  corr(gap,RTH) +0.204  corr(sang,chieu) -0.052

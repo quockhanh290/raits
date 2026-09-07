@@ -1,0 +1,482 @@
+{
+ "floor": {
+  "repaired_mechanics_family_cap_5_44": {
+   "base": {
+    "net": 74409.78,
+    "pf": 1.6718,
+    "sharpe": 2.1181,
+    "calmar": 2.1405,
+    "maxdd": 4973.38,
+    "trades_taken": 1690,
+    "trades_rejected": 195,
+    "swing_taken": 545,
+    "swing_rejected": 190,
+    "swing_pnl": 25676.61,
+    "pnl_by_cluster": {
+     "roska4_calm": 9162.47,
+     "global_nkd": 13405.17,
+     "roska4_swing": 25676.61,
+     "roska4_stress": 26165.53
+    }
+   },
+   "d1": {
+    "net": 66796.31,
+    "pf": 1.5867,
+    "sharpe": 1.9069,
+    "calmar": 1.9215,
+    "maxdd": 4973.38,
+    "trades_taken": 1696,
+    "trades_rejected": 203,
+    "swing_taken": 564,
+    "swing_rejected": 197,
+    "swing_pnl": 18428.52,
+    "pnl_by_cluster": {
+     "roska4_calm": 8797.09,
+     "global_nkd": 13405.17,
+     "roska4_swing": 18428.52,
+     "roska4_stress": 26165.53
+    }
+   },
+   "d1r": {
+    "net": 64374.24,
+    "pf": 1.5465,
+    "sharpe": 1.8257,
+    "calmar": 1.7759,
+    "maxdd": 5185.88,
+    "trades_taken": 1710,
+    "trades_rejected": 219,
+    "swing_taken": 580,
+    "swing_rejected": 211,
+    "swing_pnl": 16883.22,
+    "pnl_by_cluster": {
+     "roska4_calm": 7920.32,
+     "global_nkd": 13405.17,
+     "roska4_swing": 16883.22,
+     "roska4_stress": 26165.53
+    }
+   },
+   "proxy": {
+    "net": 45603.27,
+    "pf": 1.4227,
+    "sharpe": 1.4504,
+    "calmar": 1.3775,
+    "maxdd": 4736.2,
+    "trades_taken": 1523,
+    "trades_rejected": 190,
+    "swing_taken": 386,
+    "swing_rejected": 182,
+    "swing_pnl": -2433.07,
+    "pnl_by_cluster": {
+     "roska4_calm": 8465.64,
+     "global_nkd": 13405.17,
+     "roska4_stress": 26165.53,
+     "roska4_swing": -2433.07
+    }
+   },
+   "noswing": {
+    "net": 49413.78,
+    "pf": 1.8202,
+    "sharpe": 2.1878,
+    "calmar": 1.84,
+    "maxdd": 3842.17,
+    "trades_taken": 1156,
+    "trades_rejected": 1,
+    "swing_taken": 0,
+    "swing_rejected": 0,
+    "swing_pnl": 0.0,
+    "pnl_by_cluster": {
+     "roska4_calm": 9843.08,
+     "global_nkd": 13405.17,
+     "roska4_stress": 26165.53
+    }
+   }
+  },
+  "risk_clean_no_calm_nkd_family_cap_5_44": {
+   "base": {
+    "net": 64902.91,
+    "pf": 1.6172,
+    "sharpe": 2.3421,
+    "calmar": 1.9179,
+    "maxdd": 4845.31,
+    "trades_taken": 1160,
+    "trades_rejected": 195,
+    "swing_taken": 545,
+    "swing_rejected": 190,
+    "swing_pnl": 25676.61,
+    "pnl_by_cluster": {
+     "roska4_calm": 9162.47,
+     "global_nkd": 3898.3,
+     "roska4_swing": 25676.61,
+     "roska4_stress": 26165.53
+    }
+   },
+   "d1": {
+    "net": 57289.44,
+    "pf": 1.5297,
+    "sharpe": 2.0828,
+    "calmar": 1.6694,
+    "maxdd": 4913.68,
+    "trades_taken": 1166,
+    "trades_rejected": 203,
+    "swing_taken": 564,
+    "swing_rejected": 197,
+    "swing_pnl": 18428.52,
+    "pnl_by_cluster": {
+     "roska4_calm": 8797.09,
+     "global_nkd": 3898.3,
+     "roska4_swing": 18428.52,
+     "roska4_stress": 26165.53
+    }
+   },
+   "d1r": {
+    "net": 54867.37,
+    "pf": 1.4948,
+    "sharpe": 2.0007,
+    "calmar": 1.5532,
+    "maxdd": 5057.81,
+    "trades_taken": 1180,
+    "trades_rejected": 219,
+    "swing_taken": 580,
+    "swing_rejected": 211,
+    "swing_pnl": 16883.22,
+    "pnl_by_cluster": {
+     "roska4_calm": 7920.32,
+     "global_nkd": 3898.3,
+     "roska4_swing": 16883.22,
+     "roska4_stress": 26165.53
+    }
+   },
+   "proxy": {
+    "net": 36096.4,
+    "pf": 1.3526,
+    "sharpe": 1.4724,
+    "calmar": 1.1025,
+    "maxdd": 4687.68,
+    "trades_taken": 993,
+    "trades_rejected": 190,
+    "swing_taken": 386,
+    "swing_rejected": 182,
+    "swing_pnl": -2433.07,
+    "pnl_by_cluster": {
+     "roska4_calm": 8465.64,
+     "global_nkd": 3898.3,
+     "roska4_stress": 26165.53,
+     "roska4_swing": -2433.07
+    }
+   },
+   "noswing": {
+    "net": 39906.91,
+    "pf": 1.7347,
+    "sharpe": 2.447,
+    "calmar": 1.4305,
+    "maxdd": 3994.17,
+    "trades_taken": 626,
+    "trades_rejected": 1,
+    "swing_taken": 0,
+    "swing_rejected": 0,
+    "swing_pnl": 0.0,
+    "pnl_by_cluster": {
+     "roska4_calm": 9843.08,
+     "global_nkd": 3898.3,
+     "roska4_stress": 26165.53
+    }
+   }
+  }
+ },
+ "vault2025": {
+  "repaired_mechanics_family_cap_5_44": {
+   "base": {
+    "net": 16997.2,
+    "pf": 2.2571,
+    "sharpe": 2.7592,
+    "calmar": 4.4455,
+    "maxdd": 3900.89,
+    "trades_taken": 214,
+    "trades_rejected": 51,
+    "swing_taken": 55,
+    "swing_rejected": 48,
+    "swing_pnl": 4690.22,
+    "pnl_by_cluster": {
+     "global_nkd": 5964.13,
+     "roska4_swing": 4690.22,
+     "roska4_calm": 1811.89,
+     "roska4_stress": 4530.96
+    }
+   },
+   "d1": {
+    "net": 16180.57,
+    "pf": 2.0549,
+    "sharpe": 2.4964,
+    "calmar": 3.3591,
+    "maxdd": 4914.52,
+    "trades_taken": 215,
+    "trades_rejected": 53,
+    "swing_taken": 57,
+    "swing_rejected": 48,
+    "swing_pnl": 3905.85,
+    "pnl_by_cluster": {
+     "global_nkd": 5964.13,
+     "roska4_swing": 3905.85,
+     "roska4_calm": 1779.63,
+     "roska4_stress": 4530.96
+    }
+   },
+   "d1r": {
+    "net": 10039.84,
+    "pf": 1.6558,
+    "sharpe": 2.1615,
+    "calmar": 2.5196,
+    "maxdd": 4065.45,
+    "trades_taken": 221,
+    "trades_rejected": 45,
+    "swing_taken": 62,
+    "swing_rejected": 42,
+    "swing_pnl": -2189.64,
+    "pnl_by_cluster": {
+     "global_nkd": 5964.13,
+     "roska4_swing": -2189.64,
+     "roska4_calm": 1734.39,
+     "roska4_stress": 4530.96
+    }
+   },
+   "noswing": {
+    "net": 12377.27,
+    "pf": 3.0085,
+    "sharpe": 3.9015,
+    "calmar": 8.0543,
+    "maxdd": 1567.85,
+    "trades_taken": 163,
+    "trades_rejected": 1,
+    "swing_taken": 0,
+    "swing_rejected": 0,
+    "swing_pnl": 0.0,
+    "pnl_by_cluster": {
+     "global_nkd": 5964.13,
+     "roska4_calm": 1882.18,
+     "roska4_stress": 4530.96
+    }
+   }
+  },
+  "risk_clean_no_calm_nkd_family_cap_5_44": {
+   "base": {
+    "net": 13236.11,
+    "pf": 1.9956,
+    "sharpe": 2.9622,
+    "calmar": 3.0882,
+    "maxdd": 4631.53,
+    "trades_taken": 128,
+    "trades_rejected": 51,
+    "swing_taken": 55,
+    "swing_rejected": 48,
+    "swing_pnl": 4690.22,
+    "pnl_by_cluster": {
+     "global_nkd": 2203.04,
+     "roska4_swing": 4690.22,
+     "roska4_calm": 1811.89,
+     "roska4_stress": 4530.96
+    }
+   },
+   "d1": {
+    "net": 12419.48,
+    "pf": 1.8218,
+    "sharpe": 2.6345,
+    "calmar": 2.3774,
+    "maxdd": 5645.16,
+    "trades_taken": 129,
+    "trades_rejected": 52,
+    "swing_taken": 57,
+    "swing_rejected": 47,
+    "swing_pnl": 3905.85,
+    "pnl_by_cluster": {
+     "global_nkd": 2203.04,
+     "roska4_swing": 3905.85,
+     "roska4_calm": 1779.63,
+     "roska4_stress": 4530.96
+    }
+   },
+   "d1r": {
+    "net": 6278.75,
+    "pf": 1.4177,
+    "sharpe": 1.8408,
+    "calmar": 1.4147,
+    "maxdd": 4796.09,
+    "trades_taken": 135,
+    "trades_rejected": 45,
+    "swing_taken": 62,
+    "swing_rejected": 42,
+    "swing_pnl": -2189.64,
+    "pnl_by_cluster": {
+     "global_nkd": 2203.04,
+     "roska4_swing": -2189.64,
+     "roska4_calm": 1734.39,
+     "roska4_stress": 4530.96
+    }
+   },
+   "noswing": {
+    "net": 8616.18,
+    "pf": 2.506,
+    "sharpe": 4.2691,
+    "calmar": 6.2238,
+    "maxdd": 1496.01,
+    "trades_taken": 77,
+    "trades_rejected": 1,
+    "swing_taken": 0,
+    "swing_rejected": 0,
+    "swing_pnl": 0.0,
+    "pnl_by_cluster": {
+     "global_nkd": 2203.04,
+     "roska4_calm": 1882.18,
+     "roska4_stress": 4530.96
+    }
+   }
+  }
+ },
+ "vault2026": {
+  "repaired_mechanics_family_cap_5_44": {
+   "base": {
+    "net": 9288.24,
+    "pf": 1.6161,
+    "sharpe": 2.4745,
+    "calmar": 3.4117,
+    "maxdd": 4342.3,
+    "trades_taken": 129,
+    "trades_rejected": 48,
+    "swing_taken": 45,
+    "swing_rejected": 36,
+    "swing_pnl": 718.73,
+    "pnl_by_cluster": {
+     "roska4_calm": 702.19,
+     "global_nkd": 7035.86,
+     "roska4_swing": 718.73,
+     "roska4_stress": 831.46
+    }
+   },
+   "d1": {
+    "net": 8105.04,
+    "pf": 1.5196,
+    "sharpe": 2.1439,
+    "calmar": 3.7629,
+    "maxdd": 3435.49,
+    "trades_taken": 127,
+    "trades_rejected": 50,
+    "swing_taken": 43,
+    "swing_rejected": 38,
+    "swing_pnl": -464.47,
+    "pnl_by_cluster": {
+     "roska4_calm": 702.19,
+     "global_nkd": 7035.86,
+     "roska4_swing": -464.47,
+     "roska4_stress": 831.46
+    }
+   },
+   "d1r": {
+    "net": 6946.02,
+    "pf": 1.4298,
+    "sharpe": 1.871,
+    "calmar": 3.0405,
+    "maxdd": 3643.72,
+    "trades_taken": 132,
+    "trades_rejected": 53,
+    "swing_taken": 48,
+    "swing_rejected": 41,
+    "swing_pnl": -1623.49,
+    "pnl_by_cluster": {
+     "roska4_calm": 702.19,
+     "global_nkd": 7035.86,
+     "roska4_swing": -1623.49,
+     "roska4_stress": 831.46
+    }
+   },
+   "noswing": {
+    "net": 8731.29,
+    "pf": 2.0199,
+    "sharpe": 3.4646,
+    "calmar": 8.9233,
+    "maxdd": 1560.66,
+    "trades_taken": 87,
+    "trades_rejected": 10,
+    "swing_taken": 0,
+    "swing_rejected": 0,
+    "swing_pnl": 0.0,
+    "pnl_by_cluster": {
+     "roska4_calm": 863.97,
+     "global_nkd": 7035.86,
+     "roska4_stress": 831.46
+    }
+   }
+  },
+  "risk_clean_no_calm_nkd_family_cap_5_44": {
+   "base": {
+    "net": 8259.85,
+    "pf": 1.5486,
+    "sharpe": 2.5681,
+    "calmar": 2.7461,
+    "maxdd": 4797.44,
+    "trades_taken": 91,
+    "trades_rejected": 47,
+    "swing_taken": 45,
+    "swing_rejected": 36,
+    "swing_pnl": 718.73,
+    "pnl_by_cluster": {
+     "roska4_calm": 702.19,
+     "global_nkd": 6007.47,
+     "roska4_swing": 718.73,
+     "roska4_stress": 831.46
+    }
+   },
+   "d1": {
+    "net": 7076.65,
+    "pf": 1.4527,
+    "sharpe": 2.1858,
+    "calmar": 1.9284,
+    "maxdd": 5853.15,
+    "trades_taken": 89,
+    "trades_rejected": 49,
+    "swing_taken": 43,
+    "swing_rejected": 38,
+    "swing_pnl": -464.47,
+    "pnl_by_cluster": {
+     "roska4_calm": 702.19,
+     "global_nkd": 6007.47,
+     "roska4_swing": -464.47,
+     "roska4_stress": 831.46
+    }
+   },
+   "d1r": {
+    "net": 5917.63,
+    "pf": 1.3476,
+    "sharpe": 1.8021,
+    "calmar": 1.4262,
+    "maxdd": 6617.99,
+    "trades_taken": 94,
+    "trades_rejected": 52,
+    "swing_taken": 48,
+    "swing_rejected": 41,
+    "swing_pnl": -1623.49,
+    "pnl_by_cluster": {
+     "roska4_calm": 702.19,
+     "global_nkd": 6007.47,
+     "roska4_swing": -1623.49,
+     "roska4_stress": 831.46
+    }
+   },
+   "noswing": {
+    "net": 7702.9,
+    "pf": 1.8264,
+    "sharpe": 3.4637,
+    "calmar": 3.2449,
+    "maxdd": 3786.21,
+    "trades_taken": 49,
+    "trades_rejected": 9,
+    "swing_taken": 0,
+    "swing_rejected": 0,
+    "swing_pnl": 0.0,
+    "pnl_by_cluster": {
+     "roska4_calm": 863.97,
+     "global_nkd": 6007.47,
+     "roska4_stress": 831.46
+    }
+   }
+  }
+ }
+}

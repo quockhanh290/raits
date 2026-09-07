@@ -1,0 +1,206 @@
+{
+  "stage": "5ZP",
+  "title": "Track 1 diagnostics polish: sleeve rule exposure + dashboard UI consistency",
+  "checked_at": {
+    "utc": "2026-08-26T09:40",
+    "et": "2026-08-26T05:40 EDT",
+    "calgary": "2026-08-26T03:40 MDT",
+    "window": "ET 04:30-05:40"
+  },
+  "answers": {
+    "1_runtime_or_live_file_changed": {
+      "answer": false,
+      "verified": [
+        "coverage, signals and audits at baseline mtimes",
+        "checkpoint and book carry 00:55 from the live NKD close",
+        "data_observation/ still absent - the next slot creates it",
+        "no screenshots produced"
+      ]
+    },
+    "2_orders_still_impossible": {
+      "answer": true,
+      "blocking": [
+        "B1_broker_account_or_legacy_retirement",
+        "PAPER_SHADOW_EVIDENCE",
+        "REGIME_LABEL_VERIFICATION"
+      ]
+    },
+    "3_what_changed_in_the_chip": {
+      "three_separate_faults": [
+        "the TEXT doubled itself - 'Signal' was already implied by its position beside RUNNER and COMPLETED, making the longest chip on the row the least informative",
+        "it was a BORDERED PILL of its own invention while every other chip is .event-status, so it read as a different KIND of object",
+        "`grid-column: 1 / -1` is literally what put it on its own line - the whole of the 'on its own row, too large' complaint was one property"
+      ],
+      "now": "`.event-status signal-<tone>` carrying only its label, emitted INSIDE the job-badges span, beside the other two",
+      "tooltip": "unchanged and still composed by the backend, so page and journal cannot drift",
+      "measured": "a Track 1 row and a row with no chip are now the same height within 2px"
+    },
+    "4_details_inside_the_detail_block": {
+      "answer": true,
+      "was": "renderJobDetails(...) + operationalDetails(job) + signalDetails(job) - siblings of the panel, which is why they rendered as loose text below it",
+      "now": "inside the job-detail div, after EVIDENCE / RESOLUTION, in the `.job-section` style IMPACT and ACTION already use",
+      "asserted": [
+        "a count of .job-section nodes NOT inside .job-detail must be zero",
+        "DOM order: job-resolution before job-section"
+      ]
+    },
+    "5_track1_panel_visually_consistent": {
+      "answer": true,
+      "was": "label and value were inline siblings with nothing separating them - #track1Facts only ever set min-width: 0, so 'Route track1_candidate' ran together",
+      "now": "the same shape as .schedule-fact next door - small uppercase label on its own line, value beneath, wrapping allowed. No new card, no new colours.",
+      "blocking_gates": "wrapping chips in plain English with the raw id in the tooltip",
+      "measured": "with three gates the panel's scrollWidth does not exceed its clientWidth"
+    },
+    "6_new_rule_values_exposed": {
+      "answer": false,
+      "deliberate": true,
+      "why": "there are none to expose - after 5ZD every sleeve setup rule still returns not_exposed_by_sleeve (210 of 324 checks on the live journal). The detectors do not return their measured values, and the only way to produce a number here would be to COMPUTE it in the diagnostics path - forbidden by this stage's own constraints and by the reason behind them.",
+      "kept_instead": "the single honest sentence 5ZE gave it, with a test requiring it and capping the section at four lines so a wall of UNKNOWN cannot return",
+      "recorded_as_real_work": "making the detectors return their values is strategy-layer work, not a dashboard change"
+    },
+    "7_any_diagnostics_recompute": {
+      "answer": false
+    },
+    "8_mobile_overflow_checks": {
+      "passed": true,
+      "widths": [
+        380,
+        720,
+        1024
+      ],
+      "state": "expanded",
+      "also": [
+        "the badge group must not overhang its row",
+        "the page must log no console error"
+      ]
+    },
+    "9_data_proof_displays": {
+      "answer": true,
+      "three_states": [
+        "Data: IBKR · NKD · 1186 live bars checked · last 02:55 ET · splice OK",
+        "Data proof: not recorded by this slot version",
+        "Data refused: overlap mismatch"
+      ],
+      "also_asserted": "exactly ONE Data line per job, so a second source cannot start adding its own"
+    },
+    "10_remaining_before_paper": [
+      {
+        "n": 1,
+        "item": "machine sleep",
+        "class": "operator"
+      },
+      {
+        "n": 2,
+        "item": "B1 account decision",
+        "class": "operator"
+      },
+      {
+        "n": 3,
+        "item": "five clean judgeable days",
+        "class": "time, once 1 is fixed"
+      },
+      {
+        "n": 4,
+        "item": "the regime gate's first PASS",
+        "class": "time - --verify-strict is live"
+      },
+      {
+        "n": 5,
+        "item": "broker stop proof, partial fills, order in flight across a restart",
+        "class": "paper only"
+      }
+    ]
+  },
+  "misleading_sentence_found_on_the_live_journal": {
+    "measured": "22 NO_SIGNAL rows on 2026-08-26, candidates: [], freshness_allow: false - every one printed 'First rule that failed: Freshness check.'",
+    "why_wrong": "freshness stopped nothing; nothing reached admission for it to stop. A rule that guards ADMISSION has nothing to say about a slot that admitted nothing, and naming it as the first failure names a cause that did not act.",
+    "now": "Freshness check: measured as not allowing admission, but no candidate reached admission.",
+    "scope_kept_narrow": [
+      "a rule that DID block a candidate is still named as the first failure",
+      "a SETUP rule that failed with no candidate is also still named - there, the failed rule is precisely why no candidate exists"
+    ],
+    "pinned_against_reality": "a test runs the whole real journal through the composer and requires no row to blame freshness"
+  },
+  "tests": {
+    "file": "scratch/test_track1_stage5zp_dashboard_polish_20260826.py",
+    "count": 31,
+    "harness": "real chromium, real page, API stubbed - the harness monitor/test_realtime_dom.py already provides",
+    "structural_not_substring": [
+      "is the chip a CHILD of .job-badges",
+      "is its computed grid-column no longer 1 / -1",
+      "how many .job-section nodes sit OUTSIDE .job-detail",
+      "does the badge group overhang its row",
+      "does the document scroll horizontally"
+    ],
+    "four_are_not_browser_tests": "the DOM test for the freshness wording renders a FIXTURE and would stay green if the backend regressed, so the composer is asked directly - including once against the real journal"
+  },
+  "two_pinning_suites_updated": {
+    "count": 16,
+    "suites": [
+      "5ZD",
+      "5ZE"
+    ],
+    "why": "they pinned the old chip's class, text and own-row property - all three are what this stage changed, deliberately",
+    "one_got_stronger": {
+      "test": "5ZE test_41_the_chip_reuses_the_existing_visual_language",
+      "was": "checked that a bespoke pill had borrowed three properties from the dashboard look",
+      "now": "checks that the chip IS the dashboard's chip and that .job-signal-chip appears nowhere in either file"
+    },
+    "one_inverted": {
+      "test": "5ZD test_46",
+      "was": "asserted grid-column: 1 / -1 - which is the defect",
+      "now": "requires its absence"
+    },
+    "one_failed_for_a_reason_worth_recording": {
+      "test": "5ZD test_47_the_dashboard_does_not_compose_the_wording_itself",
+      "what_happened": "it searches the renderer for chip labels and went red because MY NEW COMMENT quoted the old label to explain why it had been removed",
+      "class": "substring-over-prose, on a test built to catch a different trap",
+      "fix": "it now strips line comments first, so it reads what the renderer EMITS rather than what it says about itself"
+    }
+  },
+  "regression": {
+    "passed": 572,
+    "failed": 0,
+    "suites": [
+      "5ZP",
+      "5ZO",
+      "5ZE",
+      "5ZD",
+      "5ZM",
+      "5ZN",
+      "monitor/test_realtime_dom.py",
+      "monitor/test_realtime_skin.py",
+      "monitor/test_realtime_contract.py",
+      "monitor/test_dashboard_backend.py",
+      "monitor/test_paper_dom.py"
+    ]
+  },
+  "files_changed": {
+    "modified": [
+      "global_index/dash/realtime/realtime.js",
+      "global_index/dash/realtime/realtime.css",
+      "global_index/track1_signals.py",
+      "scratch/test_track1_stage5zd_signal_diagnostics_20260825.py",
+      "scratch/test_track1_stage5ze_job_view_operator_20260825.py"
+    ],
+    "new": [
+      "scratch/test_track1_stage5zp_dashboard_polish_20260826.py"
+    ],
+    "runtime_files_changed": []
+  },
+  "liveness": {
+    "restarted": false,
+    "live_now": "the JS and CSS are static assets served fresh on reload, so every visual change is live at the next page load without a restart",
+    "NOT_live_until_a_backend_restart": "the signal wording - it lives in track1_signals, which the job reader imports at module load, so the running backend still composes the old sentence",
+    "everything_else": "browser-side; needs nothing"
+  },
+  "two_items_now_recorded_rather_than_open_questions": [
+    "the sleeve detectors do not return their measured values - strategy-layer work",
+    "nothing records whether the provider's last bar was still open (5ZO)"
+  ],
+  "claims_deliberately_NOT_made": [
+    "that any new rule value was exposed",
+    "paper readiness",
+    "that any gate moved"
+  ]
+}

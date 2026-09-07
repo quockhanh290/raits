@@ -1,0 +1,135 @@
+{"ts":"2026-08-13T05:10:32+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T05:10:32+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T05:11:34+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T05:15:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T05:15:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T05:16:09+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T05:20:15+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T05:20:15+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T05:21:14+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T05:25:15+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T05:25:15+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T05:26:17+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T05:30:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T05:30:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T05:31:13+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T05:35:13+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T05:35:13+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T05:36:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T05:40:13+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T05:40:13+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T05:41:08+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T05:45:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T05:45:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T05:46:09+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T05:50:13+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T05:50:13+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T05:51:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T05:55:13+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T05:55:13+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T05:56:09+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T06:00:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T06:00:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T06:01:15+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T06:05:13+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T06:05:13+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T06:06:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T06:10:13+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T06:10:13+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T06:11:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T06:15:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T06:15:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T06:16:12+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T06:20:13+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T06:20:13+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T06:21:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T06:25:13+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T06:25:13+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T06:26:08+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T06:30:13+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T06:30:13+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T06:31:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T06:35:13+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T06:35:13+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T06:36:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T06:40:13+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T06:40:13+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T06:41:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T06:45:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T06:45:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T06:46:08+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T06:50:13+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T06:50:13+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T06:51:06+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T06:55:13+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T06:55:13+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T06:58:47+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T18:05:15+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T18:05:15+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T18:08:14+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T18:10:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T18:10:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T18:13:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T18:15:15+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T18:15:15+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T18:18:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T18:20:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T18:20:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T18:23:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T18:25:15+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T18:25:15+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T18:28:08+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T18:30:15+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T18:30:15+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T18:33:08+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T18:35:15+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T18:35:15+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T18:38:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T18:40:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T18:40:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T18:43:08+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T18:45:15+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T18:45:15+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T18:48:06+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T18:50:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T18:50:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T18:53:09+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T18:55:15+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T18:55:15+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T18:58:08+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T19:00:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T19:00:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T19:03:06+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T19:05:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T19:05:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T19:08:08+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T19:10:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T19:10:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T19:13:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T19:15:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T19:15:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T19:18:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T19:20:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T19:20:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T19:23:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T19:25:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T19:25:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T19:28:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T19:30:15+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T19:30:15+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T19:33:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T19:35:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T19:35:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T19:38:05+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T19:40:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T19:40:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T19:43:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T19:45:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T19:45:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T19:48:08+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T19:50:14+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T19:50:14+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T19:53:07+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}
+{"ts":"2026-08-13T19:55:15+00:00","level":"INFO","category":"STATE","message":"Runner started: loaded 1 position(s) from persisted file"}
+{"ts":"2026-08-13T19:55:15+00:00","level":"INFO","category":"STATE","message":"Day started: 2026-08-13, 1 position(s) open"}
+{"ts":"2026-08-13T19:59:44+00:00","level":"ALERT","category":"GUARD","message":"G2: model age URGENT — schedule re-freeze immediately"}

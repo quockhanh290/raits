@@ -1,0 +1,137 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZZ-I",
+  "title": "Retune Swing under causal D-1 regime labels",
+  "route": "track1_candidate",
+  "date": "2026-08-29",
+  "decision": "KEEP_RESEARCH_ONLY",
+  "decision_rationale": [
+    "the retune selected ema=10 mult=2.5 and that choice is WORSE out-of-sample than the params it replaces",
+    "Swing's own contribution under a causal label is negative in BOTH OOS windows under the retuned params, and in 2026 under the old ones",
+    "in 2026 the no-Swing route beats every live-tradable Swing route on net, PF, Sharpe, Calmar and drawdown",
+    "the brief's bar - do not promote unless OOS evidence supports it - is not met",
+    "not DROP_SWING either: two OOS windows, one of them 8 months and ~45 trades, a nine-point grid, no bootstrap, and an unstable selection under BOTH labels"
+  ],
+
+  "original_process_recovered": {
+    "source": "pooled_swing_wfo.py, credited by futures/basket.py for SWING_TF_PARAM",
+    "grid": {"ema_period": [10, 20, 30], "chandelier_atr_mult": [2.5, 3.0, 3.5]},
+    "max_hold_days": 5,
+    "max_hold_in_grid": false,
+    "objective": "Calmar on the TRAIN fold, minimum 10 basket trades",
+    "folds": "rolling 18mo train -> 6mo test, stepping 6mo, one shared param per fold, pooled across the basket",
+    "labels_in_original": "raw label_regimes dict -> labels.get(day) = the session's own label"
+  },
+
+  "provenance_gap": {
+    "claim_in_repo": "SWING_TF_PARAM = ema 30, mult 2.5, max_hold 5 - 'pooled WFO winner, 5/6 folds'",
+    "reproduced": false,
+    "status": "could not be reproduced - NOT 'is wrong'",
+    "fold_geometry_reproduced": true,
+    "fold_count": 6,
+    "readings_tried": [
+      {"reading": "fold vote, original config", "winner": "ema10/2.5", "share": "2/6", "frozen_param_folds": 1},
+      {"reading": "pooled whole-region Calmar, original config", "winner": "ema10/2.5", "winner_calmar": 1.81, "frozen_param_rank": 4, "frozen_param_calmar": 1.11},
+      {"reading": "pooled whole-region Calmar, Track 1 floor config", "winner": "ema20/2.5", "winner_calmar": 1.35, "frozen_param_rank": 3, "frozen_param_calmar": 0.91}
+    ],
+    "consequence": "this stage does not claim to have re-run the original tuning; it runs a controlled A/B with one protocol applied identically to both label sets"
+  },
+
+  "retune": {
+    "selection_region": "floor only; 2025 and 2026 never read during selection",
+    "config": {"data_dir": "data/cache/futures/frozen_sim", "end": "2024-12-31",
+               "hmm_fit_end": "2022-12-31", "slippage_ticks": 2.0},
+    "arms": {
+      "same_day_control": {"winner": {"ema_period": 10, "chandelier_atr_mult": 2.5},
+                           "fold_share": "4/10",
+                           "counts": {"ema10_mult2.5": 4, "ema20_mult2.5": 4, "ema20_mult3.5": 1, "ema30_mult2.5": 1}},
+      "causal_d1": {"winner": {"ema_period": 10, "chandelier_atr_mult": 2.5},
+                    "fold_share": "4/10",
+                    "counts": {"ema10_mult2.5": 4, "ema30_mult2.5": 2, "ema20_mult2.5": 2, "ema10_mult3.5": 1, "ema20_mult3.0": 1}}
+    },
+    "stability_warning": "no parameter wins a majority in either arm; the control has a two-way tie at 4. The frozen ema30/mult2.5 is selected in 1/10 folds under same-day and 2/10 under D-1."
+  },
+
+  "results_full_stack_calm_nkd_on": {
+    "floor": {
+      "base": {"net": 74410, "pf": 1.67, "sharpe": 2.12, "calmar": 2.14, "maxdd": 4973, "trades": 1690, "swing_pnl": 25677, "swing_taken": 545, "swing_rejected": 190},
+      "d1": {"net": 66796, "pf": 1.59, "sharpe": 1.91, "calmar": 1.92, "maxdd": 4973, "trades": 1696, "swing_pnl": 18429, "swing_taken": 564, "swing_rejected": 197},
+      "d1_retuned": {"net": 64374, "pf": 1.55, "sharpe": 1.83, "calmar": 1.78, "maxdd": 5186, "trades": 1710, "swing_pnl": 16883, "swing_taken": 580, "swing_rejected": 211},
+      "no_swing": {"net": 49414, "pf": 1.82, "sharpe": 2.19, "calmar": 1.84, "maxdd": 3842, "trades": 1156, "swing_pnl": 0}
+    },
+    "vault2025": {
+      "base": {"net": 16997, "pf": 2.26, "sharpe": 2.76, "calmar": 4.45, "maxdd": 3901, "trades": 214, "swing_pnl": 4690, "swing_taken": 55, "swing_rejected": 48},
+      "d1": {"net": 16181, "pf": 2.05, "sharpe": 2.50, "calmar": 3.36, "maxdd": 4915, "trades": 215, "swing_pnl": 3906, "swing_taken": 57, "swing_rejected": 48},
+      "d1_retuned": {"net": 10040, "pf": 1.66, "sharpe": 2.16, "calmar": 2.52, "maxdd": 4065, "trades": 221, "swing_pnl": -2190, "swing_taken": 62, "swing_rejected": 42},
+      "no_swing": {"net": 12377, "pf": 3.01, "sharpe": 3.90, "calmar": 8.05, "maxdd": 1568, "trades": 163, "swing_pnl": 0}
+    },
+    "vault2026": {
+      "base": {"net": 9288, "pf": 1.62, "sharpe": 2.47, "calmar": 3.41, "maxdd": 4342, "trades": 129, "swing_pnl": 719, "swing_taken": 45, "swing_rejected": 36},
+      "d1": {"net": 8105, "pf": 1.52, "sharpe": 2.14, "calmar": 3.76, "maxdd": 3435, "trades": 127, "swing_pnl": -464, "swing_taken": 43, "swing_rejected": 38},
+      "d1_retuned": {"net": 6946, "pf": 1.43, "sharpe": 1.87, "calmar": 3.04, "maxdd": 3644, "trades": 132, "swing_pnl": -1623, "swing_taken": 48, "swing_rejected": 41},
+      "no_swing": {"net": 8731, "pf": 2.02, "sharpe": 3.46, "calmar": 8.92, "maxdd": 1561, "trades": 87, "swing_pnl": 0}
+    }
+  },
+
+  "results_risk_clean_no_calm_nkd": {
+    "floor": {"base": 64903, "d1": 57289, "d1_retuned": 54867, "no_swing": 39907},
+    "vault2025": {"base": 13236, "d1": 12419, "d1_retuned": 6279, "no_swing": 8616},
+    "vault2026": {"base": 8260, "d1": 7077, "d1_retuned": 5918, "no_swing": 7703}
+  },
+
+  "swing_contribution_by_arm": {
+    "floor": {"same_day": 25677, "d1_old": 18429, "d1_retuned": 16883},
+    "vault2025": {"same_day": 4690, "d1_old": 3906, "d1_retuned": -2190},
+    "vault2026": {"same_day": 719, "d1_old": -464, "d1_retuned": -1623}
+  },
+
+  "answers": {
+    "best_causal_d1_params": {"ema_period": 10, "chandelier_atr_mult": 2.5, "max_hold_days": 5,
+                              "fold_share": "4/10", "caveat": "a plurality, not a majority; unstable"},
+    "baseline_reproduced": true,
+    "swing_remains_enabled": true,
+    "swing_enabled_as": "shadow / research only",
+    "eligible_for_paper": false,
+    "live_route_code_changed": false,
+    "swing_tf_param_changed": false,
+    "identity_docs_rewritten": false,
+    "orders_possible": false,
+    "blockers": ["PAPER_SHADOW_EVIDENCE"]
+  },
+
+  "not_concluded": {
+    "why_not_drop_swing": [
+      "two OOS windows, one of them 8 months and 45-48 taken trades",
+      "no confidence interval; no difference here has been tested against noise",
+      "the grid is nine points in two dimensions - max_hold_days and the context filter were never in it",
+      "selection is unstable under BOTH labels (4/10 with a tie in the control)"
+    ],
+    "what_would_settle_it": "a causal-label selection over a grid including the hold cap and the filter, with a day-level bootstrap on the OOS windows and a pre-committed threshold"
+  },
+
+  "open_items": [
+    {"id": "O1", "what": "the frozen SWING_TF_PARAM's provenance cannot be reproduced from the script the repo names for it",
+     "status": "insufficient evidence, not disproven",
+     "why_it_matters": "Track 1 Swing runs ema=30/mult=2.5 today on the strength of a '5/6 folds' claim that no reading reproduced",
+     "independent_of": "the causal-label question"}
+  ],
+
+  "safety": {
+    "scheduler_restarted": false, "scheduler_pids": [3000], "broker_connected": false,
+    "orders_dir_present": false, "TRACK1_ORDERS_APPROVED_set": false,
+    "confirmation_file_modified": false, "runtime_evidence_modified": false,
+    "live_route_code_changed": false, "gate_opened": false,
+    "baseline_artifacts_sha256_unchanged": true
+  },
+
+  "files_added": [
+    "scratch/track1_stage5zzzi_swing_wfo_20260829.py",
+    "scratch/track1_stage5zzzi_swing_wfo_20260829.json",
+    "scratch/track1_stage5zzzi_make_noswing_20260829.py",
+    "scratch/track1_stage5zzzi_compare_20260829.py",
+    "scratch/track1_stage5zzzi_compare_20260829.json",
+    "scratch/normal_promotion_trades_{floor,vault2025,vault2026}_d1r_20260829.json",
+    "scratch/normal_promotion_trades_{floor,vault2025,vault2026}_noswing_20260829.json",
+    "scratch/track1_stage5zzzh_full_replay_{d1r,noswing}_20260829.json"
+  ]
+}

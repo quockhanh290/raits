@@ -1,0 +1,15 @@
+{
+ "artifact": "normal_promotion_trades_floor_d1repro_20260829.json",
+ "artifact_sha256": "2474723814ae3e925417d0a7f467b7710dcfa05ece251b4b917f684bd7bb85f9",
+ "window": "floor",
+ "labels": "RegimeLabels(lag_days=1) causal D-1",
+ "proxy_labels": false,
+ "asked_ema_period": 30,
+ "effective_ema_period": 50,
+ "ema_was_substituted": true,
+ "asked_chandelier_atr_mult": 2.5,
+ "chandelier_affects_decisions": false,
+ "effective_stop_basis_atr_mult": 2.0,
+ "ratchet": false,
+ "max_hold_days": 5
+}

@@ -1,0 +1,8 @@
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+floor/breadth3: stress=84 net=$2,749 | swing ALREADY OPEN same symbol at 10:20: 64/84 (76%) | OPPOSITE dir: 33/84 (39%) carrying $1,627 (59% of net)
+floor/wide_range3: stress=61 net=$2,588 | swing ALREADY OPEN same symbol at 10:20: 44/61 (72%) | OPPOSITE dir: 25/61 (41%) carrying $1,165 (45% of net)
+vault2025/breadth3: stress=19 net=$4,095 | swing ALREADY OPEN same symbol at 10:20: 9/19 (47%) | OPPOSITE dir: 4/19 (21%) carrying $635 (16% of net)
+vault2025/wide_range3: stress=15 net=$3,622 | swing ALREADY OPEN same symbol at 10:20: 7/15 (47%) | OPPOSITE dir: 4/15 (27%) carrying $635 (18% of net)

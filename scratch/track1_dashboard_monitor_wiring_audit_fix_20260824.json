@@ -1,0 +1,57 @@
+{
+ "stage": "track1_dashboard_monitor_wiring_fix",
+ "date": "2026-08-24",
+ "root_cause": "start_backend called _env() with no arguments, so the dashboard backend child never received RAITS_TRACK1_ONLY/RAITS_TRACK1_SHADOW while the scheduler did",
+ "additional_defects_found": [
+  "_env set RAITS_TRACK1_SHADOW only in the track1_only branch, so transitional --track1-shadow never set it",
+  "_slots_for/_state_slot_table_size still expected the 45 legacy slots in track1-only mode (32 phantom overdue on a clean day)",
+  "restart --no-scheduler --track1-only-shadow refused, leaving no way to fix the backend without restarting the live scheduler"
+ ],
+ "endpoint_before": {
+  "schedule_status.state_slot_count": 45,
+  "schedule_status.next_decision_job": "MAX_HOLD_EXIT",
+  "track1_runtime.route": "track1_candidate",
+  "note": "measured on the live backend at port 5002 before any change"
+ },
+ "expected_after_backend_restart": {
+  "schedule_status.state_slot_count": 70
+ },
+ "health_table_measured": {
+  "legacy": 45,
+  "track1_shadow": 115,
+  "track1_only": 70
+ },
+ "phantom_legacy_overdue_track1_only": {
+  "before": 32,
+  "after": 0
+ },
+ "operator_command": "python monitor\\ops.py restart --no-scheduler --yes --track1-only-shadow",
+ "tests": {
+  "backend_ops_contract": 259,
+  "dom_and_required_pair": 72,
+  "skin": 10,
+  "event_playback_run": false
+ },
+ "mutations_red": 7,
+ "side_effects": {
+  "scheduler_pid": 33868,
+  "scheduler_restarted": false,
+  "orders_placed": 0,
+  "confirmation_file": false,
+  "stop_trading_files": false,
+  "staged": 0,
+  "committed": false
+ },
+ "files_changed": {
+  "monitor/ops.py": "7e29225b0129652a",
+  "monitor/backend/schedule_status.py": "3a3cbb18df4b53e9",
+  "global_index/dash/realtime/realtime.js": "6130f4a4d634a780",
+  "global_index/dash/realtime/index.html": "60af5df46f398251",
+  "global_index/dash/realtime-next/index.html": "cb9c616a49a08bfd",
+  "global_index/dash/realtime/realtime.css": "4b2a079bda31e3ff",
+  "monitor/test_dashboard_backend.py": "9301063e5c533a2d",
+  "monitor/test_schedule_status_track1_20260823.py": "79555624b01bc14b",
+  "monitor/test_realtime_contract.py": "be7298f991215fc3",
+  "monitor/test_realtime_dom.py": "003937d7163474ba"
+ }
+}

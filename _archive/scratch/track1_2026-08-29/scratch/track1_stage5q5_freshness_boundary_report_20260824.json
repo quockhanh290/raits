@@ -1,0 +1,174 @@
+{
+  "stage": "5Q-5",
+  "title": "The D-1 freshness contract, and the boundary bar the appender never revisited",
+  "date": "2026-08-24",
+  "route": "track1_candidate",
+  "verdict": "NOT_READY",
+  "verdict_reason": "B-5R-E and B-5R-F are fixed in code, tested and mutation-checked, but only the requirement half of B-5R-E is live. The 16:20 refresh needs a scheduler restart, the boundary appender is OFF by default, and B-5R-D is unrepaired. Sequencing, not design.",
+
+  "safety_statement": {
+    "scheduler_started_or_stopped": false,
+    "scheduler_pid": 28696,
+    "backend_restarted": false,
+    "ibkr_connected": false,
+    "orders_sent": false,
+    "order_path_changed": false,
+    "b1_still_blocking": true,
+    "confirmation_file_created": false,
+    "live_positions_or_checkpoint_written": false,
+    "parquet_mutated": false,
+    "spy_csv_mutated": false,
+    "preflight_state_mutated": false,
+    "parquet_snapshots_created": false,
+    "overlap_guard_weakened": false,
+    "mnq_repair_applied": false,
+    "test_writes_outside_tmp_path": false,
+    "committed": false
+  },
+
+  "part_a_freshness": {
+    "diagnosis": "one requirement was being asked of two data sources with different availability",
+    "why_the_daily_requirement_is_d_minus_1": "RegimeLabels.get returns reg.asof(day - lag_days) with lag_days = 1, so a session on day D trades the label of D-1. Read from the code, not assumed",
+    "design_chosen": "option 1 - split the requirement by data kind",
+    "options_rejected": {
+      "option_3_split_preflight_state": "that file is written by the SHARED 13:45 job and read by legacy too; re-shaping it is a much wider blast radius for information the new consistency check already surfaces",
+      "widen_the_requirement_to_d_minus_2": "would trade a session on a label the backtest never used - a rule change disguised as a threshold"
+    },
+    "api": {
+      "required_intraday_through": "unchanged rule, for the parquets: prev trading day before 13:45, today from 13:45",
+      "required_daily_close_through": "the last TRADING day before today, all day, for the daily series",
+      "required_data_through": "kept as a name and delegates to the intraday one, because every existing caller means that one"
+    },
+    "holiday_aware": {
+      "source": "raits.live.trading_calendar where importable, reported by calendar_source()",
+      "why": "a weekday-only rule names the holiday itself on the day after one - a close no refresh can supply, so the gate would refuse for ever",
+      "measured": "the Monday after 2026-07-03/04 asks for Thursday 2026-07-02"
+    },
+    "new_check": {
+      "name": "preflight_consistency",
+      "fires_when": "the pre-flight record says a day's 13:45 job SUCCEEDED and a data input still does not satisfy the requirement",
+      "silent_when": "the pre-flight itself failed - a retry and a contract question are different problems with different owners"
+    },
+    "measured_effect": {
+      "fri_0900": {"old": "allow", "new": "allow"},
+      "fri_1400_to_2359": {"old": "REFUSE", "new": "allow", "note": "the old gate asked for a close two hours away; roughly ten hours of every trading day recovered"},
+      "mon_0900": {"old": "refuse", "new": "refuse", "note": "correctly - Monday needs Friday's close and the file holds Thursday's"},
+      "mon_1400": {"old": "refuse", "new": "refuse"}
+    },
+    "second_half_needs_a_job": {
+      "why": "the CSV gains D-1 at D's 13:45 and the requirement on D+1 is D; the 13:45 pre-flight is the ONLY refresh in the schedule",
+      "job": {"id": "spy_refresh_pm", "et": "16:20", "days": "mon-fri",
+              "runs": "update_spy_csv only",
+              "not_16_00": "Polygon's daily aggregate settles a few minutes after the close",
+              "no_ibkr_refetch": "the parquets were already brought to today at 13:45; a second fetch opens a second Gateway client for no gain",
+              "writes_preflight_state": false,
+              "failure_is_not_a_preflight_failure": "nothing today depended on it; marking the day failed would skip tomorrow's slots"}
+    },
+    "inventory": {"default": "60 -> 61", "track1_shadow": "129 -> 130", "track1_only": "100 -> 101",
+                  "parity_holds_in_all_three": true,
+                  "classification": "shared_infra - a legacy retirement cannot take the refresher with it"}
+  },
+
+  "part_b_boundary": {
+    "rule": "a partial bar can only be COMPLETED, never contradicted",
+    "monotonic": {"open": "cannot change", "low": "can only fall", "high": "can only rise",
+                  "volume": "can only grow", "close": "may move anywhere"},
+    "refusal_codes": ["open_changed", "low_rose", "high_fell", "volume_shrank",
+                      "moved_too_far", "not_offered", "schema", "identical"],
+    "percentage_net": {"const": "BOUNDARY_REPLACE_MAX_PCT", "value": 0.5,
+                       "why": "a cruder net for a bar from a different contract that happens to satisfy every monotonic rule; nothing legitimate sits near it"},
+    "purity": "boundary_replacement is pure - two frames in, one row out, no IO, no broker, no clock. A test parses its AST to keep it so, because a rule that only runs at 13:45 against a live Gateway is a rule that is never exercised",
+    "measured_against_mnq": "completed: ['close', 'low', 'volume']",
+    "wiring": {
+      "strictly_newer_filter": "UNTOUCHED - the boundary bar is the one exception, not a widening",
+      "concat_position": "between history and the new bars, so the existing ~duplicated(keep='last') prefers it",
+      "history_invariant": "still requires every other bar in the 200-bar tail unchanged; the boundary timestamp is excluded BY NAME",
+      "snapshot": ".pre5q5-<stamp>.bak, refused if one already exists",
+      "verify": "re-read the parquet and compare the replaced row; a repair that did not land is a failure",
+      "existing_protections_unchanged": ["roll identity", "splice offsets", "alignment drift", "join jump", "UTC convention"]
+    },
+    "default": "OFF (--repair-boundary absent from the scheduler argv)",
+    "why_off": "it is the only path in that file that rewrites a bar the parquet already has, and the job runs unattended at 13:45",
+    "todays_1345_run": "byte-identical to yesterday's - the new code executes, the flag is not passed, boundary is None and every path is the one that ran before"
+  },
+
+  "part_c_mnq_sequencing": {
+    "applied": false,
+    "measure_first": {
+      "command": "python scratch\\track1_stage5q4_repair_boundary_bar_20260824.py --inst MNQ",
+      "writes": "nothing", "safe_when": "the Stress window is closed, after 12:30 ET"
+    },
+    "recommended_repair": {
+      "command": "python -m global_index.update_ibkr_daily --repair-boundary --symbols MNQ",
+      "why_this_one": "it is the same code that will prevent recurrence when the flag is enabled in the scheduler - repairing with the tool that will do this daily is one rule, not two",
+      "client_id": 2,
+      "client_id_note": "the updater's own, distinct from Track 1 data 89, safety 90 and legacy 1",
+      "guards": ["monotonic completion rule", "snapshot before write", "verify by re-read"],
+      "requires_manual_approval": true
+    },
+    "stricter_alternative": "the scratch tool's --apply --expect <sha256> gate, if an explicit hash guard is wanted",
+    "never_while": "the Stress window is open"
+  },
+
+  "part_d_runtime": {
+    "live_without_restart": ["global_index/track1_freshness.py - every slot spawns a fresh child that imports it"],
+    "needs_scheduler_restart": ["the spy_refresh_pm job - job definitions are fixed when make_scheduler builds the schedule"],
+    "needs_scheduler_edit_and_restart": ["--repair-boundary in the pre-flight argv"],
+    "needs_backend_restart": ["the SPY_REFRESH_PM mirror row in /api/v1/schedule-status"],
+    "parity_while_neither_is_restarted": "scheduler and mirror agree, because neither has it",
+    "todays_scheduler_job_count": 100
+  },
+
+  "tests": {
+    "stage_5q5": {"file": "scratch/test_track1_stage5q5_freshness_boundary_20260824.py", "passed": 42},
+    "stage_5q5_mutations": {"detected": 16, "total": 16, "restores_verified_byte_for_byte": true},
+    "track1_regression": {"files": 14, "passed": 572, "skipped": 1},
+    "monitor_production": {"files": 5, "passed": 303}
+  },
+
+  "older_tests_changed": [
+    {"test": "test_the_preflight_marks_a_day_true_that_the_spy_csv_cannot_yet_cover (5Q-4)",
+     "was": "asserted the OLD behaviour - Friday 13:46 must be stale",
+     "now": "asserts the corrected requirement passes there AND that Monday morning still refuses",
+     "weakened": false},
+    {"test": "the 5Z fresh/stale fixtures",
+     "was": "produced the refusing run with the CLOCK - at 15:00 the gate asked for today's close",
+     "problem": "that refusal WAS the bug 5Q-5 removed",
+     "now": "the refusing run comes from genuinely short data; the property 5Z exists for is untouched and its test was renamed from ..._two_clocks_...",
+     "weakened": false},
+    {"test": "six inventory assertions across 5L, 5M-D, 5O, 5P x2, 5Q",
+     "now": "60->61, 129->130, 100->101 and the shared-infra tables gained spy_refresh_pm",
+     "weakened": false}
+  ],
+
+  "my_own_instrument_that_was_wrong": {
+    "what": "the purity test for boundary_replacement scanned the function text for 'fetch' and went red on its own refusal message 'not_offered: the fetch does not cover ...'",
+    "count": "the FOURTH substring-over-prose test across these stages",
+    "fix": "parses the AST and asserts the set of called names is disjoint from the IO names, with no imports inside the function"
+  },
+
+  "blockers_before_5r": [
+    {"id": "B-5R-E", "state": "code fixed; requirement half LIVE, the 16:20 refresh needs a scheduler restart"},
+    {"id": "B-5R-F", "state": "code fixed, OFF by default; needs a scheduler edit + restart to engage"},
+    {"id": "B-5R-D", "state": "unrepaired; measure then one approved command"},
+    {"id": "B-5R-C", "state": "open - NKD after 2026-11-01, reported as WARN"},
+    {"id": "B1", "state": "open by design; orders impossible"}
+  ],
+
+  "operator": {
+    "required_today": "none",
+    "sequence": [
+      {"step": 1, "command": "python scratch\\track1_stage5q4_repair_boundary_bar_20260824.py --inst MNQ",
+       "effect": "measures the MNQ bar; writes nothing"},
+      {"step": 2, "command": "python -m global_index.update_ibkr_daily --repair-boundary --symbols MNQ",
+       "effect": "repairs it; snapshots and verifies", "requires": "reading step 1 first"},
+      {"step": 3, "command": "python monitor\\ops.py restart --scheduler --track1-only-shadow",
+       "effect": "brings the 16:20 SPY refresh online",
+       "cost": "every window that already closed today reads as pre-start; prefer before 10:00 ET or after 16:00 ET"},
+      {"step": 4, "command": "python monitor\\ops.py restart --no-scheduler --track1-only-shadow",
+       "effect": "the backend picks up the SPY_REFRESH_PM mirror row"}
+    ],
+    "cli_verified": "restart --help - there is no --backend flag; backend-only is --no-scheduler",
+    "left_for_a_decision": "adding --repair-boundary to the scheduler's pre-flight argv, which would make the boundary repair permanent rather than manual"
+  }
+}

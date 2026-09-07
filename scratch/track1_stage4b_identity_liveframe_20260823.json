@@ -1,0 +1,122 @@
+{
+  "stage": "4B",
+  "date": "2026-08-23",
+  "question": "close the two remaining technical caveats, or represent them as order-blocking gates",
+  "verdict": "B",
+  "verdict_meaning": "fill-law identity is CLOSED in code and tests; the live-frame caveat is NOT closed and is now an order-blocking gate released only by a measurement. 'Only B1 remains' is no longer true and is not claimed.",
+  "caveat_1_fill_law": {
+    "status": "CLOSED",
+    "was": "track1_params declared fill_law='production_gap_after_15min_break' as a hard-coded literal, while every Track 1 row had been generated with every bar gap-eligible",
+    "now": "fill_law is a required keyword argument with no default, validated against FILL_LAWS, threaded through sleeve_config, sleeve_identity, checkpoint_entries, accepts and checkpoint_report, and sourced from NormalR4Params rather than named a second time",
+    "laws": [
+      "artifact_all_bars_gappable",
+      "production_gap_after_15min_break"
+    ],
+    "law_the_route_runs": "production_gap_after_15min_break",
+    "identity_differs_between_laws": true,
+    "missing_law_raises": "TypeError",
+    "unknown_law_raises": "ValueError",
+    "checkpoint_cross_law": "refused with params_mismatch, in BOTH directions",
+    "measured_delta": {
+      "vault2026": {
+        "pnl_artifact_law": 6825.83,
+        "pnl_production_law": 6829.04,
+        "delta": 3.21,
+        "rows": 107,
+        "rows_differing": {
+          "MNKD": 1
+        }
+      },
+      "vault2025": {
+        "pnl_artifact_law": 10953.98,
+        "pnl_production_law": 10953.98,
+        "delta": 0.0,
+        "rows": 136,
+        "rows_differing": {}
+      },
+      "floor": {
+        "pnl_artifact_law": 31609.66,
+        "pnl_production_law": 31615.23,
+        "delta": 5.57,
+        "rows": 980,
+        "rows_differing": {
+          "M2K": 1,
+          "MNKD": 4
+        }
+      }
+    },
+    "rows_total": 1223,
+    "rows_differing_total": 6
+  },
+  "caveat_2_live_frame": {
+    "status": "ORDER_BLOCKING_GATE",
+    "blocker_id": "LIVE_FRAME_ADAPTER_VERIFICATION",
+    "gate_status": "MEASURED_GATE",
+    "releasable_by_confirmation_flag": false,
+    "measurement": "live_frame_wiring",
+    "measured_now": {
+      "released": true,
+      "detail": "every live bar path on the route joins through track1_live_frame: track1_live_source (IBKRBroker, fetch_bars, fetch_session_bars, ib_insync, reqHistoricalData)"
+    },
+    "route_modules_scanned": [
+      "run_live_day_track1",
+      "track1_b1",
+      "track1_b1_decision",
+      "track1_bootstrap",
+      "track1_broker_read",
+      "track1_calm_a",
+      "track1_data_observation",
+      "track1_explain",
+      "track1_freshness",
+      "track1_gates",
+      "track1_intraday",
+      "track1_live_sleeves",
+      "track1_live_source",
+      "track1_normal_filters",
+      "track1_normal_r4",
+      "track1_order_journal",
+      "track1_order_state",
+      "track1_paper_callsite",
+      "track1_paper_executor",
+      "track1_paper_order",
+      "track1_paper_readiness",
+      "track1_params",
+      "track1_planned_stop",
+      "track1_report",
+      "track1_shadow_acceptance",
+      "track1_shadow_audit",
+      "track1_signal_layer",
+      "track1_signals",
+      "track1_sleeves",
+      "track1_slots",
+      "track1_stress_mnq",
+      "track1_switch"
+    ],
+    "built": "global_index/track1_live_frame.py — splice(frozen, live) with refusal codes not_a_frame, empty_frozen, tz_mismatch, duplicate_timestamps, out_of_order, column_mismatch, history_mutated; notices overlap_trimmed, nothing_new",
+    "proven_offline": [
+      "cut/splice round trip reproduces the original frame exactly",
+      "the frozen half is byte-compared after every join and the join fails if it moved",
+      "an overlapping live bar is trimmed, never applied over history",
+      "the NKD 13-hour clock offset is refused rather than converted",
+      "Normal-R4 and Calm A reach identical decisions on the spliced frame",
+      "a session cut before its closing bar yields no setup rather than a wrong one",
+      "the Calm A and Stress intraday gates behave identically on a spliced frame"
+    ],
+    "not_proven": [
+      "that the join is correct on a real trading day — no live day run, no broker connected",
+      "that any live bar has ever reached a Track 1 sleeve — nothing on the route fetches one"
+    ]
+  },
+  "order_gate": {
+    "blockers_total": 11,
+    "closed": 7,
+    "blocking_now": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE",
+      "REGIME_LABEL_VERIFICATION"
+    ],
+    "signature_alone_is_not_enough": true,
+    "cli_allow_orders_exit_code": 2,
+    "confirmation_file_created": false
+  }
+}

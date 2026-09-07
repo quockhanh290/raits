@@ -1,0 +1,56 @@
+
+==============================================================================
+floor: data_dir=data/cache/futures/frozen_sim start=None end=2024-12-31 hmm_fit_end=2022-12-31
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+  [SC] labels=2169 stress_lag0=126 stress_lag1=126 moved=32
+
+-- breadth3_mnq_mes --
+  lag0 (as validated) n= 84 net=$   2,749 pf=1.49
+  2018:n=22,$-444  2019:n=4,$-250  2020:n=22,$-537  2022:n=36,$3,979
+  lag1 (live-causal)  n= 78 net=$     776 pf=1.14
+  2018:n=18,$163  2019:n=4,$-250  2020:n=22,$-1  2022:n=34,$863
+  overlap=68  lost_by_lag=16  gained_by_lag=10
+  [M2] entry-bar(10:20) high>=stop: 0/84   low<=target: 0/84
+  [M2b] exit_time on entry date: 0/84  latest_exit=14:00:00
+  [M3] ATR-proxy risk/trade  med=$1,332  max=$3,235  (2.66% of 50,000)
+  [M3] TRUE stop risk/trade  med=$136  max=$398  (0.27%)
+  [M3] ratio ATRproxy/true   med=9.58x
+  [M3] per-DAY (both legs) ATR-proxy max=$5,956 (11.9%) | TRUE max=$664 (1.3%)
+  [M3] worst single trade=$-401  stop_dist_pct med=0.708% max=1.466%
+  [M3] concurrent legs/day: {2: 40, 1: 4}
+
+-- wide3_mnq_mes --
+  lag0 (as validated) n= 61 net=$   2,588 pf=1.60
+  2018:n=14,$-491  2019:n=4,$-250  2020:n=19,$-165  2022:n=24,$3,493
+  lag1 (live-causal)  n= 57 net=$   1,538 pf=1.38
+  2018:n=10,$116  2019:n=4,$-250  2020:n=19,$371  2022:n=24,$1,301
+  overlap=49  lost_by_lag=12  gained_by_lag=8
+
+==============================================================================
+vault2025: data_dir=data/cache/futures/frozen_2025_sim start=2025-01-01 end=2025-12-31 hmm_fit_end=2024-12-31
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  [SC] labels=2169 stress_lag0=290 stress_lag1=290 moved=74
+
+-- breadth3_mnq_mes --
+  lag0 (as validated) n= 19 net=$   4,095 pf=7.10
+  2025:n=19,$4,095
+  lag1 (live-causal)  n= 19 net=$   3,246 pf=5.08
+  2025:n=19,$3,246
+  overlap=15  lost_by_lag=4  gained_by_lag=4
+  [M2] entry-bar(10:20) high>=stop: 0/19   low<=target: 0/19
+  [M2b] exit_time on entry date: 0/19  latest_exit=14:00:00
+  [M3] ATR-proxy risk/trade  med=$3,406  max=$5,702  (6.81% of 50,000)
+  [M3] TRUE stop risk/trade  med=$280  max=$535  (0.56%)
+  [M3] ratio ATRproxy/true   med=12.50x
+  [M3] per-DAY (both legs) ATR-proxy max=$9,210 (18.4%) | TRUE max=$858 (1.7%)
+  [M3] worst single trade=$-213  stop_dist_pct med=0.933% max=1.386%
+  [M3] concurrent legs/day: {2: 9, 1: 1}
+
+-- wide3_mnq_mes --
+  lag0 (as validated) n= 15 net=$   3,622 pf=10.67
+  2025:n=15,$3,622
+  lag1 (live-causal)  n= 15 net=$   3,680 pf=11.17
+  2025:n=15,$3,680
+  overlap=13  lost_by_lag=2  gained_by_lag=2

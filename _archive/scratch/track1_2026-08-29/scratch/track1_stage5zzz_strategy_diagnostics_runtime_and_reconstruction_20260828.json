@@ -1,0 +1,149 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZZ-B",
+  "title": "Track 1 strategy diagnostics: runtime evidence + today reconstruction",
+  "route": "track1_candidate",
+  "date": "2026-08-28",
+  "orders_enabled": false,
+
+  "answers": {
+    "written_as_runtime_evidence": "NKD and Swing, at every slot, from the next slot onward",
+    "reconstructed_for_earlier_today": "NKD and Swing (the same four variables), plus Stress's gate and price levels",
+    "still_unavailable": ["Calm DECIDE and OBSERVE - not wired, see why_calm_is_unwired",
+                           "runtime blocks for today - no slot has run since the change"],
+    "any_trading_decision_changed": false,
+    "any_gate_changed": false,
+    "runtime_trading_files_changed": ["global_index/track1_normal_r4.py (optional observer parameter, default None)",
+                                       "global_index/track1_live_source.py (observability capture)",
+                                       "global_index/run_live_day_track1.py (observability block after the coverage row)"],
+    "orders_possible": false,
+    "blockers": ["PAPER_SHADOW_EVIDENCE"]
+  },
+
+  "the_seam": {
+    "what": "track1_normal_r4 takes an optional observer; detect_entry_for_slot reports each gate it passes or stops at, and _scan_window reports what it computed per bar",
+    "listener_return": "discarded",
+    "listener_exceptions": "swallowed inside the detector",
+    "why_not_recompute": "the detector's own docstring - 'A second implementation of an entry rule proves nothing about the first'; an EMA recomputed in a diagnostics module would drift from the one the committed artifacts were generated with",
+    "decisions_unchanged_proof": {
+      "method": "detect_entry_for_slot with and without an observer, same inputs, compared setup signature",
+      "coverage": ["MES 2026-08-27", "MES 2026-08-28", "MNKD 2026-08-27", "MNKD 2026-08-28"],
+      "also_tested": "an observer that RAISES on every event - identical result"
+    }
+  },
+
+  "reconstruction_today": {
+    "global_nkd": {"ema_period": 10, "ema": 66281.71, "close": 65905.00, "price_vs_ema": -376.71,
+                    "daily_atr": 105.71, "volume_vs_average": "1.63x", "regime": "Calm",
+                    "setup": false,
+                    "reason": "regime 'Calm'; this sleeve trades ['Normal']"},
+    "roska4_swing": {"ema_period": 50, "ema": 7754.68, "close": 7739.75, "price_vs_ema": -14.93,
+                      "daily_atr": 8.12, "volume_vs_average": "1.43x", "regime": null,
+                      "setup": false,
+                      "reason": "the regime for today is not published until the 13:45 pre-flight adds today's SPY row"},
+    "stops_at_now": {
+      "09:00 ET": {"bars": 0, "last_bar": null},
+      "14:20 ET": {"bars": 3, "last_bar": "2026-08-28 14:20:00"},
+      "23:00 ET": {"bars": 22, "last_bar": "2026-08-28 15:55:00"},
+      "a future day": {"bars": 0}
+    },
+    "gap_found_while_writing": "the reconstruction hardcoded the present instead of honouring build(now=...), which would have made 'stops at now' untestable - no test could ask it about any moment other than the one it ran in",
+    "observation_only_pass": {
+      "when": "the detector stops at a gate before reaching any bar",
+      "what": "the window is walked again through the SAME _scan_window, deciding nothing and discarding the result, purely so the four variables can be shown",
+      "why": "on a Calm morning 'this sleeve trades Normal' is complete about the DECISION and tells an operator nothing about the instrument",
+      "the_gate_that_refused": "stays refused and stays reported"
+    }
+  },
+
+  "runtime_evidence": {
+    "shape": "a third observability block in the slot, placed and wrapped exactly like Stage 5ZD's signal row and Stage 5ZO's data observation",
+    "placement": "after the coverage row - that row is the evidence the audit counts and nothing below it may be the reason a slot loses it",
+    "store": "append-only and dated, like every other evidence stream on this route",
+    "fail_safe": ["the live source's capture is wrapped",
+                   "the slot's write is wrapped and records its own last error",
+                   "the observer factory falls back to None if the diagnostics module cannot be imported"],
+    "written_yet": false,
+    "why_not": "no slot has run since the change; the directory appears at the next one (NKD 01:10 ET Monday)",
+    "reader_priority": "recorded_runtime over reconstructed_today for the same slot; a day with no runtime record reads as empty rather than raising, which is what every historical day is"
+  },
+
+  "why_calm_is_unwired": "the two-phase contract says DECIDE must never be shown a value OBSERVE produced, and the live path reaches the detector through that contract rather than through detect_entry_for_slot. Wiring it without the phase separation would leak exactly what the contract exists to prevent, so it is left unwired rather than wired wrongly - the same judgement Stage 5ZZP recorded for the same sleeve.",
+
+  "regression_introduced_and_caught": {
+    "symptom": "the polled market-view endpoint went to 57s per warm request; it had been ~0.02s",
+    "measured_cause": {"read_parquet_3375148_rows": "0.15s - not the problem",
+                        "_cache_for_EMA_ATR_pass": "14.31s and NOT internally memoised",
+                        "calls_per_build": 4, "total": "57s"},
+    "why_not_shorten_the_frame": "the EMA is recursive over full history, so a truncated frame produces different numbers than the detector saw - and a reconstruction that does not match what the detector would see is worth nothing",
+    "fix": "stale-but-usable, refreshed out of band - the pattern schedule_status._running_schedulers already uses for the process scan",
+    "after": {"cold": "66s once", "warm": "0.03s"},
+    "cache_key": "deliberately STABLE (sleeve, day, store) - a key including the clock or the file's mtime would mint a new key every bar, and a new key has nothing to serve stale, so every append would pay the full minute inline",
+    "second_correction": "build() was passing its own derived ref rather than the caller's now, so every request looked like a caller naming an instant and skipped the cache entirely"
+  },
+
+  "results": {
+    "new_suite": {"file": "scratch/test_track1_stage5zzz_b_strategy_diagnostics_20260828.py", "passed": 31},
+    "adjacent_after_fixes": {"passed": 70},
+    "tests_superseded_by_this_stage": {
+      "count": 3,
+      "which": "Stage 5ZZR tests asserting these values read 'Not reported by detector'",
+      "why": "that was an accurate description of the panel and an indictment of it",
+      "property_kept": "a card never shows a blank - it carries a value or names the reason there is none, and those are the only two shapes allowed"
+    },
+    "my_own_time_brittle_tests_fixed": {
+      "count": 2,
+      "which": ["'Stress and Swing have not run yet' - true when written, false eight hours later",
+                 "an exact set of failing readiness checks - clears the moment a fifth judgeable day lands"],
+      "note": "third time this session; named as a pattern rather than three accidents"
+    },
+    "failures_not_this_stage": {
+      "cause": "the market-view UI was rewritten (mv2-* markup) between stages, before this one began",
+      "count": 5,
+      "plus": "the long-standing rule-grid assertion",
+      "my_related_error": "one patch attempt matched remembered 5ZZR markup rather than the file; the file is the authority and it had moved"
+    }
+  },
+
+  "safety_after": {
+    "orders_possible": false,
+    "blocking": ["PAPER_SHADOW_EVIDENCE"],
+    "scheduler_pid": 3000,
+    "scheduler_restarted": false,
+    "broker_connected": false,
+    "orders_dir_exists": false,
+    "live_positions_track1_exists": false,
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "confirmation_file": "untouched",
+    "gates_thresholds_schedules": "unchanged",
+    "diagnostics_unreachable_from_any_gate": {
+      "asserted_by": "import graph - track1_gates, track1_paper_readiness and track1_shadow_acceptance do not read the module",
+      "why": "a reconstruction must never satisfy a readiness gate, an audit verdict or an order gate, and the cheapest way to keep that true is for none of them to be able to see it"
+    }
+  },
+
+  "still_open": [
+    "Calm's two phases, for the reason in why_calm_is_unwired",
+    "the first runtime block lands at the next slot; nothing has exercised that write end to end on real data yet, only its unit path",
+    "a 66-second cold request every five minutes' idle - bounded and served stale, but the underlying cost is _cache_for being un-memoised on a 3.3-million-row frame, and memoising it inside the detector would help every caller rather than just this one",
+    "the five UI tests against the rewritten market view"
+  ],
+
+  "files_touched": [
+    "global_index/track1_strategy_diagnostics.py",
+    "global_index/track1_normal_r4.py",
+    "global_index/track1_live_source.py",
+    "global_index/run_live_day_track1.py",
+    "monitor/backend/track1_market_view.py",
+    "global_index/dash/realtime/realtime.js",
+    "global_index/dash/realtime/realtime.css",
+    "scratch/test_track1_stage5zzz_b_strategy_diagnostics_20260828.py",
+    "scratch/test_track1_stage5zzr_strategy_native_market_view_20260828.py",
+    "scratch/test_track1_stage5zzz_a_shadow_audit_confirmation_20260828.py",
+    "scratch/test_track1_stage5zzzc_shadow_evidence_real_failures_20260828.py",
+    "scratch/track1_stage5zzz_strategy_diagnostics_runtime_and_reconstruction_20260828.md",
+    "scratch/track1_stage5zzz_strategy_diagnostics_runtime_and_reconstruction_20260828.json",
+    "docs/futures/TRACK1_RUNTIME_PIPELINE_2026-08-24.md",
+    "TASK.md"
+  ]
+}

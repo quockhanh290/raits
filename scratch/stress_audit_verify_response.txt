@@ -1,0 +1,19 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865149 is not greater than 7310.956641261866. Delta is -0.21902339671669324
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+
+=== vault2026 (2026-01-01..2026-08-19, 198 sessions) ===
+  Stress days IN WINDOW: lag0=4  lag1=4  only_lag1=1  only_lag0=1
+  lag0: trades=0 net=$0
+  lag1: trades=2 net=$-534
+      2026-04-07 MES pnl=$-176 exit=stop
+      2026-04-07 MNQ pnl=$-358 exit=stop
+      -> that day's lag0 label=Normal  lag1 label=Stress  prev-session lag0 label=Stress
+
+=== floor (2017-01-02..2024-12-30, 2488 sessions) ===
+  Stress days IN WINDOW: lag0=112  lag1=112  only_lag1=14  only_lag0=14
+  lag0: trades=84 net=$2,749
+  lag1: trades=78 net=$776
+  S2 breadth3: legs=78 conflicted_legs=34 (44%)  distinct CONFLICT DAYS=24  net_on_conflicted=$-48  GROSS_on_conflicted=$5,486
+  S2 wide_range3: legs=57 conflicted_legs=27 (47%)  distinct CONFLICT DAYS=18  net_on_conflicted=$23  GROSS_on_conflicted=$4,703

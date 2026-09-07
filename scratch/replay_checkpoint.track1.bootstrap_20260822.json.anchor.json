@@ -1,0 +1,53 @@
+{
+  "anchor": {
+    "rows": [
+      {
+        "inst": "MES",
+        "ok": true,
+        "day_mine": "2026-08-20",
+        "day_legacy": "2026-08-20",
+        "pos_mine": null,
+        "pos_legacy": null,
+        "why": ""
+      },
+      {
+        "inst": "MNQ",
+        "ok": true,
+        "day_mine": "2026-08-20",
+        "day_legacy": "2026-08-20",
+        "pos_mine": null,
+        "pos_legacy": null,
+        "why": ""
+      },
+      {
+        "inst": "MYM",
+        "ok": true,
+        "day_mine": "2026-08-20",
+        "day_legacy": "2026-08-20",
+        "pos_mine": null,
+        "pos_legacy": null,
+        "why": ""
+      },
+      {
+        "inst": "M2K",
+        "ok": true,
+        "day_mine": "2026-08-20",
+        "day_legacy": "2026-08-20",
+        "pos_mine": null,
+        "pos_legacy": null,
+        "why": ""
+      },
+      {
+        "inst": "MNKD",
+        "ok": true,
+        "day_mine": "2026-08-20",
+        "day_legacy": "2026-08-20",
+        "pos_mine": null,
+        "pos_legacy": null,
+        "why": ""
+      }
+    ],
+    "all_ok": true
+  },
+  "unsourced": []
+}

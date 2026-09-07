@@ -1,0 +1,59 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+=== CO SO DO ===
+  gio vu trang cua live (runner._ARM_BY_CLUSTER): {'roska4_swing': ('America/New_York', 14, 0), 'global_nkd': ('Asia/Tokyo', 14, 0)}
+  => Ro 4 vu trang D+1 14:00 America/New_York = 14h sau ranh gioi ngay
+  param ema=30 mult=2.5 max_hold=5d slippage=2.0 tick/side
+  cache MES xong
+  cache MNQ xong
+  cache MYM xong
+  cache M2K xong
+
+=== MO NEO (stop_active_hour=None phai == backtest_swing_tf) ===
+  MES  engine  615t $     6,276 | run_loop  615t $     6,276 -> MATCH
+  MNQ  engine  618t $    16,275 | run_loop  618t $    16,275 -> MATCH
+  MYM  engine  644t $     6,140 | run_loop  644t $     6,140 -> MATCH
+  M2K  engine  619t $     4,002 | run_loop  619t $     4,002 -> MATCH
+
+=== QUET MOC VU TRANG — PRODUCTION (Normal+Stress) ===
+       moc      n      P&L tho    GAP%    n sua      tong sua P&L hieu chinh   PF hc
+    engine   2496       32,694    5.3%        0             0        32,694    1.30
+     1.17h   2488       35,806    5.3%      580        39,779        -3,974    0.97
+        5h   2423       49,092    5.1%      609        54,729        -5,637    0.96
+     9.52h   2312       69,056    4.9%      672        64,109         4,947    1.03
+       12h   2126       96,685    4.9%      691        94,957         1,728    1.01
+       14h   2030      108,041    5.3%      665       100,653         7,388    1.04
+       16h   1699      100,125    6.2%      558        96,161         3,964    1.02
+       20h   1686       84,641   10.7%      464        76,369         8,272    1.05
+
+=== SELF-CHECKS ===
+  [PASS] SC1 mo neo engine trung khit
+  [PASS] SC2 quy uoc engine gan nhu khong bi hieu chinh (doi chung)
+  [PASS] SC3 moc vu trang cua live co bi hieu chinh dang ke
+  [FAIL] SC4 so lenh bi sua tang theo do tre
+  [PASS] SC5 moi do lech deu duong (theo dinh nghia)
+
+=== VI DU CU THE tai moc 14h (de soi bang mat) ===
+  MES 2018-01-31 SHORT: vao 3262.25 | mo phong khop tai stop 3270.93 | gia MO cua bar vu trang 3273.0 | lech $10.35 | pnl mo phong -49.64
+  MES 2018-02-12 LONG: vao 3115.25 | mo phong khop tai stop 3107.29 | gia MO cua bar vu trang 3106.75 | lech $2.7 | pnl mo phong -46.04
+  MES 2018-02-20 SHORT: vao 3165.25 | mo phong khop tai stop 3174.42 | gia MO cua bar vu trang 3180.25 | lech $29.15 | pnl mo phong -52.09
+  MES 2018-02-21 LONG: vao 3180.25 | mo phong khop tai stop 3174.05 | gia MO cua bar vu trang 3159.0 | lech $75.25 | pnl mo phong -37.24
+  MES 2018-02-22 SHORT: vao 3164.75 | mo phong khop tai stop 3170.55 | gia MO cua bar vu trang 3174.25 | lech $18.5 | pnl mo phong -35.24
+  MES 2018-02-26 LONG: vao 3219.25 | mo phong khop tai stop 3218.1 | gia MO cua bar vu trang 3210.25 | lech $39.25 | pnl mo phong -11.99
+  MES 2018-02-28 LONG: vao 3200.75 | mo phong khop tai stop 3195.88 | gia MO cua bar vu trang 3118.25 | lech $388.15 | pnl mo phong -30.59
+  MES 2018-03-12 LONG: vao 3232.75 | mo phong khop tai stop 3227.46 | gia MO cua bar vu trang 3221.0 | lech $32.3 | pnl mo phong -32.69
+
+=== PHAN BO DO LECH tai moc 14h ===
+  n=665 | trung vi $97.35 | tb $151.36 | p95 $462.78 | max $995.82
+
+=== CALM tai moc vu trang cua live (14h) ===
+  tho           1502t  $    46,826  PF 2.25
+  sua 526 lenh, tong sua $57,491
+  HIEU CHINH               $   -10,665
+  -- theo nam: tho -> hieu chinh --
+     2018  $    4,934 -> $   -2,061
+     2019  $    6,063 -> $   -1,639
+     2020  $    4,765 -> $      111
+     2021  $    3,310 -> $  -10,625
+     2022  $    3,037 -> $    1,586
+     2023  $    8,323 -> $   -2,902
+     2024  $   16,395 -> $    4,865

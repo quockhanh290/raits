@@ -1,0 +1,367 @@
+{
+  "stage": "5Q",
+  "title": "Track 1 post-window / daily shadow audit, made a scheduled job",
+  "date": "2026-08-24",
+  "route": "track1_candidate",
+  "verdict": "READY_FOR_THE_NEXT_SHADOW_DAYS_AFTER_ONE_OPERATOR_RESTART",
+  "claim": "The audit exists as production code, is scheduled in track1-only shadow mode, and every one of its refusals has been observed failing. It is not yet running: the live scheduler predates it.",
+  "safety_statement": {
+    "scheduler_started_or_stopped": false,
+    "scheduler_pid_before_and_after": 33868,
+    "scheduler_started_local": "2026-08-24 02:32:24",
+    "scheduler_started_et": "2026-08-24 04:32:23",
+    "backend_restarted": false,
+    "ibkr_connected": false,
+    "orders_enabled": false,
+    "allow_orders_used": false,
+    "track1_orders_approved_set": false,
+    "confirmation_file_created": false,
+    "stop_trading_files_touched": false,
+    "live_positions_written": false,
+    "route_checkpoint_written": false,
+    "runtime_evidence_written": false,
+    "audits_directory_created_in_repo": false,
+    "committed": false,
+    "trading_behaviour_changed": false
+  },
+  "added_files": [
+    "global_index/track1_shadow_audit.py",
+    "scratch/test_track1_stage5q_post_window_audit_20260824.py",
+    "scratch/track1_stage5q_mutations_20260824.py",
+    "scratch/track1_stage5q_post_window_audit_report_20260824.md",
+    "scratch/track1_stage5q_post_window_audit_report_20260824.json"
+  ],
+  "changed_files": [
+    "global_index/track1_shadow_acceptance.py",
+    "global_index/track1_slots.py",
+    "global_index/run_scheduler.py",
+    "monitor/backend/schedule_status.py",
+    "monitor/backend/track1_runtime_reader.py",
+    "global_index/dash/realtime/realtime.js",
+    "scratch/test_track1_stage5p_full_shadow_readiness_20260824.py",
+    "scratch/test_track1_stage5p_operator_text_20260824.py",
+    "scratch/test_track1_stage5m_d_track1_only_shadow_20260823.py",
+    "docs/futures/TRACK1_RUNTIME_PIPELINE_2026-08-24.md",
+    "docs/futures/TRACK1_SWITCHOVER_RUNBOOK.md"
+  ],
+  "acceptance_api_added": {
+    "module": "global_index/track1_shadow_acceptance.py",
+    "functions": [
+      "evaluate_sleeve(day, sleeve, root, now_et, scheduler_started_et)",
+      "evaluate_day_audit(day, root, now_et, scheduler_started_et)",
+      "sleeve_slot_ids(sleeve)",
+      "windows_status(now_et, scheduler_started_et, day=None)"
+    ],
+    "rule_duplication": "none - thresholds, expected slot counts, coverage rule and freshness contract are read from where they already lived"
+  },
+  "verdicts": [
+    "PASS",
+    "NOT_ENOUGH_DATA_YET",
+    "WARN",
+    "FAIL"
+  ],
+  "reason_codes": [
+    "window_not_closed",
+    "window_closed_before_scheduler_start",
+    "scheduler_joined_window_midway",
+    "scheduler_uptime_unknown_and_no_evidence",
+    "coverage_incomplete",
+    "coverage_unobserved",
+    "missing_slot_ids",
+    "no_timing_records",
+    "runtime_p95_over_ceiling",
+    "runtime_p95_over_target",
+    "slot_runtime_over_ceiling",
+    "explanations_missing",
+    "no_candidates_to_explain",
+    "explanation_without_freshness_proof",
+    "order_mark_present",
+    "order_gate_not_blocking",
+    "confirmation_file_present",
+    "checkpoint_missing",
+    "checkpoint_wrong_route",
+    "checkpoint_wrong_day",
+    "safety_paths_not_track1",
+    "daily_acceptance_gate_refused"
+  ],
+  "audit_output": {
+    "directory": "global_index/track1_runtime/audits",
+    "file": "track1_audit_YYYYMMDD.jsonl",
+    "mode": "append-only",
+    "route_stamped": true,
+    "record_fields": [
+      "ts",
+      "schema",
+      "route",
+      "date",
+      "session_day",
+      "scope",
+      "sleeve",
+      "window_et",
+      "verdict",
+      "reasons",
+      "details",
+      "judgeable",
+      "judgeability_reason",
+      "window_closed",
+      "scheduler_started_et",
+      "scheduler_start_source",
+      "scheduler_start_note",
+      "expected_slots",
+      "observed_slots",
+      "slots_with_ledger_row",
+      "registered_slots",
+      "missing_slot_ids",
+      "coverage_outcome",
+      "coverage_signal",
+      "timing_records",
+      "runtime_p95_s",
+      "runtime_max_s",
+      "explanations",
+      "checkpoint",
+      "order_gate",
+      "safety",
+      "audit_trigger",
+      "audit_pid"
+    ]
+  },
+  "scheduler_jobs": {
+    "buffer_minutes": 10,
+    "buffer_rationale": "the last slot fires AT the close minute and may run to the 300s cadence ceiling, so close + 5 min is the earliest the window is guaranteed finished writing; the rest is margin",
+    "jobs": [
+      {
+        "id": "track1_audit_global_nkd",
+        "et": "03:05",
+        "scope": "sleeve",
+        "sleeve": "global_nkd",
+        "window_close_et": "02:55"
+      },
+      {
+        "id": "track1_audit_roska4_calm",
+        "et": "10:10",
+        "scope": "sleeve",
+        "sleeve": "roska4_calm",
+        "window_close_et": "10:00"
+      },
+      {
+        "id": "track1_audit_roska4_stress",
+        "et": "12:40",
+        "scope": "sleeve",
+        "sleeve": "roska4_stress",
+        "window_close_et": "12:30"
+      },
+      {
+        "id": "track1_audit_roska4_swing",
+        "et": "16:05",
+        "scope": "sleeve",
+        "sleeve": "roska4_swing",
+        "window_close_et": "15:55"
+      },
+      {
+        "id": "track1_audit_daily",
+        "et": "16:15",
+        "scope": "day",
+        "sleeve": null,
+        "window_close_et": null
+      }
+    ],
+    "registered_in_modes": [
+      "track1-only-shadow"
+    ],
+    "child_argv_forbidden_flags": [
+      "--allow-orders",
+      "--bar-provider",
+      "--port",
+      "--window"
+    ],
+    "broker_import": "none, measured in a fresh interpreter",
+    "exit_code_on_fail_verdict": 0,
+    "exit_code_note": "a FAIL verdict is data; --exit-nonzero-on-fail exists but the scheduler job does not pass it"
+  },
+  "inventory": {
+    "default": {
+      "before": 60,
+      "after": 60
+    },
+    "track1_shadow": {
+      "before": 129,
+      "after": 129
+    },
+    "track1_only_shadow": {
+      "before": 95,
+      "after": 100,
+      "composition": {
+        "track1_strategy_slots": 70,
+        "track1_safety_jobs": 11,
+        "track1_audit_jobs": 5,
+        "legacy_drain_safety": 11,
+        "shared_infrastructure": 3,
+        "legacy_strategy_jobs": 0
+      }
+    },
+    "scheduler_dashboard_parity": {
+      "default": true,
+      "track1_shadow": true,
+      "track1_only": true
+    }
+  },
+  "dashboard": {
+    "endpoint": "/api/v1/track1-runtime",
+    "new_block": "audits",
+    "ui_row": "Audit verdict",
+    "absence_states": [
+      "audit not run yet (no audit directory)",
+      "audit not run yet (no record written)",
+      "<day>: day roll-up not run yet - not audited yet: <sleeves>"
+    ],
+    "absence_is_never_a_pass": true,
+    "legacy_endpoints_touched": false,
+    "reader_still_read_only": true
+  },
+  "live_measurement_2026_08_24": {
+    "run": "python -m global_index.track1_shadow_audit --latest --all --dry-run",
+    "wrote_anything": false,
+    "now_et": "07:43",
+    "scheduler_start_source": "process_table",
+    "scheduler_start_et": "04:32:23",
+    "day_verdict": "NOT_ENOUGH_DATA_YET",
+    "sleeves": {
+      "global_nkd": {
+        "verdict": "NOT_ENOUGH_DATA_YET",
+        "reason": "window_closed_before_scheduler_start"
+      },
+      "roska4_calm": {
+        "verdict": "NOT_ENOUGH_DATA_YET",
+        "reason": "window_not_closed"
+      },
+      "roska4_stress": {
+        "verdict": "NOT_ENOUGH_DATA_YET",
+        "reason": "window_not_closed"
+      },
+      "roska4_swing": {
+        "verdict": "NOT_ENOUGH_DATA_YET",
+        "reason": "window_not_closed"
+      }
+    },
+    "false_incident_created": false
+  },
+  "defects_found_by_running_it": [
+    {
+      "defect": "the headline said WORST VERDICT: PASS under four NOT_ENOUGH_DATA_YET rows",
+      "found": "on the live tree at 07:43 ET, not by reading the code",
+      "cause": "the roll-up seeded itself at PASS and then skipped every pending record",
+      "fixed": true,
+      "pinned_by": [
+        "test_the_headline_never_says_pass_about_a_set_that_judged_nothing",
+        "test_the_headline_still_says_pass_when_something_actually_passed"
+      ],
+      "mutation": "Q16"
+    },
+    {
+      "defect": "a verdict could be lost to an em dash on a cp1252 pipe",
+      "precedent": "deploy_sim ran 3m51s of correct work and died on its last print for the same reason",
+      "fixed": true,
+      "pinned_by": [
+        "test_the_report_survives_a_codepage_that_cannot_encode_it"
+      ]
+    }
+  ],
+  "tests": {
+    "stage_5q": {
+      "file": "scratch/test_track1_stage5q_post_window_audit_20260824.py",
+      "passed": 67
+    },
+    "mutations": {
+      "file": "scratch/track1_stage5q_mutations_20260824.py",
+      "detected": 16,
+      "total": 16,
+      "restores_verified_byte_for_byte": true
+    },
+    "track1_scratch_sweep": {
+      "passed": 493,
+      "skipped": 1
+    },
+    "monitor_production": {
+      "passed": 295
+    },
+    "monitor_remaining": {
+      "passed": 31
+    },
+    "not_run": [
+      "global_index/test_event_playback.py (known hang)"
+    ]
+  },
+  "updated_inventory_tests": [
+    "scratch/test_track1_stage5p_full_shadow_readiness_20260824.py :: test_the_full_inventory_in_all_three_modes",
+    "scratch/test_track1_stage5p_full_shadow_readiness_20260824.py :: test_every_track1_child_argv_and_env_in_track1_only (classifier repaired: keys on the module, not on --sleeve, which the audit children also carry)",
+    "scratch/test_track1_stage5p_full_shadow_readiness_20260824.py :: test_scheduler_reader_and_gate_all_work_with_legacy_deleted",
+    "scratch/test_track1_stage5p_operator_text_20260824.py :: test_the_schedule_is_untouched_by_a_text_change",
+    "scratch/test_track1_stage5m_d_track1_only_shadow_20260823.py :: four count assertions, now derived from track1_audit_jobs()"
+  ],
+  "not_claimed": [
+    "that the audit is running - the live scheduler (pid 33868) predates this code",
+    "that the dashboard audits block is live - the running backend predates it",
+    "that any shadow day has passed - window_coverage and slot_timing are still empty",
+    "that Track 1 is paper- or live-ready - B1 remains open, orders_possible is False",
+    "broker-flat, orphan working stops or the legacy book's drain - no IBKR connection was made"
+  ],
+  "open_items": [
+    {
+      "item": "the committed daily acceptance gate requires explanation rows for the DAY",
+      "consequence": "a session in which every sleeve legitimately found no candidate does not satisfy it",
+      "handling": "reported verbatim beside the audit's operational roll-up, never softened; which one governs the shadow-period decision is the project owner's call"
+    },
+    {
+      "item": "window_closed counts only slots that DECIDED",
+      "consequence": "a window whose slots all ran but all refused by name reads incomplete, and the audit FAILs on coverage",
+      "handling": "committed rule, unchanged by this stage; the most likely way a first live day produces a FAIL that is really 'the route refused by name all afternoon'. Watch it on the first judgeable day"
+    }
+  ],
+  "operator_next": [
+    {
+      "command": "python monitor\\ops.py restart --backend",
+      "effect": "brings the dashboard audits block and the pre-start classifier live; does NOT schedule the audit jobs"
+    },
+    {
+      "command": "python monitor\\ops.py restart --scheduler --track1-only-shadow",
+      "effect": "schedules the five audit jobs",
+      "timing_note": "restarting makes every window that already closed today read as pre-start. At 07:43 ET only NKD had closed, so a restart before 10:00 ET costs nothing further"
+    },
+    {
+      "command": "python -m global_index.track1_shadow_audit --latest --all",
+      "effect": "runs the audit by hand against any day without restarting anything"
+    }
+  ],
+  "first_judgeable_window": {
+    "sleeve": "global_nkd",
+    "when_et": "2026-08-25 01:10-02:55",
+    "slots": 22,
+    "audited_by": "track1_audit_global_nkd at 03:05 ET"
+  },
+  "corrections_5q1": {
+    "appended": "2026-08-24 (Stage 5Q-1). The record above is left as written; what it got wrong is here.",
+    "items": [
+      {
+        "was": "operator.commands gave `python monitor\\ops.py restart --backend`",
+        "is": "that flag does not exist; backend-only is `restart --no-scheduler --track1-only-shadow`",
+        "verified_by": "python monitor\\ops.py restart --help"
+      },
+      {
+        "was": "safety_statement said the scheduler pid was unchanged at 33868",
+        "is": "the OPERATOR restarted it between sessions; it is now pid 6880, started 06:23:03 local = 08:23 ET, and its own log shows `Jobs (100)` with all five audit ids",
+        "consequence": "the audit jobs are already live; no scheduler restart is required"
+      },
+      {
+        "was": "open_items[0] said 'no_signal / no_candidate' did not count toward coverage",
+        "is": "measured false — a slot that evaluated and found no candidate already records decided=True and already counts. The refusal actually being miscounted is the CLOCK one (too_early/too_late), which for NKD becomes 12 of 22 slots every winter after US DST ends"
+      },
+      {
+        "found_after": "the acceptance gate and the dashboard both read an explanation path NOTHING has ever written to; the live writer nests one directory deeper under the window name. On the first real shadow day both the explanations and freshness_proofs checks would have failed a correct route. Repaired in 5Q-1"
+      },
+      {
+        "found_after": "the live writer opens the day's explanation file with mode='w' on every slot and all four sleeves share one file per session date, so only the last slot's rows survive. NOT fixed; recorded as blocker B-5R-1"
+      }
+    ],
+    "follow_up_report": "scratch/track1_stage5q1_audit_semantics_report_20260824.md"
+  }
+}

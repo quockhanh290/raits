@@ -1,0 +1,197 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZL",
+  "title": "Track 1 Market View / strategy charts + Regime Monitor",
+  "when_et": "2026-08-27",
+
+  "two_findings_the_panel_was_built_around": {
+    "todays_bars_are_not_persisted": {
+      "measured": {"MNKD": {"rows": 2045063, "last_bar": "2026-08-26 17:45", "rows_today": 0},
+                   "MNQ": {"rows": 3359919, "last_bar": "2026-08-26 17:44", "rows_today": 0},
+                   "MES": {"rows": 3372388, "last_bar": "2026-08-26 17:44", "rows_today": 0}},
+      "why": "the store is appended once a day; the live half of each session is spliced IN MEMORY inside the slot process and thrown away",
+      "consequence": "the overnight sleeve fetched and used 1910 of today's bars and not one survives on disk; a chart captioned 'today' would be empty on every normal day",
+      "what_the_panel_does": "shows the most recent session the store actually covers and SAYS which session that is, in the summary and in the payload"
+    },
+    "no_prices_and_no_score": {
+      "strategy": "every rule in the signal diagnostics carries source=not_exposed_by_sleeve with a null value; there is no entry, stop, target or reference price anywhere in the evidence",
+      "model": "label_regimes returns a series of strings - no score, probability or shift threshold underneath the label",
+      "what_the_panel_does": "says 'entry levels not exposed by sleeve evidence yet' and 'not exposed by model' in those words",
+      "why_not_approximate": "a line drawn at a level nobody published is a line an operator would trade against"
+    }
+  },
+
+  "part_c_dependency": {
+    "lightweight_charts_added": false,
+    "measured_first": {
+      "package_json": false, "node_modules": false, "build_step": false,
+      "scripts_loaded_by_realtime_page": 2,
+      "all_first_party": true,
+      "pages_loading_an_external_library": 1,
+      "which": "global_index/dash/chart-forward.html (Chart.js from a CDN)",
+      "and_its_consumer": "shared/live.js guards `if (!window.Chart) return` with an inline-SVG fallback - the codebase already treats an external chart lib as optional"
+    },
+    "decision": "first-party SVG, in the same style as the sparkline already in shared/live.js",
+    "tradeoff_stated": {
+      "cdn_script_on_this_page": "this is the page an operator watches a live trading route on; a third-party host becomes a dependency at exactly the moment something is going wrong",
+      "vendoring": "commits a third-party blob into a repo that has none - a supply-chain decision for the owner, not for this stage",
+      "cost_of_the_choice": "crosshair, tooltip, price scale and time axis hand-drawn - roughly 200 lines a library would have provided",
+      "swap_is_small": "the payload shape already matches what Lightweight Charts consumes"
+    }
+  },
+
+  "part_a_before": {
+    "window_coverage_20260827": {
+      "global_nkd": "22/22 complete no_signal",
+      "roska4_stress": "18/24 incomplete no_signal",
+      "roska4_swing": "0/23 unobserved",
+      "roska4_calm": "0/1 incomplete no_signal"
+    },
+    "signal_rows": 63,
+    "signals_by_sleeve": {
+      "global_nkd": "22 NO_SIGNAL, latest TRACK1_NKD_0255 @ 02:55",
+      "roska4_stress": "18 NO_SIGNAL + 7 SLOT_REFUSED, latest TRACK1_STRESS_1230 @ 12:30",
+      "roska4_swing": "10 SLOT_REFUSED, latest TRACK1_SWING_1405 @ 14:05",
+      "roska4_calm": "6 SLOT_REFUSED, latest TRACK1_CALM_OBSERVE_1002 @ 10:02"
+    },
+    "regime_fields_available": {
+      "label": true, "label_date": true, "verification": true,
+      "drift_count": 0, "labels_compared": 1761, "checked_at": "2026-08-27T09:41:12+00:00",
+      "score": false, "probability": false, "threshold": false
+    },
+    "spy_daily_columns": ["date", "close"],
+    "spy_daily_has_label_column": false,
+    "live_correction_to_5ZZI": {
+      "5zzi_recorded": "every fetch from 03:05 ET returned zero rows",
+      "now": "the 12:30 Stress observation reads live_rows_fetched=2490, splice_result=ok",
+      "conclusion": "the feed RECOVERED during the Stress window; the outage was bounded, not ongoing"
+    }
+  },
+
+  "part_b_payload": {
+    "endpoint": "/api/v1/track1-market-view",
+    "why_its_own_endpoint": "it slices instrument stores; /track1-runtime is polled on a short interval by a page that needs it to stay cheap",
+    "field_sources": {
+      "bars": "instrument parquet, day-sliced, resampled to 5m, clipped to the sleeve context range, cached by (path, mtime, day)",
+      "slots": "signal-diagnostics rows married to the slot table so slots that have not fired appear as `future`",
+      "levels": "scanned from rule_checks where source == measured - EMPTY today, written as a scan so the day a detector publishes a price the line appears without anyone editing the file",
+      "data_status": "the data-observation row, including the provider_error Stage 5ZZI wired in",
+      "regime": "the recorded regime label, never computed in the request"
+    },
+    "broker_pulled_in_request": false,
+    "sleeve_ranges": {
+      "global_nkd": "context 00:00-03:05, window 01:10-02:55",
+      "roska4_stress": "context 09:30-12:40, window 10:35-12:30",
+      "roska4_swing": "context 09:30-16:05, window 14:05-15:55"
+    },
+    "calm_excluded": "a two-phase one-shot contract; a candle chart of a single decision instant would draw a window it does not have",
+    "live_output": {
+      "NKD": "complete, 38 bars, 22 slots all no_signal",
+      "Stress": "incomplete, 39 bars, 18 no_signal + 6 refused",
+      "Swing": "waiting, 80 bars, 22 future + 1 refused"
+    }
+  },
+
+  "regime_recorder": {
+    "module": "global_index/track1_regime_record.py",
+    "why_not_computed_on_request": "label_regimes takes 8.54 SECONDS measured; a dashboard endpoint calling it would hang the operator's page for that long on the first poll after every SPY refresh and on every cold backend",
+    "pattern": "a probe measures and writes down what it saw; the reader reads what the probe wrote - the same shape as track1_b1, track1_account_baseline and regime_verify",
+    "fails_to": "UNKNOWN, never to a label",
+    "why": "Calm is the permissive regime; a labeller that could not run must not read like one that answered 'safe'",
+    "record_carries_the_fit_window": true,
+    "why_that": "a label without the fit window that produced it is a label nobody can reproduce - the FreezeRecord mistake this project already made once",
+    "record_written": "global_index/track1_runtime/regime_label/regime_label_20260827.jsonl",
+    "live_frame_gate_still_open_after_adding_a_track1_module": true
+  },
+
+  "defects_caught_by_measuring": [
+    {"what": "two definitions of 'observed' on one page",
+     "detail": "the summary counted slot markers and printed 24/24 for a sleeve the window ledger recorded as 18 of 24 - a refused slot leaves a row here and is not an observation there",
+     "fix": "the count comes from the ledger; the markers only draw"},
+    {"what": "'Data refused' printed over a working feed",
+     "detail": "any provider_reason was treated as a refusal, so Swing - which had simply not opened yet - was labelled a data problem",
+     "fix": "ok is None means nobody looked; only ok is False reads as refused"},
+    {"what": "the regime rows rendered UNSTYLED",
+     "detail": "the fact-row CSS was scoped to #track1Facts, so the regime panel reused the markup and inherited none of it: label inline at 14px instead of block at 11px, producing 'RegimeCalm as of 2026-08-26' on the page",
+     "found_by": "comparing computed styles against the Track 1 panel, not by looking at a screenshot",
+     "fix": "both selectors named in one rule"},
+    {"what": "the render calls landed inside the ISSUE-ROW CLICK HANDLER, not the render pipeline",
+     "detail": "the panels only appeared after clicking an issue",
+     "found_by": "the DOM tests timing out waiting for tabs that were never drawn - a code-read would have shown a call in the file and looked correct"}
+  ],
+
+  "layout_measured_in_browser": {
+    "375": {"page_overflow": 0, "market_view": "375x451/0", "chart": "343x240",
+            "regime": "375x304/0", "chart_height_per_tab": [240, 240, 240]},
+    "720": {"page_overflow": 0, "market_view": "720x407/0", "chart": "668x240",
+            "regime": "720x197/0", "chart_height_per_tab": [240, 240, 240]},
+    "1440": {"page_overflow": 0, "market_view": "987x489/0", "chart": "935x320",
+             "regime": "987x197/0", "chart_height_per_tab": [320, 320, 320]},
+    "tab_switch_moves_the_panel": false,
+    "empty_state_moves_the_panel": false,
+    "regime_row_text": "REGIME | Calm as of 2026-08-26 · read 0.3h ago | LABEL CHECK | PASS · 1761 compared, none changed | SCORE | not exposed by model"
+  },
+
+  "values_not_exposed": [
+    "entry / stop / target / reference price - every sleeve, no rule publishes a number",
+    "regime score - the model returns strings",
+    "regime shift threshold - likewise",
+    "distance to a regime shift - nothing to compute it from",
+    "today's bars - not persisted; the stored session is named instead"
+  ],
+
+  "frontend_computes_nothing": {
+    "asserted_not_claimed": true,
+    "scanned_for": ["label_regimes", "benchmark_daily", "decode(", "atr(", "stdev(",
+                    "Math.exp", "Math.log", "entryPrice =", "computeLevel"],
+    "scan_scoped_to_the_added_block": true,
+    "why_scoped": "the page has long-standing prose that NAMES the model ('The HMM stale guard is hard-tripped'); a whole-file search fails on a label rather than on a computation, which is exactly how the first version of that test failed",
+    "timestamps": "split as strings rather than parsed with Date - these are wall-clock on the sleeve's own exchange clock and a Date would reinterpret them in the viewer's zone, the thirteen-hour class of error this project has already paid for once"
+  },
+
+  "tests": {
+    "new_file": "scratch/test_track1_stage5zzl_market_view_regime_20260827.py",
+    "new_count": 47,
+    "broker_contacts": 0,
+    "runtime_writes_by_tests": 0,
+    "dom_widths": [375, 720, 1440],
+    "my_own_test_bugs_found_and_fixed": [
+      "a whole-file search for 'HMM' matched pre-existing PROSE rather than a computation",
+      "an NKD fixture generated 09:30 bars for a 01:10-02:55 window, so no bar fell inside the band and the band test failed on the fixture",
+      "an assertion pinned to rendered casing when CSS uppercases the empty-state heading"
+    ],
+    "registrations_the_existing_tests_demanded": [
+      "the new endpoint added to the realtime endpoint contract",
+      "the new endpoint added to the shared DOM fixture - an unstubbed route shows up as a console 404 and fails the healthy-page test",
+      "the contract list-slot was pinned to `sleeves`, which is a dict; caught immediately and repointed at regime.recent / regime.context"
+    ],
+    "restated": [
+      {"test": "5ZZH test_track1_blockers_come_from_the_gate_registry",
+       "why": "Stage 5ZZK closed B1, so pinning it as blocking asserts a state the route has moved past",
+       "now": "asks the registry for whatever is blocking and requires something to compare against"}
+    ]
+  },
+
+  "safety": {
+    "orders_possible_before": false,
+    "orders_possible_after": false,
+    "track1_blocking_before": ["PAPER_SHADOW_EVIDENCE"],
+    "track1_blocking_after": ["PAPER_SHADOW_EVIDENCE"],
+    "confirmation_before": true, "confirmation_after": true,
+    "confirmation_touched_by_this_stage": false,
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "orders_dir": "ABSENT",
+    "scheduler_restarts": 0,
+    "broker_calls": 0,
+    "strategy_thresholds_slots_gates_send_wire_touched": false,
+    "backend_restart_required": true,
+    "backend_restart_reason": "/api/v1/track1-market-view is a new route; the running process does not have it",
+    "backend_restart_command": "python monitor\\ops.py restart --backend",
+    "backend_restart_run": false,
+    "page_handles_its_absence": "the fetch is independent; a failure leaves every other panel exactly as it was",
+    "runtime_files_written_by_this_stage": [
+      "global_index/track1_runtime/regime_label/regime_label_20260827.jsonl (new evidence directory, written by the regime probe)"
+    ],
+    "trading_files_touched": "none"
+  }
+}

@@ -1,0 +1,56 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+cache xong
+
+=== CONG: H=0.0 co dung la quy uoc engine khong? ===
+  MES  engine  615t $     6,276 | H=0.0  615t $     6,276 -> MATCH
+  MNQ  engine  618t $    16,275 | H=0.0  618t $    16,275 -> MATCH
+  MYM  engine  644t $     6,140 | H=0.0  644t $     6,140 -> MATCH
+  M2K  engine  619t $     4,002 | H=0.0  619t $     4,002 -> MATCH
+
+=== QUET — MOI COT DEU DUOC HIEU CHINH BANG CUNG MOT BO PHAT HIEN ===
+       moc |      n |  n sua   %sua |      P&L tho   P&L h/chinh |      IS hc   VAULT hc
+  --------------------------------------------------------------------------------------------
+        0h |   2496 |    591  23.7% |       32,694        -6,210 |     -6,953        742
+     1.17h |   2488 |    580  23.3% |       35,806        -3,974 |     -4,428        454
+        5h |   2423 |    609  25.1% |       49,092        -5,637 |     -4,012     -1,625
+     9.52h |   2312 |    672  29.1% |       69,056         4,947 |      3,249      1,698
+       12h |   2126 |    691  32.5% |       96,685         1,728 |         28      1,700
+       14h |   2030 |    665  32.8% |      108,041         7,388 |     -1,370      8,758
+       16h |   1699 |    558  32.8% |      100,125         3,964 |     -6,398     10,362
+       20h |   1686 |    464  27.5% |       84,641         8,272 |     -2,172     10,444
+
+=== DO LECH TRUNG VI / P95 THEO MOC ===
+       0h  n= 591  trung vi $     40  p95 $     256  max $     589  tong $    38,904
+    1.17h  n= 580  trung vi $     40  p95 $     267  max $     611  tong $    39,779
+       5h  n= 609  trung vi $     53  p95 $     315  max $     744  tong $    54,729
+    9.52h  n= 672  trung vi $     67  p95 $     283  max $     707  tong $    64,109
+      12h  n= 691  trung vi $     93  p95 $     417  max $   1,147  tong $    94,957
+      14h  n= 665  trung vi $     97  p95 $     463  max $     996  tong $   100,653
+      16h  n= 558  trung vi $    118  p95 $     510  max $   1,130  tong $    96,161
+      20h  n= 464  trung vi $    111  p95 $     473  max $   1,106  tong $    76,369
+
+=== P&L HIEU CHINH THEO NAM ===
+       moc |     2018 |     2019 |     2020 |     2021 |     2022 |     2023 |     2024
+        0h |    1,714 |   -1,681 |    4,616 |     -940 |  -10,661 |    3,545 |   -2,802
+     1.17h |    2,167 |   -1,567 |    4,249 |   -1,584 |   -7,694 |    3,343 |   -2,889
+        5h |    2,494 |     -605 |      483 |   -2,573 |   -3,811 |    2,670 |   -4,296
+     9.52h |    3,297 |   -2,418 |    3,471 |      285 |   -1,385 |    1,371 |      327
+       12h |    3,899 |   -2,741 |    6,225 |   -1,870 |   -5,486 |    4,308 |   -2,608
+       14h |    2,835 |   -2,222 |    7,370 |     -613 |   -8,740 |    8,615 |      143
+       16h |    5,880 |     -404 |    3,150 |     -497 |  -14,528 |    6,906 |    3,456
+       20h |    6,607 |   -1,039 |    4,844 |      769 |  -13,353 |    7,654 |    2,791
+
+=== WALK-FORWARD tren so DA HIEU CHINH (moi cot cung co so) ===
+       nam |    h* chon |   P&L nam do
+      2020 |        20h |        4,844
+      2021 |        20h |          769
+      2022 |        20h |      -13,353
+      2023 |      9.52h |        1,371
+      2024 |        14h |          143
+    TONG ngoai mau $-6,226 | h*: 20h, 20h, 20h, 9.52h, 14h
+
+=== SELF-CHECKS ===
+  [PASS] SC1 H=0.0 == engine
+  [PASS] SC2 DOI CHUNG THAT: moc 0h VAN bi hieu chinh (khong phai 0 theo cau tao)
+  [PASS] SC3 ty le lenh bi sua tang tu 0h den 14h
+  [PASS] SC4 hieu chinh khong bao gio lam P&L tang

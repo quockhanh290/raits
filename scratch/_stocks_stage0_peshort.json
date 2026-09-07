@@ -1,0 +1,122 @@
+{
+  "n_events_simulated": 1094,
+  "window": [
+    "2017-01-03",
+    "2022-12-30"
+  ],
+  "note": "h\u00ecnh d\u1ea1ng t\u00edn hi\u1ec7u theo b\u1ed9i s\u1ed1 R; KH\u00d4NG ph\u1ea3i s\u1ed5 \u2014 thi\u1ebfu tr\u1ea7n 2 v\u1ecb th\u1ebf, v\u1ed1n/\u0111\u1ecbnh c\u1ee1, PDT, c\u1ea7u dao",
+  "gap_definition": {
+    "median_abs_diff_pct": 0.2148,
+    "p90_abs_diff_pct": 3.9583,
+    "n_where_ext_passes_rth_fails": 2,
+    "n_where_rth_passes_ext_fails": 40,
+    "n_ext_passes": 5,
+    "n_rth_passes": 43
+  },
+  "threshold_curve": [
+    {
+      "threshold": 0.0,
+      "n": 495,
+      "entry_days": 314,
+      "win_pct": 47.1,
+      "mean_r": -0.002,
+      "total_r": -0.8,
+      "stop_pct": 12.7,
+      "target_pct": 1.4,
+      "p": 0.5211
+    },
+    {
+      "threshold": 0.01,
+      "n": 165,
+      "entry_days": 130,
+      "win_pct": 44.8,
+      "mean_r": -0.027,
+      "total_r": -4.5,
+      "stop_pct": 18.2,
+      "target_pct": 1.8,
+      "p": 0.6688
+    },
+    {
+      "threshold": 0.02,
+      "n": 74,
+      "entry_days": 66,
+      "win_pct": 43.2,
+      "mean_r": -0.064,
+      "total_r": -4.7,
+      "stop_pct": 18.9,
+      "target_pct": 1.4,
+      "p": 0.7839
+    },
+    {
+      "threshold": 0.03,
+      "n": 31,
+      "entry_days": 31,
+      "win_pct": 45.2,
+      "mean_r": -0.026,
+      "total_r": -0.8,
+      "stop_pct": 25.8,
+      "target_pct": 3.2,
+      "p": 0.5486
+    },
+    {
+      "threshold": 0.04,
+      "n": 17,
+      "entry_days": 17,
+      "win_pct": 23.5,
+      "mean_r": -0.245,
+      "total_r": -4.2,
+      "stop_pct": 41.2,
+      "target_pct": 5.9,
+      "p": null
+    },
+    {
+      "threshold": 0.05,
+      "n": 5,
+      "entry_days": 5,
+      "win_pct": 0.0,
+      "mean_r": -0.64,
+      "total_r": -3.2,
+      "stop_pct": 60.0,
+      "target_pct": 0.0,
+      "p": null
+    },
+    {
+      "threshold": 0.06,
+      "n": 3,
+      "entry_days": 3,
+      "win_pct": 0.0,
+      "mean_r": -0.4,
+      "total_r": -1.2,
+      "stop_pct": 33.3,
+      "target_pct": 0.0,
+      "p": null
+    },
+    {
+      "threshold": 0.07,
+      "n": 1,
+      "entry_days": 1,
+      "win_pct": 0.0,
+      "mean_r": -0.118,
+      "total_r": -0.1,
+      "stop_pct": 0.0,
+      "target_pct": 0.0,
+      "p": null
+    },
+    {
+      "threshold": 0.08,
+      "n": 1,
+      "entry_days": 1,
+      "win_pct": 0.0,
+      "mean_r": -0.118,
+      "total_r": -0.1,
+      "stop_pct": 0.0,
+      "target_pct": 0.0,
+      "p": null
+    }
+  ],
+  "gap_up_mirror": {
+    "n": 15,
+    "mean_r_if_shorted": -0.056,
+    "win_pct": 46.7
+  }
+}

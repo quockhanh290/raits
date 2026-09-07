@@ -1,0 +1,82 @@
+======================================================================================================================
+HOD_CONSOLIDATION_BREAKOUT_SCALP — Stage A + controls  [5min]
+======================================================================================================================
+  bars 8,685,579 | tickers 75 | sessions 1,510 | 2017-01-03 .. 2022-12-30
+  NOTE: a 5-bar consolidation is 25 min at this resolution.
+  marks: (1, 2, 3) bars = 5/10/15 minutes
+    scanned 25/75 tickers, 912,833 events
+    scanned 50/75 tickers, 1,904,128 events
+    scanned 75/75 tickers, 3,145,076 events
+  events cached -> hod_cons_events_5min.parquet
+  frame memory: 513 MB
+
+  SIGNAL FUNNEL (core config {'hod': 0.01, 'cons_bars': 5, 'max_range': 0.0035, 'vol_mult': 1.5})
+    consolidations near extreme, compressed, valid risk : 3,145,076
+      TREATED           40,012
+      C1_volfail        78,202
+      C2_nobreak     3,026,862
+
+  risk distance % (TREATED): mean 0.358 median 0.349 p10 0.203 p90 0.517
+    round-trip 2 bps = 0.040% of price = 11% of median risk
+    round-trip 5 bps = 0.100% of price = 29% of median risk   <-- COSTS DOMINATE
+    contraction ratio (cons/prev range): median 0.753
+
+======================================================================================================================
+STAGE A — excursion in R, signed return %, path probs (conservative bound)
+======================================================================================================================
+  group                           n   MFE5m  MFE10m  MFE15m   MAE5m  MAE10m  MAE15m   sret15    +.5R     +1R   +1.5R
+  TREATED                    40,012   0.192   0.275   0.337  -0.186  -0.264  -0.323   0.0010   22.0%    4.1%    0.9%
+  C1_volfail                 78,202   0.182   0.264   0.327  -0.182  -0.262  -0.323   0.0009   21.3%    3.7%    0.7%
+  C2_nobreak              3,026,862   1.015   1.443   1.751  -0.971  -1.422  -1.747  -0.0002   35.2%   19.9%   10.7%
+
+  ambiguity rate (one bar spans +1R and -1R): 0.01%   LOW — the ordering caveat is immaterial here
+  P(+1R before -1R): conservative 4.1%  optimistic 4.1%
+
+  WHY THE CONTROL COMPARISON USES sret, NOT R:
+    C2_nobreak did not break out, so its entry sits inside the
+    consolidation and its risk denominator (entry - cons_low) is
+    tiny. That inflates its R-normalised MFE/MAE without meaning
+    anything. Signed return in % shares one denominator across all
+    three groups and is the only like-for-like measure here.
+
+  CONTROL COMPARISON — signed return at 15m (direction-adjusted)
+    TREATED        mean +0.0010%  95% CI [-0.0008,+0.0028]  P(<=0) 0.130
+    C1_volfail     mean +0.0009%  95% CI [-0.0002,+0.0020]  P(<=0) 0.047
+    C2_nobreak     mean +0.0000%  95% CI [-0.0005,+0.0006]  P(<=0) 0.438  [boot on 200,000 of 3,010,279]
+    TREATED minus C1_volfail   +0.0001%
+    TREATED minus C2_nobreak   +0.0010%
+
+======================================================================================================================
+BREAKDOWN — TREATED only
+======================================================================================================================
+  group                           n   MFE5m  MFE10m  MFE15m   MAE5m  MAE10m  MAE15m   sret15    +.5R     +1R   +1.5R
+  LONG                       23,154   0.186   0.267   0.326  -0.182  -0.259  -0.318   0.0018   20.8%    3.5%    0.7%
+  SHORT                      16,858   0.201   0.286   0.352  -0.191  -0.272  -0.331  -0.0001   23.6%    4.9%    1.3%
+
+  09:45-11:00                 4,857   0.189   0.270   0.330  -0.183  -0.257  -0.311   0.0014   20.5%    3.3%    0.7%
+  11:00-14:00                24,055   0.192   0.273   0.333  -0.182  -0.258  -0.316   0.0007   21.6%    4.1%    1.0%
+  14:00-15:45                10,587   0.191   0.280   0.349  -0.193  -0.278  -0.346   0.0015   23.7%    4.4%    1.0%
+
+  2017                       10,486   0.191   0.271   0.330  -0.173  -0.245  -0.300   0.0034   21.2%    3.9%    1.1%
+  2018                        6,608   0.193   0.274   0.334  -0.184  -0.265  -0.320  -0.0021   21.3%    4.1%    0.8%
+  2019                        7,953   0.185   0.267   0.329  -0.189  -0.269  -0.329  -0.0001   21.1%    3.8%    0.9%
+  2020                        4,803   0.200   0.292   0.362  -0.203  -0.283  -0.352   0.0007   25.2%    5.1%    1.0%
+  2021                        6,510   0.192   0.273   0.335  -0.187  -0.266  -0.326   0.0009   21.5%    3.8%    1.0%
+  2022                        3,652   0.199   0.289   0.352  -0.196  -0.281  -0.341   0.0029   24.1%    4.2%    0.8%
+
+  regime Calm                   300   0.198   0.296   0.425  -0.180  -0.251  -0.311   0.0470   24.0%    8.7%    5.0%
+  regime Normal               7,803   0.191   0.274   0.335  -0.190  -0.266  -0.327   0.0006   21.9%    4.2%    0.8%
+  regime Stress               4,636   0.196   0.288   0.352  -0.204  -0.292  -0.356  -0.0031   24.5%    4.5%    1.0%
+  regime coverage 31.8%  (labelled 12,739 / unlabelled 27,273)
+
+  ticker concentration: top5 15.1%  top10 26.0%
+    signed return 15m: all +0.0010%  excluding top5 +0.0010%
+
+======================================================================================================================
+KILL CRITERIA (spec section 21)
+======================================================================================================================
+  MFE ~ |MAE| and signed return ~ 0  -> diffusion, not direction
+  TREATED not beating C1_volfail     -> the volume rule adds nothing
+  TREATED not beating C2_nobreak     -> the breakout adds nothing
+======================================================================================================================
+EXIT=0

@@ -1,0 +1,177 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZW",
+  "title": "Dashboard Track 1 mode issue pruning and freshness source fix",
+  "route": "track1_candidate",
+  "date": "2026-08-28",
+  "orders_enabled": false,
+
+  "reproduced_bug": {
+    "dashboard_said": "scheduler attention required / runner state stale",
+    "ops_said": {"track1_mode": "track1-only-shadow", "track1_mode_source": "process_table",
+                 "track1_slot_table": "fresh", "slots": "71/71"},
+    "backend_payload_before": {"route_mode": "legacy", "freshness": "stale",
+                               "state_age_seconds": 364941,
+                               "unexplained_overdue": 22,
+                               "legacy_runner.inactive_by_design": false,
+                               "state_slot_count": 45},
+    "stale_source": "the legacy runner state file, which nothing writes in track1-only shadow"
+  },
+
+  "root_cause": {
+    "two_lanes": {
+      "ops.py": "reads the SCHEDULER's command line from the process table",
+      "schedule_status.track1_only_enabled": "read THIS BACKEND PROCESS's RAITS_TRACK1_ONLY"
+    },
+    "why_they_disagreed": "ops.py sets that variable on both processes when it starts them; the backend that was serving had been started without it",
+    "two_independent_rail_triggers": [
+      "inactive_by_design came out false, so the Stage 5ZF suppression never fired and the stale legacy snapshot raised the page-level alarm",
+      "the slot mirror expected the legacy table for a scheduler that registers none of it - 22 phantom overdue slots"
+    ],
+    "precedent": "ops.py carries a comment about this exact class of bug being fixed once already, for itself"
+  },
+
+  "top_rail_now_uses": {
+    "route_mode": "track1_only_shadow",
+    "route_mode_source": "scheduler_process_table",
+    "route_mode_known": true,
+    "freshness": "not_expected_yet",
+    "unexplained_overdue": 0,
+    "state_slot_count": 71,
+    "legacy_runner.state_stale": true,
+    "unknown_handling": "None is carried as route_mode 'unknown' and rendered UNKNOWN, never collapsed into legacy",
+    "where_resolved": "injected as a parameter by app.py, NOT resolved inside get_schedule_status",
+    "why_injected": "the first version resolved it inside get_schedule_status and made 26 tests read the real process table - every suite that describes a machine by clearing the environment. A test that is not isolated is worse than no test."
+  },
+
+  "wording": {
+    "legacy_stale": "Legacy runner snapshot is stale because legacy entries are retired",
+    "scheduler_attention": "Track 1 scheduler needs attention",
+    "chip_label": "Track 1 scheduler",
+    "unknown": "scheduler mode unknown - could not read the scheduler",
+    "replaced": "runner state stale (4d 5h)"
+  },
+
+  "issue_pruning": {
+    "gating_conditions_all_required": {"confirmation": true, "scheduler_mode": "compatible",
+                                        "legacy_entry_jobs": 0},
+    "fails_toward": "showing too much - any condition unreadable means NOT retired",
+    "before": {"issues": 8, "all_counted": true},
+    "after": {"issues": 6, "active": 3, "retired_history": 3},
+    "why_8_to_6": "separate from this stage: Stage 5ZZU's stream fix merged the SPY retry rungs into one ladder issue",
+    "moved_to_history": ["paper:lifecycle:unresolved", "paper:pnl:paper_flex_total_mismatch",
+                         "paper:decision_path:unresolved"],
+    "why_those": "scoped legacy because they compare the LEGACY paper ledger against broker statements and read no Track 1 artefact",
+    "nothing_deleted": "every issue still travels with counts_as_active and a reason; the rest sit under a Legacy / retired history group",
+    "still_counted": ["Track 1 issues", "shared infra / scheduler issues", "HMM known debt"]
+  },
+
+  "cache_defect_found_by_the_tests": {
+    "what": "the retirement was first computed inside _build, which is memoised on the scheduler log signatures plus the date",
+    "consequence": "a second read with the opposite answer returned the first from cache; whether legacy is retired is a fact about the RUNNING SCHEDULER and can change with no log line written here, so the answer would have stayed frozen while legacy came back",
+    "fix": "applied per read, outside the cache",
+    "precedent": "the roll-schedule cache key two lines above records the same trap"
+  },
+
+  "hmm_regime": {
+    "known_debt_model_age": "active, always counted",
+    "was": "grouped under Legacy",
+    "now": "its own Model / Regime group; the chip reads MODEL rather than DEBT",
+    "why_it_mattered": "survivable while both were shown; a real hazard the moment the legacy group stopped counting - the model-age debt would have gone quiet with it",
+    "superseded_test": "5ZZH test_dom_the_debt_issue_lands_under_legacy now asserts the opposite",
+    "regime_verification": "untouched - window audit failures and the regime record's verification block are unchanged"
+  },
+
+  "model_inputs": {
+    "was": "the legacy runner snapshot, so in track1-only shadow it showed a Regime label from whenever legacy last ran, presented as today's",
+    "now": {
+      "Regime": "marketView.regime.label - the Track 1 regime record",
+      "SPY data": "regime.label_date - the session the published label belongs to",
+      "Fit end": "regime.inputs.fit_end",
+      "label check": "regime.verification.status, in the Fit end tooltip"
+    },
+    "dead_field_found": "Fit end had no setter at all - a dead field showing -- since it was added; now wired",
+    "fallback": "the legacy reading survives so a machine with no Track 1 record reads as before; when neither is available the panel says 'Track 1 record unavailable' rather than reporting a stale legacy value as current",
+    "panel_class": "no longer marked runner-derived"
+  },
+
+  "gates": {
+    "paper_shadow_evidence_is_the_only_track1_blocker": true,
+    "orders_possible": false,
+    "gate_schedule_strategy_order_behaviour_changed": false,
+    "b1_note": "B1 blocked for part of the morning because the account baseline record passed its 24-hour freshness policy (recorded in Stage 5ZZU); the operator refreshed it and B1 is closed again. Not this stage's doing, and it is why two tests here assert membership rather than pinning the exact blocker list."
+  },
+
+  "results": {
+    "new_suite": {"file": "scratch/test_track1_stage5zzw_dashboard_track1_mode_hygiene_20260828.py", "passed": 30},
+    "adjacent_suites": {"passed": 698, "failed": 6},
+    "mutations": {"file": "scratch/track1_stage5zzw_mutations_20260828.py", "attempted": 14, "caught": 14},
+    "mutation_design": "the suppression is broken in BOTH directions - one that stops it firing, one that makes it unconditional so a live legacy fault would go quiet - and the retirement in both, hiding too little and too much",
+    "m10_retargeted": "green twice honestly: the first version moved a deep copy while still recomputing the answer each read, so it never reproduced the defect",
+    "adjacent_tests_updated": [
+      {"test": "test_dom_the_debt_issue_lands_under_legacy", "suite": "5ZZH", "reason": "deliberate supersession - task 4 forbids labelling model debt as legacy"},
+      {"test": "test_dom_issues_are_grouped_and_none_disappears", "suite": "5ZZH", "reason": "group headings changed; the none-disappears assertion untouched"},
+      {"test": "test_the_issue_groups_are_the_three_the_stage_named", "suite": "5ZZH", "reason": "rewritten to derive from the backend scopes rather than pin a count"},
+      {"test": "test_orders_remain_blocked_and_nothing_arming_exists", "suite": "dashboard_runtime_wiring", "reason": "thirteenth instance of the pre-B1 staleness family"},
+      {"test": "test_the_panel_renders_no_fact_this_list_does_not_know_about", "suite": "dashboard_runtime_wiring", "reason": "PRE-EXISTING - the pinned-fact list had been missing 'Blockers come from' since Stage 5ZZK; fixed while passing"}
+    ],
+    "remaining_failures_all_pre_existing": [
+      "three expecting a Calm slot from before Calm became two phases",
+      "a rule grid and a JSON.stringify in the market-view render path from 5ZZL/5ZZR",
+      "one intermittent DOM test recorded in Stage 5ZZU"
+    ]
+  },
+
+  "safety_after": {
+    "track1_mode": "track1-only-shadow",
+    "orders_possible": false,
+    "blocking": ["PAPER_SHADOW_EVIDENCE"],
+    "scheduler_mode": "compatible",
+    "confirmation": true,
+    "legacy_entry_jobs": 0,
+    "orders_dir_exists": false,
+    "live_positions_track1_exists": false,
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "scheduler_restarted": false,
+    "backend_restarted": false,
+    "broker_connections": 0,
+    "runtime_trading_files_edited": false
+  },
+
+  "backend_restart_required": {
+    "required": true,
+    "reason": "schedule_status.py, open_issue_reader.py and app.py are imported once per process; the running backend (pid 20212) started at 03:13, before any of this, and will keep serving route_mode legacy until restarted",
+    "frontend": "realtime.js and index.html are static and a browser reload picks them up, but they read fields only the new backend emits",
+    "done_here": false,
+    "scheduler_impact": "none - a backend-only restart does not disturb the scheduler"
+  },
+
+  "verified_through_the_endpoints": {
+    "schedule_status": {"route_mode": "track1_only_shadow", "route_mode_known": true,
+                        "route_mode_source": "scheduler_process_table",
+                        "freshness": "not_expected_yet", "unexplained_overdue": 0,
+                        "state_slot_count": 71, "legacy_runner.state_stale": true},
+    "open_issues": {"total": 6, "active": 3, "retired_history": 3, "retired": true}
+  },
+
+  "still_open": [
+    "the three Calm-band tests and two render-path assertions listed above",
+    "ops.py still propagates RAITS_TRACK1_ONLY to the backends it starts - now a convenience rather than the source of truth for the live page, but a backend started by hand still answers from the environment for any caller that does not inject the mode"
+  ],
+
+  "files_touched": [
+    "monitor/backend/schedule_status.py",
+    "monitor/backend/open_issue_reader.py",
+    "monitor/backend/app.py",
+    "global_index/dash/realtime/realtime.js",
+    "global_index/dash/realtime/index.html",
+    "scratch/test_track1_stage5zzw_dashboard_track1_mode_hygiene_20260828.py",
+    "scratch/track1_stage5zzw_mutations_20260828.py",
+    "scratch/test_track1_stage5zzh_dashboard_hygiene_20260827.py",
+    "scratch/test_track1_dashboard_runtime_wiring_20260824.py",
+    "scratch/track1_stage5zzw_dashboard_track1_mode_hygiene_20260828.md",
+    "scratch/track1_stage5zzw_dashboard_track1_mode_hygiene_20260828.json",
+    "docs/futures/TRACK1_RUNTIME_PIPELINE_2026-08-24.md",
+    "TASK.md"
+  ]
+}

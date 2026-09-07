@@ -1,0 +1,87 @@
+{
+  "results": [
+    {
+      "mutation": "M1 the live half is spliced without being projected",
+      "guard": "scratch/test_track1_stage5q3_live_frame_splice_20260824.py::test_a_feed_with_the_ibkr_extras_now_splices",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "M2 the projection is applied after the concat instead of before",
+      "guard": "scratch/test_track1_stage5q3_live_frame_splice_20260824.py::test_the_joined_ohlcv_has_no_nan_holes",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "M3 a missing frozen column is filled instead of refused",
+      "guard": "scratch/test_track1_stage5q3_live_frame_splice_20260824.py::test_a_missing_frozen_column_is_refused_never_filled",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "M4 a NaN in a frozen column is allowed through",
+      "guard": "scratch/test_track1_stage5q3_live_frame_splice_20260824.py::test_a_nan_in_a_frozen_column_is_refused",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "M5 the dropped column names are not reported",
+      "guard": "scratch/test_track1_stage5q3_live_frame_splice_20260824.py::test_extra_provider_columns_are_dropped_and_named",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "M6 the guard tolerates mismatched columns instead of the caller projecting",
+      "guard": "scratch/test_track1_stage5q3_live_frame_splice_20260824.py::test_the_guard_still_refuses_a_caller_that_skipped_the_projection",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "M7 SpliceRefused is not caught, so the slot writes no record",
+      "guard": "scratch/test_track1_stage5q3_live_frame_splice_20260824.py::test_a_splice_refusal_is_written_as_a_named_slot_record",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "M8 a live-frame refusal is filed as a gate refusal",
+      "guard": "scratch/test_track1_stage5q3_live_frame_splice_20260824.py::test_the_audit_names_the_refusal_instead_of_missing_evidence",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "M9 the audit treats live_frame_refused as an observed no-action",
+      "guard": "scratch/test_track1_stage5q3_live_frame_splice_20260824.py::test_a_live_frame_refusal_is_a_hard_refusal_not_an_unobserved_window",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "M10 the slot stops emitting telemetry",
+      "guard": "scratch/test_track1_stage5q3_live_frame_splice_20260824.py::test_the_entry_point_actually_wires_the_telemetry",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    }
+  ],
+  "detected": 10,
+  "total": 10,
+  "restore_mismatch": []
+}

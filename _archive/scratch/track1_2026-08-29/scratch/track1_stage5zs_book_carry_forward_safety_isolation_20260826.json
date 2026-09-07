@@ -1,0 +1,177 @@
+{
+  "stage": "5ZS",
+  "title": "Track 1 book carry-forward: safety jobs stop writing the route's book in legacy shape",
+  "checked_at": {
+    "utc": "2026-08-26T15:35",
+    "et": "2026-08-26T11:35 EDT",
+    "calgary": "2026-08-26T09:35 MDT",
+    "window": "ET 11:00-11:40"
+  },
+  "verdict": {
+    "live_book_corrupted": "YES",
+    "repaired": "DRY-RUN ONLY — the prompt did not say apply",
+    "safety_jobs_fixed": "YES — three layers, all mutation-proven",
+    "legacy_unchanged": "YES — byte-for-byte, asserted at every layer",
+    "runtime_files_touched": [],
+    "orders_possible": false,
+    "next_shadow_window_ready": "RUNS, but will REFUSE to write evidence until the book is repaired — which is the fix working, not a new fault",
+    "remaining_before_paper": 5
+  },
+  "answers": {
+    "1_is_the_book_corrupted": {
+      "answer": true,
+      "path": "live_positions.track1.json (repo root)",
+      "mtime_et": "2026-08-26 09:31:13",
+      "size_bytes": 218,
+      "schema_version": 1,
+      "route": "<ABSENT>",
+      "window": "<ABSENT>",
+      "cut_instant": "<ABSENT>",
+      "cur_day": "<ABSENT>",
+      "equity": "<ABSENT>",
+      "peak_equity": "<ABSENT>",
+      "day_start_equity": "<ABSENT>",
+      "booked_counter": "<ABSENT>",
+      "counters": "<ABSENT>",
+      "positions": 0,
+      "breaker": {
+        "peak_equity": 50000.0,
+        "max_dd_dollars": 0.0,
+        "max_dd_pct": 0.0,
+        "system_equity": 50000.0,
+        "last_broker_equity": 996881.46
+      },
+      "so": "nine fields dropped, schema downgraded 2->1, and an account-scale equity this route has never used written in their place. `positions` was [] before and after — which is exactly why it was quiet."
+    },
+    "2_which_job_wrote_it": {
+      "job": "TRACK1_MAX_HOLD_EXIT",
+      "started_et": "2026-08-26 09:31:00",
+      "completed_et": "2026-08-26 09:31:13",
+      "mtime_matches_completion": true,
+      "argv": "pythonw.exe -m global_index.run_maxhold_exit --positions-path live_positions.track1.json --stop-path STOP_TRADING.track1 --lock-path runner.track1.pid --client-id 90 --trade-log-path global_index/track1_runtime/trade_log.track1.jsonl --route track1_candidate --port 4002",
+      "note": "the argv is FULLY route-aware — Stage 5ZG's routing worked exactly as built. The job was given its own book, kill switch, lock, client id, trade log and route tag. Every one of those was honoured. The book was still written in legacy shape, because the writer had no idea the envelope mattered.",
+      "first_opportunity": "the schema-2 book was created at 02:55 today (5ZN's cross-day book) and MAX_HOLD runs once a day at 09:31 — so 09:31 today is the FIRST moment this collision could occur, and it did"
+    },
+    "3_which_code_path": {
+      "writer": "FuturesRunner._persist_state (runner.py) — builds {schema_version: 1, positions, breaker} unconditionally",
+      "why_the_breaker_was_invented": "the LOADER (runner.py __init__) reads schema 2, hits `sv not in (0, 1)` and logs 'proceeding anyway', finds no `breaker` key, so every breaker field stays at its DEFAULT — and the writer then persists those defaults",
+      "fail_open": "the loader's own warning path is 'proceeding anyway'. An unrecognised schema was a log line, not a refusal."
+    },
+    "4_same_defect_elsewhere": {
+      "run_stop_repair": "YES — same FuturesRunner, same _persist_state. LATENT only: it did not persist on 2026-08-26 at 02:20 / 04:20 / 06:20 / 08:20 because the book held nothing to change. The first Track 1 stop it repaired would have done the same thing.",
+      "any_other": "these two are the only Track 1 safety entry points that construct a FuturesRunner with a positions path"
+    },
+    "5_carry_forward_fixed": {
+      "was": "`route is None` PASSED the check, and `carried = dict(prev)` copied every key",
+      "now": "route must equal track1_candidate and schema must equal 2 — both refusals; and only fields the schema declares are carried, so a foreign `breaker` is dropped rather than inherited. A declared field the previous book lacked comes back at its fresh default, so a reader never has to guess which of the two it is."
+    },
+    "6_route_schema_guard": {
+      "module": "global_index/safety_book.py — the book's version of the contract Stage 5ZG gave the trade log",
+      "rules": [
+        "no argument -> the legacy book, byte for byte as before",
+        "--route track1_candidate with the LEGACY book -> refused",
+        "the Track 1 book without --route -> refused",
+        "the Track 1 book that exists and is not a Track 1 book -> refused"
+      ],
+      "placed": "BEFORE the positions-exists early return, for the same reason 5ZG placed the trade-log probe there: both scripts return early on a missing book, which is every run during shadow, so a check after it would never execute",
+      "narrowed_once": "the first draft ALSO required the canonical Track 1 filename for any routed run. That is not the hazard — it forbade a harness using its own path and broke four 5ZG tests exercising the trade-log contract. Narrowed to the hazard (the legacy book) and the canonical artefact (the envelope check), with a mutation pinning the narrowing."
+    },
+    "7_missing_vs_corrupt": {
+      "missing": "allowed — it is the normal shadow state and both scripts return early on it",
+      "corrupt": "fails closed, everywhere: at the entry point, in carry-forward, and now in the B1 measurement",
+      "inspect": "four states — missing / unreadable / corrupt / track1 — and it never raises"
+    },
+    "8_repair": {
+      "tool": "python -m global_index.b1_book_repair  (dry run; --apply writes)",
+      "applied": false,
+      "why_not": "the prompt did not say apply",
+      "what_it_can_recover": "NOTHING, and it says so. The checkpoint carries per-instrument resume state and NO book envelope, so the lost fields have no source on disk. It rebuilds the envelope at the route's defaults and carries `positions` forward.",
+      "what_it_proves_first": [
+        "the damaged book's positions must be empty",
+        "the route's trade log must be empty (measured: 0 rows)",
+        "the order journal must not exist (measured: absent)"
+      ],
+      "and_refuses_otherwise": "over an open position or a traded route it stops, because rebuilding equity and counters from defaults would be a guess about money",
+      "backs_up": "the damaged file is copied to *.corrupt-<stamp>.bak before any write, and the result is re-inspected after"
+    },
+    "9_legacy_unchanged": {
+      "answer": true,
+      "how": [
+        "the writer's new branch is gated on `route is not None` — the same switch 5ZG used; a legacy sweep passes route=None and gets the identical payload",
+        "a legacy run that happens to have an envelope STILL writes legacy (test 12)",
+        "the book contract returns the legacy default unchanged with no argument",
+        "the legacy argv from the scheduler log runs end to end in a subprocess with no book refusal (test 27)"
+      ]
+    },
+    "10_orders_possible": {
+      "answer": false,
+      "blockers": [
+        "B1_broker_account_or_legacy_retirement",
+        "PAPER_SHADOW_EVIDENCE",
+        "REGIME_LABEL_VERIFICATION"
+      ],
+      "unchanged": true
+    },
+    "11_next_window": {
+      "runs": true,
+      "but": "the stress window closes 12:30 ET and `_carry_forward_book` will now REFUSE the corrupt book, so that close writes no checkpoint and no book. That is the fix working — the alternative is the corruption propagating into a schema-2 book carrying a legacy breaker — but it will show as a failed window.",
+      "operator_can_avoid_it": "apply the repair before 12:30 ET",
+      "no_restart_needed": "every slot and every safety job is a separate `python -m` invocation, so the children pick up this code on their next run. The scheduler parent holds job definitions, not this logic."
+    }
+  },
+  "a_gap_this_stage_also_closed": {
+    "what": "B1 called the corrupt book FLAT",
+    "why": "`read_book` asks one question — how many positions — and a legacy-shaped file over the route's path still carries `positions: []`. So B1's Track 1 half reported 'Track 1 book flat' about a book that was not the route's book at all.",
+    "now": "`read_track1_book` checks the envelope as well, and the audit calls it. Measured after: B1 reports UNKNOWN (book_unreadable) on the live file.",
+    "note_on_the_recorded_evidence": "`ops.py status` still prints PASS because it reads the 06:15 RECORD, which was true at 06:15 — the corruption happened at 09:31. The record is honest about its own timestamp; the next audit will not be."
+  },
+  "tests": {
+    "file": "scratch/test_track1_stage5zs_book_carry_forward_20260826.py",
+    "count": 42,
+    "style": "the real methods, real argv in a subprocess, and AST at call sites",
+    "reproduces_the_live_event": "CORRUPT_0931 is copied field-for-field off the live file, so the suite reproduces the real event and not an idea of it",
+    "mutations": {
+      "attempted": 15,
+      "red": 15,
+      "includes_the_four_named_by_the_stage": [
+        "route deletion",
+        "schema downgrade",
+        "legacy breaker copy",
+        "missing/corrupt collapse"
+      ],
+      "two_caught_weak_tests": [
+        "the loader stash had no test at all — the writer tests inject the attribute, so the loader could be deleted and they stayed green",
+        "the narrowing test used a path that did not exist, so `dest.exists()` short-circuited and it could not tell a narrow rule from a wide one"
+      ]
+    }
+  },
+  "regression": {
+    "passed": 658,
+    "failed": 0,
+    "skipped": 1,
+    "scope": "5ZS + 5ZG + 5ZK + 5ZN + 5ZQ + 5ZR + 5O + 5S + 3B + 5W + monitor ops / dashboard / schedule-status / no-zero-for-missing"
+  },
+  "files": {
+    "new": [
+      "global_index/safety_book.py",
+      "global_index/b1_book_repair.py",
+      "scratch/test_track1_stage5zs_book_carry_forward_20260826.py"
+    ],
+    "modified": [
+      "global_index/run_live_day_track1.py",
+      "global_index/runner.py",
+      "global_index/track1_slots.py",
+      "global_index/run_maxhold_exit.py",
+      "global_index/run_stop_repair.py",
+      "global_index/track1_b1.py",
+      "global_index/b1_audit.py"
+    ],
+    "runtime_touched": []
+  },
+  "claims_deliberately_NOT_made": [
+    "that the live book was repaired",
+    "that the lost fields were recovered",
+    "that Track 1 is ready for paper",
+    "that the next window will write a checkpoint"
+  ]
+}

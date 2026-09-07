@@ -1,0 +1,185 @@
+{
+  "stage": "5R-1",
+  "title": "Apply the one-time boundary repair, restart Track1-only shadow, verify runtime ready",
+  "generated_et": "2026-08-24T23:45:00-04:00",
+  "verdict": "READY_FOR_NEXT_JUDGEABLE_TRACK1_SHADOW_WINDOW",
+
+  "direct_answers": {
+    "repair_applied_or_refused": "applied, exit 0 — all three boundary bars replaced and verified by re-read, history-check OK",
+    "real_data_files_changed": ["data/cache/futures/NQ_continuous_1m_8y.parquet",
+                                "data/cache/futures/YM_continuous_1m_8y.parquet",
+                                "data/cache/futures/RTY_continuous_1m_8y.parquet"],
+    "real_data_files_unchanged": ["data/cache/futures/ES_continuous_1m_8y.parquet",
+                                  "global_index/data/NKD_continuous_1m_8y.parquet",
+                                  "spy_daily_live.csv", "global_index/preflight_state.json",
+                                  "global_index/data/_ibkr_splice_offsets.json"],
+    "probes_nothing_to_repair": "yes — MNQ, MYM and M2K all returned nothing_to_repair with shared_disagreements_total 0 and nothing in or outside the window",
+    "scheduler_running_corrected_track1_only_shadow": "yes — pid 45272, started 2026-08-24T23:29:35-04:00, 101 jobs, spy_refresh_pm present, legacy strategy jobs 0",
+    "backend_mirror_corrected": "yes — SPY_REFRESH_PM at 2026-08-25 16:20:00-04:00 is in the scheduled slots (my earlier 'missing' reading was a bad measurement, see corrections)",
+    "orders_still_impossible": "yes — orders_possible=False, blocking ['B1_broker_account_or_legacy_retirement'], no confirmation file, TRACK1_ORDERS_APPROVED unset",
+    "next_judgeable_window": "global_nkd 01:10-02:55 ET on 2026-08-25 (14:10-15:55 JST), covered end to end by a scheduler up since 23:29:35 ET"
+  },
+
+  "timing": {
+    "stage_ran_et": "2026-08-24 23:25 to 23:45",
+    "all_windows_closed_throughout": true,
+    "nkd_window_opens_et": "2026-08-25T01:10:00-04:00",
+    "margin_before_nkd": "1h25m"
+  },
+
+  "part_a_before": {
+    "MNQ": {"sha256_24": "c0ae9d3c3c7984f7731436be", "last_bar": "2026-08-25 00:20:00", "tz": "None", "mtime": "2026-08-24T18:21:17"},
+    "MYM": {"sha256_24": "272003cda1c17c83e105be32", "last_bar": "2026-08-25 00:21:00", "tz": "None", "mtime": "2026-08-24T18:21:42"},
+    "M2K": {"sha256_24": "e4e2e1c49606a36d1ed790e2", "last_bar": "2026-08-25 00:21:00", "tz": "None", "mtime": "2026-08-24T18:22:05"},
+    "MES": {"sha256_24": "99da6feb97ea1a28abb9ffae", "last_bar": "2026-08-24 17:44:00", "tz": "None"},
+    "MNKD": {"sha256_24": "a761a36b2018f82f0869bfb9", "last_bar": "2026-08-24 17:46:00", "tz": "None"},
+    "snapshot_file": "scratch/_track1_stage5r1_before.json"
+  },
+
+  "part_b_repair": {
+    "command": "python -m global_index.update_ibkr_daily --repair-boundary --symbols MNQ MYM M2K",
+    "exit_code": 0,
+    "refused": false,
+    "first_live_exercise_of_5r0": true,
+    "per_instrument": [
+      {"inst": "MNQ", "final_bar_check": "dropped 2026-08-25 03:26:00 (still open)",
+       "stored_through": "2026-08-25 03:25:00", "boundary_repaired": "2026-08-25 00:20:00",
+       "alignment": {"shared_bars": 2902, "median": 0.0, "iqr": 0.0},
+       "snapshot": "NQ_continuous_1m_8y.parquet.pre5q5-20260825T032631Z.bak",
+       "verified_by_reread": true, "history_check": "OK", "total_bars": 3357680},
+      {"inst": "MYM", "final_bar_check": "dropped 2026-08-25 03:26:00 (still open)",
+       "stored_through": "2026-08-25 03:25:00", "boundary_repaired": "2026-08-25 00:21:00",
+       "completed_fields": ["close", "high", "volume"], "appended_bars": 184,
+       "snapshot": "YM_continuous_1m_8y.parquet.pre5q5-20260825T032658Z.bak",
+       "verified_by_reread": true, "history_check": "OK", "total_bars": 3314559},
+      {"inst": "M2K", "final_bar_check": "dropped 2026-08-25 03:26:00 (still open)",
+       "stored_through": "2026-08-25 03:25:00", "boundary_repaired": "2026-08-25 00:21:00",
+       "completed_fields": ["close", "high", "volume"], "appended_bars": 184,
+       "snapshot": "RTY_continuous_1m_8y.parquet.pre5q5-20260825T032722Z.bak",
+       "verified_by_reread": true, "history_check": "OK", "total_bars": 2951565}
+    ],
+    "post_verification": {
+      "changed_exactly": ["MNQ", "MYM", "M2K"],
+      "tz_still_naive": true,
+      "columns_unchanged": "open,high,low,close,volume",
+      "snapshots_only_for_touched_files": true,
+      "snapshots_now": 6
+    },
+    "probes": {
+      "MNQ": {"verdict": "nothing_to_repair", "shared_disagreements_total": 0},
+      "MYM": {"verdict": "nothing_to_repair", "shared_disagreements_total": 0},
+      "M2K": {"verdict": "nothing_to_repair", "shared_disagreements_total": 0}
+    },
+    "significance": "the first repair run in the sequence to leave a clean tail; this is the observation that closes B-5R-H on the live files rather than only in the code"
+  },
+
+  "part_c_restart": {
+    "performed": true,
+    "commands": ["python monitor/ops.py restart --scheduler --track1-only-shadow --yes"],
+    "note_it_also_restarted_the_backend": true,
+    "unexpected_finding": {
+      "what": "the pids stopped were 16752 / 35088, not the 28696 / 11720 recorded earlier",
+      "explanation": "monitor/logs/ops.log shows the OPERATOR already restarted at 21:15 local (23:15 ET) — the action outstanding since Stage 5Q-7 — about ten minutes before this stage began; mine at 21:29 superseded it",
+      "harm": "none — both restarts produced 101 jobs and every window was closed between 23:15 and 23:29",
+      "lesson": "I restarted a process I had not established was still the one I recorded; the check belongs before the command, not in the log afterwards"
+    },
+    "post_state": {
+      "scheduler_pid": 45272, "scheduler_started_et": "2026-08-24T23:29:35-04:00",
+      "backend_pid": 27540, "backend_started_et": "2026-08-24T23:29:38-04:00",
+      "track1_mode": "track1-only-shadow",
+      "job_count": 101,
+      "track1_strategy_slots": 70, "track1_safety": 11, "track1_audit": 5,
+      "legacy_safety_drain": 11, "shared": 4,
+      "legacy_strategy_jobs": 0,
+      "spy_refresh_pm": "present, 16:20 ET",
+      "repair_boundary_in_preflight_argv": true,
+      "backend_mirror_spy_refresh_pm": "2026-08-25 16:20:00-04:00",
+      "scheduler_process_stale_code": false,
+      "orders_possible": false,
+      "track1_blocking": ["B1_broker_account_or_legacy_retirement"]
+    }
+  },
+
+  "part_d_restart_cost": {
+    "audit_after_restart": {
+      "global_nkd": "NOT_ENOUGH_DATA_YET", "roska4_calm": "NOT_ENOUGH_DATA_YET",
+      "roska4_stress": "NOT_ENOUGH_DATA_YET", "roska4_swing": "NOT_ENOUGH_DATA_YET",
+      "day": "NOT_ENOUGH_DATA_YET",
+      "reason": "window_closed_before_scheduler_start"
+    },
+    "expected": true,
+    "recorded_in": "Stage 5Q-6 and accepted then",
+    "evidence_intact": "the 8 audit records written during 2026-08-24 remain the truth for that day; the file still holds 8 rows and was not touched",
+    "note": "the audit did not turn a restart into a false FAIL — it said what it could and could not judge, and why"
+  },
+
+  "tests": {
+    "result": "213 passed across nine suites",
+    "suites": ["5R-0", "5Q-9", "5Q-8", "5Q-5", "5Q-4", "5N", "ops_status_mode",
+               "schedule_status_track1", "ops"],
+    "mutations_5r0": "8 red, 0 green",
+    "not_run": {"test_event_playback.py": "known to hang"},
+    "failures_found_and_fixed": [
+      {"test": "test_7b_the_5q9_identity_hashes_are_unchanged_by_this_stage",
+       "cause": "it pinned the FULL sleeve_identity hash, which includes data_source_identity — a sha256 of the parquet. The repair appended bars, so the hash moved. Correct behaviour; the test had a built-in expiry date of one trading day",
+       "fix": "rewritten to pin the STRATEGY half with the three content-hash fields normalised, plus a new test_7c proving the data pin still reaches the hash",
+       "production_defect": false,
+       "note": "the same defect I criticised in Stage 2's log anchor, in a test I wrote the day before"},
+      {"test": "monitor/test_schedule_status_track1_20260823.py::test_a_due_track1_slot_with_no_closing_line_goes_overdue",
+       "cause": "get_schedule_status reads the REAL scheduler's started_at to decide whether a slot is judgeable at all — pre-start slots are not overdue. With the old 09:25 start TRACK1_STRESS_1035 was overdue; after the 23:29 restart it is pre-start",
+       "verified_by": "patching three different start instants and watching the result flip (09:25 -> in, 23:29 -> out, None -> in)",
+       "fix": "an autouse fixture pinning started_at to 00:05 ET on the file's own Monday",
+       "production_defect": false,
+       "note": "correct production behaviour — the same pre-start rule the Track 1 audit applies"}
+    ]
+  },
+
+  "corrections_to_earlier_reports": [
+    {"where": "Stage 5Q-6 and 5Q-7",
+     "claim": "the backend mirror lacks SPY_REFRESH_PM",
+     "reality": "the /api/v1/schedule-status endpoint never enumerates slots, so a substring search over its payload could not answer the question either way. Measured properly via _scheduled_slots_for, the row is present and at the right time — possibly since the code landed",
+     "impact": "the restart was still needed for spy_refresh_pm to be REGISTERED in the scheduler; only the mirror claim was wrong"},
+    {"where": "Stage 5R-0 report",
+     "claim": "the end-of-run IN-PROGRESS FINAL MINUTES NOT STORED block exists",
+     "reality": "it did not — the str.replace that should have added it silently matched nothing (a heredoc mangled the doubled backslashes) and I printed 'patched' without asserting. The per-instrument 'final-bar check' log line WAS real and is what the operator saw tonight",
+     "fix": "the block is now genuinely present, added with an assertion"},
+    {"where": "Stage 5R-0 report header",
+     "claim": "2026-08-25, 00:40-02:10 ET",
+     "reality": "the file's own mtime is 23:10 ET on 2026-08-24; the header was wrong by a date",
+     "fix": "corrected in place in both the .md and .json"}
+  ],
+
+  "files": {
+    "production_this_stage": ["global_index/update_ibkr_daily.py (the dropped-tail summary block)"],
+    "production_data_changed": ["data/cache/futures/NQ_continuous_1m_8y.parquet",
+                                "data/cache/futures/YM_continuous_1m_8y.parquet",
+                                "data/cache/futures/RTY_continuous_1m_8y.parquet"],
+    "tests_changed": ["scratch/test_track1_stage5r0_boundary_tail_20260824.py",
+                      "monitor/test_schedule_status_track1_20260823.py"],
+    "added": ["scratch/_track1_stage5r1_before.json", "scratch/_track1_stage5r1_after.json",
+              "scratch/track1_stage5r1_operational_repair_restart_20260825.md",
+              "scratch/track1_stage5r1_operational_repair_restart_20260825.json"],
+    "unchanged_by_design": ["strategy rules", "identity fields", "sizing basis", "cap logic",
+                            "overlap guard", "order gate"],
+    "durable_state_absent": ["global_index/live_positions.json",
+                             "global_index/live_positions.track1.json",
+                             "global_index/replay_checkpoint.track1.json"]
+  },
+
+  "next_windows_et": [
+    {"at": "01:10-02:55", "what": "global_nkd — THE NEXT JUDGEABLE WINDOW (14:10-15:55 JST)"},
+    {"at": "09:31", "what": "MAX_HOLD_EXIT"},
+    {"at": "10:00", "what": "roska4_calm one-shot"},
+    {"at": "10:35-12:30", "what": "roska4_stress"},
+    {"at": "13:45", "what": "pre-flight — first run with --repair-boundary AND 5R-0 live"},
+    {"at": "14:05-15:55", "what": "roska4_swing"},
+    {"at": "16:20", "what": "spy_refresh_pm — makes Wednesday morning's freshness pass"}
+  ],
+
+  "what_to_check_in_the_morning": [
+    "the 13:45 log carries a 'final-bar check' line per instrument and an 'IN-PROGRESS FINAL MINUTES NOT STORED' block",
+    "--repair-boundary finds NOTHING to repair; a reported replacement means something wrote a partial bar and is worth stopping for",
+    "the morning windows are judgeable on their data — the three bars that would have refused them are gone",
+    "python -m global_index.track1_shadow_audit --latest --all --dry-run"
+  ]
+}

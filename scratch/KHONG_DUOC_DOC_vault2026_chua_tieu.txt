@@ -1,0 +1,17 @@
+### HIEN TRANG tren 2026
+  net $-7,764  |  Calmar -6.89
+  [sua khop lenh] 95 lenh, $25,578 (co so 1 hop dong, truoc sizing)
+  MaxDD $7,355 (14.7%)  |  return ≈ -101.3%/yr on $50,000
+  circuit-breaker halts: 175
+
+### ema=50 tren 2026
+
+### tham hoa 3x tren 2026
+  net $-7,678  |  Calmar -6.27
+  MaxDD $7,335 (14.7%)  |  return ≈ -92.0%/yr on $50,000
+  circuit-breaker halts: 196
+
+### quet toi nen dung chieu tren 2026
+  net $2,131  |  Calmar 0.86
+  MaxDD $4,469 (8.9%)  |  return ≈ 7.7%/yr on $50,000
+  circuit-breaker halts: 0

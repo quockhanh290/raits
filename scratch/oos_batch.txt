@@ -1,0 +1,49 @@
+##### A tren VAULT 2023-2024 #####
+====================================================================================
+CAU HINH: vu trang 14.0833h + stop co dinh + QUET TOI nen resume dung chieu + SUA KHOP LENH
+MOC     : vault2324
+====================================================================================
+  net $13,649  |  Calmar 3.26
+  [sua khop lenh] 133 lenh, $17,818 (co so 1 hop dong, truoc sizing)
+  MaxDD $2,119 (4.2%)  |  return ≈ 13.8%/yr on $50,000
+  circuit-breaker halts: 0
+
+##### A tren VAULT 2025 #####
+====================================================================================
+CAU HINH: vu trang 14.0833h + stop co dinh + QUET TOI nen resume dung chieu + SUA KHOP LENH
+MOC     : vault2025
+====================================================================================
+  net $2,493  |  Calmar 0.44
+  [sua khop lenh] 94 lenh, $19,464 (co so 1 hop dong, truoc sizing)
+  MaxDD $5,767 (11.5%)  |  return ≈ 5.1%/yr on $50,000
+  circuit-breaker halts: 0
+
+##### D tren VAULT 2023-2024 #####
+====================================================================================
+CAU HINH: vu trang 14.0833h + stop co dinh + tham hoa 2x + SUA KHOP LENH
+MOC     : vault2324
+====================================================================================
+  net $6,401  |  Calmar 1.15
+  [sua khop lenh] 3 lenh, $117 (co so 1 hop dong, truoc sizing)
+  MaxDD $2,807 (5.6%)  |  return ≈ 6.5%/yr on $50,000
+  circuit-breaker halts: 0
+
+##### D tren VAULT 2025 #####
+====================================================================================
+CAU HINH: vu trang 14.0833h + stop co dinh + tham hoa 2x + SUA KHOP LENH
+MOC     : vault2025
+====================================================================================
+  net $1,006  |  Calmar 0.23
+  [sua khop lenh] 2 lenh, $497 (co so 1 hop dong, truoc sizing)
+  MaxDD $4,492 (9.0%)  |  return ≈ 2.1%/yr on $50,000
+  circuit-breaker halts: 0
+
+##### A+D tren BASELINE #####
+====================================================================================
+CAU HINH: vu trang 14.0833h + stop co dinh + tham hoa 2x + QUET TOI nen resume dung chieu + SUA KHOP LENH
+MOC     : baseline
+====================================================================================
+  net $-2,313  |  Calmar -0.05
+  [sua khop lenh] 17 lenh, $663 (co so 1 hop dong, truoc sizing)
+  MaxDD $8,713 (17.4%)  |  return ≈ -0.9%/yr on $50,000
+  circuit-breaker halts: 692

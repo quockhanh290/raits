@@ -1,0 +1,332 @@
+{
+ "floor": [
+  {
+   "mode": {
+    "name": "current_nkd",
+    "use_current_nkd": true,
+    "use_calm_nkd": false,
+    "calm_switch": false
+   },
+   "metrics": {
+    "net": 56037.35924999998,
+    "ret": 1.1207471849999995,
+    "pf": 1.6063829832129886,
+    "sharpe": 2.452646347792608,
+    "calmar": 1.6725847023871587,
+    "maxdd": 4892.896999999972
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 551,
+     "roska4_stress": 49,
+     "global_nkd": 228
+    },
+    "rejected": {
+     "roska4_swing": 192,
+     "roska4_stress": 1,
+     "global_nkd": 0
+    },
+    "halted": 2,
+    "stress_closed_r4": 11,
+    "stress_switch_delta": 1279.2099999999998,
+    "calm_closed_current_nkd": 0,
+    "calm_switch_delta": 0.0,
+    "suppressed_current_nkd": 0,
+    "suppressed_current_nkd_pnl": 0.0,
+    "suppressed_r4": 7
+   }
+  },
+  {
+   "mode": {
+    "name": "calm_nkd_replacement",
+    "use_current_nkd": false,
+    "use_calm_nkd": true,
+    "calm_switch": false
+   },
+   "metrics": {
+    "net": 59294.71924999998,
+    "ret": 1.1858943849999997,
+    "pf": 1.732902952232233,
+    "sharpe": 2.0686226084664905,
+    "calmar": 1.269278781428069,
+    "maxdd": 6691.2775
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 551,
+     "roska4_stress": 49,
+     "global_nkd": 550
+    },
+    "rejected": {
+     "roska4_swing": 192,
+     "roska4_stress": 1,
+     "global_nkd": 0
+    },
+    "halted": 2,
+    "stress_closed_r4": 11,
+    "stress_switch_delta": 1279.2099999999998,
+    "calm_closed_current_nkd": 0,
+    "calm_switch_delta": 0.0,
+    "suppressed_current_nkd": 0,
+    "suppressed_current_nkd_pnl": 0.0,
+    "suppressed_r4": 7
+   }
+  },
+  {
+   "mode": {
+    "name": "current_nkd_plus_calm_switch",
+    "use_current_nkd": true,
+    "use_calm_nkd": true,
+    "calm_switch": true
+   },
+   "metrics": {
+    "net": 64094.22924999999,
+    "ret": 1.2818845849999998,
+    "pf": 1.637846336277598,
+    "sharpe": 1.9311633298898265,
+    "calmar": 1.7406042029572644,
+    "maxdd": 5274.3499999999985
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 551,
+     "roska4_stress": 49,
+     "global_nkd": 758
+    },
+    "rejected": {
+     "roska4_swing": 192,
+     "roska4_stress": 1,
+     "global_nkd": 0
+    },
+    "halted": 2,
+    "stress_closed_r4": 11,
+    "stress_switch_delta": 1279.2099999999998,
+    "calm_closed_current_nkd": 45,
+    "calm_switch_delta": 340.0,
+    "suppressed_current_nkd": 20,
+    "suppressed_current_nkd_pnl": -561.2100000000003,
+    "suppressed_r4": 7
+   }
+  }
+ ],
+ "vault2025": [
+  {
+   "mode": {
+    "name": "current_nkd",
+    "use_current_nkd": true,
+    "use_calm_nkd": false,
+    "calm_switch": false
+   },
+   "metrics": {
+    "net": 12369.720000000001,
+    "ret": 0.24739440000000001,
+    "pf": 1.9913541065589533,
+    "sharpe": 3.233484925272866,
+    "calmar": 2.7975334581372198,
+    "maxdd": 4792.31
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 55,
+     "roska4_stress": 3,
+     "global_nkd": 31
+    },
+    "rejected": {
+     "roska4_swing": 50,
+     "roska4_stress": 0,
+     "global_nkd": 0
+    },
+    "halted": 0,
+    "stress_closed_r4": 1,
+    "stress_switch_delta": 241.06999999999994,
+    "calm_closed_current_nkd": 0,
+    "calm_switch_delta": 0.0,
+    "suppressed_current_nkd": 0,
+    "suppressed_current_nkd_pnl": 0.0,
+    "suppressed_r4": 0
+   }
+  },
+  {
+   "mode": {
+    "name": "calm_nkd_replacement",
+    "use_current_nkd": false,
+    "use_calm_nkd": true,
+    "calm_switch": false
+   },
+   "metrics": {
+    "net": 12643.96,
+    "ret": 0.25287919999999997,
+    "pf": 2.2530521191651975,
+    "sharpe": 2.439107934194054,
+    "calmar": 3.572650113178632,
+    "maxdd": 3610.77
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 55,
+     "roska4_stress": 3,
+     "global_nkd": 90
+    },
+    "rejected": {
+     "roska4_swing": 50,
+     "roska4_stress": 0,
+     "global_nkd": 0
+    },
+    "halted": 0,
+    "stress_closed_r4": 1,
+    "stress_switch_delta": 241.06999999999994,
+    "calm_closed_current_nkd": 0,
+    "calm_switch_delta": 0.0,
+    "suppressed_current_nkd": 0,
+    "suppressed_current_nkd_pnl": 0.0,
+    "suppressed_r4": 0
+   }
+  },
+  {
+   "mode": {
+    "name": "current_nkd_plus_calm_switch",
+    "use_current_nkd": true,
+    "use_calm_nkd": true,
+    "calm_switch": true
+   },
+   "metrics": {
+    "net": 16165.810000000001,
+    "ret": 0.32331620000000005,
+    "pf": 2.2259921582902953,
+    "sharpe": 2.69666756786622,
+    "calmar": 4.065696798222909,
+    "maxdd": 4056.67
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 55,
+     "roska4_stress": 3,
+     "global_nkd": 117
+    },
+    "rejected": {
+     "roska4_swing": 50,
+     "roska4_stress": 0,
+     "global_nkd": 0
+    },
+    "halted": 0,
+    "stress_closed_r4": 1,
+    "stress_switch_delta": 241.06999999999994,
+    "calm_closed_current_nkd": 7,
+    "calm_switch_delta": 29.99999999999997,
+    "suppressed_current_nkd": 4,
+    "suppressed_current_nkd_pnl": -1288.81,
+    "suppressed_r4": 0
+   }
+  }
+ ],
+ "vault2026": [
+  {
+   "mode": {
+    "name": "current_nkd",
+    "use_current_nkd": true,
+    "use_calm_nkd": false,
+    "calm_switch": false
+   },
+   "metrics": {
+    "net": 7897.669999999998,
+    "ret": 0.15795339999999997,
+    "pf": 1.5862289090178954,
+    "sharpe": 2.8878428429385994,
+    "calmar": 2.9282925994156,
+    "maxdd": 4876.67
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 46,
+     "roska4_stress": 3,
+     "global_nkd": 24
+    },
+    "rejected": {
+     "roska4_swing": 35,
+     "roska4_stress": 1,
+     "global_nkd": 2
+    },
+    "halted": 0,
+    "stress_closed_r4": 0,
+    "stress_switch_delta": 0.0,
+    "calm_closed_current_nkd": 0,
+    "calm_switch_delta": 0.0,
+    "suppressed_current_nkd": 0,
+    "suppressed_current_nkd_pnl": 0.0,
+    "suppressed_r4": 0
+   }
+  },
+  {
+   "mode": {
+    "name": "calm_nkd_replacement",
+    "use_current_nkd": false,
+    "use_calm_nkd": true,
+    "calm_switch": false
+   },
+   "metrics": {
+    "net": 3572.6599999999994,
+    "ret": 0.0714532,
+    "pf": 1.32965112523875,
+    "sharpe": 1.3878140404484847,
+    "calmar": 1.6005997369937186,
+    "maxdd": 3655.8999999999996
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 46,
+     "roska4_stress": 3,
+     "global_nkd": 43
+    },
+    "rejected": {
+     "roska4_swing": 35,
+     "roska4_stress": 1,
+     "global_nkd": 1
+    },
+    "halted": 0,
+    "stress_closed_r4": 0,
+    "stress_switch_delta": 0.0,
+    "calm_closed_current_nkd": 0,
+    "calm_switch_delta": 0.0,
+    "suppressed_current_nkd": 0,
+    "suppressed_current_nkd_pnl": 0.0,
+    "suppressed_r4": 0
+   }
+  },
+  {
+   "mode": {
+    "name": "current_nkd_plus_calm_switch",
+    "use_current_nkd": true,
+    "use_calm_nkd": true,
+    "calm_switch": true
+   },
+   "metrics": {
+    "net": 8926.06,
+    "ret": 0.1785212,
+    "pf": 1.6541643886616175,
+    "sharpe": 2.584203230342583,
+    "calmar": 3.3668621762205957,
+    "maxdd": 4342.299999999999
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 46,
+     "roska4_stress": 3,
+     "global_nkd": 62
+    },
+    "rejected": {
+     "roska4_swing": 35,
+     "roska4_stress": 1,
+     "global_nkd": 3
+    },
+    "halted": 0,
+    "stress_closed_r4": 0,
+    "stress_switch_delta": 0.0,
+    "calm_closed_current_nkd": 5,
+    "calm_switch_delta": -3172.5,
+    "suppressed_current_nkd": 5,
+    "suppressed_current_nkd_pnl": -2518.4300000000003,
+    "suppressed_r4": 0
+   }
+  }
+ ]
+}

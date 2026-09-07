@@ -1,0 +1,163 @@
+{
+  "stage": "5M-C",
+  "title": "Normal-R4 swing provider readiness + stale ops text",
+  "date": "2026-08-23",
+  "verdict": "READY_FOR_5N_NKD_TRACK1_OWNERSHIP",
+  "claim_limits": "Normal-R4 slots are READY for a provider and prove the full build/connect/fetch/decide/disconnect path on a fake broker. The provider is OFF by default. NKD still has no Track 1 slot, so this is not a full Track 1 route and no shadow period yet covers four sleeves.",
+  "blocker_found_and_fixed": {
+    "id": "P5-as-shipped",
+    "what": "run_live_day_track1's --sleeve argument listed choices [None, roska4_calm, roska4_stress]; roska4_swing was not among them",
+    "effect": "the scheduler built an argv argparse REJECTS. All 23 swing slots would have failed at parse time, every day, before any of the route ran",
+    "why_5m_b_missed_it": "the Stage 5M-B suite called observe_live_slot directly. The captured argv was correct; nothing drove it through main()",
+    "fix": "choices derived from tp.WINDOWS_ET, so a new sleeve cannot be rejected by a list nobody updated",
+    "proof": "python -m global_index.run_live_day_track1 --sleeve roska4_swing ... now parses and reaches the route's own ledger_not_configured refusal",
+    "mutation": "P5"
+  },
+  "provider_staging": {
+    "decision": "staged, not switched on",
+    "mechanism": "RAITS_TRACK1_SWING_PROVIDER",
+    "default": "none",
+    "values": [
+      "none",
+      "ibkr"
+    ],
+    "unrecognised": "raises at scheduler build time; the scheduler does not start",
+    "scope": "roska4_swing only; Calm and Stress keep ibkr and are not reachable by it",
+    "resolved": "once per session, at job registration",
+    "why_not_switched_on_now": "the premise that freezing legacy frees the 14:05-15:55 window is FALSE. STOP_TRADING halts new entries only: runner.run_day checks it AFTER the slot has spawned, connected on IBKR clientId 1, fetched bars for every instrument, rolled contracts and run the exit and reconcile checks. Freezing legacy removes the trading, not the load. The collision is unchanged and still unmeasured"
+  },
+  "provider_path_proved": {
+    "broker": "fake, injected via build_bar_provider(broker_cls=...)",
+    "real_ibkr": false,
+    "client_id": 89,
+    "connect": true,
+    "disconnect_in_finally": true,
+    "disconnect_on_refusal": true,
+    "slot_outcome_with_fake_provider": "decided=True",
+    "instruments_fetched": [
+      "M2K",
+      "MES",
+      "MNQ",
+      "MYM"
+    ],
+    "ledger_rows": [
+      "window_open",
+      "slot_observed"
+    ]
+  },
+  "route_guards_that_caught_the_fixture": [
+    {
+      "guard": "no_frozen_half",
+      "what": "a provider without history has nothing to append to"
+    },
+    {
+      "guard": "frozen_clock",
+      "what": "history must be tz-aware; a naive frame was not loaded by frozen_frame()"
+    },
+    {
+      "guard": "bars_from_the_future",
+      "what": "the fake returned the whole session regardless of `through`; a real broker trims"
+    },
+    {
+      "guard": "overlap_disagreement",
+      "what": "the fake feed and the frozen half disagreed on 276 of 276 shared timestamps"
+    }
+  ],
+  "stale_text_cleaned": {
+    "monitor/ops.py": "three mentions of '25 Track 1 slots' -> ops.track1_slot_count(), derived from TRACK1_SLOTS",
+    "global_index/track1_gates.py": "gate evidence no longer states a count at all",
+    "global_index/run_scheduler.py": "a Stage 5M-B comment saying '25 slots' corrected",
+    "docs/futures/TRACK1_SWITCHOVER_RUNBOOK.md": "two stale mentions rewritten",
+    "scratch/track1_blocking_ledger_20260822.json": "REGENERATED from the registry, not edited; only the evidence field differed",
+    "guard": "test_no_operator_facing_file_states_a_slot_count_that_can_go_stale scans five operator-facing files for a slot/job count and allows only lines that describe the old wording as history",
+    "derived_count_now": 48
+  },
+  "inventory": {
+    "slots": {
+      "roska4_calm": 1,
+      "roska4_stress": 24,
+      "roska4_swing": 23
+    },
+    "total": 48,
+    "providers_default": {
+      "ibkr": 25,
+      "none": 23
+    }
+  },
+  "preserved": {
+    "allow_orders": "absent from all 48 slots, with the switch on and off",
+    "order_gate": "blocking_now == ['B1_broker_account_or_legacy_retirement']",
+    "route_env": "track1_candidate on all 48",
+    "dashboard_parity": "true in both modes",
+    "switch_files": "none created, none removed",
+    "scheduler": "never started or stopped",
+    "real_ibkr": "never connected"
+  },
+  "not_true_yet": {
+    "nkd": "no Track 1 slot; asserted by test_nkd_still_has_no_track1_slot",
+    "route_aware_safety": "stop repair and max-hold still hard-wired to legacy's positions file; max-hold state shared (Stage 5O)",
+    "swing_slot_runtime": "STILL NOT MEASURED against a live Gateway"
+  },
+  "mutations": {
+    "mutations": [
+      {
+        "mutation": "P1 provider_for ignores the switch and returns ibkr",
+        "guard": "test_the_scheduler_launches_swing_without_a_provider_by_default",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "P2 an unrecognised switch value falls back to none",
+        "guard": "test_an_unrecognised_value_is_refused_rather_than_falling_back[IBKR]",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "P3 the swing switch also governs Calm and Stress",
+        "guard": "test_calm_and_stress_are_not_reachable_by_this_switch",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "P4 disconnect is a no-op, so the connection leaks",
+        "guard": "test_a_swing_slot_with_a_provider_disconnects_in_the_finally",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "P5 the --sleeve choices are hard-coded to Calm and Stress again",
+        "guard": "test_a_swing_slot_with_a_provider_disconnects_in_the_finally",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "P6 a hard-coded '25 Track 1 slots' returns to operator text",
+        "guard": "test_no_operator_facing_file_states_a_slot_count_that_can_go_stale",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      }
+    ],
+    "files_restored": true
+  },
+  "no_side_effects": [
+    "no scheduler/backend/dashboard started or stopped",
+    "no IBKR connection (fake broker only)",
+    "no order",
+    "no STOP_TRADING or STOP_TRADING.track1 touched",
+    "no confirmation file",
+    "no live state file written",
+    "no commit"
+  ]
+}

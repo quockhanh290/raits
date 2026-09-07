@@ -1,0 +1,152 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZ",
+  "title": "ops.py status: process reporting that names its source and its failures",
+  "when_et": "2026-08-27T04:40:00-04:00/2026-08-27T05:00:00-04:00",
+  "scope": "monitor/ops.py and its tests",
+
+  "verdicts": {
+    "ops_status_reliable": true,
+    "scheduler_restarted": false,
+    "backend_restarted": false,
+    "runtime_files_touched": false,
+    "orders_possible": false,
+    "next_calm_phase_ready": true
+  },
+
+  "reproduction": {
+    "reproduced_the_UNKNOWN_output": false,
+    "what_status_printed_at_stage_start": ["scheduler_pids=[5856]", "backend_pids=[2108]"],
+    "conclusion": "the fault is intermittent; this stage fixes why a failure is unreadable when it happens, which WAS reproduced exactly",
+    "theories_tested": [
+      {"theory": "the 20s probe timeout", "verdict": "WRONG",
+       "measurement": "0.63-0.73 s over three runs on a 471-process host; filtering the query to python processes measured 0.65 s, no better, because the cost is PowerShell startup and not enumeration",
+       "consequence": "the narrowing optimisation was NOT made — it buys nothing and would exclude a scheduler launched under a different interpreter name"},
+      {"theory": "the reason was never readable", "verdict": "CONFIRMED", "see": "root_cause"}
+    ]
+  },
+
+  "root_cause": {
+    "what": "the recorded reason was stderr[:200], and PowerShell echoes the whole command before the message",
+    "measured": {"stderr_length": 692,
+                 "first_200_chars": "the script's own opening",
+                 "actual_message": "Invalid class",
+                 "message_position": "the very end"},
+    "historical_instance": "the project's ops log, 2026-08-13: 'scheduler: scan failed ($ErrorActionPreference=...' — truncated before saying anything",
+    "why_last_line_is_also_wrong": "PowerShell's last line is the FullyQualifiedErrorId, an exception CLASS NAME; and the message itself is split across two lines by wrapping",
+    "fix": "a marker the probe writes its own message behind, plus a fallback built from the measured rendering: the first ' : ' that is not decoration, continued across wrapped lines until the position marker",
+    "verified_on_real_output": {"with_marker": "Invalid class", "without_marker": "Invalid class"}
+  },
+
+  "tri_state_restored": {
+    "defect": "ProcessScan has three states by design; scheduler_processes() returns a list, and a list cannot say 'I could not look'",
+    "effect": "a failed probe reached track1_status as [] -> scheduler_running=False -> track1_mode=n/a, the health check announcing Track 1 is off about a scheduler that is running",
+    "family": "the same collapse the dataclass was written to end, one function later",
+    "now": "scheduler_running is True | False | None; None prints as track1_mode=unknown with the reason attached"
+  },
+
+  "output_contract": {
+    "success": ["scheduler_pids=[5856] source=process_table",
+                "backend_pids=[2108] source=process_table",
+                "track1_mode=track1-only-shadow track1_mode_source=process_table",
+                "track1_slot_table=fresh source_slots=71 registered_slots=71"],
+    "failure": ["scheduler_process_scan=permission_denied: Access is denied.",
+                "scheduler_pids=unknown_due_to_process_scan_error source=none",
+                "backend_process_scan=permission_denied: Access is denied.",
+                "backend_pids=unknown_due_to_process_scan_error source=none",
+                "backend_fallback=listeners:[2108] source=port_listener proves_running=True",
+                "scheduler_fallback=last_registered_71_slots at 2026-08-27 02:08:11 machine-local source=log proves_running=False",
+                "track1_mode=unknown track1_mode_source=log (permission_denied: Access is denied.)"],
+    "bare_UNKNOWN_possible": false,
+    "codes": ["permission_denied", "probe_timeout", "probe_unavailable", "probe_failed",
+              "probe_no_output", "probe_not_json"]
+  },
+
+  "provenance_today": {
+    "scheduler_pid_source": "process_table",
+    "scheduler_mode_source": "process_table",
+    "backend_pid_source": "process_table",
+    "pid_files_exist_in_this_project": false,
+    "fallback_available": {"backend": "port_listener (may prove running)",
+                           "scheduler": "log (never proves running)"},
+    "why_log_never_proves_running": "a log line is a history; it is equally consistent with a process still going and one that died a minute later"
+  },
+
+  "stale_table_check": {
+    "added": "track1_slot_table",
+    "compares": "the slot count the running scheduler registered (from its own log) against the count the package declares",
+    "current": {"state": "fresh", "source_slots": 71, "registered_slots": 71},
+    "stale_output": "track1_slot_table=stale source_slots=71 registered_slots=70 + RESTART NEEDED",
+    "works_without_the_process_table": true,
+    "relevance": "this is the check Stage 5ZY-PRE had to perform by hand"
+  },
+
+  "latent_defect_found_and_closed": {
+    "what": "the probe matched itself — the search pattern is embedded verbatim in the probe's own PowerShell command line",
+    "why_it_had_not_bitten": "both production patterns escape their dots, so their regex cannot match their own source text — an accident",
+    "why_it_matters": "ensure_single decides whether to KILL a process from this same scan",
+    "fix": "exclude the probe's own process, plus a test asserting each production pattern does not match its own source",
+    "verified": "invoked as production invokes it, a non-matching pattern returns nothing and the three real patterns return exactly the right processes"
+  },
+
+  "my_own_mistake_caught_by_tests": {
+    "what": "the first version had track1_status read the scan directly",
+    "effect": "it silently bypassed the seam every existing test patches; five suites believed they had described a scheduler and were reading the real machine",
+    "principle": "a test that is not isolated is worse than no test — it reports on the wrong system with full confidence",
+    "fix": "rows come through scheduler_processes(); the scan is consulted only for its third state; rows are proof whatever the probe said, and only 'no rows AND could not look' is unknown"
+  },
+
+  "correction_to_stage_5zy_pre": {
+    "was_reported": "3 true Stage 5ZX regressions",
+    "actual": 4,
+    "the_missed_one": "scratch/test_track1_stage5k_ops_startup_20260823.py::test_no_allow_orders_and_no_port_reaches_a_track1_slot",
+    "why_missed": "a third copy of the same argv extractor, failing with a differently-worded message ('_track1_body argv not found' rather than 'no _run([...]) call found'), so grouping by reason string put it in the pre-existing bucket",
+    "why_it_matters_more_than_the_count": "that test asserts no order flag can reach a Track 1 slot, and it had stopped running",
+    "repaired": true,
+    "also_now_pins": "that a phased slot carries its phase",
+    "corrected_split": {"calm_slot_split": 45, "pre_existing": 50, "true_5zx_regressions": 4}
+  },
+
+  "tests": {
+    "file": "scratch/test_track1_stage5zz_ops_status_process_reporting_20260827.py",
+    "count": 22,
+    "result": "22 passed",
+    "mutations": [
+      "an exception in the probe read as a definite empty scan",
+      "the printer reverting to a bare UNKNOWN",
+      "the reason reverting to the first 200 characters of stderr",
+      "a 70-against-71 slot table reported as fresh",
+      "a log line promoted to proof that the scheduler is running"
+    ],
+    "all_mutations_red": true,
+    "repairs_to_older_suites": [
+      "test_track1_ops_status_mode_20260824.py (3 cases) — seam restored, not the tests changed",
+      "test_track1_stage5k_ops_startup_20260823.py (2 cases) — seam plus the argv extractor",
+      "test_track1_stage5o_route_aware_safety_20260824.py (1 case) — seam"
+    ],
+    "adjacent_suites_after": {"passed": 135, "failed": 2,
+                              "both_failures_pre_existing": true,
+                              "detail": "a blocker-roster pin and an absence proxy asserting the live runtime tree does not exist"}
+  },
+
+  "safety_confirmed": {
+    "scheduler_pid_before": 5856,
+    "scheduler_pid_after": 5856,
+    "backend_pid_before": 2108,
+    "backend_pid_after": 2108,
+    "orders_possible": false,
+    "blocking": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "confirmation_file": false,
+    "orders_dir": "ABSENT",
+    "shadow_intent_dir": "ABSENT",
+    "broker_order_path_touched": false,
+    "runtime_mtimes_all_predate_this_stage": true
+  },
+
+  "next_event_to_watch": {
+    "when_et": "2026-08-27T09:32:00-04:00",
+    "what": "TRACK1_CALM_DECIDE_0932 — the first run of either phase in production",
+    "then": "10:02 ET TRACK1_CALM_OBSERVE_1002",
+    "scheduler_is_ready": "restarted 04:08 ET, registered 71 slots, and status now says so on its own"
+  }
+}

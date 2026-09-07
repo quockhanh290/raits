@@ -15248,3 +15248,54 @@ và mv2-calm-gates. Khi đổi cấu trúc, phải tìm MỌI rule đang nhắm 
 không chỉ viết rule mới.
 
 Chưa đo được trên trang (devtools vẫn mất kết nối). 83 passed (skin + dom).
+
+---
+## Sub-task: Track 1 dashboard design — ĐÓNG 2026-09-06
+Status: DONE
+
+Đóng ở đây theo yêu cầu chủ dự án. Việc tiếp theo không phải là dashboard nữa mà là rà soát
+cổng trước khi paper trade — prompt ở `docs/futures/PAPER_GATE_REVIEW_PROMPT.md`.
+
+### Completed (các stage của phiên cuối, 5ZZZ-CE…CV)
+- [x] CE — trang giải thích riêng `global_index/dash/realtime/help.html` (12 mục), vào từ dòng
+      nguồn của mỗi section; route `/realtime/help`
+- [x] CF/CG — khối Book chuyển khỏi ảnh chụp của runner đã nghỉ (289,8h, toàn số 0) sang sổ
+      của chính Track 1; `peak_equity 0.0` đọc thành "chưa giao dịch", không phải "0,00%"
+- [x] CJ/CK/CL — bảng màu về đúng thang; 21 luật CSS chết được ghi nhận và dọn
+- [x] CM/CN — Model Inputs thành một dải; độ bất định về trong khối nhãn
+- [x] CO/CP — chip chọn công cụ trên thanh giá; `recorded_series` không còn gộp bốn công cụ
+      vào một chuỗi (nến MES ~7.724 nằm trên đường M2K ~2.979 là do lỗi này)
+- [x] CQ — nhãn mức giá không chồng nhau, không rơi ra ngoài khung; thang giá nới để chứa
+- [x] CR — hai pane dùng chung một lề, để con trỏ chữ thập dóng đúng một phút
+- [x] CS — bảng Source Clocks không còn in mã máy (`not_expected_yet`, `not_scheduled / none`)
+- [x] CT — ba mức giá ba màu theo LOẠI; trạng thái vũ trang do nét vẽ mang
+- [x] CU — chữ trên đường ngưỡng đọc được (ô chữ đặc + vành, bỏ mờ .75); biểu đồ slot không
+      dựng khung khi không có gì để nói; độ bất định tô theo mức; mốc kiểm có giờ tuyệt đối
+- [x] CV — ô đọc của biểu đồ lên hàng PRICE; mốc kiểm xuống đáy khối nhãn
+
+### Cổng đã dựng (scratch/, đều đã mutation-test)
+test_track1_stage5zzz_{ce,cf,cg,cj,ck,cl,co,cq,cs,cu}_*.py — 12 tệp.
+Lượt chạy cuối: 129 passed (CU 15 + CQ + dom + skin), và 363 passed trên bốn bộ chính
+(dom / skin / contract / dashboard_backend).
+
+### Chưa đóng — cố ý để lại
+- [ ] Rà soát tooltip toàn trang (mục 3 của bản review 11 điểm) — CHƯA BẮT ĐẦU
+- [ ] `global_index/dash/realtime-next/index.html` là bản markup cũ, thiếu Market View / Calm /
+      Regime. Đã báo, chủ dự án nói bỏ qua.
+
+### Files touched (chưa commit tại thời điểm đóng)
+global_index/dash/realtime/realtime.js, realtime.css
+global_index/dash/realtime-next/next.js, next.css
+monitor/backend/track1_market_view.py, monitor/test_realtime_dom.py
+scratch/test_track1_stage5zzz_{co,cq,cs,cu}_*.py
+LƯU Ý: `git status` còn nhiều tệp KHÔNG thuộc phiên này (ibkr_reader.py, open_issue_reader.py,
+paper_evidence_reader.py, preview-states.js, preview.html, skin-e.css, paper/index.html,
+paper_pnl_compare.*) — chúng đã sửa từ trước khi phiên bắt đầu. Đừng gộp vào cùng một commit.
+
+### Next
+- [ ] Chạy rà soát cổng theo `docs/futures/PAPER_GATE_REVIEW_PROMPT.md`
+- [ ] Trạng thái cổng đo được 2026-09-06: `may_enable_orders() = False`; ba cổng đang chặn là
+      B1_broker_account_or_legacy_retirement (USER_DECISION_GATE, phép đo kèm theo đang
+      UNKNOWN vì bản ghi cũ), FINAL_BAR_DIVERGENCE_OBSERVED (chưa quan sát được),
+      PAPER_SHADOW_EVIDENCE (1 ngày FAIL + baseline 194h). `self_check()` trả về rỗng.
+

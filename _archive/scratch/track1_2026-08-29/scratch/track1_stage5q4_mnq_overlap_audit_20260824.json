@@ -1,0 +1,321 @@
+{
+  "stage": "5Q-4",
+  "title": "MNQ history/live overlap mismatch, and the freshness day the data cannot cover",
+  "date": "2026-08-24",
+  "route": "track1_candidate",
+  "verdict": "MNQ_MISMATCH_CONFIRMED_REPAIR_TOOL_BUILT_NOT_APPLIED",
+  "claim": "The parquet is the wrong side, with high confidence and for a directional reason. The repair is a one-way write to shared history, applying it needs a broker connection that would contend with the running Stress slots, and it would fix one day only. Measured, tooled, handed over.",
+  "safety_statement": {
+    "scheduler_started_or_stopped": false,
+    "scheduler_pid": 28696,
+    "backend_restarted": false,
+    "ibkr_connected": false,
+    "orders_sent": false,
+    "confirmation_file_created": false,
+    "live_positions_or_checkpoint_written": false,
+    "parquet_mutated": false,
+    "parquet_backups_created": false,
+    "parquet_mtimes_unchanged": "all five still carry their 2026-08-21 13:45-13:47 ET mtimes",
+    "overlap_guard_weakened": false,
+    "production_modules_changed": false,
+    "test_writes_outside_tmp_path": false,
+    "committed": false
+  },
+  "part_a_measurement": {
+    "mnq_mismatch_confirmed": true,
+    "file": "data/cache/futures/NQ_continuous_1m_8y.parquet",
+    "file_rows": 3355780,
+    "file_mtime_et": "2026-08-21 13:46:16",
+    "disputed_bar_et": "2026-08-21 13:45:00-04:00",
+    "disputed_bar_is_file_last_bar": true,
+    "disputed_position_from_end": 0,
+    "stored": {
+      "open": 29404.5,
+      "high": 29408.0,
+      "low": 29400.25,
+      "close": 29404.5,
+      "volume": 1399.0
+    },
+    "feed_low": 29395.75,
+    "gap_points": 4.5,
+    "columns_disagreeing": [
+      "low"
+    ],
+    "columns_that_agreed_exactly": [
+      "open",
+      "high"
+    ],
+    "columns_not_compared": [
+      "close",
+      "volume"
+    ],
+    "columns_not_compared_why": "the guard compares open, high, low, close in order and raises on the first that differs",
+    "shared_timestamps": 1186,
+    "bars_disagreeing": 1,
+    "independent_fetches_agreeing": 12,
+    "independent_fetches_window_et": "10:35 to 11:15",
+    "feed_internally_consistent_across_reads": true,
+    "direction": "the feed's low is LOWER than the stored low - the only direction a partial minute's low can be wrong in",
+    "evidence_source": "the window ledger's own slot_observed rows; no broker query was made"
+  },
+  "mechanism": {
+    "proven_by": "reading global_index/update_ibkr_daily.py:548",
+    "code": "new_only = new_bars_adj[new_bars_adj.index > last_existing]",
+    "consequence": "the bar that was last in the file is never re-fetched, compared or rewritten; the dedupe at line 637 never sees a duplicate because new_only already excluded that timestamp",
+    "self_heals": false,
+    "systemic": "the MECHANISM is systemic and deterministic - every 13:45 leaves a boundary bar. The observed CORRUPTION is one bar."
+  },
+  "scope_across_instruments": {
+    "MNQ": {
+      "state": "disagrees",
+      "evidence": "12 measured slot fetches today"
+    },
+    "MES": {
+      "state": "agrees",
+      "evidence": "the 10:00 ET Calm slot reached splice and failed on the column mismatch; the overlap check runs before the splice, over instruments in sorted order, so MES passed it"
+    },
+    "MYM": {
+      "state": "not exercised today",
+      "next_measurement_et": "14:05 (Normal-R4)"
+    },
+    "M2K": {
+      "state": "not exercised today",
+      "next_measurement_et": "14:05 (Normal-R4)"
+    },
+    "MNKD": {
+      "state": "not exercised today",
+      "next_measurement_et": "01:10 tomorrow (NKD)"
+    }
+  },
+  "parquet_last_bars": {
+    "MES": "2026-08-21 13:44:00-04:00",
+    "MNQ": "2026-08-21 13:45:00-04:00",
+    "MYM": "2026-08-21 13:46:00-04:00",
+    "M2K": "2026-08-21 13:46:00-04:00",
+    "MNKD": "2026-08-22 02:47:00+09:00"
+  },
+  "failed_measurement": {
+    "what": "whether partial boundary bars are systemic across history, measured offline from volume",
+    "attempt_1": "each bar vs its same-day neighbours, ratio < 0.6 - flagged 76-99 bars over 29-34 days, two or three a day in every instrument. That is the lunchtime lull",
+    "attempt_2": "each bar vs the SAME clock-minute across days, ratio < 0.35 - still 0.38-0.96 flags per day",
+    "decisive": "the bar we KNOW is wrong is NOT flagged (MNQ 13:45, ratio ~0.9), while a flagged one (MYM 2026-08-21 13:46, vol 15 vs usual 66, ratio 0.227, that file's last bar) is not known to be wrong",
+    "natural_spread_at_1345": {
+      "MES": [
+        55,
+        1137
+      ],
+      "MNQ": [
+        545,
+        2973
+      ],
+      "MYM": [
+        14,
+        138
+      ],
+      "M2K": [
+        18,
+        114
+      ]
+    },
+    "conclusion": "volume is not the discriminator; historical frequency is UNMEASURED. The only instrument that could measure it is a broker re-fetch of past windows compared bar by bar - which is what the repair tool does in dry run"
+  },
+  "part_b_freshness": {
+    "blocker": "B-5R-E",
+    "confirmed": true,
+    "preflight_state_last_day": "2026-08-21",
+    "preflight_state_value": true,
+    "spy_csv_last_date": "2026-08-20",
+    "required_data_through_mon_1130": "2026-08-21",
+    "regime_csv_status": "stale",
+    "freshness_allow": false,
+    "mechanism": "update_spy_csv fetches [fetch_from, today] from Polygon at 13:45 ET; the day's daily bar does not close until 16:00, so the CSV gains day D-1 at day D's pre-flight while required_data_through returns D from 13:45 onward",
+    "gap": "exactly one business day, permanently",
+    "only_refresh_in_the_schedule": "the 13:45 pre-flight (update_ibkr_daily then update_spy_csv) - confirmed by reading run_scheduler",
+    "grid": [
+      {
+        "instant_et": "Fri 14:00",
+        "required": "2026-08-21",
+        "regime_csv": "stale",
+        "allow": false
+      },
+      {
+        "instant_et": "Mon 09:00",
+        "required": "2026-08-21",
+        "regime_csv": "stale",
+        "allow": false
+      },
+      {
+        "instant_et": "Mon 11:30",
+        "required": "2026-08-21",
+        "regime_csv": "stale",
+        "allow": false
+      },
+      {
+        "instant_et": "Mon 14:00",
+        "required": "2026-08-24",
+        "regime_csv": "stale",
+        "allow": false
+      },
+      {
+        "instant_et": "Tue 09:00",
+        "required": "2026-08-24",
+        "regime_csv": "stale",
+        "allow": false
+      }
+    ],
+    "grid_caveat": "the one allow=True row in the wider grid (Fri 12:00) is an artefact of testing a past instant against today's file; on Friday at noon the CSV held Wednesday",
+    "consequence": "shadow_live is a freshness-BINDING mode, so no Track 1 candidate can be admitted at any instant until this is resolved. Slots still observe and refuse by name",
+    "implemented_here": false,
+    "why_not": "it needs either a second SPY refresh after the close or a requirement that asks for D-1 rather than D - both are decisions about what the route considers fresh"
+  },
+  "part_c_repair_decision": {
+    "option_chosen": "Option 2 - minimal safe repair utility, dry-run only, NOT applied",
+    "tool": "scratch/track1_stage5q4_repair_boundary_bar_20260824.py",
+    "default_mode": "dry run",
+    "apply_requires": [
+      "--apply",
+      "--expect <sha256 of the file as it is now>"
+    ],
+    "guards": [
+      "dry run by default - the only mode that runs without a second flag",
+      "--expect hash guard - stops a repair measured against one version landing on another",
+      "snapshot first, re-read and hash-checked before any write",
+      "bounded window - a disagreement outside it refuses the whole run",
+      "bounded count - more than --max-bars is a different problem",
+      "index unchanged - a repair replaces bars, never adds or removes one",
+      "verify by re-reading - a write that did not land is a failure, not an assumption"
+    ],
+    "reuses": "project_to_frozen_columns from 5Q-3, so the comparison is over the same columns the route joins on",
+    "why_not_applied": [
+      "only `low` has been compared; close and volume on that bar are unmeasured because the guard stops at the first differing column",
+      "applying needs a broker fetch, which would open a second client beside the Stress slots on client id 89 - two clients on one id has already cost six entry slots",
+      "it fixes today only; tomorrow's 13:45 writes a fresh boundary bar (B-5R-F)"
+    ],
+    "option_3_rejected": "dropping the final parquet bar at runtime changes the frame every sleeve reads, on every slot, to work around one bar - and would silently change what a frozen-window backtest computes on. The guard is right, the data is wrong, the data is what should move",
+    "promotion_to_production": "deferred - the tool earns a place in global_index/ only once B-5R-F is decided, since the right answer may be that the appender stops creating the problem"
+  },
+  "tests": {
+    "stage_5q4": {
+      "file": "scratch/test_track1_stage5q4_overlap_and_repair_20260824.py",
+      "passed": 26
+    },
+    "stage_5q4_mutations": {
+      "detected": 9,
+      "total": 9,
+      "restores_verified_byte_for_byte": true
+    },
+    "regression": {
+      "files": 11,
+      "passed": 413,
+      "skipped": 1
+    },
+    "read_only_probes": 2
+  },
+  "my_own_instruments_that_were_wrong": [
+    {
+      "what": "the volume probe, twice",
+      "outcome": "no frequency is reported because of it"
+    },
+    {
+      "what": "mutation N8's first form - the repair overwrites bars that already agreed",
+      "outcome": "undetected 0/0/0; writing a value that is already there changes nothing, so there was no guard to break. Re-aimed at the dry-run/apply boundary"
+    },
+    {
+      "what": "mutation N9's guard had no reachable failure in the harness",
+      "outcome": "fixed by adding a test that injects a write which does not land"
+    },
+    {
+      "what": "the 'guard was not weakened' test scanned the function text for the word 'tolerance' and went red on its own docstring sentence 'No tolerance to tune'",
+      "outcome": "THIRD substring-over-prose mistake in these stages. It now parses the function AST and asserts the numeric literals are a subset of {0, 1, 1e-6}"
+    }
+  ],
+  "blockers_before_5r": [
+    {
+      "id": "B-5R-E",
+      "rank": 1,
+      "what": "the 13:45 pre-flight marks a day true before that day's SPY close exists, so the regime CSV is permanently one business day behind the freshness requirement",
+      "impact": "no candidate can be admitted at any instant",
+      "state": "open"
+    },
+    {
+      "id": "B-5R-D",
+      "rank": 2,
+      "what": "MNQ 2026-08-21 13:45 ET, low off by 4.5 points",
+      "impact": "refuses every Stress slot; MNQ is in the swing basket too",
+      "state": "open - measured, tool ready, not applied"
+    },
+    {
+      "id": "B-5R-F",
+      "rank": 3,
+      "new": true,
+      "what": "update_ibkr_daily appends strictly-newer, so every 13:45 leaves a partial boundary bar that is never revisited",
+      "impact": "B-5R-D is one instance of it; a repair fixes one day",
+      "state": "open"
+    },
+    {
+      "id": "B-5R-C",
+      "rank": 4,
+      "what": "NKD after 2026-11-01: 12 of 22 ET slots outside the Tokyo decision band",
+      "state": "open, reported as WARN"
+    },
+    {
+      "id": "B1",
+      "rank": 5,
+      "what": "the order gate",
+      "state": "open by design; orders impossible"
+    }
+  ],
+  "blockers_closed_earlier": [
+    "B-5R-A live-frame schema (5Q-3)",
+    "B-5R-B uncaught SpliceRefused (5Q-3)"
+  ],
+  "ranking_note": "B-5R-E outranks B-5R-D: repairing the MNQ bar would let the Stress window join and the freshness gate would still refuse every admission",
+  "operator": {
+    "action_required": "none",
+    "do_not": [
+      "apply the repair yet - it needs a broker fetch beside the running Stress slots and fixes one day while B-5R-F keeps writing new boundary bars",
+      "widen the overlap guard - it is the only thing that noticed",
+      "restart the scheduler or the backend - no production module changed in this stage"
+    ],
+    "watch_without_touching": [
+      {
+        "when_et": "14:05 today",
+        "what": "the Normal-R4 slots are the first to touch MYM and M2K"
+      },
+      {
+        "when_et": "01:10 tomorrow",
+        "what": "the NKD slots are the first to touch MNKD"
+      }
+    ],
+    "safe_measurement_command": "python scratch\\track1_stage5q4_repair_boundary_bar_20260824.py --inst MNQ",
+    "safe_measurement_window": "any moment the Stress window is closed - after 12:30 ET",
+    "safe_measurement_writes": "nothing to the parquet"
+  },
+  "followup_5q5": {
+    "appended": "2026-08-24 (Stage 5Q-5). The record above is left as written.",
+    "b_5r_e": {
+      "state": "fixed in code, two halves",
+      "requirement_half": "LIVE - required_intraday_through for the parquets, required_daily_close_through (last trading day before today) for the daily series",
+      "refresh_half": "NOT live - a new 16:20 ET job spy_refresh_pm, needs a scheduler restart"
+    },
+    "correction_to_this_report": "the grid recorded Fri 14:00 -> allow=False as the true state. Under the corrected contract that instant ALLOWS; the old refusal was the bug. About ten hours of every trading day were being refused for a reason that was not true",
+    "b_5r_f": {
+      "state": "fixed in code, OFF by default",
+      "flag": "--repair-boundary",
+      "rule": "replace only when the feed's bar is a COMPLETION - open unchanged, low no higher, high no lower, volume no smaller",
+      "guards": [
+        "snapshot before write",
+        "verify by re-read",
+        "0.5% net",
+        "history invariant exempts one timestamp by name"
+      ],
+      "todays_1345_run": "byte-identical to yesterday's"
+    },
+    "b_5r_d": {
+      "state": "still unrepaired",
+      "recommended_repair": "python -m global_index.update_ibkr_daily --repair-boundary --symbols MNQ",
+      "why": "the same code that prevents recurrence once enabled"
+    },
+    "follow_up_report": "scratch/track1_stage5q5_freshness_boundary_report_20260824.md"
+  }
+}

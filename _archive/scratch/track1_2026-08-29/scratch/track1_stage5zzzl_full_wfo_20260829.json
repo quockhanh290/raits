@@ -1,0 +1,143 @@
+{
+ "engine": "futures._validated_core.backtest_swing_tf",
+ "labels": "RegimeLabels(lag_days=1) - causal D-1",
+ "grid": {
+  "ema_period": [
+   10,
+   20,
+   30,
+   50
+  ],
+  "chandelier_atr_mult": [
+   2.0,
+   2.5,
+   3.0,
+   3.5
+  ],
+  "max_hold_days": [
+   3,
+   5,
+   10
+  ]
+ },
+ "candidates_evaluated": 48,
+ "region": "floor only; 2025 and 2026 never read",
+ "folds": [
+  {
+   "test_from": "2019-07-01",
+   "test_to": "2020-01-01",
+   "ema": 50,
+   "mult": 2.0,
+   "hold": 5,
+   "oos_n": 102,
+   "oos_pnl": 355.0,
+   "oos_calmar": 3.74
+  },
+  {
+   "test_from": "2020-01-01",
+   "test_to": "2020-07-01",
+   "ema": 50,
+   "mult": 2.0,
+   "hold": 5,
+   "oos_n": 175,
+   "oos_pnl": 10294.0,
+   "oos_calmar": 24.15
+  },
+  {
+   "test_from": "2020-07-01",
+   "test_to": "2021-01-01",
+   "ema": 50,
+   "mult": 2.0,
+   "hold": 5,
+   "oos_n": 192,
+   "oos_pnl": 6326.0,
+   "oos_calmar": 13.25
+  },
+  {
+   "test_from": "2021-01-01",
+   "test_to": "2021-07-01",
+   "ema": 50,
+   "mult": 2.0,
+   "hold": 5,
+   "oos_n": 154,
+   "oos_pnl": 2311.0,
+   "oos_calmar": 4.21
+  },
+  {
+   "test_from": "2021-07-01",
+   "test_to": "2022-01-01",
+   "ema": 50,
+   "mult": 2.0,
+   "hold": 5,
+   "oos_n": 101,
+   "oos_pnl": 3940.0,
+   "oos_calmar": 5.9
+  },
+  {
+   "test_from": "2022-01-01",
+   "test_to": "2022-07-01",
+   "ema": 10,
+   "mult": 2.0,
+   "hold": 3,
+   "oos_n": 335,
+   "oos_pnl": 8782.0,
+   "oos_calmar": 7.4
+  },
+  {
+   "test_from": "2022-07-01",
+   "test_to": "2023-01-01",
+   "ema": 10,
+   "mult": 2.0,
+   "hold": 3,
+   "oos_n": 352,
+   "oos_pnl": 733.0,
+   "oos_calmar": 0.28
+  },
+  {
+   "test_from": "2023-01-01",
+   "test_to": "2023-07-01",
+   "ema": 10,
+   "mult": 2.5,
+   "hold": 10,
+   "oos_n": 184,
+   "oos_pnl": 3676.0,
+   "oos_calmar": 3.3
+  },
+  {
+   "test_from": "2023-07-01",
+   "test_to": "2024-01-01",
+   "ema": 10,
+   "mult": 2.5,
+   "hold": 10,
+   "oos_n": 103,
+   "oos_pnl": 5694.0,
+   "oos_calmar": 8.64
+  },
+  {
+   "test_from": "2024-01-01",
+   "test_to": "2024-07-01",
+   "ema": 50,
+   "mult": 2.0,
+   "hold": 3,
+   "oos_n": 90,
+   "oos_pnl": 4020.0,
+   "oos_calmar": 25.05
+  }
+ ],
+ "n_folds": 10,
+ "selection_counts": {
+  "ema50_mult2.0_hold5": 5,
+  "ema10_mult2.0_hold3": 2,
+  "ema10_mult2.5_hold10": 2,
+  "ema50_mult2.0_hold3": 1
+ },
+ "winner": {
+  "ema_period": 50,
+  "chandelier_atr_mult": 2.0,
+  "max_hold_days": 5
+ },
+ "winner_fold_share": "5/10",
+ "winner_fold_fraction": 0.5,
+ "pooled_floor_table": null,
+ "note": "the pooled whole-floor context table crashed on a trades_for(day_set=None) call after the folds completed; the SELECTION is the fold vote above and is unaffected. The bug is fixed in the script for any rerun."
+}

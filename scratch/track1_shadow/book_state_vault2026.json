@@ -1,0 +1,25 @@
+{
+ "schema_version": 1,
+ "route": "track1_candidate",
+ "window": "vault2026",
+ "equity": 58259.85,
+ "cur_day": "2026-08-19",
+ "peak_equity": 58494.31,
+ "day_start_equity": 58303.08,
+ "positions": [],
+ "booked_counter": {},
+ "counters": {
+  "taken:roska4_swing": 45,
+  "rejected:roska4_swing": 36,
+  "taken:roska4_calm": 19,
+  "rejected:roska4_calm": 8,
+  "taken:roska4_stress": 3,
+  "rejected:roska4_stress": 1,
+  "taken:global_nkd": 24,
+  "rejected:global_nkd": 2,
+  "take": 91,
+  "reject_cap": 37,
+  "reject_family_cap": 10,
+  "suppress_same_symbol": 1
+ }
+}

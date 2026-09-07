@@ -1,0 +1,299 @@
+{
+ "vault2026": {
+  "per_inst": {
+   "MES": {
+    "n_artifact": 22,
+    "n_production": 22,
+    "identical": true,
+    "rows_differing": 0,
+    "first_diff": null,
+    "pnl_artifact": 1238.61,
+    "pnl_production": 1238.61,
+    "pnl_delta": 0.0,
+    "reasons_artifact": {
+     "MAX_HOLD": 20,
+     "GAP": 1,
+     "CHANDELIER": 1
+    },
+    "reasons_production": {
+     "MAX_HOLD": 20,
+     "GAP": 1,
+     "CHANDELIER": 1
+    }
+   },
+   "MNQ": {
+    "n_artifact": 18,
+    "n_production": 18,
+    "identical": true,
+    "rows_differing": 0,
+    "first_diff": null,
+    "pnl_artifact": 1165.25,
+    "pnl_production": 1165.25,
+    "pnl_delta": 0.0,
+    "reasons_artifact": {
+     "MAX_HOLD": 16,
+     "CHANDELIER": 2
+    },
+    "reasons_production": {
+     "MAX_HOLD": 16,
+     "CHANDELIER": 2
+    }
+   },
+   "MYM": {
+    "n_artifact": 24,
+    "n_production": 24,
+    "identical": true,
+    "rows_differing": 0,
+    "first_diff": null,
+    "pnl_artifact": -937.12,
+    "pnl_production": -937.12,
+    "pnl_delta": 0.0,
+    "reasons_artifact": {
+     "MAX_HOLD": 22,
+     "CHANDELIER": 2
+    },
+    "reasons_production": {
+     "MAX_HOLD": 22,
+     "CHANDELIER": 2
+    }
+   },
+   "M2K": {
+    "n_artifact": 17,
+    "n_production": 17,
+    "identical": true,
+    "rows_differing": 0,
+    "first_diff": null,
+    "pnl_artifact": 1066.92,
+    "pnl_production": 1066.92,
+    "pnl_delta": 0.0,
+    "reasons_artifact": {
+     "MAX_HOLD": 17
+    },
+    "reasons_production": {
+     "MAX_HOLD": 17
+    }
+   },
+   "MNKD": {
+    "n_artifact": 26,
+    "n_production": 26,
+    "identical": false,
+    "rows_differing": 1,
+    "first_diff": 7,
+    "pnl_artifact": 4292.17,
+    "pnl_production": 4295.38,
+    "pnl_delta": 3.21,
+    "reasons_artifact": {
+     "MAX_HOLD": 24,
+     "CHANDELIER": 1,
+     "GAP": 1
+    },
+    "reasons_production": {
+     "MAX_HOLD": 24,
+     "CHANDELIER": 2
+    }
+   }
+  },
+  "sleeve_pnl_artifact": 6825.83,
+  "sleeve_pnl_production": 6829.04,
+  "sleeve_pnl_delta": 3.21,
+  "secs": 47.8
+ },
+ "vault2025": {
+  "per_inst": {
+   "MES": {
+    "n_artifact": 26,
+    "n_production": 26,
+    "identical": true,
+    "rows_differing": 0,
+    "first_diff": null,
+    "pnl_artifact": 5070.97,
+    "pnl_production": 5070.97,
+    "pnl_delta": 0.0,
+    "reasons_artifact": {
+     "MAX_HOLD": 23,
+     "CHANDELIER": 3
+    },
+    "reasons_production": {
+     "MAX_HOLD": 23,
+     "CHANDELIER": 3
+    }
+   },
+   "MNQ": {
+    "n_artifact": 27,
+    "n_production": 27,
+    "identical": true,
+    "rows_differing": 0,
+    "first_diff": null,
+    "pnl_artifact": -1414.98,
+    "pnl_production": -1414.98,
+    "pnl_delta": 0.0,
+    "reasons_artifact": {
+     "MAX_HOLD": 24,
+     "CHANDELIER": 3
+    },
+    "reasons_production": {
+     "MAX_HOLD": 24,
+     "CHANDELIER": 3
+    }
+   },
+   "MYM": {
+    "n_artifact": 26,
+    "n_production": 26,
+    "identical": true,
+    "rows_differing": 0,
+    "first_diff": null,
+    "pnl_artifact": 4647.69,
+    "pnl_production": 4647.69,
+    "pnl_delta": 0.0,
+    "reasons_artifact": {
+     "MAX_HOLD": 25,
+     "CHANDELIER": 1
+    },
+    "reasons_production": {
+     "MAX_HOLD": 25,
+     "CHANDELIER": 1
+    }
+   },
+   "M2K": {
+    "n_artifact": 26,
+    "n_production": 26,
+    "identical": true,
+    "rows_differing": 0,
+    "first_diff": null,
+    "pnl_artifact": 447.26,
+    "pnl_production": 447.26,
+    "pnl_delta": 0.0,
+    "reasons_artifact": {
+     "MAX_HOLD": 23,
+     "CHANDELIER": 3
+    },
+    "reasons_production": {
+     "MAX_HOLD": 23,
+     "CHANDELIER": 3
+    }
+   },
+   "MNKD": {
+    "n_artifact": 31,
+    "n_production": 31,
+    "identical": true,
+    "rows_differing": 0,
+    "first_diff": null,
+    "pnl_artifact": 2203.04,
+    "pnl_production": 2203.04,
+    "pnl_delta": 0.0,
+    "reasons_artifact": {
+     "MAX_HOLD": 28,
+     "CHANDELIER": 3
+    },
+    "reasons_production": {
+     "MAX_HOLD": 28,
+     "CHANDELIER": 3
+    }
+   }
+  },
+  "sleeve_pnl_artifact": 10953.98,
+  "sleeve_pnl_production": 10953.98,
+  "sleeve_pnl_delta": 0.0,
+  "secs": 61.7
+ },
+ "floor": {
+  "per_inst": {
+   "MES": {
+    "n_artifact": 188,
+    "n_production": 188,
+    "identical": true,
+    "rows_differing": 0,
+    "first_diff": null,
+    "pnl_artifact": 5879.02,
+    "pnl_production": 5879.02,
+    "pnl_delta": 0.0,
+    "reasons_artifact": {
+     "MAX_HOLD": 165,
+     "CHANDELIER": 23
+    },
+    "reasons_production": {
+     "MAX_HOLD": 165,
+     "CHANDELIER": 23
+    }
+   },
+   "MNQ": {
+    "n_artifact": 186,
+    "n_production": 186,
+    "identical": true,
+    "rows_differing": 0,
+    "first_diff": null,
+    "pnl_artifact": 16986.65,
+    "pnl_production": 16986.65,
+    "pnl_delta": 0.0,
+    "reasons_artifact": {
+     "MAX_HOLD": 174,
+     "CHANDELIER": 12
+    },
+    "reasons_production": {
+     "MAX_HOLD": 174,
+     "CHANDELIER": 12
+    }
+   },
+   "MYM": {
+    "n_artifact": 200,
+    "n_production": 200,
+    "identical": true,
+    "rows_differing": 0,
+    "first_diff": null,
+    "pnl_artifact": 3293.84,
+    "pnl_production": 3293.84,
+    "pnl_delta": 0.0,
+    "reasons_artifact": {
+     "MAX_HOLD": 186,
+     "CHANDELIER": 14
+    },
+    "reasons_production": {
+     "MAX_HOLD": 186,
+     "CHANDELIER": 14
+    }
+   },
+   "M2K": {
+    "n_artifact": 178,
+    "n_production": 178,
+    "identical": false,
+    "rows_differing": 1,
+    "first_diff": 122,
+    "pnl_artifact": 1551.85,
+    "pnl_production": 1552.06,
+    "pnl_delta": 0.21,
+    "reasons_artifact": {
+     "MAX_HOLD": 166,
+     "CHANDELIER": 11,
+     "GAP": 1
+    },
+    "reasons_production": {
+     "MAX_HOLD": 166,
+     "CHANDELIER": 12
+    }
+   },
+   "MNKD": {
+    "n_artifact": 228,
+    "n_production": 228,
+    "identical": false,
+    "rows_differing": 4,
+    "first_diff": 29,
+    "pnl_artifact": 3898.3,
+    "pnl_production": 3903.66,
+    "pnl_delta": 5.36,
+    "reasons_artifact": {
+     "MAX_HOLD": 203,
+     "CHANDELIER": 21,
+     "GAP": 4
+    },
+    "reasons_production": {
+     "MAX_HOLD": 203,
+     "CHANDELIER": 25
+    }
+   }
+  },
+  "sleeve_pnl_artifact": 31609.66,
+  "sleeve_pnl_production": 31615.23,
+  "sleeve_pnl_delta": 5.57,
+  "secs": 369.2
+ }
+}

@@ -1,0 +1,113 @@
+================================================================================================================================
+NORMAL PROMOTION - VARIANT x CAP MATRIX   (scratch / read-only, built from regenerated dumps)
+================================================================================================================================
+headroom = percentage points left before the 15% circuit-breaker trip, measured on
+drawdown from PEAK EQUITY (the breaker's own rule), not on MaxDD as a share of $50,000.
+
+################################################################################################################################
+WINDOW: floor
+################################################################################################################################
+  [SELF-CHECK] replay == deploy_sim.replay on the default cap: PASS
+
+  variant                        cap              net$     PF  Sharpe  Calmar    MaxDD$   MaxDD%  trades  taken   rej  halt  headroom
+  R4 raw only                    current         8,570   1.21    1.10    0.18    11,372    22.7%     839    350   135   354     -1.3p
+  R4 raw only                    strict025      16,387   1.44    2.26    0.48     5,011    10.0%     839    349   490     0      6.6p
+  R4 raw + NKD (baseline)        current        33,176   1.36    1.73    0.52     9,259    18.5%    1067    799   268     0      1.3p
+  R4 raw + NKD (baseline)        strict025      20,285   1.33    1.71    0.68     4,333     8.7%    1067    577   490     0      7.4p
+  R4 posthoc-deleted only        current        30,211   1.57    2.63    0.71     6,226    12.5%     603    434   169     0      5.7p
+  R4 posthoc-deleted only        strict025      15,077   1.48    2.43    0.60     3,660     7.3%     603    281   322     0      8.8p
+  R4 posthoc-deleted + NKD       current        34,109   1.44    2.03    1.04     4,769     9.5%     831    662   169     0      5.7p
+  R4 posthoc-deleted + NKD       strict025      18,975   1.34    1.77    0.64     4,315     8.6%     831    509   322     0      8.7p
+  R4 filtered only               current        30,071   1.49    2.26    0.61     7,243    14.5%     752    529   223     0      4.8p
+  R4 filtered only               strict025      10,442   1.26    1.45    0.26     5,981    12.0%     752    333   419     0      4.7p
+  R4 filtered + NKD              current        33,970   1.40    1.84    0.88     5,626    11.3%     980    757   223     0      6.9p
+  R4 filtered + NKD              strict025      14,340   1.23    1.23    0.43     4,905     9.8%     980    561   419     0      7.2p
+  R4 filtered(prevbar) only      current        31,064   1.49    2.33    0.52     8,733    17.5%     790    554   236     0      2.2p
+  R4 filtered(prevbar) only      strict025      15,354   1.41    2.11    0.46     4,891     9.8%     790    348   442     0      6.6p
+  R4 filtered(prevbar) + NKD     current        34,962   1.40    1.88    0.79     6,503    13.0%    1018    782   236     0      5.1p
+  R4 filtered(prevbar) + NKD     strict025      19,252   1.31    1.63    0.63     4,464     8.9%    1018    576   442     0      8.6p
+  NKD only                       current         3,898   1.15    0.86    0.14     3,941     7.9%     228    228     0     0      6.9p
+  NKD only                       strict025       3,898   1.15    0.86    0.14     3,941     7.9%     228    228     0     0      6.9p
+
+  post-hoc gate action on the RAW book (for comparison with the decision-boundary run)
+  inst       seen    passed  blk range   blk vol  blk missing
+  MES         202       154          8        40            0
+  MNQ         210       155         26        29            0
+  MYM         216       160         12        44            0
+  M2K         211       134         38        39            0
+
+################################################################################################################################
+WINDOW: vault2025
+################################################################################################################################
+  [SELF-CHECK] replay == deploy_sim.replay on the default cap: PASS
+
+  variant                        cap              net$     PF  Sharpe  Calmar    MaxDD$   MaxDD%  trades  taken   rej  halt  headroom
+  R4 raw only                    current         4,654   1.55    2.39    1.64     3,094     6.2%     113     52    61     0      9.5p
+  R4 raw only                    strict025       2,580   1.44    1.75    1.38     2,026     4.1%     113     40    73     0     11.2p
+  R4 raw + NKD (baseline)        current         6,857   1.51    2.33    1.47     5,025    10.1%     144     83    61     0      6.7p
+  R4 raw + NKD (baseline)        strict025       4,783   1.43    1.95    1.31     3,957     7.9%     144     71    73     0      8.1p
+  R4 posthoc-deleted only        current         6,334   1.94    3.41    3.47     1,985     4.0%      82     44    38     0     11.1p
+  R4 posthoc-deleted only        strict025       4,077   2.06    3.26    2.59     1,712     3.4%      82     32    50     0     11.9p
+  R4 posthoc-deleted + NKD       current         8,537   1.71    2.87    2.37     3,901     7.8%     113     75    38     0      8.5p
+  R4 posthoc-deleted + NKD       strict025       6,280   1.69    2.78    1.86     3,643     7.3%     113     63    50     0      8.8p
+  R4 filtered only               current         5,120   1.49    1.80    1.86     2,985     6.0%     105     54    51     0      9.1p
+  R4 filtered only               strict025       1,787   1.31    1.24    0.85     2,273     4.5%     105     37    68     0     10.5p
+  R4 filtered + NKD              current         7,323   1.47    1.84    1.61     4,917     9.8%     136     85    51     0      6.5p
+  R4 filtered + NKD              strict025       3,990   1.36    1.65    1.09     3,949     7.9%     136     68    68     0      8.0p
+  R4 filtered(prevbar) only      current         6,358   1.77    3.13    2.25     3,075     6.2%     107     53    54     0      9.7p
+  R4 filtered(prevbar) only      strict025       2,761   1.48    1.91    1.42     2,109     4.2%     107     38    69     0     11.1p
+  R4 filtered(prevbar) + NKD     current         8,561   1.63    2.77    1.85     5,007    10.0%     138     84    54     0      6.9p
+  R4 filtered(prevbar) + NKD     strict025       4,964   1.45    2.03    1.33     4,040     8.1%     138     69    69     0      8.0p
+  NKD only                       current         2,203   1.42    2.19    1.23     1,931     3.9%      31     31     0     0     11.2p
+  NKD only                       strict025       2,203   1.42    2.19    1.23     1,931     3.9%      31     31     0     0     11.2p
+
+  post-hoc gate action on the RAW book (for comparison with the decision-boundary run)
+  inst       seen    passed  blk range   blk vol  blk missing
+  MES          26        19          1         6            0
+  MNQ          31        23          3         5            0
+  MYM          27        20          0         7            0
+  M2K          29        20          3         6            0
+
+################################################################################################################################
+WINDOW: vault2026
+################################################################################################################################
+  [SELF-CHECK] replay == deploy_sim.replay on the default cap: PASS
+
+  variant                        cap              net$     PF  Sharpe  Calmar    MaxDD$   MaxDD%  trades  taken   rej  halt  headroom
+  R4 raw only                    current           736   1.09    0.50    0.21     6,342    12.7%      88     46    42     0      2.5p
+  R4 raw only                    strict025        -824   0.82   -1.15   -0.42     3,522     7.0%      88     29    59     0      8.0p
+  R4 raw + NKD (baseline)        current         6,743   1.46    2.43    1.62     7,520    15.0%     114     70    44     0      0.3p
+  R4 raw + NKD (baseline)        strict025       5,183   1.48    2.36    1.94     4,844     9.7%     114     53    61     0      5.5p
+  R4 posthoc-deleted only        current         2,305   1.39    1.93    1.13     3,799     7.6%      65     38    27     0      6.9p
+  R4 posthoc-deleted only        strict025       1,802   1.65    2.61    1.71     1,963     3.9%      65     24    41     0     11.0p
+  R4 posthoc-deleted + NKD       current         8,313   1.69    3.29    2.77     5,421    10.8%      91     62    29     0      4.3p
+  R4 posthoc-deleted + NKD       strict025       7,810   1.87    3.71    4.22     3,344     6.7%      91     48    43     0      8.4p
+  R4 filtered only               current         2,668   1.40    2.02    1.32     3,656     7.3%      81     46    35     0      7.8p
+  R4 filtered only               strict025         247   1.06    0.36    0.15     3,027     6.1%      81     28    53     0      9.0p
+  R4 filtered + NKD              current         8,675   1.67    3.26    3.48     4,511     9.0%     107     70    37     0      6.1p
+  R4 filtered + NKD              strict025       6,254   1.61    2.82    2.60     4,351     8.7%     107     52    55     0      6.4p
+  R4 filtered(prevbar) only      current           537   1.07    0.40    0.16     6,047    12.1%      86     44    42     0      3.1p
+  R4 filtered(prevbar) only      strict025         -44   0.99   -0.06   -0.02     3,498     7.0%      86     27    59     0      8.0p
+  R4 filtered(prevbar) + NKD     current         6,545   1.46    2.42    1.64     7,225    14.4%     112     68    44     0      0.8p
+  R4 filtered(prevbar) + NKD     strict025       5,963   1.56    2.68    2.24     4,822     9.6%     112     51    61     0      5.5p
+  NKD only                       current         6,007   1.95    4.32    4.35     2,507     5.0%      26     24     2     0     10.1p
+  NKD only                       strict025       6,007   1.95    4.32    4.35     2,507     5.0%      26     24     2     0     10.1p
+
+  post-hoc gate action on the RAW book (for comparison with the decision-boundary run)
+  inst       seen    passed  blk range   blk vol  blk missing
+  MES          23        18          0         5            0
+  MNQ          20        14          2         4            0
+  MYM          24        20          0         4            0
+  M2K          21        13          2         6            0
+
+================================================================================================================================
+CROSS-WINDOW, current cap
+================================================================================================================================
+  variant                            floor$  Calmar  headroom |      2025$  Calmar  headroom |      2026$  Calmar  headroom
+  R4 raw + NKD (baseline)            33,176    0.52      1.3p |      6,857    1.47      6.7p |      6,743    1.62      0.3p
+  R4 posthoc-deleted + NKD           34,109    1.04      5.7p |      8,537    2.37      8.5p |      8,313    2.77      4.3p
+  R4 filtered + NKD                  33,970    0.88      6.9p |      7,323    1.61      6.5p |      8,675    3.48      6.1p
+  R4 filtered(prevbar) + NKD         34,962    0.79      5.1p |      8,561    1.85      6.9p |      6,545    1.64      0.8p
+  R4 filtered only                   30,071    0.61      4.8p |      5,120    1.86      9.1p |      2,668    1.32      7.8p
+  R4 posthoc-deleted only            30,211    0.71      5.7p |      6,334    3.47     11.1p |      2,305    1.13      6.9p
+  NKD only                            3,898    0.14      6.9p |      2,203    1.23     11.2p |      6,007    4.35     10.1p

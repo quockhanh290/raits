@@ -1,0 +1,187 @@
+{
+ "audit": "production_infra_route_audit_20260822",
+ "read_only": true,
+ "production_modified": false,
+ "services_started": [],
+ "correction_to_prior_audit": {
+  "claim": "no continuous-monitor execution shape exists in the runner",
+  "verdict": "WRONG",
+  "evidence": {
+   "file": "global_index/run_scheduler.py",
+   "lines": "864-881, 963-996",
+   "detail": "_CONT_SLOTS = 22 jobs every 5 min 14:10-15:55 ET; NKD night slots 01:10-02:55 ET same shape"
+  },
+  "consequence": "Stress 10:35-12:30 needs no new execution shape; 24 jobs on the existing pattern"
+ },
+ "entrypoints": {
+  "scheduler": {
+   "file": "global_index/run_scheduler.py",
+   "long_running": true,
+   "start": "python -m global_index.run_scheduler [--port 4002] [--dry-run]"
+  },
+  "signal_run": "global_index/run_live_day.py",
+  "maxhold_exit": "global_index/run_maxhold_exit.py",
+  "stop_repair": "global_index/run_stop_repair.py",
+  "dashboard": "monitor/backend/app.py via monitor/start_backend.py",
+  "broker": "global_index/ibkr_broker.py:478 IBKRBroker"
+ },
+ "mode_switches": {
+  "paper_vs_live": "--port 4002 paper / 4001 live (run_live_day.py:146,208)",
+  "client_id": "--client-id default 1 (run_live_day.py:148); shared -> slot mutex",
+  "dry_run": "--dry-run",
+  "kill_switch": "STOP_TRADING (runner.py:71), global",
+  "shadow": "--shadow-resume/--shadow-verify (run_live_day.py:164-171) decides nothing",
+  "sleeve_selector": "--clusters (run_live_day.py:181-201) aliases swing/nkd/stress"
+ },
+ "preflight_hole": {
+  "gate": "run_scheduler.py:788 fail-closed on None",
+  "risk": "Calm A 10:00 and Stress 10:35-12:30 run before the 13:45 preflight -> skipped every day",
+  "existing_fix": "prev_preflight=True, as NKD night slots use (run_scheduler.py:991)"
+ },
+ "broker_isolation": {
+  "route_aware": false,
+  "ctor": "ibkr_broker.py:496 host/port/client_id/bar_duration/_raw_fetcher only",
+  "netting": "get_positions ibkr_broker.py:981 returns cluster='UNKNOWN'; B3 compares inst/direction/contracts only",
+  "conclusion": "different client_id is NOT isolation; a parallel order-sending route needs a separate paper account or Gateway"
+ },
+ "order_ordering_defect": {
+  "file": "global_index/runner.py",
+  "func": "run_maxhold_exit",
+  "lines": "1336 close, 1349-1356 cancel",
+  "detail": "CLOSE sent before the stop is cancelled; flat account can carry a live stop"
+ },
+ "close_confirm_primitive": {
+  "file": "global_index/ibkr_broker.py",
+  "func": "_handle_rollover",
+  "lines": "1593-1730",
+  "timeouts": {
+   "exit_secs": 120,
+   "entry_secs": 30
+  },
+  "worst_case_secs": 150,
+  "reusable": "shape yes, binding no - same inst/direction/size, identity preserved"
+ },
+ "monitor_breakage": [
+  {
+   "file": "global_index/dash/shared/live.js",
+   "lines": "4-11",
+   "issue": "CL_ORDER + label + colour maps hardcode 3 clusters; roska4_calm renders unlabelled/uncoloured",
+   "severity": "presentation"
+  },
+  {
+   "file": "monitor/paper_pnl_compare.py",
+   "lines": "609,845,1115",
+   "issue": "cluster inferred from instrument: global_nkd if MNKD else roska4_swing; mislabels every Calm A and Stress leg",
+   "severity": "worst"
+  },
+  {
+   "file": "monitor/backend/paper_evidence_reader.py",
+   "lines": "95-96",
+   "issue": "second copy of runner._ARM_BY_CLUSTER",
+   "severity": "drift"
+  },
+  {
+   "file": "global_index/dash/paper/paper.js",
+   "lines": "1961",
+   "issue": "third copy of the arm-time strings",
+   "severity": "drift"
+  },
+  {
+   "file": "monitor/backend/runner_positions_reader.py",
+   "lines": "30-41",
+   "issue": "allow-list projection; a new route field is silently dropped",
+   "severity": "silent"
+  },
+  {
+   "file": "global_index/runner.py",
+   "lines": "3244",
+   "issue": "dump_state writes n_contracts:1 literal; misreports Stress qty 7",
+   "severity": "minor"
+  }
+ ],
+ "monitor_safe": [
+  {
+   "file": "monitor/backend/runner_event_reader.py",
+   "lines": "40-49",
+   "note": "requires only ts; a route field in context passes through"
+  },
+  {
+   "file": "global_index/runner.py",
+   "lines": "3265-3269",
+   "note": "dump_state clusters block derived from the guard; new cluster appears automatically"
+  },
+  {
+   "file": "monitor/backend/app.py",
+   "lines": "72-78",
+   "note": "/realtime-next is an existing parallel-route precedent"
+  }
+ ],
+ "guard": {
+  "file": "global_index/net_exposure_multi.py",
+  "clusters": {
+   "roska4_swing": [
+    0.05,
+    0.044
+   ],
+   "roska4_stress": [
+    0.025,
+    null
+   ],
+   "global_nkd": [
+    0.06,
+    0.06
+   ]
+  },
+  "exposure": "gross=max(long_r,short_r); net=|long_r-short_r|; admits() checks own cluster only (:131-140)",
+  "supports": {
+   "route_specific_caps": true,
+   "family_cap": false,
+   "separate_books": true,
+   "shadow_decisions": true
+  }
+ },
+ "global_mutable_state": [
+  {
+   "sym": "_preflight_ok",
+   "file": "global_index/run_scheduler.py",
+   "line": 193,
+   "risk": "date-keyed only"
+  },
+  {
+   "sym": "_maxhold_done",
+   "file": "global_index/run_scheduler.py",
+   "line": 210,
+   "risk": "date-keyed only; a second route would suppress legacy maxhold"
+  },
+  {
+   "sym": "_SWING_CACHE",
+   "file": "futures/_validated_core.py",
+   "line": 201,
+   "risk": "id(df)-keyed; hazard only if routes share a process"
+  },
+  {
+   "sym": "DEFAULT_CLUSTERS",
+   "file": "global_index/net_exposure_multi.py",
+   "line": 88,
+   "risk": "shallow copy; ClusterBudget objects shared"
+  },
+  {
+   "sym": "trend_follow.DEFAULT_CONFIG",
+   "file": "raits/strategies/trend_follow.py",
+   "risk": "must reach ema 50 by constructing the engine, never by mutating"
+  }
+ ],
+ "route_layer_exists": {
+  "cluster": true,
+  "sleeve_selector": true,
+  "shadow_path": true,
+  "parameterised_state_paths": true,
+  "route_name": false,
+  "family_cap": false
+ },
+ "unsettled": [
+  "Normal-R4 parameter change (ema 30->50, chandelier->fixed 2.0x daily ATR, ratchet off) changes a live sleeve; needs its own gate",
+  "Slot-lock contention with 25 added slots not simulated; STOP_REPAIR_1620 already has zero clearance (run_scheduler.py:922-928)"
+ ],
+ "verdict": "Route layer is feasible and largely additive. Four of five pieces already exist. Blockers are the family cap mechanism, broker-level route isolation, and the monitor's instrument-to-cluster inference."
+}

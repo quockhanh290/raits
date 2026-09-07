@@ -1,0 +1,488 @@
+{
+  "window": [
+    "2019-01-02",
+    "2022-12-30"
+  ],
+  "is_end": "2020-12-31",
+  "labels": "production",
+  "lag": 0,
+  "ema": 50,
+  "symbols": [
+    "AAPL",
+    "ABBV",
+    "ADBE",
+    "AMAT",
+    "AMD",
+    "AMGN",
+    "AMZN",
+    "AVGO",
+    "BA",
+    "BAC",
+    "BIIB",
+    "BMY",
+    "C",
+    "CAT",
+    "COST",
+    "CRM",
+    "CSCO",
+    "CVX",
+    "DE",
+    "EBAY"
+  ],
+  "universe_rejected": {},
+  "results": {
+    "B": {
+      "config": "spy_short_gate",
+      "config_hash": "sha256:38b57dd16dd0145997b126c4e6f2402e5dab8413738c0c96d7ec31707bc762f0",
+      "config_readable": "universe_definition=polygon_5min_cache_tickers_history>=250_sessions;universe_size=20;universe_is_point_in_time=False;data_source_identity=polygon_5min_split_div_adjusted_ETnaive_rth_0930_1555;bar_interval=5min;adjusted=True;session=RTH_0930_1555;timezone=America/New_York;calendar_source=SPY_cached_session_files;ema_period=50;max_hold_days=5;entry_window=14:00-15:55;signal_rule=trend_follow_ema_pullback_volume_resume;stop_basis=fixed_entry_atr;stop_multiple=2;stop_anchor=entry;ratchet=False;arm_hour=14:05;arm_timezone=America/New_York;atr_basis=daily_atr14_rth_shift1_causal;fill_law=production_gap_after_15min_break;regime_model=spy_gaussian_hmm_3state;regime_fit_end=2024-12-31;regime_label_lag_days=0;regime_csv_identity=spy_daily_live.csv;spy_short_filter=below_sma50;spy_short_lookback=50;spy_short_lag_days=1;r4_context_filter=None;r4_range_threshold=None;r4_range_derivation_window=None;r4_rel_volume_max=None;execution_model=entry_at_resume_bar_close;stop_exit_at_stop;gap_exit_at_open;maxhold_exit_at_0930_bar_open;sizing_basis=risk_pct_of_initial_plus_realised/|entry-stop|;risk_pct=0.005;max_position_notional_pct=0.2;max_gross_notional_pct=1;max_concurrent_positions=8;commission_per_share=0.005;min_commission_per_order=1;slippage_bps_per_side=3;stop_exit_extra_bps=5;borrow_bps_per_year=50;min_price=5;min_adv_usd=20000000;min_history_sessions=250;max_pct_of_adv_shares=0.01;max_pct_of_entry_bar_volume=0.1;initial_capital=100000;window=2019-01-02..2022-12-30",
+      "config_fields": {
+        "universe_definition": "polygon_5min_cache_tickers_history>=250_sessions",
+        "universe_size": 20,
+        "universe_is_point_in_time": false,
+        "data_source_identity": "polygon_5min_split_div_adjusted_ETnaive_rth_0930_1555",
+        "bar_interval": "5min",
+        "adjusted": true,
+        "session": "RTH_0930_1555",
+        "timezone": "America/New_York",
+        "calendar_source": "SPY_cached_session_files",
+        "ema_period": 50,
+        "max_hold_days": 5,
+        "entry_window": "14:00-15:55",
+        "signal_rule": "trend_follow_ema_pullback_volume_resume",
+        "stop_basis": "fixed_entry_atr",
+        "stop_multiple": 2.0,
+        "stop_anchor": "entry",
+        "ratchet": false,
+        "arm_hour": "14:05",
+        "arm_timezone": "America/New_York",
+        "atr_basis": "daily_atr14_rth_shift1_causal",
+        "fill_law": "production_gap_after_15min_break",
+        "regime_model": "spy_gaussian_hmm_3state",
+        "regime_fit_end": "2024-12-31",
+        "regime_label_lag_days": 0,
+        "regime_csv_identity": "spy_daily_live.csv",
+        "spy_short_filter": "below_sma50",
+        "spy_short_lookback": 50,
+        "spy_short_lag_days": 1,
+        "r4_context_filter": "None",
+        "r4_range_threshold": null,
+        "r4_range_derivation_window": null,
+        "r4_rel_volume_max": null,
+        "execution_model": "entry_at_resume_bar_close;stop_exit_at_stop;gap_exit_at_open;maxhold_exit_at_0930_bar_open",
+        "sizing_basis": "risk_pct_of_initial_plus_realised/|entry-stop|",
+        "risk_pct": 0.005,
+        "max_position_notional_pct": 0.2,
+        "max_gross_notional_pct": 1.0,
+        "max_concurrent_positions": 8,
+        "commission_per_share": 0.005,
+        "min_commission_per_order": 1.0,
+        "slippage_bps_per_side": 3.0,
+        "stop_exit_extra_bps": 5.0,
+        "borrow_bps_per_year": 50.0,
+        "min_price": 5.0,
+        "min_adv_usd": 20000000.0,
+        "min_history_sessions": 250,
+        "max_pct_of_adv_shares": 0.01,
+        "max_pct_of_entry_bar_volume": 0.1,
+        "initial_capital": 100000.0,
+        "window": "2019-01-02..2022-12-30"
+      },
+      "overall": {
+        "candidates": 2052,
+        "trades": 1033,
+        "rejected": 1019,
+        "net": -1879.6,
+        "gross": 7306.75,
+        "costs": 9186.35,
+        "cost_pct_of_gross": 125.7,
+        "return_pct": -1.88,
+        "cagr_pct": -0.48,
+        "win_rate": 50.1,
+        "avg_win": 248.47,
+        "avg_loss": -253.57,
+        "profit_factor": 0.99,
+        "expectancy": -1.82,
+        "max_dd": 15341.52,
+        "calmar": -0.03,
+        "sharpe_per_trade": -0.006,
+        "avg_hold_days": 5.72,
+        "median_hold_days": 6.0,
+        "turnover_notional": 10412127.6,
+        "turnover_x_capital": 104.1,
+        "years": 3.92
+      },
+      "is_window": {
+        "candidates": 900,
+        "trades": 447,
+        "rejected": 453,
+        "net": -2809.74,
+        "gross": 1177.27,
+        "costs": 3987.01,
+        "cost_pct_of_gross": 338.7,
+        "return_pct": -2.81,
+        "cagr_pct": -1.47,
+        "win_rate": 48.5,
+        "avg_win": 255.43,
+        "avg_loss": -253.21,
+        "profit_factor": 0.95,
+        "expectancy": -6.29,
+        "max_dd": 15341.52,
+        "calmar": -0.1,
+        "sharpe_per_trade": -0.019,
+        "avg_hold_days": 5.78,
+        "median_hold_days": 6.0,
+        "turnover_notional": 4453616.35,
+        "turnover_x_capital": 44.5,
+        "years": 1.93
+      },
+      "oos_window": {
+        "candidates": 1152,
+        "trades": 586,
+        "rejected": 566,
+        "net": 930.14,
+        "gross": 6129.48,
+        "costs": 5199.34,
+        "cost_pct_of_gross": 84.8,
+        "return_pct": 0.93,
+        "cagr_pct": 0.47,
+        "win_rate": 51.4,
+        "avg_win": 243.45,
+        "avg_loss": -253.85,
+        "profit_factor": 1.01,
+        "expectancy": 1.59,
+        "max_dd": 12417.08,
+        "calmar": 0.04,
+        "sharpe_per_trade": 0.005,
+        "avg_hold_days": 5.67,
+        "median_hold_days": 6.0,
+        "turnover_notional": 5958511.25,
+        "turnover_x_capital": 59.6,
+        "years": 1.97
+      },
+      "breakdowns": {
+        "by_year": {
+          "2019": {
+            "trades": 182,
+            "net": 5197.99,
+            "win_rate": 51.6
+          },
+          "2020": {
+            "trades": 265,
+            "net": -8007.73,
+            "win_rate": 46.4
+          },
+          "2021": {
+            "trades": 252,
+            "net": 5827.22,
+            "win_rate": 55.2
+          },
+          "2022": {
+            "trades": 334,
+            "net": -4897.08,
+            "win_rate": 48.5
+          }
+        },
+        "by_symbol": {
+          "BA": {
+            "trades": 47,
+            "net": 4118.3
+          },
+          "ABBV": {
+            "trades": 62,
+            "net": 3571.52
+          },
+          "DE": {
+            "trades": 55,
+            "net": 1942.37
+          },
+          "AVGO": {
+            "trades": 57,
+            "net": 1904.87
+          },
+          "CRM": {
+            "trades": 42,
+            "net": 1422.1
+          },
+          "COST": {
+            "trades": 62,
+            "net": 1234.63
+          },
+          "ADBE": {
+            "trades": 59,
+            "net": 1017.73
+          },
+          "AAPL": {
+            "trades": 44,
+            "net": 898.75
+          },
+          "EBAY": {
+            "trades": 46,
+            "net": 893.22
+          },
+          "AMAT": {
+            "trades": 41,
+            "net": 796.99
+          },
+          "CSCO": {
+            "trades": 65,
+            "net": 684.51
+          },
+          "AMZN": {
+            "trades": 48,
+            "net": -685.6
+          },
+          "CAT": {
+            "trades": 55,
+            "net": -805.81
+          },
+          "CVX": {
+            "trades": 42,
+            "net": -1177.95
+          },
+          "BAC": {
+            "trades": 52,
+            "net": -1959.53
+          },
+          "BIIB": {
+            "trades": 52,
+            "net": -2559.79
+          },
+          "C": {
+            "trades": 60,
+            "net": -3122.04
+          },
+          "AMD": {
+            "trades": 30,
+            "net": -3207.07
+          },
+          "BMY": {
+            "trades": 52,
+            "net": -3259.81
+          },
+          "AMGN": {
+            "trades": 62,
+            "net": -3586.99
+          }
+        },
+        "top10_winners": [
+          {
+            "symbol": "BA",
+            "entry_ts": "2020-11-06 14:25:00",
+            "direction": "LONG",
+            "shares": 42,
+            "net_pnl": 1379.63,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "CSCO",
+            "entry_ts": "2019-05-13 14:35:00",
+            "direction": "LONG",
+            "shares": 278,
+            "net_pnl": 1230.95,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "BIIB",
+            "entry_ts": "2020-08-03 14:15:00",
+            "direction": "LONG",
+            "shares": 37,
+            "net_pnl": 1068.93,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "C",
+            "entry_ts": "2020-06-01 15:00:00",
+            "direction": "LONG",
+            "shares": 94,
+            "net_pnl": 1058.04,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "CVX",
+            "entry_ts": "2019-06-03 15:20:00",
+            "direction": "LONG",
+            "shares": 155,
+            "net_pnl": 992.89,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "BAC",
+            "entry_ts": "2022-06-06 14:15:00",
+            "direction": "SHORT",
+            "shares": 234,
+            "net_pnl": 955.72,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "AMAT",
+            "entry_ts": "2021-03-30 14:30:00",
+            "direction": "LONG",
+            "shares": 45,
+            "net_pnl": 841.23,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "AAPL",
+            "entry_ts": "2021-01-20 14:10:00",
+            "direction": "LONG",
+            "shares": 72,
+            "net_pnl": 802.06,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "AMGN",
+            "entry_ts": "2021-01-04 15:30:00",
+            "direction": "LONG",
+            "shares": 58,
+            "net_pnl": 801.89,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "BA",
+            "entry_ts": "2019-01-28 14:50:00",
+            "direction": "LONG",
+            "shares": 30,
+            "net_pnl": 800.64,
+            "exit_reason": "MAX_HOLD"
+          }
+        ],
+        "top10_losers": [
+          {
+            "symbol": "BMY",
+            "entry_ts": "2022-09-07 15:00:00",
+            "direction": "SHORT",
+            "shares": 161,
+            "net_pnl": -1104.87,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "EBAY",
+            "entry_ts": "2021-04-26 14:35:00",
+            "direction": "LONG",
+            "shares": 204,
+            "net_pnl": -853.87,
+            "exit_reason": "GAP"
+          },
+          {
+            "symbol": "CAT",
+            "entry_ts": "2020-02-24 14:55:00",
+            "direction": "LONG",
+            "shares": 87,
+            "net_pnl": -688.23,
+            "exit_reason": "GAP"
+          },
+          {
+            "symbol": "CVX",
+            "entry_ts": "2022-01-18 14:30:00",
+            "direction": "LONG",
+            "shares": 125,
+            "net_pnl": -646.52,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "CVX",
+            "entry_ts": "2020-07-27 15:00:00",
+            "direction": "LONG",
+            "shares": 89,
+            "net_pnl": -645.66,
+            "exit_reason": "GAP"
+          },
+          {
+            "symbol": "AMAT",
+            "entry_ts": "2019-09-03 14:30:00",
+            "direction": "SHORT",
+            "shares": 197,
+            "net_pnl": -634.61,
+            "exit_reason": "GAP"
+          },
+          {
+            "symbol": "C",
+            "entry_ts": "2022-02-22 15:35:00",
+            "direction": "LONG",
+            "shares": 173,
+            "net_pnl": -626.07,
+            "exit_reason": "GAP"
+          },
+          {
+            "symbol": "CSCO",
+            "entry_ts": "2021-02-05 14:10:00",
+            "direction": "LONG",
+            "shares": 306,
+            "net_pnl": -617.59,
+            "exit_reason": "MAX_HOLD"
+          },
+          {
+            "symbol": "CAT",
+            "entry_ts": "2022-02-22 15:15:00",
+            "direction": "LONG",
+            "shares": 58,
+            "net_pnl": -610.56,
+            "exit_reason": "GAP"
+          },
+          {
+            "symbol": "AVGO",
+            "entry_ts": "2019-05-13 14:25:00",
+            "direction": "LONG",
+            "shares": 402,
+            "net_pnl": -597.82,
+            "exit_reason": "MAX_HOLD"
+          }
+        ],
+        "by_exit_reason": {
+          "CHANDELIER": {
+            "trades": 97,
+            "net": -50878.45
+          },
+          "GAP": {
+            "trades": 11,
+            "net": -6807.39
+          },
+          "MAX_HOLD": {
+            "trades": 925,
+            "net": 55806.24
+          }
+        },
+        "by_direction": {
+          "LONG": {
+            "trades": 860,
+            "net": 7882.83
+          },
+          "SHORT": {
+            "trades": 173,
+            "net": -9762.43
+          }
+        },
+        "concentration": {
+          "top1_share_pct": -219.1,
+          "top5_share_pct": -689.5,
+          "n_symbols_traded": 20
+        },
+        "reject_reasons": {
+          "max_concurrent_positions": 1012,
+          "gross_notional_cap": 7
+        }
+      },
+      "self_check": {
+        "LC0_candidates_nonempty": true,
+        "LC1_rows_match_candidates": true,
+        "LC_taken_nonempty": true,
+        "LC2_shares_positive": true,
+        "LC3_net_equals_gross_minus_cost": true,
+        "LC4_stop_distance_is_2x_daily_atr_frac": 1.0,
+        "LC4_pass": true,
+        "LC5_gross_within_engine_rounding": true,
+        "LC6_regime_is_normal_only": true,
+        "LC7_entry_inside_window": true,
+        "LC8_exit_not_before_entry": true,
+        "LC9_equity_basis_positive": true,
+        "LC10_adv_participation_respected": true,
+        "LC11_liquidity_floor_respected": true
+      },
+      "filter_stats_symbols": 0,
+      "filter_stats_total": {},
+      "skipped_symbols": {},
+      "ledger": "D:\\raits\\scratch\\_stocks_stage0_ledger_stab_prod_lag0.csv",
+      "candidate_stream": "D:\\raits\\scratch\\_stocks_stage0_candidates_stab_prod_lag0.pkl"
+    }
+  }
+}

@@ -1,0 +1,91 @@
+
+############################################################################################
+### SAN fit_A (floor)   (so ghim: Calmar 1.65 / net $42,565)
+############################################################################################
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+Model is not converging.  Current: 7309.542802079805 is not greater than 7309.7777731706765. Delta is -0.23497109087111312
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.719531673847 is not greater than 6772.924509067358. Delta is -0.2049773935104895
+  GOC (mo neo)                 net $42,565  |  Calmar 1.65  |  PF 1.53  |  Sharpe 1.79
+                               MaxDD $3,744 (7.5%)  |  return ≈ 12.3%/yr on $50,000
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.719531673847 is not greater than 6772.924509067358. Delta is -0.2049773935104895
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+  ENGINE + SUA KHOP LENH       net $-2,722  |  Calmar -0.07  |  PF 0.97  |  Sharpe -0.15
+                               MaxDD $8,490 (17.0%)  |  return ≈ -1.1%/yr on $50,000
+                               [sua 810 lenh, $54,275]
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+  LIVE 14:05 + SUA KHOP LENH   net $2,664  |  Calmar 0.07  |  PF 1.03  |  Sharpe 0.16
+                               MaxDD $9,593 (19.2%)  |  return ≈ 1.3%/yr on $50,000
+                               [sua 789 lenh, $114,235]
+
+############################################################################################
+### VAULT 2023-2024   (so ghim: Calmar 2.86 / net $10,757)
+############################################################################################
+Model is not converging.  Current: 7309.542802079805 is not greater than 7309.7777731706765. Delta is -0.23497109087111312
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+  GOC (mo neo)                 net $10,757  |  Calmar 2.86  |  PF 1.50  |  Sharpe 1.71
+                               MaxDD $1,899 (3.8%)  |  return ≈ 10.9%/yr on $50,000
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+  ENGINE + SUA KHOP LENH       net $1,222  |  Calmar 0.14  |  PF 1.04  |  Sharpe 0.18
+                               MaxDD $4,314 (8.6%)  |  return ≈ 1.2%/yr on $50,000
+                               [sua 155 lenh, $10,638]
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.719531673847 is not greater than 6772.924509067358. Delta is -0.2049773935104895
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+  LIVE 14:05 + SUA KHOP LENH   net $17,943  |  Calmar 4.11  |  PF 1.65  |  Sharpe 2.35
+                               MaxDD $2,207 (4.4%)  |  return ≈ 18.2%/yr on $50,000
+                               [sua 142 lenh, $18,510]
+
+############################################################################################
+### VAULT 2025   (so ghim: Calmar 2.54 / net $7,404)
+############################################################################################
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  GOC (mo neo)                 net $7,404  |  Calmar 2.54  |  PF 1.54  |  Sharpe 1.74
+                               MaxDD $3,001 (6.0%)  |  return ≈ 15.2%/yr on $50,000
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  ENGINE + SUA KHOP LENH       net $-28  |  Calmar -0.00  |  PF 1.00  |  Sharpe -0.01
+                               MaxDD $6,536 (13.1%)  |  return ≈ -0.1%/yr on $50,000
+                               [sua 102 lenh, $11,267]
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  LIVE 14:05 + SUA KHOP LENH   net $4,998  |  Calmar 1.11  |  PF 1.24  |  Sharpe 1.11
+                               MaxDD $4,624 (9.2%)  |  return ≈ 10.3%/yr on $50,000
+                               [sua 109 lenh, $24,185]
+
+============================================================================================
+TOM TAT
+============================================================================================
+  SAN fit_A (floor)    GOC (mo neo)                 net $42,565  |  Calmar 1.65  |  PF 1.53  |  Sharpe 1.79
+  SAN fit_A (floor)    ENGINE + SUA KHOP LENH       net $-2,722  |  Calmar -0.07  |  PF 0.97  |  Sharpe -0.15
+  SAN fit_A (floor)    LIVE 14:05 + SUA KHOP LENH   net $2,664  |  Calmar 0.07  |  PF 1.03  |  Sharpe 0.16
+  VAULT 2023-2024      GOC (mo neo)                 net $10,757  |  Calmar 2.86  |  PF 1.50  |  Sharpe 1.71
+  VAULT 2023-2024      ENGINE + SUA KHOP LENH       net $1,222  |  Calmar 0.14  |  PF 1.04  |  Sharpe 0.18
+  VAULT 2023-2024      LIVE 14:05 + SUA KHOP LENH   net $17,943  |  Calmar 4.11  |  PF 1.65  |  Sharpe 2.35
+  VAULT 2025           GOC (mo neo)                 net $7,404  |  Calmar 2.54  |  PF 1.54  |  Sharpe 1.74
+  VAULT 2025           ENGINE + SUA KHOP LENH       net $-28  |  Calmar -0.00  |  PF 1.00  |  Sharpe -0.01
+  VAULT 2025           LIVE 14:05 + SUA KHOP LENH   net $4,998  |  Calmar 1.11  |  PF 1.24  |  Sharpe 1.11

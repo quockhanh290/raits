@@ -1,0 +1,202 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-S",
+ "title": "Track 1 dashboard endpoint performance triage",
+ "route": "track1_candidate",
+ "date": "2026-08-29",
+ "the_premise_was_partly_my_own_error": {
+  "what_5zzzr_reported": "market-view >300s and runtime ~23s, on BOTH cold and warm calls, therefore not warm-up",
+  "what_was_actually_true": "the two 'warm' runtime readings were taken while an abandoned cold market-view request was still executing server-side. They measured contention, not the endpoint",
+  "consequence": "the 'not just warmup' half of the premise was wrong, and it was mine",
+  "how_it_was_caught": "a clean repeated baseline on a quiet machine returned 1.20s and 1.77s medians - nothing like 23s"
+ },
+ "measurements_before_any_edit": {
+  "http_warm_median_seconds": {
+   "track1-market-view": 1.2,
+   "track1-runtime": 1.77
+  },
+  "http_warm_range": {
+   "track1-market-view": [
+    1.16,
+    1.24
+   ],
+   "track1-runtime": [
+    1.38,
+    3.51
+   ]
+  },
+  "in_process_build_cold_seconds": 71.17,
+  "in_process_build_warm_seconds": 1.12,
+  "cold_to_warm_ratio": 63,
+  "contention_experiment": {
+   "abandoned_request_then_poll": "no effect - hypothesis REJECTED, the abandoned request had already finished",
+   "three_concurrent_market_view_then_runtime": "1.77s -> 6.11s",
+   "server_is_threaded_but_gil_bound": "3 concurrent runtime calls = 3.42s wall vs 1.77s single"
+  }
+ },
+ "root_cause": {
+  "primary": "the market-view reconstruction was computed INLINE on a cold cache miss. `futures/_validated_core._swing_cache` makes 11,410 `resample_5m` calls - a full-history 5-minute resample per instrument - measured at 100.6s of a 127s profiled cold build",
+  "why_it_is_cold_only": "`_swing_cache` is keyed on `id(df)`, so a fresh process recomputes everything and a warm one hits the cache",
+  "it_blocked_the_whole_payload": "every other sleeve, the regime block and the levels note waited behind a panel they do not depend on",
+  "secondary_inline_costs": {
+   "calm_blocks": 15.0,
+   "label_regimes_HMM_fit_via_label_map": 12.8,
+   "stress_daily_slices": 9.7,
+   "sliced_bar_slicing": 6.1
+  },
+  "it_was_a_documented_deliberate_trade": "the code said 'Pay once rather than show an empty panel on first load'. That is design intent, not residue - so it was changed deliberately and the reasoning is recorded beside it, not silently reversed",
+  "no_subprocess_no_shell_no_ops_py": true,
+  "no_broker_call_from_these_endpoints": true
+ },
+ "what_changed": {
+  "files": [
+   "monitor/backend/track1_market_view.py"
+  ],
+  "all_read_only_dashboard_code": true,
+  "runtime_trading_files_edited": 0,
+  "changes": [
+   {
+    "what": "_recon_cached no longer computes inline on a cold miss",
+    "how": "spawns the same background worker the aged-out branch already used, claims the key under the lock so a polled endpoint starts ONE worker",
+    "caller": "renders an explicit warming state naming why, never a value"
+   },
+   {
+    "what": "_recon_state added",
+    "why": "'still computing' and 'computed and it raised' are different facts; collapsing them is how an empty panel comes to mean either"
+   },
+   {
+    "what": "calm phases deferred through the same path",
+    "was_inline_seconds": 15.0
+   },
+   {
+    "what": "stress daily_slices deferred",
+    "was_inline_seconds": 6.5,
+    "invalidation_unchanged": "the mtime key is kept EXACTLY as it was - only WHEN it is computed changed, never WHAT invalidates it. A TTL here was considered and rejected upstream"
+   }
+  ]
+ },
+ "measurements_after": {
+  "measured_on_the_backend_actually_serving_the_final_code": true,
+  "http_cold_first_ever_request_seconds": {
+   "track1-market-view": 18.28,
+   "track1-runtime": 39.73
+  },
+  "http_cold_note": "the runtime cold reading was taken while the market-view warm-up workers were saturating the CPU - it is contention, the same effect that produced the 5ZZZ-R numbers, and it is labelled here rather than presented as the endpoint's own cost",
+  "http_warm_quiet_median_seconds": {
+   "track1-market-view": 0.02,
+   "track1-runtime": 1.89
+  },
+  "http_warm_quiet_range": {
+   "track1-market-view": [
+    0.01,
+    0.03
+   ],
+   "track1-runtime": [
+    1.33,
+    1.91
+   ]
+  },
+  "targets": {
+   "track1-runtime_under_2s": "MET (median 1.89s)",
+   "track1-market-view_under_5s": "MET comfortably (median 0.02s)"
+  },
+  "cold_market_view_improvement": "from >300s (5ZZZ-R) / 71.2s in-process to 18.3s"
+ },
+ "a_bug_i_introduced_and_an_existing_test_caught": {
+  "what": "the stress branch ignored an explicitly-named `now`, so a caller that asked for a specific instant got the deferred warming state instead of that instant computed",
+  "found_by": "5 tests in scratch/test_track1_stage5zzzf_market_view_ui_contract_20260828.py",
+  "fixed": true,
+  "after_fix": "that suite is 38/38",
+  "why_it_matters": "the convention it broke is the route's own: a caller that names an instant gets that instant computed; only the live path is cached"
+ },
+ "did_any_data_become_unavailable": {
+  "warm": "NO - payload compared key-by-key against the pre-fix capture: 0 keys lost, 0 keys added, and every sleeve status identical (no_setup / missing_bars / no_setup)",
+  "cold_window_only": "during warm-up the deferred panels report status not_available with a sentence saying it is still computing and will fill in. No value is invented and nothing reads as a PASS",
+  "swing_regime_basis_still_shown": "previous session (lag 1), for both swing and NKD"
+ },
+ "not_fixed_and_why": {
+  "track1_runtime_warm_1_99s": {
+   "dominant_cost": "the order gate's wiring scan: 160 `ast.parse` calls and 382,088 `ast.walk` calls per request, 1.85s, because `_gates()` runs `as_ledger()` and `may_enable_orders()` and each re-measures every blocker",
+   "why_not_fixed_here": "it lives in `global_index/track1_gates.py`, a runtime trading file this stage may not edit",
+   "why_not_cached_dashboard_side": "that would serve a SAFETY display stale, and deriving orders_possible from the ledger myself would be recomputing a gate differently from the slot code - explicitly not acceptable",
+   "the_correct_fix_needs_authorisation": "memoise `_identifiers` on (path, mtime, size). It is a pure function of file content, so this is behaviour-preserving, and it would speed up every gate consumer, not just the dashboard"
+  },
+  "remaining_cold_cost": "stress daily_slices and bar slicing still run in the background; the machine is busy ~90s after a backend restart. That is the computation's real cost, not a request-path bug"
+ },
+ "tests": {
+  "new_suite": "scratch/test_track1_stage5zzzs_dashboard_endpoint_performance_20260829.py",
+  "new_passed": 13,
+  "mutations_run": 6,
+  "mutations_caught": 6,
+  "mutations_survived": 0,
+  "mutation_list": [
+   "cold miss computed inline (the old behaviour)",
+   "_recon_state always says ready",
+   "no single-worker guard (one worker per poll)",
+   "background worker never writes the value",
+   "subprocess import would be detected",
+   "broker import would be detected"
+  ],
+  "regression": {
+   "suites_run": 10,
+   "passed": 461,
+   "failed": 5,
+   "seconds": 842,
+   "javascript_suites": {
+    "files": [
+     "monitor/test_realtime_contract.py",
+     "monitor/test_realtime_dom.py"
+    ],
+    "passed": 89,
+    "failed": 0
+   },
+   "node_syntax_check_on_realtime_js": "OK",
+   "the_five_failures_are_pre_existing_and_it_was_proven": {
+    "how": "the three in 5ZZZ-B were re-run with the PRE-STAGE inline behaviour restored at runtime by monkeypatch - they fail there too, so this stage did not cause them",
+    "the_two_in_5ZZP_are_stale": [
+     "test_the_regime_probe_is_still_recorded_not_computed_per_request forbids the name `label_regimes` in the module, but Stage 5ZZQ deliberately added it WITH an mtime cache - the later stage superseded the earlier rule",
+     "test_the_unwired_sleeves_say_so_rather_than_showing_nothing expects NOT_COMPUTED_UNTIL_ENTRY for global_nkd and roska4_swing, but Stage 5ZZZ-B wired those two sleeves, so that branch is unreachable for them"
+    ],
+    "left_failing_not_re_pinned": "re-pinning asserts the new values are correct, which is the operator's call - same rule followed in 5ZZZ-R"
+   }
+  },
+  "a_helper_added_that_did_not_fix_what_i_expected": {
+   "what": "warm(root) - builds until the deferred panels have landed",
+   "intended_for": "tests and offline callers; the request path must never call it",
+   "honest_note": "I added it believing it would fix the three 5ZZZ-B failures. It did not - those were pre-existing. It is kept because the deferral is real and a cold process would otherwise make those assertions flaky, but it costs test runtime and fixed nothing"
+  },
+  "a_test_failed_first_run_for_a_real_reason": "the fill test raced its own stub: a reader that returns instantly can finish before the caller re-reads the cache. The stub now sleeps"
+ },
+ "backend_restart": {
+  "required": true,
+  "why": "the running backend had the old module loaded; a read-only dashboard fix cannot be served without replacing that process",
+  "done": true,
+  "times": 2,
+  "command": "python monitor/ops.py restart --no-scheduler --yes",
+  "scheduler": "UNTOUCHED - ops printed it explicitly each time"
+ },
+ "safety": {
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "orders_sent": 0,
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "confirmation_untouched": true,
+  "confirmation_sha16": "67504a1c8a31a6a4",
+  "confirmation_mtime": "2026-08-27T10:05:45",
+  "swing_override_present_and_valid": true,
+  "swing_override_grants": "nothing",
+  "scheduler_pid": 34564,
+  "scheduler_restarted_this_stage": false,
+  "scheduler_started_at": "2026-08-29T09:11:11",
+  "broker_calls_from_dashboard_endpoints": 0,
+  "broker_connection_note": "the backend holds one persistent read-only IBKR connection to port 4002, established at startup by a different reader. 20 polls created no new connection and spawned no child process",
+  "strategy_logic_changed": false,
+  "params_changed": false,
+  "gates_changed": false,
+  "thresholds_changed": false,
+  "paper_shadow_evidence_marked_satisfied": false
+ }
+}

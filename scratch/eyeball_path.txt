@@ -1,0 +1,109 @@
+nhom thoat ngay tai bar vu trang: 697 lenh
+
+========================================================================================
+MNQ LONG  vao 2024-09-05 @ 19518.0  | muc stop mo phong dung de khop = 19486.41
+  gio vu trang (D+1 14:00 ET) = 2024-09-06 14:00:00   | gia MO cua bar do = 18988.5   | lech $995.82
+  gia XUYEN QUA muc stop lan dau luc 2024-09-06 00:00:00  -> truoc gio vu trang 840 phut
+  duong gia ngay D+1 (lay mau moi 60 phut, va 3 bar quanh moc vu trang):
+     00:00  O  19381.00 H  19408.25 L  19372.50 C  19405.50  <-- da duoi muc stop
+     01:00  O  19405.75 H  19405.75 L  19340.75 C  19383.75  <-- da duoi muc stop
+     02:00  O  19382.50 H  19396.00 L  19337.75 C  19352.75  <-- da duoi muc stop
+     03:00  O  19354.50 H  19355.25 L  19217.75 C  19289.00  <-- da duoi muc stop
+     04:00  O  19288.50 H  19302.25 L  19220.50 C  19237.00  <-- da duoi muc stop
+     05:00  O  19235.00 H  19276.00 L  19213.00 C  19270.50  <-- da duoi muc stop
+     06:00  O  19270.00 H  19274.50 L  19232.25 C  19250.25  <-- da duoi muc stop
+     07:00  O  19248.75 H  19297.50 L  19248.75 C  19292.75  <-- da duoi muc stop
+     08:00  O  19293.25 H  19468.25 L  19230.00 C  19445.25  <-- da duoi muc stop
+     09:00  O  19443.25 H  19482.25 L  19251.50 C  19255.75  <-- da duoi muc stop
+     10:00  O  19255.75 H  19298.00 L  19015.00 C  19043.75  <-- da duoi muc stop
+     11:00  O  19044.50 H  19154.00 L  18955.75 C  18972.00  <-- da duoi muc stop
+     12:00  O  18971.50 H  19008.00 L  18940.25 C  18960.75  <-- da duoi muc stop
+     13:00  O  18960.75 H  19055.75 L  18949.50 C  18987.50  <-- da duoi muc stop
+     14:00  O  18988.50 H  18998.00 L  18959.00 C  18962.75  <-- da duoi muc stop
+  bar 1 phut quanh moc vu trang:
+     13:58  O  18984.25 H  18991.75 L  18983.50 C  18986.50
+     13:59  O  18987.50 H  18990.25 L  18983.75 C  18987.50
+     14:00  O  18988.50 H  18997.25 L  18985.50 C  18994.50   <== BAR VU TRANG
+     14:01  O  18995.50 H  18998.00 L  18974.50 C  18980.25
+     14:02  O  18979.75 H  18981.25 L  18964.00 C  18967.50
+
+========================================================================================
+MNQ SHORT  vao 2022-05-12 @ 13759.0  | muc stop mo phong dung de khop = 13809.1
+  gio vu trang (D+1 14:00 ET) = 2022-05-13 14:00:00   | gia MO cua bar do = 14293.75   | lech $969.30
+  gia XUYEN QUA muc stop lan dau luc 2022-05-13 00:00:00  -> truoc gio vu trang 840 phut
+  duong gia ngay D+1 (lay mau moi 60 phut, va 3 bar quanh moc vu trang):
+     00:00  O  14103.50 H  14121.25 L  14082.25 C  14112.00  <-- da tren muc stop
+     01:00  O  14112.25 H  14131.00 L  14089.75 C  14108.75  <-- da tren muc stop
+     02:00  O  14110.00 H  14114.00 L  14058.75 C  14104.75  <-- da tren muc stop
+     03:00  O  14104.25 H  14170.50 L  14059.00 C  14129.75  <-- da tren muc stop
+     04:00  O  14129.75 H  14165.25 L  14116.25 C  14137.25  <-- da tren muc stop
+     05:00  O  14137.50 H  14164.75 L  14111.25 C  14128.50  <-- da tren muc stop
+     06:00  O  14127.75 H  14152.75 L  14103.75 C  14145.75  <-- da tren muc stop
+     07:00  O  14145.00 H  14197.75 L  14126.25 C  14189.25  <-- da tren muc stop
+     08:00  O  14189.50 H  14197.00 L  14162.75 C  14165.00  <-- da tren muc stop
+     09:00  O  14165.50 H  14269.00 L  14055.00 C  14233.50  <-- da tren muc stop
+     10:00  O  14233.00 H  14334.50 L  14227.00 C  14315.00  <-- da tren muc stop
+     11:00  O  14315.25 H  14358.50 L  14277.50 C  14350.50  <-- da tren muc stop
+     12:00  O  14350.00 H  14420.75 L  14333.50 C  14374.50  <-- da tren muc stop
+     13:00  O  14374.50 H  14387.25 L  14281.50 C  14293.50  <-- da tren muc stop
+     14:00  O  14293.75 H  14295.75 L  14208.75 C  14217.75  <-- da tren muc stop
+  bar 1 phut quanh moc vu trang:
+     13:58  O  14290.00 H  14297.50 L  14287.75 C  14295.25
+     13:59  O  14294.50 H  14298.75 L  14292.00 C  14293.50
+     14:00  O  14293.75 H  14295.75 L  14279.75 C  14283.25   <== BAR VU TRANG
+     14:01  O  14282.50 H  14283.25 L  14265.25 C  14274.50
+     14:02  O  14273.75 H  14274.00 L  14241.25 C  14243.75
+
+========================================================================================
+M2K LONG  vao 2023-05-30 @ 1927.1  | muc stop mo phong dung de khop = 1923.42
+  gio vu trang (D+1 14:00 ET) = 2023-05-31 14:00:00   | gia MO cua bar do = 1904.5999999999992   | lech $94.10
+  gia XUYEN QUA muc stop lan dau luc 2023-05-31 00:00:00  -> truoc gio vu trang 840 phut
+  duong gia ngay D+1 (lay mau moi 60 phut, va 3 bar quanh moc vu trang):
+     00:00  O   1918.60 H   1919.20 L   1918.10 C   1918.70  <-- da duoi muc stop
+     01:00  O   1918.50 H   1918.50 L   1916.00 C   1917.80  <-- da duoi muc stop
+     02:00  O   1917.70 H   1918.00 L   1913.00 C   1915.50  <-- da duoi muc stop
+     03:00  O   1915.50 H   1920.70 L   1913.40 C   1919.80  <-- da duoi muc stop
+     04:00  O   1919.70 H   1922.50 L   1918.10 C   1921.80  <-- da duoi muc stop
+     05:00  O   1921.70 H   1924.20 L   1918.90 C   1919.40  <-- da duoi muc stop
+     06:00  O   1919.30 H   1920.60 L   1916.00 C   1918.80  <-- da duoi muc stop
+     07:00  O   1918.90 H   1919.30 L   1913.30 C   1914.10  <-- da duoi muc stop
+     08:00  O   1914.20 H   1916.90 L   1913.30 C   1915.30  <-- da duoi muc stop
+     09:00  O   1915.40 H   1929.20 L   1908.80 C   1912.00  <-- da duoi muc stop
+     10:00  O   1912.20 H   1913.10 L   1894.80 C   1896.60  <-- da duoi muc stop
+     11:00  O   1896.70 H   1899.40 L   1891.90 C   1895.10  <-- da duoi muc stop
+     12:00  O   1895.20 H   1900.90 L   1893.10 C   1896.80  <-- da duoi muc stop
+     13:00  O   1896.80 H   1906.50 L   1895.80 C   1904.40  <-- da duoi muc stop
+     14:00  O   1904.60 H   1905.60 L   1903.40 C   1904.60  <-- da duoi muc stop
+  bar 1 phut quanh moc vu trang:
+     13:58  O   1903.90 H   1904.70 L   1903.90 C   1904.40
+     13:59  O   1904.40 H   1904.80 L   1904.20 C   1904.40
+     14:00  O   1904.60 H   1905.10 L   1904.00 C   1904.20   <== BAR VU TRANG
+     14:01  O   1904.30 H   1904.80 L   1904.00 C   1904.70
+     14:02  O   1904.80 H   1905.60 L   1904.30 C   1905.30
+
+========================================================================================
+MNQ LONG  vao 2022-12-13 @ 13762.0  | muc stop mo phong dung de khop = 13693.93
+  gio vu trang (D+1 14:00 ET) = 2022-12-14 14:00:00   | gia MO cua bar do = 13809.75   | lech $-231.64
+  gia XUYEN QUA muc stop lan dau luc 2022-12-14 04:51:00  -> truoc gio vu trang 549 phut
+  duong gia ngay D+1 (lay mau moi 60 phut, va 3 bar quanh moc vu trang):
+     00:00  O  13753.50 H  13765.00 L  13750.75 C  13753.50
+     01:00  O  13753.00 H  13762.25 L  13742.00 C  13751.75
+     02:00  O  13752.25 H  13753.25 L  13718.00 C  13720.00
+     03:00  O  13720.25 H  13735.00 L  13711.00 C  13731.50
+     04:00  O  13732.00 H  13737.50 L  13691.25 C  13710.25  <-- da duoi muc stop
+     05:00  O  13710.75 H  13726.75 L  13698.50 C  13706.50
+     06:00  O  13705.50 H  13711.75 L  13675.00 C  13709.75  <-- da duoi muc stop
+     07:00  O  13709.75 H  13732.50 L  13689.75 C  13699.00  <-- da duoi muc stop
+     08:00  O  13699.50 H  13706.75 L  13678.00 C  13700.75  <-- da duoi muc stop
+     09:00  O  13700.50 H  13770.75 L  13677.25 C  13764.75  <-- da duoi muc stop
+     10:00  O  13765.00 H  13799.50 L  13754.50 C  13785.00
+     11:00  O  13785.75 H  13818.00 L  13770.50 C  13788.75
+     12:00  O  13789.00 H  13790.25 L  13747.00 C  13748.50
+     13:00  O  13749.00 H  13825.00 L  13743.00 C  13805.50
+     14:00  O  13809.75 H  13811.50 L  13597.25 C  13659.75  <-- da duoi muc stop
+  bar 1 phut quanh moc vu trang:
+     13:58  O  13819.00 H  13825.00 L  13810.75 C  13812.25
+     13:59  O  13812.50 H  13820.25 L  13804.50 C  13805.50
+     14:00  O  13809.75 H  13811.50 L  13655.50 C  13721.25   <== BAR VU TRANG
+     14:01  O  13723.00 H  13731.00 L  13660.25 C  13666.75
+     14:02  O  13667.00 H  13678.00 L  13597.25 C  13647.50

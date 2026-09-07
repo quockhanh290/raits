@@ -1,0 +1,179 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-T",
+ "title": "Gate identifier AST memoization",
+ "route": "track1_candidate",
+ "date": "2026-08-29",
+ "what_changed": {
+  "file": "global_index/track1_gates.py",
+  "runtime_trading_file": true,
+  "authorised_by_this_brief": true,
+  "scope": "_identifiers only - a pure function of file content",
+  "lines_of_substance": "a stat, a dict lookup, and a frozenset store",
+  "nothing_else_touched": "no gate decision, no blocker logic, no threshold, no strategy code, no params"
+ },
+ "cache_key": {
+  "exact": "(str(Path(path).resolve()), st.st_mtime_ns, st.st_size)",
+  "why_each_part": {
+   "resolved_path": "two modules must not share an entry",
+   "st_mtime_ns": "the ordinary change signal; NANOseconds because a coarse clock lets two edits inside one second look identical",
+   "st_size": "the backstop mtime cannot provide - a same-second, same-timestamp rewrite. Getting past both needs two files of identical length AND an identical nanosecond timestamp"
+  },
+  "value_type": "frozenset",
+  "why_frozen": "the cached object is handed to every later caller; a mutable set would let one caller quietly edit what the next one measures",
+  "bounded": {
+   "max_entries": 256,
+   "policy": "cleared when full"
+  },
+  "what_is_NOT_cached": "every gate decision, blocker list and measurement result - those read state no file timestamp can speak for"
+ },
+ "fail_closed_preserved": {
+  "how": "stat() runs BEFORE the cache is consulted, so a missing or unreadable file raises exactly as the read used to and is never answered from a remembered scan",
+  "the_distinction_being_protected": "'I cannot see the file' and 'I saw the file and it was clean' are the two answers this gate exists to keep apart",
+  "proven_by": [
+   "a missing file raises and leaves NO cache entry",
+   "a file cached and then deleted raises on the next call",
+   "unparseable source still raises SyntaxError"
+  ]
+ },
+ "before_after_timings_seconds": {
+  "gate_functions": {
+   "blocking": {
+    "before": 0.212,
+    "after": 0.034,
+    "speedup": "6.2x"
+   },
+   "as_ledger": {
+    "before": 0.448,
+    "after": 0.069,
+    "speedup": "6.5x"
+   },
+   "may_enable_orders": {
+    "before": 0.212,
+    "after": 0.033,
+    "speedup": "6.4x"
+   },
+   "live_frame_wiring": {
+    "before": 0.21,
+    "after": 0.023,
+    "speedup": "9.1x"
+   }
+  },
+  "ast_parse_calls_per_blocking_call": {
+   "before": 40,
+   "after": 0
+  },
+  "identifiers_calls_per_blocking_call": {
+   "before": 40,
+   "after": 40,
+   "note": "still called; now all cache hits"
+  },
+  "endpoint_track1_runtime_warm_median": {
+   "before": 1.89,
+   "after": 0.655,
+   "target_under_1s": "MET"
+  },
+  "endpoint_track1_market_view_warm_median": {
+   "before": 0.02,
+   "after": 0.031,
+   "note": "unchanged in substance"
+  },
+  "endpoint_cold_first_call": {
+   "track1-runtime": 45.22,
+   "track1-market-view": 5.67,
+   "note": "cold is dominated by the Stage 5ZZZ-S background warm-up workers saturating the CPU, not by the gate"
+  }
+ },
+ "proof_gate_output_unchanged": {
+  "method": "the FULL ledger - 11 blockers with every measured_now and required_measurement_now - captured before the edit and after, then compared as sorted JSON",
+  "byte_identical": true,
+  "orders_possible": {
+   "before": false,
+   "after": false
+  },
+  "blocking": {
+   "before": [
+    "PAPER_SHADOW_EVIDENCE"
+   ],
+   "after": [
+    "PAPER_SHADOW_EVIDENCE"
+   ]
+  },
+  "blocker_count": 11
+ },
+ "tests": {
+  "new_suite": "scratch/test_track1_stage5zzzt_gate_ast_memoization_20260829.py",
+  "new_passed": 18,
+  "mutations_run": 7,
+  "mutations_caught": 7,
+  "mutations_survived": 0,
+  "mutations": [
+   "key omits mtime -> caught by a SAME-SIZE edit",
+   "key omits size -> caught by a SAME-MTIME edit (timestamp forced back)",
+   "returns a mutable set",
+   "unreadable file treated as empty identifiers (fail-OPEN)",
+   "a cached file that disappears still served from cache",
+   "a blocker list stored in the cache instead of identifiers",
+   "memoisation removed entirely"
+  ],
+  "adversarial_note": "the two invalidation tests use a same-SIZE edit and a same-MTIME edit on purpose. Either key part alone passes a naive test and misses a real change",
+  "regression": {
+   "passed": 362,
+   "failed": 7,
+   "skipped": 1,
+   "suites": 12,
+   "all_seven_failures_pre_existing": true,
+   "proven_how": "every one was re-run with an UNCACHED `_identifiers` - the pre-stage logic byte for byte - and fails there too. Four ran standalone, the other three under a pytest plugin because they need fixtures",
+   "what_they_actually_pin": "a suite written 2026-08-22 that asserts track1_go_live_confirmation.json does NOT exist (the operator signed it 2026-08-27), a slot count of 70 against today's 71, and a ledger/registry comparison",
+   "left_failing_not_re_pinned": true
+  },
+  "a_test_failed_first_run_for_a_real_reason": "the same-size test compared against len() of a Python string while Windows writes CRLF, so the on-disk sizes were 14 and my assertion said 13. It now compares the two on-disk sizes"
+ },
+ "backend_restart": {
+  "needed": true,
+  "done": true,
+  "times": 1,
+  "why": "to measure the endpoint against the new module",
+  "command": "python monitor/ops.py restart --no-scheduler --yes",
+  "scheduler": "UNTOUCHED, ops printed it explicitly"
+ },
+ "the_scheduler_still_runs_the_old_code": {
+  "fact": "the scheduler was NOT restarted, so pid 34564 still holds the pre-memoisation `track1_gates` in memory",
+  "consequence": "the speed-up is live for the dashboard and for any newly started process; the scheduler picks it up whenever it is next restarted",
+  "is_this_a_problem": "no - the change is performance-only and the gate output is byte-identical either way, so the two processes cannot disagree about whether orders are possible"
+ },
+ "safety": {
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "orders_sent": 0,
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "env_var_alone_cannot_open_orders": "proven by test",
+  "confirmation_untouched": true,
+  "confirmation_sha16": "67504a1c8a31a6a4",
+  "confirmation_grants_no_order_authority": true,
+  "swing_override_present_and_valid": true,
+  "swing_override_grants": "nothing",
+  "paper_shadow_evidence_still_blocking": true,
+  "broker_calls": 0,
+  "subprocess_calls": 0,
+  "network_calls": 0,
+  "scheduler_pid": 34564,
+  "scheduler_restarted": false,
+  "scheduler_alive": true,
+  "gate_decisions_changed": false,
+  "blocker_logic_changed": false,
+  "strategy_logic_changed": false,
+  "params_changed": false
+ },
+ "answers": {
+  "before_after": "blocking() 0.212s -> 0.034s; track1-runtime warm 1.89s -> 0.655s",
+  "cache_key": "(resolved path, st_mtime_ns, st_size) -> frozenset",
+  "invalidation_proven": "same-size edit caught by mtime, same-mtime edit caught by size, deleted file raises rather than serving a stale hit",
+  "gate_output_unchanged": "full ledger byte-identical",
+  "backend_restart": "needed and done once; scheduler untouched",
+  "orders_possible": false
+ }
+}

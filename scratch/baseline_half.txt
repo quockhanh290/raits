@@ -1,0 +1,43 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+
+==========================================================================================
+### 7 LIVE 14h + stop CO DINH + khop GIUA (rong luong)
+==========================================================================================
+========================================================================
+DEPLOY-REALISTIC SIM | Rổ 4 + NKD | $50,000
+========================================================================
+slippage 2 tick/side | NKD gated ema=10 mult=2.5
+
+SIZER (combined 3-cluster, DD-capped):
+  1-micro combined MaxDD : $4,975  (10.0% of account)
+  dd_scale 1.00 | margin_scale 3.23 → binding: FIXED (--n-contracts override)
+  → CONTRACTS: 1 micro each  (projected DD 10.0%, hard cap 15%)
+
+DEPLOY METRICS at 1 micro:
+  net $58,151  |  Calmar 1.69  |  PF 1.53  |  Sharpe 2.01
+  MaxDD $4,975 (10.0%)  |  return ≈ 16.8%/yr on $50,000
+
+  per-cluster entries taken / rejected (REAL risk$):
+    roska4_swing   taken 1456  rejected 571
+    roska4_stress  taken    0  rejected   0
+    global_nkd     taken  565  rejected   0
+    circuit-breaker halts: 0
+
+per-year net$ (deploy size):
+  2018  $     8,572
+  2019  $     2,094
+  2020  $    18,589
+  2021  $     2,989
+  2022  $     5,620
+  2023  $    12,188
+  2024  $     8,100
+------------------------------------------------------------------------
+NOTE: upper bound. Live MNKD slips >1 tick (rerun --slippage-ticks 2-3 to see), fills partial, unseen events absent. Paper trade is the real test.
+
+  [sua] 892 lenh, tong $125,040 (tren co so 1 hop dong, truoc sizing)
+
+==========================================================================================
+### TOM TAT — dong ket qua cua tung lan
+==========================================================================================
+  7 LIVE 14h + stop CO DINH + khop GIUA (rong luong) net $58,151  |  Calmar 1.69  |  PF 1.53  |  Sharpe 2.01

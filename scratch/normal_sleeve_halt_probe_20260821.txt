@@ -1,0 +1,124 @@
+======================================================================================================================
+NORMAL SLEEVE - CIRCUIT-BREAKER / NKD-CUSHION PROBE   (scratch / research only)
+======================================================================================================================
+Same Normal config as the fill audit. Question: is Ro4-only's floor-window
+collapse an edge fact or a latched account breaker, and is NKD supplying edge
+or an equity cushion that stops the shared breaker latching?
+
+######################################################################################################################
+WINDOW: floor
+######################################################################################################################
+  trade tables written to scratch\normal_sleeve_trades_floor_20260821.json
+  rss after releasing frames: 1061 MB
+  [SELF-CHECK] replay_diag == deploy_sim.replay : PASS
+  [SELF-CHECK] 'R4 only' subsetting == deploy_sim --no-nkd : net $8,570 vs $8,570, MaxDD $11,372 vs $11,372, halts 354 vs 354 -> PASS
+
+  variant                 breaker       net$     PF  Sharpe  Calmar    MaxDD$   MaxDD%  ret/yr  taken   rej  halt
+  R4 only                      ON      8,570   1.21    1.10    0.18    11,372    22.7%    4.1%    350   135   354
+  R4 only                     OFF     29,278   1.44    2.11    0.38    11,372    22.7%    8.6%    571   268     0
+  NKD only (corrected)         ON      3,898   1.15    0.86    0.14     3,941     7.9%    1.1%    228     0     0
+  NKD only (corrected)        OFF      3,898   1.15    0.86    0.14     3,941     7.9%    1.1%    228     0     0
+  R4 + NKD (corrected)         ON     33,176   1.36    1.73    0.52     9,259    18.5%    9.7%    799   268     0
+  R4 + NKD (corrected)        OFF     33,176   1.36    1.73    0.52     9,259    18.5%    9.7%    799   268     0
+
+  HEADROOM TO THE 15% TRIP (drawdown measured from PEAK EQUITY, the breaker's own rule)
+  variant                 breaker     worst dd           on    peak then     headroom
+  R4 only                      ON       16.3%   2022-05-17       69,941        -1.3pp
+  R4 only                     OFF       16.3%   2022-05-17       69,941        -1.3pp
+  NKD only (corrected)         ON        8.1%   2020-11-03       50,000         6.9pp
+  NKD only (corrected)        OFF        8.1%   2020-11-03       50,000         6.9pp
+  R4 + NKD (corrected)         ON       13.7%   2022-05-17       67,713         1.3pp
+  R4 + NKD (corrected)        OFF       13.7%   2022-05-17       67,713         1.3pp
+
+  BREAKER LATCH DETAIL (entries blocked once drawdown-from-peak reaches 15%)
+    R4 only                first block 2022-05-17  level HALT  peak $69,941  equity $58,570  dd 16.3%  blocked on 262 days, 354 entries
+    NKD only (corrected)   never blocked
+    R4 + NKD (corrected)   never blocked
+
+  YEARLY NET$
+  variant                 breaker       2018       2019       2020       2021       2022       2023       2024
+  R4 only                      ON      4,542      4,759      3,127      4,299     -8,158          0          0
+  R4 only                     OFF      4,542      4,759      3,127      4,299     -4,848     10,439      6,960
+  NKD only (corrected)         ON     -2,014       -502       -706        451      2,432      4,540       -302
+  NKD only (corrected)        OFF     -2,014       -502       -706        451      2,432      4,540       -302
+  R4 + NKD (corrected)         ON      2,529      4,257      2,421      4,749     -2,416     14,978      6,657
+  R4 + NKD (corrected)        OFF      2,529      4,257      2,421      4,749     -2,416     14,978      6,657
+
+######################################################################################################################
+WINDOW: vault2025
+######################################################################################################################
+  trade tables written to scratch\normal_sleeve_trades_vault2025_20260821.json
+  rss after releasing frames: 1258 MB
+  [SELF-CHECK] replay_diag == deploy_sim.replay : PASS
+  [SELF-CHECK] 'R4 only' subsetting == deploy_sim --no-nkd : net $4,654 vs $4,654, MaxDD $3,094 vs $3,094, halts 0 vs 0 -> PASS
+
+  variant                 breaker       net$     PF  Sharpe  Calmar    MaxDD$   MaxDD%  ret/yr  taken   rej  halt
+  R4 only                      ON      4,654   1.55    2.39    1.64     3,094     6.2%   10.1%     52    61     0
+  R4 only                     OFF      4,654   1.55    2.39    1.64     3,094     6.2%   10.1%     52    61     0
+  NKD only (corrected)         ON      2,203   1.42    2.19    1.23     1,931     3.9%    4.8%     31     0     0
+  NKD only (corrected)        OFF      2,203   1.42    2.19    1.23     1,931     3.9%    4.8%     31     0     0
+  R4 + NKD (corrected)         ON      6,857   1.51    2.33    1.47     5,025    10.1%   14.8%     83    61     0
+  R4 + NKD (corrected)        OFF      6,857   1.51    2.33    1.47     5,025    10.1%   14.8%     83    61     0
+
+  HEADROOM TO THE 15% TRIP (drawdown measured from PEAK EQUITY, the breaker's own rule)
+  variant                 breaker     worst dd           on    peak then     headroom
+  R4 only                      ON        5.5%   2025-11-24       56,658         9.5pp
+  R4 only                     OFF        5.5%   2025-11-24       56,658         9.5pp
+  NKD only (corrected)         ON        3.8%   2025-04-03       50,829        11.2pp
+  NKD only (corrected)        OFF        3.8%   2025-04-03       50,829        11.2pp
+  R4 + NKD (corrected)         ON        8.3%   2025-11-24       60,219         6.7pp
+  R4 + NKD (corrected)        OFF        8.3%   2025-11-24       60,219         6.7pp
+
+  BREAKER LATCH DETAIL (entries blocked once drawdown-from-peak reaches 15%)
+    R4 only                never blocked
+    NKD only (corrected)   never blocked
+    R4 + NKD (corrected)   never blocked
+
+  YEARLY NET$
+  variant                 breaker       2025
+  R4 only                      ON      4,654
+  R4 only                     OFF      4,654
+  NKD only (corrected)         ON      2,203
+  NKD only (corrected)        OFF      2,203
+  R4 + NKD (corrected)         ON      6,857
+  R4 + NKD (corrected)        OFF      6,857
+
+######################################################################################################################
+WINDOW: vault2026
+######################################################################################################################
+  trade tables written to scratch\normal_sleeve_trades_vault2026_20260821.json
+  rss after releasing frames: 1236 MB
+  [SELF-CHECK] replay_diag == deploy_sim.replay : PASS
+  [SELF-CHECK] 'R4 only' subsetting == deploy_sim --no-nkd : net $736 vs $736, MaxDD $6,342 vs $6,342, halts 0 vs 0 -> PASS
+
+  variant                 breaker       net$     PF  Sharpe  Calmar    MaxDD$   MaxDD%  ret/yr  taken   rej  halt
+  R4 only                      ON        736   1.09    0.50    0.21     6,342    12.7%    2.7%     46    42     0
+  R4 only                     OFF        736   1.09    0.50    0.21     6,342    12.7%    2.7%     46    42     0
+  NKD only (corrected)         ON      6,007   1.95    4.32    4.35     2,507     5.0%   21.8%     24     2     0
+  NKD only (corrected)        OFF      6,007   1.95    4.32    4.35     2,507     5.0%   21.8%     24     2     0
+  R4 + NKD (corrected)         ON      6,743   1.46    2.43    1.62     7,520    15.0%   24.4%     70    44     0
+  R4 + NKD (corrected)        OFF      6,743   1.46    2.43    1.62     7,520    15.0%   24.4%     70    44     0
+
+  HEADROOM TO THE 15% TRIP (drawdown measured from PEAK EQUITY, the breaker's own rule)
+  variant                 breaker     worst dd           on    peak then     headroom
+  R4 only                      ON       12.5%   2026-04-09       50,636         2.5pp
+  R4 only                     OFF       12.5%   2026-04-09       50,636         2.5pp
+  NKD only (corrected)         ON        4.9%   2026-03-11       50,817        10.1pp
+  NKD only (corrected)        OFF        4.9%   2026-03-11       50,817        10.1pp
+  R4 + NKD (corrected)         ON       14.7%   2026-04-09       51,008         0.3pp
+  R4 + NKD (corrected)        OFF       14.7%   2026-04-09       51,008         0.3pp
+
+  BREAKER LATCH DETAIL (entries blocked once drawdown-from-peak reaches 15%)
+    R4 only                never blocked
+    NKD only (corrected)   never blocked
+    R4 + NKD (corrected)   never blocked
+
+  YEARLY NET$
+  variant                 breaker       2026
+  R4 only                      ON        736
+  R4 only                     OFF        736
+  NKD only (corrected)         ON      6,007
+  NKD only (corrected)        OFF      6,007
+  R4 + NKD (corrected)         ON      6,743
+  R4 + NKD (corrected)        OFF      6,743
+

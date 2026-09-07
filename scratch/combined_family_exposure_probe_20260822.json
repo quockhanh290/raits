@@ -1,0 +1,156 @@
+{
+ "floor": {
+  "repaired_mechanics_independent_caps": {
+   "policy": "repaired_mechanics_independent_caps",
+   "n_obs": 2949,
+   "continuous_gross_peak": 0.0686125000000001,
+   "continuous_net_peak": 0.0686125000000001,
+   "continuous_gross_p99": 0.04619527142857142,
+   "continuous_net_p99": 0.043274714285714284,
+   "family_admission_gross_peak": 0.0686125000000001,
+   "family_admission_net_peak": 0.0686125000000001,
+   "n_family_admissions": 888,
+   "cap_gross": null,
+   "cap_net": null,
+   "n_breaches": 0,
+   "breaches_by_cause": {},
+   "worst_breaches": []
+  },
+  "repaired_mechanics_family_cap_5_44": {
+   "policy": "repaired_mechanics_family_cap_5_44",
+   "n_obs": 2942,
+   "continuous_gross_peak": 0.049041071428571434,
+   "continuous_net_peak": 0.048886607142857134,
+   "continuous_gross_p99": 0.043761607142857144,
+   "continuous_net_p99": 0.04314107142857143,
+   "family_admission_gross_peak": 0.049041071428571434,
+   "family_admission_net_peak": 0.043953571428571425,
+   "n_family_admissions": 883,
+   "cap_gross": 0.05,
+   "cap_net": 0.044,
+   "n_breaches": 7,
+   "breaches_by_cause": {
+    "after_exit": 5,
+    "admit_other": 2
+   },
+   "worst_breaches": [
+    {
+     "ts": "2022-03-18 16:24:00-04:00",
+     "cause": "after_exit",
+     "detail": "",
+     "gross": 0.048886607142857134,
+     "net": 0.048886607142857134,
+     "n_family": 2
+    },
+    {
+     "ts": "2022-03-21 15:55:00+09:00",
+     "cause": "admit_other",
+     "detail": "",
+     "gross": 0.048886607142857134,
+     "net": 0.048886607142857134,
+     "n_family": 2
+    },
+    {
+     "ts": "2022-05-17 09:30:00-04:00",
+     "cause": "after_exit",
+     "detail": "",
+     "gross": 0.04779375,
+     "net": 0.04779375,
+     "n_family": 2
+    },
+    {
+     "ts": "2022-05-18 00:00:00+09:00",
+     "cause": "after_exit",
+     "detail": "",
+     "gross": 0.04779375,
+     "net": 0.04779375,
+     "n_family": 2
+    },
+    {
+     "ts": "2022-05-18 14:15:00+09:00",
+     "cause": "admit_other",
+     "detail": "",
+     "gross": 0.04779375,
+     "net": 0.04779375,
+     "n_family": 2
+    },
+    {
+     "ts": "2023-11-01 09:30:00-04:00",
+     "cause": "after_exit",
+     "detail": "",
+     "gross": 0.04673035714285715,
+     "net": 0.04673035714285715,
+     "n_family": 3
+    }
+   ]
+  }
+ },
+ "vault2025": {
+  "repaired_mechanics_independent_caps": {
+   "policy": "repaired_mechanics_independent_caps",
+   "n_obs": 397,
+   "continuous_gross_peak": 0.07820571428571425,
+   "continuous_net_peak": 0.06076821428571426,
+   "continuous_gross_p99": 0.04922435714285717,
+   "continuous_net_p99": 0.048849107142857146,
+   "family_admission_gross_peak": 0.07820571428571425,
+   "family_admission_net_peak": 0.06076821428571426,
+   "n_family_admissions": 97,
+   "cap_gross": null,
+   "cap_net": null,
+   "n_breaches": 0,
+   "breaches_by_cause": {},
+   "worst_breaches": []
+  },
+  "repaired_mechanics_family_cap_5_44": {
+   "policy": "repaired_mechanics_family_cap_5_44",
+   "n_obs": 391,
+   "continuous_gross_peak": 0.049551785714285715,
+   "continuous_net_peak": 0.04381160714285714,
+   "continuous_gross_p99": 0.046767857142857146,
+   "continuous_net_p99": 0.041617857142857144,
+   "family_admission_gross_peak": 0.049551785714285715,
+   "family_admission_net_peak": 0.04360535714285715,
+   "n_family_admissions": 94,
+   "cap_gross": 0.05,
+   "cap_net": 0.044,
+   "n_breaches": 0,
+   "breaches_by_cause": {},
+   "worst_breaches": []
+  }
+ },
+ "vault2026": {
+  "repaired_mechanics_independent_caps": {
+   "policy": "repaired_mechanics_independent_caps",
+   "n_obs": 245,
+   "continuous_gross_peak": 0.07534892857142851,
+   "continuous_net_peak": 0.07534892857142851,
+   "continuous_gross_p99": 0.07508857142857141,
+   "continuous_net_p99": 0.07508857142857141,
+   "family_admission_gross_peak": 0.07534892857142851,
+   "family_admission_net_peak": 0.07534892857142851,
+   "n_family_admissions": 72,
+   "cap_gross": null,
+   "cap_net": null,
+   "n_breaches": 0,
+   "breaches_by_cause": {},
+   "worst_breaches": []
+  },
+  "repaired_mechanics_family_cap_5_44": {
+   "policy": "repaired_mechanics_family_cap_5_44",
+   "n_obs": 233,
+   "continuous_gross_peak": 0.048425,
+   "continuous_net_peak": 0.04117446428571426,
+   "continuous_gross_p99": 0.04117446428571426,
+   "continuous_net_p99": 0.039781142857142855,
+   "family_admission_gross_peak": 0.048425,
+   "family_admission_net_peak": 0.04117446428571426,
+   "n_family_admissions": 64,
+   "cap_gross": 0.05,
+   "cap_net": 0.044,
+   "n_breaches": 0,
+   "breaches_by_cause": {},
+   "worst_breaches": []
+  }
+ }
+}

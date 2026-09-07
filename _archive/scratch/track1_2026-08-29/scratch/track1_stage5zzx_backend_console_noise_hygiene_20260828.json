@@ -1,0 +1,144 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZX",
+  "title": "Backend console noise root-cause audit and logging hygiene",
+  "route": "track1_candidate",
+  "date": "2026-08-28",
+  "orders_enabled": false,
+
+  "measured_before_any_change": {
+    "file": "monitor/logs/ops_backend.err.log",
+    "total_lines": 358361,
+    "breakdown": {
+      "GET 200": {"lines": 337972, "share": "94.3%", "what": "dashboard polling"},
+      "GET 3xx": {"lines": 8860},
+      "other": {"lines": 8036},
+      "WARNING/ERROR": {"lines": 2806},
+      "Adding job tentatively": {"lines": 685, "share": "0.19%",
+                                  "distribution": "bursts on six distinct days, not continuous"},
+      "slots registered": {"lines": 2}
+    },
+    "conclusion": "the flood is the access log; a page polling every 8s writes ~10k successful GETs a day whether the system is healthy or on fire. The brief framed the APScheduler lines as a co-equal cause; they are 0.19% of the file."
+  },
+
+  "task_1_which_endpoint_emits_it": {
+    "answer": "none of them",
+    "method": "log handler attached in-process, one call per endpoint",
+    "result": {"/api/v1/schedule-status": {"status": 200, "apscheduler_records": 0},
+               "/api/v1/track1-runtime": {"status": 200, "apscheduler_records": 0},
+               "/api/v1/track1-market-view": {"status": 200, "apscheduler_records": 0},
+               "/api/v1/open-issues": {"status": 200, "apscheduler_records": 0}},
+    "real_source": "ops.py building a scheduler object to enumerate it during a restart, with its console output going to the same file",
+    "proof_from_timestamps": {
+      "burst": "2026-08-28 07:17:13 - Adding job tentatively x7 plus slots registered",
+      "backend_start": "2026-08-28 07:21:12 - Starting Flask on http://127.0.0.1:5002",
+      "gap": "the burst lands four minutes BEFORE this backend logged its own startup"
+    }
+  },
+
+  "task_2_3_does_the_backend_start_a_scheduler": {
+    "answer": false,
+    "method": "AST walk over global_index/ and monitor/ for a .start() call on a scheduler object",
+    "only_call_site": "global_index/run_scheduler.py:1942",
+    "mirror_behaviour": "builds a scheduler object and enumerates get_jobs(); never started, and dry_run=True means even a fired job would execute nothing",
+    "pinned_by": ["test_only_the_scheduler_main_ever_starts_a_scheduler",
+                  "test_a_schedule_status_request_does_not_change_the_scheduler_process"],
+    "test_self_correction": "first written as a text search, which found a match inside this stage's own docstring in app.py - a sentence ABOUT the call counted AS the call. It parses the source now."
+  },
+
+  "task_4_what_was_suppressed": {
+    "scope": "monitor/backend/app.py - the backend process only",
+    "filters": [
+      {"name": "_QuietSuccessfulRequests", "logger": "werkzeug",
+       "drops": "access lines with status 200/204/301/302/304"},
+      {"name": "_NoTentativeJobAdds", "loggers": ["apscheduler", "apscheduler.scheduler"],
+       "drops": "'Adding job tentatively' at INFO",
+       "why_both_loggers": "a filter on the parent is not consulted for a record made by a child logger; a mutation checks this"}
+    ],
+    "nothing_global_disabled": true
+  },
+
+  "task_5_what_is_kept": [
+    "every 4xx and 5xx request",
+    "every WARNING and ERROR, including on a 200 - level is checked before anything else",
+    "tracebacks - never routed through either filter",
+    "backend startup lines - monitor.backend.app is not filtered",
+    "'Scheduler started' and 'Running job ...' - if a scheduler ever ran here it would still say so",
+    "an access line the filter cannot parse - an unrecognised line is not a line to throw away",
+    "the scheduler's own log - a different process, untouched"
+  ],
+
+  "task_6_mirror_introspection": {
+    "changed": false,
+    "reason": "replacing the built scheduler with a hand-written slot list is exactly what scheduler_slot_ids exists to avoid - its own comment records that a second list is how the two drift apart, and Stage 5ZZT was spent on that class of drift. The construction already carries its own suppression and costs two lines per backend START, not per request.",
+    "chosen_instead": "quiet the logger levels in the backend, which the brief allows"
+  },
+
+  "task_8_polling_frequency": {
+    "changed": false,
+    "value": "POLL_MS = 8000",
+    "measurement": "the interval was never the problem; at zero log lines per request the same eight seconds now costs nothing"
+  },
+
+  "verified_live": {
+    "restart_command": "python monitor/ops.py restart --no-scheduler --yes",
+    "scheduler": {"pid_before": 3000, "pid_after": 3000, "restarted": false,
+                  "started": "2026-08-27 22:53:45"},
+    "backend": {"pid_after": 35956},
+    "warm_requests": {"issued": 40, "status_200": 40,
+                      "new_backend_log_lines": 0},
+    "lines_written_since_restart": {
+      "count": 2,
+      "when": "07:31:10, about sixty seconds after start",
+      "what": ["Track 1 SHADOW slots registered: 71", "session report notice"],
+      "explanation": "the known cold-start warm-up recorded in Stage 5ZZR; once per backend start, not per request"
+    },
+    "before_this_change": "those 40 requests would have written at least 40 access lines"
+  },
+
+  "results": {
+    "new_suite": {"file": "scratch/test_track1_stage5zzx_backend_console_noise_20260828.py", "passed": 31},
+    "adjacent_suites": {"passed": 553, "failed": 3},
+    "mutations": {"file": "scratch/track1_stage5zzx_mutations_20260828.py", "attempted": 10, "caught": 10},
+    "mutation_design": "most WIDEN the filter rather than narrow it, because that is the direction a logging change is dangerous in - dropping 404s, dropping warnings, dropping a real Scheduler started, throwing away an unparseable line. Two stop it filtering at all, and one replaces the approach with a global logging.disable.",
+    "remaining_failures_pre_existing": [
+      "test_flag_on_adds_a_window_band_per_sleeve",
+      "test_a_calm_failure_is_not_recovered_by_a_stress_run",
+      "test_track1_only_still_reports_a_real_track1_failure"
+    ],
+    "remaining_failures_cause": "they expect a TRACK1_CALM_1000 slot and a Calm one-shot band from before Calm became two phases; measured pre-existing since Stage 5ZZT"
+  },
+
+  "safety_after": {
+    "scheduler_pid": 3000,
+    "scheduler_restarted": false,
+    "backend_restarted": true,
+    "backend_restart_authorised_by": "the stage brief - backend-only restart allowed if needed",
+    "broker": "the backend restart reconnected the existing read-only reader it always starts (client_id=99); no new connection was made by this stage's code",
+    "orders_possible": false,
+    "blocking": ["PAPER_SHADOW_EVIDENCE"],
+    "scheduler_mode": "compatible",
+    "confirmation": true,
+    "legacy_entry_jobs": 0,
+    "orders_dir_exists": false,
+    "live_positions_track1_exists": false,
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "runtime_trading_files_edited": false
+  },
+
+  "still_open": [
+    "two construction lines per backend start - honest, and removable by extending the existing suppression to the run_scheduler logger during construction. Left alone: two lines a restart is not noise, and widening a suppression is how a real message goes missing.",
+    "the three Calm-band tests above",
+    "the retained log still holds its 358,361 historical lines - nothing was truncated; the point was to stop adding to it"
+  ],
+
+  "files_touched": [
+    "monitor/backend/app.py",
+    "scratch/test_track1_stage5zzx_backend_console_noise_20260828.py",
+    "scratch/track1_stage5zzx_mutations_20260828.py",
+    "scratch/track1_stage5zzx_backend_console_noise_hygiene_20260828.md",
+    "scratch/track1_stage5zzx_backend_console_noise_hygiene_20260828.json",
+    "docs/futures/TRACK1_RUNTIME_PIPELINE_2026-08-24.md",
+    "TASK.md"
+  ]
+}

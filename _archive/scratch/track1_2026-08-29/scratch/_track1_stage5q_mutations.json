@@ -1,0 +1,135 @@
+{
+  "results": [
+    {
+      "mutation": "Q1 the audit stops checking slot IDS and trusts the count",
+      "guard": "test_a_silent_slot_masked_by_a_doubled_one_fails_on_the_ids",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "Q2 the p95 ceiling is raised above the slot cadence",
+      "guard": "test_p95_at_the_ceiling_fails",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "Q3 the p95 TARGET is moved so a 250s day stops warning",
+      "guard": "test_p95_between_the_target_and_the_ceiling_warns_and_does_not_fail",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "Q4 a single slot over the ceiling stops being a stall",
+      "guard": "test_a_single_slot_over_the_ceiling_fails_even_with_a_healthy_p95",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "Q5 a window that closed before the scheduler started is called a FAILURE",
+      "guard": "test_a_window_that_closed_before_the_scheduler_started_is_pending_not_failed",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "Q6 an unreadable scheduler start is treated as 'the scheduler was up'",
+      "guard": "test_a_closed_window_with_no_evidence_and_no_readable_start_is_pending_not_failed",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "Q7 a window with no timing evidence passes",
+      "guard": "test_missing_timing_fails_rather_than_passing_quietly",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "Q8 explanations may go missing even when the ledger says some were due",
+      "guard": "test_missing_explanations_fail_when_the_ledger_says_some_were_due",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "Q9 an order mark stops failing the audit",
+      "guard": "test_an_order_mark_fails_every_sleeve_however_far_the_day_got",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "Q10 the audit record loses its route stamp",
+      "guard": "test_every_record_is_route_stamped_and_carries_the_reason_codes",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "Q11 the audit writes into the window-coverage evidence directory",
+      "guard": "test_the_audit_writes_only_into_its_own_audit_directory",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "Q12 the dashboard stops saying an audit has not run",
+      "guard": "test_the_reader_says_not_run_yet_rather_than_leaving_it_blank",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "Q13 an audit job argv gains --allow-orders",
+      "guard": "test_the_audit_job_argv_carries_no_order_or_broker_flag",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "Q14 the audit buffer drops below the slot runtime ceiling",
+      "guard": "test_the_audit_jobs_fire_after_their_windows_close_with_a_measured_buffer",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "Q15 the dashboard mirror stops expecting the audit jobs",
+      "guard": "test_the_scheduler_and_the_dashboard_mirror_agree_in_every_mode",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "Q16 the headline says PASS about a set of records that judged nothing",
+      "guard": "test_the_headline_never_says_pass_about_a_set_that_judged_nothing",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    }
+  ],
+  "detected": 16,
+  "total": 16,
+  "restore_mismatch": []
+}

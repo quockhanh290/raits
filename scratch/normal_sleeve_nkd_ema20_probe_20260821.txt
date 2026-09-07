@@ -1,0 +1,75 @@
+================================================================================================================
+NORMAL SLEEVE - NKD EMA20 RECHECK (scratch / research only)
+================================================================================================================
+Config: base Normal sleeve, but --nkd-ema 20. NKD fills corrected by conservative path law.
+
+################################################################################################################
+WINDOW: floor
+################################################################################################################
+  deploy_sim original anchor (before NKD path correction): net $8,224 PF 1.15 Sharpe 0.77 Calmar 0.19 MaxDD $10,447
+  corrected fill repricing: MES 1 / $318.20, MNQ 1 / $86.78, MYM 1 / $59.22, M2K 1 / $18.95, MNKD 6 / $12.14
+
+  variant                     breaker       net$    PF  Sharpe  Calmar   MaxDD%   ret/yr   taken  haltD   block   lost pnl  15% room
+  R4 only                          ON      8,570  1.21    1.10    0.18    22.7%     4.1%     350    262     354     20,921    -1.3%
+  R4 only                         OFF     29,278  1.44    2.11    0.38    22.7%     8.6%     571      0       0          0    -1.3%
+  NKD ema20 corrected              ON      2,504  1.10    0.56    0.10     7.4%     0.7%     228      0       0          0     7.7%
+  NKD ema20 corrected             OFF      2,504  1.10    0.56    0.10     7.4%     0.7%     228      0       0          0     7.7%
+  R4 + NKD ema20 corrected         ON      8,212  1.15    0.76    0.19    20.9%     3.9%     482    346     450     23,782    -0.3%
+  R4 + NKD ema20 corrected        OFF     31,781  1.35    1.66    0.44    20.9%     9.3%     799      0       0          0    -0.3%
+
+  YEARLY NET$
+  variant                     breaker      2018      2019      2020      2021      2022      2023      2024
+  R4 only                          ON     4,542     4,759     3,127     4,299    -8,158         0         0
+  R4 only                         OFF     4,542     4,759     3,127     4,299    -4,848    10,439     6,960
+  NKD ema20 corrected              ON      -547      -669    -1,269       607       590     3,286       505
+  NKD ema20 corrected             OFF      -547      -669    -1,269       607       590     3,286       505
+  R4 + NKD ema20 corrected         ON     3,996     4,091     1,859     4,906    -6,639         0         0
+  R4 + NKD ema20 corrected        OFF     3,996     4,091     1,859     4,906    -4,258    13,724     7,465
+
+################################################################################################################
+WINDOW: vault2025
+################################################################################################################
+  deploy_sim original anchor (before NKD path correction): net $6,894 PF 1.51 Sharpe 2.36 Calmar 1.33 MaxDD $5,597
+  corrected fill repricing: 
+  corrected fill repricing: none
+
+  variant                     breaker       net$    PF  Sharpe  Calmar   MaxDD%   ret/yr   taken  haltD   block   lost pnl  15% room
+  R4 only                          ON      4,654  1.55    2.39    1.64     6.2%    10.1%      52      0       0          0     9.5%
+  R4 only                         OFF      4,654  1.55    2.39    1.64     6.2%    10.1%      52      0       0          0     9.5%
+  NKD ema20 corrected              ON      2,239  1.42    2.24    0.97     5.0%     4.8%      30      0       0          0    10.4%
+  NKD ema20 corrected             OFF      2,239  1.42    2.24    0.97     5.0%     4.8%      30      0       0          0    10.4%
+  R4 + NKD ema20 corrected         ON      6,894  1.51    2.36    1.33    11.2%    14.9%      82      0       0          0     5.9%
+  R4 + NKD ema20 corrected        OFF      6,894  1.51    2.36    1.33    11.2%    14.9%      82      0       0          0     5.9%
+
+  YEARLY NET$
+  variant                     breaker      2025
+  R4 only                          ON     4,654
+  R4 only                         OFF     4,654
+  NKD ema20 corrected              ON     2,239
+  NKD ema20 corrected             OFF     2,239
+  R4 + NKD ema20 corrected         ON     6,894
+  R4 + NKD ema20 corrected        OFF     6,894
+
+################################################################################################################
+WINDOW: vault2026
+################################################################################################################
+  deploy_sim original anchor (before NKD path correction): net $6,152 PF 1.41 Sharpe 2.21 Calmar 1.40 MaxDD $7,919
+  corrected fill repricing: MNKD 1 / $3.22
+
+  variant                     breaker       net$    PF  Sharpe  Calmar   MaxDD%   ret/yr   taken  haltD   block   lost pnl  15% room
+  R4 only                          ON        736  1.09    0.50    0.21    12.7%     2.7%      46      0       0          0     2.5%
+  R4 only                         OFF        736  1.09    0.50    0.21    12.7%     2.7%      46      0       0          0     2.5%
+  NKD ema20 corrected              ON      5,412  1.81    3.86    2.86     6.9%    19.7%      24      0       0          0     8.2%
+  NKD ema20 corrected             OFF      5,412  1.81    3.86    2.86     6.9%    19.7%      24      0       0          0     8.2%
+  R4 + NKD ema20 corrected         ON      6,148  1.41    2.21    1.40    15.8%    22.2%      70      3       0          0    -0.6%
+  R4 + NKD ema20 corrected        OFF      6,148  1.41    2.21    1.40    15.8%    22.2%      70      0       0          0    -0.6%
+
+  YEARLY NET$
+  variant                     breaker      2026
+  R4 only                          ON       736
+  R4 only                         OFF       736
+  NKD ema20 corrected              ON     5,412
+  NKD ema20 corrected             OFF     5,412
+  R4 + NKD ema20 corrected         ON     6,148
+  R4 + NKD ema20 corrected        OFF     6,148
+

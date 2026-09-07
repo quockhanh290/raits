@@ -1,0 +1,73 @@
+{
+  "now_et": "2026-08-24T06:53:38-04:00",
+  "verdict": "WARNING_ONLY",
+  "scheduler_pid": 33868,
+  "checks": [
+    {
+      "name": "1_single_scheduler",
+      "status": "ok",
+      "detail": "pid 33868, started 2026-08-24 02:32:24 local, up 8471s",
+      "blocks_capture": false
+    },
+    {
+      "name": "2_track1_only_flag",
+      "status": "ok",
+      "detail": "argv carries --track1-only-shadow",
+      "blocks_capture": false
+    },
+    {
+      "name": "9_no_duplicates",
+      "status": "ok",
+      "detail": "one scheduler, one backend, one listener on 5002 ([3468])",
+      "blocks_capture": false
+    },
+    {
+      "name": "3_backend_slot_table",
+      "status": "ok",
+      "detail": "state_slot_count=70 (1 Calm + 24 Stress + 23 Swing + 22 NKD)",
+      "blocks_capture": false
+    },
+    {
+      "name": "4_track1_runtime_endpoint",
+      "status": "ok",
+      "detail": "route=track1_candidate, coverage present=True, timing present=True",
+      "blocks_capture": false
+    },
+    {
+      "name": "5_window_coverage",
+      "status": "ok",
+      "detail": "d:\\raits\\global_index\\track1_runtime\\window_coverage exists, empty (nothing has run yet)",
+      "blocks_capture": false
+    },
+    {
+      "name": "6_slot_timing",
+      "status": "ok",
+      "detail": "d:\\raits\\global_index\\track1_runtime\\slot_timing exists, empty (nothing has run yet)",
+      "blocks_capture": false
+    },
+    {
+      "name": "7_broker_feed",
+      "status": "ok",
+      "detail": "connected=True freshness=fresh age_seconds=0.613",
+      "blocks_capture": false
+    },
+    {
+      "name": "8_orders_impossible",
+      "status": "ok",
+      "detail": "B1 open, orders_possible=False, no confirmation file, TRACK1_ORDERS_APPROVED unset",
+      "blocks_capture": false
+    },
+    {
+      "name": "10_next_window_expected",
+      "status": "ok",
+      "detail": "next window roska4_calm 10:00-10:00 ET in 3.11h (Mon 2026-08-24 10:00 ET); overnight NKD 01:10-02:55 ET in 18.27h (Tue 2026-08-25 01:10 ET); backend expected_next_at=2026-08-24T14:00:00Z",
+      "blocks_capture": false
+    },
+    {
+      "name": "11_pre_start_slots_expected",
+      "status": "warn",
+      "detail": "code on disk: all 22 pre-start NKD slot(s) classify as not_applicable/before_scheduler_start; but the RUNNING BACKEND still reports 22 of them as unexplained_overdue and freshness=late. The backend process predates the fix. The night's evidence is captured by the scheduler and is unaffected -- only the screen is wrong. Restart the backend to clear it: python monitor/ops.py restart --backend",
+      "blocks_capture": false
+    }
+  ]
+}

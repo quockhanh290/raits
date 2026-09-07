@@ -1,0 +1,149 @@
+{
+  "all_red": true,
+  "results": [
+    {
+      "id": "M1",
+      "mutation": "grace 60 -> 0: a slot three seconds late reads as a missed entry",
+      "test": "test_6_seconds_of_dispatch_latency_are_still_the_scheduled_slot[3]",
+      "outcome": "RED"
+    },
+    {
+      "id": "M2",
+      "mutation": "grace 60 -> 3600: an hour-late Calm entry is accepted",
+      "test": "test_7_materially_late_is_still_refused[3600]",
+      "outcome": "RED"
+    },
+    {
+      "id": "M2b",
+      "mutation": "same mutation, at two minutes late",
+      "test": "test_7_materially_late_is_still_refused[120]",
+      "outcome": "RED"
+    },
+    {
+      "id": "M3",
+      "mutation": "grace 60 -> 61: the declared edge no longer matches behaviour",
+      "test": "test_8_the_grace_boundary_is_exactly_where_it_is_declared",
+      "outcome": "RED"
+    },
+    {
+      "id": "M4",
+      "mutation": "global_nkd loses its grace while Calm keeps it",
+      "test": "test_5_the_grace_is_declared_on_every_sleeve_and_is_one_minute",
+      "outcome": "RED"
+    },
+    {
+      "id": "M5",
+      "mutation": "the 5V-1 blanket-min mistake, reintroduced",
+      "test": "test_3_only_the_two_scanning_sleeves_follow_the_slot",
+      "outcome": "RED"
+    },
+    {
+      "id": "M6",
+      "mutation": "global_nkd demands the end of its window again",
+      "test": "test_14_no_slot_of_any_sleeve_demands_a_bar_from_its_own_future",
+      "outcome": "RED"
+    },
+    {
+      "id": "M7",
+      "mutation": "a fixed-span sleeve given an end-of-session bound",
+      "test": "test_4_no_sleeve_declares_a_span_that_needs_the_session_end",
+      "outcome": "RED"
+    },
+    {
+      "id": "M8",
+      "mutation": "end = min(end, hhmm) removed",
+      "test": "test_10_stress_narrows_its_scan_end_to_the_current_slot",
+      "outcome": "RED"
+    },
+    {
+      "id": "M9",
+      "mutation": "the widx_naive <= now_ts comparison removed",
+      "test": "test_11_normal_r4_and_nkd_truncate_their_scan_to_the_frame_clock",
+      "outcome": "RED"
+    },
+    {
+      "id": "M10",
+      "mutation": "the subscript on `win` dropped",
+      "test": "test_11_normal_r4_and_nkd_truncate_their_scan_to_the_frame_clock",
+      "outcome": "RED"
+    },
+    {
+      "id": "M11",
+      "mutation": "through=now replaced by an end-of-session bound",
+      "test": "test_12_the_live_source_fetches_every_sleeve_through_the_slot_instant",
+      "outcome": "RED"
+    },
+    {
+      "id": "M12",
+      "mutation": "detect_entry_for_day swapped for the replay detector",
+      "test": "test_13_calm_uses_the_entry_only_detector_not_the_full_day_replay",
+      "outcome": "RED"
+    },
+    {
+      "id": "M13",
+      "mutation": "the Stage 5W error, reintroduced",
+      "test": "test_16_the_seam_is_still_the_scheduler_slot_path",
+      "outcome": "RED"
+    },
+    {
+      "id": "M14",
+      "mutation": "a sleeve dropped from the registry",
+      "test": "test_1_all_seventy_strategy_slots_are_still_present_and_accounted_for",
+      "outcome": "RED"
+    },
+    {
+      "id": "M14b",
+      "mutation": "same mutation, against the causal sweep",
+      "test": "test_14_no_slot_of_any_sleeve_demands_a_bar_from_its_own_future",
+      "outcome": "RED"
+    },
+    {
+      "id": "M15",
+      "mutation": "validate() always allows",
+      "test": "test_15_the_sweep_is_capable_of_failing",
+      "outcome": "RED"
+    },
+    {
+      "id": "M16",
+      "mutation": "track1_intraday imports a strategy",
+      "test": "test_17_the_causal_work_changed_no_strategy_rule",
+      "outcome": "RED"
+    },
+    {
+      "id": "M17",
+      "mutation": "a gate field lands where identity is computed",
+      "test": "test_17b_the_grace_is_a_gate_field_not_a_strategy_parameter",
+      "outcome": "RED"
+    },
+    {
+      "id": "M18",
+      "mutation": "the crash that left a window open forever",
+      "test": "test_25_the_calm_crash_of_20260824_cannot_happen_again",
+      "outcome": "RED"
+    },
+    {
+      "id": "M19",
+      "mutation": "average/barcount ride into the join again",
+      "test": "test_25_the_calm_crash_of_20260824_cannot_happen_again",
+      "outcome": "RED"
+    },
+    {
+      "id": "M20",
+      "mutation": "an unclosed window not reported",
+      "test": "test_24_every_opened_window_in_the_ledger_is_accounted_for",
+      "outcome": "RED"
+    },
+    {
+      "id": "M21",
+      "mutation": "slot_timing dropped from the checklist",
+      "test": "test_22_the_runbook_exists_and_names_every_artefact_to_inspect",
+      "outcome": "RED"
+    },
+    {
+      "id": "M22",
+      "mutation": "the three-clock anchor removed",
+      "test": "test_23_the_runbook_states_the_three_clocks_explicitly",
+      "outcome": "RED"
+    }
+  ]
+}

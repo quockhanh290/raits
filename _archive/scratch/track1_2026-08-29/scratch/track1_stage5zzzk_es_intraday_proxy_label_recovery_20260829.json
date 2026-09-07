@@ -1,0 +1,443 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-K",
+ "title": "ES intraday proxy label-recovery test before Swing",
+ "route": "track1_candidate",
+ "date": "2026-08-29",
+ "kind": "label-recovery test only - no backtest, no promotion",
+ "decision": "ES_PROXY_NOT_PROMISING",
+ "decision_rationale": [
+  "ES fixed the data problem (coverage 98.5% / 99.6% / 100.0%) and did not fix the idea",
+  "the proxy loses to D-1 persistence in EVERY window including both OOS ones",
+  "the promotion bar's first clause - must beat D-1 OOS - fails at -5.2 pts in 2025 and -11.4 pts in 2026",
+  "Normal precision falls in every window (-0.080 / -0.098 / -0.179); the OOS recall gain is bought with a larger precision loss",
+  "in 2026 the proxy never predicted Stress at all and Calm recall collapsed to 0.500, so Calm/Stress separation is destroyed, not merely dented"
+ ],
+ "data": {
+  "path": "data/cache/futures/ES_continuous_1m_8y.parquet",
+  "bars": 3375148,
+  "first": "2017-01-02",
+  "last": "2026-08-28",
+  "timezone": {
+   "index_is": "naive UTC",
+   "determined_by": "measurement, not assumption",
+   "evidence": {
+    "localise_utc_rth_share": 0.803,
+    "localise_et_rth_share": 0.426,
+    "utc_peak_et_hours": [
+     15,
+     10,
+     9,
+     11
+    ]
+   }
+  },
+  "coverage": {
+   "floor": {
+    "sessions_with_1400_bar": 1736,
+    "expected": 1763,
+    "share": 0.9847,
+    "hmm_fit_end": "2022-12-31",
+    "first": "2018-01-02",
+    "last": "2024-12-31"
+   },
+   "vault2025": {
+    "sessions_with_1400_bar": 250,
+    "expected": 251,
+    "share": 0.996,
+    "hmm_fit_end": "2024-12-31",
+    "first": "2025-01-02",
+    "last": "2025-12-31"
+   },
+   "vault2026": {
+    "sessions_with_1400_bar": 158,
+    "expected": 158,
+    "share": 1.0,
+    "hmm_fit_end": "2024-12-31",
+    "first": "2026-01-02",
+    "last": "2026-08-19"
+   }
+  },
+  "covers_all_windows": true
+ },
+ "causality": {
+  "cut_time_et": "14:00",
+  "features": [
+   "gap",
+   "ret_to_1400",
+   "ret_open_to_1400",
+   "range_to_1400",
+   "overnight_range",
+   "rvol_1400",
+   "vol_ratio",
+   "rvol_5d_prior",
+   "absret_5d_prior"
+  ],
+  "es_only_feature": "overnight_range (18:00 prior -> 09:30), information SPY cannot supply",
+  "predicted_session_1600_close_read": false,
+  "walk_forward": "refit every 126 sessions on everything strictly before; ~18 months warm-up",
+  "label_convention": "floor from HMM fit through 2022-12-31; 2025/2026 from the fit through 2024-12-31 - the route's own per-window convention, so no later fit leaks backwards",
+  "oos_leakage": false,
+  "causal": true
+ },
+ "results": {
+  "ALL": {
+   "scored": 1766,
+   "agreement_d1": 0.906,
+   "agreement_proxy": 0.8143,
+   "difference": -0.0917,
+   "d1_wrong": 166,
+   "proxy_fixed": 84,
+   "d1_right": 1600,
+   "proxy_broke": 246,
+   "net_sessions": -162,
+   "per_state_proxy": {
+    "Calm": {
+     "support": 748,
+     "precision": 0.8356,
+     "recall": 0.8222
+    },
+    "Normal": {
+     "support": 906,
+     "precision": 0.8108,
+     "recall": 0.8322
+    },
+    "Stress": {
+     "support": 112,
+     "precision": 0.69,
+     "recall": 0.6161
+    }
+   },
+   "per_state_d1": {
+    "Calm": {
+     "support": 748,
+     "precision": 0.9104,
+     "recall": 0.9104
+    },
+    "Normal": {
+     "support": 906,
+     "precision": 0.9084,
+     "recall": 0.9084
+    },
+    "Stress": {
+     "support": 112,
+     "precision": 0.8571,
+     "recall": 0.8571
+    }
+   },
+   "confusion": {
+    "Calm": {
+     "Calm": 615,
+     "Normal": 121,
+     "Stress": 0
+    },
+    "Normal": {
+     "Calm": 133,
+     "Normal": 754,
+     "Stress": 43
+    },
+    "Stress": {
+     "Calm": 0,
+     "Normal": 31,
+     "Stress": 69
+    }
+   }
+  },
+  "floor": {
+   "scored": 1358,
+   "agreement_d1": 0.9153,
+   "agreement_proxy": 0.8189,
+   "difference": -0.0965,
+   "d1_wrong": 115,
+   "proxy_fixed": 58,
+   "d1_right": 1243,
+   "proxy_broke": 189,
+   "net_sessions": -131,
+   "per_state_proxy": {
+    "Calm": {
+     "support": 571,
+     "precision": 0.8188,
+     "recall": 0.8704
+    },
+    "Normal": {
+     "support": 700,
+     "precision": 0.8388,
+     "recall": 0.8029
+    },
+    "Stress": {
+     "support": 87,
+     "precision": 0.6543,
+     "recall": 0.6092
+    }
+   },
+   "per_state_d1": {
+    "Calm": {
+     "support": 571,
+     "precision": 0.9178,
+     "recall": 0.9194
+    },
+    "Normal": {
+     "support": 700,
+     "precision": 0.9185,
+     "recall": 0.9171
+    },
+    "Stress": {
+     "support": 87,
+     "precision": 0.8736,
+     "recall": 0.8736
+    }
+   },
+   "confusion": {
+    "Calm": {
+     "Calm": 497,
+     "Normal": 110,
+     "Stress": 0
+    },
+    "Normal": {
+     "Calm": 74,
+     "Normal": 562,
+     "Stress": 34
+    },
+    "Stress": {
+     "Calm": 0,
+     "Normal": 28,
+     "Stress": 53
+    }
+   }
+  },
+  "vault2025": {
+   "scored": 250,
+   "agreement_d1": 0.876,
+   "agreement_proxy": 0.824,
+   "difference": -0.052,
+   "d1_wrong": 31,
+   "proxy_fixed": 13,
+   "d1_right": 219,
+   "proxy_broke": 26,
+   "net_sessions": -13,
+   "per_state_proxy": {
+    "Calm": {
+     "support": 113,
+     "precision": 0.9053,
+     "recall": 0.7611
+    },
+    "Normal": {
+     "support": 116,
+     "precision": 0.7647,
+     "recall": 0.8966
+    },
+    "Stress": {
+     "support": 21,
+     "precision": 0.8421,
+     "recall": 0.7619
+    }
+   },
+   "per_state_d1": {
+    "Calm": {
+     "support": 113,
+     "precision": 0.9018,
+     "recall": 0.8938
+    },
+    "Normal": {
+     "support": 116,
+     "precision": 0.8632,
+     "recall": 0.8707
+    },
+    "Stress": {
+     "support": 21,
+     "precision": 0.8095,
+     "recall": 0.8095
+    }
+   },
+   "confusion": {
+    "Calm": {
+     "Calm": 86,
+     "Normal": 9,
+     "Stress": 0
+    },
+    "Normal": {
+     "Calm": 27,
+     "Normal": 104,
+     "Stress": 5
+    },
+    "Stress": {
+     "Calm": 0,
+     "Normal": 3,
+     "Stress": 16
+    }
+   }
+  },
+  "vault2026": {
+   "scored": 158,
+   "agreement_d1": 0.8734,
+   "agreement_proxy": 0.7595,
+   "difference": -0.1139,
+   "d1_wrong": 20,
+   "proxy_fixed": 13,
+   "d1_right": 138,
+   "proxy_broke": 31,
+   "net_sessions": -18,
+   "per_state_proxy": {
+    "Calm": {
+     "support": 64,
+     "precision": 0.9412,
+     "recall": 0.5
+    },
+    "Normal": {
+     "support": 90,
+     "precision": 0.7097,
+     "recall": 0.9778
+    },
+    "Stress": {
+     "support": 4,
+     "precision": null,
+     "recall": 0.0
+    }
+   },
+   "per_state_d1": {
+    "Calm": {
+     "support": 64,
+     "precision": 0.8594,
+     "recall": 0.8594
+    },
+    "Normal": {
+     "support": 90,
+     "precision": 0.8889,
+     "recall": 0.8889
+    },
+    "Stress": {
+     "support": 4,
+     "precision": 0.75,
+     "recall": 0.75
+    }
+   },
+   "confusion": {
+    "Calm": {
+     "Calm": 32,
+     "Normal": 2,
+     "Stress": 0
+    },
+    "Normal": {
+     "Calm": 32,
+     "Normal": 88,
+     "Stress": 4
+    }
+   }
+  }
+ },
+ "headline": {
+  "ALL": {
+   "d1": 0.906,
+   "proxy": 0.814,
+   "diff": -0.092
+  },
+  "floor": {
+   "d1": 0.915,
+   "proxy": 0.819,
+   "diff": -0.096
+  },
+  "vault2025": {
+   "d1": 0.876,
+   "proxy": 0.824,
+   "diff": -0.052
+  },
+  "vault2026": {
+   "d1": 0.873,
+   "proxy": 0.759,
+   "diff": -0.114
+  }
+ },
+ "normal_state_detection": {
+  "floor": {
+   "d1_precision": 0.918,
+   "d1_recall": 0.917,
+   "proxy_precision": 0.839,
+   "proxy_recall": 0.803,
+   "precision_delta": -0.08,
+   "recall_delta": -0.114
+  },
+  "vault2025": {
+   "d1_precision": 0.863,
+   "d1_recall": 0.871,
+   "proxy_precision": 0.765,
+   "proxy_recall": 0.897,
+   "precision_delta": -0.098,
+   "recall_delta": 0.026
+  },
+  "vault2026": {
+   "d1_precision": 0.889,
+   "d1_recall": 0.889,
+   "proxy_precision": 0.71,
+   "proxy_recall": 0.978,
+   "precision_delta": -0.179,
+   "recall_delta": 0.089
+  },
+  "verdict": "no improvement; the OOS recall gain is bought with a larger precision loss, which is the worst trade for a Normal-only sleeve",
+  "vault2026_detail": "the proxy called Normal on 124 sessions of which 88 were Normal, 32 Calm and 4 Stress; the sleeve would have traded 32 Calm sessions it should have sat out"
+ },
+ "promotion_bar": {
+  "beats_d1_oos": false,
+  "improves_normal_without_destroying_calm_stress": false,
+  "sufficient_2025_2026_coverage": true,
+  "fully_causal": true,
+  "verdict": "two of four clauses fail; no backtest warranted"
+ },
+ "cross_stage": {
+  "spy_floor": {
+   "d1": 0.916,
+   "proxy": 0.828
+  },
+  "es_floor": {
+   "d1": 0.915,
+   "proxy": 0.819
+  },
+  "reading": "two independent instruments lose to persistence by a similar margin on the same window; the limit is not the instrument but the two-hour gap to a close-defined label against a highly persistent baseline"
+ },
+ "not_closed": [
+  "a later cut time (15:30 / 15:55) would be closer to the close and still causal - but not for a sleeve that starts at 14:05",
+  "predicting the sleeve's OUTCOME rather than the label skips the two-hour gap entirely",
+  "a precision-weighted objective would trade recall away deliberately instead of by accident",
+  "each of these is a label- or outcome-recovery test costing minutes, and should be run before any backtest"
+ ],
+ "tooling_failure_recorded": {
+  "what": "the first run reported zero usable sessions in all three windows",
+  "cause": "the overnight-session join grouped on `.values`, stripping the timezone; every reindex against the tz-aware session index produced NaN and the final dropna emptied the frame",
+  "why_caught": "an empty result is a reason to suspect the instrument before believing it",
+  "fix": "grouped on a tz-aware ET key; two assertions added (overnight join coverage, feature/label intersection size) so the same failure is loud rather than quiet"
+ },
+ "answers": {
+  "es_covers_all_windows": true,
+  "d1_agreement": 0.906,
+  "proxy_agreement": 0.814,
+  "floor": "91.5% vs 81.9% (-9.6)",
+  "oos_2025": "87.6% vs 82.4% (-5.2)",
+  "oos_2026": "87.3% vs 75.9% (-11.4)",
+  "improves_normal_detection": false,
+  "worth_a_full_backtest_next": false,
+  "swing_remains_research_only": true,
+  "live_route_code_changed": false,
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ]
+ },
+ "safety": {
+  "scheduler_restarted": false,
+  "scheduler_pids": [
+   3000
+  ],
+  "broker_connected": false,
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "confirmation_file_modified": false,
+  "runtime_evidence_modified": false,
+  "live_route_code_changed": false,
+  "read_only": true
+ },
+ "files_added": [
+  "scratch/track1_stage5zzzk_es_proxy_label_recovery_20260829.py",
+  "scratch/track1_stage5zzzk_es_proxy_label_recovery_20260829.json",
+  "scratch/track1_stage5zzzk_es_intraday_proxy_label_recovery_20260829.md",
+  "scratch/track1_stage5zzzk_es_intraday_proxy_label_recovery_20260829.json"
+ ]
+}

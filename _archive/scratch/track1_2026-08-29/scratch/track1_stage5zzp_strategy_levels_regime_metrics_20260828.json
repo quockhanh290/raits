@@ -1,0 +1,168 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZP",
+  "title": "Publish strategy levels, rule values, volume and regime metrics",
+  "when_et": "2026-08-27 to 2026-08-28",
+
+  "scope_stated_up_front": {
+    "delivered_in_full": ["volume", "regime metrics", "Stress rule diagnostics",
+                          "backend payload", "dashboard"],
+    "deliberately_not_attempted": ["NKD rule diagnostics", "Swing rule diagnostics",
+                                   "Calm two-phase diagnostics",
+                                   "per-slot diagnostic persistence"],
+    "why_named": "what was not done is named with the reason from source rather than left looking finished; nothing is half-wired"
+  },
+
+  "the_finding": {
+    "what_5zzl_did": "read RETURN TYPES and concluded neither the sleeves nor the model published anything under their verdicts",
+    "what_reading_the_implementations_shows": {
+      "stress_rule_values": "every one computed, compared against a named threshold, then dropped",
+      "regime_score": "HMMEngine.predict_proba exists; the posterior is real",
+      "volume": "present in EVERY instrument store, simply not aggregated",
+      "regime_threshold": "genuinely absent - and now says why from the mechanism"
+    }
+  },
+
+  "stress": {
+    "the_gap": "entry_conditions made four comparisons and returned a bool; the values were computed by peer_features, the thresholds were named in StressParams, both sat at the call site, and only the JOIN between them was thrown away - while the slot one frame up wrote not_exposed_by_sleeve into its own record",
+    "refactors": [
+      {"what": "entry_checks() states the four comparisons AS DATA; entry_conditions became all() over it",
+       "why_not_a_second_function": "a breakdown beside the original would be two statements of one rule - the drift this repo has paid for"},
+      {"what": "basket_state() is detect_entry_for_slot's own opening, extracted",
+       "why": "it computed the contexts and features and discarded them on the way to return []"}
+    ],
+    "proof_no_decision_moved": {
+      "entry_conditions": {"cases": 5760, "parameter_sets": 5, "mismatch": 0},
+      "detect_entry_for_slot": {"slot_days": 652, "with_real_setups": 215, "differences": 0},
+      "why_215_matters": "an all-empty baseline would have proved nothing, and the first 40-day sample WAS all-empty; the sweep was widened until it contained 97 days the basket genuinely set up on"
+    },
+    "what_a_no_signal_slot_can_now_say": {
+      "session": "2026-08-27",
+      "rules": [
+        {"label": "Instruments below open and VWAP", "value": 4, "threshold": 4,
+         "comparator": ">=", "passed": true},
+        {"label": "Instruments gapped down", "value": 0, "threshold": 3,
+         "comparator": ">=", "passed": false},
+        {"label": "Instruments with a wide range", "value": 0, "threshold": 0,
+         "comparator": ">=", "passed": true},
+        {"label": "Average basket gap", "value": 0.0051153, "threshold": -0.001,
+         "comparator": "<=", "passed": false}
+      ],
+      "first_failed": "gapdown_count",
+      "reading": "the basket was fully bearish on breadth and gapped UP half a percent - a market answer, not a data answer"
+    },
+    "three_named_failures": ["missing_bars", "session_not_judgeable", "conditions_not_met"]
+  },
+
+  "regime": {
+    "mechanism_from_source": {
+      "predict_current": "self._model.predict(X)[-1] - a Viterbi decode",
+      "predict_proba": "self._model.predict_proba(X)[-1] - a posterior per state"
+    },
+    "recorded": {
+      "label": "Calm", "label_date": "2026-08-27",
+      "score": 0.998354, "score_name": "posterior probability of the labelled state",
+      "margin": 0.996711, "runner_up": "Normal",
+      "state_probabilities": {"Calm": 0.998354, "Normal": 0.001643, "Stress": 0.000003},
+      "posterior_agrees_with_label": true,
+      "agreement_measured": "8/8 recent days, and flagged when it is not",
+      "shift_threshold": null
+    },
+    "why_no_threshold": "Viterbi picks the most likely PATH; nothing is compared against a constant, so there is no cut to be near, and a distance-to-threshold display would describe a decision procedure the model does not use",
+    "what_stands_in_its_place": "the lead over the runner-up state - a real number, named as a margin, never as a threshold distance",
+    "proof_pinned_by_test": "a test reads raits/hmm/engine.py and asserts predict_current contains no threshold",
+    "still_recorded_not_computed_per_request": "the 8.54s reason from 5ZZL holds; a test pins that label_regimes appears nowhere in the reader"
+  },
+
+  "volume": {
+    "measured": {"MNQ": "every bar, mean 3195", "MES": "every bar, mean 1269",
+                 "MNKD": "270 of the last 500 bars, mean 2.5 - a genuinely thin instrument"},
+    "aggregation": "summed across each 5-minute bucket",
+    "rendered": "a pane inside the chart's EXISTING box, so adding it cannot move the panel",
+    "volume_status_values": ["present", "present_but_zero", "partial", "not_available"],
+    "why_four": "a column of zeros and an absent column must not draw the same",
+    "synthesised": false
+  },
+
+  "per_sleeve_before_after": {
+    "roska4_stress": {"before": "NO SIGNAL, no volume, not_exposed_by_sleeve on every rule",
+                      "after": "four rule values with thresholds, the first failing one as a chip, volume pane"},
+    "global_nkd": {"before": "NO SIGNAL, no volume",
+                   "after": "volume pane; rules named not_computed_until_entry with the reason"},
+    "roska4_swing": {"before": "NO SIGNAL, no volume", "after": "volume pane; same honest naming"},
+    "roska4_calm": {"before": "not charted", "after": "unchanged - see not_done_with_reasons"}
+  },
+
+  "dashboard": {
+    "regime_panel": ["Score not published -> CONFIDENCE 99.8%",
+                     "added LEAD OVER NEXT 99.7% over Normal",
+                     "SHIFT THRESHOLD None published, with the Viterbi explanation on hover"],
+    "market_view": ["volume pane", "a chip naming the first unmet condition"],
+    "new_panels": 0, "new_visual_language": false, "chart_box_changed": false
+  },
+
+  "not_done_with_reasons": [
+    {"what": "NKD and Swing rule diagnostics",
+     "from_source": "the detector returns SwingSetup(entry, stop, daily_atr, regime) when a setup exists and None when it does not",
+     "consequence": "entry and stop ARE published on a signal day; on a quiet day the entry level is produced by a per-bar signal function inside a validated core strategy, not by a comparison against a standing level",
+     "why_not_faked": "publishing a distance to entry would mean forming an entry the detector never formed",
+     "reported_as": "not_computed_until_entry, with that sentence"},
+    {"what": "Calm two-phase diagnostics",
+     "from_source": "entry_conditions already returns a dict of its own values, so the raw material is there",
+     "why_not_wired": "the live path reaches it through the DECIDE/OBSERVE contract, and the DECIDE half must not be shown values the OBSERVE half produces; wiring it without honouring that split would put a 10:00 reference price on a 09:32 decision",
+     "decision": "left unwired rather than wired wrongly"},
+    {"what": "per-slot diagnostic persistence",
+     "why": "persisting it belongs with a change to the slot's own write path, which touches the decision path and did not belong in a stage whose contract was change-no-decision"}
+  ],
+
+  "tests": {
+    "new_file": "scratch/test_track1_stage5zzp_strategy_levels_regime_metrics_20260828.py",
+    "new_count": 22,
+    "broker_contacts": 0,
+    "runtime_writes_by_tests": 0,
+    "equivalence_baseline": "the PRE-refactor function is kept in the test file - comparing the new code against a re-reading of itself would be true by construction",
+    "claims_corrected_because_this_stage_disproved_them": [
+      {"was": "score is None", "now": "the score is published and in [0,1]"},
+      {"was": "Score not published visible",
+       "now": "CONFIDENCE 99.8% visible; the THRESHOLD is the named-absent one"},
+      {"was": "tooltip: publishes labels but not the score",
+       "now": "tooltips say what the numbers are, and why the threshold cannot exist"},
+      {"was": "module docstring: there is no score, no probability",
+       "now": "corrected in place, with the engine calls quoted",
+       "note": "a statement IN THE SOURCE that had become false - corrected where it lives, not annotated elsewhere"}
+    ],
+    "my_own_mistakes": [
+      "read 'MES has no bars for this session' as a defect; it was 01:56 ET on the NEXT session - the diagnostic was right and my reading was wrong, the three-clock trap",
+      "a DOM assertion was case-sensitive against a CSS-uppercased label - the identical trap 5ZZM hit on the empty-state heading"
+    ],
+    "suites": "5ZZP + 5ZZL/M + dashboard backend + realtime contract + realtime DOM + ops + 5ZZN + 5ZZO",
+    "passed": 414,
+    "failed": 0
+  },
+
+  "safety": {
+    "orders_possible_before": false, "orders_possible_after": false,
+    "track1_blocking_before": ["PAPER_SHADOW_EVIDENCE"],
+    "track1_blocking_after": ["PAPER_SHADOW_EVIDENCE"],
+    "confirmation_before": true, "confirmation_after": true, "confirmation_touched": false,
+    "scheduler": "pid 3000, track1-only-shadow, 0 legacy entry jobs, untouched",
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "orders_dir": "ABSENT",
+    "broker_order_calls": 0,
+    "trading_decisions_moved": 0,
+    "decision_proof": "5760 rule cases and 652 slot-days, 0 differences",
+    "runtime_written": "one appended regime-label record; no trading file touched"
+  },
+
+  "files_touched": {
+    "modified": ["global_index/track1_stress_mnq.py",
+                 "global_index/track1_regime_record.py",
+                 "monitor/backend/track1_market_view.py",
+                 "global_index/dash/realtime/realtime.js",
+                 "global_index/dash/realtime/realtime.css",
+                 "scratch/test_track1_stage5zzl_market_view_regime_20260827.py"],
+    "new": ["scratch/test_track1_stage5zzp_strategy_levels_regime_metrics_20260828.py",
+            "scratch/track1_stage5zzp_strategy_levels_regime_metrics_20260828.md",
+            "scratch/track1_stage5zzp_strategy_levels_regime_metrics_20260828.json"]
+  }
+}

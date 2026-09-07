@@ -1,0 +1,1122 @@
+{
+  "p1_samples": [
+    {
+      "symbol": "AAPL",
+      "day": "2019-01-23",
+      "bar": "2019-01-23 14:30:00",
+      "bars_corrupted": 77218,
+      "unchanged": true,
+      "base": [
+        "2019-01-23 14:30:00",
+        38.2925,
+        36.002329,
+        "LONG"
+      ],
+      "got": [
+        "2019-01-23 14:30:00",
+        38.2925,
+        36.002329,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "AAPL",
+      "day": "2019-10-04",
+      "bar": "2019-10-04 15:00:00",
+      "bars_corrupted": 63441,
+      "unchanged": true,
+      "base": [
+        "2019-10-04 15:00:00",
+        56.5925,
+        54.582043,
+        "LONG"
+      ],
+      "got": [
+        "2019-10-04 15:00:00",
+        56.5925,
+        54.582043,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "AAPL",
+      "day": "2020-10-16",
+      "bar": "2020-10-16 14:40:00",
+      "bars_corrupted": 43165,
+      "unchanged": true,
+      "base": [
+        "2020-10-16 14:40:00",
+        120.28,
+        113.165729,
+        "LONG"
+      ],
+      "got": [
+        "2020-10-16 14:40:00",
+        120.28,
+        113.165729,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "AAPL",
+      "day": "2021-06-22",
+      "bar": "2021-06-22 14:55:00",
+      "bars_corrupted": 29972,
+      "unchanged": true,
+      "base": [
+        "2021-06-22 14:55:00",
+        133.565,
+        129.374014,
+        "LONG"
+      ],
+      "got": [
+        "2021-06-22 14:55:00",
+        133.565,
+        129.374014,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "AAPL",
+      "day": "2022-01-14",
+      "bar": "2022-01-14 15:00:00",
+      "bars_corrupted": 18774,
+      "unchanged": true,
+      "base": [
+        "2022-01-14 15:00:00",
+        172.43,
+        165.124286,
+        "LONG"
+      ],
+      "got": [
+        "2022-01-14 15:00:00",
+        172.43,
+        165.124286,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "AAPL",
+      "day": "2022-11-22",
+      "bar": "2022-11-22 14:15:00",
+      "bars_corrupted": 2013,
+      "unchanged": true,
+      "base": [
+        "2022-11-22 14:15:00",
+        149.5724,
+        138.973014,
+        "LONG"
+      ],
+      "got": [
+        "2022-11-22 14:15:00",
+        149.5724,
+        138.973014,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2019-01-23",
+      "bar": "2019-01-23 15:20:00",
+      "bars_corrupted": 77208,
+      "unchanged": true,
+      "base": [
+        "2019-01-23 15:20:00",
+        106.36,
+        101.3391,
+        "LONG"
+      ],
+      "got": [
+        "2019-01-23 15:20:00",
+        106.36,
+        101.3391,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2019-09-11",
+      "bar": "2019-09-11 14:50:00",
+      "bars_corrupted": 64769,
+      "unchanged": true,
+      "base": [
+        "2019-09-11 14:50:00",
+        135.65,
+        130.254686,
+        "LONG"
+      ],
+      "got": [
+        "2019-09-11 14:50:00",
+        135.65,
+        130.254686,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2020-10-22",
+      "bar": "2020-10-22 14:35:00",
+      "bars_corrupted": 42854,
+      "unchanged": true,
+      "base": [
+        "2020-10-22 14:35:00",
+        214.965,
+        204.755014,
+        "LONG"
+      ],
+      "got": [
+        "2020-10-22 14:35:00",
+        214.965,
+        204.755014,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2021-06-28",
+      "bar": "2021-06-28 14:50:00",
+      "bars_corrupted": 29661,
+      "unchanged": true,
+      "base": [
+        "2021-06-28 14:50:00",
+        268.19,
+        261.1076,
+        "LONG"
+      ],
+      "got": [
+        "2021-06-28 14:50:00",
+        268.19,
+        261.1076,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2022-01-20",
+      "bar": "2022-01-20 14:10:00",
+      "bars_corrupted": 18550,
+      "unchanged": true,
+      "base": [
+        "2022-01-20 14:10:00",
+        307.17,
+        324.397757,
+        "SHORT"
+      ],
+      "got": [
+        "2022-01-20 14:10:00",
+        307.17,
+        324.397757,
+        "SHORT"
+      ]
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2022-12-09",
+      "bar": "2022-12-09 15:05:00",
+      "bars_corrupted": 1102,
+      "unchanged": true,
+      "base": [
+        "2022-12-09 15:05:00",
+        247.01,
+        235.330086,
+        "LONG"
+      ],
+      "got": [
+        "2022-12-09 15:05:00",
+        247.01,
+        235.330086,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "JPM",
+      "day": "2019-01-23",
+      "bar": "2019-01-23 14:30:00",
+      "bars_corrupted": 77215,
+      "unchanged": true,
+      "base": [
+        "2019-01-23 14:30:00",
+        102.79,
+        98.053729,
+        "LONG"
+      ],
+      "got": [
+        "2019-01-23 14:30:00",
+        102.79,
+        98.053729,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "JPM",
+      "day": "2019-09-10",
+      "bar": "2019-09-10 14:25:00",
+      "bars_corrupted": 64851,
+      "unchanged": true,
+      "base": [
+        "2019-09-10 14:25:00",
+        116.43,
+        112.071471,
+        "LONG"
+      ],
+      "got": [
+        "2019-09-10 14:25:00",
+        116.43,
+        112.071471,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "JPM",
+      "day": "2020-10-15",
+      "bar": "2020-10-15 14:50:00",
+      "bars_corrupted": 43241,
+      "unchanged": true,
+      "base": [
+        "2020-10-15 14:50:00",
+        101.39,
+        96.6928,
+        "LONG"
+      ],
+      "got": [
+        "2020-10-15 14:50:00",
+        101.39,
+        96.6928,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "JPM",
+      "day": "2021-04-28",
+      "bar": "2021-04-28 14:15:00",
+      "bars_corrupted": 32944,
+      "unchanged": true,
+      "base": [
+        "2021-04-28 14:15:00",
+        152.1317,
+        146.437129,
+        "LONG"
+      ],
+      "got": [
+        "2021-04-28 14:15:00",
+        152.1317,
+        146.437129,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "JPM",
+      "day": "2022-01-10",
+      "bar": "2022-01-10 14:50:00",
+      "bars_corrupted": 19088,
+      "unchanged": true,
+      "base": [
+        "2022-01-10 14:50:00",
+        166.68,
+        160.555157,
+        "LONG"
+      ],
+      "got": [
+        "2022-01-10 14:50:00",
+        166.68,
+        160.555157,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "JPM",
+      "day": "2022-12-15",
+      "bar": "2022-12-15 15:30:00",
+      "bars_corrupted": 785,
+      "unchanged": true,
+      "base": [
+        "2022-12-15 15:30:00",
+        130.855,
+        124.734286,
+        "LONG"
+      ],
+      "got": [
+        "2022-12-15 15:30:00",
+        130.855,
+        124.734286,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "XOM",
+      "day": "2019-01-24",
+      "bar": "2019-01-24 15:40:00",
+      "bars_corrupted": 77122,
+      "unchanged": true,
+      "base": [
+        "2019-01-24 15:40:00",
+        71.315,
+        68.721814,
+        "LONG"
+      ],
+      "got": [
+        "2019-01-24 15:40:00",
+        71.315,
+        68.721814,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "XOM",
+      "day": "2019-09-06",
+      "bar": "2019-09-06 14:45:00",
+      "bars_corrupted": 65003,
+      "unchanged": true,
+      "base": [
+        "2019-09-06 14:45:00",
+        70.795,
+        68.517071,
+        "LONG"
+      ],
+      "got": [
+        "2019-09-06 14:45:00",
+        70.795,
+        68.517071,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "XOM",
+      "day": "2020-11-19",
+      "bar": "2020-11-19 15:10:00",
+      "bars_corrupted": 41287,
+      "unchanged": true,
+      "base": [
+        "2020-11-19 15:10:00",
+        37.295,
+        34.01,
+        "LONG"
+      ],
+      "got": [
+        "2020-11-19 15:10:00",
+        37.295,
+        34.01,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "XOM",
+      "day": "2021-07-22",
+      "bar": "2021-07-22 15:30:00",
+      "bars_corrupted": 28327,
+      "unchanged": true,
+      "base": [
+        "2021-07-22 15:30:00",
+        57.25,
+        53.804657,
+        "LONG"
+      ],
+      "got": [
+        "2021-07-22 15:30:00",
+        57.25,
+        53.804657,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "XOM",
+      "day": "2022-03-23",
+      "bar": "2022-03-23 14:25:00",
+      "bars_corrupted": 15193,
+      "unchanged": true,
+      "base": [
+        "2022-03-23 14:25:00",
+        83.54,
+        76.742171,
+        "LONG"
+      ],
+      "got": [
+        "2022-03-23 14:25:00",
+        83.54,
+        76.742171,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "XOM",
+      "day": "2022-12-15",
+      "bar": "2022-12-15 14:55:00",
+      "bars_corrupted": 792,
+      "unchanged": true,
+      "base": [
+        "2022-12-15 14:55:00",
+        105.02,
+        99.453886,
+        "LONG"
+      ],
+      "got": [
+        "2022-12-15 14:55:00",
+        105.02,
+        99.453886,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2019-01-24",
+      "bar": "2019-01-24 15:05:00",
+      "bars_corrupted": 77133,
+      "unchanged": true,
+      "base": [
+        "2019-01-24 15:05:00",
+        3.942,
+        3.5954,
+        "LONG"
+      ],
+      "got": [
+        "2019-01-24 15:05:00",
+        3.942,
+        3.5954,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2019-12-10",
+      "bar": "2019-12-10 15:05:00",
+      "bars_corrupted": 59887,
+      "unchanged": true,
+      "base": [
+        "2019-12-10 15:05:00",
+        5.3637,
+        5.0957,
+        "LONG"
+      ],
+      "got": [
+        "2019-12-10 15:05:00",
+        5.3637,
+        5.0957,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2020-08-17",
+      "bar": "2020-08-17 15:20:00",
+      "bars_corrupted": 46511,
+      "unchanged": true,
+      "base": [
+        "2020-08-17 15:20:00",
+        12.314,
+        11.6,
+        "LONG"
+      ],
+      "got": [
+        "2020-08-17 15:20:00",
+        12.314,
+        11.6,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2021-03-30",
+      "bar": "2021-03-30 14:55:00",
+      "bars_corrupted": 34496,
+      "unchanged": true,
+      "base": [
+        "2021-03-30 14:55:00",
+        12.8753,
+        11.957014,
+        "LONG"
+      ],
+      "got": [
+        "2021-03-30 14:55:00",
+        12.8753,
+        11.957014,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2021-10-18",
+      "bar": "2021-10-18 15:10:00",
+      "bars_corrupted": 23573,
+      "unchanged": true,
+      "base": [
+        "2021-10-18 15:10:00",
+        22.2665,
+        20.976214,
+        "LONG"
+      ],
+      "got": [
+        "2021-10-18 15:10:00",
+        22.2665,
+        20.976214,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2022-12-13",
+      "bar": "2022-12-13 15:50:00",
+      "bars_corrupted": 937,
+      "unchanged": true,
+      "base": [
+        "2022-12-13 15:50:00",
+        18.114,
+        16.703571,
+        "LONG"
+      ],
+      "got": [
+        "2022-12-13 15:50:00",
+        18.114,
+        16.703571,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "WMT",
+      "day": "2019-01-23",
+      "bar": "2019-01-23 14:15:00",
+      "bars_corrupted": 77218,
+      "unchanged": true,
+      "base": [
+        "2019-01-23 14:15:00",
+        32.7367,
+        31.745329,
+        "LONG"
+      ],
+      "got": [
+        "2019-01-23 14:15:00",
+        32.7367,
+        31.745329,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "WMT",
+      "day": "2019-08-23",
+      "bar": "2019-08-23 14:30:00",
+      "bars_corrupted": 65709,
+      "unchanged": true,
+      "base": [
+        "2019-08-23 14:30:00",
+        37.0967,
+        35.284386,
+        "LONG"
+      ],
+      "got": [
+        "2019-08-23 14:30:00",
+        37.0967,
+        35.284386,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "WMT",
+      "day": "2020-11-23",
+      "bar": "2020-11-23 15:35:00",
+      "bars_corrupted": 41126,
+      "unchanged": true,
+      "base": [
+        "2020-11-23 15:35:00",
+        50.1867,
+        48.047371,
+        "LONG"
+      ],
+      "got": [
+        "2020-11-23 15:35:00",
+        50.1867,
+        48.047371,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "WMT",
+      "day": "2021-06-24",
+      "bar": "2021-06-24 14:30:00",
+      "bars_corrupted": 29821,
+      "unchanged": true,
+      "base": [
+        "2021-06-24 14:30:00",
+        45.6867,
+        44.676686,
+        "LONG"
+      ],
+      "got": [
+        "2021-06-24 14:30:00",
+        45.6867,
+        44.676686,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "WMT",
+      "day": "2022-03-28",
+      "bar": "2022-03-28 14:10:00",
+      "bars_corrupted": 14962,
+      "unchanged": true,
+      "base": [
+        "2022-03-28 14:10:00",
+        48.4966,
+        46.765057,
+        "LONG"
+      ],
+      "got": [
+        "2022-03-28 14:10:00",
+        48.4966,
+        46.765057,
+        "LONG"
+      ]
+    },
+    {
+      "symbol": "WMT",
+      "day": "2022-12-15",
+      "bar": "2022-12-15 14:25:00",
+      "bars_corrupted": 798,
+      "unchanged": true,
+      "base": [
+        "2022-12-15 14:25:00",
+        48.1633,
+        46.632471,
+        "LONG"
+      ],
+      "got": [
+        "2022-12-15 14:25:00",
+        48.1633,
+        46.632471,
+        "LONG"
+      ]
+    }
+  ],
+  "p1r_samples": [
+    {
+      "symbol": "AAPL",
+      "day": "2019-01-23",
+      "bars_corrupted": 1152,
+      "changed": true
+    },
+    {
+      "symbol": "AAPL",
+      "day": "2019-10-04",
+      "bars_corrupted": 14929,
+      "changed": true
+    },
+    {
+      "symbol": "AAPL",
+      "day": "2020-10-16",
+      "bars_corrupted": 35205,
+      "changed": true
+    },
+    {
+      "symbol": "AAPL",
+      "day": "2021-06-22",
+      "bars_corrupted": 48398,
+      "changed": true
+    },
+    {
+      "symbol": "AAPL",
+      "day": "2022-01-14",
+      "bars_corrupted": 59596,
+      "changed": true
+    },
+    {
+      "symbol": "AAPL",
+      "day": "2022-11-22",
+      "bars_corrupted": 76357,
+      "changed": true
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2019-01-23",
+      "bars_corrupted": 1162,
+      "changed": true
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2019-09-11",
+      "bars_corrupted": 13601,
+      "changed": true
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2020-10-22",
+      "bars_corrupted": 35516,
+      "changed": true
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2021-06-28",
+      "bars_corrupted": 48709,
+      "changed": true
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2022-01-20",
+      "bars_corrupted": 59820,
+      "changed": true
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2022-12-09",
+      "bars_corrupted": 77268,
+      "changed": true
+    },
+    {
+      "symbol": "JPM",
+      "day": "2019-01-23",
+      "bars_corrupted": 1152,
+      "changed": true
+    },
+    {
+      "symbol": "JPM",
+      "day": "2019-09-10",
+      "bars_corrupted": 13516,
+      "changed": true
+    },
+    {
+      "symbol": "JPM",
+      "day": "2020-10-15",
+      "bars_corrupted": 35126,
+      "changed": true
+    },
+    {
+      "symbol": "JPM",
+      "day": "2021-04-28",
+      "bars_corrupted": 45423,
+      "changed": true
+    },
+    {
+      "symbol": "JPM",
+      "day": "2022-01-10",
+      "bars_corrupted": 59279,
+      "changed": true
+    },
+    {
+      "symbol": "JPM",
+      "day": "2022-12-15",
+      "bars_corrupted": 77582,
+      "changed": true
+    },
+    {
+      "symbol": "XOM",
+      "day": "2019-01-24",
+      "bars_corrupted": 1244,
+      "changed": true
+    },
+    {
+      "symbol": "XOM",
+      "day": "2019-09-06",
+      "bars_corrupted": 13363,
+      "changed": true
+    },
+    {
+      "symbol": "XOM",
+      "day": "2020-11-19",
+      "bars_corrupted": 37079,
+      "changed": true
+    },
+    {
+      "symbol": "XOM",
+      "day": "2021-07-22",
+      "bars_corrupted": 50039,
+      "changed": true
+    },
+    {
+      "symbol": "XOM",
+      "day": "2022-03-23",
+      "bars_corrupted": 63173,
+      "changed": true
+    },
+    {
+      "symbol": "XOM",
+      "day": "2022-12-15",
+      "bars_corrupted": 77574,
+      "changed": true
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2019-01-24",
+      "bars_corrupted": 1237,
+      "changed": true
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2019-12-10",
+      "bars_corrupted": 18483,
+      "changed": true
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2020-08-17",
+      "bars_corrupted": 31859,
+      "changed": true
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2021-03-30",
+      "bars_corrupted": 43874,
+      "changed": true
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2021-10-18",
+      "bars_corrupted": 54797,
+      "changed": true
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2022-12-13",
+      "bars_corrupted": 77433,
+      "changed": true
+    },
+    {
+      "symbol": "WMT",
+      "day": "2019-01-23",
+      "bars_corrupted": 1149,
+      "changed": true
+    },
+    {
+      "symbol": "WMT",
+      "day": "2019-08-23",
+      "bars_corrupted": 12658,
+      "changed": true
+    },
+    {
+      "symbol": "WMT",
+      "day": "2020-11-23",
+      "bars_corrupted": 37241,
+      "changed": true
+    },
+    {
+      "symbol": "WMT",
+      "day": "2021-06-24",
+      "bars_corrupted": 48546,
+      "changed": true
+    },
+    {
+      "symbol": "WMT",
+      "day": "2022-03-28",
+      "bars_corrupted": 63405,
+      "changed": true
+    },
+    {
+      "symbol": "WMT",
+      "day": "2022-12-15",
+      "bars_corrupted": 77569,
+      "changed": true
+    }
+  ],
+  "p2_samples": [
+    {
+      "symbol": "AAPL",
+      "day": "2019-01-23",
+      "identical": true
+    },
+    {
+      "symbol": "AAPL",
+      "day": "2019-10-04",
+      "identical": true
+    },
+    {
+      "symbol": "AAPL",
+      "day": "2020-10-16",
+      "identical": true
+    },
+    {
+      "symbol": "AAPL",
+      "day": "2021-06-22",
+      "identical": true
+    },
+    {
+      "symbol": "AAPL",
+      "day": "2022-01-14",
+      "identical": true
+    },
+    {
+      "symbol": "AAPL",
+      "day": "2022-11-22",
+      "identical": true
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2019-01-23",
+      "identical": true
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2019-09-11",
+      "identical": true
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2020-10-22",
+      "identical": true
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2021-06-28",
+      "identical": true
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2022-01-20",
+      "identical": true
+    },
+    {
+      "symbol": "MSFT",
+      "day": "2022-12-09",
+      "identical": true
+    },
+    {
+      "symbol": "JPM",
+      "day": "2019-01-23",
+      "identical": true
+    },
+    {
+      "symbol": "JPM",
+      "day": "2019-09-10",
+      "identical": true
+    },
+    {
+      "symbol": "JPM",
+      "day": "2020-10-15",
+      "identical": true
+    },
+    {
+      "symbol": "JPM",
+      "day": "2021-04-28",
+      "identical": true
+    },
+    {
+      "symbol": "JPM",
+      "day": "2022-01-10",
+      "identical": true
+    },
+    {
+      "symbol": "JPM",
+      "day": "2022-12-15",
+      "identical": true
+    },
+    {
+      "symbol": "XOM",
+      "day": "2019-01-24",
+      "identical": true
+    },
+    {
+      "symbol": "XOM",
+      "day": "2019-09-06",
+      "identical": true
+    },
+    {
+      "symbol": "XOM",
+      "day": "2020-11-19",
+      "identical": true
+    },
+    {
+      "symbol": "XOM",
+      "day": "2021-07-22",
+      "identical": true
+    },
+    {
+      "symbol": "XOM",
+      "day": "2022-03-23",
+      "identical": true
+    },
+    {
+      "symbol": "XOM",
+      "day": "2022-12-15",
+      "identical": true
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2019-01-24",
+      "identical": true
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2019-12-10",
+      "identical": true
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2020-08-17",
+      "identical": true
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2021-03-30",
+      "identical": true
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2021-10-18",
+      "identical": true
+    },
+    {
+      "symbol": "NVDA",
+      "day": "2022-12-13",
+      "identical": true
+    },
+    {
+      "symbol": "WMT",
+      "day": "2019-01-23",
+      "identical": true
+    },
+    {
+      "symbol": "WMT",
+      "day": "2019-08-23",
+      "identical": true
+    },
+    {
+      "symbol": "WMT",
+      "day": "2020-11-23",
+      "identical": true
+    },
+    {
+      "symbol": "WMT",
+      "day": "2021-06-24",
+      "identical": true
+    },
+    {
+      "symbol": "WMT",
+      "day": "2022-03-28",
+      "identical": true
+    },
+    {
+      "symbol": "WMT",
+      "day": "2022-12-15",
+      "identical": true
+    }
+  ],
+  "p3": {
+    "probe_day": "2021-06-15",
+    "label_read_at_probe_day_unchanged": true,
+    "label_at_probe_day_lag1": "Calm",
+    "n_later_sessions_checked": 40,
+    "n_later_labels_moved": 8
+  },
+  "p4": {
+    "probe_day_membership_unchanged": true,
+    "n_later_sessions_checked": 62,
+    "n_later_memberships_moved": 48
+  },
+  "self_check": {
+    "SC1_p1_sample_nonempty": true,
+    "SC2_p1_corruption_landed": true,
+    "SC3_p1_all_unchanged": true,
+    "SC4_p1r_sample_nonempty": true,
+    "SC5_p1r_majority_changed": true,
+    "SC6_p2_sample_nonempty": true,
+    "SC7_p2_all_identical": true,
+    "SC8_p3_probe_label_unchanged": true,
+    "SC9_p3_later_labels_moved": true,
+    "SC10_p4_probe_membership_unchanged": true,
+    "SC11_p4_later_memberships_moved": true
+  },
+  "summary": {
+    "p1_n": 36,
+    "p1_unchanged": 36,
+    "p1r_n": 36,
+    "p1r_changed": 36,
+    "p2_n": 36,
+    "p2_identical": 36,
+    "seconds": 859.6
+  }
+}

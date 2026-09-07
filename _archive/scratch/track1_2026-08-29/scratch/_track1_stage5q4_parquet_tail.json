@@ -1,0 +1,421 @@
+{
+  "probe": "parquet_tail",
+  "read_only": true,
+  "paths": {
+    "MES": "data/cache/futures/ES_continuous_1m_8y.parquet",
+    "MNQ": "data/cache/futures/NQ_continuous_1m_8y.parquet",
+    "MYM": "data/cache/futures/YM_continuous_1m_8y.parquet",
+    "M2K": "data/cache/futures/RTY_continuous_1m_8y.parquet",
+    "MNKD": "global_index/data/NKD_continuous_1m_8y.parquet"
+  },
+  "disputed_instant_et": "2026-08-21 13:45:00-04:00",
+  "instruments": {
+    "MES": {
+      "path": "data/cache/futures/ES_continuous_1m_8y.parquet",
+      "exists": true,
+      "size_bytes": 51438925,
+      "mtime": "2026-08-21 13:45:36.194581509-04:00",
+      "rows": 3368248,
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume"
+      ],
+      "tz": "America/New_York",
+      "first_bar": "2017-01-02 18:00:00-05:00",
+      "last_bar": "2026-08-21 13:44:00-04:00",
+      "last_bar_is_the_disputed_one": false,
+      "tail": [
+        {
+          "ts": "2026-08-21 13:39:00-04:00",
+          "open": 7691.25,
+          "high": 7692.0,
+          "low": 7690.75,
+          "close": 7691.0,
+          "volume": 337.0
+        },
+        {
+          "ts": "2026-08-21 13:40:00-04:00",
+          "open": 7691.0,
+          "high": 7691.5,
+          "low": 7690.0,
+          "close": 7690.25,
+          "volume": 929.0
+        },
+        {
+          "ts": "2026-08-21 13:41:00-04:00",
+          "open": 7690.25,
+          "high": 7692.5,
+          "low": 7690.25,
+          "close": 7692.0,
+          "volume": 672.0
+        },
+        {
+          "ts": "2026-08-21 13:42:00-04:00",
+          "open": 7692.0,
+          "high": 7692.5,
+          "low": 7691.5,
+          "close": 7692.0,
+          "volume": 563.0
+        },
+        {
+          "ts": "2026-08-21 13:43:00-04:00",
+          "open": 7692.0,
+          "high": 7692.25,
+          "low": 7691.0,
+          "close": 7691.5,
+          "volume": 396.0
+        },
+        {
+          "ts": "2026-08-21 13:44:00-04:00",
+          "open": 7691.5,
+          "high": 7692.25,
+          "low": 7690.75,
+          "close": 7692.0,
+          "volume": 705.0
+        }
+      ],
+      "last_bar_shape": {
+        "volume": 705.0,
+        "prev30_volume_median": 659.0,
+        "volume_ratio_vs_median": 1.069802731411229,
+        "range": 1.5,
+        "prev30_range_median": 1.5
+      }
+    },
+    "MNQ": {
+      "path": "data/cache/futures/NQ_continuous_1m_8y.parquet",
+      "exists": true,
+      "size_bytes": 57648422,
+      "mtime": "2026-08-21 13:46:16.102229118-04:00",
+      "rows": 3355780,
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume"
+      ],
+      "tz": "America/New_York",
+      "first_bar": "2017-01-02 18:00:00-05:00",
+      "last_bar": "2026-08-21 13:45:00-04:00",
+      "last_bar_is_the_disputed_one": true,
+      "tail": [
+        {
+          "ts": "2026-08-21 13:40:00-04:00",
+          "open": 29394.75,
+          "high": 29395.5,
+          "low": 29386.0,
+          "close": 29386.75,
+          "volume": 1847.0
+        },
+        {
+          "ts": "2026-08-21 13:41:00-04:00",
+          "open": 29387.25,
+          "high": 29398.25,
+          "low": 29386.75,
+          "close": 29395.5,
+          "volume": 1568.0
+        },
+        {
+          "ts": "2026-08-21 13:42:00-04:00",
+          "open": 29394.75,
+          "high": 29399.25,
+          "low": 29394.75,
+          "close": 29396.75,
+          "volume": 764.0
+        },
+        {
+          "ts": "2026-08-21 13:43:00-04:00",
+          "open": 29396.25,
+          "high": 29400.25,
+          "low": 29394.5,
+          "close": 29396.75,
+          "volume": 892.0
+        },
+        {
+          "ts": "2026-08-21 13:44:00-04:00",
+          "open": 29397.0,
+          "high": 29404.25,
+          "low": 29394.25,
+          "close": 29403.75,
+          "volume": 1051.0
+        },
+        {
+          "ts": "2026-08-21 13:45:00-04:00",
+          "open": 29404.5,
+          "high": 29408.0,
+          "low": 29400.25,
+          "close": 29404.5,
+          "volume": 1399.0
+        }
+      ],
+      "last_bar_shape": {
+        "volume": 1399.0,
+        "prev30_volume_median": 1584.0,
+        "volume_ratio_vs_median": 0.8832070707070707,
+        "range": 7.75,
+        "prev30_range_median": 10.125
+      },
+      "disputed_bar": {
+        "open": 29404.5,
+        "high": 29408.0,
+        "low": 29400.25,
+        "close": 29404.5,
+        "volume": 1399.0
+      },
+      "disputed_position_from_end": 0
+    },
+    "MYM": {
+      "path": "data/cache/futures/YM_continuous_1m_8y.parquet",
+      "exists": true,
+      "size_bytes": 52964219,
+      "mtime": "2026-08-21 13:46:49.555023909-04:00",
+      "rows": 3312660,
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume"
+      ],
+      "tz": "America/New_York",
+      "first_bar": "2017-01-02 18:00:00-05:00",
+      "last_bar": "2026-08-21 13:46:00-04:00",
+      "last_bar_is_the_disputed_one": false,
+      "tail": [
+        {
+          "ts": "2026-08-21 13:41:00-04:00",
+          "open": 53248.0,
+          "high": 53267.0,
+          "low": 53246.0,
+          "close": 53264.0,
+          "volume": 119.0
+        },
+        {
+          "ts": "2026-08-21 13:42:00-04:00",
+          "open": 53262.0,
+          "high": 53262.0,
+          "low": 53250.0,
+          "close": 53251.0,
+          "volume": 62.0
+        },
+        {
+          "ts": "2026-08-21 13:43:00-04:00",
+          "open": 53253.0,
+          "high": 53256.0,
+          "low": 53251.0,
+          "close": 53253.0,
+          "volume": 50.0
+        },
+        {
+          "ts": "2026-08-21 13:44:00-04:00",
+          "open": 53253.0,
+          "high": 53257.0,
+          "low": 53252.0,
+          "close": 53257.0,
+          "volume": 35.0
+        },
+        {
+          "ts": "2026-08-21 13:45:00-04:00",
+          "open": 53260.0,
+          "high": 53268.0,
+          "low": 53259.0,
+          "close": 53265.0,
+          "volume": 68.0
+        },
+        {
+          "ts": "2026-08-21 13:46:00-04:00",
+          "open": 53266.0,
+          "high": 53266.0,
+          "low": 53263.0,
+          "close": 53265.0,
+          "volume": 15.0
+        }
+      ],
+      "last_bar_shape": {
+        "volume": 15.0,
+        "prev30_volume_median": 48.5,
+        "volume_ratio_vs_median": 0.30927835051546393,
+        "range": 3.0,
+        "prev30_range_median": 9.0
+      },
+      "disputed_bar": {
+        "open": 53260.0,
+        "high": 53268.0,
+        "low": 53259.0,
+        "close": 53265.0,
+        "volume": 68.0
+      },
+      "disputed_position_from_end": 1
+    },
+    "M2K": {
+      "path": "data/cache/futures/RTY_continuous_1m_8y.parquet",
+      "exists": true,
+      "size_bytes": 46736680,
+      "mtime": "2026-08-21 13:47:19.301440239-04:00",
+      "rows": 2949666,
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume"
+      ],
+      "tz": "America/New_York",
+      "first_bar": "2017-07-09 18:01:00-04:00",
+      "last_bar": "2026-08-21 13:46:00-04:00",
+      "last_bar_is_the_disputed_one": false,
+      "tail": [
+        {
+          "ts": "2026-08-21 13:41:00-04:00",
+          "open": 3019.1,
+          "high": 3019.6,
+          "low": 3019.1,
+          "close": 3019.3,
+          "volume": 12.0
+        },
+        {
+          "ts": "2026-08-21 13:42:00-04:00",
+          "open": 3019.1,
+          "high": 3019.7,
+          "low": 3019.1,
+          "close": 3019.2,
+          "volume": 25.0
+        },
+        {
+          "ts": "2026-08-21 13:43:00-04:00",
+          "open": 3019.3,
+          "high": 3019.5,
+          "low": 3019.0,
+          "close": 3019.5,
+          "volume": 46.0
+        },
+        {
+          "ts": "2026-08-21 13:44:00-04:00",
+          "open": 3019.0,
+          "high": 3019.2,
+          "low": 3018.6,
+          "close": 3019.0,
+          "volume": 34.0
+        },
+        {
+          "ts": "2026-08-21 13:45:00-04:00",
+          "open": 3019.2,
+          "high": 3019.6,
+          "low": 3019.2,
+          "close": 3019.2,
+          "volume": 22.0
+        },
+        {
+          "ts": "2026-08-21 13:46:00-04:00",
+          "open": 3019.3,
+          "high": 3019.9,
+          "low": 3019.3,
+          "close": 3019.9,
+          "volume": 27.0
+        }
+      ],
+      "last_bar_shape": {
+        "volume": 27.0,
+        "prev30_volume_median": 27.0,
+        "volume_ratio_vs_median": 1.0,
+        "range": 0.599999999999909,
+        "prev30_range_median": 0.599999999999909
+      },
+      "disputed_bar": {
+        "open": 3019.2,
+        "high": 3019.6,
+        "low": 3019.2,
+        "close": 3019.2,
+        "volume": 22.0
+      },
+      "disputed_position_from_end": 1
+    },
+    "MNKD": {
+      "path": "global_index/data/NKD_continuous_1m_8y.parquet",
+      "exists": true,
+      "size_bytes": 28115209,
+      "mtime": "2026-08-21 13:47:42.437076807-04:00",
+      "rows": 2040934,
+      "columns": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume"
+      ],
+      "tz": "Asia/Tokyo",
+      "first_bar": "2018-01-02 08:00:00+09:00",
+      "last_bar": "2026-08-22 02:47:00+09:00",
+      "last_bar_is_the_disputed_one": false,
+      "tail": [
+        {
+          "ts": "2026-08-22 02:42:00+09:00",
+          "open": 65925.0,
+          "high": 65925.0,
+          "low": 65925.0,
+          "close": 65925.0,
+          "volume": 1.0
+        },
+        {
+          "ts": "2026-08-22 02:43:00+09:00",
+          "open": 65925.0,
+          "high": 65925.0,
+          "low": 65925.0,
+          "close": 65925.0,
+          "volume": 0.0
+        },
+        {
+          "ts": "2026-08-22 02:44:00+09:00",
+          "open": 65920.0,
+          "high": 65920.0,
+          "low": 65920.0,
+          "close": 65920.0,
+          "volume": 1.0
+        },
+        {
+          "ts": "2026-08-22 02:45:00+09:00",
+          "open": 65920.0,
+          "high": 65920.0,
+          "low": 65920.0,
+          "close": 65920.0,
+          "volume": 0.0
+        },
+        {
+          "ts": "2026-08-22 02:46:00+09:00",
+          "open": 65920.0,
+          "high": 65920.0,
+          "low": 65920.0,
+          "close": 65920.0,
+          "volume": 0.0
+        },
+        {
+          "ts": "2026-08-22 02:47:00+09:00",
+          "open": 65920.0,
+          "high": 65920.0,
+          "low": 65920.0,
+          "close": 65920.0,
+          "volume": 0.0
+        }
+      ],
+      "last_bar_shape": {
+        "volume": 0.0,
+        "prev30_volume_median": 0.0,
+        "volume_ratio_vs_median": null,
+        "range": 0.0,
+        "prev30_range_median": 0.0
+      },
+      "disputed_bar": {
+        "open": 65920.0,
+        "high": 65920.0,
+        "low": 65920.0,
+        "close": 65920.0,
+        "volume": 0.0
+      },
+      "disputed_position_from_end": 2
+    }
+  }
+}

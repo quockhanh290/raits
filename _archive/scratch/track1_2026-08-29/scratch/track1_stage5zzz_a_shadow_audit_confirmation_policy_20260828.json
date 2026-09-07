@@ -1,0 +1,143 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZZ-A",
+  "title": "Shadow audit must not fail just because B1 confirmation exists",
+  "route": "track1_candidate",
+  "date": "2026-08-28",
+  "orders_enabled": false,
+
+  "answers": {
+    "calm_20260828_turned_pass": true,
+    "nkd_20260828_turned_pass": true,
+    "remaining_non_confirmation_reason_on_those_two": null,
+    "orders_possible_remained_false": true,
+    "runtime_trading_files_touched": false
+  },
+
+  "before_and_after_20260828": {
+    "roska4_calm": {"before": {"verdict": "FAIL", "reasons": ["confirmation_file_present"]},
+                     "after": {"verdict": "PASS", "reasons": ["all_slots_observed_no_action",
+                                                               "no_candidates_to_explain"]}},
+    "global_nkd": {"before": {"verdict": "FAIL", "reasons": ["confirmation_file_present"]},
+                    "after": {"verdict": "PASS", "reasons": ["all_slots_observed_no_action"]}},
+    "roska4_stress": {"before": {"verdict": "FAIL", "reasons": ["confirmation_file_present", "window_not_closed"]},
+                       "after": {"verdict": "NOT_ENOUGH_DATA_YET", "reasons": ["window_not_closed"]},
+                       "note": "window opens 10:35 ET and had not run when the audit was taken"},
+    "roska4_swing": {"before": {"verdict": "FAIL", "reasons": ["confirmation_file_present", "window_not_closed"]},
+                      "after": {"verdict": "NOT_ENOUGH_DATA_YET", "reasons": ["window_not_closed"]},
+                      "note": "window opens 14:05 ET"}
+  },
+
+  "the_rule_that_expired": {
+    "was": "elif confirmation: FAIL 'the confirmation file exists during a shadow period'",
+    "true_when_written": "the signature really was the last thing between this route and an order",
+    "what_changed": ["Stage 5S added a measured evidence gate",
+                      "Stage 5ZZK gave B1 a measured half of its own",
+                      "the operator signed on 2026-08-27 and orders_possible never became true"],
+    "now": "the file records that a DECISION was made; whether an order could be sent is a separate question with its own answer"
+  },
+
+  "the_order_gate_now": [
+    {"condition": "an order mark on any record", "verdict": "FAIL", "changed": false, "note": "still first"},
+    {"condition": "the gate says orders are possible (may_enable_orders, or no blocker open)", "verdict": "FAIL", "changed": false},
+    {"condition": "TRACK1_ORDERS_APPROVED is set", "verdict": "FAIL", "changed": true, "new": true},
+    {"condition": "an order journal directory exists", "verdict": "FAIL", "changed": true, "new": true},
+    {"condition": "a signed confirmation, orders still blocked", "verdict": "OK", "changed": true,
+     "detail": "no order marks; B1 confirmation present; orders remain blocked by PAPER_SHADOW_EVIDENCE"}
+  ],
+  "why_the_two_new_fails_matter": "the gate registry deliberately does not read the environment (pinned by Stage 5ZZS), so without them an approved shadow run would pass an audit whose entire subject is whether an order could have been sent",
+
+  "what_the_stale_rule_was_costing": {
+    "masking_real_failures": {
+      "day": "2026-08-27",
+      "recorded": ["confirmation_file_present"],
+      "actually_wrong_underneath": {
+        "global_nkd": ["checkpoint_wrong_day"],
+        "roska4_calm": ["coverage_incomplete", "slot_could_not_evaluate", "no_candidates_to_explain"],
+        "roska4_stress": ["coverage_incomplete", "slot_could_not_evaluate"],
+        "roska4_swing": ["checkpoint_wrong_day"]
+      },
+      "consequence": "anyone reading that day's record would have seen one stale-policy reason and moved on; four sleeves had real problems underneath",
+      "still_fails_after_the_fix": true,
+      "and_should": true
+    },
+    "feeding_the_only_remaining_blocker": {
+      "measured": "shadow_evidence -> False: judgeable_days 4 of 5 required; no_failing_days 4 FAIL day(s) in the qualifying window, at most 0 allowed",
+      "consequence": "a rule that fails every day from the signature onward manufactures the failures that hold the route's last gate shut"
+    }
+  },
+
+  "audit_records_on_disk": {
+    "appended_a_corrected_record": false,
+    "rewrote_history": false,
+    "reasoning": [
+      "2026-08-28: the audit jobs run at 03:05, 10:10, 12:40, 16:05 and 16:15 ET and will write corrected rows today from the fixed code; a hand-written row would carry my pid and an invented audit_trigger, which is not what any other row in the file means",
+      "2026-08-27: re-evaluating gives FAIL either way, so a corrected row would state the same verdict with different reasons - it changes no count and no decision"
+    ],
+    "stored_rows_kept_as": "a true record of what the audit said under the old policy"
+  },
+
+  "results": {
+    "new_suite": {"file": "scratch/test_track1_stage5zzz_a_shadow_audit_confirmation_20260828.py", "passed": 18},
+    "adjacent_suites": {"passed": 460, "failed": 3},
+    "mutations": {"file": "scratch/track1_stage5zzz_a_mutations_20260828.py", "attempted": 9, "caught": 9},
+    "attribution": {"method": "reverted the branch chain and diffed the failure sets",
+                    "caused_by_this_change": 0},
+    "mutation_design": "this stage REMOVED a FAIL, so most mutations re-arm the route some other way and require the suite to notice: orders genuinely possible, the approval marker set, an order journal on disk, an order mark on a record. Two put the stale rule back.",
+    "honest_greens_before_retargeting": [
+      {"mutation": "M2", "why": "dropped `possible` from `possible or not blocking` - inert, because the fixture flipped both facts together and the two are coupled in practice", "response": "added a test that flips each alone"},
+      {"mutation": "M9", "why": "forced the window_not_closed branch false and fell through to an else producing the same code", "response": "retargeted at the judgeability block as a whole"}
+    ],
+    "stale_tests_restated": {
+      "count": 6,
+      "suites": 5,
+      "family": "the pre-B1 world - the same family Stage 5ZZS restated in four suites and 5ZZW in two more",
+      "four_asserted": "the confirmation file does not exist -> now assert that the things which ARM an order do not exist, and that any decision on disk is signed",
+      "two_pinned": "the exact blocker roster, which changes with record age and with evidence"
+    },
+    "remaining_failures_not_caused_here": [
+      {"family": "parquet fingerprints and dates pinned against a store that has since grown",
+       "suite": "test_track1_stage5zk_checkpoint_frames_resume_20260826.py"},
+      {"family": "fixtures written before Stage 5ZZC changed how the SPY refresh calls _run",
+       "suite": "test_track1_stage5zl_regime_tristate_20260826.py"},
+      {"family": "job inventory and preflight/window pins", "suites": ["5zg", "5zo"]}
+    ]
+  },
+
+  "safety_after": {
+    "orders_possible": false,
+    "blocking": ["PAPER_SHADOW_EVIDENCE"],
+    "scheduler_pid": 3000,
+    "scheduler_restarted": false,
+    "broker_connected_by_this_stage": false,
+    "confirmation_file": "intact and signed - not deleted",
+    "orders_dir_exists": false,
+    "live_positions_track1_exists": false,
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "TRACK1_ORDERS_APPROVED_in_tests": "set through monkeypatch inside the test process and asserted to make the audit FAIL; never written to a file, never exported, restored automatically",
+    "strategy_schedule_gates_order_send": "untouched - audit semantics only",
+    "production_files_changed": ["global_index/track1_shadow_acceptance.py"]
+  },
+
+  "still_open": [
+    "2026-08-27 fails for four real reasons now visible for the first time - two checkpoints on the wrong day, and coverage gaps on Calm and Stress. Worth a stage of its own; this one only removed what was hiding them.",
+    "PAPER_SHADOW_EVIDENCE still reports 4 judgeable days of 5 and 4 failing days; 08-27 fails on merit, 08-28 should stop counting once today's scheduled audits write corrected rows",
+    "the Calm window in the audit's own table still reads ['10:00','10:00'] from before Calm became two phases - coverage passes anyway (2 of 1 decided) but the expected count is stale",
+    "the two unrelated test families above"
+  ],
+
+  "files_touched": [
+    "global_index/track1_shadow_acceptance.py",
+    "scratch/test_track1_stage5zzz_a_shadow_audit_confirmation_20260828.py",
+    "scratch/track1_stage5zzz_a_mutations_20260828.py",
+    "scratch/test_track1_stage5zg_route_aware_safety_reporting_20260825.py",
+    "scratch/test_track1_stage5zh_quiet_checkpoint_audit_20260825.py",
+    "scratch/test_track1_stage5zk_checkpoint_frames_resume_20260826.py",
+    "scratch/test_track1_stage5zl_regime_tristate_20260826.py",
+    "scratch/test_track1_stage5zo_live_bar_pull_proof_20260826.py",
+    "scratch/track1_stage5zzz_a_shadow_audit_confirmation_policy_20260828.md",
+    "scratch/track1_stage5zzz_a_shadow_audit_confirmation_policy_20260828.json",
+    "docs/futures/TRACK1_RUNTIME_PIPELINE_2026-08-24.md",
+    "TASK.md"
+  ]
+}

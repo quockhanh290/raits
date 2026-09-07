@@ -1,0 +1,408 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-P",
+ "title": "Live execution replay parity proof",
+ "route": "track1_candidate",
+ "date": "2026-08-29",
+ "read_only": true,
+ "verdict": "ALL_FOUR_SLEEVES_NOT_YET_OBSERVED",
+ "counts_toward_paper_shadow_evidence": false,
+ "wired_as_a_gate": false,
+ "why_not_yet_observed": {
+  "newest_live_slot_ran_at": "2026-08-28T12:46:22",
+  "newest_relevant_fix_at": "2026-08-29T00:35:14",
+  "fix_files": {
+   "global_index/track1_normal_r4.py": "2026-08-28T18:11:59",
+   "global_index/track1_live_source.py": "2026-08-29T00:35:14",
+   "global_index/track1_strategy_diagnostics.py": "2026-08-29T00:33:12",
+   "global_index/run_live_day_track1.py": "2026-08-28T18:31:52"
+  },
+  "corroboration": "global_index/track1_runtime/strategy_diagnostics/ does not exist - the store Stage 5ZZZ-B wired has never been written, which is only possible if no slot has run since",
+  "runtime_diagnostics_store_present": false
+ },
+ "harness": {
+  "module": "global_index/track1_replay_parity.py",
+  "entry_point": "track1_replay_parity.parity(root)",
+  "live_sources": [
+   "global_index/track1_runtime/signals/track1_signals_YYYYMMDD.jsonl",
+   "global_index/track1_runtime/shadow_intent/ (Calm phases)"
+  ],
+  "replay_path": {
+   "global_nkd / roska4_swing / roska4_stress": "monitor.backend.track1_market_view._strategy(root, sleeve, day, spec)",
+   "roska4_calm": "global_index.track1_strategy_diagnostics.calm_blocks(root, day)"
+  },
+  "why_reuse_the_reconstruction": "Stages 5ZZZ-B and 5ZZZ-G established it mirrors the live call sites exactly; a parity check whose two sides come from two implementations compares the implementations, not the route",
+  "verdicts": {
+   "PASS": "every comparable field matched",
+   "FAIL": "a comparable field disagreed",
+   "UNKNOWN": "evidence missing or context unreconstructable",
+   "NOT_YET_OBSERVED": "no live slot since the fixes"
+  },
+  "rule": "a partial match is UNKNOWN, never PASS"
+ },
+ "summary": {
+  "PASS": 0,
+  "FAIL": 0,
+  "UNKNOWN": 0,
+  "NOT_YET_OBSERVED": 4
+ },
+ "sleeves": {
+  "global_nkd": {
+   "verdict": "NOT_YET_OBSERVED",
+   "reason": "the newest live slot ran at 2026-08-28T12:46:22, before the newest relevant fix at 2026-08-29T00:35:14",
+   "newest_live_slot": {
+    "slot_id": "TRACK1_NKD_0255",
+    "slot_time": "02:55",
+    "session_date": "2026-08-28",
+    "live_ran_at": "2026-08-28T12:46:22"
+   },
+   "pre_fix_informational": {
+    "sleeve": "global_nkd",
+    "session_date": "2026-08-28",
+    "slot_id": "TRACK1_NKD_0255",
+    "slot_time": "02:55",
+    "verdict": "UNKNOWN",
+    "reason": "some fields matched but others could not be compared; a partial match is not a pass",
+    "live_ran_at": "2026-08-28T12:46:22",
+    "post_fix": false,
+    "checks": [
+     {
+      "name": "route",
+      "live": "track1_candidate",
+      "replay": "track1_candidate",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "sleeve",
+      "live": "global_nkd",
+      "replay": "global_nkd",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "session_date",
+      "live": "2026-08-28",
+      "replay": "2026-08-28",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "data_source_identity",
+      "live": "global_index/data/NKD_continuous_1m_8y.parquet",
+      "replay": "NKD_continuous_1m_8y.parquet",
+      "verdict": "PASS",
+      "note": "compared on the file name; the two sides spell the path differently"
+     },
+     {
+      "name": "params_hash",
+      "live": "",
+      "replay": null,
+      "verdict": "UNKNOWN",
+      "note": "live rows record an empty params_hash"
+     },
+     {
+      "name": "regime_basis",
+      "live": null,
+      "replay": "previous session (lag 1)",
+      "verdict": "UNKNOWN",
+      "note": "live rows do not record the regime basis"
+     }
+    ]
+   }
+  },
+  "roska4_stress": {
+   "verdict": "NOT_YET_OBSERVED",
+   "reason": "the newest live slot ran at 2026-08-28T12:46:22, before the newest relevant fix at 2026-08-29T00:35:14",
+   "newest_live_slot": {
+    "slot_id": "TRACK1_STRESS_1230",
+    "slot_time": "12:30",
+    "session_date": "2026-08-28",
+    "live_ran_at": "2026-08-28T12:46:22"
+   },
+   "pre_fix_informational": {
+    "sleeve": "roska4_stress",
+    "session_date": "2026-08-28",
+    "slot_id": "TRACK1_STRESS_1230",
+    "slot_time": "12:30",
+    "verdict": "UNKNOWN",
+    "reason": "some fields matched but others could not be compared; a partial match is not a pass",
+    "live_ran_at": "2026-08-28T12:46:22",
+    "post_fix": false,
+    "checks": [
+     {
+      "name": "route",
+      "live": "track1_candidate",
+      "replay": "track1_candidate",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "sleeve",
+      "live": "roska4_stress",
+      "replay": "roska4_stress",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "session_date",
+      "live": "2026-08-28",
+      "replay": "2026-08-28",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "data_source_identity",
+      "live": "data/cache/futures/NQ_continuous_1m_8y.parquet",
+      "replay": null,
+      "verdict": "UNKNOWN",
+      "note": "compared on the file name; the two sides spell the path differently"
+     },
+     {
+      "name": "params_hash",
+      "live": "",
+      "replay": null,
+      "verdict": "UNKNOWN",
+      "note": "live rows record an empty params_hash"
+     }
+    ]
+   }
+  },
+  "roska4_calm": {
+   "verdict": "NOT_YET_OBSERVED",
+   "reason": "the newest live slot ran at 2026-08-28T12:46:22, before the newest relevant fix at 2026-08-29T00:35:14",
+   "newest_live_slot": {
+    "slot_id": "TRACK1_CALM_OBSERVE_1002",
+    "slot_time": "10:02",
+    "session_date": "2026-08-28",
+    "live_ran_at": "2026-08-28T12:46:22"
+   },
+   "pre_fix_informational": {
+    "sleeve": "roska4_calm",
+    "session_date": "2026-08-28",
+    "slot_id": "TRACK1_CALM_OBSERVE_1002",
+    "slot_time": "10:02",
+    "verdict": "UNKNOWN",
+    "reason": "some fields matched but others could not be compared; a partial match is not a pass",
+    "live_ran_at": "2026-08-28T12:46:22",
+    "post_fix": false,
+    "checks": [
+     {
+      "name": "route",
+      "live": "track1_candidate",
+      "replay": "track1_candidate",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "sleeve",
+      "live": "roska4_calm",
+      "replay": "roska4_calm",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "session_date",
+      "live": "2026-08-28",
+      "replay": "2026-08-28",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "data_source_identity",
+      "live": "data/cache/futures/ES_continuous_1m_8y.parquet",
+      "replay": null,
+      "verdict": "UNKNOWN",
+      "note": "compared on the file name; the two sides spell the path differently"
+     },
+     {
+      "name": "params_hash",
+      "live": "",
+      "replay": null,
+      "verdict": "UNKNOWN",
+      "note": "live rows record an empty params_hash"
+     },
+     {
+      "name": "calm_decide_has_no_observe_value",
+      "live": null,
+      "replay": [],
+      "verdict": "PASS",
+      "note": "DECIDE must carry no OBSERVE-only value"
+     },
+     {
+      "name": "calm_decide_has_no_price_level",
+      "live": null,
+      "replay": 0,
+      "verdict": "PASS",
+      "note": ""
+     }
+    ]
+   }
+  },
+  "roska4_swing": {
+   "verdict": "NOT_YET_OBSERVED",
+   "reason": "the newest live slot ran at 2026-08-28T12:46:22, before the newest relevant fix at 2026-08-29T00:35:14",
+   "newest_live_slot": {
+    "slot_id": "TRACK1_SWING_1445",
+    "slot_time": "14:45",
+    "session_date": "2026-08-28",
+    "live_ran_at": "2026-08-28T12:46:22"
+   },
+   "pre_fix_informational": {
+    "sleeve": "roska4_swing",
+    "session_date": "2026-08-28",
+    "slot_id": "TRACK1_SWING_1445",
+    "slot_time": "14:45",
+    "verdict": "FAIL",
+    "reason": "at least one comparable field disagrees",
+    "live_ran_at": "2026-08-28T12:46:22",
+    "post_fix": false,
+    "checks": [
+     {
+      "name": "route",
+      "live": "track1_candidate",
+      "replay": "track1_candidate",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "sleeve",
+      "live": "roska4_swing",
+      "replay": "roska4_swing",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "session_date",
+      "live": "2026-08-28",
+      "replay": "2026-08-28",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "data_source_identity",
+      "live": "data/cache/futures/ES_continuous_1m_8y.parquet",
+      "replay": "ES_continuous_1m_8y.parquet",
+      "verdict": "PASS",
+      "note": "compared on the file name; the two sides spell the path differently"
+     },
+     {
+      "name": "params_hash",
+      "live": "",
+      "replay": null,
+      "verdict": "UNKNOWN",
+      "note": "live rows record an empty params_hash"
+     },
+     {
+      "name": "swing_regime_basis_is_causal_d1",
+      "live": "causal D-1 (declared paper identity)",
+      "replay": "this session's own label",
+      "verdict": "FAIL",
+      "note": "the detector's own basis, from the reconstruction that mirrors the live call site"
+     }
+    ]
+   }
+  }
+ },
+ "findings": [
+  {
+   "id": "F1",
+   "severity": "material",
+   "what": "the Swing paper identity recorded in Stage 5ZZZ-O says regime_basis causal_d1, but the live detector path reads the session's own label",
+   "evidence": {
+    "declared": "causal D-1 (D1_OLD_EFFECTIVE_EMA50)",
+    "detector_reads": "this session's own label",
+    "check": "swing_regime_basis_is_causal_d1 -> FAIL"
+   },
+   "nuance": "the ARTIFACT and BACKTEST identity is genuinely causal D-1 - Stage 5ZZZ-N proved it on 147/147 label-change sessions. The LIVE DETECTOR path is not. The record signed in 5ZZZ-O describes the former.",
+   "changes_any_number": false,
+   "invalidates_the_override": false,
+   "same_as": "the open finding from Stage 5ZZZ-G, which declined to fix it because it touches a runtime trading file"
+  },
+  {
+   "id": "F2",
+   "severity": "evidence gap",
+   "what": "params_hash is empty on every live row inspected",
+   "consequence": "no slot can reach PASS on that field until the live writer records it"
+  },
+  {
+   "id": "F3",
+   "severity": "evidence gap",
+   "what": "the live signal row has no regime-basis field",
+   "consequence": "NKD and Swing - the two sleeves whose identity turns on it - cannot reach PASS at all today, even with every other field agreeing",
+   "pinned_by": "test_nkd_and_swing_cannot_reach_pass_until_live_records_a_regime_basis"
+  },
+  {
+   "id": "F4",
+   "severity": "reporting inconsistency",
+   "what": "data identity is spelled two ways: live records the full path, the reconstruction the basename",
+   "handling": "compared on the file name, because a false FAIL is worse than an honest UNKNOWN - someone acts on it. The inconsistency is reported rather than hidden by the fix."
+  }
+ ],
+ "tests": {
+  "suite": "scratch/test_track1_stage5zzzp_replay_parity_20260829.py",
+  "passed": 19,
+  "failed": 0,
+  "self_correction": "the first 'fully matching slot passes' fixture used NKD, which structurally cannot reach PASS; the premise was wrong, not the tool. Retargeted to Stress and the NKD/Swing gap pinned as its own finding."
+ },
+ "answers": {
+  "slots_checked": [
+   {
+    "sleeve": "global_nkd",
+    "slot_id": "TRACK1_NKD_0255",
+    "session_date": "2026-08-28"
+   },
+   {
+    "sleeve": "roska4_stress",
+    "slot_id": "TRACK1_STRESS_1230",
+    "session_date": "2026-08-28"
+   },
+   {
+    "sleeve": "roska4_calm",
+    "slot_id": "TRACK1_CALM_OBSERVE_1002",
+    "session_date": "2026-08-28"
+   },
+   {
+    "sleeve": "roska4_swing",
+    "slot_id": "TRACK1_SWING_1445",
+    "session_date": "2026-08-28"
+   }
+  ],
+  "passed": 0,
+  "failed": 0,
+  "unknown": 0,
+  "not_yet_observed": 4,
+  "live_matches_replay": "not yet established - no post-fix session has run",
+  "evidence_missing": true,
+  "evidence_missing_detail": [
+   "params_hash absent on every live row",
+   "regime basis absent on every live row",
+   "runtime diagnostics store never written"
+  ],
+  "should_count_toward_paper_shadow_evidence": false,
+  "what_would_make_it_answerable": "one Track 1 session after 2026-08-29T00:35 (Monday), plus the live writer recording params_hash and the regime basis - neither fixable from the reading side"
+ },
+ "safety": {
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "confirmation_present": true,
+  "confirmation_approves_orders": false,
+  "swing_override_present_and_valid": true,
+  "swing_override_grants": "nothing",
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "broker_calls": 0,
+  "scheduler_pid": 3000,
+  "scheduler_restarted": false,
+  "backend_pid": 10136,
+  "backend_restarted": false,
+  "runtime_trading_files_modified": false,
+  "strategy_logic_changed": false,
+  "params_changed": false,
+  "gates_changed": false,
+  "runtime_evidence_modified": false,
+  "paper_shadow_evidence_marked_satisfied": false
+ }
+}

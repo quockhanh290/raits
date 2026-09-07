@@ -1,0 +1,191 @@
+{
+  "all_red": true,
+  "results": [
+    {
+      "id": "M1",
+      "mutation": "a rejected candidate reported as NO_SIGNAL",
+      "test": "test_7_no_signal_and_rejected_cannot_be_the_same_row",
+      "outcome": "RED"
+    },
+    {
+      "id": "M1b",
+      "mutation": "same mutation, against the classification matrix",
+      "test": "test_6_classification_is_total_and_explicit[True-1-0-1-SIGNAL_REJECTED]",
+      "outcome": "RED"
+    },
+    {
+      "id": "M2",
+      "mutation": "a refused slot with a stale candidate reads as accepted",
+      "test": "test_6_classification_is_total_and_explicit[False-3-1-0-SLOT_REFUSED]",
+      "outcome": "RED"
+    },
+    {
+      "id": "M3",
+      "mutation": "`candidates: 0` wearing a longer name",
+      "test": "test_9_a_row_without_rule_checks_is_refused",
+      "outcome": "RED"
+    },
+    {
+      "id": "M4",
+      "mutation": "rule_checks_for returns only the gate",
+      "test": "test_8_no_signal_carries_rule_checks_not_just_a_zero",
+      "outcome": "RED"
+    },
+    {
+      "id": "M4b",
+      "mutation": "same mutation, against the per-sleeve catalogue",
+      "test": "test_20_each_sleeve_emits_every_declared_rule_on_a_real_row[global_nkd]",
+      "outcome": "RED"
+    },
+    {
+      "id": "M5",
+      "mutation": "not_exposed_by_sleeve flattened into a pass",
+      "test": "test_10_the_three_answer_sources_are_distinct",
+      "outcome": "RED"
+    },
+    {
+      "id": "M5b",
+      "mutation": "same mutation, against the nearest-miss report",
+      "test": "test_11_primary_failure_reports_not_exposed_separately_from_passed",
+      "outcome": "RED"
+    },
+    {
+      "id": "M6",
+      "mutation": "the one claim this journal exists to make impossible",
+      "test": "test_17_accepted_shadow_cannot_claim_an_order_attempt",
+      "outcome": "RED"
+    },
+    {
+      "id": "M7",
+      "mutation": "a reader left to assume the default",
+      "test": "test_18_every_row_states_orders_enabled_false_explicitly",
+      "outcome": "RED"
+    },
+    {
+      "id": "M8",
+      "mutation": "the day has not started, reported as a fault",
+      "test": "test_26_reader_reports_absent_file_as_not_yet_observed",
+      "outcome": "RED"
+    },
+    {
+      "id": "M9",
+      "mutation": "channel_disabled dropped from the summary",
+      "test": "test_29_reader_reports_a_disabled_channel_rather_than_an_empty_day",
+      "outcome": "RED"
+    },
+    {
+      "id": "M10",
+      "mutation": "the machine was asleep, reported as the strategy declining",
+      "test": "test_34_a_slot_that_never_spawned_is_missed_and_never_no_signal",
+      "outcome": "RED"
+    },
+    {
+      "id": "M10b",
+      "mutation": "same mutation, against a slot that ran with no row",
+      "test": "test_33_a_slot_that_RAN_with_no_row_is_no_diagnostics_not_missed",
+      "outcome": "RED"
+    },
+    {
+      "id": "M11",
+      "mutation": "a slot that ran accused of never spawning",
+      "test": "test_25_a_missed_slot_is_never_rendered_as_no_signal",
+      "outcome": "RED"
+    },
+    {
+      "id": "M12",
+      "mutation": "a stop-repair row reading NO SIGNAL",
+      "test": "test_31_non_strategy_jobs_get_no_signal_key_at_all",
+      "outcome": "RED"
+    },
+    {
+      "id": "M13",
+      "mutation": "the prefix widened to every TRACK1_ job",
+      "test": "test_30_only_track1_strategy_jobs_are_classified_as_such",
+      "outcome": "RED"
+    },
+    {
+      "id": "M14",
+      "mutation": "the sleeve allow-list removed",
+      "test": "test_22_a_non_strategy_sleeve_cannot_write_a_row",
+      "outcome": "RED"
+    },
+    {
+      "id": "M15",
+      "mutation": "cap, window and same-symbol flattened into admission",
+      "test": "test_13_every_rejection_names_its_layer[reject_window-window]",
+      "outcome": "RED"
+    },
+    {
+      "id": "M16",
+      "mutation": "a rejection nobody can act on",
+      "test": "test_15_a_rejection_without_a_named_layer_is_refused",
+      "outcome": "RED"
+    },
+    {
+      "id": "M17",
+      "mutation": "no instrument, no risk, nothing to judge",
+      "test": "test_14_a_rejection_carries_the_candidate_a_reader_needs",
+      "outcome": "RED"
+    },
+    {
+      "id": "M18",
+      "mutation": "a restated threshold that goes stale on the first tune",
+      "test": "test_21_thresholds_come_from_the_params_not_a_second_copy",
+      "outcome": "RED"
+    },
+    {
+      "id": "M19",
+      "mutation": "a diagnostics failure could cost a slot its evidence",
+      "test": "test_39_the_slot_writes_diagnostics_AFTER_its_coverage_row",
+      "outcome": "RED"
+    },
+    {
+      "id": "M20",
+      "mutation": "a diagnostics bug can take a slot down",
+      "test": "test_40_the_diagnostics_block_cannot_take_a_slot_down",
+      "outcome": "RED"
+    },
+    {
+      "id": "M21",
+      "mutation": "observability reaching into the write path",
+      "test": "test_35_the_signals_module_imports_no_broker_or_order_path",
+      "outcome": "RED"
+    },
+    {
+      "id": "M22",
+      "mutation": "legacy state presented as Track 1 signal state",
+      "test": "test_37_the_reader_does_not_touch_the_legacy_book",
+      "outcome": "RED"
+    },
+    {
+      "id": "M23",
+      "mutation": "the summary disappears from the Track 1 panel",
+      "test": "test_43_the_panel_has_one_compact_signals_row",
+      "outcome": "RED"
+    },
+    {
+      "id": "M24",
+      "mutation": "the job row loses its details",
+      "test": "test_44_the_job_row_renders_one_line_and_the_expanded_row_renders_the_checks",
+      "outcome": "RED"
+    },
+    {
+      "id": "M25",
+      "mutation": "false comfort in the one place it matters",
+      "test": "test_45_an_unreported_rule_is_not_rendered_as_a_pass",
+      "outcome": "RED"
+    },
+    {
+      "id": "M26",
+      "mutation": "the schedule table gets wider on mobile",
+      "test": "test_46_the_signal_line_wraps_instead_of_widening_the_row",
+      "outcome": "RED"
+    },
+    {
+      "id": "M27",
+      "mutation": "two owners for the phrasing",
+      "test": "test_47_the_dashboard_does_not_compose_the_sentence_itself",
+      "outcome": "RED"
+    }
+  ]
+}

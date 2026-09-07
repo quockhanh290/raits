@@ -1,0 +1,282 @@
+{
+  "stage": "5Q-6",
+  "title": "Operationalize the 5Q-5 freshness and boundary-bar fixes on the live day",
+  "generated_et": "2026-08-24T20:10:00-04:00",
+  "verdict": "NOT_READY",
+  "safety": {
+    "scheduler_started_stopped_or_restarted": false,
+    "backend_restarted": false,
+    "orders_enabled": false,
+    "confirmation_file_created": false,
+    "track1_orders_approved_env_set": false,
+    "b1_still_blocking": true,
+    "overlap_guard_weakened": false,
+    "parquet_or_csv_or_state_mutated": false,
+    "evidence_rows_deleted_or_rewritten": false,
+    "ibkr_connections": [
+      {
+        "purpose": "read-only historical fetch for the boundary measurement",
+        "client_id": 95,
+        "reason_for_client_id": "cannot contend with track1 data (89), track1 safety (90), legacy (1) or daily updater (2)",
+        "orders_placed": 0,
+        "instruments": ["MNQ", "MYM", "M2K", "MES", "MNKD"],
+        "wrote_anything": false
+      }
+    ],
+    "stress_window_open_during_run": false,
+    "run_time_et": "19:45-20:10, every Track 1 window closed, next window 01:10 ET"
+  },
+
+  "part_a_live_state": {
+    "scheduler": {
+      "pid": 28696,
+      "started_local": "2026-08-24T07:25:31",
+      "started_et": "2026-08-24T09:25:31",
+      "mode": "track1-only-shadow",
+      "job_count": 100,
+      "spy_refresh_pm_present": false,
+      "note": "started before spy_refresh_pm existed"
+    },
+    "backend": {
+      "pid": 11720,
+      "connected": true,
+      "freshness": "fresh",
+      "age_seconds": 0.18,
+      "spy_refresh_pm_in_mirror": false
+    },
+    "gate": {
+      "track1_mode": "track1-only-shadow",
+      "track1_blocking": ["B1_broker_account_or_legacy_retirement"],
+      "orders_possible": false,
+      "track1_stop_trading": false,
+      "confirmation": false,
+      "track1_orders_approved": false
+    },
+    "evidence_today": {
+      "window_coverage_rows": 52,
+      "slot_timing_rows": 42,
+      "audit_records": 8,
+      "timing_p50_s": 2.41,
+      "timing_p95_s": 2.78,
+      "timing_max_s": 3.27,
+      "timing_outcomes_all_ok": true,
+      "acceptance_target_s": 240,
+      "acceptance_hard_limit_s": 300
+    },
+    "preflight_1345": {
+      "ran": true,
+      "succeeded": true,
+      "local_window": "11:45-11:47"
+    },
+    "freshness_now": {
+      "csv_last_date": "2026-08-21",
+      "required_intraday_through": "2026-08-24",
+      "required_daily_close_through": "2026-08-21",
+      "allow": true,
+      "preflight_consistency": "ok",
+      "note": "tomorrow 09:00 ET will require 2026-08-24 and go stale unless spy_refresh_pm runs at 16:20"
+    },
+    "audit_records_today": [
+      {"sleeve": "global_nkd", "verdict": "NOT_ENOUGH_DATA_YET", "reasons": ["window_closed_before_scheduler_start"]},
+      {"sleeve": "roska4_calm", "verdict": "FAIL", "reasons": ["coverage_unobserved", "missing_slot_ids", "no_timing_records"]},
+      {"sleeve": "roska4_stress", "verdict": "FAIL", "p95_s": 3.1, "reasons": ["coverage_incomplete", "slot_could_not_evaluate", "slot_without_timing", "no_candidates_to_explain"]},
+      {"sleeve": "roska4_swing", "verdict": "FAIL", "p95_s": 2.4, "reasons": ["coverage_incomplete", "slot_could_not_evaluate"]},
+      {"scope": "day", "date": "2026-08-24", "verdict": "FAIL"}
+    ],
+    "false_pass_observed": false
+  },
+
+  "part_b_boundary_measurement": {
+    "method": "read-only fetch through the existing provider path; tool writes nothing in this mode; no parquet mtime changed",
+    "results": [
+      {
+        "instrument": "MNQ",
+        "verdict": "repairable",
+        "last_stored_bar": "2026-08-24 13:45",
+        "shared_disagreements_total": 1,
+        "fields": {
+          "open": "identical",
+          "low": "identical",
+          "high": {"stored": 29123.0, "feed": 29125.0, "delta": 2.0},
+          "close": {"stored": 29123.0, "feed": 29125.0, "delta": 2.0},
+          "volume": {"stored": 738.0, "feed": 1801.0, "delta": 1063.0, "stored_share_pct": 41.0}
+        },
+        "friday_bad_bar_still_in_overlap": false,
+        "parquet_sha256_before": "d231a9574a5579acd073bd173ba97c26d537b5e1ed9b9d10aed749a8add70539"
+      },
+      {
+        "instrument": "MYM",
+        "verdict": "repairable",
+        "last_stored_bar": "2026-08-24 13:45",
+        "shared_disagreements_total": 1,
+        "fields": {"volume": {"stored": 137.0, "feed": 182.0, "delta": 45.0}}
+      },
+      {
+        "instrument": "M2K",
+        "verdict": "repairable",
+        "last_stored_bar": "2026-08-24 13:46",
+        "shared_disagreements_total": 1,
+        "fields": {
+          "high": {"stored": 2997.6, "feed": 2997.7, "delta": 0.1},
+          "volume": {"stored": 2.0, "feed": 15.0, "delta": 13.0}
+        }
+      },
+      {
+        "instrument": "MES",
+        "verdict": "nothing_to_repair",
+        "last_stored_bar": "2026-08-24 13:44",
+        "shared_disagreements_total": 0
+      },
+      {
+        "instrument": "MNKD",
+        "verdict": "REFUSED",
+        "refusal_code": "disagreement_outside_the_window",
+        "bars_disagreeing": 1052,
+        "first_disagreeing_bar": "2026-08-24T07:01:00+09:00",
+        "note": "not a boundary bar; cause unmeasured"
+      }
+    ],
+    "findings": {
+      "isolated_or_systemic": "systemic and daily: one preflight corrupted 3 of 5 instruments",
+      "friday_mnq_bar": "no longer inside the fetch overlap, so it can no longer be measured or repaired by this tool; still wrong in history but no longer causes refusals",
+      "corroboration_from_ledger": [
+        {"sleeve": "roska4_stress", "instrument": "MNQ", "field": "low", "bar": "2026-08-21 13:45", "stored": 29400.25, "feed": 29395.75, "of_bars": 1186},
+        {"sleeve": "roska4_swing", "instrument": "M2K", "field": "high", "bar": "2026-08-21 13:46", "stored": 3019.9, "feed": 3020.5, "of_bars": 2567}
+      ]
+    }
+  },
+
+  "part_c_repair": {
+    "decision": "apply, using the production appender",
+    "applied": false,
+    "blocked_by": "environment permission gate",
+    "blocked_command": "python -m global_index.update_ibkr_daily --repair-boundary --symbols MNQ MYM M2K",
+    "worked_around": false,
+    "latent_defect_found_and_fixed": {
+      "where": "scratch/track1_stage5q4_repair_boundary_bar_20260824.py --apply",
+      "defect": "wrote frozen_frame output straight back; raw parquets are tz-NAIVE UTC while frozen_frame returns tz-AWARE America/New_York, so an apply would have rewritten the storage convention of a 3.3M-row, 8-year file",
+      "why_tests_missed_it": "the fixture wrote a tz-AWARE UTC parquet, so the round trip preserved awareness in test and would not have on disk",
+      "fix": [
+        "read and restore the file's own index convention",
+        "refuse with column_shape_changed if the column shape would change",
+        "re-verify the convention after writing",
+        "new test builds a tz-naive parquet and requires it to come back naive"
+      ]
+    }
+  },
+
+  "part_d_repair_boundary_permanent": {
+    "decision": "enabled",
+    "basis": "measured recurrence: one preflight today corrupted 3 of 5 instruments; Friday's equivalents refused 46 Track 1 slots (23 stress + 23 swing)",
+    "code_change": "global_index/run_scheduler.py preflight argv now passes --repair-boundary to update_ibkr_daily",
+    "live": false,
+    "live_requires": "scheduler restart (job argv is fixed when the schedule is built)",
+    "conditions_verified": {
+      "no_write_unless_boundary_replacement_accepts": true,
+      "unchanged_days_byte_identical_and_no_snapshot": true,
+      "legitimate_partial_replaced_and_verified_by_reread": true,
+      "wrong_contract_and_each_direction_rule_refuse_by_name": true,
+      "failure_marks_preflight_failed_not_silently_ok": true,
+      "documented_as_able_to_rewrite_the_last_boundary_bar": true
+    },
+    "failure_propagation": "every refusal appends to failed; update_ibkr_daily ends sys.exit(1); the preflight detects returncode != 0 and sets _preflight_ok[today] = False"
+  },
+
+  "part_e_restart": {
+    "performed": false,
+    "recommended_time": "this evening, before the 01:10 ET NKD window",
+    "reasons": [
+      "every Track 1 window for 2026-08-24 has already closed and been audited; the 8 records are durable",
+      "a scheduler started this evening fully covers the 01:10 NKD window; restarting tomorrow morning would make NKD NOT_ENOUGH_DATA_YET a second consecutive day",
+      "spy_refresh_pm fires 16:20 tomorrow, which is what makes Wednesday morning freshness pass",
+      "--repair-boundary engages at tomorrow's 13:45, stopping the recurrence"
+    ],
+    "cost": "after a restart, any future audit of 2026-08-24 reports its closed windows as window_closed_before_scheduler_start (pre-start, not judgeable); today's verdicts must be read from the 8 records already written, not re-derived; nothing is deleted",
+    "commands": [
+      "python monitor\\ops.py restart --scheduler --track1-only-shadow",
+      "python monitor\\ops.py restart --no-scheduler --track1-only-shadow"
+    ],
+    "post_restart_expected": {
+      "job_count_track1_only": 101,
+      "spy_refresh_pm": "present, 16:20 ET",
+      "backend_mirror_row": "SPY_REFRESH_PM present",
+      "track1_mode": "track1-only-shadow",
+      "legacy_strategy_jobs": 0,
+      "track1_strategy_safety_audit_jobs": [70, 11, 5],
+      "orders_possible": false,
+      "track1_blocking": ["B1_broker_account_or_legacy_retirement"]
+    }
+  },
+
+  "part_f_tests": {
+    "suites": 13,
+    "passed": 472,
+    "failed": 0,
+    "audit_probe": {
+      "command": "python -m global_index.track1_shadow_audit --latest --all --dry-run",
+      "wrote_anything": false,
+      "worst_verdict": "FAIL",
+      "false_pass": false
+    }
+  },
+
+  "blockers": [
+    {
+      "id": "B-5R-G",
+      "new": true,
+      "what": "MNKD: 1052 bars disagree with the feed, first at 2026-08-24T07:01:00+09:00; not a boundary bar",
+      "state": "open, unmeasured",
+      "next": "audit it the way MNQ was audited in 5Q-4; do not widen any guard to silence it"
+    },
+    {
+      "id": "B-5R-D/F recurrence",
+      "what": "three partial boundary bars created today (MNQ, MYM, M2K); repair decided, apply blocked pending operator approval",
+      "state": "open",
+      "next": "python -m global_index.update_ibkr_daily --repair-boundary --symbols MNQ MYM M2K"
+    },
+    {
+      "id": "B-5R-E refresh half",
+      "what": "spy_refresh_pm exists but is not registered in the running scheduler",
+      "state": "open",
+      "next": "scheduler restart"
+    },
+    {
+      "id": "B-5R-F prevention",
+      "what": "--repair-boundary is in the preflight argv in code but not in the running job table",
+      "state": "open",
+      "next": "same scheduler restart"
+    },
+    {
+      "id": "B-5R-C",
+      "what": "NKD window after 2026-11-01",
+      "state": "open, reported as WARN"
+    },
+    {
+      "id": "B1",
+      "what": "the order gate",
+      "state": "open by design; orders remain impossible"
+    }
+  ],
+
+  "closed_this_stage": [
+    "B-5R-E requirement half: verified ALLOW on the live day (csv 2026-08-21, requirement 2026-08-21, every check ok)",
+    "acceptance p95 measured against real slots for the first time: 2.78s vs a 240s target",
+    "the audit pipeline produced no false PASS and correctly held NKD as NOT_ENOUGH_DATA_YET"
+  ],
+
+  "files": {
+    "changed_production": [
+      "global_index/run_scheduler.py"
+    ],
+    "changed_scratch": [
+      "scratch/track1_stage5q4_repair_boundary_bar_20260824.py",
+      "scratch/test_track1_stage5q4_overlap_and_repair_20260824.py",
+      "scratch/test_track1_stage5q5_freshness_boundary_20260824.py"
+    ],
+    "added": [
+      "scratch/track1_stage5q6_operationalize_freshness_boundary_20260824.md",
+      "scratch/track1_stage5q6_operationalize_freshness_boundary_20260824.json"
+    ],
+    "production_data_written": []
+  }
+}

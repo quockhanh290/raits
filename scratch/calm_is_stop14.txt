@@ -1,0 +1,97 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+=== CO SO DO ===
+  data-dir   data/cache/futures/frozen_sim
+  param      ema=30 mult=2.5 max_hold=5d  slippage=2.0 tick/side
+  production allowed_regimes = ['Normal', 'Stress']  (nguon: trend_follow.py)
+  quy uoc LIVE: stop vu trang luc (ngay vao lenh + 1 ngay) + 14h
+  MES: 2,807,032 bars  2017-01-02 .. 2024-12-30
+  MNQ: 2,803,922 bars  2017-01-02 .. 2024-12-30
+  MYM: 2,785,458 bars  2017-01-02 .. 2024-12-30
+  M2K: 2,447,843 bars  2017-07-09 .. 2024-12-30
+
+=== MO NEO ===
+  MES  ghi nhan  615t $     6,276 | do lai  615t $     6,276 -> MATCH
+  MES  doi chieu engine truc tiep  615t $     6,276 -> MATCH
+  MES xong
+  MNQ  ghi nhan  618t $    16,275 | do lai  618t $    16,275 -> MATCH
+  MNQ xong
+  MYM  ghi nhan  644t $     6,140 | do lai  644t $     6,140 -> MATCH
+  MYM xong
+  M2K  ghi nhan  619t $     4,002 | do lai  619t $     4,002 -> MATCH
+  M2K xong
+
+  (da ghi 4 tep lenh vao scratch/calm_probe_*.csv)
+
+=== SELF-CHECKS ===
+  [PASS] SC1 mo neo trung khit
+  [PASS] SC2 nhanh Calm co lenh
+  [PASS] SC3 moi lenh Calm mang nhan Calm
+  [PASS] SC4 khong lenh production nao mang nhan Calm
+  [PASS] SC5 doi quy uoc stop PHAI doi ket qua
+  [PASS] SC6 hoan stop thi khong the vao nhieu lenh hon
+
+=== KET QUA (1 hop dong/ma, khong cap danh muc, 2-tick, max_hold 5 ngay) ===
+  -- quy uoc BACKTEST: stop co hieu luc tu ranh gioi ngay ke tiep --
+  PRODUCTION Normal+Stress    2496t  $    32,694  WR  15.9%  PF  1.30  exp $   13.10
+  CALM                        1833t  $     6,972  WR  13.0%  PF  1.14  exp $    3.80
+
+  -- quy uoc LIVE: stop vu trang ngay-ke-tiep + 14h --
+  PRODUCTION Normal+Stress    2030t  $   108,041  WR  25.7%  PF  2.33  exp $   53.22
+  CALM                        1502t  $    46,826  WR  21.8%  PF  2.25  exp $   31.18
+
+  -- doi quy uoc stop lam gi --
+  PRODUCTION  $    32,694 -> $   108,041  (   +75,347)   exp $  13.10 -> $  53.22   n 2496 -> 2030
+  CALM        $     6,972 -> $    46,826  (   +39,854)   exp $   3.80 -> $  31.18   n 1833 -> 1502
+
+########## CHI TIET NHANH CALM — quy uoc BACKTEST ##########
+  -- theo ma --
+  CALM MES                     443t  $       873  WR  13.5%  PF  1.07  exp $    1.97
+  CALM MNQ                     450t  $     6,424  WR  15.1%  PF  1.34  exp $   14.28
+  CALM MYM                     467t  $       351  WR  13.9%  PF  1.04  exp $    0.75
+  CALM M2K                     473t  $      -676  WR   9.5%  PF  0.93  exp $   -1.43
+  -- theo nam --
+  CALM 2018                    309t  $     1,211  WR  12.6%  PF  1.20  exp $    3.92
+  CALM 2019                    415t  $      -394  WR  14.7%  PF  0.95  exp $   -0.95
+  CALM 2020                    157t  $     2,691  WR  14.6%  PF  1.62  exp $   17.14
+  CALM 2021                    357t  $    -3,485  WR   8.7%  PF  0.70  exp $   -9.76
+  CALM 2022                     17t  $       709  WR  17.6%  PF  2.42  exp $   41.70
+  CALM 2023                    261t  $       198  WR  10.7%  PF  1.02  exp $    0.76
+  CALM 2024                    317t  $     6,041  WR  16.7%  PF  1.53  exp $   19.06
+  -- theo huong --
+  CALM LONG                   1094t  $    11,538  WR  15.2%  PF  1.42  exp $   10.55
+  CALM SHORT                   739t  $    -4,566  WR   9.7%  PF  0.80  exp $   -6.18
+  -- theo ly do thoat --
+  CALM CHANDELIER             1492t  $   -43,042  WR   0.9%  PF  0.01  exp $  -28.85
+  CALM GAP                     103t  $    -5,699  WR   0.0%  PF  0.00  exp $  -55.33
+  CALM MAX_HOLD                238t  $    55,714  WR  94.1%  PF 122.95  exp $  234.09
+
+########## CHI TIET NHANH CALM — quy uoc LIVE 14h ##########
+  -- theo ma --
+  CALM MES                     373t  $     9,215  WR  21.2%  PF  1.96  exp $   24.70
+  CALM MNQ                     365t  $    24,223  WR  25.2%  PF  2.76  exp $   66.36
+  CALM MYM                     398t  $     6,898  WR  20.6%  PF  1.94  exp $   17.33
+  CALM M2K                     366t  $     6,492  WR  20.2%  PF  1.98  exp $   17.74
+  -- theo nam --
+  CALM 2018                    264t  $     4,934  WR  20.5%  PF  2.00  exp $   18.69
+  CALM 2019                    332t  $     6,063  WR  22.9%  PF  2.11  exp $   18.26
+  CALM 2020                    130t  $     4,765  WR  21.5%  PF  2.52  exp $   36.65
+  CALM 2021                    291t  $     3,310  WR  16.8%  PF  1.38  exp $   11.37
+  CALM 2022                     17t  $     3,037  WR  35.3%  PF  9.39  exp $  178.63
+  CALM 2023                    209t  $     8,323  WR  20.6%  PF  2.40  exp $   39.82
+  CALM 2024                    259t  $    16,395  WR  27.4%  PF  2.85  exp $   63.30
+  -- theo huong --
+  CALM LONG                    881t  $    31,025  WR  24.4%  PF  2.57  exp $   35.22
+  CALM SHORT                   621t  $    15,802  WR  18.0%  PF  1.90  exp $   25.45
+  -- theo ly do thoat --
+  CALM CHANDELIER             1082t  $   -31,861  WR   0.6%  PF  0.01  exp $  -29.45
+  CALM GAP                      83t  $    -4,693  WR   0.0%  PF  0.00  exp $  -56.54
+  CALM MAX_HOLD                337t  $    83,380  WR  95.0%  PF 148.55  exp $  247.42
+
+########## PRODUCTION theo nam — quy uoc LIVE 14h ##########
+  PROD 2018                    252t  $    11,641  WR  27.8%  PF  2.40  exp $   46.19
+  PROD 2019                    181t  $     5,626  WR  27.6%  PF  2.25  exp $   31.08
+  PROD 2020                    355t  $    25,777  WR  26.2%  PF  2.75  exp $   72.61
+  PROD 2021                    243t  $    11,886  WR  26.7%  PF  2.35  exp $   48.92
+  PROD 2022                    464t  $    21,236  WR  22.4%  PF  1.83  exp $   45.77
+  PROD 2023                    298t  $    18,883  WR  28.2%  PF  2.87  exp $   63.37
+  PROD 2024                    237t  $    12,992  WR  23.2%  PF  2.41  exp $   54.82

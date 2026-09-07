@@ -1,0 +1,15 @@
+{
+ "artifact": "normal_promotion_trades_vault2026_d1repro_20260829.json",
+ "artifact_sha256": "1ee198a9f10387c85ddb5814062bde0af658a9182b400851738fdaa162d91a86",
+ "window": "vault2026",
+ "labels": "RegimeLabels(lag_days=1) causal D-1",
+ "proxy_labels": false,
+ "asked_ema_period": 30,
+ "effective_ema_period": 50,
+ "ema_was_substituted": true,
+ "asked_chandelier_atr_mult": 2.5,
+ "chandelier_affects_decisions": false,
+ "effective_stop_basis_atr_mult": 2.0,
+ "ratchet": false,
+ "max_hold_days": 5
+}

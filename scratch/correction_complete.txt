@@ -1,0 +1,34 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+
+========================================================================================
+QUY UOC ENGINE (vu trang ranh gioi ngay)
+========================================================================================
+  tong lenh 2496
+  1. bar mo vuot muc stop VA la bar vu trang   :   591 lenh  $    38,904
+  2. bar mo vuot muc stop, KHONG phai bar vu trang:  26 lenh  $       120
+  3. nhan GAP (engine da khop tai gia mo)      :   133 lenh
+
+  -> phep sua cua toi cham nhom 1: $38,904
+  -> BO SOT nhom 2               : $120  (0.3% cua tong 39,024)
+
+  vi du nhom BO SOT:
+    MES vao 2023-01-11 thoat 2023-01-12 LONG | stop 4422.12 | gia mo 4422.0 | lech $0.6 | luc 08:30:00 | giu 1 ngay
+    MES vao 2023-06-20 thoat 2023-06-21 LONG | stop 4797.62 | gia mo 4797.5 | lech $0.6 | luc 02:05:00 | giu 1 ngay
+    MNQ vao 2023-03-13 thoat 2023-03-14 LONG | stop 13728.31 | gia mo 13728.25 | lech $0.12 | luc 01:29:00 | giu 1 ngay
+    MNQ vao 2023-05-02 thoat 2023-05-03 LONG | stop 14809.35 | gia mo 14809.25 | lech $0.2 | luc 00:23:00 | giu 1 ngay
+    MYM vao 2020-03-13 thoat 2020-03-16 LONG | stop 24027.96 | gia mo 23807.0 | lech $110.48 | luc 09:30:00 | giu 3 ngay
+    MYM vao 2022-07-25 thoat 2022-07-26 LONG | stop 35212.36 | gia mo 35212.0 | lech $0.18 | luc 00:05:00 | giu 1 ngay
+
+========================================================================================
+LUAT LIVE (vu trang D+1 14:05, stop co dinh)
+========================================================================================
+  tong lenh 2018
+  1. bar mo vuot muc stop VA la bar vu trang   :   645 lenh  $    99,502
+  2. bar mo vuot muc stop, KHONG phai bar vu trang:   1 lenh  $         0
+  3. nhan GAP (engine da khop tai gia mo)      :   100 lenh
+
+  -> phep sua cua toi cham nhom 1: $99,502
+  -> BO SOT nhom 2               : $0  (0.0% cua tong 99,503)
+
+  vi du nhom BO SOT:
+    M2K vao 2018-11-28 thoat 2018-11-30 LONG | stop 1694.62 | gia mo 1694.6 | lech $0.1 | luc 07:02:00 | giu 2 ngay

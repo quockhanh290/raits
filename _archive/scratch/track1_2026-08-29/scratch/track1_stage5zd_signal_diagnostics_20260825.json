@@ -1,0 +1,217 @@
+{
+  "stage": "5ZD",
+  "title": "Track 1 signal diagnostics journal + job view integration",
+  "checked_at": {
+    "utc": "16:05",
+    "et": "2026-08-25 12:05 EDT",
+    "calgary": "10:05 MDT",
+    "tokyo": "2026-08-26 01:05 JST"
+  },
+  "verdicts": {
+    "signal_diagnostics": "READY",
+    "dashboard_integration": "READY",
+    "paper": "STILL BLOCKED - B1 and PAPER_SHADOW_EVIDENCE unchanged",
+    "restart_needed_for_writer_or_dashboard": false,
+    "restart_reason": "none - slot subprocesses import fresh, so the writer went live on save; the backend serves the reader on the next request",
+    "live_runtime_file_touched_by_this_stage": false,
+    "live_runtime_file_written_by_production": true
+  },
+  "went_live_without_a_restart": {
+    "proof": "the running scheduler wrote real rows before this stage finished",
+    "rows_written_by_production": 3,
+    "slots": [
+      "TRACK1_STRESS_1150",
+      "TRACK1_STRESS_1155",
+      "TRACK1_STRESS_1200"
+    ],
+    "path": "global_index/track1_runtime/signals"
+  },
+  "journal": {
+    "path": "global_index/track1_runtime/signals",
+    "under_runtime_tree_not_scratch": true,
+    "statuses": [
+      "SLOT_REFUSED",
+      "NO_SIGNAL",
+      "RAW_SIGNAL_FOUND",
+      "SIGNAL_REJECTED",
+      "SIGNAL_ACCEPTED_SHADOW"
+    ],
+    "extra_readings_never_written_to_the_journal": [
+      "SLOT_MISSED",
+      "SLOT_NO_ROW"
+    ],
+    "layers": [
+      "freshness",
+      "admission",
+      "cap",
+      "same_symbol",
+      "window",
+      "route_switch"
+    ],
+    "strategy_sleeves_only": [
+      "roska4_calm",
+      "roska4_stress",
+      "roska4_swing",
+      "global_nkd"
+    ],
+    "write_is_best_effort": true,
+    "write_failure_remembered": "last_error() and surfaced by the reader",
+    "build_time_refusals": [
+      "unknown status",
+      "non-strategy sleeve",
+      "accepted-shadow claiming an order",
+      "rejection with no named layer",
+      "row with no rule_checks"
+    ]
+  },
+  "rule_checks": {
+    "three_answer_sources": [
+      "measured",
+      "not_reached",
+      "not_exposed_by_sleeve"
+    ],
+    "why_the_third_exists": "the sleeve detectors compute breadth, EMA and the gap internally and do not return them. Re-implementing those rules here would be a second answer to the same question, which is the defect this project has paid for twice. not_exposed_by_sleeve has NOT been shown to be fine and is never counted as a pass",
+    "observed_in_production": {
+      "measured": 6,
+      "not_exposed_by_sleeve": 24,
+      "not_reached": 9
+    },
+    "per_sleeve_rule_counts": {
+      "roska4_calm": 6,
+      "roska4_stress": 11,
+      "roska4_swing": 7,
+      "global_nkd": 6
+    },
+    "thresholds_read_from_params_not_restated": true
+  },
+  "the_follow_up_this_exposed": {
+    "what": "the four sleeve detectors do not return their rule values",
+    "consequence": "NO_SIGNAL rows cannot yet name a blocker; the line says so explicitly",
+    "line_rendered": "Signal: NO SIGNAL - candidates 0 - blocker not reported (8 rules)",
+    "belongs_to": "its own stage, with the artifact reproduction re-run behind it",
+    "not_attempted_here": true
+  },
+  "scope_enforcement": {
+    "strategy_jobs_with_signal_key": 34,
+    "non_strategy_jobs_with_signal_key": 0,
+    "enforced_in_two_places": [
+      "SignalRow.__post_init__ sleeve allow-list",
+      "job view prefix test, checked BEFORE the legacy prefixes"
+    ],
+    "missed_vs_no_row": {
+      "SLOT_MISSED": "never spawned - operations health",
+      "SLOT_NO_ROW": "ran and left no row - predates the journal or channel disabled",
+      "why": "33 slots had already run before the journal existed; calling them MISSED would have accused the scheduler of failing when it had not"
+    }
+  },
+  "dashboard": {
+    "panel_row": "one compact 'Signals today' fact row, existing style",
+    "job_view": "one sentence under the existing status line, strategy slots only",
+    "sentence_composed_by": "backend (track1_signals.one_line), not the browser",
+    "expanded_row_only": [
+      "rule_checks",
+      "candidates",
+      "primary_failure"
+    ],
+    "absent_file_renders": "not yet observed (never an error)",
+    "unreported_rule_colour": "warn, never good",
+    "wraps_not_widens": true,
+    "mobile_breakpoint": "720px",
+    "new_cards_added": 0,
+    "new_table_columns_added": 0
+  },
+  "reader_snapshot": {
+    "present": true,
+    "day": "20260825",
+    "route": "track1_candidate",
+    "rows": 3,
+    "invalid": 0,
+    "invalid_detail": [],
+    "channel_disabled": false,
+    "channel_error": null,
+    "orders_enabled": false,
+    "order_attempted": false,
+    "sleeves": {
+      "roska4_calm": {
+        "observed": 0,
+        "reading": "not yet observed"
+      },
+      "roska4_stress": {
+        "observed": 3,
+        "counts": {
+          "NO_SIGNAL": 3
+        },
+        "latest_status": "NO_SIGNAL",
+        "latest_slot_id": "TRACK1_STRESS_1200",
+        "latest_slot_time": "12:00",
+        "latest_reason": "decided",
+        "latest_accepted": null,
+        "latest_declined": null
+      },
+      "roska4_swing": {
+        "observed": 0,
+        "reading": "not yet observed"
+      },
+      "global_nkd": {
+        "observed": 0,
+        "reading": "not yet observed"
+      }
+    },
+    "days": [
+      "20260825"
+    ]
+  },
+  "orders": {
+    "orders_possible": false,
+    "blocking": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "confirmation_file": false,
+    "track1_orders_approved_env": false,
+    "allow_orders_added": false,
+    "order_journal_dir": false,
+    "track1_book": false,
+    "signals_module_imports_broker_or_order_path": false,
+    "legacy_live_positions_read_by_this_feature": false
+  },
+  "tests": {
+    "stage_5zd": 68,
+    "mutations": 31,
+    "mutations_all_red": true,
+    "combined_15_files": "720 passed, 0 failed",
+    "end_to_end_tests_drive_the_real_slot": [
+      "a decided slot writes exactly one row",
+      "a REFUSED slot still writes its row",
+      "the row lands under the runtime tree",
+      "a diagnostics failure does not cost the coverage row",
+      "the slot's own decision is identical with the journal on and off"
+    ]
+  },
+  "tests_i_had_to_correct": [
+    {
+      "test": "5Z::test_31_the_live_slot_records_shadow_live_unconditionally",
+      "was": "pinned exactly one mode=tx.SHADOW_LIVE",
+      "why_it_broke": "the diagnostics row records the mode it decided under, making two",
+      "now": "asserts EVERY mode= is SHADOW_LIVE - what its docstring always claimed, and stronger"
+    },
+    {
+      "test": "5Q3::test_this_suite_never_wrote_into_the_real_runtime_tree",
+      "was": "asserted no .jsonl anywhere under the real shadow tree",
+      "why_it_broke": "the live Stress slots decided at 11:10 ET and wrote their explanations; a correct system made it false",
+      "why_a_snapshot_alone_is_not_the_fix": "the live route writes there every 5 minutes during a window and would be blamed on the suite",
+      "now": "structural - the shadow dir is a RELATIVE constant and the fixture hands a tmp root, plus a snapshot for anything outside the live-explanations path"
+    }
+  ],
+  "my_own_fixture_was_wrong_first": "the hand-rolled end-to-end frames were refused with frozen_clock; the Stage 5Q3 helpers were imported instead, because a fixture that does not play the real data source is a fixture that tests itself",
+  "files": [
+    "global_index/track1_signals.py (new)",
+    "global_index/run_live_day_track1.py",
+    "monitor/backend/track1_runtime_reader.py",
+    "monitor/backend/job_journal_reader.py",
+    "global_index/dash/realtime/realtime.js",
+    "global_index/dash/realtime/realtime.css",
+    "scratch/test_track1_stage5zd_signal_diagnostics_20260825.py",
+    "scratch/track1_stage5zd_mutations_20260825.py"
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "results": [
+    {
+      "mutation": "N1 the overlap guard gains a price tolerance",
+      "guard": "scratch/test_track1_stage5q4_overlap_and_repair_20260824.py::test_refuse_overlap_disagreement_is_untouched",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "N2 the overlap guard warns instead of refusing",
+      "guard": "scratch/test_track1_stage5q4_overlap_and_repair_20260824.py::test_the_overlap_check_still_hard_refuses_a_real_disagreement",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "N3 the repair tool applies by default",
+      "guard": "scratch/test_track1_stage5q4_overlap_and_repair_20260824.py::test_the_tool_defaults_to_dry_run_at_the_cli_level",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "N4 --apply no longer needs --expect to match",
+      "guard": "scratch/test_track1_stage5q4_overlap_and_repair_20260824.py::test_apply_without_the_hash_guard_refuses",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "N5 a disagreement outside the window is repaired anyway",
+      "guard": "scratch/test_track1_stage5q4_overlap_and_repair_20260824.py::test_a_disagreement_outside_the_window_refuses_the_whole_run",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "N6 any number of disagreeing bars is repaired",
+      "guard": "scratch/test_track1_stage5q4_overlap_and_repair_20260824.py::test_too_many_disagreeing_bars_refuses",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "N7 the repair writes without snapshotting first",
+      "guard": "scratch/test_track1_stage5q4_overlap_and_repair_20260824.py::test_apply_snapshots_repairs_one_bar_and_verifies",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "N8 a dry run falls through into the apply path",
+      "guard": "scratch/test_track1_stage5q4_overlap_and_repair_20260824.py::test_a_dry_run_writes_nothing_and_says_what_it_would_do",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "N9 the repair does not verify by re-reading",
+      "guard": "scratch/test_track1_stage5q4_overlap_and_repair_20260824.py::test_a_repair_that_does_not_land_is_reported_as_a_failure",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    }
+  ],
+  "detected": 9,
+  "total": 9,
+  "restore_mismatch": []
+}

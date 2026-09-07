@@ -1,0 +1,127 @@
+{
+  "results": [
+    {
+      "mutation": "R1 a hard refusal counts as an observation",
+      "guard": "test_a_window_that_could_not_evaluate_fails[no_bar_provider]",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "R2 the audit stops failing a window that could not evaluate",
+      "guard": "test_a_window_that_could_not_evaluate_fails[live_source_not_ready]",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "R3 any gate refusal counts as the decision band being shut",
+      "guard": "test_a_window_that_could_not_evaluate_fails[gate_stale]",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "R4 an unreadable gate refusal is read as a window-shut",
+      "guard": "test_an_unreadable_row_is_a_hard_refusal_not_an_observation",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "R5 freshness_refused is treated as a valid no-action",
+      "guard": "test_a_window_that_could_not_evaluate_fails[freshness_refused]",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "R6 slot IDS stop being checked and the count is trusted",
+      "guard": "test_a_missing_slot_id_fails_even_though_a_duplicate_keeps_the_count",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "R7 a duplicate slot id compensates for a missing one",
+      "guard": "test_a_missing_slot_id_fails_even_though_a_duplicate_keeps_the_count",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "R8 a ledger row with no timing record is ignored",
+      "guard": "test_a_slot_with_a_ledger_row_and_no_timing_fails",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "R9 a timing record with no ledger row is ignored",
+      "guard": "test_a_slot_with_timing_and_no_ledger_row_fails",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "R10 the gate reads the flat explanation path nothing writes",
+      "guard": "test_the_gate_finds_rows_written_by_the_REAL_writer",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "R11 a sleeve is failed for rows a later sleeve overwrote",
+      "guard": "test_a_sleeve_whose_rows_a_later_sleeve_overwrote_is_named_not_failed",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "R12 the committed daily gate is enforced on the operational roll-up",
+      "guard": "test_a_day_on_which_every_sleeve_found_nothing_is_not_a_failure",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "R13 an unobserved sleeve no longer fails the day",
+      "guard": "test_one_unobserved_sleeve_fails_the_day_even_when_the_rest_were_quiet",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "R14 the dashboard reader guesses at the explanation layout again",
+      "guard": "test_the_dashboard_reader_and_the_gate_agree_on_where_rows_live",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "R15 a window whose decision band never opened passes without a word",
+      "guard": "test_a_full_window_the_decision_band_was_shut_for_warns_and_does_not_fail",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    }
+  ],
+  "detected": 15,
+  "total": 15,
+  "restore_mismatch": []
+}

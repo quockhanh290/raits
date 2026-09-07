@@ -1,0 +1,63 @@
+======================================================================================================================
+NORMAL SLEEVE - INDEPENDENT FILL-FEASIBILITY AUDIT   (scratch / research only)
+======================================================================================================================
+config: Normal regime only | Ro4 EMA50 | NKD ema=10 mult=2.5 | 2x daily ATR stop,
+        fixed (no ratchet), armed 14:05 local on the next session | max_hold 5d |
+        SHORT only when SPY D-1 close < SMA50 | 2 ticks/side | 1 micro | $50,000
+        Stress sleeve disabled. 'original' = what the current config books,
+        i.e. harness day+1-arm fill correction already applied.
+
+######################################################################################################################
+WINDOW: floor
+######################################################################################################################
+  argv: --data-dir data/cache/futures/frozen_sim --nkd-parquet global_index/data/NKD_frozen_2024.parquet --regime-csv spy_daily_live.csv --end 2024-12-31 --hmm-fit-end 2022-12-31 --n-contracts 1 --slippage-ticks 2
+  deploy_sim ANCHOR (current config, Ro4+NKD original fill):
+    net $33,176 | PF 1.36 | Sharpe 1.73 | Calmar 0.52 | MaxDD $9,259
+    harness day+1-arm fill correction inside that config: 0 trades, $0 (1-contract basis)
+
+  PER-INSTRUMENT FILL AUDIT - 'original' (what the current config books)
+  inst   trades out_exit_bar out_exit_day  sig>entry same_bar_exit entry!=close favourable adverse
+  MES       202            0            0          0             0            0         0       0
+  MNQ       210            0            0          0             0            0         0       0
+  MYM       216            0            0          0             0            0         0       0
+  M2K       211            0            0          0             0            0         0       0
+  MNKD      228            0            0          0             0            0         0       0
+
+  PER-INSTRUMENT FILL AUDIT - 'corrected' (conservative path law)
+  inst   trades out_exit_bar out_exit_day  sig>entry same_bar_exit entry!=close favourable adverse
+  MES       202            0            0          0             0            0         0       0
+  MNQ       210            0            0          0             0            0         0       0
+  MYM       216            0            0          0             0            0         0       0
+  M2K       211            0            0          0             0            0         0       0
+  MNKD      228            0            0          0             0            0         0       0
+
+  corrected-fill law repricing (vs raw engine output, 1-contract basis):
+    MES       0 trades repriced, $         0 removed
+    MNQ       0 trades repriced, $         0 removed
+    MYM       0 trades repriced, $         0 removed
+    M2K       0 trades repriced, $         0 removed
+    MNKD      0 trades repriced, $         0 removed
+
+  FAILING SAMPLES (original) - showing up to 12; total outside_exit_bar = 0
+    (none)
+
+  VARIANT METRICS (deploy_sim risk layer: MultiClusterGuard + CircuitBreaker, 1 micro, $50k)
+  variant                          net$     PF  Sharpe  Calmar    MaxDD$   MaxDD%   ret/yr  trades  taken   rej  halt out_exit_bar
+  R4 only (NKD excluded)          8,570   1.21    1.10    0.18    11,372    22.7%     4.1%     839    350   135   354            0
+  NKD only, original              3,898   1.15    0.86    0.14     3,941     7.9%     1.1%     228    228     0     0            0
+  NKD only, corrected             3,898   1.15    0.86    0.14     3,941     7.9%     1.1%     228    228     0     0            0
+  R4 + NKD, original             33,176   1.36    1.73    0.52     9,259    18.5%     9.7%    1067    799   268     0            0
+  R4 + NKD, corrected NKD        33,176   1.36    1.73    0.52     9,259    18.5%     9.7%    1067    799   268     0            0
+  R4 + NKD, corrected both       33,176   1.36    1.73    0.52     9,259    18.5%     9.7%    1067    799   268     0            0
+
+  YEARLY NET$ per variant
+  variant                          2018       2019       2020       2021       2022       2023       2024
+  R4 only (NKD excluded)          4,542      4,759      3,127      4,299     -8,158          0          0
+  NKD only, original             -2,014       -502       -706        451      2,432      4,540       -302
+  NKD only, corrected            -2,014       -502       -706        451      2,432      4,540       -302
+  R4 + NKD, original              2,529      4,257      2,421      4,749     -2,416     14,978      6,657
+  R4 + NKD, corrected NKD         2,529      4,257      2,421      4,749     -2,416     14,978      6,657
+  R4 + NKD, corrected both        2,529      4,257      2,421      4,749     -2,416     14,978      6,657
+
+  [SELF-CHECK] re-assembly reproduces deploy_sim: net $33,176 vs $33,176, Calmar 0.52 vs 0.52, MaxDD $9,259 vs $9,259 -> PASS
+

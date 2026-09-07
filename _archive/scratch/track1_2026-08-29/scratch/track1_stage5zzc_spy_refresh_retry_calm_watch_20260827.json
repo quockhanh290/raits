@@ -1,0 +1,177 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZC",
+  "title": "SPY post-close retry ladder, and the Calm live phase watch (pending)",
+  "when_et": "2026-08-27T06:10:00-04:00/2026-08-27T06:30:00-04:00",
+
+  "verdict": {
+    "spy_daily_now_covers_required_day": true,
+    "retry_schedule_built": true,
+    "scheduler_restart_required": true,
+    "calm_decide_observed": false,
+    "calm_observe_observed": false,
+    "part_c_status": "PENDING — recorded at 06:24 ET; the phases run at 09:32 and 10:02",
+    "orders_possible": false,
+    "runtime_files_touched": false,
+    "production_spy_csv_touched_by_stage": false,
+    "next_action": "watch 09:32 and 10:02, then restart in the 12:40-13:45 ET window"
+  },
+
+  "part_a_ladder": {
+    "measurement_that_shaped_it": {
+      "what": "a retry with nothing to do — the SUCCESSFUL case — exits 1 under --verify-strict",
+      "why": "the series already ends at today, so the update returns early with UNKNOWN (no_snapshot): nothing fetched, nothing compared, which is honest and is not a PASS",
+      "consequence_if_ignored": "two rungs a day each reporting FAILED on every day that went well — an alarm that fires when nothing is wrong",
+      "measured_exit_code": 1
+    },
+    "fix": {
+      "flag": "--skip-if-covered",
+      "behaviour": "short-circuits before the fetch and before the API key is used",
+      "proof": "run with a deliberately invalid key: EXIT 0, 'nothing to do: the day this run was sent for is already in the series', provider never reached",
+      "only_on_retries": true,
+      "why_not_the_primary": "the 16:20 run does the verification even when the day is already there, because checking the labels is part of what that run is for"
+    },
+    "rungs": [
+      {"id": "spy_refresh_pm", "label": "SPY_REFRESH_PM", "at_et": "16:20", "skip_if_covered": false},
+      {"id": "spy_refresh_pm_r1", "label": "SPY_REFRESH_PM_R1", "at_et": "16:45", "skip_if_covered": true},
+      {"id": "spy_refresh_pm_r2", "label": "SPY_REFRESH_PM_R2", "at_et": "17:15", "skip_if_covered": true}
+    ],
+    "every_rung_carries": ["--verify-strict", "--require-through <session_day>"],
+    "no_rung_carries": "--allow-orders",
+    "morning_slots_fetch_spy": false,
+    "four_outcomes": {
+      "primary_success": "OK — the daily series now covers <today>",
+      "retry_recovered": "RECOVERED — <day> was missing when the earlier attempt ran and is there now. The 16:20 refresh is running before the provider is ready; if this keeps happening, move it later rather than relying on the ladder.",
+      "retry_noop": "nothing to do — <day> was already in the series when this rung ran",
+      "still_missing_middle_rung": "the daily series still ends on X, not Y ... Next attempt at 17:15 ET.",
+      "still_missing_last_rung": "LAST ATTEMPT — ... the overnight NKD window and BOTH Calm phases will refuse on regime_csv: stale",
+      "run_broke": "FAILED, with drift / unverifiable / other told apart"
+    },
+    "recovered_is_a_warning_not_info": "a ladder that quietly rescues the same failure every day is a schedule that wants moving, not a schedule that is working",
+    "job_inventory": {
+      "method": "real make_scheduler construction",
+      "legacy": {"before": 61, "after": 63},
+      "transitional": {"before": 131, "after": 133},
+      "track1_only": {"before": 102, "after": 104},
+      "delta": 2,
+      "note": "the rungs are shared infrastructure and appear in the legacy schedule too — the daily regime file is not Track 1's private input"
+    },
+    "hole_i_made_and_closed": {
+      "what": "in dry-run the rung judged itself against a series nothing had touched and logged a FAILED refresh for a command never sent",
+      "cause": "_run reports a dry run as success without executing",
+      "fixed": true,
+      "found_by": "writing the test for it"
+    }
+  },
+
+  "part_b_status_and_dashboard": {
+    "ops_status_line": "spy_daily_coverage=covers_required_day last=2026-08-26 required=2026-08-26 calendar=raits.live.trading_calendar",
+    "dashboard_block": "spy_daily",
+    "dashboard_row": "SPY daily",
+    "covered_wording": "SPY daily file covers 2026-08-26",
+    "short_wording": "SPY daily file is missing 2026-08-26 — it ends on 2026-08-25. This is a stale daily-context warning, not a slot failure: sleeves that run before the 13:45 pre-flight will refuse until the refresh is re-run",
+    "separate_from_slot_status": true,
+    "evidence_it_matters": {
+      "nkd_20260827_audit": {"verdict": "PASS", "observed_slots": 22, "expected_slots": 22,
+                             "reasons": ["all_slots_observed_no_action"], "judgeable": true},
+      "per_slot_diagnostics_before_the_manual_refresh": "freshness_allow=false",
+      "conclusion": "two true facts about different things; folding the second into the first would send somebody to inspect a window that worked"
+    },
+    "fact_pin": "the bidirectional dashboard pin caught the new row the moment it was added; it is now declared"
+  },
+
+  "part_c_watch": {
+    "status": "PENDING",
+    "recorded_at_et": "2026-08-27T06:24:12-04:00",
+    "decide_at_et": "09:32",
+    "observe_at_et": "10:02",
+    "baseline": {
+      "scheduler_pids": [5856],
+      "spy_daily_coverage": "covers_required_day",
+      "spy_csv_last": "2026-08-26",
+      "spy_csv_md5": "80f062531f4b61bc131005c0e9da376e",
+      "track1_slot_table": "fresh 71/71",
+      "orders_possible": false,
+      "blocking": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+      "confirmation": false,
+      "orders_dir": "ABSENT",
+      "shadow_intent_dir": "ABSENT",
+      "trade_log_rows": 0,
+      "live_positions_track1_mtime_et": "2026-08-27T02:55:42-04:00",
+      "replay_checkpoint_mtime_et": "2026-08-27T02:55:42-04:00"
+    },
+    "watch_commands": [
+      "Select-String -Path scheduler_0827.log -Pattern \"TRACK1_CALM_DECIDE_0932\" | Select-Object -Last 6",
+      "Get-Content global_index\\track1_runtime\\shadow_intent\\shadow_intent_20260827.jsonl",
+      "python -c \"from global_index import track1_shadow_intent as si; import json; rows=si.read_day('.','2026-08-27'); print(json.dumps(si.classify_day(rows),indent=2))\""
+    ],
+    "decide_must_show": [
+      "an intent row if the setup exists, or an explicit NO_SETUP/no_candidate row if not — silence is the one outcome not allowed",
+      "NO entry_reference_price and NO planned_stop",
+      "freshness passed, or an explicit REFUSED/freshness_refused row",
+      "orders dir still absent, trade log still 0 rows, book and checkpoint unmoved"
+    ],
+    "observe_must_show": [
+      "it reads the DECIDE rows for the same day and refuses no_decide_row_for_this_day if there are none",
+      "entry_reference_price equal to the real 10:00 open",
+      "planned_stop computed FROM it, not before",
+      "still no orders"
+    ],
+    "how_to_tell_a_real_no_setup_from_a_data_problem": {
+      "NO_SETUP / no_candidate": "the rule looked and said nothing today",
+      "REFUSED / freshness_refused": "the inputs were stale; the rule was never asked",
+      "REFUSED / gate_refused": "the causal gate refused; the rule was never asked",
+      "no rows at all": "the phase did not run — the only outcome that is not evidence"
+    },
+    "note": "today the daily file covers the required day, so a freshness refusal would be a surprise worth investigating rather than the expected outcome it would have been before the manual refresh"
+  },
+
+  "restart": {
+    "required": true,
+    "why": "the running scheduler (PID 5856) started 04:08 ET and holds the old single-job schedule; the code is not the process",
+    "nothing_worse_meanwhile": "today's 16:20 refresh behaves exactly as it did yesterday, and status says whether it left the file short",
+    "window_et": "12:40-13:45",
+    "window_length_minutes": 65,
+    "why_that_window": "a measured gap after the Stress window's audit and before the pre-flight — and after both Calm phases have been observed",
+    "next_best_windows_et": ["13:45-14:05 (20 min)", "10:20-10:35 (15 min)"],
+    "command": "python monitor\\ops.py restart --scheduler --track1-only-shadow --yes",
+    "argv_verified": "--shadow-resume is the default on that path, so the new argv is byte-identical to what PID 5856 runs today",
+    "run_by_this_stage": false
+  },
+
+  "tests": {
+    "file": "scratch/test_track1_stage5zzc_spy_retry_ladder_20260827.py",
+    "count": 22,
+    "result": "22 passed",
+    "network_calls": 0,
+    "writes_outside_tmp_path": 0,
+    "mutations": [
+      "the retries losing their skip flag",
+      "a covered retry reaching the provider",
+      "the skip flag passing a genuinely missing day",
+      "the last rung claiming a successor so nothing says the day is lost",
+      "daily context rendered as a window failure"
+    ],
+    "all_mutations_red": true,
+    "rescoped_not_loosened": {
+      "which": ["test_13_the_post_close_job_asks_the_child_for_the_day_it_needs",
+                "test_14_the_success_line_is_still_guarded_by_a_coverage_read"],
+      "why": "they asserted what the 16:20 job does, and the job is now a one-line delegator to a shared body",
+      "how": "widened to the shared body, so they now cover all three rungs at once"
+    },
+    "suites_after": {"track1_and_ops": "185 passed",
+                     "dashboard_contract_and_backend": "220 passed"}
+  },
+
+  "safety_confirmed": {
+    "scheduler_restarted": false,
+    "backend_restarted": false,
+    "orders_possible": false,
+    "confirmation_file": false,
+    "orders_dir": "ABSENT",
+    "runtime_files_touched": false,
+    "production_spy_csv_md5_at_stage_start": "80f062531f4b61bc131005c0e9da376e",
+    "production_spy_csv_md5_at_stage_end": "80f062531f4b61bc131005c0e9da376e",
+    "note": "the operator's manual refresh landed before this stage began; this stage did not touch the file"
+  }
+}

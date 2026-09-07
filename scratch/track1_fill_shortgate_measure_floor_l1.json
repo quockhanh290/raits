@@ -1,0 +1,150 @@
+{
+ "level1": {
+  "floor": {
+   "window": "floor",
+   "sleeves": {
+    "roska4_swing": [
+     {
+      "variant": "artifact_gate_on",
+      "fill_law": "artifact_all_bars_gappable",
+      "spy_short_gate": true,
+      "trades": 752,
+      "added": 0,
+      "removed": 0,
+      "changed": 0,
+      "net": 27711.359999999993,
+      "pf": 1.2999698312923,
+      "calmar": 0.25145712528063874,
+      "maxdd": 16120.019999999986,
+      "d_net": 0.0,
+      "d_pf": 0.0,
+      "d_calmar": 0.0,
+      "d_maxdd": 0.0
+     },
+     {
+      "variant": "production_gate_on",
+      "fill_law": "production_gap_after_15min_break",
+      "spy_short_gate": true,
+      "trades": 752,
+      "added": 1,
+      "removed": 1,
+      "changed": 2,
+      "net": 27711.569999999992,
+      "pf": 1.299972786399868,
+      "calmar": 0.2514623067224636,
+      "maxdd": 16119.809999999987,
+      "d_net": 0.20999999999912689,
+      "d_pf": 2.95510756798123e-06,
+      "d_calmar": 5.1814418248752325e-06,
+      "d_maxdd": -0.20999999999912689
+     },
+     {
+      "variant": "artifact_gate_off",
+      "fill_law": "artifact_all_bars_gappable",
+      "spy_short_gate": false,
+      "trades": 822,
+      "added": 232,
+      "removed": 162,
+      "changed": 394,
+      "net": 7242.760000000002,
+      "pf": 1.0708819829214076,
+      "calmar": 0.04964367545110077,
+      "maxdd": 21289.69999999997,
+      "d_net": -20468.59999999999,
+      "d_pf": -0.22908784837089247,
+      "d_calmar": -0.20181344982953797,
+      "d_maxdd": 5169.679999999986
+     },
+     {
+      "variant": "production_gate_off",
+      "fill_law": "production_gap_after_15min_break",
+      "spy_short_gate": false,
+      "trades": 822,
+      "added": 232,
+      "removed": 162,
+      "changed": 394,
+      "net": 7242.760000000002,
+      "pf": 1.0708819829214076,
+      "calmar": 0.04964367545110077,
+      "maxdd": 21289.69999999997,
+      "d_net": -20468.59999999999,
+      "d_pf": -0.22908784837089247,
+      "d_calmar": -0.20181344982953797,
+      "d_maxdd": 5169.679999999986
+     }
+    ],
+    "global_nkd": [
+     {
+      "variant": "artifact_gate_on",
+      "fill_law": "artifact_all_bars_gappable",
+      "spy_short_gate": true,
+      "trades": 228,
+      "added": 0,
+      "removed": 0,
+      "changed": 0,
+      "net": 3898.300000000001,
+      "pf": 1.1517692723967028,
+      "calmar": 0.14446768130041188,
+      "maxdd": 3940.770000000005,
+      "d_net": 0.0,
+      "d_pf": 0.0,
+      "d_calmar": 0.0,
+      "d_maxdd": 0.0
+     },
+     {
+      "variant": "production_gate_on",
+      "fill_law": "production_gap_after_15min_break",
+      "spy_short_gate": true,
+      "trades": 228,
+      "added": 4,
+      "removed": 4,
+      "changed": 8,
+      "net": 3903.6600000000017,
+      "pf": 1.152009669653906,
+      "calmar": 0.14479749246293547,
+      "maxdd": 3937.2000000000044,
+      "d_net": 5.360000000000582,
+      "d_pf": 0.00024039725720315097,
+      "d_calmar": 0.0003298111625235911,
+      "d_maxdd": -3.5700000000006185
+     },
+     {
+      "variant": "artifact_gate_off",
+      "fill_law": "artifact_all_bars_gappable",
+      "spy_short_gate": false,
+      "trades": 235,
+      "added": 75,
+      "removed": 68,
+      "changed": 143,
+      "net": 1533.1400000000003,
+      "pf": 1.054315702358708,
+      "calmar": 0.03531262853698499,
+      "maxdd": 6340.5700000000015,
+      "d_net": -2365.1600000000008,
+      "d_pf": -0.09745357003799482,
+      "d_calmar": -0.10915505276342688,
+      "d_maxdd": 2399.7999999999965
+     },
+     {
+      "variant": "production_gate_off",
+      "fill_law": "production_gap_after_15min_break",
+      "spy_short_gate": false,
+      "trades": 235,
+      "added": 77,
+      "removed": 70,
+      "changed": 147,
+      "net": 1542.4300000000003,
+      "pf": 1.054662817001137,
+      "calmar": 0.0355606471595591,
+      "maxdd": 6334.5,
+      "d_net": -2355.870000000001,
+      "d_pf": -0.09710645539556584,
+      "d_calmar": -0.10890703414085277,
+      "d_maxdd": 2393.729999999995
+     }
+    ]
+   }
+  }
+ },
+ "level2": {}
+}

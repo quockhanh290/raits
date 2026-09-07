@@ -1,0 +1,256 @@
+{
+  "stage": "5Q-3",
+  "title": "Track 1 live frame schema projection, and a splice refusal that leaves a record",
+  "date": "2026-08-24",
+  "route": "track1_candidate",
+  "verdict": "B_5R_A_AND_B_5R_B_CLOSED",
+  "claim": "Both faults in the 10:00 ET failure are fixed and each has been observed failing when removed. The fix does not unblock today's Stress window: overlap_disagreement fires before the splice and is a price disagreement, not a schema one.",
+  "safety_statement": {
+    "scheduler_started_or_stopped": false,
+    "scheduler_pid": 28696,
+    "scheduler_started_local": "2026-08-24 07:25:31",
+    "scheduler_started_et": "2026-08-24 09:25:31",
+    "scheduler_pid_unchanged_before_and_after": true,
+    "backend_restarted": false,
+    "ibkr_connected_by_this_work": false,
+    "orders_enabled": false,
+    "allow_orders_used": false,
+    "track1_orders_approved_set": false,
+    "confirmation_file_created": false,
+    "stop_trading_files_touched": false,
+    "live_positions_written": false,
+    "route_checkpoint_written": false,
+    "test_writes_outside_tmp_path": false,
+    "strategy_logic_changed": false,
+    "order_gate_changed": false,
+    "job_inventory_changed": false,
+    "committed": false
+  },
+  "projection_owner": {
+    "module": "global_index/track1_live_source.py",
+    "function": "live_frame -> project_to_frozen_columns",
+    "why": "it is the ONLY caller of track1_live_frame.splice in the repo, asserted by a test that scans every production module in global_index/",
+    "guard_left_strict": true,
+    "guard_rationale": "relaxing splice to 'extras are fine' would let a future caller that forgot to project hand it a wider frame and get a wider frame back, with provider fields riding downstream into every sleeve",
+    "order": [
+      "fetch",
+      "on_frozen_clock",
+      "project_to_frozen_columns",
+      "bars_from_the_future",
+      "overlap_disagreement",
+      "guard.splice"
+    ],
+    "order_rationale": "schema before prices - the overlap check compares values column by column and cannot compare a column that is not there",
+    "rules": {
+      "extra_provider_columns": "DROPPED, names returned and carried on JoinedFrame.dropped_columns and in its record",
+      "missing_frozen_column": "REFUSED, missing_required_columns, naming the column; never synthesised",
+      "nan_in_frozen_column": "REFUSED, nan_in_required_columns, naming column and first bar",
+      "column_order": "taken from frozen, so the frames are identical rather than equal as sets"
+    },
+    "allowlist_rejected": "an allowlist of average/barcount drifts the first time IBKR adds a field and would refuse a harmless new column; the general rule plus a VISIBLE drop is the safety property"
+  },
+  "splice_refusal": {
+    "reason_code": "live_frame_refused",
+    "detail_shape": "<guard code>: <guard detail>, e.g. 'column_mismatch: frozen columns [...] != live [...]'",
+    "rationale": "the stage is the reason and the check is the detail - the same shape gate_refused already uses for the intraday gate's codes",
+    "caught_in": "run_live_day_track1.observe_live_slot",
+    "acceptance_change_needed": false,
+    "acceptance_classification": "observed_hard_refusal (decided=False and reason != gate_refused) - verified by test, not assumed",
+    "audit_before": [
+      "coverage_unobserved",
+      "missing_slot_ids",
+      "no_timing_records"
+    ],
+    "audit_after": [
+      "slot_could_not_evaluate"
+    ],
+    "window_still_closes": true,
+    "checkpoint_written_for_incomplete_window": false
+  },
+  "third_defect_found": {
+    "what": "run_live_day_track1.py had never imported slot_telemetry",
+    "evidence": "the word 'telemetry' appeared once, in a comment naming the recommended directory; slot_timing/ was created and RAITS_TELEMETRY_DIR exported, and no Track 1 strategy slot had ever written a row",
+    "consequence_before": "the acceptance gate's no_timing_records was unsatisfiable and the p95 cadence check could never run on anything",
+    "fix": "begin() before argument parsing, mark() for sleeve/outcome, set_outcome('ok') on completion; off unless RAITS_TELEMETRY_DIR names a directory",
+    "ok_semantics": "'ok' means the slot RAN, not that it decided - a named refusal is a successful observation and its runtime belongs in the cadence numbers",
+    "measured_live_first_rows_ever": [
+      {
+        "slot_id": "TRACK1_STRESS_1100",
+        "outcome": "ok",
+        "runtime_s": 2.641,
+        "reason": "overlap_disagreement"
+      },
+      {
+        "slot_id": "TRACK1_STRESS_1105",
+        "outcome": "ok",
+        "runtime_s": 2.671
+      },
+      {
+        "slot_id": "TRACK1_STRESS_1110",
+        "outcome": "ok",
+        "runtime_s": 2.766
+      },
+      {
+        "slot_id": "TRACK1_STRESS_1115",
+        "outcome": "ok",
+        "runtime_s": 2.734
+      }
+    ],
+    "p95_now_measurable": {
+      "observed_p95_s": 2.7,
+      "target_s": 240.0,
+      "ceiling_s": 300.0
+    }
+  },
+  "todays_evidence": {
+    "calm_slot": "TRACK1_CALM_1000",
+    "left_as_failed_historical_evidence": true,
+    "rewritten_or_migrated": false,
+    "why": "it ran on the code as it stood, crashed in the splice and left only a window_open line. Back-filling it would manufacture evidence for a window nobody observed",
+    "audit_record_stands": {
+      "verdict": "FAIL",
+      "reasons": [
+        "coverage_unobserved",
+        "missing_slot_ids",
+        "no_timing_records"
+      ]
+    },
+    "only_future_slots_pick_up_the_fix": true,
+    "visible_proof": "the Stress slots from 11:00 ET onward are the first with timing rows",
+    "live_read_1119_et": {
+      "roska4_calm": {
+        "verdict": "FAIL",
+        "observed": 0,
+        "expected": 1
+      },
+      "roska4_stress": {
+        "verdict": "NOT_ENOUGH_DATA_YET",
+        "observed": 9,
+        "expected": 24,
+        "p95_s": 2.7,
+        "reason": "window_not_closed"
+      }
+    }
+  },
+  "correction_to_5q2": {
+    "was_claimed": "B-5R-A, the column mismatch, was the single thing standing between this route and a judgeable day",
+    "is": "it was one of TWO live-frame blockers. overlap_disagreement runs BEFORE the splice, so the Stress slots never reached the column mismatch and will not reach it after the fix either",
+    "measured": "every Stress slot today refuses with overlap_disagreement on MNQ"
+  },
+  "blockers_before_5r": [
+    {
+      "id": "B-5R-D",
+      "new": true,
+      "what": "one MNQ history bar disagrees with the live feed",
+      "detail": "2026-08-21 13:45:00-04:00, 'low': history 29400.2500 vs feed 29395.7500, gap 4.5000, on 1 of 1186 shared timestamps",
+      "impact": "refuses every Stress slot; MNQ is also in the swing basket",
+      "kind": "data question, not code - which of the two readings is right, and which to change",
+      "state": "open"
+    },
+    {
+      "id": "B-5R-C",
+      "new": false,
+      "what": "NKD after 2026-11-01: 12 of 22 ET slots fall outside the Tokyo decision band",
+      "state": "open, reported as WARN"
+    },
+    {
+      "id": "B1",
+      "new": false,
+      "what": "the order gate",
+      "state": "open by design; orders impossible"
+    }
+  ],
+  "blockers_closed_by_this_stage": [
+    "B-5R-A live frame column mismatch",
+    "B-5R-B SpliceRefused crashed the slot instead of being recorded"
+  ],
+  "tests": {
+    "stage_5q3": {
+      "file": "scratch/test_track1_stage5q3_live_frame_splice_20260824.py",
+      "passed": 32
+    },
+    "stage_5q3_mutations": {
+      "detected": 10,
+      "total": 10,
+      "restores_verified_byte_for_byte": true
+    },
+    "track1_scratch_regression": {
+      "files": 24,
+      "passed": 903,
+      "skipped": 2
+    },
+    "monitor_production": {
+      "files": 6,
+      "passed": 313
+    },
+    "not_run": [
+      "global_index/test_event_playback.py (known hang)"
+    ]
+  },
+  "older_tests_changed": [
+    {
+      "test": "test_mismatched_columns_are_refused (Stage 4C)",
+      "was": "asserted SpliceRefused / column_mismatch for a live half missing volume",
+      "now": "asserts LiveSourceRefused / missing_required_columns, which names the column",
+      "weakened": false,
+      "note": "the contract is unchanged; the refusal moved earlier and got more specific. A new test pins that extras no longer refuse, and the guard's own column_mismatch is still reachable and pinned in the 5Q-3 suite"
+    },
+    {
+      "test": "test_no_legacy_path_is_touched (Stage 5Z)",
+      "was": "fingerprinted scheduler_*.log before and after a shadow run",
+      "problem": "the LIVE scheduler appends to it every five minutes, so the guard went red whenever the system was running",
+      "now": "scheduler logs are out of the fingerprint; a new structural test requires the shadow entry point not to NAME a scheduler or log file",
+      "own_first_draft_was_wrong": "'.log' not in src went red on the module DOCSTRING - a substring test over free text, the same shape as the freshness check 5Q-2 replaced. It now parses string literals and excludes docstrings"
+    }
+  ],
+  "changed_files": [
+    "global_index/track1_live_source.py",
+    "global_index/run_live_day_track1.py",
+    "scratch/test_track1_stage4c_live_source_20260823.py",
+    "scratch/test_track1_stage5z_freshness_root_20260823.py",
+    "docs/futures/TRACK1_RUNTIME_PIPELINE_2026-08-24.md",
+    "docs/futures/TRACK1_SWITCHOVER_RUNBOOK.md",
+    "scratch/track1_stage5q2_explanation_integrity_report_20260824.md",
+    "scratch/track1_stage5q2_explanation_integrity_report_20260824.json"
+  ],
+  "unchanged_on_purpose": [
+    "global_index/track1_live_frame.py - the guard stays strict",
+    "global_index/track1_shadow_acceptance.py - the classification already handled live_frame_refused"
+  ],
+  "operator": {
+    "scheduler_restart_required": false,
+    "scheduler_restart_reason": "each slot spawns a fresh run_live_day_track1 that imports the current modules from disk; the fix is already live and the 11:00 ET Stress slots ran on it",
+    "backend_restart_required": false,
+    "backend_restart_reason": "the dashboard reader is unchanged by this stage",
+    "backend_restart_command_if_wanted": "python monitor\\ops.py restart --no-scheduler --track1-only-shadow",
+    "cli_verified": "python monitor\\ops.py restart --help - there is no --backend flag",
+    "what_needs_a_decision": "B-5R-D, the MNQ history/feed disagreement"
+  },
+  "followup_5q4": {
+    "appended": "2026-08-24 (Stage 5Q-4). The record above is left as written.",
+    "b_5r_d": {
+      "confirmed": true,
+      "wrong_side": "the parquet",
+      "evidence": [
+        "it is the FILE'S LAST BAR",
+        "the feed's low is 4.5 pts LOWER - the only direction a partial minute's low can be wrong in",
+        "open and high agreed exactly",
+        "12 independent slot fetches over an hour reported it identically"
+      ],
+      "broker_query_needed": false
+    },
+    "new_blockers": [
+      {
+        "id": "B-5R-F",
+        "what": "update_ibkr_daily appends strictly-newer, so the bar the fetch stopped on is never revisited; every 13:45 leaves a partial boundary bar"
+      },
+      {
+        "id": "B-5R-E",
+        "what": "the 13:45 pre-flight marks a day true before that day's SPY close exists; the regime CSV is permanently one business day behind the freshness requirement, and shadow_live binds that gate, so no candidate can be admitted at any instant",
+        "outranks": "B-5R-D"
+      }
+    ],
+    "repair_tool": "scratch/track1_stage5q4_repair_boundary_bar_20260824.py - dry run only, NOT applied, no parquet mutated",
+    "follow_up_report": "scratch/track1_stage5q4_mnq_overlap_audit_20260824.md"
+  }
+}

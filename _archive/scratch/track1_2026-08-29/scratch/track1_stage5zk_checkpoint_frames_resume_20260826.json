@@ -1,0 +1,357 @@
+{
+  "stage": "5ZK",
+  "title": "Track 1 checkpoint frames and resume correctness",
+  "checked_at": {
+    "utc": "2026-08-26T05:05",
+    "et": "2026-08-26T01:05 EDT",
+    "calgary": "2026-08-25T23:05 MDT",
+    "tokyo": "2026-08-26T14:05 JST",
+    "window": "ET 00:28-01:05"
+  },
+  "read_first_naming_note": "Two paths in the brief do not exist: track1_stage5zj_make_5zg_live_20260825.md is dated 20260826 (written after ET midnight), and there is no track1_stage5q9_identity_match_20260824.md - the nearest artefacts are test_track1_stage5q9_identity_admission_20260824.py, _track1_stage5q9_sizing_basis.json and track1_stage4b_identity_liveframe_report_20260823.md, which is what was read.",
+  "answers": {
+    "1_runtime_checkpoint_book_or_audit_changed": {
+      "changed": false,
+      "proof": "replay_checkpoint.track1.json and live_positions.track1.json both still at 2026-08-25 13:56:19, exactly the Part A baseline; no audit record rewritten"
+    },
+    "2_live_checkpoint_still_quiet_and_valid": {
+      "quiet": true,
+      "valid": true,
+      "why": "the companion book proves route track1_candidate, cut day 2026-08-25 and ZERO positions; the quiet-window contract is satisfied"
+    },
+    "3_entries_usable_when_the_book_has_open_positions": {
+      "yes": true,
+      "measured": "5 of 5 entries return Resumed through track1_bootstrap.accepts; a position placed in the book survives the round trip and comes back on res.pos",
+      "caveat": "the open-position path is BUILT AND TESTED BUT NOT REACHABLE in production - the route has no cross-day book (see not_fixed_here)"
+    },
+    "4_frames_reused_or_reloaded": {
+      "choice": "RELOADED from the parquets",
+      "correction": "the first version of this stage claimed reuse was IMPOSSIBLE because splicing changes the hash. The test written to prove it went GREEN. That is true through the CUT day and false through the LAST COMPLETE day, where the appended bars sit above the cut and both frames hash the same prefix. Reuse WOULD have worked.",
+      "why_reload_anyway": [
+        "the parquet is what the resume path reads, so fingerprinting it IS the contract rather than being equal to it by an argument about what the join touches",
+        "the closing slot holds only its own sleeve's instruments (sleeve_frames is called with one sleeve), so reuse would checkpoint 4 at the Swing close and 1 at NKD, never all 5 from one place",
+        "6s against 221s of headroom buys the simpler seam and leaves observe_live_slot's return shape alone"
+      ],
+      "pinned": "a test asserts the two are interchangeable under the derived-day rule; it goes red the day the join starts rewriting history below the cut"
+    },
+    "5_measured_cost_and_headroom": {
+      "checkpoint_frames_load_plus_fingerprint_s": {
+        "min": 2.67,
+        "median": 2.9,
+        "max": 2.98
+      },
+      "full_write_route_checkpoint_s": {
+        "min": 5.97,
+        "median": 6.16,
+        "max": 6.22
+      },
+      "per_instrument": {
+        "M2K": {
+          "load_s": 0.14,
+          "fingerprint_s": 0.5,
+          "rows": 2952425
+        },
+        "MES": {
+          "load_s": 0.11,
+          "fingerprint_s": 0.56,
+          "rows": 3371008
+        },
+        "MNKD": {
+          "load_s": 0.11,
+          "fingerprint_s": 0.29,
+          "rows": 2043688
+        },
+        "MNQ": {
+          "load_s": 0.1,
+          "fingerprint_s": 0.53,
+          "rows": 3358539
+        },
+        "MYM": {
+          "load_s": 0.1,
+          "fingerprint_s": 0.54,
+          "rows": 3315419
+        }
+      },
+      "slot_ceiling_s": 300,
+      "swing_p95_s": 78.5,
+      "headroom_s": 221.1,
+      "closing_slot_would_become_s": 84.7,
+      "share_of_budget": "about 2%, and it lands on ONE slot per sleeve"
+    },
+    "6_fails_closed_on_open_book_without_entries": {
+      "yes": true,
+      "code": "entries_missing_for_open_book",
+      "reason": "checkpoint_entries_missing_for_open_book",
+      "mirror_case": "entries carry a position and the book says flat -> checkpoint_book_disagrees_with_entries"
+    },
+    "7_strategy_or_backtest_identity_changed": {
+      "changed": false,
+      "proof": "sleeve_identity hashes identical before and after a write, both directions; the hash that lands in the entry is that same hash; checkpoint_frames imports no signal, rule or gate module (AST-checked)"
+    },
+    "8_orders_still_impossible": {
+      "yes": true,
+      "orders_possible": false,
+      "blocking": [
+        "B1_broker_account_or_legacy_retirement",
+        "PAPER_SHADOW_EVIDENCE"
+      ],
+      "confirmation_file": false,
+      "orders_dir": false
+    },
+    "9_next_shadow_window_ready": {
+      "yes": true,
+      "note": "NKD opens 01:10 ET, four minutes after this was written; its 02:55 close is the first that will run the new writer"
+    },
+    "10_remaining_and_next": {
+      "next_stage": "5ZL regime verification tri-state",
+      "why": "the smallest thing left - no broker, no frames, no restart - and until it lands a label drift is invisible end to end",
+      "remaining": [
+        {
+          "n": 1,
+          "item": "machine sleep",
+          "class": "operator"
+        },
+        {
+          "n": 2,
+          "item": "B1 account decision",
+          "class": "operator"
+        },
+        {
+          "n": 3,
+          "item": "regime verification warn-only, return discarded",
+          "stage": "5ZL"
+        },
+        {
+          "n": 4,
+          "item": "route-aware PnL / parity / legacy-reader split",
+          "stage": "5ZM"
+        },
+        {
+          "n": 5,
+          "item": "planned stop not journalled; close_position and place_protective_stop unbuilt; NO CROSS-DAY BOOK",
+          "stage": "5ZN"
+        }
+      ],
+      "removed_by_this_stage": "the checkpoint cannot resume anything"
+    }
+  },
+  "part_a_baseline": {
+    "scheduler_pid": 18096,
+    "backend_pid": 30604,
+    "track1_mode": "track1-only-shadow",
+    "orders_possible": false,
+    "checkpoint": {
+      "mtime": "2026-08-25 13:56:19",
+      "bytes": 315,
+      "schema_version": 2,
+      "routes": [
+        "track1_candidate"
+      ],
+      "sleeves": 4,
+      "instrument_entries": 0
+    },
+    "book": {
+      "mtime": "2026-08-25 13:56:19",
+      "bytes": 284,
+      "route": "track1_candidate",
+      "window": "live",
+      "cut_instant": "2026-08-25T15:55:01.009095-04:00",
+      "cur_day": "2026-08-25",
+      "positions": 0,
+      "equity": 0.0
+    },
+    "runtime_dirs_present": [
+      "window_coverage",
+      "slot_timing",
+      "audits"
+    ],
+    "trade_log_track1": {
+      "mtime": "2026-08-25 22:20:01",
+      "bytes": 0,
+      "note": "Stage 5ZJ's writability probe"
+    },
+    "any_real_track1_positions_exist": false
+  },
+  "part_b_writer_and_frames": {
+    "production_call_sites": 1,
+    "what_the_closing_slot_holds": "src.sleeve_frames(...)[sleeve] - the JOINED frames (parquet history + today's broker bars). JoinedFrame keeps only the joined result; the parquet is not retained. They are in scope at the close and dropped at observe_live_slot's return boundary.",
+    "the_measurement_that_decided_the_design": {
+      "parquet_state_at_a_1555_close": {
+        "MES": "newest day 2026-08-25 last bar 13:44; previous day 2026-08-24 last bar 23:59",
+        "MNKD": "newest day 2026-08-25 last bar 13:45; previous day 2026-08-24 last bar 23:59"
+      },
+      "mechanism": "the daily append runs at 13:45 ET, so the next append BACKFILLS today's afternoon - bars that sit BELOW the cut a fingerprint through today uses",
+      "result": {
+        "through_newest_stored_day": "changes after the next append",
+        "through_previous_day": "unchanged after the next append"
+      },
+      "conclusion": "an entry naming the cut day is refused by every later resume with fingerprint_rowcount, a code that reads like data corruption"
+    },
+    "design_adopted": "last_complete_day(df) - the newest day the parquet has stopped filling, derived from the frame's own day index, returned tz-naive because fingerprint requires it"
+  },
+  "implementation": {
+    "global_index/run_live_day_track1.py": [
+      "last_complete_day(df)",
+      "checkpoint_frames(data_paths) -> ({inst: frame}, {inst: why not}); reports failures by name rather than raising, because a checkpoint writer must not stop a window closing",
+      "write_route_checkpoint: frames=None now means LOAD THEM; frames={} means deliberately none. They used to mean the same thing, which is exactly how the production call site wrote an empty checkpoint on every window",
+      "return value gains entry_count, instruments, last_day_by_inst, frames_unavailable"
+    ],
+    "global_index/track1_bootstrap.py": [
+      "checkpoint_entries gains optional last_day_by_inst; omitted, the cut day is used exactly as before, so the bootstrap path is byte-identical (asserted)"
+    ],
+    "global_index/track1_shadow_acceptance.py": [
+      "the companion book is the day proof in BOTH cases, not only the quiet one",
+      "open-book guard, both directions",
+      "new codes: entries_missing_for_open_book, book_disagrees_with_entries, history_stale",
+      "CHECKPOINT_MAX_HISTORY_LAG_DAYS = 5 (a judgement call, named)"
+    ],
+    "measured_end_to_end": {
+      "entry_count": "0 -> 5",
+      "instruments": [
+        "M2K",
+        "MES",
+        "MNKD",
+        "MNQ",
+        "MYM"
+      ],
+      "last_day_by_inst": "all 2026-08-24",
+      "resume_check": "5 of 5 Resumed, 0 refused"
+    }
+  },
+  "part_c_contract": [
+    {
+      "condition": "complete window, no positions, empty entries, book proves route/day/flat",
+      "verdict": "OK"
+    },
+    {
+      "condition": "complete window, open position, entries with a position",
+      "verdict": "OK"
+    },
+    {
+      "condition": "complete window, open position, NO entries",
+      "verdict": "FAIL checkpoint_entries_missing_for_open_book"
+    },
+    {
+      "condition": "entries carry a position, book says flat",
+      "verdict": "FAIL checkpoint_book_disagrees_with_entries"
+    },
+    {
+      "condition": "incomplete window",
+      "verdict": "never asked for a checkpoint at all"
+    },
+    {
+      "condition": "schema-1 flat payload",
+      "verdict": "FAIL checkpoint_unreadable; route_checkpoint.load refuses it too"
+    },
+    {
+      "condition": "route is not track1_candidate",
+      "verdict": "FAIL checkpoint_wrong_route, naming what it did find"
+    },
+    {
+      "condition": "book missing / undated / unreadable",
+      "verdict": "FAIL checkpoint_day_unverifiable"
+    },
+    {
+      "condition": "entries dated after the judged day",
+      "verdict": "FAIL checkpoint_wrong_day"
+    },
+    {
+      "condition": "entries more than 5 days behind",
+      "verdict": "FAIL checkpoint_history_stale"
+    }
+  ],
+  "stage_5zh_rule_replaced": {
+    "old": "when entries exist, their last_day must equal the judged day and the book is not consulted",
+    "why_wrong": "a correct entry names the PREVIOUS trading day, so the rule would have failed every real checkpoint the writer can produce - including the first one",
+    "new": "the book is the day proof in both cases; entries are asked only that their history is not from the future and not stale",
+    "tests_rewritten": 6,
+    "live_evidence_re_judged": "checkpoint check still OK for the quiet artefact; roska4_swing 2026-08-25 still PASSes; Calm/Stress/NKD still fail on their own grounds"
+  },
+  "not_fixed_here": {
+    "finding": "the route has no cross-day book",
+    "detail": "observe_live_slot builds a fresh Track1Book per slot and never loads the persisted one; write_route_checkpoint synthesises a state with positions: [] when no book_state is handed to it. Today's book is a correctly-shaped 'nothing is held' marker, accurate only because nothing is held.",
+    "consequence": "the open-position path is built and tested but NOT REACHABLE in production",
+    "stage": "5ZN (position lifecycle)",
+    "what_stands_in_the_gap": "the fail-closed guard - the day a position exists and the checkpoint does not record it, the audit says so instead of passing"
+  },
+  "tests": {
+    "file": "scratch/test_track1_stage5zk_checkpoint_frames_resume_20260826.py",
+    "count": 38,
+    "real_parquets_used": true,
+    "why": "the one claim a fixture cannot support is a runtime-budget claim; the budget test asserts the frames it timed are over a million rows each, so it cannot pass on a toy",
+    "brief_items_covered": {
+      "1_quiet_complete_empty_book_passes": "test_1_quiet_complete_window_with_an_empty_book_passes",
+      "2_open_position_with_frames_writes_usable_entries": "test_2_complete_window_with_an_open_position_and_frames_passes + test_every_written_entry_is_accepted_by_the_real_resume_check + test_a_position_survives_the_round_trip",
+      "3_open_position_no_frames_fails_closed": "test_3_complete_window_with_an_open_position_and_no_frames_fails_closed",
+      "4_rejects_schema1_flat": "test_4_the_reader_rejects_a_flat_schema_1_payload",
+      "5_book_date_route_mismatch": "test_5_a_book_that_cannot_date_the_checkpoint_fails_closed (4 params) + test_a_route_mismatch_still_fails",
+      "6_incomplete_no_usable_checkpoint": "test_6_an_incomplete_window_produces_no_usable_checkpoint_and_is_not_asked_for_one",
+      "7_legacy_path_unchanged": "test_7_the_legacy_schema_1_checkpoint_module_is_untouched + test_7b_checkpoint_entries_without_the_new_argument_is_unchanged",
+      "8_identity_unaffected": "test_8_the_strategy_identity_is_unaffected + test_8b_the_writer_imports_no_signal_or_rule_module",
+      "9_runtime_budget_guard": "test_9_the_reload_fits_the_slot_budget + test_9b_the_whole_write_fits_the_slot_budget"
+    }
+  },
+  "part_e_liveness": {
+    "restart_performed": false,
+    "restart_needed": false,
+    "why": "every changed module is imported by a SUBPROCESS - the scheduler spawns `python -m global_index.run_live_day_track1` for slots and `_run(argv)` for audits, and both pick up current source on the next launch. The dashboard reader was not touched, so the backend is unaffected.",
+    "timing_note": "the next Track 1 window opened 4 minutes after this was written; restarting the scheduler then would have been the wrong trade for no gain"
+  },
+  "regression": {
+    "stage_5zk": {
+      "passed": 38
+    },
+    "checkpoint_and_acceptance_surface": {
+      "passed": 572,
+      "skipped": 1,
+      "failed": 2
+    },
+    "repaired_in_surface": {
+      "count": 6,
+      "what": "absence proxies in the three suites that exercise write_route_checkpoint",
+      "fix": "mtime instead of absence, with the reason recorded",
+      "note": "sixth occurrence of this pattern"
+    },
+    "pre_existing_failures_left": [
+      {
+        "test": "5D::test_turning_shadow_on_still_leaves_legacy_alone",
+        "cause": "default-mode job count 61 against a pinned 60"
+      },
+      {
+        "test": "5E::test_orders_remain_impossible",
+        "cause": "blocker set gained PAPER_SHADOW_EVIDENCE after the suite was written"
+      }
+    ],
+    "newly_surfaced_pre_existing_not_fixed": {
+      "test": "5m1::test_every_engine_params_built_in_production_states_its_fill_law",
+      "offender": "global_index/track1_signals.py:224 builds NormalR4Params() without naming a fill law",
+      "provenance": "Stage 5ZD; file mtime 2026-08-25 10:24, twelve hours older than any edit here",
+      "risk": "narrow - the construction is diagnostics-only, reads configured thresholds to record them in the signal journal and decides nothing. If the default ever diverged, the journal would print a threshold the decision path does not use.",
+      "belongs_with": "sleeve rule-exposure work (5ZP), not a checkpoint change"
+    }
+  },
+  "files_changed": {
+    "source": [
+      "global_index/run_live_day_track1.py",
+      "global_index/track1_bootstrap.py",
+      "global_index/track1_shadow_acceptance.py"
+    ],
+    "tests_new": [
+      "scratch/test_track1_stage5zk_checkpoint_frames_resume_20260826.py"
+    ],
+    "tests_revised": [
+      "scratch/test_track1_stage5zh_quiet_checkpoint_audit_20260825.py",
+      "scratch/test_track1_stage5d_shadow_live_wiring_20260823.py",
+      "scratch/test_track1_stage5e_live_source_20260823.py",
+      "scratch/test_track1_stage5f_stress_live_source_20260823.py"
+    ],
+    "runtime_files_written_or_edited": []
+  },
+  "claims_deliberately_NOT_made": [
+    "paper readiness",
+    "that the open-position path is reachable in production",
+    "broker-flat",
+    "orphan-STP safety",
+    "that reusing the in-memory frames would have been impossible"
+  ]
+}

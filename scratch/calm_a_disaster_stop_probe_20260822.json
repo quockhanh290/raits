@@ -1,0 +1,872 @@
+{
+ "floor": [
+  {
+   "stop": {
+    "name": "no_stop",
+    "kind": "none",
+    "value": null
+   },
+   "standalone": {
+    "n": 349,
+    "net": 9717.989999999998,
+    "pf": 1.67183482718452,
+    "sharpe": 3.03979553086089,
+    "calmar": 0.8133876218817935,
+    "maxdd": 1720.0799999999967,
+    "stop_rate": 0.0,
+    "med_risk": 579.6875,
+    "max_risk": 2062.0535714285716
+   },
+   "combined": {
+    "pnl": 72731.86924999999,
+    "pf": 1.651633387128963,
+    "calmar": 2.1134940160614772,
+    "sharpe": 2.062138436064586,
+    "maxdd": 4923.377499999988
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 551,
+     "roska4_stress": 49,
+     "global_nkd": 758,
+     "roska4_calm": 335
+    },
+    "rejected": {
+     "roska4_swing": 192,
+     "roska4_stress": 1,
+     "global_nkd": 0,
+     "roska4_calm": 7
+    },
+    "halted": 2,
+    "stress_closed_r4": 11,
+    "stress_closed_calm": 4,
+    "calm_closed_current_nkd": 45,
+    "suppressed_current_nkd": 20,
+    "suppressed_calm_same_symbol": 7,
+    "suppressed_calm_pnl": -296.43000000000006,
+    "calm_attempted": 349,
+    "calm_audit_bad": 0
+   }
+  },
+  {
+   "stop": {
+    "name": "atr05",
+    "kind": "atr",
+    "value": 0.5
+   },
+   "standalone": {
+    "n": 349,
+    "net": 8757.275714285719,
+    "pf": 1.5793487330648215,
+    "sharpe": 2.8228055316839975,
+    "calmar": 0.9027142673225605,
+    "maxdd": 1396.6528571428585,
+    "stop_rate": 0.25787965616045844,
+    "med_risk": 115.9375,
+    "max_risk": 412.4107142857174
+   },
+   "combined": {
+    "pnl": 72793.77746428571,
+    "pf": 1.6505327937931544,
+    "calmar": 2.1152929886684935,
+    "sharpe": 2.0650833820952244,
+    "maxdd": 4923.377499999991
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 551,
+     "roska4_stress": 49,
+     "global_nkd": 758,
+     "roska4_calm": 342
+    },
+    "rejected": {
+     "roska4_swing": 192,
+     "roska4_stress": 1,
+     "global_nkd": 0,
+     "roska4_calm": 0
+    },
+    "halted": 2,
+    "stress_closed_r4": 11,
+    "stress_closed_calm": 3,
+    "calm_closed_current_nkd": 45,
+    "suppressed_current_nkd": 20,
+    "suppressed_calm_same_symbol": 7,
+    "suppressed_calm_pnl": -148.4924999999937,
+    "calm_attempted": 349,
+    "calm_audit_bad": 0
+   }
+  },
+  {
+   "stop": {
+    "name": "atr10",
+    "kind": "atr",
+    "value": 1.0
+   },
+   "standalone": {
+    "n": 349,
+    "net": 7956.579285714293,
+    "pf": 1.491040758784886,
+    "sharpe": 2.389571337082606,
+    "calmar": 0.59912711133912,
+    "maxdd": 1911.9528571428498,
+    "stop_rate": 0.07736389684813753,
+    "med_risk": 231.875,
+    "max_risk": 824.8214285714275
+   },
+   "combined": {
+    "pnl": 71843.20710714285,
+    "pf": 1.633772272494933,
+    "calmar": 2.0876706439881834,
+    "sharpe": 2.030352970170948,
+    "maxdd": 4923.377499999988
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 551,
+     "roska4_stress": 49,
+     "global_nkd": 758,
+     "roska4_calm": 342
+    },
+    "rejected": {
+     "roska4_swing": 192,
+     "roska4_stress": 1,
+     "global_nkd": 0,
+     "roska4_calm": 0
+    },
+    "halted": 2,
+    "stress_closed_r4": 11,
+    "stress_closed_calm": 4,
+    "calm_closed_current_nkd": 45,
+    "suppressed_current_nkd": 20,
+    "suppressed_calm_same_symbol": 7,
+    "suppressed_calm_pnl": -270.35857142857344,
+    "calm_attempted": 349,
+    "calm_audit_bad": 0
+   }
+  },
+  {
+   "stop": {
+    "name": "atr15",
+    "kind": "atr",
+    "value": 1.5
+   },
+   "standalone": {
+    "n": 349,
+    "net": 9686.07928571428,
+    "pf": 1.668154733089387,
+    "sharpe": 3.02527781140899,
+    "calmar": 0.7780672058785914,
+    "maxdd": 1792.2585714285692,
+    "stop_rate": 0.0057306590257879654,
+    "med_risk": 347.8125,
+    "max_risk": 1237.232142857145
+   },
+   "combined": {
+    "pnl": 73598.77853571427,
+    "pf": 1.6594724471055013,
+    "calmar": 2.1386852782511983,
+    "sharpe": 2.083271699551855,
+    "maxdd": 4923.377499999988
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 551,
+     "roska4_stress": 49,
+     "global_nkd": 758,
+     "roska4_calm": 342
+    },
+    "rejected": {
+     "roska4_swing": 192,
+     "roska4_stress": 1,
+     "global_nkd": 0,
+     "roska4_calm": 0
+    },
+    "halted": 2,
+    "stress_closed_r4": 11,
+    "stress_closed_calm": 4,
+    "calm_closed_current_nkd": 45,
+    "suppressed_current_nkd": 20,
+    "suppressed_calm_same_symbol": 7,
+    "suppressed_calm_pnl": -296.43000000000006,
+    "calm_attempted": 349,
+    "calm_audit_bad": 0
+   }
+  },
+  {
+   "stop": {
+    "name": "atr20",
+    "kind": "atr",
+    "value": 2.0
+   },
+   "standalone": {
+    "n": 349,
+    "net": 9717.989999999998,
+    "pf": 1.67183482718452,
+    "sharpe": 3.03979553086089,
+    "calmar": 0.8133876218817935,
+    "maxdd": 1720.0799999999967,
+    "stop_rate": 0.0,
+    "med_risk": 463.75,
+    "max_risk": 1649.642857142855
+   },
+   "combined": {
+    "pnl": 73630.68924999998,
+    "pf": 1.6599470788882988,
+    "calmar": 2.1396125623205697,
+    "sharpe": 2.0842648434101076,
+    "maxdd": 4923.377499999988
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 551,
+     "roska4_stress": 49,
+     "global_nkd": 758,
+     "roska4_calm": 342
+    },
+    "rejected": {
+     "roska4_swing": 192,
+     "roska4_stress": 1,
+     "global_nkd": 0,
+     "roska4_calm": 0
+    },
+    "halted": 2,
+    "stress_closed_r4": 11,
+    "stress_closed_calm": 4,
+    "calm_closed_current_nkd": 45,
+    "suppressed_current_nkd": 20,
+    "suppressed_calm_same_symbol": 7,
+    "suppressed_calm_pnl": -296.43000000000006,
+    "calm_attempted": 349,
+    "calm_audit_bad": 0
+   }
+  },
+  {
+   "stop": {
+    "name": "or_low_1tick",
+    "kind": "or_low",
+    "value": 1.0
+   },
+   "standalone": {
+    "n": 349,
+    "net": 5605.739999999999,
+    "pf": 1.5407292370020256,
+    "sharpe": 2.3881944897847016,
+    "calmar": 0.707656745232032,
+    "maxdd": 1140.4600000000003,
+    "stop_rate": 0.6217765042979942,
+    "med_risk": 39.0,
+    "max_risk": 314.0
+   },
+   "combined": {
+    "pnl": 69622.39924999999,
+    "pf": 1.6427330694750526,
+    "calmar": 2.0118778497550927,
+    "sharpe": 1.9894611848625998,
+    "maxdd": 4950.930000000015
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 551,
+     "roska4_stress": 49,
+     "global_nkd": 758,
+     "roska4_calm": 342
+    },
+    "rejected": {
+     "roska4_swing": 192,
+     "roska4_stress": 1,
+     "global_nkd": 0,
+     "roska4_calm": 0
+    },
+    "halted": 2,
+    "stress_closed_r4": 11,
+    "stress_closed_calm": 0,
+    "calm_closed_current_nkd": 45,
+    "suppressed_current_nkd": 20,
+    "suppressed_calm_same_symbol": 7,
+    "suppressed_calm_pnl": 77.56999999999994,
+    "calm_attempted": 349,
+    "calm_audit_bad": 0
+   }
+  }
+ ],
+ "vault2025": [
+  {
+   "stop": {
+    "name": "no_stop",
+    "kind": "none",
+    "value": null
+   },
+   "standalone": {
+    "n": 44,
+    "net": 2049.6899999999996,
+    "pf": 2.6885998154616755,
+    "sharpe": 5.687431162167912,
+    "calmar": 6.423710395875641,
+    "maxdd": 361.94000000000005,
+    "stop_rate": 0.0,
+    "med_risk": 1009.0401785714286,
+    "max_risk": 2619.8214285714284
+   },
+   "combined": {
+    "pnl": 17881.440000000002,
+    "pf": 2.3163507335782283,
+    "calmar": 4.6263539417959665,
+    "sharpe": 2.85050246381418,
+    "maxdd": 3943.4
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 55,
+     "roska4_stress": 3,
+     "global_nkd": 117,
+     "roska4_calm": 38
+    },
+    "rejected": {
+     "roska4_swing": 50,
+     "roska4_stress": 0,
+     "global_nkd": 0,
+     "roska4_calm": 4
+    },
+    "halted": 0,
+    "stress_closed_r4": 1,
+    "stress_closed_calm": 0,
+    "calm_closed_current_nkd": 7,
+    "suppressed_current_nkd": 4,
+    "suppressed_calm_same_symbol": 2,
+    "suppressed_calm_pnl": 122.26999999999998,
+    "calm_attempted": 44,
+    "calm_audit_bad": 0
+   }
+  },
+  {
+   "stop": {
+    "name": "atr05",
+    "kind": "atr",
+    "value": 0.5
+   },
+   "standalone": {
+    "n": 44,
+    "net": -150.8457142857105,
+    "pf": 0.9500649063527846,
+    "sharpe": -0.30589978356329567,
+    "calmar": -0.16865339834593576,
+    "maxdd": 1014.5471428571477,
+    "stop_rate": 0.29545454545454547,
+    "med_risk": 201.8080357142867,
+    "max_risk": 523.9642857142826
+   },
+   "combined": {
+    "pnl": 15892.694285714293,
+    "pf": 2.022724481360759,
+    "calmar": 4.1619613339956745,
+    "sharpe": 2.502476361926582,
+    "maxdd": 3895.89
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 55,
+     "roska4_stress": 3,
+     "global_nkd": 117,
+     "roska4_calm": 42
+    },
+    "rejected": {
+     "roska4_swing": 50,
+     "roska4_stress": 0,
+     "global_nkd": 0,
+     "roska4_calm": 0
+    },
+    "halted": 0,
+    "stress_closed_r4": 1,
+    "stress_closed_calm": 0,
+    "calm_closed_current_nkd": 7,
+    "suppressed_current_nkd": 4,
+    "suppressed_calm_same_symbol": 2,
+    "suppressed_calm_pnl": 122.26999999999998,
+    "calm_attempted": 44,
+    "calm_audit_bad": 0
+   }
+  },
+  {
+   "stop": {
+    "name": "atr10",
+    "kind": "atr",
+    "value": 1.0
+   },
+   "standalone": {
+    "n": 44,
+    "net": 1804.243571428573,
+    "pf": 2.2363875494921475,
+    "sharpe": 4.778364431390661,
+    "calmar": 3.581723017921327,
+    "maxdd": 571.3964285714267,
+    "stop_rate": 0.022727272727272728,
+    "med_risk": 403.6160714285711,
+    "max_risk": 1047.9285714285725
+   },
+   "combined": {
+    "pnl": 17847.78357142858,
+    "pf": 2.284912975802737,
+    "calmar": 4.67395797002021,
+    "sharpe": 2.836894301879841,
+    "maxdd": 3895.89
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 55,
+     "roska4_stress": 3,
+     "global_nkd": 117,
+     "roska4_calm": 42
+    },
+    "rejected": {
+     "roska4_swing": 50,
+     "roska4_stress": 0,
+     "global_nkd": 0,
+     "roska4_calm": 0
+    },
+    "halted": 0,
+    "stress_closed_r4": 1,
+    "stress_closed_calm": 0,
+    "calm_closed_current_nkd": 7,
+    "suppressed_current_nkd": 4,
+    "suppressed_calm_same_symbol": 2,
+    "suppressed_calm_pnl": 122.26999999999998,
+    "calm_attempted": 44,
+    "calm_audit_bad": 0
+   }
+  },
+  {
+   "stop": {
+    "name": "atr15",
+    "kind": "atr",
+    "value": 1.5
+   },
+   "standalone": {
+    "n": 44,
+    "net": 2049.6899999999996,
+    "pf": 2.6885998154616755,
+    "sharpe": 5.687431162167912,
+    "calmar": 6.423710395875641,
+    "maxdd": 361.94000000000005,
+    "stop_rate": 0.0,
+    "med_risk": 605.4241071428578,
+    "max_risk": 1571.892857142855
+   },
+   "combined": {
+    "pnl": 18093.230000000007,
+    "pf": 2.326014560837006,
+    "calmar": 4.73823521130584,
+    "sharpe": 2.879330024757295,
+    "maxdd": 3895.89
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 55,
+     "roska4_stress": 3,
+     "global_nkd": 117,
+     "roska4_calm": 42
+    },
+    "rejected": {
+     "roska4_swing": 50,
+     "roska4_stress": 0,
+     "global_nkd": 0,
+     "roska4_calm": 0
+    },
+    "halted": 0,
+    "stress_closed_r4": 1,
+    "stress_closed_calm": 0,
+    "calm_closed_current_nkd": 7,
+    "suppressed_current_nkd": 4,
+    "suppressed_calm_same_symbol": 2,
+    "suppressed_calm_pnl": 122.26999999999998,
+    "calm_attempted": 44,
+    "calm_audit_bad": 0
+   }
+  },
+  {
+   "stop": {
+    "name": "atr20",
+    "kind": "atr",
+    "value": 2.0
+   },
+   "standalone": {
+    "n": 44,
+    "net": 2049.6899999999996,
+    "pf": 2.6885998154616755,
+    "sharpe": 5.687431162167912,
+    "calmar": 6.423710395875641,
+    "maxdd": 361.94000000000005,
+    "stop_rate": 0.0,
+    "med_risk": 807.2321428571422,
+    "max_risk": 2095.857142857145
+   },
+   "combined": {
+    "pnl": 18045.720000000005,
+    "pf": 2.322532653417194,
+    "calmar": 4.668857086148896,
+    "sharpe": 2.87160137590011,
+    "maxdd": 3943.4
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 55,
+     "roska4_stress": 3,
+     "global_nkd": 117,
+     "roska4_calm": 41
+    },
+    "rejected": {
+     "roska4_swing": 50,
+     "roska4_stress": 0,
+     "global_nkd": 0,
+     "roska4_calm": 1
+    },
+    "halted": 0,
+    "stress_closed_r4": 1,
+    "stress_closed_calm": 0,
+    "calm_closed_current_nkd": 7,
+    "suppressed_current_nkd": 4,
+    "suppressed_calm_same_symbol": 2,
+    "suppressed_calm_pnl": 122.26999999999998,
+    "calm_attempted": 44,
+    "calm_audit_bad": 0
+   }
+  },
+  {
+   "stop": {
+    "name": "or_low_1tick",
+    "kind": "or_low",
+    "value": 1.0
+   },
+   "standalone": {
+    "n": 44,
+    "net": 18.189999999999813,
+    "pf": 1.009279570660436,
+    "sharpe": 0.052450833506422975,
+    "calmar": 0.026195262038276552,
+    "maxdd": 787.6700000000001,
+    "stop_rate": 0.6136363636363636,
+    "med_risk": 66.125,
+    "max_risk": 377.0
+   },
+   "combined": {
+    "pnl": 16164.730000000003,
+    "pf": 2.11796548323335,
+    "calmar": 4.215618142228691,
+    "sharpe": 2.5809473401279655,
+    "maxdd": 3912.14
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 55,
+     "roska4_stress": 3,
+     "global_nkd": 117,
+     "roska4_calm": 42
+    },
+    "rejected": {
+     "roska4_swing": 50,
+     "roska4_stress": 0,
+     "global_nkd": 0,
+     "roska4_calm": 0
+    },
+    "halted": 0,
+    "stress_closed_r4": 1,
+    "stress_closed_calm": 0,
+    "calm_closed_current_nkd": 7,
+    "suppressed_current_nkd": 4,
+    "suppressed_calm_same_symbol": 2,
+    "suppressed_calm_pnl": 19.269999999999982,
+    "calm_attempted": 44,
+    "calm_audit_bad": 0
+   }
+  }
+ ],
+ "vault2026": [
+  {
+   "stop": {
+    "name": "no_stop",
+    "kind": "none",
+    "value": null
+   },
+   "standalone": {
+    "n": 28,
+    "net": 1185.2799999999997,
+    "pf": 1.609432924227077,
+    "sharpe": 2.456960735495103,
+    "calmar": 4.907319386678479,
+    "maxdd": 385.24,
+    "stop_rate": 0.0,
+    "med_risk": 1724.263392857143,
+    "max_risk": 3200.3571428571427
+   },
+   "combined": {
+    "pnl": 10132.209999999997,
+    "pf": 1.7228252378632154,
+    "calmar": 3.721680612280916,
+    "sharpe": 2.7734642454484058,
+    "maxdd": 4342.299999999999
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 46,
+     "roska4_stress": 3,
+     "global_nkd": 62,
+     "roska4_calm": 15
+    },
+    "rejected": {
+     "roska4_swing": 35,
+     "roska4_stress": 1,
+     "global_nkd": 3,
+     "roska4_calm": 12
+    },
+    "halted": 0,
+    "stress_closed_r4": 0,
+    "stress_closed_calm": 0,
+    "calm_closed_current_nkd": 5,
+    "suppressed_current_nkd": 5,
+    "suppressed_calm_same_symbol": 1,
+    "suppressed_calm_pnl": -23.740000000000002,
+    "calm_attempted": 28,
+    "calm_audit_bad": 0
+   }
+  },
+  {
+   "stop": {
+    "name": "atr05",
+    "kind": "atr",
+    "value": 0.5
+   },
+   "standalone": {
+    "n": 28,
+    "net": 465.98982142856676,
+    "pf": 1.1919296299529716,
+    "sharpe": 0.9430712079020527,
+    "calmar": 0.9816610002260785,
+    "maxdd": 757.1285714285725,
+    "stop_rate": 0.17857142857142858,
+    "med_risk": 344.85267857142753,
+    "max_risk": 640.0714285714275
+   },
+   "combined": {
+    "pnl": 9415.789821428569,
+    "pf": 1.6004845382109032,
+    "calmar": 3.4585310043635786,
+    "sharpe": 2.445801928408362,
+    "maxdd": 4342.3
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 46,
+     "roska4_stress": 3,
+     "global_nkd": 62,
+     "roska4_calm": 27
+    },
+    "rejected": {
+     "roska4_swing": 35,
+     "roska4_stress": 1,
+     "global_nkd": 3,
+     "roska4_calm": 0
+    },
+    "halted": 0,
+    "stress_closed_r4": 0,
+    "stress_closed_calm": 0,
+    "calm_closed_current_nkd": 5,
+    "suppressed_current_nkd": 5,
+    "suppressed_calm_same_symbol": 1,
+    "suppressed_calm_pnl": -23.740000000000002,
+    "calm_attempted": 28,
+    "calm_audit_bad": 0
+   }
+  },
+  {
+   "stop": {
+    "name": "atr10",
+    "kind": "atr",
+    "value": 1.0
+   },
+   "standalone": {
+    "n": 28,
+    "net": 1185.2799999999997,
+    "pf": 1.609432924227077,
+    "sharpe": 2.456960735495103,
+    "calmar": 4.907319386678479,
+    "maxdd": 385.24,
+    "stop_rate": 0.0,
+    "med_risk": 689.7053571428587,
+    "max_risk": 1280.142857142855
+   },
+   "combined": {
+    "pnl": 10135.080000000002,
+    "pf": 1.6691402984995796,
+    "calmar": 3.7227347972373335,
+    "sharpe": 2.643142204816388,
+    "maxdd": 4342.299999999999
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 46,
+     "roska4_stress": 3,
+     "global_nkd": 62,
+     "roska4_calm": 27
+    },
+    "rejected": {
+     "roska4_swing": 35,
+     "roska4_stress": 1,
+     "global_nkd": 3,
+     "roska4_calm": 0
+    },
+    "halted": 0,
+    "stress_closed_r4": 0,
+    "stress_closed_calm": 0,
+    "calm_closed_current_nkd": 5,
+    "suppressed_current_nkd": 5,
+    "suppressed_calm_same_symbol": 1,
+    "suppressed_calm_pnl": -23.740000000000002,
+    "calm_attempted": 28,
+    "calm_audit_bad": 0
+   }
+  },
+  {
+   "stop": {
+    "name": "atr15",
+    "kind": "atr",
+    "value": 1.5
+   },
+   "standalone": {
+    "n": 28,
+    "net": 1185.2799999999997,
+    "pf": 1.609432924227077,
+    "sharpe": 2.456960735495103,
+    "calmar": 4.907319386678479,
+    "maxdd": 385.24,
+    "stop_rate": 0.0,
+    "med_risk": 1034.5580357142862,
+    "max_risk": 1920.2142857142826
+   },
+   "combined": {
+    "pnl": 9778.820000000002,
+    "pf": 1.6456192288342724,
+    "calmar": 3.5918762841457967,
+    "sharpe": 2.5678952074838524,
+    "maxdd": 4342.299999999999
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 46,
+     "roska4_stress": 3,
+     "global_nkd": 62,
+     "roska4_calm": 26
+    },
+    "rejected": {
+     "roska4_swing": 35,
+     "roska4_stress": 1,
+     "global_nkd": 3,
+     "roska4_calm": 1
+    },
+    "halted": 0,
+    "stress_closed_r4": 0,
+    "stress_closed_calm": 0,
+    "calm_closed_current_nkd": 5,
+    "suppressed_current_nkd": 5,
+    "suppressed_calm_same_symbol": 1,
+    "suppressed_calm_pnl": -23.740000000000002,
+    "calm_attempted": 28,
+    "calm_audit_bad": 0
+   }
+  },
+  {
+   "stop": {
+    "name": "atr20",
+    "kind": "atr",
+    "value": 2.0
+   },
+   "standalone": {
+    "n": 28,
+    "net": 1185.2799999999997,
+    "pf": 1.609432924227077,
+    "sharpe": 2.456960735495103,
+    "calmar": 4.907319386678479,
+    "maxdd": 385.24,
+    "stop_rate": 0.0,
+    "med_risk": 1379.4107142857138,
+    "max_risk": 2560.2857142857174
+   },
+   "combined": {
+    "pnl": 9860.74,
+    "pf": 1.658173352253841,
+    "calmar": 3.6219664693825857,
+    "sharpe": 2.6144901753722367,
+    "maxdd": 4342.299999999999
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 46,
+     "roska4_stress": 3,
+     "global_nkd": 62,
+     "roska4_calm": 18
+    },
+    "rejected": {
+     "roska4_swing": 35,
+     "roska4_stress": 1,
+     "global_nkd": 3,
+     "roska4_calm": 9
+    },
+    "halted": 0,
+    "stress_closed_r4": 0,
+    "stress_closed_calm": 0,
+    "calm_closed_current_nkd": 5,
+    "suppressed_current_nkd": 5,
+    "suppressed_calm_same_symbol": 1,
+    "suppressed_calm_pnl": -23.740000000000002,
+    "calm_attempted": 28,
+    "calm_audit_bad": 0
+   }
+  },
+  {
+   "stop": {
+    "name": "or_low_1tick",
+    "kind": "or_low",
+    "value": 1.0
+   },
+   "standalone": {
+    "n": 28,
+    "net": 1079.03,
+    "pf": 1.7981935732039298,
+    "sharpe": 2.9046717805828375,
+    "calmar": 3.4740896877066803,
+    "maxdd": 495.3900000000001,
+    "stop_rate": 0.5,
+    "med_risk": 106.125,
+    "max_risk": 2354.464285714286
+   },
+   "combined": {
+    "pnl": 10107.570000000002,
+    "pf": 1.6962191241097138,
+    "calmar": 3.7126300487526644,
+    "sharpe": 2.7028504484121747,
+    "maxdd": 4342.299999999999
+   },
+   "state": {
+    "taken": {
+     "roska4_swing": 46,
+     "roska4_stress": 3,
+     "global_nkd": 62,
+     "roska4_calm": 26
+    },
+    "rejected": {
+     "roska4_swing": 35,
+     "roska4_stress": 1,
+     "global_nkd": 3,
+     "roska4_calm": 1
+    },
+    "halted": 0,
+    "stress_closed_r4": 0,
+    "stress_closed_calm": 0,
+    "calm_closed_current_nkd": 5,
+    "suppressed_current_nkd": 5,
+    "suppressed_calm_same_symbol": 1,
+    "suppressed_calm_pnl": -32.49,
+    "calm_attempted": 28,
+    "calm_audit_bad": 0
+   }
+  }
+ ]
+}

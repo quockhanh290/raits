@@ -1,0 +1,290 @@
+{
+  "stage": "5Q-1",
+  "title": "Track 1 audit semantics: observed vs decided, and the explanation path repair",
+  "date": "2026-08-24",
+  "route": "track1_candidate",
+  "verdict": "AUDIT_SEMANTICS_REPAIRED",
+  "claim": "The audit now distinguishes a slot that looked from a slot that could not evaluate, and it reads explanations from the path the writer actually uses. Both changes were made because measurement said so.",
+  "safety_statement": {
+    "scheduler_started_or_stopped_by_this_work": false,
+    "scheduler_pid_now": 6880,
+    "scheduler_started_local": "2026-08-24 06:23:03",
+    "scheduler_started_et": "2026-08-24 08:23:03",
+    "scheduler_pid_changed_between_sessions": true,
+    "scheduler_pid_change_cause": "the OPERATOR restarted it between turns (was 33868 at 02:32:24 local); this session ran no start/stop command",
+    "backend_restarted": false,
+    "ibkr_connected": false,
+    "orders_enabled": false,
+    "allow_orders_used": false,
+    "track1_orders_approved_set": false,
+    "confirmation_file_created": false,
+    "stop_trading_files_touched": false,
+    "live_positions_written": false,
+    "route_checkpoint_written": false,
+    "runtime_evidence_written": false,
+    "committed": false,
+    "trading_behaviour_changed": false
+  },
+  "measurements": [
+    {
+      "what": "the ledger row each slot outcome writes",
+      "how": "ran observe_live_slot against a temp tree; did not read it off a docstring",
+      "results": {
+        "provider_none": {
+          "decided": false,
+          "reason": "no_bar_provider"
+        },
+        "gate_ok_zero_candidates": {
+          "decided": true,
+          "reason": "decided",
+          "candidates": 0
+        },
+        "gate_refused_clock": {
+          "decided": false,
+          "reason": "gate_refused",
+          "detail": "too_late"
+        },
+        "gate_refused_data": {
+          "decided": false,
+          "reason": "gate_refused",
+          "detail": "stale"
+        },
+        "live_source_not_ready": {
+          "decided": false,
+          "reason": "live_source_not_ready"
+        }
+      },
+      "consequence": "the brief's premise that 'no_signal / no_candidate' does not count was WRONG: a slot that looked and found nothing already records decided=True. The only designed refusal being miscounted is the CLOCK one."
+    },
+    {
+      "what": "where explanation rows are actually written",
+      "how": "drove run_live_day_track1.emit_explanations into a temp tree",
+      "writer_path": "global_index/track1_runtime/shadow/explanations/live_<YYYY-MM-DD>/explanations_<YYYYMMDD>.jsonl",
+      "gate_path_before": "global_index/track1_runtime/shadow/explanations/explanations_<YYYYMMDD>.jsonl",
+      "rows_the_gate_found": 0,
+      "consequence": "on the first real shadow day the explanations and freshness_proofs checks would both have failed a route that wrote its explanations correctly"
+    },
+    {
+      "what": "the writer truncates the day's file on every slot",
+      "how": "called emit_explanations twice for the same window",
+      "after_second_slot": {
+        "rows": 1,
+        "sleeves": [
+          "roska4_stress"
+        ]
+      },
+      "consequence": "only the last slot's rows survive; all four sleeves share one file per session date"
+    },
+    {
+      "what": "the running scheduler already carries the Stage 5Q audit jobs",
+      "how": "read its own startup log, not inferred from file mtimes",
+      "log_lines": [
+        "2026-08-24 06:23:04  [track1-only] 5 Track 1 audit jobs registered (read-only, no broker)",
+        "2026-08-24 06:23:04  Jobs (100):"
+      ],
+      "job_ids": [
+        "track1_audit_global_nkd",
+        "track1_audit_roska4_calm",
+        "track1_audit_roska4_stress",
+        "track1_audit_roska4_swing",
+        "track1_audit_daily"
+      ]
+    }
+  ],
+  "slot_classification": {
+    "observed_decision": {
+      "row": "decided=True, candidates evaluated",
+      "counts_as_observed": true
+    },
+    "observed_no_action": {
+      "row": "decided=True, zero candidates",
+      "counts_as_observed": true
+    },
+    "observed_window_shut": {
+      "row": "gate_refused and EVERY code is a clock code (too_early/too_late)",
+      "counts_as_observed": true
+    },
+    "observed_hard_refusal": {
+      "row": "anything else with decided=False",
+      "counts_as_observed": false
+    },
+    "unobserved": {
+      "row": "no ledger row at all",
+      "counts_as_observed": false
+    },
+    "fails_closed": "a row the classifier cannot read, and gate_refused with an empty detail, are hard refusals",
+    "mixed_codes": "too_late,stale is HARD - a stale frame that also happened to be late is still a stale frame",
+    "freshness_refused": {
+      "classified": "observed_hard_refusal",
+      "why": "measured at its raise site: it fires only when a binding mode caught the engine ADMITTING a candidate while the daily inputs were refused"
+    },
+    "clock_codes_source": "read from track1_intraday.TOO_EARLY/TOO_LATE, not restated"
+  },
+  "new_reason_codes": [
+    "slot_could_not_evaluate",
+    "all_slots_observed_no_action",
+    "all_slots_observed_window_shut",
+    "duplicate_slot_ids",
+    "unregistered_slot_ids",
+    "slot_without_timing",
+    "timing_without_ledger_row",
+    "explanations_overwritten_by_a_later_sleeve"
+  ],
+  "rules": {
+    "window_closed_record": "absent -> FAIL, unchanged (the ledger's fail-closed rule)",
+    "observation_completeness": "every registered slot id in an observed class, else FAIL naming the ids",
+    "duplicates": "named; never fill a gap; a duplicate alone is WARN",
+    "hard_refusal": "any -> FAIL, with the reason and the gate codes",
+    "timing_both_directions": "ledger row with no timing -> FAIL; timing with no ledger row -> FAIL",
+    "runtime": "unchanged: p95 >= 300 FAIL, >= 240 WARN, any single slot >= 300 FAIL",
+    "explanations": "owed only where the ledger's counters say candidates were seen",
+    "freshness": "every row present must carry a freshness reference, else FAIL",
+    "all_slots_window_shut": "WARN, named - legitimate for NKD in winter but worth an eye",
+    "all_slots_no_action": "PASS, named - a complete observation of a quiet window",
+    "ledger_disagreement": "reported as the informational reason coverage_incomplete beside ledger_outcome, never hidden",
+    "daily_gate": "evaluate_day reported verbatim as acceptance_gate; it never forces the operational roll-up down"
+  },
+  "unchanged": {
+    "track1_shadow_audit.py": "orchestration and reporting only; a test asserts it carries no threshold, class name or gate vocabulary",
+    "evaluate_day": "the committed daily gate keeps its own decided-only coverage rule",
+    "runtime_thresholds": [
+      300.0,
+      240.0
+    ],
+    "scheduler_job_table": "unchanged by 5Q-1; the 5 audit jobs were registered by Stage 5Q"
+  },
+  "changed_files": [
+    "global_index/track1_shadow_acceptance.py",
+    "monitor/backend/track1_runtime_reader.py",
+    "global_index/dash/realtime/realtime.js",
+    "scratch/test_track1_stage5q_post_window_audit_20260824.py",
+    "scratch/track1_stage5q_mutations_20260824.py",
+    "scratch/track1_stage5q_post_window_audit_report_20260824.md",
+    "scratch/track1_stage5q_post_window_audit_report_20260824.json",
+    "docs/futures/TRACK1_RUNTIME_PIPELINE_2026-08-24.md",
+    "docs/futures/TRACK1_SWITCHOVER_RUNBOOK.md"
+  ],
+  "added_files": [
+    "scratch/test_track1_stage5q1_audit_semantics_20260824.py",
+    "scratch/track1_stage5q1_mutations_20260824.py",
+    "scratch/track1_stage5q1_audit_semantics_report_20260824.md",
+    "scratch/track1_stage5q1_audit_semantics_report_20260824.json"
+  ],
+  "tests": {
+    "stage_5q1": {
+      "file": "scratch/test_track1_stage5q1_audit_semantics_20260824.py",
+      "passed": 42
+    },
+    "stage_5q1_mutations": {
+      "detected": 15,
+      "total": 15,
+      "restores_verified_byte_for_byte": true
+    },
+    "stage_5q_mutations_rerun": {
+      "detected": 16,
+      "total": 16,
+      "restores_verified_byte_for_byte": true
+    },
+    "track1_scratch_regression": {
+      "files": 16,
+      "passed": 565,
+      "skipped": 1
+    },
+    "monitor_production": {
+      "files": 5,
+      "passed": 305
+    },
+    "not_run": [
+      "global_index/test_event_playback.py (known hang)"
+    ]
+  },
+  "unfaithful_mutations_recorded": [
+    {
+      "id": "R5",
+      "first_form": "added freshness_refused to a reason test",
+      "why_it_proved_nothing": "such a row carries prose in detail, so it fell through to hard by the code check anyway (0/0/0)",
+      "faithful_form": "reclassify it outright"
+    },
+    {
+      "id": "R1",
+      "first_form": "added SLOT_HARD_REFUSAL to OBSERVED_CLASSES",
+      "why_it_proved_nothing": "the verdict fails on the hard-refusal list independently; OBSERVED_CLASSES feeds the reported observed COUNT",
+      "faithful_form": "a test that reads that count"
+    },
+    {
+      "id": "Q1/Q8 (5Q harness)",
+      "note": "targets moved with the rewrite; the harness raised SystemExit rather than reporting a detection it had not made"
+    }
+  ],
+  "blockers_before_5r": [
+    {
+      "id": "B-5R-1",
+      "what": "the live explanation writer truncates the day's file on every slot, and all four sleeves share one file per session date",
+      "measured": "after a second slot wrote the same window the file held 1 row from that slot only",
+      "why_not_fixed_here": "truncating only on seq==0 does not fix it - Stress's first slot at 10:35 still erases Calm's 10:00 rows, because the window name is live_<date> for all sleeves. The real choice is a per-sleeve window name or append-only for the live path, and that is an evidence-layout decision owned by the runner, not by an audit stage",
+      "audit_handling": "named as explanations_overwritten_by_a_later_sleeve with a not_checked_here note; never charged to the sleeve"
+    },
+    {
+      "id": "B-5R-2",
+      "what": "the freshness proof check is a substring match on the whole record",
+      "detail": "the context record carries no proofs key, so the check falls through to 'freshness' in json.dumps(row).lower()",
+      "family": "same shape as counting every traceback line containing 'python' as a job launch"
+    },
+    {
+      "id": "B-5R-3",
+      "what": "NKD after 2026-11-01: 12 of 22 ET slots fall outside the Tokyo decision band",
+      "audit_handling": "reported as WARN all_slots_observed_window_shut, not FAIL",
+      "open_question": "should the NKD slot grid follow the Tokyo session instead of ET? Rule change, unowned, legacy's inherited behaviour today"
+    }
+  ],
+  "operator": {
+    "scheduler_restart_required": false,
+    "scheduler_restart_reason": "the 5 audit jobs are already registered (operator's 06:23 local restart picked up Stage 5Q; the scheduler logged Jobs (100)). Stage 5Q-1 changed only modules the audit CHILD imports fresh on each spawn, plus the backend's reader",
+    "scheduler_restart_cost_if_done_anyway": "every window that has already closed today reads as pre-start on a new process",
+    "backend_restart_required": true,
+    "backend_restart_command": "python monitor\\ops.py restart --no-scheduler --track1-only-shadow",
+    "correction": "the Stage 5Q report gave `restart --backend`; that flag does not exist. Verified against `python monitor\\ops.py restart --help`",
+    "manual_audit": "python -m global_index.track1_shadow_audit --latest --all",
+    "first_real_audit_today": {
+      "job": "track1_audit_roska4_calm",
+      "at_et": "10:10",
+      "judgeable": true,
+      "why": "the scheduler came up at 08:23 ET, before the 10:00 Calm window"
+    },
+    "nkd_today": "NOT_ENOUGH_DATA_YET - 01:10-02:55 ET closed before the process existed"
+  },
+  "live_measurement_0901_et": {
+    "run": "python -m global_index.track1_shadow_audit --latest --all --dry-run",
+    "wrote_anything": false,
+    "day_verdict": "NOT_ENOUGH_DATA_YET",
+    "sleeves": {
+      "global_nkd": "NOT_ENOUGH_DATA_YET / window_closed_before_scheduler_start",
+      "roska4_calm": "NOT_ENOUGH_DATA_YET / window_not_closed",
+      "roska4_stress": "NOT_ENOUGH_DATA_YET / window_not_closed",
+      "roska4_swing": "NOT_ENOUGH_DATA_YET / window_not_closed"
+    },
+    "false_incident_created": false
+  },
+  "corrections_5q2": {
+    "appended": "2026-08-24 (Stage 5Q-2). The record above is left as written.",
+    "items": [
+      {
+        "was": "the substring freshness check was ALSO too strict - a real rejected decision contained the word nowhere",
+        "is": "wrong; the probe used an empty inputs_summary and the real writer always fills it with freshness_allow. The defect was one-directional: too loose only"
+      },
+      {
+        "closed": "B-5R-1 writer truncation - each live slot now writes under live_<date>/<sleeve>/<slot_id>/ and truncation is scoped to its own file"
+      },
+      {
+        "closed": "B-5R-2 substring freshness check - replaced by a structural rule in track1_explain"
+      },
+      {
+        "still_open": "B-5R-3 NKD winter grid"
+      },
+      {
+        "changed": "a sleeve that reported nothing no longer prints 'it observed its window and found nothing to admit' - seen live at 10:07 ET beside three correct FAIL reasons for a crashed slot"
+      }
+    ],
+    "follow_up_report": "scratch/track1_stage5q2_explanation_integrity_report_20260824.md"
+  }
+}

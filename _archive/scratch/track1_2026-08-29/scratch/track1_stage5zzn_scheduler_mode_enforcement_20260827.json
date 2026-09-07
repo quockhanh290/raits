@@ -1,0 +1,161 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZN",
+  "title": "Scheduler mode enforcement after B1 confirmation",
+  "when_et": "2026-08-27",
+
+  "root_cause": {
+    "where": "monitor/ops.py::track1_shadow_blockers",
+    "rule": "refused a Track 1 shadow start because the confirmation FILE EXISTS",
+    "stated_reason": "that file arms the Track 1 route",
+    "why_it_expired": "true when the signature was the only thing between this route and an order; Stage 5S added a measured evidence gate and Stage 5ZZK gave B1 a measured half, so the file no longer arms anything by itself",
+    "sequence": [
+      "operator signs the B1 decision -> confirmation file exists",
+      "--track1-only-shadow now REFUSES because of that file",
+      "scheduler restarted without any Track 1 flag -> 45 legacy entry jobs registered on the very login the signature had just declared retired"
+    ],
+    "one_line": "the guard pushed the operator out of the only safe mode and into the unsafe one",
+    "not_a_missing_check": "a check whose premise had expired, with nothing failing loudly when it did"
+  },
+
+  "part_a_before": {
+    "scheduler_pid": 11332,
+    "started": "2026-08-27 21:51:23",
+    "argv": "run_scheduler --port 4002 --shadow-resume",
+    "track1_flags_present": false,
+    "track1_mode": "legacy-only",
+    "mode_source": "process_table",
+    "legacy_entry_jobs_registered": 45,
+    "track1_slots_registered": 0,
+    "confirmation": true,
+    "track1_blocking": ["PAPER_SHADOW_EVIDENCE"],
+    "orders_possible": false,
+    "b1_legacy_flat": "PASS",
+    "verified_not_assumed": "an earlier probe printed the command line one character per line, which would have meant the mode detection was type-confused and the alarm a false positive; scheduler_command_lines returns a single string, the substring test is correct, and the argv above is real",
+    "job_counts_by_mode": {
+      "legacy_default": {"legacy_entry": 45, "track1": 0, "safety": 12, "shared": 4, "total": 64},
+      "track1_shadow": {"legacy_entry": 45, "track1": 71, "safety": 11, "shared": 4, "total": 134},
+      "track1_only_shadow": {"legacy_entry": 0, "track1": 71, "safety": 11, "shared": 4, "total": 89}
+    },
+    "second_defect_found": {
+      "what": "ops status printed track1_slot_table=fresh registered_slots=71",
+      "truth": "a statement about a process that had ALREADY EXITED - last [track1-only] registration line 2026-08-27 05:08:33, running scheduler started 21:51:23 and registered none",
+      "principle": "a freshness check that compares the code against a dead process's log reports on the wrong system with full confidence"
+    }
+  },
+
+  "part_b_implementation": {
+    "chosen": "Option A - relax the guard, do not invent a mode",
+    "why": "there is nothing wrong with --track1-only-shadow: it already registers no legacy entry job, keeps legacy's safety sweeps draining the old book, and cannot send an order. A new mode name would have been a second thing to explain and a second thing to keep in step.",
+    "new_rule": "the confirmation file blocks a shadow start only when the GATE REGISTRY reports every order blocker clear",
+    "why_the_registry": "since 5ZZK it reads the confirmation file AND the measurement behind every blocker - it is the thing that knows",
+    "half_of_the_old_guard_kept": "if every blocker really is clear, a shadow start is starting something nobody asked for",
+    "fails_closed": "orders_would_be_possible reports 'possible' when the registry cannot be read, so a guard built on it refuses rather than waving a start through on a question it could not answer"
+  },
+
+  "part_c_missing_guard": {
+    "function": "monitor/ops.py::legacy_entry_start_blockers",
+    "what_it_refuses": "a scheduler start that would register legacy ENTRY jobs while a signed B1 decision says legacy has retired from this login",
+    "why_it_was_missing": "track1_shadow_blockers always asked whether a TRACK 1 start was safe; nothing asked whether a LEGACY start was, and the answer stopped being 'always' the moment an operator signed",
+    "names_four_things": ["the confirmation file records legacy_retired_confirmed",
+                          "this start would register 45 legacy entry jobs on that same login",
+                          "start with --track1-only-shadow instead",
+                          "if legacy must run entries again, retire the decision first"],
+    "placement": "before EITHER launch path, next to the existing flags-conflict refusal",
+    "why_that_placement": "restart --scheduler stops the running process first; a guard that fired after that would leave the operator with no scheduler at all",
+    "proven": "with the guard tripped, ensure_single, stop_runners and start_scheduler are all untouched and the command returns 2",
+    "track1_shadow_exempt": false,
+    "why_not": "it adds Track 1's slots and keeps all 45 legacy entry jobs - exactly the collision B1 exists to prevent",
+    "track1_only_shadow_exempt": true,
+    "one_table_three_readers": "both guards count from legacy_retirement_candidates, the same table the scheduler's removal step and the retirement audit read, so the number in the refusal cannot drift from the number registered"
+  },
+
+  "part_d_status": {
+    "new_line": "track1_scheduler_mode=INCOMPATIBLE confirmation=True legacy_entry_jobs=45",
+    "conflict_line": "MODE CONFLICT - the B1 decision says legacy is retired for this login, and the running scheduler registers 45 legacy entry job(s) on it",
+    "fix_line": "fix: python monitor/ops.py restart --scheduler --track1-only-shadow --yes",
+    "three_states": ["compatible", "INCOMPATIBLE", "unknown"],
+    "why_three": "a mode nobody could read is NOT a compatible mode, and printing it as one would be the fail-open this route keeps finding",
+    "stale_sentences_repaired": [
+      {"was": "track1_slot_table=fresh about a dead process",
+       "now": "track1_slot_table=stale_log when the registration line predates the running process"},
+      {"was": "orders : impossible - B1 open and no confirmation file",
+       "problem": "false on BOTH halves after the operator signed, and went on printing",
+       "now": "orders : impossible - blocked by PAPER_SHADOW_EVIDENCE, asked of the registry"}
+    ]
+  },
+
+  "part_e_restart_command": {
+    "command": "python monitor\\ops.py restart --scheduler --track1-only-shadow --yes",
+    "verified_accepted": true,
+    "how_verified": "track1_shadow_blockers(track1_only=True) returns [] against the REAL signed confirmation, and the legacy guard exempts this mode by design",
+    "run": false,
+    "after_it": ["the mode conflict clears",
+                 "track1_slot_table returns to fresh",
+                 "the 5ZZJ alarm passes BECAUSE the mode is compatible, not because anything was loosened"],
+    "orders_stay_impossible": "PAPER_SHADOW_EVIDENCE is measured, not signed, and the approval variable is unset"
+  },
+
+  "part_f_backend": {
+    "5zzm_polish_is_source_only": true,
+    "backend_restart_still_needed": true,
+    "reason": "/api/v1/track1-market-view was added in Stage 5ZZL and the running backend does not have it",
+    "command": "python monitor\\ops.py restart --no-scheduler --yes",
+    "does_not_touch_scheduler": "--no-scheduler leaves a running scheduler alone and prints its age; it does not start one and does not change its mode",
+    "run": false,
+    "kept_separate_from_the_scheduler_restart": true
+  },
+
+  "tests": {
+    "new_file": "scratch/test_track1_stage5zzn_scheduler_mode_enforcement_20260827.py",
+    "new_count": 26,
+    "processes_started_or_stopped": 0,
+    "production_confirmation_touched": false,
+    "items_covered": 10,
+    "5zzj_alarm_pinned_as_strict": "a test reads that file and asserts `capability != dec.LEGACY_ENTRY_PRESENT` is still present and has not become a skip",
+    "my_own_mistakes_caught_by_running": [
+      "compared scheduler JOB ids against SLOT-TABLE ids - jobs register lowercase (track1_calm_decide_0932), the table names them TRACK1_CALM_DECIDE_0932",
+      "a test Namespace was missing api_port, so it ran past the guard into backend startup",
+      "slot_table_freshness scanned the LIVE process table inside itself, so two 5ZZ unit tests handing it a fixture log failed because the real scheduler outside started after their fixture's timestamp - a function that reads ambient state cannot be asked a hypothetical; the process start is now passed in"
+    ],
+    "suites": "5ZZN + 5ZZ ops status + monitor/test_ops + dashboard backend + 5ZZK + 5ZR + 5ZQ + 5ZZJ",
+    "passed": 379,
+    "failed": 1,
+    "failure_classification": "the 5ZZJ alarm, still red because the running scheduler has not been restarted - the enforcement is in the code, not yet in the process; it clears with the Part E command",
+    "tests_weakened": 0,
+    "tests_isolated_not_weakened": {
+      "count": 4,
+      "where": "monitor/test_dashboard_backend.py ops up/restart tests",
+      "why": "they describe a LEGACY start and were reading the real machine's confirmation file, so they began failing for a reason that has nothing to do with process management",
+      "how": "pointed at a path that does not exist - the pre-B1 world they were written for",
+      "the_refusal_they_would_have_hit": "asserted in the 5ZZN suite instead"
+    }
+  },
+
+  "safety": {
+    "orders_possible_before": false,
+    "orders_possible_after": false,
+    "track1_blocking_before": ["PAPER_SHADOW_EVIDENCE"],
+    "track1_blocking_after": ["PAPER_SHADOW_EVIDENCE"],
+    "confirmation_before": true,
+    "confirmation_after": true,
+    "confirmation_touched": false,
+    "b1_before": "closed", "b1_after": "closed",
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "orders_dir": "ABSENT",
+    "scheduler_restarted": false,
+    "broker_order_calls": 0,
+    "strategy_slots_gates_send_wire_touched": false,
+    "external": "scheduler pid 11332, started 2026-08-27 21:51:23 with no Track 1 flag - the restart that caused this, done outside these stages"
+  },
+
+  "files_touched": {
+    "modified": ["monitor/ops.py",
+                 "scratch/test_track1_stage5zz_ops_status_process_reporting_20260827.py (one stub signature)",
+                 "monitor/test_dashboard_backend.py (ops stub isolated from the production confirmation)"],
+    "new": ["scratch/test_track1_stage5zzn_scheduler_mode_enforcement_20260827.py",
+            "scratch/track1_stage5zzn_scheduler_mode_enforcement_20260827.md",
+            "scratch/track1_stage5zzn_scheduler_mode_enforcement_20260827.json"],
+    "runtime_trading_files_written": "none"
+  }
+}

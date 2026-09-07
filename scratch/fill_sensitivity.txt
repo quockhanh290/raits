@@ -1,0 +1,15 @@
+da nap 4 ma
+
+=== prod_backtest (quy uoc engine) ===
+  tong 2496 lenh, P&L mo phong $32,694 | so lenh bi anh huong 578
+  1 khop tai MUC STOP (nhu hien nay)   tru $        0  ->  P&L $    32,694
+  2 khop GIUA stop va gia mo           tru $   19,323  ->  P&L $    13,371
+  3 khop tai GIA MO  (dang dung)       tru $   38,645  ->  P&L $    -5,952
+  4 khop tai CUC XAU cua bar           tru $   39,863  ->  P&L $    -7,169
+
+=== prod_live14h (luat live) ===
+  tong 2030 lenh, P&L mo phong $108,041 | so lenh bi anh huong 665
+  1 khop tai MUC STOP (nhu hien nay)   tru $        0  ->  P&L $   108,041
+  2 khop GIUA stop va gia mo           tru $   50,327  ->  P&L $    57,714
+  3 khop tai GIA MO  (dang dung)       tru $  100,653  ->  P&L $     7,388
+  4 khop tai CUC XAU cua bar           tru $  106,590  ->  P&L $     1,451

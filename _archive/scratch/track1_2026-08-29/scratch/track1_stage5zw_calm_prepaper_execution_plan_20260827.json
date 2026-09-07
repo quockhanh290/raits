@@ -1,0 +1,125 @@
+{
+  "stage": "5ZW",
+  "title": "Review the 5ZV correction, then plan Calm's pre-paper execution and evidence",
+  "checked_at": {
+    "utc": "2026-08-27T05:20",
+    "et": "2026-08-27T01:20 EDT"
+  },
+  "kind": "REVIEW + PLAN. No order-send implementation, and none authorised.",
+  "verdict": {
+    "5ZV_correction": "ACCEPTED",
+    "calm_contract": "still TRADABLE, Option A, the 10:00 open",
+    "shadow_evidence_now": "the DECISION half - that the route would have acted",
+    "paper_only": "that an order was accepted, the fill, the slippage, a resting stop",
+    "paper_readiness": "NOT_READY",
+    "orders_possible": false
+  },
+  "review_of_the_correction": {
+    "the_claim": "Calm's stop is entry minus 1.5 x ATR, so a concrete stop price cannot be known before the 10:00 entry reference exists",
+    "verified": "disaster_stop(entry, atr) = entry - mult x atr, read from source. The stop LEVEL requires the entry price. The first draft of 5ZV put planned_stop in the before-entry group, which would have shadow record a price it cannot compute - the same error as recording the reference price early.",
+    "accepted": true,
+    "and_sharpened": {
+      "measured": "two entries, one ATR: 5000.00 gives stop 4982.00 (distance 18.00); 5123.75 gives stop 5105.75 (distance 18.00)",
+      "so": "the stop DISTANCE is 1.5 x ATR and is entry-INDEPENDENT; the dollar risk is distance x point_value x qty and cancels the entry out; and qty is a fixed sleeve constant SLEEVE_QTY['roska4_calm'], not risk-derived. ONLY THE STOP LEVEL waits for 10:00. That is a sharper statement than 'the stop is not known', and it is what justifies stop_rule + risk_inputs before and planned_stop after."
+    },
+    "the_agreed_split": {
+      "before_entry": [
+        "setup",
+        "instrument",
+        "direction",
+        "qty",
+        "stop_rule",
+        "risk_inputs",
+        "entry_reference_time",
+        "intent"
+      ],
+      "after_reference_bar_closes": [
+        "entry_reference_price",
+        "planned_stop"
+      ],
+      "never_in_shadow": [
+        "fill_price",
+        "fill_time",
+        "realised_pnl",
+        "slippage"
+      ]
+    },
+    "does_it_change_the_strategy": false,
+    "does_it_authorise_a_send": false,
+    "runtime_files_touched_by_the_edits": "none. live_positions.track1.json and the checkpoint moved at 15:56:24 ET because the SWING window closed - the route wrote them, and the book came through still schema 2, route-stamped, no foreign keys. That is the third window close the Stage 5ZS repair has survived.",
+    "docs_were_NOT_consistent_and_are_now": "the 5ZV markdown listed planned_stop under before-entry in its code block and contradicted itself five lines later in the correction paragraph. The block, the JSON and the pipeline doc are now aligned - the block is the thing a reader copies.",
+    "tests_run": {
+      "5ZV alone": "22 passed",
+      "5ZN + 5ZV together": "76 passed",
+      "nothing loosened": "the repairs were to stale ROSTER and DATE pins, not to safety assertions"
+    }
+  },
+  "answers": {
+    "1_production_wiring_still_missing": {
+      "DECIDE ~09:32": "MISSING. Nothing computes the setup from the closed 09:30 bar and records an intent. Today's single Calm slot fires at 10:00 and does everything at once.",
+      "SEND 10:00:00": "MISSING BY DESIGN, and must stay missing. run_live_day_track1 builds NoOrderBroker unconditionally; UnbuiltPaperExecutor is the placeholder.",
+      "OBSERVE 10:01+": "MISSING. The 5ZU gate can now read the 10:00 OPEN from a closed one-minute bar, but nothing records it as the reference."
+    },
+    "2_jobs_or_slot_or_stream": {
+      "answer": "two scheduler jobs and ONE new evidence stream",
+      "why_not_one_expanded_slot": "a slot that starts at 09:32 and finishes after 10:01 would hold a process and a client id across the entry instant, and a crash anywhere in that half hour loses both halves. The phases have different inputs and different failure modes; a slot that spans them cannot report which failed.",
+      "why_not_reuse_a_stream": "every existing stream already has a reader that counts it. shadow/ holds per-slot explanations; a reader counting rows there would start counting intents.",
+      "shape": "TRACK1_CALM_DECIDE_0932 (one_shot) and TRACK1_CALM_OBSERVE_1002 (one_shot), replacing TRACK1_CALM_1000. Net +1 job.",
+      "cost": "the scheduler goes from 101 jobs to 102"
+    },
+    "3_how_shadow_counts_without_pretending_a_fill": {
+      "rule": "a Calm day is judgeable when the DECIDE phase decided causally from bars closed at or before 09:31, an intent was recorded before 10:00, and the OBSERVE phase recorded the 10:00 reference afterwards",
+      "what_it_certifies": "the route would have acted, and at what reference",
+      "what_it_does_not": "that an order would have been accepted, filled, or filled near that reference",
+      "how_the_gate_should_say_it": "PAPER_SHADOW_EVIDENCE should carry the label it is counting - decision_judgeable - so a later reader cannot mistake five clean days for five proven executions"
+    },
+    "4_what_must_stay_separate_from_the_order_journal": {
+      "answer": "shadow intent gets its own stream: global_index/track1_runtime/shadow_intent/",
+      "why_this_is_not_a_preference": "FOUR readers treat the EXISTENCE of track1_runtime/orders/ as proof the route acted",
+      "the_four": [
+        "b1_book_repair.route_has_never_traded - refuses the book repair if it exists",
+        "track1_paper_callsite - guards the production root against it",
+        "track1_report - reports NOT_PRODUCED while it is absent",
+        "the shadow-window runbook - 'an order journal was written, stop and investigate'"
+      ],
+      "consequence_if_ignored": "a shadow intent written there would make all four report a route that traded, on a day it sent nothing - and it would block its own book repair",
+      "pinned": "scratch/test_track1_stage5zw_calm_prepaper_execution_20260827.py holds this before anyone implements it"
+    },
+    "5_what_changes_later_to_send_at_10_00": {
+      "one_job": "a SEND job at 10:00:00 that reads the recorded intent and calls the executor. It reads NO bars - that is what makes it free of future data.",
+      "one_swap": "UnbuiltPaperExecutor becomes a real executor holding an IBKRBroker, built and proven separately",
+      "one_promotion": "the shadow intent becomes an INTENDED row in the real order journal at the moment the route is armed - the same fields, a different stream, and the promotion is the act that says this is no longer a rehearsal",
+      "unchanged": "the DECIDE and OBSERVE phases, their times, and the entry reference. That is the point of building them now."
+    },
+    "6_what_remains_blocked": {
+      "PAPER_SHADOW_EVIDENCE": "3 of 5 judgeable days. Calm contributes none until the DECIDE and OBSERVE jobs exist, because its slot still refuses.",
+      "B1": "no decision recorded. The measurement passes on a record from 11:34 ET and expires 24h later, so it needs re-running the day the decision is made.",
+      "machine_sleep": "operator; unchanged",
+      "the_SEND_wire": "does not exist, and this stage does not build it"
+    }
+  },
+  "what_this_stage_changed": {
+    "code": "none",
+    "docs": [
+      "the 5ZV markdown's evidence block, which contradicted its own correction paragraph",
+      "the 5ZV JSON answer 5",
+      "the pipeline doc's 5ZV section"
+    ],
+    "tests": [
+      "scratch/test_track1_stage5zw_calm_prepaper_execution_20260827.py - 15 tests holding the separation invariant and the phase times"
+    ],
+    "runtime": "nothing"
+  },
+  "a_finding_recorded_not_fixed": {
+    "what": "ORDERS_DIR is defined independently in three modules - track1_order_journal, b1_book_repair and track1_report - while a fourth references the shared constant.",
+    "risk": "three definitions of one path drift silently; the readers that prove the route has not traded would start looking in different places",
+    "done": "a test asserts they still agree, which fails the day they stop - the only way anyone would find out",
+    "not_done": "collapsing them to one import, which belongs to whoever next touches that path"
+  },
+  "claims_deliberately_NOT_made": [
+    "that Calm has produced a judgeable day",
+    "that a 10:00 fill is achievable",
+    "that the DECIDE and OBSERVE jobs exist",
+    "that paper is ready"
+  ]
+}

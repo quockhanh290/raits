@@ -1,0 +1,184 @@
+{
+  "stage": "5V-1 / 5R-2",
+  "title": "NKD per-slot intraday gate causality \u2014 the gate required bars from the future",
+  "generated_et": "2026-08-25T03:00:00-04:00",
+  "verdict": "READY_FOR_NEXT_JUDGEABLE_WINDOW",
+  "safety": {
+    "window_open_during_stage": "global_nkd 01:10-02:55 ET \u2014 open for most of it, NOT disturbed",
+    "scheduler_or_backend_restarted": false,
+    "runtime_evidence_written": false,
+    "ledger_rows_edited": false,
+    "backfilled": false,
+    "ibkr_read_only_fetches": 2,
+    "ibkr_client_id": 95,
+    "orders_sent": 0,
+    "confirmation_file_created": false,
+    "track1_orders_approved_set": false,
+    "allow_orders_added": false
+  },
+  "root_cause": "a grid-quantised frame compared against a continuous instant, in two places",
+  "where_the_codes_came_from": "run_live_day_track1 builds the ledger detail as ','.join(verdict.codes) from intra.validate and nothing else \u2014 so both codes were the INTRADAY gate, not the SPY freshness gate",
+  "the_wrong_story_ruled_out": "three slots ran AFTER the CSV was refreshed to 2026-08-24 and still said partial_coverage,stale, and freshness.evaluate() returned allow=True by then",
+  "bugs": [
+    {
+      "code": "partial_coverage",
+      "cause": "_span_check demanded bars to req.today_to = 15:55 for EVERY slot, so a 14:10 slot required 105 minutes that had not happened",
+      "measured": "today_span partial_coverage \u2014 'last bar in the span is 15:46, expected 15:55' on a frame holding 107 contiguous bars of the session"
+    },
+    {
+      "code": "stale",
+      "cause": "the staleness horizon was raw `now`. A slot fires ~3s after its minute, so the newest complete 5-minute bucket is exactly one bar back and `last + 5min < now` was true by those seconds",
+      "measured": "staleness stale \u2014 'last bar 15:45 is more than one 5-minute bar behind 15:50:03'"
+    }
+  ],
+  "fix": {
+    "helper": "_last_closed_bar(now, n) = floor(now, n) - n \u2014 the newest grid point whose bar must certainly have finished",
+    "why_flooring_alone_is_not_enough": "at 14:10:03 the 14:10 bar is the one still open; Stage 5R-0 drops it for exactly that reason",
+    "used_twice": "the span high bound and the staleness horizon, so the two cannot disagree about which bar the frame owes; a test parses validate and requires exactly two call sites",
+    "span_bound_is_per_sleeve": {
+      "field": "Requirement.today_to_follows_now",
+      "true_for": [
+        "roska4_swing",
+        "global_nkd"
+      ],
+      "false_for": [
+        "roska4_calm",
+        "roska4_stress"
+      ],
+      "why_not_blanket": "a blanket min() would have shrunk Calm's span from 09:30-10:00 to 09:30-09:55 at 10:00:03 and stopped demanding the 10:00 bar in the span"
+    },
+    "swing_also_fixed": "measurement, not assumption \u2014 its today_to is the same end-of-band shape; its 14:00 low bound is untouched",
+    "nothing_widened": [
+      "span still contiguous from today_from",
+      "a hole still refuses",
+      "a late start still refuses",
+      "a frame two bars behind still refuses stale"
+    ]
+  },
+  "live_confirmation": {
+    "observed_mid_window_without_restarting": true,
+    "why_observable": "slot subprocesses import fresh modules",
+    "progression": [
+      {
+        "slot_et": "02:45",
+        "detail": "partial_coverage,stale",
+        "meaning": "old code"
+      },
+      {
+        "slot_et": "02:50",
+        "detail": "stale",
+        "meaning": "span fix live, staleness fix not yet"
+      },
+      {
+        "slot_et": "02:55",
+        "detail": "too_late",
+        "meaning": "both live; only the benign end-of-band refusal"
+      }
+    ],
+    "real_frame_through_the_fixed_gate": {
+      "at_jst": "15:50:52",
+      "allow": true,
+      "codes": [],
+      "today_span": "ok \u2014 22 bars 14:00-15:45 contiguous",
+      "staleness": "ok \u2014 last bar 15:50"
+    }
+  },
+  "too_late_is_not_a_third_bug": {
+    "what": "the final slot fires ~3s after decide_to and can never decide",
+    "pre_existing": true,
+    "benign_because": "the acceptance gate classifies too_late as observed_window_shut, an OBSERVED class, so it cannot make a window incomplete",
+    "contrast": "partial_coverage,stale classified as observed_hard_refusal \u2014 which is why the other nineteen mattered",
+    "both_pinned_by_test": true
+  },
+  "proofs": {
+    "1_frame_ending_at_slot_passes": "five slot times plus a walk of all 21 decidable slots",
+    "2_same_frame_fails_a_later_slot": "three later slots, stale",
+    "3_hole_still_refuses": "gap_in_coverage; a late start still partial_coverage",
+    "4_stale_still_fires": "1/2/6 bars behind \u2014 one back is NOT stale, two is",
+    "5_no_future_bars_required": "the 21-slot walk",
+    "6_live_ledger_explained_and_untouched": "a test reads the real ledger and asserts every refusal is one of the two codes, decided=False, nothing edited",
+    "7_artifact_reproduction_unchanged": "Stage 4 three-window run (TRACK1_STAGE4_ALL=1): 32 passed in 16m01s \u2014 Normal-R4 incl. MNKD 1,223/1,223, Calm A 421/421, Stress-MNQ 50/3/4",
+    "8_orders_impossible": "B1 and PAPER_SHADOW_EVIDENCE both blocking; no confirmation file; env unset; no --allow-orders"
+  },
+  "tests": {
+    "file": "scratch/test_track1_stage5v1_intraday_causality_20260825.py",
+    "count": 31
+  },
+  "mutations": {
+    "total": 9,
+    "red": 9,
+    "still_green": 0,
+    "note": "most do not remove the fix, they OVERSHOOT it \u2014 the danger with a causality fix is that it widens something",
+    "detail": [
+      {
+        "id": "M1",
+        "mutation": "the fix removed"
+      },
+      {
+        "id": "M2",
+        "mutation": "the LOW bound follows the slot too"
+      },
+      {
+        "id": "M3",
+        "mutation": "the gap check dropped"
+      },
+      {
+        "id": "M4",
+        "mutation": "staleness reaches back a whole day"
+      },
+      {
+        "id": "M5",
+        "mutation": "the horizon uses raw now again"
+      },
+      {
+        "id": "M6",
+        "mutation": "Calm dragged into the dynamic bound"
+      },
+      {
+        "id": "M7",
+        "mutation": "Swing loses its 14:00 low bound"
+      },
+      {
+        "id": "M8",
+        "mutation": "the NKD requirement validated on ET"
+      },
+      {
+        "id": "M9",
+        "mutation": "too_late removed from the clock refusal codes"
+      }
+    ]
+  },
+  "this_window_will_not_pass": {
+    "why": "nineteen slots were hard-refused by the old code before the fix landed",
+    "window_closed": {
+      "outcome": "incomplete",
+      "observed_slots": 0,
+      "expected_slots": 22
+    },
+    "nothing_backfilled": true,
+    "next_judgeable": "2026-08-26 01:10 ET \u2014 the first NKD window on the fixed gate",
+    "watch_there": "spy_refresh_pm fires for the first time today at 16:20 ET, so Wednesday's freshness should pass \u2014 a different gate from this one, and not yet observed working"
+  },
+  "files": {
+    "production": [
+      "global_index/track1_intraday.py"
+    ],
+    "tests_new": [
+      "scratch/test_track1_stage5v1_intraday_causality_20260825.py",
+      "scratch/track1_stage5v1_mutations_20260825.py"
+    ],
+    "tests_repaired": [
+      {
+        "file": "scratch/test_track1_stage5f_stress_live_source_20260823.py",
+        "why": "a stale 'B1 is the only blocker' literal \u2014 the eighth and last copy, left over from before Stage 5S added PAPER_SHADOW_EVIDENCE; not caused by this stage"
+      }
+    ]
+  },
+  "regression": {
+    "stage4_three_window": "32 passed (16m01s)",
+    "intraday_audit_identity_journal_9_files": "368 passed, 2 skipped",
+    "stage5v1": "31 passed",
+    "stage5v1_mutations": "9 red, 0 green",
+    "note": "the gate change touches what a slot is ALLOWED to decide on, not what the sleeves compute, so the reproduction was the check that mattered most \u2014 and the committed rows are unmoved"
+  }
+}

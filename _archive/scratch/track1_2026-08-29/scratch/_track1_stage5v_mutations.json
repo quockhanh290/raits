@@ -1,0 +1,62 @@
+[
+  {
+    "id": "M1",
+    "mutation": "append catches and returns None",
+    "test": "test_a_write_failure_raises_and_does_not_pretend_success",
+    "outcome": "RED"
+  },
+  {
+    "id": "M1b",
+    "mutation": "a try/except wrapped around append's write",
+    "test": "test_the_module_catches_nothing_around_its_write",
+    "outcome": "RED"
+  },
+  {
+    "id": "M2",
+    "mutation": "ALLOWED_TRANSITIONS[INTENDED] gains FILLED",
+    "test": "test_intended_to_filled_is_refused",
+    "outcome": "RED"
+  },
+  {
+    "id": "M3",
+    "mutation": "JournalRecord.__post_init__ stops checking the route stamp",
+    "test": "test_a_record_without_the_route_stamp_is_refused",
+    "outcome": "RED"
+  },
+  {
+    "id": "M4",
+    "mutation": "journal_path stops validating the day",
+    "test": "test_a_day_that_could_escape_the_journal_directory_is_refused",
+    "outcome": "RED"
+  },
+  {
+    "id": "M5",
+    "mutation": "read() returns an empty invalid list",
+    "test": "test_a_corrupt_line_is_reported_by_the_reader",
+    "outcome": "RED"
+  },
+  {
+    "id": "M5b",
+    "mutation": "read() returns an empty invalid list",
+    "test": "test_a_corrupt_journal_refuses_to_authorise_another_order",
+    "outcome": "RED"
+  },
+  {
+    "id": "M5c",
+    "mutation": "resolve_journal hides impossible histories",
+    "test": "test_an_impossible_history_already_on_disk_is_refused_not_repaired",
+    "outcome": "RED"
+  },
+  {
+    "id": "M6",
+    "mutation": "an ib_insync import added to the journal",
+    "test": "test_this_module_cannot_reach_a_broker",
+    "outcome": "RED"
+  },
+  {
+    "id": "M7",
+    "mutation": "os.fsync removed from append",
+    "test": "test_the_write_is_flushed_and_fsynced",
+    "outcome": "RED"
+  }
+]

@@ -1,0 +1,147 @@
+{
+ "floor": {
+  "p1_maxhold_order": {
+   "checks": {
+    "n_maxhold": 894,
+    "n_resolved": 894,
+    "n_arm_before_exit": 894
+   },
+   "n_hits": 4,
+   "total_delta": -423.53571428571513,
+   "worst_delta": -376.64285714285734,
+   "by_inst": [
+    {
+     "inst": "M2K",
+     "n": 1,
+     "delta": -376.64285714285734,
+     "n_loss_over_declared": 1
+    },
+    {
+     "inst": "MES",
+     "n": 1,
+     "delta": 28.392857142857792,
+     "n_loss_over_declared": 0
+    },
+    {
+     "inst": "MNQ",
+     "n": 1,
+     "delta": -58.42857142857247,
+     "n_loss_over_declared": 0
+    },
+    {
+     "inst": "MYM",
+     "n": 1,
+     "delta": -16.857142857143117,
+     "n_loss_over_declared": 0
+    }
+   ],
+   "worst_rows": [
+    {
+     "inst": "M2K",
+     "day": "2020-11-04",
+     "exit_day": "2020-11-09",
+     "direction": "SHORT",
+     "entry": 1782.7,
+     "exit": 1943.5,
+     "stop": 1868.1714285714286,
+     "booked_pnl": -807.24,
+     "stop_pnl": -430.59714285714267,
+     "delta": -376.64285714285734,
+     "declared_risk": 534.1964285714284
+    },
+    {
+     "inst": "MNQ",
+     "day": "2019-05-08",
+     "exit_day": "2019-05-13",
+     "direction": "LONG",
+     "entry": 9669.25,
+     "exit": 9404.25,
+     "stop": 9433.464285714286,
+     "booked_pnl": -533.24,
+     "stop_pnl": -474.81142857142754,
+     "delta": -58.42857142857247,
+     "declared_risk": 589.4642857142857
+    },
+    {
+     "inst": "MYM",
+     "day": "2019-05-08",
+     "exit_day": "2019-05-13",
+     "direction": "LONG",
+     "entry": 28374.0,
+     "exit": 27747.0,
+     "stop": 27780.714285714286,
+     "booked_pnl": -316.74,
+     "stop_pnl": -299.8828571428569,
+     "delta": -16.857142857143117,
+     "declared_risk": 370.80357142857144
+    },
+    {
+     "inst": "MES",
+     "day": "2021-05-14",
+     "exit_day": "2021-05-19",
+     "direction": "LONG",
+     "entry": 4642.75,
+     "exit": 4539.25,
+     "stop": 4533.571428571428,
+     "booked_pnl": -523.74,
+     "stop_pnl": -552.1328571428578,
+     "delta": 28.392857142857792,
+     "declared_risk": 682.3660714285713
+    }
+   ]
+  },
+  "p2_nkd_series": {
+   "artifact_nkd_parquet": "global_index/data/NKD_frozen_2024.parquet",
+   "calm_nkd_probe_parquet": "global_index/data/NKD_continuous_1m_8y.parquet",
+   "same_file": false,
+   "overlap_bars": 1665238,
+   "n_bars_differ": 1665238,
+   "pct_bars_differ": 1.0,
+   "median_abs_diff_points": 100.0,
+   "max_abs_diff_points": 100.0,
+   "max_abs_diff_dollars": 50.0
+  }
+ },
+ "vault2025": {
+  "p1_maxhold_order": {
+   "checks": {
+    "n_maxhold": 123,
+    "n_resolved": 123,
+    "n_arm_before_exit": 123
+   },
+   "n_hits": 0
+  },
+  "p2_nkd_series": {
+   "artifact_nkd_parquet": "global_index/data/NKD_frozen_2025.parquet",
+   "calm_nkd_probe_parquet": "global_index/data/NKD_continuous_1m_8y.parquet",
+   "same_file": false,
+   "overlap_bars": 1880537,
+   "n_bars_differ": 1880537,
+   "pct_bars_differ": 1.0,
+   "median_abs_diff_points": 10.0,
+   "max_abs_diff_points": 10.0,
+   "max_abs_diff_dollars": 5.0
+  }
+ },
+ "vault2026": {
+  "p1_maxhold_order": {
+   "checks": {
+    "n_maxhold": 99,
+    "n_resolved": 99,
+    "n_arm_before_exit": 99
+   },
+   "n_hits": 0
+  },
+  "p2_nkd_series": {
+   "artifact_nkd_parquet": "global_index/data/NKD_continuous_1m_8y.parquet",
+   "calm_nkd_probe_parquet": "global_index/data/NKD_continuous_1m_8y.parquet",
+   "same_file": true,
+   "overlap_bars": 2040934,
+   "n_bars_differ": 0,
+   "pct_bars_differ": 0.0,
+   "median_abs_diff_points": 0.0,
+   "max_abs_diff_points": 0.0,
+   "max_abs_diff_dollars": 0.0
+  }
+ }
+}

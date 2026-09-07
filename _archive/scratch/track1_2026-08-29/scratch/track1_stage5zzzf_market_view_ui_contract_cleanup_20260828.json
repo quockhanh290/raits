@@ -1,0 +1,174 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZZ-F",
+  "title": "Market view UI contract cleanup after full strategy diagnostics",
+  "route": "track1_candidate",
+  "date": "2026-08-28",
+  "clocks": {"machine": "America/Edmonton", "operator": "Asia/Ho_Chi_Minh", "market": "America/New_York"},
+
+  "answers": {
+    "diagnostics_visible_per_sleeve": {
+      "global_nkd": ["trend filter (EMA 10)", "close used", "price vs EMA", "daily ATR",
+                     "volume", "average volume (10 bars)", "volume vs average", "regime",
+                     "setup state", "nearest failed condition"],
+      "roska4_swing": ["trend filter (EMA 50)", "close used", "price vs EMA", "daily ATR",
+                       "volume", "average volume (10 bars)", "volume vs average", "regime",
+                       "setup state", "nearest failed condition"],
+      "roska4_stress": ["instruments below open and VWAP", "instruments gapped down",
+                        "instruments with a wide range", "average basket gap",
+                        "trigger (pre-session low)", "planned stop", "session open",
+                        "armed state", "decided_at_et"],
+      "roska4_calm": ["DECIDE phase card", "OBSERVE phase card", "matched-decide state",
+                      "per-phase source badge"],
+      "regime": ["label", "posterior distribution", "confidence", "runner-up", "lead",
+                 "shift threshold named absent", "entropy in bits", "SPY 1-day log return",
+                 "realised volatility"]
+    },
+    "frontend_computes_anything_strategy_like": false,
+    "frontend_computation_evidence": [
+      "no strategy arithmetic in mvSetupCard / mvCalmCards / mvChartSvg",
+      "pass/fail is read from the payload, never derived",
+      "source words are a lookup keyed on diagnostics_source, never inferred",
+      "mutation M9 (badge invents a word) goes red"
+    ],
+    "layout_passes_browser_checks": true,
+    "browser_widths": [375, 720, 1440],
+    "console_errors": 0,
+    "gate_order_or_runtime_trading_file_changed": false,
+    "orders_possible": false,
+    "blockers": ["PAPER_SHADOW_EVIDENCE"]
+  },
+
+  "backend_restart": {
+    "required": true,
+    "reason": "monitor/backend/track1_market_view.py changed; the running backend serves the module it imported at startup",
+    "running_pid": 44968,
+    "performed": false,
+    "note": "left to the operator; the scheduler (pid 3000) is a different process and was not touched"
+  },
+
+  "defects_found_and_fixed": [
+    {"id": "D1", "what": "levels_note said 'Strategy levels unavailable' while the sleeve published three price levels",
+     "where": "monitor/backend/track1_market_view.py",
+     "evidence": "roska4_stress on 2026-08-28: trigger 29592.5, stop 29652.623, open 29615.25",
+     "fix": "note derived from levels published by any source, with armed/unarmed kept apart"},
+    {"id": "D2", "what": "strategy blocks carried no diagnostics_source at the top level",
+     "fix": "every strategy block and setup boundary declares its source; Stress included"},
+    {"id": "D3", "what": "the Stress gate no longer stated the hour it was decided at",
+     "fix": "published from StressParams.setup_time and rendered in the card head"},
+    {"id": "D4", "what": "the absent shift threshold was no longer named on the regime panel",
+     "evidence": "the only mention was a fallback on the Lead note, unreachable because the record always supplies margin_name",
+     "fix": "its own row, carrying the record's threshold_note"},
+    {"id": "D5", "what": "the plot's height came from its content",
+     "evidence": "populated tab 437px, empty tab 116px", "fix": "fixed box, empty state in the same box"},
+    {"id": "D6", "what": "the card head height varied with its text",
+     "evidence": "41.89px vs 40.39px", "fix": "min-height pinned"},
+    {"id": "D7", "what": "the legend added 40px to a populated tab only",
+     "fix": "overlaid inside the plot box"},
+    {"id": "D8", "what": "a chip carrying a sentence could not wrap and overflowed at 375px",
+     "evidence": "chip box right edge 385 on a 375 viewport",
+     "fix": "box-sizing: border-box + max-width + wrapping at narrow widths"},
+    {"id": "D9", "what": "the card head overflowed by 20px at every width once the decision hour was added (introduced by this stage)",
+     "fix": "min-width: 0 on head children, ellipsis on the right-hand block"},
+    {"id": "D10", "what": "the 60-day regime run was no longer dimmed",
+     "evidence": "overridden by .regime-strip .regime-run { opacity: 1 }, whose comment covers only height and gap",
+     "fix": "restored at the selector that wins"},
+    {"id": "D11", "what": "Calm rendered inside the market-view band under whichever sleeve was selected",
+     "fix": "its own headed section band, rendered once, hidden when empty"},
+    {"id": "D12", "what": "the page had no way to say the backend could not read something",
+     "fix": "UNAVAILABLE, shown only on an explicit backend error"},
+    {"id": "D13", "what": "the payload-wide levels_note asserted one claim for three sleeves that disagree",
+     "fix": "derived from the sleeves; silent when they differ"}
+  ],
+
+  "self_inflicted_and_caught": [
+    {"what": "the derived payload-wide note was inserted into regime() instead of build(), where out['sleeves'] does not exist",
+     "caught_by": "reading the output instead of trusting the patch", "status": "fixed"},
+    {"what": "the writer test scanned for 'append(' and matched a list method",
+     "status": "rewritten as an AST walk"},
+    {"what": "a new test was inserted between a decorator and its function",
+     "status": "moved"},
+    {"what": "the content-spill check reported the tooltip pseudo-element as overflow",
+     "evidence": "OBSERVE card head 484 -> 462 once .has-tip was removed",
+     "status": "scoped, with the measurement recorded"}
+  ],
+
+  "tests": {
+    "new_suite": "scratch/test_track1_stage5zzzf_market_view_ui_contract_20260828.py",
+    "new_suite_result": {"passed": 38, "failed": 0},
+    "regression_result": {"passed": 301, "failed": 0},
+    "suites_run": ["5zzzf", "5zzl", "5zzq", "5zzr", "5zzze",
+                   "monitor/test_realtime_dom.py", "monitor/test_realtime_contract.py"],
+    "restated": {
+      "total": 19,
+      "stale_selector_or_wording": 14,
+      "caught_a_real_defect": 5,
+      "claims_deliberately_changed": [
+        "the strip legend is derived from the states the payload declares, not a fixed four-word list that printed Crisis for a three-state model",
+        "a DOM fixture that fed the page pre-5ZZM wording and demanded it not be shown was the stale thing"
+      ]
+    }
+  },
+
+  "mutation_harness": {
+    "method": "source-level, subprocess, restored byte-identical; baseline proved green first",
+    "caught": 12, "total": 12, "restored_byte_identical": true,
+    "green_on_first_run": [
+      {"id": "M7", "why": "a text slice could not tell inside the div from just after it"},
+      {"id": "M8", "why": "calm.error appears twice, so the substring survived the branch being replaced"},
+      {"id": "M11", "why": "mis-aimed: removed one of the two rules the fix is made of"},
+      {"id": "M12", "why": "both phases present in the fixture, so the fallback could never fire"}
+    ]
+  },
+
+  "measurements": {
+    "market_view_build_cold_seconds": 69.8,
+    "market_view_build_warm_seconds": 0.03,
+    "label_map_cold_seconds": 8.02,
+    "label_map_refits_across_five_reads": 1,
+    "recon_ttl_seconds": 300
+  },
+
+  "safety": {
+    "scheduler_restarted": false,
+    "scheduler_pids": [3000],
+    "broker_connected": false,
+    "orders_dir_created": false,
+    "orders_dir_present": false,
+    "live_positions_track1_present": false,
+    "TRACK1_ORDERS_APPROVED_set": false,
+    "allow_orders_passed": false,
+    "confirmation_file_modified": false,
+    "confirmation_file_present": true,
+    "gates_thresholds_schedules_or_strategy_logic_changed": false,
+    "runtime_trading_files_modified": []
+  },
+
+  "files_changed": [
+    "monitor/backend/track1_market_view.py",
+    "global_index/dash/realtime/realtime.js",
+    "global_index/dash/realtime/realtime.css",
+    "global_index/dash/realtime/index.html",
+    "scratch/test_track1_stage5zzzf_market_view_ui_contract_20260828.py",
+    "scratch/test_track1_stage5zzl_market_view_regime_20260827.py",
+    "scratch/test_track1_stage5zzq_setup_boundaries_hmm_explain_20260828.py",
+    "scratch/test_track1_stage5zzr_strategy_native_market_view_20260828.py"
+  ],
+
+  "still_open": [
+    {"id": "O1", "severity": "reported, not concluded",
+     "what": "the Swing sleeve's detector-level regime gate reads day D's own label, which does not exist during its 14:05-15:55 window",
+     "evidence": [
+       "the panel showed Regime Calm for NKD and Regime Unavailable for Swing on the same day from the same detector",
+       "NKD reads its label through RegimeLabels(lag_days=1); Swing is handed the raw map and the detector does labels.get(day)",
+       "the label map's last entry at 23:34 ET on 2026-08-28 was 2026-08-27",
+       "causal_regime_label's own docstring calls reading today's row 'six hours of the future' and guards the OUTER gate only"
+     ],
+     "why_not_acted_on": "runtime trading file, live/backtest divergence, outside this stage's scope and safety constraints",
+     "prior": "raised on 2026-08-26 and explicitly left unresolved; today's reading advances it without closing it"},
+    {"id": "O2", "what": "the cold market-view build takes ~70s; served stale afterwards with a background refresh",
+     "why_not_acted_on": "the frame cannot be shortened - the trend filter is recursive over the full history"},
+    {"id": "O3", "what": "one DOM test failed once and did not reproduce across four subsequent runs",
+     "status": "recorded as unexplained rather than dismissed"}
+  ]
+}

@@ -1,0 +1,90 @@
+import json, sys
+from pathlib import Path
+sys.path.insert(0, str(Path.cwd()))
+from global_index import track1_gates as g
+ok, detail = g.live_frame_wiring()
+out = {
+ "stage": "5G", "date": "2026-08-23",
+ "kind": "close LIVE_FRAME_ADAPTER_VERIFICATION by moving the touchpoint, not the rule",
+ "verdict": "LIVE_FRAME_RELEASED_B1_ONLY",
+ "files_read_before_changing": [
+   "scratch/track1_stage5ab_g1_source_mode_report_20260823.md",
+   "scratch/test_track1_stage5ab_g1_source_mode_20260823.py",
+   "global_index/run_live_day_track1.py", "global_index/track1_live_source.py",
+   "global_index/track1_live_frame.py", "global_index/track1_gates.py",
+   "scratch/track1_stage5d/5e/5f reports (blocker assertions)"],
+ "root_cause": {
+   "what": ("build_bar_provider() was added to global_index/run_live_day_track1.py at 10:17 by "
+            "another session; it constructs IBKRBroker"),
+   "rule": ("track1_gates.live_frame_wiring() is per MODULE: any Track 1 module that obtains "
+            "live bars must import global_index/track1_live_frame"),
+   "why_it_blocked": ("run_live_day_track1 named a live-bar primitive and did not import the "
+                      "guard; transitive reach through track1_live_source does not count, by "
+                      "design"),
+   "measured_before": "live bars are obtained without the splice guard in: run_live_day_track1 (IBKRBroker)",
+   "had_callers": False,
+ },
+ "fix": {
+   "chosen": "preferred option - move the provider construction into track1_live_source.py",
+   "why": ("that module already owns every other live-bar primitive (fetch_bars, "
+           "fetch_session_bars, fetch_session_bars_direct, ib_insync, reqHistoricalData) AND "
+           "already imports the splice guard, so moving the touchpoint makes the structural "
+           "claim TRUE rather than making the detector look away"),
+   "rejected": ["importing the guard into run_live_day_track1 just to satisfy the check - it "
+                "would leave a broker primitive in the entry point",
+                "removing IBKRBroker from the detector vocabulary",
+                "relaxing track1_gates"],
+   "entry_point_now": ("re-exports build_bar_provider from track1_live_source so any caller "
+                       "still finds it, without holding a primitive of its own"),
+   "behaviour_preserved": ["kind='none' returns (None, None)",
+                           "kind='ibkr' builds and connects, broker_cls injectable",
+                           "unknown kind refused by name (code unknown_bar_provider)"],
+ },
+ "gate": {"released": ok, "detail": detail,
+          "blocking": [b.id for b in g.blocking()],
+          "b1_only": [b.id for b in g.blocking()] == ["B1_broker_account_or_legacy_retirement"],
+          "self_check": g.self_check(),
+          "orders_possible": g.may_enable_orders()[0],
+          "cli_allow_orders_exit": 2,
+          "cli_names_live_frame_blocker": False},
+ "g1_contract_preserved": {
+   "run_shadow_mode_default_is_None": True,
+   "main_derives_mode": "decision_mode_for(a.source, gate)",
+   "mismatch_raises": "DecisionModeMismatch",
+   "live_and_live_shadow_bind_freshness": True,
+   "armed_but_refused_resolves_to_shadow_live": True,
+   "replay_is_context_only": True,
+   "inputs_summary_key": "decision_mode",
+ },
+ "stale_assertions_fixed": {
+   "what": ("four suites asserted the blocker list equals exactly one element, which goes red "
+            "whenever a MEASURED gate legitimately re-shuts - the mechanism working, not a "
+            "regression"),
+   "now": ["orders impossible", "B1 present in the set",
+           "any extra blocker must genuinely be holding",
+           "B1-only asserted only when live_frame_wiring() is released"],
+   "files": ["test_track1_stage5b_runbook_fix_20260823.py",
+             "test_track1_stage5d_shadow_live_wiring_20260823.py",
+             "test_track1_stage5e_live_source_20260823.py",
+             "test_track1_stage5f_stress_live_source_20260823.py"],
+ },
+ "out_of_scope_failure": {
+   "test": "scratch/test_track1_explain_20260823.py::test_no_monitor_or_dashboard_file_mentions_the_module",
+   "cause": ("monitor/test_schedule_status_track1_20260823.py, created by another session, "
+             "mentions track1_explain and trips that session's own guard"),
+   "action": "none - monitor/ is outside this stage's scope and was not touched",
+ },
+ "no_side_effects": ["no scheduler started", "no IBKR connection", "no order",
+                     "no dashboard write", "no confirmation file", "no STOP_TRADING",
+                     "no legacy retirement", "no commit",
+                     "test_event_playback.py not run"],
+ "remaining_before_shadow_scheduler": [
+   "B1 - legacy retirement or a separate account (order gate)",
+   "operator: STOP_TRADING before any scheduler start (shadow keeps 23 legacy entry slots)",
+   "RAITS_WINDOW_LEDGER_DIR must be set or every live-shadow slot hard-refuses",
+   "a real broker provider has still never been connected",
+ ],
+}
+Path("scratch/track1_stage5g_live_frame_provider_gate_20260823.json").write_text(
+    json.dumps(out, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+print("verdict:", out["verdict"], "| blocking:", out["gate"]["blocking"])

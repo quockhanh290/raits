@@ -1,0 +1,29 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+
+======================================================================================
+VU TRANG ranh gioi ngay (stop co dinh, dung luat live)
+======================================================================================
+  tong 2494 lenh  $32,789
+  so lenh co it nhat MOT lan cham stop bi xoa trong quang tran: 1498 (60.1%)
+  nhom                                               lenh           P&L
+  BI XOA cham stop -> CHANDELIER                     1269       -54,632
+  BI XOA cham stop -> GAP                             111       -13,124
+  BI XOA cham stop -> MAX_HOLD                        118        39,741
+  khong cham stop trong quang tran -> CHANDELIER      704       -38,059
+  khong cham stop trong quang tran -> GAP              22        -2,025
+  khong cham stop trong quang tran -> MAX_HOLD        267       100,835
+  --> tong P&L cua nhom bi xoa cham stop: $-28,014
+
+======================================================================================
+VU TRANG D+1 14:00 (stop co dinh, dung luat live)
+======================================================================================
+  tong 2027 lenh  $108,086
+  so lenh co it nhat MOT lan cham stop bi xoa trong quang tran: 1549 (76.4%)
+  nhom                                               lenh           P&L
+  BI XOA cham stop -> CHANDELIER                     1169       -55,125
+  BI XOA cham stop -> GAP                              94       -10,901
+  BI XOA cham stop -> MAX_HOLD                        286       103,721
+  khong cham stop trong quang tran -> CHANDELIER      218       -11,535
+  khong cham stop trong quang tran -> GAP              14        -1,590
+  khong cham stop trong quang tran -> MAX_HOLD        221        79,696
+  --> tong P&L cua nhom bi xoa cham stop: $37,695

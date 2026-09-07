@@ -1,0 +1,105 @@
+{
+  "stage": "5P-cleanup",
+  "title": "operator text cleanup before the shadow start",
+  "date": "2026-08-24",
+  "verdict": "OPERATOR_TEXT_CORRECT_NO_LOGIC_CHANGED",
+  "scope": "operator-facing text only; no route, scheduler, safety or order logic touched",
+  "files_changed": {
+    "monitor/ops.py": [
+      "the --track1-only-shadow banner: the single line 'safety sweeps : still run against live_positions.json — Stage 5O' replaced by TWO lines naming both sets and both books",
+      "the --track1-only-shadow help on `up` AND `restart` (identical string, both replaced): the stale safety clause removed, 'all four sleeves' added, Track 1's own safety net named with a DERIVED count",
+      "new helpers track1_safety_count() / _t1_safety() / _t1_const() so the banner and help read the slot table instead of restating numbers and paths"
+    ],
+    "docs/futures/TRACK1_SWITCHOVER_RUNBOOK.md": [
+      "section 9 (Stage 5M-D) gained a 'Superseded in part' banner pointing at 11 and 12",
+      "section 9's safety-sweeps bullet now says what was true at 5M-D and that 5O closed it",
+      "section 9's 'May not' block dated to 5M-D; the 5N/5O supersessions named",
+      "section 10 (Stage 5N) 'Not claimed' line dated and pointed at 11"
+    ],
+    "scratch/test_track1_stage5p_operator_text_20260824.py": "NEW — 20 tests"
+  },
+  "files_read_not_changed": {
+    "docs/futures/NORMAL_STRESS_CALM_HANDOFF_2026-08-22.md": "its only live_positions.json mention is about the legacy file's rewrite-in-place semantics, not track1-only operator guidance — nothing stale",
+    "scratch Stage 5K/5M/5O/5P reports": "historical records of what was true when; no current instruction in them is wrong, so they are left as the record"
+  },
+  "stale_lines_replaced": [
+    {
+      "where": "monitor/ops.py, cmd_up banner",
+      "was": "  safety sweeps   : still run against live_positions.json — Stage 5O",
+      "now": "  track1 safety   : 11 jobs watching live_positions.track1.json / (own lock runner.track1.pid, own max-hold marker, clientId 90) +   legacy safety   : still scheduled, watching live_positions.json — the DRAIN",
+      "why": "unqualified 'safety sweeps' after 5O reads as 'a Track 1 position is unprotected'"
+    },
+    {
+      "where": "monitor/ops.py, --track1-only-shadow help (up and restart)",
+      "was": "The safety sweeps still run against live_positions.json (Stage 5O).",
+      "now": "Track 1 gets its OWN safety net (11 jobs on live_positions.track1.json); the legacy safety jobs stay registered on live_positions.json to drain any position still open in the legacy book.",
+      "why": "same claim, in the string an operator reads before typing the command"
+    },
+    {
+      "where": "runbook section 9, 'What stays scheduled'",
+      "was": "**These are NOT route-safe**: both are hard-wired to live_positions.json ... that is Stage 5O.",
+      "now": "dated to 5M-D plus 'Stage 5O closed that' and a pointer to section 11"
+    },
+    {
+      "where": "runbook sections 9 and 10, the 'may not claim' blocks",
+      "was": "NKD still has no Track 1 slot (Stage 5N) ... The safety sweeps still point at legacy's book (Stage 5O).",
+      "now": "dated as of their stage, with the 5N and 5O supersessions named"
+    }
+  ],
+  "current_model_now_stated": {
+    "legacy_drain_safety": "watches live_positions.json — protects positions still open in the legacy book; not Track 1's safety net",
+    "track1_safety": "11 jobs watching live_positions.track1.json, lock runner.track1.pid, marker global_index/maxhold_state.track1.json, clientId 90",
+    "track1_only": "removes legacy STRATEGY jobs; keeps legacy drain safety until the legacy book is confirmed empty",
+    "sleeves_owned": 4,
+    "root_stop_trading": "halts legacy ENTRIES inside the legacy runner; does NOT stop Track 1 and does not stop legacy jobs from spawning/fetching"
+  },
+  "guard_design": {
+    "problem": "banning 'live_positions.json' near 'safety' would forbid the TRUE drain sentence along with the false one",
+    "solution": "the guard bans the CLAIM SHAPE — safety tied to the legacy book on a line that does not name legacy/drain as its owner — and is itself checked against the exact removed sentence (must trip) and the true drain sentence (must not)",
+    "also_guarded": [
+      "no line says the root STOP_TRADING stops Track 1 (STOP_TRADING.track1 stays sayable)",
+      "no unqualified line says NKD has no Track 1 slot",
+      "help counts are derived, not hardcoded"
+    ]
+  },
+  "mutation_check": {
+    "ran": 3,
+    "detected": 3,
+    "files_restored": true,
+    "cases": [
+      "the exact stale banner line returns",
+      "'STOP_TRADING halts Track 1 too' returns to the runbook",
+      "unqualified 'NKD has no Track 1 slot' returns"
+    ]
+  },
+  "verification": {
+    "help_renders": "python monitor/ops.py up --help prints 70 slots / 11 safety jobs, derived",
+    "banner_renders": "cmd_up prints both safety sets with the real paths and clientId 90",
+    "counts_derived": {
+      "track1_slot_count": 70,
+      "track1_safety_count": 11
+    },
+    "schedule_unchanged": {
+      "default": 60,
+      "track1_shadow": 129,
+      "track1_only": 95
+    },
+    "orders_still_blocked": "B1_broker_account_or_legacy_retirement open; may_enable_orders() False"
+  },
+  "tests": {
+    "stage5p_operator_text": "20 passed",
+    "mutation_check": "3/3 detected",
+    "sweep (text + 5P + 5O + 5M-D + 5M-C + ops + dashboard backend + mirror)": "375 passed",
+    "not_run": "global_index/test_event_playback.py — known hang"
+  },
+  "no_side_effects": [
+    "no scheduler/backend/dashboard started or stopped",
+    "no IBKR connection",
+    "no order",
+    "no STOP_TRADING or STOP_TRADING.track1 created or removed",
+    "no confirmation file",
+    "no live state written",
+    "no commit",
+    "no route/scheduler/order logic changed"
+  ]
+}

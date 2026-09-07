@@ -1,0 +1,16 @@
+================================================================================================================
+NORMAL SLEEVE - ENGINE-FIX POLICY ANCHOR (scratch only)
+================================================================================================================
+Real engine path after gap-through fix. Stress disabled. NKD original is now corrected in-engine.
+
+################################################################################################################
+WINDOW: vault2026
+################################################################################################################
+  completed current_cap_enginefix
+  completed strict025_enginefix
+  completed strict030_enginefix
+  case                           net$    PF  Sharpe  Calmar    MaxDD$   MaxDD%   fix_n   halts
+  current_cap_enginefix         6,743  1.46    2.43    1.62     7,520     15.0       0       0
+  strict025_enginefix           5,183  1.48    2.36    1.94     4,844      9.7       0       0
+  strict030_enginefix           5,273  1.46    2.33    1.86     5,116     10.2       0       0
+

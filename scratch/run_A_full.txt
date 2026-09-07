@@ -1,0 +1,37 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+CAU HINH: vu trang 14.0833h + stop co dinh + QUET TOI nen resume dung chieu + SUA KHOP LENH
+
+========================================================================
+DEPLOY-REALISTIC SIM | Rổ 4 + NKD | $50,000
+========================================================================
+slippage 2 tick/side | NKD gated ema=10 mult=2.5
+
+SIZER (combined 3-cluster, DD-capped):
+  1-micro combined MaxDD : $7,808  (15.6% of account)
+  dd_scale 0.64 | margin_scale 3.23 → binding: FIXED (--n-contracts override)
+  → CONTRACTS: 1 micro each  (projected DD 15.6%, hard cap 15%)
+
+DEPLOY METRICS at 1 micro:
+  net $12,832  |  Calmar 0.24  |  PF 1.09  |  Sharpe 0.45
+  MaxDD $7,808 (15.6%)  |  return ≈ 3.7%/yr on $50,000
+
+  per-cluster entries taken / rejected (REAL risk$):
+    roska4_swing   taken 1305  rejected 470
+    roska4_stress  taken    0  rejected   0
+    global_nkd     taken  533  rejected   0
+    circuit-breaker halts: 0
+
+per-year net$ (deploy size):
+  2018  $        82
+  2019  $    -3,031
+  2020  $    12,224
+  2021  $    -1,854
+  2022  $    -4,426
+  2023  $     6,863
+  2024  $     2,973
+------------------------------------------------------------------------
+NOTE: upper bound. Live MNKD slips >1 tick (rerun --slippage-ticks 2-3 to see), fills partial, unseen events absent. Paper trade is the real test.
+
+
+[sua khop lenh] 762 lenh, $101,974

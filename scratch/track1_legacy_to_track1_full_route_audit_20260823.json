@@ -1,0 +1,341 @@
+{
+  "audit": "legacy -> Track 1 full route",
+  "date": "2026-08-23",
+  "kind": "read-only",
+  "verdict": "NOT_READY_BLOCKERS_FOUND",
+  "headline": "Stage 5K can start a shadow scheduler, but that is not the combined route. Normal-R4 and NKD are decided by LEGACY jobs, and the STOP_TRADING an operator must place to freeze legacy freezes them too. A first shadow period under the 5J/5K flow measures Calm + Stress ONLY.",
+  "jobs": {
+    "off": 60,
+    "on": 84,
+    "added": 25,
+    "removed": [
+      "stop_repair_1220"
+    ],
+    "groups": {
+      "TRACK1": 25,
+      "LEGACY_ENTRY_live_day": 23,
+      "nkd_night_and_other": 22,
+      "SAFETY_stop_repair": 10,
+      "SAFETY_maxhold": 1,
+      "PREFLIGHT_DATA": 1,
+      "INFRA_heartbeat": 1,
+      "REPORT": 1
+    },
+    "classification": {
+      "shared_infrastructure_keep": [
+        "heartbeat",
+        "preflight (13:45)",
+        "session_report_fallback"
+      ],
+      "legacy_strategy_retire": [
+        "live_day + 22 slots (14:05-15:55)",
+        "nkd_night slots (01:10-02:55)"
+      ],
+      "track1_owned_today": [
+        "track1_calm_1000",
+        "track1_stress_1035..1230 (24)"
+      ],
+      "track1_owned_MISSING": [
+        "Normal-R4 14:05-15:55",
+        "NKD overnight"
+      ],
+      "safety_needs_route_awareness": [
+        "stop_repair x10",
+        "maxhold_exit"
+      ]
+    }
+  },
+  "ownership_map": {
+    "roska4_swing / Normal-R4": {
+      "decided_by": "LEGACY run_live_day (14:05-15:55, --clusters all)",
+      "state": "live_positions.json",
+      "stop": "legacy chandelier, ratchet ON",
+      "broker": "legacy IBKRBroker order path",
+      "matches_track1_backtest": false,
+      "gap": "legacy is ema 30 / chandelier 2.5 / ratchet ON; Track 1 is ema 50 / entry-anchored 2.0x ATR / ratchet OFF / arm 14:05. Different strategies. The Track 1 module exists (track1_normal_r4, reproduces 1223 rows exactly) but has NO slot"
+    },
+    "global_nkd / MNKD": {
+      "decided_by": "LEGACY run_live_day night slots (--clusters nkd)",
+      "state": "live_positions.json",
+      "stop": "chandelier 2.5, max_hold 5",
+      "broker": "legacy order path",
+      "matches_track1_backtest": true,
+      "gap": "the STRATEGY matches - ema 10, chandelier 2.5, hold 5, RegimeLabels(lag_days=1) - so this is a wiring/ownership job, not a promotion. The BOOK and caps are legacy's"
+    },
+    "roska4_calm": {
+      "decided_by": "TRACK 1 slot track1_calm_1000 (10:00)",
+      "state": "window ledger + route checkpoint",
+      "stop": "ATR15 disaster stop, risk from true stop distance",
+      "broker": "none - shadow only",
+      "matches_track1_backtest": true,
+      "gap": "needs a real bar provider on a live day; never connected"
+    },
+    "roska4_stress": {
+      "decided_by": "TRACK 1 slots 10:35-12:30 (24)",
+      "state": "window ledger + route checkpoint",
+      "stop": "pre_high*1.001, RR 1.5",
+      "broker": "none - shadow only",
+      "matches_track1_backtest": true,
+      "gap": "same - provider never connected"
+    }
+  },
+  "preflight": {
+    "job": "single `preflight` at 13:45 ET",
+    "runs": [
+      "update_ibkr_daily --port 4002",
+      "update_spy_csv --csv spy_daily_live.csv"
+    ],
+    "writes": "global_index/preflight_state.json",
+    "track1_dependency": "track1_freshness encodes the D-1 13:45 contract",
+    "morning_slots": "Calm 10:00 and Stress 10:35-12:30 all fire BEFORE 13:45, so they decide on D-1 stored bars plus today's live bars via the provider - the designed contract, not a defect",
+    "pre_market_refresh_needed": "no; adding one would be a deliberate change",
+    "action": "promote to a SHARED job owned by neither route before retiring legacy"
+  },
+  "state_files": {
+    "legacy_only": [
+      "live_positions.json",
+      "global_index/replay_checkpoint.json",
+      "runner.pid",
+      "trade_log.jsonl",
+      "global_index/live_state_data.js"
+    ],
+    "track1_only": [
+      "live_positions.track1.json",
+      "global_index/replay_checkpoint.track1.json",
+      "runner.track1.pid",
+      "STOP_TRADING.track1",
+      "global_index/track1_runtime/*"
+    ],
+    "shared_must_stay_single": [
+      "global_index/preflight_state.json",
+      "spy_daily_live.csv",
+      "the futures bar store"
+    ],
+    "shared_and_DANGEROUS": [
+      "global_index/maxhold_state.json - one file, two routes would overwrite each other's already-ran-today marker"
+    ],
+    "operator_switches": [
+      "STOP_TRADING (legacy)",
+      "track1_go_live_confirmation.json"
+    ]
+  },
+  "safety_gates": {
+    "account_level_cannot_be_split": [
+      "B3 broker/file reconcile (ib.positions() unfiltered)",
+      "account breaker / NetLiquidation",
+      "orphan working STP - an order carries no route"
+    ],
+    "must_become_route_aware": [
+      "stop_repair x10 (--positions-path live_positions.json)",
+      "maxhold_exit (--positions-path live_positions.json)",
+      "maxhold_state.json"
+    ],
+    "already_route_scoped_in_track1": [
+      "cluster/family caps",
+      "same-symbol suppression",
+      "Stress displacement",
+      "window ledger",
+      "route checkpoint"
+    ],
+    "not_yet_ported": [
+      "stop arming (14:05 swing / 01:10 NKD)",
+      "contract rollover",
+      "cancel-stop-before-close ordering"
+    ]
+  },
+  "migration_plan": [
+    {
+      "stage": "5L",
+      "name": "shared pre-flight",
+      "work": "promote the 13:45 job to route-neutral",
+      "files": [
+        "run_scheduler.py",
+        "docs"
+      ],
+      "gate": "both routes read the same preflight_state",
+      "rollback": "revert the job name; the body is unchanged"
+    },
+    {
+      "stage": "5M",
+      "name": "promote Normal-R4",
+      "work": "Track 1 slots 14:05-15:55 via track1_normal_r4",
+      "files": [
+        "run_scheduler.py",
+        "run_live_day_track1.py",
+        "track1_live_source.py"
+      ],
+      "gate": "shadow rows for the swing window match the measured book day for day",
+      "rollback": "drop the slots; legacy keeps running the window"
+    },
+    {
+      "stage": "5N",
+      "name": "own NKD",
+      "work": "Track 1 night slots; strategy already matches",
+      "files": [
+        "run_scheduler.py",
+        "track1_live_source.py"
+      ],
+      "gate": "NKD shadow rows match legacy's decisions on the same nights",
+      "rollback": "drop the slots"
+    },
+    {
+      "stage": "5O",
+      "name": "route-aware safety",
+      "work": "stop repair + max-hold per route; split maxhold_state",
+      "files": [
+        "run_stop_repair",
+        "run_maxhold_exit",
+        "run_scheduler.py"
+      ],
+      "gate": "a Track 1 position gets a stop repaired and a max-hold exit in a dry run",
+      "rollback": "legacy paths unchanged; the Track 1 pair is additive"
+    },
+    {
+      "stage": "5P",
+      "name": "full Track 1 shadow",
+      "work": "all four sleeves shadowed together",
+      "files": [
+        "none - operation"
+      ],
+      "gate": "coverage complete every trading day, all four sleeves; checkpoint accepted",
+      "rollback": "stop the Track 1 slots"
+    },
+    {
+      "stage": "5Q",
+      "name": "retire legacy jobs",
+      "work": "remove legacy entry slots; keep shared infra",
+      "files": [
+        "run_scheduler.py",
+        "schedule_status.py"
+      ],
+      "gate": "B1 recorded; legacy flat at the broker; no orphan STP",
+      "rollback": "restore the legacy slots from git"
+    },
+    {
+      "stage": "5R",
+      "name": "paper then live",
+      "work": "arm Track 1",
+      "files": [
+        "confirmation file"
+      ],
+      "gate": "the switch-over runbook's eight preconditions",
+      "rollback": "remove the confirmation file"
+    }
+  ],
+  "blockers": [
+    {
+      "id": "L1",
+      "title": "Track 1 Normal-R4 has no production slot, and legacy's swing is a DIFFERENT strategy",
+      "evidence": "legacy run_live_day: ema 30, chandelier 2.5, ratchet ON (NKD_EMA/SWING_TF_PARAM); Track1 NormalR4Params: ema 50, entry-anchored 2.0x ATR, ratchet OFF, arm 14:05. run_live_day_track1 documents the resulting checkpoint params_mismatch as correct.",
+      "impact": "the 23 live_day slots (14:05-15:55) produce LEGACY swing, not Track 1's Normal-R4. Track 1's largest sleeve has no live path at all",
+      "fix": "promote Normal-R4 into Track 1 slots covering 14:05-15:55, as Calm/Stress were",
+      "blocks": {
+        "shadow": "partially - Normal cannot be shadowed",
+        "paper": true,
+        "live": true,
+        "legacy_retirement": true
+      }
+    },
+    {
+      "id": "L2",
+      "title": "STOP_TRADING freezes two of Track 1's four sleeves",
+      "evidence": "Normal-R4's window is served by legacy live_day slots and NKD's by legacy nkd_night slots; both run run_live_day, whose D5 gate clears entry_candidates when STOP_TRADING is present",
+      "impact": "the Stage 5J/5K operator flow - STOP_TRADING then --track1-shadow - measures Calm and Stress ONLY. It is not the combined route, and coverage collected under it cannot support a combined-book claim",
+      "fix": "either promote Normal/NKD to Track 1 slots first, or state explicitly that the first shadow period is a Calm+Stress-only measurement",
+      "blocks": {
+        "shadow": "changes what shadow MEANS",
+        "paper": true,
+        "live": true,
+        "legacy_retirement": true
+      }
+    },
+    {
+      "id": "L3",
+      "title": "Safety jobs are hard-wired to the legacy positions file",
+      "evidence": "captured argv: run_maxhold_exit --positions-path live_positions.json; run_stop_repair --positions-path live_positions.json",
+      "impact": "a Track 1 position in live_positions.track1.json would get NO stop repair and NO max-hold exit. The two mechanisms that protect a multi-day position do not see it",
+      "fix": "route-aware stop repair and max-hold, or a second pair of route-scoped jobs",
+      "blocks": {
+        "shadow": false,
+        "paper": true,
+        "live": true,
+        "legacy_retirement": true
+      }
+    },
+    {
+      "id": "L4",
+      "title": "One IB login is one position book (B1, unchanged)",
+      "evidence": "IBKRBroker.get_positions() reads ib.positions() unfiltered; B3 reconciles per contract",
+      "impact": "legacy LONG 1 beside Track 1 SHORT 1 nets to zero and halts entries on BOTH routes",
+      "fix": "retire legacy first, or a separate account",
+      "blocks": {
+        "shadow": false,
+        "paper": true,
+        "live": true,
+        "legacy_retirement": "is the fix"
+      }
+    },
+    {
+      "id": "L5",
+      "title": "Track 1 caps/family guard are not applied to the legacy-run sleeves",
+      "evidence": "track1_params CAPS/FAMILY_GROSS 0.05/FAMILY_NET 0.044 are enforced by track1_signal_layer, which only the Track 1 slots reach; legacy uses its own MultiClusterGuard in run_live_day",
+      "impact": "while Normal/NKD are legacy-run, the combined book is capped by legacy's guard, not Track 1's - the two are not the same object and have not been reconciled",
+      "fix": "whichever route owns a sleeve must own its cap; reconcile the two guards before mixing",
+      "blocks": {
+        "shadow": "partially",
+        "paper": true,
+        "live": true,
+        "legacy_retirement": true
+      }
+    },
+    {
+      "id": "L6",
+      "title": "Pre-flight is a legacy job that Track 1 depends on",
+      "evidence": "the single `preflight` job at 13:45 ET runs update_ibkr_daily + update_spy_csv and writes preflight_state.json; track1_freshness encodes the D-1 13:45 contract",
+      "impact": "retiring legacy jobs wholesale would remove the data refresh Track 1's freshness gate is defined against, and every Track 1 slot would refuse",
+      "fix": "promote pre-flight to a SHARED production job owned by neither route",
+      "blocks": {
+        "shadow": false,
+        "paper": false,
+        "live": true,
+        "legacy_retirement": true
+      }
+    },
+    {
+      "id": "L7",
+      "title": "Morning Track 1 slots trade on D-1 data by contract",
+      "evidence": "required_data_through(): before 13:45 ET the answer is the previous business day; Calm fires 10:00 and Stress 10:35-12:30, all before 13:45",
+      "impact": "this is the DESIGNED contract, not a defect - but it means Calm/Stress decide on yesterday's parquet plus today's live bars through the provider. If anyone expects a pre-market refresh, it does not exist",
+      "fix": "none required; state it, or add a pre-market refresh as a deliberate change",
+      "blocks": {
+        "shadow": false,
+        "paper": false,
+        "live": false,
+        "legacy_retirement": false
+      }
+    },
+    {
+      "id": "L8",
+      "title": "The running scheduler predates all Track 1 work",
+      "evidence": "pid 36656, started 2026-08-20 06:35:53, pythonw, --port 4002 --shadow-resume",
+      "impact": "any Track 1 change is inert until it is restarted; it also runs pre-Track-1 legacy code",
+      "fix": "restart --scheduler --track1-shadow when the operator is ready",
+      "blocks": {
+        "shadow": true,
+        "paper": true,
+        "live": true,
+        "legacy_retirement": false
+      }
+    }
+  ],
+  "verdict_reason": "8 blockers, 5 of which block legacy retirement. The largest: Track 1's Normal-R4 has no slot and legacy's swing is a different strategy, so the combined book cannot be run or measured by either route today.",
+  "no_side_effects": [
+    "read-only audit",
+    "no scheduler/backend/dashboard started or stopped",
+    "no IBKR connection",
+    "no order",
+    "no switch or confirmation file",
+    "no production code edited",
+    "no commit"
+  ]
+}

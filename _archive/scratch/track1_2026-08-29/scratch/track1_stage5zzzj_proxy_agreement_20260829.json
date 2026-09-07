@@ -1,0 +1,37 @@
+{
+ "spy_intraday": {
+  "rth_bars": 155266,
+  "sessions": 1999,
+  "first": "2017-01-03",
+  "last": "2024-12-30"
+ },
+ "aligned_sessions": 1748,
+ "accuracy_same_day_label": {
+  "always_majority": 0.4834,
+  "majority_label": "Normal",
+  "carry_d1_forward": 0.9161,
+  "causal_pre1400_proxy": 0.8277,
+  "proxy_minus_d1": -0.0883,
+  "scored_sessions": 1370
+ },
+ "d1_wrong_sessions": 115,
+ "proxy_fixes_d1_errors": 0.487,
+ "proxy_keeps_d1_correct": 0.859,
+ "confusion_proxy_vs_sameday": {
+  "Calm": {
+   "Calm": 520,
+   "Normal": 120,
+   "Stress": 0
+  },
+  "Normal": {
+   "Calm": 59,
+   "Normal": 560,
+   "Stress": 36
+  },
+  "Stress": {
+   "Calm": 0,
+   "Normal": 21,
+   "Stress": 54
+  }
+ }
+}

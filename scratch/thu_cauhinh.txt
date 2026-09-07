@@ -1,0 +1,31 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+
+==========================================================================
+HIEN HANH  ema30, stop 2,5xATR5
+==========================================================================
+  net $3,716   Calmar 0.09
+  MaxDD $9,603 (19.2%)  |  return ≈ 1.7%/yr on $50,000
+  circuit-breaker halts: 1072
+  [sua khop lenh] 876 lenh, $123,527
+  per-year:
+    2018  $     5,409
+    2019  $    -3,702
+    2020  $    11,368
+    2021  $    -4,466
+    2022  $    -4,893
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+
+==========================================================================
+YEU CAU    ema50, stop 2,0xATRngay
+==========================================================================
+  net $-1,007   Calmar -0.03
+  MaxDD $9,459 (18.9%)  |  return ≈ -0.6%/yr on $50,000
+  circuit-breaker halts: 724
+  [sua khop lenh] 6 lenh, $746
+  per-year:
+    2018  $     6,086
+    2019  $      -805
+    2020  $     3,122
+    2021  $    -9,410

@@ -1,0 +1,43 @@
+da nap 4 ma
+
+=== prod_live14h ===
+  tong lenh 2030  | P&L mo phong $108,041
+  nhom thoat sat moc vu trang: 724 lenh
+  trong do gia MO da o ben kia muc stop: 665 lenh (32.8% tong lenh)
+  do lech fill: trung vi $97.35 | tb $151.36 | p95 $462.78 | max $995.82
+  TONG lac quan = $100,653  = 93.2% cua P&L mo phong
+  P&L sau khi tru = $7,388
+  -- theo ma --
+     M2K    145 lenh  $   13,838
+     MES    170 lenh  $   26,110
+     MNQ    163 lenh  $   39,576
+     MYM    187 lenh  $   21,129
+  -- theo nam --
+     2018    85 lenh  $    8,952
+     2019    62 lenh  $    7,701
+     2020   121 lenh  $   18,406
+     2021    84 lenh  $   12,411
+     2022   156 lenh  $   30,675
+     2023    90 lenh  $    9,457
+     2024    67 lenh  $   13,051
+
+=== calm_live14h ===
+  tong lenh 1502  | P&L mo phong $46,826
+  nhom thoat sat moc vu trang: 565 lenh
+  trong do gia MO da o ben kia muc stop: 526 lenh (35.0% tong lenh)
+  do lech fill: trung vi $71.11 | tb $109.30 | p95 $331.07 | max $943.66
+  TONG lac quan = $57,491  = 122.8% cua P&L mo phong
+  P&L sau khi tru = $-10,665
+  -- theo ma --
+     M2K    116 lenh  $    8,682
+     MES    129 lenh  $   12,558
+     MNQ    127 lenh  $   24,386
+     MYM    154 lenh  $   11,865
+  -- theo nam --
+     2018    95 lenh  $    6,995
+     2019   105 lenh  $    7,701
+     2020    40 lenh  $    4,654
+     2021   118 lenh  $   13,934
+     2022     9 lenh  $    1,451
+     2023    86 lenh  $   11,225
+     2024    73 lenh  $   11,530

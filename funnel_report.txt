@@ -1,0 +1,60 @@
+
+==============================================================================
+FUNNEL
+==============================================================================
+  days with an ORB universe                   1,845
+  ticker-days examined                       14,490
+  pass engine 0.5% gap pre-filter             8,987  ( 62.0% of prev)
+  pass ORB scanner (gap/price/vol)              870  (  9.7% of prev)
+  opening range VALID                           861  ( 99.0% of prev)
+  BREAKOUT (dir + RVol>=2.0)                    378  ( 43.9% of prev)
+    of which fakeout-marked                     105
+  CONFIRM on B+1 (= ORB entry)                  209  ( 55.3% of prev)
+  reverted inside OR (-> FADE, dropped)          81  ( 38.8% of prev)
+
+  RETEST PROXY (upper bound — see header caveat)
+    tolerance 0.10%      204 of 378 breakouts  (54.0%)
+    tolerance 0.20%      233 of 378 breakouts  (61.6%)
+    tolerance 0.30%      252 of 378 breakouts  (66.7%)
+
+  PER YEAR
+    year   ticker-days  scanner   OR ok  breakout  confirm
+    2017         1,900       76      73        35       21
+    2018         2,510      163     162        77       35
+    2019         2,520      127     126        51       26
+    2020         2,530      203     203        76       45
+    2021         2,520      137     133        69       43
+    2022         2,510      164     164        70       39
+
+==============================================================================
+SELF-CHECKS
+==============================================================================
+  1. funnel monotonic                 : PASS
+  2. CONFIRM(2017-2022)=209 >= 80 real ORB trades  : PASS
+  3. retest <= breakout and in-window : PASS
+
+  Calibration: the omitted gates (Normal-only regime, VIX<25,
+  SPY bull trend, position caps) collectively pass 38.3% of
+  confirmed breakouts (80/209).
+    tol 0.10% -> ORB_RETEST_SCALP realistic n ~ 78 over 2017-2024
+    tol 0.20% -> ORB_RETEST_SCALP realistic n ~ 89 over 2017-2024
+    tol 0.30% -> ORB_RETEST_SCALP realistic n ~ 96 over 2017-2024
+
+==============================================================================
+VERDICT INPUT
+==============================================================================
+  Read the calibrated n above, not the raw breakout count.
+  n >= ~200 : a 1-minute pull can support the spec's bootstrap +
+              year x direction x regime breakdown. Buying data is sound.
+  n ~ 80-200: bootstrap is possible; the requested breakdowns will have
+              empty cells. Narrow the spec before buying.
+  n <  ~80  : sample-limited regardless of data source. 1-minute bars
+              would make the strategy VISIBLE but still not TESTABLE.
+              Verdict stays INSUFFICIENT DATA — do not buy.
+
+  Note for whatever runs next: the engine activates ORB in Normal ONLY
+  (_REGIME_STRATEGIES). The spec's Calm and Stress arms would be empty
+  under engine-faithful conditions.
+
+  elapsed: 1559s
+==============================================================================

@@ -1,0 +1,254 @@
+{
+  "meta": {
+    "title": "Track 1 live-shadow log read",
+    "date_et": "2026-08-24",
+    "read_window_et": ["09:25:31", "10:55:00"],
+    "read_taken_at_et": "2026-08-24T10:53:00-04:00",
+    "mode": "read-only; no scheduler/backend start-stop, no IBKR connect, no order, no confirmation file, no runtime evidence written, no non-dry-run audit",
+    "clocks": {
+      "machine": "America/Edmonton (MDT)",
+      "market": "America/New_York (ET)",
+      "note": "scheduler log lines are stamped in MACHINE local time; ET = log + 2h"
+    }
+  },
+
+  "status": {
+    "scheduler_pid": 28696,
+    "scheduler_started_et": "2026-08-24T09:25:31-04:00",
+    "scheduler_age_seconds_at_read": 5222,
+    "scheduler_process_count": 1,
+    "scheduler_stale_code": false,
+    "scheduler_code_mtime_et": "2026-08-24T07:24:58-04:00",
+    "backend_pid": 11720,
+    "backend_port": 5002,
+    "track1_mode": "track1-only-shadow",
+    "jobs_registered_total": 100,
+    "jobs_breakdown": {
+      "track1_slots": 70,
+      "track1_safety": 11,
+      "track1_audits": 5,
+      "legacy_strategy_not_scheduled": 45
+    },
+    "broker_connected": true,
+    "broker_freshness": "fresh",
+    "broker_age_seconds": 3.926,
+    "orders_possible": false,
+    "blocking": ["B1_broker_account_or_legacy_retirement"],
+    "track1_orders_approved_env": false,
+    "confirmation_file_present": false,
+    "stop_trading_present": false,
+    "stop_trading_track1_present": false,
+    "runner_track1_pid_present": false,
+    "schedule_status_freshness_field": "stale",
+    "schedule_status_freshness_note": "refers to the legacy slot-state file (state_age_seconds 28426), not to the broker feed; the broker itself is fresh at 3.9s"
+  },
+
+  "timeline_et": [
+    {
+      "time": "02:00-02:58",
+      "job": "NKD_NIGHT_0200..0255 (x12)",
+      "owner": "legacy",
+      "outcome": "exit OK but each wrote an ERROR line",
+      "error": "hmm_stale_guard G2 HARD: model 20 months old (fit_end=2024-12-31)",
+      "note": "legacy run_live_day, NOT Track 1; ran under an earlier scheduler instance"
+    },
+    {"time": "04:20", "job": "TRACK1_STOP_REPAIR_0420", "outcome": "completed OK", "runtime_s": 1, "scheduler_instance": "earlier"},
+    {"time": "06:20", "job": "TRACK1_STOP_REPAIR_0620", "outcome": "completed OK", "runtime_s": 1, "scheduler_instance": "earlier"},
+    {"time": "08:20", "job": "TRACK1_STOP_REPAIR_0820", "outcome": "completed OK", "runtime_s": 6, "scheduler_instance": "earlier"},
+    {"time": "09:25:31", "job": "SCHEDULER START (pid 28696)", "outcome": "track1-only-shadow; 70 slots + 11 safety + 5 audits registered", "runtime_s": null},
+    {
+      "time": "09:31:00",
+      "job": "TRACK1_MAX_HOLD_EXIT",
+      "outcome": "completed OK",
+      "runtime_s": 1,
+      "reason": "live_positions.track1.json absent -> early return BEFORE the E1 lock and BEFORE any broker connect",
+      "wrote": []
+    },
+    {
+      "time": "09:31:00",
+      "job": "MAX_HOLD_EXIT (legacy)",
+      "outcome": "completed OK",
+      "runtime_s": 10,
+      "note": "10s vs Track 1's 1s: legacy HAS a positions file and did connect; the contrast is what proves the Track 1 job returned early"
+    },
+    {
+      "time": "10:00:00",
+      "job": "TRACK1_CALM_1000",
+      "outcome": "exited with code 1",
+      "runtime_s": 4,
+      "error": "global_index.track1_live_frame.SpliceRefused: column_mismatch: frozen columns [open,high,low,close,volume] != live [open,high,low,close,volume,average,barcount]",
+      "instrument_that_raised": "MES",
+      "wrote": ["window_coverage:window_open"],
+      "did_not_write": ["window_coverage:slot_observed", "window_coverage:window_closed", "slot_timing", "explanations"]
+    },
+    {
+      "time": "10:10:00",
+      "job": "TRACK1_AUDIT_ROSKA4_CALM",
+      "outcome": "completed OK",
+      "runtime_s": 1,
+      "wrote": ["audits:1 row"],
+      "verdict": "FAIL",
+      "reasons": ["coverage_unobserved", "missing_slot_ids", "no_timing_records"]
+    },
+    {"time": "10:20:00", "job": "TRACK1_STOP_REPAIR_1020", "outcome": "completed OK", "runtime_s": 0},
+    {
+      "time": "10:35:00",
+      "job": "TRACK1_STRESS_1035",
+      "outcome": "completed OK",
+      "runtime_s": 3,
+      "slot_reason": "overlap_disagreement",
+      "instrument_that_raised": "MNQ",
+      "wrote": ["window_coverage:window_open", "window_coverage:slot_observed"]
+    },
+    {"time": "10:40:00", "job": "TRACK1_STRESS_1040", "outcome": "completed OK", "runtime_s": 3, "slot_reason": "overlap_disagreement", "wrote": ["window_coverage:slot_observed"]},
+    {"time": "10:45:00", "job": "TRACK1_STRESS_1045", "outcome": "completed OK", "runtime_s": 3, "slot_reason": "overlap_disagreement", "wrote": ["window_coverage:slot_observed"]},
+    {"time": "10:50:00", "job": "TRACK1_STRESS_1050", "outcome": "completed OK", "runtime_s": 5, "slot_reason": "overlap_disagreement", "wrote": ["window_coverage:slot_observed"]},
+    {"time": "10:55:00", "job": "TRACK1_STRESS_1055", "outcome": "completed OK", "runtime_s": 3, "slot_reason": "overlap_disagreement", "wrote": ["window_coverage:slot_observed"]}
+  ],
+
+  "evidence_matrix": {
+    "global_nkd": {
+      "window_et": ["01:10", "02:55"],
+      "expected_slots": 22,
+      "observed_slots": 0,
+      "missing_slots": 22,
+      "timing_rows": 0,
+      "explanation_rows": 0,
+      "audit_verdict": null,
+      "reason_codes": [],
+      "note": "the Track 1-only scheduler was not up during this window (it started 09:25 ET). Its audit job (03:05 ET) also never fired. The 02:00-02:58 ET NKD activity in the log is the LEGACY NKD_NIGHT jobs, a different route."
+    },
+    "roska4_calm": {
+      "window_et": ["10:00", "10:00"],
+      "expected_slots": 1,
+      "observed_slots": 0,
+      "missing_slots": 1,
+      "missing_slot_ids": ["TRACK1_CALM_1000"],
+      "timing_rows": 0,
+      "explanation_rows": 0,
+      "audit_verdict": "FAIL",
+      "reason_codes": ["coverage_unobserved", "missing_slot_ids", "no_timing_records"],
+      "note": "window_open was written; the slot then crashed, so neither slot_observed nor window_closed exists."
+    },
+    "roska4_stress": {
+      "window_et": ["10:35", "12:30"],
+      "expected_slots": 24,
+      "observed_slots": 5,
+      "missing_slots": 19,
+      "missing_note": "19 not yet due at read time (10:53 ET), not lost",
+      "timing_rows": 0,
+      "explanation_rows": 0,
+      "audit_verdict": null,
+      "audit_due_et": "12:40",
+      "reason_codes": ["overlap_disagreement"],
+      "gate_evaluated": false,
+      "candidates": null,
+      "note": "every row is decided=false; the slot never reached the intraday gate."
+    },
+    "roska4_swing": {
+      "window_et": ["14:05", "15:55"],
+      "expected_slots": 23,
+      "observed_slots": 0,
+      "missing_slots": 23,
+      "missing_note": "not yet due at read time",
+      "timing_rows": 0,
+      "explanation_rows": 0,
+      "audit_verdict": null,
+      "audit_due_et": "16:05",
+      "reason_codes": [],
+      "note": "provider resolves to none unless RAITS_TRACK1_SWING_PROVIDER is exported; these slots will refuse by name rather than touch the broker."
+    }
+  },
+
+  "confirm_or_deny": {
+    "B_5R_A_outside_calm_1000": {
+      "answer": "NOT OBSERVED OUTSIDE CALM TODAY, BUT IT IS NOT CALM-SPECIFIC - IT IS UNIVERSAL AND CURRENTLY MASKED",
+      "evidence_level": "verified (mechanism read in code + both halves measured on disk)",
+      "mechanism": "frozen_frame() returns exactly df[REQUIRED_COLUMNS] = 5 columns for EVERY instrument. IBKRBroker.fetch_bars() lowercases and sorts but never subsets, so the live half carries IBKR's average+barcount for EVERY instrument. splice() compares the column lists, so column_mismatch is guaranteed for any instrument that reaches splice.",
+      "why_stress_did_not_hit_it": "_refuse_overlap_disagreement runs at track1_live_source.py:474, one line BEFORE guard.splice at :475. roska4_stress = (MNQ,) only, and MNQ trips the overlap check first, so MNQ never reaches splice. roska4_calm = (MES, MNQ) sorted -> MES first; MES passes the overlap check and reaches splice.",
+      "measured_proof": {
+        "MES_parquet_last_bar_et": "2026-08-21 13:44:00-04:00",
+        "MNQ_parquet_last_bar_et": "2026-08-21 13:45:00-04:00",
+        "MNQ_stored_low": 29400.25,
+        "MNQ_live_low": 29395.75,
+        "gap": 4.5,
+        "reading": "MNQ's last stored bar is a PARTIAL 13:45 bar (its low is too high, i.e. price fell further after the snapshot). MES's file stops one minute earlier at a completed bar, so MES has nothing to disagree about."
+      },
+      "consequence": "Repairing the MNQ partial bar (or refreshing the parquet) WITHOUT first landing B-5R-B will turn all 24 Stress slots from row-writing into silent crashes. Order of repair matters."
+    },
+    "B_5R_B_makes_slot_silent": {
+      "answer": "CONFIRMED",
+      "evidence_level": "verified (observed live + catch list read)",
+      "detail": "observe_live_slot catches ShadowRefused, FreshnessRefused, LiveSourceRefused and NotImplementedError. SpliceRefused subclasses RuntimeError and is in none of them. Observed at 10:00 ET: window_open written, then nothing. LiveSourceRefused IS caught, which is exactly why the Stress slots wrote rows - the two refusals are different exception classes, not different severities."
+    },
+    "audit_jobs_ran": {
+      "answer": "YES",
+      "detail": "5 audit jobs registered at 09:25:32. TRACK1_AUDIT_ROSKA4_CALM fired 10:10 ET, completed OK in 1s, wrote 1 row. The other four are not yet due (global_nkd 03:05 was already past before scheduler start; stress 12:40; swing 16:05; daily 16:15)."
+    },
+    "audit_verdict_correct": {
+      "answer": "CORRECT ON WHAT IT SAW, BUT ONE REASON IS A PERMANENT FALSE FAIL",
+      "detail": "coverage_unobserved and missing_slot_ids are exactly right. no_timing_records is factually true but structural: run_live_day_track1.py contains ZERO references to slot_telemetry (measured: 0, vs 16 in the legacy run_live_day.py). No Track 1 slot can ever emit a timing row, and track1_shadow_acceptance.py:915-918 sets verdict = AUDIT_FAIL unconditionally when durations is empty. Therefore every Track 1 sleeve audit is pinned to FAIL forever, including a perfect window."
+    },
+    "any_order_attempt": {
+      "answer": "NO",
+      "evidence_level": "verified",
+      "detail": "no order/placeOrder/send_order/--allow-orders text anywhere in the post-restart scheduler log; confirmation file absent; TRACK1_ORDERS_APPROVED unset; the audit order_gate section reports no order marks; orders_possible=false with B1 open."
+    },
+    "any_write_to_book_or_checkpoint": {
+      "answer": "NO",
+      "detail": "live_positions.track1.json absent; global_index/replay_checkpoint.track1.json absent; the API reports book.present=false and checkpoint.present=false. The only file in the whole track1_runtime tree besides the coverage ledger is the single audit row."
+    },
+    "track1_maxhold_1s_cause": {
+      "answer": "NO POSITIONS FILE - no other action",
+      "evidence_level": "verified",
+      "detail": "run_maxhold_exit.py:108-111 checks pos_path.exists() and returns immediately, BEFORE the E1 PID lock and before any IBKR connect. Corroborated by the legacy twin at the same minute taking 10s because it does have a file."
+    }
+  },
+
+  "blockers": {
+    "known": {
+      "B1_broker_account_or_legacy_retirement": {"status": "open, intentional", "effect": "orders impossible"},
+      "B-5R-A_column_mismatch": {"status": "open", "scope": "universal across all instruments, currently masked on roska4_stress"},
+      "B-5R-B_spliceRefused_uncaught": {"status": "open", "effect": "slot silent, no ledger row, no window close"},
+      "B-5R-C_nkd_tokyo_band_after_2026-11-01": {"status": "open, WARN-level, unowned"}
+    },
+    "new_this_read": {
+      "B-5R-D_no_slot_timing_from_track1_entry_point": {
+        "severity": "blocks any PASS verdict",
+        "status": "NEW",
+        "evidence_level": "verified",
+        "detail": "run_live_day_track1.py never imports slot_telemetry, so RAITS_TELEMETRY_DIR (set correctly by monitor/ops.py:197) has no consumer in the Track 1 child. The scheduler parent only writes telemetry on record_skip (mutex/preflight), never on completion. Two independent audit rules turn this into FAIL: no_timing_records (acceptance.py:915) when a sleeve has zero rows, and slot_without_timing (acceptance.py:943) for every slot that DID write a ledger row. Fixing B-5R-A and B-5R-B alone will still leave every audit FAIL.",
+        "prediction_to_falsify_this": "the 12:40 ET roska4_stress audit will return FAIL with at least slot_could_not_evaluate + no_timing_records, regardless of what the market did."
+      },
+      "B-5R-E_stale_parquet_partial_last_bar": {
+        "severity": "blocks every Stress slot today",
+        "status": "NEW (distinct from B-5R-A; it is a DATA defect, not a code defect)",
+        "evidence_level": "verified",
+        "detail": "data/cache/futures/NQ_continuous_1m_8y.parquet was last written 2026-08-21 13:46 ET and its final bar, 2026-08-21 13:45, is a partial: stored low 29400.25 vs the completed 29395.75. Every Stress slot today refuses on it. The ES file stops at 13:44 and is clean, which is why MES behaves differently. This is the 13:45 ET append boundary that track1_params.py:37 already names.",
+        "ordering_constraint": "must be repaired AFTER B-5R-B, never before."
+      }
+    }
+  },
+
+  "conclusions": {
+    "evidence_sufficient_to_judge_today": false,
+    "why": [
+      "roska4_calm: zero observations; the one slot crashed silently.",
+      "roska4_stress: 5 of 24 slots so far, all hard refusals; no slot reached the intraday gate, so nothing about the strategy was exercised.",
+      "global_nkd: window passed before the scheduler existed; no slot, no audit.",
+      "roska4_swing: not yet due, and configured with provider none.",
+      "zero timing rows and zero explanation rows across the whole route, structurally rather than incidentally."
+    ],
+    "proceed_to_5Q_3": {
+      "answer": "NO - do B-5R-B first",
+      "rationale": "5Q-3 is explanation/evidence work, and no slot on any sleeve has reached the explanation writer today. Every explanation-layer change would be unexercised by the live route. B-5R-B is a small, well-scoped change to one except-clause that converts today's silent crash into a named row, and it must land before B-5R-E is repaired or the Stress sleeve goes silent too."
+    },
+    "recommended_repair_order": [
+      "1. B-5R-B - add SpliceRefused to the except chain in observe_live_slot so a refusal becomes a row.",
+      "2. B-5R-A - project the live fetch onto REQUIRED_COLUMNS (the BarProvider protocol docstring at track1_live_source.py:121 already declares this contract; IBKRBarProvider violates its own stated contract, so this is enforcing an existing decision, not making a new one).",
+      "3. B-5R-D - wire slot_telemetry into run_live_day_track1.py, or the audit can never pass.",
+      "4. B-5R-E - refresh/repair the MNQ parquet partial last bar. Strictly after step 1."
+    ],
+    "operator_action_needed_now": "NONE. Nothing is unsafe, nothing is placing orders, and no state file is being written. Every remaining Stress slot today will keep writing an honest refusal row. The decision is a code decision, not an ops decision."
+  }
+}

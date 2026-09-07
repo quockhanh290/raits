@@ -1,0 +1,37 @@
+{
+ "floor": {
+  "current_cap_enginefix": {
+   "net": 33176.0,
+   "calmar": 0.52,
+   "pf": 1.36,
+   "sharpe": 1.73,
+   "maxdd": 9259.0,
+   "maxdd_pct": 18.5,
+   "fix_n": 0,
+   "fix_dollars": 0.0,
+   "halts": 0
+  },
+  "strict025_enginefix": {
+   "net": 20285.0,
+   "calmar": 0.68,
+   "pf": 1.33,
+   "sharpe": 1.71,
+   "maxdd": 4333.0,
+   "maxdd_pct": 8.7,
+   "fix_n": 0,
+   "fix_dollars": 0.0,
+   "halts": 0
+  },
+  "strict030_enginefix": {
+   "net": 24013.0,
+   "calmar": 0.6,
+   "pf": 1.33,
+   "sharpe": 1.61,
+   "maxdd": 5808.0,
+   "maxdd_pct": 11.6,
+   "fix_n": 0,
+   "fix_dollars": 0.0,
+   "halts": 0
+  }
+ }
+}

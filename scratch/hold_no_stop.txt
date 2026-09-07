@@ -1,0 +1,31 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  MES xong
+  MNQ xong
+  MYM xong
+  M2K xong
+
+============================================================================================
+NHOM C — BA CACH XU LY TAI MOC VU TRANG
+============================================================================================
+  642 lenh | 382 ngay
+  A. CAT ngay tai gia thi truong          : $  -126,515
+  B. GIU, van de stop (phep do cu, SAI)   : $  -125,182
+  C. HUY STOP, giu toi tran 5 ngay        : $  -138,815
+  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+  TRAN: biet truoc hoan hao, moi lenh chon max(A,C) : $   -46,677
+  => tran cao hon 'cat het' +79,838  (302 lenh nen giu = 47%)
+
+  so lenh ma HUY STOP cho ra LAI: 168 (26.2%)
+
+=== THEO DO SAU TAI MOC VU TRANG ===
+  do sau          n       A cat  C huy stop        tran      %C>A    %C lai
+  <0.05          48      -1,930      -1,993       4,834       48%       44%
+  0.05-0.1       55      -4,606      -6,114       2,411       44%       33%
+  0.1-0.2       102      -9,823     -19,089      -1,189       43%       32%
+  0.2-0.4       151     -21,653     -20,881      -3,716       56%       28%
+  >0.4          286     -88,502     -90,737     -49,016       44%       19%
+
+=== TRUNG BINH MOI LENH ===
+  cat $-197 | huy stop $-216 | tran $-73
+
+  LUU Y: van chua tinh chi phi chiem cho.

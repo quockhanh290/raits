@@ -1,0 +1,23 @@
+### CHAN STOP SAI PHIA — baseline
+MOC     : baseline
+====================================================================================
+  net $3,325  |  Calmar 0.08
+  [sua khop lenh] 865 lenh, $122,262 (co so 1 hop dong, truoc sizing)
+  MaxDD $9,878 (19.8%)  |  return ≈ 1.6%/yr on $50,000
+  circuit-breaker halts: 1058
+
+### CHAN STOP SAI PHIA — vault 2025
+MOC     : vault2025
+====================================================================================
+  net $4,998  |  Calmar 1.11
+  [sua khop lenh] 109 lenh, $24,185 (co so 1 hop dong, truoc sizing)
+  MaxDD $4,624 (9.2%)  |  return ≈ 10.3%/yr on $50,000
+  circuit-breaker halts: 0
+
+### CHAN STOP SAI PHIA — vault 2023-24
+MOC     : vault2324
+====================================================================================
+  net $17,943  |  Calmar 4.11
+  [sua khop lenh] 141 lenh, $17,937 (co so 1 hop dong, truoc sizing)
+  MaxDD $2,207 (4.4%)  |  return ≈ 18.2%/yr on $50,000
+  circuit-breaker halts: 0

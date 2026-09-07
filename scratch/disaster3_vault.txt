@@ -1,0 +1,13 @@
+### THAM HOA 3x — VAULT 2023-2024
+====================================================================================
+  net $10,721  |  Calmar 1.73
+  [sua khop lenh] 13 lenh, $459 (co so 1 hop dong, truoc sizing)
+  MaxDD $3,144 (6.3%)  |  return ≈ 10.8%/yr on $50,000
+  circuit-breaker halts: 0
+
+### THAM HOA 3x — VAULT 2025
+====================================================================================
+  net $3,750  |  Calmar 0.80
+  [sua khop lenh] 10 lenh, $922 (co so 1 hop dong, truoc sizing)
+  MaxDD $4,845 (9.7%)  |  return ≈ 7.7%/yr on $50,000
+  circuit-breaker halts: 0

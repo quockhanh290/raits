@@ -1,0 +1,185 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-O",
+ "title": "Record the Swing paper override in the route decision trail",
+ "route": "track1_candidate",
+ "date": "2026-08-29",
+ "recorded_outside_the_report": true,
+ "artifacts": {
+  "record": "track1_swing_paper_override.json",
+  "reader": "global_index/track1_swing_paper_override.py",
+  "surfaced_in": "global_index/track1_paper_readiness.py report(), above the B1 block"
+ },
+ "measured_before_module_existed": {
+  "may_enable_orders": false,
+  "blocking": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "gates_source_mentions_swing_override": false,
+  "record_file_present": false
+ },
+ "measured_after_record_exists": {
+  "may_enable_orders": false,
+  "blocking": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "identical_to_before": true
+ },
+ "record": {
+  "schema": "track1_swing_paper_override/1",
+  "decision_type": "swing_paper_scope",
+  "decision": "INCLUDE_SWING_IN_PAPER_BY_OPERATOR_OVERRIDE",
+  "confirmed_by": "kevindo290",
+  "confirmed_at": "2026-08-29",
+  "route": "track1_candidate",
+  "sleeve": "roska4_swing",
+  "regime_basis": "causal_d1",
+  "selected_identity": "D1_OLD_EFFECTIVE_EMA50",
+  "parameter_promotion": false,
+  "evidence_promotion": false,
+  "risk_acceptance": true,
+  "caveats": [
+   "same-day Swing not live-tradable",
+   "Swing 2026 contribution negative",
+   "no-Swing risk-adjusted OOS better",
+   "no bootstrap yet"
+  ],
+  "source_stage": "5ZZZ-N",
+  "baseline_reference": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+  "measured_at_time_of_record": {
+   "orders_possible": false,
+   "blocking": [
+    "PAPER_SHADOW_EVIDENCE"
+   ],
+   "gates_source_mentions_this_record": false
+  }
+ },
+ "override_as_loaded": {
+  "valid": true,
+  "reason": "",
+  "decision": "INCLUDE_SWING_IN_PAPER_BY_OPERATOR_OVERRIDE",
+  "confirmed_by": "kevindo290",
+  "confirmed_at": "2026-08-29",
+  "route": "track1_candidate",
+  "sleeve": "roska4_swing",
+  "regime_basis": "causal_d1",
+  "selected_identity": "D1_OLD_EFFECTIVE_EMA50",
+  "risk_acceptance": true,
+  "caveats": [
+   "same-day Swing not live-tradable",
+   "Swing 2026 contribution negative",
+   "no-Swing risk-adjusted OOS better",
+   "no bootstrap yet"
+  ],
+  "source_stage": "5ZZZ-N",
+  "baseline_reference": "scratch/track1_stage5zzzn_canonical_strategy_baseline_reproduction_20260829.json",
+  "expires_at": "",
+  "grants_orders": false,
+  "satisfies_shadow_evidence": false,
+  "is_parameter_promotion": false,
+  "is_evidence_promotion": false
+ },
+ "grants": {
+  "orders": false,
+  "shadow_evidence": false,
+  "parameter_promotion": false,
+  "evidence_promotion": false
+ },
+ "fail_closed_on": [
+  "absent",
+  "unreadable",
+  "not an object",
+  "any missing required field",
+  "wrong schema/decision/decision_type/route/sleeve/regime_basis/selected_identity",
+  "unsigned",
+  "empty confirmed_at",
+  "parameter_promotion true",
+  "evidence_promotion true",
+  "risk_acceptance not true",
+  "any required caveat dropped",
+  "expired when expires_at is set"
+ ],
+ "paper_scope": {
+  "schema": "track1_swing_paper_override/1",
+  "route": "track1_candidate",
+  "sleeves": {
+   "global_nkd": {
+    "in_scope": true,
+    "basis": "in_scope_by_route_design",
+    "evidence": "pending"
+   },
+   "roska4_stress": {
+    "in_scope": true,
+    "basis": "in_scope_by_route_design",
+    "evidence": "pending"
+   },
+   "roska4_calm": {
+    "in_scope": true,
+    "basis": "in_scope_by_route_design",
+    "evidence": "pending"
+   },
+   "roska4_swing": {
+    "in_scope": true,
+    "basis": "operator_override",
+    "risk_accepted": true,
+    "evidence_promoted": false,
+    "parameter_promoted": false,
+    "identity": "D1_OLD_EFFECTIVE_EMA50",
+    "regime_basis": "causal_d1",
+    "override_valid": true,
+    "override_reason": "",
+    "caveats": [
+     "same-day Swing not live-tradable",
+     "Swing 2026 contribution negative",
+     "no-Swing risk-adjusted OOS better",
+     "no bootstrap yet"
+    ],
+    "evidence": "pending"
+   }
+  },
+  "grants_orders": false,
+  "satisfies_shadow_evidence": false,
+  "note": "Paper SCOPE only. No entry here releases a gate, satisfies PAPER_SHADOW_EVIDENCE, or promotes a parameter."
+ },
+ "validation": {
+  "suite": "scratch/test_track1_stage5zzzo_swing_override_20260829.py",
+  "passed": 43,
+  "combined_with_canonical_suite": 64,
+  "failed": 0,
+  "mutation_harness": {
+   "caught": 10,
+   "total": 10,
+   "restore_note": "the harness reported restored byte-identical NO for the new module; the cause was line endings (LF -> CRLF on the read/write round-trip), matching the package's existing CRLF convention. Content verified unchanged, no mutation text survives, all tests pass."
+  }
+ },
+ "answers": {
+  "override_recorded_outside_report": true,
+  "all_four_sleeves_in_paper_scope": true,
+  "orders_possible": false,
+  "paper_shadow_evidence_remains_the_blocker": true,
+  "params_changed": false,
+  "gates_changed": false,
+  "orders_changed": false,
+  "strategy_logic_changed": false,
+  "wfo_artifacts_changed": false
+ },
+ "safety": {
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "confirmation_present": true,
+  "confirmation_approves_orders": false,
+  "swing_override_present_and_valid": true,
+  "swing_override_grants": "nothing",
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "scheduler_pid": 3000,
+  "scheduler_restarted": false,
+  "backend_pid": 10136,
+  "backend_restarted": false,
+  "broker_calls": 0,
+  "runtime_evidence_modified": false,
+  "swing_tf_param_changed": false
+ }
+}

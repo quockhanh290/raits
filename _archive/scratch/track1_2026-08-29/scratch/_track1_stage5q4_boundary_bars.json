@@ -1,0 +1,1217 @@
+{
+  "probe": "boundary_bars_v2",
+  "read_only": true,
+  "band_et": [
+    "13:40",
+    "13:55"
+  ],
+  "partial_ratio_threshold": 0.35,
+  "days": 45,
+  "control": "same clock-minute across days",
+  "instruments": {
+    "MES": {
+      "path": "data/cache/futures/ES_continuous_1m_8y.parquet",
+      "days_examined": 45,
+      "last_bar": "2026-08-21 13:44:00-04:00",
+      "control": "same clock-minute median across the days examined",
+      "flagged": [
+        {
+          "ts": "2026-07-07 13:55:00-04:00",
+          "minute": "13:55",
+          "volume": 383.0,
+          "same_minute_median": 1203.0,
+          "ratio": 0.318,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-09 13:46:00-04:00",
+          "minute": "13:46",
+          "volume": 379.0,
+          "same_minute_median": 1210.0,
+          "ratio": 0.313,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-09 13:53:00-04:00",
+          "minute": "13:53",
+          "volume": 188.0,
+          "same_minute_median": 864.0,
+          "ratio": 0.218,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-10 13:46:00-04:00",
+          "minute": "13:46",
+          "volume": 393.0,
+          "same_minute_median": 1210.0,
+          "ratio": 0.325,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-10 13:47:00-04:00",
+          "minute": "13:47",
+          "volume": 215.0,
+          "same_minute_median": 826.5,
+          "ratio": 0.26,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-10 13:50:00-04:00",
+          "minute": "13:50",
+          "volume": 312.0,
+          "same_minute_median": 1083.0,
+          "ratio": 0.288,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-10 13:51:00-04:00",
+          "minute": "13:51",
+          "volume": 325.0,
+          "same_minute_median": 996.5,
+          "ratio": 0.326,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-10 13:53:00-04:00",
+          "minute": "13:53",
+          "volume": 235.0,
+          "same_minute_median": 864.0,
+          "ratio": 0.272,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-14 13:54:00-04:00",
+          "minute": "13:54",
+          "volume": 280.0,
+          "same_minute_median": 802.5,
+          "ratio": 0.349,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-14 13:55:00-04:00",
+          "minute": "13:55",
+          "volume": 315.0,
+          "same_minute_median": 1203.0,
+          "ratio": 0.262,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-22 13:44:00-04:00",
+          "minute": "13:44",
+          "volume": 272.0,
+          "same_minute_median": 798.0,
+          "ratio": 0.341,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-06 13:45:00-04:00",
+          "minute": "13:45",
+          "volume": 55.0,
+          "same_minute_median": 732.5,
+          "ratio": 0.075,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-07 13:45:00-04:00",
+          "minute": "13:45",
+          "volume": 122.0,
+          "same_minute_median": 732.5,
+          "ratio": 0.167,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-10 13:45:00-04:00",
+          "minute": "13:45",
+          "volume": 77.0,
+          "same_minute_median": 732.5,
+          "ratio": 0.105,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-12 13:46:00-04:00",
+          "minute": "13:46",
+          "volume": 404.0,
+          "same_minute_median": 1210.0,
+          "ratio": 0.334,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-19 13:45:00-04:00",
+          "minute": "13:45",
+          "volume": 98.0,
+          "same_minute_median": 732.5,
+          "ratio": 0.134,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-20 13:45:00-04:00",
+          "minute": "13:45",
+          "volume": 202.0,
+          "same_minute_median": 732.5,
+          "ratio": 0.276,
+          "is_file_last_bar": false
+        }
+      ],
+      "flagged_count": 17,
+      "days_with_a_flag": 11,
+      "flags_per_day": 0.38,
+      "volume_at_1345_last_12_sessions": [
+        {
+          "ts": "2026-08-05 13:45:00-04:00",
+          "volume": 278.0
+        },
+        {
+          "ts": "2026-08-06 13:45:00-04:00",
+          "volume": 55.0
+        },
+        {
+          "ts": "2026-08-07 13:45:00-04:00",
+          "volume": 122.0
+        },
+        {
+          "ts": "2026-08-10 13:45:00-04:00",
+          "volume": 77.0
+        },
+        {
+          "ts": "2026-08-11 13:45:00-04:00",
+          "volume": 1137.0
+        },
+        {
+          "ts": "2026-08-12 13:45:00-04:00",
+          "volume": 389.0
+        },
+        {
+          "ts": "2026-08-13 13:45:00-04:00",
+          "volume": 363.0
+        },
+        {
+          "ts": "2026-08-14 13:45:00-04:00",
+          "volume": 729.0
+        },
+        {
+          "ts": "2026-08-17 13:45:00-04:00",
+          "volume": 307.0
+        },
+        {
+          "ts": "2026-08-18 13:45:00-04:00",
+          "volume": 603.0
+        },
+        {
+          "ts": "2026-08-19 13:45:00-04:00",
+          "volume": 98.0
+        },
+        {
+          "ts": "2026-08-20 13:45:00-04:00",
+          "volume": 202.0
+        }
+      ]
+    },
+    "MNQ": {
+      "path": "data/cache/futures/NQ_continuous_1m_8y.parquet",
+      "days_examined": 45,
+      "last_bar": "2026-08-21 13:45:00-04:00",
+      "control": "same clock-minute median across the days examined",
+      "flagged": [
+        {
+          "ts": "2026-07-01 13:40:00-04:00",
+          "minute": "13:40",
+          "volume": 376.0,
+          "same_minute_median": 2484.0,
+          "ratio": 0.151,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-01 13:41:00-04:00",
+          "minute": "13:41",
+          "volume": 334.0,
+          "same_minute_median": 2088.0,
+          "ratio": 0.16,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-01 13:42:00-04:00",
+          "minute": "13:42",
+          "volume": 266.0,
+          "same_minute_median": 2116.0,
+          "ratio": 0.126,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-01 13:43:00-04:00",
+          "minute": "13:43",
+          "volume": 379.0,
+          "same_minute_median": 1788.0,
+          "ratio": 0.212,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-01 13:44:00-04:00",
+          "minute": "13:44",
+          "volume": 342.0,
+          "same_minute_median": 1478.0,
+          "ratio": 0.231,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-01 13:46:00-04:00",
+          "minute": "13:46",
+          "volume": 381.0,
+          "same_minute_median": 2265.0,
+          "ratio": 0.168,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-01 13:47:00-04:00",
+          "minute": "13:47",
+          "volume": 446.0,
+          "same_minute_median": 1922.5,
+          "ratio": 0.232,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-01 13:48:00-04:00",
+          "minute": "13:48",
+          "volume": 518.0,
+          "same_minute_median": 1982.5,
+          "ratio": 0.261,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-01 13:49:00-04:00",
+          "minute": "13:49",
+          "volume": 380.0,
+          "same_minute_median": 1608.5,
+          "ratio": 0.236,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-01 13:50:00-04:00",
+          "minute": "13:50",
+          "volume": 672.0,
+          "same_minute_median": 2245.5,
+          "ratio": 0.299,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-01 13:51:00-04:00",
+          "minute": "13:51",
+          "volume": 461.0,
+          "same_minute_median": 1986.5,
+          "ratio": 0.232,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-01 13:52:00-04:00",
+          "minute": "13:52",
+          "volume": 364.0,
+          "same_minute_median": 2023.5,
+          "ratio": 0.18,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-01 13:53:00-04:00",
+          "minute": "13:53",
+          "volume": 405.0,
+          "same_minute_median": 1905.0,
+          "ratio": 0.213,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-01 13:54:00-04:00",
+          "minute": "13:54",
+          "volume": 241.0,
+          "same_minute_median": 1750.5,
+          "ratio": 0.138,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-01 13:55:00-04:00",
+          "minute": "13:55",
+          "volume": 776.0,
+          "same_minute_median": 2331.5,
+          "ratio": 0.333,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-02 13:42:00-04:00",
+          "minute": "13:42",
+          "volume": 546.0,
+          "same_minute_median": 2116.0,
+          "ratio": 0.258,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-02 13:43:00-04:00",
+          "minute": "13:43",
+          "volume": 540.0,
+          "same_minute_median": 1788.0,
+          "ratio": 0.302,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-02 13:44:00-04:00",
+          "minute": "13:44",
+          "volume": 435.0,
+          "same_minute_median": 1478.0,
+          "ratio": 0.294,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-02 13:45:00-04:00",
+          "minute": "13:45",
+          "volume": 592.0,
+          "same_minute_median": 1822.0,
+          "ratio": 0.325,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-02 13:49:00-04:00",
+          "minute": "13:49",
+          "volume": 556.0,
+          "same_minute_median": 1608.5,
+          "ratio": 0.346,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-02 13:50:00-04:00",
+          "minute": "13:50",
+          "volume": 741.0,
+          "same_minute_median": 2245.5,
+          "ratio": 0.33,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-02 13:51:00-04:00",
+          "minute": "13:51",
+          "volume": 475.0,
+          "same_minute_median": 1986.5,
+          "ratio": 0.239,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-02 13:52:00-04:00",
+          "minute": "13:52",
+          "volume": 492.0,
+          "same_minute_median": 2023.5,
+          "ratio": 0.243,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-02 13:53:00-04:00",
+          "minute": "13:53",
+          "volume": 662.0,
+          "same_minute_median": 1905.0,
+          "ratio": 0.348,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-02 13:55:00-04:00",
+          "minute": "13:55",
+          "volume": 476.0,
+          "same_minute_median": 2331.5,
+          "ratio": 0.204,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-06 13:40:00-04:00",
+          "minute": "13:40",
+          "volume": 579.0,
+          "same_minute_median": 2484.0,
+          "ratio": 0.233,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-06 13:41:00-04:00",
+          "minute": "13:41",
+          "volume": 436.0,
+          "same_minute_median": 2088.0,
+          "ratio": 0.209,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-06 13:48:00-04:00",
+          "minute": "13:48",
+          "volume": 559.0,
+          "same_minute_median": 1982.5,
+          "ratio": 0.282,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-06 13:49:00-04:00",
+          "minute": "13:49",
+          "volume": 489.0,
+          "same_minute_median": 1608.5,
+          "ratio": 0.304,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-06 13:51:00-04:00",
+          "minute": "13:51",
+          "volume": 553.0,
+          "same_minute_median": 1986.5,
+          "ratio": 0.278,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-06 13:52:00-04:00",
+          "minute": "13:52",
+          "volume": 613.0,
+          "same_minute_median": 2023.5,
+          "ratio": 0.303,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-06 13:53:00-04:00",
+          "minute": "13:53",
+          "volume": 548.0,
+          "same_minute_median": 1905.0,
+          "ratio": 0.288,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-06 13:54:00-04:00",
+          "minute": "13:54",
+          "volume": 443.0,
+          "same_minute_median": 1750.5,
+          "ratio": 0.253,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-06 13:55:00-04:00",
+          "minute": "13:55",
+          "volume": 643.0,
+          "same_minute_median": 2331.5,
+          "ratio": 0.276,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-10 13:47:00-04:00",
+          "minute": "13:47",
+          "volume": 608.0,
+          "same_minute_median": 1922.5,
+          "ratio": 0.316,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-11 13:52:00-04:00",
+          "minute": "13:52",
+          "volume": 652.0,
+          "same_minute_median": 2023.5,
+          "ratio": 0.322,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-12 13:45:00-04:00",
+          "minute": "13:45",
+          "volume": 545.0,
+          "same_minute_median": 1822.0,
+          "ratio": 0.299,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-18 13:45:00-04:00",
+          "minute": "13:45",
+          "volume": 575.0,
+          "same_minute_median": 1822.0,
+          "ratio": 0.316,
+          "is_file_last_bar": false
+        }
+      ],
+      "flagged_count": 38,
+      "days_with_a_flag": 7,
+      "flags_per_day": 0.84,
+      "volume_at_1345_last_12_sessions": [
+        {
+          "ts": "2026-08-06 13:45:00-04:00",
+          "volume": 2973.0
+        },
+        {
+          "ts": "2026-08-07 13:45:00-04:00",
+          "volume": 1587.0
+        },
+        {
+          "ts": "2026-08-10 13:45:00-04:00",
+          "volume": 2206.0
+        },
+        {
+          "ts": "2026-08-11 13:45:00-04:00",
+          "volume": 1810.0
+        },
+        {
+          "ts": "2026-08-12 13:45:00-04:00",
+          "volume": 545.0
+        },
+        {
+          "ts": "2026-08-13 13:45:00-04:00",
+          "volume": 1822.0
+        },
+        {
+          "ts": "2026-08-14 13:45:00-04:00",
+          "volume": 1555.0
+        },
+        {
+          "ts": "2026-08-17 13:45:00-04:00",
+          "volume": 1425.0
+        },
+        {
+          "ts": "2026-08-18 13:45:00-04:00",
+          "volume": 575.0
+        },
+        {
+          "ts": "2026-08-19 13:45:00-04:00",
+          "volume": 1548.0
+        },
+        {
+          "ts": "2026-08-20 13:45:00-04:00",
+          "volume": 1178.0
+        },
+        {
+          "ts": "2026-08-21 13:45:00-04:00",
+          "volume": 1399.0
+        }
+      ]
+    },
+    "MYM": {
+      "path": "data/cache/futures/YM_continuous_1m_8y.parquet",
+      "days_examined": 45,
+      "last_bar": "2026-08-21 13:46:00-04:00",
+      "control": "same clock-minute median across the days examined",
+      "flagged": [
+        {
+          "ts": "2026-07-09 13:53:00-04:00",
+          "minute": "13:53",
+          "volume": 25.0,
+          "same_minute_median": 74.0,
+          "ratio": 0.338,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-10 13:50:00-04:00",
+          "minute": "13:50",
+          "volume": 27.0,
+          "same_minute_median": 83.5,
+          "ratio": 0.323,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-21 13:43:00-04:00",
+          "minute": "13:43",
+          "volume": 19.0,
+          "same_minute_median": 73.0,
+          "ratio": 0.26,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-05 13:48:00-04:00",
+          "minute": "13:48",
+          "volume": 26.0,
+          "same_minute_median": 82.0,
+          "ratio": 0.317,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-05 13:55:00-04:00",
+          "minute": "13:55",
+          "volume": 26.0,
+          "same_minute_median": 80.0,
+          "ratio": 0.325,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-07 13:41:00-04:00",
+          "minute": "13:41",
+          "volume": 21.0,
+          "same_minute_median": 77.0,
+          "ratio": 0.273,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-07 13:48:00-04:00",
+          "minute": "13:48",
+          "volume": 28.0,
+          "same_minute_median": 82.0,
+          "ratio": 0.341,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-07 13:49:00-04:00",
+          "minute": "13:49",
+          "volume": 22.0,
+          "same_minute_median": 68.0,
+          "ratio": 0.324,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-10 13:43:00-04:00",
+          "minute": "13:43",
+          "volume": 13.0,
+          "same_minute_median": 73.0,
+          "ratio": 0.178,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-11 13:52:00-04:00",
+          "minute": "13:52",
+          "volume": 18.0,
+          "same_minute_median": 74.5,
+          "ratio": 0.242,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-11 13:53:00-04:00",
+          "minute": "13:53",
+          "volume": 14.0,
+          "same_minute_median": 74.0,
+          "ratio": 0.189,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-12 13:45:00-04:00",
+          "minute": "13:45",
+          "volume": 14.0,
+          "same_minute_median": 79.0,
+          "ratio": 0.177,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-12 13:51:00-04:00",
+          "minute": "13:51",
+          "volume": 20.0,
+          "same_minute_median": 72.0,
+          "ratio": 0.278,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-14 13:43:00-04:00",
+          "minute": "13:43",
+          "volume": 14.0,
+          "same_minute_median": 73.0,
+          "ratio": 0.192,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-14 13:48:00-04:00",
+          "minute": "13:48",
+          "volume": 26.0,
+          "same_minute_median": 82.0,
+          "ratio": 0.317,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-18 13:45:00-04:00",
+          "minute": "13:45",
+          "volume": 17.0,
+          "same_minute_median": 79.0,
+          "ratio": 0.215,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-18 13:48:00-04:00",
+          "minute": "13:48",
+          "volume": 16.0,
+          "same_minute_median": 82.0,
+          "ratio": 0.195,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-18 13:53:00-04:00",
+          "minute": "13:53",
+          "volume": 19.0,
+          "same_minute_median": 74.0,
+          "ratio": 0.257,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-18 13:55:00-04:00",
+          "minute": "13:55",
+          "volume": 19.0,
+          "same_minute_median": 80.0,
+          "ratio": 0.237,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-19 13:50:00-04:00",
+          "minute": "13:50",
+          "volume": 29.0,
+          "same_minute_median": 83.5,
+          "ratio": 0.347,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-19 13:52:00-04:00",
+          "minute": "13:52",
+          "volume": 18.0,
+          "same_minute_median": 74.5,
+          "ratio": 0.242,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-21 13:46:00-04:00",
+          "minute": "13:46",
+          "volume": 15.0,
+          "same_minute_median": 66.0,
+          "ratio": 0.227,
+          "is_file_last_bar": true
+        }
+      ],
+      "flagged_count": 22,
+      "days_with_a_flag": 12,
+      "flags_per_day": 0.49,
+      "volume_at_1345_last_12_sessions": [
+        {
+          "ts": "2026-08-06 13:45:00-04:00",
+          "volume": 61.0
+        },
+        {
+          "ts": "2026-08-07 13:45:00-04:00",
+          "volume": 52.0
+        },
+        {
+          "ts": "2026-08-10 13:45:00-04:00",
+          "volume": 56.0
+        },
+        {
+          "ts": "2026-08-11 13:45:00-04:00",
+          "volume": 55.0
+        },
+        {
+          "ts": "2026-08-12 13:45:00-04:00",
+          "volume": 14.0
+        },
+        {
+          "ts": "2026-08-13 13:45:00-04:00",
+          "volume": 111.0
+        },
+        {
+          "ts": "2026-08-14 13:45:00-04:00",
+          "volume": 88.0
+        },
+        {
+          "ts": "2026-08-17 13:45:00-04:00",
+          "volume": 138.0
+        },
+        {
+          "ts": "2026-08-18 13:45:00-04:00",
+          "volume": 17.0
+        },
+        {
+          "ts": "2026-08-19 13:45:00-04:00",
+          "volume": 48.0
+        },
+        {
+          "ts": "2026-08-20 13:45:00-04:00",
+          "volume": 82.0
+        },
+        {
+          "ts": "2026-08-21 13:45:00-04:00",
+          "volume": 68.0
+        }
+      ]
+    },
+    "M2K": {
+      "path": "data/cache/futures/RTY_continuous_1m_8y.parquet",
+      "days_examined": 45,
+      "last_bar": "2026-08-21 13:46:00-04:00",
+      "control": "same clock-minute median across the days examined",
+      "flagged": [
+        {
+          "ts": "2026-07-07 13:51:00-04:00",
+          "minute": "13:51",
+          "volume": 19.0,
+          "same_minute_median": 62.0,
+          "ratio": 0.306,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-09 13:46:00-04:00",
+          "minute": "13:46",
+          "volume": 20.0,
+          "same_minute_median": 62.0,
+          "ratio": 0.323,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-21 13:41:00-04:00",
+          "minute": "13:41",
+          "volume": 26.0,
+          "same_minute_median": 75.0,
+          "ratio": 0.347,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-21 13:42:00-04:00",
+          "minute": "13:42",
+          "volume": 23.0,
+          "same_minute_median": 76.0,
+          "ratio": 0.303,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-22 13:49:00-04:00",
+          "minute": "13:49",
+          "volume": 25.0,
+          "same_minute_median": 73.0,
+          "ratio": 0.342,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-07-24 13:54:00-04:00",
+          "minute": "13:54",
+          "volume": 19.0,
+          "same_minute_median": 57.0,
+          "ratio": 0.333,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-03 13:52:00-04:00",
+          "minute": "13:52",
+          "volume": 21.0,
+          "same_minute_median": 67.5,
+          "ratio": 0.311,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-06 13:43:00-04:00",
+          "minute": "13:43",
+          "volume": 18.0,
+          "same_minute_median": 60.0,
+          "ratio": 0.3,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-06 13:45:00-04:00",
+          "minute": "13:45",
+          "volume": 18.0,
+          "same_minute_median": 74.0,
+          "ratio": 0.243,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-07 13:44:00-04:00",
+          "minute": "13:44",
+          "volume": 11.0,
+          "same_minute_median": 56.0,
+          "ratio": 0.196,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-07 13:47:00-04:00",
+          "minute": "13:47",
+          "volume": 2.0,
+          "same_minute_median": 53.0,
+          "ratio": 0.038,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-07 13:49:00-04:00",
+          "minute": "13:49",
+          "volume": 9.0,
+          "same_minute_median": 73.0,
+          "ratio": 0.123,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-07 13:55:00-04:00",
+          "minute": "13:55",
+          "volume": 27.0,
+          "same_minute_median": 83.5,
+          "ratio": 0.323,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-10 13:40:00-04:00",
+          "minute": "13:40",
+          "volume": 26.0,
+          "same_minute_median": 76.0,
+          "ratio": 0.342,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-10 13:41:00-04:00",
+          "minute": "13:41",
+          "volume": 19.0,
+          "same_minute_median": 75.0,
+          "ratio": 0.253,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-11 13:46:00-04:00",
+          "minute": "13:46",
+          "volume": 6.0,
+          "same_minute_median": 62.0,
+          "ratio": 0.097,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-11 13:48:00-04:00",
+          "minute": "13:48",
+          "volume": 23.0,
+          "same_minute_median": 70.5,
+          "ratio": 0.326,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-11 13:50:00-04:00",
+          "minute": "13:50",
+          "volume": 18.0,
+          "same_minute_median": 62.5,
+          "ratio": 0.288,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-11 13:53:00-04:00",
+          "minute": "13:53",
+          "volume": 20.0,
+          "same_minute_median": 59.0,
+          "ratio": 0.339,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-12 13:41:00-04:00",
+          "minute": "13:41",
+          "volume": 16.0,
+          "same_minute_median": 75.0,
+          "ratio": 0.213,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-12 13:42:00-04:00",
+          "minute": "13:42",
+          "volume": 23.0,
+          "same_minute_median": 76.0,
+          "ratio": 0.303,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-12 13:46:00-04:00",
+          "minute": "13:46",
+          "volume": 10.0,
+          "same_minute_median": 62.0,
+          "ratio": 0.161,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-12 13:52:00-04:00",
+          "minute": "13:52",
+          "volume": 20.0,
+          "same_minute_median": 67.5,
+          "ratio": 0.296,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-13 13:44:00-04:00",
+          "minute": "13:44",
+          "volume": 14.0,
+          "same_minute_median": 56.0,
+          "ratio": 0.25,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-13 13:46:00-04:00",
+          "minute": "13:46",
+          "volume": 18.0,
+          "same_minute_median": 62.0,
+          "ratio": 0.29,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-13 13:48:00-04:00",
+          "minute": "13:48",
+          "volume": 13.0,
+          "same_minute_median": 70.5,
+          "ratio": 0.184,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-13 13:53:00-04:00",
+          "minute": "13:53",
+          "volume": 8.0,
+          "same_minute_median": 59.0,
+          "ratio": 0.136,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-13 13:55:00-04:00",
+          "minute": "13:55",
+          "volume": 23.0,
+          "same_minute_median": 83.5,
+          "ratio": 0.275,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-14 13:53:00-04:00",
+          "minute": "13:53",
+          "volume": 12.0,
+          "same_minute_median": 59.0,
+          "ratio": 0.203,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-17 13:46:00-04:00",
+          "minute": "13:46",
+          "volume": 15.0,
+          "same_minute_median": 62.0,
+          "ratio": 0.242,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-18 13:41:00-04:00",
+          "minute": "13:41",
+          "volume": 13.0,
+          "same_minute_median": 75.0,
+          "ratio": 0.173,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-18 13:46:00-04:00",
+          "minute": "13:46",
+          "volume": 6.0,
+          "same_minute_median": 62.0,
+          "ratio": 0.097,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-18 13:48:00-04:00",
+          "minute": "13:48",
+          "volume": 21.0,
+          "same_minute_median": 70.5,
+          "ratio": 0.298,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-19 13:41:00-04:00",
+          "minute": "13:41",
+          "volume": 23.0,
+          "same_minute_median": 75.0,
+          "ratio": 0.307,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-19 13:46:00-04:00",
+          "minute": "13:46",
+          "volume": 2.0,
+          "same_minute_median": 62.0,
+          "ratio": 0.032,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-19 13:50:00-04:00",
+          "minute": "13:50",
+          "volume": 14.0,
+          "same_minute_median": 62.5,
+          "ratio": 0.224,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-20 13:41:00-04:00",
+          "minute": "13:41",
+          "volume": 12.0,
+          "same_minute_median": 75.0,
+          "ratio": 0.16,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-20 13:43:00-04:00",
+          "minute": "13:43",
+          "volume": 20.0,
+          "same_minute_median": 60.0,
+          "ratio": 0.333,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-20 13:54:00-04:00",
+          "minute": "13:54",
+          "volume": 14.0,
+          "same_minute_median": 57.0,
+          "ratio": 0.246,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-21 13:40:00-04:00",
+          "minute": "13:40",
+          "volume": 16.0,
+          "same_minute_median": 76.0,
+          "ratio": 0.211,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-21 13:41:00-04:00",
+          "minute": "13:41",
+          "volume": 12.0,
+          "same_minute_median": 75.0,
+          "ratio": 0.16,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-21 13:42:00-04:00",
+          "minute": "13:42",
+          "volume": 25.0,
+          "same_minute_median": 76.0,
+          "ratio": 0.329,
+          "is_file_last_bar": false
+        },
+        {
+          "ts": "2026-08-21 13:45:00-04:00",
+          "minute": "13:45",
+          "volume": 22.0,
+          "same_minute_median": 74.0,
+          "ratio": 0.297,
+          "is_file_last_bar": false
+        }
+      ],
+      "flagged_count": 43,
+      "days_with_a_flag": 18,
+      "flags_per_day": 0.96,
+      "volume_at_1345_last_12_sessions": [
+        {
+          "ts": "2026-08-06 13:45:00-04:00",
+          "volume": 18.0
+        },
+        {
+          "ts": "2026-08-07 13:45:00-04:00",
+          "volume": 29.0
+        },
+        {
+          "ts": "2026-08-10 13:45:00-04:00",
+          "volume": 84.0
+        },
+        {
+          "ts": "2026-08-11 13:45:00-04:00",
+          "volume": 72.0
+        },
+        {
+          "ts": "2026-08-12 13:45:00-04:00",
+          "volume": 39.0
+        },
+        {
+          "ts": "2026-08-13 13:45:00-04:00",
+          "volume": 29.0
+        },
+        {
+          "ts": "2026-08-14 13:45:00-04:00",
+          "volume": 107.0
+        },
+        {
+          "ts": "2026-08-17 13:45:00-04:00",
+          "volume": 88.0
+        },
+        {
+          "ts": "2026-08-18 13:45:00-04:00",
+          "volume": 44.0
+        },
+        {
+          "ts": "2026-08-19 13:45:00-04:00",
+          "volume": 49.0
+        },
+        {
+          "ts": "2026-08-20 13:45:00-04:00",
+          "volume": 114.0
+        },
+        {
+          "ts": "2026-08-21 13:45:00-04:00",
+          "volume": 22.0
+        }
+      ]
+    }
+  }
+}

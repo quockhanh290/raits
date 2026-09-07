@@ -1,0 +1,295 @@
+{
+  "stage": "5ZC",
+  "title": "post-window runtime check: first judgeable windows after 5ZB",
+  "checked_at": {
+    "utc": "2026-08-25 15:21:29",
+    "et": "2026-08-25 11:21:29 EDT",
+    "calgary": "09:21 MDT",
+    "tokyo": "2026-08-26 00:21 JST"
+  },
+  "read_only": true,
+  "restarted_anything": false,
+  "broker_call_initiated": false,
+  "runtime_evidence_written_or_edited": false,
+  "production_files_modified": 0,
+  "verdicts": {
+    "next_shadow_window": "READY",
+    "windows": {
+      "global_nkd_0110_0255": "FAIL",
+      "roska4_calm_1000": "NOT_ENOUGH_DATA",
+      "roska4_stress_1035_1230": "OPEN - not judgeable yet",
+      "roska4_swing_1405_1555": "AHEAD"
+    },
+    "paper_shadow_evidence": "0 of 5 qualifying days",
+    "operator_action_needed": true,
+    "operator_action": "disable machine sleep (powercfg); NOT run by this stage"
+  },
+  "root_cause_of_the_missing_calm_window": {
+    "what": "the machine slept; the scheduler process survived but its timer did not advance",
+    "evidence": "scheduler's own [HEARTBEAT] STALLED 13020s warning, which names the cause",
+    "stalled_seconds": 13020,
+    "stalled_hours": 3.62,
+    "jobs_missed": [
+      "Stop repair 08:20 ET",
+      "MAX_HOLD exit 09:31 ET",
+      "Track1 roska4_calm 10:00 ET",
+      "Track 1 audit sleeve roska4_calm 10:10 ET",
+      "Stop repair 10:20 ET",
+      "Stress 10:35, 10:40, 10:45, 10:50, 10:55, 11:00, 11:05"
+    ],
+    "first_job_after_wake": "TRACK1_STRESS_1110",
+    "calm_classification": "NOT_ENOUGH_DATA - the sleeve, gate, splice and strategy were never exercised",
+    "5zb_healthy_call_was_correct": "the heartbeat is hourly; at the 5ZB check the last one was 39 min old, which is normal. The sleep began after the 05:00 Calgary heartbeat"
+  },
+  "sleep_is_chronic": {
+    "log_files_with_a_stall": 16,
+    "stall_events": 33,
+    "total_seconds": 79620,
+    "total_hours": 22.1,
+    "today": [
+      {
+        "log": "scheduler_0825.log",
+        "at_local_calgary": "2026-08-25 09:12:00",
+        "seconds": 13020
+      }
+    ],
+    "worst": {
+      "log": "scheduler_0820.log",
+      "at_local_calgary": "2026-08-20 01:30:00",
+      "seconds": 13080
+    },
+    "remedy_operator_only": [
+      "powercfg /setacvalueindex SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 0",
+      "powercfg /setdcvalueindex SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 0",
+      "powercfg /setactive SCHEME_CURRENT"
+    ],
+    "note": "the log names only the dc (battery) form; the ac form matters too"
+  },
+  "first_decided_slots_on_record": {
+    "slots": [
+      "TRACK1_STRESS_1110",
+      "TRACK1_STRESS_1115"
+    ],
+    "decided": true,
+    "gate": true,
+    "freshness_allow": true,
+    "candidates": 0,
+    "classification": "legitimate no-candidate / no-action",
+    "overlap_disagreement_seen": false,
+    "significance": "first evidence the whole chain runs end to end on live data"
+  },
+  "per_sleeve": {
+    "global_nkd": {
+      "window_open": true,
+      "window_closed": true,
+      "slot_rows": 22,
+      "decided": 0,
+      "reasons": {
+        "gate_refused/partial_coverage,stale": 20,
+        "gate_refused/stale": 1,
+        "gate_refused/too_late": 1
+      }
+    },
+    "roska4_calm": {
+      "window_open": false,
+      "window_closed": false,
+      "slot_rows": 0,
+      "decided": 0,
+      "reasons": {}
+    },
+    "roska4_stress": {
+      "window_open": false,
+      "window_closed": false,
+      "slot_rows": 3,
+      "decided": 3,
+      "reasons": {
+        "decided/None": 3
+      }
+    },
+    "roska4_swing": {
+      "window_open": false,
+      "window_closed": false,
+      "slot_rows": 0,
+      "decided": 0,
+      "reasons": {}
+    }
+  },
+  "timing": {
+    "coverage_slot_rows": 25,
+    "timing_rows": 25,
+    "coverage_without_timing": 0,
+    "timing_without_coverage": 0,
+    "p50_s": 2.485,
+    "p95_s": 18.828,
+    "max_s": 19.125,
+    "any_over_300s": false,
+    "max_row": "TRACK1_STRESS_1110 - 0.1s setup, 19.0s observe (first live IBKR fetch of the window)"
+  },
+  "audits": {
+    "rows_today": 1,
+    "global_nkd": {
+      "verdict": "FAIL",
+      "reasons": [
+        "coverage_incomplete",
+        "slot_could_not_evaluate",
+        "no_candidates_to_explain"
+      ],
+      "judgeable": true,
+      "judgeability_reason": "window closed and the scheduler was up before it opened",
+      "note": "PRE-FIX window; the 5V-1 causality fix landed between the 02:45 and 02:55 slots"
+    },
+    "not_audited_yet": [
+      "roska4_calm",
+      "roska4_stress",
+      "roska4_swing"
+    ],
+    "calm_audit_job_also_missed": true
+  },
+  "explanations": {
+    "files_today": 2,
+    "sleeves": [
+      "roska4_stress"
+    ],
+    "slots": 2,
+    "candidates": 0,
+    "structural_proof_present": true,
+    "rule_id": "CONTEXT.FRESHNESS_OBSERVED",
+    "data_source_identity": "NQ_continuous_1m_8y.parquet:a13167b1...c7877c1",
+    "absence_recorded_not_merely_absent": true
+  },
+  "ledger_asymmetry": {
+    "what": "roska4_stress has slot rows and NO window_open",
+    "why": "window_open is written by the window's first slot, which the sleep ate",
+    "consequence": "at 12:30 it will close without ever having opened",
+    "runbook_gap": "the runbook teaches opened-never-closed; closed-without-open is the equally informative inverse",
+    "check_at_et": "12:40 - does the audit refuse to call it judgeable?"
+  },
+  "dashboard": {
+    "consistent_with_ledger": true,
+    "phantom_overdue_rows": 0,
+    "incidents": 0,
+    "open_incidents": 0,
+    "active_window": true,
+    "next_scheduled_job": {
+      "at": "2026-08-25T15:25:00Z",
+      "job_id": "TRACK1_STRESS_1125"
+    },
+    "scheduler_process": {
+      "age_seconds": 36847,
+      "code_mtime": "2026-08-24T19:53:40-04:00",
+      "pid": 48604,
+      "process_count": 1,
+      "running": true,
+      "stale_code": false,
+      "started_at": "2026-08-25T01:07:22-04:00"
+    },
+    "discrepancy": {
+      "what": "two different fields are called 'freshness'",
+      "ops_py": "IBKR connection freshness - fresh, age ~9s",
+      "schedule_status": "legacy runner state snapshot age - stale, 32.4h",
+      "traced_to": "app.py builds observed_at from read_runner_state(LIVE_STATE_PATH), the LEGACY route's state file",
+      "why_stale": "the legacy runner never runs during a track1-only-shadow period, so its state is stale by design",
+      "classification": "dashboard-reader mismatch, NOT a runtime failure",
+      "corroborated_by_runtime_evidence": false,
+      "raises_incident": false,
+      "action_taken": "none - recorded for whoever owns the reader"
+    }
+  },
+  "orders": {
+    "orders_possible": false,
+    "blocking": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "confirmation_file": false,
+    "track1_orders_approved_env": false,
+    "allow_orders_in_argv": false,
+    "order_journal_dir": false,
+    "track1_book": false,
+    "dry_run_dir": false,
+    "scheduler_argv": "--port 4002 --shadow-resume --track1-only-shadow"
+  },
+  "job_inventory": {
+    "strategy_slots": 70,
+    "track1_safety_jobs": 11,
+    "expected_total": 101,
+    "restart_needed": false
+  },
+  "paper_readiness": {
+    "ready": false,
+    "checks": {
+      "audit_records_readable": {
+        "status": "ok",
+        "detail": "every audit line parsed"
+      },
+      "judgeable_days": {
+        "status": "fail",
+        "detail": "1 judgeable day(s) on record, 5 required — a day with no audit record is not a day that went well"
+      },
+      "no_failing_days": {
+        "status": "fail",
+        "detail": "1 FAIL day(s) in the qualifying window, at most 0 allowed"
+      },
+      "warn_days_within_allowance": {
+        "status": "ok",
+        "detail": "0 WARN day(s), at most 1 allowed"
+      },
+      "evidence_is_recent": {
+        "status": "ok",
+        "detail": "newest qualifying day 2026-08-24 is 1 day(s) old, at most 21 allowed"
+      },
+      "every_sleeve_passed_at_least_once": {
+        "status": "fail",
+        "detail": "never PASSED inside the window: ['roska4_swing', 'roska4_calm', 'roska4_stress', 'global_nkd']"
+      }
+    },
+    "qualifying_days": "0 of 5",
+    "judgeable_days_on_record": 1,
+    "failing_days": [
+      "2026-08-24"
+    ],
+    "sleeves_ever_passed": []
+  },
+  "pre_existing_failures": [
+    {
+      "test": "5Q4::test_the_live_invariant_holds_on_the_real_files_right_now",
+      "classification": "TIME-DEPENDENT EXPECTED FAILURE",
+      "why": "the pre-flight runs at 13:45 ET; checked at 11:17 ET",
+      "action": "none - not touched, not loosened; re-check after 13:45 ET"
+    },
+    {
+      "test": "5V-1::test_the_live_ledger_rows_are_explained_and_untouched",
+      "classification": "MY OWN TEST WAS WRONG - fixed",
+      "why": "Stage 5W pinned the DAY file at 22 rows because the NKD WINDOW had closed; the file is one ledger per day shared by every sleeve and grew when Stress wrote into it at 11:11 ET",
+      "family": "pinning a line count on a log that is still being appended to",
+      "action": "scoped to global_nkd, keeping the exact distribution; a second test now pins the shared-file property itself"
+    }
+  ],
+  "tests": {
+    "suites": 7,
+    "result": "198 passed, 1 failed",
+    "the_one_failure": "5Q4 time-dependent, see above"
+  },
+  "next_checks_et": [
+    {
+      "et": "12:40",
+      "what": "Stress audit - is a closed-without-open window refused as unjudgeable?"
+    },
+    {
+      "et": "13:45",
+      "what": "pre-flight, first automatic --repair-boundary; 5Q4 invariant should pass after"
+    },
+    {
+      "et": "14:05-15:55",
+      "what": "Swing, 23 slots, on today's repaired boundary"
+    },
+    {
+      "et": "16:20",
+      "what": "spy_refresh_pm"
+    },
+    {
+      "et": "01:10 (26th)",
+      "what": "first NKD window on the fixed causal gate"
+    }
+  ]
+}

@@ -1,0 +1,181 @@
+{
+  "stage": "5M-1",
+  "title": "fill law identity cleanup",
+  "date": "2026-08-23",
+  "verdict": "READY_FOR_5M_NORMAL_R4_PROMOTION",
+  "policy_source": "scratch/track1_three_blockers_report_20260822.md §2",
+  "policy": {
+    "track1_identity": "production_gap_after_15min_break",
+    "measured_delta": "$0 to +$6 book level across floor/vault2025/vault2026",
+    "direction": "production law is MORE permissive; published numbers were measured under the more conservative artifact law, so nothing needs re-rating",
+    "why_it_still_matters": "the law is hashed into params_hash and a route checkpoint is accepted or refused on that hash"
+  },
+  "changed_callsites": [
+    {
+      "file": "global_index/track1_normal_r4.py",
+      "what": "NormalR4Params.fill_law default",
+      "from": "FILL_ARTIFACT",
+      "to": "FILL_PRODUCTION",
+      "class": "engine default",
+      "why": "a default is what gets taken; four route sites and one engine site took it"
+    },
+    {
+      "file": "global_index/track1_params.py",
+      "what": "new constant LIVE_FILL_LAW",
+      "from": "(did not exist)",
+      "to": "FILL_PRODUCTION",
+      "class": "route config",
+      "why": "the route's law needs one name that is not an engine default"
+    },
+    {
+      "file": "global_index/run_live_day_track1.py:255",
+      "what": "checkpoint_report fallback",
+      "from": "NormalR4Params().fill_law",
+      "to": "tp.LIVE_FILL_LAW",
+      "class": "identity/checkpoint"
+    },
+    {
+      "file": "global_index/run_live_day_track1.py:470",
+      "what": "emit_explanations(fill_law=)",
+      "from": "NormalR4Params().fill_law",
+      "to": "tp.LIVE_FILL_LAW",
+      "class": "live/shadow route"
+    },
+    {
+      "file": "global_index/run_live_day_track1.py:554",
+      "what": "write_route_checkpoint -> checkpoint_entries(fill_law=)",
+      "from": "NR.NormalR4Params().fill_law",
+      "to": "tp.LIVE_FILL_LAW",
+      "class": "identity/checkpoint"
+    },
+    {
+      "file": "global_index/run_live_day_track1.py:1037",
+      "what": "run_shadow single reading",
+      "from": "NormalR4Params().fill_law",
+      "to": "tp.LIVE_FILL_LAW",
+      "class": "live/shadow route"
+    },
+    {
+      "file": "global_index/track1_sleeves.py:150",
+      "what": "LiveSleeveSource.detect engine params",
+      "from": "NormalR4Params(ema_period=...) — artifact by default",
+      "to": "NormalR4Params(ema_period=..., fill_law=tp.LIVE_FILL_LAW)",
+      "class": "live/shadow route — BEHAVIOURAL",
+      "why": "decides which bars are gap-eligible, so which trades exist. Carries no fill_law token, so the search for the other four walked past it"
+    },
+    {
+      "file": "scratch/test_track1_stage4_production_clean_20260823.py:100-101,157",
+      "what": "artifact reproduction params",
+      "from": "NormalR4Params() / NormalR4Params(ema_period=10)",
+      "to": "... fill_law=NR.FILL_ARTIFACT",
+      "class": "replay/equivalence artifact test"
+    },
+    {
+      "file": "scratch/test_track1_stage4_production_clean_20260823.py:497",
+      "what": "_run stub signature",
+      "from": "no route kwarg",
+      "to": "route=None",
+      "class": "pre-existing staleness from Stage 5I, not a 5M-1 defect"
+    }
+  ],
+  "left_artifact_only_on_purpose": [
+    {
+      "where": "scratch/test_track1_stage4_production_clean_20260823.py reproduction",
+      "law": "FILL_ARTIFACT, now stated explicitly",
+      "why": "the committed rows were generated under it; reproducing them means asking for it"
+    },
+    {
+      "where": "scratch/track1_fill_shortgate_regen_20260822.py",
+      "law": "both, by name, in a policy matrix",
+      "why": "the measurement script that produced the policy; artifact_gate_on is the anchor"
+    },
+    {
+      "where": "scratch/test_track1_stage4b_identity_liveframe_20260823.py",
+      "law": "both, explicitly",
+      "why": "it tests that the two laws hash differently and refuse each other"
+    }
+  ],
+  "left_on_engine_default_in_scratch": {
+    "count": 13,
+    "why": "test-side identity comparisons that read the SAME string on both sides. They now resolve to the production law and pass. The AST scan covers global_index/ only, because a scratch test legitimately asks for either law"
+  },
+  "static_scan": {
+    "production_modules_scanned": 115,
+    "implicit_reads_NormalR4Params_dot_fill_law": 0,
+    "constructions_without_explicit_fill_law": 0
+  },
+  "mutations": [
+    {
+      "mutation": "F1 LIVE_FILL_LAW set back to the artifact law",
+      "guard": "test_the_route_names_the_production_law_and_only_once",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "F2 the engine dataclass default back to the artifact law",
+      "guard": "test_the_engine_default_is_the_live_law",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "F3 the checkpoint report defaults to the artifact law",
+      "guard": "test_the_checkpoint_report_defaults_to_the_production_identity",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "F4 the live sleeve source runs the engine under the artifact law",
+      "guard": "test_the_live_sleeve_source_runs_the_engine_under_the_production_law",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "F5 the checkpoint accepts a run under the other law",
+      "guard": "test_a_cross_law_checkpoint_is_refused_in_both_directions[artifact_all_bars_gappable-production_gap_after_15min_break]",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    },
+    {
+      "mutation": "F6 the fill law no longer reaches the identity hash",
+      "guard": "test_the_live_identity_is_the_production_identity",
+      "baseline_exit": 0,
+      "mutated_exit": 1,
+      "restored_exit": 0,
+      "detected": true
+    }
+  ],
+  "no_side_effects": [
+    "no scheduler/backend/dashboard started or stopped",
+    "no IBKR connection",
+    "no order",
+    "no STOP_TRADING or STOP_TRADING.track1 touched",
+    "no confirmation file",
+    "no commit",
+    "no live state file written BY THIS STAGE"
+  ],
+  "tests": {
+    "stage5m1": "18 passed",
+    "stage5m1_mutations": "6/6 detected",
+    "stage4_production_clean + stage4b_identity_liveframe": "54 passed 1 skipped; the one failure was the pre-existing Stage 5I stale _run stub, fixed, now green",
+    "stage3_route + stage3b_blockers + explain_wiring + stage5l_shared_preflight": "192 passed, 2 skipped",
+    "stage4c + stage5d + stage5e + stage5f + stage5i": "143 passed, 1 skipped",
+    "not_run": "global_index/test_event_playback.py — known hang"
+  },
+  "observed_not_caused": {
+    "what": "preflight_state.json and maxhold_state.json changed at 20:58:38 from the damaged Sunday key to seven attested days each",
+    "matches_5m0_proposal_exactly": true,
+    "attribution": "not written by Stage 5M-1; content is exactly what the 5M-0 repair --apply produces. Not attributed further without evidence",
+    "effect": "2026-08-21 is present, so the Stage 5M-0 restart hazard is closed on the evidence now on disk",
+    "verified": "Stage 5L guard test passes and both mtimes are unchanged across suite runs"
+  }
+}

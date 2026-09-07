@@ -1,0 +1,188 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-R",
+ "title": "Restart liveness and post-fix shadow parity watch",
+ "route": "track1_candidate",
+ "date": "2026-08-29",
+ "clocks": {
+  "machine_calgary": "2026-08-29 09:11 MDT",
+  "market_et": "2026-08-29 11:11 ET (Saturday, not a trading day)",
+  "operator_vn": "2026-08-29 22:11 VN"
+ },
+ "part_a_pre_restart": {
+  "scheduler_pid": 9356,
+  "backend_pid": 31248,
+  "track1_mode": "track1-only-shadow",
+  "registered_slots": 71,
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "legacy_entry_jobs": 0,
+  "confirmation_present": true,
+  "swing_override_present": true,
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "slot_children_running": 0,
+  "b1_legacy_flat": "PASS (legacy_book=0 track1_book=0 broker_positions=0 working_orders=0 orphans=0)",
+  "next_slot_when_measured": "Sunday 2026-08-30 18:30 ET stop-repair sweep, ~31h away",
+  "all_restart_conditions_met": true
+ },
+ "unexplained_state_change_found": {
+  "what": "the scheduler was NOT the pid 5ZZZ-Q recorded. ops.log line 2026-08-29T08:59:37 'scheduler: scan_ok=True found=[3000] -> kill_then_start' shows an ops.py restart ran from outside this session",
+  "consequence": "the 5ZZZ-Q fix had ALREADY been live since 08:59:45, before this stage restarted anything - the edits landed 08:12-08:25",
+  "who": "not attributable from the evidence; recorded as measured, not guessed",
+  "verified_no_source_changed_after_that_start": true
+ },
+ "part_b_restart": {
+  "command": "python monitor/ops.py restart --scheduler --track1-only-shadow --yes",
+  "ran_at": "2026-08-29T09:11:05 machine time",
+  "exit_code": 0,
+  "scheduler_pid_before": 9356,
+  "scheduler_pid_after": 34564,
+  "backend_pid_before": 31248,
+  "backend_pid_after": 44480,
+  "brief_expectation_corrected": {
+   "expected": "backend pid unchanged",
+   "measured": "backend pid CHANGED 31248 -> 44480",
+   "why": "monitor/ops.py:1474 defines restart as 'replace scheduler, its run_live_day children, and backend'. The command the brief specifies replaces the backend by design; the 08:59 external run did the same",
+   "this_is_not_a_failure": true
+  },
+  "broker": "the restart reconnected the READ-ONLY backend (broker=connected). No order path was opened and orders remained impossible throughout"
+ },
+ "part_c_fix_is_live": {
+  "verdict": "PASS",
+  "evidence_1_process": "scheduler 34564 started 2026-08-29T09:11:11, after the last 5ZZZ-Q edit at 08:25:46, and zero runtime .py files were modified after that start",
+  "evidence_2_behavioural": "the freshly started read-only backend serves .market_view.sleeves.roska4_swing.strategy.diagnostics.regime_basis = 'previous session (lag 1)' - a running process, not a timestamp inference",
+  "nkd_agrees": "global_nkd reports the same basis, as it always did",
+  "startup_line": "Track 1 SHADOW slots registered: 71 (no orders - the route's gate refuses)",
+  "legacy_live_day_jobs": "removed at startup, legacy_entry_jobs=0"
+ },
+ "part_d_first_post_fix_slots": {
+  "today_is": "Saturday 2026-08-29 ET - not a trading day (repo calendar)",
+  "monday_is_a_trading_day": true,
+  "labor_day_2026_09_07_is_not": true,
+  "next_scheduler_job_of_any_kind": "Sunday 2026-08-30 18:30 ET stop-repair sweep",
+  "slots_et_mt_vn": [
+   {
+    "sleeve": "global_nkd",
+    "et": "Mon 2026-08-31 01:10",
+    "machine_mt": "Sun 2026-08-30 23:10",
+    "operator_vn": "Mon 2026-08-31 12:10",
+    "note": "the night-slot trap: it falls on the machine's SUNDAY"
+   },
+   {
+    "sleeve": "roska4_calm",
+    "et": "Mon 2026-08-31 09:32 DECIDE / 10:02 OBSERVE",
+    "machine_mt": "Mon 07:32 / 08:02",
+    "operator_vn": "Mon 20:32 / 21:02"
+   },
+   {
+    "sleeve": "roska4_stress",
+    "et": "Mon 2026-08-31 10:35 (gate decided 10:30)",
+    "machine_mt": "Mon 08:35",
+    "operator_vn": "Mon 21:35"
+   },
+   {
+    "sleeve": "roska4_swing",
+    "et": "Mon 2026-08-31 14:05",
+    "machine_mt": "Mon 12:05",
+    "operator_vn": "Tue 2026-09-01 01:05",
+    "note": "THE slot this stage exists for - 50.7 hours after the measurement"
+   }
+  ]
+ },
+ "part_e_parity": {
+  "verdict_all_four_sleeves": "NOT_YET_OBSERVED",
+  "reason": "the newest live slot ran 2026-08-28T12:46:22, before the newest relevant fix at 2026-08-29T08:21:23",
+  "sleeves": {
+   "global_nkd": "NOT_YET_OBSERVED",
+   "roska4_stress": "NOT_YET_OBSERVED",
+   "roska4_calm": "NOT_YET_OBSERVED",
+   "roska4_swing": "NOT_YET_OBSERVED"
+  },
+  "counts_toward_paper_shadow_evidence": false,
+  "unknown_turned_into_pass": false,
+  "params_hash_gap_still_caps_a_post_fix_slot_at_unknown": true
+ },
+ "part_f_evidence_gate": {
+  "moved": false,
+  "manually_satisfied": false,
+  "orders_possible": false,
+  "readiness_ready_for_paper_evidence_half": false,
+  "checks_failing": {
+   "no_failing_days": "5 FAIL day(s) in the qualifying window, at most 0 allowed",
+   "calm_decision_evidence": "missing 08-24/25/26, incomplete 08-27, present 08-28"
+  },
+  "checks_passing": [
+   "audit_records_readable",
+   "judgeable_days",
+   "warn_days_within_allowance",
+   "evidence_is_recent",
+   "paper_account_baseline",
+   "every_sleeve_passed_at_least_once"
+  ],
+  "thresholds": {
+   "REQUIRED_JUDGEABLE_DAYS": 5,
+   "MAX_FAIL_DAYS": 0,
+   "MAX_WARN_DAYS": 1,
+   "MAX_EVIDENCE_AGE_DAYS": 21
+  },
+  "the_decisive_fact": "all five judgeable days (08-24..08-28) are PRE-FIX. The window cannot become entirely post-fix before five post-fix trading days have run",
+  "whether_post_fix_days_will_pass": "NOT_YET_OBSERVED - not predicted here"
+ },
+ "tests": {
+  "new_suite": "scratch/test_track1_stage5zzzr_restart_liveness_postfix_parity_20260829.py",
+  "new_passed": 13,
+  "mutations_run": 6,
+  "mutations_caught": 6,
+  "mutations_survived": 0,
+  "regression_passed": 291,
+  "regression_failed": 5,
+  "regression_failures_are_pre_existing": {
+   "suite": "scratch/test_track1_stage5m_d_track1_only_shadow_20260823.py",
+   "count": 5,
+   "root_cause": "a suite written 2026-08-23 pins literals that legitimately changed on 2026-08-27: three SPY-ladder shared_infra jobs were added (spy_last_chance_pre_nkd, spy_refresh_pm_r1, spy_refresh_pm_r2), the operator signed the legacy-retirement confirmation, and the lead blocker advanced from B1 to PAPER_SHADOW_EVIDENCE",
+   "caused_by_this_restart": false,
+   "proof": "the confirmation record is dated 2026-08-27 and none of the five tests reads the process table; the restart ran 2026-08-29T09:11:11",
+   "left_unfixed_deliberately": "updating a pinned expectation is a decision that the values are now correct. Reported for the operator rather than silently re-pinned"
+  }
+ },
+ "safety": {
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "orders_sent": 0,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "orders_dir_present": false,
+  "confirmation_untouched": true,
+  "confirmation_mtime": "2026-08-27T10:05:45 (unchanged, predates this stage)",
+  "confirmation_sha16": "67504a1c8a31a6a4",
+  "swing_override_present_and_valid": true,
+  "swing_override_grants": "nothing",
+  "paper_shadow_evidence_marked_satisfied": false,
+  "params_changed": false,
+  "gates_changed": false,
+  "thresholds_changed": false,
+  "strategy_logic_changed": false,
+  "runtime_trading_files_edited_this_stage": 0,
+  "runtime_evidence_rewritten": false,
+  "scheduler_pids_now": [
+   34564
+  ],
+  "exactly_one_scheduler": true,
+  "track1_slot_count": 71
+ },
+ "answers": {
+  "was_the_restart_safe_to_perform": "yes - every Part A condition measured and met",
+  "did_the_restart_happen": true,
+  "is_the_5zzzq_fix_live": true,
+  "was_it_already_live_before_this_stage": "yes, since 08:59:45, via an ops restart from outside this session",
+  "post_fix_slots_observed": 0,
+  "parity_on_post_fix_slots": "NOT_YET_OBSERVED",
+  "evidence_gate_moved": false,
+  "orders_possible": false
+ },
+ "operator_should_note": "Two things. First, the scheduler had already been restarted from outside this session at 08:59, so the Swing fix has been live since then rather than since this stage - and the pid recorded in the 5ZZZ-Q report was stale by the time this stage read it. Second, Monday 14:05 ET is the first Swing slot that will run post-fix, and it is the first session in which the sleeve will actually decide rather than refuse. Orders remain impossible, but the shadow evidence written from Monday describes different behaviour from every day currently in the qualifying window."
+}

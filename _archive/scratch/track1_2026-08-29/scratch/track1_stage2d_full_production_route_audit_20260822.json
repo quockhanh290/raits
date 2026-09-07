@@ -1,0 +1,523 @@
+{
+  "artifact": "track1_stage2d_full_production_route_audit",
+  "date": "2026-08-22",
+  "scope": "read-only audit of the production route, to prepare a parallel Track 1 route",
+  "contract": {
+    "production_code_edited": false,
+    "scheduler_or_service_started": false,
+    "ibkr_connected": false,
+    "dashboard_written": false,
+    "committed": false,
+    "commands_that_could_touch_broker_or_dashboard_run": false
+  },
+
+  "baseline": {
+    "commit": "601970bf97e23b200b8eb06cbcf22a240897133a",
+    "branch": "future/incorporation",
+    "working_tree_entries_dirty": 504,
+    "host_clock_at_audit_start": "2026-08-22T21:28:06-06:00",
+    "host_tz": "America/Edmonton (MDT)",
+    "scheduler_jobs_registered": 60,
+    "job_enumeration_method": "make_scheduler(port=4002, dry_run=True).get_jobs(); scheduler never started",
+    "must_stay_green_suites": {
+      "passed": 156,
+      "failed": 0,
+      "skipped": 0,
+      "wall_seconds": 6.27,
+      "files": [
+        "scratch/test_track1_stage2_equivalence_bootstrap_20260822.py",
+        "scratch/test_track1_route_checkpoint_stage1_20260822.py",
+        "scratch/test_slot_telemetry_20260822.py",
+        "global_index/test_slot_overlap.py",
+        "global_index/test_log_hygiene.py",
+        "global_index/test_scheduler_heartbeat.py",
+        "global_index/test_dashboard_live_snapshot.py",
+        "global_index/test_scheduler_shadow_verify.py"
+      ],
+      "deliberately_not_run": ["global_index/test_event_playback.py (known to hang)"]
+    },
+    "live_processes_observed_read_only": [
+      {"pid": 36656, "started": "2026-08-20T06:35:53-06:00", "cmd": "pythonw -m global_index.run_scheduler --port 4002 --shadow-resume"},
+      {"pid": 29432, "started": "2026-08-20T06:43:59-06:00", "cmd": "python monitor/start_backend.py --ibkr-port 4002 --api-port 5002"},
+      {"pid": 11964, "started": "2026-08-22T21:51:14-06:00", "cmd": "python scratch/track1_stage2c_breaker_mutation_20260822.py --which floor --variant producti..."}
+    ],
+    "stale_code_finding": {
+      "run_scheduler_py_mtime": "2026-08-22T09:46:26-06:00",
+      "running_scheduler_started": "2026-08-20T06:35:53-06:00",
+      "verdict": "the live scheduler is running the pre-telemetry version of run_scheduler.py",
+      "consequences": [
+        "RAITS_SLOT_ID / RAITS_ROUTE are not stamped on children by the running parent",
+        "parent-side skipped_mutex / skipped_preflight telemetry records are not written",
+        "run_live_day.py changes ARE live because each slot is a fresh subprocess"
+      ],
+      "already_detected_by": "monitor/backend/schedule_status.py:155 stale_code = started < code_mtime"
+    }
+  },
+
+  "verdict": {
+    "ready_to_build_shadow_route": true,
+    "ready_to_build_order_sending_route": false,
+    "summary": "A shadow (no-order) Track 1 route can be built now. An order-sending route is blocked on four design decisions, none of which is a defect in the current system - each is a single-route assumption that a second route breaks."
+  },
+
+  "blockers": [
+    {
+      "id": "BLOCK-1",
+      "title": "One IB Gateway login is one position book; no account dimension exists",
+      "evidence": [
+        "global_index/ibkr_broker.py:496 IBKRBroker.__init__(host, port, client_id, bar_duration, _raw_fetcher) - no account parameter",
+        "global_index/ibkr_broker.py:981 get_positions() reads ib.positions() unfiltered",
+        "global_index/ibkr_broker.py:1038 get_equity() reads NetLiquidation from ib.accountValues() unfiltered",
+        "global_index/run_scheduler.py:684-702 records that same-symbol netting is exactly why STRESS_MID's 10:20 cron was disabled"
+      ],
+      "failure_mode": "legacy LONG 1 + Track1 SHORT 1 on the same symbol nets to 0 at IBKR; B3 sees two file rows against broker x0 -> B3 MISMATCH -> entries HALT for both routes",
+      "note": "a different client_id does NOT solve this - it changes who may cancel an order, not whose positions are counted",
+      "decision_required": "separate IBKR account/login for Track 1, or Track 1 stays order-free until legacy is retired"
+    },
+    {
+      "id": "BLOCK-2",
+      "title": "The 10:20 to 14:05 ET no-run invariant forbids the Track 1 windows on the legacy entry point",
+      "evidence": [
+        "global_index/run_scheduler.py:672 explicit invariant comment",
+        "global_index/signal_layer.py:97 diff_desired_vs_held, exit loop at lines 118-121",
+        "_mark_held_unchanged (signal_layer.py:130) is never called for the stress cluster"
+      ],
+      "failure_mode": "a run_live_day slot inside that band closes stress positions on the next run; recorded case +$12,850 -> -$450, silent",
+      "decision_required": "Track 1 needs its own entry-point script and its own signal layer; a --clusters flag on run_live_day would breach the invariant on the first slot"
+    },
+    {
+      "id": "BLOCK-3",
+      "title": "Track 1's windows open before the day's own pre-flight",
+      "evidence": [
+        "global_index/run_scheduler.py:802-846 fail-closed on a missing pre-flight flag",
+        "pre-flight cron is 13:45 ET",
+        "Calm A is 10:00 ET; Stress is 10:35-12:30 ET"
+      ],
+      "failure_mode": "both windows must use prev_preflight=True, so the freshest data update available is 13:45 ET the PREVIOUS business day - a different data-freshness contract from the one every Track 1 backtest number was produced under",
+      "decision_required": "accept D-1 13:45 as the Track 1 data contract and record it in the invariants, or add a second pre-flight before 10:00 with its own fail-closed reasoning"
+    },
+    {
+      "id": "BLOCK-4",
+      "title": "Quantity has no cluster dimension and Stress-MNQ is 7 lots",
+      "evidence": [
+        "global_index/runner.py:1883 and :2054 n = self.contracts.get(t['inst'], 1)",
+        "global_index/live_decision.py decide_day reads contracts_by_inst the same way",
+        "global_index/run_live_day.py contracts_by = {n: 1 for n in list(BASKET) + [NKD_INST]}",
+        "fat-finger cap max_contracts_per_order = 10 (runner.py:843) would pass 7"
+      ],
+      "failure_mode": "Track 1 wants MNQ=1 under roska4_swing and MNQ=7 under roska4_stress on the same day; there is no key that expresses that, so it fails silently as 'entered 1 instead of 7'",
+      "decision_required": "make size a property of the candidate (t['contracts']) or wrap the runner for Track 1"
+    }
+  ],
+
+  "warnings": [
+    {"id": "W1", "text": "route_checkpoint.py, route_params.py and window_ledger.py have zero importers outside scratch/. slot_telemetry.py IS wired (run_scheduler.py:70, run_live_day.py:77)."},
+    {"id": "W2", "text": "monitor/backend/schedule_status.py:167-181 keeps a hand-written mirror of the scheduler's slot table; an unmirrored Track 1 slot becomes a fake incident every day. Its own comment at :273 says so."},
+    {"id": "W3", "text": "roska4_calm does not exist in production: no MultiClusterGuard budget (KeyError, uncaught by decide_day), no _ARM_BY_CLUSTER entry (runner.py:144), not in dump_state _cl_keys (runner.py:3124)."},
+    {"id": "W4", "text": "The family cap Track 1 measures with exists only at scratch/combined_repaired_replay_20260822.py:60. MultiClusterGuard.admits checks a candidate against its own cluster only, by design."},
+    {"id": "W5", "text": "Stage 2C left two mutations unproved on the floor window: M5 (carried position in the wrong cluster) and M5b (carried risk x20) both MATCH where they must DIVERGE (scratch/track1_breaker_mut4.log). This is a bootstrap gate, not a production-wiring gate."},
+    {"id": "W6", "text": "Two Stress candidates exist: futures/stress_liquidation_1020.py (10:20 entry, variants breadth3/wide_range3, self-described as not wired) and the Track 1 stack mnq_only_g3_q7 at 10:35-12:30 (scratch/stress_switch_full_replay_20260822.py:44). Port the scratch one."},
+    {"id": "W7", "text": "global_index/deploy_sim.py - the backtest reference - has uncommitted changes adding --stress-engine/--stress-variant/--stress-instruments/--stress-cap. Any re-derived baseline must name which version produced it."}
+  ],
+
+  "scheduler": {
+    "framework": "APScheduler BlockingScheduler, timezone America/New_York (ET-native, DST automatic)",
+    "total_jobs": 60,
+    "constants": {
+      "SLOT_MISFIRE_GRACE_SECS": 300,
+      "_SLOT_TIMEOUT_SECS": 1200,
+      "_INFLIGHT_STUCK_SECS": 1500,
+      "HEARTBEAT_SECS": 60,
+      "_HEARTBEAT_TOLERANCE": 30,
+      "_PREFLIGHT_KEEP": 7,
+      "_FAIL_TAIL_LINES": 25,
+      "_ENTRY_WINDOWS": [[[1, 0], [2, 55]], [[14, 0], [15, 55]]]
+    },
+    "mutex": {
+      "primitive": "threading.Lock (_slot_lock)",
+      "scope": "one scheduler PROCESS only - two scheduler processes have two locks and cannot see each other",
+      "cross_process_guard": "runner.pid PID lockfile, taken by run_live_day / run_maxhold_exit / run_stop_repair before connecting",
+      "skip_semantics": "skipping is correct for 5-minute slots (diff_desired_vs_held is idempotent) and NOT correct for once-a-day jobs; that is why maxhold_exit is deliberately not wrapped in _run_guarded"
+    },
+    "route_dimension_present": "only _env.setdefault('RAITS_ROUTE', 'legacy') in _run - identity only, enables nothing. Slot ids, job ids, log lines, state files and dashboard readers have no route dimension.",
+    "jobs": [
+      {"time_et": "every minute", "days": "all", "id": "heartbeat", "target": "internal", "class": "maintenance-only", "side_effects": ["log line hourly or on stall recovery"]},
+      {"time_et": "00:20", "days": "mon-fri", "id": "stop_repair_0020", "target": "python -m global_index.run_stop_repair --positions-path live_positions.json --port P", "class": "trade-affecting", "side_effects": ["B4 may place stops", "B3 may book a stop exit and write a CLOSE row", "live_positions.json", "trade_log.jsonl"]},
+      {"time_et": "01:10-01:55 x10", "days": "mon-fri", "id": "nkd_night_01xx", "target": "run_live_day --clusters nkd", "class": "trade-affecting", "args": {"prev_preflight": true, "clusters": "nkd"}},
+      {"time_et": "02:00-02:55 x12", "days": "mon-fri", "id": "nkd_night_02xx", "target": "run_live_day --clusters nkd", "class": "trade-affecting", "args": {"prev_preflight": true, "clusters": "nkd", "shadow_verify_on_last_slot": "02:55"}},
+      {"time_et": "04:20, 06:20, 08:20", "days": "mon-fri", "id": "stop_repair_0420/0620/0820", "target": "run_stop_repair", "class": "trade-affecting"},
+      {"time_et": "09:31", "days": "mon-fri", "id": "maxhold_exit", "target": "python -m global_index.run_maxhold_exit --positions-path live_positions.json --port P", "class": "trade-affecting", "notes": "deliberately NOT wrapped in _run_guarded; also arms deferred stops via B4; records maxhold_state.json only on a real (non-dry) run"},
+      {"time_et": "10:20, 12:20", "days": "mon-fri", "id": "stop_repair_1020/1220", "target": "run_stop_repair", "class": "trade-affecting"},
+      {"time_et": "13:45", "days": "mon-fri", "id": "preflight", "target": "update_ibkr_daily then update_spy_csv", "class": "gate", "side_effects": ["parquet append", "spy_daily_live.csv append", "preflight_state.json"], "failure_behaviour": "flag=False -> every 14:05-15:55 slot skipped that day"},
+      {"time_et": "14:05", "days": "mon-fri", "id": "live_day", "target": "run_live_day (all clusters)", "class": "trade-affecting", "args": {"first_slot": true}},
+      {"time_et": "14:10-15:55 x22", "days": "mon-fri", "id": "live_day_xxxx", "target": "run_live_day", "class": "trade-affecting", "args": {"shadow_verify_on_last_slot": "15:55"}},
+      {"time_et": "16:20, 18:20, 20:20, 22:20", "days": "mon-fri", "id": "stop_repair_xx20", "target": "run_stop_repair", "class": "trade-affecting"},
+      {"time_et": "18:30", "days": "sun", "id": "stop_repair_sun_1830", "target": "run_stop_repair", "class": "trade-affecting", "notes": "CME reopen; closes the 6h30 gap to Monday 00:20"},
+      {"time_et": "23:55", "days": "mon-fri", "id": "session_report_fallback", "target": "session_report", "class": "dashboard/log-only", "notes": "only fires if the event-driven report did not"},
+      {"time_et": "event-driven on _LAST_JOB_ID", "days": "mon-fri", "id": "(listener)", "target": "session_report, then monitor.flex_pull + monitor.paper_pnl_compare", "class": "dashboard/log-only", "notes": "_LAST_JOB_ID computed from the schedule (run_scheduler.py:1038); resolves to stop_repair_2220"},
+      {"time_et": "at scheduler startup", "days": "mon-fri", "id": "_catch_up_maxhold", "target": "the maxhold_exit closure", "class": "recovery/catch-up", "notes": "runs only when started after 09:31 and maxhold_state has no record for today"}
+    ],
+    "disabled_job": {
+      "id": "stress_mid",
+      "time_et": "10:20",
+      "state": "guarded by `if False:` at run_scheduler.py:704",
+      "reason": "same-symbol netting at IBKR (get_positions returns net signed qty) and symbol-level stop tracking (has_working_stop keys on SYMBOL) - both would produce false B3 mismatches and a permanently naked contract"
+    }
+  },
+
+  "run_live_day": {
+    "path": "global_index/run_live_day.py",
+    "args": [
+      {"name": "--data-dir", "required": true},
+      {"name": "--nkd-parquet", "required": true},
+      {"name": "--regime-csv", "required": true},
+      {"name": "--port", "default": 4002},
+      {"name": "--client-id", "default": 1},
+      {"name": "--positions-path", "default": "live_positions.json"},
+      {"name": "--lock-path", "default": "runner.pid"},
+      {"name": "--stop-path", "default": "STOP_TRADING"},
+      {"name": "--dry-run", "default": false},
+      {"name": "--print-signals", "default": false},
+      {"name": "--live-state-path", "default": null},
+      {"name": "--shadow-resume", "default": false},
+      {"name": "--shadow-verify", "default": false},
+      {"name": "--stress-entry", "default": false},
+      {"name": "--checkpoint-path", "default": "global_index/replay_checkpoint.json"},
+      {"name": "--clusters", "default": "all", "values": ["swing", "nkd", "stress", "all"]}
+    ],
+    "env_vars_read": ["PYTEST_CURRENT_TEST (suppresses the production log handler)", "RAITS_TELEMETRY_DIR (via slot_telemetry)", "RAITS_SLOT_ID", "RAITS_ROUTE"],
+    "ordered_phases": [
+      "argparse + _tel.begin()",
+      "cluster alias resolution",
+      "today = now(America/New_York).normalize().tz_localize(None)",
+      "verify_frozen.quick_check_manifest - WARN only, never blocks",
+      "parquet load (futures/_validated_core.load_parquet, ET-aware; global_index/_core.load_parquet + tz_convert(Asia/Tokyo) for NKD)",
+      "HMM labels: benchmark_daily -> label_regimes(train 2018-01-01, 3 states, fit_end 2024-12-31); RegimeLabels(lag_days=1) for NKD",
+      "engines + costs (slippage 2.0 ticks)",
+      "signal_fn closure: _splice_live / _splice_nkd_live -> optional _shadow -> generate_today_signals",
+      "--print-signals branch: connect, fetch, compute, print, disconnect, return (no orders)",
+      "E1 lock BEFORE connecting",
+      "IBKRBroker.connect",
+      "FuturesRunner construction (B1 load, B3 reconcile, B4 naked sweep all run here)",
+      "runner.run_day(today)",
+      "broker.disconnect in finally"
+    ],
+    "route_selection_seam": {
+      "recommended": "a NEW sibling entry-point script",
+      "rejected_alternatives": [
+        "a --route flag on run_live_day: the argv is parsed by three log readers and _run logs it verbatim; the file is also the one bound by the 10:20-14:05 invariant",
+        "an env var route switch: makes one script behave two ways with identical argv, which is unreviewable in the log",
+        "a wrapper around run_live_day: it would still import signal_layer and inherit the global held-position sweep"
+      ],
+      "reason": "the legacy invocation must stay byte-identical, and Track 1 needs a different signal layer, a different cluster set, a different quantity model and different state files"
+    },
+    "legacy_compatibility_requirements": [
+      "argv of the legacy invocation unchanged",
+      "log line prefixes [SLOT_ID] and the tokens 'completed OK', 'thoat OK nhung', 'exited with code N', 'SKIPPED' unchanged",
+      "live_day_MMDD.log filename pattern unchanged (paper_evidence_reader globs it)"
+    ]
+  },
+
+  "data_inputs": [
+    {
+      "name": "Ro 4 futures parquet",
+      "path": "data/cache/futures/<data_symbol>_continuous_1m_8y.parquet",
+      "loader": "futures/_validated_core.py:29 load_parquet",
+      "tz": "read as UTC then tz_convert('America/New_York'); tz-aware",
+      "contract_mapping": "futures/basket.py data_filename(c) -> c.data_symbol (MES->ES, MNQ->NQ, MYM->YM, M2K->RTY)",
+      "freshness_rule": "appended by update_ibkr_daily at 13:45 ET; JOIN_JUMP_MAX_PCT 0.35 refuses an append whose join jump is too large",
+      "failure_behaviour": "update_ibkr_daily sys.exit(1) -> pre-flight flag False -> every later slot skipped",
+      "fails_closed_on_stale": true,
+      "track1_same_source": true,
+      "route_dimension_needed": false
+    },
+    {
+      "name": "NKD parquet",
+      "path": "global_index/data/NKD_continuous_1m_8y.parquet",
+      "loader": "global_index/_core.py:28 load_parquet, then tz_convert(specs.MNKD.session_tz = Asia/Tokyo)",
+      "tz": "JST after conversion; _strip_tz makes it JST-naive before splicing",
+      "contract_mapping": "MNKD -> data_symbol NKD (full-size history on purpose) -> IBKR symbol MNK",
+      "freshness_rule": "same 13:45 pre-flight",
+      "failure_behaviour": "same",
+      "fails_closed_on_stale": true,
+      "track1_same_source": true,
+      "route_dimension_needed": false
+    },
+    {
+      "name": "SPY daily regime CSV",
+      "path": "spy_daily_live.csv",
+      "loader": "futures/_validated_core.py:71 benchmark_daily",
+      "tz": "date-only, normalized, tz-naive",
+      "freshness_rule": "G1: >2 bday soft warn, >5 bday hard block (hmm_stale_guard.py)",
+      "failure_behaviour": "update_spy_csv failure -> pre-flight False -> slots skipped; independently G1 blocks entries",
+      "fails_closed_on_stale": true,
+      "track1_same_source": true,
+      "route_dimension_needed": false,
+      "note": "the SPY short gate Track 1 uses reads the same file with a 50-session SMA shifted by 1"
+    },
+    {
+      "name": "HMM labels",
+      "producer": "futures/_validated_core.py:82 label_regimes",
+      "params": {"train_end": "2018-01-01", "n_components": 3, "hmm_fit_end": "2024-12-31"},
+      "lag": "Ro 4 uses same-day asof; NKD wraps in RegimeLabels(lag_days=1) because the Tokyo power hour precedes the US close",
+      "cost_note": "refit happens in every slot process (save=False); the training window is frozen at fit_end so the fit is identical every time",
+      "track1_same_source": true,
+      "route_dimension_needed": false
+    },
+    {
+      "name": "IBKR live bars",
+      "producer": "IBKRBroker.fetch_bars(inst, through=day+23:59)",
+      "tz": "ET-naive",
+      "scale": "RAW front month - spliced onto the back-adjusted parquet by _splice_live with a measured offset, undone in to_candidate before an order price is formed",
+      "failure_behaviour": "C3 warns on empty bars for an instrument with an open position; exits are bar-independent and still run",
+      "fails_closed_on_stale": "partly - E3 blocks entries only when the last bar is >3 days old",
+      "track1_same_source": true,
+      "route_dimension_needed": false
+    },
+    {
+      "name": "contract month / rollover map",
+      "path": "global_index/ibkr_broker.py ROLL_SCHEDULE",
+      "keying": "IBKR symbol; get_roll_event and _current_front_month both resolve the runner name first (idempotent)",
+      "failure_behaviour": "_month_contract raises ContractResolutionError if qualifyContracts leaves conId unset",
+      "track1_same_source": true,
+      "route_dimension_needed": false
+    },
+    {
+      "name": "frozen manifest",
+      "producer": "global_index/verify_frozen.py quick_check_manifest (size-only)",
+      "failure_behaviour": "WARNING banner; never blocks paper. 'unverified' is deliberately distinguished from 'verified OK'",
+      "track1_same_source": true,
+      "route_dimension_needed": false
+    }
+  ],
+
+  "signal_identity": {
+    "production_today": {
+      "roska4_swing": {"engine": "SwingTFEngine", "ema_period": 30, "chandelier_atr_mult": 2.5, "max_hold_days": 5, "instruments": ["MES", "MNQ", "MYM", "M2K"], "qty": 1, "model": "STATE (desired_position diffed against held)"},
+      "global_nkd": {"engine": "SwingTFEngine", "ema_period": 10, "chandelier_atr_mult": 2.5, "max_hold_days": 5, "instruments": ["MNKD"], "qty": 1, "model": "STATE", "regime_lag_days": 1, "session_tz": "Asia/Tokyo"},
+      "roska4_stress": {"engine": "StressMidEngine", "state": "constructed but never fed - stress_bars_1015={} unless --stress-entry, and no cron passes it", "model": "EVENT"},
+      "regime_source": "SPY 3-state HMM, fit_end 2024-12-31",
+      "r4_context_filter": "ABSENT",
+      "spy_short_gate": "ABSENT",
+      "calm_sleeve": "ABSENT",
+      "cluster_caps": {"roska4_swing": {"gross": 0.05, "net": 0.044}, "roska4_stress": {"gross": 0.025, "net": null}, "global_nkd": {"gross": 0.06, "net": 0.06}}
+    },
+    "track1_needs_that_production_lacks": [
+      "R4 context filter on the Normal sleeve",
+      "SPY short gate (SMA50 on the D-1 close, SHORT entries only, LONG never gated)",
+      "roska4_calm sleeve: Calm A PCLoc, D-1 Calm causal gate, MES/MNQ LONG, entry 10:00 ET open, exit 15:55 ET open, disaster stop entry - 1.5x daily ATR, true ATR15 stop-risk sizing",
+      "Stress-MNQ mnq_only_g3_q7: MNQ only, 7 micros, cap 10% gross-only, window 10:35-12:30 ET",
+      "same-symbol suppression between Normal and Calm",
+      "Stress force-close of a same-symbol Normal/Calm position, gated on cap+breaker passing FIRST",
+      "family cap over roska4_swing + roska4_calm combined",
+      "per-cluster quantity"
+    ],
+    "reusable_as_is": [
+      "SwingTFEngine (both parameterisations)",
+      "futures/_validated_core loaders, resample_5m, daily_atr_series, backtest_swing_tf",
+      "benchmark_daily + label_regimes + RegimeLabels",
+      "diff_desired_vs_held (the state->event diff itself)",
+      "to_candidate for the ATR-proxy sleeves (NOT for Calm A - see below)",
+      "MultiClusterGuard mechanics (the clusters= parameter already accepts a custom budget set)",
+      "CircuitBreaker",
+      "HMMStaleGuard"
+    ],
+    "must_be_ported_from_scratch": [
+      {"what": "SPY short gate", "source": "scratch/directional_market_filter_probe.py:18-46 (allowed_short_days / below_sma50), applied unconditionally at scratch/normal_promotion_regen_audit_20260821.py:121,131"},
+      {"what": "Normal-R4 filtered trade table", "source": "scratch/normal_promotion_trades_<window>_20260821.json, 'filtered' bucket"},
+      {"what": "Stress-MNQ sleeve", "source": "scratch/stress_switch_full_replay_20260822.py:44 Scenario('mnq_only_g3_q7', ('MNQ',), 7), built on scratch/stress_open_search_20260821.py; entry window 10:35-12:30"},
+      {"what": "Calm A PCLoc", "source": "scratch/calm_a_combined_replay_20260822.py + scratch/calm_a_disaster_stop_probe_20260822.py (StopSpec('atr15','atr',1.5))"},
+      {"what": "family cap", "source": "scratch/combined_repaired_replay_20260822.py:60 family_admits"},
+      {"what": "Track 1 decision loop (suppression, switch, book)", "source": "scratch/track1_stage2c_book_bootstrap_20260822.py replay()"},
+      {"what": "guard cap set for Track 1", "source": "scratch/combined_repaired_replay_20260822.py:46 make_guard (stress 10%, calm 5%)"}
+    ],
+    "do_not_port": [
+      "futures/stress_liquidation_1020.py - a different 10:20 candidate, self-described as not wired; NOT the Track 1 stress sleeve"
+    ],
+    "sizing_incompatibility": {
+      "what": "signal_layer.to_candidate computes risk_sized = contracts * mult * daily_atr * point_value",
+      "why_it_breaks": "Calm A's cap is measured on TRUE ATR15 stop-risk (the disaster-stop distance), not on an ATR proxy",
+      "classification": "wrap for Track 1"
+    }
+  },
+
+  "rollover": {
+    "trigger": "runner._handle_rollover_if_needed, first step of run_day, before fetch_bars, per open position",
+    "close_confirm_enter": "ibkr_broker._handle_rollover lines 1652-1745: CLOSE front month (market, outsideRth, tif=DAY, 120s) -> _verified_status must say Filled -> only then OPEN next month (30s)",
+    "stop_handling": "cancel the old STP with confirmation, then _roll_stop shifts the recorded level by the measured close->open spread and re-places; if the position is still inside its deferral window the level is recorded and B4 arms it later",
+    "state_update": "pos.contract_month = open_fill.contract_month, then _persist_state() immediately",
+    "failure_paths": {
+      "roll_raises": "caught per position (runner.py:1425), CRITICAL, loop continues",
+      "close_not_filled": "roll aborted, position unchanged, CRITICAL",
+      "open_not_filled_after_close_filled": "position is FLAT at IBKR; removed from state, persisted immediately, CRITICAL"
+    },
+    "two_clock_guard": "session_month_conflict (ibkr_broker.py:324) refuses to roll or to send an order when the session day and the wall clock imply different front months",
+    "route_dimension_needed": "only on the state file and the events, not on the roll table",
+    "track1_reuse_of_close_confirm_enter": {
+      "verdict": "not directly reusable; generalise rather than copy",
+      "reusable_shape": ["verified terminal status, not a bare Cancelled", "second leg only after the first actually filled", "explicit now-flat-at-the-broker branch"],
+      "hard_wired_and_wrong_for_a_switch": ["gated on get_roll_event returning a roll date", "assumes same symbol, same direction, same quantity, different month - the switch is same symbol, possibly different direction, different quantity (1 -> 7), same month", "stamps both Fills with front_month/next_month", "the caller's state update (contract_month, _roll_stop(shift)) is meaningless for a cluster switch"],
+      "recommendation": "extract close_then_open(inst, close_leg, open_leg) from _handle_rollover and leave _handle_rollover as its first caller, so existing rollover tests keep exercising it"
+    }
+  },
+
+  "state_artifacts": [
+    {"path": "live_positions.json", "writer": "runner._persist_state (runner.py:1188)", "readers": ["runner B1/B3", "run_maxhold_exit", "run_stop_repair", "monitor/backend/runner_positions_reader.py"], "schema": "{schema_version, positions[], breaker{peak_equity, day_start_equity, cur_day, max_dd_dollars, max_dd_pct, system_equity, last_broker_equity, system_epoch, paper_start}}", "route_field": false, "write_mode": "whole-file rewrite, atomic (.tmp -> os.replace)", "lost_update_risk": "high with two writers", "two_routes_same_process": false, "separate_file_required": true},
+    {"path": "runner.pid", "writer": "runner._acquire_lock", "readers": ["the same three entry points"], "schema": "single PID", "route_field": false, "write_mode": "write_text, not atomic", "note": "same-PID re-acquire is exempted on purpose (runner.py:227)", "separate_file_required": true},
+    {"path": "global_index/preflight_state.json", "writer": "run_scheduler", "readers": ["run_scheduler"], "schema": "{'YYYY-MM-DD': bool}, last 7 kept", "route_field": false, "write_mode": "atomic", "separate_file_required": true},
+    {"path": "global_index/maxhold_state.json", "writer": "run_scheduler", "readers": ["_catch_up_maxhold"], "schema": "{'YYYY-MM-DD': bool}", "route_field": false, "write_mode": "atomic", "separate_file_required": true},
+    {"path": "global_index/replay_checkpoint.json", "writer": "run_live_day._shadow via replay_checkpoint.save", "readers": ["run_live_day._shadow"], "schema": "{schema_version:1, instruments:{INST:{last_day,fingerprint,params,pos}}}", "route_field": false, "write_mode": "whole-dict rewrite, atomic file swap", "lost_update_risk": "a second writer loses the first's entries", "separate_file_required": true, "replacement": "global_index/route_checkpoint.py schema 2"},
+    {"path": "global_index/replay_checkpoint.track1.json", "writer": "route_checkpoint.save_route", "readers": ["route_checkpoint.load"], "schema": "schema 2, routes/<route>/sleeves/<sleeve>/instruments/<inst>", "route_field": true, "write_mode": "O_EXCL file lock + scoped merge + ScopeViolation assertion + atomic replace", "separate_file_required": "already separate", "wired_in_production": false},
+    {"path": "trade_log.jsonl", "writer": "runner._append_trade / _append_trade_raw (6 paths)", "readers": ["paper_evidence_reader", "execution_quality_reader"], "schema": "one JSON object per line; CLOSE_RECORD_FIELDS union declared at runner.py:76", "route_field": false, "write_mode": "append-only", "separate_file_required": "no if a route field is added AND paper_evidence_reader is taught to split on it; otherwise yes"},
+    {"path": "slip_stats.json", "writer": "runner._persist_slip_stats", "readers": ["runner"], "schema": "running open/close slippage sums and counts", "route_field": false, "write_mode": "whole-file rewrite, not atomic", "separate_file_required": true},
+    {"path": "global_index/runner_events_YYYYMMDD.jsonl", "writer": "runner._append_event_log (runner.py:2658)", "readers": ["monitor/backend/runner_event_reader.py"], "schema": "{ts, level, category, message, context?}; filename derived from the event's own ET timestamp", "route_field": false, "write_mode": "O_APPEND with a trailing-newline precheck and a short-write check; one failure disables the channel for that process", "separate_file_required": false, "recommendation": "add a route field - the reader passes unknown keys through untouched"},
+    {"path": "global_index/live_state_data.js", "writer": "runner.dump_state (runner.py:3114)", "readers": ["runner_state_reader", "paper_evidence_reader", "dashboard"], "schema": "window.LIVE_DATA = {runner_health, meta, snapshots[]}; snapshots capped at LIVE_SNAPSHOT_LIMIT=500, meta.events capped at 500", "route_field": false, "write_mode": "whole-file rewrite, atomic", "separate_file_required": true},
+    {"path": "global_index/paper_history.json", "writer": "runner._record_paper_day", "readers": ["paper_evidence_reader"], "schema": "daily equity marks", "route_field": false, "write_mode": "whole-file rewrite", "separate_file_required": true},
+    {"path": "monitor/paper_pnl_compare.json", "writer": "monitor/paper_pnl_compare.py (22:20 job)", "readers": ["paper_evidence_reader"], "route_field": false, "separate_file_required": "legacy-only for now"},
+    {"path": "scheduler_MMDD.log / live_day_MMDD.log", "writer": "run_scheduler / run_live_day", "readers": ["schedule_status", "job_journal_reader", "paper_evidence_reader"], "schema": "free text parsed by [SLOT_ID] prefix and exit tokens", "route_field": false, "separate_file_required": false, "requirement": "Track 1 slot ids must be prefixed so the parsers can split them"},
+    {"path": "slot_timing_YYYYMMDD.jsonl", "writer": "global_index/slot_telemetry.py", "readers": ["nothing yet"], "schema": "{ts, route, slot_id, pid, outcome, runtime_s, phases, marks}", "route_field": true, "enabled_by": "RAITS_TELEMETRY_DIR", "wired_in_production": true},
+    {"path": "window_coverage_YYYYMMDD.jsonl", "writer": "global_index/window_ledger.py", "readers": ["window_ledger.read/status"], "schema": "{ts, schema, route, sleeve, date, event, expected_slots, observed_slots, outcome, signal}", "route_field": true, "enabled_by": "RAITS_WINDOW_LEDGER_DIR", "wired_in_production": false}
+  ],
+
+  "state_isolation_rule": "Every artifact whose writer rewrites the whole file must be per-route. Every append-only artifact may be shared provided each record carries a route field.",
+
+  "order_lifecycle_risks": [
+    {"risk": "deliberate naked-stop window between entry and the sleeve's arm time", "status": "by design, measured: STP at fill -$10,832 vs next session +$47,166 over 2018-2026 (runner.py:2393)", "track1": "Calm A and Stress must NOT inherit the deferral - they are same-session models and _stop_deferred already returns False for clusters outside _ARM_BY_CLUSTER"},
+    {"risk": "duplicate settlement", "status": "the Track 1 replay counts booked[tid] > 1; production relies on the exit paths being disjoint by branch", "track1": "keep the counter and assert it is zero"},
+    {"risk": "exit escalation at 3x consecutive failures", "status": "DOCUMENTED IN THE DOCSTRING, NOT IMPLEMENTED (ibkr_broker.py:722)", "track1": "do not assume it exists"},
+    {"risk": "reconnect mid-run", "status": "no production path calls reconnect()/reconcile_positions(); a drop raises IBKRConnectionError and the slot fails", "track1": "inherit"},
+    {"risk": "force-close support", "status": "ABSENT - there is no 'close everything now' entry point; the kill switch stops entries only", "track1": "the Stress switch needs a close primitive, and an operator force-close is a separate missing capability"},
+    {"risk": "flat-and-unprotected window between the two legs of a switch", "status": "the same window _handle_rollover already accepts; a 7-lot leg makes it more expensive", "track1": "emit before each leg so a crash between them is attributable"},
+    {"risk": "crash between the switch legs", "status": "next startup sees file=position, broker=flat, stop NOT_FOUND, no matching execution -> B3 HALT branch", "track1": "correct fail direction; document as an expected operator event"}
+  ],
+
+  "recovery_policy": [
+    {"scenario": "machine sleep", "production": "APScheduler's wait timer does not advance; heartbeat bounds the wait to 60s and reports the stall as a number", "track1_desired": "same, plus a window_ledger record", "catch_up": "n/a"},
+    {"scenario": "scheduler restart", "production": "preflight and maxhold state restored from disk; _catch_up_maxhold runs 09:31's job if missed", "track1_desired": "per-sleeve catch-up decision", "catch_up": "depends on sleeve"},
+    {"scenario": "IBKR disconnect", "production": "slot fails, tail logged, next slot is a fresh process", "track1_desired": "same", "catch_up": "valid for state sleeves"},
+    {"scenario": "missed 09:31 maxhold", "production": "startup catch-up, or 5-minute misfire grace, else the exit lands at 14:05 (4h40 late)", "track1_desired": "unchanged (legacy)", "catch_up": "valid"},
+    {"scenario": "missed 10:00 Calm A", "production": "does not exist", "track1_desired": "FAIL CLOSED - do not enter late; misfire_grace <= 60s; write window_closed(outcome=incomplete)", "catch_up": "INVALID"},
+    {"scenario": "missed Stress slots 10:35-12:30", "production": "does not exist", "track1_desired": "tolerate missed slots inside the window; never enter after 12:30; never enter on a break that happened materially earlier", "catch_up": "valid INSIDE the window only"},
+    {"scenario": "stale data", "production": "pre-flight fail-closed; G1 hard-stale blocks entries; E3 blocks on >3d bar skew", "track1_desired": "same once BLOCK-3 is resolved", "catch_up": "n/a"},
+    {"scenario": "no checkpoint", "production": "shadow logs WARNING and skips the comparison (deliberately not ERROR)", "track1_desired": "typed Refusal with one of seven codes", "catch_up": "n/a"},
+    {"scenario": "checkpoint mismatch after verify", "production": "checkpoint NOT advanced; the same comparison re-runs tomorrow from the same anchor", "track1_desired": "same rule", "catch_up": "n/a"},
+    {"scenario": "partial fill", "production": "PARTIAL treated as a fill for booking and stop placement; ordered vs filled both written", "track1_desired": "same", "catch_up": "n/a"},
+    {"scenario": "stop placement failure", "production": "place_stop returns '', level recorded, B4 re-places at the next runner construction, B5 shouts at end of run", "track1_desired": "same", "catch_up": "valid, idempotent"},
+    {"scenario": "dashboard unavailable", "production": "no effect on trading; dump_state failures are logged and swallowed", "track1_desired": "same", "catch_up": "n/a"}
+  ],
+
+  "telemetry": {
+    "minimum_before_shadow": [
+      {"field": "route on every runner event", "channel": "runner_events_*.jsonl via _emit_event base dict (runner.py:2645)"},
+      {"field": "window_open / slot_observed / window_closed", "channel": "window_coverage_*.jsonl - currently written by nobody"},
+      {"field": "checkpoint refusal code", "channel": "route_checkpoint.Refusal.code, emitted not merely logged"},
+      {"field": "slot runtime and phase timing for the new windows", "channel": "slot_timing_*.jsonl; requires RAITS_TELEMETRY_DIR in the scheduler environment"},
+      {"field": "parent-side skip records", "channel": "slot_timing_*.jsonl; requires the scheduler to be restarted onto current code"}
+    ],
+    "minimum_before_paper": [
+      {"field": "broker order lifecycle with a route field: submitted / verified-status / partial / cancelled / rejected", "channel": "runner_events ORDER category"},
+      {"field": "forced-close lifecycle: switch_requested, cap_passed, stop_cancelled, close_filled, open_filled, plus every failure branch", "channel": "runner_events, emitted before each step begins"},
+      {"field": "cap rejection reason vocabulary extended to cap_gross, cap_net, family_cap, same_symbol_suppressed, stress_switch_declined", "channel": "DayDecision.rejected_details"},
+      {"field": "rollover status per route", "channel": "runner_events ROLLOVER category"},
+      {"field": "per-route equity ledger and breaker level", "channel": "a route-scoped live_state file"}
+    ]
+  },
+
+  "dashboard_contract": {
+    "principle": "the backend never imports the runner; it reads files. Preserve that.",
+    "readers": [
+      {"reader": "runner_state_reader", "input": "global_index/live_state_data.js", "breaks_on_new_route": false, "note": "reads ONE path - a Track 1 state file is invisible until an API route is added"},
+      {"reader": "runner_positions_reader", "input": "live_positions.json", "breaks_on_new_route": false, "note": "projects an ALLOW-LIST of 10 keys - an unknown key is silently dropped, so a route field on a position needs this list extended"},
+      {"reader": "runner_event_reader", "input": "runner_events_YYYYMMDD.jsonl", "breaks_on_new_route": false, "note": "extra keys pass through untouched - a route field is safely additive"},
+      {"reader": "schedule_status", "input": "scheduler_*.log + its own hard-coded slot table at :167-181", "breaks_on_new_route": true, "note": "an unmirrored slot becomes an unexplained-overdue / fake incident; its own comment at :273 says so"},
+      {"reader": "job_journal_reader", "input": "scheduler_*.log", "breaks_on_new_route": "partly", "note": "_LAUNCH matches '-m (global_index|monitor).' so a new module is recognised as a launch, but _job_type returns 'other' and _job_id_from_name returns None unless the job name follows an existing pattern"},
+      {"reader": "paper_evidence_reader", "input": "live_state_data.js, paper_history.json, trade_log.jsonl, monitor/paper_inputs.json, monitor/paper_pnl_compare.json, scheduler_*.log, live_day_*.log", "breaks_on_new_route": true, "note": "SILENTLY - Track 1 CLOSE rows in a shared trade_log.jsonl would be folded into legacy fill-quality and P&L gates"}
+    ],
+    "allowed_in_existing_channels": [
+      "a route field on every runner_events_*.jsonl record",
+      "a route field on trade_log.jsonl rows ONLY together with a paper_evidence_reader change; otherwise Track 1 writes its own trade log"
+    ],
+    "must_go_to_a_side_channel": [
+      "slot timing -> slot_timing_*.jsonl (already route-aware)",
+      "window coverage -> window_coverage_*.jsonl (already route-aware)",
+      "Track 1 positions / equity / breaker / dashboard state -> route-scoped files"
+    ],
+    "must_not_change": [
+      "the window.LIVE_DATA wrapper and the meta / snapshots / runner_health shape",
+      "the position projection keys in runner_positions_reader (extend, never rename)",
+      "the scheduler log line format [SLOT_ID] ... and the tokens 'completed OK', 'thoat OK nhung', 'exited with code N', 'SKIPPED'",
+      "the argv of the legacy run_live_day invocation"
+    ],
+    "route_specific_display_required_before": "paper (orders), not shadow"
+  },
+
+  "implementation_sequence": [
+    {"step": 1, "action": "restart the scheduler onto current code and set RAITS_TELEMETRY_DIR; collect one clean week of legacy telemetry", "touches_production_code": false},
+    {"step": 2, "action": "give MultiClusterGuard a roska4_calm budget and make the cap set injectable per route; legacy defaults unchanged byte-for-byte", "touches_production_code": true},
+    {"step": 3, "action": "extract close_then_open from _handle_rollover, leaving rollover as its first caller", "touches_production_code": true},
+    {"step": 4, "action": "add a route field to _emit_event and to slot_telemetry consumers - additive only", "touches_production_code": true},
+    {"step": 5, "action": "write the Track 1 signal layer as a SIBLING of signal_layer.py", "touches_production_code": false},
+    {"step": 6, "action": "write the Track 1 entry point with its own state/lock/checkpoint/kill-switch/window-ledger and a hard-coded no-orders default", "touches_production_code": false},
+    {"step": 7, "action": "add the Track 1 slots to the scheduler AND mirror them in schedule_status.py in the same change; add ((10,35),(12,30)) to _ENTRY_WINDOWS so the 12:20 sweep does not land inside the Stress window; run shadow", "touches_production_code": true},
+    {"step": 8, "action": "resolve BLOCK-1 (separate IBKR account) and only then enable orders", "touches_production_code": true}
+  ],
+
+  "required_new_tests": [
+    {"step": 2, "test": "legacy default cluster set unchanged - assert the three names and four cap numbers", "red_when": "any default cap is mutated"},
+    {"step": 2, "test": "a roska4_calm candidate no longer raises KeyError in decide_day", "red_when": "the budget is removed"},
+    {"step": 3, "test": "close_then_open refuses the second leg when the first does not fill", "red_when": "the guard is removed"},
+    {"step": 3, "test": "rollover behaviour byte-identical after extraction", "red_when": "anchored on values measured BEFORE the refactor"},
+    {"step": 4, "test": "every emitted event carries a route", "red_when": "assert the list is non-empty first, then that every record has the key"},
+    {"step": 5, "test": "Track 1 signal layer reproduces the scratch replay trade-for-trade IN ORDER", "red_when": "compare the ordered event list, never counts or sums"},
+    {"step": 5, "test": "at most one position per instrument across all four Track 1 sleeves", "red_when": "drive a day where Normal, Calm and Stress all want MNQ"},
+    {"step": 5, "test": "SPY short gate is causal D-1", "red_when": "scale SPY close at D by 10; the value at D must be unchanged and D+1 must move"},
+    {"step": 6, "test": "Track 1 writes nothing under a legacy path", "red_when": "assert the mtime of live_positions.json, replay_checkpoint.json, runner.pid and live_state_data.js, not just their existence"},
+    {"step": 6, "test": "the entry point refuses to send an order without an explicit flag", "red_when": "assert send_order was never called"},
+    {"step": 6, "test": "all seven checkpoint refusal codes are reachable", "red_when": "a code becomes unreachable"},
+    {"step": 6, "test": "route isolation under concurrent writers", "red_when": "spawn two REAL processes - _acquire_lock exempts the same PID on purpose"},
+    {"step": 7, "test": "scheduler slot table and schedule_status slot table agree", "red_when": "a slot is added to one file only"},
+    {"step": 7, "test": "a missed 10:00 Calm A slot does not enter late", "red_when": "drive the slot 25 minutes late; assert zero entries and window_closed(outcome=incomplete)"},
+    {"step": 7, "test": "a missed Stress slot inside the window still enters; one after 12:30 does not", "red_when": "two drives, opposite verdicts"},
+    {"step": 7, "test": "dashboard readers survive Track 1 events", "red_when": "feed a route-tagged event file to runner_event_reader; assert malformed_lines == 0"}
+  ],
+
+  "do_not_touch_invariants": [
+    {"id": "INV-1", "text": "No run_live_day slot between 10:20 and 14:05 ET", "where": "run_scheduler.py:672", "cost_if_broken": "+$12,850 -> -$450 in the recorded case, silently"},
+    {"id": "INV-2", "text": "The STP deferral window: swing and NKD arm at 14:00 in the sleeve's own timezone the day after entry", "where": "runner.py:144 _ARM_BY_CLUSTER, runner.py:2393 _stop_deferred", "cost_if_broken": "-$10,832 vs +$47,166 over 2018-2026"},
+    {"id": "INV-3", "text": "One clientId (1) for every process that touches an order", "where": "run_live_day / run_maxhold_exit / run_stop_repair argparse defaults", "cost_if_broken": "IBKR accepts a cancel only from the placing client; orphan stops fill into unwanted positions"},
+    {"id": "INV-4", "text": "One shared runner.pid across those three entry points", "where": "same", "cost_if_broken": "each process locks only itself"},
+    {"id": "INV-5", "text": "The argv of the legacy run_live_day invocation stays byte-identical", "where": "run_scheduler._run", "cost_if_broken": "three log readers mis-parse"},
+    {"id": "INV-6", "text": "configs/final_params.yaml is sealed", "where": "CLAUDE.md", "cost_if_broken": "the vault result stops being a result"},
+    {"id": "INV-7", "text": "BACKTEST_CALMAR_FLOOR = 1.65 is not to be copied without its paragraph", "where": "runner.py:~178", "cost_if_broken": "the floor sits inside the noise band (five seeds 1.56-1.72, two below); a single reading under it is not evidence of degradation"},
+    {"id": "INV-8", "text": "The pre-flight gate fails closed - a missing flag means skip, never assume-fresh", "where": "run_scheduler.py:822-846"},
+    {"id": "INV-9", "text": "decide_day's ordering - exits, then start_day, then entries - is deliberate (decided 2026-08-08)", "where": "live_decision.py:~110", "cost_if_broken": "moves the brake in the backtest too; every baseline figure would have to be rebuilt"},
+    {"id": "INV-10", "text": "size_multiplier stays dead", "where": "futures/circuit_breaker.py docstring", "cost_if_broken": "changes sizing; requires re-validating WFO and the vault"},
+    {"id": "INV-11", "text": "Never delete .parquet or data/cache/", "cost_if_broken": "2-3 hours to rebuild from Polygon"},
+    {"id": "INV-12", "text": "monitor/paper_inputs.json is human attestation, not data; the nightly refresh deliberately does not regenerate it, nor the backtest baseline", "where": "run_scheduler._refresh_paper_evidence docstring", "cost_if_broken": "self-signed evidence; 21 frozen go-live bands lose their basis"}
+  ],
+
+  "confidence_labels": {
+    "verified_reproduced_with_a_number": [
+      "60-job schedule",
+      "156-test baseline, 6.27s",
+      "zero production importers for route_checkpoint, route_params, window_ledger",
+      "the running scheduler predates run_scheduler.py's current mtime",
+      "Stage 2C M5 and M5b MATCH where they must DIVERGE",
+      "IBKRBroker has no account parameter",
+      "roska4_calm has no guard budget, no arm-time entry, no dashboard cluster key"
+    ],
+    "reasoned_from_the_code_path_not_executed": [
+      "what would happen if a Track 1 slot ran between 10:20 and 14:05",
+      "the KeyError path for an unknown cluster in decide_day",
+      "the netting behaviour of two routes in one IBKR account"
+    ],
+    "not_examined": [
+      "paper_evidence_reader beyond its input list (3,498 lines)",
+      "session_event_reader, open_issue_reader, execution_quality_reader, entry_time_reader internals",
+      "the dashboard front-end",
+      "futures/_validated_core.backtest_swing_tf internals",
+      "whether the Track 1 scratch fill law matches what send_order would actually achieve"
+    ],
+    "out_of_scope": "Stage 2C. Its two unproved mutations are a BOOTSTRAP gate (is the resumed Track 1 book's cluster/risk field load-bearing on the floor window), which is a different question from the PRODUCTION WIRING gate this document answers. Neither substitutes for the other."
+  }
+}

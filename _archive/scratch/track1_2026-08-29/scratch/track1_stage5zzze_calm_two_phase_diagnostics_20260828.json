@@ -1,0 +1,116 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZZ-E",
+  "title": "Calm two-phase diagnostics without leaking observe values",
+  "route": "track1_candidate",
+  "date": "2026-08-28",
+  "clocks": {"machine": "America/Edmonton", "operator": "Asia/Ho_Chi_Minh", "market": "America/New_York"},
+
+  "answers": {
+    "calm_decide_values_published": [
+      "instrument", "direction", "daily_atr_causal", "stop_rule", "stop_distance",
+      "risk_dollars", "entry_reference_time"
+    ],
+    "calm_observe_values_published": [
+      "instrument", "entry_reference_price", "planned_stop", "daily_atr_causal",
+      "stop_distance", "risk_dollars"
+    ],
+    "can_an_observe_only_value_leak_into_decide": false,
+    "leak_prevention": {
+      "split_source": "derived from the detector's own dataclasses, not a hand-kept list",
+      "decide_set": "CalmPreEntry.__dataclass_fields__",
+      "observe_only_set": "CalmSetup fields minus CalmPreEntry fields, plus planned_stop, entry_reference_price, risk_dollars",
+      "price_levels_at_decide": "gated on the phase itself, not on what the row contains",
+      "stop_at_decide": "published as the RULE and its DISTANCE; never as a level"
+    },
+    "decision_gate_or_order_behaviour_changed": false,
+    "orders_possible": false,
+    "blockers": ["PAPER_SHADOW_EVIDENCE"]
+  },
+
+  "runtime_writers_added": 0,
+  "runtime_note": "run_live_day_track1._write_shadow_intent already records both Calm phases on every path including refusals; this stage is a reader",
+
+  "sources": {
+    "recorded_runtime": "a phase whose instant has passed and which left a row",
+    "reconstructed_today": "a phase whose instant has passed and which left no row",
+    "not_yet_run": "a phase whose instant has not been reached as of the asked time",
+    "order_of_checks": "instant first, record second"
+  },
+
+  "observed": {
+    "2026-08-28": {"decide": {"status": "NO_SETUP", "reason_code": "no_candidate"},
+                   "observe": {"status": "REFUSED", "reason_code": "no_decide_row_for_this_day"}},
+    "2026-08-27": {"decide": {"status": "REFUSED", "reason_code": "gate_refused"},
+                   "observe": {"status": "REFUSED", "reason_code": "gate_refused"}}
+  },
+
+  "tests": {
+    "new_suite": "scratch/test_track1_stage5zzze_calm_two_phase_diagnostics_20260828.py",
+    "new_suite_result": {"passed": 33, "failed": 0},
+    "browser_widths": [375, 720, 1440],
+    "adjacent_suites_result": {"passed": 123, "failed": 0},
+    "restated_assertions": [
+      {"file": "scratch/test_track1_stage5zu_calm_timing_identity_20260826.py", "was": "confirmation file must not exist", "now": "any decision on disk must be signed"},
+      {"file": "scratch/test_track1_stage5zv_calm_execution_identity_20260826.py", "was": "confirmation file must not exist", "now": "any decision on disk must be signed"},
+      {"file": "scratch/test_track1_stage5zw_calm_prepaper_execution_20260827.py", "was": "confirmation file must not exist", "now": "any decision on disk must be signed"},
+      {"file": "scratch/test_track1_stage5zw_calm_prepaper_execution_20260827.py", "was": "B1 named in the blocking set", "now": "something is blocking, and it comes from the registry"}
+    ]
+  },
+
+  "mutation_harness": {
+    "method": "source-level, subprocess, restored byte-identical; baseline proved green first",
+    "caught": 6, "total": 6, "restored_byte_identical": true,
+    "mutations": [
+      {"id": "M1", "change": "a distance renamed into a level at DECIDE", "verdict": "RED"},
+      {"id": "M2", "change": "price level attaches to the row's contents rather than to the phase",
+       "verdict": "RED after fix",
+       "note": "first run came back GREEN honestly; the DECIDE card carried no level only because DECIDE rows happen to have no after_reference. The leak was prevented by the data, not the code."},
+      {"id": "M3", "change": "the instant stops being checked at all", "verdict": "RED"},
+      {"id": "M4", "change": "a replayed OBSERVE stops refusing without a DECIDE", "verdict": "RED"},
+      {"id": "M5", "change": "the page falls back across the line to fill a gap", "verdict": "RED"},
+      {"id": "M6", "change": "the market view stops publishing the phases", "verdict": "RED"}
+    ]
+  },
+
+  "defects_found_and_fixed": [
+    {"where": "reconstruction", "what": "Path used without being imported; every replay returned 'could not be replayed'"},
+    {"where": "calm_blocks", "what": "the record was preferred before the time check, so not_yet_run never fired"},
+    {"where": "calm_blocks", "what": "DECIDE price levels were prevented by the data rather than by the code (found by a surviving mutation)"},
+    {"where": "realtime.js", "what": "Calm read one level too high; the response is {market_view, regime}"}
+  ],
+
+  "safety": {
+    "scheduler_restarted": false,
+    "scheduler_pids": [3000],
+    "broker_connected": false,
+    "orders_dir_created": false,
+    "orders_dir_present": false,
+    "live_positions_track1_present": false,
+    "TRACK1_ORDERS_APPROVED_set": false,
+    "allow_orders_passed": false,
+    "confirmation_file_modified": false,
+    "confirmation_file_present": true,
+    "shadow_intent_bytes_changed_by_reading": false,
+    "gates_thresholds_schedules_or_strategy_logic_changed": false,
+    "diagnostics_reachable_from_any_gate": false
+  },
+
+  "files_changed": [
+    "global_index/track1_strategy_diagnostics.py",
+    "monitor/backend/track1_market_view.py",
+    "global_index/dash/realtime/realtime.js",
+    "global_index/dash/realtime/realtime.css",
+    "global_index/dash/realtime/index.html",
+    "scratch/test_track1_stage5zzze_calm_two_phase_diagnostics_20260828.py",
+    "scratch/test_track1_stage5zu_calm_timing_identity_20260826.py",
+    "scratch/test_track1_stage5zv_calm_execution_identity_20260826.py",
+    "scratch/test_track1_stage5zw_calm_prepaper_execution_20260827.py"
+  ],
+  "runtime_trading_files_changed": [],
+
+  "still_open": [
+    "reconstructed DECIDE carries no risk inputs; recomputing them would be a second implementation of the sizing",
+    "neither reconstruction path has yet met a Calm day that actually set up - the last one is outside the retained bar window"
+  ]
+}

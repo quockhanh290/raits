@@ -1,0 +1,1051 @@
+{
+ "floor": {
+  "anchor": {
+   "net": 33181.0,
+   "calmar": 0.52,
+   "pf": 1.36,
+   "sharpe": 1.73,
+   "maxdd": 9259.0
+  },
+  "anchor_ok": true,
+  "rows": [
+   {
+    "label": "R4 only (NKD excluded)",
+    "net": 8569.549999999997,
+    "pf": 1.2065059787463586,
+    "sharpe": 1.0955514273430789,
+    "calmar": 0.17861735181291993,
+    "maxdd": 11371.609999999999,
+    "maxdd_pct": 0.22743219999999997,
+    "ret_yr": 0.04062333728098636,
+    "trades": 839,
+    "taken": 350,
+    "rejected": 135,
+    "halted": 354,
+    "yearly": {
+     "2018": 4542.48,
+     "2019": 4759.439999999999,
+     "2020": 3127.18,
+     "2021": 4298.880000000001,
+     "2022": -8158.43
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "NKD only, original",
+    "net": 3903.6600000000017,
+    "pf": 1.152009669653906,
+    "sharpe": 0.8629940247892833,
+    "calmar": 0.14479749246293547,
+    "maxdd": 3937.2000000000044,
+    "maxdd_pct": 0.07874400000000009,
+    "ret_yr": 0.011401933746501405,
+    "trades": 228,
+    "taken": 228,
+    "rejected": 0,
+    "halted": 0,
+    "yearly": {
+     "2018": -2013.52,
+     "2019": -500.8799999999999,
+     "2020": -703.6999999999997,
+     "2021": 450.5600000000002,
+     "2022": 2433.9300000000003,
+     "2023": 4539.660000000002,
+     "2024": -302.3899999999999
+    },
+    "outside_exit_bar": 3,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "NKD only, corrected",
+    "net": 3898.300000000001,
+    "pf": 1.1517692723967028,
+    "sharpe": 0.8617306055473407,
+    "calmar": 0.14446768130041188,
+    "maxdd": 3940.770000000005,
+    "maxdd_pct": 0.0788154000000001,
+    "ret_yr": 0.011386278088764497,
+    "trades": 228,
+    "taken": 228,
+    "rejected": 0,
+    "halted": 0,
+    "yearly": {
+     "2018": -2013.52,
+     "2019": -502.30999999999983,
+     "2020": -705.8399999999996,
+     "2021": 450.5600000000002,
+     "2022": 2432.1400000000003,
+     "2023": 4539.660000000002,
+     "2024": -302.3899999999999
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "R4 + NKD, original",
+    "net": 33181.26999999999,
+    "pf": 1.3648937884103922,
+    "sharpe": 1.7278912056384956,
+    "calmar": 0.5233879825283106,
+    "maxdd": 9258.60999999998,
+    "maxdd_pct": 0.18517219999999962,
+    "ret_yr": 0.09691690417832864,
+    "trades": 1067,
+    "taken": 799,
+    "rejected": 268,
+    "halted": 0,
+    "yearly": {
+     "2018": 2528.959999999998,
+     "2019": 4258.559999999999,
+     "2020": 2423.4799999999996,
+     "2021": 4749.44,
+     "2022": -2414.51,
+     "2023": 14978.17,
+     "2024": 6657.170000000001
+    },
+    "outside_exit_bar": 3,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "R4 + NKD, corrected NKD",
+    "net": 33175.90999999999,
+    "pf": 1.3648133411026089,
+    "sharpe": 1.727590532655488,
+    "calmar": 0.5233034360481321,
+    "maxdd": 9258.60999999998,
+    "maxdd_pct": 0.18517219999999962,
+    "ret_yr": 0.09690124852059173,
+    "trades": 1067,
+    "taken": 799,
+    "rejected": 268,
+    "halted": 0,
+    "yearly": {
+     "2018": 2528.959999999998,
+     "2019": 4257.129999999998,
+     "2020": 2421.3399999999997,
+     "2021": 4749.44,
+     "2022": -2416.3,
+     "2023": 14978.17,
+     "2024": 6657.170000000001
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "R4 + NKD, corrected both",
+    "net": 33175.92999999999,
+    "pf": 1.364813641261504,
+    "sharpe": 1.7275916106462723,
+    "calmar": 0.5233037515200731,
+    "maxdd": 9258.60999999998,
+    "maxdd_pct": 0.18517219999999962,
+    "ret_yr": 0.0969013069372251,
+    "trades": 1067,
+    "taken": 799,
+    "rejected": 268,
+    "halted": 0,
+    "yearly": {
+     "2018": 2528.959999999998,
+     "2019": 4257.129999999998,
+     "2020": 2421.359999999999,
+     "2021": 4749.44,
+     "2022": -2416.3,
+     "2023": 14978.17,
+     "2024": 6657.170000000001
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   }
+  ],
+  "corrected_repricing": {
+   "MES": {
+    "n": 1,
+    "dollars": 318.19999999999936
+   },
+   "MNQ": {
+    "n": 1,
+    "dollars": 86.77999999999884
+   },
+   "MYM": {
+    "n": 1,
+    "dollars": 59.215000000000146
+   },
+   "M2K": {
+    "n": 1,
+    "dollars": 18.949999999999818
+   },
+   "MNKD": {
+    "n": 4,
+    "dollars": 5.354999999999563
+   }
+  },
+  "audit_original": {
+   "MES": {
+    "inst": "MES",
+    "n": 202,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNQ": {
+    "inst": "MNQ",
+    "n": 210,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MYM": {
+    "inst": "MYM",
+    "n": 216,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "M2K": {
+    "inst": "M2K",
+    "n": 211,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNKD": {
+    "inst": "MNKD",
+    "n": 228,
+    "outside_exit_bar": 3,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 3,
+    "adverse": 0,
+    "outside_dollars": 6.419999999998254
+   }
+  },
+  "audit_corrected": {
+   "MES": {
+    "inst": "MES",
+    "n": 202,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNQ": {
+    "inst": "MNQ",
+    "n": 210,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MYM": {
+    "inst": "MYM",
+    "n": 216,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "M2K": {
+    "inst": "M2K",
+    "n": 211,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNKD": {
+    "inst": "MNKD",
+    "n": 228,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   }
+  },
+  "samples": [
+   {
+    "inst": "MNKD",
+    "day": "2019-02-04",
+    "exit_day": "2019-02-08",
+    "entry_time": "2019-02-04 14:40:00+09:00",
+    "exit_time": "2019-02-08 21:51:00+09:00",
+    "direction": "LONG",
+    "trade_reason": "CHANDELIER",
+    "entry": 20215.0,
+    "exit": 19560.71,
+    "bar": "O19560.00 H19560.00 L19560.00 C19560.00",
+    "why": "exit above bar high",
+    "pnl": -338.54
+   },
+   {
+    "inst": "MNKD",
+    "day": "2019-05-27",
+    "exit_day": "2019-05-31",
+    "entry_time": "2019-05-27 15:30:00+09:00",
+    "exit_time": "2019-05-31 16:54:00+09:00",
+    "direction": "LONG",
+    "trade_reason": "CHANDELIER",
+    "entry": 20695.0,
+    "exit": 19957.14,
+    "bar": "O19955.00 H19955.00 L19950.00 C19955.00",
+    "why": "exit above bar high",
+    "pnl": -380.33
+   },
+   {
+    "inst": "MNKD",
+    "day": "2022-09-12",
+    "exit_day": "2022-09-16",
+    "entry_time": "2022-09-12 14:50:00+09:00",
+    "exit_time": "2022-09-16 00:13:00+09:00",
+    "direction": "LONG",
+    "trade_reason": "CHANDELIER",
+    "entry": 28035.0,
+    "exit": 27258.57,
+    "bar": "O27255.00 H27255.00 L27255.00 C27255.00",
+    "why": "exit above bar high",
+    "pnl": -399.61
+   }
+  ],
+  "fix_n": 4,
+  "fix_tot": 483.14499999999816
+ },
+ "vault2025": {
+  "anchor": {
+   "net": 6857.0,
+   "calmar": 1.47,
+   "pf": 1.51,
+   "sharpe": 2.33,
+   "maxdd": 5025.0
+  },
+  "anchor_ok": true,
+  "rows": [
+   {
+    "label": "R4 only (NKD excluded)",
+    "net": 4654.160000000002,
+    "pf": 1.5487859089263671,
+    "sharpe": 2.392944002341255,
+    "calmar": 1.6352304497487042,
+    "maxdd": 3093.949999999999,
+    "maxdd_pct": 0.061878999999999976,
+    "ret_yr": 0.10118642500000004,
+    "trades": 113,
+    "taken": 52,
+    "rejected": 61,
+    "halted": 0,
+    "yearly": {
+     "2025": 4654.160000000002
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "NKD only, original",
+    "net": 2203.04,
+    "pf": 1.416819289509135,
+    "sharpe": 2.190519194173144,
+    "calmar": 1.232661743926517,
+    "maxdd": 1931.3100000000002,
+    "maxdd_pct": 0.038626200000000006,
+    "ret_yr": 0.04761303905325443,
+    "trades": 31,
+    "taken": 31,
+    "rejected": 0,
+    "halted": 0,
+    "yearly": {
+     "2025": 2203.04
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "NKD only, corrected",
+    "net": 2203.04,
+    "pf": 1.416819289509135,
+    "sharpe": 2.190519194173144,
+    "calmar": 1.232661743926517,
+    "maxdd": 1931.3100000000002,
+    "maxdd_pct": 0.038626200000000006,
+    "ret_yr": 0.04761303905325443,
+    "trades": 31,
+    "taken": 31,
+    "rejected": 0,
+    "halted": 0,
+    "yearly": {
+     "2025": 2203.04
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "R4 + NKD, original",
+    "net": 6857.200000000003,
+    "pf": 1.5118233951031492,
+    "sharpe": 2.3302074296599,
+    "calmar": 1.4745578120400835,
+    "maxdd": 5025.2599999999975,
+    "maxdd_pct": 0.10050519999999995,
+    "ret_yr": 0.14820072781065094,
+    "trades": 144,
+    "taken": 83,
+    "rejected": 61,
+    "halted": 0,
+    "yearly": {
+     "2025": 6857.200000000003
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "R4 + NKD, corrected NKD",
+    "net": 6857.200000000003,
+    "pf": 1.5118233951031492,
+    "sharpe": 2.3302074296599,
+    "calmar": 1.4745578120400835,
+    "maxdd": 5025.2599999999975,
+    "maxdd_pct": 0.10050519999999995,
+    "ret_yr": 0.14820072781065094,
+    "trades": 144,
+    "taken": 83,
+    "rejected": 61,
+    "halted": 0,
+    "yearly": {
+     "2025": 6857.200000000003
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "R4 + NKD, corrected both",
+    "net": 6857.200000000003,
+    "pf": 1.5118233951031492,
+    "sharpe": 2.3302074296599,
+    "calmar": 1.4745578120400835,
+    "maxdd": 5025.2599999999975,
+    "maxdd_pct": 0.10050519999999995,
+    "ret_yr": 0.14820072781065094,
+    "trades": 144,
+    "taken": 83,
+    "rejected": 61,
+    "halted": 0,
+    "yearly": {
+     "2025": 6857.200000000003
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   }
+  ],
+  "corrected_repricing": {
+   "MES": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "MNQ": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "MYM": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "M2K": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "MNKD": {
+    "n": 0,
+    "dollars": 0.0
+   }
+  },
+  "audit_original": {
+   "MES": {
+    "inst": "MES",
+    "n": 26,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNQ": {
+    "inst": "MNQ",
+    "n": 31,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MYM": {
+    "inst": "MYM",
+    "n": 27,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "M2K": {
+    "inst": "M2K",
+    "n": 29,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNKD": {
+    "inst": "MNKD",
+    "n": 31,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   }
+  },
+  "audit_corrected": {
+   "MES": {
+    "inst": "MES",
+    "n": 26,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNQ": {
+    "inst": "MNQ",
+    "n": 31,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MYM": {
+    "inst": "MYM",
+    "n": 27,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "M2K": {
+    "inst": "M2K",
+    "n": 29,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNKD": {
+    "inst": "MNKD",
+    "n": 31,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   }
+  },
+  "samples": [],
+  "fix_n": 0,
+  "fix_tot": 0.0
+ },
+ "vault2026": {
+  "anchor": {
+   "net": 6747.0,
+   "calmar": 1.62,
+   "pf": 1.46,
+   "sharpe": 2.43,
+   "maxdd": 7517.0
+  },
+  "anchor_ok": true,
+  "rows": [
+   {
+    "label": "R4 only (NKD excluded)",
+    "net": 735.9899999999998,
+    "pf": 1.0881345986887405,
+    "sharpe": 0.5029096273229922,
+    "calmar": 0.20984513828192833,
+    "maxdd": 6341.789999999999,
+    "maxdd_pct": 0.12683579999999997,
+    "ret_yr": 0.026615875990099003,
+    "trades": 88,
+    "taken": 46,
+    "rejected": 42,
+    "halted": 0,
+    "yearly": {
+     "2026": 735.9899999999998
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "NKD only, original",
+    "net": 6010.68,
+    "pf": 1.946650245219248,
+    "sharpe": 4.328327297408926,
+    "calmar": 4.362291374004402,
+    "maxdd": 2503.82,
+    "maxdd_pct": 0.0500764,
+    "ret_yr": 0.21844784776119403,
+    "trades": 26,
+    "taken": 24,
+    "rejected": 2,
+    "halted": 0,
+    "yearly": {
+     "2026": 6010.68
+    },
+    "outside_exit_bar": 1,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "NKD only, corrected",
+    "net": 6007.47,
+    "pf": 1.9456665979287313,
+    "sharpe": 4.324585110409293,
+    "calmar": 4.3543792021016,
+    "maxdd": 2507.03,
+    "maxdd_pct": 0.05014060000000001,
+    "ret_yr": 0.2183311858208955,
+    "trades": 26,
+    "taken": 24,
+    "rejected": 2,
+    "halted": 0,
+    "yearly": {
+     "2026": 6007.47
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "R4 + NKD, original",
+    "net": 6746.67,
+    "pf": 1.4642013550361126,
+    "sharpe": 2.434667956363328,
+    "calmar": 1.6229759473637118,
+    "maxdd": 7516.509999999999,
+    "maxdd_pct": 0.1503302,
+    "ret_yr": 0.24398229876237623,
+    "trades": 114,
+    "taken": 70,
+    "rejected": 44,
+    "halted": 0,
+    "yearly": {
+     "2026": 6746.67
+    },
+    "outside_exit_bar": 1,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "R4 + NKD, corrected NKD",
+    "net": 6743.460000000001,
+    "pf": 1.4638780392842061,
+    "sharpe": 2.4330988539480076,
+    "calmar": 1.6215112687469462,
+    "maxdd": 7519.719999999998,
+    "maxdd_pct": 0.15039439999999996,
+    "ret_yr": 0.24386621435643568,
+    "trades": 114,
+    "taken": 70,
+    "rejected": 44,
+    "halted": 0,
+    "yearly": {
+     "2026": 6743.460000000001
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   },
+   {
+    "label": "R4 + NKD, corrected both",
+    "net": 6743.460000000001,
+    "pf": 1.4638780392842061,
+    "sharpe": 2.4330988539480076,
+    "calmar": 1.6215112687469462,
+    "maxdd": 7519.719999999998,
+    "maxdd_pct": 0.15039439999999996,
+    "ret_yr": 0.24386621435643568,
+    "trades": 114,
+    "taken": 70,
+    "rejected": 44,
+    "halted": 0,
+    "yearly": {
+     "2026": 6743.460000000001
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "entry_not_bar_close": 0
+   }
+  ],
+  "corrected_repricing": {
+   "MES": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "MNQ": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "MYM": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "M2K": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "MNKD": {
+    "n": 1,
+    "dollars": 3.2150000000001455
+   }
+  },
+  "audit_original": {
+   "MES": {
+    "inst": "MES",
+    "n": 23,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNQ": {
+    "inst": "MNQ",
+    "n": 20,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MYM": {
+    "inst": "MYM",
+    "n": 24,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "M2K": {
+    "inst": "M2K",
+    "n": 21,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNKD": {
+    "inst": "MNKD",
+    "n": 26,
+    "outside_exit_bar": 1,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 1,
+    "adverse": 0,
+    "outside_dollars": 6.430000000000291
+   }
+  },
+  "audit_corrected": {
+   "MES": {
+    "inst": "MES",
+    "n": 23,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNQ": {
+    "inst": "MNQ",
+    "n": 20,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MYM": {
+    "inst": "MYM",
+    "n": 24,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "M2K": {
+    "inst": "M2K",
+    "n": 21,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNKD": {
+    "inst": "MNKD",
+    "n": 26,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   }
+  },
+  "samples": [
+   {
+    "inst": "MNKD",
+    "day": "2026-03-09",
+    "exit_day": "2026-03-11",
+    "entry_time": "2026-03-09 14:20:00+09:00",
+    "exit_time": "2026-03-11 02:20:00+09:00",
+    "direction": "SHORT",
+    "trade_reason": "CHANDELIER",
+    "entry": 52265.0,
+    "exit": 55738.57,
+    "bar": "O55745.00 H55780.00 L55745.00 C55745.00",
+    "why": "exit below bar low",
+    "pnl": -1748.19
+   }
+  ],
+  "fix_n": 0,
+  "fix_tot": 0.0
+ }
+}

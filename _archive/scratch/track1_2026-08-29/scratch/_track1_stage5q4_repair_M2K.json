@@ -1,0 +1,18 @@
+{
+  "tool": "stage5q4_repair_boundary_bar",
+  "inst": "M2K",
+  "path": "data/cache/futures/RTY_continuous_1m_8y.parquet",
+  "ran_at_utc": "2026-08-25T03:29:13",
+  "parquet_sha256_before": "86009f82160e9914f0f45b68daa1a117e4dbfe771e682ccce4e20251ad0b15ef",
+  "parquet_rows": 2951565,
+  "parquet_last_bar": "2026-08-24 23:25:00-04:00",
+  "window_minutes": 120,
+  "window_start": "2026-08-24 21:25:00-04:00",
+  "feed_rows": 1710,
+  "shared_disagreements_total": 0,
+  "in_window": [],
+  "outside_window": [],
+  "applied": false,
+  "dry_run": true,
+  "verdict": "nothing_to_repair"
+}

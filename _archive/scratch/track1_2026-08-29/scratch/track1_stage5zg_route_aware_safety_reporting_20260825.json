@@ -1,0 +1,269 @@
+{
+  "stage": "5ZG",
+  "title": "Route-aware Track 1 safety exit reporting before paper",
+  "checked_at": {
+    "utc": "2026-08-26T01:12",
+    "et": "2026-08-25T21:12 EDT",
+    "calgary": "2026-08-25T19:12 MDT",
+    "tokyo": "2026-08-26T10:12 JST",
+    "window": "ET 19:00-21:10"
+  },
+  "verdicts": {
+    "safety_exit_legacy_trade_log_blocker": "CLOSED in code and under test; NOT yet live (scheduler pid 48604 still holds this morning's argv)",
+    "next_shadow_window": "READY",
+    "paper": "NOT_READY",
+    "scheduler_backend_runtime_or_live_file_touched": false,
+    "legacy_safety_behaviour_changed": false,
+    "track1_trade_log_path": "global_index/track1_runtime/trade_log.track1.jsonl",
+    "route_tagging": "implemented now, not deferred",
+    "route_tag_value": "track1_candidate"
+  },
+  "q1_current_safety_exit_write_path": {
+    "before": {
+      "run_stop_repair.py:180": "trade_log_path=str(_CWD / 'trade_log.jsonl')",
+      "run_maxhold_exit.py:171": "trade_log_path=str(_CWD / 'trade_log.jsonl')",
+      "route_or_log_argument_accepted": false
+    },
+    "callers": {
+      "legacy_maxhold_exit_0931": {
+        "book": "live_positions.json",
+        "log": "legacy hardcoded"
+      },
+      "legacy_stop_repair_x11": {
+        "book": "live_positions.json",
+        "log": "legacy hardcoded"
+      },
+      "track1_maxhold_exit_0931": {
+        "book": "live_positions.track1.json",
+        "log": "legacy hardcoded"
+      },
+      "track1_stop_repair_x10_plus_sunday": {
+        "book": "live_positions.track1.json",
+        "log": "legacy hardcoded"
+      }
+    },
+    "track1_jobs_already_receive_positions_path": true,
+    "track1_jobs_received_any_route_or_log_argument": false,
+    "legacy_must_stay_byte_for_byte": true,
+    "why_stop_repair_is_a_writer": "B3 runs inside FuturesRunner.__init__; a matched stop is booked and a CLOSE row written. The hardcoded path was added 2026-08-17 after a max-hold close moved equity and left the log untouched."
+  },
+  "q2_destination": {
+    "path": "global_index/track1_runtime/trade_log.track1.jsonl",
+    "named_once_in": "global_index/track1_slots.py :: TRACK1_TRADE_LOG_PATH",
+    "why_separate_file": "paper_evidence_reader aggregates the whole trade log and splits on nothing (measured). The route's own PAPER_OUTPUT_POLICY already said 'SEPARATE file until paper_evidence_reader can split on route'.",
+    "why_under_track1_runtime_root": "the five sibling per-route files and every Track 1 reader already live there",
+    "reader_collision_check": "every Track 1 runtime reader targets a named subdirectory with an explicit glob; nothing enumerates the runtime root. The new file is invisible to all.",
+    "not_in_scratch": true
+  },
+  "q3_cli_design": {
+    "arguments": [
+      "--trade-log-path",
+      "--route"
+    ],
+    "contract": {
+      "no_argument": "trade_log.jsonl, byte for byte; no probe, no mkdir, no touch",
+      "trade_log_path_given": "used, and proven writable now or the job exits 1",
+      "route_given": "every row this run writes carries route=R",
+      "route_without_path": "REFUSED, exit 1"
+    },
+    "inferred_from_positions_path": false,
+    "why_not_inferred": "a caller who changed the book but not the log would silently keep writing legacy's file",
+    "probe_ordering": "before the positions check, because both scripts return early when the book is absent and in shadow that is every run",
+    "probe_kind": "append-open of the real file (exactly what the writer does), not a permission bit on the directory",
+    "probe_side_effect": "creates the file empty on first success, so 'never swept' and 'swept, closed nothing' are distinguishable"
+  },
+  "q4_scheduler_wiring": {
+    "track1_only": {
+      "jobs": 101,
+      "track1_safety_argv_has_destination_and_route": true,
+      "legacy_drain_argv_has_either": false
+    },
+    "default": {
+      "jobs": 61,
+      "any_destination_or_route": false
+    },
+    "transitional": {
+      "jobs": 130,
+      "any_destination_or_route": false
+    },
+    "job_inventory_changed": false,
+    "path_read_from_constant_not_repeated": true
+  },
+  "q5_safety_semantics": {
+    "changed": [
+      "reporting destination",
+      "optional route tag on rows"
+    ],
+    "unchanged": [
+      "stop-repair logic",
+      "max-hold exit logic",
+      "broker client id (90)",
+      "lock path (runner.track1.pid)",
+      "positions path",
+      "order placement",
+      "max-hold marker (maxhold_state.track1.json)",
+      "kill switch path"
+    ],
+    "orders_sent_in_tests": 0,
+    "how_tests_avoid_orders": "IBKRBroker class and FuturesRunner both replaced before construction; max-hold additionally run with --dry-run"
+  },
+  "q6_reporting_compatibility": {
+    "existing_schema_has_route_field": false,
+    "measured_on_production_log": {
+      "rows": 28,
+      "distinct_keys": 20,
+      "rows_with_route": 0
+    },
+    "route_tagging": "IMPLEMENTED NOW",
+    "mechanism": "FuturesRunner(route=None) optional kwarg, last in the signature; _append_trade_raw uses setdefault so a caller that already named its route wins",
+    "legacy_rows_gain_any_key": false,
+    "track1_row_keyset_minus_legacy_keyset": [
+      "route"
+    ],
+    "open_rows_tagged_too": true,
+    "tag_value_deviates_from_brief": {
+      "brief_suggested": "track1",
+      "used": "track1_candidate",
+      "reason": "matches the route field every other Track 1 artefact already carries (slot_timing, window_coverage, runner events, live state)"
+    }
+  },
+  "q7_readiness_gates": {
+    "paper": "NOT_READY",
+    "open": [
+      {
+        "blocker": "PAPER_SHADOW_EVIDENCE 0/5 clean sessions",
+        "class": "evidence"
+      },
+      {
+        "blocker": "B1_broker_account_or_legacy_retirement",
+        "class": "operator"
+      },
+      {
+        "blocker": "route-aware PnL / Flex / session report",
+        "class": "code",
+        "remaining_of_six": 5
+      },
+      {
+        "blocker": "verify_regime_labels is warn-only",
+        "class": "code"
+      }
+    ],
+    "closed_here": "Track 1 safety exits write the legacy trade log",
+    "measured_runtime": {
+      "orders_possible": false,
+      "track1_blocking": [
+        "B1_broker_account_or_legacy_retirement",
+        "PAPER_SHADOW_EVIDENCE"
+      ],
+      "confirmation_file": false,
+      "orders_dir": false,
+      "TRACK1_ORDERS_APPROVED": null
+    }
+  },
+  "not_yet_live": {
+    "entry_point_changes": "already live — each safety job is a fresh subprocess importing current source",
+    "scheduler_argv": "NOT live — built inside the running scheduler process, pid 48604, started 01:07 ET today",
+    "consequence": "until a restart, Track 1 safety jobs are still invoked with no destination and no route and would still write the legacy log",
+    "restart_performed": false
+  },
+  "observed_not_caused_by_this_stage": {
+    "live_positions_track1_json": {
+      "exists": true,
+      "mtime_calgary": "2026-08-25 13:56:19",
+      "positions": 0,
+      "written_by": "the 15:55 ET shadow slot",
+      "consequence": "both Track 1 safety jobs stop taking their early return and will acquire the lock and connect to IBKR on every sweep"
+    }
+  },
+  "tests": {
+    "file": "scratch/test_track1_stage5zg_route_aware_safety_reporting_20260825.py",
+    "count": 40,
+    "brief_items_covered": {
+      "1_legacy_stop_repair_default": "test_stop_repair_with_no_argument_still_targets_the_legacy_log",
+      "2_legacy_maxhold_default": "test_maxhold_with_no_argument_still_targets_the_legacy_log",
+      "3_track1_stop_repair_argv": "test_track1_stop_repair_argv_carries_the_book_the_log_the_lock_and_the_id",
+      "4_track1_maxhold_argv": "test_track1_maxhold_argv_carries_the_book_the_log_and_its_own_marker",
+      "5_legacy_drain_argv": "test_the_legacy_drain_safety_never_touches_the_track1_log",
+      "6_simulated_track1_stop_repair_close": "test_a_simulated_track1_stop_repair_close_lands_in_the_track1_log",
+      "7_simulated_track1_maxhold_close": "test_a_simulated_track1_maxhold_close_lands_in_the_track1_log",
+      "8_route_tagging": "test_a_legacy_row_gains_no_route_key_at_all + test_the_close_schema_is_unchanged_apart_from_the_tag",
+      "9_unwritable_fails_visibly": "test_an_unwritable_destination_fails_the_job_before_it_connects",
+      "10_no_production_write": "test_no_production_file_was_written_by_this_run (mtime, parametrized)"
+    },
+    "two_layer_composition": "which destination the SCRIPT chooses (main() with broker and FuturesRunner replaced) + what the RUNNER's real writer does with it (FuturesRunner._append_trade on an object.__new__ instance, so B3/B4 never run)",
+    "mutations": {
+      "file": "scratch/track1_stage5zg_mutations_20260825.py",
+      "count": 24,
+      "red": 24,
+      "method": "source-level edits run in a SUBPROCESS; in-process patching cannot express scheduler wiring or statement ordering",
+      "baseline_green_proved_per_mutation": true,
+      "harness_defects_found_and_fixed": [
+        "restore compared file BYTES to re-encoded TEXT — always fails in a CRLF repo, aborted the sweep mid-run",
+        "two anchors whose indentation made them suffixes of a second line, matching twice — reported as harness-broken, then pinned"
+      ]
+    }
+  },
+  "regression": {
+    "total_passed": 866,
+    "total_failed": 4,
+    "suites": [
+      {
+        "suite": "stage 5ZG",
+        "passed": 40,
+        "failed": 0
+      },
+      {
+        "suite": "dashboard backend, realtime contract, 5ZE, 5ZD, 5ZB, pre-sleep schedule status",
+        "passed": 392,
+        "failed": 0
+      },
+      {
+        "suite": "17 suites constructing FuturesRunner",
+        "passed": 222,
+        "failed": 0
+      },
+      {
+        "suite": "safety + scheduler (5ZG, 5ZF, 5O, 5M-D, 5M0, 5P, stop-repair slots, max-hold, exit reason, entry-point lock, kill switch, client id, stop placement, critical echo)",
+        "passed": 252,
+        "failed": 4
+      }
+    ],
+    "test_event_playback_run": false,
+    "updated_because_this_stage_closed_what_they_pinned": [
+      "5ZF test_17 — a deliberate tripwire carrying 'if this becomes route-aware the report is stale'; it fired within hours. Inverted and kept.",
+      "5ZF test_19 — guessed at a repo-root filename; now asserts the part still missing."
+    ],
+    "failures_are_pre_existing": {
+      "count": 4,
+      "tests": [
+        "5O::test_no_switch_or_state_file_was_created",
+        "5M-D::test_no_switch_or_state_file_was_touched",
+        "5P::test_no_switch_or_state_file_was_created",
+        "5M-D::test_b1_still_blocks_orders"
+      ],
+      "proof": {
+        "three_file_absence_tests": "live_positions.track1.json mtime 13:56:19 Calgary; the earliest file this stage edited has mtime 19:05:23 — five hours later",
+        "b1_gate_test": "PAPER_SHADOW_EVIDENCE is defined in track1_gates.py and track1_paper_executor.py and appears ZERO times in all six files this stage touched"
+      },
+      "pattern": "absence standing in for 'no test wrote it' — breaks the moment the running system writes the file legitimately. 5P's own comment says so three lines above the assertion that still uses it; the mtime fix sits immediately below.",
+      "fixed_here": false,
+      "why_not": "unrelated to this stage; the brief says not to chase them"
+    }
+  },
+  "files_touched": {
+    "new": [
+      "global_index/safety_trade_log.py",
+      "scratch/test_track1_stage5zg_route_aware_safety_reporting_20260825.py",
+      "scratch/track1_stage5zg_mutations_20260825.py"
+    ],
+    "modified": [
+      "global_index/track1_slots.py",
+      "global_index/runner.py",
+      "global_index/run_stop_repair.py",
+      "global_index/run_maxhold_exit.py",
+      "global_index/run_scheduler.py",
+      "scratch/test_track1_stage5zf_ops_report_completeness_20260825.py"
+    ],
+    "runtime_or_live_files_written": []
+  }
+}

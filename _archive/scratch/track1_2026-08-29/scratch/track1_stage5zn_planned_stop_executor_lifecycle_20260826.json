@@ -1,0 +1,257 @@
+{
+  "stage": "5ZN",
+  "title": "Planned stop, executor lifecycle, and cross-day Track 1 book before paper",
+  "checked_at": {
+    "utc": "2026-08-26T07:24",
+    "et": "2026-08-26T03:24 EDT",
+    "calgary": "2026-08-26T01:24 MDT",
+    "window": "ET 03:20-04:20"
+  },
+  "answers": {
+    "1_runtime_or_live_file_changed": {
+      "answer": false,
+      "verified": [
+        "book + checkpoint carry 00:55 from the live NKD close",
+        "Track 1 trade log carries 22:20 from 5ZJ's probe",
+        "legacy trade log untouched from 2026-08-15",
+        "preflight_state.json still the operator's seven days, 2026-08-26 absent",
+        "no order journal directory was created"
+      ]
+    },
+    "2_orders_still_impossible": {
+      "answer": true,
+      "blocking": [
+        "B1_broker_account_or_legacy_retirement",
+        "PAPER_SHADOW_EVIDENCE",
+        "REGIME_LABEL_VERIFICATION"
+      ],
+      "confirmation_file": false,
+      "orders_dir": false,
+      "no_ibkr_broker_constructed": true,
+      "no_ib_insync_import": true
+    },
+    "3_where_the_planned_stop_lives": {
+      "type": "global_index/track1_planned_stop.PlannedStop",
+      "fields": [
+        "inst",
+        "tradable_symbol",
+        "direction",
+        "qty",
+        "stop_price",
+        "stop_type",
+        "stop_distance",
+        "entry_price",
+        "ref_day",
+        "sleeve",
+        "slot_id",
+        "params_hash",
+        "detail"
+      ],
+      "also_on": [
+        "track1_order_state.OrderRecord (3 fields, appended last, defaulted)",
+        "track1_order_journal.JournalRecord (the same 3 plus qty)"
+      ],
+      "NOT_on": [
+        "broker.Order",
+        "broker.Fill"
+      ],
+      "why_not": "those are shared with the legacy route and gained nothing - asserted"
+    },
+    "4_can_an_entry_be_sendable_without_a_plan": {
+      "answer": false,
+      "refused_in_two_places": [
+        "from_candidate - six conditions, each with its own code",
+        "assert_sendable - missing plan, wrong instrument, fewer contracts than the order"
+      ],
+      "refusal_codes": [
+        "no_stop_price",
+        "stop_not_a_number",
+        "stop_on_the_wrong_side_of_entry",
+        "no_qty"
+      ],
+      "notable": "a long whose stop sits above its entry is not a stop, it is a target, and it would trigger the moment it reached a broker - caught here rather than there"
+    },
+    "5_lifecycle_verbs": {
+      "close_position": "BUILT, intent-only",
+      "place_protective_stop": "BUILT, intent-only",
+      "switch_same_symbol": "BUILT, intent-only, TWO legs journalled separately, close first",
+      "open_position": "was already built in 5W and does hand its order to its broker",
+      "the_asymmetry_is_the_point": "a method that COULD send is a method somebody can call; the send step for the three new verbs is not built",
+      "structural_proof": [
+        "none of the three mentions self.broker (AST)",
+        "the executor imports no ib_insync and names no IBKRBroker",
+        "the slot path still builds NoOrderBroker, which raises"
+      ],
+      "every_refusal_precedes_the_journal_row": "a refused operation leaves no trace a later reader could mistake for an attempt"
+    },
+    "6_cross_day_book": {
+      "safe_now": true,
+      "was_safe_before": false,
+      "before": "write_route_checkpoint synthesised positions: [] on every production call - harmless while the route holds nothing, and exactly wrong the moment it does",
+      "now": {
+        "no book": "a flat one is created, book_carried_from: None",
+        "book exists": "positions carried forward and restamped, book_carried_from names the file",
+        "unreadable": "the write is REFUSED and the file is left exactly as it was",
+        "another route's book": "refused"
+      },
+      "why_the_refusal_matters": "'I could not read what I hold' answered as 'I hold nothing' is the shape that erases a real position, and a window close that did it would be unrecoverable",
+      "book_advances_only_on_a_confirmed_fill": "asserted - intending a close does not move it",
+      "restart_classification": "MATCH / MISMATCH / UNKNOWN; UNKNOWN blocks entries, allows exits, and never becomes MATCH"
+    },
+    "7_unverified_until_paper": {
+      "one_thing": "that a broker actually holds the stop that was planned",
+      "covers": [
+        "price",
+        "quantity",
+        "side",
+        "whether it survives a close",
+        "whether an abandoned one is left behind"
+      ],
+      "why": "every part of it needs an order to exist first, and none does",
+      "reported_as": {
+        "planned_stop_ready": true,
+        "broker_stop_verified": false,
+        "broker_stop_reason": "no Track 1 order has ever been sent, so no stop has ever been placed for one to be compared against; this needs paper"
+      }
+    },
+    "8_legacy_unchanged": {
+      "answer": true,
+      "proof": [
+        "broker.Order and broker.Fill gained nothing (asserted)",
+        "run_live_day, run_stop_repair and run_maxhold_exit mention no planned_stop literal and read no such attribute (asserted)"
+      ]
+    },
+    "9_strategy_identity_unchanged": {
+      "answer": true,
+      "proof": [
+        "sleeve_identity hashes identical before and after exercising the new path",
+        "the planned-stop module imports no signal, rule, sleeve or calm module (AST)",
+        "the module does NO arithmetic beyond the two subtractions that make stop_distance (AST over its BinOps)"
+      ]
+    },
+    "10_next_shadow_window_ready": true,
+    "11_only_evidence_operator_paper_left": {
+      "answer": "yes for Track 1's own code",
+      "caveat": "the lifecycle verbs produce INTENT and the send step is deliberately not built. Wiring a real call site is a stage of its own and should come AFTER the gates open, not before - the day it is built is the day the distance between the scheduler and a broker stops being structural. Until then the remaining code is a wire, not a design."
+    }
+  },
+  "live_confirmation_of_the_previous_stage": {
+    "event": "the 02:55 ET NKD close, between 5ZM and this stage",
+    "checkpoint_entries": {
+      "roska4_swing": 4,
+      "global_nkd": 1,
+      "total": 5
+    },
+    "was": 0,
+    "audit": "global_nkd 2026-08-26 -> PASS",
+    "checkpoint_detail": "route ok, 5 entr(y/ies) through ['2026-08-24'] (2 days behind), book cut 2026-08-26, 0 open position(s) matched",
+    "significance": "the second Track 1 window ever to pass, and the first with a checkpoint anything could resume from"
+  },
+  "what_was_missing": {
+    "measured": "Candidate carries stop_price and it survives admission; candidate_to_order builds an Order with nowhere to put it, and OrderRecord had nowhere either",
+    "consequence": "the planned stop reached the edge of the order path and was dropped; the protective stop was placed later by the safety sweep in another process, and NOTHING anywhere held both the intended price and the placed one",
+    "precedent": "an abandoned stop left by a close on 2026-08-10 filled and opened a position the opposite way - which is why a stop with no record is an accounting hole"
+  },
+  "defect_found_by_building_on_it": {
+    "what": "track1_paper_executor.BOOK_PATH was 'global_index/live_positions.track1.json'",
+    "reality": "a path the book has never occupied; every other component uses the repository root, and that is where track1_bootstrap.write puts it",
+    "consequence": "read_book treats a missing file as an empty book, so that constant made reconcile_at_startup compare an ALWAYS-empty book against the broker and conclude the route was flat whatever it held - 'resume flat against a book that is not', in the one object built to prevent it",
+    "why_it_never_fired": "nothing imports the executor",
+    "fix": "corrected and READ FROM track1_slots rather than restated, so the two cannot drift",
+    "a_test_was_green_because_of_it": {
+      "test": "5X test_37_the_live_book_really_is_absent_right_now",
+      "problem": "it asserted the book was ABSENT and passed by asserting something true of a file nobody writes",
+      "rewritten_to": "the constant matches the route's own, and the book exists and is flat - a different fact from not existing"
+    }
+  },
+  "tests": {
+    "file": "scratch/test_track1_stage5zn_planned_stop_lifecycle_20260826.py",
+    "count": 52,
+    "all_fifteen_brief_items_covered": true,
+    "fake_broker_raises_on_send": "so a send would fail loudly rather than pass quietly",
+    "notable": [
+      "AST: the planned-stop module does no arithmetic beyond the distance",
+      "AST: each new verb never touches self.broker",
+      "behavioural: a refused operation leaves the journal empty"
+    ],
+    "a_pin_i_nearly_weakened_and_did_not": {
+      "pin": "six tests across five suites assert that NOTHING WHICH RUNS imports the order path - part of the argument that there is no route from the scheduler to a broker",
+      "what_broke_it": "my first reporting block imported the executor to read hasattr for a panel field",
+      "easy_fix_rejected": "loosening the six pins",
+      "done_instead": "the report DECLARES the verb names and a test compares that declaration against the real class, where imports are free. Production's import graph is unchanged, the claim stays checked, and a panel field did not buy the first import into the order path."
+    },
+    "one_rule_widened_with_its_reason": {
+      "test": "5V - every serialised journal value is str | int | float",
+      "why_widened": "the planned-stop fields default to None, and None is LOAD-BEARING: 'no plan travelled with this row' must be distinguishable from a stop at a price, and 0.0 would collide with a real one. None round-trips through JSON unchanged, so the property the line guards still holds."
+    }
+  },
+  "regression": {
+    "passed": 690,
+    "failed": 0,
+    "suites": [
+      "5ZN",
+      "5ZM",
+      "5ZL",
+      "5ZF",
+      "5ZG",
+      "5ZK",
+      "5ZH",
+      "5S",
+      "5O",
+      "the whole order-path family 5T-5Z",
+      "the whole monitor/ suite",
+      "legacy stop and max-hold suites"
+    ]
+  },
+  "files_changed": {
+    "new": [
+      "global_index/track1_planned_stop.py",
+      "scratch/test_track1_stage5zn_planned_stop_lifecycle_20260826.py"
+    ],
+    "modified": [
+      "global_index/track1_paper_order.py",
+      "global_index/track1_order_state.py",
+      "global_index/track1_order_journal.py",
+      "global_index/track1_paper_executor.py",
+      "global_index/run_live_day_track1.py",
+      "global_index/track1_report.py",
+      "scratch/test_track1_stage5x_broker_readside_20260825.py",
+      "scratch/test_track1_stage5v_order_journal_20260825.py"
+    ],
+    "runtime_files_changed": []
+  },
+  "remaining_before_paper": [
+    {
+      "n": 1,
+      "item": "machine sleep",
+      "class": "operator"
+    },
+    {
+      "n": 2,
+      "item": "B1 - separate account, or a proven-flat legacy book",
+      "class": "operator"
+    },
+    {
+      "n": 3,
+      "item": "five clean judgeable days",
+      "class": "time, once 1 is fixed"
+    },
+    {
+      "n": 4,
+      "item": "the regime gate's first PASS",
+      "class": "time - the 16:20 job records it"
+    },
+    {
+      "n": 5,
+      "item": "broker stop proof, partial fills, an order in flight across a restart",
+      "class": "paper only"
+    }
+  ],
+  "honest_summary": "nothing Track 1 needs is unknown any more. What is left is a machine that must stay awake, an account decision, five clean days, and a broker.",
+  "claims_deliberately_NOT_made": [
+    "paper readiness",
+    "that any stop has been placed",
+    "broker-verified anything",
+    "that the send step exists"
+  ]
+}

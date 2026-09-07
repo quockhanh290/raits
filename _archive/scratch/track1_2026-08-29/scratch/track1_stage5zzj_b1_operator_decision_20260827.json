@@ -1,0 +1,223 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZJ",
+  "title": "B1 operator decision: retire legacy / assign paper login to Track 1",
+  "when_et": "2026-08-27",
+
+  "status": {
+    "parts_complete": ["A", "B", "E", "F"],
+    "part_c": "BLOCKED - the harness auto-mode classifier refused to place the confirmation file",
+    "part_d": "ESTABLISHED ANALYTICALLY by the preview against the real registry, not observed on disk",
+    "b1_closed": false,
+    "orders_possible": false,
+    "needs_operator": true
+  },
+
+  "blocked_write": {
+    "what": "placing track1_go_live_confirmation.json",
+    "why_i_stopped": "it releases a go-live gate; I did not reach for a different tool to put the same bytes in the same place",
+    "command": "copy scratch\\track1_b1_decision_candidate_20260827.json track1_go_live_confirmation.json",
+    "bytes_are": "exactly what was previewed - placing anything else would mean the preview described a different file"
+  },
+
+  "spec_contradiction": {
+    "part_c": "write the B1 decision",
+    "part_d_3": "confirmation remains false",
+    "measured": "monitor/ops.py TRACK1_CONFIRMATION and track1_gates.CONFIRMATION_PATH both resolve to D:\\raits\\track1_go_live_confirmation.json",
+    "consequence": "writing the decision NECESSARILY sets confirmation=True; both cannot be satisfied",
+    "my_reading": "Part D.3 is carried over from earlier stages where the file was forbidden outright",
+    "invariant_that_actually_matters": "orders_possible=False, which holds either way and was proven by the preview before anything was written"
+  },
+
+  "part_a": {
+    "opened_with": "b1_legacy_flat=UNKNOWN (record_stale) - the last B1 audit is too old to count",
+    "action": "Part A.5 applied - measurement refreshed before anything was signed",
+    "audit": {
+      "command": "python -m global_index.b1_audit --broker ibkr --record",
+      "client_id": 97, "read_only": true, "orders_placed": 0,
+      "status": "PASS", "code": "legacy_and_broker_flat",
+      "checked_at": "2026-08-27T16:04:17.115797+00:00",
+      "age_hours": 0.07, "expires_at": "2026-08-28T16:04:17.115797+00:00",
+      "record": "global_index/track1_b1/track1_b1_20260827.jsonl"
+    },
+    "conditions": {
+      "broker_positions": 0,
+      "broker_working_orders": 0,
+      "legacy_book_positions": 0,
+      "track1_book_positions": 0,
+      "track1_book_schema_version": 2,
+      "track1_book_route": "track1_candidate",
+      "paper_baseline_status": "PASS",
+      "paper_baseline_currency": "USD",
+      "paper_baseline_equity": 250817.91,
+      "paper_baseline_account_id": "DUR125337",
+      "paper_baseline_checked_at": "2026-08-27T11:29:47.831562+00:00",
+      "paper_baseline_age_hours": 4.58,
+      "paper_baseline_policy_max_hours": 24,
+      "broker_equity_at_audit": 250819.13,
+      "confirmation_file_present": false,
+      "orders_dir_present": false,
+      "orders_possible_before": false
+    },
+    "all_conditions_pass": true,
+    "external_change_noted": "backend pid moved 6420 -> 45676 between 5ZZH and this stage; someone restarted it. Nothing this stage did."
+  },
+
+  "part_b_preview": {
+    "tool": "python -m global_index.track1_b1_decision",
+    "candidate_path": "scratch/track1_b1_decision_candidate_20260827.json",
+    "production_path_touched": false,
+    "validates": true,
+    "decision": "legacy_retired_confirmed",
+    "waiver": false,
+    "measurement_status": "PASS",
+    "measurement_expires_at": "2026-08-28T16:04:17Z",
+    "legacy_entry_capability": "none",
+    "would_release": ["B1_broker_account_or_legacy_retirement"],
+    "would_still_block": ["PAPER_SHADOW_EVIDENCE"],
+    "would_orders_be_possible": false,
+    "part_b3_stop_condition_triggered": false,
+    "part_b3_evidence": "the running scheduler is in track1-only-shadow, which registers no legacy strategy job",
+    "the_one_warning": {
+      "text": "Legacy is dormant because of a command-line flag, not because it has been retired: a restart without --track1-only-shadow registers its entry jobs again, and this recorded decision would go on reading as true.",
+      "measured": "track1-only-shadow registers 0 legacy strategy jobs; the default mode registers 45",
+      "means": "the decision is a claim a plain restart can falsify silently while the gate keeps reading it as true",
+      "blocks_the_decision": false,
+      "mitigation_in_this_stage": "the running mode is now pinned by a test (item 10)",
+      "proper_fix": "the switch-over runbook's ordered procedure, not this flag"
+    }
+  },
+
+  "part_d_expected_after_write": {
+    "source": "the preview, computed from the real registry with the candidate's confirmations",
+    "observed_on_disk": false,
+    "before_blocking": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "after_blocking": ["PAPER_SHADOW_EVIDENCE"],
+    "orders_possible": false,
+    "orders_approved": false,
+    "orders_dir": "ABSENT",
+    "confirmation": true,
+    "confirmation_note": "necessarily - see spec_contradiction",
+    "refusal_causes_each_separately_tested": [
+      "missing decision", "stale measurement (>24h)", "FAIL or UNKNOWN measurement",
+      "a file that does not validate", "an unknown key", "both decisions set at once",
+      "a waiver with no reason"
+    ]
+  },
+
+  "part_e_dashboard": {
+    "b1_appeared_on_the_page_before": false,
+    "b1_appeared_in_ops_status_before": true,
+    "problem": "the operator had to leave the dashboard to learn whether the route's most consequential gate was open",
+    "added": "monitor/backend/track1_runtime_reader._b1",
+    "fields": ["decision", "decisions", "confirmed_by", "confirmed_at", "waiver",
+               "measurement_status", "measurement_code", "measurement_checked_at",
+               "measurement_age_hours", "measurement_expires_at",
+               "broker_positions", "broker_working_orders", "legacy_book_positions",
+               "track1_book_positions", "account_equity", "blocking_now", "closed", "line"],
+    "decision_states": {
+      "not_recorded": "the operator has not decided - the normal state, not an error",
+      "accepted": "a valid decision is on file",
+      "invalid": "a file exists and does not validate"
+    },
+    "why_three": "invalid grants exactly what not_recorded grants - nothing - and means something completely different to whoever has to fix it",
+    "closed_comes_from": "the gate registry, never computed from the two halves - a second opinion in the reader is a second thing to keep in step",
+    "constructs_a_broker": false,
+    "runs_the_audit": false,
+    "legacy_issues_still_scoped_legacy": true,
+    "issues_deleted": 0,
+    "backend_restart_needed_for_this_stages_verification": false,
+    "backend_restart_needed_to_serve_the_new_block": true,
+    "restart_command": "python monitor\\ops.py restart --backend",
+    "restart_run": false
+  },
+
+  "part_f_tests": {
+    "new_file": "scratch/test_track1_stage5zzj_b1_operator_decision_20260827.py",
+    "new_count": 26,
+    "broker_contacts": 0,
+    "production_confirmation_path_written_by_tests": false,
+    "all_decision_files_under": "tmp_path",
+    "wording_correction": {
+      "stage_said": "cannot WRITE the decision without X",
+      "reality": "there is no writer - track1_b1_decision has no code path that writes anything, deliberately: 'the confirmation file is written by a person, never by a script, and that includes this one'",
+      "honest_translation": "the decision does not OPEN THE GATE without X, tested where it is actually enforced",
+      "extra_test_added": "the preview module never grows a writer - the property the 'cannot write' items were really protecting"
+    },
+    "mutations": {
+      "total": 9, "red": 9, "restored_byte_identical": true,
+      "list": ["a signature alone opens B1 again (the measurement half is dropped)",
+               "B1 stops blocking orders",
+               "an unknown key is silently dropped instead of refused",
+               "a half-parsing file has its valid flags honoured",
+               "the preview stops warning that dormant is not retired",
+               "the preview stops warning that legacy can still enter",
+               "an unreadable scheduler is reported as safe",
+               "the reader computes `closed` itself instead of asking the registry",
+               "an invalid decision file reads as absent"],
+      "harness_defect_found_and_fixed": {
+        "what": "two mutations first came back labelled 'GREEN - the guard is asleep' at exit code 2",
+        "exit_2_is": "a pytest usage error - my mutation had broken the file's syntax and nothing ran",
+        "why_that_label_is_the_worst_available": "it reads as a guard that failed to notice, when in fact there was no run at all - the same family as counting 'nothing collected' as a pass",
+        "fix": "exit 2-5 now named 'BROKE THE FILE - proves nothing'; both mutations rewritten to flip a condition rather than mangle a statement"
+      }
+    },
+    "test_bug_found_in_my_own_work": {
+      "which": "the read-only proof",
+      "what": "it built its candidate file AFTER installing the write barrier, so the test's own fixture tripped the trap and reported the preview for a write the test had made",
+      "note": "a green version of that would have proved nothing"
+    },
+    "stale_pins_repaired": {
+      "count": 2,
+      "where": "scratch/test_track1_stage5zr_b1_decision_20260826.py",
+      "which": ["test_5_a_waiver_with_a_reason_bypasses_only_the_measurement",
+                "test_18_the_preview_reports_what_would_open_and_what_would_not"],
+      "cause": "both pinned REGIME_LABEL_VERIFICATION as still blocking; it was released by its own measurement on 2026-08-26, so they failed for a reason with nothing to do with B1",
+      "family": "the roster-pin anti-pattern",
+      "now": "expressed as the property each test is about - the preview reports everything still blocking EXCEPT B1"
+    },
+    "suites": {
+      "5ZZJ + 5ZR + 5ZQ + ops + ops-status + dashboard backend + realtime contract": "352 passed"
+    },
+    "pre_existing_failures": 2,
+    "pre_existing_failures_note": "both the stale REGIME_LABEL_VERIFICATION pins above; repaired rather than left red. Nothing else red before or after."
+  },
+
+  "final_report": {
+    "before_blockers": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "after_blockers": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "after_blockers_note": "unchanged because Part C was blocked; the preview says the after-state would be [PAPER_SHADOW_EVIDENCE]",
+    "account_id": "DUR125337",
+    "account_currency": "USD",
+    "account_equity_baseline": 250817.91,
+    "account_equity_at_audit": 250819.13,
+    "broker_positions": 0,
+    "broker_working_orders": 0,
+    "legacy_book_positions": 0,
+    "track1_book_positions": 0,
+    "b1_decision_file_path": "track1_go_live_confirmation.json",
+    "b1_decision_file_present": false,
+    "b1_closed": false,
+    "orders_still_impossible": true
+  },
+
+  "safety_confirmed": {
+    "orders_possible": false,
+    "TRACK1_ORDERS_APPROVED": null,
+    "confirmation_file": "ABSENT",
+    "orders_dir": "ABSENT",
+    "order_journal_created_or_modified": false,
+    "allow_orders_in_scheduler_or_ops": false,
+    "scheduler_restarts": 0,
+    "backend_restarts_by_this_stage": 0,
+    "legacy_trade_logs_or_books": "read only",
+    "ibkr_connections": 1,
+    "ibkr_connection_detail": "read-only, client id 97, announced before it ran",
+    "strategy_rules_slots_execution_or_send_wire_touched": false
+  },
+
+  "needs_from_operator": [
+    "may I place the decision file? one copy of the previewed candidate, or run the line yourself",
+    "was Part D.3's 'confirmation remains false' meant literally? if so the decision cannot be recorded at all and I should stop"
+  ]
+}

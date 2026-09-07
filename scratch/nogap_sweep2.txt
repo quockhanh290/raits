@@ -1,0 +1,54 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 7309.542802079805 is not greater than 7309.7777731706765. Delta is -0.23497109087111312
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+Model is not converging.  Current: 7309.542802079805 is not greater than 7309.7777731706765. Delta is -0.23497109087111312
+Model is not converging.  Current: 7310.737617865149 is not greater than 7310.956641261866. Delta is -0.21902339671669324
+Model is not converging.  Current: 6772.719531673847 is not greater than 6772.924509067358. Delta is -0.2049773935104895
+Model is not converging.  Current: 7309.542802079688 is not greater than 7309.777773170553. Delta is -0.23497109086474666
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+====================================================================================
+CONG MO NEO — moi co TAT, phai tai tao dung so ghim trong INVARIANTS
+====================================================================================
+  baseline    ghim $  42,459/1.72  |  do lai $  42,459/1.72  -> MATCH
+  floor       ghim $  42,565/1.65  |  do lai $  42,565/1.65  -> MATCH
+  vault2324   ghim $  10,757/2.86  |  do lai $  10,757/2.86  -> MATCH
+  vault2025   ghim $   7,404/2.54  |  do lai $   7,404/2.54  -> MATCH
+
+  KET LUAN CONG: PASS — duoc phep doc ket qua phia sau
+
+========================================================================================
+LAP QUANG TRAN — stop song tu luc khop, co so ATR NGAY (deploy, IS 2018-2024)
+========================================================================================
+  cau hinh                                   net   Calmar     MaxDD   phanh
+  --------------------------------------------------------------------------
+  DOI CHUNG: stop hep, dat ngay           -6,661    -0.33     15.3%    2721
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  stop 0.5 x ATRngay, dat ngay            -2,651    -0.08     16.4%     925
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  stop 1.0 x ATRngay, dat ngay            -5,874    -0.25     17.4%    1095
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  stop 1.5 x ATRngay, dat ngay            -3,580    -0.09     18.3%     614
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  stop 2.5 x ATRngay, dat ngay            -1,456    -0.05     18.6%     747
+
+=== DOI CHUNG ===
+  stop hep dat ngay: net $-6,661
+  -> DAT (te nhu du kien, co che dung)
+
+=== AP QUY TAC CHON ===
+  phanh = 0: 0/4
+  KHONG cau hinh nao dat -> dong huong theo cam ket

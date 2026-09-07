@@ -1,0 +1,716 @@
+{
+ "level1": {
+  "floor": {
+   "window": "floor",
+   "sleeves": {
+    "roska4_swing": [
+     {
+      "variant": "artifact_gate_on",
+      "fill_law": "artifact_all_bars_gappable",
+      "spy_short_gate": true,
+      "trades": 752,
+      "added": 0,
+      "removed": 0,
+      "changed": 0,
+      "net": 27711.359999999993,
+      "pf": 1.2999698312923,
+      "calmar": 0.25145712528063874,
+      "maxdd": 16120.019999999986,
+      "d_net": 0.0,
+      "d_pf": 0.0,
+      "d_calmar": 0.0,
+      "d_maxdd": 0.0
+     },
+     {
+      "variant": "production_gate_on",
+      "fill_law": "production_gap_after_15min_break",
+      "spy_short_gate": true,
+      "trades": 752,
+      "added": 1,
+      "removed": 1,
+      "changed": 2,
+      "net": 27711.569999999992,
+      "pf": 1.299972786399868,
+      "calmar": 0.2514623067224636,
+      "maxdd": 16119.809999999987,
+      "d_net": 0.20999999999912689,
+      "d_pf": 2.95510756798123e-06,
+      "d_calmar": 5.1814418248752325e-06,
+      "d_maxdd": -0.20999999999912689
+     },
+     {
+      "variant": "artifact_gate_off",
+      "fill_law": "artifact_all_bars_gappable",
+      "spy_short_gate": false,
+      "trades": 822,
+      "added": 232,
+      "removed": 162,
+      "changed": 394,
+      "net": 7242.760000000002,
+      "pf": 1.0708819829214076,
+      "calmar": 0.04964367545110077,
+      "maxdd": 21289.69999999997,
+      "d_net": -20468.59999999999,
+      "d_pf": -0.22908784837089247,
+      "d_calmar": -0.20181344982953797,
+      "d_maxdd": 5169.679999999986
+     },
+     {
+      "variant": "production_gate_off",
+      "fill_law": "production_gap_after_15min_break",
+      "spy_short_gate": false,
+      "trades": 822,
+      "added": 232,
+      "removed": 162,
+      "changed": 394,
+      "net": 7242.760000000002,
+      "pf": 1.0708819829214076,
+      "calmar": 0.04964367545110077,
+      "maxdd": 21289.69999999997,
+      "d_net": -20468.59999999999,
+      "d_pf": -0.22908784837089247,
+      "d_calmar": -0.20181344982953797,
+      "d_maxdd": 5169.679999999986
+     }
+    ],
+    "global_nkd": [
+     {
+      "variant": "artifact_gate_on",
+      "fill_law": "artifact_all_bars_gappable",
+      "spy_short_gate": true,
+      "trades": 228,
+      "added": 0,
+      "removed": 0,
+      "changed": 0,
+      "net": 3898.300000000001,
+      "pf": 1.1517692723967028,
+      "calmar": 0.14446768130041188,
+      "maxdd": 3940.770000000005,
+      "d_net": 0.0,
+      "d_pf": 0.0,
+      "d_calmar": 0.0,
+      "d_maxdd": 0.0
+     },
+     {
+      "variant": "production_gate_on",
+      "fill_law": "production_gap_after_15min_break",
+      "spy_short_gate": true,
+      "trades": 228,
+      "added": 4,
+      "removed": 4,
+      "changed": 8,
+      "net": 3903.6600000000017,
+      "pf": 1.152009669653906,
+      "calmar": 0.14479749246293547,
+      "maxdd": 3937.2000000000044,
+      "d_net": 5.360000000000582,
+      "d_pf": 0.00024039725720315097,
+      "d_calmar": 0.0003298111625235911,
+      "d_maxdd": -3.5700000000006185
+     },
+     {
+      "variant": "artifact_gate_off",
+      "fill_law": "artifact_all_bars_gappable",
+      "spy_short_gate": false,
+      "trades": 235,
+      "added": 75,
+      "removed": 68,
+      "changed": 143,
+      "net": 1533.1400000000003,
+      "pf": 1.054315702358708,
+      "calmar": 0.03531262853698499,
+      "maxdd": 6340.5700000000015,
+      "d_net": -2365.1600000000008,
+      "d_pf": -0.09745357003799482,
+      "d_calmar": -0.10915505276342688,
+      "d_maxdd": 2399.7999999999965
+     },
+     {
+      "variant": "production_gate_off",
+      "fill_law": "production_gap_after_15min_break",
+      "spy_short_gate": false,
+      "trades": 235,
+      "added": 77,
+      "removed": 70,
+      "changed": 147,
+      "net": 1542.4300000000003,
+      "pf": 1.054662817001137,
+      "calmar": 0.0355606471595591,
+      "maxdd": 6334.5,
+      "d_net": -2355.870000000001,
+      "d_pf": -0.09710645539556584,
+      "d_calmar": -0.10890703414085277,
+      "d_maxdd": 2393.729999999995
+     }
+    ]
+   }
+  }
+ },
+ "level2": {
+  "floor": {
+   "window": "floor",
+   "rows": [
+    {
+     "variant": "artifact_gate_on",
+     "policy": "repaired_mechanics_independent_caps",
+     "fill_law": "artifact_all_bars_gappable",
+     "spy_short_gate": true,
+     "net": 75288.07853571427,
+     "pf": 1.678943087328752,
+     "calmar": 2.165779297444621,
+     "maxdd": 4973.377499999991,
+     "sharpe": 2.138045317335667,
+     "taken": {
+      "roska4_swing": 546,
+      "roska4_stress": 49,
+      "global_nkd": 758,
+      "roska4_calm": 342
+     },
+     "rejected": {
+      "roska4_swing": 187,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 0
+     },
+     "d_net": 0.0,
+     "d_pf": 0.0,
+     "d_calmar": 0.0,
+     "d_maxdd": 0.0,
+     "calm_stress_untouched": true
+    },
+    {
+     "variant": "artifact_gate_on",
+     "policy": "repaired_mechanics_family_cap_5_44",
+     "fill_law": "artifact_all_bars_gappable",
+     "spy_short_gate": true,
+     "net": 74409.77853571426,
+     "pf": 1.6718480082938028,
+     "calmar": 2.1405136246589462,
+     "maxdd": 4973.377499999988,
+     "sharpe": 2.118093909541625,
+     "taken": {
+      "roska4_swing": 545,
+      "roska4_stress": 49,
+      "global_nkd": 758,
+      "roska4_calm": 338
+     },
+     "rejected": {
+      "roska4_swing": 190,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 4
+     },
+     "d_net": 0.0,
+     "d_pf": 0.0,
+     "d_calmar": 0.0,
+     "d_maxdd": 0.0,
+     "calm_stress_untouched": true
+    },
+    {
+     "variant": "artifact_gate_on",
+     "policy": "repaired_mechanics_family_cap_7p5",
+     "fill_law": "artifact_all_bars_gappable",
+     "spy_short_gate": true,
+     "net": 75288.07853571427,
+     "pf": 1.678943087328752,
+     "calmar": 2.165779297444621,
+     "maxdd": 4973.377499999991,
+     "sharpe": 2.138045317335667,
+     "taken": {
+      "roska4_swing": 546,
+      "roska4_stress": 49,
+      "global_nkd": 758,
+      "roska4_calm": 342
+     },
+     "rejected": {
+      "roska4_swing": 187,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 0
+     },
+     "d_net": 0.0,
+     "d_pf": 0.0,
+     "d_calmar": 0.0,
+     "d_maxdd": 0.0,
+     "calm_stress_untouched": true
+    },
+    {
+     "variant": "artifact_gate_on",
+     "policy": "risk_clean_no_calm_nkd_family_cap_5_44",
+     "fill_law": "artifact_all_bars_gappable",
+     "spy_short_gate": true,
+     "net": 64902.908535714276,
+     "pf": 1.617201561051112,
+     "calmar": 1.9178850837166401,
+     "maxdd": 4845.307499999988,
+     "sharpe": 2.3421033574386647,
+     "taken": {
+      "roska4_swing": 545,
+      "roska4_stress": 49,
+      "global_nkd": 228,
+      "roska4_calm": 338
+     },
+     "rejected": {
+      "roska4_swing": 190,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 4
+     },
+     "d_net": 0.0,
+     "d_pf": 0.0,
+     "d_calmar": 0.0,
+     "d_maxdd": 0.0,
+     "calm_stress_untouched": true
+    },
+    {
+     "variant": "artifact_gate_on",
+     "policy": "risk_clean_no_calm_nkd_family_cap_7p5",
+     "fill_law": "artifact_all_bars_gappable",
+     "spy_short_gate": true,
+     "net": 65781.20853571428,
+     "pf": 1.624744501258052,
+     "calmar": 1.943838904693728,
+     "maxdd": 4845.307499999992,
+     "sharpe": 2.36833615868317,
+     "taken": {
+      "roska4_swing": 546,
+      "roska4_stress": 49,
+      "global_nkd": 228,
+      "roska4_calm": 342
+     },
+     "rejected": {
+      "roska4_swing": 187,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 0
+     },
+     "d_net": 0.0,
+     "d_pf": 0.0,
+     "d_calmar": 0.0,
+     "d_maxdd": 0.0,
+     "calm_stress_untouched": true
+    },
+    {
+     "variant": "production_gate_on",
+     "policy": "repaired_mechanics_independent_caps",
+     "fill_law": "production_gap_after_15min_break",
+     "spy_short_gate": true,
+     "net": 75292.21853571427,
+     "pf": 1.6790057717596978,
+     "calmar": 2.165898391017811,
+     "maxdd": 4973.377499999991,
+     "sharpe": 2.138177363236226,
+     "taken": {
+      "roska4_swing": 546,
+      "roska4_stress": 49,
+      "global_nkd": 758,
+      "roska4_calm": 342
+     },
+     "rejected": {
+      "roska4_swing": 187,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 0
+     },
+     "d_net": 4.139999999999418,
+     "d_pf": 6.268443094570308e-05,
+     "d_calmar": 0.00011909357318984348,
+     "d_maxdd": 0.0,
+     "calm_stress_untouched": true
+    },
+    {
+     "variant": "production_gate_on",
+     "policy": "repaired_mechanics_family_cap_5_44",
+     "fill_law": "production_gap_after_15min_break",
+     "spy_short_gate": true,
+     "net": 74413.91853571427,
+     "pf": 1.6719105046057892,
+     "calmar": 2.1406327182321365,
+     "maxdd": 4973.377499999988,
+     "sharpe": 2.1182261410670247,
+     "taken": {
+      "roska4_swing": 545,
+      "roska4_stress": 49,
+      "global_nkd": 758,
+      "roska4_calm": 338
+     },
+     "rejected": {
+      "roska4_swing": 190,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 4
+     },
+     "d_net": 4.14000000001397,
+     "d_pf": 6.249631198640415e-05,
+     "d_calmar": 0.00011909357319028757,
+     "d_maxdd": 0.0,
+     "calm_stress_untouched": true
+    },
+    {
+     "variant": "production_gate_on",
+     "policy": "repaired_mechanics_family_cap_7p5",
+     "fill_law": "production_gap_after_15min_break",
+     "spy_short_gate": true,
+     "net": 75292.21853571427,
+     "pf": 1.6790057717596978,
+     "calmar": 2.165898391017811,
+     "maxdd": 4973.377499999991,
+     "sharpe": 2.138177363236226,
+     "taken": {
+      "roska4_swing": 546,
+      "roska4_stress": 49,
+      "global_nkd": 758,
+      "roska4_calm": 342
+     },
+     "rejected": {
+      "roska4_swing": 187,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 0
+     },
+     "d_net": 4.139999999999418,
+     "d_pf": 6.268443094570308e-05,
+     "d_calmar": 0.00011909357318984348,
+     "d_maxdd": 0.0,
+     "calm_stress_untouched": true
+    },
+    {
+     "variant": "production_gate_on",
+     "policy": "risk_clean_no_calm_nkd_family_cap_5_44",
+     "fill_law": "production_gap_after_15min_break",
+     "spy_short_gate": true,
+     "net": 64908.47853571427,
+     "pf": 1.617287226403928,
+     "calmar": 1.9180496775716351,
+     "maxdd": 4845.307499999988,
+     "sharpe": 2.342327082154333,
+     "taken": {
+      "roska4_swing": 545,
+      "roska4_stress": 49,
+      "global_nkd": 228,
+      "roska4_calm": 338
+     },
+     "rejected": {
+      "roska4_swing": 190,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 4
+     },
+     "d_net": 5.569999999992433,
+     "d_pf": 8.566535281606669e-05,
+     "d_calmar": 0.0001645938549950099,
+     "d_maxdd": 0.0,
+     "calm_stress_untouched": true
+    },
+    {
+     "variant": "production_gate_on",
+     "policy": "risk_clean_no_calm_nkd_family_cap_7p5",
+     "fill_law": "production_gap_after_15min_break",
+     "spy_short_gate": true,
+     "net": 65786.77853571427,
+     "pf": 1.6248304548123413,
+     "calmar": 1.9440034985487231,
+     "maxdd": 4845.307499999992,
+     "sharpe": 2.3685596558567403,
+     "taken": {
+      "roska4_swing": 546,
+      "roska4_stress": 49,
+      "global_nkd": 228,
+      "roska4_calm": 342
+     },
+     "rejected": {
+      "roska4_swing": 187,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 0
+     },
+     "d_net": 5.569999999992433,
+     "d_pf": 8.595355428941964e-05,
+     "d_calmar": 0.0001645938549950099,
+     "d_maxdd": 0.0,
+     "calm_stress_untouched": true
+    },
+    {
+     "variant": "artifact_gate_off",
+     "policy": "repaired_mechanics_independent_caps",
+     "fill_law": "artifact_all_bars_gappable",
+     "spy_short_gate": false,
+     "net": 61668.918535714256,
+     "pf": 1.4953753042987745,
+     "calmar": 1.3518024295373319,
+     "maxdd": 6526.68299999999,
+     "sharpe": 1.7098115606765278,
+     "taken": {
+      "roska4_swing": 641,
+      "roska4_stress": 49,
+      "global_nkd": 764,
+      "roska4_calm": 340
+     },
+     "rejected": {
+      "roska4_swing": 161,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 0
+     },
+     "d_net": -13619.160000000018,
+     "d_pf": -0.18356778302997756,
+     "d_calmar": -0.8139768679072892,
+     "d_maxdd": 1553.3054999999986,
+     "calm_stress_untouched": false
+    },
+    {
+     "variant": "artifact_gate_off",
+     "policy": "repaired_mechanics_family_cap_5_44",
+     "fill_law": "artifact_all_bars_gappable",
+     "spy_short_gate": false,
+     "net": 60266.86853571427,
+     "pf": 1.4838742353306085,
+     "calmar": 1.3210690448544937,
+     "maxdd": 6526.682999999983,
+     "sharpe": 1.6748289770132654,
+     "taken": {
+      "roska4_swing": 641,
+      "roska4_stress": 49,
+      "global_nkd": 764,
+      "roska4_calm": 335
+     },
+     "rejected": {
+      "roska4_swing": 163,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 5
+     },
+     "d_net": -14142.909999999989,
+     "d_pf": -0.18797377296319429,
+     "d_calmar": -0.8194445798044525,
+     "d_maxdd": 1553.305499999995,
+     "calm_stress_untouched": false
+    },
+    {
+     "variant": "artifact_gate_off",
+     "policy": "repaired_mechanics_family_cap_7p5",
+     "fill_law": "artifact_all_bars_gappable",
+     "spy_short_gate": false,
+     "net": 61668.918535714256,
+     "pf": 1.4953753042987745,
+     "calmar": 1.3518024295373319,
+     "maxdd": 6526.68299999999,
+     "sharpe": 1.7098115606765278,
+     "taken": {
+      "roska4_swing": 641,
+      "roska4_stress": 49,
+      "global_nkd": 764,
+      "roska4_calm": 340
+     },
+     "rejected": {
+      "roska4_swing": 161,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 0
+     },
+     "d_net": -13619.160000000018,
+     "d_pf": -0.18356778302997756,
+     "d_calmar": -0.8139768679072892,
+     "d_maxdd": 1553.3054999999986,
+     "calm_stress_untouched": false
+    },
+    {
+     "variant": "artifact_gate_off",
+     "policy": "risk_clean_no_calm_nkd_family_cap_5_44",
+     "fill_law": "artifact_all_bars_gappable",
+     "spy_short_gate": false,
+     "net": 52706.80853571427,
+     "pf": 1.4507367721046767,
+     "calmar": 1.1323992460370542,
+     "maxdd": 6664.182999999983,
+     "sharpe": 1.841673088330665,
+     "taken": {
+      "roska4_swing": 641,
+      "roska4_stress": 49,
+      "global_nkd": 235,
+      "roska4_calm": 335
+     },
+     "rejected": {
+      "roska4_swing": 163,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 5
+     },
+     "d_net": -12196.100000000006,
+     "d_pf": -0.16646478894643524,
+     "d_calmar": -0.7854858376795859,
+     "d_maxdd": 1818.8754999999946,
+     "calm_stress_untouched": false
+    },
+    {
+     "variant": "artifact_gate_off",
+     "policy": "risk_clean_no_calm_nkd_family_cap_7p5",
+     "fill_law": "artifact_all_bars_gappable",
+     "spy_short_gate": false,
+     "net": 54108.858535714266,
+     "pf": 1.4627267883641726,
+     "calmar": 1.162522116440608,
+     "maxdd": 6664.182999999983,
+     "sharpe": 1.8837632038173826,
+     "taken": {
+      "roska4_swing": 641,
+      "roska4_stress": 49,
+      "global_nkd": 235,
+      "roska4_calm": 340
+     },
+     "rejected": {
+      "roska4_swing": 161,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 0
+     },
+     "d_net": -11672.350000000013,
+     "d_pf": -0.16201771289387934,
+     "d_calmar": -0.78131678825312,
+     "d_maxdd": 1818.875499999991,
+     "calm_stress_untouched": false
+    },
+    {
+     "variant": "production_gate_off",
+     "policy": "repaired_mechanics_independent_caps",
+     "fill_law": "production_gap_after_15min_break",
+     "spy_short_gate": false,
+     "net": 61675.34853571426,
+     "pf": 1.495452545964188,
+     "calmar": 1.351943377195055,
+     "maxdd": 6526.68299999999,
+     "sharpe": 1.710006997029257,
+     "taken": {
+      "roska4_swing": 641,
+      "roska4_stress": 49,
+      "global_nkd": 764,
+      "roska4_calm": 340
+     },
+     "rejected": {
+      "roska4_swing": 161,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 0
+     },
+     "d_net": -13612.73000000001,
+     "d_pf": -0.183490541364564,
+     "d_calmar": -0.813835920249566,
+     "d_maxdd": 1553.3054999999986,
+     "calm_stress_untouched": false
+    },
+    {
+     "variant": "production_gate_off",
+     "policy": "repaired_mechanics_family_cap_5_44",
+     "fill_law": "production_gap_after_15min_break",
+     "spy_short_gate": false,
+     "net": 60273.29853571426,
+     "pf": 1.4839508451362038,
+     "calmar": 1.3212099925122167,
+     "maxdd": 6526.682999999983,
+     "sharpe": 1.6750245094004645,
+     "taken": {
+      "roska4_swing": 641,
+      "roska4_stress": 49,
+      "global_nkd": 764,
+      "roska4_calm": 335
+     },
+     "rejected": {
+      "roska4_swing": 163,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 5
+     },
+     "d_net": -14136.479999999996,
+     "d_pf": -0.18789716315759897,
+     "d_calmar": -0.8193036321467295,
+     "d_maxdd": 1553.305499999995,
+     "calm_stress_untouched": false
+    },
+    {
+     "variant": "production_gate_off",
+     "policy": "repaired_mechanics_family_cap_7p5",
+     "fill_law": "production_gap_after_15min_break",
+     "spy_short_gate": false,
+     "net": 61675.34853571426,
+     "pf": 1.495452545964188,
+     "calmar": 1.351943377195055,
+     "maxdd": 6526.68299999999,
+     "sharpe": 1.710006997029257,
+     "taken": {
+      "roska4_swing": 641,
+      "roska4_stress": 49,
+      "global_nkd": 764,
+      "roska4_calm": 340
+     },
+     "rejected": {
+      "roska4_swing": 161,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 0
+     },
+     "d_net": -13612.73000000001,
+     "d_pf": -0.183490541364564,
+     "d_calmar": -0.813835920249566,
+     "d_maxdd": 1553.3054999999986,
+     "calm_stress_untouched": false
+    },
+    {
+     "variant": "production_gate_off",
+     "policy": "risk_clean_no_calm_nkd_family_cap_5_44",
+     "fill_law": "production_gap_after_15min_break",
+     "spy_short_gate": false,
+     "net": 52716.09853571427,
+     "pf": 1.4508520364818565,
+     "calmar": 1.1325988405351457,
+     "maxdd": 6664.182999999983,
+     "sharpe": 1.8420258455498464,
+     "taken": {
+      "roska4_swing": 641,
+      "roska4_stress": 49,
+      "global_nkd": 235,
+      "roska4_calm": 335
+     },
+     "rejected": {
+      "roska4_swing": 163,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 5
+     },
+     "d_net": -12186.810000000005,
+     "d_pf": -0.16634952456925545,
+     "d_calmar": -0.7852862431814944,
+     "d_maxdd": 1818.8754999999946,
+     "calm_stress_untouched": false
+    },
+    {
+     "variant": "production_gate_off",
+     "policy": "risk_clean_no_calm_nkd_family_cap_7p5",
+     "fill_law": "production_gap_after_15min_break",
+     "spy_short_gate": false,
+     "net": 54118.14853571427,
+     "pf": 1.462843005375754,
+     "calmar": 1.1627217109386996,
+     "maxdd": 6664.182999999983,
+     "sharpe": 1.8841154249828667,
+     "taken": {
+      "roska4_swing": 641,
+      "roska4_stress": 49,
+      "global_nkd": 235,
+      "roska4_calm": 340
+     },
+     "rejected": {
+      "roska4_swing": 161,
+      "roska4_stress": 1,
+      "global_nkd": 0,
+      "roska4_calm": 0
+     },
+     "d_net": -11663.060000000012,
+     "d_pf": -0.16190149588229796,
+     "d_calmar": -0.7811171937550285,
+     "d_maxdd": 1818.875499999991,
+     "calm_stress_untouched": false
+    }
+   ]
+  }
+ }
+}

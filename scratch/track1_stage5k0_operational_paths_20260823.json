@@ -1,0 +1,196 @@
+{
+  "stage": "5K0",
+  "date": "2026-08-23",
+  "kind": "operational evidence path hygiene",
+  "verdict": "READY_FOR_5K_OPS_STARTUP_INTEGRATION",
+  "problem": "Stage 5J's runbook exported RAITS_WINDOW_LEDGER_DIR into scratch/track1_ledger and live-shadow explanations defaulted to scratch/track1_shadow. A multi-day shadow period would have kept its ONLY copy inside the directory this project sweeps, and that evidence is not reproducible - nobody can re-observe a closed window.",
+  "split": {
+    "scratch/track1_shadow": "replay and test artifacts (reproducible)",
+    "global_index/track1_runtime": "live-shadow operational evidence: window_coverage/, slot_timing/, shadow/explanations/"
+  },
+  "why_that_root": "it sits beside the route runtime state this repo already keeps under global_index/ - live_state_data.js, preflight_state.json, replay_checkpoint.track1.json - rather than inventing a new top-level dir",
+  "inventory": [
+    {
+      "path": "RAITS_WINDOW_LEDGER_DIR -> window_coverage_*.jsonl",
+      "writer": "window_ledger._write",
+      "data": "window_open / slot_observed / window_closed",
+      "was": "operator-chosen; runbook said scratch/track1_ledger",
+      "kind": "OPERATIONAL",
+      "moved": true,
+      "now": "global_index/track1_runtime/window_coverage",
+      "why": "a closed window cannot be re-observed; it is what precondition 5 is read from"
+    },
+    {
+      "path": "RAITS_TELEMETRY_DIR -> slot_timing_*.jsonl",
+      "writer": "slot_telemetry",
+      "data": "per-slot runtime",
+      "was": "unset (off)",
+      "kind": "OPERATIONAL",
+      "moved": true,
+      "now": "global_index/track1_runtime/slot_timing (recommended; still opt-in)",
+      "why": "the p95 < 300s gate is judged from it"
+    },
+    {
+      "path": "observe_live_slot(out_dir=...) explanations",
+      "writer": "emit_explanations",
+      "data": "live-shadow decision/audit rows",
+      "was": "scratch/track1_shadow",
+      "kind": "OPERATIONAL",
+      "moved": true,
+      "now": "global_index/track1_runtime/shadow",
+      "why": "the audit trail for a live shadow day; not reproducible"
+    },
+    {
+      "path": "run_shadow(out_dir=...)",
+      "writer": "run_shadow",
+      "data": "replay decisions/settlements/summaries/explanations",
+      "was": "scratch/track1_shadow",
+      "kind": "replay/test",
+      "moved": false,
+      "now": "scratch/track1_shadow",
+      "why": "reproducible from the measured windows; losing it costs a re-run"
+    },
+    {
+      "path": "track1_explain path guard",
+      "writer": "write_shadow bound",
+      "data": "path guard",
+      "was": "single root",
+      "kind": "guard",
+      "moved": "widened",
+      "now": "APPROVED_ROOTS = (scratch/track1_shadow, global_index/track1_runtime/shadow)",
+      "why": "a set, not a relaxation - everything outside both is still refused"
+    },
+    {
+      "path": "live_positions.track1.json",
+      "writer": "write_route_checkpoint",
+      "data": "route book",
+      "was": "repo root, NOT gitignored",
+      "kind": "OPERATIONAL",
+      "moved": false,
+      "now": "repo root, now gitignored",
+      "why": "legacy twin was already ignored; this one was not"
+    },
+    {
+      "path": "runner.track1.pid",
+      "writer": "route lock",
+      "data": "pid lock",
+      "was": "not gitignored",
+      "kind": "OPERATIONAL",
+      "moved": false,
+      "now": "gitignored",
+      "why": "same"
+    },
+    {
+      "path": "global_index/replay_checkpoint.track1.json",
+      "writer": "track1_bootstrap.write",
+      "data": "route checkpoint",
+      "was": "not gitignored",
+      "kind": "OPERATIONAL",
+      "moved": false,
+      "now": "gitignored",
+      "why": "legacy replay_checkpoint.json was already ignored"
+    },
+    {
+      "path": "STOP_TRADING.track1",
+      "writer": "operator",
+      "data": "route kill switch",
+      "was": "not gitignored",
+      "kind": "operator switch",
+      "moved": false,
+      "now": "gitignored",
+      "why": "an operational decision must not travel in the tree"
+    },
+    {
+      "path": "track1_go_live_confirmation.json",
+      "writer": "operator",
+      "data": "the file that ARMS the route",
+      "was": "not gitignored",
+      "kind": "operator switch",
+      "moved": false,
+      "now": "gitignored",
+      "why": "a checkout must never be able to create one"
+    },
+    {
+      "path": "trade_log.jsonl / runner_events_*.jsonl / live_state_data.js",
+      "writer": "legacy",
+      "data": "legacy runtime",
+      "was": "gitignored",
+      "kind": "legacy",
+      "moved": false,
+      "now": "unchanged",
+      "why": "out of scope; Track 1 writes none of them"
+    },
+    {
+      "path": "monitor/ops.py logs",
+      "writer": "monitor",
+      "data": "ops output",
+      "was": "n/a",
+      "kind": "legacy",
+      "moved": false,
+      "now": "untouched",
+      "why": "not written by any Track 1 path; test_ops 8 passed"
+    }
+  ],
+  "code_changes": [
+    {
+      "file": "global_index/track1_explain.py",
+      "what": "SHADOW_ROOT kept for replay; OPERATIONAL_ROOT added; _resolve_shadow bounds a SET (APPROVED_ROOTS) instead of one root; the refusal names both"
+    },
+    {
+      "file": "global_index/run_live_day_track1.py",
+      "what": "RUNTIME_ROOT / OPERATIONAL_SHADOW_DIR / RECOMMENDED_LEDGER_DIR / RECOMMENDED_TELEMETRY_DIR added; observe_live_slot out_dir default moved to the operational root; run_shadow default deliberately left at scratch"
+    },
+    {
+      "file": ".gitignore",
+      "what": "a Track 1 route runtime section, six entries"
+    },
+    {
+      "file": "docs/futures/TRACK1_SWITCHOVER_RUNBOOK.md",
+      "what": "section 3b, append-only"
+    },
+    {
+      "file": "scratch/track1_stage5j_operator_shadow_start_runbook_20260823.md",
+      "what": "step 3's ledger path corrected, with the reason, plus the optional telemetry dir"
+    }
+  ],
+  "left_in_scratch_deliberately": [
+    "run_shadow replay output",
+    "stage reports and test files"
+  ],
+  "gitignore_added": [
+    "live_positions.track1.json",
+    "runner.track1.pid",
+    "global_index/replay_checkpoint.track1.json",
+    "STOP_TRADING.track1",
+    "track1_go_live_confirmation.json",
+    "global_index/track1_runtime/"
+  ],
+  "gitignore_verified_both_ways": {
+    "ignored_paths_checked": 8,
+    "not_ignored_checked": 5
+  },
+  "tests": {
+    "stage5k0_new": "27 passed",
+    "stage5i + explain + wiring + 5z": "204 passed, 1 out-of-scope failure",
+    "stage5b + 5k0 + 5i": "68 passed",
+    "slot_telemetry + log_hygiene + dashboard": "40 passed",
+    "monitor/test_ops.py": "8 passed",
+    "5D + 5E + 5F + G1 + 3B": "181 passed, 2 skipped",
+    "out_of_scope": "test_no_monitor_or_dashboard_file_mentions_the_module - a monitor/ file from another session; monitor/ not touched",
+    "not_run": "global_index/test_event_playback.py"
+  },
+  "no_side_effects": [
+    "no scheduler start/stop",
+    "no IBKR connection",
+    "no order",
+    "no dashboard runtime write",
+    "no STOP_TRADING",
+    "no STOP_TRADING.track1",
+    "no confirmation file",
+    "no commit",
+    "global_index/track1_runtime not created by any test",
+    "real scratch/track1_shadow/explanations not created"
+  ],
+  "readiness": "Stage 5J's READY_FOR_MANUAL_SHADOW_START stands, with corrected paths: the operator exports the ledger into global_index/track1_runtime/window_coverage",
+  "final": "Stage 5K0 complete: operational evidence no longer defaults to scratch; proceed to Stage 5K ops/dashboard startup integration."
+}

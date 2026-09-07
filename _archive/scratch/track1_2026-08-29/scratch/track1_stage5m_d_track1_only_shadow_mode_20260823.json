@@ -1,0 +1,236 @@
+{
+  "stage": "5M-D",
+  "title": "Track 1-only shadow mode + legacy-removable audit",
+  "date": "2026-08-24",
+  "verdict": "READY_FOR_5N_NKD_TRACK1_OWNERSHIP",
+  "claim": "Track1-only shadow mode exists for current Track1 sleeves; legacy strategy jobs can be omitted; Normal-R4 provider collision with legacy is resolved structurally. NKD and route-aware safety are still pending.",
+  "claim_limits": [
+    "not the full Track 1 route - NKD has no slot (5N)",
+    "not legacy-INDEPENDENT - safety sweeps still target legacy's book (5O)",
+    "not live or paper readiness",
+    "legacy may be moved/deleted only after 5N + 5O + 5P"
+  ],
+  "modes": {
+    "default": {
+      "jobs": 60,
+      "legacy_entry": 45,
+      "safety": 12,
+      "shared_infra": 3,
+      "track1": 0,
+      "unchanged": true
+    },
+    "track1_shadow": {
+      "jobs": 107,
+      "legacy_entry": 45,
+      "safety": 11,
+      "shared_infra": 3,
+      "track1": 48,
+      "unchanged": true,
+      "swing_provider_default": "none"
+    },
+    "track1_only": {
+      "jobs": 62,
+      "legacy_entry": 0,
+      "safety": 11,
+      "shared_infra": 3,
+      "track1": 48,
+      "swing_provider_default": "ibkr",
+      "requires_stop_trading": false
+    }
+  },
+  "removal_mechanism": "built then removed by id, from track1_slots.legacy_retirement_candidates() - the SAME table the Stage 5L classification and the retirement audit read. remove_job raises on a missing id, so a renamed job stops the build instead of surviving",
+  "swing_provider": {
+    "track1_only_default": "ibkr - the collision reason is structurally gone",
+    "transitional_default": "none - legacy children still occupy every swing minute there",
+    "env_override": "RAITS_TRACK1_SWING_PROVIDER, both directions, typo still refuses at build"
+  },
+  "legacy_removable_audit": {
+    "method": "meta-path import block (catches import statements AND importlib.import_module) + AST scan + state-file scan; the block is itself proven to block",
+    "static_imports_of_legacy_in_track1": [],
+    "scheduler_under_removal": {
+      "default": {
+        "built": true,
+        "total": 60,
+        "shared_infra": 3,
+        "legacy_entry": 45,
+        "safety": 12,
+        "track1": 0
+      },
+      "track1_shadow": {
+        "built": true,
+        "total": 107,
+        "shared_infra": 3,
+        "legacy_entry": 45,
+        "safety": 11,
+        "track1": 48
+      },
+      "track1_only": {
+        "built": true,
+        "total": 62,
+        "shared_infra": 3,
+        "legacy_entry": 0,
+        "safety": 11,
+        "track1": 48
+      }
+    },
+    "track1_argv_under_removal": {
+      "slots_fired": 48,
+      "providers": {
+        "roska4_calm": [
+          "ibkr"
+        ],
+        "roska4_stress": [
+          "ibkr"
+        ],
+        "roska4_swing": [
+          "ibkr"
+        ]
+      },
+      "routes": [
+        "track1_candidate"
+      ],
+      "order_flags": [],
+      "slot_table": 48
+    },
+    "dashboard_under_removal": {
+      "built": true,
+      "rows": 59,
+      "track1_rows": 48,
+      "legacy_rows": 0
+    },
+    "state_mentions": "Track 1's only code-level mentions of legacy state files are inside run_live_day_track1.LEGACY_PATHS - the route's own must-never-write refusal list. Naming a file to guarantee you never write it is the opposite of depending on it; asserted by test",
+    "remaining_dependency_BLOCKER": {
+      "what": "the 11 safety jobs (stop_repair x10 + maxhold_exit) carry --positions-path live_positions.json",
+      "measured": {
+        "jobs_fired": 11,
+        "positions_paths": [
+          "live_positions.json"
+        ]
+      },
+      "why_kept": "any position still open in legacy's book needs its stop repaired and its five-day exit; removing the sweeps would strand it",
+      "classified_as": "Stage 5O blocker, named in code comment, runbook and test - not accepted as works-for-now"
+    }
+  },
+  "ops": {
+    "flags": "--track1-only-shadow on up and restart",
+    "contradiction_refused": "--track1-shadow + --track1-only-shadow -> exit 2",
+    "stop_trading": "not required in track1-only (nothing to halt); still required in transitional mode",
+    "env_to_child": {
+      "RAITS_TRACK1_ONLY": "1",
+      "RAITS_TRACK1_SHADOW": "1",
+      "TRACK1_ORDERS_APPROVED": "removed"
+    },
+    "banner": "no longer prints 'STOP_TRADING: present (legacy frozen)' - it printed a myth"
+  },
+  "defect_found_and_fixed": {
+    "what": "python monitor/ops.py --help crashed with ModuleNotFoundError",
+    "cause": "Stage 5M-C put track1_slot_count() inside an argparse help string; operators run the file as a script, which puts monitor/ on sys.path and not the repo root",
+    "why_5m_c_missed_it": "its tests imported monitor.ops as a module with the root already on the path - both halves correct, the seam never crossed. Same shape as the --sleeve choices defect one stage earlier",
+    "fix": "track1_slot_count() puts ROOT on sys.path first; a test now runs ops.py as a subprocess the way the runbook says to"
+  },
+  "dashboard": {
+    "mirror_gate": "RAITS_TRACK1_ONLY=1 (implies the shadow mirror); legacy strategy rows omitted, 48 Track 1 rows + preflight + maxhold + sweeps remain",
+    "parity": {
+      "default": "60/58 true",
+      "track1_shadow": "107/105 true",
+      "track1_only": "62/60 true"
+    }
+  },
+  "inventory_check": {
+    "slots": {
+      "roska4_calm": 1,
+      "roska4_stress": 24,
+      "roska4_swing": 23
+    },
+    "total": 48
+  },
+  "stale_text_guards": [
+    "kill-switch myth regex over ops.py / run_scheduler.py / runbook, proven to catch the claim",
+    "hardcoded '25 slots' guard carried forward"
+  ],
+  "mutations": {
+    "mutations": [
+      {
+        "mutation": "D1 one legacy entry job survives into track1-only",
+        "guard": "test_track1_only_registers_no_legacy_strategy_job",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "D2 swing defaults to ibkr in transitional shadow",
+        "guard": "test_in_transitional_shadow_the_swing_slots_still_default_to_none",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "D3 track1-only loses the ibkr default",
+        "guard": "test_in_track1_only_the_swing_slots_take_ibkr_by_default",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "D4 ops resolves --track1-shadow + --track1-only-shadow silently",
+        "guard": "test_ops_refuses_both_shadow_flags_together",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "D5 track1-only demands STOP_TRADING after all",
+        "guard": "test_ops_track1_only_does_not_require_stop_trading",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "D6 a Track 1 module imports the legacy entrypoint",
+        "guard": "test_no_track1_module_imports_the_legacy_entrypoint",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "D7 'STOP_TRADING turns off legacy' returns to operator text",
+        "guard": "test_no_operator_text_claims_stop_trading_turns_legacy_off",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      },
+      {
+        "mutation": "D8 the mirror ignores track1-only and mirrors legacy rows",
+        "guard": "test_in_track1_only_the_mirror_shows_no_legacy_strategy_rows",
+        "baseline_exit": 0,
+        "mutated_exit": 1,
+        "restored_exit": 0,
+        "detected": true
+      }
+    ],
+    "files_restored": true
+  },
+  "tests": {
+    "stage5m_d": "35 passed",
+    "mutations": "8/8 detected, three on-disk mutations restored byte-for-byte",
+    "regression_5mc_5mb_5l_3b_ops_mirror": "232 passed, 1 skipped",
+    "not_run": "global_index/test_event_playback.py - known hang",
+    "regression_5md_5i_5d_5e_5m1": "119 passed"
+  },
+  "no_side_effects": [
+    "no scheduler/backend/dashboard started or stopped",
+    "no real IBKR connection",
+    "no order",
+    "no STOP_TRADING or STOP_TRADING.track1 touched",
+    "no confirmation file",
+    "no live state file written",
+    "no commit"
+  ]
+}

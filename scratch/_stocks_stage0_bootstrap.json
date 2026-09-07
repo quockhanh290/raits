@@ -1,0 +1,61 @@
+{
+  "ledger": "D:\\raits\\scratch\\_stocks_stage0_ledger_B_causal_lag1_ema50.csv",
+  "unit_of_resampling": "entry session (day cluster)",
+  "null": "trade P&L shifted to mean zero, same day clusters",
+  "full 2019-01-02..2022-12-30": {
+    "n_trades": 883,
+    "n_entry_days": 157,
+    "trades_per_day_mean": 5.62,
+    "trades_per_day_max": 8,
+    "observed_total": 9282.45,
+    "boot_ci95_low": -23600.71,
+    "boot_median": 9408.68,
+    "boot_ci95_high": 41297.61,
+    "frac_boot_positive": 0.7119,
+    "p_one_sided_vs_centred_null": 0.2855,
+    "n_boot": 20000,
+    "seed": 20260826
+  },
+  "in-sample 2019-2020": {
+    "n_trades": 435,
+    "n_entry_days": 70,
+    "trades_per_day_mean": 6.21,
+    "trades_per_day_max": 8,
+    "observed_total": 11606.56,
+    "boot_ci95_low": -9702.28,
+    "boot_median": 11866.33,
+    "boot_ci95_high": 32738.93,
+    "frac_boot_positive": 0.8615,
+    "p_one_sided_vs_centred_null": 0.1459,
+    "n_boot": 20000,
+    "seed": 20260826
+  },
+  "out-of-sample 2021-2022": {
+    "n_trades": 448,
+    "n_entry_days": 87,
+    "trades_per_day_mean": 5.15,
+    "trades_per_day_max": 8,
+    "observed_total": -2324.11,
+    "boot_ci95_low": -26697.25,
+    "boot_median": -2113.29,
+    "boot_ci95_high": 21690.91,
+    "frac_boot_positive": 0.4326,
+    "p_one_sided_vs_centred_null": 0.5799,
+    "n_boot": 20000,
+    "seed": 20260826
+  },
+  "self_check_zero_edge_sample": {
+    "n_trades": 883,
+    "n_entry_days": 157,
+    "trades_per_day_mean": 5.62,
+    "trades_per_day_max": 8,
+    "observed_total": -17279.09,
+    "boot_ci95_low": -35406.96,
+    "boot_median": -17300.26,
+    "boot_ci95_high": 1520.81,
+    "frac_boot_positive": 0.037,
+    "p_one_sided_vs_centred_null": 0.967,
+    "n_boot": 5000,
+    "seed": 7
+  }
+}

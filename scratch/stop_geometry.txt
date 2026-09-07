@@ -1,0 +1,32 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  MES xong
+  MNQ xong
+  MYM xong
+  M2K xong
+
+====================================================================================
+1. KHOANG CACH THAT / BANG DANH NGHIA (mult x ATR5)
+====================================================================================
+  n=3356 | p01 -0.052 | p10 0.395 | p25 0.558 | trung vi 0.777 | p75 0.902 | p90 0.961 | p99 1.0
+  trung binh 0.712 | do lech chuan 0.240
+  => anchor an mat trung vi 22% cua bang
+
+=== 2. RUI RO MOI LENH CO ON DINH KHONG (tinh bang USD) ===
+  rui ro that/lenh: p10 $14 | p25 $21 | trung vi $33 | p75 $54 | p90 $84
+  p90/p10 = 6.0 lan
+  bo sizing gia dinh rui ro/hop dong = mult x ATR ngay x pv:
+    trung vi gia dinh $722 vs trung vi THAT $33  -> gia dinh gap 21.9 lan
+    ty le gia-dinh/that: p10 11.5 | trung vi 21.3 | p90 45.3 lan
+
+=== 3. CO LENH NAO STOP ROI SANG PHIA CO LAI KHONG? ===
+  so lenh co khoang cach stop <= 0 : 42 (1.25%)
+  so lenh co khoang cach < 5% bang : 47 (1.40%)
+  vi du:
+    MES 2018-11-02 SHORT  vao 3158.25  stop 3150.97  (lech -7.28 diem SAI PHIA)
+    MES 2020-01-30 LONG  vao 3671.25  stop 3674.89  (lech -3.64 diem SAI PHIA)
+    MES 2020-09-30 LONG  vao 3818.75  stop 3824.49  (lech -5.74 diem SAI PHIA)
+    MES 2021-01-06 LONG  vao 4219.25  stop 4219.83  (lech -0.58 diem SAI PHIA)
+    MES 2021-04-28 SHORT  vao 4657.25  stop 4656.47  (lech -0.78 diem SAI PHIA)
+    MES 2021-05-19 SHORT  vao 4571.75  stop 4570.37  (lech -1.38 diem SAI PHIA)
+    MES 2021-12-23 LONG  vao 5215.75  stop 5215.87  (lech -0.12 diem SAI PHIA)
+    MES 2022-05-04 LONG  vao 4656.25  stop 4658.80  (lech -2.55 diem SAI PHIA)

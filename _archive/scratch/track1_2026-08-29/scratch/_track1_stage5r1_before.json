@@ -1,0 +1,65 @@
+{
+  "MNQ": {
+    "path": "data/cache/futures/NQ_continuous_1m_8y.parquet",
+    "sha256": "c0ae9d3c3c7984f7731436be5e14abfb59374ec386cbcd9a402bb4ab596a3539",
+    "size": 57676712,
+    "mtime": "2026-08-24T18:21:17",
+    "last_bar": "2026-08-25 00:20:00",
+    "tz": "None",
+    "columns": "open,high,low,close,volume"
+  },
+  "MYM": {
+    "path": "data/cache/futures/YM_continuous_1m_8y.parquet",
+    "sha256": "272003cda1c17c83e105be3219e1bc44147c5ec29ddc8a04399788bb69265ddc",
+    "size": 52990667,
+    "mtime": "2026-08-24T18:21:42",
+    "last_bar": "2026-08-25 00:21:00",
+    "tz": "None",
+    "columns": "open,high,low,close,volume"
+  },
+  "M2K": {
+    "path": "data/cache/futures/RTY_continuous_1m_8y.parquet",
+    "sha256": "e4e2e1c49606a36d1ed790e2353c88269ec651594fc5ef1e19c42f7d67d5bf4e",
+    "size": 46764142,
+    "mtime": "2026-08-24T18:22:05",
+    "last_bar": "2026-08-25 00:21:00",
+    "tz": "None",
+    "columns": "open,high,low,close,volume"
+  },
+  "MES": {
+    "path": "data/cache/futures/ES_continuous_1m_8y.parquet",
+    "sha256": "99da6feb97ea1a28abb9ffae748cc8fda1e8cd4bfb5a529ba27e534b5faf8d9c",
+    "size": 51460064,
+    "mtime": "2026-08-24T11:45:24",
+    "last_bar": "2026-08-24 17:44:00",
+    "tz": "None",
+    "columns": "open,high,low,close,volume"
+  },
+  "MNKD": {
+    "path": "global_index/data/NKD_continuous_1m_8y.parquet",
+    "sha256": "a761a36b2018f82f0869bfb9ac5e9f9caacd776f2b5ed687785485da3f296010",
+    "size": 28134902,
+    "mtime": "2026-08-24T11:46:46",
+    "last_bar": "2026-08-24 17:46:00",
+    "tz": "None",
+    "columns": "open,high,low,close,volume"
+  },
+  "spy_csv": {
+    "path": "spy_daily_live.csv",
+    "sha256": "c5d8cdd90eaac4cbbf09007f17ac3dcf9e5b6a845e889148aeb62ce871238773",
+    "size": 45774,
+    "mtime": "2026-08-24T11:46:48",
+    "last_bar": "-",
+    "tz": "-",
+    "columns": "-"
+  },
+  "preflight": {
+    "path": "global_index/preflight_state.json",
+    "sha256": "fcfb392383844ea1bb6a5179885918ee3f68a9911f44677a3055c68f64f181e3",
+    "size": 164,
+    "mtime": "2026-08-24T11:47:04",
+    "last_bar": "-",
+    "tz": "-",
+    "columns": "-"
+  }
+}

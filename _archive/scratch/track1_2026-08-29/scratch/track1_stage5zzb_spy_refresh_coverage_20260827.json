@@ -1,0 +1,208 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZB",
+  "title": "SPY daily refresh: the warning named its own escalation condition and nobody was reading",
+  "when_et": "2026-08-27T05:05:00-04:00/2026-08-27T05:35:00-04:00",
+
+  "verdict": {
+    "spy_refresh_pm_success_claim_valid": true,
+    "spy_refresh_pm_claimed_coverage": false,
+    "spy_csv_last_date": "2026-08-25",
+    "freshness_required_date_for_nkd_20260827": "2026-08-26",
+    "root_cause": "the escalation nobody owned: the post-close job noticed the series was short, warned 'this is only a problem if it is still true tomorrow', and nothing in the system looks tomorrow",
+    "fix_applied": true,
+    "production_spy_csv_touched": false,
+    "runtime_files_touched": false,
+    "orders_possible": false,
+    "next_action": "refresh before 09:32 ET or today's Calm phases refuse too; the bar exists at the provider now; the command writes production data and is left for the operator"
+  },
+
+  "premise_correction": {
+    "brief_said": "the scheduler logged the job as completed successfully",
+    "actually": "it logged completed OK AND, on the next line, a WARNING naming the exact shortfall",
+    "log": [
+      "2026-08-26 14:20:00 INFO [SPY_REFRESH_PM] Starting: update_spy_csv after the close (2026-08-26)",
+      "2026-08-26 14:20:00 INFO [SPY_REFRESH_PM] pythonw.exe -m global_index.update_spy_csv --csv spy_daily_live.csv --verify-strict --api-key ...",
+      "2026-08-26 14:20:13 INFO [SPY_REFRESH_PM] completed OK",
+      "2026-08-26 14:20:13 WARNING [SPY_REFRESH_PM] ran cleanly but the daily series still ends on 2026-08-25, not 2026-08-26 — the close for today was not available yet. Tomorrow's sessions ask for the last trading day BEFORE them, so this is only a problem if it is still true tomorrow."
+    ],
+    "clock_note": "log timestamps are machine-local (Calgary). 14:20 MT = 16:20 ET.",
+    "scheduler_success_means": "child exit 0 AND a coverage read of the file's last date — Stage 5ZL added the second half; before it, the job asserted coverage having checked nothing",
+    "previous_day_for_contrast": "2026-08-25 14:20:13 INFO [SPY_REFRESH_PM] OK — the daily series now covers 2026-08-25"
+  },
+
+  "freshness_verdict_before": {
+    "session": "2026-08-27T01:10:00 ET (NKD)",
+    "allow": false,
+    "checks": {
+      "preflight_record": {"status": "ok", "observed": "2026-08-26", "required": "2026-08-26"},
+      "regime_csv": {"status": "stale", "observed": "2026-08-25", "required": "2026-08-26",
+                     "detail": "last date 2026-08-25 is before the required 2026-08-26"},
+      "preflight_consistency": {"status": "stale",
+                                "detail": "the pre-flight record for 2026-08-26 says the 13:45 job SUCCEEDED, and ['regime_csv'] still do not satisfy what the gate asks of them — a contract question, not a retry"},
+      "requirement": {"status": "ok", "detail": "daily close through 2026-08-26"},
+      "intraday_source": {"status": "unverified"}
+    },
+    "note": "the 13:45 pre-flight on 2026-08-26 was RIGHT to succeed: at 13:45 the market had not closed, so that day's bar could not exist, and the pre-flight asks only for the previous day's close"
+  },
+
+  "why_the_file_is_short": {
+    "method": "update_spy_csv run against a TEMP COPY; production md5 identical before and after",
+    "result": "Updated spy_copy.csv: 1 new row(s), 2425 total (last=2026-08-26), close 766.08",
+    "conclusion": "the provider HAS 2026-08-26 now; it did not at 16:20 ET yesterday, which is what the warning said",
+    "sandbox_note": "the first attempt hit an SSLError — this environment intercepts TLS to api.polygon.io; not a Polygon fault",
+    "candidates": {
+      "provider_returned_only_through_0825": "CONFIRMED for the moment it was asked",
+      "wrong_output_path_or_cwd": "refuted — the same command against a copy writes correctly",
+      "write_skipped_row_existed_or_parse_failed": "refuted — it appended the moment the bar was there",
+      "timezone_date_issue_at_1620": "refuted — the script uses the machine date and 14:20 MT is the same calendar day as 16:20 ET",
+      "market_holiday": "refuted — 2026-08-26 was a Wednesday and the bar exists",
+      "verification_compares_labels_only_through_old_end": "CONFIRMED — this is the second defect",
+      "success_log_from_wrapper_not_verification": "refuted — the wrapper reads the file's last date and warns"
+    }
+  },
+
+  "what_verify_strict_verified": {
+    "its_own_output": "1761 label(s) compared through 2024-12-31",
+    "what_it_is": "a drift check over settled history",
+    "requires_the_just_closed_day": false,
+    "treats_no_new_bar_as_success": true,
+    "verifies_drift_not_coverage": true,
+    "writes_success_before_checking_the_tail": "it never checked the tail; the scheduler did, afterwards",
+    "swallows_provider_failures": false,
+    "measured": {"invalid_api_key_exit_code": 1, "file_left_unchanged": true,
+                 "empty_fetch": "records UNKNOWN, which strict mode fails on"}
+  },
+
+  "contract": {
+    "before": {
+      "verify_strict": "exit 1 if the regime LABELS drifted or could not be verified",
+      "coverage": "not examined",
+      "clean_run_that_supplied_nothing": "exit 0"
+    },
+    "after": {
+      "verify_strict": "unchanged",
+      "require_through": "the caller names the day it needs",
+      "states": {
+        "covers_required_day": 0,
+        "provider_did_not_return_required_day": 2,
+        "coverage_unknown": 2,
+        "coverage_not_requested": 0
+      },
+      "why_exit_2_not_1": "a data-supply gap and a history that moved under you are different problems with different owners; one exit code for both would leave an operator unable to tell which they had"
+    },
+    "scheduler": {
+      "now_passes": "--require-through <today>",
+      "effect": "the existing FAILED branch fires instead of the WARNING, so the shortfall becomes a job status rather than a line somebody has to be reading at 16:20",
+      "takes_effect": "at the next scheduler restart",
+      "restart_required_by_this_stage": false,
+      "why_not": "the running scheduler already emits the correct warning; nothing is worse in the meantime"
+    }
+  },
+
+  "status_wording": {
+    "before": "nothing — the freshness gate refused and reported freshness_allow=false",
+    "after": "spy_daily_coverage=provider_did_not_return_required_day last=2026-08-25 required=2026-08-26 calendar=raits.live.trading_calendar",
+    "plain_line": "SPY daily file is missing 2026-08-26 — it ends on 2026-08-25. Sleeves that run before the 13:45 pre-flight (the overnight NKD window) will refuse on stale daily context until the refresh is re-run",
+    "asks_the_gate_for_the_requirement": true,
+    "why": "a second copy of 'which day is needed' can drift from the gate that actually refuses, and then status and the gate disagree about the same morning",
+    "does_not_blame_the_window_that_passed": true,
+    "nkd_20260827_operational": "PASS — 22/22 slots observed, all decided; the stale daily file is a separate fact about the inputs"
+  },
+
+  "defect_found_in_my_own_stage_5zx": {
+    "what": "the phased Calm slots never evaluated freshness",
+    "measured": "a phased slot returned freshness_allow=None",
+    "how_it_happened": "Stage 5ZX put the phase's early exit before fresh.evaluate, bundling freshness with the cap guard and admission layer on the reasoning that a decide half takes no position",
+    "why_that_reasoning_is_wrong": "freshness is not a statement about positions; it asks whether the INPUTS are current enough to decide on at all, which is as live for a half that records an intent as for one that books a trade",
+    "consequence_if_unfixed": "the decide half would record an intent computed from a two-day-old regime label, in a row carrying no note that it was",
+    "fixed_here": true,
+    "now": {"decided": false, "reason": "freshness_refused",
+            "detail": "the inputs a decision needs are not current: regime_csv",
+            "intent_row": "DECIDE REFUSED freshness_refused",
+            "classify_day": "incomplete — the day does not count"}
+  },
+
+  "todays_calm_is_affected": {
+    "corrected_from_an_earlier_draft_of_this_report": true,
+    "measured": {
+      "calm_decide_0932": {"allow": false, "regime_csv": "stale", "has": "2026-08-25", "needs": "2026-08-26"},
+      "calm_observe_1002": {"allow": false, "regime_csv": "stale", "has": "2026-08-25", "needs": "2026-08-26"}
+    },
+    "why": "the 13:45 ET pre-flight runs AFTER both phases",
+    "consequence": "unless the series is refreshed before 09:32 ET, the first-ever run of the new phases records a refusal rather than an intent",
+    "structural": "it is not only the overnight sleeve that runs before its own pre-flight — Calm does too. Everything before 13:45 ET depends on the previous evening's post-close refresh having landed."
+  },
+
+  "should_it_be_fatal": {
+    "paper_readiness": "no — the gate already refuses on its own, and a day that produced no evidence is simply not a judgeable day",
+    "dashboard_health": "yes, visibly, as a stale daily-context warning separate from operational slot status — now done",
+    "next_morning_freshness": "it already is, and correctly so; that is why the overnight window refused",
+    "the_post_close_job_itself": "now non-zero, because that is the moment somebody can still act"
+  },
+
+  "tests": {
+    "file": "scratch/test_track1_stage5zzb_spy_refresh_coverage_20260827.py",
+    "count": 26,
+    "result": "26 passed",
+    "network_calls": 0,
+    "writes_outside_tmp_path": 0,
+    "covers": [
+      "coverage states and distinct exit codes",
+      "the live shortfall reproduced exactly (2026-08-27 with a series to 2026-08-25)",
+      "one more day and the regime-csv side is satisfied",
+      "the required day is the PREVIOUS trading day, and the Friday across a weekend",
+      "the scheduler asks the child for the day it needs",
+      "the success line is still guarded by a coverage read",
+      "status names the date in plain words",
+      "stale context is not rendered as an operational slot failure",
+      "a phased slot evaluates freshness at all",
+      "stale inputs make a phased slot refuse rather than record",
+      "a stale day does not count toward the evidence gate"
+    ],
+    "mutations": [
+      "a short series treated as success",
+      "an unreadable series read as covered",
+      "the requirement moved to the session's own day",
+      "status reverting to the machine-readable flag",
+      "the scheduler dropping the day from the child's argv"
+    ],
+    "all_mutations_red": true,
+    "adjacent_suites_after": "202 passed"
+  },
+
+  "my_own_errors_this_stage": [
+    {"what": "piped a command through tail and read $?",
+     "effect": "read tail's exit code, so the first probe reported EXIT=0 for a run that threw an SSL error",
+     "corrected": "re-measured; a provider failure really exits 1",
+     "note": "this project's own notes warn about exactly this"},
+    {"what": "silenced the wrong logger, twice",
+     "effect": "a trading-calendar import warning began appearing above the status header, reading like the command had failed",
+     "first_attempt": "silenced a lowercase spelling of a logger that is capitalised — a logger nobody uses",
+     "second_attempt": "right logger, wrong point in the call order",
+     "resolved": "suppressed where the import actually happens, and reported as a field (calendar=...) so the information survives rather than being tidied away"},
+    {"what": "wrote that today's Calm was unaffected",
+     "effect": "would have misled the operator about the one event they are waiting for",
+     "corrected": "measured; both phases refuse, because the pre-flight runs after them"}
+  ],
+
+  "safety_confirmed": {
+    "spy_daily_live_csv_md5_before": "d71f8ef6377bc6c7d53e0693765e1d43",
+    "spy_daily_live_csv_md5_after": "d71f8ef6377bc6c7d53e0693765e1d43",
+    "spy_daily_live_csv_last": "2026-08-25",
+    "scheduler_restarted": false,
+    "backend_restarted": false,
+    "ibkr_connected": false,
+    "orders_possible": false,
+    "blocking": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "confirmation_file": false,
+    "orders_dir": "ABSENT",
+    "runtime_mtimes_all_predate_this_stage": true
+  },
+
+  "operator_command_not_run": {
+    "writes_production_data": true,
+    "command": "python -m global_index.update_spy_csv --csv spy_daily_live.csv --verify-strict --require-through 2026-08-26 --api-key <key>",
+    "deadline_et": "09:32 — after that, today's Calm phases have already run"
+  }
+}

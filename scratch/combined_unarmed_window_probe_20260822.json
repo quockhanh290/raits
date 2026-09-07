@@ -1,0 +1,185 @@
+{
+ "floor": {
+  "checks": {
+   "n_trades": 980,
+   "n_arm_resolved": 980,
+   "n_neg_excursion": 0
+  },
+  "n": 980,
+  "per_instrument": [
+   {
+    "inst": "M2K",
+    "n": 178,
+    "med_hours": 23.25,
+    "med_adverse": 65.99999999999966,
+    "p90_adverse": 187.6000000000005,
+    "max_adverse": 349.0000000000032,
+    "med_declared": 508.705357142857,
+    "med_ratio_stop": 0.1590068040977232,
+    "p90_ratio_stop": 0.43592064171977934,
+    "max_ratio_stop": 0.9255415162454853,
+    "n_beyond_stop": 0,
+    "pct_beyond_stop": 0.0,
+    "n_beyond_declared": 0
+   },
+   {
+    "inst": "MES",
+    "n": 188,
+    "med_hours": 23.166666666666668,
+    "med_adverse": 85.0,
+    "p90_adverse": 278.25000000000034,
+    "max_adverse": 631.25,
+    "med_declared": 795.9821428571429,
+    "med_ratio_stop": 0.13931207249116734,
+    "p90_ratio_stop": 0.453671161782505,
+    "max_ratio_stop": 1.109314359637775,
+    "n_beyond_stop": 2,
+    "pct_beyond_stop": 0.010638297872340425,
+    "n_beyond_declared": 0
+   },
+   {
+    "inst": "MNKD",
+    "n": 228,
+    "med_hours": 23.583333333333332,
+    "med_adverse": 97.5,
+    "p90_adverse": 250.75000000000003,
+    "max_adverse": 930.0,
+    "med_declared": 594.4196428571429,
+    "med_ratio_stop": 0.20339830084957522,
+    "p90_ratio_stop": 0.5029646201200002,
+    "max_ratio_stop": 0.8425339366515836,
+    "n_beyond_stop": 0,
+    "pct_beyond_stop": 0.0,
+    "n_beyond_declared": 0
+   },
+   {
+    "inst": "MNQ",
+    "n": 186,
+    "med_hours": 23.083333333333332,
+    "med_adverse": 150.75,
+    "p90_adverse": 499.75,
+    "max_adverse": 1155.5,
+    "med_declared": 1310.6696428571427,
+    "med_ratio_stop": 0.15384402288953414,
+    "p90_ratio_stop": 0.4666712616173304,
+    "max_ratio_stop": 0.856464572680789,
+    "n_beyond_stop": 0,
+    "pct_beyond_stop": 0.0,
+    "n_beyond_declared": 0
+   },
+   {
+    "inst": "MYM",
+    "n": 200,
+    "med_hours": 23.166666666666668,
+    "med_adverse": 78.75,
+    "p90_adverse": 255.29999999999993,
+    "max_adverse": 438.0,
+    "med_declared": 606.3839285714287,
+    "med_ratio_stop": 0.1800039439340571,
+    "p90_ratio_stop": 0.49237845468628616,
+    "max_ratio_stop": 0.9826168224299064,
+    "n_beyond_stop": 0,
+    "pct_beyond_stop": 0.0,
+    "n_beyond_declared": 0
+   }
+  ],
+  "worst": [
+   {
+    "inst": "MES",
+    "direction": "LONG",
+    "day": "2021-01-28",
+    "reason": "CHANDELIER",
+    "unarmed_adverse": 612.5,
+    "declared_risk": 690.1785714285713,
+    "stop_risk": 552.1428571428571,
+    "hours": 23.416666666666668,
+    "ratio_declared": 0.8874514877102201,
+    "ratio_stop": 1.109314359637775
+   },
+   {
+    "inst": "MES",
+    "direction": "LONG",
+    "day": "2021-11-29",
+    "reason": "CHANDELIER",
+    "unarmed_adverse": 501.25,
+    "declared_risk": 600.4464285714286,
+    "stop_risk": 480.35714285714283,
+    "hours": 23.583333333333332,
+    "ratio_declared": 0.8347955390334573,
+    "ratio_stop": 1.0434944237918216
+   },
+   {
+    "inst": "MYM",
+    "direction": "LONG",
+    "day": "2021-11-29",
+    "reason": "CHANDELIER",
+    "unarmed_adverse": 375.5,
+    "declared_risk": 477.67857142857144,
+    "stop_risk": 382.14285714285717,
+    "hours": 22.833333333333332,
+    "ratio_declared": 0.7860934579439252,
+    "ratio_stop": 0.9826168224299064
+   },
+   {
+    "inst": "MYM",
+    "direction": "LONG",
+    "day": "2019-05-08",
+    "reason": "MAX_HOLD",
+    "unarmed_adverse": 275.0,
+    "declared_risk": 370.80357142857144,
+    "stop_risk": 296.64285714285717,
+    "hours": 23.416666666666668,
+    "ratio_declared": 0.7416325547796773,
+    "ratio_stop": 0.9270406934745966
+   },
+   {
+    "inst": "M2K",
+    "direction": "LONG",
+    "day": "2018-12-03",
+    "reason": "CHANDELIER",
+    "unarmed_adverse": 292.99999999999955,
+    "declared_risk": 395.714285714286,
+    "stop_risk": 316.5714285714288,
+    "hours": 23.0,
+    "ratio_declared": 0.7404332129963882,
+    "ratio_stop": 0.9255415162454853
+   },
+   {
+    "inst": "MES",
+    "direction": "LONG",
+    "day": "2018-02-28",
+    "reason": "CHANDELIER",
+    "unarmed_adverse": 461.25,
+    "declared_risk": 639.7321428571429,
+    "stop_risk": 511.78571428571433,
+    "hours": 23.666666666666668,
+    "ratio_declared": 0.7210048848569435,
+    "ratio_stop": 0.9012561060711792
+   },
+   {
+    "inst": "MES",
+    "direction": "LONG",
+    "day": "2019-05-08",
+    "reason": "CHANDELIER",
+    "unarmed_adverse": 297.5,
+    "declared_risk": 414.28571428571433,
+    "stop_risk": 331.42857142857144,
+    "hours": 22.75,
+    "ratio_declared": 0.718103448275862,
+    "ratio_stop": 0.8976293103448275
+   },
+   {
+    "inst": "MNQ",
+    "direction": "LONG",
+    "day": "2018-02-28",
+    "reason": "CHANDELIER",
+    "unarmed_adverse": 502.5,
+    "declared_risk": 733.3928571428571,
+    "stop_risk": 586.7142857142857,
+    "hours": 23.583333333333332,
+    "ratio_declared": 0.6851716581446311,
+    "ratio_stop": 0.856464572680789
+   }
+  ]
+ }
+}

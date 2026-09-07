@@ -1,0 +1,125 @@
+{
+  "all_red": true,
+  "results": [
+    {
+      "id": "M1",
+      "mutation": "CAN_TESTIFY ignored",
+      "test": "test_2_an_empty_position_list_from_a_broker_that_cannot_testify_is_UNKNOWN",
+      "outcome": "RED"
+    },
+    {
+      "id": "M2",
+      "mutation": "exception swallowed into []",
+      "test": "test_3_a_raising_read_is_UNKNOWN_not_empty",
+      "outcome": "RED"
+    },
+    {
+      "id": "M3",
+      "mutation": "a partly readable book answered as a book",
+      "test": "test_7_one_unreadable_position_row_makes_the_whole_read_UNKNOWN",
+      "outcome": "RED"
+    },
+    {
+      "id": "M4",
+      "mutation": "the get_working_stops convention abandoned",
+      "test": "test_10_None_from_get_open_orders_is_UNKNOWN_offline",
+      "outcome": "RED"
+    },
+    {
+      "id": "M5",
+      "mutation": "NOT_FOUND treated as 'the order does not exist'",
+      "test": "test_12_NOT_FOUND_is_UNKNOWN_because_the_broker_also_says_it_on_error",
+      "outcome": "RED"
+    },
+    {
+      "id": "M6",
+      "mutation": "three meanings folded into one",
+      "test": "test_16_None_from_find_execution_is_UNKNOWN_never_no_fill_happened",
+      "outcome": "RED"
+    },
+    {
+      "id": "M7",
+      "mutation": "silence promoted to a broker statement",
+      "test": "test_21_SUBMITTED_no_open_order_no_execution_positions_unchanged_is_UNKNOWN",
+      "outcome": "RED"
+    },
+    {
+      "id": "M7b",
+      "mutation": "same mutation, across every silent shape",
+      "test": "test_27_silence_is_never_rejection_across_every_silent_shape",
+      "outcome": "RED"
+    },
+    {
+      "id": "M8",
+      "mutation": "the remainder forgotten",
+      "test": "test_23_a_partial_fill_stays_PARTIAL_and_keeps_blocking",
+      "outcome": "RED"
+    },
+    {
+      "id": "M9",
+      "mutation": "a book advanced on a size nobody stated",
+      "test": "test_24_FILLED_without_an_execution_record_is_UNKNOWN_not_FILLED",
+      "outcome": "RED"
+    },
+    {
+      "id": "M10",
+      "mutation": "a stop on the same contract claimed as our entry",
+      "test": "test_20_a_stop_working_on_the_same_contract_is_not_our_entry",
+      "outcome": "RED"
+    },
+    {
+      "id": "M11",
+      "mutation": "reduces_exposure ignored",
+      "test": "test_32_an_exit_that_does_not_reduce_exposure_is_refused_under_UNKNOWN",
+      "outcome": "RED"
+    },
+    {
+      "id": "M12",
+      "mutation": "blocking rows not counted",
+      "test": "test_30_entries_are_blocked_if_any_row_is_unresolved",
+      "outcome": "RED"
+    },
+    {
+      "id": "M13",
+      "mutation": "'nothing working' and 'cannot say' collapse at the source",
+      "test": "test_40_get_open_orders_returns_None_offline_never_an_empty_list",
+      "outcome": "RED"
+    },
+    {
+      "id": "M14",
+      "mutation": "the shadow broker claims it can testify",
+      "test": "test_43_NoOrderBroker_is_marked_as_unable_to_testify",
+      "outcome": "RED"
+    },
+    {
+      "id": "M15",
+      "mutation": "get_order_status stops returning NOT_FOUND on error",
+      "test": "test_42_the_three_legacy_readers_were_not_modified",
+      "outcome": "RED"
+    },
+    {
+      "id": "M16",
+      "mutation": "an import added to a production module",
+      "test": "test_45_nothing_in_production_imports_the_read_module_or_the_executor",
+      "outcome": "RED"
+    },
+    {
+      "id": "M17",
+      "mutation": "get_open_orders wired into the runner",
+      "test": "test_41_get_open_orders_is_CALLED_by_nothing_in_the_legacy_route",
+      "outcome": "RED"
+    },
+    {
+      "id": "M18",
+      "mutation": "live_positions.json path added to the read side",
+      "test": "test_49_neither_new_module_reads_or_writes_the_LEGACY_book",
+      "outcome": "RED"
+    },
+    {
+      "id": "M19",
+      "mutation": "runner.py's own compensation removed",
+      "test": "test_50_the_legacy_route_compensates_at_the_call_site_and_still_does",
+      "outcome": "RED"
+    }
+  ]
+}

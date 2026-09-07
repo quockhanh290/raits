@@ -1,0 +1,168 @@
+{
+  "stage": "5U",
+  "title": "Paper order state and startup reconcile — design resolved into testable contracts, no orders",
+  "generated_et": "2026-08-25T00:45:00-04:00",
+  "verdict": "READY_FOR_PAPER_EXECUTOR_IMPLEMENTATION",
+  "verdict_note": "both Stage 5T open questions are resolved into pure, tested contracts (24 tests, no broker, no socket). Two prerequisites are named; neither is an ambiguity, both are work",
+
+  "safety": {
+    "windows_open_during_stage": [],
+    "scheduler_or_backend_restarted": false,
+    "ibkr_connection": false,
+    "orders_sent": 0,
+    "confirmation_file_created": false,
+    "track1_orders_approved_set": false,
+    "allow_orders_added_anywhere": false,
+    "runtime_parquet_or_csv_written": false,
+    "new_module_wired_into_production": false
+  },
+
+  "A_order_state": {
+    "why_the_ledger_cannot_own_it": {
+      "evidence": "window_ledger._write catches every exception and disables the channel for the process; its comment says 'It must never escape into a trading path — the ledger records availability, it does not enforce it'",
+      "conclusion": "exactly right for evidence, exactly wrong for a write-ahead log: a failed write would let an order go out with no record of intent",
+      "pinned_by_test": "a test parses _write and requires it still swallows, so a change to that contract forces a re-read of this decision"
+    },
+    "three_files_three_contracts": [
+      {"file": "window_coverage/*.jsonl", "contract": "evidence — unchanged by paper", "on_write_failure": "disable the channel, keep trading"},
+      {"file": "orders/*.jsonl (new)", "contract": "intent — append-only write-ahead log", "on_write_failure": "ABORT the order before it is sent"},
+      {"file": "live_positions.track1.json", "contract": "belief — what the route holds", "on_write_failure": "advances only on a CONFIRMED fill"}
+    ],
+    "states": {
+      "intended": "written BEFORE any broker call; the book admitted it, nothing sent",
+      "submitted": "handed to the broker; outcome not known and must not be assumed",
+      "filled": "confirmed complete fill",
+      "partial": "confirmed fill smaller than requested",
+      "rejected": "the broker definitively refused; nothing is held",
+      "unknown": "the broker did not answer, or answered unusably"
+    },
+    "rejected_is_not_unknown": "'no' and 'I could not hear you' are different facts; treating the second as the first is how a filled order becomes a position nobody believes in",
+    "allowed_transitions": {
+      "intended": ["submitted", "rejected", "unknown"],
+      "submitted": ["filled", "partial", "rejected", "unknown"],
+      "unknown": ["filled", "partial", "rejected"],
+      "partial": ["filled", "rejected"],
+      "filled": [],
+      "rejected": []
+    },
+    "the_core_guarantee": "INTENDED -> FILLED is NOT a legal transition; intent can never be mistaken for a fill because the journal will not accept the history",
+    "impossible_history_handling": "reported, never smoothed — a reader that quietly repairs the journal is a reader that can be lied to",
+    "decided_field_unchanged": {
+      "meaning": "the route reached a decision",
+      "must_not_depend_on_a_fill": "a broker outage would read as the strategy having stopped deciding, and shadow and paper evidence would stop being comparable — the premise the Stage 5S readiness gate rests on",
+      "pinned_by_test": "classify_slot_row is parsed and must mention no order word",
+      "shadow_behaviour": "bit-identical under this design; nothing in the ledger changes"
+    }
+  },
+
+  "crash_recovery": {
+    "intended": {"means": "nothing was sent", "restart": "the candidate did not trade; book unchanged; continue once reconcile says MATCH"},
+    "submitted": {"means": "outcome unknown", "restart": "ask the broker — get_order_status if an id was recorded, else compare positions. BLOCK entries, allow exits"},
+    "unknown": {"means": "same, for the same reason", "restart": "BLOCK entries, allow exits"},
+    "partial": {"means": "part of it happened", "restart": "book records the FILLED quantity only, never the requested one; remainder flagged; entries blocked"},
+    "filled": {"means": "it happened", "restart": "the book advances — the only state that may add a position"},
+    "rejected": {"means": "nothing is held", "restart": "the reserved cap is released and the refusal is recorded as a divergence from the shadow book"},
+    "close_filled_open_failed": "track1_switch emits OPEN_FAILED_FLAT and calls persist_flat. If that raised, persisted=False and the book still claims the old position while the account is flat. On restart that is a MISMATCH and the repair is to believe the BROKER about existence"
+  },
+
+  "B_startup_reconcile": {
+    "why_three_answers": "IBKRBroker.get_positions() reads until two consecutive reads agree and, if they never do, WARNS and returns the last one — the caller cannot tell a settled truth from a guess. Third time in this project a status reader has had no way to say 'I do not know'; the first (scheduler_processes() -> []) cost six entry slots",
+    "verdicts": {
+      "match": "every position agrees; nothing unattributable",
+      "mismatch": "a definite disagreement, or a journal history that cannot have happened",
+      "unknown": "positions never settled, or an order is still SUBMITTED / UNKNOWN"
+    },
+    "entries_blocked_on": ["mismatch", "unknown"],
+    "exits_allowed_on": ["match", "mismatch", "unknown"],
+    "why_exits_always_allowed": "refusing to REDUCE exposure while the book is confused is the wrong failure direction — a stop that cannot be placed is worse than one placed against a position that turns out to be flat",
+    "compares": ["instrument", "direction", "contracts"],
+    "does_not_compare": "cluster — get_positions sets it to 'UNKNOWN' because IBKR has no cluster concept, so comparing it would mismatch every time",
+    "netting": "signed per contract, the convention ib.positions() already uses, so a LONG 1 against a SHORT 1 cannot read as agreement",
+    "unrecognised_instrument": "blocks. The real case is a leftover full-size NKD position: _to_runner deliberately no longer maps NKD back to MNKD, so it arrives under a name the book does not use and must NOT be quietly adopted as MNKD"
+  },
+
+  "b1_constraint": {
+    "statement": "while one IB Gateway login serves both routes, get_positions() returns the net per contract for BOTH; the strongest available check is broker_net == track1_net + legacy_net",
+    "detects": "disagreement",
+    "cannot": "attribute it to a route",
+    "the_hole_now_asserted": {
+      "reality": "Track 1 holds LONG 1, legacy holds LONG 1 -> broker nets LONG 2",
+      "belief": "Track 1's book claims LONG 2, legacy's claims LONG 0",
+      "result": "MATCH, entries ALLOWED, while Track 1's book is wrong by a whole contract",
+      "with_a_dedicated_account": "the same broker truth is caught immediately and entries are blocked"
+    },
+    "correction_made": "the first version of that test asserted the opposite and passed, because the case it built (legacy claiming a SHORT it does not hold) is one that IS caught. It now asserts the hole",
+    "implication": "B1 is not merely a decision to record before paper — it decides whether reconcile can attribute a mismatch at all"
+  },
+
+  "broker_methods": {
+    "available": ["get_positions", "get_equity", "get_working_stops", "has_working_stop",
+                  "get_order_status", "cancel_order", "place_stop", "send_order"],
+    "missing_and_needed": [
+      {"method": "get_open_orders()", "why": "no way to ask what of mine is still working; without it a SUBMITTED with no answer can only be resolved via get_order_status(order_id), which needs an id the journal can only have if the broker already returned one — the exact gap a crash lands in"},
+      {"method": "executions / fills lookup", "why": "to distinguish 'it never filled' from 'it filled and I missed the confirmation' without inferring it from positions"}
+    ],
+    "interim_answer": "the journal writes SUBMITTED with a client-side idempotency key generated BEFORE the call, and reconcile resolves by comparing positions (existence) rather than by order id. It works, and it is weaker than it should be"
+  },
+
+  "legacy_b3_b4_reuse": {
+    "reusable": false,
+    "why": "both are written against live_positions.json — the first entry in run_live_day_track1.LEGACY_PATHS, the list of files this route must never write. Reusing them reintroduces the state assumptions the route was built to leave behind",
+    "what_is_reusable": "a rule rather than code — get_positions' own docstring says B3 compares only inst/direction/contracts, and that is what reconcile implements",
+    "minimal_track1_reconcile": "the function written this stage: ~60 lines, pure, no broker, three lists in, tri-state verdict out"
+  },
+
+  "pure_and_tested": [
+    "ORDER_STATES / TERMINAL / UNRESOLVED / ALLOWED_TRANSITIONS",
+    "transition_allowed(old, new)",
+    "OrderRecord (flat and scalar — it is read back after a crash)",
+    "resolve_journal -> final states + impossible histories, reported not repaired",
+    "unresolved_orders",
+    "Position / ReconcileResult",
+    "reconcile(book, broker, *, broker_settled, journal, legacy_book, shared_account)",
+    "CRASH_RECOVERY (one entry per state, walked by a test)",
+    "SWITCH_FLAT_RECOVERY"
+  ],
+
+  "still_unimplemented": [
+    "the order journal writer, with its fail-closed contract",
+    "Track1OrderExecutor over IBKRBroker (Stage 5T specified it)",
+    "get_open_orders() and an executions lookup on the broker",
+    "the call site: reconcile before the first slot of a session, then per-slot order handling",
+    "live_positions.track1.json read-back and repair"
+  ],
+
+  "tests_required_before_the_executor": [
+    "the journal is fail-closed: a write that raises aborts the order before it is sent",
+    "an order is never sent without an INTENDED line already durable on disk",
+    "SUBMITTED with no answer -> reconcile UNKNOWN -> entries blocked, exits allowed",
+    "partial fill books the filled quantity only and flags the remainder",
+    "rejected fill releases the reserved cap and records a divergence",
+    "disconnect mid-order leaves a state the next process can reconcile",
+    "close-then-open's three branches, including persist_flat raising",
+    "no duplicate same-symbol order",
+    "no order when explanation, freshness or admission refused — each asserted alone",
+    "an armed run and a shadow run over the same window produce the same decisions"
+  ],
+
+  "files": {
+    "production_new": ["global_index/track1_order_state.py"],
+    "production_modified": [],
+    "wired_into_production": false,
+    "tests_new": ["scratch/test_track1_stage5u_order_state_reconcile_20260825.py"],
+    "test_count": 24,
+    "deliverables": ["scratch/track1_stage5u_order_state_reconcile_design_20260825.md",
+                     "scratch/track1_stage5u_order_state_reconcile_design_20260825.json"]
+  },
+
+  "regression": {"result": "156 passed, 1 skipped", "suites": 5},
+
+  "direct_answers": {
+    "ledger_order_state_machine": "six states in a separate fail-closed journal; INTENDED -> FILLED is not a legal transition; the window ledger is untouched and `decided` keeps meaning 'the route reached a decision'",
+    "crash_recovery": "nothing sent on INTENDED; ask the broker on SUBMITTED and UNKNOWN; book the filled part only on PARTIAL; believe the broker about existence after a failed switch",
+    "startup_reconcile_contract": "three answers; compares instrument/direction/contracts as a signed net; unrecognised instruments block; unsettled reads are UNKNOWN, not flat",
+    "blocks_entries_vs_allows_exits": "MISMATCH and UNKNOWN both block entries; exits are allowed in all three verdicts",
+    "pure_vs_unimplemented": "the state machine and the reconcile rule are built and tested; the journal writer, the executor, two broker methods and the call sites are not",
+    "accidental_order_path_today": "none — four gates hold, run_shadow still builds NoOrderBroker, the scheduler's slot path takes no order gate, and neither new module is imported by anything in production"
+  }
+}

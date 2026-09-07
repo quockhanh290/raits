@@ -1,0 +1,245 @@
+{
+  "stage": "5Z",
+  "title": "paper order callsite dry-run design",
+  "date_et": "2026-08-25",
+  "verdict": "READY_FOR_PAPER_CALLSITE_IMPLEMENTATION_AFTER_EVIDENCE",
+  "ibkr_connection_opened": false,
+  "production_files_modified": 0,
+  "orders": {
+    "sent": 0,
+    "orders_possible": false,
+    "blocking": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "confirmation_file": false,
+    "track1_orders_approved_env": false,
+    "allow_orders_passed_by_any_caller": false,
+    "executor_wired_into_runtime_slot_path": false,
+    "real_runtime_orders_dir_created": false,
+    "dry_run_dir_in_repo": false
+  },
+  "seam": {
+    "file": "global_index/run_live_day_track1.py",
+    "function": "observe_live_slot",
+    "function_lines": [
+      379,
+      537
+    ],
+    "after_line": 473,
+    "anchor": "settlements, decisions = run_candidates(found, book=book)",
+    "why_here": "the first and only moment a live slot holds admitted decisions",
+    "not_run_shadow": "run_shadow replays a measured window and is not what the scheduler runs; its broker object is never passed to anything, only read for len(broker.calls)",
+    "stage5w_claim": "run_shadow line where NoOrderBroker() is constructed",
+    "stage5w_wrong_because": [
+      "run_shadow replays a measured window; the scheduler's 70 strategy slots run observe_live_slot",
+      "in run_shadow the broker object is never passed to anything - constructed, then read once for len(broker.calls)"
+    ],
+    "derived_not_written": true,
+    "refuses_when_ambiguous": true
+  },
+  "dry_run": {
+    "module": "global_index/track1_paper_callsite.py",
+    "stages": [
+      "gate",
+      "reconcile_precheck",
+      "executor",
+      "mapping",
+      "journal",
+      "boundary"
+    ],
+    "success_condition": "reached_boundary - a rehearsal that completes without reaching the wall is NOT ok",
+    "guarded_twice": "the ok property AND the boundary stage's own ok flag",
+    "journal_redirection": "track1_dry_run",
+    "root_guard_refuses": [
+      "the production orders dir",
+      "any parent of it",
+      "any child of it"
+    ],
+    "why_parent_matters": "journal.read(day=None) walks the whole tree",
+    "residue": "intended/submitted/unknown rows in the redirected root - the crash-path rehearsal",
+    "sample_run": {
+      "ok": true,
+      "reached_boundary": true,
+      "stages": [
+        {
+          "name": "gate",
+          "ok": true,
+          "detail": "production gate allow_orders=False; rehearsing on a synthetic gate",
+          "production_allow_orders": false,
+          "production_reasons": [
+            "B1_broker_account_or_legacy_retirement",
+            "PAPER_SHADOW_EVIDENCE"
+          ]
+        },
+        {
+          "name": "reconcile_precheck",
+          "ok": true,
+          "detail": "book: C:\\Users\\quock\\AppData\\Local\\Temp\\tmprb7cyy9h\\global_index\\live_positions.track1.json does not exist; the route has held nothing yet; broker positions: broker_cannot_testify: RefusingBroker.get_positions answers from nothing; an empty answer from a broker that was never connected means 'never asked', not 'flat'",
+          "book_positions": 0,
+          "broker_positions_known": false,
+          "entries_would_be_blocked": true
+        },
+        {
+          "name": "executor",
+          "ok": true,
+          "detail": "constructed against the wall",
+          "reports_order_id_at_placement": true,
+          "fill_carries_order_id": true
+        },
+        {
+          "name": "mapping",
+          "ok": true,
+          "detail": "1 of 1 admitted decision(s) mapped (1 offered)",
+          "offered": 1,
+          "admitted": 1,
+          "mapped": 1
+        },
+        {
+          "name": "journal",
+          "ok": true,
+          "detail": "3 row(s) under C:\\Users\\quock\\AppData\\Local\\Temp\\tmprb7cyy9h\\track1_dry_run",
+          "rows": 3,
+          "invalid": 0,
+          "states": [
+            "intended",
+            "submitted",
+            "unknown"
+          ]
+        },
+        {
+          "name": "boundary",
+          "ok": true,
+          "detail": "1 of 1 order(s) stopped at the wall",
+          "attempts": 1,
+          "sent": 0
+        }
+      ],
+      "orders_mapped": 1,
+      "refusals": [],
+      "journal_rows": [
+        {
+          "state": "intended",
+          "instrument": "MNQ",
+          "order_id": ""
+        },
+        {
+          "state": "submitted",
+          "instrument": "MNQ",
+          "order_id": ""
+        },
+        {
+          "state": "unknown",
+          "instrument": "MNQ",
+          "order_id": ""
+        }
+      ]
+    }
+  },
+  "wall": {
+    "type": "RefusingBroker",
+    "cannot_send": true,
+    "raises_by_name": "dry_run_boundary_reached",
+    "silent_in_two_ways": [
+      "CAN_TESTIFY = False",
+      "every read returns a cannot-say value"
+    ],
+    "a_willing_broker_is_refused": true
+  },
+  "gate": {
+    "rehearsal_runs_on": "DryRunGate (synthetic, a distinct type from ProductionGate)",
+    "production_reported_beside_it": true,
+    "production_allow_orders": false
+  },
+  "stub_scope": {
+    "recommendation": "entry only",
+    "grounds": [
+      "protective stop and max-hold exit are ALREADY covered: 11 Track 1 safety jobs against live_positions.track1.json, B3/B4 inside FuturesRunner.__init__",
+      "track1_switch is imported by NOTHING, so it cannot bypass the journal",
+      "the strategy-exit gap is not reachable from a live slot either"
+    ],
+    "safety_jobs": 11,
+    "safety_jobs_positions_path": "live_positions.track1.json",
+    "they_no_op_because": "the book file does not exist",
+    "consequence_named": "the FIRST paper fill activates eleven jobs that have never run against anything, and they connect to IBKR on the Track 1 safety client id",
+    "known_gap": "stops and exits placed by the safety jobs write trade_log, not the order journal",
+    "coverage_table": [
+      {
+        "operation": "open_position",
+        "covered_by": "the executor (Stage 5W)",
+        "missing": "nothing — built and rehearsed"
+      },
+      {
+        "operation": "place_protective_stop",
+        "covered_by": "run_stop_repair, B4 inside FuturesRunner.__init__",
+        "missing": "no journal row: a stop placed by the safety job is invisible to the order journal"
+      },
+      {
+        "operation": "close_position (max hold)",
+        "covered_by": "run_maxhold_exit, B3/B4",
+        "missing": "same: books the exit and writes trade_log, not the order journal"
+      },
+      {
+        "operation": "close_position (strategy exit)",
+        "covered_by": "nobody",
+        "missing": "the sleeves' own exits have no path to a broker at all"
+      },
+      {
+        "operation": "switch_same_symbol",
+        "covered_by": "nobody — track1_switch is imported by NOTHING",
+        "missing": "it calls broker.send_order at two sites with no journal; if it is ever wired it must go through the executor, or two orders leave no record"
+      }
+    ]
+  },
+  "confirmations": {
+    "no_scheduler_or_ops_send_path": true,
+    "checked_by": [
+      "no --allow-orders literal in any argv (AST)",
+      "no Broker constructed in observe_live_slot (AST)",
+      "no send_order call in run_scheduler.py or monitor/ops.py (AST)"
+    ],
+    "armed_vs_shadow_identical_before_boundary": true,
+    "live_slot_records_mode": "SHADOW_LIVE unconditionally - it has no gate",
+    "evidence_gate_released": false,
+    "evidence_gate_detail": "judgeable_days: 1 judgeable day(s) on record, 5 required — a day with no audit record is not a day that went well; no_failing_days: 1 FAIL day(s) in the qualifying window, at most 0 allowed; every_sleeve_passed_at_least_once: never PASSED inside the window: ['roska4_swing', 'roska4_calm', 'roska4_stress', 'global_nkd']",
+    "chain_head": {
+      "before_5Z": [
+        "track1_paper_executor",
+        "track1_broker_read"
+      ],
+      "after_5Z": [
+        "track1_paper_callsite"
+      ],
+      "note": "one door to watch instead of two"
+    }
+  },
+  "tests": {
+    "stage_5z": 44,
+    "combined_regression_27_files": 695
+  },
+  "mutations": {
+    "count": 23,
+    "all_red": true,
+    "found_the_code_being_right_twice": [
+      "M6",
+      "M10",
+      "M11"
+    ],
+    "what_that_means": "removing one guard changed nothing; the redundancy is load-bearing and is now pinned by test_7b and test_24b"
+  },
+  "runtime_untouched": {
+    "scheduler_pid": 48604,
+    "backend_pid": 35352,
+    "restarted": false,
+    "runtime_files_written": 0,
+    "ledger_rows_edited": 0,
+    "parquet_touched": 0
+  },
+  "remaining": [
+    "PAPER_SHADOW_EVIDENCE: 0 of 5 judgeable days; first fixed-gate NKD window 2026-08-26 01:10 ET",
+    "B1_broker_account_or_legacy_retirement: a user decision",
+    "the eleven safety jobs have never run against a real book - watch the first fill",
+    "stops and exits do not appear in the order journal yet",
+    "close_position / place_protective_stop / switch_same_symbol still 5T stubs, none live-reachable"
+  ]
+}

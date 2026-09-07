@@ -1,0 +1,138 @@
+{
+  "stage": "5W",
+  "title": "paper executor skeleton, uncalled by production",
+  "date_et": "2026-08-25",
+  "verdict": "READY_FOR_PAPER_EXECUTOR_WIRING",
+  "orders": {
+    "sent": 0,
+    "broker_connected_by_this_stage": false,
+    "confirmation_file": false,
+    "track1_orders_approved_env": false,
+    "allow_orders_flag_passed": false,
+    "orders_possible": false,
+    "blocking": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE"
+    ]
+  },
+  "built": {
+    "module": "global_index/track1_paper_executor.py",
+    "implemented_operations": [
+      "open_position",
+      "unresolved",
+      "reconcile_at_startup",
+      "read_book",
+      "broker_capability_report",
+      "production_gate"
+    ],
+    "still_refusing_stubs_from_5T": [
+      "close_position",
+      "place_protective_stop",
+      "switch_same_symbol"
+    ],
+    "depends_on": {
+      "5T": "track1_paper_order",
+      "5U": "track1_order_state",
+      "5V": "track1_order_journal"
+    },
+    "added_to_5T": "tradable_symbol()"
+  },
+  "fail_closed": {
+    "write_ahead_order": [
+      "assert_admitted",
+      "candidate_to_order",
+      "journal INTENDED",
+      "journal SUBMITTED",
+      "broker.send_order",
+      "journal outcome"
+    ],
+    "submitted_before_send": true,
+    "journal_write_raises": true,
+    "ambiguous_result": "UNKNOWN, exception re-raised",
+    "book_written_by_executor": false,
+    "book_read_fails_closed": true
+  },
+  "book_contract": {
+    "path": "global_index/live_positions.track1.json",
+    "exists_now": false,
+    "quantity_key_measured_from_writer": "qty",
+    "quantity_keys_accepted": [
+      "qty",
+      "contracts"
+    ],
+    "schema_version": 2,
+    "refuses_other_route": true,
+    "refuses_other_schema": true,
+    "missing_file_is_empty_book": true,
+    "unreadable_file_is_refusal": true
+  },
+  "broker_capability": {
+    "required_present_on_IBKRBroker": [
+      "send_order",
+      "get_positions",
+      "get_order_status",
+      "cancel_order",
+      "place_stop"
+    ],
+    "required_absent_on_IBKRBroker": [],
+    "still_missing": [
+      "get_open_orders",
+      "get_executions"
+    ],
+    "fill_carries_order_id": false,
+    "interim_unknown_resolution": "resolve by comparing broker POSITIONS against the book, keyed by the client-side idempotency key written before the call — not by order id, because a crash inside send_order can leave an order with no id ever returned. Weaker than get_open_orders(), and named so rather than papered over."
+  },
+  "walls": {
+    "refuses_unarmed_gate": true,
+    "imported_by_production": false,
+    "slot_path_takes_order_gate": false,
+    "run_shadow_broker": "NoOrderBroker"
+  },
+  "armed_vs_shadow": {
+    "mode_reads_after_assignment_in_run_shadow": 1,
+    "mode_consumer": "emit_explanations",
+    "both_live_modes_bind_freshness": true
+  },
+  "live_ledger_20260825_nkd": {
+    "slot_observed": 22,
+    "decided": 0,
+    "distribution": {
+      "partial_coverage,stale": 20,
+      "stale": 1,
+      "too_late": 1
+    },
+    "hard_refusals": 21,
+    "note": "window closed; pinned exactly, was a subset check in 5V-1"
+  },
+  "tests": {
+    "stage_5w": 52,
+    "regression_8_files": 234,
+    "regression_4_files": "95 passed, 1 skipped"
+  },
+  "mutations": {
+    "count": 18,
+    "all_red": true,
+    "unfaithful_first_attempts": [
+      "M5",
+      "M9"
+    ],
+    "found_a_real_test_hole": [
+      "M11"
+    ]
+  },
+  "runtime_untouched": {
+    "scheduler_pid": 48604,
+    "backend_pid": 35352,
+    "restarted": false,
+    "runtime_files_written": 0,
+    "ledger_rows_edited": 0,
+    "parquet_touched": 0
+  },
+  "remaining_before_wiring": [
+    "PAPER_SHADOW_EVIDENCE: 0 judgeable days; first fixed-gate NKD window 2026-08-26 01:10 ET",
+    "B1_broker_account_or_legacy_retirement: a user decision, not a code change",
+    "IBKRBroker.get_open_orders / get_executions still absent",
+    "the call site in run_shadow (one line, and it is the line that enables orders)",
+    "close_position / place_protective_stop / switch_same_symbol still 5T stubs"
+  ]
+}

@@ -1,0 +1,157 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZQ",
+  "title": "Candidate setup boundaries + HMM regime explainability",
+  "when_et": "2026-08-28",
+
+  "setup_boundary_classification": {
+    "roska4_stress": {
+      "type": "metric_boundary",
+      "proof": "entry_conditions compares four basket COUNTS and an average gap against StressParams; no single price is the trigger, so a price line before setup would be invented"},
+    "global_nkd": {
+      "type": "entry_after_setup_only",
+      "proof": "detect_entry_for_slot returns SwingSetup(entry, stop) when a bar signals and None otherwise; the entry comes from a per-bar signal function, not from a standing level"},
+    "roska4_swing": {
+      "type": "entry_after_setup_only",
+      "proof": "same detector as global_nkd at a different ema_period"},
+    "roska4_calm": {
+      "type": "two_phase",
+      "proof": "DECIDE and OBSERVE know different things; the 10:00 reference and planned stop are OBSERVE-only and must not appear at DECIDE"}
+  },
+  "proof_travels_in_the_payload": true,
+  "price_line_drawn_before_a_candidate_exists": false,
+
+  "stress_setup_boundary_20260827": {
+    "metrics": [
+      {"label": "Instruments below open and VWAP", "value": 4, "threshold": 4,
+       "comparator": ">=", "passed": true, "distance": null},
+      {"label": "Instruments gapped down", "value": 0, "threshold": 3,
+       "comparator": ">=", "passed": false, "distance": 3,
+       "display_distance": "3 more needed"},
+      {"label": "Instruments with a wide range", "value": 0, "threshold": 0,
+       "comparator": ">=", "passed": true, "distance": null},
+      {"label": "Average basket gap", "value": 0.0051153, "display_value": "+0.51%",
+       "threshold": -0.001, "display_threshold": "<= -0.10%", "comparator": "<=",
+       "passed": false, "display_distance": "0.61 percentage points away"}
+    ],
+    "nearest_failed_condition": "Instruments gapped down 0, needs >= 3",
+    "why_nearest_not_first": "an operator asks how close the day came; the order the rules are declared in is an accident rather than an answer, so failures are ranked by distance relative to their own threshold",
+    "summary": "No setup - Instruments gapped down 3 more needed",
+    "price_levels": [],
+    "missing_data_distinct_from_no_setup": true
+  },
+
+  "regime_explain": {
+    "features_named_at_source": "raits/hmm/features.py build_feature_matrix returns exactly two columns",
+    "features": [
+      {"name": "log_return", "label": "SPY 1-day log return", "value": 0.006531,
+       "display_value": "+0.65%", "percentile_60d": 76.7, "z_score_60d": 0.72,
+       "state_means": {"Calm": 0.001002, "Normal": 0.000539, "Stress": -0.001482},
+       "sd_distance_to_state": {"Calm": 0.976, "Normal": 0.546, "Stress": 0.319},
+       "separation": 0.228, "leans": "mixed"},
+      {"name": "realised_vol", "label": "Realised volatility, 5-day annualised",
+       "value": 0.058136, "display_value": "5.8% annualised", "percentile_60d": 0.0,
+       "z_score_60d": -1.39,
+       "state_means": {"Calm": 0.069346, "Normal": 0.156819, "Stress": 0.353277},
+       "sd_distance_to_state": {"Calm": 0.437, "Normal": 2.451, "Stress": 1.52},
+       "separation": 1.083, "leans": "Calm"}
+    ],
+    "posterior": {"Calm": 0.998354, "Normal": 0.001643, "Stress": 0.000003},
+    "runner_up": "Normal", "margin": 0.996711,
+    "entropy_bits": 0.017627, "max_entropy_bits": 1.584963,
+    "threshold": null,
+    "the_real_answer": "realised volatility is at the FLOOR of its 60-day range and sits nearest the Calm state's own mean; the day's return does not discriminate at all",
+    "lean_is_modest_by_design": {
+      "definition": "distance from the value to each state's mean, in that state's own standard deviations",
+      "mixed_when": "best and second-best are closer than half a standard deviation",
+      "why": "the three state means for log_return sit within a thousandth of each other; naming a lean there would be inventing attribution",
+      "not_an_attribution": "a Gaussian HMM decodes a path over a joint distribution and does not decompose into per-feature contributions"
+    },
+    "no_fake_threshold": "Viterbi compares states against one another and never against a cut; the page says 'No fixed shift threshold; the model chooses the most likely state' and offers the lead over the runner-up and the entropy in its place"
+  },
+
+  "performance": {
+    "regression_i_caused": "Stage 5ZZP called daily_slices on EVERY request",
+    "timings": {
+      "backend_first_request_any_route": {"before": "~62s", "after": "~62s",
+                                          "note": "pre-existing, not this endpoint"},
+      "market_view_own_cold": {"before": "9.9s", "after": "11.0s"},
+      "market_view_warm": {"before": "3.9s", "after": "0.02-0.23s"}
+    },
+    "daily_slices_alone_was": "3.24s of the 3.9s warm",
+    "cache_key": "the four stores' modification times",
+    "why_not_a_ttl": "a TTL hands back a stale answer as a fresh one for the length of the timer, which is the failure this route keeps finding in other clothes; an mtime key invalidates the moment a store is appended",
+    "the_62s_misattribution": {
+      "first_reading": "cold 95s, which read as the new work making it worse",
+      "measured_properly": "the FIRST request to a freshly started backend costs ~62s whichever endpoint it is - a cheap reader took 62.63s in that position, and the market view took 11.0s once that cost had been paid by something else",
+      "conclusion": "the number belongs to backend startup, not to this route - pre-existing and untouched by this stage, recorded as a named finding rather than folded into a figure that would have made this stage look responsible",
+      "page_survives_it": "the market-view fetch is independent, so every other panel renders while it waits"
+    }
+  },
+
+  "dashboard": {
+    "market_view": ["setup-conditions row under the chart, one card per condition with value, threshold and distance when it fails",
+                    "only the NEAREST failure emphasised - colour alone would make four cards shout at once",
+                    "a sleeve whose entry forms only after a bar signals says so in a sentence instead of showing empty cards"],
+    "regime": ["the full posterior as bars with uncertainty in bits",
+               "a Why this label table: input, value, 60-day percentile with z-score, and the lean",
+               "no lean where none can be claimed, with the reason on hover"],
+    "both_outside_the_chart_box": true,
+    "chart_height_spread_px": 0,
+    "container_overflow": {"375": 0, "720": 0, "1440": 0}
+  },
+
+  "intentionally_not_exposed": [
+    {"what": "a price line for Stress", "why": "the setup is counts and an average, not a price"},
+    {"what": "distance-to-entry for NKD/Swing",
+     "why": "the entry comes from a per-bar signal function; publishing a distance would mean forming an entry the detector never formed"},
+    {"what": "Calm phase diagnostics",
+     "why": "DECIDE must not show OBSERVE-only values; unwired rather than wired wrongly, unchanged from 5ZZP"},
+    {"what": "a regime threshold", "why": "Viterbi has none"},
+    {"what": "per-feature attribution",
+     "why": "a Gaussian HMM does not decompose; leans is a distance to a state mean and is named as such"}
+  ],
+
+  "tests": {
+    "new_file": "scratch/test_track1_stage5zzq_setup_boundaries_hmm_explain_20260828.py",
+    "new_count": 35,
+    "highlights": ["metric values checked AGAINST THE DETECTOR'S OWN OUTPUT, not re-derived",
+                   "entropy checked against its definition rather than against the implementation",
+                   "the page is scanned for build_feature_matrix, predict_proba, Math.log, entry_conditions, peer_features and breadth_min, and every displayed number shown to be addressed out of the payload"],
+    "defects_the_tests_caught": [
+      {"what": "the feature table overflowed 208px at 375px",
+       "why_not_a_scroll_container": "it would have hidden the overflow rather than removed it, and the row would still have been unreadable",
+       "fix": "below 560px each row is a block with the input name on its own line"},
+      {"what": "a case-sensitivity slip of mine, the THIRD time in these panels",
+       "detail": "an assertion pinned to `Why this label` against a heading the stylesheet uppercases"}
+    ],
+    "suites": "5ZZQ + 5ZZP + 5ZZL/M + dashboard backend + realtime contract + realtime DOM + ops + 5ZZO",
+    "passed": 423,
+    "failed": 0
+  },
+
+  "safety": {
+    "orders_possible_before": false, "orders_possible_after": false,
+    "track1_blocking_before": ["PAPER_SHADOW_EVIDENCE"],
+    "track1_blocking_after": ["PAPER_SHADOW_EVIDENCE"],
+    "confirmation_before": true, "confirmation_after": true, "confirmation_touched": false,
+    "scheduler": "pid 3000, track1-only-shadow, 0 legacy entry jobs, untouched",
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "orders_dir": "ABSENT",
+    "broker_order_calls": 0,
+    "trading_decisions_changed": 0,
+    "backend_restarts": "three, read-only dashboard process only, via restart --no-scheduler",
+    "runtime_written": "one appended regime-label record; no trading file touched"
+  },
+
+  "files_touched": {
+    "modified": ["global_index/track1_regime_record.py",
+                 "monitor/backend/track1_market_view.py",
+                 "global_index/dash/realtime/realtime.js",
+                 "global_index/dash/realtime/realtime.css",
+                 "global_index/dash/realtime/index.html"],
+    "new": ["scratch/test_track1_stage5zzq_setup_boundaries_hmm_explain_20260828.py",
+            "scratch/track1_stage5zzq_setup_boundaries_hmm_explain_20260828.md",
+            "scratch/track1_stage5zzq_setup_boundaries_hmm_explain_20260828.json"]
+  }
+}

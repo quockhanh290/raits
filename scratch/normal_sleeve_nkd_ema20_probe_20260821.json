@@ -1,0 +1,778 @@
+{
+ "floor": {
+  "rows": [
+   {
+    "net": 8569.569999999998,
+    "pf": 1.2065065602257086,
+    "sharpe": 1.0955540916857238,
+    "calmar": 0.17861776867810378,
+    "maxdd": 11371.609999999999,
+    "maxdd_pct": 0.22743219999999997,
+    "ret_yr": 0.040623432089552235,
+    "trade_count": 839,
+    "taken": 350,
+    "rejected": 135,
+    "halted_days": 262,
+    "blocked_trades": 354,
+    "lost_trade_pnl": 20921.30999999993,
+    "peak_rel_dd": 0.16258819196359064,
+    "peak_rel_day": "2022-05-17",
+    "safety_margin_15": -0.01258819196359065,
+    "first_halt": {
+     "day": "2022-05-17",
+     "peak": 69941.18000000039,
+     "equity": 58569.570000000276,
+     "dd": 0.16258819196359064,
+     "level": "HALT"
+    },
+    "yearly": {
+     "2018": 4542.48,
+     "2019": 4759.439999999999,
+     "2020": 3127.1999999999994,
+     "2021": 4298.880000000001,
+     "2022": -8158.43
+    },
+    "variant": "R4 only",
+    "breaker": "ON"
+   },
+   {
+    "net": 29277.630000000005,
+    "pf": 1.4368921738040454,
+    "sharpe": 2.1104400503343843,
+    "calmar": 0.37705763288019284,
+    "maxdd": 11371.609999999999,
+    "maxdd_pct": 0.22743219999999997,
+    "ret_yr": 0.08575504697273457,
+    "trade_count": 839,
+    "taken": 571,
+    "rejected": 268,
+    "halted_days": 0,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.16258819196359064,
+    "peak_rel_day": "2022-05-17",
+    "safety_margin_15": -0.01258819196359065,
+    "first_halt": null,
+    "yearly": {
+     "2018": 4542.48,
+     "2019": 4759.439999999999,
+     "2020": 3127.1999999999994,
+     "2021": 4298.880000000001,
+     "2022": -4848.439999999999,
+     "2023": 10438.51,
+     "2024": 6959.560000000001
+    },
+    "variant": "R4 only",
+    "breaker": "OFF"
+   },
+   {
+    "net": 2503.6600000000008,
+    "pf": 1.0964127580951115,
+    "sharpe": 0.5576818992615677,
+    "calmar": 0.09921242700588402,
+    "maxdd": 3685.4100000000035,
+    "maxdd_pct": 0.07370820000000007,
+    "ret_yr": 0.007312769412235108,
+    "trade_count": 228,
+    "taken": 228,
+    "rejected": 0,
+    "halted_days": 0,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.07319830063775948,
+    "peak_rel_day": "2020-11-03",
+    "safety_margin_15": 0.07680169936224052,
+    "first_halt": null,
+    "yearly": {
+     "2018": -546.7599999999998,
+     "2019": -668.7099999999998,
+     "2020": -1268.6399999999999,
+     "2021": 606.9300000000003,
+     "2022": 590.0300000000008,
+     "2023": 3285.7299999999996,
+     "2024": 505.08000000000004
+    },
+    "variant": "NKD ema20 corrected",
+    "breaker": "ON"
+   },
+   {
+    "net": 2503.6600000000008,
+    "pf": 1.0964127580951115,
+    "sharpe": 0.5576818992615677,
+    "calmar": 0.09921242700588402,
+    "maxdd": 3685.4100000000035,
+    "maxdd_pct": 0.07370820000000007,
+    "ret_yr": 0.007312769412235108,
+    "trade_count": 228,
+    "taken": 228,
+    "rejected": 0,
+    "halted_days": 0,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.07319830063775948,
+    "peak_rel_day": "2020-11-03",
+    "safety_margin_15": 0.07680169936224052,
+    "first_halt": null,
+    "yearly": {
+     "2018": -546.7599999999998,
+     "2019": -668.7099999999998,
+     "2020": -1268.6399999999999,
+     "2021": 606.9300000000003,
+     "2022": 590.0300000000008,
+     "2023": 3285.7299999999996,
+     "2024": 505.08000000000004
+    },
+    "variant": "NKD ema20 corrected",
+    "breaker": "OFF"
+   },
+   {
+    "net": 8212.279999999999,
+    "pf": 1.1493376142474718,
+    "sharpe": 0.7649694821765085,
+    "calmar": 0.18582202086291852,
+    "maxdd": 10454.649999999981,
+    "maxdd_pct": 0.20909299999999964,
+    "ret_yr": 0.03885408380829015,
+    "trade_count": 1067,
+    "taken": 482,
+    "rejected": 135,
+    "halted_days": 346,
+    "blocked_trades": 450,
+    "lost_trade_pnl": 23782.25999999985,
+    "peak_rel_dd": 0.15260963920880755,
+    "peak_rel_day": "2022-05-17",
+    "safety_margin_15": -0.0026096392088075515,
+    "first_halt": {
+     "day": "2022-05-17",
+     "peak": 68505.83000000035,
+     "equity": 58051.18000000039,
+     "dd": 0.15260963920880755,
+     "level": "HALT"
+    },
+    "yearly": {
+     "2018": 3995.7199999999984,
+     "2019": 4090.729999999998,
+     "2020": 1858.5599999999993,
+     "2021": 4905.81,
+     "2022": -6638.539999999999
+    },
+    "variant": "R4 + NKD ema20 corrected",
+    "breaker": "ON"
+   },
+   {
+    "net": 31781.29,
+    "pf": 1.3482935677786514,
+    "sharpe": 1.6605989274836381,
+    "calmar": 0.4439545956138938,
+    "maxdd": 10454.649999999981,
+    "maxdd_pct": 0.20909299999999964,
+    "ret_yr": 0.09282779826069573,
+    "trade_count": 1067,
+    "taken": 799,
+    "rejected": 268,
+    "halted_days": 0,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.15260963920880755,
+    "peak_rel_day": "2022-05-17",
+    "safety_margin_15": -0.0026096392088075515,
+    "first_halt": null,
+    "yearly": {
+     "2018": 3995.7199999999984,
+     "2019": 4090.729999999998,
+     "2020": 1858.5599999999993,
+     "2021": 4905.81,
+     "2022": -4258.409999999998,
+     "2023": 13724.24,
+     "2024": 7464.640000000001
+    },
+    "variant": "R4 + NKD ema20 corrected",
+    "breaker": "OFF"
+   }
+  ],
+  "corrected_repricing": {
+   "MES": {
+    "n": 1,
+    "dollars": 318.19999999999936
+   },
+   "MNQ": {
+    "n": 1,
+    "dollars": 86.77999999999884
+   },
+   "MYM": {
+    "n": 1,
+    "dollars": 59.215000000000146
+   },
+   "M2K": {
+    "n": 1,
+    "dollars": 18.949999999999818
+   },
+   "MNKD": {
+    "n": 6,
+    "dollars": 12.139999999999418
+   }
+  },
+  "audit_corrected": {
+   "MES": {
+    "inst": "MES",
+    "n": 202,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNQ": {
+    "inst": "MNQ",
+    "n": 210,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MYM": {
+    "inst": "MYM",
+    "n": 216,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "M2K": {
+    "inst": "M2K",
+    "n": 211,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNKD": {
+    "inst": "MNKD",
+    "n": 228,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   }
+  }
+ },
+ "vault2025": {
+  "rows": [
+   {
+    "net": 4654.160000000002,
+    "pf": 1.5487859089263671,
+    "sharpe": 2.392944002341255,
+    "calmar": 1.6352304497487042,
+    "maxdd": 3093.949999999999,
+    "maxdd_pct": 0.061878999999999976,
+    "ret_yr": 0.10118642500000004,
+    "trade_count": 113,
+    "taken": 52,
+    "rejected": 61,
+    "halted_days": 0,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.05460788381852554,
+    "peak_rel_day": "2025-11-24",
+    "safety_margin_15": 0.09539211618147445,
+    "first_halt": null,
+    "yearly": {
+     "2025": 4654.160000000002
+    },
+    "variant": "R4 only",
+    "breaker": "ON"
+   },
+   {
+    "net": 4654.160000000002,
+    "pf": 1.5487859089263671,
+    "sharpe": 2.392944002341255,
+    "calmar": 1.6352304497487042,
+    "maxdd": 3093.949999999999,
+    "maxdd_pct": 0.061878999999999976,
+    "ret_yr": 0.10118642500000004,
+    "trade_count": 113,
+    "taken": 52,
+    "rejected": 61,
+    "halted_days": 0,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.05460788381852554,
+    "peak_rel_day": "2025-11-24",
+    "safety_margin_15": 0.09539211618147445,
+    "first_halt": null,
+    "yearly": {
+     "2025": 4654.160000000002
+    },
+    "variant": "R4 only",
+    "breaker": "OFF"
+   },
+   {
+    "net": 2239.4400000000005,
+    "pf": 1.4193425162348607,
+    "sharpe": 2.23889234641383,
+    "calmar": 0.9669464572592662,
+    "maxdd": 2502.7099999999996,
+    "maxdd_pct": 0.05005419999999999,
+    "ret_yr": 0.04839973136094675,
+    "trade_count": 30,
+    "taken": 30,
+    "rejected": 0,
+    "halted_days": 0,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.04586149615959392,
+    "peak_rel_day": "2025-11-29",
+    "safety_margin_15": 0.10413850384040607,
+    "first_halt": null,
+    "yearly": {
+     "2025": 2239.4400000000005
+    },
+    "variant": "NKD ema20 corrected",
+    "breaker": "ON"
+   },
+   {
+    "net": 2239.4400000000005,
+    "pf": 1.4193425162348607,
+    "sharpe": 2.23889234641383,
+    "calmar": 0.9669464572592662,
+    "maxdd": 2502.7099999999996,
+    "maxdd_pct": 0.05005419999999999,
+    "ret_yr": 0.04839973136094675,
+    "trade_count": 30,
+    "taken": 30,
+    "rejected": 0,
+    "halted_days": 0,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.04586149615959392,
+    "peak_rel_day": "2025-11-29",
+    "safety_margin_15": 0.10413850384040607,
+    "first_halt": null,
+    "yearly": {
+     "2025": 2239.4400000000005
+    },
+    "variant": "NKD ema20 corrected",
+    "breaker": "OFF"
+   },
+   {
+    "net": 6893.6,
+    "pf": 1.5124366385952444,
+    "sharpe": 2.3556510981636962,
+    "calmar": 1.3310386919907877,
+    "maxdd": 5596.659999999998,
+    "maxdd_pct": 0.11193319999999995,
+    "ret_yr": 0.14898742011834318,
+    "trade_count": 143,
+    "taken": 82,
+    "rejected": 61,
+    "halted_days": 0,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.09140594708814252,
+    "peak_rel_day": "2025-11-29",
+    "safety_margin_15": 0.05859405291185747,
+    "first_halt": null,
+    "yearly": {
+     "2025": 6893.6
+    },
+    "variant": "R4 + NKD ema20 corrected",
+    "breaker": "ON"
+   },
+   {
+    "net": 6893.6,
+    "pf": 1.5124366385952444,
+    "sharpe": 2.3556510981636962,
+    "calmar": 1.3310386919907877,
+    "maxdd": 5596.659999999998,
+    "maxdd_pct": 0.11193319999999995,
+    "ret_yr": 0.14898742011834318,
+    "trade_count": 143,
+    "taken": 82,
+    "rejected": 61,
+    "halted_days": 0,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.09140594708814252,
+    "peak_rel_day": "2025-11-29",
+    "safety_margin_15": 0.05859405291185747,
+    "first_halt": null,
+    "yearly": {
+     "2025": 6893.6
+    },
+    "variant": "R4 + NKD ema20 corrected",
+    "breaker": "OFF"
+   }
+  ],
+  "corrected_repricing": {
+   "MES": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "MNQ": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "MYM": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "M2K": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "MNKD": {
+    "n": 0,
+    "dollars": 0.0
+   }
+  },
+  "audit_corrected": {
+   "MES": {
+    "inst": "MES",
+    "n": 26,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNQ": {
+    "inst": "MNQ",
+    "n": 31,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MYM": {
+    "inst": "MYM",
+    "n": 27,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "M2K": {
+    "inst": "M2K",
+    "n": 29,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNKD": {
+    "inst": "MNKD",
+    "n": 30,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   }
+  }
+ },
+ "vault2026": {
+  "rows": [
+   {
+    "net": 735.9899999999998,
+    "pf": 1.0881345986887405,
+    "sharpe": 0.5029096273229922,
+    "calmar": 0.20984513828192833,
+    "maxdd": 6341.789999999999,
+    "maxdd_pct": 0.12683579999999997,
+    "ret_yr": 0.026615875990099003,
+    "trade_count": 88,
+    "taken": 46,
+    "rejected": 42,
+    "halted_days": 0,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.1252433063115862,
+    "peak_rel_day": "2026-04-09",
+    "safety_margin_15": 0.024756693688413794,
+    "first_halt": null,
+    "yearly": {
+     "2026": 735.9899999999998
+    },
+    "variant": "R4 only",
+    "breaker": "ON"
+   },
+   {
+    "net": 735.9899999999998,
+    "pf": 1.0881345986887405,
+    "sharpe": 0.5029096273229922,
+    "calmar": 0.20984513828192833,
+    "maxdd": 6341.789999999999,
+    "maxdd_pct": 0.12683579999999997,
+    "ret_yr": 0.026615875990099003,
+    "trade_count": 88,
+    "taken": 46,
+    "rejected": 42,
+    "halted_days": 0,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.1252433063115862,
+    "peak_rel_day": "2026-04-09",
+    "safety_margin_15": 0.024756693688413794,
+    "first_halt": null,
+    "yearly": {
+     "2026": 735.9899999999998
+    },
+    "variant": "R4 only",
+    "breaker": "OFF"
+   },
+   {
+    "net": 5412.469999999999,
+    "pf": 1.8121917218259822,
+    "sharpe": 3.8633801011721824,
+    "calmar": 2.8604178664325315,
+    "maxdd": 3438.4300000000003,
+    "maxdd_pct": 0.0687686,
+    "ret_yr": 0.1967069320895522,
+    "trade_count": 26,
+    "taken": 24,
+    "rejected": 2,
+    "halted_days": 0,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.06793047381408202,
+    "peak_rel_day": "2026-03-16",
+    "safety_margin_15": 0.08206952618591798,
+    "first_halt": null,
+    "yearly": {
+     "2026": 5412.469999999999
+    },
+    "variant": "NKD ema20 corrected",
+    "breaker": "ON"
+   },
+   {
+    "net": 5412.469999999999,
+    "pf": 1.8121917218259822,
+    "sharpe": 3.8633801011721824,
+    "calmar": 2.8604178664325315,
+    "maxdd": 3438.4300000000003,
+    "maxdd_pct": 0.0687686,
+    "ret_yr": 0.1967069320895522,
+    "trade_count": 26,
+    "taken": 24,
+    "rejected": 2,
+    "halted_days": 0,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.06793047381408202,
+    "peak_rel_day": "2026-03-16",
+    "safety_margin_15": 0.08206952618591798,
+    "first_halt": null,
+    "yearly": {
+     "2026": 5412.469999999999
+    },
+    "variant": "NKD ema20 corrected",
+    "breaker": "OFF"
+   },
+   {
+    "net": 6148.460000000001,
+    "pf": 1.4134702677403002,
+    "sharpe": 2.206757446036824,
+    "calmar": 1.4033251499335961,
+    "maxdd": 7922.219999999998,
+    "maxdd_pct": 0.15844439999999996,
+    "ret_yr": 0.22234901138613863,
+    "trade_count": 114,
+    "taken": 70,
+    "rejected": 44,
+    "halted_days": 3,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.15577148591882134,
+    "peak_rel_day": "2026-04-09",
+    "safety_margin_15": -0.005771485918821345,
+    "first_halt": {
+     "day": "2026-04-01",
+     "peak": 50857.96,
+     "equity": 43178.95000000002,
+     "dd": 0.15098934365436562,
+     "level": "HALT"
+    },
+    "yearly": {
+     "2026": 6148.460000000001
+    },
+    "variant": "R4 + NKD ema20 corrected",
+    "breaker": "ON"
+   },
+   {
+    "net": 6148.460000000001,
+    "pf": 1.4134702677403002,
+    "sharpe": 2.206757446036824,
+    "calmar": 1.4033251499335961,
+    "maxdd": 7922.219999999998,
+    "maxdd_pct": 0.15844439999999996,
+    "ret_yr": 0.22234901138613863,
+    "trade_count": 114,
+    "taken": 70,
+    "rejected": 44,
+    "halted_days": 0,
+    "blocked_trades": 0,
+    "lost_trade_pnl": 0.0,
+    "peak_rel_dd": 0.15577148591882134,
+    "peak_rel_day": "2026-04-09",
+    "safety_margin_15": -0.005771485918821345,
+    "first_halt": null,
+    "yearly": {
+     "2026": 6148.460000000001
+    },
+    "variant": "R4 + NKD ema20 corrected",
+    "breaker": "OFF"
+   }
+  ],
+  "corrected_repricing": {
+   "MES": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "MNQ": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "MYM": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "M2K": {
+    "n": 0,
+    "dollars": 0.0
+   },
+   "MNKD": {
+    "n": 1,
+    "dollars": 3.2150000000001455
+   }
+  },
+  "audit_corrected": {
+   "MES": {
+    "inst": "MES",
+    "n": 23,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNQ": {
+    "inst": "MNQ",
+    "n": 20,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MYM": {
+    "inst": "MYM",
+    "n": 24,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "M2K": {
+    "inst": "M2K",
+    "n": 21,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   },
+   "MNKD": {
+    "inst": "MNKD",
+    "n": 26,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0
+   }
+  }
+ }
+}

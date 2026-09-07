@@ -1,0 +1,200 @@
+{
+ "floor": {
+  "repaired_mechanics_family_cap_5_44": {
+   "net": 66796.31,
+   "pf": 1.5867,
+   "sharpe": 1.9069,
+   "calmar": 1.9215,
+   "maxdd": 4973.38,
+   "taken": {
+    "roska4_swing": 564,
+    "roska4_stress": 49,
+    "global_nkd": 758,
+    "roska4_calm": 325
+   },
+   "rejected": {
+    "roska4_swing": 197,
+    "roska4_stress": 1,
+    "global_nkd": 0,
+    "roska4_calm": 5
+   },
+   "family_rejected": 5,
+   "halted": 1,
+   "double_booked": 0,
+   "suppressed_normal_same_symbol": 7,
+   "suppressed_normal_pnl": 940.82,
+   "stress_closed_r4": 8,
+   "calm_closed_current_nkd": 45,
+   "pnl_by_cluster": {
+    "roska4_calm": 8797.09,
+    "global_nkd": 13405.17,
+    "roska4_swing": 18428.52,
+    "roska4_stress": 26165.53
+   }
+  },
+  "risk_clean_no_calm_nkd_family_cap_5_44": {
+   "net": 57289.44,
+   "pf": 1.5297,
+   "sharpe": 2.0828,
+   "calmar": 1.6694,
+   "maxdd": 4913.68,
+   "taken": {
+    "roska4_swing": 564,
+    "roska4_stress": 49,
+    "global_nkd": 228,
+    "roska4_calm": 325
+   },
+   "rejected": {
+    "roska4_swing": 197,
+    "roska4_stress": 1,
+    "global_nkd": 0,
+    "roska4_calm": 5
+   },
+   "family_rejected": 5,
+   "halted": 1,
+   "double_booked": 0,
+   "suppressed_normal_same_symbol": 7,
+   "suppressed_normal_pnl": 940.82,
+   "stress_closed_r4": 8,
+   "calm_closed_current_nkd": 0,
+   "pnl_by_cluster": {
+    "roska4_calm": 8797.09,
+    "global_nkd": 3898.3,
+    "roska4_swing": 18428.52,
+    "roska4_stress": 26165.53
+   }
+  }
+ },
+ "vault2025": {
+  "repaired_mechanics_family_cap_5_44": {
+   "net": 16180.57,
+   "pf": 2.0549,
+   "sharpe": 2.4964,
+   "calmar": 3.3591,
+   "maxdd": 4914.52,
+   "taken": {
+    "roska4_swing": 57,
+    "roska4_stress": 3,
+    "global_nkd": 117,
+    "roska4_calm": 38
+   },
+   "rejected": {
+    "roska4_swing": 48,
+    "roska4_stress": 0,
+    "global_nkd": 0,
+    "roska4_calm": 5
+   },
+   "family_rejected": 5,
+   "halted": 0,
+   "double_booked": 0,
+   "suppressed_normal_same_symbol": 0,
+   "suppressed_normal_pnl": 0.0,
+   "stress_closed_r4": 1,
+   "calm_closed_current_nkd": 7,
+   "pnl_by_cluster": {
+    "global_nkd": 5964.13,
+    "roska4_swing": 3905.85,
+    "roska4_calm": 1779.63,
+    "roska4_stress": 4530.96
+   }
+  },
+  "risk_clean_no_calm_nkd_family_cap_5_44": {
+   "net": 12419.48,
+   "pf": 1.8218,
+   "sharpe": 2.6345,
+   "calmar": 2.3774,
+   "maxdd": 5645.16,
+   "taken": {
+    "roska4_swing": 57,
+    "roska4_stress": 3,
+    "global_nkd": 31,
+    "roska4_calm": 38
+   },
+   "rejected": {
+    "roska4_swing": 47,
+    "roska4_stress": 0,
+    "global_nkd": 0,
+    "roska4_calm": 5
+   },
+   "family_rejected": 5,
+   "halted": 1,
+   "double_booked": 0,
+   "suppressed_normal_same_symbol": 0,
+   "suppressed_normal_pnl": 0.0,
+   "stress_closed_r4": 1,
+   "calm_closed_current_nkd": 0,
+   "pnl_by_cluster": {
+    "global_nkd": 2203.04,
+    "roska4_swing": 3905.85,
+    "roska4_calm": 1779.63,
+    "roska4_stress": 4530.96
+   }
+  }
+ },
+ "vault2026": {
+  "repaired_mechanics_family_cap_5_44": {
+   "net": 8105.04,
+   "pf": 1.5196,
+   "sharpe": 2.1439,
+   "calmar": 3.7629,
+   "maxdd": 3435.49,
+   "taken": {
+    "roska4_swing": 43,
+    "roska4_stress": 3,
+    "global_nkd": 62,
+    "roska4_calm": 19
+   },
+   "rejected": {
+    "roska4_swing": 38,
+    "roska4_stress": 1,
+    "global_nkd": 3,
+    "roska4_calm": 8
+   },
+   "family_rejected": 7,
+   "halted": 0,
+   "double_booked": 0,
+   "suppressed_normal_same_symbol": 0,
+   "suppressed_normal_pnl": 0.0,
+   "stress_closed_r4": 0,
+   "calm_closed_current_nkd": 5,
+   "pnl_by_cluster": {
+    "roska4_calm": 702.19,
+    "global_nkd": 7035.86,
+    "roska4_swing": -464.47,
+    "roska4_stress": 831.46
+   }
+  },
+  "risk_clean_no_calm_nkd_family_cap_5_44": {
+   "net": 7076.65,
+   "pf": 1.4527,
+   "sharpe": 2.1858,
+   "calmar": 1.9284,
+   "maxdd": 5853.15,
+   "taken": {
+    "roska4_swing": 43,
+    "roska4_stress": 3,
+    "global_nkd": 24,
+    "roska4_calm": 19
+   },
+   "rejected": {
+    "roska4_swing": 38,
+    "roska4_stress": 1,
+    "global_nkd": 2,
+    "roska4_calm": 8
+   },
+   "family_rejected": 7,
+   "halted": 0,
+   "double_booked": 0,
+   "suppressed_normal_same_symbol": 0,
+   "suppressed_normal_pnl": 0.0,
+   "stress_closed_r4": 0,
+   "calm_closed_current_nkd": 0,
+   "pnl_by_cluster": {
+    "roska4_calm": 702.19,
+    "global_nkd": 6007.47,
+    "roska4_swing": -464.47,
+    "roska4_stress": 831.46
+   }
+  }
+ }
+}

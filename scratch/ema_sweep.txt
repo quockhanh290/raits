@@ -1,0 +1,27 @@
+### ema=20
+====================================================================================
+  net $-1,838  |  Calmar -0.05
+  [sua khop lenh] 890 lenh, $126,996 (co so 1 hop dong, truoc sizing)
+  MaxDD $9,326 (18.7%)  |  return ≈ -0.9%/yr on $50,000
+  circuit-breaker halts: 1178
+
+### ema=50
+====================================================================================
+  net $5,474  |  Calmar 0.12
+  [sua khop lenh] 856 lenh, $118,816 (co so 1 hop dong, truoc sizing)
+  MaxDD $10,204 (20.4%)  |  return ≈ 2.5%/yr on $50,000
+  circuit-breaker halts: 1018
+
+### ema=15
+====================================================================================
+  net $-3,965  |  Calmar -0.14
+  [sua khop lenh] 926 lenh, $132,784 (co so 1 hop dong, truoc sizing)
+  MaxDD $8,582 (17.2%)  |  return ≈ -2.4%/yr on $50,000
+  circuit-breaker halts: 1457
+
+### ema=40
+====================================================================================
+  net $3,683  |  Calmar 0.09
+  [sua khop lenh] 889 lenh, $123,629 (co so 1 hop dong, truoc sizing)
+  MaxDD $9,592 (19.2%)  |  return ≈ 1.7%/yr on $50,000
+  circuit-breaker halts: 1103

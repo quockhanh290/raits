@@ -1,0 +1,79 @@
+======================================================================================================================
+NORMAL-NKD CONTEXT EXCAVATION (scratch only)
+======================================================================================================================
+Selection uses floor only. Gate for display: n>=60, net>0, PF>=1.20, still positive at 4 ticks/side, breakeven>=4.5 ticks/side.
+thresholds=prev_range_p80=0.014370, prev_range_p90=0.017622, rvol_p20=0.953895, rvol_p80=4.025532, spy_rv80=0.014297, spy_ret1_p10=-0.018132
+
+FLOOR TOP
+  rule                             n       net$    PF  Sharpe  Calmar     net@3t     net@4t   be/t
+  rvol_ge_1__prev_range_le_p90   160      8,534  1.57    2.71    0.66      7,734      6,934  12.67
+  rvol_ge_1__spy_not_crash       160      7,108  1.45    2.25    0.47      6,308      5,508  10.89
+  rvol_ge_1                      180      6,955  1.38    1.98    0.35      6,055      5,155   9.73
+  long__rvol_ge_1                144      4,786  1.34    1.77    0.33      4,066      3,346   8.65
+  rvol_mid_floor                 136      3,768  1.29    1.57    0.26      3,088      2,408   7.54
+  long__open_inside               61      2,438  1.43    2.30    0.23      2,133      1,828   9.99
+  prev_range_le_p90              205      5,484  1.25    1.39    0.23      4,459      3,434   7.35
+  open_inside                     79      2,698  1.32    1.74    0.21      2,303      1,908   8.83
+  long__spy_not_crash            166      4,091  1.24    1.31    0.20      3,261      2,431   6.93
+  open_not_deep                  154      4,100  1.25    1.37    0.19      3,330      2,560   7.33
+  long__prev_range_le_p90        160      3,767  1.23    1.25    0.19      2,967      2,167   6.71
+  prev_range_le_p80              182      4,307  1.22    1.25    0.18      3,397      2,487   6.73
+
+selected_before_oos=rvol_ge_1__prev_range_le_p90,rvol_ge_1__spy_not_crash,rvol_ge_1,long__rvol_ge_1,rvol_mid_floor,long__open_inside,prev_range_le_p90,open_inside,long__spy_not_crash,open_not_deep,long__prev_range_le_p90,prev_range_le_p80
+
+CROSS-WINDOW SELECTED
+  rule                             floor$    PF  Calmar |      2025$    PF  Calmar |      2026$    PF  Calmar
+  rvol_ge_1__prev_range_le_p90      8,534  1.57    0.66 |      1,082  1.28    0.59 |      2,620  2.90    3.51
+  rvol_ge_1__spy_not_crash          7,108  1.45    0.47 |      1,757  1.54    1.43 |      2,764  1.43    2.05
+  rvol_ge_1                         6,955  1.38    0.35 |      1,797  1.46    0.98 |      2,828  1.44    2.05
+  long__rvol_ge_1                   4,786  1.34    0.33 |        614  1.16    0.32 |      3,900  2.45    4.24
+  rvol_mid_floor                    3,768  1.29    0.26 |      2,863  2.02    2.63 |      5,628  2.87    5.16
+  long__open_inside                 2,438  1.43    0.23 |        333  1.28    0.73 |      3,592  5.90   29.02
+  prev_range_le_p90                 5,484  1.25    0.23 |      1,488  1.28    0.76 |      3,157  2.26    4.23
+  open_inside                       2,698  1.32    0.21 |        477  1.40    1.05 |      5,499  8.50   29.71
+  long__spy_not_crash               4,091  1.24    0.20 |        901  1.19    0.46 |      5,365  2.26    3.05
+  open_not_deep                     4,100  1.25    0.19 |        920  1.34    0.96 |      5,406  2.20    5.04
+  long__prev_range_le_p90           3,767  1.23    0.19 |        226  1.04    0.12 |      2,563  3.27    4.23
+  prev_range_le_p80                 4,307  1.22    0.18 |      1,468  1.29    0.69 |      1,005  1.40    1.47
+
+SELECTED DIAGNOSTICS
+
+[rvol_ge_1__prev_range_le_p90]
+  floor     n=160 net=$   8,534 pf=1.57 calmar=0.66 be=12.67t day_p=0.032 week_p=0.017 month_p=0.049 drop1=$6,653 drop2=$5,395
+  vault2025 n= 23 net=$   1,082 pf=1.28 calmar=0.59 be=11.41t day_p=0.626 week_p=0.588 month_p=0.673 drop1=$-520 drop2=$-1,368
+  vault2026 n= 10 net=$   2,620 pf=2.90 calmar=3.51 be=54.39t day_p=0.204 week_p=0.202 month_p=0.267 drop1=$544 drop2=$-332
+
+[rvol_ge_1__spy_not_crash]
+  floor     n=160 net=$   7,108 pf=1.45 calmar=0.47 be=10.89t day_p=0.071 week_p=0.051 month_p=0.116 drop1=$5,228 drop2=$3,610
+  vault2025 n= 23 net=$   1,757 pf=1.54 calmar=1.43 be=17.28t day_p=0.412 week_p=0.416 month_p=0.443 drop1=$155 drop2=$-693
+  vault2026 n= 21 net=$   2,764 pf=1.43 calmar=2.05 be=28.33t day_p=0.496 week_p=0.479 month_p=0.280 drop1=$1,197 drop2=$308
+
+[rvol_ge_1]
+  floor     n=180 net=$   6,955 pf=1.38 calmar=0.35 be=9.73t day_p=0.095 week_p=0.075 month_p=0.140 drop1=$5,075 drop2=$3,457
+  vault2025 n= 25 net=$   1,797 pf=1.46 calmar=0.98 be=16.38t day_p=0.439 week_p=0.388 month_p=0.469 drop1=$195 drop2=$-653
+  vault2026 n= 22 net=$   2,828 pf=1.44 calmar=2.05 be=27.71t day_p=0.493 week_p=0.479 month_p=0.268 drop1=$1,261 drop2=$371
+
+[long__rvol_ge_1]
+  floor     n=144 net=$   4,786 pf=1.34 calmar=0.33 be=8.65t day_p=0.182 week_p=0.169 month_p=0.211 drop1=$3,168 drop2=$1,836
+  vault2025 n= 22 net=$     614 pf=1.16 calmar=0.32 be=7.58t day_p=0.769 week_p=0.780 month_p=0.768 drop1=$-234 drop2=$-1,059
+  vault2026 n= 14 net=$   3,900 pf=2.45 calmar=4.24 be=57.72t day_p=0.155 week_p=0.155 month_p=0.018 drop1=$2,333 drop2=$1,444
+
+[rvol_mid_floor]
+  floor     n=136 net=$   3,768 pf=1.29 calmar=0.26 be=7.54t day_p=0.248 week_p=0.242 month_p=0.346 drop1=$1,888 drop2=$270
+  vault2025 n= 21 net=$   2,863 pf=2.02 calmar=2.63 be=29.27t day_p=0.185 week_p=0.111 month_p=0.159 drop1=$1,261 drop2=$413
+  vault2026 n= 15 net=$   5,628 pf=2.87 calmar=5.16 be=77.03t day_p=0.069 week_p=0.089 month_p=0.122 drop1=$3,023 drop2=$862
+
+[long__open_inside]
+  floor     n= 61 net=$   2,438 pf=1.43 calmar=0.23 be=9.99t day_p=0.251 week_p=0.274 month_p=0.306 drop1=$1,501 drop2=$675
+  vault2025 n=  7 net=$     333 pf=1.28 calmar=0.73 be=11.51t day_p=0.782 week_p=0.777 month_p=0.775 drop1=$-391 drop2=$-927
+  vault2026 n=  6 net=$   3,592 pf=5.90 calmar=29.02 be=121.72t day_p=0.038 week_p=0.036 month_p=0.010 drop1=$2,225 drop2=$1,024
+
+[prev_range_le_p90]
+  floor     n=205 net=$   5,484 pf=1.25 calmar=0.23 be=7.35t day_p=0.208 week_p=0.176 month_p=0.290 drop1=$3,603 drop2=$2,089
+  vault2025 n= 29 net=$   1,488 pf=1.28 calmar=0.76 be=12.26t day_p=0.587 week_p=0.559 month_p=0.605 drop1=$-114 drop2=$-1,170
+  vault2026 n= 12 net=$   3,157 pf=2.26 calmar=4.23 be=54.61t day_p=0.273 week_p=0.275 month_p=0.307 drop1=$1,081 drop2=$-564
+
+[open_inside]
+  floor     n= 79 net=$   2,698 pf=1.32 calmar=0.21 be=8.83t day_p=0.331 week_p=0.329 month_p=0.417 drop1=$1,588 drop2=$651
+  vault2025 n=  9 net=$     477 pf=1.40 calmar=1.05 be=12.61t day_p=0.680 week_p=0.690 month_p=0.645 drop1=$-246 drop2=$-782
+  vault2026 n=  8 net=$   5,499 pf=8.50 calmar=29.71 be=139.47t day_p=0.004 week_p=0.003 month_p=0.001 drop1=$3,592 drop2=$2,225

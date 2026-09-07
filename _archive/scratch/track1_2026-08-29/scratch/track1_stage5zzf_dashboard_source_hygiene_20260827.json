@@ -1,0 +1,154 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZF",
+  "title": "Dashboard source hygiene — the equity line was subtracting across a currency boundary, three days late",
+  "when_et": "2026-08-27T07:45:00-04:00/2026-08-27T08:10:00-04:00",
+  "scope": "source, tests and docs only",
+
+  "part_a_live_measurements": {
+    "track1-runtime.paper_account": {"currency": "USD", "equity": 250817.91, "status": "PASS",
+                                     "account_id": "DUR125337", "verdict": "correct"},
+    "broker.payload.equity": {"equity": 250818.18, "freshness": "fresh", "age_seconds": 7.259,
+                              "positions": [], "verdict": "correct, live drift of $0.27"},
+    "runner-state.meta.broker_equity": {"equity": 996730.93, "currency": null,
+                                        "verdict": "76.8 hours old"},
+    "runner-state.meta.paper_start": {"date": "2026-07-08", "equity": 1000480.0,
+                                      "note": "connect_test_paper.py, DUR125337, CAD"},
+    "runner-state.envelope": {"observed_at": "2026-08-24T06:58:47Z", "age_seconds": 276575.547,
+                              "freshness": "not_expected_yet",
+                              "expected_next_at": "2026-08-27T13:32:00Z"},
+    "open-issues": {"count": 5,
+                    "keys": ["job:session_report:missed", "paper:lifecycle:unresolved",
+                             "paper:pnl:paper_flex_total_mismatch",
+                             "paper:decision_path:unresolved", "known_debt:model_age"]}
+  },
+
+  "why_old_equity_was_visible": {
+    "the_line": "Broker acct $996,731 / -$3,749 since 2026-07-08",
+    "rendered_by": "realtime.js #brokerAccountContext, from runner-state meta",
+    "fault_1": {
+      "what": "the subtraction crossed a currency boundary",
+      "detail": "meta.paper_start carries its own note saying CAD; meta.broker_equity carries no currency at all; the difference was rendered with a dollar sign on a page where every other money figure is USD, for an account that now holds USD"
+    },
+    "fault_2": {
+      "what": "the payload was three days old and the page could not tell",
+      "detail": "the envelope reported freshness=not_expected_yet, not stale, because in track1-only mode the legacy runner is never scheduled so expected_next_at keeps sliding forward",
+      "consequence": "the page's own staleness guard — ['missing','unknown','stale'].includes(freshness) — never fired",
+      "principle": "a freshness model that assumes its producer still runs cannot report a producer that has stopped"
+    }
+  },
+
+  "authoritative_source_now": {
+    "track1_paper_account": "track1-runtime.paper_account — the recorded baseline, proven against the broker",
+    "current_broker": "/api/v1/broker.payload.equity, only when fresh, labelled 'broker now', never merged into the baseline figure",
+    "legacy_runner_figure": "shown only under the name 'Legacy runner state', always with its age, never as the current account",
+    "divergence_threshold": 0.10,
+    "divergence_behaviour": "the line names the legacy figure and its age and turns negative",
+    "account_line_no_longer_consults": "runner.freshness — it uses the age, which is a fact, rather than a schedule which in this mode is a fiction"
+  },
+
+  "open_issues_treatment": {
+    "deleted": 0,
+    "hidden": 0,
+    "downgraded": 0,
+    "resolved": 0,
+    "reclassified": 5,
+    "count_before": 5,
+    "count_after": 5,
+    "fields_added": ["route_scope", "scope_reason", "track1_readiness_blocker"],
+    "classification": {
+      "job:session_report:missed": "scheduler",
+      "paper:lifecycle:unresolved": "legacy",
+      "paper:pnl:paper_flex_total_mismatch": "legacy",
+      "paper:decision_path:unresolved": "legacy",
+      "known_debt:model_age": "known_debt"
+    },
+    "track1_readiness_blocker_on_every_issue": false,
+    "payload_declares": "track1_readiness_blockers_come_from = global_index.track1_gates.blocking()",
+    "why": "a log parser holding a second opinion about what stops orders is how two answers come to disagree",
+    "derived_from": "the issue key, not a hand-kept list of titles",
+    "visual": "one chip in the existing badge lane, same pill geometry as the status beside it; legacy and debt lanes deliberately quieter than TRACK 1; no new section, no new card"
+  },
+
+  "restart": {
+    "backend_required": true,
+    "for": "the open-issue scope chips only",
+    "measured": {
+      "backend_pid": 42260,
+      "backend_started_et": "2026-08-27T07:08:35-04:00",
+      "open_issue_reader_edited_et": "2026-08-27T07:56:22-04:00",
+      "open_issue_reader_served": false,
+      "track1_runtime_reader_edited_et": "2026-08-27T07:24:34-04:00",
+      "track1_runtime_reader_served": true
+    },
+    "mechanism": "open_issue_reader is imported at module top (app.py:39) and bound at boot; track1_runtime_reader is imported inside the handler (app.py:249) and was picked up only because nothing had called that endpoint between the restart and the edit",
+    "corrects_previous_stage": "Stage 5ZZE said no backend restart was required, having measured the new block being served. The measurement was right and the conclusion too general — it was served by luck of import ordering, not by a reload mechanism",
+    "js_and_css": "static files; a browser refresh is enough for the equity line and the chip styling",
+    "command": "python monitor\\ops.py restart --backend --yes",
+    "run_by_this_stage": false,
+    "nothing_worse_meanwhile": "the issues are all still listed; they simply carry no scope chip yet",
+    "scheduler_restart_required": false
+  },
+
+  "gate": {
+    "orders_possible": false,
+    "blocking": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "confirmation_file": "ABSENT",
+    "orders_dir": "ABSENT",
+    "changed_by_this_stage": false
+  },
+
+  "tests": {
+    "unit_file": "scratch/test_track1_stage5zzf_dashboard_source_hygiene_20260827.py",
+    "unit_count": 18,
+    "dom_added": 5,
+    "dom_file": "monitor/test_realtime_dom.py",
+    "reader_mutations": ["a legacy issue promoted to Track 1",
+                         "scoping quietly filtering instead of labelling",
+                         "the log parser declaring its own readiness blockers"],
+    "page_mutations": ["the account line reverting to the legacy number (3 of 5 browser tests fail)",
+                       "the divergence threshold removed so nothing is ever material (1 fails)"],
+    "all_mutations_red": true,
+    "page_restored_byte_identical": true,
+    "suites_after": {"dom_contract_and_backend": "287 passed",
+                     "adjacent_track1_set": "144 passed"},
+    "pre_existing_test_rewritten_not_deleted": {
+      "which": "test_broker_account_delta_is_visible_in_equity_header",
+      "why": "it asserted the delta 4,168 appeared — it pinned the very behaviour this stage removed, including the cross-currency subtraction",
+      "kept": "its concern — a sharp divergence around the account must be visible rather than averaged away",
+      "now": "measures that divergence between the recorded baseline and the legacy figure, on the same scenario, and asserts the old delta is gone in every spelling"
+    }
+  },
+
+  "faults_in_my_own_tests": [
+    {"what": "a substring assertion read my own comment",
+     "detail": "assert \"Broker acct\" not in JS found the phrase inside the comment recording what was wrong",
+     "note": "that trap has now caught this project four times",
+     "fix": "the reader strips comments, and a second assertion demands the explanatory comment is still there"},
+    {"what": "a slice with no end",
+     "detail": "JS[i:i+3000] ran past the account line into runnerFreshnessText, so an assertion about one function read another's source",
+     "fix": "bounded at its own closing statement"},
+    {"what": "a cached reader made a mutation into a no-op",
+     "detail": "read_open_issues memoises on a file/date signature, so patching the builder changed nothing and the mutation test passed while proving nothing",
+     "fix": "the cache is cleared before and after, and the test asserts the issue list is non-empty first"}
+  ],
+
+  "fault_in_production_code": {
+    "what": "_build called _scoped(issues) for its side effect and then read issues again",
+    "why_it_matters": "it works while _scoped labels in place and breaks silently the day it returns a new list",
+    "how_found": "the mutation turned a wrong answer into a KeyError",
+    "fix": "the caller uses the return value"
+  },
+
+  "files_touched": {
+    "source": ["global_index/dash/realtime/realtime.js",
+               "global_index/dash/realtime/realtime.css",
+               "global_index/dash/realtime/index.html",
+               "monitor/backend/open_issue_reader.py"],
+    "tests": ["scratch/test_track1_stage5zzf_dashboard_source_hygiene_20260827.py",
+              "monitor/test_realtime_dom.py"],
+    "runtime_evidence": "none",
+    "broker_connections": 0,
+    "restarts": 0
+  }
+}

@@ -1,0 +1,56 @@
+[
+  {
+    "id": "M1",
+    "mutation": "today_to_follows_now False everywhere",
+    "test": "test_1_a_frame_ending_at_the_slot_passes_for_that_slot",
+    "outcome": "RED"
+  },
+  {
+    "id": "M2",
+    "mutation": "_span_check ignores the low bound",
+    "test": "test_3b_a_frame_starting_late_still_refuses_partial_coverage",
+    "outcome": "RED"
+  },
+  {
+    "id": "M3",
+    "mutation": "_span_check drops the gap check",
+    "test": "test_3_a_hole_inside_the_span_still_refuses",
+    "outcome": "RED"
+  },
+  {
+    "id": "M4",
+    "mutation": "_last_closed_bar reaches back a whole day",
+    "test": "test_2_the_same_frame_does_not_pass_for_a_later_slot",
+    "outcome": "RED"
+  },
+  {
+    "id": "M5",
+    "mutation": "_last_closed_bar returns now unchanged",
+    "test": "test_the_three_second_slot_latency_no_longer_reads_as_stale",
+    "outcome": "RED"
+  },
+  {
+    "id": "M6",
+    "mutation": "roska4_calm marked as scanning",
+    "test": "test_only_the_two_scanning_sleeves_follow_the_slot",
+    "outcome": "RED"
+  },
+  {
+    "id": "M7",
+    "mutation": "roska4_swing today_from moved to 14:15",
+    "test": "test_swing_scans_from_1400_to_now_and_not_beyond",
+    "outcome": "RED"
+  },
+  {
+    "id": "M8",
+    "mutation": "the NKD requirement is validated on ET",
+    "test": "test_the_tokyo_clock_is_still_the_one_used",
+    "outcome": "RED"
+  },
+  {
+    "id": "M9",
+    "mutation": "too_late removed from the clock refusal codes",
+    "test": "test_the_final_slot_of_the_band_is_window_shut_not_a_hard_refusal",
+    "outcome": "RED"
+  }
+]

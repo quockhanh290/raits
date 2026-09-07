@@ -1,0 +1,419 @@
+{
+ "floor": {
+  "anchor": {
+   "artifact_trades": 228,
+   "regenerated_trades": 228,
+   "exact_match": true,
+   "artifact_net": 3898.3,
+   "regenerated_net": 3898.3,
+   "n_differing": 0,
+   "first_diff": []
+  },
+  "mult_probe": {
+   "2.0": {
+    "n": 205,
+    "net": -3555.58,
+    "identical_to_mult2p0": true
+   },
+   "2.5": {
+    "n": 205,
+    "net": -3555.58,
+    "identical_to_mult2p0": true
+   },
+   "3.0": {
+    "n": 205,
+    "net": -3555.58,
+    "identical_to_mult2p0": true
+   }
+  },
+  "mult_inert": true,
+  "ema_sweep": {
+   "5": {
+    "n": 212,
+    "net": -508.96000000000004,
+    "pf": 0.9790456240201304,
+    "win_rate": 0.4716981132075472,
+    "med_win": 196.1,
+    "med_loss": -200.15,
+    "max_loss": -1191.4,
+    "reasons": {
+     "CHANDELIER": 26,
+     "MAX_HOLD": 179,
+     "GAP": 7
+    },
+    "stop_exit_rate": 0.15566037735849056,
+    "med_stop_dist_pts": 601.4300000000003,
+    "med_stop_x_datr": 2.0,
+    "stop_x_datr_p10": 1.9999877974987588,
+    "stop_x_datr_p90": 2.0000096576515007,
+    "med_declared_risk": 398.92857142857144,
+    "net_plus1tick": -591.46,
+    "net_plus3tick": -756.46
+   },
+   "10": {
+    "n": 205,
+    "net": -3555.5799999999995,
+    "pf": 0.8468840056706112,
+    "win_rate": 0.4585365853658537,
+    "med_win": 157.35,
+    "med_loss": -193.9,
+    "max_loss": -1191.4,
+    "reasons": {
+     "MAX_HOLD": 171,
+     "CHANDELIER": 24,
+     "GAP": 10
+    },
+    "stop_exit_rate": 0.16585365853658537,
+    "med_stop_dist_pts": 610.0,
+    "med_stop_x_datr": 2.0,
+    "stop_x_datr_p10": 1.9999896686305199,
+    "stop_x_datr_p90": 2.0000097500915195,
+    "med_declared_risk": 391.42857142857144,
+    "net_plus1tick": -3640.5799999999995,
+    "net_plus3tick": -3810.5799999999995
+   },
+   "15": {
+    "n": 200,
+    "net": -1544.6599999999987,
+    "pf": 0.9289539069233895,
+    "win_rate": 0.475,
+    "med_win": 146.1,
+    "med_loss": -203.9,
+    "max_loss": -841.76,
+    "reasons": {
+     "MAX_HOLD": 165,
+     "CHANDELIER": 27,
+     "GAP": 8
+    },
+    "stop_exit_rate": 0.175,
+    "med_stop_dist_pts": 612.1399999999994,
+    "med_stop_x_datr": 2.0,
+    "stop_x_datr_p10": 1.999989877445495,
+    "stop_x_datr_p90": 2.0000096114314916,
+    "med_declared_risk": 389.2857142857143,
+    "net_plus1tick": -1632.1599999999987,
+    "net_plus3tick": -1807.1599999999987
+   },
+   "20": {
+    "n": 198,
+    "net": -1962.9399999999987,
+    "pf": 0.9112548397655565,
+    "win_rate": 0.47474747474747475,
+    "med_win": 171.1,
+    "med_loss": -209.255,
+    "max_loss": -841.76,
+    "reasons": {
+     "MAX_HOLD": 162,
+     "CHANDELIER": 29,
+     "GAP": 7
+    },
+    "stop_exit_rate": 0.18181818181818182,
+    "med_stop_dist_pts": 627.8600000000006,
+    "med_stop_x_datr": 2.0,
+    "stop_x_datr_p10": 1.9999900166554783,
+    "stop_x_datr_p90": 2.0000095189914733,
+    "med_declared_risk": 387.5,
+    "net_plus1tick": -2052.9399999999987,
+    "net_plus3tick": -2232.9399999999987
+   }
+  },
+  "current_sleeve": {
+   "n": 228,
+   "net": 3898.300000000001,
+   "pf": 1.1517692723967028,
+   "win_rate": 0.5043859649122807,
+   "med_win": 226.1,
+   "med_loss": -171.4,
+   "max_loss": -1068.9,
+   "reasons": {
+    "MAX_HOLD": 203,
+    "CHANDELIER": 21,
+    "GAP": 4
+   },
+   "stop_exit_rate": 0.10964912280701754,
+   "med_stop_dist_pts": 928.5699999999997,
+   "med_stop_x_datr": 1.9999979349509545,
+   "stop_x_datr_p10": 1.9999915194346274,
+   "stop_x_datr_p90": 2.0000092236740987,
+   "med_declared_risk": 475.5357142857143,
+   "net_plus1tick": 3835.800000000001,
+   "net_plus3tick": 3710.800000000001
+  }
+ },
+ "vault2025": {
+  "anchor": {
+   "artifact_trades": 31,
+   "regenerated_trades": 31,
+   "exact_match": true,
+   "artifact_net": 2203.04,
+   "regenerated_net": 2203.04,
+   "n_differing": 0,
+   "first_diff": []
+  },
+  "mult_probe": {
+   "2.0": {
+    "n": 27,
+    "net": 2777.56,
+    "identical_to_mult2p0": true
+   },
+   "2.5": {
+    "n": 27,
+    "net": 2777.56,
+    "identical_to_mult2p0": true
+   },
+   "3.0": {
+    "n": 27,
+    "net": 2777.56,
+    "identical_to_mult2p0": true
+   }
+  },
+  "mult_inert": true,
+  "ema_sweep": {
+   "5": {
+    "n": 26,
+    "net": 2556.1000000000004,
+    "pf": 1.9096117575886982,
+    "win_rate": 0.6538461538461539,
+    "med_win": 141.1,
+    "med_loss": -363.9,
+    "max_loss": -583.9,
+    "reasons": {
+     "MAX_HOLD": 25,
+     "GAP": 1
+    },
+    "stop_exit_rate": 0.038461538461538464,
+    "med_stop_dist_pts": null,
+    "med_stop_x_datr": null,
+    "stop_x_datr_p10": null,
+    "stop_x_datr_p90": null,
+    "med_declared_risk": 691.4285714285714,
+    "net_plus1tick": 2553.6000000000004,
+    "net_plus3tick": 2548.6000000000004
+   },
+   "10": {
+    "n": 27,
+    "net": 2777.56,
+    "pf": 1.8429518306302806,
+    "win_rate": 0.5925925925925926,
+    "med_win": 186.1,
+    "med_loss": -363.9,
+    "max_loss": -711.04,
+    "reasons": {
+     "MAX_HOLD": 25,
+     "GAP": 1,
+     "CHANDELIER": 1
+    },
+    "stop_exit_rate": 0.07407407407407407,
+    "med_stop_dist_pts": 1399.2900000000009,
+    "med_stop_x_datr": 2.000006125574274,
+    "stop_x_datr_p10": 2.000006125574274,
+    "stop_x_datr_p90": 2.000006125574274,
+    "med_declared_risk": 692.8571428571429,
+    "net_plus1tick": 2772.56,
+    "net_plus3tick": 2762.56
+   },
+   "15": {
+    "n": 27,
+    "net": 2947.56,
+    "pf": 1.8945445275322907,
+    "win_rate": 0.5925925925925926,
+    "med_win": 271.1,
+    "med_loss": -363.9,
+    "max_loss": -711.04,
+    "reasons": {
+     "MAX_HOLD": 25,
+     "GAP": 1,
+     "CHANDELIER": 1
+    },
+    "stop_exit_rate": 0.07407407407407407,
+    "med_stop_dist_pts": 1399.2900000000009,
+    "med_stop_x_datr": 2.000006125574274,
+    "stop_x_datr_p10": 2.000006125574274,
+    "stop_x_datr_p90": 2.000006125574274,
+    "med_declared_risk": 692.8571428571429,
+    "net_plus1tick": 2942.56,
+    "net_plus3tick": 2932.56
+   },
+   "20": {
+    "n": 26,
+    "net": 3416.46,
+    "pf": 2.2088785410489216,
+    "win_rate": 0.6153846153846154,
+    "med_win": 271.1,
+    "med_loss": -282.65,
+    "max_loss": -711.04,
+    "reasons": {
+     "MAX_HOLD": 24,
+     "GAP": 1,
+     "CHANDELIER": 1
+    },
+    "stop_exit_rate": 0.07692307692307693,
+    "med_stop_dist_pts": 1399.2900000000009,
+    "med_stop_x_datr": 2.000006125574274,
+    "stop_x_datr_p10": 2.000006125574274,
+    "stop_x_datr_p90": 2.000006125574274,
+    "med_declared_risk": 693.0357142857142,
+    "net_plus1tick": 3411.46,
+    "net_plus3tick": 3401.46
+   }
+  },
+  "current_sleeve": {
+   "n": 31,
+   "net": 2203.04,
+   "pf": 1.416819289509135,
+   "win_rate": 0.6129032258064516,
+   "med_win": 278.6,
+   "med_loss": -406.4,
+   "max_loss": -1079.61,
+   "reasons": {
+    "MAX_HOLD": 28,
+    "CHANDELIER": 3
+   },
+   "stop_exit_rate": 0.0967741935483871,
+   "med_stop_dist_pts": 1294.2900000000009,
+   "med_stop_x_datr": 2.0000026791694583,
+   "stop_x_datr_p10": 2.0000016057101875,
+   "stop_x_datr_p90": 2.000005833847138,
+   "med_declared_risk": 753.5714285714286,
+   "net_plus1tick": 2195.54,
+   "net_plus3tick": 2180.54
+  }
+ },
+ "vault2026": {
+  "anchor": {
+   "artifact_trades": 26,
+   "regenerated_trades": 26,
+   "exact_match": true,
+   "artifact_net": 4292.17,
+   "regenerated_net": 4292.17,
+   "n_differing": 0,
+   "first_diff": []
+  },
+  "mult_probe": {
+   "2.0": {
+    "n": 16,
+    "net": 1765.1,
+    "identical_to_mult2p0": true
+   },
+   "2.5": {
+    "n": 16,
+    "net": 1765.1,
+    "identical_to_mult2p0": true
+   },
+   "3.0": {
+    "n": 16,
+    "net": 1765.1,
+    "identical_to_mult2p0": true
+   }
+  },
+  "mult_inert": true,
+  "ema_sweep": {
+   "5": {
+    "n": 17,
+    "net": 3398.699999999999,
+    "pf": 1.6563224161903292,
+    "win_rate": 0.6470588235294118,
+    "med_win": 608.6,
+    "med_loss": -625.15,
+    "max_loss": -2381.4,
+    "reasons": {
+     "MAX_HOLD": 16,
+     "GAP": 1
+    },
+    "stop_exit_rate": 0.058823529411764705,
+    "med_stop_dist_pts": null,
+    "med_stop_x_datr": null,
+    "stop_x_datr_p10": null,
+    "stop_x_datr_p90": null,
+    "med_declared_risk": 1639.2857142857142,
+    "net_plus1tick": 3396.199999999999,
+    "net_plus3tick": 3391.199999999999
+   },
+   "10": {
+    "n": 16,
+    "net": 1765.099999999999,
+    "pf": 1.2949304905761259,
+    "win_rate": 0.5625,
+    "med_win": 946.1,
+    "med_loss": -556.4,
+    "max_loss": -2381.4,
+    "reasons": {
+     "MAX_HOLD": 15,
+     "GAP": 1
+    },
+    "stop_exit_rate": 0.0625,
+    "med_stop_dist_pts": null,
+    "med_stop_x_datr": null,
+    "stop_x_datr_p10": null,
+    "stop_x_datr_p90": null,
+    "med_declared_risk": 1614.2857142857142,
+    "net_plus1tick": 1762.599999999999,
+    "net_plus3tick": 1757.599999999999
+   },
+   "15": {
+    "n": 16,
+    "net": 1330.099999999999,
+    "pf": 1.2200403652726308,
+    "win_rate": 0.5625,
+    "med_win": 946.1,
+    "med_loss": -616.4,
+    "max_loss": -2381.4,
+    "reasons": {
+     "MAX_HOLD": 15,
+     "GAP": 1
+    },
+    "stop_exit_rate": 0.0625,
+    "med_stop_dist_pts": null,
+    "med_stop_x_datr": null,
+    "stop_x_datr_p10": null,
+    "stop_x_datr_p90": null,
+    "med_declared_risk": 1614.2857142857142,
+    "net_plus1tick": 1327.599999999999,
+    "net_plus3tick": 1322.599999999999
+   },
+   "20": {
+    "n": 15,
+    "net": 266.49999999999966,
+    "pf": 1.0440874801482263,
+    "win_rate": 0.5333333333333333,
+    "med_win": 793.6,
+    "med_loss": -616.4,
+    "max_loss": -2381.4,
+    "reasons": {
+     "MAX_HOLD": 14,
+     "GAP": 1
+    },
+    "stop_exit_rate": 0.06666666666666667,
+    "med_stop_dist_pts": null,
+    "med_stop_x_datr": null,
+    "stop_x_datr_p10": null,
+    "stop_x_datr_p90": null,
+    "med_declared_risk": 1639.2857142857142,
+    "net_plus1tick": 263.99999999999966,
+    "net_plus3tick": 258.99999999999966
+   }
+  },
+  "current_sleeve": {
+   "n": 26,
+   "net": 4292.17,
+   "pf": 1.5320038721208535,
+   "win_rate": 0.6153846153846154,
+   "med_win": 701.1,
+   "med_loss": -681.4,
+   "max_loss": -1751.4,
+   "reasons": {
+    "MAX_HOLD": 24,
+    "CHANDELIER": 1,
+    "GAP": 1
+   },
+   "stop_exit_rate": 0.07692307692307693,
+   "med_stop_dist_pts": 2687.8600000000006,
+   "med_stop_x_datr": 2.0000021259633276,
+   "stop_x_datr_p10": 2.0000021259633276,
+   "stop_x_datr_p90": 2.0000021259633276,
+   "med_declared_risk": 1881.7857142857142,
+   "net_plus1tick": 4287.17,
+   "net_plus3tick": 4277.17
+  }
+ }
+}

@@ -1,0 +1,216 @@
+{
+  "route": "track1_candidate",
+  "blocking_now": [
+    "B1_broker_account_or_legacy_retirement",
+    "PAPER_SHADOW_EVIDENCE"
+  ],
+  "confirmation_path": "track1_go_live_confirmation.json",
+  "confirmation_flags": [
+    "legacy_retired_confirmed",
+    "separate_account_confirmed",
+    "b1_measurement_waived"
+  ],
+  "statuses_allowed": [
+    "CLOSED",
+    "USER_DECISION_GATE",
+    "MEASURED_GATE"
+  ],
+  "blockers": [
+    {
+      "id": "B1_broker_account_or_legacy_retirement",
+      "title": "One IB Gateway login is one position book",
+      "status": "USER_DECISION_GATE",
+      "blocks_orders": true,
+      "evidence": "IBKRBroker.__init__ takes host/port/client_id/bar_duration and no account. get_positions() reads ib.positions() unfiltered and get_equity() reads NetLiquidation unfiltered, so two routes on one login share one net position per contract. A legacy LONG 1 beside a Track 1 SHORT 1 on the same symbol reconciles as broker x0 against two file rows and halts entries for BOTH routes. This is the mechanism that put the legacy STRESS_MID cron behind `if False:`. Code cannot decide it; only an account or a retirement can.",
+      "decision_needed": "Either retire legacy first and let Track 1 be the sole route on the existing account — the stated end state, and the cheaper of the two — or fund and confirm a dedicated IBKR account for Track 1. Record the choice in track1_go_live_confirmation.json as legacy_retired_confirmed or separate_account_confirmed. The switch-over runbook is docs/futures/TRACK1_SWITCHOVER_RUNBOOK.md. What else does or does not hold the gate is deliberately NOT restated here — this sentence has now gone stale twice by describing another blocker's status, which is a thing only the registry can answer without drifting. Ask blocking() for that.",
+      "released_by": [
+        "legacy_retired_confirmed",
+        "separate_account_confirmed"
+      ],
+      "released_by_measurement": "",
+      "measured_now": null,
+      "also_requires_measurement": "legacy_broker_flat",
+      "waiver_flag": "b1_measurement_waived",
+      "required_measurement_now": {
+        "satisfied": true,
+        "detail": "PASS (legacy_and_broker_flat): the legacy book holds nothing, the Track 1 book holds nothing, and the broker reports 0 position(s) and 0 working order(s) as of 0 minute(s) ago. Zero needs no attribution, which is why a shared login can answer this at all."
+      },
+      "depends_on": []
+    },
+    {
+      "id": "PAPER_SHADOW_EVIDENCE",
+      "title": "Enough judgeable shadow days to justify an order",
+      "status": "MEASURED_GATE",
+      "blocks_orders": true,
+      "evidence": "Stage 5S. Until 2026-08-25 every condition on this gate was about AUTHORISATION and none was about EVIDENCE. B1 is a decision recorded on disk, the live-frame gate measures the code's wiring, TRACK1_ORDERS_APPROVED is an out-of-band approval and --allow-orders is a request. `track1_shadow_acceptance` computes, every day, whether the route actually did what it was supposed to — and nothing that decides whether orders may be sent had ever read it. A route with zero judgeable days and a route with a hundred were indistinguishable to the gate. This blocker reads the audit records the route writes to its own durable runtime directory and asks for a shadow period that went well: judgeable days, no FAIL among them, every sleeve PASSED at least once, and evidence recent enough to describe the code running today. Absence never counts as a pass — a missing audit file is a day nobody watched, not a day that went well — and a check that cannot run fails closed. The thresholds live in one named block in track1_paper_readiness.py because they are judgement calls rather than derived quantities. Moving them changes what 'ready' means and nothing else. SCOPE: this says the shadow record is good enough to consider an order. It says nothing about the broker question B1 holds, and it cannot arm anything by itself — it can only refuse.",
+      "decision_needed": "Run the shadow route until `python -m global_index.track1_paper_readiness` reports every check PASS. Nothing to confirm and nothing to sign: this gate opens when the evidence exists and closes again if it goes stale.",
+      "released_by": [],
+      "released_by_measurement": "shadow_evidence",
+      "measured_now": {
+        "released": false,
+        "detail": "judgeable_days: 3 judgeable day(s) on record, 5 required — a day with no audit record is not a day that went well; no_failing_days: 3 FAIL day(s) in the qualifying window, at most 0 allowed; every_sleeve_passed_at_least_once: never PASSED inside the window: ['roska4_calm', 'global_nkd']"
+      },
+      "also_requires_measurement": "",
+      "waiver_flag": "",
+      "required_measurement_now": null,
+      "depends_on": []
+    },
+    {
+      "id": "LIVE_FRAME_ADAPTER_VERIFICATION",
+      "title": "Live bars reach a sleeve only through the checked join",
+      "status": "MEASURED_GATE",
+      "blocks_orders": true,
+      "evidence": "Stage 4B built the join and proved it offline; Stage 4C gave it something to guard. global_index/track1_live_source.py is the route's only source of live bars, and every branch of it ends in track1_live_frame.splice — including the branches where the provider offers nothing, which is where an early return would otherwise hand back an unchecked frame. The measurement below reads the parsed code of every Track 1 module and currently answers yes: one module fetches, and it is guarded. Two failures the join alone could not catch were found by running bars through it. The halves are on different clocks by contract — parquet is UTC read as New York, Tokyo for the Nikkei sleeve, while the broker path returns naive ET — so a conversion happens, and converting the wrong way shifts a whole session. Landing BACKWARDS onto history is now caught by comparing prices where the two halves overlap: the reproduction of the Nikkei error is refused with a largest disagreement of about a thousand points, the same magnitude the real corruption had. Landing FORWARDS past history satisfied every rule the join has, and is now refused because no bar may be stamped after the instant it was fetched at. SCOPE: this says the path is wired and guarded. It does not say a live day has been run — none has, and no broker has been connected.",
+      "decision_needed": "Nothing to decide. This gate is held or released by measurement alone. It is released today; add a fetch that does not join through global_index/track1_live_frame.py and it shuts again on its own.",
+      "released_by": [],
+      "released_by_measurement": "live_frame_wiring",
+      "measured_now": {
+        "released": true,
+        "detail": "every live bar path on the route joins through track1_live_frame: track1_live_source (IBKRBroker, fetch_bars, fetch_session_bars, ib_insync, reqHistoricalData)"
+      },
+      "also_requires_measurement": "",
+      "waiver_flag": "",
+      "required_measurement_now": null,
+      "depends_on": [
+        "B3_intraday_freshness"
+      ]
+    },
+    {
+      "id": "B3_intraday_freshness",
+      "title": "Same-session sleeves decide on bars no gate could see",
+      "status": "CLOSED",
+      "blocks_orders": false,
+      "evidence": "global_index/track1_intraday.py validates a bar frame against a declared requirement per sleeve and fails closed on missing, partial, stale, duplicate, out-of-order, wrong-timezone and too-early. Calm A requires the prior session's RTH complete plus today's 09:30-10:00 contiguous and the 10:00 decision bar present; Stress requires 09:30-10:30 complete, a decision instant inside 10:35-12:30, and a window-ledger observation that is not incomplete. The validator is source-agnostic, so it is real gate logic rather than a promise about a source that does not exist yet.",
+      "decision_needed": "",
+      "released_by": [],
+      "released_by_measurement": "",
+      "measured_now": null,
+      "also_requires_measurement": "",
+      "waiver_flag": "",
+      "required_measurement_now": null,
+      "depends_on": [
+        "SLEEVE_normal_r4",
+        "SLEEVE_calm_a",
+        "SLEEVE_stress_mnq"
+      ]
+    },
+    {
+      "id": "SLEEVE_normal_r4",
+      "title": "Normal-R4 filtered: promoted into the package, no monkeypatching",
+      "status": "CLOSED",
+      "blocks_orders": false,
+      "evidence": "global_index/track1_normal_r4.py generates the sleeve from bars without replacing a single production symbol, and reproduces the committed rows EXACTLY on all three windows: 980 on floor, 136 on vault2025, 107 on vault2026 — 1,223 rows, per instrument, row for row. The scratch path got the same answer by rebinding backtest_swing_tf, _swing_cache, TrendFollowStrategy.generate_signal, SwingTFEngine and StressMidEngine and mutating trend_follow.DEFAULT_CONFIG; a test now asserts by OBJECT IDENTITY that a run leaves all five and the config untouched. The two context filters were PROMOTED rather than re-derived into global_index/track1_normal_filters.py, and a test requires the promoted copy and the scratch original to return the same verdict for every 5-minute bar.",
+      "decision_needed": "",
+      "released_by": [],
+      "released_by_measurement": "",
+      "measured_now": null,
+      "also_requires_measurement": "",
+      "waiver_flag": "",
+      "required_measurement_now": null,
+      "depends_on": [
+        "B3_intraday_freshness"
+      ]
+    },
+    {
+      "id": "SLEEVE_nkd_mnkd",
+      "title": "NKD/MNKD current sleeve",
+      "status": "CLOSED",
+      "blocks_orders": false,
+      "evidence": "The MNKD rows come out of the SAME generator run as Normal-R4 and are anchored in the same comparison, and the sleeve itself is the already-promoted futures.swing_tf.SwingTFEngine at ema 10 / chandelier 2.5 / hold 5 with RegimeLabels(lag_days=1) — production code today, unchanged by Track 1. Its route identity hash differs from the Stage 2B bootstrap only in RENDERING, measured field by field: zero strategy differences.",
+      "decision_needed": "",
+      "released_by": [],
+      "released_by_measurement": "",
+      "measured_now": null,
+      "also_requires_measurement": "",
+      "waiver_flag": "",
+      "required_measurement_now": null,
+      "depends_on": [
+        "SLEEVE_normal_r4"
+      ]
+    },
+    {
+      "id": "SLEEVE_calm_a",
+      "title": "Calm A PCLoc: the detector exists as a function",
+      "status": "CLOSED",
+      "blocks_orders": false,
+      "evidence": "global_index/track1_calm_a.py computes the setups from bars and reproduces the frozen list EXACTLY on all three windows — 421 of 421 rows, and not only the same days: a test also matches the four recorded feature columns to 1e-9, which a wrong feature with a compensating threshold could not do. A guard test fails the run if the detector path so much as opens scratch/calm_pcloc_not_deep_gap_trade_list.csv. Two conventions had to be read out of the record rather than guessed: the prior session's RTH window ends at 15:59, not 16:00 (one bar, and it moves close-location across the 1/3 threshold), and a session counts only if it RAN TO that close — the record's own prev_session_day column skips Christmas Eve, Black Friday and Presidents' Day, all of which the exchange calendar calls trading days.",
+      "decision_needed": "",
+      "released_by": [],
+      "released_by_measurement": "",
+      "measured_now": null,
+      "also_requires_measurement": "",
+      "waiver_flag": "",
+      "required_measurement_now": null,
+      "depends_on": [
+        "B3_intraday_freshness"
+      ]
+    },
+    {
+      "id": "SLEEVE_stress_mnq",
+      "title": "Stress-MNQ mnq_only_g3_q7",
+      "status": "CLOSED",
+      "blocks_orders": false,
+      "evidence": "Fully computed from bars by a rule: scratch/stress_open_search_20260821 load_window -> build_day_cache -> build_rule_with_levels(make_rule(Scenario('mnq_only_g3_q7', ('MNQ',), 7))). No frozen trade table anywhere in the chain, no monkeypatching of production modules, and quantity 7 travels on the rows themselves. Confirmed NOT futures/stress_liquidation_1020.py, which is a different 10:20 candidate that says of itself it is not wired.",
+      "decision_needed": "",
+      "released_by": [],
+      "released_by_measurement": "",
+      "measured_now": null,
+      "also_requires_measurement": "",
+      "waiver_flag": "",
+      "required_measurement_now": null,
+      "depends_on": [
+        "B3_intraday_freshness"
+      ]
+    },
+    {
+      "id": "CHECKPOINT_bootstrap_under_track1_params",
+      "title": "A Track 1 checkpoint the route can actually resume from",
+      "status": "CLOSED",
+      "blocks_orders": false,
+      "evidence": "global_index/track1_bootstrap.py writes a schema-2 route checkpoint under the track1_params identity and a book state carrying every field Stage 2C proved load-bearing, keyed on a cut_instant rather than a cut day. The Stage 2B file is still refused with params_mismatch and the test that proves it is kept; the new file is accepted; and resuming from it reproduces the full replay's ordered settlements exactly.",
+      "decision_needed": "",
+      "released_by": [],
+      "released_by_measurement": "",
+      "measured_now": null,
+      "also_requires_measurement": "",
+      "waiver_flag": "",
+      "required_measurement_now": null,
+      "depends_on": []
+    },
+    {
+      "id": "WIRING_scheduler_dashboard_paper",
+      "title": "Scheduler slots, dashboard mirror, event route field, paper output",
+      "status": "CLOSED",
+      "blocks_orders": false,
+      "evidence": "run_scheduler.make_scheduler takes track1_shadow (CLI --track1-shadow), OFF by default: off registers the same 60 jobs it always has, with STOP_REPAIR_1220 still present and the legacy argv byte-identical — all three asserted. On, it adds the Track 1 slots and extends _ENTRY_WINDOWS with ((10,35),(12,30)) so the 12:20 sweep stops landing inside the Stress window. The dashboard mirror gates on RAITS_TRACK1_SHADOW=1 and makes the same subtraction from the same constant, and the parity check now flips BOTH sides together and is green in both modes. A Track 1 slot calls run_live_day_track1 with no --allow-orders and no broker port. The slot count is deliberately NOT stated here — it said 25 until Stage 5M-B added the 23 Normal-R4 slots, and a gate whose evidence carries a stale number is a gate someone will one day disbelieve for the wrong reason. The count lives in track1_slots.TRACK1_SLOTS and nowhere else. SCOPE: this closes the WIRING, not the running of it. No scheduler was started and no Track 1 slot has ever fired.",
+      "decision_needed": "",
+      "released_by": [],
+      "released_by_measurement": "",
+      "measured_now": null,
+      "also_requires_measurement": "",
+      "waiver_flag": "",
+      "required_measurement_now": null,
+      "depends_on": [
+        "B1_broker_account_or_legacy_retirement"
+      ]
+    },
+    {
+      "id": "REGIME_LABEL_VERIFICATION",
+      "title": "The regime labels are known not to have moved",
+      "status": "MEASURED_GATE",
+      "blocks_orders": true,
+      "evidence": "Stage 5ZL. Which sleeve is allowed to trade is decided from HMM regime labels, and the check that those labels have not moved could not report a failure. It returned a COUNT, and returned 0 from four places that had verified nothing — no engine, unreadable inputs, a raising labeller, and no overlapping dates, that last one printing 'HMM stable' having compared zero labels. Zero is also what a clean run returns, so 'I could not check' and 'I checked and it was fine' were the same number. The one call site discarded it anyway, in a process that exited 0, whose non-error output the scheduler throws away. A drift was invisible from end to end. This gate reads the recorded status and opens only on PASS. DRIFT and UNKNOWN both hold it, and they are reported separately: a drift is a finding about the data, an unknown is the absence of a finding. No record at all is UNKNOWN — a check that never ran is not a check that passed. SCOPE: this holds the PAPER gate. It deliberately does not block shadow slots, and the 13:45 pre-flight deliberately does not run strict, because a verification that could not run must not skip a trading day.",
+      "decision_needed": "Run the post-close SPY refresh and let it record a PASS, or resolve the drift it reports. `python -m global_index.update_spy_csv --csv spy_daily_live.csv --verify-strict` records the status; the scheduler's 16:20 job does it daily.",
+      "released_by": [],
+      "released_by_measurement": "regime_labels_verified",
+      "measured_now": {
+        "released": true,
+        "detail": "PASS (ok): 1761 label(s) compared through 2024-12-31, none changed"
+      },
+      "also_requires_measurement": "",
+      "waiver_flag": "",
+      "required_measurement_now": null,
+      "depends_on": []
+    }
+  ]
+}

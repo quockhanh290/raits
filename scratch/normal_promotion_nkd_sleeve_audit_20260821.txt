@@ -1,0 +1,66 @@
+================================================================================================================
+NKD AS ITS OWN SLEEVE - PROMOTION AUDIT   (scratch / read-only)
+================================================================================================================
+MNKD: point_value $0.5/pt, tick 5 pts -> one tick = $2.50. Baseline 2 ticks/side
+= $10.00 slippage + $1.40 commission = $11.40 per round turn.
+
+################################################################################################################
+1. FILL - production-as-is vs post-hoc corrected vs engine-fixed
+################################################################################################################
+  window       trades  prod-as-is$     posthoc$   enginefix$      cost$    posthoc==enginefix?
+  floor           228        3,904        3,898        3,898       5.36                   PASS
+  vault2025        31        2,203        2,203        2,203       0.00                   PASS
+  vault2026        26        4,295        4,292        4,292       3.21                   PASS
+
+  'prod-as-is' is what the engine in the repo right now would book: the gap-through
+  test still demands a >15-minute time break, so a stop stepped over between two
+  adjacent 1-minute bars fills at the untraded stop level. 'cost' is the overstatement.
+
+################################################################################################################
+2. SLIPPAGE STRESS AND MEASURED DEPTH
+################################################################################################################
+  floor       228 trades | net at ticks/side: 2t $3,898  3t $2,758  4t $1,618  5t $478  6t $-662
+  vault2025   31 trades | net at ticks/side: 2t $2,203  3t $2,048  4t $1,893  5t $1,738  6t $1,583
+  vault2026   26 trades | net at ticks/side: 2t $4,292  3t $4,162  4t $4,032  5t $3,902  6t $3,772
+
+  breakeven slippage (ticks/side at which the sleeve's net reaches zero):
+    floor       5.42 ticks/side
+    vault2025   16.21 ticks/side
+    vault2026   35.02 ticks/side
+
+  floor       entry 5m bar contracts p10/med/p90 = 9/27/95  |  exit 1m bar contracts p10/med/p90 = 2/8/38
+  vault2025   entry 5m bar contracts p10/med/p90 = 9/15/45  |  exit 1m bar contracts p10/med/p90 = 2/18/51
+  vault2026   entry 5m bar contracts p10/med/p90 = 7/20/51  |  exit 1m bar contracts p10/med/p90 = 3/10/50
+
+################################################################################################################
+3. DIRECT ALPHA - cluster bootstrap  (floor is the ONLY window allowed to select)
+################################################################################################################
+  floor - 228 trades, net $3,898
+    cluster        n   observed$         p5$        p50$        p95$ p(centred)
+    day          228       3,898      -3,849       3,895      11,680      0.406
+    week         214       3,898      -3,595       3,870      11,264      0.380
+    month         68       3,898      -4,969       3,902      13,012      0.467
+
+  vault2025 - 31 trades, net $2,203
+    cluster        n   observed$         p5$        p50$        p95$ p(centred)
+    day           31       2,203      -2,376       2,202       6,859      0.439
+    week          28       2,203      -2,028       2,225       6,481      0.396
+    month         10       2,203      -2,544       2,253       6,760      0.436
+
+  vault2026 - 26 trades, net $4,292
+    cluster        n   observed$         p5$        p50$        p95$ p(centred)
+    day           26       4,292      -3,617       4,310      11,940      0.365
+    week          24       4,292      -3,365       4,384      11,751      0.352
+    month          8       4,292      -1,533       4,440       9,727      0.207
+
+  p(centred) is the bootstrap test of H0 'mean cluster P&L = 0'. The p5..p95 band is
+  a description of the sample, not a test - a band that clears zero while p(centred)
+  does not is the ordinary signature of an uncentred bootstrap, not evidence.
+
+################################################################################################################
+4. CONCENTRATION - drop the best months
+################################################################################################################
+  floor       full $3,898 | drop 1 -> $2,018  (removed 2022-03 $1,880) | drop 2 -> $400  (removed 2022-03 $1,880, 2024-02 $1,618)
+  vault2025   full $2,203 | drop 1 -> $601  (removed 2025-04 $1,602) | drop 2 -> $-455  (removed 2025-04 $1,602, 2025-06 $1,056)
+  vault2026   full $4,292 | drop 1 -> $2,050  (removed 2026-08 $2,242) | drop 2 -> $483  (removed 2026-08 $2,242, 2026-05 $1,567)
+

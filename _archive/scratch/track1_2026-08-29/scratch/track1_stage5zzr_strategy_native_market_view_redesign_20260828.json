@@ -1,0 +1,195 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZR",
+  "title": "Strategy-native Market View redesign",
+  "route": "track1_candidate",
+  "date": "2026-08-28",
+  "orders_enabled": false,
+
+  "previous_assumption": {
+    "was": "one five-minute candle chart per sleeve, each with entry/stop/target lines",
+    "wrong_because": "two of three sleeves share a detector and have no standing level to draw; the third is a different strategy and is the only one using basket metrics",
+    "harm": [
+      "NKD and Swing offered a line frame that can never be filled, so an empty chart read as missing data",
+      "Stress drew nothing, because Stage 5ZZQ had recorded that a metric boundary publishes no price levels - which was wrong"
+    ]
+  },
+
+  "detector_mapping": {
+    "global_nkd":    {"detector": "track1_normal_r4",   "ema_period": 10, "boundary_type": "entry_after_setup_only"},
+    "roska4_swing":  {"detector": "track1_normal_r4",   "ema_period": 50, "boundary_type": "entry_after_setup_only"},
+    "roska4_stress": {"detector": "track1_stress_mnq",  "ema_period": null, "boundary_type": "metric_boundary"}
+  },
+
+  "sleeve_panels": {
+    "global_nkd": {
+      "heading": "Setup prerequisites",
+      "price_levels": 0,
+      "metrics": [
+        {"label": "Trend filter (EMA 10)",    "display_value": "Not reported by detector", "missing": "not_reported_by_detector"},
+        {"label": "Volume vs 10-bar average", "display_value": "Not reported by detector", "missing": "not_reported_by_detector"},
+        {"label": "Daily ATR",                "display_value": "Not reported by detector", "missing": "not_reported_by_detector"},
+        {"label": "Regime",                   "display_value": "Not reported by detector", "missing": "not_reported_by_detector"}
+      ],
+      "source_of_absence": "computed inside _scan_window and never returned"
+    },
+    "roska4_swing": {
+      "heading": "Setup prerequisites",
+      "price_levels": 0,
+      "metrics_same_as_nkd_except": {"label": "Trend filter (EMA 50)"}
+    },
+    "roska4_stress": {
+      "heading": "Setup gate · decided 10:30 ET",
+      "measured_session": "2026-08-27",
+      "gate_passed": false,
+      "levels_armed": false,
+      "metrics": [
+        {"label": "Instruments below open and VWAP", "display_value": "4",      "display_threshold": ">= 4",      "passed": true},
+        {"label": "Instruments gapped down",         "display_value": "0",      "display_threshold": ">= 3",      "passed": false},
+        {"label": "Instruments with a wide range",   "display_value": "0",      "display_threshold": ">= 0",      "passed": true},
+        {"label": "Average basket gap",              "display_value": "+0.51%", "display_threshold": "<= -0.10%", "passed": false}
+      ],
+      "nearest_failed_condition": "Instruments gapped down 0, needs >= 3",
+      "price_levels": [
+        {"kind": "setup_trigger", "label": "Trigger (pre-session low)", "price": 29575.25, "armed": false},
+        {"kind": "stop",          "label": "Planned stop",              "price": 29662.38, "armed": false},
+        {"kind": "reference",     "label": "Session open",              "price": 29598.25, "armed": false}
+      ],
+      "levels_note": "Trigger levels were computed at 10:30 but are not armed - the setup gate did not pass"
+    }
+  },
+
+  "line_states": {
+    "hidden": "no level published",
+    "muted":  "published but gate did not pass - dashed, dimmed, labelled 'not armed', with a note saying why",
+    "armed":  "published and gate passed - solid amber"
+  },
+
+  "correction_of_stage_5zzq": {
+    "old_claim": "a metric boundary publishes no price levels",
+    "measured": "session_context returns pre_low/pre_high for every judgeable session regardless of the gate; first_low_break scans for a one-minute low through pre_low",
+    "proof": {"session": "2026-08-27", "gate_passed": false, "pre_low": 29575.25, "pre_high": 29632.75, "stop": 29662.38},
+    "rule_before": "price_levels == []",
+    "rule_now": "no level may be armed unless the gate passed"
+  },
+
+  "missingness_vocabulary": [
+    "not_yet", "no_record", "refused", "missing_data", "not_reported_by_detector"
+  ],
+
+  "regime": {
+    "feature_count": 2,
+    "features": ["SPY 1-day log return", "Realised volatility, 5-day annualised"],
+    "excluded_and_why": "range, trend/SMA and drawdown are not model inputs; showing them would invent values",
+    "measured_2026_08_28": {
+      "label": "Calm",
+      "posterior": 0.998354,
+      "margin": 0.996711,
+      "runner_up": "Normal",
+      "entropy_bits": 0.017627,
+      "max_entropy_bits": 1.584963
+    },
+    "shift_threshold": {
+      "displayed": "No published shift threshold",
+      "explanation_source": "global_index/track1_regime_record.py::NO_THRESHOLD",
+      "page_hardcodes_it": false,
+      "forbidden_phrase": "distance to threshold"
+    }
+  },
+
+  "behaviour_changed": {
+    "strategy_rules": false,
+    "thresholds": false,
+    "schedules": false,
+    "gates": false,
+    "order_path": false,
+    "detectors_modified": false
+  },
+
+  "safety_after": {
+    "orders_possible": false,
+    "blocking": ["PAPER_SHADOW_EVIDENCE"],
+    "scheduler_mode": "compatible",
+    "confirmation": true,
+    "legacy_entry_jobs": 0,
+    "orders_dir_exists": false,
+    "live_positions_track1_exists": false,
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "broker_connection_opened": false,
+    "scheduler_restarted": false
+  },
+
+  "tests": {
+    "new": {"file": "scratch/test_track1_stage5zzr_strategy_native_market_view_20260828.py",
+            "total": 33, "backend_or_source": 19, "dom": 14,
+            "viewports": [375, 720, 1440]},
+    "mutations": {"file": "scratch/track1_stage5zzr_mutations_20260828.py",
+                  "attempted": 8, "caught": 8},
+    "adjacent_suites_passed": 474,
+    "adjacent_tests_changed": [
+      {"test": "test_the_page_does_not_compute_strategy_or_regime_values", "suite": "5ZZL",
+       "reason": "pinned the identifier sleeve.levels, which moved under setup_boundary; intent unchanged"},
+      {"test": "test_dom_the_regime_panel_shows_label_and_verification", "suite": "5ZZL",
+       "reason": "wording superseded by the corrected spec"},
+      {"test": "test_dom_the_score_is_shown_and_the_threshold_is_named_absent", "suite": "5ZZL",
+       "reason": "wording superseded by the corrected spec"},
+      {"test": "test_dom_the_missing_fields_explain_themselves_on_hover", "suite": "5ZZL",
+       "reason": "fixture held a stale transcription of NO_THRESHOLD; now derived from the constant"},
+      {"test": "test_a_metric_boundary_draws_no_price_line", "suite": "5ZZQ",
+       "reason": "its claim was disproved by measurement; rewritten as the no-ARMED-line rule"},
+      {"test": "test_dom_no_fixed_threshold_is_claimed", "suite": "5ZZQ",
+       "reason": "passes again once the page reads the model's own note"}
+    ]
+  },
+
+  "known_red_not_caused_here": {
+    "count": 10,
+    "suites": ["test_track1_stage5zf_ops_report_completeness_20260825.py",
+               "test_track1_stage5k_ops_startup_20260823.py",
+               "test_track1_ops_status_mode_20260824.py"],
+    "cause": "assertions pin the pre-B1 world: that track1_go_live_confirmation.json does not exist and that B1_broker_account_or_legacy_retirement is still a blocker",
+    "created_by": "Stage 5ZZJ (file dated 2026-08-27) and Stage 5ZZK (B1 closed)",
+    "evidence_not_5zzr": [
+      "confirmation file predates this stage by one day",
+      "the only ops test reading a file 5ZZR touched (test_14 on realtime.js) passes",
+      "inside failing test_28 the safety assertion 'allowed is False' still passes"
+    ],
+    "disposition": "left open and named; needs its own stage to re-pin to the post-B1 world"
+  },
+
+  "defects_found_in_this_stage": [
+    {"what": "max-width:100% on a content-box pseudo-element is 100% plus its padding and border",
+     "measured": "row 343px at 375px viewport, tooltip rendered 367px; 24px is 9/11px padding plus 1px border each side",
+     "fix": "box-sizing: border-box, and anchor the bubble to the row rather than the chip"},
+    {"what": "case-sensitive assertion against a CSS-uppercased heading, fourth occurrence",
+     "fix": "one normalising helper every text assertion goes through"},
+    {"what": "first cut hardcoded the model's threshold explanation in the frontend",
+     "fix": "sentence lives in NO_THRESHOLD; the page reads it; the test asserts the page does not contain the words"}
+  ],
+
+  "restart_required": {
+    "frontend": false,
+    "frontend_note": "static files, no build step; a browser reload picks them up",
+    "backend": "optional - a running backend keeps the old module in memory and shows the previous panel until restarted; a display lag, not a safety matter",
+    "scheduler": false
+  },
+
+  "still_open": [
+    "NKD and Swing prerequisite values are computed in _scan_window and not returned",
+    "Calm two-phase diagnostics: DECIDE at 09:32 must not display OBSERVE values",
+    "per-slot diagnostic persistence",
+    "~62s cost of the first request to a freshly started backend, predating this work",
+    "ten stale ops assertions pinning the pre-B1 world"
+  ],
+
+  "files_touched": [
+    "monitor/backend/track1_market_view.py",
+    "global_index/dash/realtime/realtime.js",
+    "global_index/dash/realtime/realtime.css",
+    "global_index/track1_regime_record.py",
+    "scratch/test_track1_stage5zzr_strategy_native_market_view_20260828.py",
+    "scratch/track1_stage5zzr_mutations_20260828.py",
+    "scratch/test_track1_stage5zzl_market_view_regime_20260827.py",
+    "scratch/test_track1_stage5zzq_setup_boundaries_hmm_explain_20260828.py"
+  ]
+}

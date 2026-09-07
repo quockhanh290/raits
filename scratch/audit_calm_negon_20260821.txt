@@ -1,0 +1,79 @@
+A1 headline reproduction from the saved trade logs
+   is    n=699 net=$14,850 pf=1.60
+   2025  n=87 net=$2,736 pf=1.54
+   2026  n=63 net=$2,634 pf=1.58
+
+A2 fill mechanics verified against the parquet bars
+   is    entry!=open(entry bar):0/699  exit!=open(exit bar):0/699  exit==close(exit bar):26/699 (bars with open!=close 673/699)  net if CLOSE used=$15,231 vs $14,850
+   2025  entry!=open(entry bar):0/87  exit!=open(exit bar):0/87  exit==close(exit bar):5/87 (bars with open!=close 82/87)  net if CLOSE used=$3,137 vs $2,736
+   2026  entry!=open(entry bar):0/63  exit!=open(exit bar):0/63  exit==close(exit bar):0/63 (bars with open!=close 63/63)  net if CLOSE used=$2,620 vs $2,634
+
+A3 timestamps
+   is    signal==entry 699/699  entry!=09:30 0  exit!=15:55 0  exit<=entry 0  exit_date!=entry_date 0
+   2025  signal==entry 87/87  entry!=09:30 0  exit!=15:55 0  exit<=entry 0  exit_date!=entry_date 0
+   2026  signal==entry 63/63  entry!=09:30 0  exit!=15:55 0  exit<=entry 0  exit_date!=entry_date 0
+
+A4 entry-latency sensitivity (open of a later 1m bar)
+   is    base=$14,850  +1m=$14,121(-730)  +2m=$13,833(-1,017)  +5m=$13,137(-1,713)
+   2025  base=$2,736  +1m=$2,535(-202)  +2m=$2,422(-315)  +5m=$2,373(-364)
+   2026  base=$2,634  +1m=$2,049(-586)  +2m=$1,942(-693)  +5m=$1,144(-1,490)
+
+A5 day-clustered bootstrap (5000 draws over trading days)
+   is    on_neg_fade_mod001_010_x1555     days=327 net=$  14,850 CI95=[$   5,549,$  24,107] p=0.0008
+   is    on_neg_fade_raw_x1555            days=446 net=$  15,205 CI95=[$   3,503,$  26,504] p=0.0114
+   2025  on_neg_fade_mod001_010_x1555     days= 47 net=$   2,736 CI95=[$  -2,217,$   7,615] p=0.2524
+   2025  on_neg_fade_raw_x1555            days= 57 net=$   5,285 CI95=[$    -515,$  11,153] p=0.0822
+   2026  on_neg_fade_mod001_010_x1555     days= 33 net=$   2,634 CI95=[$  -2,119,$   7,654] p=0.2932
+   2026  on_neg_fade_raw_x1555            days= 37 net=$   2,440 CI95=[$  -3,341,$   8,164] p=0.3956
+   OOS pooled  on_neg_fade_mod001_010_x1555     days= 80 net=$   5,371 CI95=[$  -1,513,$  12,387] p=0.1324
+      MES trades= 43 net=$  1,290 CI95=[$   -661,$  3,244] p=0.1956
+      MNQ trades= 51 net=$  3,797 CI95=[$   -850,$  8,460] p=0.1090
+      MYM trades= 56 net=$    284 CI95=[$ -1,322,$  1,867] p=0.7266
+
+A6 overnight-return bucket stability (raw variant, shows what the band keeps/drops)
+   -- is --
+               count      sum in_band
+overnight_ret                        
+<-2%               0        0      no
+-2..-1%           28     1499      no
+-1..-0.5%        138     6930     yes
+-0.5..-0.2%      323     7453     yes
+-0.2..-0.1%      238      467     yes
+-0.1..0%         309    -1144      no
+   -- 2025 --
+               count      sum in_band
+overnight_ret                        
+<-2%               0        0      no
+-2..-1%            4      849      no
+-1..-0.5%         18     -862     yes
+-0.5..-0.2%       39     2685     yes
+-0.2..-0.1%       30      914     yes
+-0.1..0%          41     1700      no
+   -- 2026 --
+               count      sum in_band
+overnight_ret                        
+<-2%               0        0      no
+-2..-1%            4        0      no
+-1..-0.5%         22     -316     yes
+-0.5..-0.2%       26     2726     yes
+-0.2..-0.1%       15      224     yes
+-0.1..0%           9     -195      no
+
+A7 symmetric trim: is the edge outlier-driven?
+   is    n=699 net=$14,850  trim5/5=$15,192  trim10/10=$15,228  median=$19.76
+   2025  n=87 net=$2,736  trim5/5=$3,050  trim10/10=$2,539  median=$35.76
+   2026  n=63 net=$2,634  trim5/5=$2,007  trim10/10=$1,097  median=$45.01
+
+A8 same-day concurrency and the 1x-ATR admission proxy vs the 2.5% Calm cap ($1,250)
+   is    days by concurrent instruments: {1: 106, 2: 70, 3: 151}
+        MES risk$ med=$   198 max=$   363  over $1,250: 0/220
+        MNQ risk$ med=$   377 max=$   800  over $1,250: 0/236
+        MYM risk$ med=$   154 max=$   279  over $1,250: 0/243
+   2025  days by concurrent instruments: {1: 22, 2: 10, 3: 15}
+        MES risk$ med=$   346 max=$   550  over $1,250: 0/24
+        MNQ risk$ med=$   674 max=$  1127  over $1,250: 0/31
+        MYM risk$ med=$   240 max=$   330  over $1,250: 0/32
+   2026  days by concurrent instruments: {1: 14, 2: 8, 3: 11}
+        MES risk$ med=$   382 max=$   515  over $1,250: 0/19
+        MNQ risk$ med=$   937 max=$  1341  over $1,250: 3/20
+        MYM risk$ med=$   288 max=$   360  over $1,250: 0/24

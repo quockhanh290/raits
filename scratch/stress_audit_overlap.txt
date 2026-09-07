@@ -1,0 +1,59 @@
+Model is not converging.  Current: 7309.542802079805 is not greater than 7309.7777731706765. Delta is -0.23497109087111312
+Model is not converging.  Current: 7310.737617865149 is not greater than 7310.956641261866. Delta is -0.21902339671669324
+Model is not converging.  Current: 6772.719531673847 is not greater than 6772.924509067358. Delta is -0.2049773935104895
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+
+floor/breadth3: stress_trades=84 net=$2,749 | swing_trades=2273
+  stress entries on a day swing already holds SAME symbol : 79/84
+  of those, swing direction OPPOSITE to stress            : 39
+  stress PnL riding on those conflicted legs              : $1,174  (43% of sleeve net)
+    2018-02-08 MES: swing=LONG vs stress=SHORT  stress_pnl=$118
+    2018-02-12 MES: swing=LONG vs stress=SHORT  stress_pnl=$-147
+    2018-02-15 MES: swing=LONG vs stress=SHORT  stress_pnl=$-70
+    2018-12-27 MES: swing=LONG vs stress=SHORT  stress_pnl=$-124
+    2018-12-31 MES: swing=LONG vs stress=SHORT  stress_pnl=$24
+    2020-03-02 MES: swing=LONG vs stress=SHORT  stress_pnl=$-152
+    2020-03-27 MES: swing=LONG vs stress=SHORT  stress_pnl=$-107
+    2020-04-15 MES: swing=LONG vs stress=SHORT  stress_pnl=$-118
+    2020-04-16 MES: swing=LONG vs stress=SHORT  stress_pnl=$-147
+    2020-04-22 MES: swing=LONG vs stress=SHORT  stress_pnl=$-74
+    2020-06-17 MES: swing=LONG vs stress=SHORT  stress_pnl=$-127
+    2022-04-29 MES: swing=LONG vs stress=SHORT  stress_pnl=$245
+
+floor/wide_range3: stress_trades=61 net=$2,588 | swing_trades=2273
+  stress entries on a day swing already holds SAME symbol : 56/61
+  of those, swing direction OPPOSITE to stress            : 29
+  stress PnL riding on those conflicted legs              : $554  (21% of sleeve net)
+    2018-02-12 MES: swing=LONG vs stress=SHORT  stress_pnl=$-147
+    2018-12-27 MES: swing=LONG vs stress=SHORT  stress_pnl=$-124
+    2020-03-02 MES: swing=LONG vs stress=SHORT  stress_pnl=$-152
+    2020-03-27 MES: swing=LONG vs stress=SHORT  stress_pnl=$-107
+    2020-04-15 MES: swing=LONG vs stress=SHORT  stress_pnl=$-118
+    2020-04-16 MES: swing=LONG vs stress=SHORT  stress_pnl=$-147
+    2022-04-29 MES: swing=LONG vs stress=SHORT  stress_pnl=$245
+    2022-05-05 MES: swing=LONG vs stress=SHORT  stress_pnl=$379
+    2022-05-24 MES: swing=LONG vs stress=SHORT  stress_pnl=$-202
+    2022-06-28 MES: swing=LONG vs stress=SHORT  stress_pnl=$318
+    2022-09-13 MES: swing=LONG vs stress=SHORT  stress_pnl=$133
+    2022-10-05 MES: swing=LONG vs stress=SHORT  stress_pnl=$-185
+
+vault2025/breadth3: stress_trades=19 net=$4,095 | swing_trades=304
+  stress entries on a day swing already holds SAME symbol : 17/19
+  of those, swing direction OPPOSITE to stress            : 6
+  stress PnL riding on those conflicted legs              : $1,199  (29% of sleeve net)
+    2025-03-10 MES: swing=LONG vs stress=SHORT  stress_pnl=$259
+    2025-03-11 MES: swing=LONG vs stress=SHORT  stress_pnl=$156
+    2025-04-14 MES: swing=LONG vs stress=SHORT  stress_pnl=$305
+    2025-04-15 MES: swing=LONG vs stress=SHORT  stress_pnl=$35
+    2025-04-14 MNQ: swing=LONG vs stress=SHORT  stress_pnl=$425
+    2025-04-15 MNQ: swing=LONG vs stress=SHORT  stress_pnl=$19
+
+vault2025/wide_range3: stress_trades=15 net=$3,622 | swing_trades=304
+  stress entries on a day swing already holds SAME symbol : 14/15
+  of those, swing direction OPPOSITE to stress            : 5
+  stress PnL riding on those conflicted legs              : $941  (26% of sleeve net)
+    2025-03-11 MES: swing=LONG vs stress=SHORT  stress_pnl=$156
+    2025-04-14 MES: swing=LONG vs stress=SHORT  stress_pnl=$305
+    2025-04-15 MES: swing=LONG vs stress=SHORT  stress_pnl=$35
+    2025-04-14 MNQ: swing=LONG vs stress=SHORT  stress_pnl=$425
+    2025-04-15 MNQ: swing=LONG vs stress=SHORT  stress_pnl=$19

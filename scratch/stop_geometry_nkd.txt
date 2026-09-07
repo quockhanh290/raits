@@ -1,0 +1,16 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+so tin hieu NKD: 981
+
+=== NKD (MNKD) — hinh hoc muc stop ban dau ===
+  n=981 | ty le dist/bang: p01 -0.179 | p10 0.341 | trung vi 0.77 | p90 1.0
+  rui ro that/lenh: trung vi $14 | p10 $5 | p90 $38
+
+  STOP ROI SANG PHIA CO LAI: 25 lenh (2.55%)
+    2018-04-26 LONG  vao 21495.00  stop 21502.68  (lech -7.68 SAI PHIA)
+    2018-06-01 LONG  vao 21395.00  stop 21401.79  (lech -6.79 SAI PHIA)
+    2018-11-01 LONG  vao 20975.00  stop 20978.75  (lech -3.75 SAI PHIA)
+    2018-11-29 LONG  vao 21570.00  stop 21582.32  (lech -12.32 SAI PHIA)
+    2019-03-26 LONG  vao 20705.00  stop 20712.14  (lech -7.14 SAI PHIA)
+    2019-06-04 LONG  vao 19830.00  stop 19831.96  (lech -1.96 SAI PHIA)
+    2019-08-16 LONG  vao 19915.00  stop 19915.18  (lech -0.18 SAI PHIA)
+    2019-08-23 SHORT  vao 20235.00  stop 20230.71  (lech -4.29 SAI PHIA)

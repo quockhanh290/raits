@@ -1,0 +1,151 @@
+{
+  "stage": "5Y",
+  "title": "broker order-id write path",
+  "date_et": "2026-08-25",
+  "verdict": "READY_FOR_PAPER_ORDER_CALLSITE_DRY_RUN_DESIGN",
+  "ibkr_connection_opened": false,
+  "orders": {
+    "sent": 0,
+    "orders_possible": false,
+    "blocking": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "confirmation_file": false,
+    "track1_orders_approved_env": false,
+    "allow_orders_passed_by_any_caller": false,
+    "executor_wired_into_runtime_slot_path": false,
+    "runtime_orders_dir_created": false
+  },
+  "shape_chosen": {
+    "decision": "BOTH a Fill field and a placement receipt",
+    "why_not_field_alone": "a field on the returned Fill only exists if the call returns; the entry fill poll blocks up to 30s and that window is where a crash loses the id",
+    "why_not_receipt_alone": "the outcome row still has to carry the id for the reconcile",
+    "fill_order_id": {
+      "position": 12,
+      "is_last": true,
+      "default": null
+    },
+    "on_submit": {
+      "kind": "KEYWORD_ONLY",
+      "default": null,
+      "declared_on": [
+        "Broker",
+        "MockBroker",
+        "IBKRBroker"
+      ]
+    },
+    "receipt_fields": [
+      "order_id",
+      "inst",
+      "action",
+      "contracts",
+      "perm_id",
+      "client_id",
+      "contract_month",
+      "submitted_at"
+    ]
+  },
+  "send_order": {
+    "fill_return_points": 8,
+    "carrying_order_id": 7,
+    "not_carrying": "1 - test mode, which places nothing and invents nothing",
+    "receipt_fires": "after placeOrder, before the fill poll",
+    "receipt_refusal_type": "OrderReceiptRefused",
+    "receipt_refusal_reraised": true,
+    "why": "the broad handler turns an exception into Fill(status=CANCELLED); reporting a LIVE order as cancelled is the worst available answer",
+    "except_path_distinguishes_placed": true
+  },
+  "journal": {
+    "amendment": "SUBMITTED -> SUBMITTED, permitted ONLY as the arrival of the broker id",
+    "not_a_state_transition": true,
+    "refusal_code": "order_journal_bad_amendment",
+    "rules": [
+      "previous row must have no id",
+      "an id may never be replaced",
+      "no other field may move"
+    ],
+    "shared_rule": "track1_order_state.is_amendment, used by resolve_journal and asserted by the writer",
+    "row_sequence": [
+      "INTENDED",
+      "SUBMITTED (no id)",
+      "SUBMITTED (id)",
+      "FILLED (id)"
+    ]
+  },
+  "bug_found_and_fixed_in_stage": {
+    "what": "append accepted the amendment; resolve called the resulting journal an impossible history",
+    "effect": "every order that got an id would have made that day's journal unreadable",
+    "why_tests_missed_it": "all 52 checked the write; none re-read",
+    "found_by": "running the round trip by hand, not by a test",
+    "fix": "one shared rule (is_amendment) used by writer and reader; 6 read-back tests added"
+  },
+  "read_side": {
+    "id_is_authoritative_including_negatively": true,
+    "fallback_when_no_id": "working orders matched on instrument AND action, then positions",
+    "positions_decisive_alone": false,
+    "match_labels": [
+      "matched_by_order_id",
+      "matched_by_instrument_and_action",
+      "no_working_order_matched"
+    ]
+  },
+  "exits": {
+    "allowed_under_unknown_if_reducing": true,
+    "oversized_close_blocked": true
+  },
+  "legacy_compatibility": {
+    "fill_asdict_or_astuple_callers": 0,
+    "send_order_call_sites_runner_py": 6,
+    "send_order_call_sites_track1_switch": 2,
+    "callers_passing_on_submit": 0,
+    "legacy_readers_modified": 0,
+    "mock_broker_ids": "mock-N, visibly synthetic"
+  },
+  "tests": {
+    "stage_5y": 58,
+    "combined_regression_26_files": 620,
+    "test_event_playback_run": false
+  },
+  "mutations": {
+    "count": 24,
+    "all_red": true,
+    "families": [
+      "id lost",
+      "id fabricated or answering for the wrong order",
+      "a live order called cancelled",
+      "legacy moved",
+      "amendment does not survive read-back"
+    ],
+    "unfaithful_first_attempts": [
+      "M3",
+      "M5",
+      "M7",
+      "M9",
+      "M10",
+      "M11",
+      "M13",
+      "M18"
+    ],
+    "unfaithful_reason": "source patches against behaviour tests (Stage 5V M3 lesson repeated), and one patch of a module attribute the test had already imported by name",
+    "found_a_real_test_hole": [
+      "M17 - an unparseable file was skipped rather than reported"
+    ]
+  },
+  "runtime_untouched": {
+    "scheduler_pid": 48604,
+    "backend_pid": 35352,
+    "restarted": false,
+    "runtime_files_written": 0,
+    "ledger_rows_edited": 0,
+    "parquet_touched": 0
+  },
+  "remaining_before_dry_run": [
+    "PAPER_SHADOW_EVIDENCE: 0 of 5 judgeable days; first fixed-gate NKD window 2026-08-26 01:10 ET",
+    "B1_broker_account_or_legacy_retirement: a user decision",
+    "the call site in run_shadow, behind a dry-run mode that refuses at the broker boundary",
+    "close_position / place_protective_stop / switch_same_symbol still 5T stubs",
+    "perm_id carried but never waited for; a stable global id would be a second read"
+  ],
+  "no_longer_blocking": "the broker write path"
+}

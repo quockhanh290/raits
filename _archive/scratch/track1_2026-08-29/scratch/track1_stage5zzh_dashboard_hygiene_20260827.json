@@ -1,0 +1,234 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZH",
+  "title": "Track 1 dashboard hygiene / account source truth",
+  "when_et": "2026-08-27",
+
+  "verdicts": {
+    "dashboard_account_source": {"before": "LEGACY", "after": "TRACK1_BASELINE"},
+    "open_issue_scope": {"before": "SCOPED_NOT_GROUPED", "after": "GROUPED",
+                         "note": "route_scope already existed from 5ZZF; the list was flat"},
+    "track1_runtime_panel": {"before": "readable but silent about its blocker source",
+                             "after": "names the source; legacy/debt explicitly non-blocking"},
+    "orders_possible": {"before": false, "after": false}
+  },
+
+  "file_location_correction": {
+    "stage_named": ["monitor/static/dashboard.js", "monitor/static/dashboard.css"],
+    "exists": false,
+    "actual": ["global_index/dash/realtime/realtime.js",
+               "global_index/dash/realtime/realtime.css"],
+    "note": "monitor/static/ does not exist; these are the files 5ZZF worked in"
+  },
+
+  "part_a_measured": {
+    "ops_status": {
+      "backend_pid": 6420, "backend_port": 5002, "scheduler_pid": 14344,
+      "track1_mode": "track1-only-shadow", "track1_mode_source": "process_table",
+      "blocking": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+      "orders_possible": false, "confirmation": false, "track1_orders_approved": false,
+      "slot_table": {"source_slots": 71, "registered_slots": 71}
+    },
+    "track1_runtime_paper_account": {
+      "status": "PASS", "code": "account_flat_and_funded", "currency": "USD",
+      "equity": 250817.91, "account_id": "DUR125337",
+      "checked_at": "2026-08-27T11:29:47.831562+00:00",
+      "expected_equity": 250000.0, "expected_currency": "USD"
+    },
+    "broker_now": {"equity": 250818.61, "freshness": "fresh", "age_seconds": 5.6},
+    "runner_state_legacy": {
+      "meta_account": 50000.0, "snapshot_equity": 50408.25, "snapshot_date": "2026-08-24",
+      "meta_broker_equity": 996730.93,
+      "observed_at": "2026-08-24T06:58:47.545152Z",
+      "age_seconds": 288670.271, "age_hours": 80.2,
+      "freshness_label": "fresh"
+    },
+    "open_issues": {
+      "count": 5, "scopes": ["known_debt", "legacy", "scheduler"],
+      "track1_readiness_blockers_come_from": "global_index.track1_gates.blocking()",
+      "any_marked_track1_readiness_blocker": false,
+      "by_scope": {"legacy": 3, "scheduler": 1, "known_debt": 1}
+    },
+    "restarts_in_part_a": 0
+  },
+
+  "the_card_before": {
+    "headline": "$50,408",
+    "net": "+408",
+    "base": "since base $50,000",
+    "return": "+0.82%",
+    "all_from": "the legacy runner's snapshot dated 2026-08-24 and its own meta.account",
+    "track1_account_was": "small print underneath",
+    "one_line": "the largest figure on the page was the least current one, and it belonged to a different route",
+    "5zzf_fixed": "the small print only; the headline was untouched"
+  },
+
+  "second_finding_runner_freshness": {
+    "reported": "fresh",
+    "actual_age_seconds": 288670,
+    "actual_age_hours": 80.2,
+    "cause": "the freshness label comes from the schedule model, which asks whether a publication was DUE; in track1-only mode the legacy runner is never scheduled, so nothing is ever late and nothing is ever stale",
+    "consequence": "the page's runner-derived zone dims on that label, so it never dimmed",
+    "principle": "a freshness model that assumes its producer still runs cannot report a producer that has stopped",
+    "action": "legacy contract left alone (other panels read it); this card measures staleness from age_seconds past LEGACY_STALE_HOURS = 12",
+    "why_12": "the legacy runner published daily; one missed publication is a producer that has stopped, not one running late"
+  },
+
+  "part_b_source_contract": {
+    "decided_in": "monitor/backend/track1_runtime_reader._paper_account",
+    "why_not_the_template": "a policy spelled out in string interpolation is a policy nothing can test",
+    "new_fields": {
+      "age_hours": "computed at read time from checked_at",
+      "headline_usable": "status in (PASS, WARN) AND a real equity",
+      "headline_reason": "why, in words, when it is not"
+    },
+    "page_behaviour": {
+      "usable": "headline USD 250,818 with the currency spelled out; sub-line baseline PASS - read 3.7h ago / USD 250,000",
+      "unknown_or_fail": "headline says so and STOPS - no fallback",
+      "no_track1_block": "the legacy card, unchanged"
+    },
+    "refusal_branch_is_the_point": "falling back to the legacy figure is what produced the confusion; a fallback that fires silently is worse than a blank",
+    "funded_delta_not_shown_as_gain": {
+      "tempting_line": "+818 since 250,000",
+      "why_refused": "Track 1 has sent no orders; the difference is whatever the paper account held when funded. A number that will be misread as P&L is not improved by being arithmetically correct.",
+      "also_blanked_in_track1_mode": ["legacy realised P&L", "legacy total return"]
+    },
+    "age_hours_rationale": {
+      "recorded_detail_still_says": "read 0 minute(s) ago",
+      "record_written": "11:29 UTC", "clock_read": "15:10 UTC",
+      "principle": "a description walks away from the thing it describes; a field recomputed on every read cannot"
+    }
+  },
+
+  "part_c_issue_scope": {
+    "issues_hidden_or_deleted": 0,
+    "top_rail_count_still_counts_all": true,
+    "groups": ["Track 1", "Shared", "Legacy"],
+    "scheduler_chip": {"was": "SCHEDULER", "now": "SHARED",
+                       "why": "SCHEDULER reads as a component; the chip answers whose problem this is"},
+    "known_debt": "joins the legacy group rather than taking a fourth heading",
+    "unrecognised_scope": "falls into Shared, where it is visible, rather than out of all three",
+    "panel_row_added": "Blockers come from - names the gate registry and says legacy/debt issues do not block Track 1 paper readiness",
+    "why": "four of the five open issues are about the legacy route; nothing at panel level said so, so the natural reading was that Track 1 was blocked by five things"
+  },
+
+  "part_e_backend_restart": {
+    "required": true,
+    "why": "the endpoint imports its reader inside the view function, which looks like it picks up code changes per request - Python caches the module, so a backend started before this stage keeps serving the old block",
+    "measured_against_running_pid": 6420,
+    "live_response_for_new_fields": {"age_hours": null, "headline_usable": null,
+                                     "headline_reason": null},
+    "command": "python monitor\\ops.py restart --backend",
+    "command_run": false,
+    "quiet_window": "any - the backend serves the dashboard and reads evidence; it places no orders and holds no trading state",
+    "scheduler_restart": "MUST NOT and did not",
+    "defect_this_exposed_in_my_own_work": {
+      "what": "read naively, headline_usable: null is falsy - the page would have printed 'baseline FAIL' over a funded, reconciled, PASSING account",
+      "severity": "a worse lie than the one this stage set out to fix, appearing the moment the page shipped ahead of a restart",
+      "fix": "the page distinguishes ABSENT from FALSE - absent means derive from what the old block carries; false means the backend decided and its decision stands",
+      "both_halves_tested": true,
+      "same_correction_as": "Stage 5ZZE, where I inferred from file mtimes that no restart was needed and was wrong. This time the endpoint was asked."
+    },
+    "unknown_kept_distinct_from_empty": true,
+    "legacy_endpoints_backwards_compatible": true
+  },
+
+  "part_d_panel_and_overflow": {
+    "route_label_run_together": {
+      "claim": "Routetrack1_candidate",
+      "measured": "not what the page renders - label and value are separate block elements on separate lines; it is what innerText concatenation looks like without the layout",
+      "asserted_rather_than_assumed": true
+    },
+    "equity_zone_overflow_px": {
+      "legacy_headline":        {"375": 0,  "720": 17, "1440": 0},
+      "track1_headline_before": {"375": 41, "720": 59, "1440": 0},
+      "track1_headline_after":  {"375": 0,  "720": 17, "1440": 0}
+    },
+    "cause": "two white-space: nowrap rules - the headline figure and the note under it - both written when the headline was $50,408 and the note was one figure long",
+    "fix": "both wrap below 1100px; the figure shrinks below 560px",
+    "wrapping_not_ellipsis": "a truncated money figure still looks like a money figure",
+    "residual_17px": {
+      "belongs_to": "a tooltip pseudo-element (.has-tip::after, absolutely positioned, not in querySelectorAll)",
+      "identical_in_both_states": true,
+      "scrolls_the_page": false,
+      "how_tested": "as a PROPERTY - the Track 1 headline is never wider than the legacy one it replaced - rather than as a literal that would bless the artifact or fail for an unrelated reason"
+    },
+    "page_horizontal_scroll": {"375": 0, "720": 0, "1024": 0}
+  },
+
+  "also_fixed": {
+    "what": "'from 76.8h ago ago'",
+    "cause": "age() already ends in 'ago'; both branches carrying the legacy figure appended a second one",
+    "since": "Stage 5ZZF",
+    "why_nobody_caught_it": "no test looked past the number"
+  },
+
+  "tests": {
+    "new_file": "scratch/test_track1_stage5zzh_dashboard_hygiene_20260827.py",
+    "new_count": 36,
+    "broker_contacts": 0,
+    "runtime_writes": 0,
+    "asserts_the_session_has_not_armed_orders": true,
+    "mutations": {
+      "total": 9, "red": 9, "restored_byte_identical": true,
+      "exit_5_counted_as_red": false,
+      "list": ["the headline falls back to the stale legacy figure",
+               "an absent field is read as a refusal (the version-skew case)",
+               "an explicit false is overruled by re-deriving from status",
+               "a refused baseline is treated as usable",
+               "age is never computed",
+               "the shared scope reverts to a component name",
+               "the legacy group stops collecting carried debt",
+               "the equity card stops wrapping at narrow widths",
+               "the legacy return is written back onto the Track 1 card"],
+      "one_failed_to_go_red_first_time": {
+        "which": "the legacy return is written back onto the Track 1 card",
+        "cause": "a hole in my TEST DATA, not in the code - the fixture's total_return was null, so both branches rendered '--' and the test agreed with the mutation that deleted the guard",
+        "fix": "a non-null figure makes the guard provable",
+        "note": "second stage running where a mutation found a test proving less than its name promised"
+      }
+    },
+    "pins_restated_not_weakened": {
+      "count": 4,
+      "where": ["monitor/test_realtime_dom.py x3", "5ZZF suite x1"],
+      "was": "the exact phrase 'legacy runner state still shows'",
+      "now": "'Legacy runner state stale:' - it says WHY the figure is not the account, which Part B.5 asked for",
+      "invariants_unchanged": ["appears under its own name", "never without its age",
+                               "never with a doubled word",
+                               "nowhere outside its own clause, checked by cutting the clause out and looking again"],
+      "care_needed": "the negative pin CONTAINS the positive one as a substring, so replacing the positive first would have silently rewritten the negative into something that still read plausibly and asserted something else"
+    },
+    "suites": {
+      "dashboard_backend + realtime_contract + realtime_dom + 5zzh": "303 passed",
+      "ops_status + 5zze + 5zzf + monitor/test_ops": "84 passed"
+    },
+    "pre_existing_failures": 0,
+    "pre_existing_failures_note": "none in any suite this stage ran; the four adjusted pins were adjusted by this stage's own change and nothing was left red"
+  },
+
+  "safety_confirmed": {
+    "orders_possible_before": false,
+    "orders_possible_after": false,
+    "blocking": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "TRACK1_ORDERS_APPROVED": null,
+    "confirmation_file": "ABSENT",
+    "orders_dir": "ABSENT",
+    "broker_constructed_by_dashboard_code": false,
+    "broker_order_calls": 0,
+    "restarts": 0,
+    "runtime_trading_files_written": "none",
+    "external_runtime_changes": "none observed during this stage",
+    "order_gate_scheduler_or_order_wire_touched": false
+  },
+
+  "files_touched": {
+    "modified": ["monitor/backend/track1_runtime_reader.py",
+                 "global_index/dash/realtime/realtime.js",
+                 "global_index/dash/realtime/realtime.css",
+                 "monitor/test_realtime_dom.py (3 pins restated)",
+                 "scratch/test_track1_stage5zzf_dashboard_source_hygiene_20260827.py (1 pin restated)"],
+    "new": ["scratch/test_track1_stage5zzh_dashboard_hygiene_20260827.py",
+            "scratch/track1_stage5zzh_dashboard_hygiene_20260827.md",
+            "scratch/track1_stage5zzh_dashboard_hygiene_20260827.json"]
+  }
+}

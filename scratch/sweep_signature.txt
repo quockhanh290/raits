@@ -1,0 +1,51 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  MES xong
+  MNQ xong
+  MYM xong
+  M2K xong
+
+============================================================================================
+SU KIEN: lan dau gia cat qua muc stop trong quang tran
+============================================================================================
+  1377 su kien tren 636 ngay khac nhau | ty le HOI chung 53.4%
+
+=== 1. THEO GIO TRONG NGAY (ET) ===
+  khung gio             n     % HOI gio con lai tv
+  00-03 dem            80     46.2%          11.4
+  04-08 chau Au       113     51.3%           7.0
+  09 mo cua My         59     50.8%           4.5
+  10-11                66     72.7%           3.3
+  12-15 phien My      788     50.9%          22.8
+  16-23 toi           271     59.4%          19.7
+
+=== 2. THEO DONG THOI CA RO (bps, 15 phut, 3 ma con lai) ===
+  nhom                    n     % HOI gio con lai tv
+  Q1 nguoc lai          276     55.4%          22.1
+  Q2                    275     50.5%          21.9
+  Q3                    275     55.6%          22.2
+  Q4                    275     56.4%          22.2
+  Q5 ca ro cung di      276     48.9%          22.2
+
+=== 3. KIEM CO DIEU KIEN TREN THOI GIAN CON LAI ===
+  dong thoi          gio con lai      n     % HOI
+  Q1 nguoc lai       <12h           50     48.0%
+  Q1 nguoc lai       12-18h         31     58.1%
+  Q1 nguoc lai       18-24h        195     56.9%
+  Q2                 <12h           74     51.4%
+  Q2                 12-18h         26     38.5%
+  Q2                 18-24h        175     52.0%
+  Q3                 <12h           63     61.9%
+  Q3                 18-24h        193     54.9%
+  Q4                 <12h           67     56.7%
+  Q4                 18-24h        194     56.2%
+  Q5 ca ro cung di   <12h           74     59.5%
+  Q5 ca ro cung di   18-24h        192     44.3%
+
+=== 4. PHIEU QUYET DINH — bootstrap THEO NGAY ===
+  chenh ty le HOI: [nhom nguoc lai] tru [nhom ca ro cung di]
+    diem uoc luong +6.5 diem pt | KTC 95% [-3.0, +15.8] | n bootstrap 4000
+    NGUONG CAM KET TRUOC (>=10 diem pt va KTC khong chua 0): KHONG DAT
+
+  chenh ty le HOI: [quet luc 00-03 dem] tru [quet luc 12-15 phien My]
+    diem uoc luong -4.6 diem pt | KTC 95% [-17.0, +7.8]
+    NGUONG CAM KET TRUOC: KHONG DAT

@@ -1,0 +1,66 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  sig cache ema=20 xong
+  sig cache ema=30 xong
+  sig cache ema=50 xong
+  ema=20 xong
+  ema=30 xong
+  ema=50 xong
+
+================================================================================
+1. HINH DANG LUOI (60 o, P&L da sua, ca ky)
+================================================================================
+  o duong: 44/60  | trung vi $6,735 | min $-13,311 | max $30,527
+
+  10 o cao nhat:
+    ema=30  hold=7   f=2.5   $    30,527  (1266 lenh)
+    ema=20  hold=7   f=2.5   $    24,440  (1299 lenh)
+    ema=20  hold=10  f=0.5   $    22,288  (1333 lenh)
+    ema=30  hold=10  f=2.5   $    18,433  (947 lenh)
+    ema=20  hold=10  f=0.25  $    17,548  (1521 lenh)
+    ema=20  hold=7   f=0.5   $    17,308  (1621 lenh)
+    ema=20  hold=7   f=0.25  $    16,587  (1770 lenh)
+    ema=50  hold=3   f=0.12  $    15,946  (2181 lenh)
+    ema=20  hold=7   f=0.12  $    15,834  (1848 lenh)
+    ema=20  hold=10  f=0.12  $    15,169  (1619 lenh)
+
+  5 o thap nhat:
+    ema=20  hold=5   f=2.5   $    -5,875
+    ema=30  hold=5   f=2.5   $    -8,785
+    ema=20  hold=10  f=1.0   $    -9,400
+    ema=50  hold=5   f=2.5   $   -12,824
+    ema=20  hold=5   f=1.0   $   -13,311
+
+================================================================================
+2. O TOT NHAT CO NAM TREN CAO NGUYEN KHONG?
+================================================================================
+  o tot nhat: ema=30 hold=7 f=2.5 -> $30,527
+  cac o KE BEN (doi mot buoc tren mot truc):
+    ema=20  hold=7   f=2.5   $    24,440
+    ema=30  hold=5   f=2.5   $    -8,785
+    ema=30  hold=7   f=1.0   $     3,671
+    ema=30  hold=10  f=2.5   $    18,433
+    ema=50  hold=7   f=2.5   $    14,464
+
+  P&L tung nam cua o tot nhat:
+    2018  $     4,188
+    2019  $     1,994
+    2020  $     3,776
+    2021  $    -4,359
+    2022  $     6,683
+    2023  $     8,745
+    2024  $     9,499
+
+================================================================================
+3. WALK-FORWARD — chon o tren cac nam TRUOC, do o nam SAU (phieu quyet dinh)
+================================================================================
+    2020 | chon ema=50  hold=3   f=2.5   | P&L nam do $     9,520
+    2021 | chon ema=30  hold=10  f=2.5   | P&L nam do $    -4,522
+    2022 | chon ema=50  hold=3   f=1.0   | P&L nam do $   -14,993
+    2023 | chon ema=30  hold=7   f=2.5   | P&L nam do $     8,745
+    2024 | chon ema=30  hold=7   f=2.5   | P&L nam do $     9,499
+    TONG NGOAI MAU $8,249
+    o da chon: (50,3,2.5), (30,10,2.5), (50,3,1.0), (30,7,2.5), (30,7,2.5)
+    (so sanh: giu nguyen hien trang ema=30 hold=5 f=0.12 tren cung cac nam = $3,430)
+
+=== MOC MEM ===
+  (30, 5, 0.12) = $6,807 — lan truoc $6,807

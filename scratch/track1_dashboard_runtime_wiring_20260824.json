@@ -1,0 +1,116 @@
+{
+  "task": "Track 1 dashboard/monitor wiring + shadow acceptance audit",
+  "date": "2026-08-24",
+  "verdict": "WIRING_FIXED_AUDIT_READY__SHADOW_VERDICT_NOT_ENOUGH_DATA_YET",
+  "paper_orders": "NOT ENABLED and NOT recommended yet — see the readiness section",
+  "observed_state": {
+    "scheduler_pid": 33868,
+    "scheduler_started_local": "2026-08-24 02:32:24",
+    "scheduler_started_et": "04:32 ET (machine is ET-2)",
+    "scheduler_argv": "C:\\Users\\quock\\AppData\\Local\\Programs\\Python\\Python311\\pythonw.exe -m global_index.run_scheduler --port 4002 --shadow-resume --track1-only-shadow",
+    "scheduler_restarted_by_this_work": false,
+    "note": "the PID differs from the previous turn's 44904 because the OPERATOR restarted it at 02:32 local; nothing in this work touched it",
+    "backend_pid": [
+      14684
+    ]
+  },
+  "A_backend_env": {
+    "status": "ALREADY IMPLEMENTED by a parallel session before this turn — verified, not written by me. start_backend takes track1_shadow/track1_only and passes _env(track1_shadow=..., track1_only=...); cmd_up passes both through",
+    "root_cause_confirmed": "the scheduler got _env(flags) and the backend a bare _env(), so two children of one `ops.py up` disagreed about which route was running",
+    "my_contribution": "tests (11) that pin the behaviour in all three modes",
+    "mirror_measured": {
+      "legacy": 45,
+      "transitional": 115,
+      "track1_only": 70
+    },
+    "correction_to_the_brief": "the brief expected track1-only to show 45 + len(TRACK1_SLOTS). It shows 70, not 115: in track1-only the 45 legacy strategy slots are deliberately NOT registered. 115 is the TRANSITIONAL number. A mirror showing 115 in track1-only would invent 45 slots the scheduler does not have and raise an incident for each, every day",
+    "backend_restart_required": true,
+    "why": "the running backend (started 02:32:24) predates the ops.py fix (02:50:51), so it still serves state_slot_count=45. VERIFIED live, not assumed",
+    "restart_not_performed": "reported rather than done, per the brief. Command: python monitor/ops.py restart --backend"
+  },
+  "B_dashboard": {
+    "status": "fetch + renderTrack1() ALREADY EXISTED (parallel session). Two real gaps found and fixed by me",
+    "gaps_fixed": [
+      {
+        "what": "the Explanations fact was in the payload but never displayed",
+        "fix": "added a t1Fact('Explanations', ...) row"
+      },
+      {
+        "what": "the coverage row read `cov.latest?.date` — a field that DOES NOT EXIST; `latest` is keyed BY SLEEVE — so it printed 'latest --' on every day, including a fully covered one",
+        "fix": "reads the sleeve-keyed dict and summarises 'N/M sleeves complete', plus the latest day and the p95 from slot timing",
+        "verified_against": "the live endpoint payload, which returns latest={} keyed by sleeve"
+      }
+    ],
+    "absence_handling": "three states, never two: endpoint unreachable / route not yet observed / running. Already correct, now tested",
+    "legacy_labelled": "/api/v1/runner-positions carries route=legacy and points at the Track 1 endpoint — unchanged, re-asserted"
+  },
+  "C_audit": {
+    "module": "global_index/track1_shadow_acceptance.py — added windows_status() and audit_now() with the three-verdict vocabulary",
+    "script": "scratch/track1_shadow_audit_20260824.py (read-only, runnable)",
+    "verdicts": [
+      "NOT_ENOUGH_DATA_YET",
+      "SHADOW_DAY_PASS",
+      "FAIL"
+    ],
+    "key_design": "a window is JUDGEABLE only when it has closed AND the scheduler was up for all of it. A window that closed before the process existed produced no evidence and cannot be a failure",
+    "live_result": {
+      "verdict": "NOT_ENOUGH_DATA_YET",
+      "judgeable_sleeves": [],
+      "coverage_pending": [
+        "global_nkd",
+        "roska4_calm",
+        "roska4_stress",
+        "roska4_swing"
+      ],
+      "coverage_failed": [],
+      "hard_failures": []
+    },
+    "why_not_enough_data": "the scheduler started 04:32 ET; the NKD window (01:10-02:55 ET) had already closed, so no Track 1 slot has ever been due. The next window is Calm at 10:00 ET",
+    "expected_per_sleeve": {
+      "roska4_calm": 1,
+      "roska4_stress": 24,
+      "roska4_swing": 23,
+      "global_nkd": 22
+    }
+  },
+  "defect_found_in_my_own_work": {
+    "what": "the verdict constant FAIL would have SHADOWED the check-status constant FAIL (\"fail\") at module scope",
+    "consequence_if_shipped": "every `c[\"status\"] == FAIL` comparison in evaluate_day would have compared against \"FAIL\", which no check emits — every coverage failure would have stopped being seen, silently",
+    "fix": "the verdict is VERDICT_FAIL; two vocabularies, two names; a test pins both"
+  },
+  "D_paper_orders": {
+    "enabled": false,
+    "evidence_sufficient": false,
+    "blocking_now": [
+      "B1_broker_account_or_legacy_retirement"
+    ],
+    "what_would_be_required": [
+      "B1 resolved: either retire legacy so Track 1 is the sole route on the account, or fund and confirm a dedicated IBKR account — recorded in track1_go_live_confirmation.json",
+      "at least one SHADOW_DAY_PASS: all four windows judgeable and complete (1/24/23/22), no slot gaps, p95 < 300s with no slot >= 300s, explanations with freshness proofs, and an accepted route checkpoint",
+      "checkpoint IDENTITY verified separately — the gate reports it as not_checked_here because params-hash acceptance needs the frames (route_checkpoint.usable per sleeve)",
+      "account-level questions this audit does NOT answer: broker-flat, orphan working STPs, and the legacy book actually drained",
+      "the runtime measurement nobody has: real slot runtimes against a live Gateway with three client ids in play (legacy drain 1, Track 1 data 89, Track 1 safety 90)"
+    ],
+    "current_evidence": "ZERO shadow days. Coverage days = [], explanations absent, checkpoint absent — because no window has been due yet, not because anything failed",
+    "not_done_deliberately": [
+      "no track1_go_live_confirmation.json created",
+      "TRACK1_ORDERS_APPROVED not set",
+      "--allow-orders not passed anywhere"
+    ]
+  },
+  "tests": {
+    "new_wiring_suite": "34 passed",
+    "sweep (wiring + ops status + 5P readiness + 5P text + 5O + test_ops + dashboard backend + mirror)": "361 passed",
+    "not_run": "global_index/test_event_playback.py — known hang"
+  },
+  "no_side_effects": [
+    "scheduler NOT restarted or stopped — pid 33868 unchanged",
+    "backend NOT restarted (the restart it needs is REPORTED, not done)",
+    "no IBKR connection",
+    "no order",
+    "no confirmation file",
+    "TRACK1_ORDERS_APPROVED not set",
+    "no --allow-orders",
+    "no commit"
+  ]
+}

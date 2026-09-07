@@ -1,0 +1,241 @@
+{
+  "stage": "5ZE",
+  "title": "job view operator diagnostics: health first, signal chip second",
+  "checked_at": {
+    "utc": "16:50",
+    "et": "2026-08-25 12:50 EDT",
+    "calgary": "10:50 MDT",
+    "tokyo": "2026-08-26 01:50 JST"
+  },
+  "restarts": {
+    "scheduler_restarted": false,
+    "scheduler_pid": 48604,
+    "scheduler_unchanged_since_et": "2026-08-25T01:07",
+    "backend_restarted_by_this_stage": false,
+    "backend_pid_now": 35592,
+    "backend_started_et": "2026-08-25T12:14:10",
+    "backend_restarted_by": "the operator or something else, between Stage 5ZD and 5ZE",
+    "live_dashboard_currently_serves": "the Stage 5ZD shape (signal.details/source/status/summary)",
+    "live_dashboard_missing": [
+      "signal.chip",
+      "signal.operator",
+      "signal.debug",
+      "operational"
+    ],
+    "why": "app.run(..., use_reloader=False) - the process will not pick up new code",
+    "operator_command_to_make_5ZE_live": "python monitor\\\\ops.py restart --no-scheduler --track1-only-shadow",
+    "why_not_run_here": "the stage permits a backend restart only if needed for UI verification, and it was not: the UI was verified in a real chromium against a freshly imported app inside the test process. Leaving it to the operator also keeps today's remaining Ro 4 window (Swing 14:05 ET) undisturbed"
+  },
+  "runtime_files_touched": false,
+  "paper_or_order_gates_changed": false,
+  "strategy_or_scheduler_code_changed": false,
+  "orders": {
+    "orders_possible": false,
+    "blocking": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "confirmation_file": false,
+    "track1_orders_approved_env": false,
+    "order_journal_dir": false,
+    "track1_book": false
+  },
+  "part_a_audit": {
+    "measured_from": [
+      "the real job-journal payload",
+      "the real render path in realtime.js"
+    ],
+    "job_payload_carried": [
+      "status",
+      "started_at",
+      "ended_at",
+      "duration_seconds",
+      "reason",
+      "impact",
+      "action",
+      "diagnostics",
+      "events",
+      "event_counts"
+    ],
+    "expanded_panel_rendered": [
+      "Started",
+      "Completed",
+      "Duration",
+      "Outcome",
+      "Problem",
+      "IMPACT",
+      "ACTION",
+      "evidence list",
+      "EVIDENCE/RESOLUTION"
+    ],
+    "key_finding": "the evidence list is ALWAYS empty for a shadow slot - it is built from trade and protection events, and a shadow slot emits none",
+    "matrix": [
+      {
+        "field": "scheduler status ran/missed/failed",
+        "already_visible": true,
+        "where": "collapsed .event-status badge + expanded Outcome",
+        "operator_readable": true,
+        "action": "none"
+      },
+      {
+        "field": "runtime refusal (freshness, live frame, splice, bar provider, too late, stale, overlap)",
+        "already_visible": false,
+        "where": "nowhere on the job at all",
+        "operator_readable": null,
+        "action": "ADDED to Operational"
+      },
+      {
+        "field": "timing: duration",
+        "already_visible": true,
+        "where": "expanded Duration",
+        "operator_readable": true,
+        "action": "none"
+      },
+      {
+        "field": "timing: 300s breach",
+        "already_visible": false,
+        "where": "nowhere - a number with nothing to judge it against",
+        "operator_readable": null,
+        "action": "ADDED"
+      },
+      {
+        "field": "ledger/window coverage slot observed",
+        "already_visible": false,
+        "where": "day-level counts in the Track 1 panel only",
+        "operator_readable": false,
+        "action": "ADDED"
+      },
+      {
+        "field": "audit verdict",
+        "already_visible": "partly",
+        "where": "Track 1 panel, day and sleeve level",
+        "operator_readable": false,
+        "action": "ADDED per job"
+      },
+      {
+        "field": "checkpoint/book effects",
+        "already_visible": "partly",
+        "where": "Track 1 panel, present/absent for the day",
+        "operator_readable": false,
+        "action": "ADDED as an expectation"
+      }
+    ]
+  },
+  "health_fields_already_present": [
+    "scheduler status",
+    "duration"
+  ],
+  "health_fields_added": [
+    "runtime refusal reason (operator words)",
+    "300s runtime budget verdict",
+    "ledger row written / missing",
+    "freshness pass/fail",
+    "live frame pass",
+    "per-job audit verdict",
+    "explicit 'no checkpoint or book write expected in shadow'"
+  ],
+  "chip": {
+    "location": "inside the existing job row, on its own line below the job name and summary, grid-column 1 / -1",
+    "visual_language": ".event-status - 3px 6px padding, 1px currentColor border, 3px radius, mono 700 11px",
+    "new_card": false,
+    "new_column": false,
+    "table_wider": false,
+    "labels": {
+      "NO_SIGNAL": "NO SIGNAL",
+      "RAW_SIGNAL_FOUND": "RAW SIGNAL",
+      "SIGNAL_REJECTED": "REJECTED",
+      "SIGNAL_ACCEPTED_SHADOW": "ACCEPTED SHADOW",
+      "SLOT_REFUSED": "REFUSED",
+      "SLOT_MISSED": "MISSED",
+      "SLOT_NO_ROW": "NO DIAGNOSTICS"
+    },
+    "tones": {
+      "NO_SIGNAL": "neutral",
+      "RAW_SIGNAL_FOUND": "watch",
+      "SIGNAL_REJECTED": "warn",
+      "SIGNAL_ACCEPTED_SHADOW": "good",
+      "SLOT_REFUSED": "muted",
+      "SLOT_MISSED": "bad",
+      "SLOT_NO_ROW": "muted"
+    },
+    "tooltip_required": true,
+    "tooltip_pattern": ".has-tip[data-tooltip] with tabindex=0 - the page's own",
+    "non_strategy_jobs_get_a_chip": false
+  },
+  "intentionally_hidden_until_debug": {
+    "where": "signal.debug on the payload",
+    "fields": [
+      "rule_checks",
+      "primary_failure",
+      "params_hash",
+      "data_source_identity",
+      "freshness_allow",
+      "raw detail string"
+    ],
+    "rendered_by": "nothing - there is no code path in the page that reads it",
+    "why": "after Stage 5ZD every sleeve rule comes back not_exposed_by_sleeve, so a mapped list would be thirty human names with no numbers beside them - a longer way of saying nothing, burying the two lines that carry information",
+    "replaced_by_one_sentence": "Detailed setup measurements are not exposed yet."
+  },
+  "no_duplication": {
+    "rule": "REFUSED / MISSED / NO DIAGNOSTICS point at Operational rather than repeating the runtime evidence",
+    "tested": "the refusal sentence appears exactly once in the expanded row"
+  },
+  "label_mapper": {
+    "owner": "global_index/track1_signals.py (backend), beside the summary composer",
+    "labels": 41,
+    "layers": 6,
+    "unmapped_falls_back_to": "the raw name, so a gap looks wrong on the page",
+    "every_declared_rule_has_a_label": true
+  },
+  "track1_panel": {
+    "row": "Signals today",
+    "content": "counts only",
+    "per_slot_wall_removed": true
+  },
+  "tests": {
+    "stage_5ze": 64,
+    "in_a_real_browser": 11,
+    "stage_5ze_plus_5zd": 127,
+    "dashboard_backend_contract_dom_schedule_5zb": 327,
+    "test_event_playback_run": false,
+    "mutations": {
+      "count": 26,
+      "outcomes": {
+        "RED": 26
+      }
+    }
+  },
+  "mutations_that_found_my_tests_wrong": [
+    {
+      "id": "M24",
+      "what": "a chip given min-width 900px on a 380px screen",
+      "stayed_green_twice": true,
+      "first_test": "document.scrollWidth - the chip is in a scrolling container, so the page never scrolled",
+      "second_test": "the project's element-level clipping detector - which deliberately allows wide content inside a scrolling ancestor",
+      "both_answered": "does the PAGE overflow?",
+      "the_actual_claim": "the chip does not widen its ROW",
+      "now": "measures the chip's bounding box against its row's"
+    },
+    {
+      "id": "M12b",
+      "what": "a non-strategy job gets a chip, in the browser",
+      "stayed_green": true,
+      "why": "the DOM fixture builds its stub payload directly and never calls the patched backend function, so a Python patch could not reach chromium",
+      "now": "mutated in the JS the browser actually loads"
+    }
+  ],
+  "stage_5zd_tests_updated": {
+    "count": 6,
+    "why": "they pinned the UI this stage deliberately replaced: the sentence in the collapsed row, the rule grid, the per-sleeve panel row, and the signal shape before chip/operator/debug existed",
+    "how": "rewritten to assert the same intent against the new rendering, not deleted"
+  },
+  "files": [
+    "global_index/track1_signals.py",
+    "monitor/backend/job_journal_reader.py",
+    "global_index/dash/realtime/realtime.js",
+    "global_index/dash/realtime/realtime.css",
+    "scratch/test_track1_stage5ze_job_view_operator_20260825.py",
+    "scratch/track1_stage5ze_mutations_20260825.py",
+    "scratch/test_track1_stage5zd_signal_diagnostics_20260825.py"
+  ]
+}

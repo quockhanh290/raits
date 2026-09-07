@@ -1,0 +1,19 @@
+{
+  "_THIS_IS_A_TEMPLATE": "It is not a confirmation. Copied to the live path unchanged it grants NOTHING: every key beginning with an underscore is an unknown key, and an unknown key makes the whole file refuse rather than half-open a gate. `confirmed_by` being empty refuses it a second time, independently.",
+  "_HOW_TO_USE": "Copy this file to track1_go_live_confirmation.json in the repo root, delete every key beginning with an underscore, fill confirmed_by and confirmed_at, and set EXACTLY ONE of the two decision flags to true. Then run: python -m global_index.track1_b1_decision track1_go_live_confirmation.json",
+  "_PREVIEW_FIRST": "python -m global_index.track1_b1_decision scratch/track1_b1_decision_template_20260826.json",
+  "_WHAT_THIS_OPENS": "B1 and nothing else. PAPER_SHADOW_EVIDENCE and REGIME_LABEL_VERIFICATION are measured gates that no confirmation flag can release — that is enforced by track1_gates.self_check, not merely intended. orders_possible stays false.",
+  "_WHAT_THIS_DOES_NOT_DO": "It does not set TRACK1_ORDERS_APPROVED, it does not pass --allow-orders, and neither exists in this file by design. It also does not create an order path: run_live_day_track1 constructs NoOrderBroker unconditionally and never constructs IBKRBroker, so no code on this route can send anything whatever this file says.",
+  "_CHOOSE_ONE": "legacy_retired_confirmed OR separate_account_confirmed. They are mutually exclusive. Setting both says neither.",
+  "_LEGACY_RETIRED_MEANS": "Legacy has stopped trading and Track 1 becomes the sole route on the existing account. Measured 2026-08-26: legacy is DORMANT, not retired — track1-only-shadow registers 0 legacy strategy jobs and the default mode registers 45. The difference is one command-line flag, so this claim can be falsified by a plain restart while the gate goes on reading it as true. Retiring legacy is the ordered procedure in docs/futures/TRACK1_SWITCHOVER_RUNBOOK.md section 3.",
+  "_SEPARATE_ACCOUNT_MEANS": "Track 1 runs on its own IBKR login while legacy keeps running. Nothing in this system has observed a second account; the measurement cannot corroborate this one.",
+  "_MEASUREMENT_REQUIRED": "B1 also requires a PASS from `python -m global_index.b1_audit --broker ibkr --record` newer than 24 hours AT THE MOMENT THE GATE IS READ. The measurement recorded 2026-08-26T10:15:51Z is referenced below; it stops counting 24 hours later, on purpose.",
+  "_WAIVER": "b1_measurement_waived is omitted deliberately. It is not a third decision — it takes one of the two above WITHOUT the proof, it releases nothing on its own, and load_confirmations refuses it unless `note` says why the account could not be asked.",
+
+  "schema_version": 1,
+  "confirmed_by": "",
+  "confirmed_at": "",
+  "legacy_retired_confirmed": false,
+  "separate_account_confirmed": false,
+  "note": ""
+}

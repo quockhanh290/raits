@@ -1,0 +1,185 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZU",
+  "title": "Track 1 safety and audit recovery-stream isolation",
+  "route": "track1_candidate",
+  "date": "2026-08-28",
+  "orders_enabled": false,
+
+  "catch_all_membership_before": {
+    "measured_from": "the production job-type map, not the brief",
+    "jobs": ["TRACK1_STOP_REPAIR_* (9 weekday slots + track1_stop_repair_sun_1830)",
+             "TRACK1_MAX_HOLD_EXIT", "TRACK1_AUDIT_* (global_nkd, roska4_calm, roska4_stress, roska4_swing, daily)",
+             "HEARTBEAT"],
+    "not_in_brief": ["HEARTBEAT"],
+    "note": "the classifier kept them clear of the legacy prefixes since it was written, but distinguishable is not the same as typed"
+  },
+
+  "the_defect_had_two_opposite_directions": {
+    "journal_lane": {
+      "reader": "monitor/backend/job_journal_reader.py :: later_same_stream",
+      "behaviour": "grouped every catch-all job into ONE stream, so anything completing closed anything that failed",
+      "reproduced_before_fix": [
+        "a failed Track1 STOP_REPAIR closed by a Track1 AUDIT",
+        "a failed Track1 AUDIT closed by a Track1 STOP_REPAIR",
+        "a failed Track1 MAX_HOLD closed by a Track1 AUDIT"
+      ],
+      "already_safe": ["legacy STOP_REPAIR closing a Track1 sweep", "Track1 sweep closing a legacy sweep"],
+      "seen_in_production": "Stage 5ZZT measured TRACK1_STOP_REPAIR_1820 closing two failed SPY refreshes on 2026-08-27"
+    },
+    "issue_lane": {
+      "reader": "monitor/backend/open_issue_reader.py :: _stream",
+      "behaviour": "fell back to the job id when the type was `other`, so each sweep stood alone",
+      "consequence": "a Track 1 sweep that failed at 06:20 could NEVER be closed by the identical sweep at 08:20, while its legacy counterpart always could",
+      "found_by": "reading the second reader; this half was not in the brief"
+    }
+  },
+
+  "new_streams": [
+    {"type": "track1_safety_stop_repair", "jobs": "TRACK1_STOP_REPAIR_*"},
+    {"type": "track1_safety_max_hold", "jobs": "TRACK1_MAX_HOLD_EXIT and TRACK1_MAXHOLD_EXIT"},
+    {"type": "track1_window_audit", "jobs": "TRACK1_AUDIT_*"}
+  ],
+  "both_max_hold_spellings": "the slot table declares track1_maxhold_exit; the log label reaching the reader is TRACK1_MAX_HOLD_EXIT. Matching one would type the job on some days and not others.",
+  "matching_is_structured": "on the type, never a substring - TRACK1_STOP_REPAIR_0620 contains STOP_REPAIR, and a substring test would merge the two routes' sweeps, which is the one thing B1 exists to keep apart",
+
+  "isolation_after": {
+    "audit_closes_failed_sweep": false,
+    "sweep_closes_failed_audit": false,
+    "audit_closes_failed_max_hold": false,
+    "legacy_sweep_closes_track1_sweep": false,
+    "track1_sweep_closes_legacy_sweep": false,
+    "track1_sweep_closes_spy_refresh": false,
+    "later_track1_sweep_closes_earlier_failed_sweep": true,
+    "later_track1_audit_closes_earlier_failed_audit": true,
+    "legacy_sweep_stream_still_recovers_itself": true,
+    "design_note": "every must-not-close has a must-close beside it; a change that stopped closing anything would satisfy half the suite and be worse than the bug it replaced. Mutation M8 exists to make that unshippable."
+  },
+
+  "wording_changed": {
+    "before": "the `other` branch said 'the job emitted an unclassified error' and advised reconciling current broker state - for jobs that never touch the broker",
+    "after": {
+      "track1_safety_stop_repair": "protective stops on the Track 1 book were not rechecked at this slot",
+      "track1_safety_stop_repair_recovered": "the Track 1 book was rechecked when <job> completed; no immediate action",
+      "track1_safety_max_hold": "a position past its maximum hold would not have been closed",
+      "track1_window_audit": "no evidence record was written for that window; nothing is at risk in the book, and the paper-evidence gate reads that record"
+    },
+    "pinned": "a test asserts the word broker appears in none of the audit impact or action text, in either failure state"
+  },
+
+  "ui": {
+    "attribution_fixed": "these jobs reached the scheduler-owned list THROUGH `other`; typing them without naming them explicitly would have moved a missed sweep to `runner` - blamed on a runner that never ran",
+    "labels": "the job id moved to the tooltip; the row shows a readable name such as 'Track 1 stop-repair sweep 06:20'",
+    "label_scope": "the three types this stage introduces ONLY",
+    "why_scoped": "the first attempt covered strategy slots and legacy sweeps: it broke five Stage 5ZE tests that address a row by its id and a sixth that finds a row by looking for STOP_REPAIR in its name. Renaming a taxonomy is a design change of its own.",
+    "test_updated": "one Stage 5ZE test now reads the id from the tooltip, which is where this stage put it",
+    "unknown_type_fallback": "renders the job id, never blank (mutation M14)"
+  },
+
+  "my_own_error_caught_by_the_suite": {
+    "what": "the label helper was inserted next to stripScheduleBad, three scopes deep inside a render function, so jobLabel was invisible at the journal row",
+    "effect": "the Job Journal panel threw and 19 tests errored with .job-row never appearing",
+    "precedent": "the same mistake as Stage 5ZZL, where render calls landed inside a click handler",
+    "fix": "moved beside mvEsc at module scope, and the patch asserts the destination brace depth is 1 rather than trusting indentation"
+  },
+
+  "b1_reopened_during_this_stage": {
+    "caused_by_this_stage": false,
+    "observed": "track1_blocking became ['B1_broker_account_or_legacy_retirement', 'PAPER_SHADOW_EVIDENCE']",
+    "orders_possible": false,
+    "root_cause": "b1_decision_evidence returns False: account baseline UNKNOWN (baseline_record_stale)",
+    "measurement": {"baseline_checked_at": "2026-08-27T11:29:47Z",
+                    "observed_at": "2026-08-28T11:31:07Z",
+                    "elapsed": "24 hours and 1 minute",
+                    "policy": "24 hours",
+                    "margin": "expired 81 seconds before the reading"},
+    "verdict": "the gate doing exactly what Stage 5ZZS test_28b demands: B1 closed only while a signature AND a passing measurement both hold",
+    "operator_action": "rerun the account baseline check to close B1 again; nothing is at risk while it stands open",
+    "brittleness_it_exposed": [
+      {"test": "test_orders_remain_impossible (5ZZT and 5ZZU)",
+       "was": "asserted the blocker list by equality",
+       "now": "orders_possible is False and PAPER_SHADOW_EVIDENCE in ids"},
+      {"test": "test_28 (5ZZS)", "was": "asserted b1_decision_evidence is True",
+       "now": "asserts it is a two-valued answer carrying a reason, whichever way it reads today"},
+      {"test": "test_28b (5ZZS)", "was": "used 'B1 is closed right now' as a precondition",
+       "now": "drives the measurement in BOTH directions and asserts the rule"}
+    ],
+    "regression_check": "the Stage 5ZZS mutation harness still catches 11/11 after the rewrite, so those tests were made time-independent, not weaker"
+  },
+
+  "twelfth_pre_b1_stale_test": {
+    "test": "test_42_orders_are_still_impossible",
+    "suite": "scratch/test_track1_stage5zd_signal_diagnostics_20260825.py",
+    "why_missed_by_5ZZS": "that suite was not among the ones Stage 5ZZS ran",
+    "restated": true
+  },
+
+  "results": {
+    "new_suite": {"file": "scratch/test_track1_stage5zzu_recovery_stream_isolation_20260828.py", "passed": 29},
+    "adjacent_suites": {"passed": 655, "failed": 6},
+    "mutations": {"file": "scratch/track1_stage5zzu_mutations_20260828.py", "attempted": 14, "caught": 14},
+    "attribution": {"method": "reverted the production edits, re-ran the same suites, diffed the failure sets",
+                    "caused_by_this_stage": 0},
+    "remaining_failures": [
+      {"tests": ["test_40_the_render_path_has_no_rule_grid_left", "test_45_the_developer_rule_grid_is_gone_from_the_render_path"],
+       "cause": "a rule grid and a JSON.stringify in the market-view render path from Stages 5ZZL/5ZZR", "pre_existing": true},
+      {"tests": ["test_flag_on_adds_a_window_band_per_sleeve", "test_a_calm_failure_is_not_recovered_by_a_stress_run", "test_track1_only_still_reports_a_real_track1_failure"],
+       "cause": "expect a TRACK1_CALM_1000 slot and a Calm one-shot band from before Calm became two phases", "pre_existing": true},
+      {"tests": ["test_35_dom_expanded_accepted_shows_the_candidate_and_no_order"],
+       "cause": "intermittent; passes alone and in a second combined run, and failed in neither arm of the attribution measurement", "flaky": true}
+    ]
+  },
+
+  "real_data_check": {
+    "days": ["2026-08-26", "2026-08-27", "2026-08-28"],
+    "track1_maintenance_jobs": 30,
+    "all_completed": true,
+    "any_recovery_marker_on_a_completed_job": false
+  },
+
+  "safety_after": {
+    "orders_possible": false,
+    "blocking": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "blocking_note": "B1 reopened on record age during this stage; not caused here, see b1_reopened_during_this_stage",
+    "scheduler_mode": "compatible",
+    "confirmation": true,
+    "legacy_entry_jobs": 0,
+    "orders_dir_exists": false,
+    "live_positions_track1_exists": false,
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "scheduler_restarted": false,
+    "backend_restarted": false,
+    "broker_connections": 0,
+    "runtime_trading_files_edited": false,
+    "gate_schedule_strategy_order_behaviour_changed": false
+  },
+
+  "backend_restart_required": {
+    "required": true,
+    "reason": "job_journal_reader.py and open_issue_reader.py are imported once per process and the running backend started before they were edited; realtime.js is static but the types it reads come from the backend, so a browser reload alone shows nothing new",
+    "done_here": false,
+    "scheduler_impact": "none - a backend-only restart does not disturb the scheduler"
+  },
+
+  "still_open": [
+    "the account baseline record needs rerunning to close B1 - operational, not code",
+    "HEARTBEAT remains typed `other`; it never reaches the job journal so it cannot take part in a false recovery today, named here so the next reader does not rediscover it",
+    "the two market-view render-path assertions and the three Calm-band tests listed above"
+  ],
+
+  "files_touched": [
+    "monitor/backend/job_journal_reader.py",
+    "monitor/backend/open_issue_reader.py",
+    "global_index/dash/realtime/realtime.js",
+    "scratch/test_track1_stage5zzu_recovery_stream_isolation_20260828.py",
+    "scratch/track1_stage5zzu_mutations_20260828.py",
+    "scratch/test_track1_stage5ze_job_view_operator_20260825.py",
+    "scratch/test_track1_stage5zd_signal_diagnostics_20260825.py",
+    "scratch/test_track1_stage5zf_ops_report_completeness_20260825.py",
+    "scratch/test_track1_stage5zzt_schedule_mirror_spy_ladder_20260828.py",
+    "scratch/track1_stage5zzu_track1_recovery_stream_isolation_20260828.md",
+    "scratch/track1_stage5zzu_track1_recovery_stream_isolation_20260828.json",
+    "docs/futures/TRACK1_RUNTIME_PIPELINE_2026-08-24.md",
+    "TASK.md"
+  ]
+}

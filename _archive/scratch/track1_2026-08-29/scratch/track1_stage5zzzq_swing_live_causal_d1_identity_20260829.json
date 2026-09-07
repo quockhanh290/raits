@@ -1,0 +1,195 @@
+{
+ "schema": "track1_stage_report/1",
+ "stage": "5ZZZ-Q",
+ "title": "Make the live Swing detector use a causal D-1 regime basis",
+ "route": "track1_candidate",
+ "date": "2026-08-29",
+ "constraint_conflict": {
+  "what": "the brief required fixing the live Swing path AND said do not edit runtime trading files; the live Swing decision is in track1_live_source.py, imported by run_live_day_track1.py",
+  "resolution": "asked the operator rather than choosing a reading",
+  "operator_decision": "apply the live fix now; evidence fields follow the same decision"
+ },
+ "changes": [
+  {
+   "file": "global_index/track1_live_source.py",
+   "what": "_swing_candidates now builds RegimeLabels(lag_days=1) and hands it to detect_entry_for_slot, and stashes diagnostics with that same object",
+   "why": "the outer gate used causal_regime_label while the detector got the raw map"
+  },
+  {
+   "file": "global_index/track1_signals.py",
+   "what": "SignalRow gains regime_basis; build_row accepts and forwards it",
+   "default": "\"\" so pre-stage rows stay readable and are never assumed to match"
+  },
+  {
+   "file": "global_index/run_live_day_track1.py",
+   "what": "SLEEVE_REGIME_BASIS map + _signal_regime_basis(); _signal_params_hash rewritten to return an honest empty with the reason recorded"
+  },
+  {
+   "file": "monitor/backend/track1_market_view.py",
+   "what": "the reconstruction lags Swing's labels so the replay mirrors the live path"
+  },
+  {
+   "file": "global_index/track1_replay_parity.py",
+   "what": "PRE_FIX_MISMATCH and NOT_APPLICABLE verdicts; the recorded basis is now compared against the detector's"
+  }
+ ],
+ "proof_live_detector_receives_causal_d1": {
+  "method": "intercepted detect_entry_for_slot on the live path; bar join stubbed",
+  "swing": [
+   {
+    "inst": "MES",
+    "type": "RegimeLabels",
+    "lag": 1,
+    "resolved": "Calm"
+   },
+   {
+    "inst": "MNQ",
+    "type": "RegimeLabels",
+    "lag": 1,
+    "resolved": "Calm"
+   },
+   {
+    "inst": "MYM",
+    "type": "RegimeLabels",
+    "lag": 1,
+    "resolved": "Calm"
+   },
+   {
+    "inst": "M2K",
+    "type": "RegimeLabels",
+    "lag": 1,
+    "resolved": "Calm"
+   }
+  ],
+  "nkd": [
+   {
+    "inst": "MNKD",
+    "type": "RegimeLabels",
+    "lag": 1,
+    "resolved": "Calm"
+   }
+  ],
+  "before_the_change": "the same call resolved None, which is why the sleeve refused every session",
+  "independent_check": {
+   "label_change_sessions": 190,
+   "returned_previous_session_label": 190,
+   "mismatches": 0
+  }
+ },
+ "params_hash": {
+  "still_empty": true,
+  "honest": true,
+  "why": "route_params refuses a config missing any of its 27 fields; one is data_source_identity = path:sha256 of the parquet, and hashing a multi-gigabyte file on every slot would put real work on the decision path",
+  "a_cheap_hash_would_be": "the partial identity that module explicitly forbids",
+  "where_the_real_identity_lives": "the explanation record for the same run",
+  "consequence_for_parity": "a post-fix slot is capped at UNKNOWN until parity joins the identity from the explanation record - named, not papered over"
+ },
+ "reproduction": {
+  "artifacts_byte_identical": true,
+  "artifact_sha16": {
+   "floor": "2474723814ae3e92",
+   "vault2025": "c27ca3902b116912",
+   "vault2026": "1ee198a9f10387c8"
+  },
+  "full_stack": {
+   "floor": 66796,
+   "vault2025": 16181,
+   "vault2026": 8105
+  },
+  "risk_clean": {
+   "floor": 57289,
+   "vault2025": 12419,
+   "vault2026": 7077
+  },
+  "all_matched_expected": true,
+  "why_the_live_change_cannot_reach_it": "the artifact path is deploy_sim -> SwingTFEngine, not track1_live_source"
+ },
+ "params_unchanged": {
+  "SWING_TF_PARAM": {
+   "ema_period": 30,
+   "chandelier_atr_mult": 2.5,
+   "max_hold_days": 5
+  },
+  "NormalR4Params": {
+   "ema_period": 50,
+   "stop_basis_atr_mult": 2.0,
+   "chandelier_atr_mult": 2.5,
+   "max_hold_days": 5,
+   "rel_volume_max": 2.0,
+   "vol_feature": "rvol_slot20"
+  }
+ },
+ "evidence_fields_added": {
+  "regime_basis": {
+   "on": "SignalRow",
+   "default": "",
+   "values": {
+    "global_nkd": "causal_d1",
+    "roska4_swing": "causal_d1",
+    "roska4_stress": "intraday_basket_gate",
+    "roska4_calm": "causal_d1"
+   },
+   "source": "a map checked against the live call sites by test, never derived from the sleeve name"
+  }
+ },
+ "parity": {
+  "new_verdicts": {
+   "PRE_FIX_MISMATCH": "the row disagrees with today's code, and yesterday's code wrote it",
+   "NOT_APPLICABLE": "the field did not exist when the row was written"
+  },
+  "neither_is_a_pass": true,
+  "old_evidence_rewritten": false,
+  "pre_fix_swing_row_now": "PRE_FIX_MISMATCH",
+  "whole_run_still": "NOT_YET_OBSERVED for all four sleeves - no session since the fixes",
+  "can_pass_on_next_post_fix_swing_slot": {
+   "basis_check": true,
+   "full_slot": false,
+   "blocked_by": "the params_hash gap above"
+  }
+ },
+ "tests": {
+  "new_suite": "scratch/test_track1_stage5zzzq_swing_causal_d1_live_20260829.py",
+  "new_passed": 14,
+  "regression_passed": 134,
+  "failed": 0,
+  "restated_not_deleted": [
+   "5ZZZ-G's 'who decided?' guard, INVERTED: Swing must now keep the causal object and NKD must never lose it",
+   "5ZZZ-G's payload test now asserts the two sleeves AGREE, because removing the disagreement at its source was the point of this stage",
+   "5ZZZ-G's reconstruction-mirrors-live test follows the new live path",
+   "5ZZZ-P's 'cannot reach PASS' test replaced by one showing a recorded basis now can, plus NOT_APPLICABLE and contradiction cases"
+  ]
+ },
+ "answers": {
+  "live_swing_uses_causal_d1": true,
+  "backtest_artifact_live_identities_match": true,
+  "params_changed": false,
+  "selected_baseline_reproduces": true,
+  "evidence_fields_added": [
+   "regime_basis"
+  ],
+  "params_hash_left_empty_deliberately": true,
+  "parity_can_pass_next_post_fix_swing_slot": "on the basis check yes; full-slot PASS still blocked by the params-hash gap"
+ },
+ "operator_should_note": "live Swing previously refused every session because its detector resolved no label; it will now decide. Orders remain impossible, but the sleeve's shadow decisions - the input to PAPER_SHADOW_EVIDENCE - change from 'always refuse' to 'actually deciding' from the next session. This is the first change in the sequence that alters what the live route DOES rather than what it records.",
+ "safety": {
+  "orders_possible": false,
+  "blockers": [
+   "PAPER_SHADOW_EVIDENCE"
+  ],
+  "confirmation_present": true,
+  "confirmation_approves_orders": false,
+  "swing_override_present_and_valid": true,
+  "swing_override_grants": "nothing",
+  "orders_dir_present": false,
+  "TRACK1_ORDERS_APPROVED_set": false,
+  "broker_calls": 0,
+  "scheduler_pid": 3000,
+  "scheduler_restarted": false,
+  "backend_pid": 10136,
+  "backend_restarted": false,
+  "gates_changed": false,
+  "thresholds_changed": false,
+  "params_changed": false,
+  "paper_shadow_evidence_marked_satisfied": false
+ }
+}

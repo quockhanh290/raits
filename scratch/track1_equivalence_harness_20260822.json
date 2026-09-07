@@ -1,0 +1,169 @@
+{
+ "a1_log_anchor": {
+  "per_day": {
+   "live_day_0806.log": {
+    "matched": 0,
+    "diverged": 0,
+    "skipped": 16
+   },
+   "live_day_0807.log": {
+    "matched": 6,
+    "diverged": 0,
+    "skipped": 48
+   },
+   "live_day_0810.log": {
+    "matched": 5,
+    "diverged": 0,
+    "skipped": 0
+   },
+   "live_day_0811.log": {
+    "matched": 10,
+    "diverged": 0,
+    "skipped": 0
+   },
+   "live_day_0812.log": {
+    "matched": 10,
+    "diverged": 0,
+    "skipped": 0
+   },
+   "live_day_0813.log": {
+    "matched": 10,
+    "diverged": 0,
+    "skipped": 0
+   },
+   "live_day_0814.log": {
+    "matched": 10,
+    "diverged": 0,
+    "skipped": 0
+   },
+   "live_day_0817.log": {
+    "matched": 10,
+    "diverged": 0,
+    "skipped": 0
+   },
+   "live_day_0818.log": {
+    "matched": 10,
+    "diverged": 0,
+    "skipped": 0
+   },
+   "live_day_0819.log": {
+    "matched": 5,
+    "diverged": 0,
+    "skipped": 0
+   },
+   "live_day_0820.log": {
+    "matched": 5,
+    "diverged": 0,
+    "skipped": 0
+   },
+   "live_day_0821.log": {
+    "matched": 10,
+    "diverged": 0,
+    "skipped": 0
+   }
+  },
+  "all_days": {
+   "matched": 91,
+   "diverged": 0,
+   "skipped": 64
+  },
+  "window": {
+   "matched": 85,
+   "diverged": 0,
+   "skipped": 0
+  },
+  "all_days_ok": true,
+  "window_ok": true,
+  "expected_all_days": {
+   "matched": 91,
+   "diverged": 0,
+   "skipped": 64
+  },
+  "expected_window": {
+   "matched": 85,
+   "diverged": 0,
+   "skipped": 0
+  },
+  "note": "a reproduction of the RECORD, not of the computation; the shadow ran on live-spliced frames that are never persisted (run_live_day.py:400)"
+ },
+ "a2_parquet_equivalence": {
+  "config": {
+   "data_dir": "data/cache/futures",
+   "start": "2026-01-01",
+   "end": "2026-08-19",
+   "cut": "2026-06-30",
+   "ema": 30,
+   "mult": 2.5,
+   "hmm_fit_end": "2024-12-31",
+   "slippage_ticks": 2.0
+  },
+  "rows": [
+   {
+    "inst": "MES",
+    "cut": "2026-06-30",
+    "bars": 223631,
+    "full_trades": 58,
+    "checkpoint_pos": true,
+    "fingerprint": "175570:720149be932966fe",
+    "trades_expected": 10,
+    "trades_resumed": 10,
+    "trades_match": true,
+    "first_trade_diff": null,
+    "pos_match": true,
+    "pos_expected": null,
+    "pos_resumed": null,
+    "match": true
+   },
+   {
+    "inst": "MNQ",
+    "cut": "2026-06-30",
+    "bars": 223572,
+    "full_trades": 55,
+    "checkpoint_pos": true,
+    "fingerprint": "175512:35d2a2e90e2f814c",
+    "trades_expected": 10,
+    "trades_resumed": 10,
+    "trades_match": true,
+    "first_trade_diff": null,
+    "pos_match": true,
+    "pos_expected": null,
+    "pos_resumed": null,
+    "match": true
+   },
+   {
+    "inst": "MYM",
+    "cut": "2026-06-30",
+    "bars": 221600,
+    "full_trades": 68,
+    "checkpoint_pos": true,
+    "fingerprint": "173620:e4974c26ca0440ca",
+    "trades_expected": 10,
+    "trades_resumed": 10,
+    "trades_match": true,
+    "first_trade_diff": null,
+    "pos_match": true,
+    "pos_expected": null,
+    "pos_resumed": null,
+    "match": true
+   },
+   {
+    "inst": "M2K",
+    "cut": "2026-06-30",
+    "bars": 220410,
+    "full_trades": 70,
+    "checkpoint_pos": false,
+    "fingerprint": "172468:bd1bba460b8e35cb",
+    "trades_expected": 13,
+    "trades_resumed": 13,
+    "trades_match": true,
+    "first_trade_diff": null,
+    "pos_match": true,
+    "pos_expected": null,
+    "pos_resumed": null,
+    "match": true
+   }
+  ],
+  "all_match": true,
+  "note": "NOT a reproduction of the shadow comparison: the shadow ran on frames spliced with live IBKR bars that are never persisted (run_live_day.py:400). This is the parquet-only equivalence a resume-primary oracle would use."
+ }
+}

@@ -1,0 +1,204 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZO",
+  "title": "Backend-only restart must not trip the scheduler mode guard",
+  "when_et": "2026-08-27",
+  "root_cause": {
+    "what": "Stage 5ZZN's guard ran UNCONDITIONALLY, before anything decided whether a scheduler would be started at all",
+    "symptom": "restart --no-scheduler was refused with 'this start would register 45 legacy entry job(s)', about a start nobody had requested",
+    "why_it_mattered": "it was the ONLY route to a backend restart, and 5ZZN had just documented that as the way to pick up the new dashboard API route",
+    "the_deeper_harm": "a guard that fires where no start happens is not a stricter guard - it teaches an operator to work around it, and the workaround here was `restart --scheduler`: restarting a live scheduler to rebuild a read-only backend, the more dangerous of the two acts"
+  },
+  "reproduced": {
+    "scheduler_pids": [
+      3000
+    ],
+    "backend_pids": [
+      38152
+    ],
+    "track1_mode": "track1-only-shadow",
+    "scheduler_mode": "compatible",
+    "legacy_entry_jobs": 0,
+    "blocking": [
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "orders_possible": false,
+    "command": "python monitor/ops.py restart --no-scheduler --yes",
+    "result": "legacy/default: REFUSING to start",
+    "note": "5ZZN itself had landed correctly - the operator ran the restart and the scheduler is in track1-only-shadow with 0 legacy entry jobs"
+  },
+  "fix": {
+    "shape": "the guard now fires at each of the TWO places a scheduler is actually started, not once at the top",
+    "site_1": {
+      "path": "the explicit restart path",
+      "condition": "if args.restart_scheduler and not track1_only",
+      "placement": "before ensure_single stops anything",
+      "why": "5ZZN's property, kept - a guard that fired after the kill would leave the operator with no scheduler at all"
+    },
+    "site_2": {
+      "path": "the cold-start path in the else branch",
+      "why_easy_to_miss": "that branch starts a scheduler in legacy/default mode - the call passes no Track 1 flag - and both `up` AND `restart --no-scheduler` reach it when there is no scheduler to leave alone",
+      "consequence": "a backend-only restart on a machine with no scheduler running is still a real legacy start, and is still refused",
+      "cost": "nothing has been stopped on that path, so checking there costs the operator nothing"
+    },
+    "relaxation": "none - the guard covers strictly the same set of real starts"
+  },
+  "mode_matrix": [
+    {
+      "command": "restart --no-scheduler",
+      "scheduler_running": true,
+      "result": "allowed",
+      "rc": 0,
+      "touched": "backend only"
+    },
+    {
+      "command": "restart --no-scheduler",
+      "scheduler_running": false,
+      "result": "refused",
+      "rc": 2,
+      "touched": "nothing"
+    },
+    {
+      "command": "restart --scheduler (default)",
+      "scheduler_running": true,
+      "result": "refused",
+      "rc": 2,
+      "touched": "nothing"
+    },
+    {
+      "command": "restart --scheduler --track1-shadow",
+      "scheduler_running": true,
+      "result": "refused",
+      "rc": 2,
+      "touched": "nothing"
+    },
+    {
+      "command": "restart --scheduler --track1-only-shadow",
+      "scheduler_running": true,
+      "result": "allowed",
+      "rc": 0,
+      "touched": "scheduler + backend"
+    },
+    {
+      "command": "up",
+      "scheduler_running": true,
+      "result": "allowed, leaves scheduler alone",
+      "rc": 0,
+      "touched": "backend only"
+    },
+    {
+      "command": "up",
+      "scheduler_running": false,
+      "result": "refused",
+      "rc": 2,
+      "touched": "nothing"
+    }
+  ],
+  "every_refusal_touched_nothing": true,
+  "live_verification": {
+    "scheduler_pid_before": 3000,
+    "scheduler_pid_after": 3000,
+    "scheduler_untouched": true,
+    "backend_pid_before": 38152,
+    "backend_pid_after": 28320,
+    "backend_changed": true,
+    "track1_mode_after": "track1-only-shadow",
+    "scheduler_mode_after": "compatible",
+    "legacy_entry_jobs_after": 0,
+    "slot_table_after": "fresh",
+    "blocking_after": [
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "orders_possible_after": false,
+    "backend_pid_after_second_restart": 46600
+  },
+  "stage_5zzl_route_now_served": {
+    "first_request": "timed out at 25s",
+    "what_that_actually_was": "the cold import chain on a freshly started backend, not the endpoint - stated precisely rather than left as 'it timed out'",
+    "measured_immediately_after": {
+      "cold_seconds": 1.47,
+      "warm_seconds": 0.11
+    },
+    "sleeves": [
+      "global_nkd",
+      "roska4_stress",
+      "roska4_swing"
+    ],
+    "regime": "Calm",
+    "conclusion": "the day-slice cache is doing its job"
+  },
+  "tests": {
+    "new_file": "scratch/test_track1_stage5zzo_backend_restart_guard_20260827.py",
+    "new_count": 15,
+    "processes_started_or_stopped": 0,
+    "production_confirmation_touched": false,
+    "regression_asserted_twice": {
+      "once": "on the output",
+      "twice": "AT THE GUARD - a spy on legacy_entry_start_blockers proving a backend-only restart never consults it",
+      "why": "a message that stopped being printed for some unrelated reason would pass a text check and prove nothing"
+    },
+    "what_must_stay_refused_is_pinned": [
+      "default restart",
+      "transitional --track1-shadow",
+      "up with nothing running",
+      "restart --no-scheduler when there is no scheduler to leave alone (the case the fix must not open)"
+    ],
+    "restated": [
+      {
+        "test": "5ZZN test_plain_track1_shadow_is_not_exempt",
+        "was": "pinned the literal source line `if not track1_only:`",
+        "why_stale": "this stage rewrote it to `if args.restart_scheduler and not track1_only:`; a source pin goes stale the first time the code around it moves and goes red for a reason unrelated to what it is about",
+        "now": "behavioural - ask for the transitional mode, watch it be refused, assert nothing was touched"
+      }
+    ],
+    "suites": "5ZZO + 5ZZN + 5ZZ ops status + monitor/test_ops + dashboard backend + 5ZZJ + 5ZZK + 5ZQ + 5ZR",
+    "passed": 395,
+    "failed": 0,
+    "5zzj_alarm": "NOW PASSES, and for the right reason: the running scheduler is in track1-only-shadow and registers no legacy entry job. It was left red at the end of 5ZZN precisely so it would only go green when that became true."
+  },
+  "safety": {
+    "orders_possible_before": false,
+    "orders_possible_after": false,
+    "track1_blocking_before": [
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "track1_blocking_after": [
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "confirmation_before": true,
+    "confirmation_after": true,
+    "confirmation_touched": false,
+    "scheduler_restarted": false,
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "orders_dir": "ABSENT",
+    "broker_order_calls": 0,
+    "strategy_slots_gates_send_wire_touched": false
+  },
+  "commands_now_behaving_as_documented": [
+    "python monitor\\ops.py restart --no-scheduler --yes",
+    "python monitor\\ops.py restart --scheduler --track1-only-shadow --yes"
+  ],
+  "files_touched": {
+    "modified": [
+      "monitor/ops.py",
+      "scratch/test_track1_stage5zzn_scheduler_mode_enforcement_20260827.py (one source pin made behavioural)"
+    ],
+    "new": [
+      "scratch/test_track1_stage5zzo_backend_restart_guard_20260827.py",
+      "scratch/track1_stage5zzo_backend_restart_guard_20260827.md",
+      "scratch/track1_stage5zzo_backend_restart_guard_20260827.json"
+    ],
+    "runtime_trading_files_written": "none"
+  },
+  "unexplained": {
+    "what": "the backend started during verification (pid 28320) exited at 23:04:53 with nothing recorded",
+    "ruled_out_by_measurement": [
+      "no traceback in ops_backend.err.log or .out.log near the time",
+      "no kill entry in monitor/logs/ops.log - nothing in ops killed it",
+      "start_backend detaches with CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS, the same flags as the scheduler, so it was not orphaned by the shell that started it"
+    ],
+    "cause": "UNKNOWN - not guessed at",
+    "action": "restarted with the same command, pid 46600, dashboard up",
+    "if_it_recurs": "capture whether it coincides with the market-view route's cold parquet read, the only new work this backend does"
+  }
+}

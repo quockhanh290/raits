@@ -1,0 +1,149 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZY",
+  "title": "Dashboard poll must not spawn CMD/PowerShell",
+  "route": "track1_candidate",
+  "date": "2026-08-28",
+  "orders_enabled": false,
+
+  "attribution": {
+    "already_implemented_before_this_stage_began": {
+      "files": ["monitor/backend/schedule_status.py", "monitor/backend/open_issue_reader.py"],
+      "modified_at": "08:04",
+      "context": "Stage 5ZZX finished around 07:35; this stage began after 08:04",
+      "brief_items_covered": [1, 2, 3],
+      "what_existed": ["scheduler_track1_mode_status()", "scheduler_track1_only() using it",
+                       "legacy_retirement_state(root)", "no ops call in either file"]
+    },
+    "done_by_this_stage": {
+      "brief_items": [4, 5, 6],
+      "work": ["verified the existing implementation by measurement",
+               "wrote the test suite and mutation harness",
+               "found and fixed the cross-sleeve recovery defect under task 6",
+               "moved nine Stage 5ZZW tests to the new seam",
+               "live verification"]
+    },
+    "note": "recorded because the alternative is a report that reads as though I wrote all of it"
+  },
+
+  "the_regression": {
+    "introduced_by": "Stage 5ZZW - the backend asked the scheduler for its mode via ops.track1_status()",
+    "measured": {"ops.track1_status()": {"duration_s": 2.84, "powershell_processes": 2}},
+    "why_it_mattered": "a page polling every eight seconds opens a console several times a minute; Stage 5ZZX's log filters could not have helped because the noise was never in the log",
+    "why_the_backend_already_had_the_answer": "_scan_scheduler_processes() enumerates with psutil, keeps each scheduler's command line, and sits behind a 60s TTL with a background refresh; its docstring says 'never call this on a request path'"
+  },
+
+  "measurement_that_had_to_be_redone": {
+    "first_probe": "reported zero subprocess calls from every endpoint",
+    "why_suspicious": "a zero that convenient is a reason to check the instrument",
+    "self_check": "a deliberate subprocess.run proved the spy was live; calling ops.track1_status() directly showed the two PowerShell spawns",
+    "explanation": "the endpoints were already clean because the fix was already on disk",
+    "consequence": "every measurement in this report carries a self-check"
+  },
+
+  "verified_no_shell": {
+    "warm_requests": 20,
+    "endpoints": ["/api/v1/schedule-status", "/api/v1/open-issues", "/api/v1/runner-state",
+                  "/api/v1/track1-runtime"],
+    "subprocess_run_calls": 0,
+    "powershell_calls": 0
+  },
+
+  "mode_parsing": [
+    {"command": "--track1-only-shadow", "mode": "track1-only-shadow", "track1_only": true,
+     "legacy_entry_jobs": 0, "source": "process_table"},
+    {"command": "--track1-shadow", "mode": "track1-shadow", "track1_only": false,
+     "legacy_entry_jobs": 45, "source": "process_table",
+     "note": "shares a prefix with the safe mode and still runs every legacy entry slot; reporting it as retirement-compatible would hide legacy issues while legacy is trading"},
+    {"command": "(default)", "mode": "legacy-only", "track1_only": false, "legacy_entry_jobs": 45},
+    {"command": "(empty)", "mode": "n/a", "track1_only": null, "source": "unknown"},
+    {"command": "(no scheduler)", "mode": "n/a", "track1_only": null, "source": "none"}
+  ],
+
+  "task_6_calm": {
+    "already_green": "the three Calm tests had cleared before this stage",
+    "properties_that_held": [
+      "TRACK1_CALM_1000 is absent from the slot table and from the mirror",
+      "both current phases TRACK1_CALM_DECIDE_0932 and TRACK1_CALM_OBSERVE_1002 are mirrored"
+    ],
+    "property_that_did_not": {
+      "claim": "a failed Calm phase must not be recovered by Stress",
+      "why_the_green_test_missed_it": "it guards the INCIDENTS lane, which keys on slot_id and was never wrong; the journal and issue lanes key on job type and every Track 1 strategy slot shares one",
+      "measured_before": "TRACK1_CALM_DECIDE_0932 failed 09:32, TRACK1_STRESS_1035 completed 10:35 -> Calm reported lifecycle_status recovered, recovered_at 10:35",
+      "family": "the Stage 5ZZU defect - a bucket read as a stream - one layer up",
+      "fix": "recovery keys on the SLEEVE for strategy slots via recovery_stream(), which the issue lane defers to so the two lanes cannot disagree",
+      "job_type_unchanged": "everything asking 'is this a strategy slot' gets the same answer; only recovery is finer"
+    },
+    "after": {
+      "calm_failed_then_stress_completed": "open",
+      "calm_decide_failed_then_calm_observe_completed": "recovered",
+      "swing_failed_then_swing_completed": "recovered",
+      "nkd_failed_then_swing_completed": "open"
+    }
+  },
+
+  "live_verification": {
+    "command": "python monitor/ops.py restart --no-scheduler --yes --track1-only-shadow",
+    "scheduler": {"pid_before": 3000, "pid_after": 3000, "restarted": false},
+    "backend": {"pid_before": 35956, "pid_after": 34664},
+    "polling": {"requests": 32, "status_200": 32,
+                "shell_processes_before": 24, "shell_processes_peak": 24, "delta": 0,
+                "note": "the baseline includes the measurement's own PowerShell; the delta is the number that matters"},
+    "ops_status": {"track1_mode": "track1-only-shadow", "track1_mode_source": "process_table",
+                   "track1_scheduler_mode": "compatible", "confirmation": true,
+                   "legacy_entry_jobs": 0,
+                   "track1_blocking": ["PAPER_SHADOW_EVIDENCE"], "orders_possible": false}
+  },
+
+  "results": {
+    "new_suite": {"file": "scratch/test_track1_stage5zzy_dashboard_poll_no_shell_20260828.py", "passed": 28},
+    "named_and_adjacent_suites": {"passed": 681, "failed": 1},
+    "named_by_brief": {"monitor/test_dashboard_backend.py": "pass",
+                        "monitor/test_schedule_status_track1_20260823.py": "pass, including the three Calm tests"},
+    "mutations": {"file": "scratch/track1_stage5zzy_mutations_20260828.py", "attempted": 10, "caught": 10},
+    "stage_5zzw_tests_moved": {
+      "count": 9,
+      "why": "they monkeypatched ops.track1_status and expected the resolver to consult it; the resolver reads the cached scan now, so they described a seam that no longer exists",
+      "how": "each keeps its property and asserts it through _running_schedulers; the retirement fixture now writes its confirmation under tmp_path so those tests cannot be answered by the production file"
+    },
+    "remaining_failure": {
+      "test": "test_40_the_render_path_has_no_rule_grid_left",
+      "cause": "a rule grid and a JSON.stringify in the market-view render path from Stages 5ZZL/5ZZR",
+      "pre_existing": true
+    }
+  },
+
+  "safety_after": {
+    "scheduler_pid": 3000,
+    "scheduler_restarted": false,
+    "backend_restarted": true,
+    "backend_restart_authorised_by": "the stage brief",
+    "broker": "the restart reconnected the read-only reader the backend always starts; no new connection from this stage's code",
+    "orders_possible": false,
+    "blocking": ["PAPER_SHADOW_EVIDENCE"],
+    "orders_dir_exists": false,
+    "live_positions_track1_exists": false,
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "gates_strategy_order_logic_scheduler_registrations": "untouched",
+    "ops_reported_on_startup": ["TRACK1_ORDERS_APPROVED: removed from the child environment",
+                                 "orders: impossible - blocked by PAPER_SHADOW_EVIDENCE"]
+  },
+
+  "still_open": [
+    "ops.py itself still shells out, and should - it is a command-line tool, not a request path. What changed is that nothing on a polled path calls it, and a test makes any such call an explicit failure.",
+    "the frontend keeps its own recovery lane in realtime.js matching on job_type; it only runs to NAME the job that recovered one already marked recovered, so with the backend correct it has nothing to find - but it is a fourth lane with a coarser rule and wants its own pass",
+    "the pre-existing render-path assertion above"
+  ],
+
+  "files_touched": [
+    "monitor/backend/job_journal_reader.py",
+    "monitor/backend/open_issue_reader.py",
+    "scratch/test_track1_stage5zzy_dashboard_poll_no_shell_20260828.py",
+    "scratch/track1_stage5zzy_mutations_20260828.py",
+    "scratch/test_track1_stage5zzw_dashboard_track1_mode_hygiene_20260828.py",
+    "scratch/track1_stage5zzy_dashboard_poll_no_shell_20260828.md",
+    "scratch/track1_stage5zzy_dashboard_poll_no_shell_20260828.json",
+    "docs/futures/TRACK1_RUNTIME_PIPELINE_2026-08-24.md",
+    "TASK.md"
+  ]
+}

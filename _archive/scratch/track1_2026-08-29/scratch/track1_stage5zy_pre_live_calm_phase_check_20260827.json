@@ -1,0 +1,271 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZY-PRE",
+  "title": "Read-only precheck before the first live Calm DECIDE/OBSERVE window",
+  "route": "track1_candidate",
+  "when_et": "2026-08-27T03:45:00-04:00/2026-08-27T04:40:00-04:00",
+  "kind": "read_only_precheck",
+  "headline": {
+    "ready_to_observe_next_live_calm_window": false,
+    "why": "the running scheduler predates the slot change by four hours and holds the old table in memory; until it is restarted the two phase jobs exist only in the code, and the stale job it will fire produces NO ledger row at all",
+    "state_is_worse_than_before_5zx_until_restart": true
+  },
+  "hard_constraints_measured": {
+    "orders_possible": false,
+    "blocking": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "confirmation_file": false,
+    "track1_orders_approved": false,
+    "track1_stop_trading": false,
+    "orders_dir_state": "ABSENT",
+    "shadow_intent_dir_state": "ABSENT",
+    "send_implemented": false,
+    "runtime_files_edited_by_hand": false,
+    "scheduler_restarted_by_this_stage": false,
+    "live_calm_evidence_claimed": false
+  },
+  "running_process": {
+    "scheduler_pids": [
+      11788
+    ],
+    "started_et": "2026-08-26T22:07:37-04:00",
+    "started_utc": "2026-08-27T02:07:37+00:00",
+    "mode": "track1-only-shadow",
+    "port": 4002,
+    "broker_connected": true,
+    "broker_freshness": "fresh",
+    "broker_quote_age_seconds": 5.818,
+    "slots_registered_at_boot": 70,
+    "slots_the_code_now_declares": 71,
+    "calm_decide_or_observe_mentioned_in_any_log": 0,
+    "evidence": "the scheduler's own log line: 'Track 1 SHADOW slots registered: 70'",
+    "earliest_5zx_file_mtime_et": "2026-08-27T02:08:12-04:00",
+    "hours_after_boot": 4.01
+  },
+  "scheduler_registration_from_real_construction": {
+    "track1_only_total_jobs": 102,
+    "expected": 102,
+    "track1_strategy_slots": 71,
+    "track1_calm_decide_0932_registered": true,
+    "track1_calm_observe_1002_registered": true,
+    "track1_calm_1000_registered": false,
+    "caveat": "true in the CODE only; the live process has the opposite of all four"
+  },
+  "stale_scheduler_consequence": {
+    "measured": true,
+    "what_fires_at_1000_et": "TRACK1_CALM_1000",
+    "child_result": "ShadowRefused: unknown_slot",
+    "ledger_files_written": 0,
+    "why_it_matters": "the refusal is raised before the window ledger is opened, so the window leaves no row; the audit reads no row as 'nobody looked', which is strictly worse than yesterday's recorded refusal",
+    "precedent": "the same failure mode Stage 5Q-3 eliminated for splice refusals"
+  },
+  "restart_window": {
+    "measured_at_et": "2026-08-27T03:50:00-04:00",
+    "next_jobs_et": [
+      "04:20 stop_repair",
+      "06:20 stop_repair",
+      "08:20 stop_repair",
+      "09:31 maxhold_exit",
+      "09:32 TRACK1_CALM_DECIDE_0932",
+      "10:02 TRACK1_CALM_OBSERVE_1002"
+    ],
+    "quiet_gaps_et": [
+      "04:21-06:20",
+      "06:21-08:20",
+      "08:21-09:31"
+    ],
+    "deadline_et": "09:32",
+    "if_missed": "better missed than half-done: a decide phase that never ran plus an observe phase that runs anyway produces a refusal row saying there was no decision to observe, which is correct and is not evidence"
+  },
+  "adjacency_risk": {
+    "what": "TRACK1_CALM_DECIDE_0932 fires one minute after track1_maxhold_exit",
+    "history": "that job wrote the Track 1 book at 09:31:13 on 2026-08-26, the corruption Stage 5ZS repaired",
+    "measured_runtime_seconds": [
+      1,
+      13
+    ],
+    "clearance_seconds_at_worst_observed": 47,
+    "client_ids": {
+      "safety_maxhold": 90,
+      "slot_child": 89
+    },
+    "collision_possible_on_connection": false,
+    "verdict": "thin but real; watch on the first day rather than assume"
+  },
+  "runtime_filesystem_baseline": {
+    "shadow_intent_dir": "ABSENT",
+    "orders_dir": "ABSENT",
+    "trade_log_track1_rows": 0,
+    "trade_log_rows_mentioning_intent": 0,
+    "live_positions_track1_json_mtime_et": "2026-08-27T02:55:42-04:00",
+    "replay_checkpoint_track1_json_mtime_et": "2026-08-27T02:55:42-04:00",
+    "preflight_state_json_mtime_et": "2026-08-26T13:47:09-04:00",
+    "legacy_live_positions_json_mtime_et": "2026-08-26T09:31:11-04:00",
+    "book_envelope": {
+      "schema_version": 2,
+      "route": "track1_candidate",
+      "positions": 0,
+      "foreign_keys": [],
+      "state": "track1",
+      "ok": true
+    },
+    "book_move_cause": "the overnight Nikkei window closing; the route wrote its own state",
+    "note": "the fourth window close the Stage 5ZS repair has survived"
+  },
+  "evidence_reader": {
+    "judgeable_days_on_record": [
+      "2026-08-24",
+      "2026-08-25",
+      "2026-08-26"
+    ],
+    "judgeable_days_required": 5,
+    "calm_labels": {
+      "2026-08-24": "pre_shadow_intent_schema",
+      "2026-08-25": "pre_shadow_intent_schema",
+      "2026-08-26": "pre_shadow_intent_schema"
+    },
+    "calm_days_counted": 0,
+    "any_day_execution_proven": false,
+    "proves": "decision_only",
+    "does_not_prove": "acceptance_fill_or_slippage",
+    "gate_measurement": false,
+    "per_sleeve_2026_08_26": {
+      "roska4_calm": "FAIL",
+      "roska4_stress": "PASS",
+      "roska4_swing": "PASS",
+      "global_nkd": "NOT_ENOUGH_DATA_YET"
+    },
+    "calm_failure_reason_2026_08_26": "gate_refused: partial_coverage, decision_bar_absent",
+    "important": "that Calm run happened BEFORE the Stage 5ZU timing fix landed, so the most recent live Calm result does not measure the current code. No live Calm window has ever run against either the 5ZU fix or the 5ZX phases.",
+    "all_three_judgeable_days_are_FAIL_days": true
+  },
+  "argv_checked_against_production": {
+    "unsplit_sleeve_live_vs_new": "IDENTICAL",
+    "example_slot": "TRACK1_STRESS_1035",
+    "track1_child_launches_in_all_logs": 205,
+    "allow_orders_occurrences_in_logs": 0,
+    "allow_orders_in_any_of_the_71_slots_the_code_builds": 0,
+    "phase_on_unsplit_slots": 0
+  },
+  "gap_found_and_closed": {
+    "gap": "deleting the phase branch from the scheduler left every test in the corpus green; nothing asserted that the process launcher passes a phase",
+    "significance": "a mechanism built and its wiring left unproven — the fifth time in this programme",
+    "closed_by": "test_16, which fires the real registered jobs with the launcher replaced and reads the argv they build",
+    "mutations_it_catches": [
+      "--source live-shadow removed",
+      "the phase branch deleted",
+      "--allow-orders smuggled into the argv",
+      "a phase leaking into the three unsplit sleeves"
+    ],
+    "all_four_confirmed_red": true
+  },
+  "repairs_owned_by_this_precheck": [
+    {
+      "what": "the dashboard fact pin",
+      "why": "bidirectional by design; Stage 5ZX added a row without declaring it and the pin caught exactly that",
+      "repair": "the row is declared, which also brings it under the per-row rendering check",
+      "loosened": false
+    },
+    {
+      "what": "the argv extractor in an older suite",
+      "why": "it read the launcher's first argument only as a single list literal; the 5ZX narrowing made it a concatenation, so it stopped finding the call and reported 'no launch call' — which reads like the wiring was removed rather than reshaped",
+      "repair": "flattens a concatenation and reports both branches of a conditional",
+      "loosened": false,
+      "proof": "a removed flag still disappears from what the assertions read; mutations confirm"
+    }
+  ],
+  "regression": {
+    "before_5zx_repairs": {
+      "failed": 109,
+      "passed": 2460
+    },
+    "after_5zx_repairs": {
+      "failed": 99,
+      "passed": 2470
+    },
+    "after_this_precheck": {
+      "failed": 95,
+      "passed": 2476,
+      "skipped": 5,
+      "collected": 2576,
+      "reconciled": "95 + 2476 + 5 = 2576, which equals the collect-only count",
+      "collected_grew_by": 2,
+      "why_it_grew": [
+        "test_16, the scheduler wiring test",
+        "one new parametrised case: 'Calm phases' joining the dashboard fact list"
+      ],
+      "failures_fell_by": 4,
+      "of_which_repaired_here": 3,
+      "of_which_noise": 1,
+      "noise_detail": {
+        "test": "test_track1_stage5zp_dashboard_polish_20260826.py::test_13_the_raw_gate_id_is_kept_in_the_tooltip_not_dropped",
+        "what_it_asserts": "a browser assertion that the blocker tooltip carries the B1 id",
+        "relation_to_this_work": "none — it does not touch the row this stage added",
+        "checked": "passes in isolation",
+        "classification": "the corpus's known order dependence, not a repair; counted as noise rather than credited"
+      },
+      "nothing_went_red": true,
+      "verified_by": "diffing the two failure lists, not by comparing totals"
+    },
+    "buckets": {
+      "caused_by_the_calm_slot_split": 45,
+      "pre_existing_unrelated": 50,
+      "true_5zx_regressions": 4
+    },
+    "bucket_method": "the same failures re-run with the pre-stage slot table restored through a probe fixture; 45 turned green. Not read off the test names.",
+    "true_5zx_regressions_detail": [
+      "test_track1_dashboard_runtime_wiring_20260824.py::test_the_panel_renders_no_fact_this_list_does_not_know_about",
+      "test_track1_stage5d_shadow_live_wiring_20260823.py — two cases behind the argv extractor",
+      "test_track1_stage5k_ops_startup_20260823.py::test_no_allow_orders_and_no_port_reaches_a_track1_slot"
+    ],
+    "all_three_repaired": true,
+    "order_dependence": {
+      "observed": "the same set produced 109 failures then 98",
+      "meaning": "eleven tests pass or fail depending on what ran before them",
+      "implication": "any count taken from this corpus carries about ten per cent of noise"
+    },
+    "left_red_and_listed": {
+      "count": 45,
+      "why_not_repaired": "the count pins are the roster anti-pattern already on record; the ones driving the old slot exercise 10:00 semantics that no longer exist, and repairing them means deciding per test what the new Calm timing should mean — weakening assertions inside a precheck that nobody asked to weaken them in"
+    },
+    "corrected_in_stage": "5ZZ",
+    "correction": {
+      "was": 3,
+      "actual": 4,
+      "why_missed": "this classification grouped failures by their message text, and the fourth failed with different wording ('_track1_body argv not found' rather than 'no _run([...]) call found'), so it landed in the pre-existing bucket",
+      "lesson": "grouping by symptom is faster than reading each failure, and it put a genuine regression in the wrong pile",
+      "why_it_matters": "that test asserts no order flag can reach a Track 1 slot, and it had stopped running",
+      "repaired": true
+    }
+  },
+  "focused_tests_run": {
+    "scratch/test_track1_stage5zx_calm_shadow_intent_20260827.py": "21 passed (15 cases + test_16 + 5 mutations)",
+    "scratch/test_track1_dashboard_runtime_wiring_20260824.py": "passed after the pin repair",
+    "scratch/test_track1_stage5d_shadow_live_wiring_20260823.py": "argv cases pass; 4 slot-id cases remain in the split bucket"
+  },
+  "still_blocked_before_paper": [
+    "the scheduler restart — new, and now the first thing; until it happens the two jobs exist only in the code",
+    "PAPER_SHADOW_EVIDENCE — 3 judgeable days of 5, 0 carrying Calm evidence, and all three are FAIL days",
+    "B1 — no decision recorded; its measurement expires 2026-08-27T11:34:00-04:00",
+    "the SEND wire — does not exist",
+    "machine sleep — operator, unchanged"
+  ],
+  "next_event_to_watch": {
+    "first": "the scheduler restart, in a quiet gap before 09:32 ET",
+    "then": "2026-08-27 09:32 ET — TRACK1_CALM_DECIDE_0932, the first run of either phase in production",
+    "then_2": "2026-08-27 10:02 ET — TRACK1_CALM_OBSERVE_1002",
+    "what_success_looks_like": "a shadow_intent file appears for the session, carrying a DECIDE row with no price and an OBSERVE row whose reference equals the 10:00 open; the day classifies decision_judgeable; the orders directory stays absent",
+    "what_to_check_immediately_after": "the book envelope is still schema 2 and route-stamped, given the max-hold job runs one minute earlier"
+  },
+  "findings_recorded_not_fixed": [
+    {
+      "what": "ops.py status never prints the stale-scheduler warning that ops.py already has",
+      "detail": "describe_scheduler_state exists and its docstring names this precedent — '21 backend restarts read as full restarts while a scheduler from three days earlier kept running a cron table that no longer matched the code'. It is called from exactly one place, the restart path.",
+      "effect": "the read-only command an operator runs to check health is the one command that does not say the in-memory schedule no longer matches the code",
+      "why_not_fixed_here": "this stage is a read-only precheck and status is the instrument being read; changing an instrument during a measurement is the wrong order",
+      "repair_size": "one call"
+    }
+  ]
+}

@@ -1,0 +1,448 @@
+{
+ "vault2026": {
+  "anchor_ok": true,
+  "anchor": {
+   "net": 6743.0,
+   "calmar": 1.62,
+   "pf": 1.46,
+   "sharpe": 2.43,
+   "maxdd": 7520.0
+  },
+  "nkd_untouched": true,
+  "filter_stats": {
+   "MES": {
+    "seen": 66,
+    "blocked_range": 0,
+    "blocked_vol": 16,
+    "blocked_missing": 0,
+    "passed": 50
+   },
+   "MNQ": {
+    "seen": 64,
+    "blocked_range": 8,
+    "blocked_vol": 14,
+    "blocked_missing": 0,
+    "passed": 42
+   },
+   "MYM": {
+    "seen": 75,
+    "blocked_range": 0,
+    "blocked_vol": 20,
+    "blocked_missing": 0,
+    "passed": 55
+   },
+   "M2K": {
+    "seen": 62,
+    "blocked_range": 6,
+    "blocked_vol": 10,
+    "blocked_missing": 0,
+    "passed": 46
+   }
+  },
+  "fill_gate": true,
+  "audits": {
+   "MES": {
+    "inst": "MES",
+    "n": 22,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0,
+    "outside_entry_bar_1m": 13,
+    "outside_entry_bar_5m": 0,
+    "entry_not_5m_close": 0,
+    "missing_entry_bar": 0
+   },
+   "MNQ": {
+    "inst": "MNQ",
+    "n": 18,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0,
+    "outside_entry_bar_1m": 11,
+    "outside_entry_bar_5m": 0,
+    "entry_not_5m_close": 0,
+    "missing_entry_bar": 0
+   },
+   "MYM": {
+    "inst": "MYM",
+    "n": 24,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0,
+    "outside_entry_bar_1m": 17,
+    "outside_entry_bar_5m": 0,
+    "entry_not_5m_close": 0,
+    "missing_entry_bar": 0
+   },
+   "M2K": {
+    "inst": "M2K",
+    "n": 17,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0,
+    "outside_entry_bar_1m": 12,
+    "outside_entry_bar_5m": 0,
+    "entry_not_5m_close": 0,
+    "missing_entry_bar": 0
+   },
+   "MNKD": {
+    "inst": "MNKD",
+    "n": 26,
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "exit_before_entry": 0,
+    "missing_exit_bar": 0,
+    "entry_not_bar_close": 0,
+    "favourable": 0,
+    "adverse": 0,
+    "outside_dollars": 0.0,
+    "outside_entry_bar_1m": 19,
+    "outside_entry_bar_5m": 0,
+    "entry_not_5m_close": 0,
+    "missing_entry_bar": 6
+   }
+  },
+  "rows": [
+   {
+    "variant": "R4 raw + NKD (baseline)",
+    "cap": "current",
+    "net": 6743.460000000001,
+    "pf": 1.4638780392842061,
+    "sharpe": 2.4330988539480076,
+    "calmar": 1.6215112687469462,
+    "maxdd": 7519.719999999998,
+    "maxdd_pct": 0.15039439999999996,
+    "ret_yr": 0.24386621435643568,
+    "trades": 114,
+    "taken": 70,
+    "rejected": 44,
+    "halted": 0,
+    "yearly": {
+     "2026": 6743.460000000001
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "outside_entry_bar_5m": 0,
+    "outside_entry_bar_1m": 72
+   },
+   {
+    "variant": "R4 raw + NKD (baseline)",
+    "cap": "strict025",
+    "net": 5183.439999999999,
+    "pf": 1.475607350322107,
+    "sharpe": 2.3587527761038416,
+    "calmar": 1.9350222829155028,
+    "maxdd": 4843.63,
+    "maxdd_pct": 0.0968726,
+    "ret_yr": 0.18745063960396036,
+    "trades": 114,
+    "taken": 53,
+    "rejected": 61,
+    "halted": 0,
+    "yearly": {
+     "2026": 5183.439999999999
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "outside_entry_bar_5m": 0,
+    "outside_entry_bar_1m": 72
+   },
+   {
+    "variant": "R4 filtered only",
+    "cap": "current",
+    "net": 2667.74,
+    "pf": 1.3972925478048497,
+    "sharpe": 2.0229669958041465,
+    "calmar": 1.3194351447097992,
+    "maxdd": 3655.8999999999996,
+    "maxdd_pct": 0.07311799999999999,
+    "ret_yr": 0.09647445891089107,
+    "trades": 81,
+    "taken": 46,
+    "rejected": 35,
+    "halted": 0,
+    "yearly": {
+     "2026": 2667.74
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "outside_entry_bar_5m": 0,
+    "outside_entry_bar_1m": 53
+   },
+   {
+    "variant": "R4 filtered only",
+    "cap": "strict025",
+    "net": 246.66999999999985,
+    "pf": 1.062774209310138,
+    "sharpe": 0.35787168261146635,
+    "calmar": 0.14733581701909032,
+    "maxdd": 3027.24,
+    "maxdd_pct": 0.060544799999999996,
+    "ret_yr": 0.00892041757425742,
+    "trades": 81,
+    "taken": 28,
+    "rejected": 53,
+    "halted": 0,
+    "yearly": {
+     "2026": 246.66999999999985
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "outside_entry_bar_5m": 0,
+    "outside_entry_bar_1m": 53
+   },
+   {
+    "variant": "NKD only",
+    "cap": "current",
+    "net": 6007.47,
+    "pf": 1.9456665979287313,
+    "sharpe": 4.324585110409293,
+    "calmar": 4.3543792021016,
+    "maxdd": 2507.03,
+    "maxdd_pct": 0.05014060000000001,
+    "ret_yr": 0.2183311858208955,
+    "trades": 26,
+    "taken": 24,
+    "rejected": 2,
+    "halted": 0,
+    "yearly": {
+     "2026": 6007.47
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "outside_entry_bar_5m": 0,
+    "outside_entry_bar_1m": 19
+   },
+   {
+    "variant": "NKD only",
+    "cap": "strict025",
+    "net": 6007.47,
+    "pf": 1.9456665979287313,
+    "sharpe": 4.324585110409293,
+    "calmar": 4.3543792021016,
+    "maxdd": 2507.03,
+    "maxdd_pct": 0.05014060000000001,
+    "ret_yr": 0.2183311858208955,
+    "trades": 26,
+    "taken": 24,
+    "rejected": 2,
+    "halted": 0,
+    "yearly": {
+     "2026": 6007.47
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "outside_entry_bar_5m": 0,
+    "outside_entry_bar_1m": 19
+   },
+   {
+    "variant": "R4 filtered + NKD",
+    "cap": "current",
+    "net": 8675.210000000001,
+    "pf": 1.6697488521901995,
+    "sharpe": 3.2600151367548444,
+    "calmar": 3.4771690663616615,
+    "maxdd": 4511.209999999999,
+    "maxdd_pct": 0.09022419999999998,
+    "ret_yr": 0.31372479727722774,
+    "trades": 107,
+    "taken": 70,
+    "rejected": 37,
+    "halted": 0,
+    "yearly": {
+     "2026": 8675.210000000001
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "outside_entry_bar_5m": 0,
+    "outside_entry_bar_1m": 72
+   },
+   {
+    "variant": "R4 filtered + NKD",
+    "cap": "strict025",
+    "net": 6254.14,
+    "pf": 1.611571088413755,
+    "sharpe": 2.821476300679105,
+    "calmar": 2.5991201374033714,
+    "maxdd": 4350.91,
+    "maxdd_pct": 0.0870182,
+    "ret_yr": 0.22617075594059405,
+    "trades": 107,
+    "taken": 52,
+    "rejected": 55,
+    "halted": 0,
+    "yearly": {
+     "2026": 6254.14
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "outside_entry_bar_5m": 0,
+    "outside_entry_bar_1m": 72
+   },
+   {
+    "variant": "R4 filtered(prevbar) + NKD",
+    "cap": "current",
+    "net": 6544.9400000000005,
+    "pf": 1.4590717477151414,
+    "sharpe": 2.4205651702042,
+    "calmar": 1.6379750205279673,
+    "maxdd": 7224.989999999999,
+    "maxdd_pct": 0.14449979999999998,
+    "ret_yr": 0.23668706287128713,
+    "trades": 112,
+    "taken": 68,
+    "rejected": 44,
+    "halted": 0,
+    "yearly": {
+     "2026": 6544.9400000000005
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "outside_entry_bar_5m": 0,
+    "outside_entry_bar_1m": 72
+   },
+   {
+    "variant": "R4 filtered(prevbar) + NKD",
+    "cap": "strict025",
+    "net": 5963.42,
+    "pf": 1.5631536650571851,
+    "sharpe": 2.6759662200094216,
+    "calmar": 2.236121196226646,
+    "maxdd": 4822.13,
+    "maxdd_pct": 0.0964426,
+    "ret_yr": 0.21565734207920792,
+    "trades": 112,
+    "taken": 51,
+    "rejected": 61,
+    "halted": 0,
+    "yearly": {
+     "2026": 5963.42
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "outside_entry_bar_5m": 0,
+    "outside_entry_bar_1m": 72
+   },
+   {
+    "variant": "R4 posthoc-deleted + NKD",
+    "cap": "current",
+    "net": 8312.92,
+    "pf": 1.6868251896161413,
+    "sharpe": 3.2946868798502624,
+    "calmar": 2.7725245301286248,
+    "maxdd": 5421.47,
+    "maxdd_pct": 0.10842940000000001,
+    "ret_yr": 0.3006231712871287,
+    "trades": 91,
+    "taken": 62,
+    "rejected": 29,
+    "halted": 0,
+    "yearly": {
+     "2026": 8312.92
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "outside_entry_bar_5m": 0,
+    "outside_entry_bar_1m": 72
+   },
+   {
+    "variant": "R4 posthoc-deleted + NKD",
+    "cap": "strict025",
+    "net": 7809.889999999999,
+    "pf": 1.8700760909526406,
+    "sharpe": 3.7076542504848518,
+    "calmar": 4.222788416735122,
+    "maxdd": 3344.14,
+    "maxdd_pct": 0.06688279999999999,
+    "ret_yr": 0.2824319131188119,
+    "trades": 91,
+    "taken": 48,
+    "rejected": 43,
+    "halted": 0,
+    "yearly": {
+     "2026": 7809.889999999999
+    },
+    "outside_exit_bar": 0,
+    "outside_exit_day": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "outside_entry_bar_5m": 0,
+    "outside_entry_bar_1m": 72
+   }
+  ],
+  "counts": {
+   "MES": {
+    "raw": 23,
+    "regen": 22,
+    "posthoc": 18
+   },
+   "MNQ": {
+    "raw": 20,
+    "regen": 18,
+    "posthoc": 14
+   },
+   "MYM": {
+    "raw": 24,
+    "regen": 24,
+    "posthoc": 20
+   },
+   "M2K": {
+    "raw": 21,
+    "regen": 17,
+    "posthoc": 13
+   }
+  }
+ }
+}

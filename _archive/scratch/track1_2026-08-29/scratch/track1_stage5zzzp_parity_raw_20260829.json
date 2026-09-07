@@ -1,0 +1,290 @@
+{
+ "schema": "track1_replay_parity/1",
+ "route": "track1_candidate",
+ "fix_cutoff": {
+  "per_file": {
+   "global_index/track1_normal_r4.py": "2026-08-28T18:11:59",
+   "global_index/track1_live_source.py": "2026-08-29T08:12:47",
+   "global_index/track1_strategy_diagnostics.py": "2026-08-29T00:33:12",
+   "global_index/run_live_day_track1.py": "2026-08-29T08:21:23"
+  },
+  "cutoff": "2026-08-29T08:21:23"
+ },
+ "runtime_diagnostics_store_present": false,
+ "counts_toward_paper_shadow_evidence": false,
+ "note": "Read-only. This module releases no gate and marks no evidence satisfied. UNKNOWN is never reported as PASS.",
+ "sleeves": {
+  "global_nkd": {
+   "verdict": "NOT_YET_OBSERVED",
+   "reason": "the newest live slot ran at 2026-08-28T12:46:22, before the newest relevant fix at 2026-08-29T08:21:23",
+   "newest_live_slot": {
+    "slot_id": "TRACK1_NKD_0255",
+    "slot_time": "02:55",
+    "session_date": "2026-08-28",
+    "live_ran_at": "2026-08-28T12:46:22"
+   },
+   "pre_fix_informational": {
+    "sleeve": "global_nkd",
+    "session_date": "2026-08-28",
+    "slot_id": "TRACK1_NKD_0255",
+    "slot_time": "02:55",
+    "verdict": "UNKNOWN",
+    "reason": "some fields matched but others could not be compared; a partial match is not a pass",
+    "live_ran_at": "2026-08-28T12:46:22",
+    "post_fix": false,
+    "checks": [
+     {
+      "name": "route",
+      "live": "track1_candidate",
+      "replay": "track1_candidate",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "sleeve",
+      "live": "global_nkd",
+      "replay": "global_nkd",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "session_date",
+      "live": "2026-08-28",
+      "replay": "2026-08-28",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "data_source_identity",
+      "live": "global_index/data/NKD_continuous_1m_8y.parquet",
+      "replay": "NKD_continuous_1m_8y.parquet",
+      "verdict": "PASS",
+      "note": "compared on the file name; the two sides spell the path differently"
+     },
+     {
+      "name": "params_hash",
+      "live": "",
+      "replay": null,
+      "verdict": "UNKNOWN",
+      "note": "live rows record an empty params_hash"
+     },
+     {
+      "name": "regime_basis_recorded_vs_detector",
+      "live": null,
+      "replay": "previous session (lag 1)",
+      "verdict": "NOT_APPLICABLE",
+      "note": "the row predates the regime_basis field"
+     }
+    ]
+   }
+  },
+  "roska4_stress": {
+   "verdict": "NOT_YET_OBSERVED",
+   "reason": "the newest live slot ran at 2026-08-28T12:46:22, before the newest relevant fix at 2026-08-29T08:21:23",
+   "newest_live_slot": {
+    "slot_id": "TRACK1_STRESS_1230",
+    "slot_time": "12:30",
+    "session_date": "2026-08-28",
+    "live_ran_at": "2026-08-28T12:46:22"
+   },
+   "pre_fix_informational": {
+    "sleeve": "roska4_stress",
+    "session_date": "2026-08-28",
+    "slot_id": "TRACK1_STRESS_1230",
+    "slot_time": "12:30",
+    "verdict": "UNKNOWN",
+    "reason": "some fields matched but others could not be compared; a partial match is not a pass",
+    "live_ran_at": "2026-08-28T12:46:22",
+    "post_fix": false,
+    "checks": [
+     {
+      "name": "route",
+      "live": "track1_candidate",
+      "replay": "track1_candidate",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "sleeve",
+      "live": "roska4_stress",
+      "replay": "roska4_stress",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "session_date",
+      "live": "2026-08-28",
+      "replay": "2026-08-28",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "data_source_identity",
+      "live": "data/cache/futures/NQ_continuous_1m_8y.parquet",
+      "replay": null,
+      "verdict": "UNKNOWN",
+      "note": "compared on the file name; the two sides spell the path differently"
+     },
+     {
+      "name": "params_hash",
+      "live": "",
+      "replay": null,
+      "verdict": "UNKNOWN",
+      "note": "live rows record an empty params_hash"
+     }
+    ]
+   }
+  },
+  "roska4_calm": {
+   "verdict": "NOT_YET_OBSERVED",
+   "reason": "the newest live slot ran at 2026-08-28T12:46:22, before the newest relevant fix at 2026-08-29T08:21:23",
+   "newest_live_slot": {
+    "slot_id": "TRACK1_CALM_OBSERVE_1002",
+    "slot_time": "10:02",
+    "session_date": "2026-08-28",
+    "live_ran_at": "2026-08-28T12:46:22"
+   },
+   "pre_fix_informational": {
+    "sleeve": "roska4_calm",
+    "session_date": "2026-08-28",
+    "slot_id": "TRACK1_CALM_OBSERVE_1002",
+    "slot_time": "10:02",
+    "verdict": "UNKNOWN",
+    "reason": "some fields matched but others could not be compared; a partial match is not a pass",
+    "live_ran_at": "2026-08-28T12:46:22",
+    "post_fix": false,
+    "checks": [
+     {
+      "name": "route",
+      "live": "track1_candidate",
+      "replay": "track1_candidate",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "sleeve",
+      "live": "roska4_calm",
+      "replay": "roska4_calm",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "session_date",
+      "live": "2026-08-28",
+      "replay": "2026-08-28",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "data_source_identity",
+      "live": "data/cache/futures/ES_continuous_1m_8y.parquet",
+      "replay": null,
+      "verdict": "UNKNOWN",
+      "note": "compared on the file name; the two sides spell the path differently"
+     },
+     {
+      "name": "params_hash",
+      "live": "",
+      "replay": null,
+      "verdict": "UNKNOWN",
+      "note": "live rows record an empty params_hash"
+     },
+     {
+      "name": "calm_decide_has_no_observe_value",
+      "live": null,
+      "replay": [],
+      "verdict": "PASS",
+      "note": "DECIDE must carry no OBSERVE-only value"
+     },
+     {
+      "name": "calm_decide_has_no_price_level",
+      "live": null,
+      "replay": 0,
+      "verdict": "PASS",
+      "note": ""
+     }
+    ]
+   }
+  },
+  "roska4_swing": {
+   "verdict": "NOT_YET_OBSERVED",
+   "reason": "the newest live slot ran at 2026-08-28T12:46:22, before the newest relevant fix at 2026-08-29T08:21:23",
+   "newest_live_slot": {
+    "slot_id": "TRACK1_SWING_1445",
+    "slot_time": "14:45",
+    "session_date": "2026-08-28",
+    "live_ran_at": "2026-08-28T12:46:22"
+   },
+   "pre_fix_informational": {
+    "sleeve": "roska4_swing",
+    "session_date": "2026-08-28",
+    "slot_id": "TRACK1_SWING_1445",
+    "slot_time": "14:45",
+    "verdict": "PRE_FIX_MISMATCH",
+    "reason": "a comparable field disagrees; the row predates the current code",
+    "live_ran_at": "2026-08-28T12:46:22",
+    "post_fix": false,
+    "checks": [
+     {
+      "name": "route",
+      "live": "track1_candidate",
+      "replay": "track1_candidate",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "sleeve",
+      "live": "roska4_swing",
+      "replay": "roska4_swing",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "session_date",
+      "live": "2026-08-28",
+      "replay": "2026-08-28",
+      "verdict": "PASS",
+      "note": ""
+     },
+     {
+      "name": "data_source_identity",
+      "live": "data/cache/futures/ES_continuous_1m_8y.parquet",
+      "replay": "ES_continuous_1m_8y.parquet",
+      "verdict": "PASS",
+      "note": "compared on the file name; the two sides spell the path differently"
+     },
+     {
+      "name": "params_hash",
+      "live": "",
+      "replay": null,
+      "verdict": "UNKNOWN",
+      "note": "live rows record an empty params_hash"
+     },
+     {
+      "name": "regime_basis_recorded_vs_detector",
+      "live": null,
+      "replay": "this session's own label",
+      "verdict": "NOT_APPLICABLE",
+      "note": "the row predates the regime_basis field"
+     },
+     {
+      "name": "swing_regime_basis_is_causal_d1",
+      "live": "causal D-1 (declared paper identity)",
+      "replay": "this session's own label",
+      "verdict": "FAIL",
+      "note": "the detector's own basis, from the reconstruction that mirrors the live call site"
+     }
+    ]
+   }
+  }
+ },
+ "summary": {
+  "PASS": 0,
+  "FAIL": 0,
+  "UNKNOWN": 0,
+  "NOT_YET_OBSERVED": 4,
+  "PRE_FIX_MISMATCH": 0,
+  "NOT_APPLICABLE": 0
+ },
+ "all_post_fix_observed": false
+}

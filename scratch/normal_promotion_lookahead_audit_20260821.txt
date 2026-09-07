@@ -1,0 +1,44 @@
+================================================================================================================
+NORMAL-R4 FILTER - NO-LOOKAHEAD AUDIT   (scratch / read-only)
+================================================================================================================
+Filter: range_p90__vol_le_2. Every feature is recomputed from a frame hard-cut
+at the decision instant and compared with what the live filter serves. Each check
+is paired with a non-causal MUTATION that must FAIL, so a green result cannot come
+from a comparison that never had a way to disagree.
+
+################################################################################################################
+WINDOW: floor
+################################################################################################################
+  MES   prior-range  119 checked /  0 bad (mutation caught 119)  |  slot-med20  119 checked /  0 bad (mutation caught  71)  |  entry-bar  0 bad  -> PASS
+  MNQ   prior-range  119 checked /  0 bad (mutation caught 119)  |  slot-med20  119 checked /  0 bad (mutation caught  61)  |  entry-bar  0 bad  -> PASS
+  MYM   prior-range  119 checked /  0 bad (mutation caught 119)  |  slot-med20  119 checked /  0 bad (mutation caught  67)  |  entry-bar  0 bad  -> PASS
+  M2K   prior-range  119 checked /  0 bad (mutation caught 119)  |  slot-med20  119 checked /  0 bad (mutation caught  77)  |  entry-bar  0 bad  -> PASS
+
+################################################################################################################
+WINDOW: vault2025
+################################################################################################################
+  MES   prior-range  119 checked /  0 bad (mutation caught 119)  |  slot-med20  117 checked /  0 bad (mutation caught  67)  |  entry-bar  0 bad  -> PASS
+  MNQ   prior-range  119 checked /  0 bad (mutation caught 119)  |  slot-med20  117 checked /  0 bad (mutation caught  65)  |  entry-bar  0 bad  -> PASS
+  MYM   prior-range  119 checked /  0 bad (mutation caught 119)  |  slot-med20  117 checked /  0 bad (mutation caught  81)  |  entry-bar  0 bad  -> PASS
+  M2K   prior-range  119 checked /  0 bad (mutation caught 119)  |  slot-med20  117 checked /  0 bad (mutation caught  61)  |  entry-bar  0 bad  -> PASS
+
+################################################################################################################
+WINDOW: vault2026
+################################################################################################################
+  MES   prior-range  119 checked /  0 bad (mutation caught 119)  |  slot-med20  116 checked /  0 bad (mutation caught  73)  |  entry-bar  0 bad  -> PASS
+  MNQ   prior-range  119 checked /  0 bad (mutation caught 119)  |  slot-med20  116 checked /  0 bad (mutation caught  68)  |  entry-bar  0 bad  -> PASS
+  MYM   prior-range  119 checked /  0 bad (mutation caught 119)  |  slot-med20  116 checked /  0 bad (mutation caught  73)  |  entry-bar  0 bad  -> PASS
+  M2K   prior-range  119 checked /  0 bad (mutation caught 119)  |  slot-med20  116 checked /  0 bad (mutation caught  83)  |  entry-bar  0 bad  -> PASS
+
+================================================================================================================
+VERDICT: PASS - no lookahead found, and every check demonstrated it can fail
+
+Reading of the three checks:
+  prior-range  session D uses the range of the last RTH session ENDING BEFORE D 00:00.
+  slot-med20   session D's slot value uses only sessions ending before D 00:00.
+  entry-bar    the 5-minute entry bar is complete at the fill instant (entry is that
+               bar's CLOSE), and no bar at or after the fill contributes to it. The
+               engine already reads this same bar's volume in check_volume_pattern,
+               so the filter adds no information the strategy did not already use.
+               The stricter `rvol_prevbar` variant, which touches nothing from the
+               entry bar, is measured separately in the regeneration audit.

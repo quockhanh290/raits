@@ -1,0 +1,183 @@
+{
+  "stage": "5ZV",
+  "title": "Calm A shadow/paper execution identity — pick a tradable contract, not a judgeable one",
+  "checked_at": {
+    "utc": "2026-08-27T04:06",
+    "et": "2026-08-27T00:06 EDT",
+    "calgary": "2026-08-26T22:06 MDT",
+    "note": "the stage ran across midnight ET; the artefact keeps the 20260826 name it was opened under"
+  },
+  "verdict": {
+    "CALM_CONTRACT": "TRADABLE — the original 10:00-open contract, Option A",
+    "SHADOW_PAPER_IDENTITY": "MATCH, under the contract declared here; it was a MISMATCH under the 10:01 reading 5ZU left open",
+    "backtest_rerun_required": false,
+    "calm_can_count_toward_PAPER_SHADOW_EVIDENCE": "YES — for the DECISION half only, under an explicit definition (see 9)",
+    "orders_enabled": false,
+    "ibkr_send_wired": false,
+    "entry_price_changed": false,
+    "splice_guard_touched": false,
+    "remaining_blockers": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE"
+    ]
+  },
+  "the_measurement_that_decides_it": {
+    "question": "how early is the setup known?",
+    "method": "rebuild every one of the 421 frozen setups from a frame TRUNCATED at 09:30 and require the features to be identical to the full-frame detector's",
+    "result": "407 of 421 reproduce. The other 14 are 5 sessions missing their own 09:30 bar and 9 the rule no longer selects on today's re-adjusted series (the Stage 5ZU back-adjustment finding) — neither is about truncation.",
+    "so": "the rule reads the prior RTH session and today's 09:30 OPEN and nothing else. The OPEN exists at 09:30:00; a CLOSED one-minute bar carrying it exists at 09:31:00.",
+    "slack": "29 minutes between the decision being computable and the 10:00 entry"
+  },
+  "answers": {
+    "1_which_contract_is_tradable_in_paper": {
+      "answer": "Option A, the 10:00 open",
+      "why": "the decision is fixed at 09:31 and the order is sent at 10:00:00 — a market order transacting AT the open rather than reading it. Option B is tradable too, but it is a different trade (see 4).",
+      "why_not_the_5ZU_reading": "a slot that decides at 10:01 and claims the 10:00 open is claiming a fill paper cannot achieve. 5ZU made Calm JUDGEABLE; it did not make it tradable."
+    },
+    "2_which_contract_matches_the_artifact": {
+      "answer": "Option A, exactly",
+      "evidence": "all 421 rows carry signal 09:30, entry 10:00, exit 15:55, and the signal-to-entry gap takes exactly one value: 30 minutes"
+    },
+    "3_scheduler_structure_for_10_00_without_future_data": {
+      "phase_1": "DECIDE — ~09:32 ET. Reads the prior session and the CLOSED 09:30 bar. Computes the setup, the direction, the qty and the planned stop. Writes an INTENDED order row to the journal. Reads nothing from after 09:30.",
+      "phase_2": "SEND — 10:00:00 ET. Paper only. Sends the journalled intent as a market order; the fill is whatever the broker gives and is measured against the 10:00 OPEN. Reads no bars at all: it acts on the journal.",
+      "phase_3": "OBSERVE — 10:01+ ET. Shadow and paper both. Reads the CLOSED one-minute 10:00 bar and records its OPEN as the reference. In shadow this is the end of the story; in paper it is the denominator for slippage.",
+      "the_machinery_already_exists": "Stage 5V's order journal already separates INTENDED from SUBMITTED and refuses a first record that is not INTENDED. This stage needed to invent nothing.",
+      "not_built_here": "the SEND phase. The constraints forbid wiring an order send, and the route still constructs NoOrderBroker unconditionally."
+    },
+    "4_how_much_calm_changes_if_the_entry_moves": {
+      "method": "416 comparable rows, one consistent read through the route's own loader; compared on DIFFERENCES because absolute levels drift with roll adjustment",
+      "10:00_the_record": {
+        "total": 14776,
+        "mean": 35.5,
+        "win_pct": 61.5
+      },
+      "10:01": {
+        "total": 13606,
+        "delta": -1170,
+        "delta_pct": -7.9,
+        "mean": 32.7,
+        "win_pct": 61.1,
+        "per_trade_stdev": 20.6,
+        "sign_flips": 18,
+        "sign_flip_pct": 4.3
+      },
+      "10:05": {
+        "total": 14726,
+        "delta": -51,
+        "delta_pct": -0.3,
+        "mean": 35.4,
+        "win_pct": 61.8,
+        "per_trade_stdev": 36.7,
+        "sign_flips": 29,
+        "sign_flip_pct": 7.0
+      },
+      "read_this_carefully": "the 10:05 TOTAL is almost unchanged and its per-trade spread is NEARLY DOUBLE. The aggregate hides the change rather than showing there is none — 29 trades in 416 flip sign. A number that looks like 'no difference' is the one to distrust.",
+      "conclusion": "moving the entry is a different strategy that happens to sum to a similar figure. It would need its own walk-forward, not a parameter edit. Since Option A is tradable, that cost buys nothing."
+    },
+    "5_what_shadow_logs_before_vs_after_entry": {
+      "before_entry": [
+        "setup",
+        "instrument",
+        "direction",
+        "qty",
+        "stop_rule",
+        "risk_inputs",
+        "entry_reference_time",
+        "intent"
+      ],
+      "after_the_reference_bar_closes": [
+        "entry_reference_price",
+        "planned_stop"
+      ],
+      "never_in_shadow": [
+        "fill_price",
+        "fill_time",
+        "realised_pnl",
+        "slippage"
+      ],
+      "why_planned_stop_moved": "Calm's stop is `entry - 1.5 x ATR`, so the stop LEVEL cannot exist before the 10:00 reference does. The first draft had it before entry, which would have shadow record a price it cannot compute — the same error as recording the reference price early.",
+      "the_sharper_distinction": "measured with two entries and one ATR, the stop DISTANCE is 1.5 x ATR either way (18.00 from 5000.00 and from 5123.75). So the distance is entry-independent, the dollar risk is too (distance x point_value x qty cancels the entry), and qty is a fixed sleeve constant. Only the stop LEVEL waits for 10:00.",
+      "why": "shadow sends nothing, so nothing filled. A shadow row carrying a fill is a claim paper cannot honour, and it would enter the evidence gate as though it had been achieved."
+    },
+    "6_earliest_time_the_setup_is_known": {
+      "information_exists": "09:30:00 — the RTH open price itself",
+      "readable_from_a_closed_bar": "09:31:00 — a one-minute bar stamped 09:30 closes then",
+      "for_both_MES_and_MNQ": "same, the rule is per instrument on the same clock",
+      "slack_to_the_entry": "29 minutes"
+    },
+    "7_evidence_the_setup_uses_no_1000_high_low_close": [
+      "`entry_conditions(prev_row, cur_rth_open, params)` takes two inputs and neither is today's entry bar — signature, asserted",
+      "the causal detector calls it exactly once, asserted by AST",
+      "the causal path never subscripts today's minute frame directly; every read goes through `_bar_open_at`, which takes an OPEN and only an OPEN (Stage 5ZU, asserted by AST)",
+      "407 of 421 setups reproduce from a frame truncated at 09:30 — the strongest of the four, because it removes the bars rather than asserting they are unread",
+      "Stage 5ZU: the gate's decision span ends at 09:55, so a partial 10:00 bar in the frame is outside everything the decision reads, proved by verdict equality"
+    ],
+    "8_broker_evidence_needed_later_to_validate_1000_execution": [
+      "the order's own timestamp at the broker, to show it was sent at 10:00:00 and not later",
+      "the fill price and time from reqExecutions, which survives the TWS daily restart",
+      "the 10:00 OPEN from the same bar source the reference uses, so the two are comparable",
+      "slippage = fill - reference, recorded per trade rather than averaged",
+      "a resting protective stop afterwards, confirmed by reqAllOpenOrders — Stage 5ZN's one remaining unverified claim"
+    ],
+    "9_how_PAPER_SHADOW_EVIDENCE_should_count_calm_before_real_fills": {
+      "answer": "count the DECISION, never the FILL, and say which is being counted",
+      "definition": "a Calm day counts as judgeable when: the slot decided causally from closed bars at or before 09:31; an INTENDED order was journalled before 10:00; and the 10:00 reference was observed afterwards. That certifies the route would have acted, and it certifies nothing about execution.",
+      "what_it_must_not_do": "count a shadow day as evidence that a 10:00 fill is achievable. That is a paper-only fact and the gate should say so rather than inheriting it.",
+      "consequence": "PAPER_SHADOW_EVIDENCE can reach its five clean days with Calm contributing, and the first paper day is still the first time execution is tested. Those are different claims and the gate should keep them apart."
+    }
+  },
+  "what_was_built": {
+    "CalmExecutionContract": "six instants declared and cross-checked in `global_index/track1_calm_a.py`: setup_known_from 09:31, intent_journalled_by 09:59, order_sent_at 10:00, entry_reference_time 10:00, entry_reference_readable_from 10:01, exit_reference_time 15:55. `self_check()` refuses a send instant that differs from the reference — the exact shape that lets shadow claim a fill paper cannot achieve.",
+    "SHADOW_MAY_RECORD": "three groups that do not overlap: before entry, after the reference bar closes, and never in shadow",
+    "PAPER_ONLY_EVIDENCE": "the four things shadow can never stand in for",
+    "not_built": [
+      "any order send",
+      "any IBKR wiring",
+      "any change to the entry price",
+      "any change to the 5ZU gate contract"
+    ]
+  },
+  "tests": {
+    "file": "scratch/test_track1_stage5zv_calm_execution_identity_20260826.py",
+    "count": 20,
+    "mutations": {
+      "attempted": 9,
+      "red": 9,
+      "one_was_still_green_first_time": "test_5's fixture used order_sent_at=09:59, which ALSO breaks the send-equals-reference rule — so self_check() stayed non-empty with the ordering check disabled entirely and the test passed for a rule it was not testing. Rewritten to trip exactly one rule and to assert the message, with `len(errs) == 1` so it cannot drift back."
+    }
+  },
+  "claims_deliberately_NOT_made": [
+    "that a 10:00 fill has been achieved or proven achievable",
+    "that Calm has passed a shadow day",
+    "that the send phase exists",
+    "that moving the entry to 10:05 is free because the total barely moved"
+  ],
+  "the_gate_state_changed_while_this_stage_ran": {
+    "was_when_the_stage_opened": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE",
+      "REGIME_LABEL_VERIFICATION"
+    ],
+    "is_now": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE"
+    ],
+    "what_moved": {
+      "REGIME_LABEL_VERIFICATION": "RELEASED — its first PASS. Two records today: 17:47 UTC (the 13:45 ET pre-flight) and 20:20 UTC (the 16:20 ET post-close refresh), both 'PASS (ok): 1761 label(s) compared through 2024-12-31, none changed'. Stage 5ZL built that gate; this is the first time it has said yes.",
+      "PAPER_SHADOW_EVIDENCE": "2 judgeable days -> 3 of the 5 required",
+      "legacy_broker_flat": "still PASS, and the record is newer than the one Stage 5ZQ wrote: 2026-08-26T15:34:28Z, which is 11:34 ET — the same minute the book repair was applied. Whoever ran the repair re-recorded B1 afterwards, which is what the 5ZS runbook asked for."
+    },
+    "so": "I reported three blockers repeatedly during this stage and that was true when measured. It is two now. B1 still blocks because no decision is recorded, which is correct."
+  },
+  "a_test_that_could_not_stay_green": {
+    "test": "test_ledger_matches_the_registry_exactly",
+    "why": "`as_ledger()` embeds LIVE measurement results, so a frozen file cannot stay equal to it. Regenerated at Stage 5ZR, it had drifted again within hours — the judgeable day count moved and the regime verification went from 'no record' to PASS. Neither is a registry change; both are the world moving.",
+    "fix": "the STATIC half is compared exactly — every id, status, evidence sentence, releasing flag and dependency — and the live half is checked for SHAPE: a blocker that declares a measurement must carry its result, one that declares none must not pretend to. That is what the exact comparison was really protecting, and it now survives without pinning a number that changes by itself.",
+    "also": "a second test was added for the shape half, and the ledger regenerated"
+  },
+  "two_other_failures_in_the_same_run": {
+    "test_orders_are_still_impossible (5ZN)": "a roster pin — pre-existing family, measured in the Stage 5ZQ bisect",
+    "test_the_preflight_record_still_holds_the_operator_restored_seven_days (5ZN)": "a TIME BOMB, and it went off correctly. It pinned the operator's restored seven days and that 2026-08-26 was ABSENT — the guard Stage 5ZM put up after the 5ZL incident, so no test of mine could fabricate today's clearance. The real 13:45 ET pre-flight has now run: 2026-08-26 is present and 2026-08-17 has rolled off the seven-day window. The guard did its job for four stages and has expired. It should assert the PROPERTY — that no day was added by anything but the real pre-flight — rather than a date list, and that is a repair for whoever next touches 5ZN rather than something to slip into a stage about execution identity."
+  }
+}

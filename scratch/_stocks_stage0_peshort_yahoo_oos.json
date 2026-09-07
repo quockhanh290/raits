@@ -1,0 +1,49 @@
+{
+  "calibration": {
+    "n_pairs": 1456,
+    "median_abs_diff": 0.000347,
+    "p90_abs_diff": 0.00141,
+    "n_below_threshold_polygon": 126,
+    "n_below_threshold_yahoo": 127,
+    "rel_count_diff": 0.0079,
+    "gate_median": 0.0015,
+    "gate_count": 0.15
+  },
+  "calibration_passed": true,
+  "in_sample": {
+    "n": 130,
+    "days": 122,
+    "win": 66.9,
+    "mean_r": 0.269,
+    "total_r": 35.0,
+    "mean_bps": 110.2,
+    "p": 0.0002,
+    "ci95": [
+      16.86,
+      53.32
+    ]
+  },
+  "oos": {
+    "n": 65,
+    "days": 58,
+    "win": 58.5,
+    "mean_r": 0.072,
+    "total_r": 4.7,
+    "mean_bps": 34.5,
+    "p": 0.2303,
+    "ci95": [
+      -7.76,
+      17.02
+    ]
+  },
+  "oos_by_year": {
+    "2023": {
+      "n": 27,
+      "mean_r": 0.031
+    },
+    "2024": {
+      "n": 38,
+      "mean_r": 0.102
+    }
+  }
+}

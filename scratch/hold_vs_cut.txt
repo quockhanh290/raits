@@ -1,0 +1,35 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  MES xong
+  MNQ xong
+  MYM xong
+  M2K xong
+
+================================================================================================
+NHOM C: TAI MOC VU TRANG DA O BEN KIA MUC STOP — CAT hay GIU?
+================================================================================================
+  642 lenh | 382 ngay
+  CAT ngay tai gia thi truong : $  -126,515
+  GIU tiep                    : $  -125,182
+  chenh (giu - cat)           : $    +1,332
+
+  ket cuc khi giu: {'quay ve cham stop': 422, 'chay toi tran 5 ngay': 220}
+  ty le quay ve cham stop: 65.7%
+
+=== THEO DO SAU TAI MOC VU TRANG (don vi ATR ngay) ===
+  do sau           n          CAT          GIU        chenh  % ve stop
+  <0.02           19         -723         -659          +64       100%
+  0.02-0.05       29       -1,207       -1,771         -564        90%
+  0.05-0.1        55       -4,606       -3,704         +902        89%
+  0.1-0.2        102       -9,823      -10,388         -564        85%
+  0.2-0.4        151      -21,653      -20,511       +1,143        77%
+  >0.4           286      -88,502      -88,150         +352        43%
+
+=== TRUNG BINH MOI LENH ===
+  <0.02        n=19   cat $     -38/lenh | giu $     -35/lenh
+  0.02-0.05    n=29   cat $     -42/lenh | giu $     -61/lenh
+  0.05-0.1     n=55   cat $     -84/lenh | giu $     -67/lenh
+  0.1-0.2      n=102  cat $     -96/lenh | giu $    -102/lenh
+  0.2-0.4      n=151  cat $    -143/lenh | giu $    -136/lenh
+  >0.4         n=286  cat $    -309/lenh | giu $    -308/lenh
+
+  LUU Y: phan thuc nay KHONG tinh chi phi chiem cho (giu lau hon chan lenh moi).

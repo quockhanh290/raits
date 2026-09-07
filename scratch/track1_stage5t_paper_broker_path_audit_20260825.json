@@ -1,0 +1,178 @@
+{
+  "stage": "5T",
+  "title": "Paper broker path design/audit — no orders",
+  "generated_et": "2026-08-25T00:35:00-04:00",
+  "verdict": "PAPER_BROKER_PATH_NOT_IMPLEMENTED_DESIGN_READY",
+  "verdict_note": "the boundary is specified, the one piece buildable without a broker is built and tested, and the test plan is written. NOT ready_for_implementation because two ordering questions are open — see open_questions",
+
+  "safety": {
+    "windows_open_during_stage": [],
+    "scheduler_or_backend_restarted": false,
+    "ibkr_connection": false,
+    "orders_sent": 0,
+    "confirmation_file_created": false,
+    "track1_orders_approved_set": false,
+    "allow_orders_added_anywhere": false,
+    "parquet_csv_or_runtime_written": false,
+    "new_module_wired_into_production": false
+  },
+
+  "q1_current_allow_orders_behaviour": {
+    "cli_flag_exists_on": "global_index/run_live_day_track1.py",
+    "gate": "OrderGate(a.allow_orders); if requested and not allowed -> prints REFUSED, lists open blockers, returns 2",
+    "live_shadow_path": {
+      "is_the_scheduler_path": true,
+      "gate_threaded": false,
+      "observe_live_slot_has_order_gate_param": false,
+      "observe_live_slot_references_OrderGate": false,
+      "send_order_calls_line": "printed as a LITERAL 'send_order calls: 0'",
+      "conclusion": "--allow-orders cannot reach the slot path even if every gate were released"
+    },
+    "replay_path": {
+      "gate_passed_to": "run_shadow(order_gate=gate)",
+      "effect": "resolve_decision_mode records 'armed' instead of 'shadow_live'; freshness BINDS",
+      "broker": "NoOrderBroker() — unconditional"
+    },
+    "ibkr_broker_constructed_in_runner": false,
+    "order_primitives_present_in_runner": [],
+    "where_ibkr_broker_would_need_constructing": "in the slot path beside the bar provider, only when the gate is armed — NOT inside run_shadow, which is the replay harness",
+    "where_orders_would_be_translated": "between 'the book admitted it' and 'the ledger row is written', from Decision objects with verdict TAKE"
+  },
+
+  "q2_must_be_identical": [
+    {"what": "live frame + splice guard", "where": "track1_live_source.live_frame", "why": "the bars a decision was made on"},
+    {"what": "history symbol per instrument", "where": "track1_live_source.history_symbol", "why": "MNKD reads NKD; an order symbol must never reach the bar path"},
+    {"what": "freshness gate", "where": "track1_freshness.evaluate", "why": "a stale input is a refusal in both modes"},
+    {"what": "sleeve rules", "where": "track1_normal_r4 / track1_calm_a / track1_stress_mnq", "why": "reproduced exactly against the committed artifacts"},
+    {"what": "sizing basis", "where": "track1_params.risk_dollars", "why": "the cap gate must read the number the measured book was admitted under"},
+    {"what": "admission + caps", "where": "track1_signal_layer.Track1Book", "why": "including risk-high-first ordering inside an instant"},
+    {"what": "explanations", "where": "track1_explain", "why": "a decision without an explanation is not auditable in either mode"},
+    {"what": "checkpoint + params hash", "where": "track1_params.sleeve_identity", "why": "a paper book resumed under a different identity is a different strategy"}
+  ],
+
+  "q3_may_differ": [
+    {"what": "the broker object", "detail": "NoOrderBroker -> an adapter over IBKRBroker"},
+    {"what": "send / cancel / close-then-open", "detail": "track1_switch.close_then_open already has the shape"},
+    {"what": "fill and reconcile results", "detail": "Fill.status, filled_qty, avg_price, commission"},
+    {"what": "the book after CONFIRMED fills", "detail": "live_positions.track1.json — never the legacy file"}
+  ],
+
+  "q4_objects_needed": {
+    "built_this_stage": {
+      "module": "global_index/track1_paper_order.py",
+      "pure_no_broker": true,
+      "wired_into_production": false,
+      "api": ["candidate_to_order(candidate, *, ref_day, action='OPEN') -> broker.Order",
+              "assert_admitted(decision)",
+              "Track1OrderExecutor (Protocol — nothing implements it)",
+              "UnbuiltPaperExecutor (every method refuses by name)",
+              "MUST_BE_IDENTICAL / MAY_DIFFER as walkable data"],
+      "refusal_codes": {
+        "order_identity_drift": "the params identity and the broker map disagree about what this trades",
+        "candidate_not_admitted": "orders only from Decision.verdict == TAKE",
+        "order_quantity_invalid": "quantity is the candidate's, never the instrument's",
+        "order_ref_day_missing": "required and deliberately not derived from an aware Tokyo entry stamp"
+      }
+    },
+    "still_to_build": "an adapter implementing Track1OrderExecutor over IBKRBroker",
+    "mnkd_split_is_free": {
+      "order": "Order.inst carries the RUNNER name; IBKRBroker.send_order resolves it through _front_month_contract -> _RAITS_TO_IBKR, so MNKD reaches MNK without the order layer naming MNK",
+      "bars": "history_symbol('MNKD') = 'NKD' via IBKRBarProvider",
+      "verified": "Order(inst='MNKD') routes to MNK while the bar provider fetches NKD"
+    },
+    "the_trap_to_write_down": "IBKRBroker.fetch_bars resolves through the ORDER map. Handing one IBKRBroker to both the executor and a bar reader brings Stage 5Q-7 straight back. The executor must be the only consumer of that object for orders; bars keep coming through IBKRBarProvider",
+    "no_order_broker_stays": "shadow keeps it and its send_order must keep raising"
+  },
+
+  "q5_gates_that_must_hold": [
+    {"gate": "PAPER_SHADOW_EVIDENCE", "kind": "measured — cannot be signed, only earned", "state": "holding (1 judgeable day, 5 needed)"},
+    {"gate": "B1_broker_account_or_legacy_retirement", "kind": "operator decision on disk", "state": "holding"},
+    {"gate": "TRACK1_ORDERS_APPROVED=1", "kind": "environment, out of band", "state": "unset"},
+    {"gate": "--allow-orders", "kind": "argv, per invocation", "state": "never passed by the scheduler or ops"},
+    {"gate": "broker-flat / orphan-STP", "kind": "NOT a machine gate", "state": "a decision still to be made",
+     "recommendation": "if a paper run should refuse to start against a broker whose positions disagree with live_positions.track1.json, this is the fifth gate to add — and the one to add first"}
+  ],
+
+  "q6_runbook_sequence": [
+    {"n": 1, "kind": "command", "what": "python -m global_index.track1_paper_readiness — every check PASS"},
+    {"n": 2, "kind": "command", "what": "record the B1 choice in track1_go_live_confirmation.json"},
+    {"n": 3, "kind": "WORK", "what": "build the executor"},
+    {"n": 4, "kind": "WORK", "what": "prove it — the seven failure-branch tests"},
+    {"n": 5, "kind": "WORK", "what": "decide the broker-flat / orphan-STP question"},
+    {"n": 6, "kind": "command", "what": "python monitor\\ops.py status -> orders_possible=True, track1_blocking=[]"},
+    {"n": 7, "kind": "command", "what": "per invocation, never from the scheduler: TRACK1_ORDERS_APPROVED=1 and --allow-orders"}
+  ],
+
+  "q7_test_plan": {
+    "written_and_passing": {
+      "file": "scratch/test_track1_stage5t_paper_broker_path_20260825.py",
+      "count": 20,
+      "covers": [
+        "NoOrderBroker still raises and run_shadow still builds it",
+        "IBKRBroker never constructed in the runner",
+        "the scheduler slot path takes no order gate at all",
+        "no placeOrder/MarketOrder/LimitOrder anywhere in the runner",
+        "the executor protocol has no implementation",
+        "the design module cannot reach a broker (AST over imports and calls)",
+        "MNKD orders MNK while its bars come from NKD",
+        "the order never carries the history symbol",
+        "quantity from the candidate, not the instrument (MNQ 1 vs 7)",
+        "non-positive quantity refused, not rounded",
+        "ref_day required, never guessed from a Tokyo stamp",
+        "identity drift refused — the 2026-08-14 defect re-injected",
+        "orders only from TAKE",
+        "the invariant list names everything and every module in it exists",
+        "sizing basis is the measured book's",
+        "all four gates hold and the evidence gate cannot be signed",
+        "no scheduler/ops path requests orders"
+      ]
+    },
+    "required_before_enabling": [
+      "partial fill — PARTIAL on an entry must not book a full position; on a close it leaves the remainder flagged, never silently",
+      "failed fill — FAILED/CANCELLED on an entry frees the cap and records a divergence; on an exit it sets a retry, three consecutive failures escalate",
+      "disconnect mid-order — the book ends in a state the next process can reconcile and the ledger row says the slot could not complete",
+      "close-then-open — the three branches track1_switch already specifies, including open-fails-after-close-filled leaving the account FLAT and the book recording it",
+      "no duplicate same-symbol order — the executor must never see a second order for a symbol it holds",
+      "no order when the upstream refused — explanation missing, freshness stale, admission rejected, each asserted independently",
+      "an armed run and a shadow run over the same window produce the SAME DECISIONS — the strongest available test that the seam is only at the broker"
+    ]
+  },
+
+  "q8_legacy_reuse": {
+    "close_then_open_shape": {"reusable": "already done",
+      "detail": "track1_switch.close_then_open is Track 1's own extraction; its docstring records that Stage 2D examined reusing _handle_rollover directly and said no — it is gated on a roll date and assumes same symbol, direction, quantity and a different month"},
+    "order_placement": {"reusable": true,
+      "detail": "IBKRBroker.send_order / place_stop / cancel_order are broker-level and instrument-agnostic, and send_order already resolves the tradable symbol correctly"},
+    "reconciliation": {"reusable": false,
+      "detail": "runner.py's reconcile is written against live_positions.json — the first entry in run_live_day_track1.LEGACY_PATHS, the list this route must never write. Reusing it reintroduces the legacy state assumptions the route exists to leave behind"},
+    "stop_state": {"reusable": false, "detail": "same reason — the legacy stop bookkeeping lives in the legacy position file"}
+  },
+
+  "open_questions": [
+    {"id": "ordering_of_row_and_order",
+     "what": "observe_live_slot writes the slot's row and returns. An order sent BEFORE the row leaves a position nobody recorded on a crash; AFTER leaves a row claiming a decision never placed",
+     "implication": "legacy and track1_switch both emit before acting, which implies the row comes first and must distinguish INTENDED from FILLED. The ledger schema has no such field today"},
+    {"id": "reconcile_on_startup",
+     "what": "nothing reads live_positions.track1.json back and compares it with the broker before the first slot of a session",
+     "implication": "a paper run restarted mid-session cannot know what it holds — the failure mode B1 exists to talk about, arriving from inside the route rather than from legacy"}
+  ],
+
+  "files": {
+    "production_new": ["global_index/track1_paper_order.py"],
+    "production_modified": [],
+    "wired_into_scheduler_or_runner": false,
+    "tests_new": ["scratch/test_track1_stage5t_paper_broker_path_20260825.py"],
+    "deliverables": ["scratch/track1_stage5t_paper_broker_path_audit_20260825.md",
+                     "scratch/track1_stage5t_paper_broker_path_audit_20260825.json"]
+  },
+
+  "regression": {"result": "218 passed, 1 skipped", "suites": 7},
+
+  "direct_answers": {
+    "current_behaviour_of_allow_orders": "refused unless every gate is open; if open, the scheduler's slot path ignores it entirely and the replay path records 'armed' while still holding NoOrderBroker",
+    "exact_missing_code": "an implementation of Track1OrderExecutor over IBKRBroker, its construction in the slot path under the gate, the mapping call site between admission and the ledger row, and reconciliation against live_positions.track1.json",
+    "what_must_be_built_before_paper": "that executor, the seven failure-branch tests, and a decision on the two ordering questions",
+    "what_must_never_change_from_shadow": "the eight items in MUST_BE_IDENTICAL",
+    "accidental_order_path_today": "none — four gates, a broker that raises, a slot path that cannot see the gate, and no order-placing call anywhere in the route"
+  }
+}

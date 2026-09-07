@@ -1,0 +1,40 @@
+{
+ "object": "RegimeLabels(lag_days=1)",
+ "window": "floor 2018-2024, hmm_fit_end 2022-12-31",
+ "label_change_sessions": 147,
+ "returned_previous_session_label": 147,
+ "mismatches": [],
+ "sample": [
+  {
+   "day": "2018-02-02",
+   "same_day_label": "Normal",
+   "previous_session_label": "Calm",
+   "object_returned": "Calm"
+  },
+  {
+   "day": "2018-02-06",
+   "same_day_label": "Stress",
+   "previous_session_label": "Normal",
+   "object_returned": "Normal"
+  },
+  {
+   "day": "2018-02-16",
+   "same_day_label": "Normal",
+   "previous_session_label": "Stress",
+   "object_returned": "Stress"
+  },
+  {
+   "day": "2018-03-08",
+   "same_day_label": "Calm",
+   "previous_session_label": "Normal",
+   "object_returned": "Normal"
+  },
+  {
+   "day": "2018-03-09",
+   "same_day_label": "Normal",
+   "previous_session_label": "Calm",
+   "object_returned": "Calm"
+  }
+ ],
+ "verdict": "causal D-1 confirmed on every disagreeing session"
+}

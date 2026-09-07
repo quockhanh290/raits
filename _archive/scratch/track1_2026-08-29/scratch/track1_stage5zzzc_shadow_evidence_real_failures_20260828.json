@@ -1,0 +1,161 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZZ-C",
+  "title": "Re-evaluate real shadow evidence failures after the confirmation audit fix",
+  "route": "track1_candidate",
+  "date": "2026-08-28",
+  "orders_enabled": false,
+
+  "answers": {
+    "20260827_still_counts_as_a_failed_evidence_day": true,
+    "exactly_why": "roska4_calm and roska4_stress genuinely failed on data refusals - nothing to do with the confirmation file",
+    "paper_shadow_evidence_moved": false,
+    "orders_possible": false,
+    "runtime_audit_or_trading_files_written": false
+  },
+
+  "day_20260827": {
+    "roska4_calm": {
+      "stored": {"verdict": "FAIL", "reasons": ["confirmation_file_present"]},
+      "solely_stale": true,
+      "reevaluated": {"verdict": "FAIL", "authoritative": true,
+                       "reasons": ["coverage_incomplete", "slot_could_not_evaluate",
+                                   "no_candidates_to_explain"]},
+      "real_cause": "observed 0 of 1 decided; both phases gate_refused - TRACK1_CALM_DECIDE_0932 (missing_session, entry_quote_absent, stale, partial_coverage) and TRACK1_CALM_OBSERVE_1002 (missing_session, stale, partial_coverage)",
+      "classification": "REAL - data/provider failure"
+    },
+    "roska4_stress": {
+      "stored": {"verdict": "FAIL", "reasons": ["confirmation_file_present"]},
+      "solely_stale": true,
+      "reevaluated": {"verdict": "FAIL", "authoritative": true,
+                       "reasons": ["coverage_incomplete", "slot_could_not_evaluate"]},
+      "real_cause": "observed 18 of 24; the six slots from 10:35 to 11:00 gate_refused (missing_session, stale)",
+      "classification": "REAL - data/provider failure at the window open"
+    },
+    "global_nkd": {
+      "stored_rows": [
+        {"verdict": "PASS", "reasons": ["all_slots_observed_no_action"], "when": "window closed"},
+        {"verdict": "FAIL", "reasons": ["confirmation_file_present", "window_closed_before_scheduler_start"], "when": "daily sweep"}
+      ],
+      "solely_stale": false,
+      "standing_reasons": ["window_closed_before_scheduler_start"],
+      "standing_reason_meaning": "a not-judgeable note, not a fault",
+      "reevaluated": {"verdict": "FAIL", "authoritative": false,
+                       "artefact_reasons": ["checkpoint_wrong_day"]},
+      "classification": "PASSED ON THE DAY - the later sweep overwrote it and its only failing reason was the removed rule"
+    },
+    "roska4_swing": {
+      "stored": {"verdict": "FAIL", "reasons": ["confirmation_file_present"]},
+      "solely_stale": true,
+      "reevaluated": {"verdict": "FAIL", "authoritative": false,
+                       "artefact_reasons": ["checkpoint_wrong_day"]},
+      "classification": "NOT RE-JUDGEABLE - no same-day clean row and the checkpoint cannot be reconstructed"
+    }
+  },
+
+  "checkpoint_wrong_day_explained": {
+    "is_a_finding_about_the_day": false,
+    "mechanism": "the checkpoint check compares the day under judgment against live_positions.track1.json, a SINGLE LIVE FILE overwritten on every run",
+    "measured": {"cut_instant": "2026-08-28T10:02:01-04:00", "file_mtime": "08:02 today",
+                 "dated_history_anywhere_in_tree": "none"},
+    "consequence": "re-judging ANY past day reports checkpoint_wrong_day, every time, forever",
+    "pinned_by": "test_the_checkpoint_book_is_a_single_live_file_with_no_history"
+  },
+
+  "read_time_classification": {
+    "module": "global_index/track1_audit_reinterpretation.py",
+    "writes_anything": false,
+    "reports_per_sleeve": ["stored (the record, verbatim)",
+                            "classification (which reasons came from a removed rule, and whether the row was failed SOLELY by those)",
+                            "reevaluated (what the current code says, WITH whether it is entitled to say it)"],
+    "stale_registry_is_verified_against_the_code": true,
+    "verification_test": "test_every_stale_reason_is_really_gone_from_the_code",
+    "loose_end_that_check_found": {
+      "what": "reasons.append(R_CONFIRMATION_FILE) was still present in the acceptance module after Stage 5ZZZ-A",
+      "reachable": false,
+      "why_it_mattered": "unreachable only because no check emitted the string it matched on - a thin thing to rest on, and it made the reason look live to anything reading the file to learn which reasons the code can produce",
+      "action": "removed"
+    },
+    "not_wired_into_the_gate": {
+      "import_path": "track1_gates.shadow_evidence -> track1_paper_readiness.gate_measurement -> readiness",
+      "module_on_that_path": false,
+      "asserted_by": "test_the_order_gate_does_not_read_this_module",
+      "reasoning": "turning a stored failure into a pass moves the only gate still holding this route; that has to be an operator's decision with the reasoning in front of them, not a side effect of a reader",
+      "and_on_this_day": "it would change nothing anyway - two sleeves failed for real, so 2026-08-27 is a failing day under any honest reading"
+    }
+  },
+
+  "no_corrected_rows_written": {
+    "allowed_if_proven_required_and_safe": true,
+    "proven": false,
+    "reasons": [
+      "the rows are append-only JSONL carrying provenance (audit_trigger, audit_pid, ts); a hand-written row would carry my pid and a trigger no other row means",
+      "2026-08-27 fails on merit, so a corrected row states the same verdict",
+      "2026-08-28's rows will be rewritten by the scheduled audits from the fixed code"
+    ],
+    "verified": "audit directory digests identical before and after; a test recomputes them around a reinterpretation call"
+  },
+
+  "paper_shadow_evidence": {
+    "before": false,
+    "after": false,
+    "moved": false,
+    "failing_checks": [
+      {"name": "judgeable_days", "detail": "4 judgeable day(s) on record, 5 required",
+       "nature": "time, not a defect"},
+      {"name": "no_failing_days", "detail": "4 FAIL day(s) in the qualifying window, at most 0 allowed",
+       "nature": "real - 08-24 and 08-25 coverage and schema failures, 08-26 Calm coverage, 08-27 the Calm and Stress data refusals"},
+      {"name": "calm_decision_evidence", "detail": "missing or incomplete for 2026-08-24 and 2026-08-25 (pre_shadow_intent_schema)",
+       "nature": "real"},
+      {"name": "every_sleeve_passed_at_least_once", "detail": "never PASSED inside the window: ['roska4_calm', 'global_nkd']",
+       "nature": "the one place the stale rule still costs something - global_nkd DID pass on 08-27 in a row a since-removed rule overwrote"}
+    ],
+    "passing_checks": ["audit_records_readable", "warn_days_within_allowance",
+                        "evidence_is_recent", "paper_account_baseline"]
+  },
+
+  "results": {
+    "new_suite": {"file": "scratch/test_track1_stage5zzzc_shadow_evidence_real_failures_20260828.py", "passed": 21},
+    "adjacent_suites": {"passed": 408, "failed": 1},
+    "adjacent_failure": {"test": "test_the_job_inventory_did_not_move", "pre_existing": true},
+    "mutations": {"file": "scratch/track1_stage5zzzc_mutations_20260828.py", "attempted": 10, "caught": 10},
+    "mutation_design": "most WIDEN the classifier - register a live reason as stale, dismiss a re-evaluation entitled to speak, wire it into the gate, let it write. Two narrow it, since a classifier that dismisses nothing would satisfy every safety test and be useless.",
+    "honest_greens_before_retargeting": [
+      {"mutation": "M6", "why": "wrote `{} or {...}`, which Python evaluates to the non-empty dict - a no-op"},
+      {"mutation": "M10", "why": "substituted the re-evaluated verdict into the stored field, invisible because every sleeve is FAIL both ways on this day",
+       "response": "a synthetic record that makes the two disagree by construction"}
+    ]
+  },
+
+  "safety_after": {
+    "orders_possible": false,
+    "blocking": ["PAPER_SHADOW_EVIDENCE"],
+    "scheduler_pid": 3000,
+    "scheduler_restarted": false,
+    "broker_connected": false,
+    "audit_file_digests_changed": false,
+    "confirmation_file": "intact and signed - not modified",
+    "orders_dir_exists": false,
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "strategy_gates_order_send": "untouched",
+    "production_files_changed": ["global_index/track1_audit_reinterpretation.py (new, read-only)",
+                                  "global_index/track1_shadow_acceptance.py (one unreachable branch removed)"]
+  },
+
+  "still_open": [
+    "the Calm and Stress data refusals of 2026-08-27 - missing_session, stale, partial_coverage, entry_quote_absent. This stage identified them; nobody has yet asked why the provider had no session at 09:32 and at 10:35.",
+    "global_nkd's overwritten PASS - whether the readiness reader should keep the last row or the best row is a real design question, and changing it moves a gate, so it belongs to an operator",
+    "the audit's Calm window still reads ['10:00','10:00'] and expects 1 slot where two phases now run"
+  ],
+
+  "files_touched": [
+    "global_index/track1_audit_reinterpretation.py",
+    "global_index/track1_shadow_acceptance.py",
+    "scratch/test_track1_stage5zzzc_shadow_evidence_real_failures_20260828.py",
+    "scratch/track1_stage5zzzc_mutations_20260828.py",
+    "scratch/track1_stage5zzzc_shadow_evidence_real_failures_20260828.md",
+    "scratch/track1_stage5zzzc_shadow_evidence_real_failures_20260828.json",
+    "docs/futures/TRACK1_RUNTIME_PIPELINE_2026-08-24.md",
+    "TASK.md"
+  ]
+}

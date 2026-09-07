@@ -1,0 +1,52 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  MES xong
+  MNQ xong
+  MYM xong
+  M2K xong
+
+============================================================================================
+NHAN = GIU (huy stop, toi tran 5 ngay) HON CAT ngay
+============================================================================================
+  642 lenh | 382 ngay | ty le nen 'nen giu' = 47.0%
+
+=== 1. HUONG ===
+  nhom                    n   % nen giu  chenh tb/lenh
+  LONG                  352       49.1%           -38
+  SHORT                 290       44.5%             4
+
+=== 2. REGIME ===
+  nhom                    n   % nen giu  chenh tb/lenh
+  Normal                464       48.1%           -28
+  Stress                178       44.4%             4
+
+=== 3. GIA SO VOI MA50 NGAY ===
+  nhom                    n   % nen giu  chenh tb/lenh
+  tren MA50             290       47.2%            -6
+  duoi MA50             352       46.9%           -30
+
+=== 4. LO CHUA THUC HIEN (ATR ngay) ===
+  nhom                    n   % nen giu  chenh tb/lenh
+  nho                   212       44.8%           -59
+  vua                   212       53.3%            29
+  lon                   218       43.1%           -28
+
+=== 5. BIEN DONG ===
+  nhom                    n   % nen giu  chenh tb/lenh
+  thap                  321       43.9%           -53
+  cao                   321       50.2%            14
+
+============================================================================================
+PHIEU QUYET DINH — bootstrap THEO NGAY, nguong >=10 diem pt
+============================================================================================
+  LONG vs SHORT              +4.6 diem pt | KTC [  -5.5, +15.0] | khong dat
+  tren MA50 vs duoi          +0.4 diem pt | KTC [  -9.2,  +9.9] | khong dat
+  lo lon vs lo nho           -1.7 diem pt | KTC [ -12.6,  +9.3] | khong dat
+  bien dong cao vs thap      +6.3 diem pt | KTC [  -2.6, +15.4] | khong dat
+  Stress vs Normal           -3.8 diem pt | KTC [ -15.8,  +8.4] | khong dat
+
+=== CUA THU HAI: hieu ung co giu dau o CA HAI NUA thoi gian khong ===
+  LONG vs SHORT            nua dau +14.0 diem pt | nua sau  -4.2 | DOI DAU
+  tren MA50 vs duoi        nua dau  +4.0 diem pt | nua sau  -3.4 | DOI DAU
+  lo lon vs lo nho         nua dau  -6.3 diem pt | nua sau  +5.3 | DOI DAU
+  bien dong cao vs thap    nua dau  +1.1 diem pt | nua sau +11.6 | cung dau
+  Stress vs Normal         nua dau  -4.4 diem pt | nua sau  -5.5 | cung dau

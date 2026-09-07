@@ -1,0 +1,249 @@
+{
+  "stage": "5R-0",
+  "title": "Close B-5R-H \u2014 never persist an in-progress final minute",
+  "generated_et": "2026-08-24T23:10:00-04:00",
+  "verdict": "READY_FOR_TRACK1_SHADOW_RESTART_WITH_IDENTITY_MATCHED",
+  "direct_answers": {
+    "b_5r_h_closed": "yes, going forward \u2014 the updater no longer stores an open final minute. The three partial bars already in the files from 2026-08-24 are NOT fixed by this and still need --repair-boundary once",
+    "identity_5q9_unchanged": "yes \u2014 all four sleeve hashes pinned by test and unchanged",
+    "real_data_file_changed": "no \u2014 byte-identical, asserted at the end of the suite",
+    "scheduler_or_backend_touched": "no \u2014 pids 28696 / 11720 unchanged since 09:25 ET",
+    "orders_impossible_and_b1_blocking": "yes \u2014 orders_possible=False, track1_blocking=['B1_broker_account_or_legacy_retirement']",
+    "next_operator_command": "python monitor\\ops.py restart --scheduler --track1-only-shadow, then restart --no-scheduler --track1-only-shadow (both still outstanding from Stage 5Q-7)"
+  },
+  "read_list_correction": {
+    "requested": "scratch/track1_stage5q7_mnkd_identity_boundary_20260824.md",
+    "exists": false,
+    "actual": "scratch/track1_stage5q7_apply_boundary_restart_mnkd_identity_20260824.md"
+  },
+  "safety": {
+    "scheduler_pids": [
+      28696
+    ],
+    "backend_pids": [
+      11720
+    ],
+    "ibkr_connection": false,
+    "parquet_csv_sidecar_or_runtime_evidence_written": false,
+    "orders_enabled": false,
+    "confirmation_file_created": false,
+    "track1_orders_approved_env_set": false,
+    "b1_still_blocking": true,
+    "overlap_guard_weakened": false,
+    "strategy_rules_changed": false,
+    "identity_changed": false,
+    "sizing_basis_changed": false,
+    "cap_logic_changed": false,
+    "order_gate_changed": false
+  },
+  "the_defect": {
+    "what": "--repair-boundary repairs the partial bar the PREVIOUS run left behind; it cannot help the one the CURRENT run creates. The fetch asks for 'now', IBKR answers with the minute in progress, and the append stores that snapshot as a finished bar.",
+    "evidence": "Stage 5Q-7, 2026-08-24: the approved repair fixed the 13:45 bars in MNQ/MYM/M2K and the same run left new partial bars at 20:20 and 20:21; the re-probe returned repairable_dry_run instead of nothing_to_repair",
+    "conclusion": "repairing moves the defect one minute later; only refusing to store it removes it"
+  },
+  "the_fix": {
+    "function": "update_ibkr_daily.drop_open_final_bar(fetched, *, observed_utc) -> (bars, dropped_ts_or_None, reason)",
+    "rule": "a bar stamped T covers [T, T+1min), so it is complete exactly when the observation instant has reached T + BAR_SECONDS (60)",
+    "no_threshold_to_tune": true,
+    "prices_inspected": false,
+    "only_the_final_bar_is_a_candidate": true,
+    "clock": {
+      "stamped": "BEFORE ib.reqHistoricalData is issued",
+      "why": "the snapshot IBKR answers with is at or after the moment we asked; stamping afterwards would let a minute that closed during the round trip look complete while the row held for it is still the partial one",
+      "cost": "at most one just-closed minute deferred to the next run, which appends it as an ordinary new bar",
+      "pinned_by": "an AST test requiring the stamp to precede the request"
+    },
+    "signature_change": {
+      "_fetch_contfuture": "now returns (bars, contract, requested_at)",
+      "other_caller_updated": "global_index/fix_offset_step.py \u2014 measures an offset over ten days and never appends, so it ignores the instant by name"
+    },
+    "operator_visibility": [
+      "per-instrument log line: 'final-bar check \u2014 kept: \u2026' or '\u2026 dropped: T is still open at OBS (complete at T+1min)'",
+      "end-of-run block: 'IN-PROGRESS FINAL MINUTES NOT STORED (Stage 5R-0, intentional)'"
+    ]
+  },
+  "tests": {
+    "file": "scratch/test_track1_stage5r0_boundary_tail_20260824.py",
+    "result": "21 passed",
+    "method": "tests 1/2/4/5 drive the pure function; tests 3/8 and the convention checks drive the REAL main() end to end against a stubbed ib_insync and tmp_path parquets \u2014 the whole append path including the clock stamp, splice, join-jump guard, history invariant and convention assertion",
+    "required_coverage": {
+      "1_fetch_inside_final_minute_drops_it": "test_1_\u2026 plus test_2b pinning T+60s complete and T+59s not",
+      "2_fetch_after_final_minute_keeps_it": "test_2_\u2026 and again through the real append",
+      "3_repair_previous_and_append_only_closed": "test_3_\u2026 \u2014 stored history ends on a partial 17:45, the run repairs it and stops at 17:49 with 17:50 absent",
+      "4_no_closed_bar_dropped": "test_4_\u2026 at four observation offsets; exactly one bar goes in the drop case",
+      "5_tz_naive_stays_tz_naive": "test_5_ (function), test_5c_ (written file), test_5b_ (aware observation converted, not assumed)",
+      "6_missing_frozen_column_refuses_extras_unchanged": "test_6_ and test_6b_ (average/barcount still projected away)",
+      "7_nkd_identity_correct": "test_7_ (bars NKD, orders MNK, pv 0.50) and test_7b_ (all four 5Q-9 hashes pinned)",
+      "8_no_fresh_partial_tail_after_a_repair_run": "test_8_ \u2014 every shared bar must match the feed to 1e-9",
+      "9_no_real_file_changes": "test_9_ fingerprints at import and compares; plus no confirmation file, no order env, and no order path anywhere in the updater"
+    }
+  },
+  "mutations": {
+    "total": 8,
+    "red": 8,
+    "still_green": 0,
+    "detail": [
+      {
+        "id": "M1",
+        "mutation": "drop_open_final_bar -> identity",
+        "test": "the pure rule"
+      },
+      {
+        "id": "M1b",
+        "mutation": "drop_open_final_bar -> identity",
+        "test": "the real append"
+      },
+      {
+        "id": "M2",
+        "mutation": "always drop the tail",
+        "test": "the append keeps a closed bar"
+      },
+      {
+        "id": "M2b",
+        "mutation": "always drop the tail",
+        "test": "the rule's own contract"
+      },
+      {
+        "id": "M3",
+        "mutation": "boundary_replacement -> skipped",
+        "test": "the previous partial bar survives"
+      },
+      {
+        "id": "M4",
+        "mutation": "to_parquet localises the index",
+        "test": "the convention check (the 5Q-6 near miss)"
+      },
+      {
+        "id": "M5",
+        "mutation": "_refuse_overlap_disagreement -> no-op",
+        "test": "a behavioural refusal test added for this"
+      },
+      {
+        "id": "M6",
+        "mutation": "requested_at stamped after the request",
+        "test": "the AST order check"
+      }
+    ],
+    "note": "M5 needed a NEW behavioural test \u2014 the existing guard check parses the source, so monkeypatching it could never turn that red. A mutation with no test to fail proves nothing."
+  },
+  "fixture_bugs_caught_by_real_guards": [
+    {
+      "what": "the fake reqHistoricalData returned a DataFrame; ib_insync returns a list of BarData and _fetch_contfuture does `if not bars:`, which raises 'truth value is ambiguous' on a frame",
+      "lesson": "a fake that returns the wrong shape tests a code path production never takes"
+    },
+    {
+      "what": "synthetic bars ramping 1 point/minute from base 100 are a 0.365% step at a price of 205, tripping the real JOIN_JUMP_MAX_PCT guard at 0.35%",
+      "fix": "base raised to 5000",
+      "lesson": "synthetic data has to sit in the range the production thresholds were measured for, or the test measures the fixture"
+    }
+  ],
+  "regression": {
+    "suites": 15,
+    "list": [
+      "5R-0",
+      "5Q-9",
+      "5Q-8",
+      "5Q-7",
+      "5Q-5",
+      "5Q-4",
+      "5Q-3",
+      "4C",
+      "4B",
+      "5E",
+      "5F",
+      "5L",
+      "route_checkpoint_stage1",
+      "stage2_equivalence",
+      "5N"
+    ],
+    "result": "492 passed, 1 skipped",
+    "not_run": {
+      "test_event_playback.py": "known to hang",
+      "freshness_and_audit_suites": "nothing they read was touched \u2014 run_scheduler.py, track1_freshness.py, track1_shadow_acceptance.py and track1_shadow_audit.py are all unchanged in this stage"
+    }
+  },
+  "live_status": {
+    "5r0_no_open_final_minute_stored": {
+      "live": true,
+      "why": "the pre-flight runs the updater as a fresh subprocess \u2014 _run([sys.executable, '-m', 'global_index.update_ibkr_daily', ...]) via subprocess.run \u2014 so it imports the corrected source on every invocation",
+      "first_effect": "tomorrow's 13:45 pre-flight, with no restart"
+    },
+    "repair_boundary_in_preflight_argv": {
+      "live": false,
+      "needs": "the scheduler restart"
+    },
+    "spy_refresh_pm": {
+      "live": false,
+      "needs": "the same restart"
+    }
+  },
+  "existing_partial_bars_not_fixed_by_this_stage": {
+    "files": [
+      {
+        "file": "NQ_continuous_1m_8y.parquet",
+        "last_bar": "2026-08-25 00:20:00",
+        "partial": true
+      },
+      {
+        "file": "YM_continuous_1m_8y.parquet",
+        "last_bar": "2026-08-25 00:21:00",
+        "partial": true
+      },
+      {
+        "file": "RTY_continuous_1m_8y.parquet",
+        "last_bar": "2026-08-25 00:21:00",
+        "partial": true
+      }
+    ],
+    "clean": [
+      "ES_continuous_1m_8y.parquet",
+      "NKD_continuous_1m_8y.parquet"
+    ],
+    "consequences": [
+      "tomorrow morning's Calm and Stress windows will still refuse on those bars \u2014 one per basket instrument, exactly as Stage 5Q-7 predicted. MES and NKD are clean.",
+      "--repair-boundary is still needed once to clear them; after that it becomes a no-op in normal operation, which is the right end state"
+    ]
+  },
+  "files": {
+    "production": [
+      "global_index/update_ibkr_daily.py",
+      "global_index/fix_offset_step.py"
+    ],
+    "scratch_added": [
+      "scratch/test_track1_stage5r0_boundary_tail_20260824.py",
+      "scratch/track1_stage5r0_mutations_20260824.py",
+      "scratch/_track1_stage5r0_mutations.json",
+      "scratch/track1_stage5r0_boundary_tail_closeout_20260824.md",
+      "scratch/track1_stage5r0_boundary_tail_closeout_20260824.json"
+    ],
+    "production_data_written": []
+  },
+  "operator_next": [
+    {
+      "n": 1,
+      "cmd": "python monitor\\ops.py restart --scheduler --track1-only-shadow"
+    },
+    {
+      "n": 2,
+      "cmd": "python monitor\\ops.py restart --no-scheduler --track1-only-shadow"
+    },
+    {
+      "n": 3,
+      "cmd": "python monitor\\ops.py status"
+    },
+    {
+      "n": 4,
+      "check": "after the restart: 101 jobs, spy_refresh_pm 16:20, SPY_REFRESH_PM mirrored, --repair-boundary in the 13:45 argv, legacy strategy jobs 0, Track1 70/11/5, orders_possible=False with B1 blocking"
+    },
+    {
+      "n": 5,
+      "check": "at tomorrow's 13:45: a 'final-bar check' line per instrument and an 'IN-PROGRESS FINAL MINUTES NOT STORED' block"
+    },
+    {
+      "n": 6,
+      "cmd": "python scratch\\track1_stage5q4_repair_boundary_bar_20260824.py --inst MNQ",
+      "expect": "nothing_to_repair \u2014 the observation that closes B-5R-H on the live files rather than only in the code"
+    }
+  ],
+  "generated_et_correction": "originally recorded as 2026-08-25T02:10:00-04:00, wrong by a date; corrected in Stage 5R-1 from the file mtime"
+}

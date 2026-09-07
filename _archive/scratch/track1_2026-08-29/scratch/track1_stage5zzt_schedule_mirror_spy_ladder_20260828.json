@@ -1,0 +1,162 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZT",
+  "title": "Dashboard schedule mirror parity for the SPY refresh ladder",
+  "route": "track1_candidate",
+  "date": "2026-08-28",
+  "orders_enabled": false,
+
+  "parity_tests_that_were_red": {
+    "named_in_brief": 2,
+    "actually_found": 4,
+    "tests": [
+      {"test": "test_scheduler_and_mirror_are_still_in_parity[False]",
+       "file": "scratch/test_track1_stage5l_shared_preflight_20260823.py"},
+      {"test": "test_scheduler_and_mirror_are_still_in_parity[True]",
+       "file": "scratch/test_track1_stage5l_shared_preflight_20260823.py"},
+      {"test": "test_parity_report_still_true_with_the_flag_off",
+       "file": "monitor/test_schedule_status_track1_20260823.py"},
+      {"test": "test_parity_report_still_true_with_the_flag_on",
+       "file": "monitor/test_schedule_status_track1_20260823.py"}
+    ],
+    "before": {
+      "only_in_scheduler": ["spy_last_chance_pre_nkd", "spy_refresh_pm_r1", "spy_refresh_pm_r2"],
+      "only_in_dashboard_mirror": [],
+      "legacy_mode": {"compared": 62, "mirror_rows": 59},
+      "track1_shadow_mode": {"compared": 132, "mirror_rows": 129}
+    },
+    "after": {"in_parity": true, "only_in_scheduler": [], "only_in_dashboard_mirror": []}
+  },
+
+  "jobs": [
+    {"id": "spy_refresh_pm", "cron": "mon-fri 16:20", "mirror_row": "already present",
+     "job_type": "spy_refresh_pm", "bucket": "shared_infra", "strategy_slot": false},
+    {"id": "spy_refresh_pm_r1", "cron": "mon-fri 16:45", "mirror_row": "added",
+     "job_type": "spy_refresh_pm", "bucket": "shared_infra", "strategy_slot": false},
+    {"id": "spy_refresh_pm_r2", "cron": "mon-fri 17:15", "mirror_row": "added",
+     "job_type": "spy_refresh_pm", "bucket": "shared_infra", "strategy_slot": false},
+    {"id": "spy_last_chance_pre_nkd", "cron": "mon-fri 00:45", "mirror_row": "added",
+     "job_type": "spy_last_chance_pre_nkd", "bucket": "shared_infra", "strategy_slot": false}
+  ],
+  "times_source": "read from the scheduled_job decorators in run_scheduler.py, not assumed",
+
+  "what_the_gap_had_cost": {
+    "measured_from": "the job journal for 2026-08-26 to 2026-08-28",
+    "event": "on 2026-08-27 all three rungs of the evening ladder FAILED; the 00:45 last look on 2026-08-28 completed and brought the series up to date",
+    "defects_visible": [
+      {"id": "F1", "severity": "false recovery", "fixed": true,
+       "what": "SPY_REFRESH_PM_R1 and _R2 reported lifecycle_status recovered, recovered_at 2026-08-27T22:20:14Z",
+       "which_job_that_was": "TRACK1_STOP_REPAIR_1820, a stop-repair sweep",
+       "mechanism": "later_same_stream matches on job_type and both sat in the `other` catch-all; a catch-all is not a stream",
+       "after": "lifecycle open, recovered_at null"},
+      {"id": "F2", "severity": "misleading language", "fixed": true,
+       "what": "the retries read 'The job emitted an unclassified error ... reconcile current broker state' - broker advice for a data job that never touches the broker"},
+      {"id": "F3", "severity": "invisible", "fixed": true,
+       "what": "none of the three had a schedule-panel row, so neither the failures nor the recovery could be reported"}
+    ]
+  },
+
+  "stream_design": {
+    "three_rungs_share_one_type": "so later_same_stream expresses the ladder: a missed rung caught by a later rung is a recovery, through the mechanism that already existed for stop-repair",
+    "last_look_is_its_own_type": "it asks for the PREVIOUS TRADING DAY, not today's close; folding it in would let a 00:45 success mark an evening rung recovered for a question that rung never asked"
+  },
+
+  "language": {
+    "caught_by_a_later_rung": "This rung of the post-close SPY ladder did not run; the series was brought up to date when <job> completed. No immediate action.",
+    "not_caught": "unchanged severe wording - the series is a day short and tomorrow's Track 1 slots meet a freshness refusal",
+    "why_conditional": "Stage 5ZZC found that two retries reporting failure on every good day is an alarm people learn to ignore; copying the 16:20 wording onto the rungs would rebuild that alarm via the missed path. Making it unconditional would be the opposite error - a total ladder failure reading mild. Both directions are pinned by tests.",
+    "last_look": "states its own consequence including the Monday case: the evening ladder last ran thirty-one hours earlier"
+  },
+
+  "the_check_parity_cannot_make": {
+    "problem": "parity compares slot IDS only; a row at the wrong minute passes it and then reports overdue every day forever",
+    "test": "test_the_mirror_holds_every_spy_job_at_the_minute_the_scheduler_runs_it",
+    "method": "derives the schedule from run_scheduler.py decorators via AST and compares clocks in both directions",
+    "proof": "mutation M3 moves SPY_REFRESH_PM_R1 one hour early - parity still passes, only this test catches it"
+  },
+
+  "results": {
+    "new_suite": {"file": "scratch/test_track1_stage5zzt_schedule_mirror_spy_ladder_20260828.py", "passed": 18},
+    "adjacent_suites": {"passed": 407, "failed": 5},
+    "mutations": {"file": "scratch/track1_stage5zzt_mutations_20260828.py", "attempted": 9, "caught": 9},
+    "attribution": {"method": "reverted both production edits, re-ran the same suites, diffed the failure sets",
+                    "caused_by_this_stage": 0, "pre_existing": 5,
+                    "fixed_by_this_stage": ["test_parity_report_still_true_with_the_flag_off",
+                                            "test_parity_report_still_true_with_the_flag_on",
+                                            "test_scheduler_and_mirror_are_still_in_parity[False]",
+                                            "test_scheduler_and_mirror_are_still_in_parity[True]"]},
+    "pre_existing_failures": [
+      "test_flag_on_adds_a_window_band_per_sleeve - expects a Calm one-shot band from before Calm became two phases",
+      "test_a_calm_failure_is_not_recovered_by_a_stress_run - expects TRACK1_CALM_1000",
+      "test_track1_only_still_reports_a_real_track1_failure - same Calm slot",
+      "test_state_slot_count_is_seventy_in_track1_only - pins the old 70-slot literal, the table holds 71",
+      "test_the_running_backend_answer_is_reported_honestly - reads the running backend's mode"
+    ]
+  },
+
+  "no_phantom_alarm": {
+    "schedule_status_today": {"incidents": 0, "open_incidents": 0, "unexplained_overdue": 0,
+                              "spy_rows_overdue": "none"},
+    "track1_only_mode": {"state_slot_count": 71, "incidents": 0, "unexplained_overdue": 0},
+    "note": "the 00:45 job ran today and is recognised; this was the risk Stage 5ZZS declined to take without measuring first"
+  },
+
+  "gate_and_slot_invariants": {
+    "strategy_slot_count_before": 71,
+    "strategy_slot_count_after": 71,
+    "is_track1_strategy_job": {"spy_refresh_pm": false, "spy_refresh_pm_r1": false,
+                               "spy_refresh_pm_r2": false, "spy_last_chance_pre_nkd": false},
+    "route_classification": "all four shared_infra",
+    "legacy_bucket_unchanged": "_bucket_for('live_day_0935') = legacy_entry",
+    "orders_possible": false,
+    "blocking": ["PAPER_SHADOW_EVIDENCE"],
+    "gates_reached_only_via": "the existing SPY coverage and verification records"
+  },
+
+  "safety_after": {
+    "track1_mode": "track1-only-shadow",
+    "orders_possible": false,
+    "blocking": ["PAPER_SHADOW_EVIDENCE"],
+    "scheduler_mode": "compatible",
+    "confirmation": true,
+    "legacy_entry_jobs": 0,
+    "orders_dir_exists": false,
+    "live_positions_track1_exists": false,
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "scheduler_restarted": false,
+    "backend_restarted": false,
+    "broker_connections": 0,
+    "runtime_trading_files_edited": false,
+    "run_scheduler_py": "read only, never written - not even by the mutation harness"
+  },
+
+  "backend_restart_required": {
+    "required": true,
+    "evidence": {"backend_pid": 20212, "started": "2026-08-28 03:13:01",
+                 "schedule_status_edited": "2026-08-28 04:52:17",
+                 "job_journal_reader_edited": "2026-08-28 04:52:53"},
+    "reason": "Python imports a module once per process, so the running backend holds the pre-5ZZT versions",
+    "done_here": false,
+    "scheduler_impact": "none - a backend-only restart does not disturb the scheduler (Stage 5ZZO)"
+  },
+
+  "still_open": [
+    {"id": "O1", "what": "the `other` bucket is still a shared stream",
+     "detail": "TRACK1_STOP_REPAIR_* and TRACK1_AUDIT_* are deliberately kept from the legacy prefixes and were never given types of their own, so they sit in `other` together. All completed today, so nothing receives a false recovery now; the next failed Track 1 stop-repair will be closed by an unrelated audit job completing afterwards.",
+     "disposition": "same defect, different jobs - wants its own stage"},
+    {"id": "O2", "what": "cross-day recovery is invisible",
+     "detail": "the 00:45 job on the 28th genuinely repaired the 27th failure, but the journal reads one day at a time, so the 27th still shows three open failures with no sign of what fixed them"},
+    {"id": "O3", "what": "five pre-existing failures listed above, none of them this stage's"}
+  ],
+
+  "files_touched": [
+    "monitor/backend/schedule_status.py",
+    "monitor/backend/job_journal_reader.py",
+    "scratch/test_track1_stage5zzt_schedule_mirror_spy_ladder_20260828.py",
+    "scratch/track1_stage5zzt_mutations_20260828.py",
+    "scratch/track1_stage5zzt_schedule_mirror_spy_ladder_20260828.md",
+    "scratch/track1_stage5zzt_schedule_mirror_spy_ladder_20260828.json",
+    "docs/futures/TRACK1_RUNTIME_PIPELINE_2026-08-24.md",
+    "TASK.md"
+  ]
+}

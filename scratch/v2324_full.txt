@@ -1,0 +1,36 @@
+Model is not converging.  Current: 7309.542802079805 is not greater than 7309.7777731706765. Delta is -0.23497109087111312
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+Model is not converging.  Current: 7309.542802079805 is not greater than 7309.7777731706765. Delta is -0.23497109087111312
+Model is not converging.  Current: 7310.737617865189 is not greater than 7310.956641261874. Delta is -0.21902339668486093
+Model is not converging.  Current: 6772.7195316736415 is not greater than 6772.924509067145. Delta is -0.20497739350321353
+CAU HINH: vu trang 14.0833h + stop co dinh + SUA KHOP LENH
+
+========================================================================
+DEPLOY-REALISTIC SIM | Rổ 4 + NKD | $50,000
+========================================================================
+slippage 2 tick/side | NKD gated ema=10 mult=2.5
+
+SIZER (combined 3-cluster, DD-capped):
+  1-micro combined MaxDD : $2,207  (4.4% of account)
+  dd_scale 2.27 | margin_scale 3.23 → binding: FIXED (--n-contracts override)
+  → CONTRACTS: 1 micro each  (projected DD 4.4%, hard cap 15%)
+
+DEPLOY METRICS at 1 micro:
+  net $17,943  |  Calmar 4.11  |  PF 1.65  |  Sharpe 2.35
+  MaxDD $2,207 (4.4%)  |  return ≈ 18.2%/yr on $50,000
+
+  per-cluster entries taken / rejected (REAL risk$):
+    roska4_swing   taken  305  rejected 122
+    roska4_stress  taken    0  rejected   0
+    global_nkd     taken  118  rejected   0
+    circuit-breaker halts: 0
+
+per-year net$ (deploy size):
+  2023  $    10,181
+  2024  $     7,762
+------------------------------------------------------------------------
+NOTE: upper bound. Live MNKD slips >1 tick (rerun --slippage-ticks 2-3 to see), fills partial, unseen events absent. Paper trade is the real test.
+
+
+[sua khop lenh] 142 lenh, $18,510

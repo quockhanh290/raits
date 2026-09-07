@@ -1,0 +1,665 @@
+{
+ "floor": {
+  "gate": true,
+  "net": 64902.908535714276,
+  "maxdd": 4845.307499999988,
+  "pf": 1.617201561051112,
+  "calmar": 1.9178850837166401,
+  "sharpe": 2.3421033574386647,
+  "event_kinds": {
+   "ENTRY": 1160,
+   "EXIT": 1146,
+   "PLACE_STOP": 387,
+   "REJECT": 195,
+   "SUPPRESS": 22,
+   "CANCEL_STOP": 14,
+   "FORCE_CLOSE": 14,
+   "AWAIT_CLOSE_CONFIRM": 14,
+   "HALTED_BY_BREAKER": 2
+  },
+  "n_force_close": 14,
+  "force_close_pnl": -6072.359999999999,
+  "force_close_detail": [
+   {
+    "ts": "2018-06-25 10:58:00-04:00",
+    "kind": "FORCE_CLOSE",
+    "cluster": "roska4_calm",
+    "inst": "MNQ",
+    "direction": "LONG",
+    "qty": NaN,
+    "risk": NaN,
+    "stop": NaN,
+    "trade_id": "calm_a_atr15_floor_MNQ_21",
+    "pnl": -67.74,
+    "reason": NaN,
+    "note": NaN,
+    "after_force_close": NaN
+   },
+   {
+    "ts": "2018-11-09 11:05:00-05:00",
+    "kind": "FORCE_CLOSE",
+    "cluster": "roska4_swing",
+    "inst": "MNQ",
+    "direction": "LONG",
+    "qty": NaN,
+    "risk": NaN,
+    "stop": NaN,
+    "trade_id": "normal_filtered_MNQ_15",
+    "pnl": 247.26,
+    "reason": NaN,
+    "note": NaN,
+    "after_force_close": NaN
+   },
+   {
+    "ts": "2019-08-14 10:37:00-04:00",
+    "kind": "FORCE_CLOSE",
+    "cluster": "roska4_swing",
+    "inst": "MNQ",
+    "direction": "LONG",
+    "qty": NaN,
+    "risk": NaN,
+    "stop": NaN,
+    "trade_id": "normal_filtered_MNQ_33",
+    "pnl": -346.74,
+    "reason": NaN,
+    "note": NaN,
+    "after_force_close": NaN
+   },
+   {
+    "ts": "2019-10-02 10:37:00-04:00",
+    "kind": "FORCE_CLOSE",
+    "cluster": "roska4_calm",
+    "inst": "MNQ",
+    "direction": "LONG",
+    "qty": NaN,
+    "risk": NaN,
+    "stop": NaN,
+    "trade_id": "calm_a_atr15_floor_MNQ_105",
+    "pnl": -51.74,
+    "reason": NaN,
+    "note": NaN,
+    "after_force_close": NaN
+   },
+   {
+    "ts": "2020-06-24 10:37:00-04:00",
+    "kind": "FORCE_CLOSE",
+    "cluster": "roska4_swing",
+    "inst": "MNQ",
+    "direction": "LONG",
+    "qty": NaN,
+    "risk": NaN,
+    "stop": NaN,
+    "trade_id": "normal_filtered_MNQ_52",
+    "pnl": -321.24,
+    "reason": NaN,
+    "note": NaN,
+    "after_force_close": NaN
+   },
+   {
+    "ts": "2021-01-15 11:05:00-05:00",
+    "kind": "FORCE_CLOSE",
+    "cluster": "roska4_calm",
+    "inst": "MNQ",
+    "direction": "LONG",
+    "qty": NaN,
+    "risk": NaN,
+    "stop": NaN,
+    "trade_id": "calm_a_atr15_floor_MNQ_147",
+    "pnl": -271.74,
+    "reason": NaN,
+    "note": NaN,
+    "after_force_close": NaN
+   },
+   {
+    "ts": "2021-05-12 10:36:00-04:00",
+    "kind": "FORCE_CLOSE",
+    "cluster": "roska4_swing",
+    "inst": "MNQ",
+    "direction": "LONG",
+    "qty": NaN,
+    "risk": NaN,
+    "stop": NaN,
+    "trade_id": "normal_filtered_MNQ_79",
+    "pnl": -421.24,
+    "reason": NaN,
+    "note": NaN,
+    "after_force_close": NaN
+   },
+   {
+    "ts": "2022-01-10 10:35:00-05:00",
+    "kind": "FORCE_CLOSE",
+    "cluster": "roska4_swing",
+    "inst": "MNQ",
+    "direction": "LONG",
+    "qty": NaN,
+    "risk": NaN,
+    "stop": NaN,
+    "trade_id": "normal_filtered_MNQ_92",
+    "pnl": -888.74,
+    "reason": NaN,
+    "note": NaN,
+    "after_force_close": NaN
+   },
+   {
+    "ts": "2022-06-10 11:05:00-04:00",
+    "kind": "FORCE_CLOSE",
+    "cluster": "roska4_swing",
+    "inst": "MNQ",
+    "direction": "LONG",
+    "qty": NaN,
+    "risk": NaN,
+    "stop": NaN,
+    "trade_id": "normal_filtered_MNQ_109",
+    "pnl": -1492.74,
+    "reason": NaN,
+    "note": NaN,
+    "after_force_close": NaN
+   },
+   {
+    "ts": "2022-08-19 10:42:00-04:00",
+    "kind": "FORCE_CLOSE",
+    "cluster": "roska4_swing",
+    "inst": "MNQ",
+    "direction": "LONG",
+    "qty": NaN,
+    "risk": NaN,
+    "stop": NaN,
+    "trade_id": "normal_filtered_MNQ_117",
+    "pnl": -734.74,
+    "reason": NaN,
+    "note": NaN,
+    "after_force_close": NaN
+   },
+   {
+    "ts": "2022-12-15 10:53:00-05:00",
+    "kind": "FORCE_CLOSE",
+    "cluster": "roska4_swing",
+    "inst": "MNQ",
+    "direction": "LONG",
+    "qty": NaN,
+    "risk": NaN,
+    "stop": NaN,
+    "trade_id": "normal_filtered_MNQ_128",
+    "pnl": -826.74,
+    "reason": NaN,
+    "note": NaN,
+    "after_force_close": NaN
+   },
+   {
+    "ts": "2023-10-25 11:42:00-04:00",
+    "kind": "FORCE_CLOSE",
+    "cluster": "roska4_swing",
+    "inst": "MNQ",
+    "direction": "LONG",
+    "qty": NaN,
+    "risk": NaN,
+    "stop": NaN,
+    "trade_id": "normal_filtered_MNQ_159",
+    "pnl": -303.24,
+    "reason": NaN,
+    "note": NaN,
+    "after_force_close": NaN
+   },
+   {
+    "ts": "2024-04-12 10:36:00-04:00",
+    "kind": "FORCE_CLOSE",
+    "cluster": "roska4_swing",
+    "inst": "MNQ",
+    "direction": "LONG",
+    "qty": NaN,
+    "risk": NaN,
+    "stop": NaN,
+    "trade_id": "normal_filtered_MNQ_171",
+    "pnl": -506.24,
+    "reason": NaN,
+    "note": NaN,
+    "after_force_close": NaN
+   },
+   {
+    "ts": "2024-10-31 10:39:00-04:00",
+    "kind": "FORCE_CLOSE",
+    "cluster": "roska4_calm",
+    "inst": "MNQ",
+    "direction": "LONG",
+    "qty": NaN,
+    "risk": NaN,
+    "stop": NaN,
+    "trade_id": "calm_a_atr15_floor_MNQ_335",
+    "pnl": -86.74,
+    "reason": NaN,
+    "note": NaN,
+    "after_force_close": NaN
+   }
+  ],
+  "violations": [],
+  "positions_entered": 1160,
+  "positions_settled": 1160,
+  "settled_twice": 0,
+  "never_settled": 0,
+  "item6": {
+   "scanned": 701,
+   "armed": 701,
+   "hits": 4,
+   "delta": -423.53571428571513,
+   "worst": -376.64285714285734,
+   "rows": [
+    {
+     "inst": "MES",
+     "day": "2021-05-14",
+     "exit_day": "2021-05-19",
+     "booked": -523.74,
+     "if_stop_first": -552.1328571428578,
+     "delta": 28.392857142857792
+    },
+    {
+     "inst": "MNQ",
+     "day": "2019-05-08",
+     "exit_day": "2019-05-13",
+     "booked": -533.24,
+     "if_stop_first": -474.81142857142754,
+     "delta": -58.42857142857247
+    },
+    {
+     "inst": "MYM",
+     "day": "2019-05-08",
+     "exit_day": "2019-05-13",
+     "booked": -316.74,
+     "if_stop_first": -299.8828571428569,
+     "delta": -16.857142857143117
+    },
+    {
+     "inst": "M2K",
+     "day": "2020-11-04",
+     "exit_day": "2020-11-09",
+     "booked": -807.24,
+     "if_stop_first": -430.59714285714267,
+     "delta": -376.64285714285734
+    }
+   ]
+  },
+  "item9": {
+   "scanned": 773,
+   "touched_1400_1405": 0,
+   "delta": 0.0,
+   "rows": []
+  },
+  "item10": {
+   "swing_entries": 773,
+   "exits_inside_fill_window": 0,
+   "family_relevant": 0,
+   "cases": []
+  },
+  "fill": [
+   {
+    "sleeve": "normal_r4",
+    "n": 752,
+    "outside_entry_bar": 0,
+    "outside_exit_bar": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "missing_bars": 0,
+    "impossible_stop_fills": 0,
+    "impossible_dollars": 0.0
+   },
+   {
+    "sleeve": "current_nkd",
+    "n": 228,
+    "outside_entry_bar": 0,
+    "outside_exit_bar": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "missing_bars": 0,
+    "impossible_stop_fills": 0,
+    "impossible_dollars": 0.0
+   },
+   {
+    "sleeve": "stress_mnq",
+    "n": 50,
+    "outside_entry_bar": 0,
+    "outside_exit_bar": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "missing_bars": 0,
+    "impossible_stop_fills": 0,
+    "impossible_dollars": 0.0
+   },
+   {
+    "sleeve": "calm_a",
+    "n": 349,
+    "outside_entry_bar": 0,
+    "outside_exit_bar": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "missing_bars": 0,
+    "impossible_stop_fills": 0,
+    "impossible_dollars": 0.0
+   }
+  ],
+  "cap": {
+   "roska4_swing": {
+    "carried_gross_peak": 0.049041071428571434,
+    "carried_net_peak": 0.048886607142857134,
+    "admission_gross_peak": 0.049041071428571434,
+    "admission_net_peak": 0.048886607142857134,
+    "n_obs": 1917
+   },
+   "roska4_stress": {
+    "carried_gross_peak": 0.08356347999999969,
+    "carried_net_peak": 0.08356347999999969,
+    "admission_gross_peak": 0.08356347999999969,
+    "admission_net_peak": 0.08356347999999969,
+    "n_obs": 1917
+   },
+   "global_nkd": {
+    "carried_gross_peak": 0.0420625,
+    "carried_net_peak": 0.0420625,
+    "admission_gross_peak": 0.0420625,
+    "admission_net_peak": 0.0420625,
+    "n_obs": 1917
+   },
+   "roska4_calm": {
+    "carried_gross_peak": 0.03444964285714288,
+    "carried_net_peak": 0.03444964285714288,
+    "admission_gross_peak": 0.03444964285714288,
+    "admission_net_peak": 0.03444964285714288,
+    "n_obs": 1917
+   },
+   "FAMILY": {
+    "carried_gross_peak": 0.049041071428571434,
+    "carried_net_peak": 0.048886607142857134,
+    "admission_gross_peak": 0.049041071428571434,
+    "admission_net_peak": 0.048886607142857134,
+    "n_obs": 1917
+   }
+  }
+ },
+ "vault2025": {
+  "gate": true,
+  "net": 13236.110000000004,
+  "maxdd": 4631.530000000001,
+  "pf": 1.9956109537356164,
+  "calmar": 3.088228386437971,
+  "sharpe": 2.96223610737079,
+  "event_kinds": {
+   "ENTRY": 128,
+   "EXIT": 127,
+   "REJECT": 51,
+   "PLACE_STOP": 42,
+   "SUPPRESS": 4,
+   "CANCEL_STOP": 1,
+   "FORCE_CLOSE": 1,
+   "AWAIT_CLOSE_CONFIRM": 1
+  },
+  "n_force_close": 1,
+  "force_close_pnl": -1744.24,
+  "force_close_detail": [
+   {
+    "ts": "2025-04-03 10:38:00-04:00",
+    "kind": "FORCE_CLOSE",
+    "cluster": "roska4_swing",
+    "inst": "MNQ",
+    "direction": "LONG",
+    "qty": NaN,
+    "risk": NaN,
+    "reason": NaN,
+    "trade_id": "normal_filtered_MNQ_8",
+    "pnl": -1744.24,
+    "stop": NaN,
+    "note": NaN,
+    "after_force_close": NaN
+   }
+  ],
+  "violations": [],
+  "positions_entered": 128,
+  "positions_settled": 128,
+  "settled_twice": 0,
+  "never_settled": 0,
+  "item6": {
+   "scanned": 78,
+   "armed": 78,
+   "hits": 0,
+   "delta": 0.0,
+   "worst": 0.0,
+   "rows": []
+  },
+  "item9": {
+   "scanned": 86,
+   "touched_1400_1405": 0,
+   "delta": 0.0,
+   "rows": []
+  },
+  "item10": {
+   "swing_entries": 86,
+   "exits_inside_fill_window": 2,
+   "family_relevant": 2,
+   "cases": [
+    {
+     "swing_entry": "2025-08-04 15:50:00-04:00",
+     "swing_inst": "MYM",
+     "other_exit": "2025-08-04 15:55:00-04:00",
+     "other_inst": "MES",
+     "other_cluster": "roska4_calm",
+     "same_family": true
+    },
+    {
+     "swing_entry": "2025-08-04 15:50:00-04:00",
+     "swing_inst": "MYM",
+     "other_exit": "2025-08-04 15:55:00-04:00",
+     "other_inst": "MNQ",
+     "other_cluster": "roska4_calm",
+     "same_family": true
+    }
+   ]
+  },
+  "fill": [
+   {
+    "sleeve": "normal_r4",
+    "n": 105,
+    "outside_entry_bar": 0,
+    "outside_exit_bar": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "missing_bars": 0,
+    "impossible_stop_fills": 0,
+    "impossible_dollars": 0.0
+   },
+   {
+    "sleeve": "current_nkd",
+    "n": 31,
+    "outside_entry_bar": 0,
+    "outside_exit_bar": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "missing_bars": 0,
+    "impossible_stop_fills": 0,
+    "impossible_dollars": 0.0
+   },
+   {
+    "sleeve": "stress_mnq",
+    "n": 3,
+    "outside_entry_bar": 0,
+    "outside_exit_bar": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "missing_bars": 0,
+    "impossible_stop_fills": 0,
+    "impossible_dollars": 0.0
+   },
+   {
+    "sleeve": "calm_a",
+    "n": 44,
+    "outside_entry_bar": 0,
+    "outside_exit_bar": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "missing_bars": 0,
+    "impossible_stop_fills": 0,
+    "impossible_dollars": 0.0
+   }
+  ],
+  "cap": {
+   "roska4_swing": {
+    "carried_gross_peak": 0.049551785714285715,
+    "carried_net_peak": 0.04381160714285714,
+    "admission_gross_peak": 0.049551785714285715,
+    "admission_net_peak": 0.04360535714285715,
+    "n_obs": 222
+   },
+   "roska4_stress": {
+    "carried_gross_peak": 0.07955359999999971,
+    "carried_net_peak": 0.07955359999999971,
+    "admission_gross_peak": 0.07955359999999971,
+    "admission_net_peak": 0.07955359999999971,
+    "n_obs": 222
+   },
+   "global_nkd": {
+    "carried_gross_peak": 0.03390178571428572,
+    "carried_net_peak": 0.03390178571428572,
+    "admission_gross_peak": 0.03390178571428572,
+    "admission_net_peak": 0.03390178571428572,
+    "n_obs": 222
+   },
+   "roska4_calm": {
+    "carried_gross_peak": 0.040269107142857086,
+    "carried_net_peak": 0.040269107142857086,
+    "admission_gross_peak": 0.040269107142857086,
+    "admission_net_peak": 0.040269107142857086,
+    "n_obs": 222
+   },
+   "FAMILY": {
+    "carried_gross_peak": 0.049551785714285715,
+    "carried_net_peak": 0.04381160714285714,
+    "admission_gross_peak": 0.049551785714285715,
+    "admission_net_peak": 0.04360535714285715,
+    "n_obs": 222
+   }
+  }
+ },
+ "vault2026": {
+  "gate": true,
+  "net": 8259.849999999999,
+  "maxdd": 4797.4400000000005,
+  "pf": 1.548621281711517,
+  "calmar": 2.746106340867239,
+  "sharpe": 2.56807338060808,
+  "event_kinds": {
+   "ENTRY": 91,
+   "EXIT": 91,
+   "REJECT": 47,
+   "PLACE_STOP": 22,
+   "SUPPRESS": 1
+  },
+  "n_force_close": 0,
+  "force_close_pnl": 0.0,
+  "force_close_detail": [],
+  "violations": [],
+  "positions_entered": 91,
+  "positions_settled": 91,
+  "settled_twice": 0,
+  "never_settled": 0,
+  "item6": {
+   "scanned": 64,
+   "armed": 64,
+   "hits": 0,
+   "delta": 0.0,
+   "worst": 0.0,
+   "rows": []
+  },
+  "item9": {
+   "scanned": 69,
+   "touched_1400_1405": 0,
+   "delta": 0.0,
+   "rows": []
+  },
+  "item10": {
+   "swing_entries": 69,
+   "exits_inside_fill_window": 0,
+   "family_relevant": 0,
+   "cases": []
+  },
+  "fill": [
+   {
+    "sleeve": "normal_r4",
+    "n": 81,
+    "outside_entry_bar": 0,
+    "outside_exit_bar": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "missing_bars": 0,
+    "impossible_stop_fills": 0,
+    "impossible_dollars": 0.0
+   },
+   {
+    "sleeve": "current_nkd",
+    "n": 26,
+    "outside_entry_bar": 0,
+    "outside_exit_bar": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "missing_bars": 0,
+    "impossible_stop_fills": 0,
+    "impossible_dollars": 0.0
+   },
+   {
+    "sleeve": "stress_mnq",
+    "n": 4,
+    "outside_entry_bar": 0,
+    "outside_exit_bar": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "missing_bars": 0,
+    "impossible_stop_fills": 0,
+    "impossible_dollars": 0.0
+   },
+   {
+    "sleeve": "calm_a",
+    "n": 28,
+    "outside_entry_bar": 0,
+    "outside_exit_bar": 0,
+    "signal_after_entry": 0,
+    "same_or_before_bar_exit": 0,
+    "missing_bars": 2,
+    "impossible_stop_fills": 0,
+    "impossible_dollars": 0.0
+   }
+  ],
+  "cap": {
+   "roska4_swing": {
+    "carried_gross_peak": 0.048425,
+    "carried_net_peak": 0.04005714285714285,
+    "admission_gross_peak": 0.048425,
+    "admission_net_peak": 0.04005714285714285,
+    "n_obs": 162
+   },
+   "roska4_stress": {
+    "carried_gross_peak": 0.08539873999999924,
+    "carried_net_peak": 0.08539873999999924,
+    "admission_gross_peak": 0.08539873999999924,
+    "admission_net_peak": 0.08539873999999924,
+    "n_obs": 162
+   },
+   "global_nkd": {
+    "carried_gross_peak": 0.059178571428571435,
+    "carried_net_peak": 0.059178571428571435,
+    "admission_gross_peak": 0.059178571428571435,
+    "admission_net_peak": 0.059178571428571435,
+    "n_obs": 162
+   },
+   "roska4_calm": {
+    "carried_gross_peak": 0.04117446428571426,
+    "carried_net_peak": 0.04117446428571426,
+    "admission_gross_peak": 0.04117446428571426,
+    "admission_net_peak": 0.04117446428571426,
+    "n_obs": 162
+   },
+   "FAMILY": {
+    "carried_gross_peak": 0.048425,
+    "carried_net_peak": 0.04117446428571426,
+    "admission_gross_peak": 0.048425,
+    "admission_net_peak": 0.04117446428571426,
+    "n_obs": 162
+   }
+  }
+ },
+ "gate_all": true
+}

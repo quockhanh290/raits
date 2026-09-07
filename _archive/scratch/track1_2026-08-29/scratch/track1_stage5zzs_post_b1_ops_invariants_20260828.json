@@ -1,0 +1,183 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZS",
+  "title": "Post-B1 ops test invariant repair",
+  "route": "track1_candidate",
+  "date": "2026-08-28",
+  "orders_enabled": false,
+
+  "the_ten": [
+    {"test": "test_no_switch_or_confirmation_file_exists",
+     "suite": "test_track1_ops_status_mode_20260824.py",
+     "class": "stale_pre_b1", "asserted": "the confirmation file is absent",
+     "why_red": "Stage 5ZZJ placed it 2026-08-27 as a deliberate operator decision"},
+    {"test": "test_nothing_real_was_created_by_this_suite",
+     "suite": "test_track1_stage5k_ops_startup_20260823.py",
+     "class": "stale_pre_b1", "asserted": "the confirmation file is absent",
+     "why_red": "same"},
+    {"test": "test_30_no_order_journal_book_or_confirmation_exists",
+     "suite": "test_track1_stage5zf_ops_report_completeness_20260825.py",
+     "class": "stale_pre_b1", "asserted": "the confirmation file is absent",
+     "why_red": "same"},
+    {"test": "test_it_refuses_when_the_confirmation_file_exists",
+     "suite": "test_track1_stage5k_ops_startup_20260823.py",
+     "class": "stale_pre_b1", "asserted": "the file alone refuses a shadow start",
+     "why_red": "Stage 5ZZN narrowed the rule to file AND orders actually possible"},
+    {"test": "test_status_reports_what_an_operator_must_see",
+     "suite": "test_track1_stage5k_ops_startup_20260823.py",
+     "class": "stale_pre_b1", "asserted": "B1 is in blocking, confirmation_present is False",
+     "why_red": "Stage 5ZZK closed B1"},
+    {"test": "test_28_orders_are_still_impossible",
+     "suite": "test_track1_stage5zf_ops_report_completeness_20260825.py",
+     "class": "stale_pre_b1", "asserted": "B1 is in blocking and the file is absent",
+     "why_red": "same; note the safety assertion allowed is False was passing throughout"},
+
+    {"test": "test_27_a_label_drift_is_now_visible_as_a_job_failure",
+     "suite": "test_track1_stage5zf_ops_report_completeness_20260825.py",
+     "class": "stale_post_refactor_not_b1",
+     "asserted": "--verify-strict appears in the job_spy_refresh_pm body",
+     "truth": "Stage 5ZZC moved it into _spy_refresh at run_scheduler.py:995; the flag was never lost",
+     "note": "its failure message claimed a label drift would exit 0 again - it would not"},
+    {"test": "test_5_spy_refresh_pm_emits_normal_job_evidence",
+     "suite": "test_track1_stage5zf_ops_report_completeness_20260825.py",
+     "class": "stale_post_refactor_not_b1",
+     "asserted": "one _run call site with the literal label SPY_REFRESH_PM",
+     "truth": "the label became a parameter of _spy_refresh"},
+    {"test": "test_1_the_inventory_is_101_jobs_with_nothing_unclassified",
+     "suite": "test_track1_stage5zf_ops_report_completeness_20260825.py",
+     "class": "stale_post_refactor_not_b1",
+     "asserted": "70 strategy slots, 4 shared-infra jobs, 101 total",
+     "truth": "71 slots, and three jobs registered by 5ZZC/5ZZD that nobody had classified"},
+    {"test": "test_13_the_route_health_now_comes_from_track1_evidence",
+     "suite": "test_track1_stage5zf_ops_report_completeness_20260825.py",
+     "class": "stale_post_refactor_not_b1",
+     "asserted": "the mirror tracks 70 slots", "truth": "it tracks 71"}
+  ],
+
+  "classification_summary": {
+    "stale_pre_b1": 6,
+    "stale_post_refactor_not_b1": 4,
+    "real_post_b1_safety_regression": 0
+  },
+
+  "eleventh_found_while_running_adjacent_work": {
+    "test": "test_no_confirmation_file_was_created_by_this_suite",
+    "suite": "test_track1_stage5s_paper_readiness_20260825.py",
+    "class": "stale_pre_b1", "repaired": true
+  },
+
+  "real_defects_found": [
+    {"id": "D1", "severity": "real, fail-closed", "fixed": true,
+     "what": "spy_refresh_pm_r1, spy_refresh_pm_r2 and spy_last_chance_pre_nkd were unclassified in route_classification",
+     "how_it_surfaced": "exactly as the module intended - its comment says an unnamed job lands in unclassified and turns the Stage 5L test red",
+     "cost": "none to safety: legacy_retirement_candidates returns only the legacy_entry bucket, so an unclassified job was never removable and never inflated the legacy count",
+     "measured": {"_bucket_for('live_day_0935')": "legacy_entry before and after"},
+     "fix": "declared as shared_infra in track1_slots.SHARED_INFRA_JOBS, and by hand in the 5L REQUIRED_SURVIVORS list which deliberately does not derive from it"},
+
+    {"id": "D2", "severity": "real monitoring gap", "fixed": false,
+     "what": "the dashboard schedule mirror does not model those same three jobs",
+     "evidence": "schedule_status.py:181 lists only SPY_REFRESH_PM; parity_report returns only_in_scheduler = ['spy_last_chance_pre_nkd','spy_refresh_pm_r1','spy_refresh_pm_r2']",
+     "consequence": "three jobs run nightly and the schedule panel has no row to report them late or missing",
+     "why_not_fixed_here": "different subsystem, and a row for a job that does not fire when expected creates a permanently-red alarm - the failure mode this project has already paid for. Needs its own stage with the cron times measured.",
+     "status": "the two parity tests are left RED so the alarm keeps ringing; they were red before this stage"}
+  ],
+
+  "new_post_b1_invariants": [
+    {"id": "I1", "invariant": "orders are impossible and something MEASURED holds them", "test": "test_28"},
+    {"id": "I2", "invariant": "B1 closed requires a signature - remove it and B1 returns", "test": "test_28"},
+    {"id": "I3", "invariant": "B1 closed requires a measurement - fail the composite while signed and B1 returns", "test": "test_28b", "new": true},
+    {"id": "I4", "invariant": "no signature and no environment variable can release what is holding orders", "test": "test_28c", "new": true,
+     "note": "never sets TRACK1_ORDERS_APPROVED; asserts every holding blocker is a MEASURED_GATE with released_by == () and that the registry does not read the environment"},
+    {"id": "I5", "invariant": "a confirmation on disk must be signed and must not imply orders_possible", "test": "test_30 / ops-status-mode / 5S"},
+    {"id": "I6", "invariant": "the confirmation file alone does NOT refuse a shadow start", "test": "test_the_confirmation_file_alone_no_longer_refuses_a_shadow_start"},
+    {"id": "I7", "invariant": "a confirmation PLUS every order blocker clear still does refuse", "test": "same test, second half"},
+    {"id": "I8", "invariant": "a legacy entry start is refused while the decision says legacy retired, and the refusal names the mode that IS allowed", "test": "test_a_legacy_start_is_refused_once_the_decision_says_legacy_retired", "new": true},
+    {"id": "I9", "invariant": "shared-infra membership is exact in both directions against the PRODUCTION classifier", "test": "test_4"},
+    {"id": "I10", "invariant": "nothing is unclassified, and the counts are derived from the tables rather than pinned", "test": "test_1"}
+  ],
+
+  "mutations": {
+    "file": "scratch/track1_stage5zzs_mutations_20260828.py",
+    "attempted": 11, "caught": 11,
+    "run_scheduler_mutated_on_a_copy": true,
+    "copy_rationale": "run_scheduler.py is a runtime trading file this stage may not edit; a killed process would leave the live scheduler's own module broken on disk. The real file's digest is checked before and after.",
+    "retargeted_after_an_honest_green": [
+      {"mutation": "M1", "first_target": "waive b1_decision_evidence",
+       "why_green": "the suite asserted only that the SIGNATURE is necessary; B1 reappears unsigned whatever the measurement says, so one half of the rule was asserted twice",
+       "response": "added test_28b and retargeted M1 at the place a signed gate consults its required measurement"},
+      {"mutation": "M6", "first_target": "open orders when TRACK1_ORDERS_APPROVED is set",
+       "why_green": "every test asserted the variable was UNSET and none asserted what happens if it is set",
+       "response": "added test_28c"},
+      {"mutation": "M7", "first_target": "the unclassified fallback",
+       "why_green": "once the three rungs were declared no registered job reaches that line, so the edit was to unreachable code - a mutation that never ran, not a passing test",
+       "response": "retargeted at the opposite direction: every job bucketed as shared whether declared or not"}
+    ]
+  },
+
+  "my_own_error_caught_by_a_test": {
+    "what": "asserted conf.get('confirmed_by'), but confirmed_by is an attribute of Confirmations, not one of its flags",
+    "effect": "a properly signed decision read as unsigned",
+    "caught": "first run"
+  },
+
+  "attribution_of_33_wider_failures": {
+    "method": "reverted the one production edit, re-ran the same suites, diffed the failure sets",
+    "pre_existing": 29,
+    "caused_by_this_stage": ["test_the_shared_infra_table_covers_exactly_the_jobs_that_must_survive"],
+    "fixed_by_this_stage": ["test_every_registered_job_is_classified[False]",
+                            "test_every_registered_job_is_classified[True]"],
+    "note": "guessing from test names would have misfiled test_b1_still_blocks_orders, which reads like this stage's work and is not"
+  },
+
+  "results": {
+    "ops_gates_readiness_suites": {"passed": 363, "failed": 2},
+    "the_two_failures": "the D2 mirror-parity alarm, pre-existing and deliberately left ringing",
+    "tests_added": 4
+  },
+
+  "safety_after": {
+    "track1_mode": "track1-only-shadow",
+    "orders_possible": false,
+    "blocking": ["PAPER_SHADOW_EVIDENCE"],
+    "scheduler_mode": "compatible",
+    "confirmation": true,
+    "legacy_entry_jobs": 0,
+    "orders_dir_exists": false,
+    "live_positions_track1_exists": false,
+    "TRACK1_ORDERS_APPROVED": "unset",
+    "scheduler_restarted": false,
+    "backend_restarted": false,
+    "broker_connections": 0,
+    "runtime_trading_files_edited": false,
+    "allow_orders_passed": false
+  },
+
+  "b1_status": {
+    "closed": true,
+    "closed_by": "a signed operator decision AND a passing composite measurement",
+    "measurement": "b1_decision_evidence -> PASS (B1 audit legacy_and_broker_flat; book route track1_candidate; account baseline account_flat_and_funded; account DUR125337)",
+    "not_checked": "the B1 audit records no account id, so the two records cannot be cross-checked"
+  },
+
+  "remaining_blockers": ["PAPER_SHADOW_EVIDENCE"],
+
+  "still_open": [
+    "D2 - the dashboard schedule mirror does not model the three SPY-ladder jobs",
+    "29 pre-existing failures in the wider slot and scheduler suites: a live_day/maxhold_exit aliasing group, job-count literals, and a rendered-blocker pinning mismatch",
+    "PAPER_SHADOW_EVIDENCE is measured, not signable, and remains the sole thing between this route and an order"
+  ],
+
+  "files_touched": [
+    "global_index/track1_slots.py",
+    "scratch/test_track1_stage5zf_ops_report_completeness_20260825.py",
+    "scratch/test_track1_stage5k_ops_startup_20260823.py",
+    "scratch/test_track1_ops_status_mode_20260824.py",
+    "scratch/test_track1_stage5s_paper_readiness_20260825.py",
+    "scratch/test_track1_stage5l_shared_preflight_20260823.py",
+    "scratch/track1_stage5zzs_mutations_20260828.py",
+    "scratch/track1_stage5zzs_post_b1_ops_invariants_20260828.md",
+    "scratch/track1_stage5zzs_post_b1_ops_invariants_20260828.json",
+    "docs/futures/TRACK1_RUNTIME_PIPELINE_2026-08-24.md",
+    "TASK.md"
+  ]
+}

@@ -1,0 +1,198 @@
+{
+  "stage": "5ZU",
+  "title": "Calm A backtest/live timing identity: the gate was asking for a bar that cannot exist",
+  "checked_at": {
+    "utc": "2026-08-26T17:10",
+    "et": "2026-08-26T13:10 EDT",
+    "calgary": "2026-08-26T11:10 MDT"
+  },
+  "verdict": {
+    "backtest_contract": "CONFIRMED",
+    "live_gate_mismatch": "CONFIRMED",
+    "fix_applied": true,
+    "calm_can_become_judgeable": "YES in the gate; NOT YET in the schedule (see below)",
+    "strategy_changed": "NO — the entry price is still the OPEN at 10:00, asserted",
+    "splice_guard_unchanged": true,
+    "orders_possible": false,
+    "remaining_blockers": [
+      "B1_broker_account_or_legacy_retirement",
+      "PAPER_SHADOW_EVIDENCE",
+      "REGIME_LABEL_VERIFICATION"
+    ],
+    "regression": "13 caused, 13 fixed, 33 pre-existing"
+  },
+  "part_A_backtest_contract": {
+    "rows": 421,
+    "instruments": {
+      "MNQ": 217,
+      "MES": 204
+    },
+    "directions": [
+      "LONG"
+    ],
+    "windows": {
+      "IS_2018_2024": 349,
+      "OOS_2025": 44,
+      "SANITY_2026": 28
+    },
+    "claims_all_421_rows": {
+      "signal_time <= entry_time": "PASS, 0 violations",
+      "signal_after_entry == 0": "PASS",
+      "outside_entry_bar == 0": "PASS",
+      "outside_exit_bar == 0": "PASS",
+      "signal_time is 09:30:00": "PASS",
+      "entry_time is 10:00:00": "PASS",
+      "exit_time is 15:55:00": "PASS",
+      "same session day": "PASS",
+      "entry_time - signal_time": "EXACTLY 30 minutes on every row — one distinct value"
+    },
+    "price_identity": {
+      "SANITY_2026": "28 of 28 entries equal the OPEN at 10:00 EXACTLY",
+      "OOS_2025": "0 of 44 — max offset 535.75",
+      "IS_2018_2024": "0 of 349 — max offset 1548.43",
+      "why": "the series is a BACK-ADJUSTED continuous contract: every roll subtracts a gap from all prior history, so the further back a row is the larger the accumulated adjustment. Confirmed three ways: the offsets are monotone in age with ~50 distinct levels; 395 of 416 rows have an IDENTICAL exit-minus-entry difference (an additive offset cancels in a difference); and prev_close_loc, which is offset-INVARIANT, agrees far more often than the ratio features that are not.",
+      "so": "the contract is confirmed. The absolute price level of older rows is not reproducible from today's parquet BY DESIGN, and the existing reproduction test still passes because it checks the current window."
+    },
+    "a_measurement_error_of_mine_and_how_it_was_caught": {
+      "what": "the first run used `_naive(df.index)`, which STRIPS the zone without converting",
+      "but": "the parquet index is UTC — `track1_live_source.frozen_frame` says so in a comment written after an earlier incident",
+      "effect": "every bar read four or five hours off; 420 of 421 entries mismatched",
+      "the_tell": "the parquet values carried a long decimal tail (9184.872880047082) where the artifact was round (8753). A price that cannot be a tick is a measurement fault, not a data fault.",
+      "lesson": "it is the exact mistake my own note warns about — measure in the frame the system uses, through the loader the system uses"
+    }
+  },
+  "part_B_live_gate": {
+    "reproduced": "the live refusal was reproduced from the requirement table, with the same two codes and the same wording as the 2026-08-26 slot",
+    "the_impossible_interval": {
+      "latest_allowed_decision": "10:01:00 (decide_to 10:00 + 60s grace)",
+      "earliest_closed_10_00_5m_bar": "10:05:00",
+      "gap": "four minutes, every day"
+    },
+    "the_config_that_did_it": "REQUIREMENTS['roska4_calm'] declared today_to=10:00, decision_bar=10:00 and decide_from=10:00 — the bar it waited to close was the instant it was first allowed to decide",
+    "structural_statement": "Calm was the ONLY sleeve with decision_bar == decide_from, asserted by a test derived from the table",
+    "why_the_others_escape": {
+      "roska4_stress": "today_to 10:30 sits BEFORE decide_from 10:35, so its measured level is always already closed",
+      "roska4_swing / global_nkd": "today_to_follows_now=True — Stage 5V-1 fixed exactly this class for the scanning sleeves after 19 consecutive NKD slots refused partial_coverage; Calm kept False because for it the bar really is what the decision transacts at"
+    },
+    "what_the_rule_actually_reads": "the prior RTH session and today's 09:30 open. Both are fixed by 09:30, thirty minutes before the bar the gate was demanding — which is the artifact's own signal-to-entry gap, on every one of the 421 rows."
+  },
+  "part_C_fix": {
+    "two_names_where_one_was_doing_both": {
+      "required_context_through": "09:55 — the last bar the DECISION reads",
+      "required_entry_quote_time": "10:00 — the bar whose OPEN is the fill reference, checked against the MINUTE index it is read from"
+    },
+    "decision_bar": "None for Calm — retired, and a test fails if it returns",
+    "new_codes": {
+      "entry_quote_absent": "the fill reference is not readable yet",
+      "entry_quote_unverified": "no index was offered, so that half was NOT checked — never reported as a pass"
+    },
+    "grace": {
+      "was": 60,
+      "now": 180,
+      "why": "an OBSERVATION change, not a strategy one. A one-minute bar stamped 10:00 closes at 10:01:00, so 60s put the deadline exactly on the closing instant. Three minutes let a slot observe a CLOSED bar and still refuse anything past 10:03.",
+      "entry_price": "unchanged — still the OPEN at 10:00, asserted against CalmAParams.entry_time"
+    },
+    "the_caller_was_wired_too": "the gate change alone did nothing: the slot passed only the resampled 5-minute frame, so every Calm slot would have refused `entry_quote_unverified` instead of `decision_bar_absent` — a different refusal, not a fix. The joined 1-minute frame was already in scope at the call site and is now passed as the quote index.",
+    "no_late_entry": "too_late still refuses past the grace, and a refused slot is SLOT_REFUSED, never NO_SIGNAL — pinned",
+    "partial_bar_constraint": "held BY CONSTRUCTION: the context span stops at 09:55, so a 10:00 bar in the frame is outside everything the decision reads. Proved by verdict equality — adding a partial 10:00 bar with absurd high/low/close changes neither the verdict nor the span detail."
+  },
+  "part_D_runtime": {
+    "simulated_under_the_fixed_contract": {
+      "last closed 5m 09:55, no quote index": "REFUSE entry_quote_unverified",
+      "last closed 5m 09:55, minutes to 09:59": "REFUSE entry_quote_absent",
+      "last closed 5m 09:55, minute 10:00 closed, at 10:01:10": "ALLOW",
+      "at 10:03:30, past the grace": "REFUSE too_late",
+      "a hole at 09:45": "REFUSE gap_in_coverage"
+    },
+    "can_PAPER_SHADOW_EVIDENCE_count_calm": {
+      "in_the_gate": "yes — the contradiction is gone",
+      "in_the_schedule": "NOT YET, and this is the honest part. The slot is dispatched at 10:00:00 and the quote it needs closes at 10:01:00. Measured today at 10:00:19: MES's joined frame ended 09:59 while MNQ's already carried a 19-second-old 10:00 bar. The sleeve takes the first instrument's index, so it would still refuse.",
+      "what_would_fix_it": "dispatch the Calm slot at 10:01 or 10:02 instead of 10:00. The entry price is unchanged, so this is an observation-time change, not a strategy change. It is a scheduler cron edit and needs a restart, so it is RECOMMENDED here and NOT applied."
+    },
+    "other_sleeves_unchanged": "asserted — the other three carry no context/quote override and keep the 60s grace",
+    "orders_possible": false
+  },
+  "tests": {
+    "file": "scratch/test_track1_stage5zu_calm_timing_identity_20260826.py",
+    "count": 33,
+    "mutations": {
+      "attempted": 11,
+      "red": 11,
+      "the_five_named_by_the_stage": [
+        "requiring a closed 10:00 bar again",
+        "using the 10:00 HIGH in the setup path",
+        "allowing a late 10:05 entry",
+        "treating a missing quote as a pass",
+        "moving the entry off the 10:00 open"
+      ]
+    }
+  },
+  "five_older_tests_updated_not_weakened": {
+    "why": "they pinned the OLD contract, which this stage changed on purpose, and they called validate for Calm without saying where the entry quote comes from",
+    "which": [
+      "5V-1 test_calm_still_needs_its_declared_bar_and_the_prior_rth",
+      "5V-1 test_only_the_two_scanning_sleeves_follow_the_slot",
+      "3B test_b3_calm_a_passes_only_when_everything_it_reads_is_there",
+      "3B the parametrised no_decision_bar case -> no_entry_quote",
+      "Stage 4 test_b_a_partial_or_stale_frame_is_refused_by_the_intraday_gate"
+    ],
+    "one_got_stronger": "the 3B parametrised case now distinguishes 'the quote index was not offered' from 'it was offered and the bar is absent' — two facts the old single code could not tell apart",
+    "one_added": "3B gained test_b3_calm_a_is_unverified_when_nobody_says_where_the_quote_comes_from"
+  },
+  "regression": {
+    "full_scratch_sweep_before_repairs": {
+      "passed": 2461,
+      "failed": 48,
+      "skipped": 5
+    },
+    "bisect": {
+      "method": "the two SOURCE edits reverted in a subprocess — the requirement table plus the new checks, and the quote-index argument at the slot call site — then the same 20 suites re-run and everything restored and digest-verified. Test-file edits left in place: they are part of the change.",
+      "with_5zu": 46,
+      "without_5zu": 33,
+      "caused_by_this_stage": 13
+    },
+    "the_13_and_what_they_were": {
+      "the grace group (9)": "5ZB pinned `decision_grace_seconds == 60` on EVERY sleeve and asserted 61s and 120s late are refused. Calm's grace is now 180s on purpose. Rewritten to read the grace PER SLEEVE from the requirement, with the odd one out asserted to be the sleeve that has an entry quote to wait for — a stronger claim than the uniform number, which was pinning a coincidence.",
+      "the calm gate group (4)": "4B, 4C and 5ZA called validate for Calm without saying where the entry quote comes from, so they got UNVERIFIED. Each now offers the minute index; 4B's second half asserted `decision_bar_absent`, a code Calm no longer emits, and now asserts the span refusal that says the same thing in the terms the contract uses."
+    },
+    "all_13_fixed": true,
+    "pre_existing_and_not_mine": 33,
+    "mutations_after_the_repairs": "11 of 11 still red",
+    "final_after_all_repairs": {
+      "passed": 2476,
+      "failed": 35,
+      "skipped": 5,
+      "was_before_the_repairs": {
+        "passed": 2461,
+        "failed": 48
+      },
+      "all_13_of_mine_gone": true,
+      "the_35": "18 suites, every one of them a suite the bisect classified. The count is 35 rather than the bisected 33 because the full sweep runs 67 suites against the bisect's 20 and this repo has measured order-dependent failures before (15 of them in the Stage 5ZQ sweep).",
+      "spot_checked": "test_8c_persisting_the_book_writes_the_route_path_and_never_legacy is an ABSENCE PROXY: it asserts live_positions.track1.json does not exist, and the live system wrote it at 12:30:25 today. Stale since Stage 5ZN gave the route a cross-day book — the same family as the others, not 5ZS and not 5ZU. Its failure message even blames the test's own redirection, which is what an absence proxy looks like when the world moves under it."
+    }
+  },
+  "stage_5ZT_closure_folded_in_here": {
+    "why_here": "5ZT's four deliverables were never written — its two decisive events were still in the future when the next stage arrived. They have since happened and are recorded here rather than left unanswered.",
+    "observed": {
+      "12:30:25 ET": "the stress window closed and wrote BOTH the book and the checkpoint",
+      "book_after": "schema_version 2, route track1_candidate — the repaired envelope SURVIVED a real window close",
+      "checkpoint": "written for the first time since 02:55",
+      "carry_forward": "accepted the repaired book; no refusal, no schema or route mismatch",
+      "legacy": "live_positions.json untouched at 09:31:11 throughout"
+    },
+    "answers": {
+      "book still schema 2 / route stamped": true,
+      "a safety job ran after the repair": "not before 12:45; the next stop-repair is 12:20 ET daily and MAX_HOLD is once a day at 09:31",
+      "next closing window wrote evidence": true,
+      "carry-forward refusals after repair": 0,
+      "legacy untouched": true,
+      "orders possible": false
+    }
+  },
+  "claims_deliberately_NOT_made": [
+    "that Calm will pass tomorrow — the slot still runs a minute too early",
+    "that the older artifact prices were reproduced",
+    "that the strategy changed",
+    "that anything was restarted"
+  ]
+}

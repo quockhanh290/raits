@@ -1,0 +1,24 @@
+{
+ "schema_version": 1,
+ "route": "track1_candidate",
+ "window": "vault2025",
+ "equity": 63236.11,
+ "cur_day": "2025-12-29",
+ "peak_equity": 64937.17,
+ "day_start_equity": 63215.35,
+ "positions": [],
+ "booked_counter": {},
+ "counters": {
+  "taken:roska4_swing": 55,
+  "rejected:roska4_swing": 48,
+  "taken:roska4_calm": 39,
+  "rejected:roska4_calm": 3,
+  "taken:roska4_stress": 3,
+  "taken:global_nkd": 31,
+  "take": 128,
+  "reject_cap": 48,
+  "reject_family_cap": 3,
+  "suppress_same_symbol": 4,
+  "forced_closes": 1
+ }
+}

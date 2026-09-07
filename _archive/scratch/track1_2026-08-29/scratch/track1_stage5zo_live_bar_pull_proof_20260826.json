@@ -1,0 +1,223 @@
+{
+  "stage": "5ZO",
+  "title": "Live bar pull proof: prove every decided Track 1 slot observed real data",
+  "checked_at": {
+    "utc": "2026-08-26T08:16",
+    "et": "2026-08-26T04:16 EDT",
+    "calgary": "2026-08-26T02:16 MDT",
+    "window": "ET 02:20-04:20"
+  },
+  "answers": {
+    "1_runtime_or_live_file_changed": {
+      "answer": false,
+      "verified": [
+        "window_coverage, slot_timing, signals, shadow/explanations and audits all at their baseline mtimes",
+        "checkpoint and book carry 00:55 from the live NKD close",
+        "data_observation/ does not exist yet - the first slot creates it",
+        "no old explanation row touched; nothing backfilled for 2026-08-26"
+      ]
+    },
+    "2_where_evidence_is_written": "global_index/track1_runtime/data_observation/data_observation_YYYYMMDD.jsonl (append-only, dated, beside the other evidence streams)",
+    "3_every_future_decided_slot_requires_proof": {
+      "answer": true,
+      "scope": "once the stream exists for that day",
+      "severity": "WARN, not FAIL",
+      "justification": "the ledger row already proves the slot ran and decided; the observation row proves what it observed. A missing observation WEAKENS the evidence without contradicting it. Making it fatal would fail every window recorded before this stage existed - not a finding about those windows. It stops being tolerable the day a paper order is sent on a decision nobody can show the data for, and the readiness gate is where that belongs.",
+      "reason_code": "decided_without_data_observation"
+    },
+    "4_what_is_proven_per_instrument": [
+      "provider (as the join reported it, not a guess)",
+      "three identities kept apart: runner name / history symbol / order symbol",
+      "parquet path and <path>:<sha256> identity - the same shape the explanation row carries",
+      "live_rows_fetched / offered / appended / offered_but_unused",
+      "live_first_kept_ts",
+      "frozen_rows",
+      "frozen_last_ts",
+      "overlap_checked_rows and overlap_result",
+      "splice_result (the code the join produced), notices, detail, dropped_columns",
+      "final_frame_first_ts / last_ts / rows",
+      "dropped_open_final_bar: NULL with a reason - see the residual"
+    ],
+    "5_changes_strategy_decisions": {
+      "answer": false,
+      "why": "every number already existed on the objects the slot built while deciding; the writer reads them and computes nothing",
+      "asserted": [
+        "imports nothing named signal / detector / sleeve / params (AST)",
+        "instrument_row calls as_dict and no aggregation function (AST)",
+        "the row is written AFTER the ledger row (AST line numbers)",
+        "the write is wrapped so it cannot take a slot down (AST)"
+      ]
+    },
+    "6_old_slots_without_observation": {
+      "classification": "pre_observation_schema",
+      "principle": "a day with no stream at all is a fact about the SOFTWARE, not about the window - classified, never accused",
+      "measured_on_the_real_evidence": {
+        "window": "global_nkd 2026-08-26",
+        "verdict": "PASS (unchanged)",
+        "schema_state": "pre_observation_schema",
+        "records": 0,
+        "decided_slots": 22,
+        "slots_without_data_observation": []
+      }
+    },
+    "7_dashboard": {
+      "placement": "one line inside the EXISTING Operational block - not a new section",
+      "why": "the panel already has a health block and a signal chip; a third heading for a single sentence costs more attention than it returns",
+      "three_shapes": [
+        "Data: IBKR · NKD · 1186 live bars checked · last 02:55 ET · splice OK",
+        "Data proof: not recorded by this slot version",
+        "Data refused: overlap mismatch"
+      ],
+      "asserted": [
+        "no variable names, no JSON, no thresholds",
+        "a length cap so it cannot wrap to three lines on a phone",
+        "exactly one Data line per job"
+      ]
+    },
+    "8_orders_still_impossible": {
+      "answer": true,
+      "blocking": [
+        "B1_broker_account_or_legacy_retirement",
+        "PAPER_SHADOW_EVIDENCE",
+        "REGIME_LABEL_VERIFICATION"
+      ]
+    },
+    "9_next_shadow_window_ready": true,
+    "10_remaining_before_paper": [
+      {
+        "n": 1,
+        "item": "machine sleep",
+        "class": "operator"
+      },
+      {
+        "n": 2,
+        "item": "B1 account decision",
+        "class": "operator"
+      },
+      {
+        "n": 3,
+        "item": "five clean judgeable days",
+        "class": "time, once 1 is fixed"
+      },
+      {
+        "n": 4,
+        "item": "the regime gate's first PASS",
+        "class": "time - and --verify-strict is NOW LIVE, so the 16:20 job will record one"
+      },
+      {
+        "n": 5,
+        "item": "broker stop proof, partial fills, order in flight across a restart",
+        "class": "paper only"
+      }
+    ]
+  },
+  "the_gap": {
+    "found_in": "the evidence, not the code",
+    "window": "global_nkd 2026-08-26 - PASS, 22 slots, all decided, no candidates, p95 32.2s",
+    "row": "TRACK1_NKD_0255: bar_timestamps [], data_time null",
+    "statement": "the ledger proved the slot DECIDED; nothing proved WHAT IT LOOKED AT. On a route that has never traded, a slot that fetched nothing and one that fetched a thousand bars produce the same ledger row.",
+    "already_proven_and_not_re_solved": "data_source_identity on that same row carries <parquet path>:<sha256> - the HISTORY side was provable; the LIVE side was not"
+  },
+  "the_residual_named_rather_than_guessed": {
+    "field": "dropped_open_final_bar",
+    "value": null,
+    "reason": "not_reported_by_the_join",
+    "explanation": "nothing in the chain records whether the provider's final bar was still forming when it was handed over. The fetch is causal - it keeps bars at or before the instant it was taken - but that is a different guarantee.",
+    "closing_it": "means asking the provider layer a question it does not currently answer - a small stage, not a blocker"
+  },
+  "three_write_cases": {
+    "built a frame and decided": "a full row",
+    "refused before deciding": "a refusal row naming the code - 'nobody looked' and 'we looked and were refused' call for different actions",
+    "never reached either": "NOTHING - a row claiming an observation nobody made is worse than no row"
+  },
+  "no_bar_arrays": {
+    "rule": "no raw bar array, no prices",
+    "why": "a row that embedded bars would grow with the market and would put price data into a stream whose purpose is provenance",
+    "enforced_by": "a test that walks the whole payload and fails on any list longer than 20 items or any non-scalar leaf, plus a 4 KB cap on one row"
+  },
+  "operator_restart_i_did_not_do": {
+    "what": "scheduler 18096 -> 18780 at 02:09:03 Calgary; backend 30604 -> 48760 at 02:09:16",
+    "who": "the operator - I restarted nothing",
+    "why_i_checked": "a process table that disagrees with what I did is a reason to stop",
+    "restart_was_clean": [
+      "same argv and mode",
+      "45 legacy strategy jobs not scheduled",
+      "11 safety, 5 audit, 70 shadow slots",
+      "THE SEVEN PRE-FLIGHT DAYS RESTORED - the operator's repair survived"
+    ],
+    "settles_liveness_in_the_opposite_direction_from_my_first_assumption": {
+      "my_edits": "02:03-02:06",
+      "restart": "02:09",
+      "conclusion": "the new processes picked up EVERYTHING",
+      "verified_against_the_live_api": {
+        "5ZL regime_verify block": "present",
+        "5ZM reporting block": "present",
+        "5ZO data line on a job": "'Data proof: not recorded by this slot version'",
+        "scheduler spy_refresh_pm": "now carries --verify-strict"
+      }
+    },
+    "slot_writer_needs_no_restart": "slots run as fresh subprocesses, so the first Track 1 window after this produces real observation rows"
+  },
+  "audit_integration": {
+    "reason_added": "decided_without_data_observation (WARN)",
+    "summary_fields": [
+      "schema_state",
+      "records",
+      "malformed_lines",
+      "decided_slots",
+      "slots_without_data_observation",
+      "providers",
+      "refusals_by_reason",
+      "splice_results",
+      "live_rows_fetched_total"
+    ],
+    "old_audits_preserved": true,
+    "2026_08_26_not_rewritten": true
+  },
+  "tests": {
+    "file": "scratch/test_track1_stage5zo_live_bar_pull_proof_20260826.py",
+    "count": 34,
+    "all_ten_brief_items_covered": true,
+    "three_worth_naming": [
+      "the END-TO-END WIRING test - a `root` parameter was added to the slot writer purely so one could exist, because a mechanism nobody has watched run is a trap this project has already paid for twice",
+      "the ORDERING test - reads line numbers out of the AST to prove the observation row is written after the ledger row",
+      "the PAYLOAD WALK - fails on any list long enough to be bar data rather than trusting a sentence that says there is none"
+    ]
+  },
+  "regression": {
+    "passed": 709,
+    "failed": 0,
+    "suites": [
+      "5ZO",
+      "5ZN",
+      "5ZM",
+      "5ZK",
+      "5ZH",
+      "5ZE",
+      "5ZD",
+      "5Q",
+      "5Q1",
+      "5P",
+      "monitor/test_dashboard_backend.py",
+      "monitor/test_realtime_contract.py"
+    ]
+  },
+  "files_changed": {
+    "new": [
+      "global_index/track1_data_observation.py",
+      "scratch/test_track1_stage5zo_live_bar_pull_proof_20260826.py"
+    ],
+    "modified": [
+      "global_index/run_live_day_track1.py",
+      "global_index/track1_shadow_acceptance.py",
+      "monitor/backend/job_journal_reader.py"
+    ],
+    "runtime_files_changed": []
+  },
+  "claims_deliberately_NOT_made": [
+    "that 2026-08-26 NKD has data_observation rows",
+    "that the provider's final bar was or was not open",
+    "paper readiness",
+    "any broker-verified anything"
+  ]
+}

@@ -1,0 +1,20 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+  MES xong
+  MNQ xong
+  MYM xong
+  M2K xong
+
+====================================================================================
+HINH HOC MUC STOP BAN DAU — bo tin hieu GOC vs bo tin hieu cua A
+====================================================================================
+  bo           n      p01      p10  trung vi      p75      p90       sai phia
+  GOC       3356   -0.052    0.395     0.777    0.902    0.961       42 (1.25%)
+  A         2398    0.503    0.716     0.887    0.946    0.977        2 (0.08%)
+
+=== RUI RO THAT MOI LENH (USD) ===
+  GOC    p10 $    14 | trung vi $    33 | p90 $    84 | p90/p10 6.0 lan
+  A      p10 $    20 | trung vi $    41 | p90 $    94 | p90/p10 4.7 lan
+
+=== DOC ===
+  bang ATR bi an: GOC trung vi 22% | A trung vi 11%
+  stop sai phia : GOC 42 lenh | A 2 lenh

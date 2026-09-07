@@ -1,0 +1,232 @@
+{
+  "artifact": "track1_stage3b_close_blockers",
+  "date": "2026-08-22",
+  "stage": "3B — close every remaining Track 1 blocker, or turn it into a hard code gate",
+
+  "contract": {
+    "scheduler_or_service_started": false,
+    "ibkr_connected": false,
+    "live_order_sent": false,
+    "dashboard_written": false,
+    "committed": false,
+    "legacy_retired": false,
+    "legacy_production_files_modified": [],
+    "test_event_playback_run": false
+  },
+
+  "verdict": {
+    "code": "B",
+    "label": "ONLY USER_DECISION_GATE REMAINS",
+    "closed": 4,
+    "gated": 4,
+    "open_without_gate": 0,
+    "prose_only": 0,
+    "summary": "Four blockers closed with code and a test that goes red when the code is removed. Four are held by a decision only the project owner can make, each enforced by a hard code gate that refuses to arm the order path until an explicit schema-checked confirmation exists on disk. There is no OPEN status: track1_gates allows exactly two, and a self-check refuses a gate nothing can release, a CLOSED blocker that still blocks, and a CLOSED blocker with no evidence."
+  },
+
+  "decisions_needed": [
+    {"flag": "legacy_retired_confirmed OR separate_account_confirmed",
+     "blocker": "B1_broker_account_or_legacy_retirement",
+     "decision": "One IB Gateway login is one position book. Retire legacy first — the stated end state and the cheaper of the two — or fund a dedicated IBKR account for Track 1.",
+     "runbook": "docs/futures/TRACK1_SWITCHOVER_RUNBOOK.md"},
+    {"flag": "normal_generator_isolation_accepted",
+     "blocker": "SLEEVE_normal_r4",
+     "decision": "The Normal-R4 generator reproduces the committed rows exactly but replaces five production symbols while it runs and depends on a root-level script. Accept subprocess isolation, or fund a real promotion into futures/ with its own equivalence proof."},
+    {"flag": "calm_a_detector_accepted_frozen",
+     "blocker": "SLEEVE_calm_a",
+     "decision": "Calm A's setup list is a frozen CSV; the detector exists as prose and a column, not a function. Write it with a test that reproduces the CSV row for row, or accept that Calm A is replay-only and can never fire live."},
+    {"flag": "scheduler_wiring_approved",
+     "blocker": "WIRING_scheduler_dashboard_paper",
+     "decision": "Scheduling Track 1 slots changes what a running production process does. Approve when the slots, the schedule_status mirror, the _ENTRY_WINDOWS entry for 10:35-12:30 and the route-field policy are all to be applied together."}
+  ],
+  "second_factor": {
+    "env": "TRACK1_ORDERS_APPROVED=1",
+    "why": "one flag on a command line must never be enough to reach an exchange",
+    "tested": "the gate arms only with no blockers AND the env approval; missing either refuses"
+  },
+
+  "blockers": [
+    {"id": "B1_broker_account_or_legacy_retirement", "status": "USER_DECISION_GATE",
+     "blocks_orders": true, "released_by": ["legacy_retired_confirmed", "separate_account_confirmed"],
+     "built": ["docs/futures/TRACK1_SWITCHOVER_RUNBOOK.md — 7 preconditions, 8 ordered steps, rollback",
+               "global_index/track1_gates.py — confirmation schema and the gate"],
+     "fail_closed_cases_tested": ["wrong schema_version", "missing confirmed_by", "blank confirmed_by",
+                                  "non-boolean flag", "misspelled flag", "unknown extra key",
+                                  "unparseable JSON", "JSON array not object"],
+     "design_note": "absent is NOT an error — the file's normal state is 'not there', it grants nothing, and the gated blockers refuse on their own. A file that EXISTS and does not validate is refused whole rather than partially honoured."},
+
+    {"id": "B3_intraday_freshness", "status": "CLOSED", "blocks_orders": false,
+     "closed_by": "global_index/track1_intraday.py — a source-agnostic bar validator",
+     "refusal_codes": ["no_bars", "not_a_frame", "tz_mismatch", "duplicate_timestamps",
+                       "out_of_order", "missing_session", "partial_coverage", "gap_in_coverage",
+                       "stale", "too_early", "too_late", "decision_bar_absent",
+                       "window_unobserved", "unknown_sleeve"],
+     "requirements": {
+       "roska4_calm": {"today_span": "09:30-10:00 contiguous", "decision_bar": "10:00 (its OPEN is the entry)",
+                       "clock": "at or after 10:00 and not after it", "prior_rth": "09:30-16:00 complete"},
+       "roska4_stress": {"today_span": "09:30-10:30 contiguous (the detector's input)",
+                         "decision_bar": null, "clock": "10:35 to 12:30 inclusive",
+                         "observation": "window ledger must not report incomplete"}},
+     "tests": "18 fail-closed cases plus one passing case per sleeve; plus a test that an unsupplied window-observation check reports 'did not run' rather than passing",
+     "refusals_that_could_have_been_repairs": [
+       "duplicate timestamps — survive sorting, and the last one wins on a reindex; this is how 1,050 of 1,590 NKD live bars once overwrote frozen history with a 13-hour clock error",
+       "wrong timezone — refused, never converted; converting is how a frame ends up right by accident and wrong the next time the offset moves"]},
+
+    {"id": "SLEEVE_normal_r4", "status": "USER_DECISION_GATE", "blocks_orders": true,
+     "released_by": ["normal_generator_isolation_accepted"],
+     "anchor_measured_now": {"window": "vault2026", "seconds": 33.3, "all_ok": true,
+                             "committed_total": 107, "pytest_subprocess_seconds": 39.8},
+     "anchor_historic": {"floor": 980, "vault2025": 136, "vault2026": 107},
+     "why_gated": "replaces futures._validated_core.backtest_swing_tf, _swing_cache, TrendFollowStrategy.generate_signal, SwingTFEngine and StressMidEngine for the duration of the run, mutates trend_follow.DEFAULT_CONFIG, and depends on model_sameday_stop.run_loop (a root-level script). While it runs, the production engine IS the patched one."},
+
+    {"id": "SLEEVE_nkd_mnkd", "status": "CLOSED", "blocks_orders": false,
+     "closed_by": "the sleeve IS futures.swing_tf.SwingTFEngine at ema 10 / chandelier 2.5 / hold 5 with RegimeLabels(lag_days=1) — production code today, unchanged by Track 1",
+     "anchor": {"floor": 228, "vault2025": 31, "vault2026": 26},
+     "identity_vs_stage2b_bootstrap": "zero strategy differences; all four differences are rendering"},
+
+    {"id": "SLEEVE_calm_a", "status": "USER_DECISION_GATE", "blocks_orders": true,
+     "released_by": ["calm_a_detector_accepted_frozen"],
+     "computed_half": ["ATR15 disaster stop", "exit simulation", "risk", "P&L"],
+     "frozen_half": "scratch/calm_pcloc_not_deep_gap_trade_list.csv — the SETUP LIST: which days set up, in which direction, at what entry price",
+     "why_gated": "the detector rule is written down and is a column in that CSV, and is no function anywhere. Today has no answer.",
+     "note": "recording the flag does NOT make it live-capable; it records that the limitation is understood"},
+
+    {"id": "SLEEVE_stress_mnq", "status": "CLOSED", "blocks_orders": false,
+     "closed_by": "computed from bars end to end: load_window -> build_day_cache -> build_rule_with_levels(make_rule(Scenario('mnq_only_g3_q7', ('MNQ',), 7)))",
+     "not_this": "futures/stress_liquidation_1020.py — a different 10:20 candidate that says of itself it is not wired; asserted by test",
+     "side_effect": "sets SETUPS to ('10:30',) for the call and restores it in a finally — scoped and reversed"},
+
+    {"id": "CHECKPOINT_bootstrap_under_track1_params", "status": "CLOSED", "blocks_orders": false,
+     "closed_by": "global_index/track1_bootstrap.py",
+     "resume_measured": {"window": "vault2026", "events_full": 91, "events_head": 39,
+                         "events_tail": 52, "events_exact": true, "equity_exact": true,
+                         "cuts_tested": ["2026-03-31 (bare date)", "2026-03-31 11:14:00-04:00 (explicit instant)"]},
+     "refusals": ["a bootstrap with no cut_instant", "missing equity", "missing peak_equity",
+                  "missing positions", "a trade_id not in the candidate stream"],
+     "old_bootstrap": "still refused with params_mismatch; the test proving it is kept",
+     "new_bootstrap": "accepted by route_checkpoint.usable; moving one setting turns acceptance back into params_mismatch; writing the route never touches another route's keys"},
+
+    {"id": "WIRING_scheduler_dashboard_paper", "status": "USER_DECISION_GATE", "blocks_orders": true,
+     "released_by": ["scheduler_wiring_approved"],
+     "built": ["global_index/track1_slots.py — 25 slots declared, none registered",
+               "a legacy scheduler/dashboard parity check that goes red on divergence",
+               "the paper-output policy per channel, asserted as data"],
+     "slots": {"calm": 1, "stress": 24, "total": 25, "scheduled_live": false},
+     "named_not_applied": "run_scheduler._ENTRY_WINDOWS needs ((10,35),(12,30)) or STOP_REPAIR_1220 runs a B3 reconcile inside the Stress window; a test asserts 12:20 is the one sweep inside it and that it is currently NOT excluded"}
+  ],
+
+  "parity_finding": {
+    "title": "the scheduler and its dashboard mirror key on two different namespaces",
+    "detail": "APScheduler keys a job by its `id`; the dashboard parses scheduler_*.log and keys on the [BRACKETED] label. They coincide for 56 of 58 timed jobs.",
+    "divergences": {"live_day": "LIVE_DAY_1405", "maxhold_exit": "MAX_HOLD_EXIT"},
+    "harm_so_far": "none",
+    "now": "the alias table is asserted, so a THIRD divergence goes red; a test also asserts the table still has exactly two entries and both jobs still exist",
+    "self_test": "removing one job from the comparison turns the parity check red"
+  },
+
+  "carried_state_finding": {
+    "title": "what Stage 2C could not prove is now proved — the cut was the problem, not the field",
+    "correction": "Stage 2D Addendum 1 stated that Stage 2C had proved risk and cluster load-bearing. That was taken from a handoff and not measured; Stage 2C's own artifacts record both mutations MATCHING where they had to DIVERGE, at both cuts it tried. Corrected in Stage 2D Addendum 2.",
+    "mechanism": "a carried position's cluster and risk_dollars are read by exactly one thing — the cap gate, when a same-cluster candidate arrives WHILE that position is still open. Stage 2C placed its cuts to make the breaker's peak bind (a few sessions before the deepest drawdown), and at those instants no same-cluster candidate followed before the carried position exited. Measured directly at one such cut: both carried positions had ZERO same-cluster candidates before they exited.",
+    "binding_cuts": {
+      "cluster": {"vault2026": "2026-01-26 14:30", "vault2025": "2025-01-21 14:15", "floor": "2018-10-31 14:35"},
+      "risk_dollars": {"vault2026": "2026-01-26 14:30", "vault2025": "2025-02-03 15:25", "floor": "2018-02-22 14:45"},
+      "day_start_equity": {"vault2026": "2026-01-26 14:30", "vault2025": "2025-02-05 14:20 JST", "floor": "2018-02-22 14:45"},
+      "equity": {"vault2026": "2026-06-29 14:55", "vault2025": "2025-05-22 14:20", "floor": "any floor cut tested"},
+      "peak_equity": "any cut carrying anything",
+      "positions": "any cut carrying anything"},
+    "equity_note": "resetting equity to the account base only bites once the book has GROWN enough that the reset manufactures a drawdown crossing a breaker threshold; at an early cut it changes nothing",
+    "in_code": "track1_bootstrap.binding_cuts() returns the instants where a carried position's cluster is consulted again, so the next mutation test picks a cut that CAN bind instead of hoping",
+    "counter_test": "a companion test asserts that at the ordinary 2026-03-31 cut no carried position is consulted again, so if that changes the explanation goes red rather than becoming folklore",
+    "booked": "remains a double-settlement counter and is correctly inert"
+  },
+
+  "tests": [
+    {"suite": "scratch/test_track1_stage3b_blockers_20260822.py",
+     "command": "python -m pytest scratch/test_track1_stage3b_blockers_20260822.py -q",
+     "result": "72 passed, 1 skipped in 26.57s"},
+    {"suite": "Stage 3B regeneration gate (subprocess)",
+     "command": "TRACK1_REGEN=1 python -m pytest scratch/test_track1_stage3b_blockers_20260822.py -q -k regenerates",
+     "result": "1 passed in 39.78s"},
+    {"suite": "scratch/test_track1_stage3_route_20260822.py",
+     "command": "python -m pytest scratch/test_track1_stage3_route_20260822.py -q",
+     "result": "41 passed, 1 skipped in 35.04s"},
+    {"suite": "Stage 3 floor equivalence",
+     "command": "TRACK1_EQUIV_FLOOR=1 python -m pytest scratch/test_track1_stage3_route_20260822.py -q -k \"floor or test_1_\"",
+     "result": "3 passed in 127.03s (re-run at the end of Stage 3B; Stage 3 measured 142.26s)"},
+    {"suite": "the eight that must stay green",
+     "command": "python -m pytest scratch/test_track1_stage2_equivalence_bootstrap_20260822.py scratch/test_track1_route_checkpoint_stage1_20260822.py scratch/test_slot_telemetry_20260822.py global_index/test_slot_overlap.py global_index/test_log_hygiene.py global_index/test_scheduler_heartbeat.py global_index/test_dashboard_live_snapshot.py global_index/test_scheduler_shadow_verify.py -q",
+     "result": "156 passed in 5.51s",
+     "baseline": "156 passed — unchanged since Stage 2D"},
+    {"suite": "global_index/test_event_playback.py", "result": "NOT RUN — known to hang"}
+  ],
+
+  "files_created": {
+    "production_package": ["global_index/track1_gates.py", "global_index/track1_intraday.py",
+                           "global_index/track1_live_sleeves.py", "global_index/track1_bootstrap.py",
+                           "global_index/track1_slots.py"],
+    "docs": ["docs/futures/TRACK1_SWITCHOVER_RUNBOOK.md"],
+    "scratch": ["scratch/test_track1_stage3b_blockers_20260822.py",
+                "scratch/track1_blocking_ledger_20260822.md",
+                "scratch/track1_blocking_ledger_20260822.json",
+                "scratch/_stage3b_legacy_baseline.json"]
+  },
+  "files_changed": [
+    {"path": "global_index/track1_signal_layer.py",
+     "change": "ADDITIVE: restore(), cut_instant_for(), BootstrapRefused, and stop_after/resume_from on run_candidates. Existing callers unaffected — the Stage 3 suite is unchanged and green."},
+    {"path": "global_index/run_live_day_track1.py",
+     "change": "OrderGate delegates to track1_gates; OPEN_ORDER_BLOCKERS is derived rather than hand-written"},
+    {"path": "scratch/track1_stage2d_full_production_route_audit_20260822.md",
+     "change": "APPENDED Addendum 2 — corrects Addendum 1's unmeasured claim about carried fields"}
+  ],
+
+  "legacy_untouched": {
+    "method": "content sha256 + mtime_ns snapshot taken BEFORE any write, compared after every run",
+    "result": "26 of 26 identical",
+    "confirmation_file_absent": true,
+    "groups": {
+      "runtime_state": ["live_positions.json", "slip_stats.json", "trade_log.jsonl",
+                        "global_index/replay_checkpoint.json", "global_index/live_state_data.js",
+                        "global_index/preflight_state.json", "global_index/maxhold_state.json",
+                        "global_index/paper_history.json"],
+      "legacy_code": ["global_index/signal_layer.py", "global_index/run_live_day.py",
+                      "global_index/runner.py", "global_index/run_scheduler.py",
+                      "global_index/ibkr_broker.py", "global_index/live_decision.py",
+                      "global_index/net_exposure_multi.py", "global_index/replay_checkpoint.py"],
+      "shared_route_modules": ["global_index/route_checkpoint.py", "global_index/route_params.py",
+                               "global_index/window_ledger.py", "global_index/slot_telemetry.py"],
+      "dashboard": ["monitor/backend/app.py", "monitor/backend/schedule_status.py",
+                    "monitor/backend/job_journal_reader.py", "monitor/backend/paper_evidence_reader.py"],
+      "still_absent": ["runner.pid", "STOP_TRADING"]
+    }
+  },
+
+  "ledger_parity": {
+    "generated_from": "global_index/track1_gates.BLOCKERS",
+    "json": "scratch/track1_blocking_ledger_20260822.json",
+    "test": "test_ledger_matches_the_registry_exactly compares them byte for byte",
+    "structural_tests": ["no status outside the two allowed",
+                         "every gate is releasable and names its decision",
+                         "every closed blocker carries evidence and does not block",
+                         "the full confirmation set WOULD open the route",
+                         "the sleeve table and the blocker registry agree about live-readiness"]
+  },
+
+  "confidence_labels": {
+    "verified_reproduced_with_a_number": [
+      "every test result listed above",
+      "the 33.3s / 107-row Normal-R4 re-anchor and its 39.8s subprocess re-run",
+      "per-field binding cuts on all three windows",
+      "the 56-of-58 scheduler/dashboard namespace coincidence",
+      "the identity diff against the Stage 2B bootstrap",
+      "26 of 26 legacy artifacts unchanged"
+    ],
+    "reasoned_from_the_code_path_not_executed": [
+      "that the intraday validator's requirements match what a live sleeve will actually read. They are derived from the strategies' entry and exit definitions and no live source exists to disagree yet; if a promoted detector reads one more bar than the requirement declares, the gate would pass a frame one bar short."
+    ],
+    "not_examined": [
+      "whether the Normal-R4 generator is safe to run in a subprocess CONCURRENTLY with a trading process — the test runs it alone; memory and parquet-cache contention were not measured"
+    ],
+    "out_of_scope_and_not_started": "retiring legacy, scheduling any Track 1 slot, and creating any confirmation file"
+  }
+}

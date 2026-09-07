@@ -1,0 +1,339 @@
+{
+  "stage": "5ZJ",
+  "title": "Make 5ZG live safely, then verify Track 1 safety exit routing",
+  "checked_at": {
+    "utc": "2026-08-26T04:21",
+    "et": "2026-08-26T00:21 EDT",
+    "calgary": "2026-08-25T22:21 MDT",
+    "tokyo": "2026-08-26T13:21 JST",
+    "window": "ET 00:01-00:25"
+  },
+  "answers": {
+    "1_scheduler_restarted": {
+      "yes": true,
+      "old_pid": 48604,
+      "new_pid": 18096,
+      "old_started": "2026-08-24 23:07:22 Calgary (= 2026-08-25 01:07 ET)",
+      "new_started": "2026-08-25 22:03:38 Calgary"
+    },
+    "2_backend_restarted": {
+      "yes": true,
+      "old_pid": 7872,
+      "new_pid": 30604,
+      "old_started": "2026-08-25 18:36:28 Calgary",
+      "new_started": "2026-08-25 22:03:41 Calgary"
+    },
+    "3_is_5zg_live": {
+      "yes": true,
+      "proof": "the running scheduler launched a REAL sweep with both flags - see live_argv"
+    },
+    "4_did_track1_safety_route_to_the_track1_trade_log": {
+      "destination_proven": true,
+      "close_row_proven": false,
+      "detail": "the file was created by the WRITABILITY PROBE and is 0 bytes / 0 rows, because live_positions.track1.json holds zero positions and there was nothing to close"
+    },
+    "5_legacy_safety_unchanged": {
+      "yes": true,
+      "proof": "same-second argv comparison in the live log; legacy trade_log.jsonl still 8486 bytes, mtime 2026-08-15"
+    },
+    "6_runtime_or_live_data_changed": {
+      "count": 1,
+      "files": [
+        {
+          "path": "global_index/track1_runtime/trade_log.track1.jsonl",
+          "change": "CREATED, 0 bytes, 0 rows",
+          "at": "2026-08-25 22:20:01.18",
+          "why": "the writability probe in safety_trade_log.resolve, which append-opens the destination before the job looks for its book",
+          "intended": true
+        }
+      ],
+      "everything_else_byte_identical": true
+    },
+    "7_orders_still_impossible": {
+      "yes": true,
+      "orders_possible": false,
+      "blocking": [
+        "B1_broker_account_or_legacy_retirement",
+        "PAPER_SHADOW_EVIDENCE"
+      ],
+      "confirmation_file": false,
+      "track1_orders_approved": false,
+      "orders_dir": false,
+      "stop_trading": false
+    },
+    "8_what_remains_before_paper": [
+      "machine sleep (operator)",
+      "B1 (operator decision)",
+      "checkpoint cannot resume - 5ZK",
+      "regime verification warn-only - 5ZL",
+      "route-aware PnL / parity / legacy-reader split - 5ZM",
+      "planned stop not journalled + close_position/place_protective_stop unbuilt - 5ZN"
+    ],
+    "9_next_stage": {
+      "recommended": "5ZK checkpoint frames",
+      "reasons": [
+        "it has a MEASUREMENT GATE in front of it that nothing else has - whether the closing slot can reuse frames or must reload is unmeasured, and if that cost is large the stage changes shape",
+        "cheap and self-contained: one call site, no broker, no strategy change",
+        "the audit now reads the checkpoint correctly and the artefact is still inert; a correct reader over an empty file is a smaller achievement than it looks, and 5ZK is exactly that gap"
+      ],
+      "close_second": "5ZL (smaller still; either order works)",
+      "should_not_be_next": "5ZM - a PnL reader over the order journal would read a journal that nothing writes yet"
+    }
+  },
+  "part_a_pre_restart": {
+    "scheduler": {
+      "pid": 48604,
+      "started": "2026-08-24 23:07:22 Calgary",
+      "argv": "-m global_index.run_scheduler --port 4002 --shadow-resume --track1-only-shadow"
+    },
+    "backend": {
+      "pid": 7872,
+      "started": "2026-08-25 18:36:28 Calgary"
+    },
+    "track1_mode": "track1-only-shadow",
+    "orders_possible": false,
+    "inventory_from_source": {
+      "total": 101,
+      "track1_strategy": 70,
+      "track1_safety": 11,
+      "track1_audit": 5,
+      "shared_infra": 4,
+      "legacy_drain_safety": 11,
+      "legacy_strategy": 0,
+      "spy_refresh_pm": true
+    },
+    "live_track1_safety_argv_before": {
+      "line": "2026-08-25 20:20:00 [TRACK1_STOP_REPAIR_2220] -m global_index.run_stop_repair --positions-path live_positions.track1.json --stop-path STOP_TRADING.track1 --lock-path runner.track1.pid --client-id 90 --port 4002",
+      "has_trade_log_path": false,
+      "has_route": false,
+      "conclusion": "STALE - the scheduler holding this argv started 14 hours before 5ZG was written"
+    },
+    "artefacts_before": {
+      "global_index/track1_runtime/trade_log.track1.jsonl": "absent",
+      "trade_log.jsonl": "8486 B, mtime 2026-08-15 10:11:28",
+      "live_positions.track1.json": "present, 284 B, zero positions",
+      "global_index/track1_runtime/orders": "absent",
+      "track1_go_live_confirmation.json": "absent"
+    },
+    "backend_freshness_before": {
+      "5ZF legacy_runner block": "PRESENT (backend started after 5ZF)",
+      "5ZF route_mode": "track1_only_shadow",
+      "5ZH checkpoint summary": "STALE - route: null, no `routes` key, no `entry_count` (backend started 18:36, 5ZH edited 19:44)"
+    }
+  },
+  "part_b_restart": {
+    "command_run": "python monitor\\ops.py restart --scheduler --track1-only-shadow --yes",
+    "why_yes_flag": "this shell is non-interactive; without --yes, ensure_single puts a confirmation prompt in front of the restart that would read EOF. It is the flag's documented purpose ('for unattended runs'), not a widening of the action.",
+    "timing_chosen_not_taken": {
+      "et_at_restart": "00:03",
+      "window_open": false,
+      "run_live_day_children": "runner scan ok=True pids=[]",
+      "minutes_to_next_sweep": 17,
+      "minutes_to_nkd_window": 67
+    },
+    "second_restart_skipped": {
+      "command_not_run": "python monitor\\ops.py restart --no-scheduler --track1-only-shadow",
+      "why": "restart --scheduler restarts the BACKEND too - the transcript shows 'backend: stopped [7872] / backend=started pid 30604'. The new backend started 22:03:41, after every source edit (latest 5ZH at 19:44). A second restart would replace a seconds-old process with an identical one.",
+      "verified_not_assumed": {
+        "5ZH checkpoint summary": "route now 'track1_candidate', routes + entry_count present",
+        "5ZF legacy_runner + route_mode": "present",
+        "5ZD signal chip on job rows": "present",
+        "5ZE operational block on job rows": "present"
+      }
+    }
+  },
+  "part_c_post_restart": {
+    "mode": "track1-only-shadow",
+    "new_process_argv": "-m global_index.run_scheduler --port 4002 --shadow-resume --track1-only-shadow  (--shadow-resume survived)",
+    "inventory_from_the_new_process_log": {
+      "banner": [
+        "[track1-only] 45 legacy strategy jobs not scheduled; 85 jobs remain",
+        "[track1-only] 11 Track 1 safety jobs registered against live_positions.track1.json",
+        "[track1-only] 5 Track 1 audit jobs registered (read-only, no broker)",
+        "Track 1 SHADOW slots registered: 70 (no orders - the route's gate refuses)"
+      ],
+      "counted_independently": {
+        "added": 146,
+        "removed": 45,
+        "net": 101
+      },
+      "matches_pre_restart_source_construction": true,
+      "spy_refresh_pm": true,
+      "legacy_drain_still_scheduled": true
+    },
+    "argv_from_the_code_the_new_process_loaded": {
+      "track1_safety_jobs_fired": 11,
+      "legacy_drain_fired": 11,
+      "track1": {
+        "--positions-path": "live_positions.track1.json",
+        "--trade-log-path": "global_index/track1_runtime/trade_log.track1.jsonl",
+        "--route": "track1_candidate",
+        "--client-id": "90",
+        "--lock-path": "runner.track1.pid"
+      },
+      "legacy_drain": {
+        "--positions-path": "live_positions.json",
+        "--trade-log-path": "ABSENT (correct)",
+        "--route": "ABSENT (correct)"
+      },
+      "allow_orders_in_any_fired_argv": false
+    },
+    "gates": {
+      "orders_possible": false,
+      "stop_trading": false,
+      "confirmation": false,
+      "track1_orders_approved": false,
+      "orders_dir": false,
+      "blocking": [
+        "B1_broker_account_or_legacy_retirement",
+        "PAPER_SHADOW_EVIDENCE"
+      ]
+    },
+    "dashboard_backend_now_reflects": [
+      "5ZD signal chip",
+      "5ZE operational block",
+      "5ZF legacy_runner + route_mode",
+      "5ZH checkpoint schema-2 summary"
+    ]
+  },
+  "part_d_first_live_sweep": {
+    "when": "2026-08-25 22:20:00 Calgary = 2026-08-26 00:20 ET",
+    "both_routes_launched_in_the_same_second": true,
+    "live_argv": {
+      "legacy": "[STOP_REPAIR_0020] -m global_index.run_stop_repair --positions-path live_positions.json --port 4002",
+      "track1": "[TRACK1_STOP_REPAIR_0020] -m global_index.run_stop_repair --positions-path live_positions.track1.json --stop-path STOP_TRADING.track1 --lock-path runner.track1.pid --client-id 90 --trade-log-path global_index/track1_runtime/trade_log.track1.jsonl --route track1_candidate --port 4002"
+    },
+    "outcomes": {
+      "legacy": "completed OK at 22:20:11",
+      "track1": "completed OK at 22:20:13"
+    },
+    "what_the_sweep_wrote": {
+      "global_index/track1_runtime/trade_log.track1.jsonl": {
+        "created_at": "22:20:01.18",
+        "bytes": 0,
+        "rows": 0,
+        "cause": "WRITABILITY PROBE ONLY - recorded explicitly as briefed"
+      },
+      "trade_log.jsonl": {
+        "bytes": 8486,
+        "rows": 28,
+        "mtime": "2026-08-15 10:11:28",
+        "changed": false
+      }
+    },
+    "probe_ordering_confirmed_by_timing": "launched :00 -> file created :01.18 -> completed :13 after connecting to IB Gateway. The probe runs before the positions check and before the connect, as designed.",
+    "close_row_created": false,
+    "why_no_close_row_is_correct": "live_positions.track1.json holds ZERO positions, so the sweep found nothing to repair",
+    "lock_files_released": {
+      "runner.track1.pid": "absent after the run",
+      "runner.pid": "absent after the run",
+      "meaning": "the atexit release worked on a path that connects to the broker"
+    },
+    "runtime_close_row_proof": "PENDING - that a real Track 1 safety close lands in that file tagged route=track1_candidate cannot be shown until the route holds a position and a sweep or max-hold exit closes it. Nothing here fakes it; the empty file is NOT evidence of it."
+  },
+  "part_e_tests": {
+    "new_tests_added": 0,
+    "why": "all five items the brief lists were already pinned; a second copy would be noise",
+    "already_pinned_by": {
+      "track1 safety argv carries the log path and route": "5ZG",
+      "legacy safety argv stays legacy": "5ZG",
+      "dashboard reads Track 1 evidence not the stale legacy runner": "5ZF + test_dashboard_backend",
+      "checkpoint schema-2 summary": "5ZH",
+      "no caller passes --allow-orders": "5M-D (strategy slots) + 5O (safety jobs)"
+    },
+    "regression": {
+      "passed": 433,
+      "suites": [
+        "5ZG",
+        "5ZH",
+        "5ZF",
+        "5O",
+        "5M-D",
+        "5P",
+        "monitor/test_dashboard_backend.py",
+        "monitor/test_realtime_contract.py"
+      ]
+    },
+    "one_repair_inside_this_stage_surface": {
+      "test": "5O::test_no_switch_or_state_file_was_created",
+      "problem": "asserted live_positions.track1.json does not exist; the live 15:55 close now writes it by design",
+      "fix": "moved onto the written-during-this-run mtime check two lines below it - the identical repair already applied to 5P",
+      "after": "26 passed"
+    },
+    "left_alone": [
+      "5M-D::test_b1_still_blocks_orders",
+      "5M-D::test_no_switch_or_state_file_was_touched"
+    ],
+    "why_left_alone": "gate-list staleness already classified in 5ZI; not this stage's surface"
+  },
+  "files_changed_on_disk": {
+    "runtime": [
+      {
+        "path": "global_index/track1_runtime/trade_log.track1.jsonl",
+        "change": "created, 0 bytes",
+        "cause": "writability probe",
+        "intended": true
+      }
+    ],
+    "source": [
+      {
+        "path": "scratch/test_track1_stage5o_route_aware_safety_20260824.py",
+        "change": "one assertion moved to the mtime check",
+        "cause": "absence-proxy repair, this stage's surface"
+      }
+    ],
+    "unchanged_verified_by_mtime": [
+      "global_index/replay_checkpoint.track1.json (13:56:19)",
+      "live_positions.track1.json (13:56:19)",
+      "live_positions.json (2026-08-24)",
+      "global_index/maxhold_state.track1.json (2026-08-24)",
+      "global_index/maxhold_state.json (2026-08-24)",
+      "global_index/track1_runtime/audits/track1_audit_20260825.jsonl (14:15:03)",
+      "global_index/track1_runtime/signals/track1_signals_20260825.jsonl (13:56:19)",
+      "global_index/track1_runtime/window_coverage/window_coverage_20260825.jsonl (13:56:19)",
+      "trade_log.jsonl (2026-08-15 10:11:28)"
+    ],
+    "no_audit_record_rewritten": true,
+    "no_book_or_checkpoint_edited": true
+  },
+  "remaining_before_paper": [
+    {
+      "n": 1,
+      "item": "machine sleep (16 missed jobs in one burst on the 25th)",
+      "class": "operator"
+    },
+    {
+      "n": 2,
+      "item": "B1 - separate account or a proven-flat legacy book",
+      "class": "operator decision"
+    },
+    {
+      "n": 3,
+      "item": "checkpoint cannot resume: the callsite passes no frames",
+      "stage": "5ZK"
+    },
+    {
+      "n": 4,
+      "item": "regime verification warn-only and its return discarded",
+      "stage": "5ZL"
+    },
+    {
+      "n": 5,
+      "item": "route-aware PnL / open-position parity / legacy-reader split",
+      "stage": "5ZM"
+    },
+    {
+      "n": 6,
+      "item": "planned stop not journalled; close_position and place_protective_stop unbuilt",
+      "stage": "5ZN"
+    }
+  ],
+  "removed_from_the_list_by_this_stage": "5ZG's argv is not live - it IS live, and a real sweep proved it",
+  "evidence_gate_unchanged": "2 judgeable days, both FAIL, 5 required, none clean - which is item 1's consequence more than anything else's",
+  "claims_deliberately_NOT_made": [
+    "paper readiness",
+    "broker-flat",
+    "orphan-STP safety",
+    "that a real Track 1 close has been routed (only the destination is proven)"
+  ]
+}

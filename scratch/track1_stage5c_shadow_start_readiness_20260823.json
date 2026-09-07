@@ -1,0 +1,168 @@
+{
+  "stage": "5C",
+  "date": "2026-08-23",
+  "kind": "read-only readiness check + operator checklist; nothing started, nothing connected",
+  "verdict": "NOT_READY_FOR_SHADOW_START",
+  "verdict_reason": "Starting the Track 1 shadow scheduler cannot produce the evidence it would be started to produce. Each Track 1 slot runs run_live_day_track1 with only --regime-csv, so it defaults to --source replay --window vault2026: it REPLAYS a historical window, 25 times a trading day. record_window_observation has ZERO call sites and boot.write has ZERO call sites, so no window_coverage_*.jsonl and no Track 1 checkpoint can ever be written by that path. Preconditions 5 and 6 therefore cannot turn green by starting the scheduler.",
+  "correction_to_earlier_stages": "Stage 5 concluded, and Stage 5B repeated, that starting the shadow scheduler is what moves preconditions 5 and 6 - 'starting is what fixes them'. That was reasoned from the runbook's framing and never measured against the call sites. It is wrong. The wiring gap must be closed first, and the runbook's section 2 status table says the opposite of what is true.",
+  "measured_state": {
+    "measured_at_et": "2026-08-23T10:28:55-04:00",
+    "et_weekday": "Sunday",
+    "scheduler_running": false,
+    "scheduler_process_count": 0,
+    "scheduler_probe": "counted via Win32_Process",
+    "pid_file_present": false,
+    "track1_pid_file_present": false,
+    "stop_trading_present": false,
+    "stop_trading_track1_present": false,
+    "confirmation_present": false,
+    "confirmation_errors": [],
+    "confirmation_flags": {},
+    "orders_env_present": false,
+    "track1_blockers": [
+      "B1_broker_account_or_legacy_retirement"
+    ],
+    "gate_self_check": [],
+    "orders_possible": false,
+    "live_frame_wiring_released": true,
+    "scheduler_shapes": {
+      "jobs_off": 60,
+      "jobs_on": 84,
+      "track1_slots": 25,
+      "track1_calm_slots": 1,
+      "track1_stress_slots": 24,
+      "track1_first": "track1_calm_1000",
+      "track1_last": "track1_stress_1230",
+      "legacy_entry_slots_off": 23,
+      "legacy_entry_slots_under_shadow": 23,
+      "shadow_removes_legacy_entries": false,
+      "added_by_shadow": 25,
+      "removed_by_shadow": [
+        "stop_repair_1220"
+      ]
+    },
+    "window_coverage_files": [],
+    "window_coverage_present": false,
+    "checkpoint": {
+      "path": "global_index/replay_checkpoint.track1.json",
+      "present": false,
+      "accepted": false,
+      "code": "file_absent"
+    },
+    "maxhold_catch_up_would_fire_on_start": false,
+    "safe_to_start_shadow": false,
+    "blocking_reasons": [
+      "STOP_TRADING is absent and shadow mode keeps 23 legacy entry slots"
+    ]
+  },
+  "task2_sequence_validation": {
+    "runbook_says_stop_trading_then_start_then_watch": true,
+    "shadow_keeps_legacy_entry_slots": true,
+    "legacy_entry_slots_under_shadow": 23,
+    "track1_slot_argv": [
+      "python",
+      "-m",
+      "global_index.run_live_day_track1",
+      "--regime-csv",
+      "<csv>"
+    ],
+    "track1_slot_has_allow_orders": false,
+    "track1_slot_has_broker_port": false,
+    "orders_possible_now": false,
+    "verified_by_execution": "ran the slot's exact argv: mode=shadow, source=replay, window=vault2026, send_order calls=0, legacy files unchanged by md5, no window_coverage produced"
+  },
+  "wiring_gaps_blocking_the_collection_gate": [
+    {
+      "what": "record_window_observation is never called",
+      "where": "global_index/run_live_day_track1.py:257 defines it; no caller anywhere",
+      "effect": "no window_coverage_*.jsonl can be written -> precondition 5 unreachable"
+    },
+    {
+      "what": "the window ledger is off unless RAITS_WINDOW_LEDGER_DIR is set",
+      "where": "global_index/window_ledger.py - 'Unset -> off'",
+      "effect": "even once a caller exists, the env var must be set or writes are silently skipped"
+    },
+    {
+      "what": "nothing writes the Track 1 checkpoint",
+      "where": "track1_bootstrap.write has zero call sites in global_index/",
+      "effect": "precondition 6 unreachable by running"
+    },
+    {
+      "what": "the scheduler slot passes no --source, so it replays history",
+      "where": "global_index/run_scheduler.py _track1_body",
+      "effect": "25 identical replays of vault2026 per trading day; run_shadow itself reports window_ledger: 'not driven: a replay cannot testify to observation'"
+    },
+    {
+      "what": "the live source cannot produce candidates anyway",
+      "where": "track1_sleeves.load_source('live').candidates() raises NotImplementedError",
+      "effect": "even with --source live wired in, there is nothing behind it yet"
+    }
+  ],
+  "other_findings": [
+    {
+      "what": "Track 1 freshness already refuses for today",
+      "measured": "regime_csv last date 2026-08-20 is before the required 2026-08-21; the D-1 13:45 contract fails while the scheduler is down and nothing refreshes it"
+    },
+    {
+      "what": "starting the scheduler is not inert",
+      "measured": "_catch_up_maxhold runs before sched.start() and, on a weekday after 09:31 ET, immediately runs the max-hold exit which reads the BROKER. Today is Sunday ET so it would not fire, but a weekday start connects at once. STOP_TRADING does not prevent this - D5 clears entries only, exits keep running, by design"
+    }
+  ],
+  "constraints_held": [
+    "no scheduler started or stopped",
+    "no IBKR connection",
+    "no order",
+    "no dashboard runtime write",
+    "STOP_TRADING not created",
+    "track1_go_live_confirmation.json not created",
+    "TRACK1_ORDERS_APPROVED not set",
+    "no commit",
+    "global_index/test_event_playback.py not run"
+  ],
+  "collection_gate": {
+    "minimum_period_trading_days": 10,
+    "why": "Calm A gives ONE observation per day against the Stress window's 24, so Calm is the scarce one; below ten days a single bad morning is a tenth of the evidence",
+    "per_day_required": [
+      "window_coverage_YYYYMMDD.jsonl exists and status(...) outcome == 'complete' for BOTH roska4_calm and roska4_stress",
+      "every expected slot recorded - a window that opened and vanished is unobserved",
+      "no scheduler stall inside either window; a mutex skip, misfire or grace overrun marks the day INVALID rather than partial",
+      "zero legacy entries while STOP_TRADING is present",
+      "orders blocked throughout: blocking() still B1, no confirmation file, env unset",
+      "p95 slot runtime inside target if telemetry is enabled"
+    ],
+    "end_of_period_required": [
+      "track1_bootstrap.accepts(...) returns Resumed for every checkpointed sleeve and instrument",
+      "coverage complete on EVERY trading day of the period, not most"
+    ],
+    "reachable_today": false,
+    "reachable_after": "wiring gaps 1-3 are closed"
+  },
+  "operator_checklist": {
+    "read_only": {
+      "probe": "python scratch/track1_stage5c_shadow_readiness_probe_20260823.py",
+      "confirm_scheduler_running": "@(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { $_.CommandLine -like '*run_scheduler*' }).Count",
+      "confirm_legacy_frozen": "Select-String live_day_*.log -Pattern 'D5: STOP_FILE present'",
+      "confirm_track1_slots": "make_scheduler(port=4002, dry_run=True, track1_shadow=True) job ids",
+      "inspect_window_coverage": "Get-ChildItem -Recurse -Filter 'window_coverage_*.jsonl'",
+      "inspect_checkpoint": "probe.checkpoint_state()",
+      "verify_orders_impossible": "python -m global_index.run_live_day_track1 --allow-orders --window vault2026  -> exit 2, two reasons"
+    },
+    "operational_not_run_here": {
+      "create_stop_trading": "if (-not (Test-Path STOP_TRADING)) { New-Item -ItemType File STOP_TRADING }",
+      "start_shadow_scheduler": "python -m global_index.run_scheduler --track1-shadow",
+      "caveat": "on a weekday after 09:31 ET the start immediately runs a max-hold pass against the BROKER; STOP_TRADING does not prevent it, by design"
+    }
+  },
+  "tests": {
+    "stage5c_shadow_readiness": "11 passed (new)",
+    "stage5b_runbook_fix": "22 passed",
+    "not_run": "global_index/test_event_playback.py"
+  },
+  "next_action": [
+    "1. Answer why the scheduler is down",
+    "2. Close wiring gaps 1-3: call record_window_observation, require RAITS_WINDOW_LEDGER_DIR, write the Track 1 checkpoint at the end of a real slot",
+    "3. Decide what a Track 1 slot should do on a live day - today it replays history",
+    "4. Correct runbook section 2, which says 5 and 6 turn green by starting (measured false)",
+    "5. Only then STOP_TRADING, start, watch, collect against the gate"
+  ]
+}

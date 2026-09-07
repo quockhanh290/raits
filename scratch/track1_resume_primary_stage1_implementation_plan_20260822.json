@@ -1,0 +1,165 @@
+{
+ "plan": "track1_resume_primary_stage1",
+ "date": "2026-08-22",
+ "mode": "plan_only",
+ "code_written": false,
+ "production_modified": false,
+ "services_started": [],
+ "committed": false,
+
+ "design_rule": "every Stage 1 artefact is a NEW file; no edit to runner.py, signal_layer.py, replay_checkpoint.py, run_live_day.py or run_scheduler.py",
+
+ "stages": {
+  "1A_schema_v2_module": {
+   "new_files": ["global_index/route_checkpoint.py"],
+   "touched": [],
+   "reuse": "import fingerprint() from replay_checkpoint verbatim; do not copy it",
+   "tests": ["round-trip save/load", "schema mismatch refusal both directions", "pos round-trip keeps entry_day/entry_time as pd.Timestamp"],
+   "rollback": "delete the file; nothing imports it",
+   "gate": "v1 file refused by v2 loader AND v2 file refused by replay_checkpoint.load()"
+  },
+  "1B_params_hash": {
+   "new_files": ["global_index/route_params.py", "scratch/test_route_checkpoint_*.py"],
+   "touched": [],
+   "isolation": "pure function config -> (readable string, hash); no I/O, no engine import",
+   "tests": ["one mutation test per field in params_hash", "same config -> same hash across processes"],
+   "rollback": "delete both files",
+   "gate": "every params_hash field has a test that goes red when the field is removed from the hash input",
+   "why_highest_value": "the params-mismatch refusal branch has never fired in production"
+  },
+  "1C_route_path_and_keyspace": {
+   "new_files": [],
+   "touched": [],
+   "path": "global_index/replay_checkpoint.track1.json",
+   "note": "run_live_day already has --checkpoint-path (:179); Stage 1 uses it only from tests",
+   "tests": ["writing route A leaves route B byte-identical", "two sleeves on one instrument coexist", "concurrent writer simulation loses nothing"],
+   "rollback": "delete the file",
+   "gate": "the does-not-clobber test fails when the per-key merge is removed"
+  },
+  "1D_window_ledger": {
+   "new_files": ["global_index/window_ledger.py"],
+   "output": "window_coverage_YYYYMMDD.jsonl",
+   "isolation": "append-only JSONL, off unless an env var names a directory, never raises, never decides",
+   "rollback": "delete the file",
+   "gate": "simulated suspend yields window_unobserved AND a quiet window yields no_signal, distinguishable without reading any other file"
+  },
+  "1E_equivalence_harness": {
+   "new_files": ["scratch/track1_equivalence_harness_*.py"],
+   "isolation": "offline, parquet only; no IBKR, no live bars, no runner",
+   "anchor": "must reproduce the existing shadow record (91 matched / 0 diverged, 2026-08-10..2026-08-21) before judging anything new",
+   "gate": "anchor reproduced, then a deliberately corrupted resume state is detected"
+  },
+  "1F_telemetry_phases": {
+   "new_files": [],
+   "note": "phase names declared here, implemented in Stage 2 alongside the route code",
+   "phases": ["ckpt_load", "ckpt_verify", "bars_fetch_incremental", "sleeve_update", "ckpt_advance_write", "oracle_replay"],
+   "key_rule": "oracle_replay timed separately and EXCLUDED from the route p95",
+   "gate": "deferred to Stage 2 (R7: p95 < 300s hard, < 240s target)"
+  },
+  "1G_scheduler_review": {
+   "new_files": [],
+   "touched": [],
+   "finding": "_catch_up_maxhold (run_scheduler.py:1132) is startup-only, called at :1243; a running scheduler that sleeps through 09:31 and is not restarted gets neither the cron run nor the catch-up",
+   "stage2_shape": "evaluate the same predicate on the heartbeat as well as at startup: no new job, no new trigger, no argv change",
+   "blocker": "_maxhold_done and _preflight_ok are date-keyed and persisted; they need a route dimension before a second route runs in the same scheduler process",
+   "gate": "Stage 2 may not add a Track 1 window until this is fixed or accepted in writing with the residual named"
+  }
+ },
+
+ "schema_v2": {
+  "schema_version": 2,
+  "path": "global_index/replay_checkpoint.track1.json",
+  "key_space": ["routes", "sleeves", "instruments"],
+  "fields": ["last_day", "fingerprint", "params", "params_hash", "data_source", "pos"],
+  "empty_sleeves_present_on_purpose": ["roska4_calm", "roska4_stress"],
+  "empty_sleeve_rationale": "same-session sleeves need no historical checkpoint; present-but-empty says accounted for, absent would say nobody thought about it",
+  "reason_codes": ["no_entry", "bad_last_day", "fingerprint_rowcount", "fingerprint_content", "params_mismatch", "route_mismatch", "schema_mismatch"],
+  "rowcount_vs_content_split_rationale": "48 of the 64 historical skips were rowcount, 4 were content; different causes, and this session had to reconstruct the split by string-diffing hashes out of log lines",
+  "lost_update_fix": [
+   "keep atomic whole-file write (.tmp then replace)",
+   "read-modify-write under a lock file",
+   "per-key merge: a writer may only replace keys under its own route",
+   "write-scope assertion: every key outside the writer's route byte-identical to what was loaded"
+  ],
+  "cheaper_alternative": "one file per route removes the merge problem entirely; take it at Stage 2 if the lock adds latency inside the runtime gate"
+ },
+
+ "params_hash_content": {
+  "signal": ["ema_period", "max_hold_days"],
+  "stop": ["stop_basis", "stop_multiple", "stop_anchor", "ratchet"],
+  "arming": ["arm_hour", "arm_timezone"],
+  "filters": ["r4_range_p90 threshold AND its derivation window", "rel_volume_max", "spy_short_filter below_sma50 + lookback"],
+  "regime": ["hmm_fit_end", "regime csv identity (path + content hash)", "label lag_days", "calm gate definition"],
+  "caps": ["roska4_swing", "roska4_calm", "roska4_stress", "global_nkd", "normal+calm family cap"],
+  "cost": ["slippage_ticks_per_side", "commission basis"],
+  "data": ["data_source identity per instrument", "fill law in force (all-bars-gappable vs >15min rule)"],
+  "rules": [
+   "hashlib.sha256 over a canonical sorted rendering; never Python hash() (salted per process)",
+   "floats at fixed precision so 2.5 and 2.50 cannot disagree",
+   "a field that cannot be tested is not added",
+   "thresholds derived from a window carry the window, not just the value"
+  ]
+ },
+
+ "window_ledger": {
+  "separate_from_checkpoint": true,
+  "rationale": "a checkpoint answers what state the last observation left; the ledger answers whether an observation happened at all",
+  "windows": {"calm_a": {"time": "10:00 ET", "expected_slots": 1},
+              "stress_mnq": {"time": "10:35-12:30 ET every 5 min", "expected_slots": 24}},
+  "events": ["window_open", "slot_observed", "window_closed"],
+  "outcomes": {
+   "complete + no_signal": "observed, produced nothing - safe",
+   "complete + entered": "observed, traded",
+   "incomplete": "window_closed written but observed_slots < expected_slots",
+   "unobserved": "no window_closed record exists at all - the fail-closed signal"
+  },
+  "fail_closed_property": "absence of window_closed is itself the signal; a suspended host writes nothing, and nothing must read as failure",
+  "cross_checks": [
+   "scheduler HEARTBEAT STALLED, measured to match a real OS suspend 28 of 28",
+   "Windows Power-Troubleshooter log, which caught 39 suspends against the scheduler's 28"
+  ]
+ },
+
+ "equivalence": {
+  "position_fields": ["instrument", "sleeve", "direction", "qty", "entry_day", "entry_time", "entry_price", "stop", "target", "extreme/ratchet state"],
+  "trade_fields": ["instrument", "sleeve", "direction", "qty", "entry_day", "entry_time", "entry_price", "exit_day", "exit_time", "exit_price", "exit_reason", "points", "pnl", "hold_days"],
+  "comparison": "ordered sequence, not set",
+  "tolerance": "exact to stored rounding, no epsilon",
+  "coverage": "100% over the declared window",
+  "skipped_comparison": "counts as a FAILED day, not neutral",
+  "divergence": "one divergence resets the promotion counter to zero",
+  "post_promotion": "oracle keeps running (R8); a divergence then is a rollback trigger"
+ },
+
+ "offline_tests": [
+  {"id": "T1", "what": "params mismatch refuses", "note": "branch that has never fired in production"},
+  {"id": "T2", "what": "route mismatch refuses"},
+  {"id": "T3", "what": "sleeve mismatch refuses as no_entry, never a silent hit"},
+  {"id": "T4", "what": "rowcount vs content categorised correctly"},
+  {"id": "T5", "what": "missing checkpoint fails closed, no entries, not a silent full replay"},
+  {"id": "T6", "what": "stale checkpoint fails closed even when the fingerprint matches"},
+  {"id": "T7", "what": "save preserves other routes/sleeves byte-identically"},
+  {"id": "T8", "what": "concurrent writers lose nothing"},
+  {"id": "T9", "what": "schema cross-refusal both directions"},
+  {"id": "T10", "what": "ledger distinguishes unobserved from no_signal"},
+  {"id": "T11", "what": "params_hash stable across processes"}
+ ],
+ "test_discipline": "each test mutation-checked: break the guard, confirm the right test goes red, restore",
+
+ "stage1_exit_criteria": [
+  "all offline tests pass and each shown to go red on its own mutation",
+  "equivalence harness reproduces the existing shadow record before judging anything new",
+  "params_hash covers every listed field, each with its own mutation test",
+  "ledger distinguishes unobserved from no_signal without consulting another file",
+  "legacy byte-identical: no edit to the five files, artifact sha256 matches, empty job/argv diff, 44 baseline tests still pass",
+  "Stage 1G scheduler review written down with the residual either scheduled or accepted"
+ ],
+
+ "not_in_stage1": ["any scheduler job", "any live or paper order", "any monitor/dashboard change", "any edit to the five legacy files", "the runtime gate R7"],
+
+ "unsettled": [
+  "R0 host availability unchanged: 8 of the 9 most recent trading days had an S3 suspend; idle timer already off so STANDBYIDLE 0 is not the remedy for this host",
+  "the run_day cost of Track 1's two same-session sleeves is unmeasured; Stage 1 is offline and produces no p95; the margin at stake is 84s",
+  "_maxhold_done and _preflight_ok are date-keyed and persisted and need a route dimension before a second route shares the scheduler process"
+ ]
+}

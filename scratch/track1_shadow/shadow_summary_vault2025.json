@@ -1,0 +1,149 @@
+{
+ "route": "track1_candidate",
+ "window": "vault2025",
+ "source": "replay",
+ "order_gate": {
+  "state": "shadow",
+  "requested": false,
+  "allow_orders": false,
+  "reasons": []
+ },
+ "send_order_calls": 0,
+ "kill_switch_present": false,
+ "window_ledger": "not driven: a replay cannot testify to observation",
+ "freshness": {
+  "allow": true,
+  "reasons": [],
+  "unverified": [
+   "intraday_source"
+  ],
+  "checks": [
+   {
+    "name": "preflight_record",
+    "status": "ok",
+    "detail": "",
+    "observed": "2026-08-20",
+    "required": "2026-08-20"
+   },
+   {
+    "name": "regime_csv",
+    "status": "ok",
+    "detail": "",
+    "observed": "2026-08-20",
+    "required": "2026-08-20"
+   },
+   {
+    "name": "parquet:MES",
+    "status": "ok",
+    "detail": "",
+    "observed": "2026-08-21",
+    "required": "2026-08-20"
+   },
+   {
+    "name": "parquet:MNQ",
+    "status": "ok",
+    "detail": "",
+    "observed": "2026-08-21",
+    "required": "2026-08-20"
+   },
+   {
+    "name": "parquet:MYM",
+    "status": "ok",
+    "detail": "",
+    "observed": "2026-08-21",
+    "required": "2026-08-20"
+   },
+   {
+    "name": "parquet:M2K",
+    "status": "ok",
+    "detail": "",
+    "observed": "2026-08-21",
+    "required": "2026-08-20"
+   },
+   {
+    "name": "parquet:MNKD",
+    "status": "ok",
+    "detail": "",
+    "observed": "2026-08-21",
+    "required": "2026-08-20"
+   },
+   {
+    "name": "intraday_source",
+    "status": "unverified",
+    "detail": "the bars a same-session sleeve decides on come from the broker at decision time; this gate cannot see them",
+    "observed": "None",
+    "required": "a broker fetch inside the window"
+   }
+  ]
+ },
+ "checkpoint": [
+  {
+   "sleeve": "roska4_swing",
+   "inst": "MES",
+   "params_hash": "sha256:b8f6ed7f21d04ec215363a2f87a066c6852660f59b7a9101702f32505bf87149",
+   "resumed": false,
+   "code": "no_entry",
+   "detail": "no entry under routes/track1_candidate/sleeves/roska4_swing"
+  },
+  {
+   "sleeve": "roska4_swing",
+   "inst": "MNQ",
+   "params_hash": "sha256:95e831154d5bf8929f21209eb521bf0f5c95adfebc26ec0354111f91fb5e236b",
+   "resumed": false,
+   "code": "no_entry",
+   "detail": "no entry under routes/track1_candidate/sleeves/roska4_swing"
+  },
+  {
+   "sleeve": "roska4_swing",
+   "inst": "MYM",
+   "params_hash": "sha256:120f817d3541b13d7966e647fb75798c78855475dd2a8cf2f51ea3204f241038",
+   "resumed": false,
+   "code": "no_entry",
+   "detail": "no entry under routes/track1_candidate/sleeves/roska4_swing"
+  },
+  {
+   "sleeve": "roska4_swing",
+   "inst": "M2K",
+   "params_hash": "sha256:5a390b93480154119032548ad74b3a29d7b3aaebaecce1f068b64cf646f7f89c",
+   "resumed": false,
+   "code": "no_entry",
+   "detail": "no entry under routes/track1_candidate/sleeves/roska4_swing"
+  },
+  {
+   "sleeve": "global_nkd",
+   "inst": "MNKD",
+   "params_hash": "sha256:be5c1486551efe8989d7247e20592e0115907241489c2b829667e792c9530459",
+   "resumed": false,
+   "code": "no_entry",
+   "detail": "no entry under routes/track1_candidate/sleeves/global_nkd"
+  }
+ ],
+ "candidates": 183,
+ "settlements": 128,
+ "net": 13236.11,
+ "days": 89,
+ "equity_end": 63236.11,
+ "counters": {
+  "taken:roska4_swing": 55,
+  "rejected:roska4_swing": 48,
+  "taken:roska4_calm": 39,
+  "rejected:roska4_calm": 3,
+  "taken:roska4_stress": 3,
+  "taken:global_nkd": 31,
+  "take": 128,
+  "reject_cap": 48,
+  "reject_family_cap": 3,
+  "suppress_same_symbol": 4,
+  "forced_closes": 1
+ },
+ "open_at_end": [],
+ "state_paths": {
+  "positions": "live_positions.track1.json",
+  "lock": "runner.track1.pid",
+  "checkpoint": "global_index/replay_checkpoint.track1.json",
+  "kill_switch": "STOP_TRADING.track1",
+  "shadow_dir": "scratch/track1_shadow"
+ },
+ "book_state_positions": 0,
+ "book_persisted_to": null
+}

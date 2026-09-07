@@ -1,0 +1,50 @@
+import json, sys
+from pathlib import Path
+sys.path.insert(0, str(Path.cwd()))
+
+I = lambda **kw: kw
+inv = [
+ I(path="RAITS_WINDOW_LEDGER_DIR -> window_coverage_*.jsonl", writer="window_ledger._write",
+   data="window_open / slot_observed / window_closed",
+   was="operator-chosen; runbook said scratch/track1_ledger",
+   kind="OPERATIONAL", moved=True, now="global_index/track1_runtime/window_coverage",
+   why="a closed window cannot be re-observed; it is what precondition 5 is read from"),
+ I(path="RAITS_TELEMETRY_DIR -> slot_timing_*.jsonl", writer="slot_telemetry",
+   data="per-slot runtime", was="unset (off)", kind="OPERATIONAL", moved=True,
+   now="global_index/track1_runtime/slot_timing (recommended; still opt-in)",
+   why="the p95 < 300s gate is judged from it"),
+ I(path="observe_live_slot(out_dir=...) explanations", writer="emit_explanations",
+   data="live-shadow decision/audit rows", was="scratch/track1_shadow", kind="OPERATIONAL",
+   moved=True, now="global_index/track1_runtime/shadow",
+   why="the audit trail for a live shadow day; not reproducible"),
+ I(path="run_shadow(out_dir=...)", writer="run_shadow",
+   data="replay decisions/settlements/summaries/explanations", was="scratch/track1_shadow",
+   kind="replay/test", moved=False, now="scratch/track1_shadow",
+   why="reproducible from the measured windows; losing it costs a re-run"),
+ I(path="track1_explain path guard", writer="write_shadow bound", data="path guard",
+   was="single root", kind="guard", moved="widened",
+   now="APPROVED_ROOTS = (scratch/track1_shadow, global_index/track1_runtime/shadow)",
+   why="a set, not a relaxation - everything outside both is still refused"),
+ I(path="live_positions.track1.json", writer="write_route_checkpoint", data="route book",
+   was="repo root, NOT gitignored", kind="OPERATIONAL", moved=False,
+   now="repo root, now gitignored", why="legacy twin was already ignored; this one was not"),
+ I(path="runner.track1.pid", writer="route lock", data="pid lock", was="not gitignored",
+   kind="OPERATIONAL", moved=False, now="gitignored", why="same"),
+ I(path="global_index/replay_checkpoint.track1.json", writer="track1_bootstrap.write",
+   data="route checkpoint", was="not gitignored", kind="OPERATIONAL", moved=False,
+   now="gitignored", why="legacy replay_checkpoint.json was already ignored"),
+ I(path="STOP_TRADING.track1", writer="operator", data="route kill switch",
+   was="not gitignored", kind="operator switch", moved=False, now="gitignored",
+   why="an operational decision must not travel in the tree"),
+ I(path="track1_go_live_confirmation.json", writer="operator",
+   data="the file that ARMS the route", was="not gitignored", kind="operator switch",
+   moved=False, now="gitignored", why="a checkout must never be able to create one"),
+ I(path="trade_log.jsonl / runner_events_*.jsonl / live_state_data.js", writer="legacy",
+   data="legacy runtime", was="gitignored", kind="legacy", moved=False, now="unchanged",
+   why="out of scope; Track 1 writes none of them"),
+ I(path="monitor/ops.py logs", writer="monitor", data="ops output", was="n/a", kind="legacy",
+   moved=False, now="untouched", why="not written by any Track 1 path; test_ops 8 passed"),
+]
+Path("scratch/_5k0_inv.json").write_text(json.dumps(inv, indent=1, ensure_ascii=False),
+                                         encoding="utf-8")
+print("inventory rows:", len(inv))

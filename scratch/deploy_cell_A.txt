@@ -1,0 +1,32 @@
+
+========================================================================
+DEPLOY-REALISTIC SIM | Rổ 4 + NKD | $50,000
+========================================================================
+slippage 2 tick/side | NKD gated ema=10 mult=2.5
+
+SIZER (combined 3-cluster, DD-capped):
+  1-micro combined MaxDD : $3,287  (6.6% of account)
+  dd_scale 1.52 | margin_scale 3.23 → binding: FIXED (--n-contracts override)
+  → CONTRACTS: 1 micro each  (projected DD 6.6%, hard cap 15%)
+
+DEPLOY METRICS at 1 micro:
+  net $71,044  |  Calmar 3.13  |  PF 1.81  |  Sharpe 2.71
+  MaxDD $3,287 (6.6%)  |  return ≈ 20.6%/yr on $50,000
+
+  per-cluster entries taken / rejected (REAL risk$):
+    roska4_swing   taken  949  rejected 317
+    roska4_stress  taken    0  rejected   0
+    global_nkd     taken  573  rejected   0
+    circuit-breaker halts: 0
+
+per-year net$ (deploy size):
+  2018  $    10,796
+  2019  $     4,757
+  2020  $    13,212
+  2021  $       349
+  2022  $    14,606
+  2023  $    14,844
+  2024  $    12,480
+------------------------------------------------------------------------
+NOTE: upper bound. Live MNKD slips >1 tick (rerun --slippage-ticks 2-3 to see), fills partial, unseen events absent. Paper trade is the real test.
+

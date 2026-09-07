@@ -1,0 +1,209 @@
+{
+  "schema": "track1_stage_report/1",
+  "stage": "5ZZE",
+  "title": "Paper account baseline and broker reconcile — B1 was vouching for an account that no longer existed",
+  "when_et": "2026-08-27T07:20:00-04:00/2026-08-27T07:35:00-04:00",
+
+  "verdict": {
+    "paper_account_baseline_recorded": true,
+    "account_currency": "USD",
+    "account_equity": 250817.91,
+    "account_id": "DUR125337",
+    "broker_positions": 0,
+    "broker_working_orders": 0,
+    "legacy_book_flat": true,
+    "track1_book_flat": true,
+    "b1_evidence_fresh": true,
+    "b1_evidence_was_describing_the_wrong_account": true,
+    "readiness_gate_changed": true,
+    "dashboard_updated": true,
+    "orders_possible": false,
+    "runtime_files_touched": ["global_index/track1_runtime/account_baseline/account_baseline_20260827.jsonl"],
+    "next_action": "Calm DECIDE at 09:32 ET is still pending; re-record the baseline within 24h"
+  },
+
+  "the_measurement_that_made_this_necessary": {
+    "taken": "before any code was written, against the live B1 record",
+    "b1_record_et": "2026-08-26T11:34:28-04:00",
+    "b1_record_age_hours": 19.77,
+    "b1_window_hours": 24,
+    "b1_status_at_the_time": "PASS",
+    "recorded_equity": 996875.91,
+    "currency_recorded_anywhere_in_the_row": false,
+    "stated_baseline": 250000,
+    "drift": "299%",
+    "conclusion": "B1's freshness window is about POSITIONS AND ORDERS, and a reset changes neither — so the record went on vouching for an account that no longer existed and nothing in it could have said so",
+    "books_were_genuinely_flat": {
+      "legacy": "state=read count=0",
+      "track1": "state=read count=0",
+      "note": "flatness was never the problem; identity was"
+    }
+  },
+
+  "why_get_equity_could_not_close_it": {
+    "docstring": "Accept any currency (CAD/USD/BASE accounts all work)",
+    "behaviour": "prefers a BASE figure, then whichever of USD or CAD the broker lists first, then anything at all; returns a bare float",
+    "consequence": "a baseline built on it would record 'equity 250000' for an account holding 250,000 CAD and nobody could tell afterwards",
+    "what_the_probe_does_instead": "reads accountValues() and keeps EVERY currency-tagged NetLiquidation, with the label attached to the number all the way into the record"
+  },
+
+  "broker_reconcile": {
+    "mode": "read-only",
+    "client_id": 96,
+    "client_id_distinct_from": {"legacy": 1, "slot_child": 89, "safety_jobs": 90, "b1_audit": 97},
+    "port": 4002,
+    "stated_before_connecting": true,
+    "b1": "PASS (legacy_and_broker_flat)",
+    "baseline": "PASS (account_flat_and_funded)",
+    "detail": "USD 250,817.91, no positions, no working orders, both books flat and route-stamped, read 0 minute(s) ago",
+    "currencies_reported": {"USD": 250817.91},
+    "drift_from_expected": "0.33%",
+    "confirms_the_reset_landed": true
+  },
+
+  "contract": {
+    "currency_not_usd": "FAIL",
+    "equity_le_zero": "FAIL",
+    "drift_gt_25pct": "FAIL",
+    "drift_gt_5pct": "WARN",
+    "drift_le_5pct": "PASS",
+    "anything_unread": "UNKNOWN",
+    "b1_not_pass": "FAIL or UNKNOWN",
+    "observation_older_than_30_min": "UNKNOWN",
+    "record_older_than_24h": "UNKNOWN",
+    "satisfies_gate": ["PASS"],
+    "why_warn_also_refuses": "the difference between WARN and FAIL is what an operator does next, not what the gate does; a gate with a maybe in it is a gate somebody argues with",
+    "pass_band_rationale": "5% of 250,000 is 12,500 — wide enough for fees and marks, narrow enough that a mis-funded account cannot hide in it",
+    "fail_band_rationale": "25% is 62,500; the reading that prompted this module was 299% away"
+  },
+
+  "where_it_lives": {
+    "path": "global_index/track1_runtime/account_baseline/account_baseline_YYYYMMDD.jsonl",
+    "durable_not_scratch": true,
+    "why": "a baseline that lives only in a report is a baseline the gate cannot read",
+    "append_only": true,
+    "why_append": "a record that overwrote its predecessor would make 'when did this account last look right' unanswerable",
+    "attribution_in_every_row": "zero positions is attributable to every route; a non-zero count is attributable to none"
+  },
+
+  "readiness": {
+    "check_added": "paper_account_baseline",
+    "satisfied_by": "PASS only",
+    "current_checks": {
+      "audit_records_readable": "PASS",
+      "judgeable_days": "FAIL (3 of 5)",
+      "no_failing_days": "FAIL (3 FAIL days)",
+      "warn_days_within_allowance": "PASS",
+      "evidence_is_recent": "PASS",
+      "calm_decision_evidence": "FAIL (the phases have not run)",
+      "paper_account_baseline": "PASS",
+      "every_sleeve_passed_at_least_once": "FAIL"
+    },
+    "orders_possible": false,
+    "blocking": ["B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"],
+    "confirmation_file_created": false,
+    "approval_flag_set": false,
+    "b1_changed": false,
+    "b1_note": "still an operator decision plus a measurement; it can cite fresher account evidence, but nothing here signs it and nothing auto-creates a retirement confirmation"
+  },
+
+  "dashboard": {
+    "backend_block": "paper_account",
+    "row": "Paper account",
+    "separate_from_shadow_evidence": true,
+    "separate_from_slot_verdicts": true,
+    "fact_pin_caught_it": true,
+    "verified_against_the_running_process": {
+      "endpoint": "/api/v1/track1-runtime",
+      "serves_paper_account": true,
+      "served_status": "PASS",
+      "served_line": "Paper account baseline: USD 250,818 — broker reconcile flat"
+    },
+    "shadow_evidence_intact_after": {"audits": true, "window_coverage": true, "signals": true},
+    "backend_restart_required": false
+  },
+
+  "an_inference_i_nearly_reported_as_fact": {
+    "what": "from file mtimes I concluded the running backend could not be serving the new block",
+    "why_it_looked_true": "the scheduler and backend were restarted at 07:08 ET by the operator, and every file this stage touched was written 16-18 minutes after",
+    "what_the_measurement_said": "asking the endpoint directly returned the new block, correctly populated",
+    "lesson": "an inference from file times is not a measurement of a process — the stage two before this one says so in its own words"
+  },
+
+  "restart_that_had_already_happened": {
+    "scheduler_pid": 14344,
+    "started_et": "2026-08-27T07:08:32-04:00",
+    "by": "the operator, through ops.py (ops.log records kill_then_start on 5856)",
+    "registered": ["spy_refresh_pm_r1", "spy_refresh_pm_r2", "spy_last_chance_pre_nkd"],
+    "means": "the restart Stages 5ZZC and 5ZZD were both waiting for is done and both are live",
+    "this_stage_needs_one": false
+  },
+
+  "defects_found_in_my_own_code": [
+    {"what": "operator_line crashed on a PASS record with no account block",
+     "how": "it formatted the equity unconditionally and raised TypeError",
+     "consequence": "would have taken the whole readiness call down — a reporting function that can crash turns a mild problem into no report at all",
+     "found_by": "a mutation test, not by reading",
+     "fixed": true},
+    {"what": "MAX_RECORD_AGE_HOURS looked like a setting and was not",
+     "how": "written into latest()'s signature as a default argument, evaluated once at definition, so patching the module constant changed nothing",
+     "consequence": "a stale record still read back as a PASS",
+     "found_by": "the mutation that patched it and watched the test stay green",
+     "fixed": "resolved at call time"}
+  ],
+
+  "tests": {
+    "file": "scratch/test_track1_stage5zze_paper_account_baseline_20260827.py",
+    "count": 36,
+    "result": "36 passed",
+    "network_calls": 0,
+    "mutations": [
+      "the currency discarded",
+      "WARN satisfying the gate",
+      "a stale record read as PASS",
+      "unreadable flattened into absent",
+      "readiness accepting a baseline that was never recorded"
+    ],
+    "all_mutations_red": true,
+    "notable_cases": [
+      "the 996,875.91 that B1 actually recorded fails today",
+      "recording a baseline clears no shadow evidence",
+      "a dashboard 0/0 snapshot is not accepted as a broker reconcile",
+      "the connecting tool is outside the gate-scanned prefix, has no order path, and holds its own client id"
+    ],
+    "suites_after": {"track1_and_ops": "259 passed",
+                     "dashboard_backend_and_contract": "220 passed"},
+    "pre_existing_failures": {
+      "count": 2,
+      "where": "scratch/test_track1_stage5zr_b1_decision_20260826.py",
+      "why": "they pin a blocker roster including REGIME_LABEL_VERIFICATION, released 2026-08-26",
+      "confirmed_against": "the recorded failure list from two stages ago, not assumed"
+    },
+    "repairs_none_loosened": [
+      "the ops-status check banned the STRING 'UNKNOWN (' across the whole output; this stage added a line that legitimately uses that shape with a real reason code, so it is now scoped to the process lines it is about",
+      "the readiness fixtures grew an account baseline, because that is now part of what a clean period means"
+    ]
+  },
+
+  "safety_confirmed": {
+    "orders_dir": "ABSENT",
+    "shadow_intent_dir": "ABSENT",
+    "confirmation_file": "ABSENT",
+    "trade_log_mtime_et": "2026-08-26T00:20:01-04:00",
+    "live_positions_track1_mtime_et": "2026-08-27T02:55:42-04:00",
+    "live_positions_legacy_mtime_et": "2026-08-26T09:31:11-04:00",
+    "replay_checkpoint_mtime_et": "2026-08-27T02:55:42-04:00",
+    "b1_dir_mtime_et": "2026-08-26T06:15:51-04:00",
+    "only_runtime_write": "account_baseline_20260827.jsonl at 07:29:47 ET",
+    "spy_daily_coverage": "covers_required_day last=2026-08-26 required=2026-08-26",
+    "restarted_by_this_stage": "nothing"
+  },
+
+  "remaining": [
+    "Calm DECIDE 09:32 ET and OBSERVE 10:02 ET — still pending at 07:35",
+    "PAPER_SHADOW_EVIDENCE — 3 judgeable days of 5, 0 carrying Calm evidence, all three FAIL days",
+    "B1 — no decision recorded; its own measurement expires 11:34 ET today",
+    "the SEND wire — does not exist",
+    "this baseline expires 11:29 ET tomorrow; re-record with `python -m global_index.account_baseline_audit --broker ibkr --record`"
+  ]
+}

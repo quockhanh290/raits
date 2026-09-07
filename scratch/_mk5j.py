@@ -1,0 +1,105 @@
+import json, sys
+from pathlib import Path
+sys.path.insert(0, str(Path.cwd()))
+from global_index import track1_gates as g
+out = {
+ "stage": "5J", "date": "2026-08-23", "kind": "operator shadow-start runbook + dry-run gate",
+ "verdict": "READY_FOR_MANUAL_SHADOW_START",
+ "scope": ("shadow only; live orders remain blocked by B1 and no step in the runbook unblocks "
+           "them"),
+ "headline": ("the first shadow start is the first time a real IBKR feed reaches this route; "
+              "every test so far injected a fake broker, so a NAMED refusal on day one is a "
+              "pass and silence is the failure"),
+
+ "verified": {
+   "gate": {"live_frame_released": g.live_frame_wiring()[0],
+            "blocking": [b.id for b in g.blocking()], "self_check": g.self_check(),
+            "confirmation_file": Path(g.CONFIRMATION_PATH).exists(),
+            "allow_orders_exit": 2},
+   "scheduler": {"started": False, "jobs_off": 60, "jobs_on": 84, "track1_slots": 25,
+                 "legacy_entry_slots_under_shadow": 23,
+                 "removed_by_shadow": ["stop_repair_1220"],
+                 "parity_off": True, "parity_on": True},
+   "track1_argv": {"includes": {"--source": "live-shadow", "--sleeve": "<sleeve>",
+                                "--slot-id": "<id>", "--bar-provider": "ibkr",
+                                "--regime-csv": "spy_daily_live.csv"},
+                   "excludes": ["--allow-orders", "--window", "--port"],
+                   "captured_from": "the real job closure, with subprocess.run faked"},
+   "child_route": {"track1": "track1_candidate", "legacy": "legacy"},
+   "ledger": {"unset_refuses": "exit 2, ledger_not_configured, no broker constructed",
+              "ib_insync_imported_on_that_path": False,
+              "rows": ["window_open", "slot_observed", "window_closed"],
+              "route_on_rows": "track1_candidate",
+              "status_on_a_lone_undecided_slot": "incomplete 0/1",
+              "checkpoint_on_incomplete_window": "not written",
+              "filename_caveat": ("named by UTC write date while records carry the ET session "
+                                  "day; use read_day(), not the filename")},
+   "slot_times_et": {"roska4_calm": ["10:00"],
+                     "roska4_stress": "10:35..12:30 every 5 minutes (24 slots)"},
+   "environment_at_check": {"scheduler_processes": 0, "runner_pid": False,
+                            "STOP_TRADING": False, "STOP_TRADING.track1": False,
+                            "RAITS_WINDOW_LEDGER_DIR": None,
+                            "TRACK1_ORDERS_APPROVED": None,
+                            "legacy_positions": 0, "legacy_cur_day": "2026-08-21",
+                            "et_at_check": "2026-08-23 20:56 Sunday",
+                            "maxhold_catchup_would_fire_now": False},
+ },
+
+ "operator_steps": [
+   "1. confirm intent: shadow only, no live orders",
+   "2. create root STOP_TRADING BEFORE any scheduler start (shadow keeps 23 legacy entry slots)",
+   "3. export RAITS_WINDOW_LEDGER_DIR into the scheduler's own shell",
+   "4. confirm TRACK1_ORDERS_APPROVED is unset",
+   "5. start: python -m global_index.run_scheduler --track1-shadow (banner should list 84 jobs)",
+   "6. watch the 10:00 Calm slot, then Stress 10:35-12:30",
+   "7. inspect the ledger with read_day()/status(), never by filename",
+   "8. confirm every row carries route=track1_candidate",
+   "9. confirm send_order calls: 0 and no legacy artefact moved",
+   "10. confirm a checkpoint exists only for a complete window",
+   "11. on a feed error: capture and stop; do not improvise against a live feed",
+   "12. continue only if the first window meets the criteria",
+ ],
+
+ "acceptance_first_day": {
+   "pass": ["slots fired at their times", "ledger rows for both windows",
+            "every row route=track1_candidate", "no orders, no confirmation file",
+            "no legacy entry after STOP_TRADING",
+            "a NAMED refusal counts as a pass",
+            "window complete only when every expected slot decided",
+            "checkpoint only for a complete window",
+            "telemetry captured if RAITS_TELEMETRY_DIR was set"],
+   "fail": ["a slot that ran with no ledger row (silent success)",
+            "any row under route=legacy",
+            "a legacy entry after STOP_TRADING",
+            "a checkpoint for an incomplete window",
+            "dashboard stale_code true"],
+ },
+ "acceptance_multi_day": ["coverage complete on EVERY trading day, both windows",
+                          "track1_bootstrap.accepts returns Resumed for every sleeve/instrument",
+                          "runtime p95 < 300s, target < 240s - provider cost is UNMEASURED",
+                          "no scheduler stall or machine sleep inside a window (day invalid)",
+                          "no legacy trading resumed",
+                          "no unexplained dashboard incidents",
+                          "no broker-flat or orphan-STP claim without a separate check"],
+
+ "go_live_requires_all_four_and_none_are_here": {
+   "confirmation_file": "no step writes it",
+   "TRACK1_ORDERS_APPROVED": "step 4 checks it is unset",
+   "--allow-orders": "no step passes it; the slot argv excludes it",
+   "B1": "still open",
+   "belt_underneath": ("the shadow route holds NoOrderBroker whose send_order raises, and "
+                       "observe_live_slot never calls it - verified by call-graph parse"),
+ },
+ "tests": {"stage5i": "19 passed", "not_run": "global_index/test_event_playback.py",
+           "live_ibkr": "never contacted"},
+ "no_side_effects": ["no scheduler start/stop", "no IBKR connection", "no orders",
+                     "no dashboard runtime write", "no STOP_TRADING created",
+                     "no STOP_TRADING.track1", "no confirmation file", "no commit",
+                     "real scratch/track1_shadow clean"],
+ "final": ("Stage 5J complete: READY_FOR_MANUAL_SHADOW_START. Operator may create STOP_TRADING, "
+           "export RAITS_WINDOW_LEDGER_DIR, and start scheduler with --track1-shadow. This is "
+           "shadow only; live orders remain blocked by B1."),
+}
+Path("scratch/track1_stage5j_operator_shadow_start_runbook_20260823.json").write_text(
+    json.dumps(out, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+print("verdict:", out["verdict"])

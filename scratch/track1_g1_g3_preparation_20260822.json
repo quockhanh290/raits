@@ -1,0 +1,93 @@
+{
+ "stage": "track1_G1_G3_preparation",
+ "date": "2026-08-22",
+ "services_started": [],
+ "power_settings_changed": false,
+ "production_patched": false,
+ "committed": false,
+ "sleep_finding": {
+  "scheduler_suggested_remedy": "powercfg /setdcvalueindex SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 0",
+  "already_applied": true,
+  "measured": {
+   "STANDBYIDLE_AC": 0,
+   "STANDBYIDLE_DC": 0,
+   "HIBERNATEIDLE_AC": 0,
+   "HIBERNATEIDLE_DC": 0,
+   "active_scheme": "Legion Performance Mode"
+  },
+  "conclusion": "the suggested command is a no-op on this host; the machine is not sleeping from idle",
+  "sleep_states": {
+   "available": [
+    "S3",
+    "Hibernate",
+    "Fast Startup"
+   ],
+   "modern_standby_S0": false
+  },
+  "os_suspend_events_40d": 120,
+  "os_suspend_events_in_audit_window": 39,
+  "os_suspend_hours_in_window": 22.0,
+  "wake_sources": {
+   "Power Button": 24,
+   "USB host controller": 13,
+   "Unknown": 2,
+   "wake_timer": 0
+  },
+  "scheduler_stalls_matched_to_os_suspend": "28 of 28",
+  "scheduler_underreports": "39 suspends / 22.0h vs 28 stalls / 17.2h",
+  "actual_mechanism": "deliberate or lid-triggered suspend by a person, woken by hand",
+  "recommended": [
+   "lid action -> do nothing (AC+DC)",
+   "Start-menu power button -> do nothing (currently Sleep)",
+   "stop manually sleeping during the collection window",
+   "or move the scheduler to the host in docs/futures/VPS_DEPLOY_PLAN.md"
+  ]
+ },
+ "maxhold_incident_2026_08_04": {
+  "prior_description": "fired 41 minutes late",
+  "corrected": "did NOT run at all",
+  "why": "misfire 2475s vs SLOT_MISFIRE_GRACE_SECS=300 (run_scheduler.py:363); APScheduler dropped it",
+  "evidence": "no 'Running job' and no 'executed successfully' line on 2026-08-04; a normal day has both",
+  "compounding": "same day pre-flight failed; 26 preflight skips; all 23 day-window slots skipped",
+  "fix_status": "closed for the observed sequence by _catch_up_maxhold, commit 91dbc0e, 2026-08-07",
+  "since_fix": {
+   "maxhold_misfires": 0,
+   "weekday_sleeps_spanning_0931_ET": 0
+  },
+  "residual_hole": "catch-up is startup-only; a running scheduler that sleeps through 09:31 and is never restarted gets neither the cron run nor the catch-up",
+  "not_reconstructible": [
+   "position affected",
+   "intended exit price",
+   "available price",
+   "pnl impact"
+  ],
+  "data_needed": [
+   "dated position snapshot (live_positions.json is rewritten in place)",
+   "retained dated trade-log rows",
+   "IBKR execution history for 2026-08-04 (operator, out of scope here)"
+  ],
+  "classification": "trading-job incident, not scheduler maintenance"
+ },
+ "collection_runbook": {
+  "enable": "set RAITS_TELEMETRY_DIR=D:\raits before starting the scheduler",
+  "route": "leave RAITS_ROUTE=legacy",
+  "output": "slot_timing_YYYYMMDD.jsonl, ~70 lines/day",
+  "min_trading_days": 10,
+  "join_rule": "join to runner_events by ts, NOT by filename (telemetry UTC vs runner ET)"
+ },
+ "gates": {
+  "G1": ">=10 instrumented trading days, p95 from runtime_s",
+  "G2": "p95 near 216s confirms the current regime",
+  "G3": "zero HEARTBEAT STALLED across the window",
+  "G4": "Track1 shadow p95 < 300s hard, < 240s target",
+  "G5": "phase markers in runner.py/signal_layer.py if run_day threatens G4",
+  "G6": "outcome accounting closes per day",
+  "G7": "legacy unchanged (artifact sha256, empty job/argv diff, 44 baseline tests)"
+ },
+ "verification": {
+  "telemetry_tests": 23,
+  "baseline_tests": 44,
+  "excluded": "global_index/test_event_playback.py (pre-existing hang)",
+  "telemetry_inert": true
+ }
+}

@@ -1,0 +1,78 @@
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+Model is not converging.  Current: 9945.820342723808 is not greater than 9945.972771402961. Delta is -0.15242867915367242
+
+==========================================================================================
+### 5 LIVE 14h + stop CO DINH (tho)
+==========================================================================================
+========================================================================
+DEPLOY-REALISTIC SIM | Rổ 4 + NKD | $50,000
+========================================================================
+slippage 2 tick/side | NKD gated ema=10 mult=2.5
+
+SIZER (combined 3-cluster, DD-capped):
+  1-micro combined MaxDD : $1,451  (2.9% of account)
+  dd_scale 3.45 | margin_scale 3.23 → binding: FIXED (--n-contracts override)
+  → CONTRACTS: 1 micro each  (projected DD 2.9%, hard cap 15%)
+
+DEPLOY METRICS at 1 micro:
+  net $105,496  |  Calmar 10.52  |  PF 2.62  |  Sharpe 3.89
+  MaxDD $1,451 (2.9%)  |  return ≈ 30.5%/yr on $50,000
+
+  per-cluster entries taken / rejected (REAL risk$):
+    roska4_swing   taken 1456  rejected 571
+    roska4_stress  taken    0  rejected   0
+    global_nkd     taken  565  rejected   0
+    circuit-breaker halts: 0
+
+per-year net$ (deploy size):
+  2018  $    13,683
+  2019  $     6,347
+  2020  $    26,529
+  2021  $     9,770
+  2022  $    17,788
+  2023  $    17,202
+  2024  $    14,177
+------------------------------------------------------------------------
+NOTE: upper bound. Live MNKD slips >1 tick (rerun --slippage-ticks 2-3 to see), fills partial, unseen events absent. Paper trade is the real test.
+
+==========================================================================================
+### 6 LIVE 14h + stop CO DINH + SUA KHOP LENH
+==========================================================================================
+========================================================================
+DEPLOY-REALISTIC SIM | Rổ 4 + NKD | $50,000
+========================================================================
+slippage 2 tick/side | NKD gated ema=10 mult=2.5
+
+SIZER (combined 3-cluster, DD-capped):
+  1-micro combined MaxDD : $9,387  (18.8% of account)
+  dd_scale 0.53 | margin_scale 3.23 → binding: FIXED (--n-contracts override)
+  → CONTRACTS: 1 micro each  (projected DD 18.8%, hard cap 15%)
+
+DEPLOY METRICS at 1 micro:
+  net $2,814  |  Calmar 0.07  |  PF 1.03  |  Sharpe 0.15
+  MaxDD $9,387 (18.8%)  |  return ≈ 1.3%/yr on $50,000
+
+  per-cluster entries taken / rejected (REAL risk$):
+    roska4_swing   taken  901  rejected 312
+    roska4_stress  taken    0  rejected   0
+    global_nkd     taken  337  rejected   0
+    circuit-breaker halts: 1042
+
+per-year net$ (deploy size):
+  2018  $     3,460
+  2019  $    -2,159
+  2020  $    10,648
+  2021  $    -3,792
+  2022  $    -5,342
+------------------------------------------------------------------------
+NOTE: upper bound. Live MNKD slips >1 tick (rerun --slippage-ticks 2-3 to see), fills partial, unseen events absent. Paper trade is the real test.
+
+  [sua] 892 lenh, tong $125,040 (tren co so 1 hop dong, truoc sizing)
+
+==========================================================================================
+### TOM TAT — dong ket qua cua tung lan
+==========================================================================================
+  5 LIVE 14h + stop CO DINH (tho) net $105,496  |  Calmar 10.52  |  PF 2.62  |  Sharpe 3.89
+  6 LIVE 14h + stop CO DINH + SUA KHOP LENH net $2,814  |  Calmar 0.07  |  PF 1.03  |  Sharpe 0.15
