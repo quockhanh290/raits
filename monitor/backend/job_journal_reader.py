@@ -189,6 +189,54 @@ def _job_type(job_id: str) -> str:
     return "other"
 
 
+ROUTE_TRACK1 = "track1"
+ROUTE_LEGACY = "legacy"
+ROUTE_SHARED = "shared"
+
+#: Job types that serve BOTH routes, named rather than inferred.
+#:
+#: The page had two buckets and derived the second by exclusion: anything without a Track 1
+#: prefix was legacy. That is wrong for shared infrastructure, and wrong in the direction that
+#: misinforms — the SPY jobs got a LEGACY chip while the reason two of them exist is Track 1's
+#: Nikkei sleeve. The window opens on a Sunday evening, so Friday's SPY row has to be on disk
+#: before it; `spy_weekend_pre_nkd_check` and `spy_last_chance_pre_nkd` are named for that
+#: window. The daily refresh feeds the regime labels, and BOTH routes read those.
+#:
+#: The scheduler already draws this line and states it: track1-only mode is documented as
+#: "Track 1 plus shared infrastructure", and the block that strips legacy work keeps
+#: "the 13:45 pre-flight (Track 1's freshness gate reads its record), the heartbeat, the
+#: session-report fallback" on the grounds that all three are route-neutral. The concept
+#: existed in the scheduler and stopped there; this carries it to the reader.
+#:
+#: Measured rather than assumed: `legacy_retirement_candidates` — the list track1-only mode
+#: actually drops — is 45 jobs, and every one of them is `live_day_*` or `nkd_night_*`.
+#: Nothing here appears in it.
+_SHARED_JOB_TYPES: frozenset = frozenset({
+    "spy_refresh_pm", "spy_last_chance_pre_nkd", "spy_weekend_pre_nkd_check",
+    "preflight", "session_report",
+})
+
+
+def job_route(job_type: str) -> str:
+    """Which route a job serves: Track 1, the retiring legacy route, or both.
+
+    Three answers, not two. The two-value version could only ever be "Track 1" and "not
+    Track 1", and shared infrastructure has no home in that: it gets labelled as the route it
+    is least about.
+
+    `flex_pull` and `paper_pnl` are deliberately NOT listed as shared. They may well be —
+    they rebuild paper P&L against the broker's own numbers, which is not obviously one
+    route's business — but nothing measured says so, and a guess here would print on screen
+    as a fact. They keep the answer they have until someone establishes it.
+    """
+    t = str(job_type or "")
+    if t.startswith("track1_"):
+        return ROUTE_TRACK1
+    if t in _SHARED_JOB_TYPES:
+        return ROUTE_SHARED
+    return ROUTE_LEGACY
+
+
 def _job_id_from_name(name: str) -> str | None:
     timed = re.search(r"(?P<hour>\d{2}):(?P<minute>\d{2}) ET$", name)
     suffix = f"{timed.group('hour')}{timed.group('minute')}" if timed else None
@@ -208,8 +256,13 @@ def _job_id_from_name(name: str) -> str | None:
 
 
 def _new_job(job_id: str, started_at: str) -> dict[str, Any]:
+    job_type = _job_type(job_id)
     return {
-        "id": f"{job_id}:{started_at}", "job_id": job_id, "job_type": _job_type(job_id),
+        "id": f"{job_id}:{started_at}", "job_id": job_id, "job_type": job_type,
+        # Stated by the layer that knows, rather than derived on the page by exclusion.
+        # A display that has to guess a route will guess "not Track 1" for everything
+        # shared, which is how a job that exists FOR Track 1 came to be chipped LEGACY.
+        "route": job_route(job_type),
         "started_at": started_at, "ended_at": None, "duration_seconds": None,
         "status": "running", "reason": None, "launch_count": 1, "failed_runs": 0,
         "diagnostics": [], "diagnostics_omitted": 0, "events": [],
@@ -496,11 +549,43 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]],
            root: Path = Path(".")) -> dict[str, Any]:
     jobs: list[dict[str, Any]] = []
     active: dict[str, dict[str, Any]] = {}
+    #: Lines that belong to a launching job but arrived while no card was open — the warning
+    #: that says why the job is about to run, and the line that reports how it went after the
+    #: card has closed. They used to become cards of their own. Nothing is dropped: they are
+    #: held here and attached to that label's card, which is where they were always about.
+    orphan_notes: dict[str, list[str]] = {}
     monitor_events: list[dict[str, Any]] = []
     pending_stall_at: str | None = None
     raw_lines: list[str] = []
     for path in paths:
         raw_lines.extend(path.read_text(encoding="utf-8", errors="replace").splitlines())
+
+    # Which labels launch a child anywhere in this log, decided BEFORE the walk.
+    #
+    # The one-shot branch below opens and closes a card for a labelled line that is not a
+    # launch. It exists for jobs that write a single line and stop -- five such labels had
+    # never become a card at all, including the 13:45 gate that decides whether a session
+    # runs. But it decided that at the line in hand, and a line cannot see whether its own
+    # label launches a child three lines later.
+    #
+    # Measured on 2026-09-06: the Sunday SPY check ran ONCE, 16:00:00 to 16:00:22, and
+    # produced three cards -- the real 22-second run, plus two zero-second cards built from
+    # the warning that says why the job was needed and the line reporting it recovered. Both
+    # phantoms carried status "completed", so the reason a job had to run, and its good news,
+    # each rendered as a finished execution. The page then counted five executions where
+    # three had happened, on the line an operator reads first.
+    #
+    # A label that launches is a label whose other lines belong INSIDE its card. Knowing that
+    # needs one pass over the lines, which is cheap and is already paid for by reading them.
+    launching_labels: set[str] = set()
+    for _raw in raw_lines:
+        _line = _LINE.match(_raw)
+        if not _line:
+            continue
+        _tagged = _JOB.match(_line.group("message"))
+        if _tagged and _LAUNCH.search(_tagged.group("detail")):
+            launching_labels.add(_tagged.group("job_id"))
+
     for raw in raw_lines:
         line = _LINE.match(raw)
         if not line:
@@ -625,6 +710,7 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]],
             # into 545 cards would bury the page this one exists to keep readable.
             if (not _LAUNCH.search(detail) and not detail.startswith("SKIPPED")
                     and "completed OK" not in detail and job_id not in _LIVENESS_LABELS
+                    and job_id not in launching_labels
                     and current is None):
                 # Opened AND CLOSED on the same line. These jobs write one line and stop, so a
                 # card left open would sit on the operations page reading "running" forever --
@@ -634,6 +720,21 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]],
                 _finish(one_shot, timestamp,
                         "failed" if level in ("ERROR", "CRITICAL") else "completed",
                         detail[:200])
+                continue
+            # Same shape, but the label DOES launch a child somewhere in this log, so this
+            # line is one of its own — the warning that explains why it is about to run, or
+            # the outcome line after its card has closed. It goes on that card as a
+            # diagnostic. Attaching it to the card that already exists is the point: the
+            # count of executions has to stay the count of executions.
+            if (not _LAUNCH.search(detail) and not detail.startswith("SKIPPED")
+                    and "completed OK" not in detail and job_id not in _LIVENESS_LABELS
+                    and current is None):
+                prior = [j for j in jobs if j["job_id"] == job_id]
+                if prior:
+                    prior[-1]["diagnostics"].append(detail)
+                else:
+                    # The card has not been opened yet; hold the line for it.
+                    orphan_notes.setdefault(job_id, []).append(detail)
                 continue
             if (_LAUNCH.search(detail) or detail.startswith("SKIPPED")) and "completed OK" not in detail:
                 if detail.startswith("SKIPPED"):
@@ -651,6 +752,9 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]],
                     current["launch_count"] += 1
                 else:
                     current = _new_job(job_id, timestamp)
+                    # Lines held from before the launch belong to this card, and they go on
+                    # FIRST so the card reads in the order the log did.
+                    current["diagnostics"].extend(orphan_notes.pop(job_id, []))
                     jobs.append(current)
                     active[job_id] = current
                 continue
