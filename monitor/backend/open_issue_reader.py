@@ -417,8 +417,19 @@ def _build(paths: list[Path]) -> dict[str, Any]:
     if g2:
         latest_g2 = g2[-1][1]
         age = re.search(r"model (?P<months>\d+) months old \(fit_end=(?P<fit_end>\d{4}-\d{2}-\d{2})\)", latest_g2)
+        # The month count is DERIVED from `fit_end`, not read out of the log line.
+        # `months` in that line is what the runner measured on the day it wrote it, and the
+        # line stops being rewritten the day the runner stops running. Measured 2026-09-04:
+        # the newest G2 HARD line was from 24 August and still said "20 months", while the
+        # same fit read 21 months everywhere the age was computed fresh — one page stating
+        # two ages for one fit. `fit_end` is the durable half and does not age; the count is
+        # the same arithmetic `runner.py` uses, on this module's own ET clock.
+        months_now = None
+        if age:
+            fit_end = dt.date.fromisoformat(age.group("fit_end"))
+            months_now = max(0, (today.year - fit_end.year) * 12 + (today.month - fit_end.month))
         problem = (
-            f"HMM fit ended {age.group('fit_end')} and is {age.group('months')} months old; G2 HARD remains active."
+            f"HMM fit ended {age.group('fit_end')} and is {months_now} months old; G2 HARD remains active."
             if age else "The runner continues to emit G2 HARD because the HMM model age exceeds its hard limit."
         )
         issues.append(_issue(

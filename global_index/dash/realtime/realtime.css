@@ -1935,8 +1935,13 @@ details.issue-group-retired > summary b { opacity: .72; font-weight: 500; }
 /* Stage 5ZZZ-CO. Hàng chip công cụ, cùng khuôn với hàng chip phiên ở đầu băng: cùng cỡ,
    cùng bo góc, cùng cách đánh dấu cái đang chọn — hai hàng chọn thứ khác nhau nhưng đọc
    như một cặp. */
+/* Đệm lấy ĐÚNG của thẻ ngay dưới nó, không lấy của hàng chip phiên ở trên.
+   Đo được: chữ trong hàng này bắt đầu ở x=23 còn "PRICE" và "DATA HEALTH" ngay dưới bắt đầu
+   ở x=41 — hụt đúng 18px, là phần đệm trong của thẻ. Hàng SESSION thì đúng ở mép 23 vì nó
+   là hàng cấp TRANG; hàng này thuộc về chồng thẻ bên dưới và phải thẳng hàng với chúng.
+   Đệm trên 12px, cùng bậc với đệm trên của đầu thẻ. */
 .mv2-instbar { display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
-  padding: 0 0 10px; }
+  padding: 12px 18px 10px; }
 .mv2-inst-label { font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
   color: var(--mv-dim, #8b929c); margin-right: 3px; }
 .mv2-inst { font: inherit; font-size: 11px; line-height: 1.6; cursor: pointer;

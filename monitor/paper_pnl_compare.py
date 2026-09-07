@@ -55,6 +55,10 @@ def _optional_js_json(path: Path) -> dict[str, Any]:
         return {}
 
 
+#: Routes whose rows belong to a different report. See the guard in the two row loops.
+FOREIGN_ROUTES = ("track1_candidate",)
+
+
 def _date(value: Any) -> str | None:
     if value is None or value == "":
         return None
@@ -389,6 +393,14 @@ def _paper_closes(path: Path, epoch: str) -> list[dict[str, Any]]:
             item = json.loads(line)
         except json.JSONDecodeError:
             continue
+        # Stage 5ZM. A row carrying another route's tag is not this report's trade. Track 1
+        # writes its own file (Stage 5ZG), so this should never fire — but the file can be
+        # mis-wired by one argument and the tag travels with the row, and this report is the
+        # P&L number itself. Untagged rows are legacy's and are KEPT: everything written
+        # before 5ZG carries no tag, and excluding those would empty the report of its
+        # entire history.
+        if str(item.get("route") or "") in FOREIGN_ROUTES:
+            continue
         items.append(item)
         if str(item.get("type")).upper() == "OPEN":
             day = _date(item.get("entry_day") or item.get("ts"))
@@ -471,6 +483,14 @@ def _paper_open_signals(path: Path, epoch: str) -> list[dict[str, Any]]:
         try:
             item = json.loads(line)
         except json.JSONDecodeError:
+            continue
+        # Stage 5ZM. A row carrying another route's tag is not this report's trade. Track 1
+        # writes its own file (Stage 5ZG), so this should never fire — but the file can be
+        # mis-wired by one argument and the tag travels with the row, and this report is the
+        # P&L number itself. Untagged rows are legacy's and are KEPT: everything written
+        # before 5ZG carries no tag, and excluding those would empty the report of its
+        # entire history.
+        if str(item.get("route") or "") in FOREIGN_ROUTES:
             continue
         if str(item.get("type")).upper() != "OPEN":
             continue

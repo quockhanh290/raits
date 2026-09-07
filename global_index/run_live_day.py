@@ -72,6 +72,9 @@ from global_index._core import load_parquet as gi_load, FuturesCost as GIFC
 from global_index import specs as gi_specs
 from global_index.regime import RegimeLabels
 from global_index.net_exposure_multi import MultiClusterGuard
+# Additive telemetry. Every call is a no-op unless RAITS_TELEMETRY_DIR is set in
+# the environment, so an unflagged run behaves exactly as before.
+from global_index import slot_telemetry as _tel
 from global_index.signal_layer import (generate_today_signals, CLUSTER_SWING,
                                        CLUSTER_NKD, CLUSTER_STRESS)
 from global_index.ibkr_broker import IBKRBroker
@@ -186,6 +189,7 @@ def main():
                          "14:00-15:55 entry window) so NKD can be evaluated inside "
                          "its own window without touching live Rổ 4 positions.")
     a = ap.parse_args()
+    _tel.begin()
 
     _CLUSTER_ALIASES = {"swing": CLUSTER_SWING, "nkd": CLUSTER_NKD,
                         "stress": CLUSTER_STRESS}
@@ -229,6 +233,7 @@ def main():
         log.warning("[frozen] %d integrity issue(s) — see banner above", len(issues))
     else:
         log.info("[frozen] Primary frozen files intact (size check OK)")
+    _tel.split("frozen_check")
 
     # ── Load bar data ────────────────────────────────────────────────────────
     log.info("[data] Loading parquet bar data...")
@@ -238,6 +243,7 @@ def main():
     ndf = gi_load(a.nkd_parquet)
     ndf.index = ndf.index.tz_convert(c_nkd.session_tz)
     log.info("  Basket: %s | NKD: %d bars", list(dfs.keys()), len(ndf))
+    _tel.split("data_load")
 
     # ── HMM fit_C labels ─────────────────────────────────────────────────────
     log.info("[hmm]  fit_C labels (hmm_fit_end=%s)...", HMM_FIT_END)
@@ -260,6 +266,7 @@ def main():
         return str(v) if v is not None and not (isinstance(v, float) and pd.isna(v)) else None
 
     log.info("  %d SPY label days", len(swing_labels))
+    _tel.split("hmm_labels")
 
     # ── Costs + engines ──────────────────────────────────────────────────────
     # Option C: generate_today_signals() + concat(frozen_parquet + live_bars).
@@ -379,6 +386,9 @@ def main():
     # --print-signals uses real signal_fn even when --dry-run is set.
     if a.dry_run and not a.print_signals:
         log.info("[sig]  --dry-run: signal_fn returns empty (no orders)")
+        _tel.set_outcome("dry_run", sticky=True)   # a dry run still executes
+        _tel.mark("mode", "dry_run")               # run_day; without sticky the
+        # later success would relabel it "ok" and hide that no order could be sent
         def signal_fn(day, _bars, held):
             return [], []
     else:
@@ -622,7 +632,8 @@ def main():
                                costs_2t[i], _kw(swing_engine)) for i in concat_swing]
                     _specs.append((NKD_INST, concat_nkd, ndf, nkd_labels,
                                    ncost_2t, _kw(nkd_engine)))
-                    _shadow(_specs, day_ts, verify=a.shadow_verify)
+                    with _tel.timer("shadow_replay"):
+                        _shadow(_specs, day_ts, verify=a.shadow_verify)
                 except Exception:
                     # A comparison must never be able to stop a trading run.
                     log.exception("[shadow] loi — bo qua, khong anh huong giao dich")
@@ -651,6 +662,7 @@ def main():
     # ── --print-signals: connect + fetch + compute signals, no orders ──────────
     if a.print_signals:
         log.info("[sig]  --print-signals: connect + fetch + compute, no orders")
+        _tel.set_outcome("print_signals", sticky=True)
         _ps_broker = IBKRBroker(host="127.0.0.1", port=a.port, client_id=a.client_id)
         _ps_broker.connect()
         time.sleep(15)  # wait for IB Gateway farm connections to stabilize (2103/2104 flicker)
@@ -732,13 +744,16 @@ def main():
             log.warning("[lock] %s — this slot is a no-op (previous run still in "
                         "flight). Not an error: the STATE model is idempotent, the "
                         "next slot picks up.", exc)
+            _tel.set_outcome("lock_held", sticky=True)
             return
 
     # ── Connect IBKRBroker ───────────────────────────────────────────────────
     log.info("[ibkr] Connecting IBKRBroker → 127.0.0.1:%d clientId=%d ...",
              a.port, a.client_id)
+    _tel.split("setup")
     broker = IBKRBroker(host="127.0.0.1", port=a.port, client_id=a.client_id)
     broker.connect()
+    _tel.split("ibkr_connect")
     log.info("       Connected.")
 
     # ── Wire runner ──────────────────────────────────────────────────────────
@@ -771,10 +786,13 @@ def main():
     )
 
     # ── run_day(today) ───────────────────────────────────────────────────────
+    _tel.split("runner_init")
     log.info("[run]  run_day(%s)...", today.date())
     try:
         decision = runner.run_day(today)
         log.info("[run]  run_day complete.")
+        _tel.split("run_day")
+        _tel.set_outcome("ok")
         if decision is not None:
             # rejected_details must be surfaced: without it "entries=0" conflates
             # "no signal today" with "signal fired but the cluster cap refused it".
@@ -795,6 +813,7 @@ def main():
                 )
     except Exception:
         log.exception("[run]  run_day raised — disconnecting before re-raise")
+        _tel.set_outcome("error", force=True)
         raise
     finally:
         broker.disconnect()

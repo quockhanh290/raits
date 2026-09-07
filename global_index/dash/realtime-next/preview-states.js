@@ -86,6 +86,128 @@
     };
   };
 
+  /* ── Stage 5ZZY. Market-view states ─────────────────────────────────────────────────
+     The market view has six states an operator can meet and live data shows one of them at
+     a time — on an ordinary afternoon, one sleeve complete and two waiting. A layout
+     validated only against that breaks on the day a slot is refused.
+
+     Rule 1 of this file applies with full force here: these MUTATE the real payload. Every
+     one of them changes slot statuses, the window ledger's counts and the rule-lane cells
+     TOGETHER, because those three are derived from one another in the backend and a preview
+     that moves one without the others shows a shape the route cannot produce.
+
+     What is deliberately NOT mutated: `rule_lanes[].values_published` stays at whatever the
+     real payload carried, which measured across every stored session is zero. Injecting a
+     value here would let a design be validated against numbers the detectors do not return,
+     and the panel's whole point is to be honest about that absence. */
+
+  /* The backend's own cell rule, restated here so the two cannot silently diverge:
+     a cell follows its slot unless the rule itself was never reached. */
+  const mvCell = (slotStatus, wasReached) => {
+    if (slotStatus === 'future') return 'future';
+    if (slotStatus === 'missed') return 'no_record';
+    if (slotStatus === 'refused') return 'not_reached';
+    return wasReached ? 'not_published' : 'not_reached';
+  };
+
+  /* Rewrites one sleeve so that slots, coverage and lanes tell the same story. `decide`
+     returns the slot status for index i; everything else follows from it. */
+  const mvSleeve = (s, decide, extra) => {
+    const n = (s.slots || []).length;
+    s.slots = (s.slots || []).map((slot, i) => ({ ...slot, status: decide(i, n) }));
+    const observed = s.slots.filter(x => x.status !== 'future' && x.status !== 'missed').length;
+    s.coverage = { ...(s.coverage || {}), observed_slots: observed, expected_slots: n };
+    s.rule_lanes = (s.rule_lanes || []).map(L => {
+      // A gate rule is reached on every slot that ran; a detector rule only on slots the
+      // gate let through. Read from the lane's own recorded cells rather than by name.
+      const gateish = (L.cells || []).some(c => c.state === 'pass' || c.state === 'fail');
+      const cells = s.slots.map((slot, i) => {
+        const prev = (L.cells || [])[i] || {};
+        const state = gateish && slot.status !== 'future' && slot.status !== 'missed'
+          ? (slot.status === 'refused' ? 'fail' : 'pass')
+          : mvCell(slot.status, slot.status !== 'refused');
+        return { ...prev, slot_id: slot.slot_id, time_et: slot.time_et, state, value: null };
+      });
+      const passed = cells.filter(c => c.state === 'pass').length;
+      const failed = cells.filter(c => c.state === 'fail').length;
+      const decided = passed + failed;
+      return { ...L, cells, passed, failed, slots_decided: decided,
+        state_display: decided ? `${passed}/${decided} pass`
+          : 'value not published by the detector' };
+    });
+    return Object.assign(s, extra || {});
+  };
+
+  const mvApply = (data, decide, extra) => {
+    const sleeves = data?.market_view?.sleeves || {};
+    Object.keys(sleeves).forEach(k => mvSleeve(sleeves[k], decide, extra));
+    return data;
+  };
+
+  const MV_SCENARIOS = {
+    mvWaiting: {
+      label: 'MV · Waiting',
+      note: 'No slot has run. Nothing may be inferred before the first one.',
+      expect: 'ok',
+      apply: (url, data) => url.includes('/track1-market-view')
+        ? mvApply(data, () => 'future', { status: 'waiting',
+            /* Waiting means nothing has been observed, so the data reading goes too. Left
+               as it was, the chips showed a latest bar for a window that has not opened —
+               a state the route cannot actually be in. */
+            data_status: { provider: null, ok: null, latest_bar_et: null,
+              live_rows_fetched: null, splice_result: 'unknown',
+              provider_reason: 'this sleeve recorded no observation for this instrument' } })
+        : data,
+    },
+    mvLive: {
+      label: 'MV · Live',
+      note: 'A third of the window has run. The rest must read as not-yet, never as no-signal.',
+      expect: 'ok',
+      apply: (url, data) => url.includes('/track1-market-view')
+        ? mvApply(data, (i, n) => i < Math.round(n / 3) ? 'no_signal' : 'future',
+                  { status: 'live' }) : data,
+    },
+    mvComplete: {
+      label: 'MV · Complete, no signal',
+      note: 'Every slot decided and none fired, with one slot that left no record at all — '
+          + 'the two must not draw the same.',
+      expect: 'ok',
+      apply: (url, data) => url.includes('/track1-market-view')
+        ? mvApply(data, (i, n) => i === Math.round(n * 0.4) ? 'missed' : 'no_signal',
+                  { status: 'complete' }) : data,
+    },
+    mvDelayed: {
+      label: 'MV · Data delayed',
+      note: 'The provider held the bars back. Prices on screen are stale and must say so.',
+      expect: 'watch',
+      apply: (url, data) => {
+        if (!url.includes('/track1-market-view')) return data;
+        return mvApply(data, (i, n) => i < Math.round(n * 0.45) ? 'no_signal' : 'refused',
+          { status: 'incomplete',
+            data_status: { provider: 'ibkr', ok: false, latest_bar_et: null,
+              live_rows_fetched: 0, splice_result: 'unknown',
+              provider_reason: 'the provider returned no rows for this window' } });
+      },
+    },
+    mvSignal: {
+      label: 'MV · Signal',
+      note: 'One slot produced a candidate. Everything else on the panel must agree with it.',
+      expect: 'ok',
+      apply: (url, data) => url.includes('/track1-market-view')
+        ? mvApply(data, (i, n) => i === Math.round(n * 0.7) ? 'signal' : 'no_signal',
+                  { status: 'complete' }) : data,
+    },
+    mvRejected: {
+      label: 'MV · Rejected',
+      note: 'The setup was met and the order gate refused it. The setup was not the blocker, '
+          + 'and the panel must not blame it.',
+      expect: 'watch',
+      apply: (url, data) => url.includes('/track1-market-view')
+        ? mvApply(data, (i, n) => i === Math.round(n * 0.7) ? 'rejected' : 'no_signal',
+                  { status: 'complete' }) : data,
+    },
+  };
+
   /* Each scenario: label, note, mutation, and the verdict state it EXPECTS. */
   const SCENARIOS = {
     ok: {
@@ -167,6 +289,7 @@
       apply: null,          // handled separately: make the request fail outright
       failUrls: ['/api/v1/broker'],
     },
+    ...MV_SCENARIOS,
   };
 
   /* Typeface probes. Self-hosted, so switching costs no external request. Applied

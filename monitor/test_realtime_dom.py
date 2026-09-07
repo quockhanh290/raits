@@ -2137,12 +2137,17 @@ def test_a_day_where_nothing_repeats_keeps_every_sentence_on_its_row(
 
 
 def test_the_label_date_is_stated_once_in_the_regime_card(realtime_server, browser_page):
-    """Ngày nhãn và tuổi bản đọc nói một lần, ở dòng nguồn của section.
+    """Ngày nhãn và tuổi bản đọc, mỗi thứ nói một lần trong thẻ.
 
-    Đo được: `daily label · 2026-09-03 · checked 5.29h ago` ở dòng nguồn, và
+    Đo được ở bản gốc: `daily label · 2026-09-03 · checked 5.29h ago` ở dòng nguồn, và
     `as of 2026-09-03 · checked 5.29h ago` trong ô neo — cùng ngày, cùng số giờ, cách nhau
-    176px. Dòng nguồn là chỗ mọi section khác của trang đặt xuất xứ của mình, nên bản trong
-    ô neo là bản đi.
+    176px.
+
+    Điều luật này bảo vệ là "mỗi thứ một lần", KHÔNG phải "cả hai ở dòng nguồn". Stage
+    5ZZZ-CU chuyển tuổi bản đọc vào ô neo (kèm giờ tuyệt đối, để tra được vào nhật ký job)
+    và bỏ nó khỏi dòng nguồn; dòng nguồn giữ phần xuất xứ — nhãn của ngày nào — đúng vai nó
+    đang giữ cho mọi section khác. Phần "một lần" do cổng CU đo; ở đây chỉ giữ chốt chặn
+    rằng ô neo không dựng lại nguyên câu xuất xứ.
     """
     stub_api(browser_page, {"/api/v1/track1-market-view": {
         "market_view": {"session_date": "2026-08-27", "sleeves": {}},

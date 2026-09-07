@@ -365,13 +365,38 @@ def _records(value: Any) -> list[dict[str, Any]]:
     return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
 
 
+#: Rows carrying a route other than legacy's are EXCLUDED from this reader's aggregates.
+#: Stage 5ZM. This reader consumes the whole trade log and splits on nothing, which is the
+#: measured reason Stage 5ZG gave Track 1 a separate file: a route-tagged row landing here
+#: would enter legacy's fill-quality and P&L gates as a legacy fill. The separate file makes
+#: that unlikely; this makes it impossible, because a file can be mis-wired by one argument
+#: and a tag travels with the row.
+#:
+#: Untagged rows are legacy's and are kept. Every row written before Stage 5ZG is untagged,
+#: so this must not become "keep only rows tagged legacy" — that would silently empty the
+#: aggregate of its entire history.
+FOREIGN_ROUTES = ("track1_candidate",)
+
+
 def _trade_records(path: Path) -> tuple[list[dict[str, Any]], int, str | None]:
+    records, _foreign, malformed, error = _trade_records_split(path)
+    return records, malformed, error
+
+
+def _trade_records_split(path: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]],
+                                              int, str | None]:
+    """`(legacy rows, foreign-route rows, malformed count, error)`.
+
+    The foreign rows are returned rather than dropped, so a caller can SAY how many were
+    excluded. A filter whose effect nobody can see is a filter nobody can check.
+    """
     records: list[dict[str, Any]] = []
+    foreign: list[dict[str, Any]] = []
     malformed = 0
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError as exc:
-        return records, malformed, str(exc)
+        return records, foreign, malformed, str(exc)
     for line in lines:
         line = line.strip()
         if not line:
@@ -382,10 +407,13 @@ def _trade_records(path: Path) -> tuple[list[dict[str, Any]], int, str | None]:
             malformed += 1
             continue
         if isinstance(value, dict):
-            records.append(value)
+            if str(value.get("route") or "") in FOREIGN_ROUTES:
+                foreign.append(value)
+            else:
+                records.append(value)
         else:
             malformed += 1
-    return records, malformed, None
+    return records, foreign, malformed, None
 
 
 def _date(value: Any) -> str | None:
@@ -3149,7 +3177,8 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
     slip_stats, slip_error = _read_json(root / "slip_stats.json")
     paper_inputs, paper_inputs_error = _read_optional_json(root / "monitor" / "paper_inputs.json")
     paper_compare, paper_compare_error = _read_optional_json(root / "monitor" / "paper_pnl_compare.json")
-    records, malformed_trades, trade_error = _trade_records(root / "trade_log.jsonl")
+    records, foreign_trades, malformed_trades, trade_error = _trade_records_split(
+        root / "trade_log.jsonl")
 
     epoch = str(meta.get("system_epoch") or history.get("epoch") or "") or None
     history_days = sorted(day for day in (history.get("days") or {}) if _in_epoch(day, epoch))
@@ -3473,6 +3502,12 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
                 "history_error": history_error,
                 "trade_log_error": trade_error,
                 "trade_log_malformed_lines": malformed_trades,
+                # Stage 5ZM: said out loud rather than silently dropped. Zero here is the
+                # expected reading and the number that must be watched: a non-zero count
+                # means a Track 1 row reached legacy's file.
+                "trade_log_foreign_route_rows": len(foreign_trades),
+                "trade_log_foreign_routes": sorted(
+                    {str(r.get("route")) for r in foreign_trades}),
                 "slip_stats_error": slip_error,
                 "paper_inputs_error": paper_inputs_error,
                 "paper_pnl_compare_error": paper_compare_error,

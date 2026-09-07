@@ -161,12 +161,13 @@ body {
    the order the question gets asked in. */
 .now-monitor > .section-body, .now-monitor .now-monitor-shell { padding: 0; }
 .now-schedule-facts {
+  --fact-pad: 16px 20px;
   border: 1px solid var(--line-card); border-radius: 8px; background: var(--card);
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
   overflow: hidden; gap: 0;
 }
 .now-schedule-facts > .schedule-fact {
-  display: block; padding: 16px 20px; margin: 0;
+  display: block; padding: var(--fact-pad); margin: 0;
   border: 0; border-right: 1px solid var(--line-hair);
   border-top: 2px solid var(--d-exposure);
   background: transparent; border-radius: 0;
@@ -767,9 +768,15 @@ small.broker-account-line {
   font: 500 11px/1.4 var(--sans); letter-spacing: .1em; text-transform: uppercase;
   color: var(--t-label);
 }
-.job-detail p, .job-detail dd {
+/* The Operational and Signal lines are `li`, not `p`, so this rule never reached them
+   and they kept the base sheet's dimmer, heavier footnote ink. One declaration owns the
+   panel's body text now, so the two cannot drift apart again. The list keeps its own
+   spacing — the 4px lead-in belongs to a paragraph following a label, not to every
+   bullet in a seven-line list. */
+.job-detail p, .job-detail dd, .job-detail .job-lines li {
   margin: 4px 0 0; font: 400 12px/1.5 var(--sans); color: var(--t-primary);
 }
+.job-detail .job-lines li { margin: 0; }
 
 /* The four facts sit two up, matching the reference's Started | Exit band. */
 .job-detail > dl {

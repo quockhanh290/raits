@@ -21,52 +21,16 @@
     "actual_source": "paper_history.days / live_state.meta.final_equity",
     "actual_semantics": "runner system ledger / sleeve equity, realised-only by design",
     "not_ibkr_equity": true,
-    "realtime_system_ledger_pnl": 228.75,
+    "realtime_system_ledger_pnl": 408.25,
     "realtime_system_ledger_formula": "live_state.meta.final_equity - paper_history.account",
-    "realtime_final_equity": 50228.75,
+    "realtime_final_equity": 50408.25,
     "realtime_account_base": 50000.0,
     "paper_closed_trade_realized": -43.25,
-    "system_ledger_offset_vs_paper_closed_trades": 272.0,
+    "system_ledger_offset_vs_paper_closed_trades": 451.5,
     "system_ledger_offset_trace": {
-      "status": "MATCHED_PRE_EPOCH_CARRY",
-      "conclusion": "The runner system ledger includes one intentionally selected Flex carry-in close. Zero-base strategy comparison keeps excluding it; ledger-aligned reconcile includes it on purpose.",
-      "matching_carry_closed": [
-        {
-          "inst": "MYM",
-          "direction": "SHORT",
-          "contracts": 1.0,
-          "entry_day": "2026-08-05",
-          "exit_day": "2026-08-10",
-          "entry_price": 54631.0,
-          "exit_price": 54087.0,
-          "pnl": 272.0,
-          "pnl_basis": "statement_proceeds",
-          "commission": -1.22,
-          "broker_trade_id": "TradeID:1802283182 | IBOrderID:733941750 | IBExecID:0000e1a7.6a7f790f.01.01 | OrigOrderID:0 | OrigTransactionID:0 | BrokerageOrderID:02642105.0002b366.6a72bb8b.0001 | ExchOrderID:02642105.00012a00.6eaf5851[2] | ExtExecID:150986291S | TransactionID:10714913899 | TradeID:1804952288 | IBOrderID:735284154 | IBExecID:0000e1a7.6a8326f2.01.01 | BrokerageOrderID:02642105.0002b366.6a7950e0.0001 | ExchOrderID:02642105.00012a00.6eb47971[2] | ExtExecID:582718587B | TransactionID:10725199983",
-          "entry_broker_ids": {
-            "TradeID": "1802283182",
-            "IBOrderID": "733941750",
-            "IBExecID": "0000e1a7.6a7f790f.01.01",
-            "OrigOrderID": "0",
-            "OrigTransactionID": "0",
-            "BrokerageOrderID": "02642105.0002b366.6a72bb8b.0001",
-            "ExchOrderID": "02642105.00012a00.6eaf5851[2]",
-            "ExtExecID": "150986291S",
-            "TransactionID": "10714913899"
-          },
-          "exit_broker_ids": {
-            "TradeID": "1804952288",
-            "IBOrderID": "735284154",
-            "IBExecID": "0000e1a7.6a8326f2.01.01",
-            "OrigOrderID": "0",
-            "OrigTransactionID": "0",
-            "BrokerageOrderID": "02642105.0002b366.6a7950e0.0001",
-            "ExchOrderID": "02642105.00012a00.6eb47971[2]",
-            "ExtExecID": "582718587B",
-            "TransactionID": "10725199983"
-          }
-        }
-      ],
+      "status": "UNRESOLVED",
+      "conclusion": "No exact Flex carry-close match was found for the runner ledger offset.",
+      "matching_carry_closed": [],
       "ignored_zero_base_fills": [
         {
           "date": "2026-08-10",
@@ -93,12 +57,12 @@
         }
       ],
       "comparable_source_of_truth": "flex_ledger_aligned_realized",
-      "comparable_flex_realized": -1031.25,
-      "system_ledger_is_comparable": true
+      "comparable_flex_realized": -1123.75,
+      "system_ledger_is_comparable": false
     },
     "broker_equity_context": {
       "source": "live_state.meta.broker_equity and live_positions.breaker.last_broker_equity",
-      "value": 996440.14,
+      "value": 996730.93,
       "not_used_for_pnl_compare": true
     },
     "bridge_note": "system_ledger_vs_trade_filter is the retained ledger offset versus CLOSED trade_log P&L from the paper epoch. It is not classified as interest, mark-to-market, or broker cash movement unless an IBKR ledger source is added."
@@ -175,6 +139,96 @@
       "paper_trade_realized_cum": -43.25,
       "backtest_trade_realized_cum": -163.15,
       "system_ledger_vs_trade_filter": 272.0,
+      "account_window_diff": null,
+      "trade_filter_realized_diff": 119.9,
+      "curve_status": "stale_through:2026-08-12"
+    },
+    {
+      "date": "2026-08-17",
+      "actual_equity": 50408.25,
+      "actual_equity_source": "system_ledger_realized_only",
+      "expected_equity_account_window": null,
+      "expected_equity_actual_window": null,
+      "expected_equity_trade_filter": 49836.85,
+      "paper_trade_filter_equity": 49956.75,
+      "paper_trade_realized_cum": -43.25,
+      "backtest_trade_realized_cum": -163.15,
+      "system_ledger_vs_trade_filter": 451.5,
+      "account_window_diff": null,
+      "trade_filter_realized_diff": 119.9,
+      "curve_status": "stale_through:2026-08-12"
+    },
+    {
+      "date": "2026-08-18",
+      "actual_equity": 50408.25,
+      "actual_equity_source": "system_ledger_realized_only",
+      "expected_equity_account_window": null,
+      "expected_equity_actual_window": null,
+      "expected_equity_trade_filter": 49836.85,
+      "paper_trade_filter_equity": 49956.75,
+      "paper_trade_realized_cum": -43.25,
+      "backtest_trade_realized_cum": -163.15,
+      "system_ledger_vs_trade_filter": 451.5,
+      "account_window_diff": null,
+      "trade_filter_realized_diff": 119.9,
+      "curve_status": "stale_through:2026-08-12"
+    },
+    {
+      "date": "2026-08-19",
+      "actual_equity": 50408.25,
+      "actual_equity_source": "system_ledger_realized_only",
+      "expected_equity_account_window": null,
+      "expected_equity_actual_window": null,
+      "expected_equity_trade_filter": 49836.85,
+      "paper_trade_filter_equity": 49956.75,
+      "paper_trade_realized_cum": -43.25,
+      "backtest_trade_realized_cum": -163.15,
+      "system_ledger_vs_trade_filter": 451.5,
+      "account_window_diff": null,
+      "trade_filter_realized_diff": 119.9,
+      "curve_status": "stale_through:2026-08-12"
+    },
+    {
+      "date": "2026-08-20",
+      "actual_equity": 50408.25,
+      "actual_equity_source": "system_ledger_realized_only",
+      "expected_equity_account_window": null,
+      "expected_equity_actual_window": null,
+      "expected_equity_trade_filter": 49836.85,
+      "paper_trade_filter_equity": 49956.75,
+      "paper_trade_realized_cum": -43.25,
+      "backtest_trade_realized_cum": -163.15,
+      "system_ledger_vs_trade_filter": 451.5,
+      "account_window_diff": null,
+      "trade_filter_realized_diff": 119.9,
+      "curve_status": "stale_through:2026-08-12"
+    },
+    {
+      "date": "2026-08-21",
+      "actual_equity": 50408.25,
+      "actual_equity_source": "system_ledger_realized_only",
+      "expected_equity_account_window": null,
+      "expected_equity_actual_window": null,
+      "expected_equity_trade_filter": 49836.85,
+      "paper_trade_filter_equity": 49956.75,
+      "paper_trade_realized_cum": -43.25,
+      "backtest_trade_realized_cum": -163.15,
+      "system_ledger_vs_trade_filter": 451.5,
+      "account_window_diff": null,
+      "trade_filter_realized_diff": 119.9,
+      "curve_status": "stale_through:2026-08-12"
+    },
+    {
+      "date": "2026-08-24",
+      "actual_equity": 50408.25,
+      "actual_equity_source": "system_ledger_realized_only",
+      "expected_equity_account_window": null,
+      "expected_equity_actual_window": null,
+      "expected_equity_trade_filter": 49836.85,
+      "paper_trade_filter_equity": 49956.75,
+      "paper_trade_realized_cum": -43.25,
+      "backtest_trade_realized_cum": -163.15,
+      "system_ledger_vs_trade_filter": 451.5,
       "account_window_diff": null,
       "trade_filter_realized_diff": 119.9,
       "curve_status": "stale_through:2026-08-12"
@@ -913,43 +967,30 @@
         "entry_price": 67065.0,
         "exit_day": "2026-08-12",
         "source": "replay_snapshots.decision.entries"
-      },
-      {
-        "date": "2026-08-10",
-        "inst": "M2K",
-        "cluster": "roska4_swing",
-        "direction": "LONG",
-        "action": "OPEN",
-        "risk_sized": null,
-        "price": 3022.5,
-        "entry_price": 3022.5,
-        "entry_time": "2026-08-10 14:55:00",
-        "exit_day": null,
-        "open_position": true,
-        "source": "replay_checkpoint.open_position"
       }
     ],
     "classified": {
       "counts": {
-        "MATCHED_SIGNAL": 6
+        "MATCHED_SIGNAL": 5,
+        "PAPER_ONLY_SIGNAL": 1
       },
-      "unresolved": 0,
+      "unresolved": 1,
       "rows": [
         {
-          "classification": "MATCHED_SIGNAL",
-          "reason_code": "MATCHED_DECISION",
-          "reason": "paper and backtest emitted the same date/instrument/cluster/direction/action signal",
+          "classification": "PAPER_ONLY_SIGNAL",
+          "reason_code": "PAPER_ONLY_OPEN_NO_REPLAY_DECISION",
+          "reason": "paper/live emitted and filled an OPEN, but the replay snapshot has no matching OPEN decision for the same date/instrument/cluster/direction; compare live candidate inputs, open-book state, caps, and replay bundle for that decision timestamp",
           "date": "2026-08-10",
           "inst": "M2K",
           "cluster": "roska4_swing",
           "direction": "LONG",
           "action": "OPEN",
           "paper_count": 1,
-          "backtest_count": 1,
+          "backtest_count": 0,
           "paper_price": 3022.5,
-          "backtest_price": 3022.5,
-          "price_diff": 0.0,
-          "price_compare_status": "MATCH",
+          "backtest_price": null,
+          "price_diff": null,
+          "price_compare_status": "MISSING",
           "paper_risk": null,
           "backtest_risk": null,
           "risk_diff": null,
@@ -970,20 +1011,7 @@
             "contracts": 1,
             "source": "trade_log"
           },
-          "backtest_sample": {
-            "date": "2026-08-10",
-            "inst": "M2K",
-            "cluster": "roska4_swing",
-            "direction": "LONG",
-            "action": "OPEN",
-            "risk_sized": null,
-            "price": 3022.5,
-            "entry_price": 3022.5,
-            "entry_time": "2026-08-10 14:55:00",
-            "exit_day": null,
-            "open_position": true,
-            "source": "replay_checkpoint.open_position"
-          }
+          "backtest_sample": null
         },
         {
           "classification": "MATCHED_SIGNAL",
@@ -1222,13 +1250,14 @@
   },
   "entry_compare": {
     "counts": {
-      "MATCHED_ENTRY": 5
+      "MATCHED_ENTRY": 4,
+      "PAPER_ONLY_ENTRY": 1
     },
-    "unresolved": 0,
+    "unresolved": 1,
     "rows": [
       {
-        "classification": "MATCHED_ENTRY",
-        "reason": "paper admitted/filled an entry and replay admitted the same entry identity",
+        "classification": "PAPER_ONLY_ENTRY",
+        "reason": "paper admitted/filled an entry that replay did not admit for the same date/instrument/cluster/direction",
         "trade_id": "M2K|roska4_swing|LONG|",
         "date": "2026-08-10",
         "inst": "M2K",
@@ -1237,10 +1266,10 @@
         "paper_expected_entry": 3022.5,
         "paper_fill_price": 3025.3,
         "broker_statement_price": 3025.3,
-        "backtest_entry_price": 3022.5,
+        "backtest_entry_price": null,
         "paper_fill_vs_expected": 2.8,
-        "paper_expected_vs_backtest": 0.0,
-        "paper_fill_vs_backtest": 2.8,
+        "paper_expected_vs_backtest": null,
+        "paper_fill_vs_backtest": null,
         "broker_vs_paper_fill": 0.0,
         "broker_verified": true,
         "audit_ref": "audit-m2k-entry",
@@ -1261,20 +1290,7 @@
           "contracts": 1,
           "source": "trade_log"
         },
-        "backtest_sample": {
-          "date": "2026-08-10",
-          "inst": "M2K",
-          "cluster": "roska4_swing",
-          "direction": "LONG",
-          "action": "OPEN",
-          "risk_sized": null,
-          "price": 3022.5,
-          "entry_price": 3022.5,
-          "entry_time": "2026-08-10 14:55:00",
-          "exit_day": null,
-          "open_position": true,
-          "source": "replay_checkpoint.open_position"
-        },
+        "backtest_sample": null,
         "broker_sample": {
           "date": "2026-08-10",
           "inst": "M2K",
@@ -1577,10 +1593,10 @@
   },
   "lifecycle_compare": {
     "counts": {
-      "MATCHED_LIFECYCLE": 1,
-      "THREE_WAY_DIFF": 4
+      "THREE_WAY_DIFF": 4,
+      "TWO_WAY_ONLY": 1
     },
-    "unresolved": 0,
+    "unresolved": 1,
     "paper_minus_backtest_sum": 119.9,
     "paper_minus_flex_sum": 1260.0,
     "rows": [
@@ -1612,49 +1628,41 @@
           "reason": null
         },
         "backtest": {
-          "status": "OPEN",
-          "entry_price": 3022.5,
-          "exit_day": null,
-          "exit_price": null,
-          "pnl": null,
-          "source": "replay_checkpoint.open_position",
-          "qty": null,
-          "fee": null,
-          "source_trade_id": "M2K|roska4_swing|LONG|2026-08-10",
-          "broker_trade_id": null,
-          "expected_entry": null,
-          "entry_slip": null,
-          "entry_slippage_pnl": null,
-          "expected_exit": null,
-          "exit_slip": null,
-          "exit_slippage_pnl": null,
-          "components": {},
-          "reason": null
+          "status": "MISSING"
         },
         "flex": {
-          "status": "OPEN",
+          "status": "CLOSED",
           "entry_price": 3025.3,
-          "exit_day": null,
-          "exit_price": null,
-          "pnl": null,
-          "source": "flex_epoch_rebased_open_lot",
+          "exit_day": "2026-08-17",
+          "exit_price": 3061.2,
+          "pnl": 179.5,
+          "source": "flex_epoch_rebased",
           "qty": 1.0,
-          "fee": -0.61,
+          "fee": -1.22,
           "source_trade_id": "M2K|roska4_swing|LONG|2026-08-10",
-          "broker_trade_id": "BrokerageOrderID:02642105.0002b366.6a7952cd.0001 | ExchOrderID:02642105.00012a00.6eb53b77[2] | ExtExecID:582851172B | IBExecID:0000e1a7.6a83b66f.01.01 | IBOrderID:735685382 | OrigOrderID:0 | OrigTransactionID:0 | TradeID:1805829039 | TransactionID:10728449940",
+          "broker_trade_id": "BrokerageOrderID:02642105.0002b366.6a828b58.0001 | ExchOrderID:02642105.00012a00.6ebdac3e[2] | ExtExecID:582769522S | IBExecID:0000e1a7.6a891348.01.01 | IBOrderID:738135973 | OrigOrderID:0 | OrigTransactionID:0 | TradeID:1810878291 | TransactionID:10747595177",
           "expected_entry": null,
           "entry_slip": null,
           "entry_slippage_pnl": null,
           "expected_exit": null,
           "exit_slip": null,
           "exit_slippage_pnl": null,
-          "components": {},
+          "components": {
+            "gross_pnl": 179.5,
+            "fee": -1.22,
+            "model_commission": null,
+            "model_slippage": null,
+            "model_cost": null,
+            "net_pnl": 179.5,
+            "net_with_fee": 178.28,
+            "component_source": "flex_reconstructed_gross_plus_broker_commission"
+          },
           "reason": null
         },
-        "audit_ref": "audit-m2k-entry",
-        "audit_label": "checkpoint open-position audit",
-        "classification": "MATCHED_LIFECYCLE",
-        "reason": "paper, backtest, and Flex have the same lifecycle status and realised P&L where closed",
+        "audit_ref": null,
+        "audit_label": null,
+        "classification": "TWO_WAY_ONLY",
+        "reason": "trade identity exists in two sources and is missing from the third",
         "paper_minus_backtest_pnl": null,
         "paper_minus_flex_pnl": null
       },
@@ -2126,39 +2134,15 @@
   },
   "open_position_parity": {
     "status": "MATCH",
-    "paper_day": "2026-08-14",
+    "paper_day": "2026-08-24",
     "replay_day": "2026-08-12",
-    "paper_open_count": 1,
-    "replay_open_count": 1,
-    "backtest_position_source": "replay_checkpoint.open_position",
+    "paper_open_count": 0,
+    "replay_open_count": 0,
+    "backtest_position_source": "replay_snapshots.open_positions",
     "paper_only": [],
     "backtest_only": [],
-    "paper_positions": [
-      {
-        "inst": "M2K",
-        "cluster": "roska4_swing",
-        "direction": "LONG",
-        "entry_day": "2026-08-10",
-        "contracts": 1,
-        "risk_sized": 602.1428571428572,
-        "entry_price": 3025.3,
-        "stop_order_id": "288",
-        "source": null
-      }
-    ],
-    "backtest_positions": [
-      {
-        "inst": "M2K",
-        "cluster": "roska4_swing",
-        "direction": "LONG",
-        "entry_day": "2026-08-10",
-        "contracts": null,
-        "risk_sized": null,
-        "entry_price": 3022.5,
-        "stop_order_id": null,
-        "source": "replay_checkpoint.open_position"
-      }
-    ],
+    "paper_positions": [],
+    "backtest_positions": [],
     "note": "Parity compares current retained paper positions against replay checkpoint open positions when available; replay snapshot open_positions are used only when no checkpoint position exists."
   },
   "signal_path_audit": {
@@ -2276,8 +2260,8 @@
   "backtest_artifact_audit": {
     "status": "OBSERVED",
     "focus": "M2K LONG OPEN on 2026-08-10",
-    "classification": "REPLAY_SNAPSHOT_OMITS_OPEN_CHECKPOINT_POSITION",
-    "reason": "A fresh regenerate still leaves M2K out of replay_snapshots.decision.entries because that bundle is built from closed/known trades. The current per-instrument replay checkpoint retains the still-open M2K LONG from 2026-08-10, so compare must use replay_checkpoint.open_position for open-entry parity and reserve replay_snapshots entries for closed/known trade P&L.",
+    "classification": "NO_ARTIFACT_DIVERGENCE_DETECTED",
+    "reason": "Replay snapshot and current checkpoint do not show the focused M2K artifact mismatch.",
     "epoch": "2026-08-10",
     "focus_day": "2026-08-10",
     "replay_snapshot_has_m2k_entry": false,
@@ -2391,25 +2375,18 @@
         "exit_day": null
       }
     ],
-    "current_checkpoint_has_m2k_long": true,
+    "current_checkpoint_has_m2k_long": false,
     "current_checkpoint_m2k": {
-      "last_day": "2026-08-13",
-      "fingerprint": "2941939:bdeae4adaf412154",
-      "pos": {
-        "dir": "LONG",
-        "entry": 3022.5,
-        "entry_day": "2026-08-10 00:00:00",
-        "regime": "Normal",
-        "extreme": 3078.2,
-        "stop": 3020.24,
-        "entry_time": "2026-08-10 14:55:00"
-      }
+      "last_day": "2026-08-20",
+      "fingerprint": "2948839:10faea7a73f88fe7",
+      "params": "chandelier_atr_mult=2.5;ema_period=30;max_hold_days=5",
+      "pos": null
     },
     "parquet": {
       "status": "OBSERVED",
       "path": "data\\cache\\futures\\RTY_continuous_1m_8y.parquet",
       "min": "2017-07-09 22:01:00",
-      "max": "2026-08-14 17:46:00",
+      "max": "2026-09-04 17:45:00",
       "focus_day_bars": 1380,
       "focus_day_min": "2026-08-10 00:00:00",
       "focus_day_max": "2026-08-10 23:59:00"
@@ -2417,67 +2394,36 @@
   },
   "statement_pnl_compare": {
     "status": "OBSERVED",
-    "source": "monitor\\inputs\\ibkr_flex\\flex_20260813T103831Z_q1603041_ref6822861365.csv",
+    "source": "monitor\\inputs\\ibkr_flex\\flex_20260905T035534Z_q1603041_ref7228841988_20260307-20260903.csv",
+    "flex_coverage": {
+      "through": "2026-09-03",
+      "source": "requested_range",
+      "exact": true
+    },
     "epoch": "2026-08-10",
     "actual_system_ledger_semantics": "runner realised trade ledger / sleeve equity, not IBKR NetLiquidation",
     "paper_epoch_closed_realized": -43.25,
     "backtest_epoch_closed_realized": -163.15,
     "paper_minus_backtest_realized": 119.9,
-    "flex_epoch_rebased_realized": -1303.25,
-    "paper_minus_flex_epoch_rebased_realized": 1260.0,
-    "flex_ledger_aligned_realized": -1031.25,
-    "paper_minus_flex_ledger_aligned_realized": 988.0,
-    "ledger_aligned_minus_system_ledger_pnl": -1260.0,
+    "flex_epoch_rebased_realized": -1123.75,
+    "paper_minus_flex_epoch_rebased_realized": 1080.5,
+    "flex_ledger_aligned_realized": -1123.75,
+    "paper_minus_flex_ledger_aligned_realized": 1080.5,
+    "ledger_aligned_minus_system_ledger_pnl": -1532.0,
     "ledger_alignment_override": {
-      "status": "ACTIVE",
+      "status": "INACTIVE",
       "scope": "selective",
-      "reason": "Intentional carry-in override: include only the Flex closed lot that exactly explains the runner system-ledger offset, without moving the global strategy rebase date.",
+      "reason": "No exact ledger-offset carry close was found, so no selective carry-in override is active.",
       "global_rebase_changed": false,
-      "included_carry_closed": [
-        {
-          "inst": "MYM",
-          "direction": "SHORT",
-          "contracts": 1.0,
-          "entry_day": "2026-08-05",
-          "exit_day": "2026-08-10",
-          "entry_price": 54631.0,
-          "exit_price": 54087.0,
-          "pnl": 272.0,
-          "pnl_basis": "statement_proceeds",
-          "commission": -1.22,
-          "broker_trade_id": "TradeID:1802283182 | IBOrderID:733941750 | IBExecID:0000e1a7.6a7f790f.01.01 | OrigOrderID:0 | OrigTransactionID:0 | BrokerageOrderID:02642105.0002b366.6a72bb8b.0001 | ExchOrderID:02642105.00012a00.6eaf5851[2] | ExtExecID:150986291S | TransactionID:10714913899 | TradeID:1804952288 | IBOrderID:735284154 | IBExecID:0000e1a7.6a8326f2.01.01 | BrokerageOrderID:02642105.0002b366.6a7950e0.0001 | ExchOrderID:02642105.00012a00.6eb47971[2] | ExtExecID:582718587B | TransactionID:10725199983",
-          "entry_broker_ids": {
-            "TradeID": "1802283182",
-            "IBOrderID": "733941750",
-            "IBExecID": "0000e1a7.6a7f790f.01.01",
-            "OrigOrderID": "0",
-            "OrigTransactionID": "0",
-            "BrokerageOrderID": "02642105.0002b366.6a72bb8b.0001",
-            "ExchOrderID": "02642105.00012a00.6eaf5851[2]",
-            "ExtExecID": "150986291S",
-            "TransactionID": "10714913899"
-          },
-          "exit_broker_ids": {
-            "TradeID": "1804952288",
-            "IBOrderID": "735284154",
-            "IBExecID": "0000e1a7.6a8326f2.01.01",
-            "OrigOrderID": "0",
-            "OrigTransactionID": "0",
-            "BrokerageOrderID": "02642105.0002b366.6a7950e0.0001",
-            "ExchOrderID": "02642105.00012a00.6eb47971[2]",
-            "ExtExecID": "582718587B",
-            "TransactionID": "10725199983"
-          }
-        }
-      ]
+      "included_carry_closed": []
     },
-    "raw_statement_entry_epoch_realized": -1399.5,
-    "statement_entry_epoch_realized": -1303.25,
-    "paper_minus_statement_entry_epoch_realized": 1356.25,
+    "raw_statement_entry_epoch_realized": -1220.0,
+    "statement_entry_epoch_realized": -1123.75,
+    "paper_minus_statement_entry_epoch_realized": 1176.75,
     "excluded_pre_epoch_exit_window_realized": 388.25,
     "excluded_pre_epoch_closed_count": 2,
-    "latest_system_ledger_vs_paper_trade_filter": 272.0,
-    "ledger_offset_explanation": "MATCH_PRE_EPOCH_CARRY_FILL",
+    "latest_system_ledger_vs_paper_trade_filter": 451.5,
+    "ledger_offset_explanation": "PARTIAL_OR_UNRESOLVED_WITH_CURRENT_STATEMENT",
     "note": "Flex P&L compare is epoch-rebased: it filters fills to date >= paper epoch, starts from zero position, then pairs those fills inside the window. Raw IBKR FIFO remains broker provenance, but pre-epoch lots are excluded from the main comparable base.",
     "paper_flex_bridge": [
       {
@@ -2683,6 +2629,40 @@
         "flex_open_lot_price": null,
         "fifo_carry_entry_day": null,
         "fifo_carry_pnl": null
+      },
+      {
+        "classification": "FLEX_ONLY_CLOSED",
+        "reason": "Flex closed lot entered after epoch has no matching paper closed trade",
+        "trade_id": "M2K|roska4_swing|LONG|2026-08-10",
+        "inst": "M2K",
+        "direction": "LONG",
+        "entry_day": "2026-08-10",
+        "paper_exit_day": null,
+        "paper_pnl": null,
+        "paper_source_trade_id": null,
+        "paper_entry_price": null,
+        "paper_exit_price": null,
+        "paper_components": {},
+        "flex_exit_day": "2026-08-17",
+        "flex_pnl": 179.5,
+        "flex_broker_trade_id": "BrokerageOrderID:02642105.0002b366.6a828b58.0001 | ExchOrderID:02642105.00012a00.6ebdac3e[2] | ExtExecID:582769522S | IBExecID:0000e1a7.6a891348.01.01 | IBOrderID:738135973 | OrigOrderID:0 | OrigTransactionID:0 | TradeID:1810878291 | TransactionID:10747595177",
+        "flex_entry_price": 3025.3,
+        "flex_exit_price": 3061.2,
+        "flex_commission": -1.22,
+        "flex_components": {
+          "gross_pnl": 179.5,
+          "fee": -1.22,
+          "model_commission": null,
+          "model_slippage": null,
+          "model_cost": null,
+          "net_pnl": 179.5,
+          "net_with_fee": 178.28,
+          "component_source": "flex_reconstructed_gross_plus_broker_commission"
+        },
+        "paper_minus_flex": null,
+        "flex_open_lot_price": null,
+        "fifo_carry_entry_day": null,
+        "fifo_carry_pnl": null
       }
     ],
     "paper_flex_bridge_diff_sum": 1260.0,
@@ -2876,38 +2856,50 @@
         }
       },
       {
-        "inst": "MYM",
-        "direction": "SHORT",
-        "contracts": 1.0,
-        "entry_day": "2026-08-05",
-        "exit_day": "2026-08-10",
-        "entry_price": 54631.0,
-        "exit_price": 54087.0,
-        "pnl": 272.0,
         "pnl_basis": "statement_proceeds",
+        "fifo_pnl": 0.0,
+        "inst": "M2K",
+        "direction": "LONG",
+        "contracts": 1.0,
+        "entry_day": "2026-08-10",
+        "exit_day": "2026-08-17",
+        "entry_price": 3025.3,
+        "exit_price": 3061.2,
+        "pnl": 179.5,
         "commission": -1.22,
-        "broker_trade_id": "TradeID:1802283182 | IBOrderID:733941750 | IBExecID:0000e1a7.6a7f790f.01.01 | OrigOrderID:0 | OrigTransactionID:0 | BrokerageOrderID:02642105.0002b366.6a72bb8b.0001 | ExchOrderID:02642105.00012a00.6eaf5851[2] | ExtExecID:150986291S | TransactionID:10714913899 | TradeID:1804952288 | IBOrderID:735284154 | IBExecID:0000e1a7.6a8326f2.01.01 | BrokerageOrderID:02642105.0002b366.6a7950e0.0001 | ExchOrderID:02642105.00012a00.6eb47971[2] | ExtExecID:582718587B | TransactionID:10725199983",
+        "broker_trade_id": "BrokerageOrderID:02642105.0002b366.6a828b58.0001 | ExchOrderID:02642105.00012a00.6ebdac3e[2] | ExtExecID:582769522S | IBExecID:0000e1a7.6a891348.01.01 | IBOrderID:738135973 | OrigOrderID:0 | OrigTransactionID:0 | TradeID:1810878291 | TransactionID:10747595177",
         "entry_broker_ids": {
-          "TradeID": "1802283182",
-          "IBOrderID": "733941750",
-          "IBExecID": "0000e1a7.6a7f790f.01.01",
+          "TradeID": "1805829039",
+          "IBOrderID": "735685382",
+          "IBExecID": "0000e1a7.6a83b66f.01.01",
           "OrigOrderID": "0",
           "OrigTransactionID": "0",
-          "BrokerageOrderID": "02642105.0002b366.6a72bb8b.0001",
-          "ExchOrderID": "02642105.00012a00.6eaf5851[2]",
-          "ExtExecID": "150986291S",
-          "TransactionID": "10714913899"
+          "BrokerageOrderID": "02642105.0002b366.6a7952cd.0001",
+          "ExchOrderID": "02642105.00012a00.6eb53b77[2]",
+          "ExtExecID": "582851172B",
+          "TransactionID": "10728449940"
         },
         "exit_broker_ids": {
-          "TradeID": "1804952288",
-          "IBOrderID": "735284154",
-          "IBExecID": "0000e1a7.6a8326f2.01.01",
+          "TradeID": "1810878291",
+          "IBOrderID": "738135973",
+          "IBExecID": "0000e1a7.6a891348.01.01",
           "OrigOrderID": "0",
           "OrigTransactionID": "0",
-          "BrokerageOrderID": "02642105.0002b366.6a7950e0.0001",
-          "ExchOrderID": "02642105.00012a00.6eb47971[2]",
-          "ExtExecID": "582718587B",
-          "TransactionID": "10725199983"
+          "BrokerageOrderID": "02642105.0002b366.6a828b58.0001",
+          "ExchOrderID": "02642105.00012a00.6ebdac3e[2]",
+          "ExtExecID": "582769522S",
+          "TransactionID": "10747595177"
+        },
+        "source": "flex_epoch_rebased",
+        "components": {
+          "gross_pnl": 179.5,
+          "fee": -1.22,
+          "model_commission": null,
+          "model_slippage": null,
+          "model_cost": null,
+          "net_pnl": 179.5,
+          "net_with_fee": 178.28,
+          "component_source": "flex_reconstructed_gross_plus_broker_commission"
         }
       }
     ],
@@ -3099,17 +3091,21 @@
           "net_with_fee": -36.02,
           "component_source": "flex_reconstructed_gross_plus_broker_commission"
         }
-      }
-    ],
-    "flex_epoch_rebased_open_lots": [
+      },
       {
-        "date": "2026-08-10",
+        "pnl_basis": "statement_proceeds",
+        "fifo_pnl": 0.0,
         "inst": "M2K",
-        "signed": 1.0,
-        "price": 3025.3,
-        "commission": -0.61,
-        "net_amount": -2.11,
-        "broker_ids": {
+        "direction": "LONG",
+        "contracts": 1.0,
+        "entry_day": "2026-08-10",
+        "exit_day": "2026-08-17",
+        "entry_price": 3025.3,
+        "exit_price": 3061.2,
+        "pnl": 179.5,
+        "commission": -1.22,
+        "broker_trade_id": "BrokerageOrderID:02642105.0002b366.6a828b58.0001 | ExchOrderID:02642105.00012a00.6ebdac3e[2] | ExtExecID:582769522S | IBExecID:0000e1a7.6a891348.01.01 | IBOrderID:738135973 | OrigOrderID:0 | OrigTransactionID:0 | TradeID:1810878291 | TransactionID:10747595177",
+        "entry_broker_ids": {
           "TradeID": "1805829039",
           "IBOrderID": "735685382",
           "IBExecID": "0000e1a7.6a83b66f.01.01",
@@ -3120,10 +3116,31 @@
           "ExtExecID": "582851172B",
           "TransactionID": "10728449940"
         },
-        "proceeds": -15126.5,
-        "fifo_pnl": 0.0
+        "exit_broker_ids": {
+          "TradeID": "1810878291",
+          "IBOrderID": "738135973",
+          "IBExecID": "0000e1a7.6a891348.01.01",
+          "OrigOrderID": "0",
+          "OrigTransactionID": "0",
+          "BrokerageOrderID": "02642105.0002b366.6a828b58.0001",
+          "ExchOrderID": "02642105.00012a00.6ebdac3e[2]",
+          "ExtExecID": "582769522S",
+          "TransactionID": "10747595177"
+        },
+        "source": "flex_epoch_rebased",
+        "components": {
+          "gross_pnl": 179.5,
+          "fee": -1.22,
+          "model_commission": null,
+          "model_slippage": null,
+          "model_cost": null,
+          "net_pnl": 179.5,
+          "net_with_fee": 178.28,
+          "component_source": "flex_reconstructed_gross_plus_broker_commission"
+        }
       }
     ],
+    "flex_epoch_rebased_open_lots": [],
     "flex_epoch_rebased_ignored_fills": [
       {
         "date": "2026-08-10",
@@ -3255,45 +3272,44 @@
           "ExtExecID": "64459307B",
           "TransactionID": "10732759690"
         }
-      }
-    ],
-    "ledger_offset_matching_carry_closed": [
+      },
       {
-        "inst": "MYM",
-        "direction": "SHORT",
+        "inst": "M2K",
+        "direction": "LONG",
         "contracts": 1.0,
-        "entry_day": "2026-08-05",
-        "exit_day": "2026-08-10",
-        "entry_price": 54631.0,
-        "exit_price": 54087.0,
-        "pnl": 272.0,
+        "entry_day": "2026-08-10",
+        "exit_day": "2026-08-17",
+        "entry_price": 3025.3,
+        "exit_price": 3061.2,
+        "pnl": 179.5,
         "pnl_basis": "statement_proceeds",
         "commission": -1.22,
-        "broker_trade_id": "TradeID:1802283182 | IBOrderID:733941750 | IBExecID:0000e1a7.6a7f790f.01.01 | OrigOrderID:0 | OrigTransactionID:0 | BrokerageOrderID:02642105.0002b366.6a72bb8b.0001 | ExchOrderID:02642105.00012a00.6eaf5851[2] | ExtExecID:150986291S | TransactionID:10714913899 | TradeID:1804952288 | IBOrderID:735284154 | IBExecID:0000e1a7.6a8326f2.01.01 | BrokerageOrderID:02642105.0002b366.6a7950e0.0001 | ExchOrderID:02642105.00012a00.6eb47971[2] | ExtExecID:582718587B | TransactionID:10725199983",
+        "broker_trade_id": "TradeID:1805829039 | IBOrderID:735685382 | IBExecID:0000e1a7.6a83b66f.01.01 | OrigOrderID:0 | OrigTransactionID:0 | BrokerageOrderID:02642105.0002b366.6a7952cd.0001 | ExchOrderID:02642105.00012a00.6eb53b77[2] | ExtExecID:582851172B | TransactionID:10728449940 | TradeID:1810878291 | IBOrderID:738135973 | IBExecID:0000e1a7.6a891348.01.01 | BrokerageOrderID:02642105.0002b366.6a828b58.0001 | ExchOrderID:02642105.00012a00.6ebdac3e[2] | ExtExecID:582769522S | TransactionID:10747595177",
         "entry_broker_ids": {
-          "TradeID": "1802283182",
-          "IBOrderID": "733941750",
-          "IBExecID": "0000e1a7.6a7f790f.01.01",
+          "TradeID": "1805829039",
+          "IBOrderID": "735685382",
+          "IBExecID": "0000e1a7.6a83b66f.01.01",
           "OrigOrderID": "0",
           "OrigTransactionID": "0",
-          "BrokerageOrderID": "02642105.0002b366.6a72bb8b.0001",
-          "ExchOrderID": "02642105.00012a00.6eaf5851[2]",
-          "ExtExecID": "150986291S",
-          "TransactionID": "10714913899"
+          "BrokerageOrderID": "02642105.0002b366.6a7952cd.0001",
+          "ExchOrderID": "02642105.00012a00.6eb53b77[2]",
+          "ExtExecID": "582851172B",
+          "TransactionID": "10728449940"
         },
         "exit_broker_ids": {
-          "TradeID": "1804952288",
-          "IBOrderID": "735284154",
-          "IBExecID": "0000e1a7.6a8326f2.01.01",
+          "TradeID": "1810878291",
+          "IBOrderID": "738135973",
+          "IBExecID": "0000e1a7.6a891348.01.01",
           "OrigOrderID": "0",
           "OrigTransactionID": "0",
-          "BrokerageOrderID": "02642105.0002b366.6a7950e0.0001",
-          "ExchOrderID": "02642105.00012a00.6eb47971[2]",
-          "ExtExecID": "582718587B",
-          "TransactionID": "10725199983"
+          "BrokerageOrderID": "02642105.0002b366.6a828b58.0001",
+          "ExchOrderID": "02642105.00012a00.6ebdac3e[2]",
+          "ExtExecID": "582769522S",
+          "TransactionID": "10747595177"
         }
       }
     ],
+    "ledger_offset_matching_carry_closed": [],
     "raw_statement_entry_epoch_open_lots": [
       {
         "date": "2026-08-10",
@@ -3315,37 +3331,21 @@
         },
         "proceeds": 38865.0,
         "fifo_pnl": 0.0
-      },
-      {
-        "date": "2026-08-10",
-        "inst": "M2K",
-        "signed": 1.0,
-        "price": 3025.3,
-        "commission": -0.61,
-        "net_amount": -2.11,
-        "broker_ids": {
-          "TradeID": "1805829039",
-          "IBOrderID": "735685382",
-          "IBExecID": "0000e1a7.6a83b66f.01.01",
-          "OrigOrderID": "0",
-          "OrigTransactionID": "0",
-          "BrokerageOrderID": "02642105.0002b366.6a7952cd.0001",
-          "ExchOrderID": "02642105.00012a00.6eb53b77[2]",
-          "ExtExecID": "582851172B",
-          "TransactionID": "10728449940"
-        },
-        "proceeds": -15126.5,
-        "fifo_pnl": 0.0
       }
     ]
   },
   "ibkr_statement": {
     "status": "OBSERVED",
-    "path": "monitor\\inputs\\ibkr_flex\\flex_20260813T103831Z_q1603041_ref6822861365.csv",
-    "fills_count": 71,
-    "closed_count": 34,
-    "open_lot_count": 3,
+    "path": "monitor\\inputs\\ibkr_flex\\flex_20260905T035534Z_q1603041_ref7228841988_20260307-20260903.csv",
+    "fills_count": 72,
+    "closed_count": 35,
+    "open_lot_count": 2,
     "cash_count": 0,
+    "coverage": {
+      "through": "2026-09-03",
+      "source": "requested_range",
+      "exact": true
+    },
     "open_lots": [
       {
         "date": "2026-08-07",
@@ -3388,27 +3388,6 @@
         },
         "proceeds": 38865.0,
         "fifo_pnl": 0.0
-      },
-      {
-        "date": "2026-08-10",
-        "inst": "M2K",
-        "signed": 1.0,
-        "price": 3025.3,
-        "commission": -0.61,
-        "net_amount": -2.11,
-        "broker_ids": {
-          "TradeID": "1805829039",
-          "IBOrderID": "735685382",
-          "IBExecID": "0000e1a7.6a83b66f.01.01",
-          "OrigOrderID": "0",
-          "OrigTransactionID": "0",
-          "BrokerageOrderID": "02642105.0002b366.6a7952cd.0001",
-          "ExchOrderID": "02642105.00012a00.6eb53b77[2]",
-          "ExtExecID": "582851172B",
-          "TransactionID": "10728449940"
-        },
-        "proceeds": -15126.5,
-        "fifo_pnl": 0.0
       }
     ]
   },
@@ -3423,45 +3402,46 @@
   ],
   "verdicts": {
     "overview": {
-      "status": "EXPLAINED",
+      "status": "BREACH",
       "title": "Overview verdicts",
-      "summary": "Headline reconciliation is table-explained and has no unresolved items.",
+      "summary": "Headline reconciliation has unresolved/breach items.",
       "facts": [
-        "unresolved 0",
+        "unresolved 5",
         "P-B RECONCILED",
-        "P-F RECONCILED"
+        "P-F CHECK"
       ],
       "target": "pnl-tab-overview"
     },
     "trade_master": {
-      "status": "EXPLAINED",
+      "status": "BREACH",
       "title": "Trade master reconcile",
-      "summary": "Trade rows reconcile to headline totals.",
+      "summary": "Trade rows have unresolved sources or footer totals do not match the grid.",
       "facts": [
         "rows 5",
         "delta rows 4",
-        "missing 0",
-        "unresolved 0"
+        "missing 1",
+        "unresolved 1",
+        "Flex covers through 2026-09-03"
       ],
       "target": "pnl-tab-trades"
     },
     "components": {
-      "status": "EXPLAINED",
+      "status": "BREACH",
       "title": "Component variance",
-      "summary": "Component deltas reconcile to headline totals.",
+      "summary": "Component deltas do not reconcile to headline totals.",
       "facts": [
         "P-B RECONCILED",
-        "P-F RECONCILED"
+        "P-F CHECK"
       ],
       "target": "pnl-tab-trades"
     },
     "decision": {
-      "status": "PASS",
+      "status": "BREACH",
       "title": "Decision path",
-      "summary": "Signal, entry, and open-position parity have no unresolved rows.",
+      "summary": "Signal, entry, or open-position parity has unresolved rows.",
       "facts": [
-        "signal unresolved 0",
-        "entry unresolved 0",
+        "signal unresolved 1",
+        "entry unresolved 1",
         "open diff 0"
       ],
       "target": "pnl-tab-decision"
@@ -3471,7 +3451,7 @@
       "title": "Timeline reconcile",
       "summary": "Timeline final values reconcile to headline P&L grid.",
       "facts": [
-        "daily stale 2",
+        "daily stale 8",
         "latest trade diff 119.9"
       ],
       "target": "pnl-tab-timeline"
@@ -3481,19 +3461,19 @@
       "title": "Daily divergence",
       "summary": "Some daily rows are stale.",
       "facts": [
-        "rows 5",
-        "stale 2"
+        "rows 11",
+        "stale 8"
       ],
       "target": "pnl-tab-timeline"
     }
   },
   "source_signature": {
-    "monitor/paper_pnl_compare.py": "d70359e017798e99",
+    "monitor/paper_pnl_compare.py": "3e11c0b2d5713b6a",
     "global_index/statement.py": "c45e91297709a54f"
   },
   "data_watermark": {
     "trade_log_last_day": "2026-08-11",
-    "paper_history_last_day": "2026-08-14",
-    "flex_statement": "flex_20260813T103831Z_q1603041_ref6822861365.csv"
+    "paper_history_last_day": "2026-08-24",
+    "flex_statement": "flex_20260905T035534Z_q1603041_ref7228841988_20260307-20260903.csv"
   }
 }

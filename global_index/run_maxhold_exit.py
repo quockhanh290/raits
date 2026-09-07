@@ -51,6 +51,8 @@ import pandas as pd
 
 from futures.basket import SWING_TF_PARAM, RISK
 from futures.circuit_breaker import CircuitBreaker
+from global_index import safety_trade_log
+from global_index import safety_book
 from global_index.ibkr_broker import IBKRBroker
 from global_index.net_exposure_multi import MultiClusterGuard
 from global_index.runner import (FuturesRunner, RunnerLockError, STOP_FILE_NAME,
@@ -94,7 +96,37 @@ def main():
                          "không thì mỗi cái tự khoá mình và không cái nào thấy cái kia.")
     ap.add_argument("--dry-run",        action="store_true",
                     help="Connect + check positions but emit no orders")
+    # Stage 5ZG. Not inferred from --positions-path: a caller who changed the book but
+    # not the log would silently keep writing legacy's file, and that file is the one
+    # paper_evidence_reader aggregates whole.
+    ap.add_argument("--trade-log-path", default=None,
+                    help="Where trade rows go. Omitted = trade_log.jsonl, exactly as "
+                         "before. Track 1 must pass track1_slots.TRACK1_TRADE_LOG_PATH.")
+    ap.add_argument("--route",          default=None,
+                    help="Stamp `route` on every row this run writes. REQUIRES "
+                         "--trade-log-path; on its own it is refused.")
     a = ap.parse_args()
+
+    # Before the positions check, not after: through the whole shadow period Track 1's
+    # positions file does not exist, so the branch below returns on every single run. A
+    # check placed after it would never execute, and a wrong path would first be found
+    # by the first real fill.
+    try:
+        trade_log_path, trade_log_route = safety_trade_log.resolve(
+            a.trade_log_path, a.route, _CWD)
+    except safety_trade_log.TradeLogRefused as exc:
+        log.error("[trade-log] %s", exc)
+        return 1
+
+    # Stage 5ZS. The book gets the same treatment as the trade log, and for the same reason
+    # and at the same point: before the positions check, so it is proved every day of the
+    # shadow period rather than first discovered by a real fill. A book that exists and is
+    # not the one this route owns is a refusal, never a rewrite.
+    try:
+        _resolved_book, _ = safety_book.resolve(a.positions_path, a.route, _CWD)
+    except safety_book.BookRefused as exc:
+        log.error("[book] %s", exc)
+        return 1
 
     today = pd.Timestamp.now(tz="America/New_York").normalize().tz_localize(None)
     print("=" * 68)
@@ -102,6 +134,7 @@ def main():
     print(f"  today:          {today.date()}")
     print(f"  max_hold_days:  {MAX_HOLD_DAYS}")
     print(f"  positions-path: {a.positions_path}")
+    print(f"  trade-log:      {trade_log_path}"  + (f"  route={trade_log_route}" if trade_log_route else ""))
     print(f"  port:           {a.port}  dry-run: {a.dry_run}")
     print("=" * 68)
 
@@ -168,7 +201,8 @@ def main():
             # the exit books its P&L into the sleeve ledger and leaves no row behind.
             # Measured 2026-08-17 — M2K closed here, equity 50228.75 -> 50408.25, and
             # trade_log.jsonl untouched, so the day read as having no exit at all.
-            trade_log_path=str(_CWD / "trade_log.jsonl"),
+            trade_log_path=str(trade_log_path),
+            route=trade_log_route,
             stop_path=a.stop_path,        # D5 — see RUNNER_AUDIT.md H2
             # B4 runs inside __init__, so this job is what places a deferred STP —
             # 09:31 ET the morning after entry, not the 14:05 slot. Pass the session

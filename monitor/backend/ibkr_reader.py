@@ -18,13 +18,23 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+#: `positions_ok` / `orders_ok` exist because an empty list here has always had two meanings.
+#: Both collectors below build their list inside a try/except that logs a warning and leaves
+#: the list EMPTY, and the payload was then published with `connected: true, error: null`. So
+#: "the account holds nothing" and "the call raised" arrived at every reader identically.
+#: That is fail-open, and B1 — is the account flat? — is exactly the question where it must
+#: not be. The flags start False: a cache that has never been filled has not testified.
 _cache: dict[str, Any] = {
     "connected": False,
     "error": None,
     "last_update": None,
     "account": {"equity": None, "unrealized_pnl": None},
     "positions": [],
+    "positions_ok": False,
+    "positions_error": None,
     "orders": [],
+    "orders_ok": False,
+    "orders_error": None,
     "contract_specs": {},
 }
 _cache_lock = threading.Lock()
@@ -89,6 +99,7 @@ def _reader_thread(port: int, client_id: int, poll_interval: int) -> None:
 
             # ── Portfolio (per-position unrealized PNL, entry price proxy) ─
             positions: list[dict] = []
+            positions_ok, positions_error = False, None
             try:
                 for item in ib.portfolio():
                     c = item.contract
@@ -103,7 +114,9 @@ def _reader_thread(port: int, client_id: int, poll_interval: int) -> None:
                         "unrealized_pnl": _safe_float(item.unrealizedPNL),
                         "realized_pnl":  _safe_float(item.realizedPNL),
                     })
+                positions_ok = True
             except Exception as e:
+                positions_error = f"{type(e).__name__}: {e}"
                 logger.warning(f"portfolio error: {e}")
 
             # Total unrealized = sum of the rows the panel actually renders.
@@ -130,6 +143,7 @@ def _reader_thread(port: int, client_id: int, poll_interval: int) -> None:
             # panel still showed it PreSubmitted at 08:27. A naked position would render as
             # protected, which is the one thing this panel must never do.
             orders: list[dict] = []
+            orders_ok, orders_error = False, None
             try:
                 for t in ib.reqAllOpenOrders():
                     c = t.contract
@@ -147,7 +161,9 @@ def _reader_thread(port: int, client_id: int, poll_interval: int) -> None:
                         "status":     s.status if s else "?",
                         "tif":        o.tif if o else None,
                     })
+                orders_ok = True
             except Exception as e:
+                orders_error = f"{type(e).__name__}: {e}"
                 logger.warning(f"openTrades error: {e}")
 
             _set({
@@ -156,7 +172,11 @@ def _reader_thread(port: int, client_id: int, poll_interval: int) -> None:
                 "last_update": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
                 "account": {"equity": equity, "unrealized_pnl": unrealized_pnl},
                 "positions": positions,
+                "positions_ok": positions_ok,
+                "positions_error": positions_error,
                 "orders": orders,
+                "orders_ok": orders_ok,
+                "orders_error": orders_error,
                 "contract_specs": contract_specs,
             })
 
@@ -165,7 +185,12 @@ def _reader_thread(port: int, client_id: int, poll_interval: int) -> None:
         except Exception as e:
             msg = str(e)
             logger.warning(f"IBKR reader error: {msg}")
-            _set({"connected": False, "error": msg})
+            # The ok flags are cleared with the connection. Leaving a True behind would let a
+            # disconnected reader keep testifying that the account was flat, using the last
+            # good answer as though it were current.
+            _set({"connected": False, "error": msg,
+                  "positions_ok": False, "positions_error": msg,
+                  "orders_ok": False, "orders_error": msg})
             try:
                 ib.disconnect()
             except Exception:

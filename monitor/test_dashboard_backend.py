@@ -9,6 +9,8 @@ import re
 import types
 from pathlib import Path
 
+from monitor.backend.open_issue_reader import ET as _ET
+
 import pytest
 
 from monitor.backend import ibkr_reader, schedule_status
@@ -5026,7 +5028,52 @@ def test_the_hover_reads_the_plot_padding_instead_of_restating_it():
     assert "const MV_PAD = { L: 34, R: 68 };" in js
     assert "padL = MV_PAD.L, padR = MV_PAD.R, padT" in js, "plot không đọc từ hằng chung"
     assert "const W = 1000, padL = MV_PAD.L, padR = MV_PAD.R;" in js, "hover không đọc từ hằng chung"
-    # Chart CHUỖI có lề riêng (52/12) và đó là đúng — nó là một plot khác. Điều phải giữ
-    # là hai nơi cùng nói về plot GIÁ thì đọc chung một hằng, không phải "không ai được
-    # viết số nữa".
-    assert "padL = 52" in js, "chart chuỗi mất lề riêng của nó"
+    # Stage 5ZZZ-CR. Chart CHUỖI cũng đọc hằng chung, và dòng cũ ở đây đã sai.
+    #
+    # Nó ghim `padL = 52` với lý do "chart chuỗi là một plot khác". Đo được thì không: hai
+    # pane chia nhau MỘT con trỏ chữ thập dóng theo phút, nên hai khung vẽ phải trùng nhau
+    # — lề riêng 52/12 làm khung dưới rộng hơn khung trên (52→988 so với 34→932). Lề 12 đơn
+    # vị còn buộc trục của nó phải nằm bên TRÁI, vì không đủ chỗ cho "7,727.02", nên hai
+    # biểu đồ xếp chồng đọc trục ở hai phía đối nhau.
+    #
+    # Bất biến gốc của phép kiểm này — "chỉ có MỘT nơi khai lề" — không bị nới, nó được áp
+    # cho cả ba nơi thay vì hai.
+    assert "padL = MV_PAD.L, padR = MV_PAD.R, padT = 14" in js, (
+        "chart chuỗi không đọc từ hằng chung")
+    import re as _re
+    bare = _re.findall(r"padL = \d+", js)
+    assert not bare, f"còn nơi khai lề bằng số: {bare}"
+
+
+def test_model_age_months_are_derived_from_the_fit_end_not_read_from_the_log(tmp_path: Path):
+    """Số tháng phải suy từ `fit_end`, không đọc lại con số trong dòng log.
+
+    `months` trong dòng G2 HARD là thứ runner đo được vào NGÀY nó ghi dòng đó, và dòng đó
+    ngừng được ghi lại kể từ ngày runner ngừng chạy. Đo được 2026-09-04: dòng G2 HARD mới
+    nhất là của 24 tháng 8 và vẫn nói "20 months", trong khi cùng bản fit ấy đọc ra 21
+    tháng ở mọi chỗ tính tươi — một trang nói hai tuổi cho một bản fit.
+
+    `fit_end` là nửa bền và không già đi. Phép kiểm ghim vào nó: dòng log cố tình mang một
+    con số CŨ, và câu hiện ra phải là con số tính từ hôm nay.
+    """
+    (tmp_path / "scheduler_0811.log").write_text(
+        "2026-08-11 23:10:00 INFO run_scheduler - [NKD_NIGHT_0110] python -m global_index.run_live_day\n"
+        "2026-08-11 23:12:00 ERROR run_scheduler - "
+        "[NKD_NIGHT_0110] G2 HARD: model 3 months old (fit_end=2024-12-31)\n",
+        encoding="utf-8",
+    )
+    issues = {issue["key"]: issue for issue in read_open_issues(tmp_path)["issues"]}
+    # Chốt chặn: không có issue này thì mọi assert dưới đây đạt rỗng.
+    assert "known_debt:model_age" in issues, f"không dựng được issue: {list(issues)}"
+    problem = issues["known_debt:model_age"]["problem"]
+
+    # Cùng đồng hồ mà chính module đang kiểm dùng, không dựng một cái thứ hai.
+    today = dt.datetime.now(_ET).date()
+    expected = (today.year - 2024) * 12 + (today.month - 12)
+    # Chốt chặn thứ hai: con số cũ trong log phải KHÁC con số đúng, nếu không phép kiểm
+    # không phân biệt được "suy ra" với "đọc lại".
+    assert expected != 3, "dòng log tình cờ mang đúng số tháng — sửa fixture"
+
+    assert f"{expected} months old" in problem, (
+        f"vẫn đang đọc lại con số trong log thay vì suy từ fit_end: {problem!r}")
+    assert "2024-12-31" in problem

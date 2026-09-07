@@ -195,6 +195,24 @@ global_index/replay_checkpoint.json
 trade_log.jsonl
 # runner.py ghi cạnh file vị thế (trượt giá tích luỹ)
 slip_stats.json
+
+# ── Track 1 route runtime ───────────────────────────────────────────────────
+# Same reasoning as the legacy runtime state above: these change every session, and a copy
+# committed today is the WRONG copy tomorrow. The legacy counterparts were already ignored;
+# their Track 1 twins were not, so a shadow run would have offered route state for commit.
+live_positions.track1.json
+runner.track1.pid
+global_index/replay_checkpoint.track1.json
+global_index/maxhold_state.track1.json
+# Operator switches. Committing either would carry an operational decision into the tree —
+# and `track1_go_live_confirmation.json` is the file that ARMS the route, so it must never be
+# something a checkout can create.
+STOP_TRADING.track1
+track1_go_live_confirmation.json
+# Live-shadow operational evidence: window coverage, slot timing and explanation rows. Kept
+# out of scratch precisely so it survives a scratch sweep, and out of git because it is
+# append-only runtime output measured in megabytes.
+global_index/track1_runtime/
 bao_cao_*.txt
 global_index/paper_history.json
 # p0c_overnight.py capture output — megabytes of run log, not source

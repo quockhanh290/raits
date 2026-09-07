@@ -1213,6 +1213,23 @@ header .runner-header-state i { animation: none; }
 /* muc 4.5 · readout của tab này là dòng duy nhất, nằm trên head, màu #8dc0f7. */
 .mv2-card-head .mv2-slot-readout { color: #8dc0f7; }
 
+/* Stage 5ZZZ-CV. Ô đọc của biểu đồ khi nó về hàng đầu thẻ: bỏ khung riêng, canh phải,
+   cùng màu và cùng chỗ với ô đọc của lưới lane. Khung viền là thứ hợp lý khi nó đứng
+   một mình giữa thẻ; trên một hàng đã có "Price" và chip ngày thì thêm một khung nữa là
+   thêm một hộp lồng trong hộp.
+
+   KHÔNG chặn bề ngang ở đây. Bản đầu đặt `max-width: 66%` để chuỗi O/H/L/C dài khỏi đẩy
+   chữ "Price" ra khỏi hàng — đo lại thì nó không làm gì cả: hàng đầu là flex, mọi con đã
+   có `min-width: 0`, và luật gốc của ô đọc đã có `white-space: nowrap` cộng
+   `text-overflow: ellipsis`. Chuỗi dài thu lại và cắt bằng ba chấm, không đẩy ai. Gỡ một
+   luật đo được là vô tác dụng còn hơn giữ nó rồi tin nó đang bảo vệ điều gì đó. */
+.mv2-card-head .mv2-chart-readout {
+  margin: 0 0 0 auto; padding: 0;
+  border: 0; background: none; border-radius: 0;
+  min-height: 0;
+  text-align: right; color: #8dc0f7;
+}
+
 /* muc 4.5 · swatch legend là chữ nhật 10x4, mô phỏng hình CELL trong lane —
    không phải dot slot. Hai thứ khác nhau thì không được vẽ giống nhau. */
 .mv2-legend .mv2-legend-item .mv2-cell {
@@ -1313,7 +1330,13 @@ header .runner-header-state i { animation: none; }
   padding: 0 18px 14px;
 }
 #marketViewChart .mv2-tabnote + .mv2-tabnote { padding-top: 8px; }
-#marketViewChart .mv2-chart-readout { margin-left: 18px; margin-right: 18px; }
+/* Chỉ còn cho đường DỰ PHÒNG — khi thẻ được dựng mà không có hàng đầu, ô đọc rơi về
+   chỗ cũ (con trực tiếp của card) và khi ấy mới cần tự bù đệm ngang của thẻ. Nằm trong
+   hàng đầu thì đệm đã là của hàng đầu, và một luật ID ở đây sẽ đè lên luật lớp
+   bên dưới mà không ai thấy. */
+#marketViewChart > .mv2-card > .mv2-chart-readout {
+  margin-left: 18px; margin-right: 18px;
+}
 
 /* Cột volume vượt trần: vẽ hết chiều cao pane rồi đội một nắp mỏng, để người đọc
    biết cột này CAO HƠN khung chứ không phải bằng đúng trần. Sáng hơn thân cột,
@@ -1808,3 +1831,58 @@ header .runner-header-state i { animation: none; }
    `.rg2-card > #modelInputsZone` phía trên che — hộp vẫn là flex nên các track không
    làm gì cả. Đã gỡ và sửa thẳng vào luật đang thắng. */
 
+/* ═══ CT · Ba mức giá, ba màu, và chữ đọc được trên nền nến ═══════════════════════════
+   Ba đường đều xám đứt như nhau, nên người đọc phải dò từ chữ xuống đường mới biết cái nào
+   là cái nào — và chữ thì nằm đè lên vùng nến ở mép trái nên có chỗ không đọc nổi.
+
+   MÀU THEO LOẠI, không theo trạng thái. Trạng thái (đã vũ trang hay chưa) vẫn do nét vẽ và
+   độ đậm nói: chưa vũ trang thì đứt và mảnh, đã vũ trang thì liền và dày. Hai trục cho hai
+   câu hỏi khác nhau — "đây là mức gì" và "nó đang có hiệu lực chưa" — thay vì nhồi cả hai
+   vào một trục màu như trước.
+
+   Màu lấy từ bảng token của hợp đồng, không tự chọn: mức dừng lỗ dùng sắc đỏ, mức kích hoạt
+   dùng hổ phách, mức tham chiếu dùng bậc nhãn xám vì nó là bối cảnh chứ không phải một
+   ngưỡng đang chờ. */
+.mv-level.mv-level-stop          { stroke: #f2555a; }
+.mv-level.mv-level-setup_trigger { stroke: #f0b429; }
+.mv-level.mv-level-reference     { stroke: #798394; }
+
+.mv-lab.mv-level-label.mv-level-stop          { color: #f2555a; }
+.mv-lab.mv-level-label.mv-level-setup_trigger { color: #f0b429; }
+.mv-lab.mv-level-label.mv-level-reference     { color: #798394; }
+
+/* Chưa vũ trang thì mờ hơn, nhưng KHÔNG mất màu — mất màu là mất chính thứ phân biệt ba
+   đường với nhau, và một mức đã tính ra vẫn là một con số thật để đọc. */
+.mv-level.muted { opacity: .55; }
+.mv-lab.mv-level-label.muted { opacity: .75; }
+
+/* Nền cho chữ. Nhãn nằm trong vùng vẽ, ngay trên các cây nến ở mép trái — không có nền thì
+   chữ và nến chồng lên nhau và cả hai đều khó đọc. Nền lấy màu nền thẻ nên nó đọc như một
+   ô chữ nằm trên biểu đồ, không như một khối lạ. */
+.mv-lab.mv-level-label {
+  /* Nền ĐẶC hơn nền thẻ, cộng một vành mảnh cùng màu chữ. Bản đầu chỉ đặt nền cùng màu thẻ:
+     ô chữ chìm vào nền biểu đồ, và ranh giới duy nhất giữa chữ và nến là chỗ nền vừa đủ phủ
+     hết chữ — không đủ để mắt tách hai lớp ra. Vành làm ô chữ thành một vật nằm TRÊN biểu
+     đồ. Đậm và to hơn mỗi thứ một nấc vì chữ này nằm trong vùng vẽ, không nằm ở lề. */
+  background: #0b0d11;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: .01em;
+}
+/* Chưa vũ trang thì nhạt hơn — nhưng .75 chồng lên nến làm chữ khó đọc, và "chưa vũ trang"
+   đã được chính chữ trong nhãn nói ra. Nét ĐỨT của đường mới là chỗ mang trạng thái ấy. */
+.mv-lab.mv-level-label.muted { opacity: .92; }
+
+/* ═══ CU · Độ bất định tô theo mức, và mốc kiểm gần nhất ══════════════════════════════
+   Ba mức bất định trước đây in cùng một bậc chữ xám, nên cái chấm 5px bên cạnh là thứ DUY
+   NHẤT mang tin — và một chấm 5px là chỗ dễ bỏ qua nhất trên thẻ. Cùng bảng màu với ba mức
+   giá ở biểu đồ, để một màu có một nghĩa trên toàn trang. */
+.rg2-uncertain.rg2-unc-low      { color: #3ecf8e; }
+.rg2-uncertain.rg2-unc-moderate { color: #f0b429; }
+.rg2-uncertain.rg2-unc-high     { color: #f2555a; }
+
+/* Dòng mốc kiểm dùng LẠI `.rg2-asof` — luật đã có sẵn cho đúng vai ấy (dòng xuất xứ nằm
+   trong khối nhãn), và một luật thứ hai chép y hệt là một luật sẽ trôi khỏi luật gốc. */

@@ -314,7 +314,8 @@ class FuturesRunner:
                  hmm_stale_guard=None, positions_path=None, lock_path=None,
                  live_state_path=None, paper_history_path=None,
                  stop_path=None, max_contracts_per_order=10,
-                 regime_fn=None, trade_log_path=None, today=None, now=None):
+                 regime_fn=None, trade_log_path=None, today=None, now=None,
+                 route=None):
         """signal_fn(day, bars_by_inst, held) -> (entry_candidates, exit_positions)
         wraps signal_layer.generate_today_signals with the engines/labels/costs bound.
         Injecting it keeps the runner testable without real engines.
@@ -337,11 +338,26 @@ class FuturesRunner:
 
         lock_path (optional, str|Path): path for PID lockfile (E1 fix). Pass None
         (default) for offline/test use. In production set to e.g. Path("runner.pid")
-        to prevent duplicate runner instances from submitting double orders to IBKR."""
+        to prevent duplicate runner instances from submitting double orders to IBKR.
+
+        route (optional, str): stamped onto every trade row this instance writes, as
+        `route`. Default None writes no such key, so every existing caller produces
+        byte-identical rows and no legacy reader sees a field it has never seen. Only
+        the Track 1 safety jobs pass it today (Stage 5ZG). The tag duplicates what the
+        destination path already says, deliberately: the path can be mis-wired by one
+        argument, and a row that ended up in the wrong file still names its own route.
+        Nothing splits on it yet — but a row is written once and read for years, and a
+        reader taught to split later cannot relabel rows written before it existed."""
 
         self._regime_fn = regime_fn
         self._last_regime: str = "Unknown"
         self._trade_log_path = Path(trade_log_path) if trade_log_path else None
+        self._trade_log_route = route
+        #: Stage 5ZS. The non-position keys of the book as it was READ, so a route-stamped
+        #: sweep can write positions back into the envelope it found instead of replacing it
+        #: with the legacy one. Empty until a book is loaded, and never consulted on the
+        #: legacy path.
+        self._loaded_book_envelope: dict = {}
         # Initialised before anything can emit. B3's reconcile runs inside __init__ and
         # can report an unpriceable close, which happens well before the operational-log
         # section further down.
@@ -419,6 +435,11 @@ class FuturesRunner:
                     # legacy format: plain list of positions (schema_version 0, no breaker state)
                     loaded_positions = [_openpos_from_dict(d) for d in raw]
                 else:
+                    # Stage 5ZS. Keep the envelope this file arrived in — everything except
+                    # the positions themselves. Only consulted when a route was supplied, so
+                    # the legacy path is untouched; see `_persist_state`.
+                    self._loaded_book_envelope = {k: v for k, v in raw.items()
+                                                  if k != "positions"}
                     sv = raw.get("schema_version", 0)
                     if sv not in (0, 1):
                         logger.warning(
@@ -1177,6 +1198,11 @@ class FuturesRunner:
         if self._trade_log_path is None:
             return
         record.setdefault("ts", pd.Timestamp.now("UTC").isoformat())
+        # setdefault, not assignment: a caller that already put a route on the row means
+        # it, and this is the wrong place to overrule it. None adds nothing at all, which
+        # is what keeps every legacy row the shape it has always had.
+        if self._trade_log_route is not None:
+            record.setdefault("route", self._trade_log_route)
         try:
             with open(self._trade_log_path, "a", encoding="utf-8") as _f:
                 _f.write(json.dumps(record) + "\n")
@@ -1212,6 +1238,26 @@ class FuturesRunner:
         if self._paper_start:
             breaker_data["paper_start"] = self._paper_start
         payload = {"schema_version": 1, "positions": positions_data, "breaker": breaker_data}
+        # Stage 5ZS. A route-stamped sweep writes positions back into the envelope it read,
+        # instead of replacing that envelope with this one.
+        #
+        # Measured 2026-08-26 09:31 ET. The Track 1 max-hold sweep runs this method against
+        # `live_positions.track1.json`, and the payload above is legacy's shape: schema 1, a
+        # nested `breaker`, and — because the loader found no `breaker` in a schema-2 file —
+        # DEFAULTS. It wrote `peak_equity: 50000.0` and `last_broker_equity: 996881.46` into a
+        # route whose book carried 0.0, and dropped nine fields: route, window, cut_instant,
+        # cur_day, equity, peak_equity, day_start_equity, booked_counter, counters.
+        #
+        # The gate is `route is not None`, which is the same switch Stage 5ZG used, so with no
+        # `--route` this method is byte-for-byte what it was. A route-stamped run whose book
+        # carries no envelope (a first fill into a file that does not exist yet) also falls
+        # through to the legacy payload — there is nothing to preserve, and inventing a
+        # schema-2 envelope here would be this method deciding a format it does not own.
+        env = self._loaded_book_envelope
+        if self._trade_log_route is not None and env:
+            preserved = dict(env)
+            preserved["positions"] = positions_data
+            payload = preserved
         try:
             tmp = self._positions_path.with_suffix(".tmp")
             with open(tmp, "w", encoding="utf-8") as f:

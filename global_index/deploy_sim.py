@@ -35,13 +35,13 @@ try:
     from global_index._core import load_parquet as gi_load, FuturesCost as GIFC
     from global_index import specs as gi_specs
     from global_index.regime import RegimeLabels
-    from global_index.net_exposure_multi import MultiClusterGuard, Position, entry_priority_key
+    from global_index.net_exposure_multi import MultiClusterGuard, ClusterBudget, Position, entry_priority_key
 except ImportError:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from global_index._core import load_parquet as gi_load, FuturesCost as GIFC
     from global_index import specs as gi_specs
     from global_index.regime import RegimeLabels
-    from global_index.net_exposure_multi import MultiClusterGuard, Position, entry_priority_key
+    from global_index.net_exposure_multi import MultiClusterGuard, ClusterBudget, Position, entry_priority_key
 
 
 def metrics(daily: pd.Series) -> dict:
@@ -123,6 +123,17 @@ def main():
     ap.add_argument("--nkd-parquet", required=True)
     ap.add_argument("--regime-csv", required=True)
     ap.add_argument("--include-stress", action="store_true")
+    ap.add_argument("--stress-engine", choices=["stress_mid", "liquidation1020"],
+                    default="stress_mid",
+                    help="Stress sleeve to include when --include-stress is set. "
+                         "Default preserves the validated legacy STRESS_MID path.")
+    ap.add_argument("--stress-variant", choices=["breadth3", "wide_range3"],
+                    default="breadth3",
+                    help="Variant for --stress-engine liquidation1020.")
+    ap.add_argument("--stress-instruments", default="MNQ,MES",
+                    help="Comma-separated R4 instruments for liquidation1020.")
+    ap.add_argument("--stress-cap", type=float, default=None,
+                    help="Override roska4_stress gross cap for this sim only, e.g. 0.075.")
     ap.add_argument("--nkd-instrument", default="MNKD", choices=list(gi_specs.SPECS.keys()))
     ap.add_argument("--nkd-ema", type=int, default=10)
     ap.add_argument("--nkd-mult", type=float, default=2.5)
@@ -179,8 +190,16 @@ def main():
     swing = SwingTFEngine().backtest_basket(dfs, labels, costs)
     stress = None
     if a.include_stress:
-        from futures.stress_mid import StressMidEngine
-        stress = StressMidEngine().backtest_basket(dfs, labels, costs)
+        if a.stress_engine == "stress_mid":
+            from futures.stress_mid import StressMidEngine
+            stress = StressMidEngine().backtest_basket(dfs, labels, costs)
+        else:
+            from futures.stress_liquidation_1020 import StressLiquidation1020Engine
+            instruments = {x.strip() for x in a.stress_instruments.split(",") if x.strip()}
+            stress = StressLiquidation1020Engine(
+                variant=a.stress_variant,
+                instruments=instruments,
+            ).backtest_basket(dfs, labels, costs)
 
     # ── NKD ─────────────────────────────────────────────────────────────────
     c = gi_specs.SPECS[a.nkd_instrument]
@@ -234,7 +253,16 @@ def main():
     for t in all_tr:
         t["risk_sized"] = real_risk(t["atr"], t["mult"], t["pv"], t["_atr_entry"], 1)
         t["pnl_sized"] = t["pnl1"] * 1
-    guard0 = MultiClusterGuard(account=a.account)
+    def make_guard():
+        if a.stress_cap is None:
+            return MultiClusterGuard(account=a.account)
+        clusters = dict(MultiClusterGuard(account=a.account).clusters)
+        clusters["roska4_stress"] = ClusterBudget(
+            "roska4_stress", max_gross_pct=a.stress_cap, max_net_pct=None
+        )
+        return MultiClusterGuard(clusters=clusters, account=a.account)
+
+    guard0 = make_guard()
     d1, _ = replay(all_tr, a.account, guard0, {}, CircuitBreaker)
     m1 = metrics(d1)
 
@@ -259,7 +287,7 @@ def main():
         n = 1 if t["cluster"] == "global_nkd" else n_contracts
         t["risk_sized"] = real_risk(t["atr"], t["mult"], t["pv"], t["_atr_entry"], n)
         t["pnl_sized"] = t["pnl1"] * n
-    guard = MultiClusterGuard(account=a.account)
+    guard = make_guard()
     sized_daily, st = replay(all_tr, a.account, guard, contracts_by, CircuitBreaker)
     msz = metrics(sized_daily)
 
@@ -267,7 +295,14 @@ def main():
     nkd_tag = "" if a.no_nkd else "+ NKD "
     print(f"\n{'='*72}\nDEPLOY-REALISTIC SIM | Rổ 4 {'+ STRESS ' if a.include_stress else ''}{nkd_tag}| ${a.account:,.0f}")
     print(f"{'='*72}")
-    print(f"slippage {a.slippage_ticks:g} tick/side | NKD gated ema={a.nkd_ema} mult={a.nkd_mult}\n")
+    stress_tag = ""
+    if a.include_stress:
+        stress_tag = f" | stress_engine={a.stress_engine}"
+        if a.stress_engine == "liquidation1020":
+            stress_tag += f" variant={a.stress_variant} inst={a.stress_instruments}"
+        if a.stress_cap is not None:
+            stress_tag += f" cap={a.stress_cap:.1%}"
+    print(f"slippage {a.slippage_ticks:g} tick/side | NKD gated ema={a.nkd_ema} mult={a.nkd_mult}{stress_tag}\n")
 
     print("SIZER (combined 3-cluster, DD-capped):")
     print(f"  1-micro combined MaxDD : ${m1['maxdd']:,.0f}  ({m1['maxdd']/a.account:.1%} of account)")

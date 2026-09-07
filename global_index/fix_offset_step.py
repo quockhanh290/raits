@@ -87,7 +87,11 @@ def main() -> int:
     try:
         for inst, exch, path in TARGETS:
             stored, contract = _split_entry(sidecar.get(inst))
-            live, _ = _fetch_contfuture(ib, _ibkr_symbol(inst), exch, duration="10 D")
+            # Stage 5R-0: `_fetch_contfuture` also returns the instant the request went out.
+            # This tool measures an offset over ten days and does not append, so a still-open
+            # final minute cannot reach a parquet from here; the instant is ignored by name.
+            live, _, _requested_at = _fetch_contfuture(ib, _ibkr_symbol(inst), exch,
+                                                       duration="10 D")
             ib.sleep(1.2)
             df = _load_parquet(Path(path))
             ov = df.index.intersection(live.index)

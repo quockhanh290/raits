@@ -1362,7 +1362,7 @@ def _apply_stress_block(out: dict, block: dict) -> dict:
 
 
 def _strategy(root: Path, sleeve: str, day: str, spec: dict, *, now=None,
-              instrument: str = "") -> dict:
+              instrument: str = "", _levels_only: bool = False) -> dict:
     """The sleeve's own rule values for this session, from the detector.
 
     Only Stress is wired here, and that is a scope statement rather than an oversight:
@@ -1468,10 +1468,32 @@ def _strategy(root: Path, sleeve: str, day: str, spec: dict, *, now=None,
     # newest bars are the previous day's. Same asymmetry the Normal-R4 branch settled -- old
     # numbers under a card labelled with today's session are worse than none.
     recorded = _sd.recorded_for(root, day, sleeve, instrument=instrument)
-    if recorded and (recorded.get("rows") or []):
+    if recorded and (recorded.get("rows") or []) and not _levels_only:
         blk = _apply_stress_block(dict(out), recorded)
         blk["slot_series"] = _slot_series(root, day, sleeve, instrument)
         blk["slot_series_session"] = day
+        # Stage 5ZZZ-CT. Bản ghi thắng ở mọi thứ nó CÓ. Một trường nó không mang thì
+        # không phải nó nói "không có".
+        #
+        # Đo trên toàn bộ cây bằng chứng: KHÔNG khối ghi nào — mọi ngày, mọi sleeve — mang
+        # `price_levels`. Ba mức của Stress (mức kích hoạt từ đáy phiên trước, mức dừng lỗ,
+        # giá mở phiên) chỉ tồn tại ở nhánh dựng lại. Trả về sớm ở đây nghĩa là ba con số
+        # thật ấy không bao giờ lên màn hình — và chú thích của chính nhánh kia nói rõ vì
+        # sao không được giấu chúng: chúng được tính ra dù cổng rổ có qua hay không, nên
+        # giấu đi là giấu một con số thật.
+        #
+        # Lấy ĐÚNG ba trường ấy từ nhánh dựng lại, không lấy gì khác: phần còn lại của thẻ
+        # vẫn là những gì slot đã ghi. Nhánh kia dùng cache lát cắt nên lượt gọi này gần như
+        # không tốn gì; và nó chỉ chạy khi bản ghi thật sự thiếu mức.
+        if not blk.get("price_levels"):
+            try:
+                _recon = _strategy(root, sleeve, day, spec, now=now,
+                                   instrument=instrument, _levels_only=True)
+                for _k in ("price_levels", "levels_armed", "levels_note"):
+                    if _recon.get(_k):
+                        blk[_k] = _recon[_k]
+            except Exception:                                      # noqa: BLE001
+                pass
         return blk
     try:
         import pandas as pd
@@ -1950,6 +1972,15 @@ def build(root: str | Path = ".", *, day: str | None = None, now: Any = None,
             # đối chiếu, và với một rổ bốn công cụ chúng gần như chắc chắn khác nhau.
             inst, inst_all, inst_src = _pick_instrument(root, asked, sleeve, spec,
                                                         instrument or "")
+            # Stage 5ZZZ-CT. Lọc CHỈ khi mã đến từ bằng chứng.
+            #
+            # Stress ghi 24 khối diagnostics mỗi ngày và KHÔNG khối nào mang trường
+            # `instrument` — nó không phán xét một công cụ, nó đếm độ rộng của cả rổ, và
+            # các dòng của nó là "Instruments gapped down", "Average basket gap". Truyền mã
+            # lấy từ bảng cấu hình ("MNQ") vào bộ lọc thì 24 khối ấy biến mất sạch: đo được
+            # 24 -> 0. Đó là hồi quy tôi tạo ra ở Stage 5ZZZ-CO, và cổng khi ấy không bắt
+            # được vì nó kiểm siêu dữ liệu (`instruments == []`) chứ không kiểm hậu quả.
+            inst_filter = inst if inst_src in ("recorded", "asked") else ""
             bars, session_day, note = _sliced(inst, asked, spec, root)
             levels = _levels(rows, sleeve)
             data = _data_status(root, asked, sleeve, inst)
@@ -1985,7 +2016,7 @@ def build(root: str | Path = ".", *, day: str | None = None, now: Any = None,
                 "declared_config": _declared_config(rows, sleeve),
                 "levels_note": None if levels else LEVELS_NOT_EXPOSED,
                 # Stage 5ZZP. The sleeve's own rule values, where the detector publishes them.
-                "strategy": _strategy(root, sleeve, asked, spec, now=now, instrument=inst),  # the CALLER's instant, not the derived one:
+                "strategy": _strategy(root, sleeve, asked, spec, now=now, instrument=inst_filter),  # the CALLER's instant, not the derived one:
                 #   `ref` is never None, so passing it made every request look like a
                 #   caller naming an instant and bypass the cache entirely.
                 # Stage 5ZZQ. What would have to happen for a candidate to exist. Built from

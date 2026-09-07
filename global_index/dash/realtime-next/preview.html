@@ -92,7 +92,7 @@
           <span>Model age</span><b id="modelInputAge">--</b>
         </div>
         <div class="model-input-item model-input-fit">
-          <span class="has-tip tip-bottom" tabindex="0" data-tooltip="Daily HMM fit evidence grouped from runner logs. Convergence warnings are diagnostic unless a documented decision gate fails.">HMM fit</span><b id="modelFitStatus">--</b>
+          <span class="has-tip tip-bottom" tabindex="0" data-tooltip="The shape of the frozen fit the live route reads: how many states it has, and how many sessions it has labelled. Track 1 does not refit per session, so there is no daily convergence count here. Whether that fit still agrees with the data is on Fit end.">HMM fit</span><b id="modelFitStatus">--</b>
         </div>
         <div class="model-input-item model-input-fitend">
           <span class="has-tip tip-bottom" tabindex="0" data-tooltip="The last date in the data the live HMM was fitted on. `Model age` says how old that fit is; this says what it is anchored to.">Fit end</span><b id="modelFitEnd">--</b>
@@ -170,6 +170,51 @@
               <div class="open-issue-detail" id="openIssueDetail" aria-live="polite"></div>
             </div>
           </details>
+        </section>
+
+        <!-- Stage 5ZZY. Copied from `/realtime` so the six market-view preview
+             states have a surface to render on. This page predates both panels and
+             carried neither, so `?state=mvSignal` had nowhere to draw and silently
+             showed nothing — the renderers guard on a missing host, so there was no
+             error to notice either. Kept in sync by hand, like the rest of this file. -->
+        <section class="section-band market-view-section mv2">
+          <div class="mv2-head">
+            <span class="mv2-accent"></span>
+            <h2>Track 1 Market View</h2>
+            <div class="mv-tabs" id="marketViewTabs" role="tablist" aria-label="Sleeve"></div>
+            <span class="source-note mv2-meta" id="marketViewSource">Market view not yet read</span>
+          </div>
+          <!-- The verdict and the chips are two rows, not one: the verdict is the answer and
+               the chips are the evidence for it, and a reader who only takes in the first
+               line must still get the answer. -->
+          <div class="mv2-verdict" id="marketViewVerdict"></div>
+          <p class="mv-summary" id="marketViewSummary">--</p>
+          <div class="mv2-innertabs" id="marketViewInnerTabs"></div>
+          <div id="marketViewLanes"></div>
+          <div class="mv-chart" id="marketViewChart" role="img"
+               aria-label="Five-minute price bars for the selected sleeve window"></div>
+          <div id="marketViewSetup"></div>
+          <p class="source-note" id="marketViewNote"></p>
+        </section>
+
+        <section class="section-band regime-section rg2">
+          <div class="mv2-head">
+            <span class="mv2-accent purple"></span>
+            <h2>Regime Monitor</h2>
+            <span class="source-note mv2-meta" id="regimeSource">Regime not yet read</span>
+          </div>
+          <div class="rg2-card">
+            <div class="rg2-top">
+              <div class="rg2-anchor-cell" id="regimeFacts"></div>
+              <div class="rg2-metrics" id="regimeMetrics"></div>
+            </div>
+            <div class="rg2-mid">
+              <div class="rg2-post-cell" id="regimePosterior"></div>
+              <div class="rg2-feat-cell" id="regimeFeatures"></div>
+            </div>
+            <div class="regime-strip" id="regimeStrip"></div>
+            <p class="rg2-foot" id="regimeNote"></p>
+          </div>
         </section>
 
         <section class="section-band positions-section">

@@ -68,6 +68,8 @@ import pandas as pd
 
 from futures.basket import RISK
 from futures.circuit_breaker import CircuitBreaker
+from global_index import safety_trade_log
+from global_index import safety_book
 from global_index.ibkr_broker import IBKRBroker
 from global_index.net_exposure_multi import MultiClusterGuard
 from global_index.runner import (FuturesRunner, RunnerLockError, STOP_FILE_NAME,
@@ -104,7 +106,35 @@ def main() -> int:
                          "CHUNG một tệp, nếu không thì mỗi cái tự khoá mình.")
     ap.add_argument("--dry-run", action="store_true",
                     help="chỉ báo cáo; KHÔNG dựng runner nên B4 không đặt lệnh nào")
+    # Stage 5ZG. Không suy ra từ `--positions-path`: đổi sổ mà quên đổi log thì im lặng
+    # ghi vào log legacy, và dòng đó lọt vào cổng fill-quality/P&L của legacy.
+    ap.add_argument("--trade-log-path", default=None,
+                    help="đích ghi dòng trade. Bỏ trống = trade_log.jsonl như trước. "
+                         "Track 1 phải truyền track1_slots.TRACK1_TRADE_LOG_PATH.")
+    ap.add_argument("--route", default=None,
+                    help="gắn `route` vào mọi dòng lượt này ghi. BẮT BUỘC đi kèm "
+                         "--trade-log-path; một mình nó bị từ chối.")
     a = ap.parse_args()
+
+    # TRƯỚC khi kiểm positions: trong giai đoạn shadow tệp vị thế Track 1 không tồn tại
+    # nên nhánh dưới thoát sớm MỌI lượt. Đặt phép kiểm sau đó thì nó không bao giờ chạy,
+    # và một đường dẫn sai sẽ lộ ra đúng vào lần khớp lệnh thật đầu tiên.
+    try:
+        trade_log_path, trade_log_route = safety_trade_log.resolve(
+            a.trade_log_path, a.route, _CWD)
+    except safety_trade_log.TradeLogRefused as exc:
+        log.error("[trade-log] %s", exc)
+        return 1
+
+    # Stage 5ZS. The book gets the same treatment as the trade log, and for the same reason
+    # and at the same point: before the positions check, so it is proved every day of the
+    # shadow period rather than first discovered by a real fill. A book that exists and is
+    # not the one this route owns is a refusal, never a rewrite.
+    try:
+        _resolved_book, _ = safety_book.resolve(a.positions_path, a.route, _CWD)
+    except safety_book.BookRefused as exc:
+        log.error("[book] %s", exc)
+        return 1
 
     pos_path = Path(a.positions_path)
     if not pos_path.exists():
@@ -177,7 +207,8 @@ def main() -> int:
             # dòng CLOSE. Thiếu đường dẫn thì `_append_trade_raw` trả về ngay, nên lượt
             # quét vẫn chuyển tiền vào sổ vốn mà không để lại dòng nào — cùng lỗ hổng
             # vừa đo được ở max-hold ngày 2026-08-17.
-            trade_log_path=str(_CWD / "trade_log.jsonl"),
+            trade_log_path=str(trade_log_path),
+            route=trade_log_route,
             stop_path=a.stop_path,        # D5 — see RUNNER_AUDIT.md H2
             # today/now truyền tường minh: runner sẽ tự đọc đồng hồ nếu thiếu, và hai khái
             # niệm "hôm nay" trong một lần chạy là cách cửa sổ hoãn bị tính sai.

@@ -3,17 +3,22 @@
 Sinh bởi `global_index/dash/tools/measure_dashboards.py`. **Đừng sửa tay**:
 chạy lại script để cập nhật, nếu không con số sẽ rời khỏi thứ nó mô tả.
 
-- **measured_at_utc**: `2026-09-03 17:37:02Z`
-- **commit**: `88ef3d9`
+- **measured_at_utc**: `2026-09-05 06:55:55Z`
+- **commit**: `41b4c71`
 - **branch**: `future/incorporation`
-- **dash_tree_state**: `M global_index/dash/paper/index.html
+- **dash_tree_state**: `M global_index/dash/DASHBOARD_BASELINE.json
+ M global_index/dash/DASHBOARD_BASELINE.md
+ M global_index/dash/paper/index.html
  M global_index/dash/realtime-next/index.html
  M global_index/dash/realtime-next/next.css
+ M global_index/dash/realtime-next/next.js
  M global_index/dash/realtime-next/preview-states.js
  M global_index/dash/realtime-next/preview.html
  M global_index/dash/realtime-next/skin-e.css
+ M global_index/dash/realtime/index.html
  M global_index/dash/realtime/realtime.js
 ?? global_index/dash/COVERAGE.md
+?? global_index/dash/DESIGN_AUDIT_2026-09-04.md
 ?? global_index/dash/DESIGN_SPEC.md
 ?? global_index/dash/IMPLEMENTATION_PROMPT.md
 ?? global_index/dash/README.md
@@ -29,8 +34,8 @@ chạy lại script để cập nhật, nếu không con số sẽ rời khỏi 
 
 | Trang | Rộng | Node vẽ ra | Chữ đè chữ | Cắt ngoài mép | Tràn trang | Dưới AA | Cỡ chữ | Họ chữ |
 |---|---|---|---|---|---|---|---|---|
-| /realtime | 1900 | 268 | 0 | 0 | 0 | 7/662 | 12 | 2 |
-| /realtime | 390 | 937 | 0 | 0 | 0 | 19/817 | 13 | 2 |
+| /realtime | 1900 | 167 | 0 | 0 | 0 | 5/157 | 12 | 2 |
+| /realtime | 390 | 378 | 0 | 0 | 0 | 19/320 | 12 | 2 |
 | /paper · Overview ⚠ | 1900 | 22 | 0 | 0 | 0 | 0/22 | 6 | 2 |
 | /paper · Gates | 1900 | 46 | 0 | 0 | 0 | 0/46 | 6 | 2 |
 | /paper · Coverage ⚠ | 1900 | 19 | 0 | 0 | 0 | 0/19 | 6 | 2 |
@@ -42,7 +47,7 @@ chạy lại script để cập nhật, nếu không con số sẽ rời khỏi 
 | /analytics | 1900 | 891 | 0 | 0 | 0 | 17/890 | 11 | 1 |
 | /analytics | 390 | 493 | 0 | 0 | 0 | 17/890 | 10 | 1 |
 | /reports | 1900 | 53 | 0 | 0 | 0 | 14/53 | 9 | 1 |
-| /reports | 390 | 268 | 0 | 0 | 0 | 240/597 | 12 | 1 |
+| /reports | 390 | 186 | 0 | 0 | 0 | 47/199 | 11 | 1 |
 | / ⚠ | 1900 | 19 | 0 | 0 | 0 | 0/17 | 5 | 1 |
 | / ⚠ | 390 | 26 | 0 | 0 | 0 | 0/17 | 6 | 1 |
 

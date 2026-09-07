@@ -71,6 +71,16 @@ class Fill:
     # order that was sent — the M4 two-clocks defect. MockBroker leaves it None, so the
     # verify/replay path is unchanged.
     contract_month: str | None = None
+    #: The broker's own id for the order this fill came from, when there is one.
+    #:
+    #: Added in Stage 5Y and appended LAST with a default, so every existing caller —
+    #: positional or keyword — is untouched and no legacy test moves. `None` means the
+    #: order never reached the broker, or the broker cannot say. It never means zero.
+    #:
+    #: Why it matters: `get_order_status` and `find_execution` both take an order id, and
+    #: until now nothing that placed an order ever learned one. After a crash the Track 1
+    #: journal held a row saying SUBMITTED and no way to ask about it.
+    order_id: str | None = None
 
     def __post_init__(self):
         """Normalise the expiry to the YYYYMM the rest of the system speaks.
@@ -96,6 +106,39 @@ class Fill:
             self.contract_month = m[:6]
 
 
+class OrderReceiptRefused(RuntimeError):
+    """A receipt callback refused, AFTER the order reached the broker.
+
+    Raised straight through `send_order`'s own error handling rather than caught by it. That
+    is the entire point of having its own type: the broad handler turns an exception into
+    `Fill(status="CANCELLED")`, and reporting a LIVE order as cancelled is the worst answer
+    available — worse than crashing, because the caller would believe it and move on.
+    """
+
+
+@dataclass(frozen=True)
+class OrderReceipt:
+    """What the broker knows the instant an order is accepted, before it is worked.
+
+    Handed to `send_order(..., on_submit=...)` immediately after placement and before any
+    polling. The poll can block for 30 seconds on an entry, and that window is where a crash
+    loses everything: without this the process dies holding a live order it cannot name.
+
+    `perm_id` is IBKR's stable global identifier and is often still 0 at this moment — it is
+    carried when present and never waited for, because waiting would put the delay back
+    inside the window this exists to close.
+    """
+
+    order_id: str
+    inst: str
+    action: str
+    contracts: int
+    perm_id: "int | None" = None
+    client_id: "int | None" = None
+    contract_month: "str | None" = None
+    submitted_at: str = ""
+
+
 @dataclass
 class BrokerPosition:
     inst: str
@@ -112,7 +155,18 @@ class Broker(ABC):
     @abstractmethod
     def fetch_bars(self, inst: str, through) -> pd.DataFrame: ...
     @abstractmethod
-    def send_order(self, order: Order) -> Fill: ...
+    def send_order(self, order: Order, *, on_submit=None) -> Fill:
+        """Place an order and return its outcome.
+
+        `on_submit`, when given, is called ONCE with an `OrderReceipt` as soon as the broker
+        accepts the order and BEFORE the outcome is known. Keyword-only with a default so
+        every caller written before Stage 5Y is unchanged and no implementation is forced to
+        support it — a broker that ignores it simply never reports an id early, and the
+        caller falls back to identifying the order by what is working at the broker.
+
+        A callback that raises must NOT be turned into a cancelled fill. See
+        `OrderReceiptRefused`.
+        """
     @abstractmethod
     def get_positions(self) -> list: ...
     @abstractmethod
@@ -193,12 +247,21 @@ class MockBroker(Broker):
             return pd.DataFrame()
         return df[df.index <= through]         # causal: only bars through `through`
 
-    def send_order(self, order: Order) -> Fill:
+    def send_order(self, order: Order, *, on_submit=None) -> Fill:
+        # MockBroker's ids are synthetic and say so. They are stable within a run so a test
+        # can follow one order through, and they are prefixed so a synthetic id can never be
+        # mistaken for something IBKR issued if one ever reaches a log.
+        self._order_seq = getattr(self, "_order_seq", 0) + 1
+        oid = f"mock-{self._order_seq}"
+        if on_submit is not None:
+            on_submit(OrderReceipt(order_id=oid, inst=order.inst, action=order.action,
+                                   contracts=order.contracts))
         if order.action == "OPEN":
             self._positions.append(BrokerPosition(
                 order.inst, order.direction, order.contracts, order.cluster,
                 order.ref_day, order.exit_day, order.pnl_sized))
-            f = Fill(order.inst, "OPEN", order.direction, order.contracts, order.cluster)
+            f = Fill(order.inst, "OPEN", order.direction, order.contracts,
+                     order.cluster, order_id=oid)
         else:  # CLOSE — remove one matching position; realize the order's pnl (verify:
                # runner passes the closed position's ledger pnl → equity is exact)
             for i, p in enumerate(self._positions):
@@ -207,7 +270,7 @@ class MockBroker(Broker):
                     break
             self._equity += order.pnl_sized
             f = Fill(order.inst, "CLOSE", order.direction, order.contracts,
-                     order.cluster, pnl_sized=order.pnl_sized)
+                     order.cluster, pnl_sized=order.pnl_sized, order_id=oid)
         self.fills.append(f)
         return f
 

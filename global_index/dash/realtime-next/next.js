@@ -550,13 +550,26 @@
   const chartReadoutNode = () => {
     const plot = document.querySelector('.mv2-plot');
     if (!plot) return null;
+    /* Stage 5ZZZ-CV. Bên PHẢI hàng "Price", đúng chỗ ô đọc của lưới lane đang đứng —
+       không phải một dải riêng chen giữa hàng Data health và biểu đồ.
+
+       Ở giữa như trước nó cắt ngang hai thứ nó không nói về, và khi chưa ai rê chuột thì
+       nó là một khung rỗng chiếm nguyên một hàng chỉ để in một câu hướng dẫn. Trên hàng
+       đầu thẻ nó đọc như nửa phải của chính đầu thẻ ấy: nhãn của biểu đồ ngay dưới nó.
+       Cùng khuôn với `.mv2-slot-readout` ở tab Detector rules, nên hai tab đặt cùng một
+       thứ ở cùng một chỗ. */
+    const head = plot.parentElement.querySelector('.mv2-card-head');
     let el = document.querySelector('.mv2-chart-readout');
     if (!el) {
       el = document.createElement('div');
       el.className = 'mv2-chart-readout';
       el.textContent = CHART_HINT;
     }
-    if (el.parentElement !== plot.parentElement || el.nextElementSibling !== plot) {
+    // realtime.js dựng lại thẻ mỗi 8s và có thể đã bỏ rơi nút này; đặt lại chứ đừng cho
+    // rằng nó còn nguyên đó.
+    if (head) {
+      if (el.parentElement !== head || el !== head.lastElementChild) head.appendChild(el);
+    } else if (el.parentElement !== plot.parentElement || el.nextElementSibling !== plot) {
       plot.parentElement.insertBefore(el, plot);
     }
     return el;

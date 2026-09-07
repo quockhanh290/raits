@@ -255,6 +255,31 @@ _ENDPOINT_CONTRACTS = {
         {"source", "day", "fills", "exceptions"}, {}, ["fills", "exceptions"]),
     f"/api/v1/reports/{_TODAY}": ({"day", "daily"}, {}, []),
     "/api/v1/paper-evidence": ({"source"}, {}, []),
+    # Stage 5AB: the Track 1 runtime panel. Every one of these keys is read by
+    # renderTrack1() in realtime.js, so a backend that stops emitting one blanks a fact the
+    # operator is being asked to trust.
+    "/api/v1/track1-runtime": (
+        {"source", "route", "book", "checkpoint", "window_coverage", "slot_timing",
+         "gates", "safety"},
+        {"gates": {"blocking_now", "orders_possible"},
+         "window_coverage": {"present"},
+         "slot_timing": {"present"},
+         "safety": {"positions_path", "client_id"}},
+        ["gates.blocking_now"]),
+    # Stage 5ZZL: the market view and the regime monitor. Its own endpoint because it slices
+    # instrument stores and the runtime endpoint above is polled on a short interval.
+    # `score` and `shift_threshold` are in the contract deliberately AS NULLABLE KEYS: the
+    # model publishes a label and nothing underneath it, and a field that is absent invites
+    # the next reader to assume it was zero.
+    "/api/v1/track1-market-view": (
+        {"market_view", "regime"},
+        {"market_view": {"schema", "route", "session_date", "sleeves"},
+         "regime": {"status", "label", "score", "shift_threshold",
+                    "score_note", "threshold_note"}},
+        # The third slot pins keys that must be LISTS. `sleeves` is a dict keyed by sleeve
+        # name -- pinned here at first by copying the shape of the entry above, and caught
+        # immediately by this test doing exactly its job. The regime strips are the lists.
+        ["regime.recent", "regime.context"]),
 }
 
 
@@ -293,6 +318,37 @@ def test_the_endpoint_contract_covers_every_route_the_page_calls():
     covered |= {"/api/v1/runner-state", "/api/v1/schedule-status"}
     missing = sorted(c for c in called if c not in covered)
     assert not missing, f"realtime.js goi endpoint chua co hop dong: {missing}"
+
+
+def test_the_page_renders_the_track1_runtime_panel_it_fetches():
+    """Fetching without rendering is a silent panel; rendering without the DOM ids is a
+    no-op. Both halves are asserted, on BOTH routes that load this script."""
+    js, _ = _realtime_sources()
+    assert "/api/v1/track1-runtime" in js
+    assert "function renderTrack1(" in js
+    assert "renderTrack1();" in js, "renderTrack1 is defined but never called"
+    for page in ("realtime", "realtime-next"):
+        html = (ROOT / "global_index" / "dash" / page / "index.html").read_text(encoding="utf-8")
+        for element_id in ("track1Facts", "track1Source", "track1Note"):
+            assert f'id="{element_id}"' in html, (page, element_id)
+
+
+def test_absence_of_track1_evidence_is_stated_not_silent():
+    """"Nothing shown" must never be readable as "nothing wrong". The panel has to say
+    which of the three states it is in."""
+    js, _ = _realtime_sources()
+    assert "Track 1 runtime not yet observed" in js
+    assert "did not answer" in js, "an unreachable endpoint must say so, not render blank"
+
+
+def test_the_legacy_position_panel_is_labelled_legacy_on_both_routes():
+    """During a track1-only period live_positions.json is the DRAINING legacy book. An
+    unlabelled row invites the reader to take it for Track 1 state."""
+    js, _ = _realtime_sources()
+    assert "legacy(drain) runner qty" in js
+    for page in ("realtime", "realtime-next"):
+        html = (ROOT / "global_index" / "dash" / page / "index.html").read_text(encoding="utf-8")
+        assert "Open Positions <span class=\"source-note\">legacy / drain</span>" in html, page
 
 
 def test_all_four_readers_agree_on_which_slots_are_open(tmp_path):

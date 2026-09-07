@@ -1549,14 +1549,22 @@
      KHÔNG đổi tên job: comment ở `renderScheduleFacts` đã dặn giữ nguyên job id của
      scheduler, vì "một từ vựng dashboard không tồn tại ở đâu khác trong hệ thống là một
      bước dịch dưới áp lực". Thêm một sự thật, không thay một cái tên. */
-  function jobRouteChip(job) {
-    const type = String((job && job.job_type) || '');
-    if (!type || type.startsWith('track1_')) return '';
-    return `<span class="issue-scope legacy has-tip" tabindex="0" data-tooltip="Tuyến legacy. `
-      + `Nhiều job bảo trì chạy theo cặp — một lượt cho mỗi tuyến, cùng một phút — nên hai `
-      + `hàng cùng giờ là hai lần chạy thật, không phải một lần ghi đôi.">`
-      + `${esc(issueScope('legacy'))}</span>`;
-  }
+  /* Stage 5ZZZ-CV. Ô chip tuyến trên thẻ job đã được GỠ, có chủ đích.
+
+     Nó ra đời khi hai tuyến còn chạy song song: các lượt quét bảo trì bắn theo cặp, cùng
+     một phút, nên hai hàng cùng giờ đọc như một hàng ghi đôi nếu không có gì nói tuyến.
+
+     Điều kiện ấy đã hết. Đo ngày 2026-09-06: 45 slot chiến lược của tuyến cũ KHÔNG còn được
+     đăng ký ở chế độ chỉ-Track-1 — bỏ hẳn chứ không phải chỉ bị hãm — và cuốn sổ của tuyến
+     cũ giữ 0 vị thế, không đổi từ 04/09. Không còn tuyến thứ hai để phân biệt với.
+
+     Và cái việc chip từng làm thì nay tên job tự làm: hàng của tuyến cũ hiện tên thô
+     `STOP_REPAIR_SUN_1830`, hàng Track 1 hiện "Track 1 stop-repair sweep 18:30". Hai tên đã
+     tự nói, nên một ô nữa nói lại chỉ là một ô nữa để đọc.
+
+     Dữ liệu thì GIỮ: bộ đọc nhật ký vẫn ghi tuyến của từng job vào payload, và một phép kiểm
+     ghim nó vào chính danh sách bộ lập lịch bỏ đi. Bỏ một ô khỏi màn hình khác với bỏ một sự
+     thật khỏi hồ sơ — nếu có ngày cần vẽ lại, con số đã nằm sẵn đó. */
 
   function jobLabel(job) {
     const base = MV_JOB_NAMES[job && job.job_type];
@@ -1933,6 +1941,34 @@
     let lo = Infinity, hi = -Infinity;
     bars.forEach(b => { lo = Math.min(lo, b.low); hi = Math.max(hi, b.high); });
     if (!(hi > lo)) { hi = lo + 1; lo -= 1; }
+    /* Stage 5ZZZ-CQ. Thang giá phải chứa được những gì sẽ vẽ lên nó.
+
+       Thang tính từ NẾN thôi, rồi các mức giá được vẽ chồng lên — nên một mức nằm ngoài
+       khoảng nến bị cắt ở mép. Đo trên trang, sleeve Stress 2026-09-04:
+
+           khoảng nến     29.477,75 → 29.692,00
+           Planned stop   29.715,69   cao hơn đỉnh 23,69 điểm
+
+       Đường và nhãn của nó rơi nửa trong nửa ngoài mép trên, đọc như một lỗi vẽ. Mà khoảng
+       cách từ giá tới mức dừng lỗ chính là thứ người đọc muốn thấy — giấu nó đi hay cắt nó
+       đôi đều tệ hơn là nới thang.
+
+       NỚI CÓ HẠN. Một mức ở xa gấp mấy lần khoảng nến sẽ nén toàn bộ cây nến thành một
+       vạch, và lúc đó biểu đồ mất đúng việc nó sinh ra để làm. Trần 40% khoảng nến: trong
+       hạn thì nới, ngoài hạn thì mức ấy không vẽ và được nói ra bằng chữ ở dòng dưới. */
+    const _span = hi - lo;
+    const _room = _span * 0.40;
+    const _lv = ((sleeve.setup_boundary || {}).price_levels || [])
+      .map(l => Number(l.price)).filter(Number.isFinite);
+    const outOfRange = [];
+    ((sleeve.setup_boundary || {}).price_levels || []).forEach(l => {
+      const v = Number(l.price);
+      if (!Number.isFinite(v)) return;
+      if (v > hi + _room || v < lo - _room) outOfRange.push(l);
+    });
+    _lv.forEach(v => {
+      if (v <= hi + _room && v >= lo - _room) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    });
     const pad = (hi - lo) * 0.06;
     lo -= pad; hi += pad;
     const x = i => padL + (bars.length === 1 ? iw / 2 : (i / (bars.length - 1)) * iw);
@@ -1975,7 +2011,7 @@
     // collide at narrow widths.
     const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => {
       const v = lo + (hi - lo) * f;
-      mvLab(W - padR + 6, y(v) + 3.5, '', mvEsc(axPrice(v)), 'start');
+      mvLab(W - 6, y(v) + 3.5, '', mvEsc(axPrice(v)), 'end');
       return `<line class="mv-grid" x1="${padL}" x2="${W - padR}"
                 y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"></line>`;
     }).join('');
@@ -2043,16 +2079,50 @@
     const armed = bnd.levels_armed === true;
     const levels = (bnd.price_levels || [])
       .filter(l => Number.isFinite(Number(l.price)))
-      .map(l => {
-        const yy = y(Number(l.price)).toFixed(1);
-        const cls = (l.armed === true && armed) ? 'mv-level armed' : 'mv-level muted';
-        const suffix = (l.armed === true && armed) ? '' : ' · not armed';
-        mvLab(padL + 4, Number(yy) - 4,
-          `mv-level-label ${cls.includes('armed') ? 'armed' : 'muted'}`,
-          mvEsc(l.label) + suffix, 'start');
-        return `<line class="${cls} mv-level-${mvEsc(l.kind)}" x1="${padL}" x2="${W - padR}"
-            y1="${yy}" y2="${yy}"></line>`;
-      }).join('');
+      .filter(l => !outOfRange.includes(l))
+      .map(l => ({ l, yy: y(Number(l.price)) }))
+      .sort((a, b) => a.yy - b.yy);
+
+    /* Stage 5ZZZ-CQ. Đường ở đúng giá của nó; CHỮ thì nhường nhau.
+
+       Mỗi nhãn được đặt tại toạ độ giá của chính nó và không có bước nào hỏi xem chỗ ấy đã
+       có ai đứng chưa. Đo trên trang, sleeve Stress 2026-09-04: "Trigger (pre-session low) ·
+       not armed" ở y=1163 và "Session open · not armed" ở y=1157 — cách nhau 6px trong khi
+       mỗi nhãn cao 11px, nên hai câu in chồng lên nhau và không câu nào đọc được.
+
+       Chỉ nhãn dịch. Đường phải ở đúng giá, vì đó là thứ người đọc so với cây nến; một nhãn
+       lệch vài pixel khỏi đường của nó vẫn đọc được, một đường lệch khỏi giá của nó thì sai.
+       Đẩy xuống chứ không đẩy lên: thứ tự trên-dưới của các mức giá được giữ nguyên. */
+    /* Chiều cao một nhãn — tính bằng ĐƠN VỊ viewBox, không phải pixel màn hình.
+       Đây là chỗ hai bản trước cùng trượt. Nhãn là một <span> HTML phủ lên SVG, định vị
+       bằng phần trăm của khung `.mv2-plot` cao 320px; còn `yy` ở dòng dưới là toạ độ trong
+       viewBox cao 420. Hai hệ đo khác nhau, tỉ lệ 320/420. Một hằng số "16" đặt ở đây thật
+       ra chỉ giữ được 16 × 320/420 ≈ 12px trên màn hình — nên khi ô chữ cao 18px thì hai
+       nhãn cách nhau đúng 16px vẫn in đè lên nhau, đo được ở cổng CQ.
+       Quy đổi một lần, ở đây, thay vì đoán:
+         ô chữ = 11.5px chữ (line-height 1) + 2×2px đệm + 2×1px vành ≈ 17.5px
+         đổi sang đơn vị viewBox: 17.5 × 420/320 ≈ 23  →  cộng 3 cho một khoảng thở
+       PHỤ THUỘC vào `.mv-lab.mv-level-label` trong next.css và vào chiều cao `.mv2-plot`
+       trong realtime.css. Đổi đệm, vành, cỡ chữ hay chiều cao khung thì phải sửa hai con số
+       dưới đây — và cổng CQ đo hình học thật trên trang sẽ đỏ nếu quên. */
+    const LAB_PX = 17.5, PLOT_PX = 320;
+    const LAB_H = Math.ceil(LAB_PX * H / PLOT_PX) + 3;
+    let _prevLab = -Infinity;
+    const levelLines = levels.map(({ l, yy }) => {
+      const line = yy.toFixed(1);
+      const cls = (l.armed === true && armed) ? 'mv-level armed' : 'mv-level muted';
+      const suffix = (l.armed === true && armed) ? '' : ' · not armed';
+      const labY = Math.max(yy - 4, _prevLab + LAB_H);
+      _prevLab = labY;
+      // Nhãn mang theo LOẠI của mức, không chỉ mang trạng thái. Không có nó thì ba nhãn
+      // cùng một màu xám và người đọc phải dò xem chữ nào thuộc đường nào.
+      mvLab(padL + 4, labY,
+        `mv-level-label mv-level-${mvEsc(l.kind)} `
+        + `${cls.includes('armed') ? 'armed' : 'muted'}`,
+        mvEsc(l.label) + suffix, 'start');
+      return `<line class="${cls} mv-level-${mvEsc(l.kind)}" x1="${padL}" x2="${W - padR}"
+          y1="${line}" y2="${line}"></line>`;
+    }).join('');
 
     // Volume bars, drawn only where the store actually carried the column. Never
     // synthesised: a zero-height bar for a missing reading and a zero-height bar for a quiet
@@ -2098,10 +2168,13 @@
          the pane they land on the same line: measured, "32  peak 110" printed straight
          through "64127.80". Twenty units down clears it and still reads as the top of
          this pane rather than the bottom of the one above. */
-      + mvLab(W - padR + 6, vTop + 20, 'mv-vol-ax', mvEsc(axCount(vpeak)), 'start')
-      + mvLab(W - padR + 6, vTop + usable / 2 + 3, 'mv-vol-ax',
-              mvEsc(axCount(Math.round(vpeak / 2))), 'start')
-      + mvLab(W - padR + 6, vTop + usable, 'mv-vol-ax', '0', 'start')
+      /* Căn PHẢI. Căn trái làm cột khối lượng so le với cột giá ngay trên nó: đo được
+         mép phải 1410 · 1433 · 1439 cho "0" · "6,905" · "13,810" trong khi cột giá đứng ở
+         1455. Số trong một cột thì phải thẳng ở hàng đơn vị, không thẳng ở chữ số đầu. */
+      + mvLab(W - 6, vTop + 20, 'mv-vol-ax', mvEsc(axCount(vpeak)), 'end')
+      + mvLab(W - 6, vTop + usable / 2 + 3, 'mv-vol-ax',
+              mvEsc(axCount(Math.round(vpeak / 2))), 'end')
+      + mvLab(W - 6, vTop + usable, 'mv-vol-ax', '0', 'end')
       /* A floor to stand on. Without it the columns hang in the gap between two panes and
          the eye has nothing to read their height against. */
       + `<line class="mv-vol-base" x1="${padL}" x2="${W - padR}" y1="${
@@ -2111,7 +2184,7 @@
     return `<svg class="mv-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
               data-bars='${mvEsc(JSON.stringify(bars.map(b => [mvClock(b.time), b.open, b.high, b.low,
                 b.close, (typeof b.volume === 'number' ? b.volume : null)])))}'>
-        ${ticks}${band}${candles}${levels}${vol}${laneRule}${marks}${times}
+        ${ticks}${band}${candles}${levelLines}${vol}${laneRule}${marks}${times}
         <line class="mv-cross" x1="0" x2="0" y1="${padT}" y2="${padT + ih}" style="display:none"></line>
       </svg>
       <div class="mv-labels">${axisText.join('')}</div>
@@ -2693,9 +2766,26 @@
      có bằng chứng per-slot (Stress không ghi diagnostics), và lúc đó dòng nói rõ rằng công
      cụ đang vẽ đến từ bảng cấu hình chứ không từ quan sát. */
   function mvInstBar(s) {
-    const all = s.instruments || [];
+    /* BA trạng thái, và bản đầu gộp mất hai.
+
+       Stage 5ZZZ-CP. `instruments` VẮNG MẶT không phải `instruments` RỖNG. Bản đầu viết
+       `s.instruments || []` nên một backend chưa khởi động lại kể từ khi trường này ra đời
+       rơi thẳng vào nhánh "phiên này không ghi bằng chứng nào" — một câu sai, nói chắc
+       nịch, về một sleeve đã ghi bốn công cụ. Đo được trên máy chủ đang chạy: payload
+       không có trường ấy, còn cây bằng chứng có đủ MES · MNQ · MYM · M2K.
+
+       Chính tệp này đã ghi lại cái bẫy đó ở Stage 5ZZH cho `headline_usable`: Python giữ
+       module trong bộ nhớ, nên một backend khởi động trước bản sửa cứ thế phục vụ khối cũ
+       mãi mãi. Đọc xong rồi vẫn mắc lại. */
+    const all = Array.isArray(s.instruments) ? s.instruments : null;
     const cur = s.instrument || '';
-    const src = s.instrument_source || '';
+    if (all === null) {
+      return `<div class="mv2-instbar"><span class="mv2-inst-label">Instrument</span>`
+        + `<span class="mv2-inst on">${mvEsc(cur)}</span>`
+        + `<span class="mv2-inst-note">the backend has not been restarted since instrument `
+        + `selection was added, so it cannot say which instruments this sleeve read</span>`
+        + `</div>`;
+    }
     if (!all.length) {
       return `<div class="mv2-instbar"><span class="mv2-inst-label">Instrument</span>`
         + `<span class="mv2-inst on">${mvEsc(cur)}</span>`
@@ -3202,6 +3292,13 @@
       const sess = ((state.marketView || {}).sessions || [])
         .find(r => r.day === ((s.strategy || {}).slot_series_session || state.mvDay));
       const noStore = sess && sess.has_diagnostics === false;
+      /* Stage 5ZZZ-CU. Không có slot nào, và cũng không có lý do nào để nêu → không dựng gì.
+         Câu cũ ở đây là 'No slot has recorded a reading for this session yet.' — nó chỉ nói
+         lại điều mà một ô trống đã nói, và nó chiếm một khối 250px ngay dưới biểu đồ giá để
+         nói điều đó. Ba nhánh còn lại ở dưới thì giữ: mỗi nhánh mang một sự thật KHÁC nhau
+         về cùng một ô trống (kho slot chưa với tới ngày này / bộ dò không đo giá đóng cửa /
+         cửa vào chưa mở), và những sự thật ấy không có ở chỗ nào khác trên trang. */
+      if (!ran && !noStore) return '';
       return `<div class="mv2-slotchart-empty">${mvEsc(
         noStore ? `No per-slot record exists for this session — the per-slot store begins `
                   + `2026-08-31. The conditions above were replayed over the bars on disk, `
@@ -3217,12 +3314,16 @@
         : ran && withPrice.length === 0
             ? `${ran} slot${ran === 1 ? '' : 's'} recorded and none published a close price. `
               + `What this sleeve's detector does publish is in the Detector rules tab.`
-        : ran ? `${ran} slot${ran === 1 ? '' : 's'} recorded, ${withPrice.length} carrying `
+        : `${ran} slot${ran === 1 ? '' : 's'} recorded, ${withPrice.length} carrying `
               + `numbers — the line starts when the entry window opens and the detector has `
-              + `bars to walk.`
-            : 'No slot has recorded a reading for this session yet.')}</div>`;
+              + `bars to walk.`)}</div>`;
     }
-    const W = 1000, H = 250, padL = 52, padR = 12, padT = 14, padB = 24;
+    /* Stage 5ZZZ-CR. CÙNG lề với biểu đồ nến ngay trên, không phải lề riêng.
+       Lề riêng (52 trái / 12 phải) buộc trục phải nằm bên TRÁI, vì 12 đơn vị không đủ chỗ
+       cho "7,727.02" — nên hai biểu đồ xếp chồng đọc trục ở hai phía đối nhau. Dùng chung
+       MV_PAD thì hai khung vẽ trùng nhau, và đó cũng là điều kiện để con trỏ chữ thập dóng
+       hai pane theo cùng một phút. */
+    const W = 1000, H = 250, padL = MV_PAD.L, padR = MV_PAD.R, padT = 14, padB = 24;
     /* Cùng lý do và cùng cách với biểu đồ nến ở trên: luật 5 cấm <text> trong một SVG
        kéo lệch, nên chữ ra một lớp HTML phủ lên, định vị bằng phần trăm của viewBox. */
     const scText = [];
@@ -3375,10 +3476,13 @@
     const fmtP = v => Number(v).toLocaleString('en-US',
       { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const ticks = [
-      scLab(4, padT + 8, mvEsc(fmtP(pHi)), 'start'),
-      scLab(4, padT + priceH, mvEsc(fmtP(pLo)), 'start'),
-      scLab(4, volTop + 8, mvEsc(Number(Math.round(vHi)).toLocaleString('en-US')), 'start'),
-      scLab(4, volTop + volH, '0', 'start'),
+      // Bên PHẢI và căn PHẢI, giống biểu đồ nến ngay trên. Căn phải là điều kiện để hai
+      // cột số thẳng hàng: căn trái thì "0" và "13,810" lệch nhau đúng bằng hiệu số chữ số.
+      scLab(W - 6, padT + 8, mvEsc(fmtP(pHi)), 'end'),
+      scLab(W - 6, padT + priceH, mvEsc(fmtP(pLo)), 'end'),
+      scLab(W - 6, volTop + 8,
+            mvEsc(Number(Math.round(vHi)).toLocaleString('en-US')), 'end'),
+      scLab(W - 6, volTop + volH, '0', 'end'),
     ].join('');
     const drawn = series.map((_, i) => i).filter(i => !unplaced(i));
     /* Nhãn thời gian mô tả TRỤC, không mô tả chuỗi.
@@ -3850,7 +3954,18 @@
     // The label is the anchor, and it is NEVER shown alone. "Calm" from a reading nobody has
     // refreshed in three days is a different statement from "Calm" from this morning, and a
     // panel that prints only the word invites the first to be read as the second.
-    const age = r.age_hours == null ? '' : `checked ${r.age_hours}h ago`;
+    /* Stage 5ZZZ-CU. Mốc kiểm gần nhất, theo đồng hồ chứ không chỉ theo khoảng cách.
+       'checked 43.61h ago' trả lời 'cũ bao nhiêu' nhưng không trả lời 'lúc nào' — và
+       'lúc nào' mới là thứ đối chiếu được với nhật ký job. Hai vế đi cùng nhau: giờ tuyệt
+       đối để tra, khoảng cách để đọc nhanh. Số giờ làm tròn: hai chữ số thập phân trên một
+       phép đo tính bằng ngày là độ chính xác giả.
+       Nó nằm TRONG khối nhãn chứ không nhân đôi ở dòng nguồn: đây là thuộc tính của bản
+       đọc, và luật 5ZZY chỉ đòi nó được nói MỘT lần, không đòi nói ở đâu. Dòng nguồn giữ
+       phần xuất xứ — nhãn ngày nào — đúng vai nó đang giữ cho mọi section khác. */
+    const age = r.checked_at
+      ? `last checked ${etDateTime(r.checked_at)}`
+        + (r.age_hours == null ? '' : ` · ${Math.round(r.age_hours)}h ago`)
+      : (r.age_hours == null ? '' : `last checked ${Math.round(r.age_hours)}h ago`);
     const held = regimeHeld(r);
     const cls = mvEsc(String(r.label || '').toLowerCase());
     const checkPass = String(v.status || '').toUpperCase() === 'PASS';
@@ -3877,8 +3992,8 @@
                ? `held ${held.capped ? 'at least ' : ''}${held.days} day${held.days === 1 ? '' : 's'}`
                : ''}</span>
            </div>
-           ${uncertain ? `<div class="rg2-uncertain has-tip tip-bottom" tabindex="0"
-                data-tooltip="${mvEsc(uncertainNote)}">
+           ${uncertain ? `<div class="rg2-uncertain rg2-unc-${uncertain} has-tip tip-bottom"
+                tabindex="0" data-tooltip="${mvEsc(uncertainNote)}">
                 <i class="mv2-dot ${uncertain === 'low' ? 'ok' : uncertain === 'moderate'
                   ? 'warn' : 'bad'}"></i>
                 <span>${mvEsc(uncertain)} uncertainty</span></div>` : ''}
@@ -3886,6 +4001,11 @@
              <i class="mv2-dot ${checkPass ? 'ok' : 'warn'}"></i>
              <span>${mvEsc(regimeCheckLine(v))}</span>
            </div>
+           <!-- Mốc kiểm ở ĐÁY khối, dưới cả dòng kiểm nhãn. Ba dòng trên đều nói về
+                bản đọc — nhãn gì, mô hình chắc tới đâu, phép kiểm có qua không — còn
+                dòng này nói về chính lượt đọc ấy đã chạy lúc nào. Xuất xứ đứng cuối,
+                đúng như dòng nguồn đứng cuối ở mọi section khác của trang. -->
+           ${age ? `<div class="rg2-asof">${mvEsc(age)}</div>` : ''}
            <!-- Dòng "as of <ngày> · checked <n>h ago" đã bỏ khỏi đây. Dòng nguồn của
                 section, ngay đầu thẻ, in ĐÚNG câu ấy: "daily label · <ngày> · checked <n>h
                 ago". Đo được hai câu cách nhau 176px, cùng ngày cùng số giờ. Giữ bản ở dòng
@@ -3937,10 +4057,9 @@
 
 
     if (src) {
-      src.textContent = r.label
-        ? `daily label · ${r.label_date}` +
-          (r.age_hours == null ? '' : ` · checked ${r.age_hours}h ago`)
-        : 'not measured';
+      // Tuổi bản đọc đã về khối nhãn (5ZZZ-CU). Để lại ở đây nữa là dựng lại đúng cặp câu
+      // trùng nhau cách 176px mà 5ZZY đã gỡ đi. Dòng nguồn giữ xuất xứ: nhãn của ngày nào.
+      src.textContent = r.label ? `daily label · ${r.label_date}` : 'not measured';
       src.className = 'source-note mv2-meta';
     }
 
@@ -5219,7 +5338,7 @@
       return `<li class="job-row tone-${esc(tone)} status-${esc(presentation.status)} ${selected ? 'selected' : ''}">
         <button class="job-trigger" type="button" data-job-id="${esc(job.id)}" aria-expanded="${selected}">
           <span class="job-time">${esc(etDateTime(job.started_at))}</span><span class="job-duration">${esc(duration(job.duration_seconds))}</span><span class="job-chevron" aria-hidden="true">${selected ? '−' : '+'}</span>
-          <span class="job-badges"><span class="issue-origin ${esc(presentation.component)}">${esc(presentation.component)}</span><span class="event-status ${esc(presentation.status)}">${esc(presentation.statusLabel)}</span>${jobRouteChip(job)}${signalLine(job)}</span>
+          <span class="job-badges"><span class="issue-origin ${esc(presentation.component)}">${esc(presentation.component)}</span><span class="event-status ${esc(presentation.status)}">${esc(presentation.statusLabel)}</span>${signalLine(job)}</span>
           <span class="job-name" title="${esc(job.job_id)}">${esc(jobLabel(job))}</span><span class="job-summary">${esc(rowProblem)}</span>
         </button>${selected ? renderJobDetails(job, snap, presentation, Boolean(rowProblem)) : ''}
       </li>`;
@@ -5290,6 +5409,55 @@
       || (Number.isFinite(hours) && hours > LEGACY_STALE_HOURS);
   }
 
+  /* Stage 5ZZZ-CS. Mã máy không được lên màn hình.
+
+     Bảng Source Clocks in thẳng `not_expected_yet` và `not_scheduled / none` — đó là từ
+     của người viết bộ lập lịch, và người đọc bảng ấy không có cách nào đoán ra nghĩa. Tệ
+     hơn `not_scheduled / none`: hai mã ghép bằng dấu gạch chéo trông như một tỉ số.
+
+     Dịch ở TẦNG HIỂN THỊ. Bản ghi giữ nguyên mã của nó — mã là thứ máy đọc và là thứ đối
+     soát về sau; chỉ câu người đọc thấy là đổi. Cùng khuôn với `MISSING_WORDS` đã dùng cho
+     những sự vắng mặt khác trên trang này.
+
+     Mã LẠ thì in nguyên, không đoán. Một bộ dịch im lặng nuốt mã nó chưa biết sẽ biến một
+     trạng thái mới thành một ô trống, và ô trống là thứ không ai đi tìm. */
+  const MV_FRESHNESS_WORDS = {
+    fresh:            'another slot is due today',
+    not_expected_yet: 'no slot is due right now',
+    late:             'a slot was due and has not run',
+    stale:            'the newest snapshot is older than the last slot that ran',
+    missing:          'nothing has been published',
+    unknown:          'the scheduler log could not be read, so this cannot be judged'
+  };
+
+  function mvFreshnessWords(code) {
+    const key = String(code || 'missing');
+    return MV_FRESHNESS_WORDS[key] || key;
+  }
+
+  const MV_EVIDENCE_WORDS = {
+    executed:       'the last slot ran',
+    failed:         'the last slot raised an error',
+    skipped:        'the last slot was skipped',
+    interrupted:    'the last slot was cut off by a scheduler restart',
+    not_scheduled:  'no slot was scheduled in this window',
+    not_observed:   'no record of the last slot',
+    not_applicable: 'this window is before the scheduler started'
+  };
+
+  //: Lý do chỉ được nói khi nó THÊM điều gì. `none` và `unknown` là chỗ giữ chỗ, và ghép
+  //: chúng vào câu bằng dấu gạch chéo là cách "not_scheduled / none" ra đời.
+  const MV_EVIDENCE_MUTE = ['none', 'unknown', '', null, undefined];
+
+  function mvEvidenceWords(ev) {
+    if (!ev) return 'no scheduler evidence';
+    const st = String(ev.state || '');
+    const words = MV_EVIDENCE_WORDS[st] || st || 'no scheduler evidence';
+    const why = ev.reason;
+    if (MV_EVIDENCE_MUTE.includes(why)) return words;
+    return `${words} — ${String(why).replace(/_/g, ' ')}`;
+  }
+
   function renderClocks() {
     // Stage 5ZZZ-BU. Two rows that read as a contradiction, and both numbers were right.
     //
@@ -5310,10 +5478,13 @@
     const observed = etDateTime(state.runner?.observed_at);
     const entries = [
       ['Runner observed', stale ? `${observed} · legacy route, retired` : observed],
-      ['Schedule freshness', (state.runner?.freshness || 'missing')
-        + ' · whether another slot is due today, not the runner\'s health'],
+      ['Schedule freshness', mvFreshnessWords(state.runner?.freshness)
+        // Nửa "whether another slot is due today" đã bỏ: chính GIÁ TRỊ nói câu ấy rồi, kể
+        // từ khi mã máy được dịch ra. Nửa còn lại thì giữ — nó phân biệt hàng này với sức
+        // khoẻ của runner, và đó là chỗ người đọc dễ nhầm nhất.
+        + ' · not the runner\'s health'],
       ['Expected next', etDateTime(state.schedule?.expected_next_at)],
-      ['Schedule evidence', state.schedule?.evidence ? `${state.schedule.evidence.state} / ${state.schedule.evidence.reason}` : 'missing'],
+      ['Schedule evidence', mvEvidenceWords(state.schedule?.evidence)],
       ['Broker observed', etDateTime(state.broker?.observed_at)],
       ['Browser poll', `${POLL_MS / 1000}s`]
     ];

@@ -112,3 +112,60 @@ def test_mot_ma_khong_co_that_khong_lam_panel_gay():
     s = _sleeve("KHONGCO")
     assert s.get("instrument") in (s.get("instruments") or [s.get("declared_instrument")])
     assert s.get("instrument_source") in ("recorded", "declared")
+
+
+# ── ba trạng thái ở mặt hiển thị ───────────────────────────────────────────────────────
+def _instbar(payload_sleeve: dict) -> str:
+    """Chạy ĐÚNG hàm dựng hàng chip của trang, trên một payload dựng sẵn.
+
+    Đọc mã bằng regex không chứng minh được nhánh nào chạy; nạp hàm và gọi nó thì có. Ba
+    trạng thái này khác nhau ở đúng một chỗ — `s.instruments` vắng mặt, rỗng, hay có — và
+    một phép kiểm đọc chuỗi sẽ xanh cho cả ba.
+    """
+    import json
+    import os
+    import subprocess
+    import tempfile
+    from pathlib import Path
+
+    js = (Path(__file__).resolve().parent.parent / "global_index" / "dash" / "realtime"
+          / "realtime.js").read_text(encoding="utf-8")
+    a = js.index("function mvInstBar(s) {")
+    b = js.index("function mvPriceHead(s) {", a)
+    body = js[a:b]
+    nl = chr(10)
+    src = ("const mvEsc = x => String(x);" + nl + body + nl
+           + "process.stdout.write(mvInstBar(" + json.dumps(payload_sleeve) + "));" + nl)
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+        f.write(src)
+        path = f.name
+    try:
+        out = subprocess.run(["node", path], capture_output=True, text=True, timeout=30)
+        assert out.returncode == 0, out.stderr
+        return out.stdout
+    finally:
+        os.unlink(path)
+
+
+def test_truong_VANG_MAT_khong_duoc_doc_thanh_khong_co_bang_chung():
+    """Bẫy đã có sẵn trong tệp này ở Stage 5ZZH và tôi vẫn mắc lại: một backend chưa khởi
+    động lại không gửi trường ấy, và bản đầu đọc thành "phiên này không ghi gì" — một câu
+    sai, nói chắc nịch, về một sleeve đã ghi bốn công cụ."""
+    html = _instbar({"instrument": "MES"})
+    assert "has not been restarted" in html, html
+    assert "recorded no per-slot evidence" not in html, html
+
+
+def test_truong_RONG_thi_moi_la_khong_co_bang_chung():
+    html = _instbar({"instrument": "MNQ", "instruments": [], "instrument_source": "declared"})
+    assert "recorded no per-slot evidence" in html, html
+    assert "has not been restarted" not in html, html
+
+
+def test_co_danh_sach_thi_dung_chip():
+    html = _instbar({"instrument": "MES",
+                     "instruments": ["MES", "MNQ", "MYM", "M2K"],
+                     "instrument_source": "recorded"})
+    assert html.count("data-mvinst=") == 4, html
+    assert "4 read today" in html, html
+    assert "has not been restarted" not in html and "no per-slot evidence" not in html
