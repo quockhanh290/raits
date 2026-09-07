@@ -4414,10 +4414,23 @@ def test_the_market_view_anchors_on_the_last_trading_day_when_the_market_is_shut
     # 2026-08-29 Sat and 2026-08-30 Sun both fall back to Friday the 28th.
     assert mv._anchor_day("2026-08-29") == "2026-08-28"
     assert mv._anchor_day("2026-08-30") == "2026-08-28"
-    # A holiday is a closed day too, and the fallback has to skip it rather than land on it:
-    # 2026-09-07 is Labor Day, so Tuesday the 8th looks back past it to Friday the 4th.
-    assert mv._anchor_day("2026-09-07") == "2026-09-04"
+    # Stage 5ZZZ-CZ. This used to assert that Labor Day anchors back to the Friday, on the
+    # assumption that a US public holiday is a closed day. It is closed for US EQUITIES. The
+    # instruments here are CME futures, and the sleeve that trades hardest overnight is the
+    # Nikkei, which has no opinion about an American holiday at all.
+    #
+    # Measured on the stored NKD bars, and on CME's own calendar:
+    #
+    #     Labor Day 2023 / 2024 / 2025    CME open,  672 / 860 / 596 bars
+    #     Good Friday 2024 / 2025         CME shut,  0 bars
+    #
+    # And the scheduler agrees without being asked: its cron says "mon-fri", so on
+    # 2026-09-07 it fires all 92 jobs. The old assertion described the calendar the panel
+    # was reading, not the sessions the route actually trades.
+    assert mv._anchor_day("2026-09-07") == "2026-09-07"
     assert mv._anchor_day("2026-09-08") == "2026-09-08"
+    # A day CME really is shut still falls back, which is the half that must not regress.
+    assert mv._anchor_day("2026-04-03") == "2026-04-02"          # Good Friday
     # An ordinary trading day anchors on itself.
     assert mv._anchor_day("2026-08-28") == "2026-08-28"
     assert mv._anchor_day("2026-08-31") == "2026-08-31"

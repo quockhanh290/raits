@@ -1695,6 +1695,32 @@ def _anchor_day(today: str) -> str:
     So this consults the calendar and never the evidence. A trading day with no evidence still
     anchors here, and the emptiness is the finding.
     """
+    # Stage 5ZZZ-CZ. CME's calendar, not the equity one. This asked `_is_trading_day`, which
+    # resolves to "is NYSE open" — and on 2026-09-07, a Labor Day, that answered no while the
+    # scheduler fired 92 jobs and the Nikkei sleeve traded a full Tokyo session. The panel
+    # anchored three days back and said so in its own reason string.
+    #
+    # Measured on the stored NKD bars: Labor Day 2023/2024/2025 carry 672/860/596 bars and
+    # Thanksgiving 2025 carries 431, on every one of which NYSE is shut. Good Friday is shut
+    # on both calendars, so nothing here starts anchoring to a day that did not trade.
+    #
+    # A day the futures calendar cannot speak for falls through to the equity calendar rather
+    # than to `today`: without the library the old answer is still better than none.
+    try:
+        from raits.live.trading_calendar import is_futures_session
+
+        import datetime as _dt
+
+        known = is_futures_session(_dt.date.fromisoformat(today))
+        if known:
+            return today
+        if known is None:
+            raise RuntimeError("no futures calendar")
+        from global_index import track1_freshness as _fresh
+
+        return _fresh.prev_trading_day(today).strftime("%Y-%m-%d")
+    except Exception:                                             # noqa: BLE001
+        pass
     try:
         from global_index import track1_freshness as _fresh
 
@@ -1857,6 +1883,20 @@ def _is_session(day: str) -> bool:
     """Was the market open on this date? The project's own calendar answers, never a weekday
     test written here -- a holiday looks like a trading day to anything that only counts days
     of the week, and `calendar_source()` reports which of the two is in force."""
+    # Stage 5ZZZ-CZ. Same swap as the session anchor above: the sessions this picker offers
+    # are CME sessions, and the equity calendar was hiding every US holiday the futures
+    # traded through — Labor Day and Thanksgiving among them, each with a full Tokyo session
+    # on the Nikkei sleeve.
+    try:
+        import datetime as _dt
+
+        from raits.live.trading_calendar import is_futures_session
+
+        known = is_futures_session(_dt.date.fromisoformat(str(day)[:10]))
+        if known is not None:
+            return bool(known)
+    except Exception:                                             # noqa: BLE001
+        pass
     try:
         import pandas as pd
 
