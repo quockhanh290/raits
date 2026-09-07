@@ -12,7 +12,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from global_index.session_report import _is_test_line, _to_et
-from raits.live.trading_calendar import is_futures_session, is_trading_day
+from raits.live.trading_calendar import is_futures_session
 
 ET = ZoneInfo("America/New_York")
 
@@ -854,7 +854,11 @@ def _schedule_status_body(
     latest = due[-1] if due else None
     next_slot = future[0] if future else None
 
-    trading_today = is_trading_day(now_et.date())
+    # Stage 5ZZZ-CX. The same exchange the slot table below is built from, and it has to be:
+    # this flag decides "not_expected_yet", and `todays_slots` on the very next line now asks
+    # CME. Left on the equity calendar the two contradicted each other on a US holiday — 91
+    # slots listed, and the freshness line saying nothing was due today.
+    trading_today = scheduler_registers_on(now_et.date())
     todays_slots = _slots_for(now_et.date())
     todays_due = [slot for slot in todays_slots if slot["at"] <= now_et]
     before_first = bool(todays_slots and now_et < todays_slots[0]["at"])
