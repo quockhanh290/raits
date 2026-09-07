@@ -72,6 +72,21 @@ h5py>=3.9.0  # HDF5 format (alternative to Parquet)
 tzdata>=2023.3        # ZoneInfo timezone DB for Windows (stdlib zoneinfo has no system tz on Windows)
 
 # ============================================
+# Exchange calendars
+# ============================================
+# Two calendars, and the difference is load-bearing. NYSE (XNYS) answers questions about US
+# equity DATA -- SPY does not print on a US market holiday. CME (CMES) answers about the
+# instruments this route actually trades, and the two part company on exactly the days that
+# matter: measured against stored NKD bars, CME is open on Labor Day and Thanksgiving with
+# 431-860 bars each while NYSE is shut, and both are shut on Good Friday with zero bars.
+#
+# Without this the module falls back to hardcoded NYSE rules and there is NO futures calendar
+# at all, so the schedule mirror reported zero slots on a Labor Day the scheduler fired 92
+# jobs on. Not optional any more: `is_futures_session` returns None without it, and the
+# caller then has to guess.
+exchange_calendars>=4.13.0
+
+# ============================================
 # Utilities
 # ============================================
 python-dotenv>=1.0.0  # Environment variable management

@@ -292,6 +292,58 @@ def is_trading_day(d: datetime.date) -> bool:
     return d not in _us_market_holidays(d.year)
 
 
+#: CME's own calendar, loaded once. None when the library is absent, which is the state this
+#: repo ran in until 2026-09-06 — every import printed "no calendar library found".
+_CME_IS_SESSION: Optional[Callable] = None
+try:                                                    # pragma: no cover - import guard
+    import exchange_calendars as _xc
+
+    _CME_IS_SESSION = _xc.get_calendar("CMES").is_session
+except Exception:                                       # noqa: BLE001
+    _CME_IS_SESSION = None
+
+
+def is_futures_session(d: datetime.date) -> Optional[bool]:
+    """Is CME open on date d? `None` when nothing here can say.
+
+    A SECOND calendar, not a replacement. `is_trading_day` answers about NYSE and is right to:
+    SPY does not print on a US market holiday, and the freshness gate needs to know that. But
+    the sleeves on this route are CME futures, and one of them is the Nikkei, which has no
+    opinion about an American public holiday. Asking the equity calendar about them gave the
+    wrong answer on exactly the days that differ.
+
+    Measured against the stored NKD bars, the two calendars against what actually traded:
+
+        day                   CME     NYSE    bars
+        Labor Day 2023        open    shut     672
+        Labor Day 2024        open    shut     860
+        Labor Day 2025        open    shut     596
+        Thanksgiving 2025     open    shut     431
+        Good Friday 2024      shut    shut       0
+        Good Friday 2025      shut    shut       0
+        Christmas 2025        shut    shut      22
+
+    CME agrees with the bars on all of these; NYSE is wrong on the four where futures traded
+    through a US equity holiday. One row disagrees -- Good Friday 2026, called shut while 359
+    bars exist -- and it is left as a known disagreement rather than smoothed over: a rule
+    written to make one row fit is a rule that fits nothing else.
+
+    **Returns None rather than guessing.** Without the library there is no honest answer here:
+    the hardcoded fallback below this module models NYSE holidays, and reusing it would be the
+    original mistake with a new name. A caller that gets None must decide for itself what an
+    unknown session means, and for a schedule mirror the safe reading is "assume the scheduler
+    registers", because the scheduler's cron does not consult a calendar at all.
+    """
+    if isinstance(d, datetime.datetime):
+        d = d.date()
+    if _CME_IS_SESSION is None:
+        return None
+    try:
+        return bool(_CME_IS_SESSION(datetime.datetime.combine(d, datetime.time())))
+    except Exception:                                   # noqa: BLE001
+        return None
+
+
 def market_close_time(d: datetime.date) -> datetime.time:
     """Return NYSE close time (ET, naive) for date d: 16:00 normally, 13:00 on half-days."""
     if isinstance(d, datetime.datetime):

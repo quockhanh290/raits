@@ -12,9 +12,42 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from global_index.session_report import _is_test_line, _to_et
-from raits.live.trading_calendar import is_trading_day
+from raits.live.trading_calendar import is_futures_session, is_trading_day
 
 ET = ZoneInfo("America/New_York")
+
+
+def scheduler_registers_on(day: dt.date) -> bool:
+    """Does the scheduler put timed slots on this calendar day?
+
+    Asked of CME, because that is where these sleeves trade. The mirror used to ask
+    `is_trading_day`, whose own docstring says it answers "is NYSE open" — the wrong
+    exchange for a route whose instruments are index futures and one of which is the Nikkei.
+
+    The two calendars agree on ordinary days and part company on US equity holidays, which is
+    exactly when the panel had to be right. Measured against the stored NKD bars:
+
+        Labor Day 2023 / 2024 / 2025    CME open,  NYSE shut,  672 / 860 / 596 bars
+        Thanksgiving 2025               CME open,  NYSE shut,  431 bars
+        Good Friday 2024 / 2025         both shut,             0 bars
+
+    On 2026-09-07, a Labor Day, the scheduler fires 92 jobs because its cron says weekday,
+    and the mirror was reporting zero slots — so the panel put the next job a full day late
+    and had no row for anything that ran.
+
+    Weekday alone is not the answer either: Good Friday is a weekday and CME is shut, and a
+    weekday rule would invent a full day of phantom overdue slots. That is why this asks a
+    calendar rather than the clock.
+
+    **Unknown reads as "yes".** Without the calendar library `is_futures_session` returns
+    None, and the honest reading of that is the scheduler's own: its cron consults no calendar
+    at all and fires on any weekday. A mirror that assumed "no session" on an unknown day
+    would go silent about jobs that ran, which is the failure this function was written for.
+    """
+    known = is_futures_session(day)
+    if known is None:
+        return day.weekday() < 5
+    return known
 
 _SCHEDULER_CMD = "global_index.run_scheduler"
 
@@ -422,7 +455,7 @@ def _track1_state_slots(day: dt.date) -> list[dict[str, Any]]:
     cannot be retried at all; a `window` slot gets the ordinary grace, because inside the
     window a missed slot costs nothing.
     """
-    if not (track1_shadow_enabled() and is_trading_day(day)):
+    if not (track1_shadow_enabled() and scheduler_registers_on(day)):
         return []
     from global_index.track1_slots import TRACK1_SLOTS
     return [{
@@ -470,7 +503,7 @@ def _active_windows() -> tuple:
 
 
 def _slots_for(day: dt.date) -> list[dict[str, Any]]:
-    if not is_trading_day(day):
+    if not scheduler_registers_on(day):
         return []
     out = []
     # In track1-only mode the scheduler registers no legacy STRATEGY job, so expecting these
@@ -498,7 +531,7 @@ def _slots_for(day: dt.date) -> list[dict[str, Any]]:
 
 def _pipeline_slots_for(day: dt.date) -> list[dict[str, Any]]:
     """Decision-producing slots and the gates that directly precede them."""
-    if not is_trading_day(day):
+    if not scheduler_registers_on(day):
         return []
     # The legacy entry slots — R4 14:05-15:55 and the NKD night runs. In Track 1-only mode
     # the scheduler does not register them, so mirroring them would invent 45 stray slots a
@@ -540,8 +573,8 @@ def _scheduled_slots_for(day: dt.date) -> list[dict[str, Any]]:
         slots.extend({
             "id": f"STOP_REPAIR_{hour:02d}{minute:02d}",
             "at": dt.datetime.combine(day, dt.time(hour, minute), tzinfo=ET),
-        } for hour, minute in _stop_repair_slots() if is_trading_day(day))
-    if track1_shadow_enabled() and is_trading_day(day):
+        } for hour, minute in _stop_repair_slots() if scheduler_registers_on(day))
+    if track1_shadow_enabled() and scheduler_registers_on(day):
         from global_index.track1_slots import TRACK1_SLOTS
         slots.extend({
             "id": s.id,
@@ -559,7 +592,7 @@ def _scheduled_slots_for(day: dt.date) -> list[dict[str, Any]]:
                     slots.append({"id": sj.id.upper(),
                                   "at": dt.datetime.combine(day, dt.time(sj.hour, sj.minute),
                                                             tzinfo=ET)})
-            elif is_trading_day(day):
+            elif scheduler_registers_on(day):
                 slots.append({"id": sj.id.upper(),
                               "at": dt.datetime.combine(day, dt.time(sj.hour, sj.minute),
                                                         tzinfo=ET)})
@@ -574,7 +607,7 @@ def _scheduled_slots_for(day: dt.date) -> list[dict[str, Any]]:
         # `late`.
         from global_index.track1_slots import track1_audit_jobs
         for aj in track1_audit_jobs():
-            if is_trading_day(day):
+            if scheduler_registers_on(day):
                 slots.append({"id": aj.id.upper(),
                               "at": dt.datetime.combine(day, dt.time(aj.hour, aj.minute),
                                                         tzinfo=ET)})
