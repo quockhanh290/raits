@@ -1613,6 +1613,25 @@ b.muted, .mv2-lane-value.muted { color: var(--t-label); }
 #marketViewLanes .mv-empty b { display: block; }
 #marketViewLanes .mv-empty span { display: block; margin-top: 5px; max-width: 70ch; }
 
+/* Trần 70 ký tự đúng cho một đoạn văn, và sai cho khối này. Ở đây là HAI câu khác loại —
+   một câu giải thích cố định, một dòng lý do thay đổi — và nối chúng lại thành 195 ký tự
+   rồi cuốn ở mốc 70 cho ra ba dòng trong một ô rộng hơn hai nghìn điểm ảnh, dùng chưa tới
+   một phần ba chiều ngang. Tách hai câu ra thì mỗi câu tự vừa một dòng: 91 và 103 ký tự.
+   Trần vẫn còn, chỉ nới tới chỗ câu dài nhất vừa đủ — bỏ hẳn trần là để một dòng chạy hết
+   hai nghìn điểm ảnh, và mắt lạc dòng khi quay về đầu dòng sau. */
+#marketViewLanes .mv-empty-wide span { max-width: 112ch; }
+
+/* Nhãn rồi giá trị, cùng ngôn ngữ với mọi hàng khác trong panel — nên dòng lý do đọc như
+   một phép đo, không như phần đuôi của câu phía trên. */
+#marketViewLanes .mv2-stopped {
+  margin-top: 12px; display: flex; align-items: baseline; gap: 12px;
+  color: var(--t-label, #8a94a6);
+}
+#marketViewLanes .mv2-stopped i {
+  flex: none; font-style: normal; text-transform: uppercase; letter-spacing: .1em;
+  font: 500 10px/1.4 var(--sans); color: var(--dim, #6a7284);
+}
+
 /* A condition whose value is a SENTENCE ("Not reported by detector") is the common case
    here, and holding it on one line crushed the label into one word per line. The value
    wraps instead; real figures are short enough that they never do. */

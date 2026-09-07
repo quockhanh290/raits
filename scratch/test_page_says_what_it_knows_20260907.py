@@ -97,6 +97,39 @@ def test_the_pointer_sentence_survives_when_nothing_can_be_read():
     assert "It stopped here" not in html
 
 
+def test_the_reason_is_its_own_line_not_the_tail_of_a_sentence():
+    """Hai loại thông tin, hai dòng.
+
+    Câu giải thích giống nhau ở mọi sleeve, mọi ngày. Lý do là thứ duy nhất thay đổi và là
+    thứ người đọc mở ô này để tìm. Nối lại thành một đoạn thì 195 ký tự cuốn ở mốc 70 cho
+    ra ba dòng trong một ô rộng hơn hai nghìn điểm ảnh — dùng chưa tới một phần ba chiều
+    ngang, và thứ đáng đọc nhất nằm lẫn giữa dòng thứ hai.
+    """
+    html = _card({"strategy": {"detail": "Instruments below open and VWAP 3 (needs >= 4)"}})
+    assert 'class="mv2-stopped"' in html, "lý do vẫn bị nối vào đuôi câu giải thích"
+    lead_end = html.index("per-bar verdict to show.")
+    assert html.index("mv2-stopped") > lead_end, "lý do phải nằm SAU câu giải thích"
+
+
+def test_the_wide_layout_is_asked_for_and_exists():
+    """Một lớp CSS không có luật nào là một bố cục vô hình — mã nguồn đọc lên như đã dàn
+    lại, còn màn hình vẫn cuốn ba dòng."""
+    html = _card({"strategy": {"detail": "x"}})
+    assert "mv-empty-wide" in html
+    css = CSS.read_text(encoding="utf-8")
+    assert ".mv-empty-wide span" in css
+    m = re.search(r"\.mv-empty-wide span\s*\{[^}]*max-width:\s*(\d+)ch", css)
+    assert m, "lớp rộng không đặt trần nào"
+    assert 103 <= int(m.group(1)) <= 140, (
+        f"trần {m.group(1)}ch: dưới 103 thì câu dài nhất vẫn cuốn; trên 140 thì một dòng "
+        f"chạy quá xa và mắt lạc dòng khi quay về đầu dòng sau")
+
+
+def test_the_plain_case_keeps_the_narrow_measure():
+    """Không có lý do thì chỉ còn một đoạn văn, và trần hẹp là đúng cho đoạn văn."""
+    assert "mv-empty-wide" not in _card({"strategy": {}})
+
+
 def test_a_passing_gate_is_not_mistaken_for_the_reason():
     """Lý do phải là cổng KHÔNG đạt. Lấy cổng đầu tiên bất kể trạng thái sẽ in ra một dòng
     đang PASS làm lý do dừng — sai, và sai một cách nghe rất hợp lý."""

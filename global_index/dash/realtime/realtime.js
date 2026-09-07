@@ -2674,15 +2674,26 @@
 
        Câu trỏ vẫn giữ khi KHÔNG có lý do nào đọc được: lúc ấy nó là hướng dẫn thật, không
        phải lời thoái thác. */
+    /* Hai loại thông tin, hai dòng — không gộp thành một đoạn văn.
+       Câu đầu luôn giống nhau ở mọi sleeve, mọi ngày; câu sau là thứ DUY NHẤT thay đổi và
+       là thứ người đọc mở ô này để tìm. Nối chúng lại thì 195 ký tự cuốn thành ba dòng
+       trong một ô rộng hơn hai nghìn điểm ảnh, và thứ đáng đọc nhất nằm lẫn ở giữa dòng
+       thứ hai.
+       Lý do đi cùng một nhãn, theo đúng ngôn ngữ nhãn-rồi-giá-trị mà mọi hàng khác trong
+       panel này đã dùng — nên nó đọc như một phép đo chứ không như phần đuôi của một câu. */
     const lead = 'The detector returned before it scanned the window, so there is no '
                + 'per-bar verdict to show.';
+    const body = why
+      ? `<div class="mv-empty mv-empty-wide"><b>No bar was evaluated</b>` +
+        `<span>${mvEsc(lead)}</span>` +
+        `<span class="mv2-stopped"><i>Stopped at</i>${mvEsc(why)}</span></div>`
+      : mvEmpty('No bar was evaluated',
+          `${lead} Setup rules says where it stopped; the readings it stopped on are `
+          + `in Conditions below.`);
     return `<div class="mv2-card"><div class="mv2-card-head">
         <span class="mv2-kicker">Detector rules, per bar</span>
         <span class="mv2-mono">no bar evaluated</span>
-      </div>` + mvEmpty('No bar was evaluated',
-        why ? `${lead} It stopped here: ${why}`
-            : `${lead} Setup rules says where it stopped; the readings it stopped on are `
-              + `in Conditions below.`) + `</div>`;
+      </div>${body}</div>`;
   }
 
   function mvBarGrid(s) {
