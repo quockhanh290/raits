@@ -3000,7 +3000,24 @@
     present.forEach(([k]) => ((phases[k] || {}).instruments || []).forEach(iv => {
       if (iv && iv.instrument && !names.includes(iv.instrument)) names.push(iv.instrument);
     }));
-    if (names.length < 2) return '';
+    /* Stage 5ZZZ-DA. MỘT mã cũng đi đường này. Trước đây ngưỡng là hai, và một mã rơi
+       xuống đường vẽ cũ — nên cùng một panel có hai hình dạng không liên quan gì nhau.
+
+       Ý định cũ đúng ở phần nó nói: khi chỉ có một mã thì không cần tiêu đề để phân biệt
+       với cái thứ hai. Nhưng nó lấy đi nhiều hơn thế. Đường cũ tách hai pha thành HAI THẺ
+       rời, nên bảng hai cột DECIDE | OBSERVE biến mất, và cùng với nó là:
+
+           số cổng đã đạt      "4 / 4 gates met"
+           hình dạng bảng      "2 instruments · 7 rows · 4 gates each"
+           câu nói cái gì đổi  "chỉ hai hàng có giá thay đổi; phần còn lại chốt trước phiên"
+           dấu — ở cột sau     nghĩa "giống hệt cột trước", thứ chỉ nói được khi có hai cột
+
+       Người vận hành mở panel lúc 09:32 thấy một hình, mở lại lúc 10:02 thấy một hình khác
+       — và hình đầu ít thông tin hơn, không chỉ khác. Hai pha là một câu chuyện: quyết định
+       trước phiên, rồi đọc giá lúc 10:00. Kể nó bằng hai thẻ rời là kể mất mối nối.
+
+       Không có mã nào thì vẫn nhường đường cũ, vì lúc ấy không có gì để dựng bảng. */
+    if (!names.length) return '';
 
     const head = present.map(([k, title, at]) =>
       `<span class="mv2-calm-phase"><b class="mv2-kicker">${mvEsc(title)}</b>` +
@@ -3072,13 +3089,22 @@
           }).join('') + `</div>`
         : '';
 
-      return `<div class="mv2-calm-inst">
-        <div class="mv2-calm-inst-head"><b>${mvEsc(name)}</b>` +
+      /* Tên mã chỉ in khi có cái thứ hai để phân biệt — giữ nguyên ý định của bản cũ, và
+         nó đúng: một tiêu đề chỉ nói "MES" khi MES là thứ duy nhất trên màn hình là một
+         dòng không mang tin. CHIỀU cũng vậy thì vẫn in, vì LONG hay SHORT không suy ra
+         được từ chỗ khác trong khối này.
+         Số cổng đã đạt thì LUÔN in: nó tóm tắt bốn dòng ở dưới thành một con số, và điều
+         đó đúng với một mã y như với hai. */
+      const soleName = names.length < 2;
+      const headBits =
+        (soleName ? '' : `<b>${mvEsc(name)}</b>`) +
         (direction ? `<span class="mv2-mono">${mvEsc(direction)}</span>` : '') +
         (gates.length
-          ? `<span class="mv2-calm-tally">${met} / ${gates.length} gates met</span>` : '') +
-        `</div>
-        <div class="mv2-calm-grid" style="--calm-cols:${present.length}">
+          ? `<span class="mv2-calm-tally">${met} / ${gates.length} gates met</span>` : '');
+
+      return `<div class="mv2-calm-inst">` +
+        (headBits ? `<div class="mv2-calm-inst-head">${headBits}</div>` : '') +
+        `<div class="mv2-calm-grid" style="--calm-cols:${present.length}">
           <div></div>${colHead}${body}
         </div>${gateRow}</div>`;
     }).join('');
@@ -3103,9 +3129,15 @@
     });
     const uniform = shape.every(s => s === shape[0]);
     const [rowCount, gateCount] = (shape[0] || '0/0').split('/');
+    /* "1 instruments · 7 rows · 4 gates each" sai ngữ pháp ở cả hai chỗ: số nhiều, và chữ
+       "each" chỉ có nghĩa khi có nhiều hơn một. Một mã thì câu này rút lại còn hình dạng
+       bảng, thứ vẫn đáng nói — người đọc muốn biết bảng dài bao nhiêu trước khi cuộn. */
     const meta = uniform && names.length
-      ? `<span class="mv2-calm-shape">${names.length} instruments · ${rowCount} rows` +
-        (Number(gateCount) ? ` · ${gateCount} gates each` : '') + `</span>`
+      ? `<span class="mv2-calm-shape">` +
+        (names.length > 1 ? `${names.length} instruments · ` : '') +
+        `${rowCount} rows` +
+        (Number(gateCount)
+          ? ` · ${gateCount} gates${names.length > 1 ? ' each' : ''}` : '') + `</span>`
       : '';
 
     return `<div class="mv2-calm"><div class="mv2-calm-cards">
