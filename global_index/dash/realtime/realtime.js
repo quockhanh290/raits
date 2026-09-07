@@ -2659,13 +2659,30 @@
     const st = s.strategy || {};
     const why = (((st.diagnostics || {}).gates || [])
       .find(g => g && g.passed === false) || {}).detail || st.detail || '';
+    /* Stage 5ZZZ-DB. `why` được tính từ lâu và chưa bao giờ được vẽ ra.
+       Câu thay thế nó bảo người đọc đi tìm: "Setup rules nói nó dừng ở đâu; các chỉ số nó
+       dừng trên nằm ở Conditions bên dưới." Nhưng lý do đã nằm ngay trong tay — đọc từ
+       chính cổng đầu tiên không đạt, hoặc từ câu chẩn đoán của chiến lược. Ngày 07/09 nó
+       chứa:
+
+           global_nkd      "regime 'Calm'; this sleeve trades Normal"
+           roska4_stress   "Instruments below open and VWAP 3 (needs >= 4); ..."
+
+       Câu đầu trả lời trong một dòng vì sao sleeve Nikkei không quét bar nào — thứ mà bản
+       cũ bắt người đọc suy ra bằng cách mở tab khác. Một ô nói "câu trả lời ở chỗ khác"
+       trong khi đang cầm câu trả lời là một ô đang giấu việc của chính nó.
+
+       Câu trỏ vẫn giữ khi KHÔNG có lý do nào đọc được: lúc ấy nó là hướng dẫn thật, không
+       phải lời thoái thác. */
+    const lead = 'The detector returned before it scanned the window, so there is no '
+               + 'per-bar verdict to show.';
     return `<div class="mv2-card"><div class="mv2-card-head">
         <span class="mv2-kicker">Detector rules, per bar</span>
         <span class="mv2-mono">no bar evaluated</span>
       </div>` + mvEmpty('No bar was evaluated',
-        'The detector returned before it scanned the window, so there is no per-bar verdict '
-        + 'to show. Setup rules says where it stopped; the readings it stopped on are in '
-        + 'Conditions below.') + `</div>`;
+        why ? `${lead} It stopped here: ${why}`
+            : `${lead} Setup rules says where it stopped; the readings it stopped on are `
+              + `in Conditions below.`) + `</div>`;
   }
 
   function mvBarGrid(s) {
@@ -5367,7 +5384,18 @@
       const selected = job.id === state.selectedJobId;
       const rowProblem = foldQuiet && presentation.problem === QUIET_ROW ? '' : presentation.problem;
       const tone = presentation.status === 'recovered' ? 'success' : presentation.status === 'known_debt' ? 'cleanup' : jobTone(job.status);
-      return `<li class="job-row tone-${esc(tone)} status-${esc(presentation.status)} ${selected ? 'selected' : ''}">
+      /* Stage 5ZZZ-DC. Hàng KHÔNG im lặng được đánh dấu, không chỉ hàng có trạng thái lạ.
+         Câu gộp ở đầu danh sách hứa: "mọi hàng nói điều gì khác là hàng có chuyện khác xảy
+         ra". Nhưng cơ chế đánh dấu duy nhất bám vào `status`, và đo trên phiên 07/09 thì
+         48 trên 48 thẻ đều `completed` — kể cả thẻ duy nhất có nội dung riêng, lượt SPY
+         04:45 báo "nothing to do — the daily series covers 2026-09-04". Nên hàng mà câu gộp
+         vừa hứa sẽ nổi lên lại trông y hệt 47 hàng nó vừa gộp đi, và người đọc phải tự quét
+         tìm hàng nào có thêm một dòng chữ xám.
+         Dấu nhạt có chủ đích: nó nói "đọc dòng này", không nói "có lỗi". Trạng thái lạ đã
+         có màu riêng và những màu ấy vẫn thắng, vì chúng nói mạnh hơn. */
+      const speaks = Boolean(rowProblem);
+      return `<li class="job-row tone-${esc(tone)} status-${esc(presentation.status)}${
+        speaks ? ' says-something' : ''} ${selected ? 'selected' : ''}">
         <button class="job-trigger" type="button" data-job-id="${esc(job.id)}" aria-expanded="${selected}">
           <span class="job-time">${esc(etDateTime(job.started_at))}</span><span class="job-duration">${esc(duration(job.duration_seconds))}</span><span class="job-chevron" aria-hidden="true">${selected ? '−' : '+'}</span>
           <span class="job-badges"><span class="issue-origin ${esc(presentation.component)}">${esc(presentation.component)}</span><span class="event-status ${esc(presentation.status)}">${esc(presentation.statusLabel)}</span>${signalLine(job)}</span>

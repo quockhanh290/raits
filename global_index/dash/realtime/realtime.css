@@ -497,6 +497,15 @@ tbody tr:last-child td { border-bottom: 0; }
 .job-badges { grid-column: 1 / 3; display: flex; gap: 5px; }
 .job-summary { grid-column: 1 / 3; color: var(--muted); font: 12px/1.35 var(--mono); overflow-wrap: anywhere; }
 .job-chevron { grid-column: 3; grid-row: 1 / 5; color: var(--dim); text-align: center; font: 18px/1 var(--mono); }
+/* Một hàng CÓ NÓI GÌ ĐÓ. Câu gộp ở đầu danh sách hứa rằng hàng nào nói thêm là hàng có
+   chuyện khác xảy ra, và trước dòng này lời hứa ấy không có gì đỡ: đo trên phiên 07/09,
+   48/48 thẻ đều `completed`, kể cả thẻ duy nhất mang nội dung riêng. Nên hàng được hứa sẽ
+   nổi lên trông y hệt 47 hàng vừa bị gộp đi.
+   Nhạt có chủ đích — nó nói "đọc dòng này", không nói "có lỗi". Đặt TRƯỚC các luật trạng
+   thái bên dưới để màu của một trạng thái bất thường vẫn thắng: chúng nói mạnh hơn. */
+.job-row.says-something { border-left-color: var(--blue); background: rgba(88,163,255,.022); }
+.job-row.says-something .job-summary { color: var(--t-label, #8a94a6); }
+
 .job-row.status-recovered { border-left-color: var(--green); background: rgba(54,191,105,.025); }
 .job-row.status-known_debt { border-left-color: var(--violet); background: rgba(139,114,255,.035); }
 .job-row.status-open, .job-row.status-missed { border-left-color: var(--red); }
