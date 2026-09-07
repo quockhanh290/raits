@@ -508,20 +508,39 @@ def _pipeline_slots_for(day: dt.date) -> list[dict[str, Any]]:
         {"id": _slot_id(hour, minute), "at": dt.datetime.combine(day, dt.time(hour, minute), tzinfo=ET)}
         for hour, minute in STATE_SLOTS
     ]
+    # Stage 5ZZZ-CW. The max-hold exit sits in this table beside the pre-flight and the SPY
+    # ladder, and the comment above calls the whole table "NOT legacy strategy". True of the
+    # rest; not of this one. It is the retiring route's five-day exit, wired to that route's
+    # book, and in track1-only mode the scheduler no longer registers it — Track 1 runs its
+    # own against its own book. Named here rather than filtered by prefix: this is the one
+    # entry in the table whose owner is a route.
+    _retired_here = {"MAX_HOLD_EXIT"} if track1_only_enabled() else set()
     slots.extend({
         "id": job_id,
         "at": dt.datetime.combine(day, dt.time(hour, minute), tzinfo=ET),
-    } for job_id, hour, minute in PIPELINE_FIXED_SLOTS)
+    } for job_id, hour, minute in PIPELINE_FIXED_SLOTS if job_id not in _retired_here)
     return sorted(slots, key=lambda item: item["at"])
 
 
 def _scheduled_slots_for(day: dt.date) -> list[dict[str, Any]]:
     """Timed operational jobs, excluding heartbeat and dependent session reports."""
     slots = _pipeline_slots_for(day)
-    slots.extend({
-        "id": f"STOP_REPAIR_{hour:02d}{minute:02d}",
-        "at": dt.datetime.combine(day, dt.time(hour, minute), tzinfo=ET),
-    } for hour, minute in _stop_repair_slots() if is_trading_day(day))
+    # Stage 5ZZZ-CW. The retiring route's sweeps mirror in every mode EXCEPT track1-only,
+    # where the scheduler no longer registers them: their book has held nothing since the
+    # route stopped trading, and each sweep still reconciles the broker — which does not
+    # filter by route — so every Track 1 position would read to them as an orphan and log
+    # CRITICAL. Track 1's own eleven-job net is added further down and watches the only book
+    # that can now hold a position.
+    #
+    # Gated on the same predicate the scheduler uses, so the two sides move together. A
+    # mirror that kept listing rows the scheduler stopped registering is a mirror that
+    # reports slots as overdue forever, which is the failure the parity check exists to
+    # catch — and did catch, on the run that produced this line.
+    if not track1_only_enabled():
+        slots.extend({
+            "id": f"STOP_REPAIR_{hour:02d}{minute:02d}",
+            "at": dt.datetime.combine(day, dt.time(hour, minute), tzinfo=ET),
+        } for hour, minute in _stop_repair_slots() if is_trading_day(day))
     if track1_shadow_enabled() and is_trading_day(day):
         from global_index.track1_slots import TRACK1_SLOTS
         slots.extend({
@@ -564,7 +583,9 @@ def _scheduled_slots_for(day: dt.date) -> list[dict[str, Any]]:
     # có một sweep lúc 18:30 ET, ngay sau khi CME mở lại, để 6 tiếng rưỡi đầu phiên
     # không trôi qua mà không lượt kiểm bảo vệ nào (run_scheduler.py, day_of_week="sun").
     # Không mirror ở đây thì dashboard coi nó là slot lạ và dựng incident giả mỗi tuần.
-    if day.weekday() == SUNDAY_REPAIR_SLOT[0]:
+    # Stage 5ZZZ-CW: cùng điều kiện với các sweep trong tuần ở trên — ở chế độ chỉ-Track-1
+    # scheduler không đăng ký nó nữa, nên mirror cũng không được liệt kê.
+    if day.weekday() == SUNDAY_REPAIR_SLOT[0] and not track1_only_enabled():
         slots.append({
             "id": "STOP_REPAIR_SUN_1830",
             "at": dt.datetime.combine(day, dt.time(*SUNDAY_REPAIR_SLOT[1:]), tzinfo=ET),

@@ -634,6 +634,15 @@ SHARED_INFRA_JOBS: dict = {
                                "yesterday's date - the Monday gap, where the last evening "
                                "rung ran thirty-one hours earlier. Both routes read the file "
                                "it protects, and it decides no trade.",
+    # Stage 5ZZZ-CW. The same omission as the two rungs above, one stage later: this job was
+    # added and never named here, so the inventory has been reporting it `unclassified` since.
+    # Named now, and it belongs in this bucket for the same reason as its 00:45 sibling — the
+    # Nikkei window opens on a Sunday evening, so Friday's SPY row has to be on disk before
+    # it, and the file it protects is read by the regime labels that BOTH routes consult.
+    "spy_weekend_pre_nkd_check": "Stage 5ZZ. The Sunday 18:00 look, run because the Nikkei "
+                                 "window opens that evening and the Friday evening ladder "
+                                 "may have given up before the row arrived. Refreshes data "
+                                 "and records a label verification; decides no trade.",
 }
 
 #: Prefixes of the jobs that DO decide legacy trades. These are the retirement candidates.
@@ -685,8 +694,43 @@ def legacy_retirement_candidates(port: int = 4002, *, track1_shadow: bool = Fals
     return set(route_classification(port, track1_shadow=track1_shadow)["legacy_entry"])
 
 
+def legacy_safety_retirement_candidates(port: int = 4002, *,
+                                        track1_shadow: bool = False) -> set:
+    """The retiring route's safety sweeps — removable ONLY in track1-only mode.
+
+    Kept apart from `legacy_retirement_candidates` on purpose. That set is the jobs that
+    DECIDE legacy trades, and removing them is what "retire the strategy" means. These decide
+    nothing; they protect a book. Retiring them is a second decision with a different
+    precondition, and folding the two together would let a caller drop protection while
+    believing it had only stopped trading.
+
+    **The precondition is that the book they watch holds nothing**, and that is not checked
+    here — this function names the candidates, it does not authorise the removal. The caller
+    that removes them is track1-only mode, where Track 1 runs its own eleven-job safety net
+    against its own book, its own lock and its own client id.
+
+    Why they stop being harmless once legacy is flat. They are not idle: each one connects and
+    reconciles the broker's positions against its own book, and the broker does not filter by
+    route — one login is one position book, which is the whole of B1. So every position Track 1
+    opens appears to them as a position with no matching file entry, and that branch logs
+    CRITICAL "B3 ORPHAN ... opened outside this runner?". The scheduler promotes a child's
+    CRITICAL into an incident, so ten sweeps a day would raise ten false incidents for as long
+    as Track 1 holds anything — starting on the first order, which is the day the page most has
+    to be believed.
+
+    Measured 2026-09-06 before this was wired: the legacy book held 0 positions and had not
+    changed since 09-04, the B1 audit reported the broker flat with no working orders, and the
+    45 legacy strategy slots were already not being registered.
+    """
+    return set(route_classification(port, track1_shadow=track1_shadow)["safety"])
+
+
 def surviving_jobs(port: int = 4002, *, track1_shadow: bool = False) -> set:
-    """What the schedule still holds after legacy entry jobs are retired."""
+    """What the schedule still holds after legacy entry jobs are retired.
+
+    Strategy jobs only — the safety sweeps are NOT subtracted here, because this answers what
+    a legacy retirement leaves behind, and a legacy retirement does not touch protection.
+    """
     ids = scheduler_slot_ids(port, track1_shadow=track1_shadow)
     return ids - legacy_retirement_candidates(port, track1_shadow=track1_shadow)
 

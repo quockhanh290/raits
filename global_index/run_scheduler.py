@@ -1796,20 +1796,38 @@ def make_scheduler(port: int, dry_run: bool,
     #   shared infrastructure  the 13:45 pre-flight (Track 1's freshness gate reads its
     #                          record), the heartbeat, the session-report fallback. None
     #                          decides a trade; all three are route-neutral (Stage 5L).
-    #   the safety sweeps      stop repair and the max-hold exit. They are NOT route-safe —
-    #                          both are hard-wired to `live_positions.json`, legacy's book —
-    #                          and removing them would leave any position still open in that
-    #                          book with no stop repair and no five-day exit. They stay, and
-    #                          they are the reason this mode is not yet legacy-INDEPENDENT.
-    #                          That is Stage 5O's work and it is recorded as a blocker, not
-    #                          waved through.
+    #
+    # The legacy SAFETY sweeps used to be on this list too, and the reason given was sound
+    # while it held: they are wired to `live_positions.json`, and dropping them would leave a
+    # position still open in that book with no stop repair and no five-day exit.
+    #
+    # Stage 5ZZZ-CW: that condition ended, and holding on past it costs something. The book
+    # has held nothing since 2026-09-04 and the B1 audit reports the broker flat with no
+    # working orders, so there is no protection left to withdraw. Meanwhile each sweep still
+    # connects and reconciles the broker against its own book — and the broker does not
+    # filter by route, which is the whole of B1. Every position TRACK 1 opens therefore reads
+    # to them as a position with no matching file entry, logged CRITICAL as "B3 ORPHAN ...
+    # opened outside this runner?". The scheduler promotes a child's CRITICAL into an
+    # incident, so ten sweeps a day would raise ten false incidents for as long as Track 1
+    # holds anything, beginning on its first order.
+    #
+    # So in THIS mode they go, and Track 1's own eleven-job net — its own book, lock, client
+    # id and max-hold marker, registered below — is what protects the only book that can now
+    # hold a position. The transitional mode is untouched: there legacy may still trade, and
+    # its sweeps are the only thing watching it.
     if track1_only:
         from global_index import track1_slots as _t1r
         _doomed = sorted(_t1r.legacy_retirement_candidates(port, track1_shadow=True))
         for _jid in _doomed:
             sched.remove_job(_jid)
-        log.info("[track1-only] %d legacy strategy jobs not scheduled; %d jobs remain",
-                 len(_doomed), len(sched.get_jobs()))
+        _retired_safety = sorted(_t1r.legacy_safety_retirement_candidates(
+            port, track1_shadow=True))
+        for _jid in _retired_safety:
+            sched.remove_job(_jid)
+        log.info("[track1-only] %d legacy strategy jobs not scheduled; %d legacy safety "
+                 "sweeps retired (their book has been empty since the route stopped "
+                 "trading); %d jobs remain",
+                 len(_doomed), len(_retired_safety), len(sched.get_jobs()))
 
         # ── Stage 5O: Track 1's own safety net ───────────────────────────────
         #
