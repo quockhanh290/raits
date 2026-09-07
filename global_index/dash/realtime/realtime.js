@@ -5476,8 +5476,28 @@
     // it measures, and the observation beside it says which route it belongs to.
     const stale = legacyRunnerStale();
     const observed = etDateTime(state.runner?.observed_at);
+    /* Stage 5ZZZ-CY. Đồng hồ của tuyến ĐANG CHẠY, không phải của tuyến đã nghỉ.
+
+       Ô này đọc trạng thái mà runner cũ ghi ra. Tuyến ấy ngừng giao dịch, nên tệp ấy đứng
+       yên ở 24/08 và sẽ đứng yên mãi — một panel tên "Source Clocks" mà dòng trên cùng là
+       một cái đồng hồ đã chết. Chữ "legacy route, retired" nói thật, nhưng nó trả lời câu
+       "runner quan sát lần cuối khi nào" bằng số của runner KHÔNG chạy, trong khi runner
+       đang chạy thì không có dòng nào.
+
+       Ngày cuối Track 1 ghi đo thời gian slot là câu trả lời tương đương: nó chỉ được viết
+       khi một slot thật sự chạy xong, đúng như tệp trạng thái cũ chỉ được viết khi runner
+       cũ chạy xong.
+
+       Đồng hồ cũ KHÔNG bị bỏ đi — nó xuống một dòng riêng, giữ nhãn, và chỉ hiện khi thật
+       sự đã cũ. Bỏ hẳn thì mất mất khả năng thấy tuyến cũ có bất ngờ sống lại hay không. */
+    const t1Days = Object.keys(state.track1?.slot_timing?.days || {}).sort();
+    const t1Last = t1Days.length ? t1Days[t1Days.length - 1] : '';
+    const t1Observed = t1Last
+      ? sessionDate(`${t1Last.slice(0, 4)}-${t1Last.slice(4, 6)}-${t1Last.slice(6, 8)}`)
+      : '--';
     const entries = [
-      ['Runner observed', stale ? `${observed} · legacy route, retired` : observed],
+      ['Track 1 observed', t1Observed],
+      ...(stale ? [['Legacy runner observed', `${observed} · route retired`]] : []),
       ['Schedule freshness', mvFreshnessWords(state.runner?.freshness)
         // Nửa "whether another slot is due today" đã bỏ: chính GIÁ TRỊ nói câu ấy rồi, kể
         // từ khi mã máy được dịch ra. Nửa còn lại thì giữ — nó phân biệt hàng này với sức

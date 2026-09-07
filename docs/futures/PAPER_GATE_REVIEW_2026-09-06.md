@@ -874,6 +874,73 @@ tiên chứ không phải một lúc nào đó.
 
 ---
 
+### F19. Bảng lịch hỏi sàn chứng khoán Mỹ, còn tuyến này giao dịch trên CME
+
+**Ai sở hữu:** bảng lịch của trang.
+**Mức tin:** đã đo chắc chắn. **Đã sửa** trong lượt này.
+
+Bảng lịch trên trang hỏi một hàm mà docstring của chính nó viết: *"True nếu NYSE mở"*. Tuyến
+này không giao dịch cổ phiếu Mỹ — các sleeve là hợp đồng tương lai chỉ số trên CME, và một
+trong số đó là Nikkei.
+
+Hai lịch trùng nhau ngày thường và tách nhau đúng vào ngày lễ Mỹ. Đối chiếu với số thanh dữ
+liệu Nikkei đã lưu:
+
+```
+Labor Day 2023 / 2024 / 2025    CME mở,  NYSE đóng,   672 / 860 / 596 thanh
+Thanksgiving 2025               CME mở,  NYSE đóng,   431 thanh
+Good Friday 2024 / 2025         cả hai đóng,            0 thanh
+```
+
+Ngày 07/09/2026 là Labor Day. Bộ lập lịch nổ **92 job** vì cron của nó chỉ biết thứ trong
+tuần; bảng lịch báo **0 slot**. Nên trang chỉ ra công việc kế tiếp trễ nguyên một ngày, và
+không có dòng nào cho bất cứ thứ gì thật sự chạy.
+
+**Bản sửa đầu tiên của tôi sai, và đáng ghi lại.** Tôi cho bảng lịch dùng đúng luật của cron —
+ngày trong tuần thì có slot. Một phép kiểm có sẵn đỏ ngay, và nó đúng: Good Friday là ngày
+trong tuần và CME đóng thật, nên luật ấy sẽ bịa ra nguyên một ngày slot trễ hạn. Hai luật, mỗi
+cái sai đúng vào những ngày cái kia đúng. Câu hỏi cần một cuốn lịch, không phải một cái đồng hồ.
+
+Kết cục: thư viện lịch sàn thành phụ thuộc thật, và một hàm hỏi CME đứng **cạnh** hàm hỏi
+NYSE chứ không thay nó — lịch chứng khoán vẫn đúng việc của nó, vì SPY không có giá vào ngày
+lễ Mỹ và cổng độ tươi cần biết điều đó. Đã kiểm thư viện không đổi thứ gì đang được tin: câu
+trả lời về NYSE trùng khít luật viết cứng suốt 120 ngày tới, không một khác biệt.
+
+Sót một chỗ ở lần sửa đầu, và câu hỏi của chủ dự án moi ra: cờ "hôm nay có phải ngày giao dịch"
+nằm ngay hai dòng trên bảng lịch vẫn hỏi NYSE. Nửa bản sửa còn tệ hơn không sửa — hai con số
+mâu thuẫn trong cùng một gói dữ liệu và không ai biết cái nào sai.
+
+Một dòng cố ý để lệch chứ không uốn cho khớp: Good Friday 2026 lịch nói đóng mà dữ liệu có 359
+thanh. Uốn luật cho vừa một dòng thì không vừa dòng nào khác.
+
+---
+
+### F20. Đồng hồ trên cùng của panel là đồng hồ của một tuyến đã chết
+
+**Ai sở hữu:** giao diện dashboard.
+**Mức tin:** đã đo chắc chắn. **Đã sửa** trong lượt này.
+
+Panel tên là "Source Clocks" — sáu dòng trả lời "dữ liệu trên trang này mới tới đâu". Dòng
+trên cùng đọc tệp trạng thái mà runner của tuyến cũ ghi ra. Tệp ấy sửa lần cuối **24/08 00:58**
+và sẽ không bao giờ đổi nữa, vì tuyến ấy đã ngừng giao dịch.
+
+Giá trị không sai, và nó có nhãn "tuyến cũ, đã nghỉ hưu" để người đọc không tưởng là số hôm
+nay. Nhưng nó trả lời câu *"runner quan sát lần cuối khi nào"* bằng số của runner **không
+chạy**, trong khi runner **đang chạy** thì không có dòng nào trên panel. Và nó chiếm đúng chỗ
+mắt nhìn trước nhất.
+
+Đây là cái thứ tư cùng một dạng trong một buổi: một ô trỏ vào nguồn của tuyến cũ sau khi tuyến
+mới đã tiếp quản. Ba cái trước là nhãn tuyến trên thẻ công việc, bảng lịch hỏi sai sàn, và mười
+một lượt quét canh một cuốn sổ rỗng. Không cái nào là lỗi logic; tất cả là **một mô tả ở lại
+sau khi thứ nó mô tả đã đi**.
+
+Bản sửa cho dòng ấy đọc ngày cuối cùng tuyến đang chạy ghi đo thời gian slot — thứ chỉ được
+viết khi một slot thật sự chạy xong, đúng như tệp cũ chỉ được viết khi runner cũ chạy xong.
+Đồng hồ cũ không bị bỏ: nó xuống một dòng riêng, giữ nhãn, và chỉ hiện khi đã cũ — bỏ hẳn thì
+mất khả năng thấy tuyến cũ có bất ngờ sống lại hay không.
+
+---
+
 ## 4. Trả lời tám lớp khuyết tật của đề bài
 
 | Lớp | Kết luận |
