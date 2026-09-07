@@ -956,6 +956,74 @@ mất khả năng thấy tuyến cũ có bất ngờ sống lại hay không.
 
 ---
 
+## 4b. Trạng thái hệ thống, đo lại 2026-09-07 12:20 ET
+
+Thêm vào cuối phiên, sau khi các bản sửa đã vào và một phiên ngày lễ đã chạy qua.
+
+### Con số quan trọng nhất
+
+```
+687 slot đã chạy trong 11 ngày
+  0 slot ra tín hiệu vào lệnh
+598 không có tín hiệu
+ 89 bị từ chối
+```
+
+Từ vựng trạng thái **có** chỗ cho "tìm thấy tín hiệu thô" và "tín hiệu được nhận trong
+shadow". Không ngày nào chạm tới. Thư mục nhật ký lệnh rỗng; sổ vị thế giữ 0.
+
+**Nên toàn bộ bằng chứng tích luỹ được là bằng chứng về HẠ TẦNG, không phải về CHIẾN LƯỢC.**
+Hệ đã chứng minh nó chạy đúng giờ, lấy được dữ liệu, ghi được bằng chứng, chấm được điểm.
+Nó **chưa chứng minh** được nó ra quyết định đúng, vì chưa có quyết định nào để xét.
+
+Cổng bằng chứng shadow đòi năm ngày không hỏng. Nó **không** đòi ngày nào có kèo. Nên khi
+cổng mở, câu nó nói là *"hạ tầng chạy sạch năm phiên"* — và người đọc rất dễ hiểu thành
+*"chiến lược đã được kiểm chứng"*. Hai câu ấy cách nhau rất xa, và không có gì trên màn
+hình phân biệt chúng.
+
+### Độ ổn định
+
+```
+53x  bất đồng ở phần chồng lấn   26-27/08 và 04/09 — ánh xạ hợp đồng, đã sửa
+22x  cổng chặn                    26-27/08 — chặn đúng việc
+14x  không có nguồn bar           26-27/08 — nguồn chưa nối
+```
+
+Từ 28/08 đến 03/09 **không một lần từ chối nào**, rồi 19 lần ngày 04/09 do roll hợp đồng,
+rồi 07/09 sạch hoàn toàn. Đường cong đi đúng hướng.
+
+### Cái mới được chứng minh hôm nay
+
+Phiên 07/09 là **lần đầu tuyến này đi qua một ngày lễ**. Nikkei 22/22 sạch. Trước hôm nay
+đây là ô "chưa ai chạy qua", và nó là ô đã làm bảng lịch nói sai suốt vì hỏi nhầm sàn.
+
+### Cái còn chưa ai chạm
+
+Đường gửi lệnh **chưa bao giờ chạy** — không phải "chạy và bị từ chối", mà là chưa có quyết
+định nào để gửi. Bộ thực thi, nhật ký lệnh, đối chiếu vị thế, lệnh dừng: có code, có phép
+kiểm, chưa cái nào gặp một lệnh thật.
+
+### Điều đáng lo nhất, và nó không nằm trong cổng nào
+
+Trong một buổi, **bảy chỗ trên bảng điều khiển** hoá ra đang mô tả tuyến đã nghỉ hưu hoặc
+dùng luật đã hết đúng. Không cái nào là lỗi logic.
+
+Điều đó nói hai chuyện. Một: hệ này thay đổi nhanh hơn tốc độ các mô tả của nó được rà lại.
+Hai: **cả bảy đều tìm ra vì có người nhìn màn hình và thấy lạ**, không phải vì phép kiểm nào
+bắt. Phép kiểm kiểm kê ở F17 bắt được cái thứ tám thuộc cùng họ, nhưng nó chỉ phủ chỗ chạm
+nguồn của tuyến cũ — nó không phủ được "một câu chữ đã hết đúng".
+
+### Verdict
+
+**Hạ tầng: dùng được, và có bằng chứng.** **Chiến lược: chưa có bằng chứng nào** — không
+phải bằng chứng xấu, là không có.
+
+Việc đáng làm nhất trước khi cổng mở không phải sửa thêm chỗ nào trên màn hình, mà là trả
+lời: *một phiên có kèo trông như thế nào, và làm sao biết hệ xử lý nó đúng?* Ngày đầu tiên
+có kèo cũng là ngày đầu tiên toàn bộ nửa dưới của hệ chạy thật.
+
+---
+
 ## 5. Kết luận
 
 **Lời từ chối thì tin được. Lời cho phép, khi nó tới, thì chưa đọc được.**
