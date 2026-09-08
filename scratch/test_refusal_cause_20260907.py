@@ -188,6 +188,80 @@ def test_the_recorded_history_is_not_all_one_bucket():
                                                f"chối thuộc nhóm thị trường đóng: {by}")
 
 
+# ── nhãn con: lỗi ở ĐÂU, và phải kiểm gì ────────────────────────────────────
+
+def test_a_system_fault_names_where_it_is():
+    """"Có phải lỗi không" là câu thứ nhất. "Lỗi ở đâu" là câu thứ hai, và 89 lời từ chối
+    mang chung một nhãn thì không trả lời được."""
+    c = rc.classify(session_day="2026-09-08", codes="missing_session,stale", **SWING)
+    assert c.cause == rc.SYSTEM_FAULT
+    assert c.fault in rc.FAULTS and c.fault, c
+
+
+@pytest.mark.parametrize("codes, fault", [
+    ("ES: the live half and history disagree on 3 of 100 shared", rc.FAULT_DATA_JOIN),
+    ("no bar provider was handed to the slot", rc.FAULT_NO_PROVIDER),
+    ("missing_session,stale", rc.FAULT_SESSION_ABSENT),
+    ("partial_coverage", rc.FAULT_PARTIAL),
+    ("stale", rc.FAULT_STALE),
+])
+def test_each_origin_gets_its_own_label(codes, fault):
+    c = rc.classify(session_day="2026-09-08", codes=codes, **SWING)
+    assert c.fault == fault, c
+
+
+def test_an_empty_session_is_not_labelled_a_stale_frame():
+    """Thứ tự xét không hoán đổi được, và số liệu nói vì sao: `missing_session` và `stale`
+    đi cùng nhau 21 trên 22 lần, vì một phiên không có bar nào thì bar cuối cũng cũ theo.
+
+    Xét `stale` trước sẽ dán nhãn "khung cũ" lên một phiên hoàn toàn trống, và gửi người
+    vận hành đi tìm một tệp chậm thay vì một job không chạy.
+    """
+    c = rc.classify(session_day="2026-09-08", codes="missing_session,stale", **SWING)
+    assert c.fault == rc.FAULT_SESSION_ABSENT, c
+    assert "13:45" in c.action, "việc phải làm phải trỏ vào job dữ liệu"
+
+
+def test_every_fault_carries_something_to_check():
+    """Một nhãn không kèm việc phải làm là một cái tên mới cho cùng sự bối rối."""
+    for f in rc.FAULTS:
+        act = rc.ACTIONS.get(f, "")
+        assert len(act.split()) >= 10, (f, act)
+
+
+def test_a_non_fault_carries_no_label():
+    """Nhãn con trên một lời từ chối không phải lỗi là câu trả lời cho câu hỏi không ai
+    đặt ra."""
+    for day, codes in (("2026-09-07", "missing_session,stale"),   # ngày lễ
+                       ("2026-09-05", "missing_session")):        # thứ Bảy
+        c = rc.classify(session_day=day, codes=codes, **SWING)
+        assert c.cause == rc.MARKET_CLOSED and c.fault == "" and c.action == "", c
+
+
+def test_the_recorded_faults_split_into_more_than_one_origin():
+    """Neo vào bằng chứng thật: nếu 89 lỗi hệ rơi hết vào một nhãn con thì tầng này chưa
+    tách được gì."""
+    import collections
+    import glob
+    import json
+
+    by = collections.Counter()
+    for f in sorted(glob.glob(str(REPO / "global_index/track1_runtime/signals/*.jsonl"))):
+        for line in open(f, encoding="utf-8"):
+            if not line.strip():
+                continue
+            d = json.loads(line)
+            if d.get("status") != "SLOT_REFUSED":
+                continue
+            c = rc.classify_slot(d)
+            if c.cause == rc.SYSTEM_FAULT:
+                by[c.fault] += 1
+    assert len(by) >= 3, by
+    assert by.get(rc.FAULT_DATA_JOIN, 0) >= 40, by
+    assert by.get(rc.FAULT_SESSION_ABSENT, 0) >= 15, by
+    assert by.get(rc.FAULT_NO_PROVIDER, 0) >= 10, by
+
+
 def test_it_changes_no_verdict():
     """Tầng này chỉ dịch. Nó không được import bởi cổng, bộ chấm hay bộ thực thi — nếu có,
     một phân loại sai sẽ đổi được một quyết định, và đó không phải việc của nó."""

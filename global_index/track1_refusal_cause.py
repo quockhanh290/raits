@@ -78,6 +78,50 @@ _JOIN_FAULT_PHRASES: tuple = (
 )
 
 
+#: Nhãn con của SYSTEM_FAULT. "Có phải lỗi không" là câu hỏi thứ nhất và bốn nhóm trên trả
+#: lời nó; "lỗi ở đâu" là câu thứ hai, và một nhãn duy nhất cho 89 lần từ chối thì không trả
+#: lời được. Đo trên bằng chứng đã ghi, ba nguồn gốc tách bạch nhau:
+#:
+#:      53x  hai nửa dữ liệu bất đồng     roll hợp đồng, hoặc sai múi giờ khi nối
+#:      22x  phiên mở mà không có bar     nghi job dữ liệu không chạy
+#:      14x  slot chạy không có nguồn     lỗi nối dây, không phải lỗi dữ liệu
+#:
+#: Ba việc phải làm khác hẳn nhau. Gộp chúng lại là đúng lỗi vừa sửa ở tầng trên, chỉ ở độ
+#: phân giải thô hơn.
+FAULT_DATA_JOIN = "data_join"
+FAULT_SESSION_ABSENT = "session_absent"
+FAULT_PARTIAL = "partial_coverage"
+FAULT_STALE = "stale_frame"
+FAULT_NO_PROVIDER = "no_provider"
+FAULT_OTHER = "other"
+
+FAULTS: tuple = (FAULT_DATA_JOIN, FAULT_SESSION_ABSENT, FAULT_PARTIAL,
+                 FAULT_STALE, FAULT_NO_PROVIDER, FAULT_OTHER)
+
+#: Việc phải làm, viết cho người vận hành đọc lúc 2 giờ sáng. Mỗi câu nói MỘT việc kiểm
+#: được, không phải một lời khuyên chung.
+ACTIONS: dict = {
+    FAULT_DATA_JOIN:
+        "Hai nửa khung dữ liệu bất đồng. Kiểm hợp đồng mà chuỗi lịch sử đang neo vào và "
+        "hợp đồng lần lấy bar vừa trả về — lệch nhau nghĩa là sàn đã chuyển kỳ hạn và tệp "
+        "chưa neo lại. Nếu cùng một hợp đồng thì nghi múi giờ khi nối.",
+    FAULT_SESSION_ABSENT:
+        "Phiên đang mở mà không có bar nào cho ngày đó. Kiểm job cập nhật dữ liệu 13:45 "
+        "trong nhật ký công việc: nó chạy chưa, và nó lấy tới ngày nào.",
+    FAULT_PARTIAL:
+        "Có bar nhưng thủng giữa cửa sổ. Kiểm khoảng trống nằm ở đâu; một lần mất kết nối "
+        "giữa phiên để lại đúng hình dạng này.",
+    FAULT_STALE:
+        "Có bar nhưng bar cuối cũ hơn mức cửa sổ đòi. Nguồn dữ liệu đang chậm hơn đồng hồ, "
+        "hoặc lần cập nhật gần nhất dừng giữa chừng.",
+    FAULT_NO_PROVIDER:
+        "Slot chạy mà không ai đưa nguồn bar cho nó. Đây là lỗi nối dây chứ không phải lỗi "
+        "dữ liệu — kiểm chỗ dựng slot, không kiểm parquet.",
+    FAULT_OTHER:
+        "Chưa có nhãn con nào khớp. Đọc mã từ chối nguyên văn trong bằng chứng.",
+}
+
+
 @dataclass(frozen=True)
 class Cause:
     """Nguyên nhân, và bằng chứng dẫn tới nó.
@@ -88,12 +132,44 @@ class Cause:
     cause: str
     detail: str
     evidence: dict = field(default_factory=dict)
+    #: Nhãn con, chỉ có nghĩa khi `cause` là SYSTEM_FAULT. Rỗng ở mọi nhóm khác — một
+    #: nhãn con trên một lời từ chối không phải lỗi là một câu trả lời cho câu hỏi không ai
+    #: đặt ra.
+    fault: str = ""
 
     @property
     def needs_a_person(self) -> bool:
         """UNKNOWN cũng cần người — không biết vì sao hệ từ chối là một trạng thái phải
         có ai đó nhìn, không phải một trạng thái để bỏ qua."""
         return self.cause in (SYSTEM_FAULT, UNKNOWN)
+
+    @property
+    def action(self) -> str:
+        """Việc phải làm, hoặc rỗng khi không có việc gì."""
+        return ACTIONS.get(self.fault, "") if self.fault else ""
+
+
+def _fault_of(codes) -> str:
+    """Nguồn gốc của một lỗi hệ, từ cụ thể nhất tới chung nhất.
+
+    Thứ tự không hoán đổi được, và lý do nằm trong số liệu: `missing_session` và `stale`
+    xuất hiện cùng nhau 21 trên 22 lần, vì một phiên không có bar nào thì bar cuối cũng cũ
+    theo. Xét `stale` trước sẽ dán nhãn "khung cũ" lên một phiên hoàn toàn trống, và gửi
+    người vận hành đi tìm một tệp chậm thay vì một job không chạy.
+    """
+    blob = " ".join(codes).lower()
+    if any(p in blob for p in _JOIN_FAULT_PHRASES if p != "no bar provider"):
+        return FAULT_DATA_JOIN
+    if "no bar provider" in blob:
+        return FAULT_NO_PROVIDER
+    s = {c.strip() for c in codes}
+    if "missing_session" in s or "no_bars" in s:
+        return FAULT_SESSION_ABSENT
+    if "partial_coverage" in s or "gap_in_coverage" in s:
+        return FAULT_PARTIAL
+    if "stale" in s:
+        return FAULT_STALE
+    return FAULT_OTHER
 
 
 def _session_bounds(day: _dt.date) -> Optional[tuple]:
@@ -165,7 +241,8 @@ def classify(*, session_day, window_from: str, window_to: str,
     if shape:
         return Cause(SYSTEM_FAULT,
                      f"khung dữ liệu sai hình dạng ({', '.join(shape)}); lịch không liên "
-                     f"quan tới loại lỗi này", {**ev, "shape_codes": shape})
+                     f"quan tới loại lỗi này", {**ev, "shape_codes": shape},
+                     fault=FAULT_OTHER)
 
     # Lỗi của tầng nối dữ liệu. Xét ngay sau hình dạng và TRƯỚC mọi thứ dính tới lịch: dữ
     # liệu đã về nhưng sai thì giờ phiên không nói được gì về nó, và một sleeve chạy trên
@@ -177,7 +254,8 @@ def classify(*, session_day, window_from: str, window_to: str,
     if hit:
         return Cause(SYSTEM_FAULT,
                      f"tầng nối dữ liệu từ chối ({hit[0]}); dữ liệu đã về nhưng sai, nên "
-                     f"giờ phiên không giải thích được", {**ev, "join_fault": hit})
+                     f"giờ phiên không giải thích được", {**ev, "join_fault": hit},
+                     fault=_fault_of(codes))
 
     if clock != "America/New_York":
         return Cause(UNKNOWN,
@@ -219,7 +297,8 @@ def classify(*, session_day, window_from: str, window_to: str,
     if codes:
         return Cause(SYSTEM_FAULT,
                      f"phiên mở suốt cửa sổ {window_from}-{window_to} nhưng cổng vẫn từ "
-                     f"chối ({', '.join(sorted(set(codes)))}) — dữ liệu đáng lẽ phải có", ev)
+                     f"chối ({', '.join(sorted(set(codes)))}) — dữ liệu đáng lẽ phải có",
+                     ev, fault=_fault_of(codes))
 
     return Cause(UNKNOWN, "không có mã từ chối nào để xét", ev)
 
