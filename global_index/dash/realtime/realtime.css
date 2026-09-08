@@ -248,6 +248,22 @@ h2 { font-size: 21px; }
 /* A blocker list is the one value that can be long. It wraps as chips rather than as one
    unbroken string, so a third gate does not push the panel wider. */
 #track1Facts .t1-gates, #regimeFacts .t1-gates { display: flex; flex-wrap: wrap; gap: 4px; }
+/* Vì sao slot bị từ chối, gom theo nguyên nhân. Hai màu và chỉ hai: xám cho những gì
+   không ai phải làm gì — thị trường đóng, dữ liệu chưa tới — và hổ phách cho những gì cần
+   người nhìn. Ngày 07/09 cả 23 lời từ chối đều xám, và đó chính là điều đáng nói: hàng đếm
+   ngay trên nói "refused 23" y hệt một ngày job dữ liệu chết.
+   Không dùng đỏ. Đỏ ở đây sẽ dạy người vận hành rằng một ngày lễ trông như một sự cố. */
+#track1Facts .t1-refusals { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+#track1Facts .t1-refusal {
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  color: var(--dim, #6a7284);
+  font: 500 11px/1.25 var(--mono);
+}
+#track1Facts .t1-refusal.needs-person { color: var(--amber); font-weight: 700; }
+#track1Facts .t1-refusal b { font-weight: 700; }
+
 #track1Facts .t1-gate, #regimeFacts .t1-gate {
   padding: 2px 6px;
   border: 1px solid currentColor;

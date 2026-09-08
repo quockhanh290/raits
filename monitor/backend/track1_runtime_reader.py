@@ -568,7 +568,74 @@ def _signals(root: Path) -> dict:
         return {"present": False, "reading": "signals unreadable",
                 "error": f"{type(exc).__name__}: {exc}"}
     out["days"] = sig.days(root)
+    out["refusals"] = _refusal_causes(day, root)
     return out
+
+
+def _refusal_causes(day: str, root: Path) -> dict:
+    """Vì sao các slot hôm nay bị từ chối, gom theo nguyên nhân gốc.
+
+    Stage 5ZZZ-DD. Trước dòng này panel chỉ hiện chuỗi mã của cổng — ngày 07/09 là
+    "gate_refused" trên cả 23 slot swing, và tìm ra câu trả lời thật (CME đóng 13:00 vào
+    Labor Day, cửa sổ swing là 14:00-15:55) mất bốn tệp mã, một lần đo lại parquet và một
+    lần đổi múi giờ.
+
+    Tầng phân loại đã có và đã được kiểm; nó chỉ chưa hiện ở đâu. Đó là lỗi kho này đã ghi
+    lại một lần: hai job gắn vào bộ lập lịch, chạy mỗi tối, và bộ đọc nhật ký không thấy gì
+    — cả khi thành công lẫn khi hỏng.
+
+    Read-only và fail-soft: một ngày không đọc được trả về `present: False` kèm lý do, chứ
+    không làm hỏng cả payload. Panel mất một khối thì vẫn là panel; panel không tải được thì
+    không còn là panel.
+    """
+    try:
+        import collections
+        import json as _json
+
+        from global_index import track1_refusal_cause as rc
+
+        path = Path(root) / "global_index" / "track1_runtime" / "signals" / \
+            f"track1_signals_{day}.jsonl"
+        if not path.exists():
+            return {"present": False, "reading": "chưa có slot nào hôm nay"}
+
+        by: dict = collections.OrderedDict()
+        total = 0
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if not line.strip():
+                continue
+            try:
+                rec = _json.loads(line)
+            except Exception:                                     # noqa: BLE001
+                continue
+            if rec.get("status") != "SLOT_REFUSED":
+                continue
+            total += 1
+            c = rc.classify_slot(rec)
+            key = f"{c.cause}/{c.fault}" if c.fault else c.cause
+            slot = by.setdefault(key, {
+                "cause": c.cause, "fault": c.fault, "count": 0,
+                "needs_a_person": c.needs_a_person, "action": c.action,
+                "detail": c.detail, "sleeves": [], "evidence": c.evidence,
+            })
+            slot["count"] += 1
+            s = rec.get("sleeve")
+            if s and s not in slot["sleeves"]:
+                slot["sleeves"].append(s)
+
+        return {
+            "present": True, "total": total,
+            "groups": list(by.values()),
+            # Đếm riêng, vì đây là con số quyết định người vận hành có phải làm gì không.
+            # Gộp nó vào tổng là quay lại chỗ một ngày lễ trông như một ngày hỏng.
+            "needs_a_person": sum(g["count"] for g in by.values() if g["needs_a_person"]),
+            "reading": ("không slot nào bị từ chối hôm nay" if not total else
+                        "mỗi lời từ chối được xếp theo nguyên nhân gốc; nhóm nào cần người "
+                        "thì kèm việc phải kiểm"),
+        }
+    except Exception as exc:                                      # noqa: BLE001
+        return {"present": False, "reading": "không phân loại được lời từ chối",
+                "error": f"{type(exc).__name__}: {exc}"}
 
 
 def _today_et():

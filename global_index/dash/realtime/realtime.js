@@ -4628,6 +4628,43 @@
       return '';
     }
 
+    /* Stage 5ZZZ-DD. VÌ SAO bị từ chối, không chỉ BAO NHIÊU.
+       Hàng trên đếm "refused 23" và dừng ở đó. Ngày 07/09 cả 23 slot ấy bị từ chối vì CME
+       đóng cửa lúc 13:00 vào Labor Day trong khi cửa sổ swing là 14:00-15:55 — không có gì
+       hỏng, không ai phải làm gì. Cùng con số ấy vào một ngày thường lại nghĩa là job dữ
+       liệu không chạy. Một con số, hai tình huống trái ngược, và màn hình nói y hệt nhau.
+       Con số dẫn đầu là SỐ CẦN NGƯỜI, không phải tổng: đó là câu hỏi người vận hành đang
+       hỏi. Gộp chúng lại là quay về chỗ một ngày lễ trông như một ngày hỏng. */
+    const REFUSAL_WORDS = {
+      market_closed: 'thị trường đóng',
+      data_not_yet: 'dữ liệu chưa tới',
+      unknown: 'chưa rõ nguyên nhân',
+      'system_fault/data_join': 'hai nửa dữ liệu bất đồng',
+      'system_fault/session_absent': 'phiên mở mà không có bar',
+      'system_fault/partial_coverage': 'bar thủng giữa cửa sổ',
+      'system_fault/stale_frame': 'khung dữ liệu cũ',
+      'system_fault/no_provider': 'slot chạy không có nguồn bar',
+      system_fault: 'lỗi hệ thống'
+    };
+    function refusalRow() {
+      const r = sig.refusals || {};
+      if (!r.present) return r.reading || '--';
+      if (!r.total) return 'không slot nào bị từ chối';
+      const groups = (r.groups || []).slice().sort((a, b) => b.count - a.count);
+      const chips = groups.map(g => {
+        const key = g.fault ? `${g.cause}/${g.fault}` : g.cause;
+        const word = REFUSAL_WORDS[key] || REFUSAL_WORDS[g.cause] || key;
+        const tip = [g.detail, g.action].filter(Boolean).join('  •  ');
+        return `<span class="t1-refusal${g.needs_a_person ? ' needs-person' : ''}` +
+          `${tip ? ' has-tip' : ''}"${tip ? ` tabindex="0" data-tooltip="${esc(tip)}"` : ''}>` +
+          `${esc(word)} <b>${g.count}</b></span>`;
+      }).join('');
+      const lead = r.needs_a_person
+        ? `<b>${r.needs_a_person} cần người</b> trên ${r.total}`
+        : `${r.total}, không cái nào cần người`;
+      return `<span class="t1-refusals">${lead}${chips}</span>`;
+    }
+
     const blocking = gates.blocking_now || [];
     const rows = [
       t1Fact('Route', t1.route || '--'),
@@ -4659,6 +4696,9 @@
       t1Fact('Book', t1.book?.present ? 'present' : 'absent (expected in shadow — no orders)'),
       t1Fact('Checkpoint', t1.checkpoint?.present ? 'present' : 'absent'),
       t1Fact('Signals today', signalsRow(), signalsTone()),
+      // Ngay dưới hàng đếm, vì nó trả lời câu hỏi hàng ấy vừa đặt ra.
+      t1Fact('Refusals', refusalRow(),
+             (sig.refusals || {}).needs_a_person ? 'negative' : ''),
       t1Fact('Audit verdict', auditRow(), auditTone),
       t1Fact('Audit reasons', auditReasons() || (aud.present ? 'none recorded' : 'no audit has run')),
       // Stage 5ZZZ-CM. Ô này từng in TÊN TỆP, và câu giải thích nó thì trôi ở đáy panel
