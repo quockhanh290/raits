@@ -126,7 +126,7 @@ def test_a_join_fault_beats_a_closed_market():
 def test_a_malformed_frame_is_a_system_fault():
     c = rc.classify(session_day="2026-09-07", codes="tz_mismatch", **SWING)
     assert c.cause == rc.SYSTEM_FAULT
-    assert "hình dạng" in c.detail
+    assert "wrong shape" in c.detail
 
 
 # ── chưa tới lúc là chuyện khác hẳn ──────────────────────────────────────────

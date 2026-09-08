@@ -76,13 +76,31 @@ def test_the_monday_last_chance_job_is_untouched():
 
 
 def test_it_runs_before_the_sunday_stop_repair_sweep():
-    """18:00 then 18:30: one Sunday log, data check first, protection sweep after."""
-    sched = rs.make_scheduler(port=7497, dry_run=True, track1_only=True)
-    jobs = {j.id: j for j in sched.get_jobs()}
-    assert "stop_repair_sun_1830" in jobs
+    """18:00 then 18:30: one Sunday log, data check first, protection sweep after.
+
+    The ordering is asked of the mode where BOTH jobs live. It used to be asked of
+    track1_only, and went red when the retired route's eleven sweeps came off that schedule —
+    an ordering claim about two jobs, only one of which was still there. The claim itself was
+    never wrong; it had simply been pinned in the one mode that no longer holds both halves.
+    """
+    jobs = {j.id: j for j in
+            rs.make_scheduler(port=7497, dry_run=True).get_jobs()}
+    assert "stop_repair_sun_1830" in jobs, sorted(jobs)
     spy_min = int(str({str(x.name): str(x)
                        for x in jobs[JOB].trigger.fields}["minute"]))
     assert spy_min < 30
+
+
+def test_the_sunday_sweep_is_absent_from_the_track1_route_on_purpose():
+    """And the other half of that split, said out loud so nobody restores it by accident.
+
+    The sweep watches the legacy book. On the Track 1 route it has nothing to protect, and a
+    protection job with nothing to protect is a job whose silence means nothing.
+    """
+    ids = {j.id for j in rs.make_scheduler(port=7497, dry_run=True,
+                                           track1_only=True).get_jobs()}
+    assert "stop_repair_sun_1830" not in ids
+    assert JOB in ids, "the Sunday SPY check itself must stay — it feeds the NKD window"
 
 
 def test_the_spy_family_is_now_five_jobs():

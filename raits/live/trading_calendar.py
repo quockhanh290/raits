@@ -6,6 +6,9 @@ Proactive NYSE trading calendar for the live path.
 Public API
 ----------
   is_trading_day(d)    -> bool        — True if NYSE is open on date d
+  is_futures_session(d)-> bool|None   — True if CME is open; None when unknowable
+  holiday_name(d)      -> str|None    — what to CALL a shut day; None = no name, not
+                                        evidence the day was open
   is_early_close(d)    -> bool        — True if d closes at 13:00 ET (half-day)
   market_close_time(d) -> time        — 16:00 normally, 13:00 on early-close days
   et_now_time()        -> time        — current wall-clock time in US/Eastern
@@ -342,6 +345,36 @@ def is_futures_session(d: datetime.date) -> Optional[bool]:
         return bool(_CME_IS_SESSION(datetime.datetime.combine(d, datetime.time())))
     except Exception:                                   # noqa: BLE001
         return None
+
+
+@functools.lru_cache(maxsize=8)
+def _holiday_names(year: int) -> Optional[dict]:
+    """{date: name} for NYSE holidays in `year`, or None when nothing here can say."""
+    try:
+        import exchange_calendars as xc
+        import pandas as pd
+        named = xc.get_calendar("XNYS").regular_holidays.holidays(
+            pd.Timestamp(f"{year}-01-01"), pd.Timestamp(f"{year}-12-31"), return_name=True)
+        return {ts.date(): str(name) for ts, name in named.items()}
+    except Exception:                                   # noqa: BLE001
+        return None
+
+
+def holiday_name(d: datetime.date) -> Optional[str]:
+    """The name of the NYSE holiday on `d`, or None when no name is available.
+
+    NAMING ONLY. None here does NOT mean "d is a trading day" — the hardcoded fallback that
+    backs `is_trading_day` carries dates and no names at all, so without the library every day
+    of the year answers None. Ask `is_trading_day` whether the market was shut; ask this only
+    what to CALL a day already known to be shut, and print nothing when it declines.
+
+    That split is deliberate. A label is worth having when it turns "2026-09-07" into "Labor
+    Day" on a screen, and worth nothing if a reader can mistake its absence for evidence.
+    """
+    if isinstance(d, datetime.datetime):
+        d = d.date()
+    names = _holiday_names(d.year)
+    return names.get(d) if names else None
 
 
 def market_close_time(d: datetime.date) -> datetime.time:

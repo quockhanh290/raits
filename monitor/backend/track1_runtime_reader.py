@@ -337,6 +337,50 @@ def _paper_account(root: Path) -> dict:
                             "to none")}
 
 
+def _closed_since(required, today) -> list:
+    """The days between the required session and today on which nothing could have printed.
+
+    Stage 5ZZZ-BC. The row above says the file covers a date and stops there. On a Tuesday
+    after Labor Day that date is four calendar days old, and the panel offers no way to tell
+    "the market was shut" from "the refresh has not run" — which are the two readings an
+    operator has to choose between, and only one of them is worth getting out of bed for.
+
+    Derived, never written down: the gap is recomputed from the same calendar the requirement
+    itself is computed on, so it cannot describe a rule the requirement no longer follows.
+    A day whose name cannot be looked up is still reported, without a name.
+    """
+    from raits.live.trading_calendar import holiday_name, is_trading_day
+
+    out, d = [], required + _dt.timedelta(days=1)
+    while d <= today and len(out) < 14:
+        try:
+            open_ = is_trading_day(d)
+        except Exception:                                             # noqa: BLE001
+            return []          # cannot tell: say nothing rather than imply the market was shut
+        if not open_:
+            # A weekend names itself. A weekday needs a reason, and when the calendar cannot
+            # supply one the honest label is that there was no session — not the weekday's
+            # name, which states a fact everyone can already see and explains nothing.
+            label = (d.strftime("%a") if d.weekday() >= 5
+                     else (holiday_name(d) or "no session"))
+            out.append({"date": d.isoformat(), "label": label})
+        d += _dt.timedelta(days=1)
+    return out
+
+
+def _closed_phrase(closed: list) -> str:
+    """"Sat 5, Sun 6, Labor Day 7 Sep" — the month named once, or per day when the gap
+    crosses one. A bare day number is ambiguous across a month boundary, and the New Year
+    gap is exactly where somebody would be reading this."""
+    months = {c["date"][:7] for c in closed}
+    if len(months) == 1:
+        body = ", ".join(f"{c['label']} {int(c['date'][8:10])}" for c in closed)
+        return f"{body} {_dt.date.fromisoformat(closed[0]['date']).strftime('%b')}"
+    return ", ".join(
+        f"{c['label']} {int(c['date'][8:10])} "
+        f"{_dt.date.fromisoformat(c['date']).strftime('%b')}" for c in closed)
+
+
 def _spy_daily(root: Path, regime_csv: str = "spy_daily_live.csv") -> dict:
     """The daily regime file against the day the next session will ask for. Stage 5ZZC.
 
@@ -362,8 +406,17 @@ def _spy_daily(root: Path, regime_csv: str = "spy_daily_live.csv") -> dict:
                        f"unknown is not covered")
         return out
 
+    try:
+        out["closed_since"] = _closed_since(need.date(), _today_et().date())
+    except Exception:                                                 # noqa: BLE001
+        out["closed_since"] = []
+
     if out["state"] == _spy.COVERAGE_OK:
         out["line"] = f"SPY daily file covers {out['required']}"
+        if out["closed_since"]:
+            out["line"] += (f" — the latest session. Nothing has printed since: "
+                            f"{_closed_phrase(out['closed_since'])}, so this date is expected "
+                            f"to stand until the next open")
     elif out["state"] == _spy.COVERAGE_SHORT:
         out["line"] = (f"SPY daily file is missing {out['required']} — it ends on "
                        f"{out['last']}. This is a stale daily-context warning, not a slot "
@@ -597,7 +650,7 @@ def _refusal_causes(day: str, root: Path) -> dict:
         path = Path(root) / "global_index" / "track1_runtime" / "signals" / \
             f"track1_signals_{day}.jsonl"
         if not path.exists():
-            return {"present": False, "reading": "chưa có slot nào hôm nay"}
+            return {"present": False, "reading": "no slot has run today"}
 
         by: dict = collections.OrderedDict()
         total = 0
@@ -629,12 +682,12 @@ def _refusal_causes(day: str, root: Path) -> dict:
             # Đếm riêng, vì đây là con số quyết định người vận hành có phải làm gì không.
             # Gộp nó vào tổng là quay lại chỗ một ngày lễ trông như một ngày hỏng.
             "needs_a_person": sum(g["count"] for g in by.values() if g["needs_a_person"]),
-            "reading": ("không slot nào bị từ chối hôm nay" if not total else
-                        "mỗi lời từ chối được xếp theo nguyên nhân gốc; nhóm nào cần người "
-                        "thì kèm việc phải kiểm"),
+            "reading": ("no slot was refused today" if not total else
+                        "each refusal is grouped by root cause; a group that needs a person "
+                        "carries the one thing to check"),
         }
     except Exception as exc:                                      # noqa: BLE001
-        return {"present": False, "reading": "không phân loại được lời từ chối",
+        return {"present": False, "reading": "the refusals could not be classified",
                 "error": f"{type(exc).__name__}: {exc}"}
 
 

@@ -98,27 +98,28 @@ FAULT_OTHER = "other"
 FAULTS: tuple = (FAULT_DATA_JOIN, FAULT_SESSION_ABSENT, FAULT_PARTIAL,
                  FAULT_STALE, FAULT_NO_PROVIDER, FAULT_OTHER)
 
-#: Việc phải làm, viết cho người vận hành đọc lúc 2 giờ sáng. Mỗi câu nói MỘT việc kiểm
-#: được, không phải một lời khuyên chung.
+#: What to do, written for an operator reading it at two in the morning. Each sentence names
+#: ONE checkable thing rather than offering general advice.
 ACTIONS: dict = {
     FAULT_DATA_JOIN:
-        "Hai nửa khung dữ liệu bất đồng. Kiểm hợp đồng mà chuỗi lịch sử đang neo vào và "
-        "hợp đồng lần lấy bar vừa trả về — lệch nhau nghĩa là sàn đã chuyển kỳ hạn và tệp "
-        "chưa neo lại. Nếu cùng một hợp đồng thì nghi múi giờ khi nối.",
+        "The two halves of the frame disagree. Check the contract the stored history is "
+        "anchored to against the contract the last fetch returned — a mismatch means the "
+        "exchange rolled and the file was never re-anchored. If it is the same contract, "
+        "suspect the timezone used when splicing.",
     FAULT_SESSION_ABSENT:
-        "Phiên đang mở mà không có bar nào cho ngày đó. Kiểm job cập nhật dữ liệu 13:45 "
-        "trong nhật ký công việc: nó chạy chưa, và nó lấy tới ngày nào.",
+        "The session was open and no bar exists for the day. Check the 13:45 data refresh "
+        "in the job journal: whether it ran, and how far forward it fetched.",
     FAULT_PARTIAL:
-        "Có bar nhưng thủng giữa cửa sổ. Kiểm khoảng trống nằm ở đâu; một lần mất kết nối "
-        "giữa phiên để lại đúng hình dạng này.",
+        "Bars exist but the window has a hole in it. Find where the gap sits; a single "
+        "mid-session disconnect leaves exactly this shape.",
     FAULT_STALE:
-        "Có bar nhưng bar cuối cũ hơn mức cửa sổ đòi. Nguồn dữ liệu đang chậm hơn đồng hồ, "
-        "hoặc lần cập nhật gần nhất dừng giữa chừng.",
+        "Bars exist but the last one is older than the window asks for. The feed is running "
+        "behind the clock, or the most recent update stopped part-way.",
     FAULT_NO_PROVIDER:
-        "Slot chạy mà không ai đưa nguồn bar cho nó. Đây là lỗi nối dây chứ không phải lỗi "
-        "dữ liệu — kiểm chỗ dựng slot, không kiểm parquet.",
+        "The slot ran and nobody handed it a bar source. This is a wiring fault, not a data "
+        "fault — look at where the slot is built, not at the parquet.",
     FAULT_OTHER:
-        "Chưa có nhãn con nào khớp. Đọc mã từ chối nguyên văn trong bằng chứng.",
+        "No sub-label matched. Read the refusal codes verbatim in the evidence.",
 }
 
 
@@ -240,8 +241,8 @@ def classify(*, session_day, window_from: str, window_to: str,
     shape = sorted(set(codes) & _SHAPE_CODES)
     if shape:
         return Cause(SYSTEM_FAULT,
-                     f"khung dữ liệu sai hình dạng ({', '.join(shape)}); lịch không liên "
-                     f"quan tới loại lỗi này", {**ev, "shape_codes": shape},
+                     f"the frame is the wrong shape ({', '.join(shape)}); the calendar has no "
+                     f"bearing on this kind of fault", {**ev, "shape_codes": shape},
                      fault=FAULT_OTHER)
 
     # Lỗi của tầng nối dữ liệu. Xét ngay sau hình dạng và TRƯỚC mọi thứ dính tới lịch: dữ
@@ -253,24 +254,24 @@ def classify(*, session_day, window_from: str, window_to: str,
     hit = [p for p in _JOIN_FAULT_PHRASES if p in blob]
     if hit:
         return Cause(SYSTEM_FAULT,
-                     f"tầng nối dữ liệu từ chối ({hit[0]}); dữ liệu đã về nhưng sai, nên "
-                     f"giờ phiên không giải thích được", {**ev, "join_fault": hit},
+                     f"the join layer refused ({hit[0]}); the data arrived and was wrong, so "
+                     f"session hours explain nothing here", {**ev, "join_fault": hit},
                      fault=_fault_of(codes))
 
     if clock != "America/New_York":
         return Cause(UNKNOWN,
-                     f"cửa sổ của sleeve tính theo {clock}, còn giờ phiên đọc được là ET; "
-                     f"so hai đồng hồ khác nhau ở đây sẽ cho một câu trả lời trông đúng",
+                     f"the sleeve's window is on {clock} while session hours read as ET; "
+                     f"comparing two clocks here gives an answer that only looks right",
                      ev)
 
     bounds = _session_bounds(day)
     if bounds is None:
         if _is_a_session(day) is False:
-            return Cause(MARKET_CLOSED, f"{day} không phải một phiên CME",
+            return Cause(MARKET_CLOSED, f"{day} is not a CME session",
                          {**ev, "is_session": False})
         return Cause(UNKNOWN,
-                     "không đọc được giờ phiên cho ngày này, nên không nói được thị trường "
-                     "có mở trong cửa sổ hay không", ev)
+                     "session hours for this day could not be read, so whether the market was "
+                     "open during the window cannot be stated", ev)
 
     open_et, close_et = bounds
     lo = _dt.datetime.combine(day, _dt.time(*(int(x) for x in window_from.split(":"))))
@@ -279,28 +280,28 @@ def classify(*, session_day, window_from: str, window_to: str,
 
     if lo >= close_et:
         return Cause(MARKET_CLOSED,
-                     f"phiên đóng lúc {close_et:%H:%M} ET, còn cửa sổ bắt đầu "
-                     f"{window_from} — không bar nào có thể tồn tại trong khung này", ev)
+                     f"the session closed at {close_et:%H:%M} ET and the window opens at "
+                     f"{window_from} — no bar can exist in this frame", ev)
     if hi <= open_et:
         return Cause(MARKET_CLOSED,
-                     f"phiên mở lúc {open_et:%H:%M} ET, còn cửa sổ kết thúc {window_to}", ev)
+                     f"the session opened at {open_et:%H:%M} ET and the window ended at {window_to}", ev)
     if lo < close_et < hi:
         return Cause(MARKET_CLOSED,
-                     f"phiên đóng lúc {close_et:%H:%M} ET, giữa cửa sổ {window_from}-"
-                     f"{window_to} — phần sau giờ đóng không thể có bar",
+                     f"the session closed at {close_et:%H:%M} ET, inside the window {window_from}-"
+                     f"{window_to} — nothing after the close can carry a bar",
                      {**ev, "partial": True})
 
     if codes and set(codes) <= _TIMING_CODES:
         return Cause(DATA_NOT_YET,
-                     "cửa sổ chưa tới; slot sau trong cùng cửa sổ vẫn có thể chạy", ev)
+                     "the window has not arrived; a later slot in it can still run", ev)
 
     if codes:
         return Cause(SYSTEM_FAULT,
-                     f"phiên mở suốt cửa sổ {window_from}-{window_to} nhưng cổng vẫn từ "
-                     f"chối ({', '.join(sorted(set(codes)))}) — dữ liệu đáng lẽ phải có",
+                     f"the session was open across {window_from}-{window_to} and the gate still "
+                     f"refused ({', '.join(sorted(set(codes)))}) — the data should have been there",
                      ev, fault=_fault_of(codes))
 
-    return Cause(UNKNOWN, "không có mã từ chối nào để xét", ev)
+    return Cause(UNKNOWN, "there is no refusal code to judge", ev)
 
 
 def classify_slot(record: dict, requirements: "dict | None" = None) -> Cause:
@@ -314,11 +315,11 @@ def classify_slot(record: dict, requirements: "dict | None" = None) -> Cause:
         try:
             from global_index.track1_intraday import REQUIREMENTS as requirements
         except Exception:                                        # noqa: BLE001
-            return Cause(UNKNOWN, "không đọc được bảng yêu cầu của cổng",
+            return Cause(UNKNOWN, "the gate's requirement table could not be read",
                          {"sleeve": sleeve})
     req = (requirements or {}).get(sleeve)
     if req is None:
-        return Cause(UNKNOWN, f"cổng không có yêu cầu nào cho sleeve {sleeve!r}",
+        return Cause(UNKNOWN, f"the gate holds no requirement for sleeve {sleeve!r}",
                      {"sleeve": sleeve})
     return classify(session_day=record.get("session_date"),
                     window_from=req.today_from, window_to=req.today_to,

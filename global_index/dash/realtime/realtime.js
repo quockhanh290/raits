@@ -4636,20 +4636,20 @@
        Con số dẫn đầu là SỐ CẦN NGƯỜI, không phải tổng: đó là câu hỏi người vận hành đang
        hỏi. Gộp chúng lại là quay về chỗ một ngày lễ trông như một ngày hỏng. */
     const REFUSAL_WORDS = {
-      market_closed: 'thị trường đóng',
-      data_not_yet: 'dữ liệu chưa tới',
-      unknown: 'chưa rõ nguyên nhân',
-      'system_fault/data_join': 'hai nửa dữ liệu bất đồng',
-      'system_fault/session_absent': 'phiên mở mà không có bar',
-      'system_fault/partial_coverage': 'bar thủng giữa cửa sổ',
-      'system_fault/stale_frame': 'khung dữ liệu cũ',
-      'system_fault/no_provider': 'slot chạy không có nguồn bar',
-      system_fault: 'lỗi hệ thống'
+      market_closed: 'market closed',
+      data_not_yet: 'data has not arrived',
+      unknown: 'cause not established',
+      'system_fault/data_join': 'the two halves disagree',
+      'system_fault/session_absent': 'session open, no bars',
+      'system_fault/partial_coverage': 'bars missing mid-window',
+      'system_fault/stale_frame': 'frame is stale',
+      'system_fault/no_provider': 'slot ran with no bar source',
+      system_fault: 'system fault'
     };
     function refusalRow() {
       const r = sig.refusals || {};
       if (!r.present) return r.reading || '--';
-      if (!r.total) return 'không slot nào bị từ chối';
+      if (!r.total) return 'no slot was refused';
       const groups = (r.groups || []).slice().sort((a, b) => b.count - a.count);
       const chips = groups.map(g => {
         const key = g.fault ? `${g.cause}/${g.fault}` : g.cause;
@@ -4660,8 +4660,8 @@
           `${esc(word)} <b>${g.count}</b></span>`;
       }).join('');
       const lead = r.needs_a_person
-        ? `<b>${r.needs_a_person} cần người</b> trên ${r.total}`
-        : `${r.total}, không cái nào cần người`;
+        ? `<b>${r.needs_a_person} need a person</b> of ${r.total}`
+        : `${r.total}, none need a person`;
       return `<span class="t1-refusals">${lead}${chips}</span>`;
     }
 

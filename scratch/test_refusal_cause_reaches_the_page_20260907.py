@@ -78,12 +78,30 @@ def test_the_payload_counts_what_needs_a_person_separately():
     assert r["needs_a_person"] <= r.get("total", 0)
 
 
-def test_todays_refusals_are_all_market_closed():
-    """Neo vào phiên 07/09: 23 slot swing, CME đóng 13:00, không cái nào cần người."""
-    r = _payload()
+def test_the_labor_day_session_reads_as_market_closed():
+    """Neo vào phiên 07/09 ĐÃ GHI, không vào "hôm nay".
+
+    Bản đầu neo vào hôm nay và đỏ hai giờ sau khi viết, lúc ET lăn sang 08/09 — đúng luật
+    "phép đo của chính mình cũng hết hạn". Một ngày đã đóng sổ thì không đổi nữa; "hôm nay"
+    thì đổi mỗi đêm, và một phép kiểm đo nó thực ra đang đo cái đồng hồ.
+    """
+    from monitor.backend.track1_runtime_reader import _refusal_causes
+
+    r = _refusal_causes("20260907", REPO)
     assert r.get("total") == 23, r
     assert r.get("needs_a_person") == 0, r
     assert [g["cause"] for g in r["groups"]] == ["market_closed"], r["groups"]
+    assert r["groups"][0]["evidence"]["codes"] == ["missing_session", "stale"], r["groups"][0]
+
+
+def test_the_live_payload_is_well_formed_on_any_day():
+    """Cái duy nhất đúng với MỌI ngày: hình dạng. Số thì tuỳ ngày, và một ngày chưa có slot
+    nào là câu trả lời hợp lệ, không phải một lỗi."""
+    r = _payload()
+    assert r.get("present") is True, r
+    assert isinstance(r.get("total"), int) and r["total"] >= 0, r
+    assert r["needs_a_person"] <= r["total"], r
+    assert sum(g["count"] for g in r["groups"]) == r["total"], r
 
 
 def test_a_group_that_needs_a_person_carries_what_to_check():
@@ -137,11 +155,11 @@ def _row(refusals: dict) -> str:
 HOLIDAY = {"present": True, "total": 23, "needs_a_person": 0,
            "groups": [{"cause": "market_closed", "fault": "", "count": 23,
                        "needs_a_person": False, "action": "",
-                       "detail": "phiên đóng lúc 13:00 ET"}]}
+                       "detail": "the session closed at 13:00 ET"}]}
 BROKEN = {"present": True, "total": 23, "needs_a_person": 23,
           "groups": [{"cause": "system_fault", "fault": "session_absent", "count": 23,
-                      "needs_a_person": True, "action": "Kiểm job cập nhật dữ liệu 13:45",
-                      "detail": "phiên mở mà không có bar"}]}
+                      "needs_a_person": True, "action": "Check the 13:45 data refresh",
+                      "detail": "session open, no bars"}]}
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="cần node")
@@ -150,8 +168,8 @@ def test_the_same_count_reads_differently_on_a_holiday_and_a_broken_day():
     phải nói khác nhau."""
     h, b = _row(HOLIDAY), _row(BROKEN)
     assert h != b, "hai tình huống trái ngược mà màn hình nói y hệt nhau"
-    assert "không cái nào cần người" in h, h
-    assert "cần người" in b and "23" in b, b
+    assert "none need a person" in h, h
+    assert "need a person" in b and "23" in b, b
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="cần node")
@@ -171,19 +189,19 @@ def test_the_cause_is_named_in_words_not_in_codes():
     """"market_closed" là từ của người viết mã. Người đọc màn hình cần một câu."""
     h = _row(HOLIDAY)
     assert "market_closed" not in h, h
-    assert "thị trường đóng" in h, h
+    assert "market closed" in h, h
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="cần node")
 def test_no_refusals_says_so_rather_than_rendering_empty():
     out = _row({"present": True, "total": 0, "needs_a_person": 0, "groups": []})
-    assert "không slot nào bị từ chối" in out
+    assert "no slot was refused" in out
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="cần node")
 def test_an_absent_day_shows_its_reading():
-    out = _row({"present": False, "reading": "chưa có slot nào hôm nay"})
-    assert "chưa có slot nào" in out
+    out = _row({"present": False, "reading": "no slot has run today"})
+    assert "no slot has run today" in out
 
 
 # ── dấu phải nhìn thấy được ──────────────────────────────────────────────────
