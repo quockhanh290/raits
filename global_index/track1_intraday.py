@@ -517,10 +517,16 @@ def validate(sleeve: str, bars, *, now_et, session_day=None,
 
     # ── the prior session, where the gate reads it ───────────────────────────
     if req.needs_prior_rth:
-        prior = (pd.Timestamp(prior_session_day).normalize()
-                 if prior_session_day is not None else _prev_business_day(day))
-        checks.extend(_span_check("prior_rth", idx, prior, req.prior_from, req.prior_to,
-                                  req.bar_minutes))
+        if prior_session_day is not None:
+            prior, stepped = pd.Timestamp(prior_session_day).normalize(), []
+        else:
+            prior, stepped = _prev_full_session(idx, day, req.prior_to)
+        unexplained = _skip_is_explained(stepped)
+        if unexplained is not None:
+            checks.append(unexplained)
+        else:
+            checks.extend(_span_check("prior_rth", idx, prior, req.prior_from, req.prior_to,
+                                      req.bar_minutes))
 
     # ── did anyone actually watch the window ─────────────────────────────────
     if ledger_status is None:
@@ -541,10 +547,111 @@ def validate(sleeve: str, bars, *, now_et, session_day=None,
 
 
 def _prev_business_day(day: pd.Timestamp) -> pd.Timestamp:
+    """Weekdays only. Kept as the LAST RESORT of `_prev_full_session`, not as a rule.
+
+    On its own this names a holiday the day after every holiday, which is how 2026-09-08
+    refused: it returned Labor Day, whose RTH holds 210 of 391 minutes because CME shut at
+    13:00, and the gate reported `partial_coverage` on a day whose data was fine.
+    """
     x = pd.Timestamp(day).normalize() - pd.Timedelta(days=1)
     while x.weekday() >= 5:
         x -= pd.Timedelta(days=1)
     return x
+
+
+def _prev_full_session(idx: pd.DatetimeIndex, day: pd.Timestamp, prior_to: str,
+                       limit: int = 14) -> pd.Timestamp:
+    """The last session BEFORE `day` that ran to `prior_to` — asked of the bars, not a clock.
+
+    Stage 5ZZZ-BD. This is the detector's own rule, borrowed rather than re-derived.
+    `track1_calm_a.rth_sessions` admits a session only when its end bar exists, and its
+    docstring records that a calendar was tried and rejected for this exact job:
+
+        trading_calendar calls 2019-12-24 and 2023-11-24 trading days, which they are — the
+        exchange is open. What the detector cannot use is a session with no end bar, because
+        its close and its range would then be measured at 13:00 and mean something different.
+
+    So a calendar answers the wrong question TWICE over. It says a half day is a trading day,
+    which the detector rejects; and it says nothing at all about whether the bars arrived.
+    Measured on the five half-day cases in two years — 2024-11-29, 2024-12-24, 2025-07-03,
+    2025-11-28, 2025-12-24 — a calendar rule names the half day while the detector skips to
+    the full session before it. A gate that verified the half day would be checking a day the
+    strategy never reads.
+
+    Asking the bars answers both questions at once and cannot drift from the detector, since
+    both are the same sentence: did this session produce its end bar.
+
+    When NOTHING qualifies inside `limit` days, it returns the weekday rule and an EMPTY skip
+    list — deliberately, so the span check speaks instead. A frame with no bars at all is not
+    fourteen separate outages; it is one blackout, and `_span_check` already has the sentence
+    for that. Measured: a silent provider recorded `missing_session` on 2026-08-27, and
+    reporting fourteen dates there would bury the one fact that matters. The gate still
+    refuses either way — this only chooses which true sentence a person reads.
+
+    Returns the day AND every day it stepped over, because those two cases must not be
+    confused by whatever reads this:
+
+        stepped over a holiday or a half day   the calendar says so; the detector skips it too
+        stepped over a full session            that session's bars are MISSING
+
+    Walking past the second one silently is how a data outage becomes an invisible decision on
+    a two-day-old close. `_skip_is_explained` is what refuses it.
+    """
+    want = pd.Timestamp(day).normalize() - pd.Timedelta(days=1)
+    stepped: list = []
+    for _ in range(int(limit)):
+        if len(idx[idx == want + _hhmm(prior_to)]):
+            return want, stepped
+        stepped.append(want)
+        want -= pd.Timedelta(days=1)
+    return _prev_business_day(day), []
+
+
+def _skip_is_explained(stepped: list) -> "Check | None":
+    """Every day stepped over must be a day the market could not have delivered.
+
+    Stage 5ZZZ-BD. The bars decide WHICH session is prior; the calendar only has to say
+    whether each skipped day was entitled to be skipped. A weekend, a holiday, an early close
+    — all fine, the detector rejects those by its own rule. A full regular session with no end
+    bar is not fine: it is an outage, and the sleeve would otherwise decide on an older close
+    with nothing on the record saying so.
+
+    Measured: 2024-09-23 steps over 2024-09-20, a full NYSE session whose RTH is missing from
+    the file. Without this the gate allows that day; with it, it refuses and names the date.
+
+    Returns None when every skip is accounted for. An unreadable calendar cannot account for
+    anything, so it refuses — the same direction the gate takes everywhere else.
+    """
+    if not stepped:
+        return None
+    try:
+        from raits.live.trading_calendar import is_early_close, is_trading_day
+    except Exception as exc:                                # noqa: BLE001
+        return Check("prior_rth", MISSING_SESSION,
+                     f"stepped over {[str(d.date()) for d in stepped]} and no calendar could "
+                     f"say whether those were sessions ({type(exc).__name__}) — refusing "
+                     f"rather than assuming they were closed")
+    unexplained = []
+    for d in stepped:
+        day = d.date()
+        if d.weekday() >= 5:
+            continue
+        try:
+            if not is_trading_day(day) or is_early_close(day):
+                continue
+        except Exception:                                   # noqa: BLE001
+            unexplained.append(day)
+            continue
+        unexplained.append(day)
+    if not unexplained:
+        return None
+    # ISO, not the repr of a date object: this sentence is read by a person deciding whether
+    # to get out of bed, and `datetime.date(2024, 9, 20)` makes them parse Python first.
+    named = ", ".join(d.isoformat() for d in unexplained)
+    return Check("prior_rth", MISSING_SESSION,
+                 f"{named} were full sessions and their end bars are absent, so the "
+                 f"prior session had to be taken from further back — that is a data outage, "
+                 f"not a market fact")
 
 
 def synth_bars(day, lo: str, hi: str, step_minutes: int = 5, *, tz: str | None = None,
