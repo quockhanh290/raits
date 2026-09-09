@@ -829,10 +829,19 @@ SLOT_WINDOW_SHUT = "observed_window_shut"
 SLOT_HARD_REFUSAL = "observed_hard_refusal"
 SLOT_UNOBSERVED = "unobserved"
 
+#: Stage 5ZZZ-BF. The slot looked, and the market was shut across its window.
+#:
+#: Kept apart from SLOT_WINDOW_SHUT on purpose, because the two are different facts and a
+#: reader of the record needs both: window_shut says the SLEEVE's decision band was closed at
+#: that instant, market_closed says the EXCHANGE was. Collapsing them would leave "the window
+#: was shut" doing two jobs and answering neither cleanly.
+SLOT_MARKET_CLOSED = "observed_market_closed"
+
 #: The three that prove somebody looked. A window is OBSERVATION-complete when every
 #: registered slot id landed in one of these — which is a different question from the ledger's
 #: `complete`, and both are reported.
-OBSERVED_CLASSES = frozenset({SLOT_DECISION, SLOT_NO_ACTION, SLOT_WINDOW_SHUT})
+OBSERVED_CLASSES = frozenset({SLOT_DECISION, SLOT_NO_ACTION, SLOT_WINDOW_SHUT,
+                              SLOT_MARKET_CLOSED})
 
 
 def clock_refusal_codes() -> frozenset:
@@ -864,6 +873,42 @@ def classify_slot_row(row) -> str:
     codes = [c.strip() for c in str(row.get("detail") or "").split(",") if c.strip()]
     if codes and all(c in clock_refusal_codes() for c in codes):
         return SLOT_WINDOW_SHUT
+    return _shut_market_or_hard_refusal(row, codes)
+
+
+def _shut_market_or_hard_refusal(row: dict, codes: list) -> str:
+    """Was there nothing to look at, or was something broken?
+
+    Stage 5ZZZ-BF. Until this, every refusal that was not a clock code counted as a failure.
+    That sentence gathers two facts that lead to opposite actions:
+
+        the feed broke and the bars never came     somebody has to get up
+        the exchange was shut across the window    nobody has to do anything
+
+    Measured, and the reason this is not a small distinction: on Labor Day 2026-09-07 CME
+    closed at 13:00 and the Swing window is 14:05-15:55. Twenty-three slots ran, looked, found
+    no bar could exist, and refused — correct behaviour, graded as twenty-three failures, and
+    the day recorded as FAIL. The shadow ledger is the gate on sending orders and allows zero
+    FAIL days in five, so one holiday locked the go-live gate for another five judged days.
+
+    The distinction is not re-derived here. `track1_refusal_cause` already makes it, from the
+    session hours of the sleeve's own exchange, and was measured over 112 recorded refusals.
+    Asking it is what keeps this from becoming a second opinion that can drift.
+
+    Fails CLOSED on everything else. Only `market_closed` opens this door: UNKNOWN does not,
+    because not knowing is not an excuse, and an unreadable classifier leaves the old verdict
+    standing rather than a friendlier one.
+    """
+    if not codes:
+        return SLOT_HARD_REFUSAL
+    try:
+        from global_index import track1_refusal_cause as rc
+
+        cause = rc.classify_slot({**row, "session_date": row.get("date")})
+        if cause.cause == rc.MARKET_CLOSED:
+            return SLOT_MARKET_CLOSED
+    except Exception:                                            # noqa: BLE001
+        return SLOT_HARD_REFUSAL
     return SLOT_HARD_REFUSAL
 
 
@@ -892,7 +937,7 @@ def window_observation(rows, sleeve: str, day) -> dict:
 
     classes: dict = {}
     counts = {k: 0 for k in (SLOT_DECISION, SLOT_NO_ACTION, SLOT_WINDOW_SHUT,
-                             SLOT_HARD_REFUSAL, SLOT_UNOBSERVED)}
+                             SLOT_MARKET_CLOSED, SLOT_HARD_REFUSAL, SLOT_UNOBSERVED)}
     for sid in registered:
         got = by_id.get(sid)
         # The LAST row for a slot id is the one that stands: a slot re-run after a failure

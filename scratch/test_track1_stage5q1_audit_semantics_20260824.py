@@ -237,8 +237,11 @@ def test_the_clock_codes_come_from_the_gate_module_not_from_a_local_copy():
 
 
 def test_the_observed_classes_are_exactly_the_three_that_prove_somebody_looked():
+    # Lớp thứ tư thêm ngày 08/09: một slot chạy vào lúc thị trường đóng cửa suốt cửa sổ của
+    # nó đã quan sát đúng như thiết kế, y như một slot bị đồng hồ của chính sleeve chặn. Giữ
+    # riêng với `window_shut` vì hai sự thật khác nhau — dải quyết định đóng, và SÀN đóng.
     assert acc.OBSERVED_CLASSES == {acc.SLOT_DECISION, acc.SLOT_NO_ACTION,
-                                    acc.SLOT_WINDOW_SHUT}
+                                    acc.SLOT_WINDOW_SHUT, acc.SLOT_MARKET_CLOSED}
     assert acc.SLOT_HARD_REFUSAL not in acc.OBSERVED_CLASSES
     assert acc.SLOT_UNOBSERVED not in acc.OBSERVED_CLASSES
 

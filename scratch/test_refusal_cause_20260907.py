@@ -262,13 +262,63 @@ def test_the_recorded_faults_split_into_more_than_one_origin():
     assert by.get(rc.FAULT_NO_PROVIDER, 0) >= 10, by
 
 
-def test_it_changes_no_verdict():
-    """Tầng này chỉ dịch. Nó không được import bởi cổng, bộ chấm hay bộ thực thi — nếu có,
-    một phân loại sai sẽ đổi được một quyết định, và đó không phải việc của nó."""
+def test_nothing_with_order_authority_reads_it():
+    """Cấm ba module nắm quyền cho lệnh đi. Bộ chấm thì KHÔNG còn bị cấm — sửa ngày 08/09.
+
+    Bản đầu cấm cả bốn, và lý do vẫn đúng: một phân loại sai sẽ đổi được một quyết định. Cái
+    đổi là bộ chấm ĐÃ CẦN nó. Ngày lễ, Swing bị chặn đúng vì chợ đóng, và bộ chấm gọi đó là
+    hai mươi ba lần hỏng — rồi cả ngày thành FAIL, rồi cổng go-live khoá thêm năm ngày xét,
+    vì một hành vi đúng.
+
+    Nên ranh giới dời, và dời có điều kiện chứ không dời suông. Ba điều kiện ấy là ba phép
+    kiểm dưới đây, không phải ba lời hứa trong docstring này.
+
+    Nói rõ chỗ phép kiểm này KHÔNG với tới: `track1_paper_readiness` đọc phán quyết của bộ
+    chấm, nên tầng phân loại vẫn ảnh hưởng tới nó — GIÁN TIẾP. Cấm import trực tiếp không
+    chặn được đường đó, và giả vờ rằng có là đúng cái bẫy "tên phép kiểm hứa rộng hơn thứ nó
+    kiểm".
+    """
     import ast
 
     for name in ("track1_gates.py", "track1_paper_readiness.py",
-                 "track1_shadow_acceptance.py", "track1_paper_executor.py"):
+                 "track1_paper_executor.py"):
         src = (REPO / "global_index" / name).read_text(encoding="utf-8")
         assert "track1_refusal_cause" not in src, name
         ast.parse(src)
+
+
+def test_the_one_module_that_may_read_it_fails_closed(monkeypatch):
+    """Điều kiện 1: phân loại hỏng thì giữ nguyên phán quyết cũ, không phán quyết dễ hơn."""
+    import global_index.track1_refusal_cause as rc
+    import global_index.track1_shadow_acceptance as acc
+
+    row = {"sleeve": "roska4_swing", "date": "2026-09-07", "decided": False,
+           "reason": "gate_refused", "detail": "missing_session,stale"}
+    assert acc.classify_slot_row(row) == acc.SLOT_MARKET_CLOSED       # đường thường
+
+    def boom(*a, **k):
+        raise RuntimeError("hỏng")
+
+    monkeypatch.setattr(rc, "classify_slot", boom)
+    assert acc.classify_slot_row(row) == acc.SLOT_HARD_REFUSAL
+
+
+def test_only_a_shut_market_is_treated_leniently():
+    """Điều kiện 2: chỉ `market_closed` mở đường. Bốn nguyên nhân, ba cái còn lại vẫn hỏng."""
+    import global_index.track1_shadow_acceptance as acc
+
+    base = {"sleeve": "roska4_swing", "decided": False, "reason": "gate_refused"}
+    # chợ mở suốt cửa sổ mà vẫn bị chặn -> system_fault
+    assert acc.classify_slot_row({**base, "date": "2026-09-04",
+                                  "detail": "missing_session,stale"}) == acc.SLOT_HARD_REFUSAL
+    # sleeve không tồn tại -> unknown, và unknown KHÔNG phải một lời bào chữa
+    assert acc.classify_slot_row({**base, "sleeve": "không_có", "date": "2026-09-07",
+                                  "detail": "missing_session"}) == acc.SLOT_HARD_REFUSAL
+
+
+def test_the_lenient_path_is_reachable_at_all():
+    """Điều kiện 3: và nó phải THẬT SỰ mở được — một đường không bao giờ đi qua thì hai phép
+    kiểm trên tự đồng ý với chính chúng."""
+    import global_index.track1_shadow_acceptance as acc
+
+    assert acc.SLOT_MARKET_CLOSED in acc.OBSERVED_CLASSES
