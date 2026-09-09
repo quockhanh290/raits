@@ -106,8 +106,47 @@ def _run_normal(window: str) -> dict:
                        context_filter_for=set(R4))
 
 
+#: Stage 5ZZZ-BG. The three rows the promoted code deliberately no longer reproduces, and
+#: the measurement behind each. Everything else must still match row for row.
+#:
+#: The committed artifact is KEPT as it was written. Regenerating it would leave the check
+#: comparing the code against its own output — a comparison that agrees with itself no matter
+#: what the code does. So the record stays, and the differences are declared here instead.
+#:
+#: All three are the same fault seen twice in one direction and once in the other: the range
+#: filter read a session that never ran to its close, and answered anyway.
+#:
+#:   window/inst  day         prior session under each rule            was -> is
+DECLARED_DIFFS: dict = {
+    ("floor", "M2K"): {
+        "removed": {("2020-07-01", "2020-07-06", "LONG", "1598.9", "1626.9", "136.76")},
+        "added": {("2021-11-29", "2021-12-01", "LONG", "2435.2", "2345.6", "-451.24")},
+        "why": ("2020-07-01 read 2020-06-30, which holds 41 bars of 391 and stops at 10:10 — "
+                "a range measured across forty minutes, 0.0075, under the threshold. The last "
+                "session that ran to its close, 2020-06-29, measures 0.0308 and blocks. "
+                "2021-11-29 is the same fault the other way: 2021-11-26 is a half day of 225 "
+                "bars ending 13:14 whose range is 0.0275, ABOVE the threshold, so it blocked "
+                "an entry the full session before it (0.0138) admits. A half day is not "
+                "reliably quieter, which is why a calendar could not have decided this."),
+    },
+    ("vault2026", "MNQ"): {
+        "removed": {("2026-07-06", "2026-07-12", "LONG", "30026.75", "29956.75", "-143.24")},
+        "added": set(),
+        "why": ("2026-07-06 read 2026-07-03, the July 4th half session: 210 bars ending 12:59, "
+                "range 0.0024 against a threshold frozen on full 6.5-hour sessions. The last "
+                "full session, 2026-07-02, measures 0.0327 and blocks."),
+    },
+}
+
+
 @pytest.mark.parametrize("window", WINDOWS)
 def test_a_normal_r4_reproduces_the_committed_rows_exactly(window):
+    """Row for row, except the differences declared above by name.
+
+    The exception list is not a softening. A fourth difference — any row appearing or
+    vanishing that is not written down — still fails, which is the whole reason the committed
+    artifact is left untouched rather than regenerated.
+    """
     raw = _committed(window)
     got = _run_normal(window)
     total = 0
@@ -115,16 +154,31 @@ def test_a_normal_r4_reproduces_the_committed_rows_exactly(window):
         a = _rows(raw["filtered"].get(inst, []))
         b = _rows(got[inst]["trades"])
         assert a, f"{window}/{inst}: the committed side is empty — the comparison would pass on nothing"
-        first = next((i for i in range(max(len(a), len(b)))
-                      if (a[i] if i < len(a) else None) != (b[i] if i < len(b) else None)),
-                     None)
-        assert first is None, (
-            f"{window}/{inst} first divergence at row {first}: "
-            f"committed={a[first] if first < len(a) else '(none)'} "
-            f"mine={b[first] if first < len(b) else '(none)'}")
-        assert len(a) == len(b)
+        decl = DECLARED_DIFFS.get((window, inst), {"removed": set(), "added": set()})
+        removed, added = set(a) - set(b), set(b) - set(a)
+        assert removed == decl["removed"], (
+            f"{window}/{inst} rows vanished that are not declared: {removed - decl['removed']}"
+            f" (declared and still present: {decl['removed'] - removed})")
+        assert added == decl["added"], (
+            f"{window}/{inst} rows appeared that are not declared: {added - decl['added']}"
+            f" (declared and absent: {decl['added'] - added})")
+        assert len(b) == len(a) - len(decl["removed"]) + len(decl["added"])
         total += len(a)
     assert total > 0
+
+
+def test_every_declared_difference_says_why_in_words():
+    """A difference list without reasons is a way to make a check green, not a record."""
+    for k, d in DECLARED_DIFFS.items():
+        assert len(d["why"].split()) >= 30, k
+        assert d["removed"] or d["added"], k
+
+
+def test_the_declared_differences_are_not_a_blanket():
+    """Two instruments, three rows. If this list starts growing, somebody has to look."""
+    n = sum(len(d["removed"]) + len(d["added"]) for d in DECLARED_DIFFS.values())
+    assert n == 3, n
+    assert len(DECLARED_DIFFS) == 2, sorted(DECLARED_DIFFS)
 
 
 def test_a_the_generator_replaces_no_production_symbol():

@@ -89,9 +89,46 @@ def prev_rth_range_map(df1m: pd.DataFrame) -> dict:
     daily = pd.DataFrame({"high": g["high"].max(), "low": g["low"].min(),
                           "close": g["close"].last()})
     rng = (daily["high"] - daily["low"]) / daily["close"].abs().clip(lower=1e-9)
-    prev = rng.shift(1)
-    return {pd.Timestamp(k).normalize(): float(v)
-            for k, v in prev.items() if np.isfinite(v)}
+
+    # Stage 5ZZZ-BG. The LAST SESSION THAT RAN TO ITS END, not the previous row.
+    #
+    # `shift(1)` takes whatever day sits above, and a row exists for any day with bars at all
+    # — including days that carry only part of a session. Two kinds slipped in, and the
+    # threshold this feeds was frozen on FULL 6.5-hour sessions, so both are a unit mismatch
+    # rather than a small inaccuracy:
+    #
+    #     a half day        3.5 hours, a mechanically smaller range
+    #     a truncated file  whatever survived
+    #
+    # Measured, and the reason this is not cosmetic: M2K on 2020-07-01. The day above it,
+    # 2020-06-30, holds 41 bars of 391 and stops at 10:10 — one of the known Databento
+    # artifacts. The filter measured "yesterday's range" across forty minutes, got a small
+    # number, concluded yesterday was quiet, and let the entry through. That day was not
+    # quiet; the file was forty minutes long.
+    #
+    # A calendar cannot do this job. It names half days and says nothing about a truncated
+    # file, and MNKD runs on the Tokyo clock where asking NYSE is the wrong exchange — the
+    # mistake this repository has already paid for twice. Asking the bars answers both at
+    # once: did this session print its end bar.
+    #
+    # COST, measured before the change: 14 days change verdict across five instruments, about
+    # 1.6 a year, of which two coincide with a committed row — M2K 2020-07-01 and MNQ
+    # 2026-07-06, both pass -> block. The committed set therefore goes 1,223 -> 1,221 and the
+    # `SLEEVE_normal_r4` evidence has to say so.
+    ran_to_close = pd.DatetimeIndex(sorted(
+        dd for dd, gg in rth.groupby(rth.index.normalize())
+        if (gg.index.time == RTH_END).any()))
+    if not len(ran_to_close):
+        return {}
+    prior_pos = ran_to_close.searchsorted(rng.index, side="left") - 1
+    out: dict = {}
+    for day, pos in zip(rng.index, prior_pos):
+        if pos < 0:
+            continue
+        v = rng.get(ran_to_close[pos], np.nan)
+        if np.isfinite(v):
+            out[pd.Timestamp(day).normalize()] = float(v)
+    return out
 
 
 class R4ContextFilter:

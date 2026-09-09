@@ -4525,6 +4525,17 @@
     // the audit verdict: on 2026-08-27 the overnight window passed all twenty-two slots while
     // this file was a day short, and showing the second as the first would send a reader to
     // inspect a window that worked.
+    function sessionNoteRow() {
+      const n = t1.session_note || {};
+      if (!n.present) return n.reading || '--';
+      const nx = n.next_quarterly_expiry
+        ? `next quarterly expiry ${n.next_quarterly_expiry}` +
+          (n.days_until_next != null ? ` (${n.days_until_next} day(s))` : '')
+        : '';
+      if (!(n.notes || []).length) return esc(['ordinary session', nx].filter(Boolean).join(' — '));
+      return esc([n.line, nx].filter(Boolean).join(' · '));
+    }
+
     function spyRow() {
       const s = t1.spy_daily || {};
       if (!s.line) return 'not measured';
@@ -4692,6 +4703,10 @@
       t1Fact('Explanations', explRow()),
       t1Fact('Paper account', acctRow(), acctTone()),
       t1Fact('SPY daily', spyRow(), spyTone()),
+      // Stage 5ZZZ-BH. What kind of session today is. Ordinary days say when the next
+      // notable one lands rather than nothing at all: a blank row and a row that has not
+      // been written look the same, and only one of them means "nothing to know".
+      t1Fact('Session', sessionNoteRow()),
       t1Fact('Calm phases', calmRow()),
       t1Fact('Book', t1.book?.present ? 'present' : 'absent (expected in shadow — no orders)'),
       t1Fact('Checkpoint', t1.checkpoint?.present ? 'present' : 'absent'),

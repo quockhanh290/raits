@@ -713,15 +713,26 @@ BLOCKERS: dict = {
         blocks_orders=False,
         evidence=(
             "global_index/track1_normal_r4.py generates the sleeve from bars without "
-            "replacing a single production symbol, and reproduces the committed rows EXACTLY "
-            "on all three windows: 980 on floor, 136 on vault2025, 107 on vault2026 — 1,223 "
-            "rows, per instrument, row for row. The scratch path got the same answer by "
+            "replacing a single production symbol, and reproduces the committed rows on all "
+            "three windows row for row EXCEPT THREE, each declared by name with its "
+            "measurement: 1,223 committed, 1,222 produced. On 2026-09-08 the range filter was "
+            "found reading sessions that never ran to their close and answering anyway — "
+            "M2K 2020-07-01 read a prior day holding 41 bars of 391 that stops at 10:10, and "
+            "MNQ 2026-07-06 read the July 4th half session of 210 bars ending 12:59, both "
+            "admitted on a range the full session refuses; M2K 2021-11-29 is the same fault "
+            "inverted, where a 225-bar half day measured ABOVE the threshold and blocked an "
+            "entry the full session before it admits. The filter now takes the last session "
+            "that printed its end bar, asked of the bars rather than a calendar so it holds "
+            "on the Tokyo clock too. The committed artifact is KEPT rather than regenerated: "
+            "regenerating would leave this check comparing the code against its own output, "
+            "and a fourth difference still fails. The scratch path got the same answer by "
             "rebinding backtest_swing_tf, _swing_cache, TrendFollowStrategy.generate_signal, "
             "SwingTFEngine and StressMidEngine and mutating trend_follow.DEFAULT_CONFIG; a "
             "test now asserts by OBJECT IDENTITY that a run leaves all five and the config "
             "untouched. The two context filters were PROMOTED rather than re-derived into "
             "global_index/track1_normal_filters.py, and a test requires the promoted copy and "
-            "the scratch original to return the same verdict for every 5-minute bar."),
+            "the scratch original to return the same verdict for every 5-minute bar — a "
+            "promotion, so the correction above was applied to BOTH copies."),
         depends_on=("B3_intraday_freshness",)),
 
     "SLEEVE_nkd_mnkd": Blocker(

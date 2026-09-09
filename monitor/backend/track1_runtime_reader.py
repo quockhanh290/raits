@@ -381,6 +381,36 @@ def _closed_phrase(closed: list) -> str:
         f"{_dt.date.fromisoformat(c['date']).strftime('%b')}" for c in closed)
 
 
+def _session_note() -> dict:
+    """What kind of session today is, and when the next notable one lands.
+
+    Stage 5ZZZ-BH. The decision on 2026-09-18 was "run normally and record it". Recording is
+    the half that does not happen by itself: nothing in the audit or on the panel names a
+    session type, so a reader coming back to that date would see an ordinary day and would
+    have to already know it was not one — which is the same as not recording it.
+
+    That day is the first quarterly expiry this route trades with complete data. Every
+    quarterly expiry from 2017-03-17 to 2024-09-20 is missing its whole RTH from the files
+    the backtest and the live route both read, so the window every threshold was frozen on
+    contains no session of this kind at all.
+
+    Fails SILENT, not closed: this decides nothing, and a calendar that cannot answer must not
+    turn an ordinary day into an alarming one.
+    """
+    try:
+        from global_index import track1_session_note as sn
+
+        today = _today_et().date()
+        nxt = sn.next_quarterly_expiry(today)
+        return {"present": True, "day": today.isoformat(),
+                "notes": sn.notes_for(today), "line": sn.line_for(today),
+                "next_quarterly_expiry": nxt.isoformat() if nxt else None,
+                "days_until_next": (nxt - today).days if nxt else None}
+    except Exception as exc:                                          # noqa: BLE001
+        return {"present": False, "notes": [], "line": "",
+                "reading": f"could not be determined ({type(exc).__name__}: {exc})"}
+
+
 def _spy_daily(root: Path, regime_csv: str = "spy_daily_live.csv") -> dict:
     """The daily regime file against the day the next session will ask for. Stage 5ZZC.
 
@@ -775,6 +805,7 @@ def read_track1_runtime(root: str | Path = ".") -> dict:
         # Stage 5ZZJ. The one gate a person closes, shown where the rest of the route is shown.
         "b1": _b1(root),
         "spy_daily": _spy_daily(root),
+        "session_note": _session_note(),
         "calm_phases": _calm_phases(root),
         "regime_verify": _regime_verify(root),
         "reporting": _reporting(root),

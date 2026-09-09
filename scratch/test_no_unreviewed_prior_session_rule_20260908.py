@@ -56,6 +56,9 @@ REVIEWED: dict = {
         "không phải luật phiên trước — đi TỚI từ một ngày ghim cứng, cho một phép kiểm",
     ("monitor/backend/track1_runtime_reader.py", "_closed_since"):
         "hỏi lịch, không đếm — đi qua từng ngày và hỏi is_trading_day",
+    ("global_index/track1_session_note.py", "third_friday"):
+        "không phải luật phiên trước — đi TỚI từ mùng 1 để đếm thứ Sáu thứ ba, và không "
+        "ngày nào nó trả về được dùng làm hôm qua của ai cả",
 }
 
 #: Những nơi ĐANG SỐNG và ĐANG mù ngày lễ. Rỗng, và đó là điều phải giữ.
@@ -82,9 +85,10 @@ SHIFT_REVIEWED: dict = {
     ("global_index/track1_normal_filters.py", "slot_volume_frame"): (2,
         "một cái là bar 5 phút liền trước, không phải phiên; cái kia nhóm theo giờ trong ngày "
         "nên là cùng khung giờ của phiên trước — nửa phiên tự rơi ra ở các khung buổi chiều"),
-    ("global_index/track1_normal_filters.py", "prev_rth_range_map"): (1,
-        "LỆCH ĐÃ BIẾT — nhận nửa phiên làm phiên trước, còn Calm thì bỏ. Đo được: đổi lại sẽ "
-        "làm 40 ngày đổi giá trị và ĐÚNG 1 ngày đổi kết luận, và phá tính tái lập 1.223 dòng"),
+    # `prev_rth_range_map` từng ở đây với một `shift(1)` và một dòng ghi "LỆCH ĐÃ BIẾT".
+    # Ngày 09/09/2026 nó được sửa: giờ lấy phiên gần nhất CÓ BAR CUỐI, không còn shift nào,
+    # nên không còn chỗ để đăng ký. Ba dòng nó đổi được khai tên trong
+    # test_track1_stage4_production_clean_20260823.py::DECLARED_DIFFS.
     ("global_index/track1_normal_filters.py", "spy_feature_frame"): (6,
         "toàn bộ là độ trễ trên chuỗi SPY ngày, chuỗi chỉ chứa ngày giao dịch nên lùi hàng "
         "đúng là lùi phiên; không cái nào tự định nghĩa phiên trước theo lịch"),
@@ -327,41 +331,62 @@ def test_every_shift_entry_says_something_checkable():
         assert len(why.split()) >= 10, k
 
 
-def test_the_known_divergence_is_still_exactly_one_day():
-    """Chỗ lệch R4 được GHIM bằng số đo, không bằng lời.
+def test_the_divergence_that_was_here_is_gone():
+    """Chỗ lệch giữa R4 và Calm đã được sửa ngày 09/09/2026, và phép kiểm này canh nó không
+    quay lại.
 
-    Nếu nó lớn lên — thêm ngày đổi kết luận — phép kiểm này đỏ và bắt đọc lại. Nếu ai sửa nó,
-    cũng đỏ, và đó là tin tốt cần được ghi vào sổ chứ không được trôi qua.
+    Bản trước của phép kiểm này ghim rằng chỗ lệch "vẫn đúng một ngày" — một câu mô tả một
+    trạng thái đã qua, đúng họ lỗi mà cả phiên này đi sửa. Nên nó được đổi thành câu ngược
+    lại: cả hai nơi giờ phải hỏi CÙNG một câu.
     """
+    import inspect
+
+    import global_index.track1_intraday as TI
+    import global_index.track1_normal_filters as NF
+
+    import ast
+
+    def calls(fn):
+        """Tên các lời gọi trong THÂN hàm. Bản đầu của phép kiểm này soi cả chú thích — nơi
+        `shift(1)` xuất hiện để GIẢI THÍCH luật cũ — và báo đỏ một hàm đã sửa đúng."""
+        tree = ast.parse(inspect.getsource(fn).lstrip())
+        out = set()
+        for n in ast.walk(tree):
+            if isinstance(n, ast.Call):
+                f = n.func
+                out.add(f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", ""))
+            if isinstance(n, ast.ImportFrom):
+                out.add(n.module or "")
+        return out
+
+    r4, calm = calls(NF.prev_rth_range_map), calls(TI._prev_full_session)
+    assert "shift" not in r4, "prev_rth_range_map quay lại lấy hàng liền trước"
+    assert not any("trading_calendar" in c for c in r4 | calm), "quay lại hỏi lịch"
+    assert "searchsorted" in r4, "prev_rth_range_map thôi tìm phiên có bar cuối"
+    assert "_hhmm" in calm, "_prev_full_session thôi tìm bar cuối"
+
+
+def test_the_two_rules_pick_the_same_kind_of_day():
+    """Không so từng ngày — hai bên chạy trên hai khung khác nhau. So NGUYÊN TẮC: cả hai đều
+    bỏ qua một phiên không in ra bar cuối."""
     import logging
     import warnings
-
-    import numpy as np
 
     warnings.filterwarnings("ignore")
     logging.disable(logging.CRITICAL)
     try:
+        import global_index.track1_normal_filters as NF
         from global_index.track1_live_source import frozen_frame
-        from global_index.track1_normal_filters import (FLOOR_RANGE_P90, RTH_END, RTH_START)
-        from raits.live.trading_calendar import is_early_close
     finally:
         logging.disable(logging.NOTSET)
 
     df = frozen_frame("MES", str(REPO / "data/cache/futures/ES_continuous_1m_8y.parquet"))
+    m = NF.prev_rth_range_map(df)
     idx = df.index.tz_localize(None) if df.index.tz is not None else df.index
-    d = df.copy()
-    d.index = idx
-    rth = d[(d.index.time >= RTH_START) & (d.index.time <= RTH_END)]
-    g = rth.groupby(rth.index.normalize())
-    daily = pd.DataFrame({"high": g["high"].max(), "low": g["low"].min(),
-                          "close": g["close"].last()})
-    rng = (daily["high"] - daily["low"]) / daily["close"].abs().clip(lower=1e-9)
+    end = pd.Timestamp(NF.RTH_END if isinstance(NF.RTH_END, str) else "16:00").time()         if not hasattr(NF.RTH_END, "hour") else NF.RTH_END
+    has_end = {d.date() for d in idx[idx.time == end].normalize().unique()}
 
-    now = rng.shift(1)
-    full = [x for x in rng.index if not is_early_close(x.date())]
-    aligned = rng.reindex(full).shift(1).reindex(rng.index).ffill()
-
-    flips = [x.date() for x in rng.index
-             if np.isfinite(now.get(x, np.nan)) and np.isfinite(aligned.get(x, np.nan))
-             and (now[x] <= FLOOR_RANGE_P90) != (aligned[x] <= FLOOR_RANGE_P90)]
-    assert flips == [dt.date(2018, 12, 24)], flips
+    # nửa phiên 28/11/2025 không có bar cuối -> không được là phiên trước của ngày kế
+    assert dt.date(2025, 11, 28) not in has_end
+    nxt = pd.Timestamp("2025-12-01")
+    assert nxt in m, "ngày sau nửa phiên biến mất khỏi bảng"
