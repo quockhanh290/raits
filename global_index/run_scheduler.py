@@ -714,6 +714,50 @@ def _record_regime_label(label: str, *, dry_run: bool = False) -> None:
                     "previous label and its age", label, type(exc).__name__, exc)
 
 
+def _prev_scheduled_day(d, limit: int = 14):
+    """The last day BEFORE `d` on which this scheduler put slots — so a pre-flight can exist.
+
+    Stage 5ZZZ-BE. Night NKD slots run at 01:10 ET, before their own day's 13:45 pre-flight,
+    so they read the PREVIOUS day's record. The rule that found that day skipped weekends and
+    nothing else, and three nights a year it named a day CME is shut, on which this scheduler
+    registers nothing and therefore writes no record. The `flag is None` branch then refused —
+    correctly, on its own terms — and dropped the whole overnight window while telling the
+    operator the scheduler had restarted or the 13:45 job had been missed. Neither happened:
+    there was no job to miss.
+
+        26/12/2025 -> 25/12 Christmas
+        02/01/2026 -> 01/01 New Year
+        06/04/2026 -> 03/04 Good Friday
+
+    Labor Day never bit, and that is the tell: CME holds a session on it, so the pre-flight
+    ran and the record was there. The question was never "which weekday" — it was "which day
+    could hold a record", and that is a question about THIS scheduler's own registration.
+
+    `scheduler_registers_on` already answers it, on the CME calendar, and reads an unknown day
+    as a registered one — the same reading the cron itself makes, since it consults no
+    calendar and fires on any weekday. So without the calendar this degrades to exactly the
+    old rule rather than to something new and untested.
+    """
+    from datetime import timedelta as _td
+
+    x = d - _td(days=1)
+    try:
+        from monitor.backend.schedule_status import scheduler_registers_on
+    except Exception:                                          # noqa: BLE001
+        while x.weekday() >= 5:
+            x -= _td(days=1)
+        return x
+    for _ in range(int(limit)):
+        try:
+            if scheduler_registers_on(x):
+                return x
+        except Exception:                                      # noqa: BLE001
+            if x.weekday() < 5:
+                return x
+        x -= _td(days=1)
+    return x
+
+
 def make_scheduler(port: int, dry_run: bool,
                    data_dir: str = "data/cache/futures",
                    nkd_parquet: str = "global_index/data/NKD_continuous_1m_8y.parquet",
@@ -1306,14 +1350,6 @@ def make_scheduler(port: int, dry_run: bool,
                   "--require-through %s (exit %s)",
                   label, need_s, after or "an unreadable date", regime_csv, need_s, code)
 
-    def _prev_bday(d):
-        """Previous weekday. Night NKD slots run before their own day's pre-flight."""
-        from datetime import timedelta as _td
-        x = d - _td(days=1)
-        while x.weekday() >= 5:      # 5=Sat 6=Sun
-            x -= _td(days=1)
-        return x
-
     def _live_day_body(slot_id: str, *, first_slot: bool = False,
                        clusters: str = "all", prev_preflight: bool = False,
                        verify: bool = False, stress_entry: bool = False) -> None:
@@ -1356,7 +1392,7 @@ def make_scheduler(port: int, dry_run: bool,
         top of it anyway.
         """
         _t = _et_today()
-        today = (_prev_bday(_t) if prev_preflight else _t).isoformat()
+        today = (_prev_scheduled_day(_t) if prev_preflight else _t).isoformat()
         flag = _preflight_ok.get(today)
 
         if flag is True:

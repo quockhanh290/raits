@@ -49,16 +49,72 @@ REVIEWED: dict = {
         "hướng nó rơi vào là TỪ CHỐI",
     ("global_index/track1_freshness.py", "prev_business_day"):
         "mù ngày lễ, nhưng MÃ CHẾT — không nơi nào gọi; docstring cạnh nó đã ghi đúng lỗi này",
-    ("global_index/run_scheduler.py", "_prev_bday"):
-        "MÙ NGÀY LỄ VÀ ĐANG SỐNG — bỏ cửa sổ NKD 3 đêm mỗi năm; chưa ai quyết sửa",
+    ("global_index/run_scheduler.py", "_prev_scheduled_day"):
+        "hỏi scheduler_registers_on, không đếm — vòng weekday còn lại chỉ là đường dự phòng "
+        "khi không nạp được lịch, và nó rơi đúng về luật cũ chứ không sang luật mới",
     ("global_index/track1_slots.py", "_first_weekday"):
         "không phải luật phiên trước — đi TỚI từ một ngày ghim cứng, cho một phép kiểm",
     ("monitor/backend/track1_runtime_reader.py", "_closed_since"):
         "hỏi lịch, không đếm — đi qua từng ngày và hỏi is_trading_day",
 }
 
-#: Trong số trên, những nơi ĐANG SỐNG và ĐANG mù ngày lễ. Trần, không phải danh sách gợi ý.
-BLIND_AND_LIVE = {("global_index/run_scheduler.py", "_prev_bday")}
+#: Những nơi ĐANG SỐNG và ĐANG mù ngày lễ. Rỗng, và đó là điều phải giữ.
+#:
+#: Từng có một: `run_scheduler._prev_bday`, bỏ cửa sổ NKD ba đêm mỗi năm. Đã sửa. Hai mục
+#: còn mù trong sổ trên đều không sống: một là đường dự phòng cuối, một là mã chết.
+BLIND_AND_LIVE: set = set()
+
+
+#: Hình dạng THỨ HAI của cùng câu hỏi: `shift()` trên một chuỗi theo ngày. Máy quét vòng lặp
+#: ở trên không thấy chúng, và chỗ lệch duy nhất tôi tìm được trong tuyến nằm đúng ở đây.
+#:
+#: Phạm vi cố ý hẹp — chỉ các tệp của tuyến Track 1 và bộ sinh bảng cơ sở. Đăng ký toàn kho
+#: sẽ kéo vào hàng chục chỗ tính lợi suất và ATR không liên quan tới "phiên trước", và một sổ
+#: đầy tiếng ồn là một sổ không ai đọc.
+SHIFT_SCOPE = ("global_index/track1_", "monitor/backend/track1_",
+               "global_index/generate_replay_snapshots.py")
+
+#: (tệp, hàm) -> (số lần shift, phán quyết)
+SHIFT_REVIEWED: dict = {
+    ("global_index/generate_replay_snapshots.py", "<module>"): (1,
+        "nhãn chế độ lùi 1 ngày trên chuỗi SPY ngày — chuỗi đó chỉ chứa ngày giao dịch, nên "
+        "lùi một hàng đúng là phiên trước"),
+    ("global_index/track1_normal_filters.py", "slot_volume_frame"): (2,
+        "một cái là bar 5 phút liền trước, không phải phiên; cái kia nhóm theo giờ trong ngày "
+        "nên là cùng khung giờ của phiên trước — nửa phiên tự rơi ra ở các khung buổi chiều"),
+    ("global_index/track1_normal_filters.py", "prev_rth_range_map"): (1,
+        "LỆCH ĐÃ BIẾT — nhận nửa phiên làm phiên trước, còn Calm thì bỏ. Đo được: đổi lại sẽ "
+        "làm 40 ngày đổi giá trị và ĐÚNG 1 ngày đổi kết luận, và phá tính tái lập 1.223 dòng"),
+    ("global_index/track1_normal_filters.py", "spy_feature_frame"): (6,
+        "toàn bộ là độ trễ trên chuỗi SPY ngày, chuỗi chỉ chứa ngày giao dịch nên lùi hàng "
+        "đúng là lùi phiên; không cái nào tự định nghĩa phiên trước theo lịch"),
+}
+
+
+def _shift_sites() -> dict:
+    """{(tệp, hàm): số lần .shift(...)} trong phạm vi tuyến."""
+    out: dict = {}
+    for root in ROOTS:
+        for f in sorted((REPO / root).rglob("*.py")):
+            rel = str(f.relative_to(REPO)).replace("\\", "/")
+            if "test_" in f.name or not rel.startswith(SHIFT_SCOPE):
+                continue
+            try:
+                src = f.read_text(encoding="utf-8")
+                tree = ast.parse(src)
+            except Exception:                                # noqa: BLE001
+                continue
+            fn_of = {}
+            for n in ast.walk(tree):
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    for c in ast.walk(n):
+                        fn_of[id(c)] = n.name
+            for n in ast.walk(tree):
+                if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                        and n.func.attr == "shift"):
+                    k = (rel, fn_of.get(id(n), "<module>"))
+                    out[k] = out.get(k, 0) + 1
+    return out
 
 
 def _walk_sites() -> dict:
@@ -207,30 +263,105 @@ def test_the_dead_one_is_still_dead():
     assert not callers, f"prev_business_day không còn là mã chết — {callers} gọi nó"
 
 
-def test_the_live_blind_rule_is_capped_at_one():
-    """Trần. Ca thứ ba không được lặng lẽ xuất hiện."""
-    assert len(BLIND_AND_LIVE) == 1, BLIND_AND_LIVE
-    assert BLIND_AND_LIVE <= set(REVIEWED)
+def test_no_live_rule_is_blind_any_more():
+    """Trần bằng không. Một ca mới không được lặng lẽ xuất hiện."""
+    assert BLIND_AND_LIVE == set(), BLIND_AND_LIVE
 
 
 def test_the_scheduler_case_is_measured_not_asserted():
-    """Ba đêm mỗi năm, và phép kiểm này đo lại chứ không tin lời tôi viết trong sổ."""
+    """Ba đêm ấy vẫn là ba đêm luật CŨ sẽ hỏng, và luật MỚI thì không.
+
+    Đo lại cả hai chiều mỗi lần chạy, chứ không tin lời tôi viết trong sổ. Nếu lịch đổi và
+    ba đêm ấy không còn là ba đêm nữa, phép kiểm này đỏ và bắt đọc lại.
+    """
     import logging
     import warnings
 
     warnings.filterwarnings("ignore")
     logging.disable(logging.CRITICAL)
     try:
+        import global_index.run_scheduler as rs
         from monitor.backend.schedule_status import scheduler_registers_on
     finally:
         logging.disable(logging.NOTSET)
 
-    bad = []
+    would_have_broken, still_broken = [], []
     for d in ("2025-12-26", "2026-01-02", "2026-04-06"):
         day = dt.date.fromisoformat(d)
-        prior = _prev_weekday(day)
-        if scheduler_registers_on(day) and scheduler_registers_on(prior) is False:
-            bad.append((d, str(prior)))
-    assert len(bad) == 3, (
-        f"số đêm bị bỏ đã đổi ({bad}) — hoặc ai đó đã sửa, hoặc lịch đã đổi. Cả hai đều cần "
-        f"cập nhật sổ chứ không được trôi qua")
+        if not scheduler_registers_on(day):
+            continue
+        if scheduler_registers_on(_prev_weekday(day)) is False:
+            would_have_broken.append(d)
+        if scheduler_registers_on(rs._prev_scheduled_day(day)) is not True:
+            still_broken.append(d)
+    assert would_have_broken == ["2025-12-26", "2026-01-02", "2026-04-06"], would_have_broken
+    assert still_broken == [], still_broken
+
+
+# ── hình dạng thứ hai: shift() trên chuỗi theo ngày ──────────────────────────
+
+def test_the_shift_scan_finds_something_at_all():
+    assert len(_shift_sites()) >= 3, _shift_sites()
+
+
+def test_every_shift_in_the_route_is_in_the_register():
+    """Một luật "phiên trước" viết bằng `shift(1)` là vô hình với máy quét vòng lặp. Sổ này
+    là chỗ nó không vô hình nữa."""
+    sites = _shift_sites()
+    unknown = {k: v for k, v in sites.items() if k not in SHIFT_REVIEWED}
+    assert not unknown, (
+        f"shift() trong tuyến mà chưa có trong sổ: {unknown}. Đọc nó, rồi nói nó là bar liền "
+        f"trước, phiên liền trước, hay một luật lịch tự chế.")
+
+
+def test_the_shift_counts_still_match():
+    """Đếm, không chỉ có mặt: thêm một `shift` vào một hàm đã duyệt cũng là một luật mới."""
+    sites = _shift_sites()
+    drift = {k: (sites.get(k), n) for k, (n, _why) in SHIFT_REVIEWED.items()
+             if sites.get(k) != n}
+    assert not drift, f"số lần shift đã đổi (thấy, đã ghi): {drift}"
+
+
+def test_every_shift_entry_says_something_checkable():
+    for k, (_n, why) in SHIFT_REVIEWED.items():
+        assert len(why.split()) >= 10, k
+
+
+def test_the_known_divergence_is_still_exactly_one_day():
+    """Chỗ lệch R4 được GHIM bằng số đo, không bằng lời.
+
+    Nếu nó lớn lên — thêm ngày đổi kết luận — phép kiểm này đỏ và bắt đọc lại. Nếu ai sửa nó,
+    cũng đỏ, và đó là tin tốt cần được ghi vào sổ chứ không được trôi qua.
+    """
+    import logging
+    import warnings
+
+    import numpy as np
+
+    warnings.filterwarnings("ignore")
+    logging.disable(logging.CRITICAL)
+    try:
+        from global_index.track1_live_source import frozen_frame
+        from global_index.track1_normal_filters import (FLOOR_RANGE_P90, RTH_END, RTH_START)
+        from raits.live.trading_calendar import is_early_close
+    finally:
+        logging.disable(logging.NOTSET)
+
+    df = frozen_frame("MES", str(REPO / "data/cache/futures/ES_continuous_1m_8y.parquet"))
+    idx = df.index.tz_localize(None) if df.index.tz is not None else df.index
+    d = df.copy()
+    d.index = idx
+    rth = d[(d.index.time >= RTH_START) & (d.index.time <= RTH_END)]
+    g = rth.groupby(rth.index.normalize())
+    daily = pd.DataFrame({"high": g["high"].max(), "low": g["low"].min(),
+                          "close": g["close"].last()})
+    rng = (daily["high"] - daily["low"]) / daily["close"].abs().clip(lower=1e-9)
+
+    now = rng.shift(1)
+    full = [x for x in rng.index if not is_early_close(x.date())]
+    aligned = rng.reindex(full).shift(1).reindex(rng.index).ffill()
+
+    flips = [x.date() for x in rng.index
+             if np.isfinite(now.get(x, np.nan)) and np.isfinite(aligned.get(x, np.nan))
+             and (now[x] <= FLOOR_RANGE_P90) != (aligned[x] <= FLOOR_RANGE_P90)]
+    assert flips == [dt.date(2018, 12, 24)], flips

@@ -253,7 +253,14 @@ def test_it_refreshes_spy_only_and_writes_no_preflight_record():
     of `preflight_state.json` would make 'did the pre-flight run' ambiguous."""
     from global_index import run_scheduler as rs
     src = Path(rs.__file__).read_text(encoding="utf-8")
-    body = src[src.index("def job_spy_refresh_pm("):src.index("def _prev_bday(")]
+    # End marker moved on 2026-09-08: `_prev_bday` was hoisted out of this closure and
+    # renamed `_prev_scheduled_day` when it stopped counting weekdays. It was never what this
+    # test checked — only where it stopped reading. Asserted rather than sliced blind, so the
+    # next rename says which marker went missing instead of raising ValueError from a slice.
+    start, end = "def job_spy_refresh_pm(", "def _live_day_body("
+    assert start in src and end in src, (start in src, end in src)
+    body = src[src.index(start):src.index(end)]
+    assert 2_000 < len(body) < 30_000, len(body)     # a slice that collapses checks nothing
     assert "update_spy_csv" in body
     assert "update_ibkr_daily" not in body
     assert "_preflight_ok" not in body and "_save_preflight_state" not in body
