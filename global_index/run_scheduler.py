@@ -1066,14 +1066,34 @@ def make_scheduler(port: int, dry_run: bool,
     #: Pointing R2 at 00:45 moves it onto the branch that says "the provider does not have it
     #: yet, next attempt at 00:45 ET", which is what is true. The error branch stays for a rung
     #: that genuinely has no successor.
-    _SPY_LADDER_NEXT = {"SPY_REFRESH_PM": "16:45", "SPY_REFRESH_PM_R1": "17:15",
+    #:
+    #: Stage 5ZZZ-BJ, 2026-09-09. The rungs move: 16:20/16:45/17:15 -> 18:20/20:10/22:00.
+    #:
+    #: The record above already said why, and it took another eleven days to act on. Counted
+    #: across the journals, every evening rung failed on every trading day from 2026-08-27 to
+    #: 2026-09-09 — thirty-three failures — and the 00:45 rung fetched the day on all seven
+    #: nights it ran. All three sat inside the window this comment measured as certainly
+    #: empty: the 2026-09-01 close was absent at 17:15 and present by 00:05. A ladder whose
+    #: every rung stands before the data can arrive is not a retry ladder; it is three alarms.
+    #:
+    #: The new times SPREAD ACROSS that window instead of clustering ahead of it. 22:00 is
+    #: still before 00:05 and may still miss — the arrival hour inside those seven hours has
+    #: never been measured, only bracketed — so this buys a chance rather than a guarantee,
+    #: and the 00:45 rung stays exactly where it is for the nights it misses.
+    #:
+    #: NOT changed, and deliberately: what the ladder ASKS for. It requires the close of the
+    #: session that just ended, while every frozen gate reads `required_daily_close_through`,
+    #: which is the session BEFORE. Asking for D-1 would make the first rung succeed
+    #: immediately and need no new times at all. That was proposed and the project owner chose
+    #: to move the clock instead, so the question stands as it was.
+    _SPY_LADDER_NEXT = {"SPY_REFRESH_PM": "20:10", "SPY_REFRESH_PM_R1": "22:00",
                         "SPY_REFRESH_PM_R2": "00:45"}
 
     def _spy_refresh(label: str, *, attempt: int) -> None:
         """One rung of the post-close ladder. Stage 5ZZC.
 
         Why a ladder at all, in one measured sentence: on 2026-08-26 this job ran cleanly at
-        16:20 and the provider did not yet have that day's SPY close, so the series stayed a
+        18:20 and the provider did not yet have that day's SPY close, so the series stayed a
         day short — and the overnight Nikkei window, which runs at 01:10 before its own
         pre-flight, refused the next morning on stale daily context. The job warned at the
         time, in the right words, and its warning ended "only a problem if it is still true
@@ -1096,7 +1116,7 @@ def make_scheduler(port: int, dry_run: bool,
         cmd = [sys.executable, "-m", "global_index.update_spy_csv", "--csv", regime_csv,
                "--verify-strict", "--require-through", today]
         if not first:
-            # Only the retries skip. The 16:20 run does the verification even when the day is
+            # Only the retries skip. The 18:20 run does the verification even when the day is
             # already there, because checking the labels is part of what that run is for.
             cmd += ["--skip-if-covered"]
         if polygon_api_key:
@@ -1126,7 +1146,7 @@ def make_scheduler(port: int, dry_run: bool,
                          "ran. An earlier attempt had it.", label, today)
             else:
                 log.warning("[%s] RECOVERED — %s was missing when the earlier attempt ran and "
-                            "is there now. The 16:20 refresh is running before the provider "
+                            "is there now. The 18:20 refresh is running before the provider "
                             "is ready; if this keeps happening, move it later rather than "
                             "relying on the ladder.", label, today)
             # Every rung that ends with the series covering today must leave the recorded label
@@ -1166,19 +1186,19 @@ def make_scheduler(port: int, dry_run: bool,
                       "ends on %s. Check POLYGON_API_KEY and the network.",
                       label, code, covered or "an unreadable date")
 
-    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=16, minute=20,
-                         id="spy_refresh_pm", name="SPY daily refresh 16:20 ET (post-close)")
+    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=18, minute=20,
+                         id="spy_refresh_pm", name="SPY daily refresh 18:20 ET (post-close)")
     def job_spy_refresh_pm():
         _spy_refresh("SPY_REFRESH_PM", attempt=1)
 
-    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=16, minute=45,
-                         id="spy_refresh_pm_r1", name="SPY daily refresh 16:45 ET (retry 1)")
+    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=20, minute=10,
+                         id="spy_refresh_pm_r1", name="SPY daily refresh 20:10 ET (retry 1)")
     def job_spy_refresh_pm_r1():
         _spy_refresh("SPY_REFRESH_PM_R1", attempt=2)
 
-    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=17, minute=15,
+    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=22, minute=0,
                          id="spy_refresh_pm_r2",
-                         name="SPY daily refresh 17:15 ET (retry 2, last)")
+                         name="SPY daily refresh 22:00 ET (retry 2, last)")
     def job_spy_refresh_pm_r2():
         _spy_refresh("SPY_REFRESH_PM_R2", attempt=3)
 
@@ -1244,7 +1264,7 @@ def make_scheduler(port: int, dry_run: bool,
 
         if ok and after and after >= need_s:
             log.warning("[%s] RECOVERED at the last look — %s arrived after the evening "
-                        "ladder had given up. The 17:15 rung is running before the provider "
+                        "ladder had given up. The 22:00 rung is running before the provider "
                         "is ready on at least some days.", label, need_s)
             # Stage 5ZZZ-CA. The rung that lands is the rung that must re-record.
             #

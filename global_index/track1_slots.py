@@ -612,7 +612,7 @@ SHARED_INFRA_JOBS: dict = {
                  "reads the file. Retiring legacy must NOT retire this.",
     "heartbeat": "liveness measurement, every minute all week; decides nothing",
     "session_report_fallback": "the 23:55 safety net for the session report; decides nothing",
-    "spy_refresh_pm": "Stage 5Q-5. The 16:20 SPY daily refresh. The 13:45 pre-flight runs "
+    "spy_refresh_pm": "Stage 5Q-5. The 18:20 SPY daily refresh. The 13:45 pre-flight runs "
                       "before the close and can never bring today's daily bar, so the regime "
                       "series it writes is always a day short of what the next morning needs. "
                       "Shared: both routes read that CSV, and it decides no trade.",

@@ -190,7 +190,20 @@ def test_9_it_is_mirrored_in_schedule_status():
     assert "SPY_REFRESH_PM" in ids
     hour, minute = next((h, m) for i, h, m in ss.PIPELINE_FIXED_SLOTS
                         if i == "SPY_REFRESH_PM")
-    assert (hour, minute) == (16, 20)
+    # Tên phép kiểm nói "được phản chiếu", nên nó phải hỏi HAI NƠI CÓ KHỚP NHAU không —
+    # chứ không phải cả hai có bằng một literal thứ ba hay không. Bản trước ghim (16, 20) và
+    # đỏ khi thang dời sang 18:20 ngày 09/09, dù bản sao vẫn phản chiếu đúng.
+    import warnings
+
+    warnings.filterwarnings("ignore")
+    from global_index import run_scheduler as rs
+
+    job = next((j for j in rs.make_scheduler(port=7497, dry_run=True).get_jobs()
+                if j.id == "spy_refresh_pm"), None)
+    assert job is not None, "bộ lập lịch không còn job này để mà phản chiếu"
+    f = {str(x.name): str(x) for x in job.trigger.fields}
+    assert (hour, minute) == (int(f["hour"]), int(f["minute"])), (
+        "bản sao lịch", (hour, minute), "bộ lập lịch", (f["hour"], f["minute"]))
 
 
 # ══════════════════════════════════════════════════════════════════════════════

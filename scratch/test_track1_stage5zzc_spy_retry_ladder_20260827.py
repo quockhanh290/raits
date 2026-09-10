@@ -144,9 +144,13 @@ def test_5_three_rungs_are_registered_at_the_declared_times(monkeypatch):
             continue
         f = {x.name: str(x) for x in j.trigger.fields}
         times[j.id] = (int(f["hour"]), int(f["minute"]))
-    assert times == {"spy_refresh_pm": (16, 20),
-                     "spy_refresh_pm_r1": (16, 45),
-                     "spy_refresh_pm_r2": (17, 15)}, times
+    # Đọc từ bản sao lịch của bảng điều khiển, không viết cứng: hai nơi cùng khai một giờ
+    # là hai nơi có thể trôi khỏi nhau, và phép kiểm này chính là chỗ bắt điều đó.
+    from monitor.backend.schedule_status import PIPELINE_FIXED_SLOTS
+
+    mirror = {jid.lower(): (h, m) for jid, h, m in PIPELINE_FIXED_SLOTS}
+    assert times == {k: mirror[k] for k in times}, (times, {k: mirror[k] for k in times})
+    assert len(set(times.values())) == 3, times
 
 
 def test_6_every_rung_asks_for_the_day_and_verifies(monkeypatch):

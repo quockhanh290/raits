@@ -213,14 +213,14 @@ PIPELINE_FIXED_SLOTS = (
     # Stage 5Q-5. The daily SPY series cannot contain today's close at 13:45, so a second
     # refresh runs after it. Mirrored here for the same reason every other timed job is: a job
     # the scheduler runs and this table does not know about is a phantom overdue row every day.
-    ("SPY_REFRESH_PM", 16, 20),
+    ("SPY_REFRESH_PM", 18, 20),
     # Stage 5ZZT. The rest of the ladder, and the last look before the overnight window. All
     # three were registered by Stages 5ZZC and 5ZZD and never mirrored, so for weeks the panel
     # had no row that could report them late or missing at all — the failure this table's own
     # comment describes, pointing the other way. Times read from run_scheduler.py rather than
     # assumed: a row at the wrong minute is an overdue alarm that never clears.
-    ("SPY_REFRESH_PM_R1", 16, 45),
-    ("SPY_REFRESH_PM_R2", 17, 15),
+    ("SPY_REFRESH_PM_R1", 20, 10),
+    ("SPY_REFRESH_PM_R2", 22, 0),
     # 00:45, before the 01:10 Nikkei window. It asks a DIFFERENT question from the evening
     # rungs — the previous TRADING day rather than today's close — which is why it is a
     # separate stream below and not a fourth rung.

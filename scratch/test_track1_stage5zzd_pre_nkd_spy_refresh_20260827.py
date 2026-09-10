@@ -147,7 +147,15 @@ def test_8_when_the_day_arrives_at_the_last_look_it_says_RECOVERED(monkeypatch, 
     assert calls, "it did not try"
     assert "RECOVERED" in out
     # and it says the evening ladder is running early, because that is the real repair
-    assert "17:15" in out
+    # Giờ trong câu thông báo phải là giờ nấc CUỐI thật sự chạy. Đọc từ bảng nấc-kế-tiếp
+    # thay vì ghim "17:15", vì câu này tồn tại để nói đúng giờ chứ không để nói 17:15.
+    import warnings
+
+    warnings.filterwarnings("ignore")
+    from monitor.backend.schedule_status import PIPELINE_FIXED_SLOTS
+
+    last = {jid: (h, m) for jid, h, m in PIPELINE_FIXED_SLOTS}["SPY_REFRESH_PM_R2"]
+    assert "%02d:%02d" % last in out, (last, out[-200:])
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

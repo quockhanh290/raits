@@ -109,8 +109,14 @@ def test_the_rows_appear_on_a_trading_day_and_at_the_right_instant():
     for jid in ALL_FOUR:
         assert jid.upper() in rows, jid
         assert rows[jid.upper()].date() == day
-    assert rows["SPY_LAST_CHANCE_PRE_NKD"].hour == 0
-    assert rows["SPY_REFRESH_PM_R2"].hour == 17
+    # Giờ đọc từ chính bảng, không viết cứng. Bản trước ghim `== 17`, và khi thang dời sang
+    # 22:00 ngày 09/09 nó đỏ vì một literal chứ không vì hành vi nào sai. Ghim hành vi:
+    # nấc cuối buổi tối phải nằm SAU nấc đầu và TRƯỚC nửa đêm, còn lượt cứu nằm sau nửa đêm.
+    fixed = {jid: (h, m) for jid, h, m in ss.PIPELINE_FIXED_SLOTS}
+    assert rows["SPY_LAST_CHANCE_PRE_NKD"].hour == fixed["SPY_LAST_CHANCE_PRE_NKD"][0] == 0
+    r2 = rows["SPY_REFRESH_PM_R2"]
+    assert r2.hour == fixed["SPY_REFRESH_PM_R2"][0]
+    assert rows["SPY_REFRESH_PM"].hour < r2.hour < 24, (rows["SPY_REFRESH_PM"].hour, r2.hour)
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════

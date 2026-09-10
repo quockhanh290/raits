@@ -242,10 +242,22 @@ def test_the_post_close_spy_job_exists_in_every_mode():
 
 
 def test_it_runs_after_the_close_and_before_midnight():
+    """Ghim HÀNH VI: nấc đầu chạy sau giờ đóng cửa và trước nửa đêm.
+
+    Bản trước tìm chuỗi `hour=16, minute=20` trong mã nguồn, nên khi thang dời sang 18:20
+    ngày 09/09 nó đỏ vì một literal chứ không vì giờ nào sai. Hỏi thẳng bộ lập lịch thì câu
+    hỏi đúng bằng cái tên của phép kiểm.
+    """
+    import warnings
+
+    warnings.filterwarnings("ignore")
     from global_index import run_scheduler as rs
-    src = Path(rs.__file__).read_text(encoding="utf-8")
-    assert 'hour=16, minute=20' in src
-    assert 'id="spy_refresh_pm"' in src
+
+    job = next((j for j in rs.make_scheduler(port=7497, dry_run=True).get_jobs()
+                if j.id == "spy_refresh_pm"), None)
+    assert job is not None, "nấc đầu của thang không còn được đăng ký"
+    f = {str(x.name): str(x) for x in job.trigger.fields}
+    assert 16 <= int(f["hour"]) < 24, f["hour"]
 
 
 def test_it_refreshes_spy_only_and_writes_no_preflight_record():
