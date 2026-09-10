@@ -287,6 +287,13 @@ REQUIRED_ENTRY_WINDOWS: dict = {
 #                     route reads a marker it did not write, concludes the sweep already ran,
 #                     and skips it. Positions past the five-day limit stay open.
 TRACK1_SAFETY_CLIENT_ID = 90
+#: Stage 5ZZZ-BK. The pre-window anchor check dials its own id rather than borrowing one.
+#: It runs 15 minutes ahead of the first slot of each session — 00:55 before the 01:10 NKD
+#: window, 09:16 before the 09:31 max-hold sweep — and both of those neighbours can still be
+#: connected when it starts: a stop-repair sweep that ran long holds 90, and a slot that
+#: over-ran holds 89. Two clients on one id do not queue, they collide, and the collision
+#: surfaces as an ordinary fetch failure with no hint of its cause.
+TRACK1_ANCHOR_CLIENT_ID = 91
 TRACK1_POSITIONS_PATH = "live_positions.track1.json"
 #: The envelope version of the book at that path. It lives here, beside the path, because
 #: three modules need to agree on it and none of them may import the others: the route writes
@@ -643,6 +650,20 @@ SHARED_INFRA_JOBS: dict = {
                                  "window opens that evening and the Friday evening ladder "
                                  "may have given up before the row arrived. Refreshes data "
                                  "and records a label verification; decides no trade.",
+    # Stage 5ZZZ-BK. Named in the SAME commit that registers them — the four entries above
+    # were all added and classified one stage late, and this table's own comment is what
+    # eventually caught each of them. Shared, for the plainest reason: the sidecar they may
+    # write is the anchor `frozen_frame` applies to the stored history, and BOTH routes read
+    # that history. They decide no trade, place no order, and on a day with no roll they
+    # write nothing at all.
+    "anchor_check_0055": "Stage 5ZZZ-BK. 00:55, fifteen minutes before the Nikkei window. "
+                         "Asks whether IBKR's continuous series rolled to a new expiry since "
+                         "the anchor was last written; if it did, records the new offset in "
+                         "the sidecar and stops. Appends no bars, so the parquet's last bar "
+                         "— everything the freshness gate reads — is untouched.",
+    "anchor_check_0916": "Stage 5ZZZ-BK. 09:16, ahead of the first US job of the day. Same "
+                         "contract as its 00:55 sibling; one run covers Calm, Stress and "
+                         "Swing because a roll is a property of the series, not the window.",
 }
 
 #: Prefixes of the jobs that DO decide legacy trades. These are the retirement candidates.

@@ -15299,3 +15299,187 @@ paper_pnl_compare.*) — chúng đã sửa từ trước khi phiên bắt đầu
       UNKNOWN vì bản ghi cũ), FINAL_BAR_DIVERGENCE_OBSERVED (chưa quan sát được),
       PAPER_SHADOW_EVIDENCE (1 ngày FAIL + baseline 194h). `self_check()` trả về rỗng.
 
+
+---
+
+## Sub-task: Mở lại hướng cổ phiếu — dựng lại nền đo (2026-09-07)
+Status: DONE (đo xong; chưa sửa gì)
+Phạm vi tệp: CHỈ ĐỌC mã/cấu hình (`raits/**`, `docs/stocks/**`, báo cáo gốc).
+Ghi mới: `STOCKS_REVISIT_2026-09-07.md` + mục này. KHÔNG chạm futures, KHÔNG commit.
+
+### Đã làm
+- [x] Đo lại toàn bộ nền đo của `STOCKS_AUDIT_2026-08-17.md` — 9/9 ô khớp
+- [x] Dựng lại $33.550,18 / 1.292 lệnh và $15.019,79 / 605 lệnh bằng hai đường độc lập
+- [x] Đối chiếu từng trường cấu hình artifact vs cấu hình sản xuất
+- [x] Chạy bộ kiểm tự động phần cổ phiếu (bản rà cũ tự nhận chưa mở)
+
+### Đo được
+- Hướng cổ phiếu ĐỨNG YÊN hoàn toàn 21 ngày: 1 ảnh chụp (07/07), mã cuối 09/07,
+  toàn bộ 117.533 tệp 5 phút ghi trong tháng 7, dữ liệu ngày dừng 2024-12-31,
+  không có việc nào trong bộ lập lịch, bộ chạy live vẫn chưa gắn lịch.
+- MỚI: bộ tối ưu cuốn chiếu chạy 15/08 (2 ngày TRƯỚC bản rà) — 327 lượt BẮT ĐẦU,
+  0 lượt XONG. Lượt hỏng trả `-999`, mốc so cũng `-999`, nên cả lưới hỏng thì
+  bộ tối ưu âm thầm giữ tham số mặc định viết cứng (15/2.0/30). Không cảnh báo nào.
+  Đối chứng: 2 lượt trên đúng đường đó, 2 tiến trình → 240s vẫn chưa xong.
+  Nguyên nhân gốc: THIẾU BẰNG CHỨNG (cơ chế: mỗi tiến trình đọc cả 1,31 GB / 117.533
+  tệp rồi mới cắt cửa sổ ngày; 16 tiến trình song song trên máy 34 GB).
+- MỚI: artifact được kiểm định khác cấu hình sản xuất ở 7/14 trường, không phải 3.
+  Hai chỗ bản rà cũ không nêu: rổ ORB (37 vs rỗng), rổ MR (3 vs 12).
+  Nhóm 25 mã của PE_SHORT: trường đó KHÔNG TỒN TẠI trong cấu hình đã lưu.
+- MỚI: bộ kiểm cổ phiếu = 501 tests, 495 xanh / 6 đỏ. 4 đỏ là test HMM viết cho
+  3 trạng thái (hệ cổ phiếu là 4 — chủ đích). 2 đỏ ORB: một ghim trần giá $200 chưa
+  từng tồn tại (mã là $1.000); một soi sai tầng (cờ "phá giả" bị chặn ở bước xác nhận,
+  không ở bước sinh tín hiệu) — CHƯA truy engine gọi tầng nào.
+- SỬA bản rà cũ: mục "1% rủi ro không có ghi chú" SAI — artifact dùng 1,5%, và
+  DECISIONS.md có mục giải thích chọn 1,5% thay vì 1,0%.
+- MỚI: "LIVE-READY" nằm ở HAI tài liệu, không phải một (docs/stocks/STATUS.md +
+  docs/SHARED.md). Ảnh chụp "+$34.214" mà STATUS.md trích: không còn trong kho.
+
+### Đề xuất (chờ chủ dự án quyết)
+- 1. ~20 phút: truy engine ORB gọi tầng nào — thứ duy nhất có thể lật một kết luận
+- 2. ~nửa buổi: chốt hồ sơ (2 chỗ live-ready, 7 trường cấu hình, mục 1% sai, 6 kết
+     luận âm tháng 8 vào nhật ký, đánh dấu $34.214 không tái tạo được)
+- 3. Sửa chỗ hỏng câm của bộ tối ưu TRƯỚC khi chạy B (chỉ sửa cách báo cáo + cắt
+     cửa sổ ngày trước khi đọc tệp; không đụng luật vào/ra lệnh)
+- 4. Chỉ khi đó mới bàn B. C (Vault 2025) chưa — vẫn thiếu dữ liệu 2025.
+
+### Khai báo
+`raits/data/cache/wfo_progress.txt` có thêm 3 dòng của phiên này (10:25:17 và hai
+dòng 10:32:21 ngày 07/09) từ hai lượt chạy đối chứng. Không xoá (không sửa nhật ký
+vận hành). Không xoá parquet/cache. Không commit.
+
+### Files touched
+STOCKS_REVISIT_2026-09-07.md (mới), TASK.md (mục này)
+
+### Bổ sung cùng ngày 07/09 — look-ahead & fill bất khả thi (mục 11 của báo cáo)
+
+Câu hỏi: performance sau khi fix look-ahead + impossible fills là bao nhiêu?
+Trả lời đo được: **CHƯA CÓ BẢN SỬA NÀO** — cả hai lỗi còn nguyên ở HEAD.
+- Look-ahead: `_close_all()` trong engine.py lấy giá `day_stocks[ticker].iloc[-1]`
+  (thanh CUỐI NGÀY) trong khi ghi exit_time = thanh kích hoạt. GAP1_REPORT.md (04/07)
+  đã ghi "Fix options (not yet applied)"; lượt commit cuối chạm engine (2405659, 08/07)
+  chỉ đổi cách đếm chuỗi thua cho CB — đọc diff để chắc, không đụng giá thoát.
+- Impossible fill: `_check_exits()` trả `trade.stop`/`trade.target` bất cứ khi nào
+  low<=stop (LONG) — kể cả khi CẢ thanh nến nằm bên kia mức đó (nhảy giá qua). Không
+  có bộ chặn tính khả thi. Bên futures có luật P0 "no impossible fills" và đã đối soát;
+  bên cổ phiếu CHƯA AI KIỂM.
+
+Đo trên bar thật (window_debug_5min.pkl — tên lấy từ commit message đã tạo artifact):
+
+| | liên tục 605 lệnh | ảnh chụp 1.292 lệnh |
+|---|---|---|
+| đã công bố | $15.019,79 | $33.550,18 |
+| thoát ở giá ngoài thanh nến | 21 (3,5%) | 85 (6,6%) |
+| sửa nhảy giá | −$804 (11) | −$4.498 (23) |
+| sửa look-ahead | −$574 (15) | −$3.027 (85) |
+| còn lại (ước lượng BẬC MỘT) | **$13.641,64 (−9,2%)** | **$26.025,10 (−22,4%)** |
+
+CẢNH BÁO NHÃN: đây là tính lại giá trên TẬP LỆNH CŨ. Sửa thật đổi vốn → đổi cỡ vị thế
+→ đổi mọi lệnh sau. Calmar/Sharpe KHÔNG tính tĩnh được, phải chạy lại.
+
+Tự kiểm: 3 đường độc lập cho $15.019,79 (pickle / cộng từng lệnh / CSV đã commit);
+2 đường cho khoản sửa, lệch $0,00; 583/604 lệnh xếp là khớp TRONG thanh (công cụ biết
+nói "không"); quy ước P&L tái tạo 50/50 và 80/80 mẫu. Một phép kiểm ĐỎ — giả định đơn
+điệu của tôi sai trên tổng, kiểm lại từng lệnh 0/11 vi phạm, công cụ đúng.
+Khớp chéo: 15 lệnh look-ahead trừ 6 lệnh kích hoạt lúc 15:55 (chỉ trước thanh cuối một
+nhịp) = 9 — đúng con số 9 mà GAP1_REPORT tìm ra tháng 7 bằng phương pháp khác.
+
+PHÁT HIỆN QUAN TRỌNG NHẤT: bản sửa KHÔNG cứu được câu hỏi nặng nhất của bản rà tháng 8.
+Ba năm cuối trong mẫu: công bố 2020 +$484 / 2021 +$1.434 / 2022 −$30 = +$1.888;
+sau khi sửa +$501 / +$1.422 / −$38 = +$1.885. Gần như KHÔNG ĐỔI. Toàn bộ khoản sửa rơi
+vào 2017-2019 (riêng 2017 mất 41,7%) — tức hai lỗi này chỉ làm mỏng edge của những năm
+đầu vốn đang gánh cả bảng, chứ không giải thích được việc hệ đi ngang ba năm cuối.
+
+CHƯA ĐO: OOS 2023-2024 (+$6.666) — tệp lệnh KHÔNG có trên đĩa, chỉ còn báo cáo.
+Calmar/Sharpe sau sửa. Con số đúng cấu hình sản xuất (vẫn không tồn tại).
+
+### Bổ sung 2 (07/09) — chạy lại phép kiểm edge của dự án trên dữ liệu đã sửa
+
+Chạy `bootstrap_block_r.py` NGUYÊN BẢN (có sẵn --csv), từ thư mục tạm nên KHÔNG ghi đè
+`raits/configs/bootstrap_block_r_report.txt` (tháng 7). Lượt gốc tái lập đúng 6.608 byte.
+BẪY CÔNG CỤ: hai cột đầu bảng là số CỨNG chép từ lần trước, chỉ B20/JK2 tính mới.
+
+B20 / JK2, trước -> sau khi sửa look-ahead + fill bất khả thi:
+  TREND_FOLLOW (353 lệnh) 0.014 -> 0.028  |  0.043 -> 0.088   BỀN -> TẬP TRUNG
+  STRESS_ORB   (108)      0.320 -> 0.517  |  0.485 -> 0.638   xấu đi, vẫn NO EDGE
+  STRESS_MID   (28)       0.325 -> 0.353  |  0.622 -> 0.664   không đổi
+  ORB          (75)       0.148 -> 0.146  |  0.429 -> 0.420   không đổi BORDERLINE
+  PE_SHORT     (29)       0.000 -> 0.000  |  0.052 -> 0.052   không đổi
+  GF_SHORT     (12)       degen           |  0.004 -> 0.004   không đổi
+Giả định khớp lại khắt khe hơn (giá mở cửa) cho cùng kết quả: TF 0.027 / 0.089.
+Nhất quán: 26 lệnh được sửa nằm ở TF 16 (-$922), STRESS_ORB 7 (-$383), STRESS_MID 1,
+ORB 2. PE_SHORT/GF_SHORT KHÔNG có lệnh nào bị sửa -> đúng hai chiến lược p-value đứng yên.
+
+KẾT LUẬN NHÃN: KHÔNG phải "không có edge". Trong mẫu edge vẫn qua ngưỡng sau khi sửa,
+nhưng trụ chính TREND_FOLLOW rớt từ "không do tập trung" xuống "tập trung" -> sau bản sửa
+CẢ BA chiến lược dương đều mang nhãn tập trung, không còn cái nào bền. Ngoài mẫu vẫn
+THIẾU BẰNG CHỨNG (không cái nào đạt ngưỡng, 96% ở 5 lệnh). Và tất cả đo trên cấu hình
+KHÔNG phải sản xuất. Muốn kết luận "không có edge" cần một phép kiểm đủ lực trên cấu hình
+sản xuất mà trượt — chưa ai chạy.
+
+---
+## Sub-task: Stage 5ZZZ-BK — sửa sổ neo TRƯỚC cửa sổ, không phải sau (2026-09-10)
+Status: DONE (mã + phép kiểm) · CHỜ QUYẾT (khởi động lại tiến trình)
+
+### Chuyện đã xảy ra
+Đêm 10/09 IBKR chuyển chuỗi liên tục NKD sang kỳ hạn tháng 12. 12 slot NKD từ chối với
+`series_rolled`. Việc neo lại chỉ nằm trong job 13:45 nên nó sửa được SAU khi cửa sổ đã
+trôi. Rổ Mỹ đáo hạn 18/09, IBKR roll trước một ngày -> Calm (10:00) và Stress (10:35-12:30)
+đều nằm TRƯỚC 13:45, sẽ mất trọn ngày.
+
+### Completed
+- [x] Chế độ `--reanchor-only` trong update_ibkr_daily: đo bậc, ghi SỔ NEO, KHÔNG ghi bar.
+      Ngày không roll (~246/năm) không ghi gì cả, kể cả sổ neo.
+- [x] Hai job: `anchor_check_0055` (trước NKD 01:10) và `anchor_check_0916` (trước 09:31,
+      phủ Calm/Stress/Swing). clientId riêng 91. Cửa sổ lấy dữ liệu `1 W`.
+- [x] TÁCH HAI CÂU HỎI. "Có roll không" đọc TÊN kỳ hạn -> không cần bar nào. "Bậc bao nhiêu"
+      mới cần bar chồng lấn. Trước đó gộp làm một, nên sáng thiếu bar trả lời "không biết"
+      trong khi tên nằm ngay đó.
+- [x] LỖI CÓ SẴN được vá cùng: thiếu bar chồng lấn thì đường ghi 13:45 chỉ log
+      "alignment unchecked" rồi VẪN NỐI BAR — tức nối bar kỳ hạn khác vào lịch sử, hình dạng
+      sự cố 05/08. Giờ từ chối ở cả hai chế độ.
+- [x] LỖI CÓ SẴN thứ hai: chốt mối nối in "NO contract change ... Not a roll, so this is a
+      data problem" VỀ MỘT LẦN ROLL THẬT. Tiền đề của nó chỉ đúng khi đủ bar. Giờ mới đúng.
+- [x] Nối vào nhật ký công việc, bảng gương lịch, bảng phân loại tuyến (`SHARED_INFRA_JOBS`).
+- [x] Dòng tổng kết: `ALL 5 INSTRUMENTS UPDATED` sau lượt không nối bar nào -> đã sửa.
+
+### Đo được (2026-09-10, chạy thật, KHÔNG ghi vào sản xuất)
+    MES/MNQ/MYM/M2K  U6 không đổi — không ghi gì
+    MNKD  NKDU6 -> NKDZ6  bậc +147,0000 (0,228% giá) / 5.730 bar chung / IQR 3,0 (2% bậc)
+    đối chiếu độc lập: phần dư trung vị +147 -> 0,0000 ; mối nối -145,00 -> +2,00 ;
+    6/6 ngày phần dư trong ±2. Tái lập hai lần.
+
+    Cửa sổ lấy dữ liệu, bar chồng lấn khi tệp cũ N phiên (sàn 500):
+        3 D   3 phiên: 544   5 phiên: 0      2,5s
+        1 W   3 phiên: 3300  5 phiên: 1969   2,7s   <- job neo dùng cái này
+        2 W   8 phiên: 4725  11 phiên: 1965  40,4s
+
+### Ngưỡng sát mép — theo dõi
+Bậc NKD 0,2285% so với sàn REANCHOR_MIN_PCT 0,20%: chỉ cao hơn sàn 14%. Nhỏ hơn chút nữa
+là hệ từ chối và phải sửa tay. Xem lại SAU 17/09; không nới trước ngày nó phải làm việc.
+
+### Chưa chứng minh
+Nhánh cộng dồn độ lệch (`reanchored_offset` khi độ lệch đang lưu khác 0) chưa từng chạy trên
+dữ liệu thật — mọi độ lệch hiện tại là 0,0. Roll Mỹ ~17/09 sẽ là lần đầu.
+
+### Next steps — CHỜ QUYẾT
+- [ ] Ghi sổ neo NKD (+147) vào sản xuất, HOẶC để job 13:45 hôm nay tự làm. Không gấp:
+      hai sổ vị thế rỗng, cửa sổ NKD kế tiếp 01:10 đêm nay > 13:45 chiều nay.
+- [ ] KHỞI ĐỘNG LẠI bộ lập lịch (PID 36860, từ 07/09 01:35) và nền dashboard (PID 53784,
+      từ 07/09 20:58). Cả hai có TRƯỚC mọi thay đổi phiên này. Kiểm chứng: thang SPY hôm qua
+      chạy 16:20/16:45/17:15 ET — giờ CŨ, dù bản dời giờ đã commit.
+      HẠN: trước ~17/09, nếu không thì rổ Mỹ roll mà job neo không tồn tại.
+      RỦI RO: sổ dự án ghi chốt chặn chống chạy trùng hỏng theo chiều mở; hai bộ lập lịch
+      tranh một clientId đã làm hỏng 6 slot vào lệnh.
+
+### Nền đo
+    bộ mặc định   1.083 xanh · 1 đỏ (test trình duyệt, đỏ y hệt ở HEAD)
+    phiên này       113 xanh · 0 đỏ
+    đột biến        6/6 đỏ khi gỡ từng mảnh, đối chứng 62 xanh
+
+### Files touched
+global_index/update_ibkr_daily.py, global_index/run_scheduler.py, global_index/track1_slots.py,
+monitor/backend/job_journal_reader.py, monitor/backend/schedule_status.py,
+monitor/test_dashboard_backend.py,
+scratch/test_reanchor_before_the_window_20260910.py,
+scratch/test_the_anchor_is_fixed_before_the_window_20260910.py

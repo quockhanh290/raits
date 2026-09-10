@@ -226,6 +226,20 @@ PIPELINE_FIXED_SLOTS = (
     # separate stream below and not a fourth rung.
     ("SPY_LAST_CHANCE_PRE_NKD", 0, 45),
 )
+
+#: Stage 5ZZZ-BK. The two pre-window anchor checks. Mirrored in the SAME commit that registers
+#: them — the SPY rungs above are in this file because they were not, and ran unmirrored long
+#: enough that the panel could not report them late or missing at all.
+#:
+#: A separate tuple from PIPELINE_FIXED_SLOTS, and that is the whole point. `next_decision_job`
+#: reads the pipeline table, and one of the two dashboards renders that field as a countdown
+#: headed ENTRY WINDOW. These jobs place no orders and open no window; naming one of them there
+#: would tell an operator that 09:16 is a trading opportunity. They belong where the stop-repair
+#: sweeps already sit: visible to the schedule, absent from the decision pipeline.
+ANCHOR_CHECK_SLOTS = (
+    ("ANCHOR_CHECK_0055", 0, 55),
+    ("ANCHOR_CHECK_0916", 9, 16),
+)
 # Track 1's shadow slots, mirrored here ONLY when the route is enabled — the scheduler gates
 # them behind --track1-shadow and this mirror gates them behind the same fact, read from the
 # environment. A slot in one file and not the other is what this module's own comment warns
@@ -558,6 +572,13 @@ def _pipeline_slots_for(day: dt.date) -> list[dict[str, Any]]:
 def _scheduled_slots_for(day: dt.date) -> list[dict[str, Any]]:
     """Timed operational jobs, excluding heartbeat and dependent session reports."""
     slots = _pipeline_slots_for(day)
+    # Stage 5ZZZ-BK. Operational, never decision — see the comment on ANCHOR_CHECK_SLOTS.
+    # They run in both modes, because the anchor they check is read by both routes.
+    if scheduler_registers_on(day):
+        slots.extend({
+            "id": job_id,
+            "at": dt.datetime.combine(day, dt.time(hour, minute), tzinfo=ET),
+        } for job_id, hour, minute in ANCHOR_CHECK_SLOTS)
     # Stage 5ZZZ-CW. The retiring route's sweeps mirror in every mode EXCEPT track1-only,
     # where the scheduler no longer registers them: their book has held nothing since the
     # route stopped trading, and each sweep still reconciles the broker — which does not

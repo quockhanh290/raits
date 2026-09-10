@@ -23,6 +23,23 @@ Usage:
     # Single instrument (debug):
     python -m global_index.update_ibkr_daily --symbols MES
 
+    # Anchor only, no bars (the 00:55 and 09:16 scheduler jobs):
+    python -m global_index.update_ibkr_daily --reanchor-only
+
+Two modes, and the difference is what gets written:
+
+    default          measure the alignment, then APPEND the day's bars to the parquet
+    --reanchor-only  measure the alignment; if the continuous series has rolled to a new
+                     expiry, write the new offset to the SIDECAR and stop. If it has not
+                     rolled — or the measurement cannot corroborate a roll — write nothing
+                     at all, sidecar included.
+
+The second mode exists because a roll that happens overnight is otherwise not repaired
+until 13:45, hours after the windows it breaks have already refused. It runs fifteen
+minutes ahead of the first slot of each session. Appending there instead would put a
+partial session into the file twice a day, all year, to fix something that happens four
+times a year.
+
 Run order each morning:
     1. python -m global_index.update_ibkr_daily   # append yesterday's bars
     2. python -m global_index.update_spy_csv       # update HMM regime labels
@@ -527,7 +544,57 @@ def _apply_splice_offset(new_bars: pd.DataFrame, old_last_close: float,
     return out, offset
 
 
-def main() -> None:
+def contract_rolled(stored: "str | None", fetched: "str | None") -> bool:
+    """Did the continuous series move to a different contract?
+
+    Stage 5ZZZ-BK. Three answers collapse into two everywhere else, and the collapse is the
+    bug: "the contract changed" is not the same as "I could not read the contract". A missing
+    name on either side means the question was never answered, and re-anchoring on an
+    unanswered question is how a price step gets written into the file on a hunch.
+
+    A first run has no stored name and is not a roll either — it is the initial splice, which
+    has its own path.
+    """
+    if not stored or not fetched:
+        return False
+    return str(stored) != str(fetched)
+
+
+def reanchored_offset(stored_offset: float, med: float) -> float:
+    """The offset after a roll: cumulative, never a replacement.
+
+    A file that has crossed several expiries carries the sum of every crossing, because the
+    stored history stays on the level it was built at and each new contract is lifted onto it.
+    Replacing rather than adding would silently undo every earlier roll.
+    """
+    return float(stored_offset) + float(med)
+
+
+def reanchor_refusals(*, n_ov: int, med: float, iqr: float, price: float) -> list:
+    """Why this measurement does NOT corroborate a roll. Empty list means it does.
+
+    The same four conditions the daily append has always applied, lifted out so one
+    implementation serves both it and the pre-window run. Two copies of a safety rule is two
+    rules, and only one of them gets read the day it matters.
+
+    Every entry names its number: a refusal without a measurement cannot be checked by the
+    person it wakes up.
+    """
+    why: list = []
+    if n_ov < ALIGN_MIN_OVERLAP:
+        why.append(f"only {n_ov} shared bars")
+    iqr_frac = (iqr / abs(med)) if med else float("inf")
+    if iqr_frac > REANCHOR_MAX_IQR_FRAC:
+        why.append(f"IQR is {iqr_frac:.0%} of the shift — not a clean level difference")
+    shift_pct = abs(med) / abs(price or 1.0) * 100
+    if not (REANCHOR_MIN_PCT <= shift_pct <= REANCHOR_MAX_PCT):
+        why.append(f"shift is {shift_pct:.3f}% of price, outside "
+                   f"{REANCHOR_MIN_PCT}-{REANCHOR_MAX_PCT}%")
+    return why
+
+
+def _argparser() -> "argparse.ArgumentParser":
+    """Built here rather than inside main() so the flags can be read without running anything."""
     ap = argparse.ArgumentParser(description="Append yesterday's IBKR bars to parquet")
     ap.add_argument("--port",          type=int, default=4002)
     ap.add_argument("--client-id",     type=int, default=2,
@@ -548,6 +615,19 @@ def main() -> None:
                          "unattended. See boundary_replacement() for the rule.")
     ap.add_argument("--dry-run",       action="store_true",
                     help="Connect + check coverage, no writes")
+    ap.add_argument("--reanchor-only", action="store_true",
+                    help="fix the anchor and nothing else: when the continuous series has "
+                         "rolled, measure the shift and write the new offset to the SIDECAR, "
+                         "then stop. Appends no bars and does not touch the parquet. Meant "
+                         "for the runs 15 minutes before a window opens, so a roll that "
+                         "happened overnight is repaired before the slots meet it instead of "
+                         "after. When the contract has not changed it exits having written "
+                         "nothing at all.")
+    return ap
+
+
+def main() -> None:
+    ap = _argparser()
     a = ap.parse_args()
 
     data_dir = Path(a.data_dir)
@@ -601,6 +681,9 @@ def main() -> None:
     log.info("Connected.")
     offsets_dirty = False
     failed = []
+    #: Instruments whose anchor this run rewrote. Collected so the closing summary can name
+    #: them instead of counting jobs -- see the reanchor branch at the end of main().
+    reanchored: list = []
     #: Stage 5R-0. Final minutes deliberately NOT stored because they were still open when the
     #: fetch went out. Reported at the end so an operator sees the skip was a decision rather
     #: than a gap — a silently shorter file is exactly how a missing bar becomes a mystery.
@@ -686,6 +769,22 @@ def main() -> None:
                 #
                 # The median is over thousands of bars, so one bad print cannot move
                 # it, and the IQR says whether it is a clean level difference or noise.
+                # Stage 5ZZZ-BK. TWO questions, and they were one until this line existed:
+                #
+                #   did it roll?          the name IBKR resolved the continuous series to.
+                #                         Needs no bars at all.
+                #   how big is the step?  needs thousands of shared bars.
+                #
+                # Asked together, a morning with a short overlap answered "I do not know
+                # whether it rolled" — when in fact the name was sitting right there. Nobody
+                # can predict the roll date, so that answer is at its most expensive on
+                # precisely the morning it happens.
+                #
+                # Three states, each with its own cause. A missing NAME is the only thing
+                # that makes the roll question unanswerable; a short overlap never does.
+                _can_name = bool(stored_contract) and bool(fetched_contract)
+                _rolled = contract_rolled(stored_contract, fetched_contract)
+
                 _ov = existing.index.intersection(new_bars_adj.index)
                 if len(_ov) >= ALIGN_MIN_OVERLAP:
                     _d = existing.loc[_ov, "close"] - new_bars_adj.loc[_ov, "close"]
@@ -693,8 +792,6 @@ def main() -> None:
                     _iqr = float(_d.quantile(0.75) - _d.quantile(0.25))
                     log.info("  %s: alignment over %d shared bars — median %+.4f, "
                              "IQR %.4f", name, len(_ov), _med, _iqr)
-                    _rolled = bool(stored_contract and fetched_contract
-                                   and stored_contract != fetched_contract)
                     if abs(_med) > ALIGN_MAX_DRIFT or _rolled:
                         # A roll makes both of these fire, so it has to be named
                         # first: the alignment message would otherwise blame a
@@ -708,24 +805,19 @@ def main() -> None:
                         _px = float(existing["close"].iloc[-1]) or 1.0
                         _shift_pct = abs(_med) / abs(_px) * 100
                         _iqr_frac = (_iqr / abs(_med)) if _med else float("inf")
-                        _why = []
-                        if len(_ov) < ALIGN_MIN_OVERLAP:
-                            _why.append(f"only {len(_ov)} shared bars")
-                        if _iqr_frac > REANCHOR_MAX_IQR_FRAC:
-                            _why.append(f"IQR is {_iqr_frac:.0%} of the shift — not a "
-                                        f"clean level difference")
-                        if not (REANCHOR_MIN_PCT <= _shift_pct <= REANCHOR_MAX_PCT):
-                            _why.append(f"shift is {_shift_pct:.3f}% of price, outside "
-                                        f"{REANCHOR_MIN_PCT}-{REANCHOR_MAX_PCT}%")
+                        # One implementation, shared with the pre-window run. Two copies of a
+                        # safety rule is two rules, and only one gets read the day it matters.
+                        _why = reanchor_refusals(n_ov=len(_ov), med=_med, iqr=_iqr, price=_px)
 
                         if _rolled and not _why:
-                            _new_off = stored_offset + _med
+                            _new_off = reanchored_offset(stored_offset, _med)
                             for _c in ("open", "high", "low", "close"):
                                 if _c in new_bars_adj.columns:
                                     new_bars_adj[_c] = new_bars_adj[_c] + _med
                             splice_offsets[name] = {"offset": _new_off,
                                                     "contract": fetched_contract}
                             offsets_dirty = True
+                            reanchored.append(name)
                             log.warning(
                                 "  %s: CONTRACT ROLLED %s -> %s — re-anchored and "
                                 "continuing.", name, stored_contract, fetched_contract)
@@ -739,7 +831,8 @@ def main() -> None:
                                 "       Tomorrow's alignment check verifies this. If the "
                                 "anchor was wrong it will refuse then — do not ignore an "
                                 "ALIGNMENT DRIFT the day after a roll.")
-                            # Fall through and append with the new offset applied.
+                            # Fall through and append with the new offset applied — or, in
+                            # --reanchor-only, stop at the single exit below.
                         elif _rolled:
                             log.error(
                                 "  %s: CONTRACT ROLLED %s -> %s — refusing to append "
@@ -790,6 +883,83 @@ def main() -> None:
                 else:
                     log.warning("  %s: only %d shared bars — alignment unchecked",
                                 name, len(_ov))
+                    if _rolled:
+                        # Stage 5ZZZ-BK. Known roll, unmeasurable step. This refuses in BOTH
+                        # modes, and the append path is the one that needed it most: before
+                        # this line it logged "alignment unchecked" and then appended bars
+                        # from a DIFFERENT EXPIRY onto the history — the shape of the
+                        # 2026-08-05 incident, where a wrong offset rode the series for three
+                        # days before anyone saw it. The join check downstream did stop it,
+                        # but told the operator "not a roll, this is a data problem", sending
+                        # them to look for a corrupt bar that does not exist.
+                        #
+                        # There is no safe automatic repair here. Inventing an offset without
+                        # measuring it is the one thing every refusal in this file exists to
+                        # prevent. So: stop, name the consequence, and say what to do.
+                        log.error(
+                            "  %s: CONTRACT ROLLED %s -> %s and the step could NOT be "
+                            "measured — only %d shared bars, %d needed. Refusing.",
+                            name, stored_contract, fetched_contract, len(_ov),
+                            ALIGN_MIN_OVERLAP)
+                        log.error(
+                            "       Consequence, now: every window that reads this series "
+                            "refuses with series_rolled until the anchor is fixed.")
+                        log.error(
+                            "       Cause: shared bars are the overlap between this fetch "
+                            "and the stored file, so a short overlap means the file has not "
+                            "been appended to for several sessions. Re-run with a wider "
+                            "window (--duration 2 W) and the step measures itself.")
+                        failed.append(name)
+                        continue
+                    if not _can_name:
+                        # The only genuine "cannot tell". Distinct from the branch above and
+                        # distinct from a confident no — merging any two of these three is
+                        # how a fail-closed gate becomes fail-open.
+                        log.warning(
+                            "  %s: could not read both contract names (stored %r, fetched "
+                            "%r) — the roll question is unanswered this run.",
+                            name, stored_contract, fetched_contract)
+
+                if a.reanchor_only:
+                    # Stage 5ZZZ-BK. The single exit for the pre-window run, and the only
+                    # place in this file that decides not to append. One exit rather than
+                    # one per branch: a second copy of this rule is a second rule, and only
+                    # one of them gets read on the day it matters.
+                    #
+                    # Reaching here with `_rolled` true means the re-anchor already SUCCEEDED
+                    # — every refusal above appends to `failed` and continues, so a bad
+                    # measurement never arrives at this line. A roll that could not be
+                    # measured never arrives either; it refuses by name further up.
+                    if not _can_name:
+                        # The one unanswered case, and it is about the NAME, not the bars.
+                        # Not "unchanged": the windows about to open would be running on an
+                        # anchor nobody managed to check this morning.
+                        log.warning(
+                            "  %s: the roll question is unanswered — stored contract %r, "
+                            "fetched %r. Nothing written.",
+                            name, stored_contract, fetched_contract)
+                    elif _rolled:
+                        # The anchor was the whole problem and it is fixed now. Appending is
+                        # a separate job with its own hour; doing it here would put a partial
+                        # session into the file fifteen minutes before a window opens.
+                        #
+                        # The sidecar carries the new offset, so `frozen_frame` brings the
+                        # stored history onto the new contract's scale from the next read
+                        # onward — which is what the slots about to run are asking for. The
+                        # daily append then finds the contract already matching and a
+                        # residual near zero, so it verifies this measurement rather than
+                        # repeating it, and writes the day's bars as usual.
+                        log.warning(
+                            "  %s: re-anchored %s -> %s, appending nothing "
+                            "(--reanchor-only). The daily append verifies this anchor.",
+                            name, stored_contract, fetched_contract)
+                    else:
+                        # Nothing rolled, so there is nothing this mode is for. Exiting here
+                        # is the point of the mode: the parquet is touched on the ~4 days a
+                        # year a contract actually changes, not on the ~246 it does not.
+                        log.info("  %s: contract unchanged (%s) — nothing written.",
+                                 name, stored_contract or "no anchor recorded")
+                    continue
 
                 # Keep only NEW bars (after existing last bar)
                 new_only = new_bars_adj[new_bars_adj.index > last_existing]
@@ -852,11 +1022,16 @@ def main() -> None:
                          name, _last_close, _first_open, _jump, _jump_pct,
                          fetched_contract or "(unknown)")
 
-                # The contract check above already ruled out a roll, so a jump this
-                # size is bad
-                # data — the wrong contract fetched by hand, a corrupt bar, a feed
-                # glitch. Loose on purpose, since identity already covers rolls and
-                # this only has to sit above anything a real market does.
+                # A roll can no longer reach this line: Stage 5ZZZ-BK moved the contract
+                # comparison ahead of the overlap check, so every roll exits above — measured
+                # and re-anchored, or refused by name. Before that, the premise this message
+                # states was only true when the overlap happened to be long enough, and on a
+                # short one it told the operator "not a roll" about a roll.
+                #
+                # So a jump this size really is bad data — the wrong contract fetched by
+                # hand, a corrupt bar, a feed glitch. Loose on purpose, since identity
+                # already covers rolls and this only has to sit above anything a real
+                # market does.
                 if _jump_pct > JOIN_JUMP_MAX_PCT:
                     log.error(
                         "  %s: JOIN JUMP %.3f%% > %.2f%% with NO contract change (%s) "
@@ -994,6 +1169,19 @@ def main() -> None:
         print(f"COMPLETED WITH ERRORS: {failed}")
         print("=" * 72)
         sys.exit(1)   # pre-flight detects failure via returncode != 0
+    elif a.reanchor_only:
+        # Stage 5ZZZ-BK. A different sentence, because a different thing happened. The line
+        # below says INSTRUMENTS UPDATED, and in this mode nothing was updated: no bars were
+        # appended for any instrument, and on most days no anchor was written either. A
+        # summary that claims work it did not do is the same defect this file keeps finding
+        # elsewhere -- a description that has drifted from the thing it describes -- and the
+        # operator reading it is the person deciding whether the morning was clean.
+        _re = sorted(reanchored)
+        if _re:
+            print(f"ANCHORS RE-ANCHORED: {_re}   (no bars appended -- --reanchor-only)")
+            print("The daily append verifies these anchors when it runs.")
+        else:
+            print(f"ALL {len(jobs)} ANCHORS UNCHANGED -- nothing written.")
     else:
         print(f"ALL {len(jobs)} INSTRUMENTS UPDATED")
         print("\nNext: python -m global_index.run_live_day ...")

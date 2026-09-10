@@ -5,6 +5,8 @@ Thay thế Windows Task Scheduler thủ công. Chạy 24/7 (process hoặc Windo
 Service), tự convert ET↔machine-TZ và tự handle US DST.
 
 Jobs mỗi ngày Mon-Fri (thứ tự):
+  00:55 ET → ANCHOR CHECK        (update_ibkr_daily --reanchor-only, trước cửa sổ NKD 01:10)
+  09:16 ET → ANCHOR CHECK        (như trên, trước 09:31 — phủ Calm, Stress và Swing)
   09:31 ET → run_maxhold_exit    (MAX_HOLD close at RTH open)
   13:45 ET → PRE-FLIGHT          (update_ibkr_daily → update_spy_csv, blocking)
   14:05 ET → run_live_day        (initial signal run — xem continuous runner bên dưới)
@@ -904,6 +906,99 @@ def make_scheduler(port: int, dry_run: bool,
         def job_stress_mid():
             _live_day_body("STRESS_MID_1020", clusters="stress",
                            prev_preflight=True, stress_entry=True)
+
+    # ── 00:55 and 09:16 ET Mon-Fri: THE ANCHOR CHECK ────────────────────────
+    #
+    # Stage 5ZZZ-BK. Fifteen minutes before the first slot of each session, ask one
+    # question: has IBKR's continuous series moved to a new expiry since the anchor
+    # was last written? If it has, measure the step and record it. Nothing else.
+    #
+    # Why it exists, measured. On the night of 2026-09-10 IBKR rolled the NKD
+    # continuous series to December between the 13:45 append and the 01:10 window.
+    # Twelve slots refused with `series_rolled`: the bars came from NKDZ6 while the
+    # stored history is anchored on NKDU6. The re-anchor that fixes this lived only
+    # inside the 13:45 job, so it ran twelve hours after the window it could have
+    # saved. That is one lost window per roll, four times a year — and the next one
+    # is worse: the US basket expires 2026-09-18 and IBKR rolls a day early, so Calm
+    # (10:00) and Stress (10:35-12:30) both sit ahead of 13:45 and would lose a whole
+    # day between them.
+    #
+    # What this is NOT. The pre-flight comment below rejects "a pre-market refresh"
+    # on the grounds that Track 1's morning slots trade on the PREVIOUS day's
+    # pre-flight plus today's live bars, and that contract produced every Track 1
+    # number. This job does not touch that contract: `--reanchor-only` appends no
+    # bars, so the parquet's last bar — the only thing `required_data_through` reads
+    # — is exactly what it was. On a day with no roll the mode writes nothing at all,
+    # not even the sidecar, and ~246 sessions a year go through that branch.
+    #
+    # Why not simply run the full append twice more a day: re-anchoring and appending
+    # are one code path in `update_ibkr_daily`, and taking that path is what put a
+    # wrong offset into the series on 2026-08-05, where it sat unnoticed for three
+    # days. A roll happens four times a year. Deciding whether to write BEFORE
+    # writing keeps the daily blast radius where it already is.
+    #
+    # It does not touch `_preflight_ok`. A failure here must not lock the day out,
+    # and — the direction that matters more — must not open it either. Everything it
+    # could have fixed, the 13:45 pre-flight still checks with a longer fetch.
+    def _anchor_check_body(label: str) -> None:
+        from global_index import track1_slots as _t1a
+
+        today = _et_today().isoformat()
+        log.info("[%s] Starting: update_ibkr_daily --reanchor-only (%s)", label, today)
+        rc: list = []
+        ok = _run(
+            [sys.executable, "-m", "global_index.update_ibkr_daily",
+             "--port", str(port),
+             "--client-id", str(_t1a.TRACK1_ANCHOR_CLIENT_ID),
+             # A week, not the daily job's three days. Measured 2026-09-10 on NKD, same
+             # instant, same gateway: both take under three seconds, and the shared-bar count
+             # against a file N sessions stale goes
+             #
+             #     stale by      3 sessions   5 sessions   8 sessions
+             #     3 D                  544            0            0
+             #     1 W                3,300        1,969            0
+             #
+             # against a floor of 500. Three days leaves 9% of margin at three sessions
+             # stale; a week leaves four times the floor at five. The step is what needs
+             # those bars, and a roll whose step cannot be measured is refused outright —
+             # so the cheap way to not need that refusal is to ask for more history.
+             # Two weeks would cover eleven sessions and costs 40s instead of 3.
+             "--duration", "1 W",
+             "--reanchor-only"],
+            label=label, dry_run=dry_run, rc_out=rc,
+        )
+        if ok:
+            # Deliberately INFO and deliberately said out loud. The overwhelmingly common
+            # outcome is "nothing to do", and a job that logs only its failures is a job
+            # whose silence cannot be told from its absence.
+            log.info("[%s] completed OK — anchors checked, no bars written", label)
+            return
+        log.error(
+            "[%s] exited with code %s — the anchor could not be verified before the "
+            "window. If the series rolled overnight the slots about to run will refuse "
+            "with series_rolled; the 13:45 pre-flight re-checks with a longer fetch.",
+            label, rc[0] if rc else "unknown")
+
+    # No `track1_` prefix, and that is deliberate. The id is what the dashboard mirror is
+    # keyed on and what the route table buckets by, and the parity check compares the two
+    # sides by id — it caught this exact mismatch on the first run. Like `preflight` and the
+    # SPY rungs, this job refreshes an input BOTH routes read; the Track 1 prefix belongs to
+    # jobs that come from Track 1's own slot table.
+    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=0, minute=55,
+                         id="anchor_check_0055",
+                         name="Anchor check 00:55 ET")
+    def job_anchor_check_0055():
+        # Fifteen minutes ahead of the 01:10 NKD window — the one this was written for.
+        _anchor_check_body("ANCHOR_CHECK_0055")
+
+    @sched.scheduled_job("cron", day_of_week="mon-fri", hour=9, minute=16,
+                         id="anchor_check_0916",
+                         name="Anchor check 09:16 ET")
+    def job_anchor_check_0916():
+        # Fifteen minutes ahead of 09:31, the first US job of the day. One run covers
+        # Calm, Stress and Swing: a roll is a property of the series, not of the window,
+        # so once the anchor is right every later slot reads it right.
+        _anchor_check_body("ANCHOR_CHECK_0916")
 
     # ── 13:45 ET Mon-Fri: SHARED PRODUCTION PRE-FLIGHT (parquet + spy CSV) ───
     #

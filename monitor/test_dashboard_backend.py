@@ -96,11 +96,20 @@ def test_gap_between_windows_is_not_expected_yet(monkeypatch, tmp_path: Path):
 def test_schedule_separates_operational_jobs_from_decision_pipeline(tmp_path: Path):
     before_maxhold = dt.datetime(2026, 8, 11, 9, 0, tzinfo=ET)
     status = schedule_status.get_schedule_status(tmp_path, now=before_maxhold)
-    assert status["next_scheduled_job"]["job_id"] == "MAX_HOLD_EXIT"
+    # Stage 5ZZZ-BK. At 09:00 the next thing the scheduler runs is the 09:16 anchor check,
+    # and the next thing that can DECIDE anything is still the 09:31 max-hold exit. The two
+    # fields naming different jobs is this test's whole subject, so it now says so outright
+    # instead of resting on a moment when they happened to coincide -- which is what it did
+    # before, and why adding one operational job turned it red.
+    assert status["next_scheduled_job"]["job_id"] == "ANCHOR_CHECK_0916"
     assert status["next_decision_job"]["job_id"] == "MAX_HOLD_EXIT"
     assert status["next_decision_job"]["at"].endswith("13:31:00Z")
     assert any(slot["id"] == "STOP_REPAIR_1020" for slot in schedule_status._scheduled_slots_for(before_maxhold.date()))
     assert all(slot["id"] != "STOP_REPAIR_1020" for slot in schedule_status._pipeline_slots_for(before_maxhold.date()))
+    # Same separation, checked for the anchor checks: on the schedule, out of the pipeline.
+    day = before_maxhold.date()
+    assert any(slot["id"] == "ANCHOR_CHECK_0916" for slot in schedule_status._scheduled_slots_for(day))
+    assert all(slot["id"] != "ANCHOR_CHECK_0916" for slot in schedule_status._pipeline_slots_for(day))
 
 
 def test_failed_slot_is_incident_while_state_remains_fresh(monkeypatch, tmp_path: Path):

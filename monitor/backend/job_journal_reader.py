@@ -177,6 +177,13 @@ def _job_type(job_id: str) -> str:
     # story worth seeing as two events, not one.
     if job_id == "SPY_WEEKEND_PRE_NKD_CHECK":
         return "spy_weekend_pre_nkd_check"
+    # Its own stream, not `other`. A catch-all is not a stream: when the SPY rungs sat in
+    # `other`, a stop-repair sweep was recorded as having RECOVERED a failed data refresh.
+    # These two runs answer the same question twelve hours apart, so a morning success
+    # genuinely does recover a failed midnight run — which only reads correctly if the two
+    # of them, and nothing else, share a stream.
+    if job_id.startswith("ANCHOR_CHECK"):
+        return "anchor_check"
     if job_id == "SESSION_REPORT":
         return "session_report"
     # The two nightly evidence jobs. Typed rather than left as "other" so the journal can
@@ -250,6 +257,12 @@ def _job_id_from_name(name: str) -> str | None:
         return "MAX_HOLD_EXIT"
     if name.startswith("Pre-flight update"):
         return "PREFLIGHT"
+    # Stage 5ZZZ-BK. Registered here at the same time as the jobs themselves, not later.
+    # The reader answers `None` for a name it does not know and then DROPS the run — it
+    # does not complain — so a job added without a line here runs every day and appears
+    # nowhere, which is exactly what happened once already in this file's history.
+    if name.startswith("Anchor check ") and suffix:
+        return f"ANCHOR_CHECK_{suffix}"
     if name.startswith("Bao cao phien"):
         return "SESSION_REPORT"
     return None
