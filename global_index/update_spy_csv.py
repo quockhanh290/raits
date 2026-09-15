@@ -37,7 +37,8 @@ import shutil
 import sys
 from dataclasses import dataclass
 from typing import Any
-from datetime import date
+from datetime import date, datetime, time as dt_time, timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 import pandas as pd
@@ -185,6 +186,44 @@ def fetch_spy_close(api_key: str, from_date: date, to_date: date) -> pd.DataFram
 
 OVERLAP_DAYS = 30   # re-fetch last N calendar days and replace them (see docstring)
 
+#: Stage 5ZZZ-BM. The earliest ET instant a day's SPY close is treated as FINAL.
+#:
+#: Measured on 2026-09-14: the 13:45 pre-flight asked Polygon for daily bars "through today",
+#: Polygon returned an IN-PROGRESS bar for that day, and it was written as the close --
+#: 762.8137 at 13:46:50 ET against a real close of 760.88. Every other row in the file is
+#: quoted to the cent; that one had four decimals. The evening ladder was then defeated by
+#: it: 18:20 saw the day already present, fetched nothing, and failed verification; the later
+#: rungs skip a covered day and reported OK. The real close never arrived.
+#:
+#: The contract was already written elsewhere -- "the 13:45 refresh is not expected to carry
+#: today's close" (test_track1_stage5q5_freshness_boundary) -- and nothing in the writer
+#: enforced it. On 2026-09-11 Polygon happened not to return the partial bar; on 2026-09-14
+#: it did. Correctness that depends on the provider's mood is not correctness.
+#:
+#: 18:00, not 16:00. The first scheduled reader of today's close is the 18:20 rung, so a later
+#: cut costs nothing, and an earlier one risks exactly this defect in the minutes the daily
+#: aggregate is still settling.
+CLOSE_FINAL_ET = dt_time(18, 0)
+_ET = ZoneInfo("America/New_York")
+
+
+def final_close_through(now=None) -> date:
+    """The last ET trading date whose SPY close may be written, as of `now`.
+
+    On the ET clock, never the machine's: this box runs in Calgary, and `date.today()` there
+    answers "which calendar date is it in Alberta" -- at 22:45 local that is still the 14th
+    while the 00:45 ET run belongs to the 15th. A naive `now` is refused rather than guessed,
+    for the same reason.
+    """
+    ts = pd.Timestamp(datetime.now(_ET) if now is None else now)
+    if ts.tzinfo is None:
+        raise ValueError(
+            "final_close_through needs an aware instant; a naive one does not say which of "
+            "the three clocks it was read from")
+    et = ts.tz_convert(_ET)
+    return et.date() if et.time() >= CLOSE_FINAL_ET else et.date() - timedelta(days=1)
+
+
 
 @dataclass(frozen=True)
 class UpdateOutcome:
@@ -212,7 +251,8 @@ class UpdateOutcome:
 
 def update_spy_csv(csv_path: Path, api_key: str,
                    snapshot_dir: Path = SNAPSHOT_DIR,
-                   verify_root: str | None = None) -> "UpdateOutcome":
+                   verify_root: str | None = None,
+                   now=None) -> "UpdateOutcome":
     """
     Extend spy_daily.csv with new rows.  Returns an `UpdateOutcome`.
     Raises NotImplementedError until fetch_spy_close() is wired.
@@ -253,9 +293,12 @@ def update_spy_csv(csv_path: Path, api_key: str,
         n_before = 0
         log.info("spy_daily.csv not found at %s — will create fresh", csv_path)
 
-    today = date.today()
-    if last_date >= today:
-        log.info("spy_daily.csv up-to-date (last=%s)", last_date)
+    # Stage 5ZZZ-BM. Not `date.today()`: that was the machine's calendar, and it asked for a day
+    # whose close did not exist yet. See CLOSE_FINAL_ET.
+    through = final_close_through(now)
+    if last_date >= through:
+        log.info("spy_daily.csv up-to-date (last=%s, final closes through %s)",
+                 last_date, through)
         # Stage 5ZL: no fetch, no snapshot, no comparison. Returning a bare 0 here used to be
         # indistinguishable from a run that verified cleanly.
         from global_index import regime_verify as _rv
@@ -272,10 +315,10 @@ def update_spy_csv(csv_path: Path, api_key: str,
     fetch_from = max(last_date - timedelta(days=OVERLAP_DAYS), first_date)
     log.info(
         "Fetching SPY close [%s, %s] (overlap %dd for adjustment consistency)",
-        fetch_from, today, OVERLAP_DAYS,
+        fetch_from, through, OVERLAP_DAYS,
     )
 
-    fetched = fetch_spy_close(api_key, fetch_from, today)
+    fetched = fetch_spy_close(api_key, fetch_from, through)
     if fetched.empty:
         log.warning("fetch_spy_close returned empty — no update applied")
         from global_index import regime_verify as _rv
@@ -286,6 +329,24 @@ def update_spy_csv(csv_path: Path, api_key: str,
             checked_at=_rv._now(), inputs={"updated": str(csv_path)}))
 
     fetched["date"] = pd.to_datetime(fetched["date"])
+
+    # Stage 5ZZZ-BM. Filtered HERE as well as asked for above: the guard belongs on our side of
+    # the wire, not in the hope that the provider honours `to`.
+    unfinished = fetched["date"] > pd.Timestamp(through)
+    if unfinished.any():
+        log.warning("dropped %d row(s) dated after %s -- a close that is not final yet is not "
+                    "a close: %s", int(unfinished.sum()), through,
+                    ", ".join(fetched.loc[unfinished, "date"].dt.strftime("%Y-%m-%d")))
+        fetched = fetched[~unfinished]
+    if fetched.empty:
+        # The window below is REPLACED by what was fetched. Letting an empty fetch through would
+        # keep only the rows older than the window and silently drop the last 30 days.
+        from global_index import regime_verify as _rv
+        return UpdateOutcome(rows_added=0, verify=_rv.VerifyResult(
+            status=_rv.UNKNOWN, code=_rv.UNREADABLE,
+            detail=f"nothing final through {through} was returned, so the series was left "
+                   f"exactly as it was",
+            checked_at=_rv._now(), inputs={"updated": str(csv_path)}))
 
     # Keep old rows that are BEFORE the fetch window (untouched, stable adjustment basis)
     existing["date"] = pd.to_datetime(existing["date"])
