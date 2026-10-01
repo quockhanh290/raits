@@ -215,6 +215,11 @@ def main() -> int:
             today=now.normalize(),
             now=now,
         )
+        # B4 may adopt a broker-owned stop id when the route book has lost it.
+        # The repair job intentionally does not call run_day(), so the normal
+        # end-of-slot persistence hook is never reached. Persist here before
+        # exiting; otherwise every sweep rediscovers the same drift.
+        runner._persist_state()
         naked = list(getattr(runner, "_b4_naked_stops", []))
         if naked:
             # [BOOKED]: placing a stop is a change on the exchange, and WARNING is not
