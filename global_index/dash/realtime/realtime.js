@@ -355,6 +355,7 @@
   // the batch's own render already includes whatever Track 1 has stored by then. This only
   // suppresses a paint that could never have been correct.
   let firstBatchRendered = false;
+  const FIRST_PAINT_TRACK1_GRACE_MS = 1000;
 
   async function pollTrack1() {
     if (track1InFlight) return;
@@ -377,7 +378,7 @@
     // between 9.06s and 12.05s (measured 2026-08-30), while the market-view endpoint that
     // fills both had already answered in 41ms. A slow panel may keep itself waiting; it may
     // not decide when the rest of the page is allowed to appear.
-    pollTrack1();
+    const track1Read = pollTrack1();
     const results = await Promise.allSettled([
       fetchJson('/api/v1/runner-state'),
       fetchJson('/api/v1/broker'),
@@ -412,6 +413,18 @@
     if (rMarketView.status === 'fulfilled') state.marketView = rMarketView.value;
     else state.marketView = { market_view: null, regime: null,
       error: rMarketView.reason?.message || 'market view request failed' };
+
+    // Paint the core dashboard as soon as the fast endpoints have answered. The journal,
+    // session-event and execution-quality readers can scan large evidence trees on a cold
+    // cache; they are supplementary panels and must not hold the first useful paint hostage.
+    await Promise.race([
+      track1Read,
+      new Promise(resolve => window.setTimeout(resolve, FIRST_PAINT_TRACK1_GRACE_MS)),
+    ]);
+    $('fatalBanner').hidden = results.some(result => result.status === 'fulfilled');
+    firstBatchRendered = true;
+    render();
+
     // TWO days, not one. Session events and execution quality belong to a trading
     // SESSION; scheduled jobs belong to a CALENDAR day, and the two part company
     // exactly when it matters most.
@@ -451,10 +464,8 @@
     // count here and no longer does: it is polled on its own clock, so a poll that arrives
     // while it is still in flight would have had no vote either way, and one panel's slow
     // read is not evidence that the backend is up.
-    $('fatalBanner').hidden = results.some(result => result.status === 'fulfilled');
-    // Set BEFORE the render, so a Track 1 read that lands during it is free to draw itself
-    // on the next poll rather than being suppressed for a whole cycle.
-    firstBatchRendered = true;
+    // Refresh the supplementary panels when their slower evidence requests finish. The
+    // core view above remains usable even if one of these readers is cold or unavailable.
     render();
   }
 
@@ -1228,7 +1239,9 @@
     }
     if (stripGates.orders_possible === true && stripOrderRequest.scheduler_armed === false) {
       stripConditions.push('order sending not armed');
-    } else if (stripGates.orders_possible === true && stripOrderRequest.scheduler_armed == null) {
+    } else if (stripGates.orders_possible === true
+               && Object.prototype.hasOwnProperty.call(state.schedule || {}, 'order_request')
+               && stripOrderRequest.scheduler_armed == null) {
       stripConditions.push('order request unknown');
     }
     if (!stripConditions.length && stripUnknown) stripConditions.push('some telemetry is unavailable');
