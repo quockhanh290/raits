@@ -170,7 +170,8 @@ LEGACY_STOP_FILE = ROOT / "STOP_TRADING"
 TRACK1_ORDERS_ENV = "TRACK1_ORDERS_APPROVED"
 
 
-def _env(*, track1_shadow: bool = False, track1_only: bool = False) -> dict[str, str]:
+def _env(*, track1_shadow: bool = False, track1_only: bool = False,
+         allow_orders: bool = False) -> dict[str, str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT)
     if track1_only:
@@ -203,8 +204,46 @@ def _env(*, track1_shadow: bool = False, track1_only: bool = False) -> dict[str,
     # Removed from the CHILD, whatever the launching shell happens to carry. This is the second
     # of the two factors that arm Track 1, and a launcher must never be the thing that supplies
     # it — the first factor, the confirmation file, is refused outright below.
-    env.pop(TRACK1_ORDERS_ENV, None)
+    # Operator decision 2026-09-23. Until then this line was unconditional, and its comment
+    # above says why: a launcher must never be the thing that supplies approval, because a
+    # scheduler that comes back on its own — after a reboot, a logon task, an unattended ops
+    # restart — must not come back armed. That machine now restarts itself, built the same
+    # morning, so the property is kept by a narrower rule rather than by a wider one:
+    #
+    #   the launcher supplies approval ONLY on an explicit flag, and the flag is refused
+    #   unless the gate registry ALREADY says orders are possible (see `arming_refusal`).
+    #
+    # Two factors, still two. The launcher can now be one of them and can never be both.
+    if allow_orders:
+        env[TRACK1_ORDERS_ENV] = "1"
+    else:
+        env.pop(TRACK1_ORDERS_ENV, None)
     return env
+
+
+def _gates_overridden() -> list:
+    """`[(id, why)]` for gates proceeding under an operator override. Never raises."""
+    try:
+        from global_index import track1_gates as _g
+        return [(b.id, why) for b, why in _g.overridden()]
+    except Exception:                                                 # noqa: BLE001
+        return []
+
+
+def arming_refusal(*, allow_orders: bool) -> tuple:
+    """`(may_proceed, why_not)` for a start that asks to arm orders.
+
+    Asked BEFORE anything is stopped or started. A refusal here costs the operator a message;
+    a refusal after `ensure_single` has killed the running scheduler costs them the scheduler.
+
+    Without `allow_orders` this always allows: an ordinary shadow start must not depend on the
+    evidence the shadow route exists to collect, or a bad week would stop the route that
+    produces the good one.
+    """
+    if not allow_orders:
+        return True, []
+    possible, why = orders_would_be_possible()
+    return bool(possible), list(why or [])
 
 
 def orders_would_be_possible() -> tuple:
@@ -278,7 +317,8 @@ def legacy_entry_job_count(port: int = DEFAULT_IBKR_PORT) -> int:
         return 0
 
 
-def track1_shadow_blockers(*, track1_only: bool = False) -> list[str]:
+def track1_shadow_blockers(*, track1_only: bool = False,
+                           allow_orders: bool = False) -> list[str]:
     """Why a Track 1 shadow start must not happen right now. Empty means it may.
 
     Fail-closed on both counts, and neither is created here:
@@ -306,7 +346,15 @@ def track1_shadow_blockers(*, track1_only: bool = False) -> list[str]:
         and reconcile checks. Freezing legacy removes the trading, not the load.
     """
     blockers = []
-    if TRACK1_CONFIRMATION.exists() and orders_would_be_possible()[0]:
+    # `allow_orders` IS the resolved intent. The refusal below exists because "starting a
+    # shadow session then is starting something nobody asked for" — and with this flag on the
+    # command line somebody has asked for it, in as many words.
+    #
+    # Refusing anyway would repeat the mistake this docstring already records: on 2026-08-27
+    # the guard refused the only safe mode, and the operator restarted into plain legacy,
+    # registering 45 entry jobs on the login the signature had just declared retired. A guard
+    # that has no answer for an explicit request sends people somewhere worse.
+    if (not allow_orders) and TRACK1_CONFIRMATION.exists() and orders_would_be_possible()[0]:
         blockers.append(
             f"{TRACK1_CONFIRMATION.name} exists AND every order blocker is clear, so this "
             f"route can send orders. A shadow start must not run while that is true; "
@@ -702,7 +750,8 @@ def _open_log(name: str):
 
 
 def start_scheduler(ibkr_port: int, *, shadow_resume: bool, assume_preflight_ok: bool,
-                    track1_shadow: bool = False, track1_only: bool = False) -> int | None:
+                    track1_shadow: bool = False, track1_only: bool = False,
+                    allow_orders: bool = False) -> int | None:
     """Start the scheduler.
 
     `track1_shadow` adds the Track 1 slots ALONGSIDE legacy — transitional, both routes run.
@@ -726,11 +775,18 @@ def start_scheduler(ibkr_port: int, *, shadow_resume: bool, assume_preflight_ok:
         args.append("--track1-only-shadow")
     elif track1_shadow:
         args.append("--track1-shadow")
+    if allow_orders:
+        # Both halves, and neither is sufficient alone. The env var is the out-of-band
+        # approval the gate reads; the argv flag is what lets the SCHEDULER put the same flag
+        # on each slot it spawns. A slot is its own process: an environment that stops at the
+        # scheduler arms nothing.
+        args.append("--allow-orders")
     err = _open_log("ops_scheduler.err.log")
     proc = subprocess.Popen(
         args,
         cwd=str(ROOT),
-        env=_env(track1_shadow=track1_shadow, track1_only=track1_only),
+        env=_env(track1_shadow=track1_shadow, track1_only=track1_only,
+                 allow_orders=allow_orders),
         stdout=subprocess.DEVNULL,
         stderr=err,
         creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "DETACHED_PROCESS", 0),
@@ -853,8 +909,29 @@ def track1_status() -> dict:
         "slot_timing_exists": TRACK1_TELEMETRY_DIR.exists(),
         "stop_trading_present": LEGACY_STOP_FILE.exists(),
         "confirmation_present": TRACK1_CONFIRMATION.exists(),
+        # Reads THIS process's environment, which is the shell `ops status` was typed in —
+        # not the scheduler's. Kept because it is occasionally what you want to know (an
+        # operator who exported the variable by hand), and renamed in the printed output so it
+        # stops being mistaken for the answer below.
         "orders_env_present": os.environ.get(TRACK1_ORDERS_ENV) is not None,
+        # Stage 2026-09-23. THE question, and the one the old field was being read as.
+        #
+        # Measured the night orders were first armed: the scheduler's argv carried
+        # `--allow-orders`, the route was armed, and `ops status` printed
+        # `track1_orders_approved=False` — because it had looked at the wrong process. An
+        # operator reading one line would have concluded the arming had failed and re-run it,
+        # or worse, concluded it had worked when it had not. The scheduler is the thing that
+        # spawns slots, so the scheduler is the thing to ask.
+        #
+        # Three states like everything else here: None means the process probe failed and
+        # nobody knows, which is not False.
+        "scheduler_armed": (("--allow-orders" in cmdlines) if (known and procs) else None),
         "blocking": blockers,
+        # Stage 2026-09-23. `blocking` alone stopped being the whole answer the moment a gate
+        # could be stepped over: it goes EMPTY on a day when a gate is failing and being
+        # overridden, which reads as "nothing wrong" and is the one reading that must never
+        # be available. Printed together, always.
+        "overridden": [(b.id, why) for b, why in gates.overridden()],
         "orders_possible": gates.may_enable_orders()[0],
         # Stage 5ZQ — B1's measured half, read from the recorded audit. Never opens a
         # connection: `python -m global_index.b1_audit --broker ibkr --record` asks the
@@ -1099,8 +1176,16 @@ def _print_track1_status() -> None:
     print(f"track1_slot_timing={t['slot_timing_dir']} exists={t['slot_timing_exists']}")
     print(f"track1_stop_trading={t['stop_trading_present']} "
           f"confirmation={t['confirmation_present']} "
-          f"{TRACK1_ORDERS_ENV.lower()}={t['orders_env_present']}")
+          f"scheduler_armed={t['scheduler_armed']} "
+          f"this_shell_{TRACK1_ORDERS_ENV.lower()}={t['orders_env_present']}")
     print(f"track1_blocking={t['blocking'] or 'none'} orders_possible={t['orders_possible']}")
+    for _gid, _why in (t.get("overridden") or ()):
+        # Not "waived", not "released", not "passed". The gate is shut and orders proceed
+        # anyway, and an operator reading one line has to be able to tell that apart from a
+        # gate that opened.
+        print(f"  ORDER BLOCK OVERRIDDEN: {_gid} is STILL FAILING — {_why}")
+        print(f"    orders may be sent and the evidence does not support them; this is an "
+              f"operator decision on record, not a gate that opened")
     _m = t.get("scheduler_mode") or {}
     _compat = _m.get("compatible")
     print(f"track1_scheduler_mode={'compatible' if _compat else 'INCOMPATIBLE' if _compat is False else 'unknown'}"
@@ -1289,6 +1374,63 @@ def cmd_up(args: argparse.Namespace) -> int:
     track1_only = bool(getattr(args, "track1_only_shadow", False))
     track1_shadow = bool(getattr(args, "track1_shadow", False)) or track1_only
 
+    allow_orders = bool(getattr(args, "allow_orders", False))
+    # Order arming must always be based on a fresh broker observation.  The gate reads the
+    # durable account-baseline record, not the time at which the file was rewritten; without
+    # refreshing here an old observation can look newly recorded and still arm the scheduler.
+    # Shadow starts deliberately skip this broker read, because they do not send orders.
+    if allow_orders:
+        print("refreshing B1 audit (read-only broker probe) before arming...")
+        try:
+            from global_index import b1_audit as _b1_audit
+            _b1_rc = _b1_audit.main([
+                "--root", str(ROOT),
+                "--broker", "ibkr",
+                "--record",
+            ])
+        except Exception as _b1_exc:  # fail closed before touching running processes
+            _b1_rc = 1
+            print(f"B1 AUDIT REFRESH FAILED: {type(_b1_exc).__name__}: {_b1_exc}")
+        if _b1_rc != 0:
+            print("REFUSING to arm orders: the refreshed B1 audit is not PASS.")
+            print("Nothing stopped, nothing started.")
+            _ops_log("arming refused: B1 audit refresh did not PASS")
+            return 2
+        print("refreshing account baseline (read-only broker probe) before arming...")
+        try:
+            from global_index import account_baseline_audit as _baseline
+            _baseline_rc = _baseline.main([
+                "--root", str(ROOT),
+                "--broker", "ibkr",
+                "--record",
+            ])
+        except Exception as _baseline_exc:  # fail closed before touching running processes
+            _baseline_rc = 1
+            print(f"BASELINE REFRESH FAILED: {type(_baseline_exc).__name__}: {_baseline_exc}")
+        if _baseline_rc != 0:
+            print("REFUSING to arm orders: the refreshed account baseline is not PASS.")
+            print("Nothing stopped, nothing started.")
+            _ops_log("arming refused: account baseline refresh did not PASS")
+            return 2
+    # Checked FIRST, before `ensure_single` stops anything. A refusal that arrives after the
+    # running scheduler has been killed costs the operator the scheduler, which is how a guard
+    # teaches people to stop passing the flag that triggers it.
+    _may, _why = arming_refusal(allow_orders=allow_orders)
+    if not _may:
+        print("REFUSING to arm orders: the gate registry still reports them impossible.")
+        for w in _why:
+            print(f"  - {w}")
+        print("  Nothing stopped, nothing started. Close the gates, or record an order-block "
+              "override, then ask again.")
+        _ops_log("arming refused: registry reports orders impossible")
+        return 2
+    if allow_orders:
+        print("*** ORDERS ARMED *** this scheduler and every slot it spawns may place PAPER "
+              "orders.")
+        for _gid, _w2 in (_gates_overridden() or ()):
+            print(f"    and {_gid} is STILL FAILING — {_w2}")
+        _ops_log("arming: orders armed by explicit --allow-orders")
+
     if bool(getattr(args, "track1_shadow", False)) and track1_only:
         print("REFUSING: --track1-shadow and --track1-only-shadow ask for different "
               "schedules. The first runs legacy AND Track 1; the second does not register "
@@ -1332,9 +1474,19 @@ def cmd_up(args: argparse.Namespace) -> int:
         if _refuse_legacy_start("track1-shadow" if track1_shadow else "legacy/default"):
             return 2
 
-    if track1_shadow:
+    # `restart --no-scheduler` starts no scheduler, so a refusal about starting one is a
+    # refusal about a start nobody requested. Stage 5ZZO already learned this on the legacy
+    # branch — "a guard that fires where no start happens is not a stricter guard, it is a guard
+    # that teaches an operator to work around it" — and the shadow refusal below had the same
+    # shape the moment orders became possible: it blocked a BACKEND-only restart, which is the
+    # documented way to pick up a new API route.
+    _no_scheduler_asked = (getattr(args, "label", None) == "restart"
+                           and not args.restart_scheduler)
+
+    if track1_shadow and not _no_scheduler_asked:
         mode = "track1-only-shadow" if track1_only else "track1-shadow"
-        blockers = track1_shadow_blockers(track1_only=track1_only)
+        blockers = track1_shadow_blockers(track1_only=track1_only,
+                                          allow_orders=allow_orders)
         if blockers:
             print(f"{mode}: REFUSING to start")
             for b in blockers:
@@ -1369,7 +1521,8 @@ def cmd_up(args: argparse.Namespace) -> int:
             print("  legacy strategy : STILL SCHEDULED. STOP_TRADING halts its ENTRIES only —")
             print("                    each slot still spawns, connects and fetches first.")
             print("                    For a clean session use --track1-only-shadow.")
-        print(f"  {TRACK1_ORDERS_ENV:15s} : removed from the child environment")
+        print(f"  {TRACK1_ORDERS_ENV:15s} : "
+              f"{'set in the child environment' if allow_orders else 'removed from the child environment'}")
         # Stage 5ZZN. This said "B1 open and no confirmation file", and after the operator
         # signed on 2026-08-27 both halves of that were false while it went on printing.
         # A sentence that names WHICH blockers is a sentence that goes stale every time one
@@ -1406,6 +1559,7 @@ def cmd_up(args: argparse.Namespace) -> int:
             assume_preflight_ok=args.assume_preflight_ok,
             track1_shadow=track1_shadow,
             track1_only=track1_only,
+            allow_orders=allow_orders,
         )
         print(f"scheduler=started pid {scheduler_pid}")
     else:
@@ -1446,19 +1600,34 @@ def cmd_up(args: argparse.Namespace) -> int:
                 _ops_log("track1: refused, scheduler already running under `up`")
                 return 2
         else:
-            # The second place a scheduler is actually started, and it starts in legacy/default
-            # mode — note the call below passes no Track 1 flag. `up` with nothing running
-            # reaches here, and so does `restart --no-scheduler` when there is no scheduler to
-            # leave alone. Both would register the 45 legacy entry jobs, so both are refused.
+            # The second place a scheduler is actually started. `up` with nothing running
+            # reaches here, and so does `restart --no-scheduler` when there is no scheduler
+            # to leave alone.
+            #
+            # It used to pass NO Track 1 flag, so every start from a cold host was a
+            # legacy/default start and the B1 decision refused it — while the refusal's own
+            # remedy, "start with --track1-only-shadow instead", was the flag the operator
+            # had just typed. Measured 2026-09-23: that made monitor/autostart_ops.cmd,
+            # whose entire job is to bring this route back after a reboot, unable to bring
+            # it back after a reboot. It had never been run once; the 2026-09-22 session was
+            # lost while it sat there looking like cover.
+            #
+            # track1_only is the one mode that registers no legacy entry job, so it is the
+            # one mode exempt — the same rule the --restart-scheduler branch above already
+            # applied. `--track1-shadow` keeps all 45 and stays refused.
             #
             # Nothing has been stopped on this path, so checking here rather than earlier costs
             # the operator nothing.
-            if _refuse_legacy_start("legacy/default"):
+            if not track1_only and _refuse_legacy_start(
+                    "track1-shadow" if track1_shadow else "legacy/default"):
                 return 2
             scheduler_pid = start_scheduler(
                 args.ibkr_port,
                 shadow_resume=not args.no_shadow_resume,
                 assume_preflight_ok=args.assume_preflight_ok,
+                track1_shadow=track1_shadow,
+                track1_only=track1_only,
+                allow_orders=allow_orders,
             )
             print(f"scheduler=started pid {scheduler_pid}")
 
@@ -1501,6 +1670,8 @@ def build_parser() -> argparse.ArgumentParser:
     up.add_argument("--no-shadow-resume", action="store_true", help="start scheduler without --shadow-resume")
     up.add_argument("--yes", action="store_true", help="stop running instances without asking (for unattended runs)")
     up.add_argument("--assume-preflight-ok", action="store_true", help="pass through run_scheduler --assume-preflight-ok")
+    up.add_argument("--allow-orders", action="store_true",
+                    help="ARM PAPER ORDERS. Refreshes the read-only broker account baseline first, then supplies TRACK1_ORDERS_APPROVED to the scheduler child and puts --allow-orders on every slot it spawns. Refused unless the refreshed baseline and gate registry pass. Off by default; a scheduler that restarts itself never carries it.")
     up.add_argument("--track1-shadow", action="store_true",
                     help=f"start the scheduler in Track 1 SHADOW mode: adds the {track1_slot_count()} Track 1 slots, points the window-ledger and telemetry at global_index/track1_runtime, and removes TRACK1_ORDERS_APPROVED from the child. Refuses unless STOP_TRADING exists and track1_go_live_confirmation.json does not. Places no orders.")
     up.add_argument("--track1-only-shadow", action="store_true",
@@ -1518,6 +1689,8 @@ def build_parser() -> argparse.ArgumentParser:
     restart.add_argument("--no-shadow-resume", action="store_true", help="start scheduler without --shadow-resume")
     restart.add_argument("--yes", action="store_true", help="stop running instances without asking (for unattended runs)")
     restart.add_argument("--assume-preflight-ok", action="store_true", help="pass through run_scheduler --assume-preflight-ok")
+    restart.add_argument("--allow-orders", action="store_true",
+                    help="ARM PAPER ORDERS. Refreshes the read-only broker account baseline first, then supplies TRACK1_ORDERS_APPROVED to the scheduler child and puts --allow-orders on every slot it spawns. Refused unless the refreshed baseline and gate registry pass. Off by default; a scheduler that restarts itself never carries it.")
     restart.add_argument("--track1-shadow", action="store_true",
                     help=f"start the scheduler in Track 1 SHADOW mode: adds the {track1_slot_count()} Track 1 slots, points the window-ledger and telemetry at global_index/track1_runtime, and removes TRACK1_ORDERS_APPROVED from the child. Refuses unless STOP_TRADING exists and track1_go_live_confirmation.json does not. Places no orders.")
     restart.add_argument("--track1-only-shadow", action="store_true",

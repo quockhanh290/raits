@@ -414,6 +414,86 @@ def heartbeat_gap(prev, now) -> "float | None":
         return None
     return gap
 
+
+# ── IB Gateway reachability ──────────────────────────────────────────────────
+#
+# Measured 2026-09-23. The 21/9 hybrid shutdown killed IB Gateway along with everything
+# else, and nothing reopened it: it is a GUI application that wants a login, so the logon
+# task that restores this scheduler restores only half the system. The scheduler then
+# comes up perfectly healthy with nothing to connect to, and each slot fails on its own,
+# quietly — which is how the 22→23/9 NKD window went missing with no line saying why.
+#
+# The heartbeat is the right carrier: it already runs every minute, all week, and already
+# owns the pattern of a latched flag with a recovery line.
+
+#: Consecutive dead beats before this is called an outage. Gateway is restarted, upgraded
+#: and reconnected routinely; a single miss is normal and saying so every time is noise.
+GATEWAY_MISSES_BEFORE_ALARM = 3
+
+#: Gateway restarts ITSELF daily from 00:00 machine time and is unreachable for roughly
+#: half an hour. Six NKD slots at 02:00-02:25 ET were already lost to that window, refused
+#: with ConnectionRefusedError [WinError 1225]. That cost is real and still unsolved, but
+#: it is not news every single night, and an alarm that fires nightly is one people mute.
+IBKR_RESTART_WINDOW_MINUTES = 40
+
+_gateway_missed: dict = {"n": 0}
+_gateway_outstanding: dict = {"v": False}
+
+
+def _in_ibkr_restart_window() -> bool:
+    """Gateway's own nightly restart, measured on the MACHINE clock, not ET.
+
+    It is the machine's midnight that starts it, so this is one of the few things in this
+    file that is deliberately not ET.
+    """
+    from datetime import datetime as _dt
+    now = _dt.now()
+    return now.hour == 0 and now.minute < IBKR_RESTART_WINDOW_MINUTES
+
+
+def ibkr_port_is_listening(port: int) -> "bool | None":
+    """Is anything listening on the IBKR API port? None when the probe cannot answer.
+
+    Three states, not two — the same lesson ProcessScan learned one layer up. psutil can
+    be missing or refused the socket table, and collapsing that into "not listening" turns
+    a monitoring bug into a 3am alarm about a Gateway that was running fine.
+
+    Reads the OS socket table rather than dialling the port. A connect-and-close every 60
+    seconds would put 1440 connection attempts a day into IB's own log and count against
+    its client limits, which is a poor way to ask "are you there".
+    """
+    try:
+        import psutil
+    except Exception:
+        return None
+    try:
+        for conn in psutil.net_connections(kind="tcp"):
+            if (conn.status == psutil.CONN_LISTEN
+                    and conn.laddr and conn.laddr.port == port):
+                return True
+        return False
+    except Exception:
+        # PermissionError on a locked-down host, or psutil raising on a socket table it
+        # could not read. Either way this beat knows nothing; it does not get a vote.
+        return None
+
+
+def gateway_alarm_verdict(listening, *, misses: int, minute: int,
+                          in_restart_window: bool, outstanding: bool) -> str:
+    """What this beat should do about the Gateway: unknown/quiet/warn/recovered/restart_window."""
+    if listening is None:
+        return "unknown"
+    if listening:
+        return "recovered" if outstanding else "quiet"
+    if in_restart_window:
+        return "restart_window"
+    if misses < GATEWAY_MISSES_BEFORE_ALARM:
+        return "quiet"
+    # Latched, with one reminder an hour: an outage lasting hours must resurface, or the
+    # single line scrolls away — but it must not shout 60 times an hour either.
+    return "warn" if (not outstanding or minute == 0) else "quiet"
+
+
 # Slots whose fail-closed skip has already been reported, keyed by (date, slot).
 # Keeps the "no pre-flight record" banner loud once and quiet afterwards.
 _skip_warned: set = set()
@@ -768,7 +848,8 @@ def make_scheduler(port: int, dry_run: bool,
                    live_state_path: str = "global_index/live_state_data.js",
                    shadow_resume: bool = False,
                    track1_shadow: bool = False,
-                   track1_only: bool = False):
+                   track1_only: bool = False,
+                   allow_orders: bool = False):
     """Build the schedule. Three modes, and the third is new in Stage 5M-D.
 
         (default)              legacy only. 60 jobs. Unchanged, and tested to be unchanged.
@@ -795,6 +876,25 @@ def make_scheduler(port: int, dry_run: bool,
     if track1_only:
         track1_shadow = True
 
+    # A scheduler armed with --allow-orders must still be able to run Track 1's
+    # observability path while the registry is closed.  Passing the request through
+    # unconditionally makes run_live_day_track1 exit before it records a slot:
+    # ``Nothing was run. Re-run without --allow-orders for a shadow pass.``  That is
+    # especially harmful for Calm, whose 09:32 DECIDE row is required by the 10:02
+    # OBSERVE phase.  Keep the request fail-closed for sending, but downgrade the child
+    # invocation to shadow when the registry has not admitted orders yet.
+    track1_order_request = bool(allow_orders)
+    if track1_shadow and track1_order_request:
+        try:
+            from global_index import track1_gates as _track1_gates
+            _orders_possible, _gate_reasons = _track1_gates.may_enable_orders()
+        except Exception as _gate_exc:  # fail closed for sending, open for observation
+            _orders_possible, _gate_reasons = False, [f"gate registry unreadable: {_gate_exc}"]
+        if not _orders_possible:
+            log.warning("Track 1 order gate is closed; running slots in shadow mode: %s",
+                        "; ".join(_gate_reasons[:2]))
+            track1_order_request = False
+
     sched = BlockingScheduler(timezone="America/New_York")   # ET-native
 
     # ── Every minute, all week: bound the wait and measure any stall ─────────
@@ -804,6 +904,33 @@ def make_scheduler(port: int, dry_run: bool,
     def job_heartbeat():
         from datetime import datetime as _dt, timezone as _tz
         now = _dt.now(_tz.utc)
+
+        # Checked before the stall branch, because the stall branch returns early on a
+        # healthy beat — which is every beat during a Gateway outage.
+        _listening = ibkr_port_is_listening(port)
+        if _listening is False:
+            _gateway_missed["n"] += 1
+        elif _listening is True:
+            _gateway_missed["n"] = 0
+        _verdict = gateway_alarm_verdict(
+            _listening, misses=_gateway_missed["n"], minute=now.minute,
+            in_restart_window=_in_ibkr_restart_window(),
+            outstanding=_gateway_outstanding["v"])
+        if _verdict == "warn":
+            _gateway_outstanding["v"] = True
+            log.warning(
+                "[GATEWAY] UNREACHABLE - nothing has been listening on IBKR port %d for "
+                "%d beats. This scheduler is healthy, so every slot from here will fail "
+                "to connect one at a time with no other line saying why. IB Gateway is a "
+                "GUI application: the logon task restores the scheduler but cannot "
+                "restore the Gateway, so it needs opening by hand.",
+                port, _gateway_missed["n"])
+        elif _verdict == "recovered":
+            _gateway_outstanding["v"] = False
+            log.info("[GATEWAY] reachable again on port %d", port)
+        elif _verdict == "restart_window":
+            log.debug("[GATEWAY] absent during its own nightly restart window")
+
         gap = heartbeat_gap(_last_beat["t"], now)
         _last_beat["t"] = now
         if gap is None:
@@ -1795,7 +1922,13 @@ def make_scheduler(port: int, dry_run: bool,
                       "--slot-id", slot_id,
                       "--bar-provider", provider]
                      + (["--phase", phase] if phase else [])
-                     + ["--regime-csv", regime_csv],
+                     + ["--regime-csv", regime_csv]
+                     # Operator decision 2026-09-23. Each slot is its OWN process: an approval
+                     # that stops at the scheduler arms nothing, so the flag has to reach the
+                     # argv the slot is actually spawned with. Absent by default and absent on
+                     # every restart the scheduler does not ask for it — which is what keeps a
+                     # machine that brings itself back from bringing orders back with it.
+                     + (["--allow-orders"] if track1_order_request else []),
                      label=slot_id, dry_run=dry_run, route=_t1.EVENT_ROUTE_VALUE)
             finally:
                 _t1_lock.release()
@@ -2117,15 +2250,17 @@ def _catch_up_maxhold_track1(sched) -> None:
     if now.hour * 60 + now.minute < 9 * 60 + 31:
         return
     if _maxhold_done_t1.get(today):
-        log.info("[MAXHOLD_T1] da chay hom nay (%s) — bo qua catch-up", today)
+        log.info("[MAXHOLD_T1] already ran today (%s) — skipping catch-up", today)
         return
-    log.warning("[MAXHOLD_T1] CATCH-UP: khoi dong luc %s ET, sau moc 09:31, va job Track 1 "
-                "hom nay chua chay. Chay ngay bay gio.", now.strftime("%H:%M"))
+    log.warning("[MAXHOLD_T1] CATCH-UP: scheduler started at %s ET after 09:31, "
+                "and today's Track 1 job has not run. Running it now.",
+                now.strftime("%H:%M"))
     ok = job.func(label="TRACK1_MAX_HOLD_EXIT_CATCHUP")
     if not ok:
-        log.critical("[MAXHOLD_T1] CATCH-UP THAT BAI — vi the Track 1 du 5 ngay co the chua "
-                     "duoc dong. Chay tay: python -m global_index.run_maxhold_exit "
-                     "--positions-path live_positions.track1.json --port <port>")
+        log.critical("[MAXHOLD_T1] CATCH-UP FAILED — a five-day Track 1 position may "
+                     "not have been closed. Run manually: python -m "
+                     "global_index.run_maxhold_exit --positions-path "
+                     "live_positions.track1.json --port <port>")
 
 
 def _catch_up_maxhold(sched) -> None:
@@ -2155,20 +2290,24 @@ def _catch_up_maxhold(sched) -> None:
     if now.hour * 60 + now.minute < 9 * 60 + 31:
         return                                  # the cron will fire it normally
     if _maxhold_done.get(today):
-        log.info("[MAXHOLD] da chay hom nay (%s) — bo qua catch-up", today)
+        log.info("[MAXHOLD] already ran today (%s) — skipping catch-up", today)
         return
 
     job = sched.get_job("maxhold_exit")
     if job is None:
-        log.error("[MAXHOLD] khong tim thay job maxhold_exit — khong catch-up duoc")
+        if sched.get_job("track1_maxhold_exit") is not None:
+            log.info("[MAXHOLD] legacy max-hold catch-up skipped: legacy maxhold "
+                     "job is retired in track1-only mode.")
+            return
+        log.error("[MAXHOLD] maxhold_exit job not found — catch-up cannot run")
         return
 
-    log.warning("[MAXHOLD] CATCH-UP: khoi dong luc %s ET, sau moc 09:31, va job hom "
-                "nay chua chay. Chay ngay bay gio.", now.strftime("%H:%M"))
+    log.warning("[MAXHOLD] CATCH-UP: scheduler started at %s ET after 09:31, "
+                "and today's job has not run. Running it now.", now.strftime("%H:%M"))
     ok = job.func(label="MAX_HOLD_EXIT_CATCHUP")
     if not ok:
-        log.critical("[MAXHOLD] CATCH-UP THAT BAI — vi the du 5 ngay co the chua duoc "
-                     "dong. Kiem live_positions.json va chay tay: python -m "
+        log.critical("[MAXHOLD] CATCH-UP FAILED — a five-day position may not have "
+                     "been closed. Check live_positions.json and run manually: python -m "
                      "global_index.run_maxhold_exit --positions-path "
                      "live_positions.json --port <port>")
 
@@ -2194,6 +2333,11 @@ def main():
                     help="pass --shadow-resume to run_live_day: log a "
                          "checkpoint-resumed target for comparison, without "
                          "trading off it")
+    ap.add_argument("--allow-orders", action="store_true",
+                    help="put --allow-orders on every Track 1 slot this scheduler spawns. "
+                         "Arming ALSO needs TRACK1_ORDERS_APPROVED in the environment and a "
+                         "gate registry that already reports orders possible; this flag is "
+                         "one of those factors and cannot be all of them.")
     ap.add_argument("--track1-shadow",    action="store_true",
                     help="TRANSITIONAL: register the Track 1 slots ALONGSIDE the legacy "
                          "schedule. Both routes run. The Track 1 route cannot place an order; "
@@ -2247,6 +2391,7 @@ def main():
         shadow_resume=a.shadow_resume,
         track1_shadow=a.track1_shadow,
         track1_only=a.track1_only_shadow,
+        allow_orders=getattr(a, "allow_orders", False),
     )
 
     jobs = sched.get_jobs()

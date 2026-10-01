@@ -257,13 +257,33 @@ def _release_lock(lock_path: Path) -> None:
 
 # ── B1: OpenPos serialisation helpers ──────────────────────────────────────
 
+#: The three fields the two position books spell differently, alias -> OpenPos field name.
+#:
+#: The route's book writes `instrument`/`qty`/`sleeve`; this engine's book writes
+#: `inst`/`contracts`/`cluster`. They are the same three facts. Declared here, in ONE place, so
+#: the writer, the reader and T7.4 all read the same list instead of each hardcoding it -- three
+#: hand-maintained copies of a mapping is how the mapping comes to disagree with itself.
+#:
+#: 2026-09-25: the reader demanded the engine's spelling and got the route's book, raised on every
+#: row, and the outer handler turned that into "fresh start" -- which persisted an empty book over
+#: three live positions and placed no stops behind them. The aliases exist so that cannot recur.
+POSITION_FIELD_ALIASES: dict = {
+    "instrument": "inst",
+    "qty": "contracts",
+    "sleeve": "cluster",
+}
+
+
 def _openpos_to_dict(p: OpenPos) -> dict:
     return {
         "inst":           p.inst,
+        "instrument":     p.inst,
         "direction":      p.direction,
         "contracts":      p.contracts,
+        "qty":            p.contracts,
         "risk_dollars":   p.risk_dollars,
         "cluster":        p.cluster,
+        "sleeve":         p.cluster,
         "entry_day":      str(p.entry_day) if p.entry_day is not None else None,
         "exit_day":       str(p.exit_day)  if p.exit_day  is not None else None,
         "pnl_sized":      p.pnl_sized,
@@ -286,13 +306,40 @@ def _openpos_from_dict(d: dict) -> OpenPos:
     # Required fields use d["field"] — KeyError if missing → outer except → fresh start.
     # No sensible defaults exist for inst/direction/contracts/risk_dollars/cluster.
     # Future OpenPos fields MUST use d.get(field, default) to keep backward-compat.
+    def dialect_value(legacy: str, track1: str):
+        has_legacy = legacy in d
+        has_track1 = track1 in d
+        if not has_legacy and not has_track1:
+            raise KeyError(legacy)
+        if has_legacy and has_track1 and d[legacy] != d[track1]:
+            raise ValueError(
+                f"conflicting values for {legacy}/{track1}: "
+                f"{d[legacy]!r} != {d[track1]!r}")
+        return d[legacy] if has_legacy else d[track1]
+
+    def entry_day_value():
+        explicit = pd.Timestamp(d["entry_day"]) if d.get("entry_day") else None
+        entry_time = str(d.get("entry_time") or "")
+        derived = None
+        if (len(entry_time) >= 10 and entry_time[4:5] == "-"
+                and entry_time[7:8] == "-"):
+            parsed = pd.to_datetime(entry_time[:10], format="%Y-%m-%d", errors="coerce")
+            if not pd.isna(parsed):
+                derived = pd.Timestamp(parsed)
+        if (explicit is not None and derived is not None
+                and explicit.normalize().tz_localize(None) != derived):
+            raise ValueError(
+                f"conflicting values for entry_day/entry_time: "
+                f"{d['entry_day']!r} != {entry_time!r}")
+        return explicit if explicit is not None else derived
+
     return OpenPos(
-        inst=d["inst"],
+        inst=dialect_value("inst", "instrument"),
         direction=d["direction"],
-        contracts=int(d["contracts"]),
+        contracts=int(dialect_value("contracts", "qty")),
         risk_dollars=float(d["risk_dollars"]),
-        cluster=d["cluster"],
-        entry_day=pd.Timestamp(d["entry_day"]) if d.get("entry_day") else None,
+        cluster=dialect_value("cluster", "sleeve"),
+        entry_day=entry_day_value(),
         exit_day=pd.Timestamp(d["exit_day"])   if d.get("exit_day")  else None,
         pnl_sized=float(d.get("pnl_sized", 0.0)),
         exit_pending=bool(d.get("exit_pending", False)),
@@ -358,6 +405,10 @@ class FuturesRunner:
         #: with the legacy one. Empty until a book is loaded, and never consulted on the
         #: legacy path.
         self._loaded_book_envelope: dict = {}
+        #: Route-owned fields such as trade_id/order_id/slot_id do not belong to OpenPos, but
+        #: they must survive a safety sweep which updates this same row. Key by object identity:
+        #: closes remove that exact object, while stop/roll changes mutate it in place.
+        self._loaded_position_rows: dict[int, dict] = {}
         # Initialised before anything can emit. B3's reconcile runs inside __init__ and
         # can report an unpriceable close, which happens well before the operational-log
         # section further down.
@@ -446,13 +497,28 @@ class FuturesRunner:
                             "B1: unrecognised schema_version=%s in %s — proceeding anyway",
                             sv, self._positions_path,
                         )
-                    loaded_positions = [_openpos_from_dict(d)
-                                        for d in raw.get("positions", [])]
+                    loaded_positions = []
+                    for row in raw.get("positions", []):
+                        position = _openpos_from_dict(row)
+                        loaded_positions.append(position)
+                        self._loaded_position_rows[id(position)] = dict(row)
                     bkr = raw.get("breaker", {})
-                    if bkr.get("peak_equity") is not None:
-                        loaded_peak_equity = float(bkr["peak_equity"])
-                    if bkr.get("day_start_equity") is not None:
-                        loaded_day_start_equity = float(bkr["day_start_equity"])
+                    if not isinstance(bkr, dict):
+                        bkr = {}
+                    # Route books are schema-2 envelopes with the breaker fields at
+                    # top level.  Legacy books keep them under "breaker".  Read both
+                    # dialects: a live route close must not disappear just because the
+                    # safety sweep preserved the route envelope instead of writing the
+                    # legacy one.
+                    peak_raw = bkr.get("peak_equity", raw.get("peak_equity"))
+                    day_start_raw = bkr.get("day_start_equity", raw.get("day_start_equity"))
+                    cur_day_raw = bkr.get("cur_day", raw.get("cur_day"))
+                    system_equity_raw = bkr.get("system_equity", raw.get("equity"))
+                    last_broker_raw = bkr.get("last_broker_equity", raw.get("broker_equity"))
+                    if peak_raw is not None:
+                        loaded_peak_equity = float(peak_raw)
+                    if day_start_raw is not None:
+                        loaded_day_start_equity = float(day_start_raw)
                     if bkr.get("max_dd_dollars") is not None:
                         # M6. Absent in every file written before this existed, which
                         # reads as 0.0 and simply starts the record from today rather
@@ -460,12 +526,12 @@ class FuturesRunner:
                         self._max_dd_dollars = float(bkr["max_dd_dollars"])
                     if bkr.get("max_dd_pct") is not None:
                         self._max_dd_pct = float(bkr["max_dd_pct"])
-                    if bkr.get("cur_day"):
-                        loaded_cur_day = pd.Timestamp(bkr["cur_day"])
-                    if bkr.get("system_equity") is not None:
-                        loaded_system_equity = float(bkr["system_equity"])
-                    if bkr.get("last_broker_equity") is not None:
-                        loaded_last_broker_equity = float(bkr["last_broker_equity"])
+                    if cur_day_raw:
+                        loaded_cur_day = pd.Timestamp(cur_day_raw)
+                    if system_equity_raw is not None:
+                        loaded_system_equity = float(system_equity_raw)
+                    if last_broker_raw is not None:
+                        loaded_last_broker_equity = float(last_broker_raw)
                     if bkr.get("system_epoch"):
                         loaded_system_epoch = str(bkr["system_epoch"])
                     # Operator-recorded, never inferred: what the broker account held
@@ -764,6 +830,23 @@ class FuturesRunner:
                             # what let MES carry the fabricated id 62 beside working stop
                             # #9 on 2026-08-05 until the close cancelled a ghost and
                             # orphaned the live order.
+                            # When the broker reports exactly one working stop for this
+                            # instrument, adopt its server order id into the route book.
+                            # The old behaviour warned forever because it deliberately
+                            # avoided placing a duplicate but never persisted the id it
+                            # had just discovered.  That left every next safety sweep with
+                            # the same false drift (notably M2KZ6).  Multiple stops remain
+                            # ambiguous and still require the explicit repair path.
+                            _ids_for_inst = list((_working or {}).get(p.inst, []))
+                            if len(_ids_for_inst) == 1 and p.inst not in (_unprot_insts or set()):
+                                _adopted = str(_ids_for_inst[0])
+                                p.stop_order_id = _adopted
+                                logger.info(
+                                    "B4 STP ID DRIFT: adopting broker working stop "
+                                    "orderId=%s for %s/%s and persisting route book",
+                                    _adopted, p.inst, p.cluster,
+                                )
+                                continue
                             logger.warning(
                                 "B4 STP ID DRIFT: %s %s x%d (%s) IS covered at the broker, "
                                 "but the recorded stop_order_id=%s names no working order. "
@@ -820,15 +903,10 @@ class FuturesRunner:
                 except Exception as _exc:
                     logger.warning("B3: cross-check failed (%s) — proceeding with file state", _exc)
             except Exception as exc:
-                logger.warning(
-                    "B1: failed to load %s (%s) — fresh start; "
-                    "manually verify broker has no orphaned positions",
-                    self._positions_path, exc,
-                )
-                loaded_positions = []
-                loaded_peak_equity = None
-                loaded_day_start_equity = None
-                loaded_cur_day = None
+                raise RuntimeError(
+                    f"B1: failed to load existing position book {self._positions_path}: "
+                    f"{type(exc).__name__}: {exc}"
+                ) from exc
 
         # H2: discard positions with invalid values — contracts≤0 or risk_dollars<0
         # indicate file corruption; these would silently produce wrong pnl and
@@ -1217,7 +1295,20 @@ class FuturesRunner:
         write-to-.tmp + os.replace: atomic on POSIX; best-effort on Windows."""
         if self._positions_path is None:
             return
-        positions_data = [_openpos_to_dict(p) for p in self.state.open_positions]
+        positions_data = []
+        source_rows = getattr(self, "_loaded_position_rows", {})
+        for position in self.state.open_positions:
+            current = _openpos_to_dict(position)
+            # A route-stamped safety process owns state changes, not the route's identity
+            # vocabulary. Preserve every field from the row it read and let the current
+            # OpenPos values win for fields the safety process can legitimately update.
+            if self._trade_log_route is not None:
+                source = source_rows.get(id(position))
+                if source is not None:
+                    merged = dict(source)
+                    merged.update(current)
+                    current = merged
+            positions_data.append(current)
         breaker_data: dict = {}
         if self.state.breaker is not None:
             breaker_data["peak_equity"] = self.state.breaker.peak_equity
@@ -1257,6 +1348,17 @@ class FuturesRunner:
         if self._trade_log_route is not None and env:
             preserved = dict(env)
             preserved["positions"] = positions_data
+            # Schema-2 route books carry the live ledger at top level.  The nested
+            # "breaker" block belongs to the legacy envelope; copying only positions
+            # leaves the route claiming equity is still 50k after a close has booked
+            # realised P&L in this process.
+            preserved["equity"] = self.state.equity
+            if self.state.breaker is not None:
+                preserved["peak_equity"] = self.state.breaker.peak_equity
+                if self.state.breaker._day_start_equity is not None:
+                    preserved["day_start_equity"] = self.state.breaker._day_start_equity
+            if self.state.cur_day is not None:
+                preserved["cur_day"] = str(pd.Timestamp(self.state.cur_day).date())
             payload = preserved
         try:
             tmp = self._positions_path.with_suffix(".tmp")
@@ -1388,17 +1490,22 @@ class FuturesRunner:
                 contract_month=p.contract_month,
             ))
             if _f.status != "FAILED":
-                if p.stop_order_id is not None:
+                stop_order_id = p.stop_order_id
+                if stop_order_id is None:
+                    stop_order_id = self._single_working_stop_order_id(p)
+                if stop_order_id is not None:
                     try:
                         # Returns False on failure; it does not raise. See
                         # _report_stop_cancel.
-                        _cancelled = self.broker.cancel_order(p.stop_order_id)
+                        _cancelled = self.broker.cancel_order(stop_order_id)
                     except Exception as _e:
                         _cancelled = False
                         logger.error(
                             "MAX_HOLD_EXIT: cancel_order(%s) raised for %s/%s: %s",
-                            p.stop_order_id, p.inst, p.cluster, _e,
+                            stop_order_id, p.inst, p.cluster, _e,
                         )
+                    if p.stop_order_id is None:
+                        p.stop_order_id = stop_order_id
                     self._report_stop_cancel(_cancelled, p)
                 self.state.equity += p.pnl_sized
                 if _f.avg_price > 0:
@@ -1445,6 +1552,59 @@ class FuturesRunner:
                 )
         self._persist_state()
         return closed
+
+    def _single_working_stop_order_id(self, p) -> str | None:
+        """Find the one broker stop that protects this position when the book lost its id.
+
+        The normal path cancels `p.stop_order_id`. Track 1's book has already been through
+        one serializer repair that dropped route-owned fields, so a MAX_HOLD close can reach
+        here with a live protective STP at the broker and no id in the row. If exactly one
+        working STP matches the position's instrument, closing side and size, cancel it; if
+        there are none or more than one, do not guess.
+        """
+        try:
+            orders = self.broker.get_open_orders()
+        except (NotImplementedError, AttributeError):
+            return None
+        except Exception as exc:
+            logger.error("MAX_HOLD_EXIT: get_open_orders() failed while finding stop for %s/%s: %s",
+                         p.inst, p.cluster, exc)
+            return None
+        if orders is None:
+            return None
+        action = "SELL" if str(p.direction).upper() == "LONG" else "BUY"
+        matches = []
+        for order in orders:
+            otype = str(order.get("order_type") or order.get("type") or "").upper()
+            if otype not in ("STP", "STP LMT"):
+                continue
+            if str(order.get("instrument") or order.get("inst") or "").upper() != str(p.inst).upper():
+                continue
+            if str(order.get("action") or "").upper() != action:
+                continue
+            try:
+                qty = int(abs(float(order.get("quantity") or order.get("qty") or 0)))
+            except (TypeError, ValueError):
+                qty = 0
+            if qty != int(p.contracts):
+                continue
+            oid = order.get("order_id")
+            if oid is not None:
+                matches.append(str(oid))
+        if len(matches) == 1:
+            logger.warning(
+                "MAX_HOLD_EXIT: %s/%s had no recorded stop_order_id; matched working "
+                "broker STP orderId=%s by instrument/action/quantity before close cleanup.",
+                p.inst, p.cluster, matches[0],
+            )
+            return matches[0]
+        if len(matches) > 1:
+            logger.error(
+                "MAX_HOLD_EXIT: %s/%s has no recorded stop_order_id and %d matching "
+                "working stops (%s). Not guessing which one to cancel.",
+                p.inst, p.cluster, len(matches), ", ".join(matches),
+            )
+        return None
 
     def _handle_rollover_if_needed(self, day) -> None:
         """C2: Roll open positions whose contract expires today (roll date per ROLL_SCHEDULE).

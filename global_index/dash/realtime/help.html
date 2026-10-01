@@ -125,7 +125,7 @@ an item stays until there is positive evidence it was fixed.</p>
 <p>Reconstructed from the scheduler's own logs — the record of every job that ran, failed, or
 was missed. Nothing is written by hand.</p>
 <dl>
-  <dt>2 open / 3 retired legacy</dt>
+  <dt>2 open / 3 retired history</dt>
   <dd>Two items still count against the system. Three belong to the older trading route that
   has been switched off; they are kept for history and collapsed by default.</dd>
   <dt>evidence 2026-07-30 to 2026-09-05</dt>
@@ -278,14 +278,15 @@ sleeve gated on the regime is deciding on an old answer.</p>
 <section class="help" id="positions">
 <h2>Open Positions</h2>
 <p class="q">What this answers</p>
-<p>What the broker says is actually held, next to what the older trading route's own records
-say. The two are shown together because a disagreement between them is the thing worth
+<p>What the broker says is actually held, next to what the trading route's own book says.
+The two are shown together because a disagreement between them is the thing worth
 seeing.</p>
 
 <p class="q">Where the numbers come from</p>
-<p>The left side is the broker, read live. The right side is the older route's saved state.
-The panel is labelled "legacy / drain" because that route is being wound down — it is not
-expected to open anything new.</p>
+<p>The left side is the broker, read live. The right side is Track 1's saved book
+(live_positions.track1.json) — the only route that trades. Until 24 September 2026 the right
+side was the older route's book, and the panel was labelled "legacy / drain"; that route is
+retired and is no longer shown here.</p>
 
 <p class="q">When not to trust it</p>
 <p class="care">"No broker positions" and "the broker could not be reached" are different
@@ -349,7 +350,7 @@ shows their age.</p>
 <dl>
   <dt>Runner observed</dt>
   <dd>When the older route last wrote a snapshot. On a machine running only the new route this
-  is deliberately old, and the row says "legacy route, retired" when it is.</dd>
+  is deliberately old, and the row says "retired route" when it is.</dd>
   <dt>Schedule freshness</dt>
   <dd>Whether another scheduled slot is still due today. It is <b>not</b> a statement about
   the route's health — it can read "fresh" beside an observation from last week, and both are

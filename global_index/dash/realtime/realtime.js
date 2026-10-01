@@ -129,7 +129,7 @@
   }
   const rootOf = symbol => {
     const clean = String(symbol || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (clean.startsWith('NKD') || clean.startsWith('MNKD')) return 'MNKD';
+    if (clean.startsWith('NKD') || clean.startsWith('MNKD') || clean.startsWith('MNK')) return 'MNKD';
     return roots.find(root => clean.startsWith(root)) || clean.replace(/[0-9].*$/, '');
   };
   const contractKey = symbol => String(symbol || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -141,7 +141,61 @@
       return !latest || String(snap.date) > String(latest.date) ? snap : latest;
     }, null);
   };
-  const runnerPositions = () => latestSnap()?.open_positions || [];
+  /* 2026-09-24. `/api/v1/runner-positions` has served Track 1's book since that morning, and a
+     Track 1 book row names its instrument `instrument`, its size `qty`, its sleeve `sleeve` —
+     not the legacy `inst` / `contracts` / `cluster` every check below reads. Measured on the live
+     page that evening: both open positions surfaced as "undefined runner-only position", two
+     false INCIDENTS, because `pos.inst` was undefined and matched no broker row. The row is
+     normalised once, here, rather than every reader learning a second spelling. */
+  const holdingAgeFromEntry = entryTime => {
+    const entryDay = String(entryTime || '').slice(0, 10);
+    const nowParts = zoneParts(new Date(), ET_ZONE, false);
+    const today = `${nowParts.year}-${nowParts.month}-${nowParts.day}`;
+    const asOfDay = String(latestSnap()?.date || today).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(entryDay) || !/^\d{4}-\d{2}-\d{2}$/.test(asOfDay)) return null;
+    const days = Math.floor((Date.parse(`${asOfDay}T00:00:00Z`) - Date.parse(`${entryDay}T00:00:00Z`)) / 86400000);
+    return Number.isFinite(days) && days >= 0 ? days : null;
+  };
+  const stopDeferredFromEntry = pos => {
+    if (typeof pos?.stop_deferred === 'boolean') return pos.stop_deferred;
+    const sleeve = String(pos?.sleeve ?? pos?.cluster ?? '').toLowerCase();
+    const zone = sleeve === 'global_nkd' || rootOf(pos?.instrument ?? pos?.inst) === 'MNKD'
+      ? 'Asia/Tokyo'
+      : sleeve === 'roska4_swing' || sleeve === 'roska4_stress'
+        ? ET_ZONE : null;
+    const entryDay = String(pos?.entry_time || '').slice(0, 10);
+    if (!zone || !/^\d{4}-\d{2}-\d{2}$/.test(entryDay)) return null;
+    const entryDate = new Date(`${entryDay}T00:00:00Z`);
+    entryDate.setUTCDate(entryDate.getUTCDate() + 1);
+    const armDay = entryDate.toISOString().slice(0, 10);
+    const stamped = Date.parse(state.broker?.server_now || state.schedule?.server_now || '');
+    const now = Number.isNaN(stamped) ? new Date() : new Date(stamped);
+    const local = zoneParts(now, zone, false);
+    const localClock = `${local.year}-${local.month}-${local.day}T${local.hour}:${local.minute}`;
+    return localClock < `${armDay}T14:00`;
+  };
+  const normPos = pos => {
+    if (!pos) return pos;
+    const mapped = pos.inst == null && pos.instrument != null
+      ? { ...pos, inst: pos.instrument, cluster: pos.cluster ?? pos.sleeve,
+          contracts: pos.contracts ?? pos.qty,
+          entry_day: pos.entry_day ?? String(pos.entry_time || '').slice(0, 10) }
+      : pos;
+    const routeBookRow = pos.instrument != null || pos.entry_time != null || pos.risk_dollars != null;
+    if (!routeBookRow) return mapped;
+    return { ...mapped,
+      days_held: mapped.days_held ?? holdingAgeFromEntry(pos.entry_time),
+      risk_sized: mapped.risk_sized ?? pos.risk_dollars ?? null,
+      stop_deferred: mapped.stop_deferred ?? stopDeferredFromEntry(mapped) };
+  };
+  // Plan stage 3: `snapshots` are Track 1's per-day series and carry no `open_positions`. When
+  // the newest snapshot has none, the route's positions are its book — the same rows
+  // runner-positions serves — never an empty list read as "the runner holds nothing".
+  const runnerPositions = () => {
+    const fromSnapshot = latestSnap()?.open_positions;
+    if (Array.isArray(fromSnapshot)) return fromSnapshot;
+    return persistedUsable() ? persistedPositions() : [];
+  };
   const brokerPositions = () => state.broker?.payload?.positions || [];
   const workingOrders = () => state.broker?.payload?.orders || [];
   const brokerUsable = () => !!(state.broker?.connected && state.broker?.freshness === 'fresh');
@@ -157,7 +211,7 @@
     String(pos?.direction || '').toUpperCase(),
     String(pos?.entry_day || '').slice(0, 10)
   ].join('|');
-  const persistedRunnerFor = pos => (state.runnerPositions?.payload?.positions || [])
+  const persistedRunnerFor = pos => persistedPositions()
     .find(saved => positionKey(saved) === positionKey(pos));
   const runnerQuantity = pos => {
     for (const value of [pos?.contracts, pos?.qty, pos?.position]) {
@@ -232,18 +286,25 @@
   // reads stop_deferred from it, and the persisted projection does not carry that field
   // — swapping wholesale would count every deliberately deferred stop as naked, trading
   // one false alarm for a worse one.
-  const persistedPositions = () => state.runnerPositions?.payload?.positions || [];
+  const persistedPositions = () => (state.runnerPositions?.payload?.positions || []).map(normPos);
   const persistedUsable = () => !!state.runnerPositions?.payload && !state.runnerPositions?.error;
   const runnerOnly = () => (persistedUsable() ? persistedPositions() : []).filter(pos =>
     !brokerPositions().some(live => rootOf(live.inst) === rootOf(pos.inst) && brokerDirection(live.position) === String(pos.direction).toUpperCase())
   );
+  const protectionState = pos => {
+    if (validStopsFor(pos).length) return 'covered';
+    const runners = runnersFor(pos);
+    if (!runners.length) return 'unknown';
+    const deferred = runners.map(runner => stopDeferredFromEntry(runner));
+    if (deferred.some(value => value === false)) return 'naked';
+    if (deferred.every(value => value === true)) return 'deferred';
+    return 'unknown';
+  };
   const protectionSummary = () => brokerPositions().reduce((acc, pos) => {
     acc.total += 1;
-    if (validStopsFor(pos).length) acc.covered += 1;
-    else if (runnersFor(pos).some(runner => runner.stop_deferred)) acc.deferred += 1;
-    else acc.naked += 1;
+    acc[protectionState(pos)] += 1;
     return acc;
-  }, { covered: 0, deferred: 0, naked: 0, total: 0 });
+  }, { covered: 0, deferred: 0, naked: 0, unknown: 0, total: 0 });
   const brokerPositionsMatchNow = () => brokerUsable()
     && runnerOnly().length === 0
     && brokerPositions().every(pos => {
@@ -384,7 +445,7 @@
       if (journalResults[1].status === 'fulfilled') state.sessionEvents = journalResults[1].value;
       else state.sessionEvents = { source: 'live_log', day: sessionDay, events: [], error: journalResults[1].reason?.message || 'session-events request failed' };
       if (journalResults[2].status === 'fulfilled') state.executionQuality = journalResults[2].value;
-      else state.executionQuality = { source: 'trade_log.jsonl', day: sessionDay, fills: [], exceptions: [], error: journalResults[2].reason?.message || 'execution-quality request failed' };
+      else state.executionQuality = { source: 'global_index/track1_runtime/trade_log.track1.jsonl', route: 'track1_candidate', day: sessionDay, fills: [], exceptions: [], error: journalResults[2].reason?.message || 'execution-quality request failed' };
     }
     // "Backend unavailable" now means the whole core batch failed. Track 1 runtime used to
     // count here and no longer does: it is polled on its own clock, so a poll that arrives
@@ -417,7 +478,7 @@
     // prints "<its date> / runner <time>" - so the two frames stay told apart rather than
     // merged.
     const t1SessionDay = state.marketView?.market_view?.session_date;
-    $('sessionDate').textContent = sessionDate(t1SessionDay || snap?.date);
+    $('sessionDate').textContent = t1SessionDay ? sessionDate(t1SessionDay) : 'Track 1 session not recorded';
     // Stage 5ZZW. The Track 1 regime record first. This read `snap?.regime` - the LEGACY
     // runner's snapshot - so in track1-only shadow, where nothing writes that file, the panel
     // was showing a label from whenever legacy last ran, presented as today's. The legacy
@@ -448,7 +509,7 @@
     $('regimeInputDate').className = (t1RegimeOk ?? (regimeStatus === 'OK')) ? 'positive' : 'warning';
     $('regimeInputDate').title = t1Regime
       ? `Track 1 regime record — ${t1Regime.status || 'unknown'}, checked ${t1Regime.age_hours ?? '?'}h ago`
-      : 'no Track 1 regime record; showing the legacy runner reading';
+      : 'no Track 1 regime record; no retired-route value is substituted';
     const modelStatus = ops.model_age?.status;
     // Stage 5ZZY. The month count is derived from the Track 1 record's own `fit_end`, not
     // read from the legacy runner's `months_old`. That field stops advancing the day legacy
@@ -466,20 +527,22 @@
       const now = new Date();
       return Math.max(0, (now.getFullYear() - fit.getFullYear()) * 12 + (now.getMonth() - fit.getMonth()));
     };
-    const modelMonths = (t1FitEnd ? monthsSinceFit(t1FitEnd) : null) ?? ops.model_age?.months_old;
+    const modelMonths = t1FitEnd ? monthsSinceFit(t1FitEnd)
+      : ops.model_age?.months_old != null ? Number(ops.model_age.months_old)
+      : null;
     // Hai dòng phụ dưới Model age / HMM fit đã bỏ khỏi header — chúng lặp lại điều mà
     // giá trị và màu đã nói, và đẩy cả thanh header cao thêm một dòng. Chi tiết không mất:
     // chuyển sang title, hover vẫn đọc được.
-    $('modelInputAge').textContent = modelStatus === 'OK' ? 'Current' : `${modelMonths ?? '?'} mo stale`;
-    $('modelInputAge').className = modelStatus === 'OK' ? 'positive' : 'warning';
+    $('modelInputAge').textContent = modelMonths == null ? 'not recorded' : modelStatus === 'OK' ? 'Current' : `${modelMonths} mo stale`;
+    $('modelInputAge').className = modelStatus === 'OK' && modelMonths != null ? 'positive' : 'warning';
     // Stage 5ZZZ-CM. Câu về việc ĐÓNG BĂNG LẠI nhập vào đây. Nó từng chiếm một cột riêng
     // để nói "none" gần như mọi ngày, và nó cùng chủ đề với tuổi mô hình: mô hình cũ bao
     // nhiêu, và có ai đang chờ quyết định đóng băng lại không.
     const refreeze = state.runner?.payload?.meta?.operational_status?.refreeze?.pending;
     $('modelInputAge').title = (modelStatus === 'OK' ? 'Fit current' : 'Known debt / G2 HARD')
       + (t1FitEnd
-          ? ` — age measured from the Track 1 fit end ${t1FitEnd}; the gate state is the legacy runner's own.`
-          : " — no Track 1 fit end; both the age and the gate state are the legacy runner's.")
+          ? ` — age measured from the Track 1 fit end ${t1FitEnd}.`
+          : " — no Track 1 fit end; no retired-route age is substituted.")
       + (refreeze === true
           ? ' A re-freeze decision is outstanding.'
           : refreeze === false
@@ -501,9 +564,6 @@
     //
     // The legacy reading stays as a fallback for a machine with no Track 1 record, the
     // same shape as `Regime`, `SPY data` and `Fit end` above.
-    const fitDiagnostic = [...(state.sessionEvents?.events || [])].reverse()
-      .find(event => event.kind === 'hmm_fit_diagnostic');
-    const fitWarnings = Number(fitDiagnostic?.non_convergence_count || 0);
     const t1States = t1Regime?.inputs?.n_states;
     const t1Labels = t1Regime?.inputs?.labels;
     if (t1States != null) {
@@ -518,13 +578,9 @@
       $('modelFitStatus').className = 'warning';
       $('modelFitStatus').title = 'the Track 1 regime record carries no fit inputs';
     } else {
-      $('modelFitStatus').textContent = fitDiagnostic
-        ? `${fitDiagnostic.completed_fits}/${fitDiagnostic.attempts} complete${fitWarnings ? ` / ${fitWarnings} warn` : ''}`
-        : 'Not observed';
-      $('modelFitStatus').className = fitDiagnostic?.completed_fits === fitDiagnostic?.attempts && fitWarnings === 0 ? 'positive' : 'warning';
-      $('modelFitStatus').title = fitDiagnostic
-        ? `no Track 1 regime record; legacy runner log — ${fitWarnings} convergence warning(s) / no documented gate failure`
-        : 'No retained fit evidence';
+      $('modelFitStatus').textContent = 'not recorded';
+      $('modelFitStatus').className = 'warning';
+      $('modelFitStatus').title = 'No Track 1 fit-shape evidence; no retired-route fit log is substituted';
     }
     // Stage 5ZZW. HMM fit end and the label check, from the Track 1 regime record rather than
     // from runner session events. `inputs.fit_end` is the end of the fitted window the label
@@ -533,7 +589,7 @@
     if (fitEndEl) {
       const fitEnd = t1Regime?.inputs?.fit_end;
       fitEndEl.textContent = fitEnd ? sessionDate(fitEnd).replace(/, \d{4}$/, '')
-        : t1Regime ? 'Track 1 unavailable' : (fitEndEl.textContent || '--');
+        : t1Regime ? 'Track 1 unavailable' : 'not recorded';
       const verify = t1Regime?.verification || null;
       fitEndEl.className = !verify ? '' : verify.status === 'PASS' ? 'positive' : 'warning';
       fitEndEl.title = verify
@@ -546,9 +602,17 @@
     // vừa nhân đôi logic vừa nằm trong một <b hidden> không bao giờ được bỏ hidden,
     // nên tuổi snapshot không hiện ở đâu ngoài Source Clocks cuối sidebar.
     const rf = state.runner?.freshness || 'missing';
-    $('runnerContext').textContent = runnerFreshnessText(rf, state.runner?.expected_next_at, state.runner?.age_seconds);
-    $('runnerContext').className = ['stale', 'late', 'missing'].includes(rf) ? 'negative'
-      : rf === 'unknown' ? 'warning' : '';
+    const legacyRetiredStale = state.schedule?.legacy_runner?.inactive_by_design === true
+      && state.schedule?.legacy_runner?.state_stale === true;
+    $('runnerContext').textContent = legacyRetiredStale
+      ? 'Track 1 active · retired route excluded'
+      : runnerFreshnessText(rf, state.runner?.expected_next_at, state.runner?.age_seconds);
+    $('runnerContext').title = legacyRetiredStale
+      ? 'This is the retired route snapshot age, not current Track 1 publishing.'
+      : '';
+    $('runnerContext').className = legacyRetiredStale ? 'positive'
+      : ['stale', 'late', 'missing'].includes(rf) ? 'negative'
+        : rf === 'unknown' ? 'warning' : '';
     // Scheduler age, and the only reading of it that means anything: is this process
     // older than the cron table it is running. Measured 2026-08-16 — the scheduler had
     // been up since 13/8 while its cron was rewritten 15/8, so the Sunday sweep
@@ -584,7 +648,7 @@
         spEl.className = 'negative';
       } else {
         spEl.textContent = `Scheduler up ${uptime(sp.age_seconds)}`;
-        spEl.className = '';
+        spEl.className = 'positive';
       }
     }
     const connected = state.broker?.connected;
@@ -604,9 +668,9 @@
     const runnerDead = Boolean(state.runner?.error);
     const meta = runnerDead ? {} : (state.runner?.payload?.meta || {});
     const snapshot = runnerDead ? null : snap;
-    const equity = snapshot?.equity ?? meta.final_equity;
+    const equity = null;
     const unreal = state.broker?.payload?.unrealized_pnl;
-    const realized = snapshot?.decision?.realized_today;
+    const realized = track1RealizedToday();
     // Stage 5ZZZ-CG. Rủi ro đọc sổ của Track 1, không đọc ảnh chụp của tuyến đã nghỉ hưu.
     //
     // Đo được 2026-09-05: ba con số của ô Risk và con số Gross đều lấy từ ảnh chụp cuối cùng
@@ -640,12 +704,15 @@
     //
     // Không cần chờ: một tuyến đã nghỉ thì con số của nó không dùng được, bất kể nguồn thay
     // thế đã kịp trả lời hay chưa. Nhánh "sổ chưa về" bên dưới đã nói đúng câu cần nói.
-    const t1mode = legacyRunnerStale();
+    const t1mode = true;
     const t1book = (!state.track1?.error && state.track1?.book?.present)
       ? (state.track1.book.payload || null) : null;
     const t1peak = t1book ? Number(t1book.peak_equity) : NaN;
     const t1equity = t1book ? Number(t1book.equity) : NaN;
+    const t1base = Number(state.track1?.book?.account_base);
+    const t1currency = state.track1?.book?.currency || 'USD';
     const t1curve = Number.isFinite(t1peak) && t1peak > 0 && Number.isFinite(t1equity);
+    const t1BookEquity = Number.isFinite(t1equity) && t1equity > 0;
     const drawdown = t1mode
       ? (t1curve ? (t1peak - t1equity) / t1peak : NaN)
       : Number(snapshot?.drawdown_pct);
@@ -667,8 +734,14 @@
     // and the whole runner-derived block read as live. The envelope's own `age_seconds` is
     // honest, and that is what this asks. The label is left alone: it is legacy contract and
     // other panels read it.
-    const legacyStale = legacyRunnerStale();
-    $('metrics').classList.toggle('runner-stale', legacyStale);
+    const equityZone = $('metricEquity')?.closest('.equity-zone');
+    const grossCell = $('metricGrossExposure')?.parentElement;
+    [[equityZone, Boolean(t1book)], [grossCell, t1mode]]
+      .filter(([element]) => Boolean(element)).forEach(([element, routeDerived]) => {
+      element.classList.toggle('runner-derived', !routeDerived);
+      element.classList.toggle('route-derived', routeDerived);
+    });
+    $('metrics').classList.remove('runner-stale');
     // Stage 5ZZZ-BK. The SAME staleness, applied to the other block that carries the same
     // marker.
     //
@@ -684,18 +757,16 @@
     // publishes for itself, which is a fact rather than a blank.
     const decisionSection = $('decisionSection');
     if (decisionSection) {
-      decisionSection.classList.toggle('runner-stale', legacyStale);
+      decisionSection.classList.remove('runner-stale');
       const retired = $('decisionRetired');
       const t1line = state.track1?.reporting?.headline;
       const t1detail = state.track1?.reporting?.headline_detail || '';
       if (retired) {
-        retired.hidden = !legacyStale;
-        retired.textContent = legacyStale
-          ? (t1line || 'The legacy runner snapshot is retired; Track 1 publishes its own state.')
-          : '';
+        retired.hidden = false;
+        retired.textContent = t1line || 'Track 1 publishes its own state; retired-route fallback is absent.';
         // Stage 5ZZZ-CM. Kiểm kê chứng minh câu trên đứng ngay sau nó, một cú rê chuột —
         // không chiếm chỗ của câu, và không biến mất.
-        retired.title = legacyStale ? t1detail : '';
+        retired.title = t1detail;
       }
       // Everything else here is done by the CLASS, not by touching nodes. A first attempt
       // set `hidden`, cleared the summary text and rewrote the source note; all three came
@@ -720,7 +791,7 @@
     //   it is not usable        -> say which, and STOP. Falling back to the legacy figure is
     //                              what produced the confusion in the first place, and a
     //                              fallback that fires silently is worse than a blank.
-    const t1acct = state.track1?.paper_account || null;
+    const t1acct = !state.track1?.error ? (state.track1?.paper_account || null) : null;
     // Stage 5ZZH. A field the backend does not serve is NOT a field the backend said no to.
     //
     // The endpoint imports its reader inside the view function, which looks like it picks up
@@ -731,21 +802,19 @@
     // this stage set out to fix, and it would appear the moment the page shipped ahead of a
     // restart. So: ABSENT means derive it here from what the old block does carry; FALSE
     // means the backend decided, and its decision stands.
-    const declared = t1acct && t1acct.headline_usable !== undefined
-                             && t1acct.headline_usable !== null;
-    const t1Headline = Boolean(t1acct && Number.isFinite(Number(t1acct.equity))
-      && (declared ? t1acct.headline_usable
-                   : ['PASS', 'WARN'].includes(t1acct.status)));
     const money0 = n => Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
 
-    if (t1Headline) {
-      setMetric('metricEquity', `${esc(t1acct.currency || '')} ${money0(t1acct.equity)}`.trim());
-    } else if (t1acct) {
-      // Named refusal, not a blank and not somebody else's number.
-      setMetric('metricEquity', t1acct.status === 'UNKNOWN' || !t1acct.status
-        ? 'not measured' : `baseline ${esc(t1acct.status)}`);
+    if (t1BookEquity) {
+      setMetric('metricEquity', `${esc(t1currency)} ${money0(t1equity)}`.trim());
+      $('metricEquity').title = 'Track 1 system-book equity; broker equity is reference only.';
+    } else if (t1book) {
+      setMetric('metricEquity', 'book equity unavailable');
+      $('metricEquity').title = 'Track 1 book is present but does not publish a valid positive equity.';
     } else {
-      setMetric('metricEquity', equity == null ? '--' : `$${Number(equity).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`);
+      setMetric('metricEquity', 'not measured');
+      $('metricEquity').title = state.track1?.error
+        ? "Track 1 runtime did not answer, so the previous paper headline is not shown as current."
+        : "Track 1 has not published its system book; broker equity is not substituted.";
     }
     /* Bậc 30px của thang chữ được hợp đồng dành cho "số paper equity" — một CON SỐ.
        Khi không có số, ô này giữ một lời từ chối có tên ("not measured", "baseline
@@ -758,10 +827,9 @@
        không có thì là câu — nên thêm một nhánh mới cũng không cần sửa chỗ này. */
     const eqEl = $('metricEquity');
     if (eqEl) eqEl.classList.toggle('is-refusal', !/\d/.test(eqEl.textContent || ''));
-    // Realised P&L belongs to whoever traded. In Track 1 mode that is nobody — the route has
-    // sent no orders — so the legacy runner's realised figure must not sit beside a Track 1
-    // headline wearing the same styling as if it were this route's day.
-    setMetric('metricRealized', t1acct ? '--' : money(realized), t1acct ? null : realized);
+    // Realised P&L belongs to whoever traded. In Track 1 mode this comes from Track 1's own
+    // durable trade log (`execution-quality`), never from the retired runner snapshot.
+    setMetric('metricRealized', realized == null ? '--' : money(realized), realized);
     setMetric('metricUnrealized', money(unreal), unreal);
     $('metricDrawdown').textContent = Number.isFinite(drawdown) ? pct(drawdown) : '--';
     $('metricDrawdownAmount').textContent = Number.isFinite(drawdownDollars)
@@ -786,6 +854,13 @@
           : [null, 'no published limit',
              "Measured against Track 1's own booked equity. This route publishes no"
              + ' drawdown limit, so there is no scale to gauge against.'];
+      if (t1curve && Number.isFinite(Number(realized)) && Number(realized) !== 0
+          && Number.isFinite(drawdownDollars) && Math.abs(drawdownDollars) < 0.005) {
+        why[1] = `book drawdown; realized ${money(realized)} separate`;
+        why[2] += ` Today's realized P&L is ${money(realized)} from the trade log, but it has`
+          + ' not changed the route book equity/peak fields this card uses, so it is not'
+          + ' counted here as drawdown.';
+      }
       if (why[0]) $('metricDrawdown').textContent = why[0];
       $('metricDrawdownLimit').textContent = why[1];
       $('metricDrawdown').title = why[2];
@@ -863,7 +938,8 @@
       : protection.total === 0 ? 'no positions'
       : [`${protection.covered} covered`,
          protection.deferred ? `${protection.deferred} deferred` : null,
-         protection.naked ? `${protection.naked} naked` : null].filter(Boolean).join(' / ');
+         protection.naked ? `${protection.naked} naked` : null,
+         protection.unknown ? `${protection.unknown} unknown` : null].filter(Boolean).join(' / ');
     const running = snapshot?.running_metrics || {};
     const sampleDays = runnerDead ? 0 : (state.runner?.payload?.snapshots || []).length;
     const enoughSample = sampleDays >= MIN_METRIC_DAYS;
@@ -876,27 +952,21 @@
         element.classList.add(Number(numeric) > 0 ? 'positive' : 'negative');
       }
     };
-    if (t1acct) {
-      // Stage 5ZZH. What this route funded to, and NOT a profit.
-      //
-      // The tempting line here is `+818 since 250,000`, and it would be read as Track 1
-      // making money. Track 1 has sent no orders; the difference is whatever the paper
-      // account happened to hold when it was funded. A number that will be misread as P&L is
-      // not improved by being arithmetically correct, so the slot says why it is empty.
-      $('performanceScope').textContent = t1Headline
-        ? `baseline ${t1acct.status}${t1acct.age_hours != null ? ` · read ${t1acct.age_hours}h ago` : ''}`
-        : (t1acct.headline_reason || '');
-      performanceValue('performanceBase', t1Headline && t1acct.expected_equity != null
-        ? `${esc(t1acct.expected_currency || '')} ${money0(t1acct.expected_equity)}`.trim() : '--');
-      performanceValue('performanceNet', '--');
-      $('performanceNet').title = 'Track 1 has sent no orders, so this route has no realised P&L. '
-        + 'The gap between the account and its funded baseline is not profit.';
-      performanceValue('performanceReturn', '--');
+    if (t1BookEquity) {
+      const bookNet = Number.isFinite(t1base) ? t1equity - t1base : NaN;
+      const bookReturn = Number.isFinite(bookNet) && t1base > 0 ? bookNet / t1base : NaN;
+      $('performanceScope').textContent = 'system book';
+      performanceValue('performanceBase', Number.isFinite(t1base)
+        ? `${esc(t1currency)} ${money0(t1base)}` : '--');
+      performanceValue('performanceNet', Number.isFinite(bookNet) ? money(bookNet) : '--', bookNet);
+      $('performanceNet').title = 'System-book equity minus the Track 1 design capital; broker equity is excluded.';
+      performanceValue('performanceReturn', Number.isFinite(bookReturn)
+        ? `${bookReturn >= 0 ? '+' : ''}${pct(bookReturn)}` : '--', bookReturn);
     } else {
-      $('performanceScope').textContent = meta.system_epoch
-        ? `since ${sessionDate(meta.system_epoch)}` : '';
-      performanceValue('performanceBase', meta.account == null ? '--' : `$${Number(meta.account).toLocaleString('en-US', { maximumFractionDigits: 0 })}`);
-      performanceValue('performanceNet', money(meta.net_pnl), meta.net_pnl);
+      $('performanceScope').textContent = 'Track 1 system book unavailable';
+      performanceValue('performanceBase', '--');
+      performanceValue('performanceNet', '--');
+      performanceValue('performanceReturn', '--');
     }
     performanceValue('performanceCalmar', enoughSample && running.calmar != null ? Number(running.calmar).toFixed(2) : '--');
     performanceValue('performanceSharpe', enoughSample && running.sharpe != null ? Number(running.sharpe).toFixed(2) : '--', enoughSample ? running.sharpe : null);
@@ -904,25 +974,21 @@
     // câu đó trả lời một câu hỏi không ai hỏi: vấn đề không phải mẫu còn ngắn, mà là tuyến
     // này chưa có đường cong vốn nào để lấy mẫu. (Ảnh chụp ấy còn giữ Sharpe 8.52 trên 11
     // ngày với tổng lợi nhuận +0,8% — cổng cỡ mẫu đang giữ đúng một con số vô nghĩa.)
-    const perfNote = t1mode
-      ? 'Track 1 has sent no orders, so it has no equity curve to measure a ratio on'
-      : sampleNote;
-    $('performanceCalmar').title = (t1mode || !enoughSample) ? perfNote : '';
-    $('performanceSharpe').title = (t1mode || !enoughSample) ? perfNote : '';
-    if (t1mode) {
-      performanceValue('performanceCalmar', '--');
-      performanceValue('performanceSharpe', '--');
-    }
+    const perfNote = sampleNote;
+    $('performanceCalmar').title = !enoughSample ? perfNote : '';
+    $('performanceSharpe').title = !enoughSample ? perfNote : '';
     // Stage 5ZZH. Guarded: without the branch this line runs AFTER the Track 1 block above
     // and puts the legacy runner's return straight back onto a Track 1 card. The bug the
     // whole stage is about, one assignment further down the same function.
-    if (!t1acct) {
+    if (!t1mode) {
       performanceValue('performanceReturn', running.total_return == null ? '--' : `${Number(running.total_return) >= 0 ? '+' : ''}${pct(running.total_return)}`, running.total_return);
     }
     performanceValue('performanceMaxDd',
-      t1mode || meta.max_dd_pct == null ? '--' : pct(meta.max_dd_pct),
-      t1mode || meta.max_dd_pct == null ? null : -Number(meta.max_dd_pct));
-    $('performanceMaxDd').title = t1mode ? perfNote : '';
+      t1mode ? (Number.isFinite(t1peak) && t1peak > 0 ? dollars(t1peak) : '--')
+             : (meta.max_dd_pct == null ? '--' : pct(meta.max_dd_pct)),
+      t1mode ? null : (meta.max_dd_pct == null ? null : -Number(meta.max_dd_pct)));
+    $('performanceMaxDd').title = t1mode
+      ? 'Peak equity from the Track 1 system book; broker equity is excluded.' : '';
     // Stage 5ZZF. This line said "Broker acct $996,731 / -$3,749 since 2026-07-08" for three
     // days after the paper account was reset to USD 250,817.91. Two separate faults, both
     // measured before this was rewritten:
@@ -942,41 +1008,24 @@
     const acct = state.track1?.paper_account || null;
     const brokerNow = Number(state.broker?.payload?.equity);
     const brokerFresh = brokerUsable();
-    const legacyEquity = Number(meta.broker_equity);
-    const legacyAgeS = Number(state.runner?.age_seconds);
     const el = $('brokerAccountContext');
 
     let text = '', tone = '';
     if (acct && Number.isFinite(Number(acct.equity))) {
       // The baseline, from the record that proves it against the broker.
-      text = `Paper account ${acct.currency || ''} ${Number(acct.equity).toLocaleString('en-US',
-        { maximumFractionDigits: 0 })} · baseline ${esc(acct.status || '')}`;
+      text = `Broker reference ${acct.currency || ''} ${Number(acct.equity).toLocaleString('en-US',
+        { maximumFractionDigits: 0 })} · recorded ${esc(acct.status || '')}`;
       if (acct.status !== 'PASS') tone = 'negative';
       // A fresh broker read is a different fact from the baseline and is allowed to differ by
       // live drift. Labelled, never merged into the number above.
       if (brokerFresh && Number.isFinite(brokerNow)) {
-        text += ` · broker now ${brokerNow.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
-      }
-      // The defensive part: if the legacy runner's last view is materially different, say so
-      // rather than letting two numbers sit on one page with nothing between them.
-      if (Number.isFinite(legacyEquity) && Number(acct.equity) > 0
-          && Math.abs(legacyEquity - Number(acct.equity)) / Number(acct.equity) > 0.10) {
-        text += ` · Legacy runner state ${legacyStale ? 'stale: ' : ''}${legacyEquity.toLocaleString('en-US',
-          { maximumFractionDigits: 0 })} from ${age(legacyAgeS)}`;
-        tone = 'negative';
+        text += ` · now ${brokerNow.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
       }
     } else if (brokerFresh && Number.isFinite(brokerNow)) {
-      text = `Broker now ${brokerNow.toLocaleString('en-US', { maximumFractionDigits: 0 })} · `
-           + `no paper baseline recorded`;
-      tone = 'negative';
-    } else if (Number.isFinite(legacyEquity)) {
-      // Nothing current to show. The legacy number may appear ONLY under its own name and
-      // only with its age attached — never as "Broker acct".
-      text = `Legacy runner state ${legacyEquity.toLocaleString('en-US',
-        { maximumFractionDigits: 0 })} from ${age(legacyAgeS)} · not the current account`;
+      text = `Broker reference now ${brokerNow.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
       tone = 'negative';
     } else {
-      text = 'Paper account not measured';
+      text = 'Broker reference unavailable';
       tone = 'negative';
     }
     el.textContent = text;
@@ -1038,10 +1087,17 @@
     return `${label} ${etClock(iso)}`;
   };
 
+  const nextProtectionJob = () => {
+    if (!brokerUsable()
+        || !brokerPositions().some(position => protectionState(position) === 'naked')) return null;
+    return state.marketView?.market_view?.next_protection_job || null;
+  };
+
   function renderScheduleFacts() {
     const schedule = state.schedule;
     const nextScheduled = schedule?.next_scheduled_job;
     const nextDecision = schedule?.next_decision_job;
+    const nextProtection = nextProtectionJob();
     const latestScheduled = latestObservedJob();
     const latestDecision = latestDecisionJob();
     // The scheduler's own job id, not a prettier synonym. Whatever this row names, the
@@ -1053,21 +1109,20 @@
     $('nowScheduleFacts').innerHTML = [
       fact('Next job', nextScheduled, nextScheduled?.at),
       fact('Next decision', nextDecision, nextDecision?.at),
+      ...(nextProtection ? [fact('Next protection', nextProtection, nextProtection.at, 'watch')] : []),
       fact('Latest job', latestScheduled, latestScheduled?.ended_at || latestScheduled?.started_at, pipelineJobTone(latestScheduled)),
       fact('Latest decision', latestDecision, latestDecision?.ended_at || latestDecision?.started_at, pipelineJobTone(latestDecision)),
     ].join('');
   }
 
   function renderRail(snap) {
-    const stripOps = state.runner?.payload?.meta?.operational_status || snap?.operational_status || {};
+    const stripOps = currentLegacyOps(snap);
     const stripSchedule = state.schedule;
     const stripEvidence = stripSchedule?.evidence;
     const stripBrokerKnown = brokerUsable();
     const stripOrphans = stripBrokerKnown ? orphanStops() : [];
-    const stripUnprotected = stripBrokerKnown ? brokerPositions().filter(position =>
-      !stopsFor(position).length
-      && runnersFor(position).length
-      && !runnersFor(position).some(runner => runner.stop_deferred)) : [];
+    const stripUnprotected = stripBrokerKnown
+      ? brokerPositions().filter(position => protectionState(position) === 'naked') : [];
     const stripInvalidStops = stripBrokerKnown
       ? brokerPositions().reduce((count, position) => count + invalidStopsFor(position).length, 0) : 0;
     const stripUnknownStops = stripBrokerKnown
@@ -1110,8 +1165,12 @@
     const stripSafetyCount = stripOrphans.length + stripUnprotected.length + stripInvalidStops + stripUnknownStops;
     const stripReconcileBad = stripBrokerKnown
       && (runnerOnly().length || stripMatched !== brokerPositions().length || stripSizeProblem);
-    const stripBreaker = stripOps.breaker?.level || snap?.breaker_level;
-    const stripBreakerBad = stripBreaker && stripBreaker !== 'OK';
+    const track1Breaker = state.track1?.breaker || {};
+    const stripBreaker = track1Breaker.level;
+    const stripBreakerUnarmed = track1Breaker.armed === false || stripBreaker === 'UNARMED';
+    const stripBreakerBad = stripBreaker
+      && !['OK', 'PASS'].includes(String(stripBreaker))
+      && !stripBreakerUnarmed;
     // Runner phát cờ này khi HMM stale guard G1 HARD bật (SPY cũ quá 5 ngày làm
     // việc) và nó CHẶN MỌI ENTRY, exit vẫn chạy. Trước đây frontend không đọc nó ở
     // đâu cả: trang hiện độ tươi SPY nhưng im lặng về hệ quả — hệ thống đã ngừng
@@ -1122,10 +1181,12 @@
       ['runner-state', state.runner?.error],
       ['broker', state.broker?.error],
       ['schedule', state.schedule?.error],
+      ['track1-runtime', state.track1?.error],
       ['open-issues', state.openIssues?.error],
       ['runner-positions', state.runnerPositions?.error]
     ].filter(([, error]) => error).map(([name]) => name);
-    const stripLevel = stripScheduleBad || stripSafetyCount || stripReconcileBad || stripBreakerBad
+    const stripLevel = stripScheduleBad || stripSafetyCount || stripReconcileBad
+      || stripBreakerBad || stripBreakerUnarmed
       || stripEntriesBlocked || stripDeadSources.length
       ? 'bad' : stripUnknown ? 'watch' : 'ok';
     const stripConditions = [];
@@ -1138,15 +1199,15 @@
     // anything. When legacy is retired its snapshot is stale because nothing writes it any
     // more, and calling that "runner state stale" put a fault-shaped line on the rail for a
     // condition that is the intended steady state.
-    if (legacyStaleByDesign) {
-      stripConditions.push('Legacy runner snapshot is stale because legacy entries are retired');
-    } else if (['stale', 'late', 'missing'].includes(stripFreshness)) {
+    if (!legacyStaleByDesign && ['stale', 'late', 'missing'].includes(stripFreshness)) {
       stripConditions.push(`runner state ${stripFreshness} (${age(state.runner?.age_seconds)})`);
     }
     if (!stripBrokerKnown) stripConditions.push('broker feed cannot be verified');
     if (stripSafetyCount) stripConditions.push(`${stripSafetyCount} protection issue(s)`);
     if (stripReconcileBad) stripConditions.push('position reconcile needs attention');
-    if (stripBreakerBad) stripConditions.push(`risk breaker ${stripBreaker}`);
+    if (stripBreakerUnarmed) {
+      stripConditions.push(`risk breaker not armed${track1Breaker.reason ? ` — ${track1Breaker.reason}` : ''}`);
+    } else if (stripBreakerBad) stripConditions.push(`risk breaker ${stripBreaker}`);
     if (stripEntriesBlocked) stripConditions.push('entries blocked: regime input unreliable');
     if (stripDeadSources.length) stripConditions.push(`${stripDeadSources.join(', ')} unreachable`);
     /* Sự thật vận hành lớn nhất của trang, và nó vốn nằm ở 11px cách đầu trang 400px:
@@ -1159,10 +1220,16 @@
        Tên cổng lấy qua `GATE_NAMES` — cùng bảng dịch mà panel Track 1 dùng, để hai chỗ
        không thể gọi một cổng bằng hai tên. */
     const stripGates = state.track1?.gates || {};
+    const stripOrderRequest = state.schedule?.order_request || {};
     if (stripGates.orders_possible === false) {
       const names = (stripGates.blocking_now || []).map(id => GATE_NAMES[id] || id);
       stripConditions.push(
         'no orders possible' + (names.length ? ` — ${names.slice(0, 3).join(' · ')}` : ''));
+    }
+    if (stripGates.orders_possible === true && stripOrderRequest.scheduler_armed === false) {
+      stripConditions.push('order sending not armed');
+    } else if (stripGates.orders_possible === true && stripOrderRequest.scheduler_armed == null) {
+      stripConditions.push('order request unknown');
     }
     if (!stripConditions.length && stripUnknown) stripConditions.push('some telemetry is unavailable');
     const stripStatus = stripConditions.length
@@ -1198,7 +1265,7 @@
     const incidents = [];
     const gaps = [];
     const schedule = state.schedule;
-    const monitorOps = state.runner?.payload?.meta?.operational_status || snap?.operational_status || {};
+    const monitorOps = currentLegacyOps(snap);
     // Guard chặn entry là điều kiện vận hành, không phải chỉ số đầu vào. Độ tươi
     // SPY đã hiện ở header từ trước, nhưng người vận hành cần biết HỆ QUẢ: hệ
     // thống đã ngừng vào lệnh, và exit thì vẫn chạy.
@@ -1269,7 +1336,7 @@
         const hasRecordedStopId = runner && Object.prototype.hasOwnProperty.call(runner, 'stop_order_id');
         const stopIdDrift = hasRecordedStopId && !runner.stop_deferred && validStops.length
           && !validStops.some(order => String(order.order_id) === String(recordedStopId));
-        if (runnersFor(pos).length && !runnersFor(pos).some(item => item.stop_deferred) && !stopsFor(pos).length) incidents.push({
+        if (protectionState(pos) === 'naked') incidents.push({
           key: `broker:unprotected:${pos.inst}`, status: 'incident', component: 'broker', title: `${pos.inst} unprotected`,
           problem: 'The broker position has no working stop and runner intent does not mark protection as deferred.',
           impact: 'The open position is exposed without the expected broker-side protective order.',
@@ -1332,9 +1399,7 @@
     const connectivityIncidentShown = incidents.some(item => String(item.key).startsWith('broker:connectivity:'));
     if (!brokerUsable() && !connectivityIncidentShown) gaps.push({ key: 'gap:broker', status: 'unknown', component: 'broker', title: 'Broker truth unavailable', problem: 'The read-only IBKR observation is disconnected, stale, or unavailable.', impact: 'Current positions, working stops, and reconciliation cannot be verified.', action: 'Restore the read-only IBKR connection; do not reconstruct broker truth from runner state.', evidence: state.broker?.error || `broker freshness ${state.broker?.freshness || 'unknown'}` });
     if (brokerUsable()) brokerPositions().forEach(pos => {
-      if (!runnerFor(pos)) return;
-      const runner = runnerFor(pos);
-      if (runner.stop_deferred === undefined && !stopsFor(pos).length) gaps.push({ key: `gap:deferred:${pos.inst}`, status: 'unknown', component: 'runner', title: `${pos.inst} stop state unknown`, problem: 'Runner state does not say whether missing protection is deferred or unexpected.', impact: 'The monitor cannot safely classify the position as protected or unprotected.', action: 'Treat protection state as unknown until runner evidence or a broker stop appears.', evidence: `${pos.inst} / no stop / deferred field not emitted` });
+      if (protectionState(pos) === 'unknown') gaps.push({ key: `gap:deferred:${pos.inst}`, status: 'unknown', component: 'runner', title: `${pos.inst} stop state unknown`, problem: 'The position cannot be matched to a book row with a known protection state.', impact: 'The monitor cannot safely classify the position as protected or unprotected.', action: 'Treat protection state as unknown until runner evidence or a broker stop appears.', evidence: `${pos.inst} / no valid stop / no matched protection state` });
       unknownStopsFor(pos).forEach(order => gaps.push({ key: `gap:stop:${order.order_id}`, status: 'unknown', component: 'broker', title: `${order.inst} stop evidence incomplete`, problem: `Broker stop #${order.order_id ?? '--'} is missing action, quantity, or status fields.`, impact: 'The order cannot be validated as position protection.', action: 'Verify the order directly in IBKR before relying on it.', evidence: `${order.inst} #${order.order_id ?? '--'} / ${order.action || '--'} / x${order.qty ?? '--'} / ${order.status || '--'}` }));
       if (expectedQuantity(pos) == null) gaps.push({ key: `gap:size:${pos.inst}`, status: 'unknown', component: 'runner', title: `${pos.inst} runner quantity missing`, problem: 'Runner state does not emit contract quantity for this position.', impact: 'The monitor can reconcile symbol and side, but not position size.', action: 'Keep size reconciliation unknown; do not infer quantity from another field.', evidence: `${pos.inst} broker x${Math.abs(Number(pos.position))} / runner quantity absent` });
     });
@@ -1422,6 +1487,13 @@
     return ({ incident: 'OPEN', known_debt: 'KNOWN DEBT', unknown: 'UNKNOWN', recovered: 'RECOVERED' })[status] || 'OPEN';
   }
 
+  // Retained paper/Flex rows remain inspectable, but they are not active incidents once the
+  // backend marks them `counts_as_active: false`. Calling those rows OPEN made the detail card
+  // contradict the retired-history group and the header count.
+  function issueDisplayStatus(issue) {
+    return issue?.counts_as_active === false ? 'RETIRED' : issueStatus(issue?.status);
+  }
+
   // Stage 5ZZF. Whose problem this is, as a chip in the badge lane that already exists — no new
   // section, no new card. Three legacy paper-reconciliation issues were sitting beside the
   // Track 1 panel with nothing to say they were about a different route, and a reader glancing
@@ -1435,7 +1507,7 @@
     // Stage 5ZZZ-CM. `SHARED` không nói gì với người đọc — nó là từ của người viết mã, và
     // nghĩa thật ("bộ lập lịch và lịch hợp đồng phục vụ CẢ HAI tuyến") chỉ nằm trong tooltip.
     // Nhãn phải tự nói được nghĩa của nó khi không ai rê chuột.
-    return ({ track1: 'TRACK 1', legacy: 'LEGACY', scheduler: 'BOTH ROUTES',
+    return ({ track1: 'TRACK 1', legacy: 'RETIRED HISTORY', scheduler: 'BOTH ROUTES',
               known_debt: 'MODEL' })[scope] || '';
   }
 
@@ -1463,7 +1535,7 @@
     { key: 'model', label: 'Model / Regime',
       note: 'carried model and regime debt — applies to Track 1 regardless of the legacy route',
       has: sc => sc === 'known_debt' },
-    { key: 'legacy', label: 'Legacy / retired history',
+    { key: 'legacy', label: 'Retired history',
       note: 'reads legacy artefacts only — does not block Track 1 paper readiness',
       has: sc => sc === 'legacy' }
   ];
@@ -1512,9 +1584,12 @@
   //: recorded is not a slot that found nothing.
   const MV_MARK = {
     no_signal: { fill: 'var(--dim, #6a7284)', hollow: false, word: 'no signal' },
-    signal:    { fill: 'var(--green, #3f9e6b)', hollow: false, word: 'signal' },
+    candidate: { fill: 'var(--blue, #4f78c4)', hollow: true, word: 'candidate found' },
+    accepted_shadow: { fill: 'var(--green, #3f9e6b)', hollow: false,
+                       word: 'admitted in shadow' },
     rejected:  { fill: 'var(--red, #c64b4b)', hollow: false, word: 'rejected' },
     refused:   { fill: 'var(--amber, #c9a227)', hollow: false, word: 'refused' },
+    fired_no_record: { fill: 'var(--amber, #c9a227)', hollow: true, word: 'ran, no decision' },
     missed:    { fill: 'var(--red, #c64b4b)', hollow: true, word: 'no record' },
     future:    { fill: 'var(--muted, #8a94a6)', hollow: true, word: 'not yet' },
     unknown:   { fill: 'var(--muted, #8a94a6)', hollow: true, word: 'unknown' }
@@ -1608,6 +1683,18 @@
     return /^[a-z0-9_]+$/.test(k) ? k.replace(/_/g, ' ') : k;
   }
 
+  function mvSlotDetail(slot) {
+    const parts = [];
+    if (slot?.status === 'unknown') {
+      parts.push(`unrecognised status: ${String(slot?.raw_status || '(empty)')}`);
+    }
+    if (slot?.reason) parts.push(mvPhrase(slot.reason));
+    const n = Number(slot?.candidate_count);
+    if (Number.isFinite(n)) parts.push(`${n} candidate${n === 1 ? '' : 's'}`);
+    if (slot?.execution?.state === 'filled') parts.push('order filled');
+    return parts.join(' · ');
+  }
+
   // The status chip vocabulary, in precedence order. A data refusal outranks everything: if
   // the feed did not answer, what the slots did is a smaller fact than why.
   // Stage 5ZZZ-BX. Where the session IS, kept apart from what it FOUND.
@@ -1654,7 +1741,8 @@
 
   function mvStatusChip(s) {
     const d = s.data_status || {};
-    const signals = (s.slots || []).filter(x => x.status === 'signal').length;
+    const admitted = (s.slots || []).filter(x => x.status === 'accepted_shadow').length;
+    const candidates = (s.slots || []).filter(x => x.status === 'candidate').length;
     // `outranks` puts this AHEAD of the progress chip. Stage 5ZZZ-BX split the two axes and
     // placed progress first unconditionally, which buried this one behind the word COMPLETE --
     // and a sleeve whose feed never answered is not meaningfully complete. The commit that
@@ -1667,7 +1755,14 @@
     // question: what did the sleeve FIND. A sleeve with nothing decided yet has no answer, and
     // says nothing rather than borrowing the progress word back.
     if (s.status === 'waiting' || s.status === 'not_started') return null;
-    if (signals) return { word: signals === 1 ? 'SIGNAL' : `${signals} SIGNALS`, tone: 'good' };
+    if (admitted) {
+      return { word: admitted === 1 ? 'ADMITTED SHADOW' : `${admitted} ADMITTED SHADOW`,
+               tone: 'good' };
+    }
+    if (candidates) {
+      return { word: candidates === 1 ? 'CANDIDATE' : `${candidates} CANDIDATES`,
+               tone: 'warn' };
+    }
     // Stage 5ZZY. A slot the gate REJECTED is not "no signal": the sleeve produced a
     // candidate and something downstream refused it, which sends an operator somewhere
     // else entirely. This branch was missing, and it showed once the verdict line began
@@ -1682,7 +1777,8 @@
       // The window is short or unvouched; what the slots that DID run found is still a fact,
       // and the progress chip beside this one carries the caveat.
       const decided = (s.slots || []).filter(
-        x => x.status === 'no_signal' || x.status === 'signal').length;
+        x => x.status === 'no_signal' || x.status === 'candidate' ||
+             x.status === 'accepted_shadow' || x.status === 'rejected').length;
       return decided ? { word: 'NO SIGNAL', tone: 'muted' } : null;
     }
     if (s.status === 'complete') return { word: 'NO SIGNAL', tone: 'muted' };
@@ -1799,8 +1895,11 @@
   }
 
   const MV_LEGEND = [
-    { k: 'no_signal', word: 'No signal' }, { k: 'signal', word: 'Signal' },
-    { k: 'refused', word: 'Refused' }, { k: 'missed', word: 'No record' },
+    { k: 'no_signal', word: 'No signal' },
+    { k: 'candidate', word: 'Candidate found' },
+    { k: 'accepted_shadow', word: 'Admitted in shadow' },
+    { k: 'refused', word: 'Refused' }, { k: 'fired_no_record', word: 'Ran, no decision' },
+    { k: 'missed', word: 'No record' },
     { k: 'future', word: 'Not yet' }
   ];
 
@@ -2049,8 +2148,8 @@
       return `<ellipse class="mv-mark" cx="${cx.toFixed(1)}" cy="${laneY.toFixed(1)}" rx="3.4" ry="3.4"
         fill="${m.hollow ? 'none' : m.fill}" stroke="${m.fill}"
         data-slot="${mvEsc(s.slot_id)}" data-time="${mvEsc(t)}"
-        data-word="${mvEsc(m.word)}" data-reason="${mvEsc(mvPhrase(s.reason))}"
-        ><title>${mvEsc(t)} · ${mvEsc(m.word)}${s.reason ? ' · ' + mvEsc(mvPhrase(s.reason)) : ''}</title></ellipse>`;
+        data-word="${mvEsc(m.word)}" data-reason="${mvEsc(mvSlotDetail(s))}"
+        ><title>${mvEsc(t)} · ${mvEsc(m.word)}${mvSlotDetail(s) ? ' · ' + mvEsc(mvSlotDetail(s)) : ''}</title></ellipse>`;
     }).join('');
     // Published only once the row is complete, so a half-built span is never read.
     mvSlotSpan = _slotSpan;
@@ -2246,8 +2345,9 @@
     // slot leaves a record without an observation, so pointing "no live bars since" at one
     // names a minute when there were already no bars.
     const last = slots.slice().reverse().find(
-      x => x.status === 'no_signal' || x.status === 'signal' || x.status === 'rejected');
-    const sig = slots.find(x => x.status === 'signal');
+      x => x.status === 'no_signal' || x.status === 'candidate' ||
+           x.status === 'accepted_shadow' || x.status === 'rejected');
+    const sig = slots.find(x => x.status === 'candidate' || x.status === 'accepted_shadow');
     const rej = slots.find(x => x.status === 'rejected');
     if (d.ok === false && d.provider_reason) {
       return last ? `no live bars since ${last.time_et} ET` : 'no live bars recorded';
@@ -2449,12 +2549,17 @@
     if (!tabs.includes(state.mvInner)) state.mvInner = tabs[0];
     const armed = (s.setup_boundary || {}).levels_armed === true;
     const bars = ((s.bar_grid || {}).bars || []).length;
+    const scanStop = (s.bar_grid || {}).scan_stop;
+    const scanStopAt = scanStop && String(scanStop.bar_time || '').slice(11, 16);
+    const scanStopZone = s.clock === 'Asia/Tokyo' ? ' JST' : '';
     const note = state.mvInner === 'Setup rules'
       ? 'What each rule did, slot by slot — open Detector rules for the per-bar verdicts.'
       : state.mvInner === 'Detector rules'
-        ? (bars
-            ? `One cell per bar, not per slot — ${bars} bars in this session's window.`
-            : 'No bar was evaluated in this session, so the detector answered nothing per bar.')
+        ? (scanStop && scanStopAt
+            ? `First setup selected at ${scanStopAt}${scanStopZone}; later slots still ran admission, but later bars were not scanned.`
+            : bars
+            ? `Slot decisions use the same axis as Setup rules; detector bar verdicts fill only the slots whose bars were scanned.`
+            : 'No detector bar was evaluated; the slot decisions still show what each scheduled run decided.')
       : (armed
           ? 'Levels published for this candidate.'
           : 'No candidate in this session, so no levels are published — price context only.');
@@ -2476,11 +2581,35 @@
   const MV_CELL = {
     pass:          { cls: 'ok',     word: 'passed' },
     fail:          { cls: 'bad',    word: 'failed' },
-    not_reached:   { cls: 'hollow', word: 'not reached — the gate stopped the slot first' },
-    not_published: { cls: 'muted',  word: 'the detector returned no verdict for this slot' },
+    mixed:         { cls: 'mixed',  word: 'some admitted, some rejected' },
+    not_reached:   { cls: 'hollow', word: 'not reached' },
+    not_applicable:{ cls: 'na',     word: 'not applicable - no candidate' },
+    not_published: { cls: 'muted',  word: 'not computed' },
     no_record:     { cls: 'norec',  word: 'no record was written for this slot' },
     future:        { cls: 'future', word: 'has not run yet' }
   };
+
+  // One slot, one geometry everywhere. Setup rules, detector rules and the slot-decision
+  // lane all call these helpers, so a sleeve or tab cannot quietly invent a second shape.
+  function mvSlotCellStyle(index, total) {
+    const width = 100 / Math.max(total, 1);
+    return `left:${(index * width).toFixed(3)}%;width:calc(${width.toFixed(3)}% - 2px)`;
+  }
+
+  function mvRuleSlotCell(index, total, cls, title) {
+    return `<i class="mv2-cell ${mvEsc(cls)}" style="${mvSlotCellStyle(index, total)}" `
+      + `title="${mvEsc(title)}"></i>`;
+  }
+
+  function mvDecisionSlotCell(slot, index, total) {
+    const mark = MV_MARK[slot.status] || MV_MARK.unknown;
+    const detail = mvSlotDetail(slot);
+    const why = detail ? ` · ${detail}` : '';
+    const hollow = mark.hollow ? ' hollow-outcome' : '';
+    return `<i class="mv2-cell mv2-slot-outcome${hollow}" `
+      + `style="${mvSlotCellStyle(index, total)};--mv-slot-fill:${mark.fill}" `
+      + `title="${mvEsc(slot.time_et)} · ${mvEsc(mark.word + why)}"></i>`;
+  }
 
   //: Short forms for the lane's right-hand column. The long sentence the backend sends is
   //: kept verbatim on hover and counted once in the card head; only the column is shortened.
@@ -2510,8 +2639,8 @@
       + `<span class="mv2-legend-lead">slot decisions</span>`
       + seen.map(k => {
           const m = MV_MARK[k];
-          return `<span class="mv2-legend-item"><i class="mv2-slot-key" style="`
-            + `background:${m.hollow ? 'transparent' : m.fill};border-color:${m.fill}"></i>`
+          return `<span class="mv2-legend-item"><i class="mv2-cell mv2-slot-outcome`
+            + `${m.hollow ? ' hollow-outcome' : ''}" style="--mv-slot-fill:${m.fill}"></i>`
             + `${mvEsc(m.word)}</span>`;
         }).join('')
       + `</div>`;
@@ -2519,12 +2648,45 @@
 
   function mvLaneLegend(tail) {
     const items = [
-      ['ok', 'Passed'], ['bad', 'Failed'], ['hollow', 'Not reached'],
+      ['ok', 'Passed'], ['bad', 'Failed'], ['mixed', 'Admitted + rejected'],
+      ['hollow', 'Not reached'],
+      ['na', 'No candidate'],
       ['muted', 'No verdict published'], ['norec', 'No record'], ['future', 'Not yet run']
     ];
     return `<div class="mv2-legend">` + items.map(pair =>
       `<span class="mv2-legend-item"><i class="mv2-cell ${pair[0]}"></i>${mvEsc(pair[1])}</span>`
     ).join('') + `${tail || ''}</div>`;
+  }
+
+  function mvSlotDecisionLane(s, label = 'Slot decisions') {
+    const slots = s.slots || [];
+    if (!slots.length) return '';
+    const w = 100 / Math.max(slots.length, 1);
+    const strip = slots.map((sl, i) => mvDecisionSlotCell(sl, i, slots.length)).join('');
+    const axisIdx = [0, Math.floor(slots.length * 0.25), Math.floor(slots.length * 0.5),
+                     Math.floor(slots.length * 0.75), slots.length - 1]
+      .filter((v, i, a) => v >= 0 && a.indexOf(v) === i && slots[v]);
+    const axis = axisIdx.map(i =>
+      `<span class="mv2-axis-t" style="left:${Math.min(i * w + w * 0.31, 94).toFixed(2)}%">`
+      + `${mvEsc(slots[i].time_et)}</span>`).join('');
+    const cov = s.coverage || {};
+    const tally = (cov.observed_slots != null && cov.expected_slots != null)
+      ? `${cov.observed_slots} / ${cov.expected_slots}` : String(slots.length);
+    return `<div class="mv2-lane mv2-lane-slots">
+        <div class="mv2-lane-name"><div>
+          <div class="mv2-lane-label">${mvEsc(label)}</div>
+          <div class="mv2-lane-thr">${mvEsc(
+            s.status === 'waiting' ? 'not started' : 'aligned to slot times')}</div>
+        </div></div>
+        <div class="mv2-lane-track slots">${strip}</div>
+        <div class="mv2-lane-value muted">${mvEsc(tally)}</div>
+      </div>
+      <div class="mv2-lane mv2-lane-axis">
+        <div class="mv2-lane-name"></div>
+        <div class="mv2-lane-track">${axis}</div>
+        <div class="mv2-lane-value"></div>
+      </div>
+      ${mvSlotLegend(slots)}`;
   }
 
   //: One row per rule, one cell per slot. This is the panel's centre, and what it draws is
@@ -2548,18 +2710,17 @@
             : 'The route wrote no rule diagnostics for this sleeve today.') +
         `</div>`;
     }
-    const w = 100 / Math.max(slots.length, 1);
     const rows = lanes.map(L => {
       const cells = (L.cells || []).map((c, i) => {
         const m = MV_CELL[c.state] || MV_CELL.not_published;
         const val = c.value == null ? '' : ' · ' + String(c.value);
+        const cellAnswer = c.reason || (m.word + val);
         // Muc 4.5 dựng track bằng flex với gap 2px, nên cell chiếm gần trọn bước
         // slot. Ở đây cell là position:absolute nên bước slot phải trừ tay: 0.62
         // để lại 38% khoảng trống và lưới đọc thành những vạch rời, không phải
         // một dải liên tục.
-        return `<i class="mv2-cell ${m.cls}" style="left:${(i * w).toFixed(3)}%;` +
-          `width:calc(${w.toFixed(3)}% - 2px)" title="${mvEsc(c.time_et)} · ` +
-          `${mvEsc(L.label)} · ${mvEsc(m.word + val)}"></i>`;
+        return mvRuleSlotCell(i, slots.length, m.cls,
+          `${c.time_et} · ${L.label} · ${cellAnswer}`);
       }).join('');
       const tone = L.failed > 0 ? 'bad' : L.passed > 0 ? 'ok' : 'muted';
       // Six rules with nothing to report printed the same twenty-nine-word sentence six
@@ -2567,7 +2728,8 @@
       // the short form, the full sentence stays on hover, and the card head says it once
       // with a count — so the fact is still on the page, stated where it means something.
       const short = MV_LANE_SHORT[L.state_display] || L.state_display;
-      return `<div class="mv2-lane">
+      const absence = L.uniform_nonverdict ? ` absence-${L.uniform_nonverdict}` : '';
+      return `<div class="mv2-lane${absence}">
         <div class="mv2-lane-name">
           <span class="mv2-dot ${tone}"></span>
           <div>
@@ -2582,25 +2744,7 @@
       </div>`;
     }).join('');
 
-    // The slot-decision strip runs under the lanes on the SAME horizontal scale, so a cell
-    // and the slot outcome beneath it are the same moment.
-    const strip = slots.map((sl, i) => {
-      const m = MV_MARK[sl.status] || MV_MARK.unknown;
-      const why = sl.reason ? ' · ' + mvPhrase(sl.reason) : '';
-      return `<i class="mv2-slot" style="left:${(i * w + w / 2).toFixed(3)}%;` +
-        `background:${m.hollow ? 'transparent' : m.fill};border-color:${m.fill}" ` +
-        `title="${mvEsc(sl.time_et)} · ${mvEsc(m.word + why)}"></i>`;
-    }).join('');
-    const axisIdx = [0, Math.floor(slots.length * 0.25), Math.floor(slots.length * 0.5),
-                     Math.floor(slots.length * 0.75), slots.length - 1]
-      .filter((v, i, a) => v >= 0 && a.indexOf(v) === i && slots[v]);
-    const axis = axisIdx.map(i =>
-      `<span class="mv2-axis-t" style="left:${Math.min(i * w + w * 0.31, 94).toFixed(2)}%">` +
-      `${mvEsc(slots[i].time_et)}</span>`).join('');
     const silent = lanes.filter(L => !L.slots_decided).length;
-    const cov = s.coverage || {};
-    const tally = (cov.observed_slots != null && cov.expected_slots != null)
-      ? `${cov.observed_slots} / ${cov.expected_slots}` : String(slots.length);
     const span = slots.length
       ? `${slots[0].time_et}–${slots[slots.length - 1].time_et} ET` : '';
 
@@ -2613,27 +2757,15 @@
           published reading.">${silent} of ${lanes.length} rules publish no verdict</span>` : ''}
       </div>
       <div class="mv2-lanes">${rows}</div>
-      <div class="mv2-lane mv2-lane-slots">
-        <div class="mv2-lane-name"><div>
-          <div class="mv2-lane-label">Slot decisions</div>
-          <div class="mv2-lane-thr">${mvEsc(
-            s.status === 'waiting' ? 'not started' : 'aligned to slot times')}</div>
-        </div></div>
-        <div class="mv2-lane-track slots">${strip}</div>
-        <div class="mv2-lane-value muted">${mvEsc(tally)}</div>
-      </div>
-      <div class="mv2-lane mv2-lane-axis">
-        <div class="mv2-lane-name"></div>
-        <div class="mv2-lane-track">${axis}</div>
-        <div class="mv2-lane-value"></div>
-      </div>
-      ${mvSlotLegend(slots)}
+      ${mvSlotDecisionLane(s)}
       ${mvLaneLegend(mvDeclaredInline(s))}
     </div>`;
   }
 
-  //: Stage 5ZZZ-AM. The detector's rules, one cell per BAR — a different axis from the lanes
-  //: above, and kept visibly separate because merging them is what made the lanes unreadable.
+  //: Stage 5ZZZ-AM. The detector's rules are still per-BAR verdicts, but the operator reads
+  //: this page against the slot schedule. Draw them on the same slot axis as Setup rules:
+  //: every slot gets the same hollow cell shape, and the few slots with detector bars are
+  //: filled. Do not stretch four bars into four full-width columns that look like four slots.
   //
   // A lane cell is a SLOT. A grid cell is a BAR. Measured on a real session: within ONE slot
   // the volume rule is answered twelve times pass and ten times fail, so a slot cell has no
@@ -2655,7 +2787,7 @@
   // gate having scanned zero bars, and the slot-level lanes next door already name that.
   function mvBarGridCard(s) {
     const inner = mvBarGrid(s);
-    if (inner) return `<div class="mv2-card">${inner}</div>`;
+    if (inner) return `<div class="mv2-card">${inner}${mvSlotDecisionLane(s)}</div>`;
     const st = s.strategy || {};
     const why = (((st.diagnostics || {}).gates || [])
       .find(g => g && g.passed === false) || {}).detail || st.detail || '';
@@ -2683,31 +2815,62 @@
        panel này đã dùng — nên nó đọc như một phép đo chứ không như phần đuôi của một câu. */
     const lead = 'The detector returned before it scanned the window, so there is no '
                + 'per-bar verdict to show.';
+    const slotLane = mvSlotDecisionLane(s, 'Slot decisions');
     const body = why
       ? `<div class="mv-empty mv-empty-wide"><b>No bar was evaluated</b>` +
         `<span>${mvEsc(lead)}</span>` +
-        `<span class="mv2-stopped"><i>Stopped at</i>${mvEsc(why)}</span></div>`
+        `<span class="mv2-stopped"><i>Setup stopped at</i>${mvEsc(why)}</span>` +
+        `<span>The slots still ran; their decisions are shown below.</span></div>`
       : mvEmpty('No bar was evaluated',
           `${lead} Setup rules says where it stopped; the readings it stopped on are `
           + `in Conditions below.`);
     return `<div class="mv2-card"><div class="mv2-card-head">
-        <span class="mv2-kicker">Detector rules, per bar</span>
-        <span class="mv2-mono">no bar evaluated</span>
-      </div>${body}</div>`;
+        <span class="mv2-kicker">Detector rules, slot decisions</span>
+        <span class="mv2-mono">no detector bar evaluated</span>
+      </div>${body}${slotLane}</div>`;
   }
 
   function mvBarGrid(s) {
     const g = s.bar_grid;
     if (!g || !(g.rows || []).length || !(g.bars || []).length) return '';
     const bars = g.bars;
-    const w = 100 / bars.length;
+    const slots = s.slots || [];
+    const axis = slots.length
+      ? slots
+      : bars.map(b => ({ time_et: mvBarToEt(b) || String(b).slice(11, 16) }));
+    const slotIndexByTime = new Map();
+    axis.forEach((sl, i) => {
+      const t = String(sl.time_et || '').slice(0, 5);
+      if (t && !slotIndexByTime.has(t)) slotIndexByTime.set(t, i);
+    });
+    const barSlotIndexes = bars.map((b, i) => {
+      const et = mvBarToEt(b);
+      if (et && slotIndexByTime.has(et)) return slotIndexByTime.get(et);
+      return slots.length ? -1 : i;
+    });
+    const scanStop = g.scan_stop || null;
+    const lastScannedSlot = barSlotIndexes.reduce((last, i) => Math.max(last, i), -1);
+    const stopAt = scanStop && String(scanStop.bar_time || '').slice(11, 16);
+    const stopZone = s.clock === 'Asia/Tokyo' ? ' JST' : '';
     const rows = g.rows.map(r => {
-      const cells = String(r.cells || '').split('').map((ch, i) => {
-        const [cls, word] = MV_GRID_CELL[ch] || MV_GRID_CELL['-'];
-        return `<i class="mv2-cell ${cls}" style="left:${(i * w).toFixed(3)}%;` +
-          `width:${(w * 0.62).toFixed(3)}%" title="${mvEsc(String(bars[i] || ''))} · ` +
-          `${mvEsc(r.gate)} · ${mvEsc(word)}"></i>`;
+      const emptyCells = axis.map((sl, i) => {
+        const stopped = scanStop && scanStop.reason === 'first_setup_selected'
+          && i > lastScannedSlot;
+        const cls = stopped ? 'stopped' : 'hollow';
+        const answer = stopped
+          ? `not scanned after first setup at ${stopAt || 'the earlier bar'}${stopZone}; slot still ran admission`
+          : 'no detector bar for this slot';
+        return mvRuleSlotCell(i, axis.length, cls,
+          `${sl.time_et || ''} · ${r.gate} · ${answer}`);
       }).join('');
+      const filledCells = String(r.cells || '').split('').map((ch, i) => {
+        const slotIdx = barSlotIndexes[i];
+        if (slotIdx == null || slotIdx < 0) return '';
+        const [cls, word] = MV_GRID_CELL[ch] || MV_GRID_CELL['-'];
+        return mvRuleSlotCell(slotIdx, axis.length, cls,
+          `${String(bars[i] || '')} · ${r.gate} · ${word}`);
+      }).join('');
+      const cells = emptyCells + filledCells;
       const tone = r.passed > 0 ? (r.passed === r.reached ? 'ok' : 'warn') : 'bad';
       return `<div class="mv2-lane">
         <div class="mv2-lane-name">
@@ -2726,17 +2889,38 @@
     }).join('');
     const first = String(bars[0] || '').slice(11, 16);
     const last = String(bars[bars.length - 1] || '').slice(11, 16);
+    const span = axis.length
+      ? `${axis[0].time_et || first}–${axis[axis.length - 1].time_et || last} ET`
+      : `${first}–${last}`;
     return `<div class="mv2-bargrid">
       <div class="mv2-card-head">
-        <span class="mv2-kicker">Detector rules, per bar</span>
-        <span class="mv2-mono">${bars.length} bars · ${mvEsc(first)}–${mvEsc(last)}
-          on the sleeve&rsquo;s own clock</span>
-        <span class="mv2-mono mv2-head-right" title="A rule is answered once per BAR, not
-          once per slot. These verdicts are fixed when the bar closes and do not change when
-          a later slot rescans the window.">one cell per bar, not per slot</span>
+        <span class="mv2-kicker">Detector rules, aligned to slots</span>
+        <span class="mv2-mono">${axis.length} slots · ${mvEsc(span)}</span>
+        <span class="mv2-mono mv2-head-right" title="${mvEsc(scanStop?.detail ||
+          'Detector evidence is one verdict per bar.')}">
+          ${bars.length} detector bars${scanStop && stopAt
+            ? ` · stopped after first setup ${mvEsc(stopAt + stopZone)}` : ''}</span>
       </div>
       ${rows}
     </div>`;
+  }
+
+  function mvBarToEt(raw) {
+    const txt = String(raw || '');
+    if (!txt) return '';
+    const iso = txt.includes('T') ? txt : txt.replace(' ', 'T');
+    const d = new Date(iso);
+    if (!Number.isNaN(d.getTime())) {
+      try {
+        return new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/New_York',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }).format(d).replace(/^24:/, '00:');
+      } catch (_) {}
+    }
+    return txt.slice(11, 16);
   }
 
   //: The threshold as the sleeve published it — a scalar, or the one-key object the
@@ -4273,7 +4457,10 @@
 
   function renderOpenIssues() {
     const data = state.openIssues;
-    const issues = data?.issues || [];
+    const allIssues = data?.issues || [];
+    // Retired history remains available in the backend evidence, but must not render as
+    // an actionable/open card in the live dashboard.
+    const issues = allIssues.filter(issue => issue?.counts_as_active !== false);
     const coverage = data?.coverage;
     const staleDays = Number(coverage?.stale_days || 0);
     // Stage 5ZZZ-BL. ONE count, used by both labels on this panel.
@@ -4288,14 +4475,14 @@
     const activeCount = data?.active_count ?? issues.length;
     const retiredCount = data?.retired_history_count ?? 0;
     $('openIssuesSource').textContent = coverage
-      ? `${activeCount} open${retiredCount ? ` / ${retiredCount} retired legacy` : ''}`
+      ? `${activeCount} open${retiredCount ? ` / ${retiredCount} retired history` : ''}`
         + ` / evidence ${coverage.from} to ${coverage.evidence_ends || coverage.to}`
         + `${staleDays > 0 ? ` (ends ${staleDays} day${staleDays === 1 ? '' : 's'} ago)` : ''}`
       : data?.error || 'Evidence coverage unavailable';
     $('openIssuesSource').className = `source-note has-tip tip-right${staleDays > 0 ? ' warning' : ''}`;
     $('openIssuesToggle').textContent =
       `${activeCount} open issue${activeCount === 1 ? '' : 's'}`
-      + (retiredCount ? ` / ${retiredCount} retired legacy` : '')
+      + (retiredCount ? ` / ${retiredCount} retired history` : '')
       + ' / show list';
     if (state.issuesSectionOpen === null) state.issuesSectionOpen = issues.length > 0 || !compactIssueMedia.matches;
     // Opening the panel because three retired legacy rows exist would defeat the point of
@@ -4305,13 +4492,18 @@
     if (!state.selectedIssueKey && issues.length && !compactIssueMedia.matches) state.selectedIssueKey = issues[0].key;
     const issueRow = issue => {
       const selected = issue.key === state.selectedIssueKey;
+      const scope = issueScope(issue.route_scope);
+      const scopeLabel = scope
+        ? `<span class="issue-route">${esc(scope)}</span>`
+        : '<span class="issue-scope">UNKNOWN SCOPE</span>';
+      const displayClass = issue.counts_as_active === false ? 'retired' : issue.status;
       return `<div class="issue-list-item">
-        <button class="issue-list-row ${esc(issue.status)} ${selected ? 'selected' : ''}" type="button" role="option" aria-selected="${selected}" aria-expanded="${selected}" data-issue-key="${esc(issue.key)}">
-          <span class="issue-badges"><span class="issue-origin ${esc(issue.component)}">${esc(issue.component || 'unknown')}</span><span class="issue-status">${esc(issueStatus(issue.status))}</span></span>
+        <button class="issue-list-row ${esc(displayClass)} ${selected ? 'selected' : ''}" type="button" role="option" aria-selected="${selected}" aria-expanded="${selected}" data-issue-key="${esc(issue.key)}">
+          <span class="issue-badges"><span class="issue-origin ${esc(issue.component)}">${esc(issue.component || 'unknown')}</span>${scopeLabel}<span class="issue-status">${esc(issueDisplayStatus(issue))}</span></span>
           <span class="issue-list-copy"><b>${esc(issue.title)}</b><small>${esc(issue.problem)}</small><em>Last ${esc(etDateTime(issue.last_seen))}</em></span>
           <span class="issue-count">${esc(issue.occurrences)}x</span>
         </button>
-        ${selected ? `<div class="issue-mobile-detail ${esc(issue.status)}">
+        ${selected ? `<div class="issue-mobile-detail ${esc(displayClass)}">
           <div class="issue-problem"><span>Problem</span><p>${esc(issue.problem)}</p></div>
           <div class="issue-timing"><span>First ${esc(etDateTime(issue.first_seen))}</span><span>Last ${esc(etDateTime(issue.last_seen))}</span></div>
           <div class="issue-assessment"><div><span>Impact</span><p>${esc(issue.impact)}</p></div><div><span>Action</span><p>${esc(issue.action)}</p></div></div>
@@ -4358,8 +4550,8 @@
       : '<div class="clear-state"><span class="status-dot"></span><b>Clear</b><span>No unresolved issue found in retained evidence</span></div>';
     const selected = issues.find(issue => issue.key === state.selectedIssueKey);
     $('openIssueDetail').innerHTML = selected ? `
-      <article class="issue-detail-panel ${esc(selected.status)}">
-        <div class="issue-detail-head"><div><span class="issue-origin ${esc(selected.component)}">${esc(selected.component || 'unknown')}</span><span class="issue-status">${esc(issueStatus(selected.status))}</span><h3>${esc(selected.title)}</h3></div><b>${esc(selected.occurrences)} occurrences</b></div>
+      <article class="issue-detail-panel ${esc(selected.counts_as_active === false ? 'retired' : selected.status)}">
+        <div class="issue-detail-head"><div><span class="issue-origin ${esc(selected.component)}">${esc(selected.component || 'unknown')}</span><span class="issue-status">${esc(issueDisplayStatus(selected))}</span><h3>${esc(selected.title)}</h3></div><b>${esc(selected.occurrences)} occurrences</b></div>
         <div class="issue-problem"><span>Problem</span><p>${esc(selected.problem)}</p></div>
         <div class="issue-timing"><span>First ${esc(etDateTime(selected.first_seen))}</span><span>Last ${esc(etDateTime(selected.last_seen))}</span></div>
         <div class="issue-assessment"><div><span>Impact</span><p>${esc(selected.impact)}</p></div><div><span>Action</span><p>${esc(selected.action)}</p></div></div>
@@ -4398,7 +4590,7 @@
   const LEGACY_STALE_HOURS = 12;
 
   const GATE_NAMES = {
-    B1_broker_account_or_legacy_retirement: 'Account / legacy retirement gate',
+    B1_broker_account_or_legacy_retirement: 'Account ownership gate',
     PAPER_SHADOW_EVIDENCE: 'Shadow evidence gate',
     REGIME_LABEL_VERIFICATION: 'Regime label verification gate',
     LIVE_FRAME_ADAPTER_VERIFICATION: 'Live frame adapter gate'
@@ -4677,10 +4869,20 @@
     }
 
     const blocking = gates.blocking_now || [];
+    const orderRequest = state.schedule?.order_request || {};
+    const armedText = orderRequest.scheduler_armed === true
+      ? 'YES'
+      : orderRequest.scheduler_armed === false
+        ? 'no'
+        : 'UNKNOWN';
     const rows = [
       t1Fact('Route', t1.route || '--'),
       t1Fact('Orders possible', gates.orders_possible ? 'YES' : 'no',
              gates.orders_possible ? 'negative' : ''),
+      t1Fact('Scheduler armed', armedText,
+             orderRequest.scheduler_armed === true ? 'negative' : ''),
+      t1Fact('Order request source',
+             esc(orderRequest.reading || 'scheduler order request state not reported')),
       t1Fact('Blocking gates', blocking.length ? gateChips(blocking) : 'none',
              blocking.length ? '' : 'negative'),
       // Stage 5ZZH. Where the row above comes from, and where it does NOT.
@@ -4750,11 +4952,11 @@
       return;
     }
     const persistedMatches = runnerPositions().filter(pos => runnerQuantity(pos) != null).length;
-    // "runner qty" here is the LEGACY book (live_positions.json). Track 1 keeps its own at
-    // live_positions.track1.json and is never merged in. Labelled rather than assumed: during
-    // a track1-only period the legacy book is DRAINING, and an unlabelled row invites the
-    // reader to take it for Track 1 state.
-    $('positionSource').textContent = `${brokerPositions().length} IBKR position(s) / ${persistedMatches} legacy(drain) runner qty from persisted state / ${age(state.broker.age_seconds)}`;
+    // 2026-09-24. This said "legacy(drain) runner qty": the runner side WAS the legacy book
+    // (live_positions.json) until that morning, when /api/v1/runner-positions moved to Track 1's
+    // book (live_positions.track1.json) on the operator's instruction — legacy is retired and
+    // one book answers "what do I hold". The label moved with the source.
+    $('positionSource').textContent = `${brokerPositions().length} IBKR position(s) / ${persistedMatches} Track 1 book qty from persisted state / ${age(state.broker.age_seconds)}`;
     if (!brokerPositions().length) {
       // Stage 5ZZZ-CF. Menh de thu hai la menh de quan trong, va SECTION_ANATOMY
       // (## Open Positions) ghi ro dieu do: o trong khong noi duoc vi sao no trong.
@@ -4813,8 +5015,8 @@
         </div>
         <div class="position-facts">
           <div class="fact-opened"><span class="has-tip" tabindex="0" data-tooltip="Entry day from runner state. The fill time is recovered from the runner's own trade log, matched on instrument, cluster, entry day and fill price. IBKR cannot supply it: reqPositions carries no timestamp and reqExecutions serves the current day only.">Opened</span><b>${esc(runner?.entry_day || '--')}</b><small>${esc(entryTimeCaption(runner))}</small></div>
-          <div class="fact-held"><span class="has-tip" tabindex="0" data-tooltip="Trading-day holding age recorded by the runner.">Held</span><b>${runner?.days_held ?? '--'}d</b></div>
-          <div class="fact-risk"><span class="has-tip" tabindex="0" data-tooltip="Risk allocation recorded by the runner. This is not current profit or market value.">Risk budget</span><b>${dollars(runner?.risk_sized)}</b></div>
+          <div class="fact-held"><span class="has-tip" tabindex="0" data-tooltip="Trading-day holding age recorded by the runner.">Held</span><b>${runner?.days_held == null ? 'not recorded' : `${runner.days_held}d`}</b></div>
+          <div class="fact-risk"><span class="has-tip" tabindex="0" data-tooltip="Risk allocation recorded by the runner. This is not current profit or market value.">Risk budget</span><b>${runner?.risk_sized == null ? 'not recorded' : dollars(runner.risk_sized)}</b></div>
           <div class="fact-stop ${protection.cls}"><span class="has-tip tip-right" tabindex="0" data-tooltip="Observed IBKR stop type, action, quantity, order ID, status, and time in force.">Stop order</span><b>${order ? `${esc(order.type || '--')} ${esc(order.action || '--')} x${esc(order.qty ?? '--')}` : '--'}</b><small>${order ? `#${esc(order.order_id ?? '--')} · ${esc(order.status || '--')} · ${esc(order.tif || 'TIF not emitted')}` : 'No broker stop observed'}</small></div>
         </div>
       </article>`;
@@ -4859,8 +5061,93 @@
     return `<article class="decision-row ${esc(kind)}"><div class="decision-row-main"><span>${esc(symbol || '--')}</span>${side ? `<span class="side ${side.toLowerCase()}">${esc(side)}</span>` : ''}${tag ? `<span class="decision-tag ${tag.unknown ? 'unknown' : ''}">${esc(tag.label)}</span>` : ''}<span class="decision-value ${esc(valueClass)}">${esc(value || '')}</span></div><div class="decision-row-detail">${esc(detail || '--')}</div></article>`;
   }
 
+  /* 2026-09-24, evening. Stage 3 gave `/api/v1/runner-state` a Track 1 per-day series, and a
+     Track 1 snapshot names its fills `opens` and counts its `closes` — it has no `decision`
+     object, which is the only thing this function and `journalRows` ever read. Measured on the
+     live page: the newest snapshot (2026-09-24) carried two `opens`, and this panel rendered
+     "Decision unavailable" with Entered / Closed / Rejected all showing `--`, while Open
+     Positions two sections above showed both positions in full. Same defect family as `pos.inst`
+     against `pos.instrument`: the positions were normalised that morning and this reader was not.
+
+     Mapped, never invented, and the asymmetry in the series is carried through rather than
+     smoothed over:
+
+       opens    a list with detail          -> entries, rendered in full
+       closes   a COUNT and nothing else    -> a count; the detail is not in the series, and a
+                                              non-zero count must say that instead of reading as
+                                              "no closes today"
+       rejected no counterpart at all       -> reported absent, never as 0. A 0 in that slot reads
+                                              as "nothing was rejected", which is a claim this
+                                              series cannot make.
+
+     `risk_sized` and `entry_time` are absent from a Track 1 open, so they stay absent: the row
+     shows the sleeve alone and the journal says "time not recorded". */
+  const decisionFromSeries = snap => {
+    if (!snap) return null;
+    const execDecision = decisionFromExecutionQuality(snap.date);
+    if (execDecision) return execDecision;
+    if (snap.decision) return snap.decision;
+    const opens = Array.isArray(snap.opens) ? snap.opens : null;
+    const closeCount = Number.isFinite(Number(snap.closes)) ? Number(snap.closes) : null;
+    if (!opens && closeCount == null) return null;
+    return {
+      from_track1_series: true,
+      entries: (opens || []).map(open => ({
+        ...open,
+        cluster: open.cluster ?? open.sleeve,
+        entry_price: open.entry_price ?? open.fill_price
+      })),
+      exits: [],
+      close_count: closeCount,
+      close_detail_absent: !!closeCount,
+      rejected_detail: [],
+      rejected_evidence_absent: true,
+      realized_today: snap.realised_pnl,
+      taken_today: { opens: (opens || []).length }
+    };
+  };
+
+  function track1RealizedToday() {
+    const execution = state.executionQuality;
+    if (!execution || execution.route !== 'track1_candidate') return null;
+    const summary = execution.summary || {};
+    if (Number.isFinite(Number(summary.realized_today))) return Number(summary.realized_today);
+    const total = (execution.fills || [])
+      .filter(fill => fill.type === 'CLOSE' && Number.isFinite(Number(fill.pnl_sized)))
+      .reduce((acc, fill) => acc + Number(fill.pnl_sized), 0);
+    return (execution.fills || []).some(fill => fill.type === 'CLOSE') ? total : null;
+  }
+
+  function decisionFromExecutionQuality(day) {
+    const execution = state.executionQuality;
+    if (!execution || execution.route !== 'track1_candidate' || execution.day !== day) return null;
+    const fills = execution.fills || [];
+    if (!fills.length) return null;
+    const entries = fills.filter(fill => fill.type === 'OPEN').map(fill => ({
+      inst: fill.inst, direction: fill.direction, cluster: fill.cluster,
+      entry_price: fill.actual_price, entry_time: fill.ts,
+      risk_sized: null
+    }));
+    const exits = fills.filter(fill => fill.type === 'CLOSE').map(fill => ({
+      inst: fill.inst, direction: fill.direction, cluster: fill.cluster,
+      pnl: fill.pnl_sized, entry_day: fill.entry_day,
+      exit_time: fill.ts, exit_price: fill.actual_price,
+      exit_reason: fill.exit_reason || 'CLOSE'
+    }));
+    const summary = execution.summary || {};
+    return {
+      from_track1_execution_quality: true,
+      entries, exits,
+      close_count: summary.close_count ?? exits.length,
+      rejected_detail: [],
+      rejected_evidence_absent: true,
+      realized_today: summary.realized_today ?? track1RealizedToday(),
+      taken_today: { opens: summary.open_count ?? entries.length }
+    };
+  }
+
   function renderDecisions(snap) {
-    const decision = snap?.decision;
+    const decision = decisionFromSeries(snap);
     if (!decision) {
       $('decisionSource').textContent = 'Decision unavailable';
       $('decisionSummary').innerHTML = '<div><span>Evidence</span><b class="warning">Unknown</b></div>';
@@ -4879,9 +5166,38 @@
     const takenCount = mapCount(decision.taken_today);
     const rejectedCount = mapCount(decision.rejected_today);
 
-    $('decisionSource').textContent = `${snap.date} / runner ${etDateTime(state.runner?.observed_at)}`;
+    // `observed_at` is when the LEGACY runner last dumped its state — 2026-08-24, and the
+    // endpoint says so itself with `source_era: legacy`. Printing it beside a Track 1 snapshot
+    // date produced "2026-09-24 / runner 08-24, 02:58 ET": two eras on one line, with the older
+    // one wearing the word "runner". A Track 1 payload is built when it is read, so that is the
+    // stamp that belongs here, and it is labelled as a build rather than as an observation.
+    const t1Series = state.runner?.payload_era === 'track1';
+    $('decisionSource').textContent = t1Series
+      ? `${snap.date} / Track 1 series built ${etDateTime(state.runner?.built_at)}`
+      : `${snap.date} / runner ${etDateTime(state.runner?.observed_at)}`;
+
+    /* 2026-09-27. The heading said "Today's Decision" as a hardcoded string while the panel
+       renders the NEWEST snapshot, whichever day that is. On a Sunday with nothing since
+       Friday it showed Friday's Nikkei entry under the word today, and an operator read it as
+       today's — which is how this was found. The date was already on screen in the source note
+       beside it; that was not enough, because a reader scans the heading first.
+       So the heading now names the day it is showing and says plainly when that is not today.
+       Selecting the newest snapshot is deliberate and unchanged: a quiet day should still show
+       the last day that decided, rather than nothing. */
+    const decisionDay = String(snap.date || '').slice(0, 10);
+    const todayEt = etToday();   // honours the server's own clock, not the browser's
+    const headingEl = $('decisionHeading');
+    if (headingEl) {
+      if (!decisionDay) {
+        headingEl.textContent = 'Decision — day not recorded';
+      } else if (decisionDay === todayEt) {
+        headingEl.textContent = "Today's Decision";
+      } else {
+        headingEl.textContent = `Decision — ${decisionDay}, not today`;
+      }
+    }
     $('decisionSummary').innerHTML = [
-      ['Regime', snap.regime || 'Unknown', ''],
+      ['Regime', snap.regime || snap.regime_traded_under || 'Unknown', ''],
       ['Realized', tradeMoney(decision.realized_today), Number(decision.realized_today || 0) >= 0 ? 'positive' : 'negative'],
       ['Taken', takenCount, ''],
       ['Rejected', rejectedCount, rejectedCount ? 'warning' : ''],
@@ -4914,8 +5230,17 @@
         detail: [close.cluster, 'same-day close'].filter(Boolean).join(' / ')
       }))
     ];
-    $('decisionCloseCount').textContent = String(closeRows.length);
-    $('decisionCloses').innerHTML = closeRows.length ? closeRows.map(decisionRow).join('') : '<div class="decision-empty">No closes in this decision.</div>';
+    // A Track 1 series counts its closes and keeps no detail. A count of 3 with no rows must not
+    // render as "No closes in this decision" — that sentence is a claim the series cannot make.
+    $('decisionCloseCount').textContent = closeRows.length
+      ? String(closeRows.length)
+      : (decision.close_count == null ? '--' : String(decision.close_count));
+    $('decisionCloses').innerHTML = closeRows.length
+      ? closeRows.map(decisionRow).join('')
+      : decision.close_detail_absent
+        ? `<div class="decision-empty">${esc(decision.close_count)} close(s) counted in this `
+          + 'day&rsquo;s series; the per-close detail is not part of it.</div>'
+        : '<div class="decision-empty">No closes in this decision.</div>';
 
     const rejectedRows = rejected.map(item => ({
       symbol: item.inst,
@@ -4926,8 +5251,17 @@
       kind: item.reason === 'breaker_halt' ? 'halted' : 'rejected'
     }));
     if (halted) rejectedRows.push({ symbol: 'ENTRY GUARD', value: `${halted} halted`, valueClass: 'negative', detail: 'Circuit breaker prevented entry signals.', kind: 'halted' });
-    $('decisionRejectedCount').textContent = String(rejectedRows.length);
-    $('decisionRejected').innerHTML = rejectedRows.length ? rejectedRows.map(decisionRow).join('') : '<div class="decision-empty">No rejected or halted entries.</div>';
+    // Nothing in the Track 1 series carries rejected or halted candidates. `0` would read as
+    // "nothing was rejected today", so the count stays a dash and the box says why.
+    $('decisionRejectedCount').textContent = rejectedRows.length
+      ? String(rejectedRows.length)
+      : (decision.rejected_evidence_absent ? '--' : '0');
+    $('decisionRejected').innerHTML = rejectedRows.length
+      ? rejectedRows.map(decisionRow).join('')
+      : decision.rejected_evidence_absent
+        ? '<div class="decision-empty">Rejected and halted candidates are not part of this '
+          + 'day&rsquo;s Track 1 series — not measured, not zero.</div>'
+        : '<div class="decision-empty">No rejected or halted entries.</div>';
     const execution = state.executionQuality;
     const exceptions = execution?.day === snap?.date ? execution.exceptions || [] : [];
     const executionBox = $('executionExceptions');
@@ -4957,7 +5291,9 @@
     const day = snap?.date;
     if (!day) return [];
     const rows = [];
-    const decision = snap.decision || {};
+    // Same adapter as the decision panel: a Track 1 snapshot has `opens`, not `decision`, and
+    // without this the journal's TRADE / ENTRY rows vanish on exactly the days it traded.
+    const decision = decisionFromSeries(snap) || {};
     const exitsByInst = new Map((decision.exits || []).map(exit => [rootOf(exit.inst), exit]));
     const operational = state.sessionEvents?.day === day ? state.sessionEvents.events || [] : [];
     const loggedExitSymbols = new Set();
@@ -5218,8 +5554,28 @@
     let resolution;
     if (recovered) {
       status = 'recovered';
-      problem = 'Windows denied the runner-state publication for this slot.';
-      resolution = job.impact.split('. ').slice(-1)[0];
+      /* 2026-09-25. This branch used to assert ONE cause for every recovered job:
+         "Windows denied the runner-state publication for this slot." That is true for the
+         failure it was written for and for nothing else, and the branch it sits in fires on
+         `lifecycle_status === 'recovered'` — which means "a later slot ran clean", not "this is
+         why it failed".
+
+         Measured tonight on three rows: slots 01:10, 01:15 and 01:20 ET exited code 2 because
+         the order gate was shut, printing "REFUSED - order sending was requested and is not
+         available" and "Nothing was run." The scheduler log holds no permission line for them at
+         all. The page showed all three as a Windows publication problem, in green, under
+         RECOVERED. A reader would have gone looking for a file-permission fault that does not
+         exist while the real one - an expired account baseline - went unnamed.
+
+         Fourth instance of one defect family in a day: a PASS/known branch stating the prose of
+         the one case it was written for. So the cause is now taken from the record, and the
+         publication wording is used only where the evidence actually says publication. */
+      const publication = /Publication resumed at/i.test(job.impact || '')
+        || /dump_state|live_state_data|publication/i.test(String(job.reason || ''));
+      problem = publication
+        ? 'Windows denied the runner-state publication for this slot.'
+        : `This execution failed and a later slot ran clean: ${job.reason || 'no reason recorded'}.`;
+      resolution = job.impact ? job.impact.split('. ').slice(-1)[0] : '';
     } else if (g2Only || job.status === 'completed_with_debt') {
       status = 'known_debt';
       problem = 'The runner completed, but the HMM model-age guard remains HARD stale.';
@@ -5529,6 +5885,18 @@
   // freshness model asks the SCHEDULE whether a publish was due, and in track1-only mode the
   // legacy runner is never due, so the label says `fresh` for a snapshot of any age. Measured
   // 2026-09-01: 724,658 seconds, 201.3 hours, eight and a half days.
+  /* Stage 2026-09-24 (plan stage 0). The legacy runner's `operational_status` — breaker level,
+     `regime_unreliable` — decided the rail and the incident list as though it were today's.
+     Measured that day: the snapshot was 31 days old, so the rail's "breaker OK" and the absence
+     of an "entries blocked" incident were both the legacy route's view of 2026-08-24. A stale
+     reading is not a green one; past the staleness line it contributes nothing, and those
+     conditions are simply not asserted either way. The header tiles keep their legacy fallback
+     because each of them already names whose reading it is. */
+  function currentLegacyOps(snap) {
+    if (legacyRunnerStale()) return {};
+    return state.runner?.payload?.meta?.operational_status || snap?.operational_status || {};
+  }
+
   function legacyRunnerStale() {
     const hours = Number(state.runner?.age_seconds) / 3600;
     return ['missing', 'unknown', 'stale'].includes(state.runner?.freshness)
@@ -5623,7 +5991,7 @@
       : '--';
     const entries = [
       ['Track 1 observed', t1Observed],
-      ...(stale ? [['Legacy runner observed', `${observed} · route retired`]] : []),
+      ...(stale ? [['Retired route observed', `${observed} · excluded from Track 1`]] : []),
       ['Schedule freshness', mvFreshnessWords(state.runner?.freshness)
         // Nửa "whether another slot is due today" đã bỏ: chính GIÁ TRỊ nói câu ấy rồi, kể
         // từ khi mã máy được dịch ra. Nửa còn lại thì giữ — nó phân biệt hàng này với sức

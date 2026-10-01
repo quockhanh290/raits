@@ -340,11 +340,13 @@ h2 { font-size: 21px; }
 .known_debt .issue-status { color: var(--violet); }
 .unknown .issue-status { color: var(--amber); }
 .recovered .issue-status { color: var(--green); }
+.retired .issue-status { color: var(--muted); }
 .open-issue-detail { min-width: 0; }
 .issue-detail-panel { height: 100%; background: var(--surface); border: 1px solid var(--line); border-top: 2px solid var(--red); border-radius: 5px; overflow: hidden; }
 .issue-detail-panel.known_debt { border-top-color: var(--violet); }
 .issue-detail-panel.unknown { border-top-color: var(--amber); }
 .issue-detail-panel.recovered { border-top-color: var(--green); }
+.issue-detail-panel.retired { border-top-color: var(--muted); }
 .issue-detail-head { min-height: 47px; padding: 9px 11px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .issue-detail-head > div { min-width: 0; display: flex; align-items: center; gap: 9px; }
 .issue-detail-head h3 { min-width: 0; margin: 0; color: var(--bright); font: 600 16px/1.3 var(--mono); letter-spacing: 0; }
@@ -419,13 +421,13 @@ h2 { font-size: 21px; }
 .decision-shell { padding: 18px 20px; overflow: hidden; background: #0e1115; border: 1px solid #1d2229; border-radius: 8px; }
 .decision-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin-bottom: 16px; border-bottom: 1px solid #1a1f26; }
 .decision-summary > div { min-width: 0; padding: 0 12px 15px; border-right: 1px solid #1a1f26; }
-.decision-summary > div:first-child { padding-left: 0; }
+.decision-summary > div:first-child { padding-left: 12px; }
 .decision-summary > div:last-child { border-right: 0; }
 .decision-summary span { display: block; color: var(--dim); text-transform: uppercase; font: 12px/1 var(--mono); }
 .decision-summary b { display: block; margin-top: 6px; color: var(--bright); font: 600 17px/1.2 var(--mono); overflow-wrap: anywhere; }
 .decision-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
 .decision-group { min-width: 0; padding: 0 16px; border-right: 1px solid #1a1f26; }
-.decision-group:first-child { padding-left: 0; }
+.decision-group:first-child { padding-left: 12px; }
 .decision-group:last-child { padding-right: 0; border-right: 0; }
 .decision-group-head { min-height: 30px; display: flex; align-items: center; justify-content: space-between; color: var(--muted); text-transform: uppercase; font: 600 13px/1 var(--mono); border-bottom: 1px solid var(--line-strong); }
 .decision-group-head b { color: var(--bright); }
@@ -1405,14 +1407,32 @@ b.muted, .mv2-lane-value.muted { color: var(--t-label); }
    strip below them, so a cell and the slot decision under it are the same minute. */
 .mv2-cell {
   position: absolute; top: 50%; transform: translateY(-50%);
-  height: 12px; border-radius: 2px; background: var(--t-null); border: 0;
+  box-sizing: border-box; height: 12px; border-radius: 5px;
+  background: var(--t-null); border: 0;
 }
 .mv2-cell.ok { background: var(--s-ok); }
 .mv2-cell.bad { background: var(--s-bad); }
+.mv2-cell.mixed {
+  background: linear-gradient(90deg, var(--s-ok) 0 50%, var(--s-bad) 50% 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18);
+}
 .mv2-cell.muted { background: #2a323d; }
 .mv2-cell.hollow { background: transparent; border: 1px solid #3a424f; }
+.mv2-cell.na {
+  background: rgba(91, 112, 137, .18);
+  border: 1px dotted #5b7089;
+}
+.mv2-cell.stopped {
+  background: repeating-linear-gradient(135deg, rgba(168, 137, 76, .24) 0 3px,
+              rgba(49, 54, 62, .28) 3px 6px);
+  border: 1px solid #796a4f;
+}
 .mv2-cell.norec { background: transparent; border: 1px solid var(--s-bad); }
 .mv2-cell.future { background: transparent; border: 1px dashed var(--line-open); }
+.mv2-cell.mv2-slot-outcome {
+  background: var(--mv-slot-fill); border: 1px solid var(--mv-slot-fill);
+}
+.mv2-cell.mv2-slot-outcome.hollow-outcome { background: transparent; }
 .mv2-lane-value {
   padding: 11px 16px; text-align: right;
   color: var(--t-secondary); font: 400 11px/1.4 var(--mono);
@@ -1896,7 +1916,7 @@ b.muted, .mv2-lane-value.muted { color: var(--t-label); }
    qualifier is CSS rather than JS because the decision renderer rewrites this section's
    nodes after the staleness is computed, and a text edit there loses that race every time. */
 .decision-section.runner-stale .section-heading h2::after {
-  content: " — legacy route, retired"; color: var(--mv-dim, #8b929c); font-weight: 400;
+  content: " — retired route"; color: var(--mv-dim, #8b929c); font-weight: 400;
   font-size: 0.82em; letter-spacing: 0.01em; }
 
 
