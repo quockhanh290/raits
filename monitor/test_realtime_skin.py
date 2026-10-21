@@ -298,6 +298,11 @@ def test_ipad_gets_a_custom_default_but_keeps_an_explicit_choice(skin_server, sk
     stub_api(skin_page)
     open_realtime(skin_page, skin_server)
     assert skin_page.locator("html").get_attribute("data-font") == "ibm-plex"
+    assert skin_page.locator("html").get_attribute("data-device") == "ipad"
+    assert "IBM Plex Sans" in skin_page.locator("body").evaluate(
+        "node => getComputedStyle(node).fontFamily"
+    )
+    assert skin_page.evaluate("document.fonts.check('14px \\\"IBM Plex Sans\\\"')")
 
     skin_page.evaluate("localStorage.setItem('raits-dashboard-font', 'jetbrains')")
     skin_page.reload(wait_until="domcontentloaded")

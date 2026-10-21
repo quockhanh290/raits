@@ -106,3 +106,10 @@
   --muted:       #a8b1c0;
   --dim:         #798394;
 }
+
+/* Segoe UI is not present on iPadOS, so the normal language stack above falls
+   through to Apple's system face. Use the bundled sans face only on iPad; the
+   desktop typography and the user's data-font choice remain unchanged. */
+html[data-device="ipad"] {
+  --sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+}

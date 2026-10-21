@@ -22,6 +22,7 @@
      an explicit choice in localStorage still wins on every platform. */
   const isIPad = /\biPad\b/.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (isIPad) document.documentElement.dataset.device = 'ipad';
   const platformDefault = isIPad ? 'ibm-plex' : 'cascadia';
   let saved = platformDefault;
   try { saved = localStorage.getItem(FONT_KEY) || saved; } catch (_) { /* tuỳ trình duyệt */ }
