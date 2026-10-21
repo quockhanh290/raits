@@ -495,7 +495,7 @@ def _parse_iso(value: str | None) -> dt.datetime | None:
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
-def _warm_paper_evidence() -> None:
+def _warm_paper_evidence(*, after: "threading.Event | None" = None) -> None:
     """Build the paper-evidence cache off the request path, in the background.
 
     The first request after a restart scans every scheduler/live-day log to rebuild this
@@ -522,6 +522,12 @@ def _warm_paper_evidence() -> None:
     def _run() -> None:
         from monitor.backend.paper_evidence_reader import read_paper_evidence
 
+        # Track 1 drives the realtime landing page. Let its much smaller history warm-up
+        # finish before this reader starts scanning the ~115 MB paper evidence tree; running
+        # both together made the first Track 1 build take 24.8s instead of 10.2s.
+        if after is not None:
+            after.wait(timeout=90)
+
         # Bounded wait. If IBKR never connects the specs stay empty, which is itself a
         # stable key -- warm that one rather than never warming at all.
         deadline = time.monotonic() + 120
@@ -543,6 +549,30 @@ def _warm_paper_evidence() -> None:
     threading.Thread(target=_run, name="paper-evidence-warm", daemon=True).start()
 
 
+def _warm_track1_runtime() -> "threading.Event":
+    """Populate the expensive Track 1 history snapshot before a browser asks for it."""
+    import threading
+    import time
+
+    ready = threading.Event()
+
+    def _run() -> None:
+        from monitor.backend.track1_runtime_reader import read_track1_runtime
+
+        started = time.monotonic()
+        try:
+            read_track1_runtime(ROOT)
+        except Exception as exc:
+            logger.warning("track1-runtime warm-up failed (%s) — the next request retries", exc)
+        else:
+            logger.info("track1-runtime cache warm in %.1fs", time.monotonic() - started)
+        finally:
+            ready.set()
+
+    threading.Thread(target=_run, name="track1-runtime-warm", daemon=True).start()
+    return ready
+
+
 def main():
     ap = argparse.ArgumentParser(description="RAITS IBKR monitor backend")
     ap.add_argument("--ibkr-port", type=int, default=4002,  help="IBKR Gateway port (paper=4002)")
@@ -555,7 +585,8 @@ def main():
     logger.info(f"Starting IBKR reader: Gateway port={a.ibkr_port}, client_id={a.client_id}")
     ibkr_reader.start(port=a.ibkr_port, client_id=a.client_id, poll_interval=a.poll)
 
-    _warm_paper_evidence()
+    track1_ready = _warm_track1_runtime()
+    _warm_paper_evidence(after=track1_ready)
 
     logger.info(f"Starting Flask on http://127.0.0.1:{a.api_port}")
     logger.info("Endpoints: /api/all  /api/account  /api/positions  /api/orders  /api/connection")

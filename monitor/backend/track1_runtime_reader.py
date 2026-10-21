@@ -25,9 +25,12 @@ than failing or inventing an empty book.
 """
 from __future__ import annotations
 
+import copy
 import json
 import statistics
 import datetime as _dt
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +44,22 @@ SHADOW_DIR = "global_index/track1_runtime/shadow"
 #: Stage 5Q — where the post-window audit writes its verdicts. Read here, never written:
 #: this module is the dashboard's eye and an eye that can edit the record is not evidence.
 AUDITS_DIR = "global_index/track1_runtime/audits"
+
+# These three summaries are append-only historical evidence, and together they used to
+# dominate every realtime poll. Measured on the production tree: explanations ~5.1s,
+# audits ~3.5s, coverage ~0.95s. Keep the current snapshot hot and rebuild an expired one
+# in the background; broker state, positions, gates and today's signals below are still read
+# on every request. A two-minute lag in aggregate history is acceptable because live state
+# comes from the uncached blocks; it also avoids spending 10 seconds of disk I/O every 30s.
+_HISTORY_TTL_SECONDS = 120.0
+_history_cache: dict[str, dict[str, Any]] = {}
+_history_cache_lock = threading.Lock()
+
+
+def invalidate_history_cache() -> None:
+    """Clear the aggregate-history cache (tests and explicit operational refreshes)."""
+    with _history_cache_lock:
+        _history_cache.clear()
 
 #: The sleeves an audit is expected to cover, from the SAME window table the gate and the
 #: slot registry read, so "not audited yet" cannot silently shrink when a sleeve is added.
@@ -967,6 +986,80 @@ def _reporting(root: Path) -> dict:
                 "reading": "the Track 1 reporting reader failed; failing closed"}
 
 
+def _build_history(root: Path) -> dict[str, dict]:
+    """Build the expensive, append-only summaries as one coherent snapshot."""
+    return {
+        "window_coverage": _coverage(root),
+        "explanations": _explanations(root),
+        "audits": _audits(root),
+    }
+
+
+def _refresh_history(key: str, root: Path) -> None:
+    """Replace one cached history snapshot; retain the last good value on failure."""
+    try:
+        value = _build_history(root)
+    except Exception as exc:  # noqa: BLE001 — stale evidence is safer than a broken endpoint
+        with _history_cache_lock:
+            entry = _history_cache.get(key)
+            if entry is not None:
+                entry["refreshing"] = False
+                entry["error"] = f"{type(exc).__name__}: {exc}"
+                entry["ready"].set()
+        return
+    with _history_cache_lock:
+        entry = _history_cache.setdefault(key, {"ready": threading.Event()})
+        entry.update(value=value, at=time.monotonic(), refreshing=False, error=None)
+        entry["ready"].set()
+        # Tests create many unique temporary roots. Bound the process cache without
+        # evicting the snapshot just built.
+        while len(_history_cache) > 8:
+            oldest = min((k for k in _history_cache if k != key),
+                         key=lambda k: _history_cache[k].get("at", 0), default=None)
+            if oldest is None:
+                break
+            _history_cache.pop(oldest, None)
+
+
+def _history(root: Path) -> dict[str, dict]:
+    """Return history immediately when warm, refreshing expired data off-request."""
+    key = str(root.resolve())
+    now = time.monotonic()
+    build_here = False
+    wait_for: threading.Event | None = None
+    with _history_cache_lock:
+        entry = _history_cache.get(key)
+        if entry and entry.get("value") is not None:
+            value = copy.deepcopy(entry["value"])
+            if now - entry.get("at", 0) >= _HISTORY_TTL_SECONDS and not entry.get("refreshing"):
+                entry["refreshing"] = True
+                entry["ready"].clear()
+                threading.Thread(target=_refresh_history, args=(key, root),
+                                 name="track1-history-refresh", daemon=True).start()
+            return value
+        if entry and entry.get("refreshing"):
+            wait_for = entry["ready"]
+        else:
+            wait_for = threading.Event()
+            _history_cache[key] = {"value": None, "at": 0.0, "refreshing": True,
+                                   "ready": wait_for, "error": None}
+            build_here = True
+
+    if build_here:
+        _refresh_history(key, root)
+    else:
+        # A startup warm-up may already own the cold scan. Do not duplicate thousands of
+        # file reads; wait for that one coherent snapshot instead.
+        wait_for.wait(timeout=60.0)
+
+    with _history_cache_lock:
+        entry = _history_cache.get(key) or {}
+        if entry.get("value") is not None:
+            return copy.deepcopy(entry["value"])
+        error = entry.get("error") or "history warm-up did not finish within 60 seconds"
+    raise RuntimeError(error)
+
+
 def read_track1_runtime(root: str | Path = ".") -> dict:
     """Everything the dashboard needs to describe the Track 1 route, from Track 1 paths only.
 
@@ -974,6 +1067,7 @@ def read_track1_runtime(root: str | Path = ".") -> dict:
     default. Read-only in every branch.
     """
     root = Path(root)
+    history = _history(root)
     return {
         "source": "track1_runtime",
         "route": ROUTE,
@@ -981,10 +1075,10 @@ def read_track1_runtime(root: str | Path = ".") -> dict:
         # Added 2026-09-24: the journal is the only record that an order reached the broker.
         "orders": _orders(root),
         "checkpoint": _checkpoint(root),
-        "window_coverage": _coverage(root),
+        "window_coverage": history["window_coverage"],
         "slot_timing": _timing(root),
-        "explanations": _explanations(root),
-        "audits": _audits(root),
+        "explanations": history["explanations"],
+        "audits": history["audits"],
         "gates": _gates(),
         "breaker": _breaker(root),
         "safety": _safety(),

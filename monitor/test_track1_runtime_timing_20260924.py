@@ -18,6 +18,7 @@ copy saved before the change (20 days, 1,178 rows). The next hot spot is `attrib
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import monitor.backend.track1_runtime_reader as rr
@@ -76,3 +77,37 @@ def test_the_resolver_is_called_once_per_request_not_once_per_day(tmp_path, monk
                         lambda root, day="", **k: calls.append(day) or real(root, day, **k))
     rr._explanations(tmp_path)
     assert calls == [""], f"the tree was walked {len(calls)} times: {calls}"
+
+
+def test_history_cache_returns_stale_snapshot_while_refreshing(tmp_path, monkeypatch):
+    """An expired history snapshot must never put its multi-second scan on the poll path."""
+    rr.invalidate_history_cache()
+    calls = []
+
+    def build(_root):
+        calls.append(len(calls) + 1)
+        time.sleep(0.05)
+        return {"window_coverage": {"generation": calls[-1]},
+                "explanations": {}, "audits": {}}
+
+    monkeypatch.setattr(rr, "_build_history", build)
+    monkeypatch.setattr(rr, "_HISTORY_TTL_SECONDS", 0.01)
+    assert rr._history(tmp_path)["window_coverage"]["generation"] == 1
+
+    time.sleep(0.02)
+    started = time.perf_counter()
+    stale = rr._history(tmp_path)
+    elapsed = time.perf_counter() - started
+    assert stale["window_coverage"]["generation"] == 1
+    assert elapsed < 0.04, f"stale read blocked for {elapsed:.3f}s"
+
+    deadline = time.monotonic() + 1
+    while len(calls) < 2 and time.monotonic() < deadline:
+        time.sleep(0.01)
+    while time.monotonic() < deadline:
+        with rr._history_cache_lock:
+            if not rr._history_cache[str(tmp_path.resolve())]["refreshing"]:
+                break
+        time.sleep(0.01)
+    assert rr._history(tmp_path)["window_coverage"]["generation"] == 2
+    rr.invalidate_history_cache()

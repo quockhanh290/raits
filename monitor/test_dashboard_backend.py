@@ -3298,6 +3298,20 @@ def test_static_dashboard_is_served():
     assert client.post("/api/v1/broker").status_code == 405
 
 
+def test_realtime_header_hides_secondary_modules_but_routes_still_exist():
+    """Navigation is intentionally realtime-only; direct diagnostic routes remain valid."""
+    client = app.test_client()
+    for page in (DASH / "realtime" / "index.html", DASH / "realtime-next" / "index.html"):
+        html = page.read_text(encoding="utf-8")
+        nav = re.search(r'<nav class="module-nav"[^>]*>(.*?)</nav>', html, re.S)
+        assert nav, f"{page} has no module navigation"
+        nav_html = nav.group(1)
+        assert 'href="/realtime"' in nav_html
+        for hidden_route in ("/analytics", "/paper", "/reports"):
+            assert f'href="{hidden_route}"' not in nav_html
+            assert client.get(hidden_route).status_code == 200
+
+
 def test_header_clock_declares_four_iana_zones():
     """A mistyped IANA zone makes Intl.DateTimeFormat throw RangeError, and that kills the
     whole header render — not just the clock. Nothing else catches it before a browser."""
