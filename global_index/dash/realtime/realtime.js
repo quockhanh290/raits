@@ -20,7 +20,9 @@
     if ($('fontSelector')) $('fontSelector').value = font;
     return font;
   };
-  let savedFont = 'cascadia';
+  // font-pref.js sets an iPad-specific first default before CSS paints. A saved
+  // user choice still wins here and remains portable across dashboard modules.
+  let savedFont = document.documentElement.dataset.font || 'cascadia';
   try { savedFont = localStorage.getItem(FONT_KEY) || savedFont; } catch (_) { /* Browser storage is optional. */ }
   applyFont(savedFont);
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({

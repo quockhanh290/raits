@@ -8,6 +8,9 @@
        time any stylesheet asks for them. Served from this host: the page still
        contains no external URL, which the backend tests assert. -->
   <link rel="stylesheet" href="/dash/fonts/fonts.css">
+  <!-- Runs before the base stylesheet so iPad gets its device default on the
+       first paint; a font explicitly chosen earlier still wins. -->
+  <script src="/dash/shared/font-pref.js"></script>
   <link rel="stylesheet" href="/dash/realtime/realtime.css">
   <!-- Bảng màu và họ chữ dùng chung. Phải nằm SAU realtime.css: nửa dưới của nó
        khai lại chính token của bảng nền, nạp trước thì không có tác dụng gì. -->

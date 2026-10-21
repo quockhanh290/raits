@@ -8,6 +8,9 @@
        external URL — the rule the backend tests assert. Loaded before the base so
        the families exist by the time any stylesheet asks for them. -->
   <link rel="stylesheet" href="/dash/fonts/fonts.css">
+  <!-- Runs before the base stylesheet so iPad gets its device default on the
+       first paint; a font explicitly chosen earlier still wins. -->
+  <script src="/dash/shared/font-pref.js"></script>
   <!-- SHARED base with /realtime. Not duplicated: all five pages load this file,
        so a copy would become a second version that drifts from the original. -->
   <link rel="stylesheet" href="/dash/realtime/realtime.css">

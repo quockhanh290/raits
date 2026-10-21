@@ -289,6 +289,21 @@ def test_the_font_control_actually_changes_the_font(skin_server, skin_page):
         f"thứ đang vẽ: {rendered}")
 
 
+def test_ipad_gets_a_custom_default_but_keeps_an_explicit_choice(skin_server, skin_page):
+    """Desktop-site mode reports MacIntel on iPad, so test both that signal and touch."""
+    skin_page.add_init_script("""
+      Object.defineProperty(navigator, 'platform', { get: () => 'MacIntel' });
+      Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 5 });
+    """)
+    stub_api(skin_page)
+    open_realtime(skin_page, skin_server)
+    assert skin_page.locator("html").get_attribute("data-font") == "ibm-plex"
+
+    skin_page.evaluate("localStorage.setItem('raits-dashboard-font', 'jetbrains')")
+    skin_page.reload(wait_until="domcontentloaded")
+    assert skin_page.locator("html").get_attribute("data-font") == "jetbrains"
+
+
 def test_no_card_sits_inside_a_card_inside_a_card(skin_server, skin_page):
     """Đo được 2026-08-16: 13 chỗ lồng thẻ, và bộ dò đầu tiên bỏ sót một nửa.
 
