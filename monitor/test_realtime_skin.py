@@ -309,13 +309,18 @@ def test_ipad_gets_a_custom_default_but_keeps_an_explicit_choice(skin_server, sk
     open_realtime(skin_page, skin_server)
     assert skin_page.locator("html").get_attribute("data-font") == "ibm-plex"
     assert skin_page.locator("html").get_attribute("data-device") == "ipad"
-    assert "IBM Plex Sans" in skin_page.locator("body").evaluate(
+    assert "Cabin" in skin_page.locator("body").evaluate(
         "node => getComputedStyle(node).fontFamily"
     )
-    assert skin_page.evaluate("document.fonts.check('14px \\\"IBM Plex Sans\\\"')")
+    loaded_cabin = skin_page.evaluate("""async () => {
+      const sample = 'Impact action Ảnh hưởng và hành động';
+      const faces = await document.fonts.load('14px Cabin', sample);
+      return faces.length > 0 && document.fonts.check('14px Cabin', sample);
+    }""")
+    assert loaded_cabin
     issue_prose = skin_page.locator("#openIssueDetail .issue-assessment p")
     assert issue_prose.count() == 2
-    assert all("IBM Plex Sans" in family for family in issue_prose.evaluate_all(
+    assert all("Cabin" in family for family in issue_prose.evaluate_all(
         "nodes => nodes.map(node => getComputedStyle(node).fontFamily)"
     ))
     fallback_text = skin_page.evaluate("""() => {
@@ -327,7 +332,7 @@ def test_ipad_gets_a_custom_default_but_keeps_an_explicit_choice(skin_server, sk
         const box = node.getBoundingClientRect();
         if (style.display === 'none' || style.visibility === 'hidden'
             || box.width < 1 || box.height < 1) continue;
-        if (!style.fontFamily.includes('IBM Plex Sans')
+        if (!style.fontFamily.includes('Cabin')
             && !style.fontFamily.includes('IBM Plex Mono')) {
           misses.push({
             tag: node.tagName,
