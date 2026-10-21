@@ -429,6 +429,75 @@ def detect_setup_before_entry(df1m: pd.DataFrame, regime, inst: str, day,
         open_loc_prev_range=(float(rth_open) - float(sessions.loc[prev]["low"])) / feats["rng"])
 
 
+#: The bar whose CLOSE the 10:00 paper order is planned against. 2026-10-05.
+#:
+#: Paper does not read the 10:00 OPEN, it transacts at it: the order is a market order sent at
+#: 10:00:00, and a one-minute bar stamped 10:00 does not close until 10:01:00 (see
+#: `CalmExecutionContract`). The slot used to demand that bar anyway, so it refused
+#: `entry_quote_absent` at 10:00:00 on both days it ran (2026-10-02, 2026-10-05) — the gate
+#: asked for a price that cannot exist at the instant the order is meant to go.
+#:
+#: What the order DOES need before it leaves is a reference for the planned stop and the risk
+#: the cap gate reads, and the last CLOSED bar is the honest one: the 09:59 bar closed at
+#: 10:00:00. Measured over 433 setups (2018-2026): |10:00 open - 09:59 close| has median 1 tick,
+#: p90 2 ticks, signed mean ~$0.1 per contract, against a disaster stop 1.5 daily ATRs away.
+#: The reference only places the stop; the FILL is whatever the market order gets, and OBSERVE
+#: still records the 10:00 open next to it so the difference stays measured.
+PAPER_ENTRY_REFERENCE_BAR = "09:59"
+
+
+def detect_paper_entry_for_day(df1m: pd.DataFrame, regime, inst: str, day,
+                               params: CalmAParams | None = None,
+                               *, observer=None) -> "CalmSetup | None":
+    """Does `day` set up, with the entry PLANNED against the last closed bar before 10:00?
+
+    The rule is `detect_setup_before_entry` unchanged — same regime, same three price
+    conditions — and only the price differs: `entry` is the CLOSE of the `09:59` bar, not the
+    OPEN of the `10:00` one. `entry_time` is the instant the order is meant to go (10:00 on
+    `day`, carried on the frame's own clock) rather than the stamp of a bar, because no 10:00
+    bar need exist when this runs and `Track1Book` judges a candidate's entry stamp against the
+    sleeve window (10:00-10:00).
+
+    `None` when the day does not set up, the prior session is missing, or the reference bar is
+    absent — never a neighbouring bar's price.
+    """
+    pre = detect_setup_before_entry(df1m, regime, inst, day, params, observer=observer)
+    if pre is None:
+        return None
+
+    p = params or CalmAParams()
+    idx = _naive(df1m.index)
+    want = pre.day + pd.Timedelta(hours=int(PAPER_ENTRY_REFERENCE_BAR[:2]),
+                                  minutes=int(PAPER_ENTRY_REFERENCE_BAR[3:]))
+    pos = int(idx.get_indexer([want])[0])
+    ref = float(df1m["close"].iloc[pos]) if pos >= 0 else None
+    if observer is not None:
+        try:
+            observer({"kind": "gate", "gate": "entry_time_valid",
+                      "passed": ref is not None and bool(np.isfinite(ref)) and ref > 0,
+                      "value": str(df1m.index[pos]) if pos >= 0 else None,
+                      "threshold": {"entry_time": p.entry_time,
+                                    "reference_bar_close": PAPER_ENTRY_REFERENCE_BAR},
+                      "comparator": "=="})
+        except Exception:                                      # noqa: BLE001
+            pass
+    if ref is None or not np.isfinite(ref) or ref <= 0:
+        return None
+
+    order_ts = pd.Timestamp(pre.day + pd.Timedelta(hours=int(p.entry_time[:2]),
+                                                   minutes=int(p.entry_time[3:])))
+    tz = getattr(df1m.index, "tz", None)
+    if tz is not None:
+        order_ts = order_ts.tz_localize(tz)
+    return CalmSetup(
+        day=pre.day, inst=pre.inst, direction=pre.direction,
+        signal_time=pre.signal_time, entry_time=order_ts, exit_time=None,
+        entry=ref, exit=float("nan"), prev_session_day=pre.prev_session_day,
+        gap_from_prev_rth_close=pre.gap_from_prev_rth_close,
+        prev_close_loc=pre.prev_close_loc, prev_rth_ret=pre.prev_rth_ret,
+        open_loc_prev_range=pre.open_loc_prev_range)
+
+
 def disaster_stop(entry: float, atr: float, params: CalmAParams | None = None) -> float:
     """The Calm A disaster stop: `entry - mult x ATR`, LONG only.
 
@@ -508,10 +577,16 @@ class CalmExecutionContract:
     #: wait for it, because paper transacts at the open rather than reading it.
     entry_reference_readable_from: str = "10:01"
     exit_reference_time: str = "15:55"
+    #: The CLOSED bar the paper order's stop and risk are planned against. It must have closed
+    #: by the instant the order is sent, which is the whole reason it is not the 10:00 bar.
+    paper_entry_reference_bar: str = PAPER_ENTRY_REFERENCE_BAR
 
     def self_check(self) -> list:
         """Structural rules. Returned as a list so a test can assert []."""
         errs = []
+        if not (self.paper_entry_reference_bar < self.order_sent_at):
+            errs.append("the paper entry reference bar must be stamped BEFORE the order is "
+                        "sent: a bar stamped at or after the send instant has not closed")
         if not (self.setup_known_from < self.intent_journalled_by
                 <= self.order_sent_at):
             errs.append("the setup must be known before the intent is journalled, and the "

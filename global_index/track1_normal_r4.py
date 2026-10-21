@@ -719,7 +719,7 @@ def detect_entry_for_slot(df: pd.DataFrame, labels, inst: str, day, now, params:
     if stop is None or not np.isfinite(float(stop)):
         return None
     return SwingSetup(inst=inst, direction=str(sig["direction"]), entry=entry,
-                      stop=float(stop), entry_time=str(pd.Timestamp(bar_ts).time())[:5],
+                      stop=float(stop), entry_time=str(pd.Timestamp(bar_ts)),
                       signal_bar=bar_ts, daily_atr=da, regime=str(regime))
 
 

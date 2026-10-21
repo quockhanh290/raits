@@ -29,7 +29,8 @@ def _parse(path: Path) -> dict[str, Any]:
         positions.append({
             key: row.get(key) for key in (
                 "inst", "direction", "contracts", "cluster", "entry_day",
-                "entry_price", "stop_price", "stop_order_id",
+                "instrument", "qty", "sleeve", "entry_time",
+                "entry_price", "risk_dollars", "stop_price", "stop_order_id",
                 # Which contract month the book thinks it holds. This projection is an
                 # allow-list, so a key not named here is dropped — recording the month
                 # in the file and then hiding it from the only page that shows positions

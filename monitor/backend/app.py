@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import logging
 from pathlib import Path
 
@@ -30,7 +31,7 @@ from flask import Flask, abort, jsonify, redirect, send_from_directory
 from monitor.backend import ibkr_reader
 from monitor.backend.entry_time_reader import annotate_open_positions, read_entry_times
 from monitor.backend.report_reader import read_report
-from monitor.backend.runner_state_reader import read_runner_state
+from monitor.backend.runner_state_reader import declare_provenance, read_runner_state
 from monitor.backend.runner_event_reader import read_runner_events
 from monitor.backend.runner_positions_reader import read_runner_positions
 from monitor.backend.schedule_status import get_schedule_status, resolve_track1_only
@@ -190,7 +191,17 @@ def favicon():
 
 @app.get("/live_state_data.js")
 def legacy_live_state_asset():
-    return send_from_directory(LIVE_STATE_PATH.parent, LIVE_STATE_PATH.name)
+    # Three pages (phone, terminal, chart-forward) load this file raw and render every field as
+    # the present — "Runner alive", the broker equity, the breaker. The file itself is left
+    # byte for byte what the legacy runner wrote; what is added is a second assignment saying
+    # how old it is, so the pages can refuse to present it as current. Built from the same
+    # envelope the JSON endpoint stamps, so the two can never disagree about staleness.
+    response = send_from_directory(LIVE_STATE_PATH.parent, LIVE_STATE_PATH.name)
+    prov = declare_provenance(read_runner_state(LIVE_STATE_PATH))["provenance"]
+    response.direct_passthrough = False
+    body = response.get_data(as_text=True)
+    response.set_data(body + "\nwindow.LIVE_DATA_PROVENANCE = " + json.dumps(prov) + ";\n")
+    return response
 
 
 @app.get("/replay_snapshots_data.js")
@@ -315,6 +326,15 @@ def api_v1_runner_state():
                                    track1_only=resolve_track1_only())
     state["freshness"] = schedule["freshness"]
     state["expected_next_at"] = schedule["expected_next_at"]
+    # The stamp walks the whole response, so a block added above this line is labelled and one
+    # added below it would not be.
+    state = declare_provenance(state)
+    # 2026-09-26 legacy dashboard removal. `payload` is Track 1's, built from Track 1 sources
+    # only. The retired route's last snapshot is no longer served as a named fallback: every
+    # absent Track 1 value must say absent, not borrow a value from the stopped route.
+    from monitor.backend.track1_meta_reader import build as _t1_meta
+    state.pop("payload", None)
+    state.update(_t1_meta(ROOT, ibkr_cache=ibkr_reader.get_cache()))
     return jsonify(state)
 
 
@@ -349,17 +369,49 @@ def api_v1_track1_market_view():
                     "requested_instrument": inst or None})
 
 
+def _utc_z(value):
+    parsed = _parse_iso(value) if value else None
+    if parsed is None:
+        return value
+    if parsed.tzinfo is None:
+        return value                       # an unzoned stamp is not converted by guesswork
+    return parsed.astimezone(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 @app.get("/api/v1/runner-positions")
 def api_v1_runner_positions():
     # Stage 5P: labelled at the SOURCE. This is the LEGACY route's book — during a Track 1
     # shadow period it is the draining legacy state, and a panel that presented it as "the
     # system's positions" would be presenting the wrong route. Track 1's own state is served
     # by /api/v1/track1-runtime, which reads only Track 1 paths.
-    payload = read_runner_positions(RUNNER_POSITIONS_PATH)
-    payload["route"] = "legacy"
-    payload["route_note"] = ("legacy book (draining during Track 1 shadow); Track 1 state "
-                             "is at /api/v1/track1-runtime")
-    return jsonify(payload)
+    # Stage 2026-09-24. This served the LEGACY book, labelled, with a note pointing elsewhere
+    # for Track 1. The label was honest and the panel was unusable: on the first armed day it
+    # answered `positions=[]` with `observed_at=2026-09-04` while the broker held two contracts
+    # — a twenty-day-old snapshot of a book nothing writes, because legacy retired 2026-08-27.
+    #
+    # Legacy is not served here at all any more, on the operator's instruction and because the
+    # measurement agrees: retired means retired, and a panel with two answers to "what do I
+    # hold" will be read by whichever one is in `payload.positions`. There is one book now.
+    #
+    # Legacy's own state has not vanished — the drain still runs and `live_positions.json` is
+    # still on disk for anyone auditing it. It is simply not what a positions panel answers.
+    from monitor.backend.track1_runtime_reader import _book as _t1_book
+    _b = _t1_book(ROOT)
+    _inner = (_b.get("payload") or {}) if _b.get("present") else {}
+    return jsonify({
+        "error": None,
+        "route": "track1_candidate",
+        "route_note": "the only route that trades on this login; legacy is retired",
+        "source": "live_positions.track1.json",
+        # The endpoint contract is UTC `...Z`; the book stamps its cut in ET with an offset
+        # ("2026-09-24T15:55:01.326128-04:00"). Same instant, restated — the contract test had
+        # been red on exactly this since the endpoint moved to Track 1's book.
+        "observed_at": _utc_z(_inner.get("cut_instant")),
+        "payload": {"positions": _inner.get("positions") or [],
+                    "schema_version": _inner.get("schema_version")},
+        "present": bool(_b.get("present")),
+        "reading": _b.get("reading"),
+    })
 
 
 @app.get("/api/v1/track1-runtime")
@@ -402,7 +454,7 @@ def api_v1_open_issues():
 
 @app.get("/api/v1/paper-evidence")
 def api_v1_paper_evidence():
-    return jsonify(read_paper_evidence(ROOT))
+    return jsonify(read_paper_evidence(ROOT, route="track1_candidate"))
 
 
 @app.get("/api/v1/execution-quality/<day>")

@@ -1,0 +1,107 @@
+{
+  "spec_id": "stocks_all_results_sleeve_grid_v1_2026-09-24",
+  "frozen_before_grid_performance": true,
+  "adaptive_search_disclosure": "This is a deliberately adaptive meta-search over already measured 2018-2024 research ledgers. It can identify a useful combination diagnostic but cannot create pristine OOS evidence or a production PASS.",
+  "objective": "Test whether independently generated broad-PIT, factor, event, pair, and SEC sleeve return streams combine into a more stable static-weight portfolio.",
+  "samples": {
+    "development": ["2018-04-27", "2022-12-30"],
+    "validation": ["2023-01-03", "2024-12-31"],
+    "calendar": "broad_pit_equal_weight dates from STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv",
+    "oos_2025_2026": "PROHIBITED"
+  },
+  "source_files": [
+    "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_OVERNIGHT_0935_XS_DIAGNOSTIC_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_GAP_EVENT_SAFE_DIAGNOSTIC_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_MCAP_MOMENTUM_MONTHLY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_MCAP_MOMENTUM_MONTHLY_LONGSHORT_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_MCAP_QUALITY_LOWVOL_MONTHLY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_LARGECAP_NEXTDAY_SELECTION_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_LARGECAP_WEEKLY_SELECTION_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_SIC_NEUTRAL_LONGSHORT_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_WASHOUT_REBOUND_PULSE_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_LARGECAP_INTRADAY_0935_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_OVERNIGHT_DAYTIME_DECOMP_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_MEGACAP_RELATIVE_SPREAD_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_CALENDAR_RELATIVE_SPREAD_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_TURN_OF_MONTH_COSTAWARE_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_GAP_MULTIDAY_REBOUND_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_DEFENSIVE_LARGECAP_MONTHLY_2026-09-15_DAILY.csv",
+    "STOCKS_PIT_FULL_TREND_DEFENSIVE_MONTHLY_2026-09-15_DAILY.csv",
+    "STOCKS_PIT_FULL_LOWBETA_MONTHLY_2026-09-15_DAILY.csv",
+    "STOCKS_PIT_FULL_SECTOR_NEUTRAL_FACTOR_2026-09-15_DAILY.csv",
+    "STOCKS_PIT_FULL_WFO_ML_RANKER_WEEKLY_2026-09-15_DAILY.csv",
+    "STOCKS_PIT_FULL_0935_EVENT_SHOCK_COHORTS_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_WFO_0935_WEEKLY_RANKER_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_REVERSAL_COHORTS_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_CRISIS_SLEEVE_2026-09-17_DAILY.csv",
+    "STOCKS_SEC_8K202_EVENT_DRIFT_DEV_2026-09-17_DAILY.csv",
+    "STOCKS_SEC_MATERIAL_EVENT_REACTION_DEV_2026-09-17_DAILY.csv",
+    "STOCKS_SEC_OWNERSHIP_INSIDER_REACTION_DEV_2026-09-17_DAILY.csv",
+    "STOCKS_SEC_FORM4_TRANSACTION_REACTION_DEV_2026-09-18_DAILY.csv",
+    "STOCKS_SEC_FORM4_PURCHASE_DRIFT_DEV_2026-09-24_DAILY.csv",
+    "STOCKS_SEC_FORM4_ROLE_PURCHASE_DRIFT_DEV_2026-09-24_DAILY.csv",
+    "STOCKS_SEC_13D_SICPAIR_DRIFT_DEV_2026-09-24_DAILY.csv"
+  ],
+  "source_exclusions": [
+    "Every filename containing OOS, INVALID, or POLYGON62",
+    "Composite portfolios and post-result risk-layer, hedge, leverage, circuit-breaker, allocator, and ensemble scans",
+    "Files without a daily PnL/equity return stream",
+    "Cost-stress variants ending in _cost8; cost4 is the comparable SEC base path",
+    "Any scenario with less than 95% development calendar coverage"
+  ],
+  "daily_return_contract": "For each scenario use daily_pnl divided by prior equity (equity minus daily_pnl). Existing source transaction costs, borrow, financing, and causal compounding remain embedded. Missing dates are zero only after the 95% coverage gate.",
+  "family_representative_selection": {
+    "development_only": true,
+    "eligibility": {
+      "cagr_min": 0.0,
+      "sharpe_min": 0.2,
+      "positive_years_min": 3,
+      "dd_pct_floor": -0.25,
+      "coverage_min": 0.95
+    },
+    "rank": "Higher development Sharpe, then CAGR, then less severe DD, then scenario name",
+    "one_per_source_file": true,
+    "cross_family_dedup": "In rank order, drop a representative with absolute development correlation >=0.97 to an already retained representative",
+    "pool_cap": 12
+  },
+  "grid": {
+    "weights": [0.0, 0.25, 0.5, 0.75, 1.0],
+    "sum_weights": 1.0,
+    "weights_nonnegative": true,
+    "max_nonzero_sleeves": 4,
+    "leverage": "None beyond leverage already embedded in each source return stream",
+    "rebalance": "Static weights applied to daily net return streams; no turnover netting benefit is credited"
+  },
+  "combination_selection": {
+    "development_gates": {
+      "cagr_min": 0.05,
+      "sharpe_min": 0.6,
+      "positive_years_min": 4,
+      "dd_pct_floor": -0.15
+    },
+    "rank": "Higher development Sharpe, then CAGR, then less severe DD, then canonical weight string",
+    "validation_gates": {
+      "pnl_positive": true,
+      "both_years_positive": true,
+      "sharpe_min": 0.4,
+      "dd_pct_floor": -0.12
+    }
+  },
+  "benchmarks": [
+    "broad_pit_equal_weight",
+    "spy_buy_hold"
+  ],
+  "audit_requirements": [
+    "Persist every source scenario metric and rejection reason, retained representatives, development correlation matrix, every grid row, selected daily path, yearly results, source attribution, and manifest with hashes.",
+    "Report rule-selection effect separately from static trade-stream combination effect.",
+    "Report dollar and percentage DD, source weights, effective sleeve count, source PnL shares, and the absence of a shared ticker-level refill replay.",
+    "Even a validation pass is CONTINUE_DIAGNOSTIC only because all source research and 2023-2024 have been touched."
+  ],
+  "implementation_freeze": {
+    "performance_not_yet_run": true,
+    "script": "raits/research/stocks_all_results_sleeve_grid.py",
+    "script_hash": "6586DBB4987CC742968521698F9478D07EF910E1C263BEDF2120F77B995D38C7"
+  }
+}

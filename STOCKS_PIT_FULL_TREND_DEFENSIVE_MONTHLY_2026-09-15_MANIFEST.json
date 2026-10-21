@@ -1,0 +1,74 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_TREND_DEFENSIVE_MONTHLY_2026-09-15",
+  "script": "raits/research/stocks_pit_full_trend_defensive_monthly.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv"
+  ],
+  "method": "Pre-registered monthly top500 trend-defensive selection: ret20_pre>0, ret60_pre>0, vol20_pre percentile cap, ranked by trend and low vol.",
+  "costs": "4.0 bps turnover; 2.5% annual financing above 1x for vol-target rows.",
+  "sample_label": "Research/touched 2018-2024 only; no 2025-2026 OOS opened.",
+  "leakage_controls": "Selection uses PIT market-cap top500 and lagged feature-cache fields only. No old manual 62 list.",
+  "rule_selection_effect": "None inside diagnostic. Six variants fixed before running.",
+  "variants": [
+    {
+      "variant": "top500_trend60_volcap60_top50_gross100",
+      "pool": 500,
+      "select_n": 50,
+      "vol_pct_max": 0.6,
+      "gross": 1.0,
+      "target_vol": null,
+      "cap": 1.0
+    },
+    {
+      "variant": "top500_trend60_volcap60_top100_gross100",
+      "pool": 500,
+      "select_n": 100,
+      "vol_pct_max": 0.6,
+      "gross": 1.0,
+      "target_vol": null,
+      "cap": 1.0
+    },
+    {
+      "variant": "top500_trend60_volcap40_top50_gross100",
+      "pool": 500,
+      "select_n": 50,
+      "vol_pct_max": 0.4,
+      "gross": 1.0,
+      "target_vol": null,
+      "cap": 1.0
+    },
+    {
+      "variant": "top500_trend60_volcap40_top100_gross100",
+      "pool": 500,
+      "select_n": 100,
+      "vol_pct_max": 0.4,
+      "gross": 1.0,
+      "target_vol": null,
+      "cap": 1.0
+    },
+    {
+      "variant": "top500_trend60_volcap60_top50_vt16_cap150",
+      "pool": 500,
+      "select_n": 50,
+      "vol_pct_max": 0.6,
+      "gross": 1.0,
+      "target_vol": 0.16,
+      "cap": 1.5
+    },
+    {
+      "variant": "top500_trend60_volcap40_top50_vt16_cap150",
+      "pool": 500,
+      "select_n": 50,
+      "vol_pct_max": 0.4,
+      "gross": 1.0,
+      "target_vol": 0.16,
+      "cap": 1.5
+    }
+  ],
+  "outputs": [
+    "STOCKS_PIT_FULL_TREND_DEFENSIVE_MONTHLY_2026-09-15_SUMMARY.csv",
+    "STOCKS_PIT_FULL_TREND_DEFENSIVE_MONTHLY_2026-09-15_YEARLY.csv",
+    "STOCKS_PIT_FULL_TREND_DEFENSIVE_MONTHLY_2026-09-15_DAILY.csv"
+  ]
+}

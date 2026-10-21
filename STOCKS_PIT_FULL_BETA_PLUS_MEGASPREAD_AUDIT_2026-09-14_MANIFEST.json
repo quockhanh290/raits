@@ -1,0 +1,27 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_AUDIT_2026-09-14",
+  "script": "raits/research/stocks_pit_full_beta_plus_megaspread_audit.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv",
+    "STOCKS_PIT_FULL_BETA_VOLTARGET_EXPANSION_2026-09-14_DAILY.csv"
+  ],
+  "sample_period": [
+    "2018-03-29",
+    "2024-12-31"
+  ],
+  "candidate": "spy_vt16_plus_top62_top200_spread3_constituent_audit",
+  "data_contract": "PIT clean daily feature cache provides close_1555/prev_close_1555 returns; Polygon market-cap snapshots provide PIT top62/top200 membership; SPY vt16 sleeve is the fixed stream generated in section 6.153.",
+  "leakage_controls": "No old manual 62 ticker list. No 2025-2026 data. Top-N membership uses as-of market-cap snapshots via backward merge onto trading dates. Candidate family was selected in section 6.170; this script audits only the leading fixed row.",
+  "costs": "Spread sleeve charges 4.0 bps per dollar of absolute target-weight change. No short borrow, financing, or SPY ETF trading costs are included.",
+  "rule_selection_effect": "No walk-forward or variant re-selection inside this audit. It isolates trade-selection/implementation effect versus the optimistic section 6.170 return-stream ensemble.",
+  "outputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_AUDIT_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_AUDIT_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_AUDIT_2026-09-14_SPLITS.csv",
+    "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_AUDIT_2026-09-14_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_AUDIT_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_AUDIT_2026-09-14_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_AUDIT_2026-09-14_QA.csv"
+  ]
+}

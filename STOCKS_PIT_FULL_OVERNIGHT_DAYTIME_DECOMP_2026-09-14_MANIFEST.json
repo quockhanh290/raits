@@ -1,0 +1,92 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_OVERNIGHT_DAYTIME_DECOMP_2026-09-14",
+  "script": "raits/research/stocks_pit_full_overnight_daytime_decomp.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv"
+  ],
+  "sample_period": [
+    "2018-03-29",
+    "2024-12-31"
+  ],
+  "universe": "PIT quarterly market-cap top62/top100/top500 stocks from broad PIT daily feature cache.",
+  "entry_exit": "Overnight earns date-t 15:55 close to next date 09:30 open; daytime earns same-date 09:30 open to 15:55 close.",
+  "leakage_controls": "Market-cap membership uses latest prior/equal snapshot; overnight return starts after date-t close.",
+  "variants": [
+    {
+      "variant": "top62_overnight_gross100",
+      "pool": 62,
+      "leg": "overnight",
+      "gross": 1.0,
+      "voltarget": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "top100_overnight_gross100",
+      "pool": 100,
+      "leg": "overnight",
+      "gross": 1.0,
+      "voltarget": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "top500_overnight_gross100",
+      "pool": 500,
+      "leg": "overnight",
+      "gross": 1.0,
+      "voltarget": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "top62_daytime_gross100",
+      "pool": 62,
+      "leg": "daytime",
+      "gross": 1.0,
+      "voltarget": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "top100_daytime_gross100",
+      "pool": 100,
+      "leg": "daytime",
+      "gross": 1.0,
+      "voltarget": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "top500_daytime_gross100",
+      "pool": 500,
+      "leg": "daytime",
+      "gross": 1.0,
+      "voltarget": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "top62_overnight_vt16_cap200",
+      "pool": 62,
+      "leg": "overnight",
+      "gross": 1.0,
+      "voltarget": 0.16,
+      "max_exposure": 2.0
+    },
+    {
+      "variant": "top62_overnight_vt25_cap300",
+      "pool": 62,
+      "leg": "overnight",
+      "gross": 1.0,
+      "voltarget": 0.25,
+      "max_exposure": 3.0
+    }
+  ],
+  "costs": "4.0 bps per side for each daily leg.",
+  "rule_selection": "None. Variant set fixed in VARIANTS before measuring.",
+  "old_62_usage": "None.",
+  "outputs": [
+    "STOCKS_PIT_FULL_OVERNIGHT_DAYTIME_DECOMP_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_OVERNIGHT_DAYTIME_DECOMP_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_OVERNIGHT_DAYTIME_DECOMP_2026-09-14_SPLITS.csv",
+    "STOCKS_PIT_FULL_OVERNIGHT_DAYTIME_DECOMP_2026-09-14_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_OVERNIGHT_DAYTIME_DECOMP_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_OVERNIGHT_DAYTIME_DECOMP_2026-09-14_TICKER_CONTRIB.csv"
+  ]
+}

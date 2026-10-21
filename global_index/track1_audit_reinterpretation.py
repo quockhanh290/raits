@@ -59,6 +59,13 @@ STALE_REASONS: dict = {
     ),
 }
 
+STALE_ORDER_DIRECTORY_DETAIL = "an order journal directory exists during a shadow period"
+STALE_ORDER_DIRECTORY_REASON = (
+    "The stored row mapped an existing orders directory to order_mark_present. A directory is "
+    "retained context after any legitimate order and can exist forever; current code treats "
+    "per-row order marks, TRACK1_ORDERS_APPROVED, and the gate registry as the order evidence."
+)
+
 #: Reasons a re-evaluation cannot honestly answer for a PAST day, because the evidence they read
 #: is a single live artefact with no history. Re-running the audit on such a day will report
 #: these whatever happened at the time.
@@ -93,6 +100,26 @@ def classify_reasons(reasons) -> dict[str, Any]:
         "solely_stale": bool(stale) and not standing,
         "why_stale": {r: STALE_REASONS[r] for r in stale},
     }
+
+
+def classify_record(record: dict[str, Any]) -> dict[str, Any]:
+    """Classify one stored audit row, including reason/detail pairs.
+
+    `order_mark_present` is still a live reason when a row carries an actual order mark or
+    when the approval environment was set. Only the old directory-exists detail is stale.
+    """
+    out = classify_reasons(record.get("reasons") or [])
+    details = [str(item) for item in (record.get("details") or [])]
+    if (acc.R_ORDER_MARK in out["standing_reasons"]
+            and any(STALE_ORDER_DIRECTORY_DETAIL in detail for detail in details)):
+        out["standing_reasons"] = [
+            reason for reason in out["standing_reasons"] if reason != acc.R_ORDER_MARK
+        ]
+        if acc.R_ORDER_MARK not in out["stale_reasons"]:
+            out["stale_reasons"].append(acc.R_ORDER_MARK)
+        out["why_stale"][acc.R_ORDER_MARK] = STALE_ORDER_DIRECTORY_REASON
+        out["solely_stale"] = bool(out["stale_reasons"]) and not out["standing_reasons"]
+    return out
 
 
 def reevaluation_authority(reasons) -> dict[str, Any]:
@@ -146,7 +173,7 @@ def reinterpret_day(day: str, root: str | Path = ".", *,
     out: dict = {}
     for sleeve, rec in sorted(last.items()):
         stored_reasons = rec.get("reasons") or []
-        classification = classify_reasons(stored_reasons)
+        classification = classify_record(rec)
         try:
             fresh = acc.evaluate_sleeve(day, sleeve, root)
             fresh_reasons = fresh.get("reasons") or []

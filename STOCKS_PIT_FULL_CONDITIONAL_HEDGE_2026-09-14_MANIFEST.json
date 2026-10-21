@@ -1,0 +1,83 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_CONDITIONAL_HEDGE_2026-09-14",
+  "script": "raits/research/stocks_pit_full_conditional_hedge.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_BETA_VOLTARGET_EXPANSION_2026-09-14_DAILY.csv"
+  ],
+  "sample_label": "Research/in-sample diagnostics across 2018-2024. 2023-2024 is touched validation, not clean unseen OOS.",
+  "method": "Long beta voltarget stream plus conditional short hedge when trailing 20-day benchmark return, shifted by one day, is <= -5%.",
+  "variants": [
+    {
+      "variant": "top62_vt20_short_spy50_spy20m5",
+      "base": "top62_vt20_cap200",
+      "hedge": "spy_buy_hold",
+      "hedge_weight": 0.5,
+      "trigger": "spy_buy_hold",
+      "lookback": 20,
+      "threshold": -0.05
+    },
+    {
+      "variant": "top62_vt20_short_spy100_spy20m5",
+      "base": "top62_vt20_cap200",
+      "hedge": "spy_buy_hold",
+      "hedge_weight": 1.0,
+      "trigger": "spy_buy_hold",
+      "lookback": 20,
+      "threshold": -0.05
+    },
+    {
+      "variant": "top62_vt25_short_spy50_spy20m5",
+      "base": "top62_vt25_cap250",
+      "hedge": "spy_buy_hold",
+      "hedge_weight": 0.5,
+      "trigger": "spy_buy_hold",
+      "lookback": 20,
+      "threshold": -0.05
+    },
+    {
+      "variant": "top62_vt25_short_spy100_spy20m5",
+      "base": "top62_vt25_cap250",
+      "hedge": "spy_buy_hold",
+      "hedge_weight": 1.0,
+      "trigger": "spy_buy_hold",
+      "lookback": 20,
+      "threshold": -0.05
+    },
+    {
+      "variant": "top62_vt20_short_broad50_broad20m5",
+      "base": "top62_vt20_cap200",
+      "hedge": "broad_pit_equal_weight",
+      "hedge_weight": 0.5,
+      "trigger": "broad_pit_equal_weight",
+      "lookback": 20,
+      "threshold": -0.05
+    },
+    {
+      "variant": "top62_vt25_short_broad50_broad20m5",
+      "base": "top62_vt25_cap250",
+      "hedge": "broad_pit_equal_weight",
+      "hedge_weight": 0.5,
+      "trigger": "broad_pit_equal_weight",
+      "lookback": 20,
+      "threshold": -0.05
+    },
+    {
+      "variant": "spy_vt20_short_spy50_spy20m5",
+      "base": "spy_vt20_cap200",
+      "hedge": "spy_buy_hold",
+      "hedge_weight": 0.5,
+      "trigger": "spy_buy_hold",
+      "lookback": 20,
+      "threshold": -0.05
+    }
+  ],
+  "rule_selection": "None. Variant set fixed in VARIANTS before measuring.",
+  "old_62_usage": "None beyond previously documented SPY benchmark bars.",
+  "outputs": [
+    "STOCKS_PIT_FULL_CONDITIONAL_HEDGE_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_CONDITIONAL_HEDGE_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_CONDITIONAL_HEDGE_2026-09-14_SPLITS.csv",
+    "STOCKS_PIT_FULL_CONDITIONAL_HEDGE_2026-09-14_DAILY.csv"
+  ]
+}

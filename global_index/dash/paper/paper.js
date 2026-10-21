@@ -31,6 +31,16 @@
     return String(status || 'unknown').toLowerCase().replace(/[\s_]+/g, '-');
   }
 
+  function kindClass(kind) {
+    return String(kind || '').toLowerCase().replace(/[\s_]+/g, '-');
+  }
+
+  function kindBadge(item) {
+    const label = item && item.operator_kind_label;
+    if (!label) return '';
+    return `<em class="operator-kind kind-${kindClass(item.operator_kind)}">${esc(label)}</em>`;
+  }
+
   function pct(value, target) {
     const n = Number(value);
     const d = Number(target);
@@ -152,8 +162,10 @@
   }
 
   function fmtPnl(value) {
+    if (value == null || value === '') return 'not measured';
     const n = Number(value);
-    if (!Number.isFinite(n) || n === 0) return '-';
+    if (!Number.isFinite(n)) return 'not measured';
+    if (n === 0) return '$0.00';
     return `${n > 0 ? '+' : '-'}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
@@ -179,7 +191,7 @@
   //
   // An empty book is not a passing check either. It is neutral: the question did not
   // arise. One function so the three cannot disagree again.
-  function protectionRead(protectedCount, positionCount) {
+  function protectionRead(protectedCount, positionCount, sourceStatus = '') {
     if (protectedCount == null || positionCount == null) {
       return { label: '--', tone: 'watch', verdict: 'MISSING', summary: 'No current persisted open-position evidence is available.' };
     }
@@ -187,9 +199,12 @@
     if (Number(positionCount) === 0) {
       return { label, tone: 'neutral', verdict: 'MISSING', summary: 'The book is empty, so there is no position to protect.' };
     }
+    if (String(sourceStatus).toUpperCase() === 'UNKNOWN') {
+      return { label: 'unknown', tone: 'watch', verdict: 'UNKNOWN', summary: 'Current broker positions or open orders could not be read.' };
+    }
     return Number(protectedCount) >= Number(positionCount)
-      ? { label, tone: 'ok', verdict: 'PASS', summary: 'Every current persisted open position has a stop_order_id.' }
-      : { label, tone: 'bad', verdict: 'BREACH', summary: 'At least one current persisted open position is missing stop_order_id.' };
+      ? { label, tone: 'ok', verdict: 'PASS', summary: 'Every persisted open position matches a broker position and working protective STP.' }
+      : { label, tone: 'bad', verdict: 'BREACH', summary: 'At least one persisted open position lacks its broker position or working protective STP.' };
   }
 
   function reconcileStatus(left, right) {
@@ -399,12 +414,14 @@
     return BLOCKER_RANK[key] ?? 4;
   }
 
-  function blockerCard(status, label, value, detail, refKey = '', purpose = '', why = '', unlock = '') {
+  function blockerCard(status, label, value, detail, refKey = '', purpose = '', why = '', unlock = '', item = null) {
     const button = refKey ? `<button type="button" data-coverage-ref="${esc(refKey)}">Open detail</button>` : '';
+    const shownStatus = label === 'C1 expected-price correspondence' && status === 'QUALITY_BREACH'
+      ? 'CORRESPONDENCE BREACH' : status;
     return {
       status,
       rank: blockerRank(status),
-      html: `<article class="blocker-card ${statusClass(status)}"><div class="blocker-card-head"><span>${esc(status || 'CHECK')}</span><b>${esc(label)}</b></div><strong>${esc(value)}</strong><dl><div><dt>purpose</dt><dd>${esc(purpose || '--')}</dd></div><div><dt>why needed</dt><dd>${esc(why || '--')}</dd></div><div><dt>current status</dt><dd>${esc(detail || '--')}</dd></div><div><dt>to pass / unlock</dt><dd>${esc(unlock || '--')}</dd></div></dl>${button}</article>`,
+      html: `<article class="blocker-card ${statusClass(status)} ${item?.operator_kind ? `kind-card-${kindClass(item.operator_kind)}` : ''}"><div class="blocker-card-head"><span>${esc(shownStatus || 'CHECK')}</span><b>${esc(label)}</b>${kindBadge(item)}</div><strong>${esc(value)}</strong><dl><div><dt>purpose</dt><dd>${esc(purpose || '--')}</dd></div><div><dt>why needed</dt><dd>${esc(why || '--')}</dd></div><div><dt>current status</dt><dd>${esc(detail || '--')}</dd></div><div><dt>to pass / unlock</dt><dd>${esc(unlock || '--')}</dd></div></dl>${button}</article>`,
     };
   }
 
@@ -438,9 +455,11 @@
     ].join(' | ');
     const openN = c1.open_n ?? summary.c1_open_n;
     const stpN = c1.stp_close_n ?? c1.close_n ?? summary.c1_close_n;
-    const minN = c1Spec.min_n;
-    const maxMean = c1Spec.max_mean_ticks;
-    const c1Quality = openN && Math.abs(Number(c1.open_mean)) > Number(maxMean) ? 'QUALITY_BREACH' : 'PENDING';
+    const openSpec = c1Spec.open || {};
+    const stpSpec = c1Spec.stp_close || {};
+    const openMinN = openSpec.min_n_per_inst;
+    const stpMinN = stpSpec.min_n;
+    const c1Quality = c1Gate.status || 'UNKNOWN';
     // The epoch has two P&L truths and they answer different questions: the sleeve ledger
     // says what the strategy would have booked, the Flex statement says what the account
     // actually did. Publishing either alone misreads the epoch in opposite directions --
@@ -493,7 +512,8 @@
         'pnl_thresholds',
         'Show both money views of the epoch and hold each against its approved gate: what the strategy booked in the sleeve ledger, and what the account actually realised at the broker.',
         'These two answer different questions; reporting one number as "the result" would either hide real losses or blame the strategy for an operational defect. The edge gate needs a sample before a loss means anything; the operational gate needs none.',
-        `Edge gate: from ${specValue(edgeGate.arm_after_sessions)} sessions, cumulative strategy P&L must stay above the p01 floor for the epoch length. Operational gate: any broker-vs-ledger gap not covered by a recorded adjustment blocks regardless of size. Open detail for the band table, the measured ${((thresholds.spec?.edge_gate?.measured_false_block_rate ?? 0) * 100).toFixed(1)}% false-block rate, and what the rule cannot catch.`
+        `Edge gate: from ${specValue(edgeGate.arm_after_sessions)} sessions, cumulative strategy P&L must stay above the p01 floor for the epoch length. Operational gate: any broker-vs-ledger gap not covered by a recorded adjustment blocks regardless of size. Open detail for the band table, the measured ${((thresholds.spec?.edge_gate?.measured_false_block_rate ?? 0) * 100).toFixed(1)}% false-block rate, and what the rule cannot catch.`,
+        coverageBy('pnl_thresholds')
       ),
       blockerCard(
         b3Gate.status || 'UNKNOWN',
@@ -503,7 +523,8 @@
         '',
         'Prove runner cold-start state matches broker/file state before decisions resume.',
         'A bad cold-start reconcile can leave the system trading from stale or wrong position state; historical mismatch evidence must be classified when present.',
-        'Group B3 logs into reviewed cold-start sessions and classify/clear every mismatch, or fix the underlying mismatch source.'
+        'Group B3 logs into reviewed cold-start sessions and classify/clear every mismatch, or fix the underlying mismatch source.',
+        b3Gate
       ),
       blockerCard(
         dataFreshness.status || 'UNKNOWN',
@@ -513,7 +534,8 @@
         'data_freshness',
         'Confirm regime/model/refreeze inputs are fresh enough for the paper/live decision path.',
         'Live readiness cannot depend on stale model artifacts or an urgent refresh condition; freshness evidence decides the card status.',
-        'Clear model=URGENT/freshness breaches and keep the freshness checks green through the active paper epoch.'
+        'Clear model=URGENT/freshness breaches and keep the freshness checks green through the active paper epoch.',
+        dataFreshness
       ),
       blockerCard(
         openIssues.status || 'UNKNOWN',
@@ -523,7 +545,8 @@
         'open_incidents',
         'Surface unresolved monitor issues that should stop promotion even if trade gates look healthy.',
         'Known unresolved incidents are direct operational risk and must not be hidden behind aggregate pass rates; issue evidence decides the card status.',
-        'Resolve or explicitly classify each open issue and ensure unexplained reconcile items emit here.'
+        'Resolve or explicitly classify each open issue and ensure unexplained reconcile items emit here.',
+        openIssues
       ),
       blockerCard(
         coverageStatus,
@@ -538,17 +561,19 @@
         // a number that cannot arrive, so the unlock text has to change with the cause.
         exitGate.metrics?.instrumentation_gap
           ? `Reach the active duration target and observe Normal + Stress. Exit paths are blocked separately: ${metricValue(exitGate.metrics?.unlabelled_exits)} CLOSE fill(s) carry no exit_reason, so waiting longer cannot complete them — the runner must record exit_reason on every CLOSE.`
-          : 'Reach the active duration target, observe Normal + Stress, and collect at least three samples per exit path.'
+          : 'Reach the active duration target, observe Normal + Stress, and collect at least three samples per exit path.',
+        durationGate
       ),
       blockerCard(
         c1Quality,
-        'C1 execution',
-        `OPEN ${metricValue(openN)}/${specValue(minN)}, STP ${metricValue(stpN)}/${specValue(minN)}`,
-        `Current OPEN mean ${fmtTicks(c1.open_mean)} vs ${specValue(maxMean)} tick limit; STP close N=${metricValue(stpN)}.`,
+        'C1 expected-price correspondence',
+        `OPEN N=${metricValue(openN)} (need ${specValue(openMinN)} per instrument), STP N=${metricValue(stpN)}/${specValue(stpMinN)}`,
+        `Current verdict ${c1Quality === 'QUALITY_BREACH' ? 'CORRESPONDENCE BREACH' : c1Quality}; favourable and adverse misses both count by absolute size.`,
         'fill_quality',
-        'Validate paper fill quality from retained trade history before using paper results as live evidence.',
-        'Execution drift can make paper P&L and risk look better or worse than the strategy logic actually produces.',
-        'Collect required OPEN/STP samples, keep absolute mean slippage within spec, and retest when position size scales beyond 1 contract.'
+        'Validate expected-price correspondence from retained trade history before using paper results as live evidence.',
+        'A favourable or adverse miss says the fill model differs from observed execution; this verdict is not a one-sided execution-cost statement.',
+        'Collect required OPEN/STP samples, keep absolute mean slippage within spec, and retest when position size scales beyond 1 contract.',
+        c1Gate
       ),
       blockerCard(
         coverageBy('stp_placement').status || 'UNKNOWN',
@@ -558,7 +583,8 @@
         'stp_placement',
         'Prove every still-open deferred trade receives a system and IBKR accepted stop after the arm period.',
         'The paper/live path intentionally defers stops after the 14h/EOD rule, so placement must be reconciled separately from backtest semantics; placement evidence decides the card status.',
-        'Run 10 continuous clean sessions; any failed session resets the streak, while close-before-arm trades must explain close time/reason.'
+        'Run 10 continuous clean sessions; any failed session resets the streak, while close-before-arm trades must explain close time/reason.',
+        coverageBy('stp_placement')
       ),
       blockerCard(
         twsGate.status || 'UNKNOWN',
@@ -568,7 +594,8 @@
         'tws_restart',
         'Prove unattended recovery across TWS/IBKR restart windows with runner resume and broker verification.',
         'Connectivity candidates only show events happened; they do not prove the system recovered safely afterward; structured restart evidence decides the card status.',
-        'Add structured restart-night records with restart_proven, runner_resumed, and broker_verified all true until the required count is met.'
+        'Add structured restart-night records with restart_proven, runner_resumed, and broker_verified all true until the required count is met.',
+        twsGate
       ),
     ];
     const root = $('readinessBlockers');
@@ -802,7 +829,7 @@
       ]),
       coverageRefGroup([
         coverageRefMetric('Placement after OPEN', placement, 'Deferred-stop route evidence: accept/fail/close-before-arm reconciliation.'),
-        coverageRefMetric('Current protection', currentProtection, 'Latest open positions with persisted stop_order_id protection.'),
+        coverageRefMetric('Current protection', currentProtection, 'Latest persisted positions reconciled to current broker positions and working protective STPs.'),
       ], 'Composite STP status uses the verification gate plus placement/protection coverage; a placement breach keeps this panel red even when the structured verification record passes.'),
       stpMoreInfo(gate, placement),
     ].join('');
@@ -844,7 +871,7 @@
     const persistMatch = positions.persist_match;
     const protectedCount = protection.protected;
     const positionCount = protection.positions ?? positions.count;
-    const protection0 = protectionRead(protectedCount, positionCount);
+    const protection0 = protectionRead(protectedCount, positionCount, currentProtection.status);
     const status = gate.status || 'UNKNOWN';
     // A mismatch with a recorded, matched root cause is not the same thing as an
     // unexplained one, and the panel must not show them the same colour.
@@ -910,12 +937,12 @@
         c1Metric('Duration', b3Duration, 'First-to-last timestamp across mismatch episodes.'),
         c1Metric('Cold starts', coldStarts ?? '--', 'Scheduler start observations from logs.'),
         c1Metric('Persist match', persistMatch == null ? '--' : String(persistMatch), 'Latest runner-state persisted-position match flag.', persistMatch === true ? 'ok' : persistMatch === false ? 'bad' : 'watch'),
-        c1Metric('Protected', protection0.label, 'Current persisted positions with stop_order_id.', protection0.tone),
+        c1Metric('Protected', protection0.label, 'Persisted positions matched to broker positions and working protective STP orders.', protection0.tone),
         c1Metric('Live state', statePersist.status || '--', 'Current state-persist coverage status.', statusClass(statePersist.status || '') === 'observed' ? 'ok' : ''),
       ]),
       coverageRefGroup([
         coverageRefMetric('State persist', statePersist, 'Latest runner-state persisted-position parity used as current-state context.'),
-        coverageRefMetric('Current protection', currentProtection, 'Latest stop_order_id protection context for open positions.'),
+        coverageRefMetric('Current protection', currentProtection, 'Current broker position and working-STP reconciliation for persisted open positions.'),
         coverageRefMetric('Open issues', openIncidents, 'Operational issue list that should surface unexplained reconcile items.'),
       ]),
       b3MoreInfo(gate, statePersist, currentProtection),
@@ -1034,13 +1061,13 @@
       ...(enough ? [] : [reason('sample gate incomplete', 'watch')]),
       reason(`scope ${scope}`, 'neutral'),
     ].map(c1ReasonChip).join('');
-    $('c1ProgressStatus').textContent = status;
+    $('c1ProgressStatus').textContent = status === 'QUALITY_BREACH' ? 'CORRESPONDENCE BREACH' : status;
     $('c1ProgressStatus').className = `gate-state ${statusClass(status)}`;
     $('c1StatusEyebrow').className = `eyebrow c1-eyebrow ${statusClass(status)}`;
     $('c1ActiveSpec').innerHTML = c1SpecPills(spec, target, maxMean);
     $('c1MetricGroups').innerHTML = [
       c1MetricGroup('Verdict', [
-        panelVerdictMetric(status, `Sample gate ${enough ? 'complete' : 'incomplete'}; current quality read is ${currentQualityStatus === 'QUALITY_BREACH' ? 'quality breach (sample pending)' : currentQualityStatus}.`, 'Current N=1 contract evidence must be retested when scaling.', currentQualityStatus === 'QUALITY_BREACH' ? 'bad' : 'watch'),
+        panelVerdictMetric(status === 'QUALITY_BREACH' ? 'CORRESPONDENCE BREACH' : status, `Sample gate ${enough ? 'complete' : 'incomplete'}; current correspondence read is ${currentQualityStatus === 'QUALITY_BREACH' ? 'outside the expected-price correspondence limit (sample pending)' : currentQualityStatus}.`, 'Current N=1 contract evidence must be retested when scaling.', currentQualityStatus === 'QUALITY_BREACH' ? 'bad' : 'watch'),
       // ^ this read `? 'watch' : 'watch'` — written as a discrimination that made none.
       // Read as residue rather than intent, because the rest of the panel already
       // disagreed with it: the OPEN-mean chip and every per-instrument card go red on
@@ -1799,7 +1826,7 @@
 
   function coverageItem(item) {
     const active = item.key === selectedCoverageKey ? ' active' : '';
-    return `<button class="coverage-item${active}" type="button" data-coverage-key="${esc(item.key)}"><b>${esc(item.title)}</b><span class="gate-state ${statusClass(item.status)}">${esc(item.status)}</span><p>${esc(item.evidence)}</p><small>${esc(sourceLine(item))}</small></button>`;
+    return `<button class="coverage-item${active} ${item.operator_kind ? `kind-card-${kindClass(item.operator_kind)}` : ''}" type="button" data-coverage-key="${esc(item.key)}"><b>${esc(item.title)}</b><span class="gate-state ${statusClass(item.status)}">${esc(item.status)}</span>${kindBadge(item)}<p>${esc(item.evidence)}</p><small>${esc(sourceLine(item))}</small></button>`;
   }
 
   function coverageMetrics(metrics) {
@@ -2010,8 +2037,11 @@
     if (!rows || !rows.length) return '<p class="detail-empty">No current persisted position rows are available.</p>';
     return `<div class="trade-table state-position-table"><table><thead><tr><th>status</th><th>position</th><th>entry</th><th>risk</th><th>stop</th><th>state</th></tr></thead><tbody>${rows.map(row => {
       const protectedOk = row.status === 'PROTECTED';
+      const unknown = row.status === 'UNKNOWN';
       const directionClass = String(row.direction || '').toLowerCase();
-      return `<tr><td><span class="fill-result ${protectedOk ? 'ok' : 'bad'}">${esc(row.status || '--')}</span><small>${row.stop_order_id ? 'stop id present' : 'missing stop id'}</small></td><td><b>${esc(row.inst || '--')} <span class="direction-chip ${directionClass}">${esc(row.direction || '--')}</span></b><small>${esc(row.cluster || '--')} x${esc(row.contracts ?? '--')}</small></td><td><b>${esc(row.entry_day || '--')}</b><small>${fmtPrice(row.entry_price)}</small></td><td><b>${fmtMoney(row.risk_dollars)}</b><small>risk dollars</small></td><td><b>${fmtPrice(row.stop_price)}</b><small>${esc(row.stop_order_id || '--')}</small></td><td><span class="fill-result ${row.exit_pending ? 'watch' : 'ok'}">${row.exit_pending ? 'EXIT PENDING' : 'OPEN'}</span><small>persisted file</small></td></tr>`;
+      const brokerOrders = (row.broker_stop_order_ids || []).filter(value => value != null).join(', ') || '--';
+      const brokerStatuses = (row.broker_stop_statuses || []).filter(Boolean).join(', ') || '--';
+      return `<tr><td><span class="fill-result ${unknown ? 'watch' : protectedOk ? 'ok' : 'bad'}">${esc(row.status || '--')}</span><small>${unknown ? 'broker unreadable' : protectedOk ? 'working broker STP matched' : 'broker position/STP mismatch'}</small></td><td><b>${esc(row.inst || '--')} <span class="direction-chip ${directionClass}">${esc(row.direction || '--')}</span></b><small>${esc(row.cluster || '--')} x${esc(row.contracts ?? '--')}</small></td><td><b>${esc(row.entry_day || '--')}</b><small>${fmtPrice(row.entry_price)}</small></td><td><b>${fmtMoney(row.risk_dollars)}</b><small>risk dollars</small></td><td><b>${fmtPrice(row.stop_price)}</b><small>broker #${esc(brokerOrders)} · ${esc(brokerStatuses)}</small></td><td><span class="fill-result ${row.exit_pending ? 'watch' : 'ok'}">${row.exit_pending ? 'EXIT PENDING' : 'OPEN'}</span><small>persisted file</small></td></tr>`;
     }).join('')}</tbody></table></div>`;
   }
 
@@ -2034,12 +2064,14 @@
     const total = Number(m.positions || 0);
     const protectedCount = Number(m.protected || 0);
     const unprotected = Number(m.unprotected || Math.max(0, total - protectedCount));
+    const brokerUnknown = item.status === 'UNKNOWN' && total !== 0;
     // Same helper the B3 panel reads, so the two cannot drift apart again.
-    const read = protectionRead(protectedCount, total);
+    const read = protectionRead(protectedCount, total, item.status);
     const verdict = read.verdict === 'PASS' && unprotected !== 0 ? 'BREACH' : read.verdict;
-    return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Current protection checks that every current persisted open position has a stop order id.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${tableVerdict(verdict, 'Current protection verdict', verdict === 'PASS' ? 'Every current persisted open position has a stop_order_id.' : verdict === 'BREACH' ? 'At least one current persisted open position is missing stop_order_id.' : 'No current persisted open-position evidence is available.', [`protected ${protectedCount}/${total}`, `unprotected ${unprotected}`])}<div class="detail-metric-grid">${[
-      metricCard('Protected rows', read.label, 'Current persisted positions with stop_order_id.', read.tone, read.verdict, 'all required', detailProgress(protectedCount, total)),
-      metricCard('Unprotected', unprotected, 'Current persisted open positions without stop_order_id.', unprotected ? 'bad' : total ? 'ok' : 'neutral', unprotected ? 'BREACH' : total ? 'PASS' : 'MISSING', 'must be 0'),
+    return `<section class="more-section trade-detail"><h3>What This Measures</h3><p class="detail-copy">${esc(m.description || 'Current protection reconciles persisted positions to broker positions and working protective stops.')}</p></section><section class="more-section trade-detail"><h3>Metrics</h3>${tableVerdict(verdict, 'Current protection verdict', read.summary, [`protected ${brokerUnknown ? 'unknown' : `${protectedCount}/${total}`}`, `unprotected ${brokerUnknown ? 'unknown' : unprotected}`])}<div class="detail-metric-grid">${[
+      metricCard('Protected rows', read.label, 'Persisted positions matched to broker positions and working protective STPs.', read.tone, read.verdict, 'all required', brokerUnknown ? '' : detailProgress(protectedCount, total)),
+      metricCard('Unprotected', brokerUnknown ? 'unknown' : unprotected, 'Persisted open positions lacking their broker position or working protective STP.', brokerUnknown ? 'watch' : unprotected ? 'bad' : total ? 'ok' : 'neutral', brokerUnknown ? 'UNKNOWN' : unprotected ? 'BREACH' : total ? 'PASS' : 'MISSING', 'must be 0'),
+      metricCard('Broker read', m.broker_readable === true ? 'readable' : 'unknown', 'Both broker positions and open orders must be read successfully.', m.broker_readable === true ? 'ok' : 'watch', m.broker_readable === true ? 'PASS' : 'UNKNOWN', m.broker_observed_at || m.broker_error || '--'),
       metricCard('Position rows', total, 'Current open-position rows in live_positions.json.', '', total ? 'OBSERVED' : 'MISSING', 'current file'),
       metricCard('Read error', m.live_positions_error || 'none', 'live_positions.json read/parse error, if any.', m.live_positions_error ? 'bad' : 'ok', m.live_positions_error ? 'BREACH' : 'PASS', 'must be none'),
     ].join('')}</div></section><section class="more-section trade-detail"><h3>Protection Rows</h3>${stateProtectionPositionRows(m.position_rows)}</section><section class="more-section trade-detail"><h3>Status Rules</h3>${listItems(m.status_rules || [])}</section>`;
@@ -2315,7 +2347,7 @@
     const pnlThresholds = item.key === 'pnl_thresholds' ? pnlThresholdDetail(item) : '';
     const customDetail = pvb || fill || stpPlacement || rejection || contractSpec || statePersist || currentProtection || runnerFreshness || dataFreshness || openIncidents || manualIntervention || rollSlippage || sampleDenominators || sameDayMultiDay || logHygiene || pnlThresholds;
     const evidence = customDetail ? '' : `<p class="coverage-detail-evidence">${esc(item.evidence)}</p>`;
-    return `<aside class="coverage-detail"><div class="coverage-detail-head"><h3>${esc(item.title)}</h3><span class="gate-state ${statusClass(item.status)}">${esc(item.status)}</span></div>${evidence}<div class="c1-more-grid">${customDetail || `<section class="more-section"><h3>Metrics</h3>${coverageMetrics(item.metrics)}</section>`}<section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(item.sources)}</ul></section></div></aside>`;
+    return `<aside class="coverage-detail"><div class="coverage-detail-head"><h3>${esc(item.title)}</h3><span class="gate-state ${statusClass(item.status)}">${esc(item.status)}</span>${kindBadge(item)}</div>${evidence}<div class="c1-more-grid">${customDetail || `<section class="more-section"><h3>Metrics</h3>${coverageMetrics(item.metrics)}</section>`}<section class="more-section source-detail"><h3>Sources</h3><ul>${sourceDetail(item.sources)}</ul></section></div></aside>`;
   }
 
   const coverageGroups = [
@@ -2406,7 +2438,8 @@
     const statuses = gates.map(gate => gate.status);
     const sourceMissing = !gates.length || data.freshness === 'missing';
     const blocked = statuses.some(status => status === 'SPEC_GAP' || status === 'STRUCTURAL_GAP');
-    const breached = statuses.includes('BREACH');
+    const faultingNow = [...gates, ...coverage].some(item => item.operator_kind === 'current_fault');
+    const breached = faultingNow;
     const complete = !sourceMissing && !blocked && !breached && gates.every(gate => gate.status === 'PASS');
     renderReadinessBlockers(gates, coverage, summary);
     updateCoveragePanel(gates, coverage);
@@ -2414,7 +2447,13 @@
     updateSTPPanel(gates, coverage);
     updateB3Panel(gates, coverage);
     updateTWSPanel(gates, coverage);
-    $('paperSource').textContent = `Paper epoch ${payload.epoch || 'missing'} | source ${data.source || 'unknown'} | observed ${data.observed_at || 'unknown'}`;
+    // Plan stage 4 (2026-09-24): the evidence is for ONE route, and the page says which. Track 1 is
+    // the default; rows it cannot measure yet arrive as NOT_WIRED and are counted here, so a page
+    // full of blanks reads as "not wired" rather than as "nothing wrong".
+    const route = data.route ? 'Track 1' : 'route unstated';
+    const notWired = Array.isArray(data.not_wired) ? data.not_wired.length : 0;
+    $('paperSource').textContent = `${route} | paper epoch ${payload.epoch || 'missing'} | observed ${data.observed_at || 'unknown'}`
+      + (notWired ? ` | ${notWired} row(s) not wired for this route yet` : '');
     renderCoverage(coverage);
     $('evidenceGaps').innerHTML = (payload.gaps || []).map(gapItem).join('');
     $('evidenceGaps').querySelectorAll('[data-gap-related]').forEach(button => {
@@ -2430,7 +2469,13 @@
     readiness.classList.toggle('unknown', sourceMissing);
     readiness.classList.toggle('complete', complete);
     $('overallStatus').textContent = sourceMissing ? 'UNKNOWN' : complete ? 'EVIDENCE COMPLETE' : breached ? 'BREACH' : blocked ? 'SPEC BLOCKED' : 'INSUFFICIENT DATA';
-    $('overallReason').textContent = sourceMissing ? 'Paper evidence source is unavailable' : complete ? 'All observable gates passed' : breached ? 'At least one observed gate breached' : blocked ? 'At least one gate needs a quantified decision before it can pass' : 'Pending evidence remains';
+    const headline = summary.paper_track_headline && summary.paper_track_headline.text;
+    $('overallReason').textContent = sourceMissing ? 'Paper evidence source is unavailable'
+      : headline ? headline
+      : complete ? 'All observable gates passed'
+      : breached ? 'At least one observed gate breached'
+      : blocked ? 'At least one gate needs a quantified decision before it can pass'
+      : 'Pending evidence remains';
   }
 
   // Polling stays; automatic repainting does not. render() reassigns innerHTML across

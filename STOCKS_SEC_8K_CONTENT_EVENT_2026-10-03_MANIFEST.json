@@ -1,0 +1,18 @@
+{
+  "script": "D:/raits/raits/research/stocks_sec_8k_content_event_map.py",
+  "scriptHash": "CB1125B37F7A23269CF381F28B9302DF061CE03CC5201D938C7FFDE8584CCC97",
+  "preregistration": "STOCKS_SEC_8K_CONTENT_EVENT_PREREG_2026-10-03.json",
+  "preregistrationHash": "B9C086634EA67D9706D6100D3E4784993E0BABEA0E03E488FBDD6DAD9CEA30B1",
+  "labels": "raits/data/cache/external_events/sec_8k_content_2018_2021/labels_discovery.csv",
+  "labelsHash": "2C920C29E4F55012A2C7D85D42FCE6449A91AA6A51A168A6A5C175FA2D370F09",
+  "classificationManifestHash": "9C8C9400D5B80389623F00B4675F1C25B98D5FF8D5BF15EC7084401286809D68",
+  "selection": {
+    "cells": 18,
+    "coveragePasses": 8,
+    "developmentPasses": 1,
+    "replicationContentFetchAllowed": true,
+    "productionPassAllowed": false
+  },
+  "oldManual62Used": false,
+  "post2020PerformanceConsumed": false
+}

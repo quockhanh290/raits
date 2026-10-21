@@ -1,0 +1,50 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_SIC_BALANCED_MARKET_CAP_BENCHMARK_2026-09-14",
+  "script": "raits/research/stocks_pit_full_sic_balanced_market_cap_benchmark.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv"
+  ],
+  "sample_period": [
+    "2018-03-29",
+    "2024-12-31"
+  ],
+  "variants": [
+    {
+      "variant": "mcap_pool500_target62_siccap4",
+      "candidate_pool": 500,
+      "target_n": 62,
+      "sic_cap": 4
+    },
+    {
+      "variant": "mcap_pool500_target62_siccap6",
+      "candidate_pool": 500,
+      "target_n": 62,
+      "sic_cap": 6
+    },
+    {
+      "variant": "mcap_pool500_target100_siccap6",
+      "candidate_pool": 500,
+      "target_n": 100,
+      "sic_cap": 6
+    },
+    {
+      "variant": "mcap_pool500_target100_siccap8",
+      "candidate_pool": 500,
+      "target_n": 100,
+      "sic_cap": 8
+    }
+  ],
+  "method": "Quarterly PIT market-cap candidates; select by descending market cap with maximum names per raw Polygon sic_description bucket; 100% gross daily-rebalanced equal weight.",
+  "sic_caveat": "Polygon sic_description is a coarse/granular industry label, not official GICS sector.",
+  "old_62_usage": "None.",
+  "rule_selection": "None. Variant set fixed in VARIANTS before measuring.",
+  "outputs": [
+    "STOCKS_PIT_FULL_SIC_BALANCED_MARKET_CAP_BENCHMARK_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_SIC_BALANCED_MARKET_CAP_BENCHMARK_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_SIC_BALANCED_MARKET_CAP_BENCHMARK_2026-09-14_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_SIC_BALANCED_MARKET_CAP_BENCHMARK_2026-09-14_MEMBERSHIP_QA.csv",
+    "STOCKS_PIT_FULL_SIC_BALANCED_MARKET_CAP_BENCHMARK_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_SIC_BALANCED_MARKET_CAP_BENCHMARK_2026-09-14_TICKER_CONTRIB.csv"
+  ]
+}

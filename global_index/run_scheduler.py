@@ -270,6 +270,25 @@ _SLOT_TIMEOUT_SECS = 20 * 60
 _INFLIGHT_STUCK_SECS = _SLOT_TIMEOUT_SECS + 5 * 60
 
 
+def _track1_gate_open_now(slot_id: str) -> bool:
+    """Is the Track 1 order gate open for THIS slot? Asked at launch, every slot. 2026-10-08.
+
+    The same registry call the startup check makes (`track1_gates.may_enable_orders`, measured at
+    0.12-0.48 s). Unreadable is closed: a slot that cannot tell whether it may send runs in
+    shadow, which still observes and records. A closed gate is logged per slot at WARNING, so a
+    session that stopped sending says when and why on every slot rather than once at startup.
+    """
+    try:
+        from global_index import track1_gates as _gates
+        ok, reasons = _gates.may_enable_orders()
+    except Exception as exc:                                     # noqa: BLE001
+        ok, reasons = False, [f"gate registry unreadable: {type(exc).__name__}: {exc}"]
+    if not ok:
+        log.warning("[%s] Track 1 order gate is closed — this slot runs in shadow mode and sends "
+                    "nothing: %s", slot_id, "; ".join(str(r) for r in reasons[:2]))
+    return bool(ok)
+
+
 def _run_guarded(slot_id: str, body) -> bool:
     """Run `body` holding the slot mutex. True if it ran, False if the slot was skipped.
 
@@ -883,6 +902,15 @@ def make_scheduler(port: int, dry_run: bool,
     # especially harmful for Calm, whose 09:32 DECIDE row is required by the 10:02
     # OBSERVE phase.  Keep the request fail-closed for sending, but downgrade the child
     # invocation to shadow when the registry has not admitted orders yet.
+    #
+    # 2026-10-08. `track1_order_request` is now the OPERATOR'S INTENT for the session, and the gate
+    # is asked again by every slot (`_track1_gate_open_now`) instead of once here. Asked once, a gate
+    # that closed mid-session left every later slot with `--allow-orders` and an order path the
+    # child then refused: "Nothing was run", no decision and no evidence. Measured on two nights
+    # running — the paper-account baseline expires 24 h after it is recorded, at 23:01 on 10/06
+    # and at 23:35 on 10/07 local, and 6 then 16 NKD slots exited 2 with nothing recorded. The
+    # reverse held too: a baseline recorded mid-session could not re-arm a scheduler that had
+    # started with the gate shut. This check stays, for the startup log line only.
     track1_order_request = bool(allow_orders)
     if track1_shadow and track1_order_request:
         try:
@@ -891,9 +919,20 @@ def make_scheduler(port: int, dry_run: bool,
         except Exception as _gate_exc:  # fail closed for sending, open for observation
             _orders_possible, _gate_reasons = False, [f"gate registry unreadable: {_gate_exc}"]
         if not _orders_possible:
-            log.warning("Track 1 order gate is closed; running slots in shadow mode: %s",
-                        "; ".join(_gate_reasons[:2]))
-            track1_order_request = False
+            log.warning("Track 1 order gate is closed at startup; slots run in shadow mode until "
+                        "it opens (re-checked at every slot): %s", "; ".join(_gate_reasons[:2]))
+
+    # 2026-10-05, reviewer finding. A Track 1 position is only protected by the Track 1 safety net:
+    # its own stop repair, the 09:31 max-hold (with the one-day limit for Calm) and the Calm clock
+    # exit. Those jobs are registered in --track1-only-shadow ONLY, while the entry slots are
+    # registered in the transitional mode too. Orders requested there would open positions nothing
+    # closes — a Calm entry would simply stay open. So the request is dropped, loudly, unless the
+    # safety net is going to exist.
+    if track1_order_request and not track1_only:
+        log.warning("--allow-orders ignored: Track 1 order sending needs the Track 1 safety net "
+                    "(stop repair, 09:31 max-hold, Calm clock exit), which is registered only with "
+                    "--track1-only-shadow. Running Track 1 slots in shadow mode.")
+        track1_order_request = False
 
     sched = BlockingScheduler(timezone="America/New_York")   # ET-native
 
@@ -1928,7 +1967,13 @@ def make_scheduler(port: int, dry_run: bool,
                      # argv the slot is actually spawned with. Absent by default and absent on
                      # every restart the scheduler does not ask for it — which is what keeps a
                      # machine that brings itself back from bringing orders back with it.
-                     + (["--allow-orders"] if track1_order_request else []),
+                     #
+                     # 2026-10-08: the operator's intent AND the gate as it stands NOW, for this
+                     # slot. A closed gate downgrades this one slot to shadow — it still observes
+                     # and records, it just cannot send — instead of spawning a child that refuses
+                     # and records nothing. See `_track1_gate_open_now`.
+                     + (["--allow-orders"] if (track1_order_request
+                                               and _track1_gate_open_now(slot_id)) else []),
                      label=slot_id, dry_run=dry_run, route=_t1.EVENT_ROUTE_VALUE)
             finally:
                 _t1_lock.release()
@@ -1947,7 +1992,7 @@ def make_scheduler(port: int, dry_run: bool,
                 id=_s.id.lower(), name=f"Track1 {_s.sleeve} {_s.hour:02d}:{_s.minute:02d} ET",
                 misfire_grace_time=SLOT_MISFIRE_GRACE_SECS,
             )
-        log.info("Track 1 SHADOW slots registered: %d (no orders — the route's gate refuses)",
+        log.info("Track 1 slots registered: %d (order sending remains gate-controlled)",
                  len(_t1.TRACK1_SLOTS))
 
     # ── Báo cáo phiên: chạy KHI VIỆC CUỐI CÙNG TRONG NGÀY XONG ───────────────
@@ -2142,6 +2187,11 @@ def make_scheduler(port: int, dry_run: bool,
                        # aggregate paper_evidence_reader treats as one system.
                        "--trade-log-path", _t1r.TRACK1_TRADE_LOG_PATH,
                        "--route", _t1r.EVENT_ROUTE_VALUE,
+                       # A sleeve that exits by the clock (Calm, 15:55) gets a one-day limit
+                       # here, so a position its time exit failed to close is found at the
+                       # next 09:31 rather than five days later. Every other cluster keeps 5.
+                       *[a for c, d in sorted(_t1r.TRACK1_CLUSTER_MAX_HOLD.items())
+                         for a in ("--cluster-max-hold", f"{c}={d}")],
                        "--port", str(port)],
                       label=label, dry_run=dry_run, route=_t1r.EVENT_ROUTE_VALUE)
             # Same rule as the legacy job: only a REAL run counts. A dry-run that marked
@@ -2150,6 +2200,23 @@ def make_scheduler(port: int, dry_run: bool,
                 _maxhold_done_t1[_et_today().isoformat()] = True
                 _save_maxhold_state_t1()
             return ok
+
+        def _t1_time_exit_body(label: str):
+            # Closes every open position of the clock-exit cluster at the market. Same argv as
+            # the max-hold job plus `--time-exit-cluster`: same book, lock, client id (90, the
+            # id that placed the stops this has to cancel) and trade log. The CLI connects only
+            # when the book holds such a position, so on a day Calm took nothing this costs one
+            # short-lived process and touches no broker.
+            return _run([sys.executable, "-m", "global_index.run_maxhold_exit",
+                         "--positions-path", _t1r.TRACK1_POSITIONS_PATH,
+                         "--stop-path", _t1r.TRACK1_STOP_PATH,
+                         "--lock-path", _t1r.TRACK1_LOCK_PATH,
+                         "--client-id", str(_t1r.TRACK1_SAFETY_CLIENT_ID),
+                         "--trade-log-path", _t1r.TRACK1_TRADE_LOG_PATH,
+                         "--route", _t1r.EVENT_ROUTE_VALUE,
+                         "--time-exit-cluster", _t1r.CALM_TIME_EXIT_CLUSTER,
+                         "--port", str(port)],
+                        label=label, dry_run=dry_run, route=_t1r.EVENT_ROUTE_VALUE)
 
         def _t1_repair_body(label: str):
             _run([sys.executable, "-m", "global_index.run_stop_repair",
@@ -2170,6 +2237,17 @@ def make_scheduler(port: int, dry_run: bool,
                 sched.add_job(_t1_maxhold_body, "cron", day_of_week=_sj.day_of_week,
                               hour=_sj.hour, minute=_sj.minute, id=_sj.id,
                               name=f"Track 1 MAX_HOLD exit {_sj.hour:02d}:{_sj.minute:02d} ET")
+            elif _sj.kind == "time_exit":
+                # Runs once a day and a skipped run leaves a position open overnight, so it is
+                # NOT behind the slot mutex (a 15:55 swing slot can hold that for minutes) and
+                # it gets the slot grace: a scheduler that is a few seconds late still fires it.
+                sched.add_job(
+                    lambda lbl=_sj.id.upper(): _t1_time_exit_body(lbl),
+                    "cron", day_of_week=_sj.day_of_week, hour=_sj.hour, minute=_sj.minute,
+                    id=_sj.id,
+                    name=f"Track 1 time exit {_t1r.CALM_TIME_EXIT_CLUSTER} "
+                         f"{_sj.hour:02d}:{_sj.minute:02d} ET",
+                    misfire_grace_time=SLOT_MISFIRE_GRACE_SECS)
             else:
                 sched.add_job(
                     lambda lbl=_sj.id.upper(): _t1_repair_body(lbl),

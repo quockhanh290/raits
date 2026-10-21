@@ -696,16 +696,22 @@ class IBKRBroker(Broker):
 
     # ── Broker interface ──────────────────────────────────────────────────────
 
-    def fetch_bars(self, inst: str, through) -> pd.DataFrame:
+    def fetch_bars(self, inst: str, through, *, lookback: str | None = None) -> pd.DataFrame:
         """
         Return 1-min OHLCV bars for `inst` up to and including `through`.
+
+        `lookback` overrides the connection's fixed `bar_duration` for this one call. It exists
+        because how far back a fetch must reach depends on how stale the stored history is,
+        which is known per-instrument at join time and not when the connection was opened. A
+        window that stops short of the last stored bar leaves NO shared minutes, and the
+        overlap price check then has nothing to compare while still recording `ok`.
 
         C3: always sort_index() — IBKR can return bars out of chronological order
             on reconnect / backfill; unsorted bars corrupt chandelier ratchet.
         C6: always lowercase column names — IBKR returns OPEN/HIGH/LOW/CLOSE/VOLUME
             (uppercase); backtest engine expects lowercase.
         """
-        raw = self._fetch_raw(inst, through)
+        raw = self._fetch_raw(inst, through, lookback=lookback)
         if raw.empty:
             return raw
         # C6: lowercase column names unconditionally
@@ -715,7 +721,7 @@ class IBKRBroker(Broker):
         # causal: only bars up to `through`
         return raw[raw.index <= pd.Timestamp(through)]
 
-    def _fetch_raw(self, inst: str, through) -> pd.DataFrame:
+    def _fetch_raw(self, inst: str, through, *, lookback: str | None = None) -> pd.DataFrame:
         """Return raw (unsorted, potentially uppercase) bars. Production uses IBKR API."""
         if self._raw_fetcher is not None:
             return self._raw_fetcher(inst, through)
@@ -739,7 +745,7 @@ class IBKRBroker(Broker):
             bars = ib.reqHistoricalData(
                 contract,
                 endDateTime=pd.Timestamp(through).strftime("%Y%m%d %H:%M:%S"),
-                durationStr=self._bar_duration,
+                durationStr=lookback or self._bar_duration,
                 barSizeSetting="1 min",
                 whatToShow="TRADES",
                 useRTH=False,

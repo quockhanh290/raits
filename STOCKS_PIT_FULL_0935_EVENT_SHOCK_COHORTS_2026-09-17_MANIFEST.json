@@ -1,0 +1,51 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_0935_EVENT_SHOCK_COHORTS_2026-09-17",
+  "script": "raits/research/stocks_pit_full_0935_event_shock_cohorts.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv"
+  ],
+  "method": "Fixed PIT top500 09:35 confirmed/rejected gap events; daily 20% gross cohorts held five trading sessions, with aggregate gross capped structurally near 1x.",
+  "event_rules": {
+    "base": "abs(gap)>=2% and rvol930>=1.5",
+    "confirmed": "abs(first5)>=0.25%, same sign as gap; trade open-to-09:35 direction",
+    "rejected": "abs(first5)>=0.50%, opposite sign to gap; trade first-five-minute direction"
+  },
+  "costs": "4.0 bps aggregate target-weight turnover and 1.0% annual borrow on short gross.",
+  "sample_label": "Research/touched 2018-2024 only. 2023-2024 is touched, not clean unseen OOS. No 2025-2026 opened.",
+  "leakage_controls": "Signals use only values known by 09:35 and lagged daily features; PIT market-cap membership uses backward snapshots; holdings are marked from the broad PIT price panel; no old manual 62 list.",
+  "rule_selection_effect": "None. Event thresholds, ranking, five-day hold, cohort size and four variants were fixed before measuring.",
+  "trade_selection_effect": "Daily candidates and overlapping cohorts are rebuilt from PIT inputs; no ticker-PnL subtraction or post-period ticker selection.",
+  "variants": [
+    {
+      "variant": "confirmed_gap_ls_hold5",
+      "event": "confirmed",
+      "mode": "long_short"
+    },
+    {
+      "variant": "rejected_gap_ls_hold5",
+      "event": "rejected",
+      "mode": "long_short"
+    },
+    {
+      "variant": "confirmed_gap_long_hold5",
+      "event": "confirmed",
+      "mode": "long"
+    },
+    {
+      "variant": "rejected_gap_long_hold5",
+      "event": "rejected",
+      "mode": "long"
+    }
+  ],
+  "outputs": [
+    "STOCKS_PIT_FULL_0935_EVENT_SHOCK_COHORTS_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_0935_EVENT_SHOCK_COHORTS_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_0935_EVENT_SHOCK_COHORTS_2026-09-17_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_0935_EVENT_SHOCK_COHORTS_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_0935_EVENT_SHOCK_COHORTS_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_0935_EVENT_SHOCK_COHORTS_2026-09-17_SIGNALS.csv",
+    "STOCKS_PIT_FULL_0935_EVENT_SHOCK_COHORTS_2026-09-17_QA.csv"
+  ]
+}

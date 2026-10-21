@@ -1,0 +1,84 @@
+{
+  "spec_id": "stocks_pit_full_lead_clean_oos_v1_2026-09-17",
+  "frozen_before_oos_read": true,
+  "approval": "User explicitly approved opening 2025-2026 OOS on 2026-09-17.",
+  "oos_period": {
+    "start": "2025-01-02",
+    "end": "2026-09-16",
+    "end_rule": "Last completed session before the approval date; no partial 2026-09-17 session."
+  },
+  "candidate": {
+    "core": "SPY lagged vt16, target cap 1.5x",
+    "calendar": "SPY first five trading days of month +0.5x",
+    "pairs": "quarterly same-SIC z2 hold10, gross scale 0.5x",
+    "crisis": "PIT top500 market-residual bottom10/top10 hold3, gross scale 0.5x, new cohorts only when lagged completed-session SPY overnight20 compounded return < 0",
+    "single_name_cap_nav": 0.03,
+    "hard_target_gross_cap": 3.0,
+    "adv_policy": "Current eligible PIT ADV20 required for openings/risk increases; reductions and exits remain permitted.",
+    "price_policy": "Exact 09:35 price required for execution; causal previous bar no more than five minutes old is mark-only.",
+    "missing_policy": "More than two missing held names or more than 2% NAV stale held notional disables satellites until one complete clean session.",
+    "base_cost_bps": 4.0,
+    "stress_cost_bps": 8.0,
+    "base_financing_annual": 0.025,
+    "base_short_borrow_annual": 0.01,
+    "required_account": "Portfolio margin; Reg-T initial margin is not compatible with frozen sizing."
+  },
+  "acceptance_criteria": {
+    "base_cagr_min": 0.15,
+    "cost8_cagr_min": 0.12,
+    "max_drawdown_pct_floor": -0.25,
+    "single_name_target_nav_max": 0.03,
+    "stale_execution_allowed": false,
+    "max_fail_safe_disabled_sessions": 1,
+    "portfolio_margin_buffer_min": 1.25
+  },
+  "frozen_code_sha256": {
+    "raits/research/stocks_pit_full_lead_crisis_eventtime_audit.py": "E094092A7833183B2E897E939AF4B82A563EA38ED52A05BE283F4B819848EBD7",
+    "raits/research/stocks_pit_full_lead_adv_execution_replay.py": "699E77BF8A8CEBB65F88D3DF913D5E77C9A3F10C11246D09A6FDD28843DEF87A",
+    "raits/research/stocks_pit_full_rolling_sic_pairs.py": "39A8A0C2AD6F384C82E06C75E8D9C2E12171135A348D1DE3107340993D690271",
+    "raits/research/stocks_pit_full_residual_reversal_cohorts.py": "77D0A0B78A8E7146F127ED6086928E62FE385C076EC05D965557D1821924C624",
+    "raits/research/stocks_pit_full_oos_5min_fetch_plan.py": "8B00225BFF3732C32D174CCD12211A30EB713CF11F761A9A29416574AD40B1C7",
+    "raits/research/stocks_pit_full_5min_fetch.py": "3EE90FAAD9869C1BC2F1222E4ED68348AB7471AB0A700205BF42858BC999F31E",
+    "raits/research/stocks_pit_full_oos_feature_cache_builder.py": "F876F6DDBDCAC42B838CA1BF28D5614F4DD3B9E97519BE388220D6A6B652E25E",
+    "raits/research/stocks_pit_full_lead_clean_oos_replay.py": "30DA4238221ABBC43212D5C92191CE0EB9FE99AFD2AB58E1633A401148D95594"
+  },
+  "governance": {
+    "no_rule_changes_after_oos_read": true,
+    "no_ticker_selection_from_oos": true,
+    "all_failures_reported": true,
+    "oos_is_single_use": true
+  },
+  "pre_measurement_amendment": {
+    "timestamp": "2026-09-17",
+    "performance_seen": false,
+    "file": "raits/research/stocks_pit_full_lead_crisis_eventtime_audit.py",
+    "old_sha256": "01766BA308E015D1CC254ECC9DB6776CB93BFCAD0FDA01964BD0A98177317B16",
+    "new_sha256": "E094092A7833183B2E897E939AF4B82A563EA38ED52A05BE283F4B819848EBD7",
+    "reason": "Correct documented missing-execution behavior: when no exact execution price exists, retain existing shares instead of silently dropping the position. As-of prices remain mark-only. No rule, threshold, ticker, or acceptance criterion changed."
+  },
+  "post_measurement_correction": {
+    "timestamp": "2026-09-17",
+    "performance_seen": true,
+    "initial_run_status": "INVALID_OPERATIONAL_REPLAY",
+    "initial_run_summary": {
+      "base_cagr": 0.011621491517953553,
+      "base_dd_pct": -0.2563287377509167,
+      "missing_marks": 1102,
+      "fail_safe_breaches": 604,
+      "disabled_sessions": 303
+    },
+    "root_cause": "The initial fetch covered only months in which a ticker was a quarterly top500 member. Positions opened before a membership boundary could remain held after that boundary but had no raw prices in the next month, creating artificial permanent missing marks.",
+    "correction": "Fetch every OOS month for the complete pre-registered 615-symbol union. Signal selection remains PIT top500. Added data is used only to provide raw execution/mark coverage for any possible held ticker.",
+    "scope_control": "The correction applies the same full-month coverage to the entire pre-registered union, not only to tickers exposed by the invalid result. No strategy rule, threshold, acceptance criterion, or ticker universe union changed.",
+    "plan_script": "raits/research/stocks_pit_full_oos_5min_coverage_plan.py",
+    "plan_script_sha256": "1168464D1BB7AE2E415ECCD212903C96EA3E23959EF2B98A02D4197481E2D5C2",
+    "corrected_run_policy": "The corrected replay is an audit correction after OOS was opened, not pristine first-look OOS. Both invalid and corrected results must be reported."
+  },
+  "verdict_interpretation": {
+    "automated_frozen_gate": "KILL flag / FAIL deployment thresholds",
+    "research_status": "NEEDS_MORE_OOS",
+    "production_status": "NO_PASS",
+    "reason": "The measured interval is 1.703 years and ends 2026-09-16, so 2026 is YTD. Base return is 5.06% in full-year 2025 and 12.80% in 2026 YTD. The frozen gate still fails, but the sample is too short for a permanent edge-kill conclusion.",
+    "forward_policy": "Do not tune on touched 2025-2026. Continue the unchanged candidate on genuinely forward data after 2026-09-16 before a terminal keep/kill decision."
+  }
+}

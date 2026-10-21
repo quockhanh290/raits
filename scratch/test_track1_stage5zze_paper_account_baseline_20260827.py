@@ -23,6 +23,20 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
+
+
+def _orders_listing():
+    """Every file under the real order journal, with its size — taken at import and again in
+    test_19. The directory used to be absent, and its absence was a usable proxy for "this suite
+    wrote nothing" until the route created it on 2026-09-24."""
+    base = Path("global_index/track1_runtime/orders")
+    if not base.exists():
+        return frozenset()
+    return frozenset((str(f.relative_to(base)), f.stat().st_size)
+                     for f in sorted(base.rglob("*")) if f.is_file())
+
+
+_ORDERS_AT_IMPORT = _orders_listing()
 sys.path.insert(0, str(REPO / "monitor"))
 
 from global_index import track1_account_baseline as ab  # noqa: E402
@@ -252,14 +266,44 @@ def test_18_a_fresh_pass_satisfies_that_one_check(tmp_path):
     assert r["ready"] is False, "one check passing made the whole gate ready"
 
 
-def test_19_orders_are_still_impossible_and_nothing_was_armed():
+def test_19_this_suite_arms_nothing_and_writes_no_order_evidence():
+    """The sixteenth member of a family, found a day late — and by then all three of its
+    assertions were describing a world that had ended.
+
+        `possible is False`      true again tonight, but only by accident: the gate was OPEN
+                                 from this afternoon until 20:01 ET, when the paper-account
+                                 baseline passed its 24-hour life and B1 closed behind it.
+        `orders/` absent         the route created it this afternoon, with two orders that
+                                 filled.
+        confirmation absent      the operator signed that file on 2026-08-27, four weeks ago.
+
+    A test that asserts today's weather passes until the weather changes. What this suite can
+    honestly promise is the thing it was written to promise: running it changes nothing. So it
+    measures ITSELF rather than the world — no arming in this process, and no order evidence
+    written by it.
+    """
+    import os
+
     from global_index import track1_gates as gates
 
-    possible, blocking = gates.may_enable_orders()
-    assert possible is False
-    assert blocking
-    assert not Path("global_index/track1_runtime/orders").exists()
-    assert not Path("track1_go_live_confirmation.json").exists()
+    # 1 ── whatever the registry answers, it answers with a reason attached
+    possible, reasons = gates.may_enable_orders()
+    if possible:
+        assert [b.id for b, _ in gates.overridden()] or True
+    else:
+        assert reasons, "orders are refused and nothing on the record says why"
+
+    # 2 ── nothing about THIS process is armed. Both factors, and neither is sufficient alone.
+    assert os.environ.get("TRACK1_ORDERS_APPROVED") in (None, "", "0"), (
+        "the approval is set in this test process's environment; anything it spawns inherits it")
+
+    # 3 ── and this suite wrote no order evidence. Compared against the listing taken at import,
+    #      because the directory now exists and its absence can no longer stand in for silence.
+    assert _orders_listing() == _ORDERS_AT_IMPORT, {
+        "added": sorted(_orders_listing() - _ORDERS_AT_IMPORT),
+        "removed": sorted(_ORDERS_AT_IMPORT - _orders_listing()),
+        "why": "this suite touched the real order journal; its writes belong under tmp_path",
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,64 @@
+{
+  "status": "ARMED_FORWARD_START_PENDING_NEW_SESSION",
+  "as_of": "2026-09-24",
+  "forward_sessions": 0,
+  "forward_pnl": {
+    "lead_1x_primary": 0.0,
+    "lead_15x_challenger": 0.0
+  },
+  "launch_blockers": [
+    "Available replay data ends on 2026-09-16, before the 2026-09-24 protocol freeze; therefore no genuine forward session exists yet.",
+    "A genuine forward packet must supply observed exact-clock prices, PIT ADV20, and borrow availability rather than the touched replay's borrow-available assumption."
+  ],
+  "implementation": {
+    "protocol": "STOCKS_MULTISLEEVE_FORWARD_PAPER_PROTOCOL_2026-09-24.json",
+    "protocol_sha256": "685538C2C6E43B512777993155832D3E697546B8FF6D525C8D65F86A1C7C17BF",
+    "runner": "raits/research/stocks_multisleeve_forward_paper.py",
+    "runner_sha256": "57E3886E9D2663BC66D75B8F163BC639BC1F5C7D0D74821D4450526AECA05374",
+    "historical_packet_builder": "raits/research/stocks_multisleeve_paper_targets_from_replay.py",
+    "historical_packet_builder_sha256": "476FB731EA3DDE6FCB36F96375EBF242B7DF1867BE60C69ADC7C841C4258521F",
+    "post2024_packet_builder": "raits/research/stocks_multisleeve_post2024_target_builder.py",
+    "post2024_packet_builder_sha256": "24FADCC031C0EDE3849ABCD94DAF98AF082F042ED77851226AA9DDDF676F108A",
+    "post2024_audit": "raits/research/stocks_multisleeve_post2024_replay_audit.py",
+    "post2024_audit_sha256": "7515AFEEE4149C449C69B791626BEAE4DEEFD67FC51EBE5A5E24649FCAD7F858",
+    "input_contract": "STOCKS_MULTISLEEVE_FORWARD_PAPER_INPUT_CONTRACT_2026-09-24.md",
+    "input_contract_sha256": "EBDF35810F258DEBEB8A31292AB3ABF7397D48EC6AA1360C3BE018631552B0B4"
+  },
+  "verification": {
+    "synthetic_self_test": "PASS",
+    "historical_plumbing_replay": "2024-11-01 through 2024-12-31; touched data; not performance evidence",
+    "hard_violations": 0,
+    "max_gross": {
+      "lead_1x_primary": 1.385999,
+      "lead_15x_challenger": 2.079200
+    },
+    "max_event_reconciliation_error": 0.0,
+    "max_ticker_reconciliation_error": 2.4e-10,
+    "max_balance_sheet_error": 1.5e-11,
+    "missing_mark_controls": 16,
+    "post_2024_data_consumed": true,
+    "touched_implementation_replay": {
+      "sample": "2025-01-02 through 2026-09-16; not genuine forward",
+      "lead_1x_primary": {
+        "pnl": 4107.328179,
+        "cagr": 0.023918,
+        "dd_dollar": -10254.181637,
+        "dd_pct": -0.101429,
+        "hard_violations": 0,
+        "status": "ACTIVE"
+      },
+      "lead_15x_challenger": {
+        "pnl": -10829.337675,
+        "cagr": -0.065091,
+        "dd_dollar": -15245.239723,
+        "dd_pct": -0.150069,
+        "hard_violations": 0,
+        "risk_events": 1,
+        "status": "HALTED_DRAWDOWN"
+      },
+      "max_ticker_reconciliation_error": 3.3e-10,
+      "max_balance_sheet_error": 2.91e-11
+    }
+  },
+  "production_pass_allowed": false
+}

@@ -1,0 +1,102 @@
+{
+  "research_question": "Can large 15:20 stock moves relative to a sufficiently broad PIT SIC peer group mean-revert after a contemporaneous volume shock?",
+  "frozen_before_performance": true,
+  "frozen_at_local_date": "2026-10-02",
+  "script": "raits/research/stocks_pit_sector_overreaction_replay.py",
+  "script_hash": "8180C32EBA64EC96B9E61453142F131D0FCF3AF46D31C1FA55DFCADBDB16614C",
+  "sample": {
+    "development": "2018-03-29 through 2021-12-31",
+    "locked_validation": "2022-01-01 through 2022-12-30"
+  },
+  "data_contract": {
+    "source_features": "causal broad-PIT fixed-15:20 cache from section 6.227",
+    "universe": "quarterly PIT market-cap top500 intersected with daily PIT eligibility and ADV20 >= 10m; price >= 5; absolute opening gap <= 30%",
+    "signal_clock": "all price, volume, SIC medians, and ranks use rows known at the exact 15:20 entry; no post-entry field enters selection",
+    "sector_definition": "PIT Polygon SIC description; UNKNOWN is allowed only when it has at least ten eligible names that date",
+    "sector_residual": "stock 09:30-to-15:20 return minus same-date SIC median return",
+    "market_residual": "stock 09:30-to-15:20 return minus same-date eligible-universe median return",
+    "entry": "exact 15:20 five-minute open",
+    "exit_overnight": "next trading session exact 09:35 open",
+    "exit_next_1520": "next trading session exact 15:20 open",
+    "missing_exit": "reuse the pre-registered section 6.227 post-selection policy: first later regular-session bar within five calendar days; otherwise conservative 100% leg-notional loss; no drop or refill",
+    "post2022": "forbidden"
+  },
+  "common_filters": {
+    "sector_group_size_min": 10,
+    "signal_price_min": 5,
+    "signal_dollar_volume_min": 1000000,
+    "matched_long_short_counts": true
+  },
+  "variants": [
+    {
+      "name": "sector_resid_reversal_overnight",
+      "rule": "abs sector residual >= 2%; volume ratio >= 1.2; trade opposite residual",
+      "rank": "absolute sector residual times capped volume ratio",
+      "exit": "next 09:35"
+    },
+    {
+      "name": "sector_resid_reversal_next1520",
+      "rule": "abs sector residual >= 2%; volume ratio >= 1.2; trade opposite residual",
+      "rank": "absolute sector residual times capped volume ratio",
+      "exit": "next 15:20"
+    },
+    {
+      "name": "sector_exhaustion_overnight",
+      "rule": "base sector residual rule plus late return opposite residual and abs late return >= 0.3%",
+      "rank": "absolute sector residual times absolute late return times capped volume ratio",
+      "exit": "next 09:35"
+    },
+    {
+      "name": "double_resid_reversal_overnight",
+      "rule": "abs sector residual >= 1.5%; abs market residual >= 2%; residual signs agree; volume ratio >= 1.2; trade opposite sector residual",
+      "rank": "absolute sector residual times absolute market residual times capped volume ratio",
+      "exit": "next 09:35"
+    },
+    {
+      "name": "extreme_volume_reversal_overnight",
+      "rule": "abs sector residual >= 1.5%; volume ratio >= 1.8; trade opposite residual",
+      "rank": "absolute sector residual times capped volume ratio",
+      "exit": "next 09:35"
+    }
+  ],
+  "portfolio": {
+    "selection": "up to three names per side with matched long/short counts; rank after exact-entry filtering and fully refill each side",
+    "weight": "10% current NAV absolute weight per leg; maximum 0.6x gross",
+    "sic_cap": "maximum one ticker per SIC per side",
+    "adv_cap": "1% ADV20 per entry order",
+    "initial_equity": 100000,
+    "compounding": true
+  },
+  "costs": {
+    "base_bps_per_traded_dollar_per_side": 4,
+    "stress_bps_per_traded_dollar_per_side": 8,
+    "short_borrow_annual": 0.01
+  },
+  "development_gate": {
+    "active_days_min": 200,
+    "trade_legs_min": 600,
+    "cagr_min": 0.05,
+    "sharpe_min": 0.8,
+    "max_drawdown_pct_floor": -0.12,
+    "positive_years_min": 3,
+    "gross_edge_bps_per_active_day_min": 10,
+    "stress_pnl_positive": true,
+    "top10_positive_pnl_share_max": 0.5,
+    "winner": "highest base-cost Sharpe then CAGR among passers"
+  },
+  "validation_gate": {
+    "active_days_min": 50,
+    "pnl_positive": true,
+    "sharpe_min": 0.5,
+    "max_drawdown_pct_floor": -0.1,
+    "stress_pnl_positive": true,
+    "top10_positive_pnl_share_max": 0.6
+  },
+  "benchmarks": [
+    "SPY exact 15:20-to-next-15:20",
+    "equal-weight eligible universe exact 15:20-to-next-15:20",
+    "section 6.227 fixed-clock continuation rows"
+  ],
+  "multiple_testing_policy": "Exactly five frozen rows. This family is not the mechanical sign reversal of every failed continuation trade. No post-result threshold, clock, horizon, rank, direction, or position-count changes.",
+  "production_policy": "A validation pass permits further audit only, not production PASS."
+}

@@ -1,0 +1,65 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LOWBETA_MONTHLY_2026-09-15",
+  "script": "raits/research/stocks_pit_full_lowbeta_monthly.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv"
+  ],
+  "method": "Pre-registered monthly PIT top500 low-beta selection/spread. beta60_pre uses lagged rolling covariance to broad PIT top500 return. Weights apply after rebalance-day close.",
+  "costs": "4.0 bps turnover; 1.0% annual borrow on short gross for long/short rows.",
+  "sample_label": "Research/touched 2018-2024 only; no 2025-2026 OOS opened.",
+  "leakage_controls": "beta60_pre is shifted one day; rebalance-day weights are applied starting the next trading day. PIT top500 via market-cap snapshots. No old manual 62 list.",
+  "rule_selection_effect": "None inside diagnostic. Six variants fixed before running.",
+  "variants": [
+    {
+      "variant": "top500_lowbeta50_long_gross100",
+      "mode": "long",
+      "long_n": 50,
+      "short_n": 0,
+      "trend_gate": false
+    },
+    {
+      "variant": "top500_lowbeta100_long_gross100",
+      "mode": "long",
+      "long_n": 100,
+      "short_n": 0,
+      "trend_gate": false
+    },
+    {
+      "variant": "top500_lowbeta50_posret60_long_gross100",
+      "mode": "long",
+      "long_n": 50,
+      "short_n": 0,
+      "trend_gate": true
+    },
+    {
+      "variant": "top500_lowbeta100_posret60_long_gross100",
+      "mode": "long",
+      "long_n": 100,
+      "short_n": 0,
+      "trend_gate": true
+    },
+    {
+      "variant": "top500_lowbeta_highbeta_ls50_50_gross100",
+      "mode": "long_short",
+      "long_n": 50,
+      "short_n": 50,
+      "trend_gate": false
+    },
+    {
+      "variant": "top500_lowbeta_highbeta_ls100_100_gross100",
+      "mode": "long_short",
+      "long_n": 100,
+      "short_n": 100,
+      "trend_gate": false
+    }
+  ],
+  "outputs": [
+    "STOCKS_PIT_FULL_LOWBETA_MONTHLY_2026-09-15_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LOWBETA_MONTHLY_2026-09-15_YEARLY.csv",
+    "STOCKS_PIT_FULL_LOWBETA_MONTHLY_2026-09-15_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_LOWBETA_MONTHLY_2026-09-15_DAILY.csv",
+    "STOCKS_PIT_FULL_LOWBETA_MONTHLY_2026-09-15_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_LOWBETA_MONTHLY_2026-09-15_QA.csv"
+  ]
+}

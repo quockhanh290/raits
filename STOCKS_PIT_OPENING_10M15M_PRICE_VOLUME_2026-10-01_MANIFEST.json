@@ -1,0 +1,30 @@
+{
+  "script": "D:/raits/raits/research/stocks_pit_opening_10m15m_price_volume.py",
+  "scriptHash": "C67C9B4FA1326CEA7C638559E2387AB2381EA99D747B972CFA55AB272658A2AC",
+  "preregistration": "STOCKS_PIT_OPENING_10M15M_PRICE_VOLUME_PREREG_2026-10-01.json",
+  "preregistrationHash": "A222B5239ACD61F69DC09228302160BF05DF11FB696E1FDA11AB7726D4526E20",
+  "selection": {
+    "status": "KILL_NO_DEVELOPMENT_PASS",
+    "selectedVariant": null,
+    "validationOpened": false,
+    "productionPassAllowed": false
+  },
+  "sample": [
+    "2018-04-27",
+    "2022-12-30"
+  ],
+  "inputs": {
+    "raits\\data\\cache\\stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl": "C65065EA082D68544A5CD87C8DAD9A81CEE0B92A49A34D3C18C162A9EDED4AEC",
+    "raits\\data\\cache\\stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl": "EEDEAACC5F5302CDD87114FA985A58BA4B32B1DA807E57AC3AFEB18D96970696",
+    "raits\\data\\cache\\external_universes\\market_cap_polygon\\polygon_market_cap_snapshots_pit_eligible_2018_2024.csv": "C184A810909371F7DB5A3F6926417496A77B97BBAF97ED14B017E3BDD42115D4",
+    "raits\\data\\cache\\stocks_survivorship\\polygon_universe_bulk\\daily_20180102_20241231_resumable\\liquidity_filter_daily_20180102_20241231_px5_adv10m_unadjusted\\filtered_daily_universe.parquet": "FD696E0BD91E3B951C86FFF89734AF908759E11829715B9C1983604E356E8B2C",
+    "raits\\data\\cache\\polygon_5min_pit_full_2018_2024\\manifest.json": "E0E4C23B186003BBEB2342E323ECD337A4DF23C972B4C99BE3DFEC410CF144C9"
+  },
+  "rawFilesUsed": 16995,
+  "rawFileInventory": "STOCKS_PIT_OPENING_10M15M_PRICE_VOLUME_2026-10-01_RAW_FILE_INVENTORY.csv",
+  "oldManual62Used": false,
+  "post2024Consumed": false,
+  "productionPassAllowed": false,
+  "causality": "09:30-09:35 bar and current cross-section finalize the signal after 09:35; execution is delayed to exact 09:40 open; scheduled exits are exact 09:50/09:55 opens and a missing scheduled bar fills at the first available five-minute open through 16:00 without changing membership; rolling beta and rvol baselines use prior sessions only.",
+  "metadataCorrection": "Post-run wording correction only: the original shorthand omitted the already-executed causal halt fallback recorded in the trade ledger and preregistration. No performance artifact or execution logic changed."
+}

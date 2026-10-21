@@ -1,0 +1,79 @@
+{
+  "title": "Pre-registered broad-PIT Polygon overnight-news reaction family",
+  "created_date": "2026-09-24",
+  "research_status": "PRE_REGISTERED_BEFORE_PERFORMANCE_RUN",
+  "hypothesis": "Company-specific news published outside regular trading hours may create a tradable same-day continuation or overreaction after the opening five minutes.",
+  "source_audit": {
+    "source": "Polygon /v2/reference/news",
+    "pit_timestamp": "published_utc",
+    "local_coverage": "Sparse before 2021-04; broad from 2021-04-01 through 2024-02-29 only.",
+    "development_limitation": "The broad development sample is only 2021-04-05 through 2022-12-30. Any passing result remains NEEDS_AUDIT and cannot be called robust.",
+    "old_manual_62_used": false,
+    "sentiment_or_text_labels_used": false
+  },
+  "data_contract": {
+    "development": ["2021-04-05", "2022-12-30"],
+    "touched_validation_if_and_only_if_development_passes": ["2023-01-03", "2024-02-29"],
+    "oos_2025_2026": "HARD_PROHIBITED",
+    "news_window": "For session D, distinct articles published from the previous trading session at 16:00 America/New_York through D at 09:25 America/New_York. Intraday articles after 09:25 and before 16:00 are excluded, not rolled forward.",
+    "article_filter": "Exactly one ticker in tickers_json; no title, description, keyword, author, URL, or sentiment selection.",
+    "universe": "Latest prior/equal quarterly Polygon PIT market-cap top 500, intersected with the daily PIT px>=5/ADV20>=10m eligible universe and exact 09:35/15:55 feature-cache prices.",
+    "signal_confirmation": "abs(gap)>=2%, rvol930>=1.5, abs(first5_ret)>=0.25%, and sign(gap)==sign(first5_ret). All values are known by 09:35.",
+    "entry_exit": "Enter at exact 09:35 price and exit at exact 15:55 price on the same session.",
+    "sizing": "3% of current NAV per event, <=1% ADV per name, deterministic pro-rata scaling to a hard 1.0x gross cap.",
+    "costs": "Base 4 bps per side, stress 8 bps per side, 1% annual short borrow for one trading day, and 2.5% financing on gross above 1x (expected zero under the hard cap).",
+    "compounding": "Single chronological account replay; ticker contribution includes allocated trading and borrow costs."
+  },
+  "candidate_family": [
+    {
+      "variant": "all_single_confirmed_cont",
+      "publisher_filter": "all",
+      "minimum_distinct_articles": 1,
+      "direction": "sign(gap)"
+    },
+    {
+      "variant": "all_single_confirmed_reversal_control",
+      "publisher_filter": "all",
+      "minimum_distinct_articles": 1,
+      "direction": "-sign(gap)"
+    },
+    {
+      "variant": "issuer_wire_confirmed_cont",
+      "publisher_filter": "GlobeNewswire Inc.",
+      "minimum_distinct_articles": 1,
+      "direction": "sign(gap)"
+    },
+    {
+      "variant": "burst2_single_confirmed_cont",
+      "publisher_filter": "all",
+      "minimum_distinct_articles": 2,
+      "direction": "sign(gap)"
+    }
+  ],
+  "development_gates": {
+    "entries_min": 100,
+    "cagr_min": 0.03,
+    "sharpe_min": 0.75,
+    "dd_pct_min": -0.08,
+    "positive_subperiods": "Both 2021-04-05..2021-12-31 and calendar 2022 must have positive net PnL.",
+    "stress_pnl_positive": true,
+    "top1_net_positive_pnl_share_max": 0.25,
+    "top5_net_positive_pnl_share_max": 0.60
+  },
+  "selection": "Among passing rows, rank by Sharpe descending, CAGR descending, DD percentage descending, then candidate_family order. Only rank 1 may open touched validation.",
+  "validation_gates": {
+    "cagr_positive": true,
+    "sharpe_min": 0.50,
+    "dd_pct_min": -0.12,
+    "calendar_2023_pnl_positive": true,
+    "stress_pnl_positive": true
+  },
+  "bridge_policy": "No portfolio bridge is run unless one row passes both development and touched validation. A later bridge must be separately pre-registered.",
+  "stopping_rule": "If no row passes development, kill this exact family without opening 2023-2024 performance and do not tune news-count, publisher, gap, rvol, first5, or cost thresholds on the touched sample.",
+  "post_result_reporting_addition": "After terminal development failure, concentration shares versus the positive-ticker PnL pool were added because net-PnL shares are undefined for losing rows, and QA was limited to base scenarios with persisted trade ledgers. These additions change no data construction, signal, trade, return, cost, gate, rank, or selection.",
+  "implementation_freeze": {
+    "script": "raits/research/stocks_polygon_news_reaction.py",
+    "script_hash": "FAD72B35F543FE9122765E2164E850C4EBE63738961265463A42298E05B32F7A",
+    "performance_not_yet_run": true
+  }
+}

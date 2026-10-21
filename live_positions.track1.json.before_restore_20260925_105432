@@ -1,0 +1,13 @@
+{
+ "schema_version": 2,
+ "route": "track1_candidate",
+ "window": "live",
+ "cut_instant": "2026-09-25T12:30:01.919762-04:00",
+ "equity": 0.0,
+ "cur_day": "2026-09-25",
+ "peak_equity": 0.0,
+ "day_start_equity": 0.0,
+ "positions": [],
+ "booked_counter": {},
+ "counters": {}
+}

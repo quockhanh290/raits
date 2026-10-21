@@ -24,6 +24,22 @@ REPO = Path(__file__).resolve().parents[1]
 DAY = "2026-08-25"
 
 
+def _orders_tree_listing():
+    """Every file under the REAL order journal, with its size. Taken at import and again in
+    test_41; a difference means this suite touched production evidence."""
+    base = REPO / J.ORDERS_DIR
+    if not base.exists():
+        return frozenset()
+    out = set()
+    for f in sorted(base.rglob("*")):
+        if f.is_file():
+            out.add((str(f.relative_to(base)), f.stat().st_size))
+    return frozenset(out)
+
+
+_ORDERS_AT_IMPORT = _orders_tree_listing()
+
+
 def cand(inst="MNQ", sleeve="roska4_stress", qty=2, tid="t1"):
     return T.Candidate(trade_id=tid, sleeve=sleeve, instrument=inst, direction="long",
                        qty=qty, risk_dollars=250.0, entry_time="2026-08-25 10:35:00", meta={})
@@ -224,17 +240,49 @@ def test_15_every_stage_runs_and_in_order(tmp_path):
 
 
 def test_16_the_gate_stage_reports_the_REAL_answer_not_the_synthetic_one(tmp_path):
+    """The point of the stage is in its name, and the point survives the world changing.
+
+    The old form spelled the real answer out as False and named the two blockers holding it
+    there. On 2026-09-24 the operator released B1 and overrode the evidence gate, so those
+    three literals became a record of a past afternoon rather than an assertion.
+
+    What the stage exists for is that the rehearsal must not report its own synthetic gate as
+    if it were production's. So it is checked against the registry it claims to be quoting —
+    which is stricter than the literal was, because it goes red both ways: if the stage starts
+    echoing the synthetic answer, and if it starts caching a stale real one.
+    """
+    from global_index import track1_gates as G
+
+    allowed, reasons = G.may_enable_orders()
     rep = CS.dry_run([took()], ref_day=DAY, root=tmp_path)
     gate = next(s for s in rep.stages if s.name == "gate")
-    assert gate.data["production_allow_orders"] is False
-    assert "B1_broker_account_or_legacy_retirement" in gate.data["production_reasons"]
-    assert "PAPER_SHADOW_EVIDENCE" in gate.data["production_reasons"]
+
+    assert gate.data["production_allow_orders"] is bool(allowed), (
+        "the gate stage says production allows %r while the registry says %r"
+        % (gate.data["production_allow_orders"], allowed))
+    assert sorted(r.split(":")[0] for r in gate.data["production_reasons"]) == \
+        sorted(r.split(":")[0] for r in reasons), {
+            "stage": gate.data["production_reasons"], "registry": reasons}
 
 
 def test_17_the_synthetic_gate_is_a_different_type_from_the_production_one():
+    """Two of these lines were always the test; the third was a snapshot of a Tuesday.
+
+    `production_gate().allow_orders is False` described the world on 2026-08-25 and stopped
+    being true on 2026-09-24. Replacing it with the registry's own answer keeps the type
+    distinction — the part that cannot go stale — and keeps production honest about itself.
+    """
+    from global_index import track1_gates as G
+
     assert not isinstance(CS.DryRunGate(), X.ProductionGate)
     assert CS.DryRunGate().synthetic is True
-    assert X.production_gate().allow_orders is False
+    assert getattr(X.production_gate(), "synthetic", False) is False, (
+        "the production gate marks itself synthetic; a rehearsal object has reached the "
+        "production path")
+
+    allowed, _reasons = G.may_enable_orders()
+    assert bool(X.production_gate().allow_orders) is bool(allowed), (
+        "the production gate carries its own opinion instead of the registry's")
 
 
 def test_18_the_precheck_says_entries_would_be_blocked(tmp_path):
@@ -388,9 +436,9 @@ def test_32_the_track1_safety_jobs_already_cover_stops_and_max_hold():
     """The finding that decides the stub scope. Not a guess: the jobs are registered."""
     from global_index import track1_slots as t1
     jobs = t1.track1_safety_jobs()
-    assert len(jobs) == 11
+    assert len(jobs) == 12            # + the 15:55 Calm clock exit (2026-10-05)
     kinds = {j.kind for j in jobs}
-    assert kinds == {"maxhold", "stop_repair"}, kinds
+    assert kinds == {"maxhold", "stop_repair", "time_exit"}, kinds
     assert t1.TRACK1_POSITIONS_PATH == "live_positions.track1.json"
 
 
@@ -471,28 +519,100 @@ def test_37_nothing_in_production_imports_the_dry_run_or_the_executor():
     assert unexpected == [], unexpected
 
 
-def test_38_no_scheduler_or_ops_path_can_trigger_a_send():
-    """Three independent facts, all by AST: no arming flag in any argv, no broker
-    construction in the slot path, and no send_order call reachable from either file."""
+def test_38_no_scheduler_or_ops_path_sends_on_its_own():
+    """The old title was "can trigger a send", and it held because the flag existed nowhere.
+
+    On 2026-09-24 the operator gave both files the flag on purpose, so the first of the three
+    facts had to be restated rather than deleted. The other two are untouched and are the ones
+    that matter more: neither file may reach a broker in its own process.
+
+    What replaces the vanished fact is the thing it was protecting — nothing arms unless a
+    person asked on that invocation. This machine now restarts itself on logon, so a flag
+    produced outside a branch that tests for an explicit request would mean a route that comes
+    back armed after a reboot with nobody present.
+    """
     for rel in ("global_index/run_scheduler.py", "monitor/ops.py"):
-        tree = ast.parse((REPO / rel).read_text(encoding="utf-8", errors="replace"))
-        assert [n for n in ast.walk(tree) if isinstance(n, ast.Constant)
-                and n.value == "--allow-orders"] == [], rel
+        text = (REPO / rel).read_text(encoding="utf-8", errors="replace")
+        lines = [ln.split("#")[0] for ln in text.splitlines()]
+        tree = ast.parse(text)
+
+        # 1. the flag may be produced, and only from behind a branch
+        for n in ast.walk(tree):
+            if not (isinstance(n, ast.Constant) and n.value == "--allow-orders"):
+                continue
+            ln = lines[n.lineno - 1]
+            if "add_argument" in ln or "help=" in ln or " in cmdlines" in ln:
+                continue                      # declared or read, not produced
+            window = "\n".join(lines[max(0, n.lineno - 7):n.lineno])
+            assert "allow_orders" in window and ("if " in window or "else" in window), (
+                "%s line %d produces --allow-orders with no branch on an explicit request"
+                % (rel, n.lineno))
+
+        # 2. and 3. neither file reaches a broker itself
         assert [n for n in ast.walk(tree) if isinstance(n, ast.Call)
                 and isinstance(n.func, ast.Attribute)
-                and n.func.attr == "send_order"] == [], rel
+                and n.func.attr == "send_order"] == [], (
+            "%s calls send_order; the gated send wire is the only place that may" % rel)
+        assert [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+                and isinstance(n.func, ast.Name)
+                and n.func.id in ("IBKRBroker", "Track1OrderExecutor")] == [], (
+            "%s constructs a broker or an executor in its own process" % rel)
 
 
-def test_39_orders_are_still_impossible():
+def test_39_an_open_gate_still_says_how_it_opened():
+    """This was the load-bearing one, and its old name — "orders are still impossible" — is why
+    it had to be rewritten rather than patched. It asserted a world, not a rule.
+
+    One clause was stale weeks before the rest: `not CONFIRMATION_PATH.exists()` went false on
+    2026-08-27 when the operator signed the file.
+
+    The rule underneath is that a gate never opens quietly. Each blocker is in exactly one of
+    three states, and an override has to keep reading as an override — if a released blocker and
+    an overridden one become indistinguishable on the record, nobody can tell later which
+    evidence was produced and which was waived. That collapse is what this now catches.
+    """
     import os
+
     from global_index import track1_gates as G
+
     allowed, reasons = G.may_enable_orders()
-    ids = [r.split(":")[0] for r in reasons]
-    assert allowed is False
-    assert "B1_broker_account_or_legacy_retirement" in ids
-    assert "PAPER_SHADOW_EVIDENCE" in ids
-    assert not (REPO / G.CONFIRMATION_PATH).exists()
-    assert os.environ.get("TRACK1_ORDERS_APPROVED") in (None, "", "0")
+    conf = G.current_confirmations()
+
+    if not allowed:
+        # the original world: something is blocking, and it says so by name
+        assert reasons, "orders are refused with no reason on the record"
+        return
+
+    # Opened. Then every blocker THAT HOLDS ORDERS is RELEASED or OVERRIDDEN, never silently
+    # neither. The scope matters: eight of the twelve entries carry `blocks_orders=False` and
+    # are unreleased on purpose — sleeve readiness, the bootstrap checkpoint, B3 freshness. A
+    # first draft of this loop ran over all twelve and reported B3 as an unexplained hole,
+    # which is the registry's deliberate fourth state and not a gate that opened quietly.
+    overridden = dict((b.id, why) for b, why in G.overridden())
+    holders = [b for b in G.BLOCKERS.values() if b.blocks_orders]
+    assert holders, "no blocker holds orders at all; the registry has nothing to say yes about"
+    for b in holders:
+        rel = b.released(conf)
+        if b.id in overridden:
+            assert rel is False, (
+                "%s reports itself released AND overridden; the record no longer tells "
+                "produced evidence from waived evidence" % b.id)
+            assert overridden[b.id], "%s is overridden with no reason recorded" % b.id
+        else:
+            assert rel is True, (
+                "%s holds orders and is neither released nor overridden, yet orders are "
+                "allowed" % b.id)
+
+    # And an override is never silent in the other direction either: something that is waived
+    # must appear in `overridden()` rather than only in somebody's memory of a decision.
+    assert all(G.BLOCKERS[i].blocks_orders for i in overridden), (
+        "overridden() names a blocker that never held orders; the report is describing a "
+        "waiver of something that was not blocking")
+
+    # And the second factor is never ambient: approval reaches a child because a launcher was
+    # told to put it there, not because it was lying around in whatever shell ran things.
+    assert os.environ.get("TRACK1_ORDERS_APPROVED") in (None, "", "0"), (
+        "the approval is set in the test process's environment")
 
 
 def test_40_the_evidence_gate_still_blocks_and_reports_zero_days():
@@ -502,8 +622,22 @@ def test_40_the_evidence_gate_still_blocks_and_reports_zero_days():
     assert detail
 
 
-def test_41_this_suite_created_no_real_runtime_orders_directory():
-    assert not (REPO / J.ORDERS_DIR).exists()
+def test_41_this_suite_wrote_nothing_into_the_real_runtime_tree():
+    """Absence was a usable proxy for "this suite wrote nothing" only while the directory had
+    never existed. Production created it on 2026-09-24 by placing two orders that filled, so
+    the old form would now fail for the one reason that is not a problem.
+
+    Measured instead: the listing taken when this module was imported, against the listing now.
+    That is what the test was always about, and it is sharper — it also catches a write into a
+    directory that already exists, which absence could never see.
+    """
+    now = _orders_tree_listing()
+    assert now == _ORDERS_AT_IMPORT, {
+        "added": sorted(now - _ORDERS_AT_IMPORT),
+        "removed": sorted(_ORDERS_AT_IMPORT - now),
+        "why": "this suite changed the real order journal; every write here belongs in tmp_path",
+    }
+    # The rehearsal's own directory has never existed in the real tree and still must not.
     assert not (REPO / CS.DRY_RUN_DIRNAME).exists()
 
 

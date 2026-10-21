@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from monitor.backend.schedule_status import is_clean_exit, is_debt_exit
+from monitor.backend.schedule_status import is_clean_exit, is_debt_exit, is_order_gate_refusal
 from monitor.backend.session_event_reader import read_session_events
 
 LOCAL_TZ = ZoneInfo("America/Edmonton")
@@ -88,12 +88,17 @@ def is_track1_strategy_job(job_id: str) -> bool:
 #: at each call site: three lanes read it and none of them has to know the id spelling.
 TRACK1_SAFETY_STOP_REPAIR = "track1_safety_stop_repair"
 TRACK1_SAFETY_MAX_HOLD = "track1_safety_max_hold"
+#: 2026-10-05. The Calm 15:55 exit. A sleeve that leaves by the clock, not by hold-days. Its id
+#: (`TRACK1_TIME_EXIT_CALM_1555`) deliberately does not start with `TRACK1_CALM_`: that prefix is
+#: a Calm STRATEGY slot, and an exit failure would have been described as "no signal".
+TRACK1_SAFETY_TIME_EXIT = "track1_safety_time_exit"
 TRACK1_WINDOW_AUDIT = "track1_window_audit"
 
 #: The maintenance types, for the readers that need to ask "is this a Track 1 upkeep job?"
 #: without listing them again and drifting from this one.
 TRACK1_MAINTENANCE_TYPES: frozenset = frozenset({
-    TRACK1_SAFETY_STOP_REPAIR, TRACK1_SAFETY_MAX_HOLD, TRACK1_WINDOW_AUDIT})
+    TRACK1_SAFETY_STOP_REPAIR, TRACK1_SAFETY_MAX_HOLD, TRACK1_SAFETY_TIME_EXIT,
+    TRACK1_WINDOW_AUDIT})
 
 
 #: Stage 5ZZY. The stream a job may be RECOVERED by, which is finer than its type.
@@ -136,6 +141,8 @@ def _job_type(job_id: str) -> str:
         return TRACK1_SAFETY_STOP_REPAIR
     if job_id.startswith(("TRACK1_MAX_HOLD", "TRACK1_MAXHOLD")):
         return TRACK1_SAFETY_MAX_HOLD
+    if job_id.startswith("TRACK1_TIME_EXIT"):
+        return TRACK1_SAFETY_TIME_EXIT
     if job_id.startswith("TRACK1_AUDIT"):
         return TRACK1_WINDOW_AUDIT
     if job_id.startswith("LIVE_DAY"):
@@ -309,6 +316,49 @@ def _finish(job: dict[str, Any], ended_at: str, status: str, reason: str | None 
         job["duration_seconds"] = max(0, round((ended - started).total_seconds()))
 
 
+#: 2026-10-06. Traceback noise, dropped BEFORE the 12-line cap so the cap holds what says why.
+#:
+#: Measured on 2026-10-06's sixteen failed jobs: of 189 lines shown, 46 were Python 3.11's
+#: position markers (`^^^^`) and 28 were frames inside ib_insync / asyncio, while 290 lines were
+#: cut by the cap. For TRACK1_STRESS_1130 the twelve kept lines were all asyncio internals and
+#: the frame that said it failed in `broker.connect()` was among the ones cut.
+#:
+#: Dropped: a line that is only `^`/`~`; a `File "..."` frame in site-packages, the standard
+#: library or a frozen module, together with the source line Python prints under it. Kept: every
+#: frame in this project's own files, the exception line, and anything that is not a traceback.
+_CARET_ONLY = re.compile(r"^[\^~\s]+$")
+_LIBRARY_FRAME = re.compile(
+    r'^File "(?:<frozen [^>]*>|[^"]*[\\/]site-packages[\\/][^"]*|[^"]*[\\/]Lib[\\/][^"]*)"')
+_EXCEPTION_LINE = re.compile(r"^[A-Za-z_][\w.]*(?:Error|Exception|Warning|Interrupt|Exit)\b")
+_SKIP_SOURCE = "_skip_library_source_line"     # per-job parse state; removed before return
+
+
+def _append_child_diagnostic(job: dict[str, Any], line: str) -> None:
+    """Attach one echoed child line, keeping the diagnostic tail within its fixed cap."""
+    line = line.strip()
+    if not line:
+        return
+    # Filtered lines are COUNTED in `diagnostics_omitted`, like the ones the cap drops: a line
+    # that is not shown is a line someone may need to know existed (pinned by
+    # test_duplicate_launch_is_one_job_not_a_wall_of_phantoms).
+    if _CARET_ONLY.match(line):
+        job["diagnostics_omitted"] += 1
+        return
+    if line.startswith('File "'):
+        if _LIBRARY_FRAME.match(line):
+            job[_SKIP_SOURCE] = True
+            job["diagnostics_omitted"] += 1
+            return
+        job.pop(_SKIP_SOURCE, None)
+    elif job.pop(_SKIP_SOURCE, False) and not _EXCEPTION_LINE.match(line):
+        job["diagnostics_omitted"] += 1
+        return                                  # the source line printed under a library frame
+    job["diagnostics"].append(line)
+    if len(job["diagnostics"]) > _MAX_CHILD_DIAGNOSTICS:
+        job["diagnostics"].pop(0)
+        job["diagnostics_omitted"] += 1
+
+
 def _annotate_impact_and_action(jobs: list[dict[str, Any]]) -> None:
     """Add conservative operator guidance derived only from observed job evidence."""
     ordered = sorted(jobs, key=lambda item: item["started_at"])
@@ -333,7 +383,24 @@ def _annotate_impact_and_action(jobs: list[dict[str, Any]]) -> None:
                 if later_same_stream else None
             )
 
-        if "dump_state" in diagnostics or "live_state_data" in diagnostics:
+        if "order sending was requested and is not available" in diagnostics:
+            job["impact"] = (
+                "Order sending was refused by the route gate; this execution produced no "
+                "decision record and nothing was sent."
+            )
+            job["action"] = (
+                "Review the named order gate in the diagnostics. Do not treat this as a "
+                "scheduler miss or retry with orders until that gate is resolved."
+            )
+        elif "winerror 1225" in diagnostics:
+            job["impact"] = (
+                "IB Gateway refused the connection (WinError 1225); this execution produced "
+                "no decision record."
+            )
+            job["action"] = (
+                "Allow the Gateway restart window to finish and confirm a later slot connects."
+            )
+        elif "dump_state" in diagnostics or "live_state_data" in diagnostics:
             recovery = (
                 f" Publication resumed at {later_same_stream['job_id']}; this incident is recovered."
                 if later_same_stream else " No later successful publication is visible in this journal yet."
@@ -438,6 +505,15 @@ def _annotate_impact_and_action(jobs: list[dict[str, Any]]) -> None:
                     "Check the Track 1 book for positions past their max hold, then confirm "
                     "the next scheduled check runs."
                 )
+            elif job["job_type"] == TRACK1_SAFETY_TIME_EXIT:
+                job["impact"] = (
+                    "The Track 1 end-of-session exit did not run, so a Calm position opened "
+                    "this morning may still be open past its 15:55 exit."
+                )
+                job["action"] = (
+                    "Check the Track 1 book for a Calm position and close it by hand if it "
+                    "is still there; the next 09:31 max-hold run also closes it."
+                )
             elif job["job_type"] == TRACK1_WINDOW_AUDIT:
                 # Nothing about the broker here on purpose. This job reads the route's own
                 # evidence records; a miss costs a gap in that evidence, not a trading risk.
@@ -511,6 +587,15 @@ def _annotate_impact_and_action(jobs: list[dict[str, Any]]) -> None:
             job["action"] = (
                 "Review the diagnostics below and check the Track 1 book for positions past "
                 "their max hold."
+            )
+        elif job["status"] == "failed" and job["job_type"] == TRACK1_SAFETY_TIME_EXIT:
+            job["impact"] = (
+                "The Track 1 end-of-session exit failed, so a Calm position opened this "
+                "morning may still be open past its 15:55 exit."
+            )
+            job["action"] = (
+                "Review the diagnostics below, check the Track 1 book for a Calm position "
+                "and close it by hand if it is still there."
             )
         elif job["status"] == "failed" and job["job_type"] == TRACK1_WINDOW_AUDIT:
             job["impact"] = (
@@ -695,16 +780,22 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]],
             # happens to contain — a traceback frame quotes the Python install path, and the
             # old "python in detail" test read every such frame as a new run of the job.
             if detail.startswith(("stdout:", "stderr:")):
-                if current is not None and detail.startswith("stderr:"):
-                    line = detail[len("stderr:"):].strip()
-                    if line:
-                        current["diagnostics"].append(line)
-                        # Keep the TAIL, not the head. A traceback says what went wrong on its
-                        # last line and how it got there on the ~28 before it; trimming from
-                        # the end left twelve frames of ib_insync plumbing and no exception.
-                        if len(current["diagnostics"]) > _MAX_CHILD_DIAGNOSTICS:
-                            current["diagnostics"].pop(0)
-                            current["diagnostics_omitted"] += 1
+                # The terminal exit line precedes the captured streams and removes the job
+                # from `active`, so late output belongs to the most recent failed execution
+                # of this same label. INFO chatter is not a failure diagnostic.
+                target = current
+                if target is None:
+                    target = next((job for job in reversed(jobs)
+                                   if job["job_id"] == job_id
+                                   and job["status"] == "failed"), None)
+                if target is not None and level in {"ERROR", "CRITICAL"}:
+                    prefix = "stdout:" if detail.startswith("stdout:") else "stderr:"
+                    _append_child_diagnostic(target, detail[len(prefix):])
+                    if (target.get("status") == "failed"
+                            and is_order_gate_refusal(
+                                "\n".join(target.get("diagnostics", [])))):
+                        target["status"] = "skipped"
+                        target["reason"] = "order_gate_refused"
                 continue
             # Stage 5ZZZ-AU. A job that does its work IN PROCESS never writes a launch line,
             # so nothing here opened a card for it and the run was invisible -- including the
@@ -745,6 +836,11 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]],
                 prior = [j for j in jobs if j["job_id"] == job_id]
                 if prior:
                     prior[-1]["diagnostics"].append(detail)
+                    if (prior[-1].get("status") == "failed"
+                            and is_order_gate_refusal(
+                                "\n".join(prior[-1].get("diagnostics", [])))):
+                        prior[-1]["status"] = "skipped"
+                        prior[-1]["reason"] = "order_gate_refused"
                 else:
                     # The card has not been opened yet; hold the line for it.
                     orphan_notes.setdefault(job_id, []).append(detail)
@@ -788,6 +884,10 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]],
                 continue
             if current and "exited with code" in detail.lower():
                 current["failed_runs"] += 1
+                if is_order_gate_refusal("\n".join(current.get("diagnostics", []) + [detail])):
+                    _finish(current, timestamp, "skipped", "order_gate_refused")
+                    active.pop(job_id, None)
+                    continue
                 # Another launch of this slot may still be in flight. Closing on the first
                 # non-zero exit is what let a refused duplicate bury a run that worked.
                 if current["failed_runs"] < current["launch_count"]:
@@ -853,6 +953,7 @@ def _parse(paths: list[Path], day: str, session_events: list[dict[str, Any]],
             candidates[-1]["events"].append(event)
 
     for job in jobs:
+        job.pop(_SKIP_SOURCE, None)             # parse state, not part of the job record
         counts: dict[str, int] = {}
         for event in job["events"]:
             counts[event["kind"]] = counts.get(event["kind"], 0) + 1
@@ -1189,7 +1290,9 @@ def _annotate_signal_diagnostics(jobs: list[dict[str, Any]], day: str, root: Pat
                    "raw_candidates": max(int(row.get("raw_candidates") or 0), len(found))}
         job["signal"] = {
             "status": status,
-            "chip": sig.chip(status),
+            # Pass the full row so a mixed slot (for example one admitted candidate and one
+            # same-symbol rejection) cannot collapse to a single ACCEPTED SHADOW badge.
+            "chip": sig.chip(row),
             "summary": sig.one_line(row),
             # What the panel renders. Plain English, no field names, no JSON.
             "operator": sig.operator_lines(row),

@@ -1,0 +1,51 @@
+{
+  "freeze_id": "stocks_sec_8k202_event_drift_oos_v1_2026-09-17",
+  "frozen_at": "2026-09-17",
+  "oos_performance_seen": false,
+  "selected_variant": "sec8k202_confirm_hold3",
+  "hold_sessions": 3,
+  "selection_basis": "Highest 2018-2022 base-cost Sharpe among variants passing all pre-registered development gates; then passed all 2023-2024 validation gates.",
+  "development_selection": {
+    "development_sharpe": 0.7311150546680193,
+    "development_dd_pct": -0.03957276445485214,
+    "development_entries": 1702,
+    "development_positive_years": 4,
+    "development_effective_ticker_count": 113.25245767911639,
+    "validation_base_pnl": 4927.60713951943,
+    "validation_cost8_pnl": 2448.421234886526,
+    "validation_dd_pct": -0.031719490165406206
+  },
+  "oos_sample": {
+    "start": "2025-01-02",
+    "end": "2026-09-16",
+    "policy": "Run all pre-registered variants for disclosure, but judge only selected_variant."
+  },
+  "acceptance_gates": {
+    "base_cagr_min": 0.05,
+    "base_sharpe_min": 0.70,
+    "cost8_cagr_min": 0.03,
+    "max_drawdown_pct_floor": -0.10,
+    "event_count_min": 30,
+    "effective_ticker_count_min": 20,
+    "top10_positive_ticker_pnl_share_max": 0.60,
+    "stale_execution_allowed": false
+  },
+  "frozen_provenance": {
+    "preregistration": "STOCKS_SEC_8K202_EVENT_DRIFT_PREREG_2026-09-17.json",
+    "preregistration_sha256": "DEEF856DC71AA99A09AB291CF68AE5C3832A09C14456FF9A657C992227E884AE",
+    "replay_script": "raits/research/stocks_sec_8k202_event_drift_replay.py",
+    "replay_script_sha256": "802364DD397C775FA698C4CAD50C5BC41B1C322452B46C61F05FF298C5528DAC",
+    "development_selection_file": "STOCKS_SEC_8K202_EVENT_DRIFT_DEV_2026-09-17_SELECTION.json",
+    "development_selection_sha256": "43FBEB0EDC41C2D9678F1E5B4E21CB6B7D43653F7FD783EB8F1C92ED99CB599D",
+    "development_summary_file": "STOCKS_SEC_8K202_EVENT_DRIFT_DEV_2026-09-17_SUMMARY.csv",
+    "development_summary_sha256": "DF226EA6FA444B90F72FF6EEBCAA2C2DBB105D7F6097B60DFD1CB470657348BE",
+    "event_file": "raits/data/cache/external_events/sec_submissions_pit_2018_2026/sec_8k_item_202_events_2017_2026.csv",
+    "event_file_sha256": "9034D0E6E83E8EFDEEFB6EE6BBC444B3D1282C00EF2BD19FFEC819AC3B705226"
+  },
+  "pre_oos_qa": {
+    "max_event_gross": 1.0,
+    "reconciliation_tolerance": 1e-8,
+    "gross_cap_pass": true,
+    "reconciliation_pass": true
+  }
+}

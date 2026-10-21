@@ -1,0 +1,116 @@
+{
+  "spec_id": "stocks_sec_form4_role_purchase_drift_v1_2026-09-24",
+  "frozen_before_family_performance": true,
+  "adaptive_search_disclosure": "This family was opened after broad purchase drift failed development gates in section 6.209. It is a new SEC reporting-owner semantic, but it is adaptive research rather than pristine discovery.",
+  "hypothesis": "Open-market purchases by economically distinct insider roles may contain more stable information than pooling every reporting owner.",
+  "samples": {
+    "development": "2018-04-27 through 2022-12-30",
+    "validation": "2023-01-03 through 2024-12-31",
+    "oos": "2025-2026 prohibited"
+  },
+  "event_contract": {
+    "transaction_source": "Corrected official SEC Form 4 accession table from section 6.208",
+    "role_source": "REPORTINGOWNER.tsv in official quarterly SEC Insider Transactions Data Sets, joined by exact accession",
+    "purchase": "NONDERIV_TRANS code P plus acquired code A",
+    "availability": "First full PIT trading session whose 09:15 ET cutoff is strictly after SEC acceptance",
+    "role_attribution": "An accession receives a role flag when at least one reporting owner has that relationship/title. SEC flattened transactions are not owner-keyed, so joint-owner filings cannot attribute a transaction to one owner; this limitation is reported and no owner is selected post hoc.",
+    "ceo": "Case-insensitive title contains chief executive or standalone CEO",
+    "cfo": "Case-insensitive title contains chief financial or standalone CFO",
+    "c_suite": "CEO or CFO",
+    "nonofficer_director": "Relationship contains Director and does not contain Officer",
+    "ten_percent_owner": "Relationship contains TenPercentOwner",
+    "role_dollars": "Sum purchase dollars only from exact accessions carrying that frozen role flag"
+  },
+  "market_contract": {
+    "universe": "Quarterly PIT market-cap top500 representative per SEC issuer CIK, current price>=5, lagged ADV20>=10m",
+    "price_reaction_gate": "None",
+    "direction": "Long only",
+    "entry": "Exact 09:35 on availability session",
+    "exit": "Exact 15:55 on hold session 20",
+    "stage_boundary": "Independent $100k development and validation books; only complete holds inside each stage"
+  },
+  "candidate_family": [
+    {
+      "variant": "form4_ceo_purchase_hold20",
+      "filter": "ceo_purchase_transaction_count>=1",
+      "hold_sessions": 20
+    },
+    {
+      "variant": "form4_cfo_purchase_hold20",
+      "filter": "cfo_purchase_transaction_count>=1",
+      "hold_sessions": 20
+    },
+    {
+      "variant": "form4_csuite_purchase100k_hold20",
+      "filter": "c_suite_purchase_dollars>=100000",
+      "hold_sessions": 20
+    },
+    {
+      "variant": "form4_nonofficer_director_purchase100k_hold20",
+      "filter": "nonofficer_director_purchase_dollars>=100000",
+      "hold_sessions": 20
+    },
+    {
+      "variant": "form4_tenpercent_purchase100k_hold20",
+      "filter": "ten_percent_owner_purchase_dollars>=100000",
+      "hold_sessions": 20
+    }
+  ],
+  "portfolio_contract": {
+    "start_capital": 100000.0,
+    "entry_notional_nav": 0.03,
+    "single_issuer_cap_nav": 0.03,
+    "hard_gross_cap": 1.0,
+    "overlap": "No new position while issuer CIK is active",
+    "capacity": "Entry notional <=1% current PIT ADV20",
+    "unused_capacity": "Cash; no refill",
+    "missing_entry": "Skip without replacement",
+    "missing_exit": "Retain until next exact 09:35 or 15:55",
+    "base_cost_bps_each_trade": 4.0,
+    "stress_cost_bps_each_trade": 8.0,
+    "financing_annual_above_1x": 0.025
+  },
+  "selection_rule": {
+    "ranking_period": "2018-2022",
+    "ranking": "Highest base Sharpe among candidates passing all development gates",
+    "development_gates": {
+      "positive_calendar_years_min": 3,
+      "base_pnl_positive": true,
+      "stress8_pnl_positive": true,
+      "max_drawdown_pct_floor": -0.15,
+      "entry_count_min": 75,
+      "effective_ticker_count_min": 20,
+      "top10_positive_ticker_pnl_share_max": 0.65
+    },
+    "validation_gates": {
+      "base_pnl_positive": true,
+      "stress8_pnl_positive": true,
+      "both_calendar_year_base_pnl_nonnegative": true,
+      "max_drawdown_pct_floor": -0.10,
+      "entry_count_min": 25,
+      "effective_ticker_count_min": 10,
+      "top10_positive_ticker_pnl_share_max": 0.75
+    },
+    "tie_break": "Higher stress8 Sharpe, then more entries, then variant name",
+    "selection_isolation": "Select once on development; validation cannot substitute another role"
+  },
+  "audit_requirements": [
+    "Report role coverage, joint-owner ambiguity, signal/entry counts, both costs, yearly PnL, dollar and percentage DD, concentration, turnover, exposure, and missing marks.",
+    "Report broad-PIT beta/residual attribution separately without changing selection.",
+    "No old-62 issuer selection, no refill shortcut, and no 2025-2026 rows."
+  ],
+  "implementation_freeze": {
+    "family_performance_seen": false,
+    "role_builder": "raits/research/stocks_sec_form4_reporting_owner_roles_build.py",
+    "replay_script": "raits/research/stocks_sec_form4_role_purchase_drift_replay.py",
+    "pre_performance_repairs": [
+      "The first replay attempt stopped during the accession-role merge before signal construction or performance measurement because accession_compact had mismatched CSV dtypes. Both merge keys were canonicalized to stripped strings; no candidate rule or threshold changed.",
+      "The second replay attempt stopped during executable-date filtering before signal construction or performance measurement because the assigned session column had object dtype. Assigned sessions were canonicalized to datetime64[ns]; no candidate rule or threshold changed.",
+      "The third replay reached simulation with an empty accession-role join because accession_compact leading zeros had already been lost during CSV inference; every printed PnL was therefore the invalid zero-book result and output writing failed on empty contributions. accession_compact is now read as string at ingestion. No valid signal or family performance was observed and no candidate rule or threshold changed."
+    ],
+    "script_hashes": {
+      "raits/research/stocks_sec_form4_reporting_owner_roles_build.py": "9DF36A1BE94DE1A1B4766F5356039F3194D1126201C893CCE2BD1BA6138C062B",
+      "raits/research/stocks_sec_form4_role_purchase_drift_replay.py": "0829CAA44595D7260F139C54BB1F17C89BB69F6162EA93A00360EA5A07AC23A7"
+    }
+  }
+}

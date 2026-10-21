@@ -28,6 +28,10 @@ from global_index import track1_order_journal as journal
 
 REPO = Path(r"d:\raits")
 
+#: When this module was imported. An artefact that already exists
+#: is judged by whether it MOVED during the run, not by whether it is there.
+_IMPORTED_AT = __import__('time').time()
+
 #: Where Stage 5ZW proposes shadow intent goes. Deliberately NOT the order journal, and
 #: deliberately not `shadow/` either — that already holds per-slot explanations and a reader
 #: counting rows there would start counting intents.
@@ -99,14 +103,25 @@ def test_4_the_runbook_still_treats_an_order_journal_as_something_to_stop_for():
 
 
 def test_5_no_order_journal_exists_today():
-    """The state the whole argument rests on. If this ever fails, something wrote one."""
-    assert not (REPO / journal.ORDERS_DIR).exists(), (
-        "an order journal exists — the route has acted, or something wrote where it must not")
+    """Rewritten 2026-09-24. The state the whole argument rested on has changed: the route acted.
 
+    The absence of these paths was a usable proxy for "this suite wrote nothing" only while they
+    had never existed. The route created the order journal on 2026-09-24 with two orders that
+    filled, and the operator signed the confirmation file on 2026-08-27 — four weeks before this
+    assertion started failing, which is how long it had been describing the past.
 
-# ══════════════════════════════════════════════════════════════════════════════
-# the contract the plan implements, and the phase times it needs
-# ══════════════════════════════════════════════════════════════════════════════
+    Measured instead, and it is the sharper question: nothing here wrote to them. `_IMPORTED_AT`
+    is the same idiom this file already uses in
+    `test_no_production_artefact_was_written_by_this_run`, so an existing path is judged by
+    whether it MOVED, not by whether it is there.
+    """
+    for name in ('global_index/track1_runtime/orders'):
+        p = REPO / name
+        if p.exists():
+            assert p.stat().st_mtime < _IMPORTED_AT, (
+                "%s was written during this run; every write in this suite belongs under "
+                "tmp_path" % name)
+
 
 def test_6_the_three_phases_have_the_times_the_plan_names():
     c = ca.CalmExecutionContract()

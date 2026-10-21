@@ -1,0 +1,28 @@
+{
+  "frozenBeforeReplicationPerformance": true,
+  "frozenAtLocalDate": "2026-10-03",
+  "script": "raits/research/stocks_sec_8k_content_event_replication.py",
+  "scriptHash": "F26598046849B18B282AB16750EFB7E740FAFA5FC0557B5D7967A6CF87AE8FAA",
+  "discoveryResults": "STOCKS_SEC_8K_CONTENT_EVENT_2026-10-03_DISCOVERY.csv",
+  "discoveryResultsHash": "4392E9A2FB4CF3A9C3779795E17D74CEEF35C4DE2C8524F3139CB66B12F31E13",
+  "replicationLabels": "raits/data/cache/external_events/sec_8k_content_2018_2021/labels_replication.csv",
+  "replicationLabelsHash": "511A4379E996DD62E90F1D702BC0C784E4D0892EFCDF316F80D26665ABC01530",
+  "replicationClassificationManifestHash": "557A432DE30115D13910BDBC4B2C27C59CC0541FE61B56C76A46A7F1A39F7C30",
+  "selectedCells": [
+    {
+      "eventClass": "buyback_authorization",
+      "horizon": "d1",
+      "direction": 1
+    }
+  ],
+  "discoveryEvidence": {
+    "meanResidual": 0.0031232277,
+    "t": 3.0462783752,
+    "q": 0.0417047788,
+    "events": 478,
+    "agreeingYears": 3
+  },
+  "replicationGate": "Calendar 2021 only; at least 20 events, positive residual mean, directional t >=1.0, and mean magnitude >=25% of discovery. No other semantic class or horizon is scored for replication.",
+  "productionPassAllowed": false,
+  "laterData": "No 2022-2026 performance is opened."
+}

@@ -1,0 +1,65 @@
+{
+  "research_question": "Can one causally retrained policy learn when and how to trade broad-PIT opening events, including an explicit no-trade action, rather than applying a fixed directional setup across regimes?",
+  "frozen_before_performance": true,
+  "frozen_at_local_date": "2026-10-04",
+  "script": "raits/research/stocks_pit_adaptive_opening_policy.py",
+  "script_hash": "1C1D8590C2B4303E78453975EC4DE03302E1462FBE3E2C281DE37DEA483F66AF",
+  "relationship_to_prior_work": "Sections 6.222-6.225 tested fixed opening price-volume and tick-flow directions. Section 6.232 tested annual expanding models on different d5/d20 contexts without a calibrated no-trade policy. This family freezes one monthly-retrained EOD policy whose direction, activity, and 0.5x/1.0x scale are learned solely from prior data. It does not tune a failed static rule or allocate among prior sleeves.",
+  "data_contract": {
+    "universe": "Quarterly PIT market-cap top500 intersected with daily PIT eligibility, price >=5, and ADV20 >=10m. Source rows are the 32,176 broad opening-event ticker-days formed causally in section 6.222. Old/manual 62 membership is unused.",
+    "features": "Only fields available before 09:35 ET: lagged price/volatility/beta/liquidity/cap, 09:30-09:35 OHLCV and market/SIC residuals, and Polygon SIP trade-flow fields whose sip_timestamp is strictly before 09:35.",
+    "execution": "Ranking follows the completed 09:30-09:35 signal. Entry admission and fill use the exact adjusted 09:40 five-minute open. Scheduled exit is the exact 15:55 open; if absent, an already-selected position exits at 16:00. Future exit availability never affects ranking or refill.",
+    "development": "Monthly walk-forward scores 2019-06-03 through 2021-12-31.",
+    "locked_validation": "Calendar 2022 opens only if the single adaptive policy passes every development gate.",
+    "post2022": "Forbidden. No 2023-2026 feature or performance may be consumed.",
+    "quotes": "Historical NBBO is unavailable under the current entitlement. No spread, quoted-depth, or auction-imbalance feature is claimed."
+  },
+  "policy": {
+    "candidate_admission": "Signal/entry fields complete at 09:40, at least 100 pre-09:35 signal trades, and at least $1m signal dollar volume. No realized-return, exit-availability, ticker-PnL, or old-62 filter.",
+    "continuous_features": [
+      "gap", "previous stock and SPY day returns", "lagged volatility and beta", "first-five return and rvol", "market and SIC opening residuals", "first-five range and close location", "total/early/late/large/TRF/lit flow imbalance", "large/TRF/opening-print shares", "late-versus-early trade rate", "VWAP displacement", "signal activity", "PIT market cap", "lagged ADV20"
+    ],
+    "transformation": "Every continuous feature is same-date cross-sectional percentile rank mapped to [-1,1]. Missing ranked values become zero. No outcome enters transformation.",
+    "model": "One HistGradientBoostingRegressor: squared error, learning rate 0.05, 100 iterations, seven leaves, minimum leaf 100, L2 10, seed 314159. No model-family or hyperparameter search.",
+    "target": "09:40 exact open to 15:55 exact open underlying return. Training targets are clipped to training-only 1st/99th percentiles and each training date receives equal aggregate weight.",
+    "retraining": "First session of every month. Use at most the previous 378 sessions. The last 63 sessions are an inner temporal calibration block; at least 189 earlier core sessions are required. Final model refits on the full prior window only after calibration diagnostics are fixed.",
+    "calibration": "A provisional core-only model forms three-long/three-short daily calibration books. A no-intercept realized-on-predicted slope is clipped to [0,1]. The month is inactive unless there are at least 20 calibration books, slope >0, and base-cost net mean is positive in the full calibration block and separately in both chronological halves.",
+    "selection": "Each day rank predicted return, select three longs and three shorts, maximum one name per SIC per side, deterministic ADV/ticker tie-break, and exclude chosen longs from the short pool. If either side cannot fill three names, do not trade.",
+    "abstention_and_scale": "Calibrated predicted whole-book edge below 12 bps means no trade; 12 to below 20 bps uses 0.5x gross; at least 20 bps uses 1.0x gross. Thresholds include the 8-bps base round-trip book cost plus a fixed buffer.",
+    "adv_cap": "Every order must be <=1% of lagged ADV20.",
+    "initial_equity": 100000,
+    "compounding": true
+  },
+  "costs": {
+    "base_bps_per_traded_dollar_per_side": 4,
+    "stress_bps_per_traded_dollar_per_side": 8,
+    "short_borrow_annual": 0.01,
+    "financing": 0
+  },
+  "development_gate": {
+    "active_days_min": 100,
+    "trade_legs_min": 600,
+    "cagr_min": 0.05,
+    "sharpe_min": 1.0,
+    "max_drawdown_pct_floor": -0.10,
+    "positive_years_min": 2,
+    "gross_edge_bps_per_active_day_min": 12,
+    "stress_pnl_positive": true,
+    "effective_positive_ticker_count_min": 30,
+    "top10_positive_pnl_share_max": 0.50
+  },
+  "validation_gate": {
+    "active_days_min": 20,
+    "pnl_positive": true,
+    "sharpe_min": 0.5,
+    "max_drawdown_pct_floor": -0.10,
+    "stress_pnl_positive": true,
+    "effective_positive_ticker_count_min": 15,
+    "top10_positive_pnl_share_max": 0.60
+  },
+  "selection_effect": "There is exactly one frozen adaptive policy, so there is no post-result model/horizon winner. Trade selection is rebuilt for each monthly vintage from causal scores, exact entry admission, SIC full refill, abstention, scale, compounding, costs, and exits.",
+  "multiple_testing_policy": "One policy, one horizon, one fixed model, one calibration rule, and fixed thresholds. No feature deletion/addition, hyperparameter search, threshold rescue, direction inversion, or ticker-PnL exclusion after performance.",
+  "production_policy": "A development or 2022 validation pass cannot itself grant production PASS. It only permits independent leakage, replay, concentration, and paper-trading audit.",
+  "technical_correction_policy": "A plumbing/runtime defect found before the first performance table may be corrected only if recorded here before rerun and without changing features, model parameters, windows, calibration, thresholds, portfolio construction, costs, or gates.",
+  "technical_corrections_before_first_output": []
+}

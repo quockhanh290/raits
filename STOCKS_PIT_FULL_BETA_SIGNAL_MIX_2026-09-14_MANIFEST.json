@@ -1,0 +1,58 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_BETA_SIGNAL_MIX_2026-09-14",
+  "script": "raits/research/stocks_pit_full_beta_signal_mix.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_NO_INTRADAY_NOWARMUP_2018_2024_EQUITY.csv",
+    "STOCKS_PIT_FULL_MCAP_BETA_RISK_CONTROL_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_BETA_VOLTARGET_EXPANSION_2026-09-14_DAILY.csv"
+  ],
+  "sample_label": "Research/in-sample diagnostics across 2018-2024. 2023-2024 is touched validation, not clean unseen OOS.",
+  "method": "Fixed daily return mix of causal benchmark beta-voltarget stream and broad PIT B no-intraday signal stream.",
+  "variants": [
+    {
+      "variant": "top62_vt12_plus_B05",
+      "beta": "top62_voltarget_12pct_cap100",
+      "beta_weight": 1.0,
+      "signal_weight": 0.5
+    },
+    {
+      "variant": "top62_vt12_plus_B10",
+      "beta": "top62_voltarget_12pct_cap100",
+      "beta_weight": 1.0,
+      "signal_weight": 1.0
+    },
+    {
+      "variant": "top62_vt16_plus_B05",
+      "beta": "top62_vt16_cap150",
+      "beta_weight": 1.0,
+      "signal_weight": 0.5
+    },
+    {
+      "variant": "top62_vt16_plus_B10",
+      "beta": "top62_vt16_cap150",
+      "beta_weight": 1.0,
+      "signal_weight": 1.0
+    },
+    {
+      "variant": "top62_vt20_plus_B05",
+      "beta": "top62_vt20_cap200",
+      "beta_weight": 1.0,
+      "signal_weight": 0.5
+    },
+    {
+      "variant": "spy_vt16_plus_B05",
+      "beta": "spy_vt16_cap150",
+      "beta_weight": 1.0,
+      "signal_weight": 0.5
+    }
+  ],
+  "rule_selection": "None. Variant set fixed in VARIANTS before measuring.",
+  "old_62_usage": "None; signal stream is full broad PIT B nowarmup, beta streams are market-cap/SPY benchmark streams.",
+  "outputs": [
+    "STOCKS_PIT_FULL_BETA_SIGNAL_MIX_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_BETA_SIGNAL_MIX_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_BETA_SIGNAL_MIX_2026-09-14_SPLITS.csv",
+    "STOCKS_PIT_FULL_BETA_SIGNAL_MIX_2026-09-14_CORRELATION.csv",
+    "STOCKS_PIT_FULL_BETA_SIGNAL_MIX_2026-09-14_DAILY.csv"
+  ]
+}

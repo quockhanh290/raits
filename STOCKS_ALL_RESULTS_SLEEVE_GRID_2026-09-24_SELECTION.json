@@ -1,0 +1,7 @@
+{
+  "selectedWeights": "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_DAILY.csv::sic_pairs_quarterly_z2_hold10=0.50|STOCKS_PIT_FULL_TURN_OF_MONTH_COSTAWARE_2026-09-14_DAILY.csv::spy_first5_x25_fin25_cost4=0.25|STOCKS_PIT_FULL_MEGACAP_RELATIVE_SPREAD_2026-09-14_DAILY.csv::long_top62_short_top200_100_100=0.25",
+  "developmentPass": true,
+  "validationPass": true,
+  "familyStatus": "CONTINUE_DIAGNOSTIC",
+  "productionPassAllowed": false
+}

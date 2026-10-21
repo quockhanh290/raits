@@ -1,0 +1,31 @@
+{
+  "scriptHash": "080F4F2C758FC3905E6B31277335818BD7AE2C26BDDD2A93AAAB218A459C65F2",
+  "manifestScriptHash": "080F4F2C758FC3905E6B31277335818BD7AE2C26BDDD2A93AAAB218A459C65F2",
+  "scriptHashMatch": true,
+  "preregHash": "7BC646E671F616B71F8CCC6CB49483DDC7B5C37E1171075E55774484253BF31C",
+  "manifestPreregHash": "7BC646E671F616B71F8CCC6CB49483DDC7B5C37E1171075E55774484253BF31C",
+  "preregHashMatch": true,
+  "featureHash": "4D1E0374FAF0783A1BD577FF970EDCC55D9A804E22624CFAEFE6D64E57D24B0D",
+  "manifestFeatureHash": "4D1E0374FAF0783A1BD577FF970EDCC55D9A804E22624CFAEFE6D64E57D24B0D",
+  "featureHashMatch": true,
+  "developmentRows": 5,
+  "developmentPasses": 0,
+  "dailyMaxDate": "2021-12-31",
+  "tradeMaxDate": "2021-12-28",
+  "post2021PerformanceRows": 0,
+  "featureClockViolations": 0,
+  "sicCapViolations": 0,
+  "nameCountViolations": 0,
+  "weightViolations": 0,
+  "advCapViolations": 0,
+  "maxReconciliationError": 8.36735125631094e-11,
+  "selection": {
+    "status": "KILL_NO_DEVELOPMENT_PASS",
+    "selectedVariant": null,
+    "validationOpened": false,
+    "productionPassAllowed": false
+  },
+  "validationOpened": false,
+  "post2022Consumed": false,
+  "pass": true
+}

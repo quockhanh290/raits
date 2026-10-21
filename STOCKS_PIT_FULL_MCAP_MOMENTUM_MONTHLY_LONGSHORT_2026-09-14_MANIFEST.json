@@ -1,0 +1,73 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_MCAP_MOMENTUM_MONTHLY_LONGSHORT_2026-09-14",
+  "script": "raits/research/stocks_pit_full_mcap_momentum_monthly_longshort.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv"
+  ],
+  "sample_label": "Research/in-sample diagnostics across 2018-2024. 2023-2024 is touched validation, not clean unseen OOS.",
+  "causality": "Monthly selection uses ret20_pre/ret60_pre and PIT market-cap snapshot on rebalance date; holdings start next trading day.",
+  "variants": [
+    {
+      "variant": "pool500_ret60_topbot10_gross100_100",
+      "pool": 500,
+      "signal": "ret60_pre",
+      "names": 10,
+      "long_gross": 1.0,
+      "short_gross": 1.0
+    },
+    {
+      "variant": "pool500_ret60_topbot20_gross100_100",
+      "pool": 500,
+      "signal": "ret60_pre",
+      "names": 20,
+      "long_gross": 1.0,
+      "short_gross": 1.0
+    },
+    {
+      "variant": "pool200_ret60_topbot10_gross100_100",
+      "pool": 200,
+      "signal": "ret60_pre",
+      "names": 10,
+      "long_gross": 1.0,
+      "short_gross": 1.0
+    },
+    {
+      "variant": "pool200_ret60_topbot20_gross100_100",
+      "pool": 200,
+      "signal": "ret60_pre",
+      "names": 20,
+      "long_gross": 1.0,
+      "short_gross": 1.0
+    },
+    {
+      "variant": "pool500_ret20_topbot20_gross100_100",
+      "pool": 500,
+      "signal": "ret20_pre",
+      "names": 20,
+      "long_gross": 1.0,
+      "short_gross": 1.0
+    },
+    {
+      "variant": "pool500_ret60_top20_short10_gross100_50",
+      "pool": 500,
+      "signal": "ret60_pre",
+      "long_names": 20,
+      "short_names": 10,
+      "long_gross": 1.0,
+      "short_gross": 0.5
+    }
+  ],
+  "costs": "4.0 bps per side approximated from monthly holding turnover.",
+  "rule_selection": "None. Variant set fixed in VARIANTS before measuring.",
+  "old_62_usage": "None.",
+  "outputs": [
+    "STOCKS_PIT_FULL_MCAP_MOMENTUM_MONTHLY_LONGSHORT_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_MCAP_MOMENTUM_MONTHLY_LONGSHORT_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_MCAP_MOMENTUM_MONTHLY_LONGSHORT_2026-09-14_SPLITS.csv",
+    "STOCKS_PIT_FULL_MCAP_MOMENTUM_MONTHLY_LONGSHORT_2026-09-14_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_MCAP_MOMENTUM_MONTHLY_LONGSHORT_2026-09-14_REBALANCES.csv",
+    "STOCKS_PIT_FULL_MCAP_MOMENTUM_MONTHLY_LONGSHORT_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_MCAP_MOMENTUM_MONTHLY_LONGSHORT_2026-09-14_TICKER_CONTRIB.csv"
+  ]
+}

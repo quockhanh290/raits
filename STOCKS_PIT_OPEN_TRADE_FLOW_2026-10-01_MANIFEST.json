@@ -1,0 +1,27 @@
+{
+  "script": "D:/raits/raits/research/stocks_pit_open_trade_flow.py",
+  "scriptHash": "C7D8A34A99B4B2C786B1CCDDB534E8F4FEBD57CF9B481D8C30BCD6E038E6A7CD",
+  "preregistration": "STOCKS_PIT_OPEN_TRADE_FLOW_PREREG_2026-10-01.json",
+  "preregistrationHash": "3358A263707C08C4D00A70FE8B4D6B5EBDB72A60DD380768783A5181E7C6DC55",
+  "featureCache": "raits/data/cache/polygon_stock_trades_open_2018_2022/causal_features_pre0935.parquet",
+  "featureCacheHash": "5105B2E1F7E3A2B8C39F03C17960D94458D9F86AFE57693ED3A4AE4D9953A014",
+  "featureManifest": "raits/data/cache/polygon_stock_trades_open_2018_2022/causal_features_pre0935_manifest.json",
+  "featureManifestHash": "6ED0A1F87E0C869CD4723FEC2A6BC5E8C455C6CFCE5F023FD1216C2EEA02CE81",
+  "exactClock": "STOCKS_PIT_OPENING_10M15M_PRICE_VOLUME_2026-10-01_EXACT_CLOCK_ROWS.csv",
+  "exactClockHash": "127E011EC9526D11E38F9EA7785AACB5E3CBBE013C7E97C3266C49BF3BEA4BE6",
+  "selection": {
+    "status": "KILL_NO_DEVELOPMENT_PASS",
+    "selectedVariant": null,
+    "validationOpened": false,
+    "productionPassAllowed": false
+  },
+  "development": [
+    "2018-05-24",
+    "2021-12-31"
+  ],
+  "validation": null,
+  "oldManual62Used": false,
+  "post2022Consumed": false,
+  "productionPassAllowed": false,
+  "causality": "features use SIP arrivals strictly before 09:35 ET; exact 09:40 entry; fixed scheduled exits with causal same-session halt fallback"
+}

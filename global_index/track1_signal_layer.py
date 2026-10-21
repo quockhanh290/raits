@@ -457,10 +457,19 @@ class Track1Book:
     # ── the loop ─────────────────────────────────────────────────────────────
     def process_instant(self, ts, candidates: Sequence[Candidate], *,
                         early_exit_value=None) -> list:
-        """One instant: settle what is due, mark the breaker, then decide each candidate in
-        risk-high-first order. Returns the decisions, in the order they were made."""
+        """One instant: open the day, settle what is due, mark the breaker, then decide each
+        candidate in risk-high-first order. Returns the decisions, in the order they were made."""
+        day = _day(ts)
+        if self.cur_day is None or day != self.cur_day:
+            if self.breaker is not None:
+                self.breaker.start_day(self.equity)
+            self.cur_day = day
         self.settle_due(ts)
-        allow = self.begin_instant(ts)
+        if self.breaker is None:
+            allow = True
+        else:
+            self.breaker.update(self.equity)
+            allow = bool(self.breaker.status(self.equity).get("allow_new_entries", True))
         out = []
         for cand in sorted(candidates, key=lambda c: entry_priority_key(
                 {"risk_sized": c.risk_dollars})):
@@ -524,6 +533,256 @@ def restore(book: "Track1Book", state: Mapping[str, Any],
                                                   row["sleeve"])))
     book.cut_instant = pd.Timestamp(state["cut_instant"])
     return book
+
+
+#: Where a seeded row came from, so a reader can tell it from one this run opened.
+SEEDED_SOURCE = "seeded_from_route_book"
+
+#: A durable system-equity mark must be a plausible Track 1 sleeve equity, not merely a
+#: number with the right unit.  The upper edge is the largest ending equity measured for
+#: this route's own replay windows (floor: 114,902.91; vault2025: 63,236.11; vault2026:
+#: 58,259.85).  The lower edge separates equity-shaped values from one-row P&L/risk-shaped
+#: values; it is deliberately not a risk-acceptance edge.  The current live rows carry
+#: 3,817.28 of total open risk, and the regression P&L-delta impostor is 408.25, so 5,000
+#: is above the measured order/P&L scale while still letting a low-but-real sleeve equity
+#: remain visible to the breaker.  The edges are intentionally not symmetric; the old
+#: symmetric account/5..account*5 band let an account-scale balance such as 240,000 pass.
+#:
+#: The magnitude band cannot establish identity when broker money falls inside it.  The
+#: persisted broker mark is therefore a PROTECTIVE DEPENDENCY, not decorative reconciliation
+#: context: without it the breaker may arm, but must report that its broker-identity check was
+#: not possible.  Writing that mark is deliberately outside this reader's responsibility.
+EQUITY_MARK_LOWER = 5_000.0
+EQUITY_MARK_UPPER = 114_902.91
+
+
+def read_route_positions(path, *, route: str = ROUTE) -> list:
+    """The OPEN rows of the route's own book. Fails CLOSED, and lives here on purpose.
+
+    The route already has a reader for this file — `track1_paper_executor.read_book` — and it may
+    not be used from the slot path. The gate check sits ABOVE that import precisely so an unarmed
+    run never loads the order layer at all, and importing it here to read a JSON file would end
+    that property for every shadow run. So the reading rule is restated in the layer that owns the
+    question "what does the route hold", with the same three-state discipline:
+
+        file absent      -> []          the route has held nothing yet, which is a real answer
+        file unreadable  -> RAISE       "I cannot read what I hold" answered as "I hold nothing"
+                                        is the shape that lets size land on the wrong side
+        wrong route      -> RAISE       `live_positions.json` and `live_positions.track1.json` are
+                                        the same shape, so a mistaken path would otherwise read as
+                                        a valid answer to a different question
+    """
+    import json as _json
+    from pathlib import Path as _Path
+
+    p = _Path(path)
+    if not p.exists():
+        return []
+    try:
+        raw = _json.loads(p.read_text(encoding="utf-8"))
+    except Exception as exc:                                          # noqa: BLE001
+        raise BootstrapRefused(
+            f"the route's book at {p} exists and could not be parsed "
+            f"({type(exc).__name__}: {exc}); that is not an empty book") from exc
+    if not isinstance(raw, dict):
+        raise BootstrapRefused(f"the route's book at {p} is not an object")
+    stamped = raw.get("route")
+    if stamped is not None and str(stamped) != str(route):
+        raise BootstrapRefused(
+            f"the book at {p} is stamped route={stamped!r}, not {route!r}")
+    if "positions" not in raw:
+        raise BootstrapRefused(
+            f"the route's book at {p} carries no `positions` key; a file that exists but "
+            f"does not say what is held is not an empty book")
+    rows = raw.get("positions")
+    if not isinstance(rows, list):
+        raise BootstrapRefused(f"the book at {p} has a non-list `positions`")
+    # Only what is still open. A row carrying an exit_time has been closed and weighs nothing.
+    out = []
+    for i, r in enumerate(rows):
+        if not isinstance(r, dict):
+            raise BootstrapRefused(
+                f"the book at {p} has a non-object positions[{i}] row; dropping it would "
+                f"understate what the route holds")
+        if not r.get("exit_time"):
+            out.append(r)
+    return out
+
+
+def route_book_breaker_state(path, *, account: float = ACCOUNT, route: str = ROUTE) -> dict:
+    """Decide whether the route book carries an armed breaker state.
+
+    The breaker must not start from the account constant and call that a measured equity mark.
+    The only in-scope durable source on this route is the book. If that book has no marks, or
+    if any of its three breaker marks is implausible relative to the sleeve account base, the
+    honest state is an unarmed breaker that says why. Broker equity is a different-scale fact.
+    It is never copied into a breaker field, but it is a protective identity input: if it is
+    absent an otherwise plausible breaker may arm only while naming that the broker-identity
+    check was not possible.
+
+    This is deliberately pure: both the live slot path and the dashboard ask this same function
+    before either one says "armed". The slot wrapper below mutates a Track1Book only after this
+    decision has been made.
+    """
+    import json as _json
+    from pathlib import Path as _Path
+
+    p = _Path(path)
+    if not p.exists():
+        return {"armed": False, "source": str(p), "reason": "route book absent"}
+    try:
+        raw = _json.loads(p.read_text(encoding="utf-8"))
+    except Exception as exc:                                          # noqa: BLE001
+        raise BootstrapRefused(
+            f"the route's book at {p} exists and breaker state could not be parsed "
+            f"({type(exc).__name__}: {exc})") from exc
+    if not isinstance(raw, Mapping):
+        raise BootstrapRefused(f"the route's book at {p} is not an object")
+    stamped = raw.get("route")
+    if stamped is not None and str(stamped) != str(route):
+        raise BootstrapRefused(
+            f"the book at {p} is stamped route={stamped!r}, not {route!r}")
+
+    def _num(name: str) -> float | None:
+        v = raw.get(name)
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            raise BootstrapRefused(
+                f"the route's book at {p} carries non-numeric {name}={v!r}") from None
+
+    equity = _num("equity")
+    peak = _num("peak_equity")
+    day_start = _num("day_start_equity")
+    broker_equity = _num("broker_equity")
+    cur_day = (pd.Timestamp(raw["cur_day"]).normalize()
+               if raw.get("cur_day") else None)
+    if equity is None and peak is None and day_start is None:
+        return {"armed": False, "source": str(p),
+                "reason": "route book carries no measured equity marks"}
+    missing_required = [name for name, value in (
+        ("equity", equity), ("peak_equity", peak)) if value is None]
+    if missing_required:
+        return {"armed": False, "source": str(p),
+                "reason": "route book carries no measured " + ", ".join(missing_required)}
+
+    lower = EQUITY_MARK_LOWER
+    upper = EQUITY_MARK_UPPER
+    breaker_marks = (
+        ("equity", equity),
+        ("peak_equity", peak),
+        ("day_start_equity", day_start),
+    )
+    invalid = [(name, value) for name, value in breaker_marks
+               if value is not None and not lower <= value <= upper]
+    if invalid:
+        held = ", ".join(f"{name}={value!r}" for name, value in invalid)
+        return {"armed": False, "source": str(p),
+                "reason": (f"route book carries out-of-band {held}; expected "
+                           f"{lower!r} <= mark <= {upper!r} from account={account!r}")}
+    if broker_equity is not None:
+        copied = [(name, value) for name, value in breaker_marks
+                  if value is not None and abs(value - broker_equity) < 1e-9]
+        if copied:
+            held = ", ".join(f"{name}={value!r}" for name, value in copied)
+            return {"armed": False, "source": str(p),
+                    "reason": (f"route book carries {held} that matches broker_equity="
+                               f"{broker_equity!r}; broker account balance is context, "
+                               f"not a breaker mark")}
+
+    state = {"armed": True, "source": str(p), "equity": equity,
+             "peak_equity": peak, "day_start_equity": day_start if day_start else equity}
+    if broker_equity is None:
+        state["identity_check"] = "not_possible"
+        state["identity_reason"] = (
+            "broker_equity mark absent; armed without broker-identity check")
+    else:
+        state["identity_check"] = "checked"
+    if cur_day is not None:
+        state["cur_day"] = cur_day
+    return state
+
+
+def apply_route_book_breaker_state(book: "Track1Book", path, *, route: str = ROUTE) -> dict:
+    """Seed the circuit breaker from the route book, or leave it explicitly unarmed."""
+    state = route_book_breaker_state(path, account=book.account, route=route)
+    if not state["armed"]:
+        book.breaker = None
+        return state
+
+    book.equity = state["equity"]
+    book.cur_day = state.get("cur_day")
+    if book.breaker is not None:
+        book.breaker.peak_equity = state["peak_equity"]
+        book.breaker._day_start_equity = state["day_start_equity"]
+    return state
+
+
+def seed_open_positions(book: "Track1Book", rows: Sequence[Mapping[str, Any]]) -> int:
+    """Put the route's ALREADY-OPEN positions into a fresh book. Returns how many were seeded.
+
+    Why this exists, measured on 2026-09-25. Every live slot builds `Track1Book(...)` with an
+    empty `open_book` and never reads `live_positions.track1.json`, so three rules that all read
+    that list were blind to positions earlier slots had opened:
+
+        holders_of   -> `SUPPRESS_SAME_SLEEVE` could not fire, so the 01:25 ET NKD slot filled
+                        MNKD and every slot after it re-proposed the same trade. The order
+                        journal refused each one (FILLED is terminal) and the slot exited 3.
+                        Sixteen slots in one night died on a rule that was written to stop
+                        exactly this and could not see.
+        guard.admits -> the cluster cap read 0% exposure while `global_nkd` held 3.52% of a 6%
+                        cap. It enforces caps WITHIN one slot run and was blind across runs.
+        settle_due   -> a position opened by an earlier slot could never be settled or reported
+                        by a later one, because the later one did not know it existed.
+
+    The journal's protection is narrower than it looks: its idempotency key contains the ref day
+    (`track1_candidate:2026-09-25:global_nkd:MNKD:OPEN:...`), so the SAME signal on the NEXT day
+    is a different key and the journal does not refuse it. What stopped a duplicate on the night
+    it was found would not have stopped one the following night.
+
+    `bootstrap_into` above cannot be reused for this. It requires every book row's `trade_id` to
+    appear in today's candidate stream and raises `BootstrapRefused` otherwise — correct for
+    resuming a replay of one window, wrong here, where the book legitimately holds positions from
+    other days and other sleeves.
+
+    `exit_time` is left None on purpose, which keeps `settle_due` from closing a seeded row. This
+    function states what is HELD; it does not decide what should close. Exits on this route are
+    owned by the safety sweeps (`run_stop_repair`, `run_maxhold_exit`), which read the same book
+    and write the CLOSE rows. A seeded row becomes settleable only once something gives it an
+    exit time, and nothing here does.
+    """
+    seeded = 0
+    for row in rows or ():
+        try:
+            qty = int(row["qty"])
+            risk = float(row["risk_dollars"])
+            inst = str(row["instrument"])
+            direction = str(row["direction"])
+            sleeve = str(row["sleeve"])
+            trade_id = str(row["trade_id"])
+        except (KeyError, TypeError, ValueError) as exc:
+            # A row this cannot read is NOT skipped quietly. Skipping it would hand the caps and
+            # the suppression rule a book that is short by one position while looking complete,
+            # which is the failure this whole function exists to end.
+            raise BootstrapRefused(
+                f"a book row could not be read ({type(exc).__name__}: {exc}); a partially "
+                f"seeded book understates what the route holds") from exc
+        if qty <= 0:
+            raise BootstrapRefused(
+                f"book row {trade_id!r} carries qty {qty}; a position of size zero is a row the "
+                f"caps cannot weigh and the 2026-09-25 qty defect wrote exactly that")
+        cand = Candidate(trade_id=trade_id, sleeve=sleeve, instrument=inst,
+                         direction=direction, qty=qty, risk_dollars=risk,
+                         entry_time=str(row.get("entry_time") or ""),
+                         exit_time=None,
+                         entry_price=row.get("entry_price"),
+                         stop_price=row.get("stop_price"),
+                         source=SEEDED_SOURCE)
+        book.open_book.append(Held(cand, Position(inst, direction, qty, risk, sleeve)))
+        seeded += 1
+    return seeded
 
 
 def cut_instant_for(candidates: Iterable[Candidate], stop_after) -> pd.Timestamp:

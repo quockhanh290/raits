@@ -1,0 +1,69 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_WFO_ML_RANKER_WEEKLY_2026-09-15",
+  "script": "raits/research/stocks_pit_full_wfo_ml_ranker_weekly.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv"
+  ],
+  "method": "Expanding yearly walk-forward ridge ranker predicts next 5 trading-day close-to-close return from lagged/PIT features, then weekly rebalances top/bottom ranked PIT top500 names.",
+  "features": [
+    "prev_dayret",
+    "gap",
+    "ret_open_to_1555",
+    "ret20_pre",
+    "ret60_pre",
+    "vol20_pre",
+    "spy_prev_dayret"
+  ],
+  "target": "target_fwd5 uses returns strictly after the feature date; simulated positions enter after the rebalance-day close.",
+  "costs": "4.0 bps target-weight turnover; 1.0% annual borrow on short gross for long/short rows.",
+  "sample_label": "Research/touched 2018-2024 only; 2019-2024 are walk-forward years. 2023-2024 is touched, not clean unseen OOS. No 2025-2026 opened.",
+  "leakage_controls": "Each test year model trains only on rows dated before that year. PIT market-cap top500 membership via backward merge. No old manual 62 list.",
+  "rule_selection_effect": "None inside diagnostic. Feature set, ridge alpha, rebalance frequency, and variants fixed before running.",
+  "variants": [
+    {
+      "variant": "wfo_ridge_top20_long_gross100",
+      "mode": "long",
+      "long_n": 20,
+      "short_n": 0,
+      "gross": 1.0
+    },
+    {
+      "variant": "wfo_ridge_top50_long_gross100",
+      "mode": "long",
+      "long_n": 50,
+      "short_n": 0,
+      "gross": 1.0
+    },
+    {
+      "variant": "wfo_ridge_top100_long_gross100",
+      "mode": "long",
+      "long_n": 100,
+      "short_n": 0,
+      "gross": 1.0
+    },
+    {
+      "variant": "wfo_ridge_ls50_50_gross100",
+      "mode": "long_short",
+      "long_n": 50,
+      "short_n": 50,
+      "gross": 1.0
+    },
+    {
+      "variant": "wfo_ridge_ls100_100_gross100",
+      "mode": "long_short",
+      "long_n": 100,
+      "short_n": 100,
+      "gross": 1.0
+    }
+  ],
+  "outputs": [
+    "STOCKS_PIT_FULL_WFO_ML_RANKER_WEEKLY_2026-09-15_SUMMARY.csv",
+    "STOCKS_PIT_FULL_WFO_ML_RANKER_WEEKLY_2026-09-15_YEARLY.csv",
+    "STOCKS_PIT_FULL_WFO_ML_RANKER_WEEKLY_2026-09-15_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_WFO_ML_RANKER_WEEKLY_2026-09-15_DAILY.csv",
+    "STOCKS_PIT_FULL_WFO_ML_RANKER_WEEKLY_2026-09-15_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_WFO_ML_RANKER_WEEKLY_2026-09-15_MODEL_COEFS.csv",
+    "STOCKS_PIT_FULL_WFO_ML_RANKER_WEEKLY_2026-09-15_QA.csv"
+  ]
+}

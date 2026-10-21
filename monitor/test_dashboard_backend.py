@@ -23,6 +23,7 @@ from monitor.backend.session_event_reader import read_session_events
 from monitor.backend.job_journal_reader import read_job_journal
 from monitor.backend.open_issue_reader import read_open_issues
 from monitor.backend.paper_evidence_reader import read_paper_evidence
+from monitor.backend import paper_evidence_reader as paper_reader
 from monitor.backend.execution_quality_reader import read_execution_quality
 
 
@@ -288,7 +289,7 @@ def test_paper_evidence_uses_durable_artifacts_when_runner_slippage_is_empty(tmp
         encoding="utf-8",
     )
 
-    result = read_paper_evidence(tmp_path)
+    result = read_paper_evidence(tmp_path, route="legacy")
     gates = {gate["key"]: gate for gate in result["payload"]["gates"]}
     coverage = {item["key"]: item for item in result["payload"]["coverage"]}
 
@@ -306,8 +307,9 @@ def test_paper_evidence_uses_durable_artifacts_when_runner_slippage_is_empty(tmp
     assert gates["stp_verification"]["metrics"]["trade_details"]["rows"][-1]["scope"] == "STP_CLOSE"
     assert gates["b3_reconcile"]["status"] == "PASS"
     assert coverage["fill_quality"]["metrics"]["fills"] == 3
-    assert coverage["current_protection"]["status"] == "OBSERVED"
-    assert coverage["current_protection"]["metrics"]["position_rows"][0]["status"] == "PROTECTED"
+    assert coverage["current_protection"]["status"] == "UNKNOWN"
+    assert coverage["current_protection"]["metrics"]["position_rows"][0]["status"] == "UNKNOWN"
+    assert coverage["current_protection"]["metrics"]["position_rows"][0]["stop_order_id"] == "42"
     assert coverage["state_persist"]["metrics"]["position_rows"][0]["stop_order_id"] == "42"
     assert coverage["runner_freshness"]["metrics"]["snapshot_rows"][-1]["date"] == "2026-08-11"
     assert coverage["runner_freshness"]["metrics"]["snapshot_rows"][-1]["log_rejected"] == 0
@@ -345,7 +347,7 @@ def test_paper_evidence_log_hygiene_excludes_timestamp_blocks_and_keeps_producti
         encoding="utf-8",
     )
 
-    payload = read_paper_evidence(tmp_path)["payload"]
+    payload = read_paper_evidence(tmp_path, route="legacy")["payload"]
     gates = {gate["key"]: gate for gate in payload["gates"]}
     coverage = {item["key"]: item for item in payload["coverage"]}
 
@@ -375,7 +377,7 @@ def test_paper_evidence_log_hygiene_excludes_timestamp_blocks_and_keeps_producti
 def test_paper_evidence_empty_logs_expose_empty_new_fields_without_false_counts(tmp_path: Path):
     _write_minimal_paper_fixture(tmp_path)
 
-    payload = read_paper_evidence(tmp_path)["payload"]
+    payload = read_paper_evidence(tmp_path, route="legacy")["payload"]
     gates = {gate["key"]: gate for gate in payload["gates"]}
     coverage = {item["key"]: item for item in payload["coverage"]}
 
@@ -411,7 +413,7 @@ def _write_stp_verification_fixture(
 
 
 def _stp_gate(root: Path) -> dict[str, object]:
-    payload = read_paper_evidence(root)["payload"]
+    payload = read_paper_evidence(root, route="legacy")["payload"]
     return {gate["key"]: gate for gate in payload["gates"]}["stp_verification"]
 
 
@@ -490,7 +492,7 @@ def test_paper_evidence_single_test_marker_line_is_excluded_without_block(tmp_pa
         encoding="utf-8",
     )
 
-    payload = read_paper_evidence(tmp_path)["payload"]
+    payload = read_paper_evidence(tmp_path, route="legacy")["payload"]
     hygiene = {item["key"]: item for item in payload["coverage"]}["log_hygiene"]["metrics"]
 
     assert hygiene["dropped_test_lines"] == 1
@@ -507,7 +509,7 @@ def test_paper_evidence_counts_one_cold_start_per_timestamp(tmp_path: Path):
         encoding="utf-8",
     )
 
-    gate = {gate["key"]: gate for gate in read_paper_evidence(tmp_path)["payload"]["gates"]}["b3_reconcile"]
+    gate = {gate["key"]: gate for gate in read_paper_evidence(tmp_path, route="legacy")["payload"]["gates"]}["b3_reconcile"]
 
     assert gate["metrics"]["cold_starts"] == 1
     assert gate["status"] == "PASS"
@@ -522,7 +524,7 @@ def test_paper_evidence_groups_repeated_b3_mismatch_heartbeats_into_one_episode(
     ]
     (tmp_path / "live_day_0810.log").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    gate = {gate["key"]: gate for gate in read_paper_evidence(tmp_path)["payload"]["gates"]}["b3_reconcile"]
+    gate = {gate["key"]: gate for gate in read_paper_evidence(tmp_path, route="legacy")["payload"]["gates"]}["b3_reconcile"]
     metrics = gate["metrics"]
 
     assert gate["status"] == "BREACH"
@@ -559,7 +561,7 @@ def test_exit_paths_report_a_structural_gap_when_no_close_carries_a_reason(tmp_p
     (tmp_path / "trade_log.jsonl").write_text(
         "\n".join(_close_row("MES") for _ in range(4)) + "\n", encoding="utf-8")
 
-    gate = {g["key"]: g for g in read_paper_evidence(tmp_path)["payload"]["gates"]}["exit_path_coverage"]
+    gate = {g["key"]: g for g in read_paper_evidence(tmp_path, route="legacy")["payload"]["gates"]}["exit_path_coverage"]
 
     assert gate["status"] == "STRUCTURAL_GAP", "unlabelled exits must not read as a pending sample"
     assert gate["status"] != "PENDING"
@@ -575,7 +577,7 @@ def test_exit_paths_stay_pending_when_reasons_exist_but_samples_are_short(tmp_pa
         _close_row("MES", "STP") + "\n" + _close_row("MYM", "MAX_HOLD") + "\n",
         encoding="utf-8")
 
-    gate = {g["key"]: g for g in read_paper_evidence(tmp_path)["payload"]["gates"]}["exit_path_coverage"]
+    gate = {g["key"]: g for g in read_paper_evidence(tmp_path, route="legacy")["payload"]["gates"]}["exit_path_coverage"]
 
     # Labelled but below target: this one genuinely does close by waiting.
     assert gate["status"] == "PENDING"
@@ -591,7 +593,7 @@ def test_exit_paths_stay_pending_when_reasons_exist_but_samples_are_short(tmp_pa
 
 def test_enforced_gate_rules_are_published_as_spec_data(tmp_path: Path):
     _write_minimal_paper_fixture(tmp_path)
-    gates = {g["key"]: g for g in read_paper_evidence(tmp_path)["payload"]["gates"]}
+    gates = {g["key"]: g for g in read_paper_evidence(tmp_path, route="legacy")["payload"]["gates"]}
 
     b3_spec = gates["b3_reconcile"]["metrics"].get("spec") or {}
     stp_spec = gates["stp_verification"]["metrics"].get("spec") or {}
@@ -651,7 +653,7 @@ def test_paper_evidence_drops_test_block_whose_tmpdir_path_is_backslash_escaped(
         encoding="utf-8",
     )
 
-    payload = read_paper_evidence(tmp_path)["payload"]
+    payload = read_paper_evidence(tmp_path, route="legacy")["payload"]
     gate = {gate["key"]: gate for gate in payload["gates"]}["b3_reconcile"]
     hygiene = {item["key"]: item for item in payload["coverage"]}["log_hygiene"]["metrics"]
 
@@ -672,7 +674,7 @@ def test_paper_evidence_keeps_production_lines_that_merely_mention_a_path(tmp_pa
         encoding="utf-8",
     )
 
-    payload = read_paper_evidence(tmp_path)["payload"]
+    payload = read_paper_evidence(tmp_path, route="legacy")["payload"]
     gate = {gate["key"]: gate for gate in payload["gates"]}["b3_reconcile"]
     hygiene = {item["key"]: item for item in payload["coverage"]}["log_hygiene"]["metrics"]
 
@@ -712,7 +714,7 @@ def test_paper_evidence_counts_candidate_gap_log_lines(tmp_path: Path):
         encoding="utf-8",
     )
 
-    payload = read_paper_evidence(tmp_path)["payload"]
+    payload = read_paper_evidence(tmp_path, route="legacy")["payload"]
     gates = {gate["key"]: gate for gate in payload["gates"]}
     coverage = {item["key"]: item for item in payload["coverage"]}
 
@@ -874,7 +876,7 @@ def test_paper_evidence_contract_spec_guard_reconciles_ibkr_cache(monkeypatch, t
         "last_update": "2026-08-14T00:00:00Z",
         "contract_specs": specs,
     })
-    payload = read_paper_evidence(tmp_path)["payload"]
+    payload = read_paper_evidence(tmp_path, route="legacy")["payload"]
     coverage = {item["key"]: item for item in payload["coverage"]}
 
     assert coverage["contract_spec_guard"]["status"] == "OBSERVED"
@@ -888,7 +890,7 @@ def test_paper_evidence_contract_spec_guard_reconciles_ibkr_cache(monkeypatch, t
         "last_update": "2026-08-14T00:00:01Z",
         "contract_specs": bad_specs,
     })
-    payload = read_paper_evidence(tmp_path)["payload"]
+    payload = read_paper_evidence(tmp_path, route="legacy")["payload"]
     coverage = {item["key"]: item for item in payload["coverage"]}
 
     assert coverage["contract_spec_guard"]["status"] == "BREACH"
@@ -1030,7 +1032,7 @@ def test_paper_evidence_uses_monitor_paper_inputs_to_unblock_gaps(tmp_path: Path
         encoding="utf-8",
     )
 
-    payload = read_paper_evidence(tmp_path)["payload"]
+    payload = read_paper_evidence(tmp_path, route="legacy")["payload"]
     gates = {gate["key"]: gate for gate in payload["gates"]}
     coverage = {item["key"]: item for item in payload["coverage"]}
 
@@ -1093,7 +1095,7 @@ def test_paper_evidence_does_not_count_actual_only_paper_vs_backtest_as_observed
         encoding="utf-8",
     )
 
-    payload = read_paper_evidence(tmp_path)["payload"]
+    payload = read_paper_evidence(tmp_path, route="legacy")["payload"]
     coverage = {item["key"]: item for item in payload["coverage"]}
 
     assert coverage["paper_vs_backtest"]["status"] == "NEEDS_DECISION"
@@ -1133,7 +1135,7 @@ def test_paper_evidence_excludes_signal_close_from_c1_slippage(tmp_path: Path):
         encoding="utf-8",
     )
 
-    gate = {gate["key"]: gate for gate in read_paper_evidence(tmp_path)["payload"]["gates"]}["c1_slippage"]
+    gate = {gate["key"]: gate for gate in read_paper_evidence(tmp_path, route="legacy")["payload"]["gates"]}["c1_slippage"]
 
     assert gate["metrics"]["open_n"] == 1
     assert gate["metrics"]["stp_close_n"] == 0
@@ -1157,7 +1159,7 @@ def test_paper_evidence_payload_contract_is_stable(tmp_path: Path):
         encoding="utf-8",
     )
 
-    payload = read_paper_evidence(tmp_path)["payload"]
+    payload = read_paper_evidence(tmp_path, route="legacy")["payload"]
 
     assert {"epoch", "gates", "coverage", "summary", "gaps", "diagnostics"} <= set(payload)
     assert payload["gates"]
@@ -1248,7 +1250,7 @@ def test_paper_dashboard_exposes_c1_observed_detail():
     assert "function showPaperTab" in source
     assert "BREACH NOW" not in source
     assert "QUALITY_BREACH" in source
-    assert "quality breach (sample pending)" in source
+    assert "outside the expected-price correspondence limit (sample pending)" in source
     assert ".quality-breach" in css
     assert "why needed" in source
     assert "to pass / unlock" in source
@@ -1621,14 +1623,14 @@ def _run_paper_js_probe(script: str) -> str:
     source = (
         source[:cut]
         + "\n  globalThis.__paperTest = { renderReadinessBlockers, updateCoveragePanel,"
-          " updateB3Panel, updateSTPPanel, b3MoreInfo, logHygieneDetail };"
+          " updateB3Panel, updateSTPPanel, b3MoreInfo, logHygieneDetail, renderCoverage, render };"
         + source[cut:]
     )
     program = (
         "const vm = require('vm');\n"
         "const elements = new Map();\n"
         "function el(id) { if (!elements.has(id)) elements.set(id, { id, textContent: '', innerHTML: '', className: '', hidden: false, parentElement: { classList: { add(){}, remove(){}, toggle(){} } }, querySelectorAll(){ return []; }, addEventListener(){}, scrollIntoView(){} }); return elements.get(id); }\n"
-        "globalThis.document = { getElementById: el };\n"
+        "globalThis.document = { getElementById: el, querySelectorAll(){ return []; } };\n"
         "globalThis.window = { setInterval(){} };\n"
         "globalThis.fetch = async () => ({ ok: true, json: async () => ({ payload: {} }), text: async () => '{\"payload\":{}}' });\n"
         "globalThis.AbortSignal = { timeout(){} };\n"
@@ -1638,6 +1640,148 @@ def _run_paper_js_probe(script: str) -> str:
     result = subprocess.run([node, "-"], input=program, capture_output=True, text=True, encoding="utf-8", timeout=60)
     assert result.returncode == 0, result.stderr
     return result.stdout.strip()
+
+
+def test_paper_track_operator_axis_classifies_current_rows_and_headline():
+    payload = read_paper_evidence(ROOT)["payload"]
+    rows = {row["key"]: row for row in [*payload["gates"], *payload["coverage"]]}
+
+    assert rows["paper_duration"]["operator_kind"] == "sample_building"
+    assert rows["roll_slippage"]["operator_kind"] == "no_track1_source"
+    assert rows["manual_intervention"]["operator_kind"] == "no_track1_source"
+    assert rows["runner_freshness"]["operator_kind"] == "source_not_connected"
+    assert rows["b3_reconcile"]["operator_kind"] == "history_awaiting_clean"
+    assert rows["c1_slippage"]["operator_kind"] == "signal_sample_small"
+    assert rows["pnl_thresholds"]["operator_kind"] == "scheduled_decision"
+    assert not any(row.get("operator_kind") == "current_fault"
+                   for row in [*payload["gates"], *payload["coverage"]])
+    assert "OPEN -7.67 ticks N=3" in rows["c1_slippage"]["evidence"]
+    assert "N>=20 each" in rows["c1_slippage"]["evidence"]
+
+    headline = payload["summary"]["paper_track_headline"]
+    assert "day(s) ·" in headline["text"]
+    assert "fill(s)" in headline["text"]
+    assert "worst MYM OPEN -15.00/3 ticks (5.00x limit)" in headline["text"]
+    assert "sample gap 19 to 20 for that instrument" in headline["text"]
+    assert headline["text"].endswith("faulting now: no")
+
+
+def test_paper_track_operator_axis_b3_history_and_current_fault_control():
+    history = {
+        "key": "b3_reconcile",
+        "status": "BREACH",
+        "metrics": {
+            "mismatch_episode_rows": [
+                {"first_seen": "2026-09-25T10:20:00-04:00",
+                 "last_seen": "2026-09-25T10:20:00-04:00"},
+            ],
+            "last_seen": "2026-09-25T10:20:00-04:00",
+            "match_episode_rows": [],
+        },
+    }
+    current = {
+        "key": "b3_reconcile",
+        "status": "BREACH",
+        "metrics": {
+            "mismatch_episode_rows": [
+                {"first_seen": "2026-09-27T10:20:00-04:00",
+                 "last_seen": "2026-09-27T10:20:00-04:00"},
+            ],
+            "last_seen": "2026-09-27T10:20:00-04:00",
+            "match_episode_rows": [],
+        },
+    }
+
+    assert paper_reader._operator_kind(history)[0] == "history_awaiting_clean"
+    assert paper_reader._operator_kind(current)[0] == "current_fault"
+
+
+def test_paper_track_axis_renders_early_and_fault_side_by_side():
+    out = _run_paper_js_probe(
+        "const gates = [\n"
+        "  { key: 'paper_duration', status: 'PENDING', title: 'Paper duration', evidence: '3 / 100 records', metrics: { observed: 2, target: 60 }, operator_kind: 'sample_building', operator_kind_label: 'Sample still building' },\n"
+        "  { key: 'b3_reconcile', status: 'BREACH', title: 'B3 cold-start reconcile', evidence: 'current mismatch', metrics: { episodes: 1 }, operator_kind: 'current_fault', operator_kind_label: 'Faulting now' },\n"
+        "  { key: 'regime_coverage', status: 'PASS', title: 'Regime coverage', evidence: 'Normal + Stress', metrics: { regimes: ['Normal', 'Stress'] } },\n"
+        "  { key: 'exit_path_coverage', status: 'PASS', title: 'Exit path coverage', evidence: 'Chandelier 3 | MAX_HOLD 3 | STP 3', metrics: { exits: { CHANDELIER: 3, MAX_HOLD: 3, STP: 3 }, target_each: 3 } },\n"
+        "  { key: 'c1_slippage', status: 'PENDING', title: 'C1 expected-price correspondence', evidence: 'C1 pending', metrics: { open_n: 3, stp_close_n: 0, spec: { open: { min_n_per_inst: 20 } } } },\n"
+        "];\n"
+        "const coverage = [];\n"
+        "__paperTest.renderReadinessBlockers(gates, coverage, {});\n"
+        "console.log(JSON.stringify({ html: elements.get('readinessBlockers').innerHTML }));"
+    )
+    html = json.loads(out)["html"]
+    assert "Sample still building" in html
+    assert "Faulting now" in html
+    assert "kind-card-sample-building" in html
+    assert "kind-card-current-fault" in html
+
+
+def test_paper_track_axis_renders_all_seven_kinds_and_green_has_no_caveat():
+    labels = [
+        ("sample_building", "Sample still building"),
+        ("no_track1_source", "No Track 1 source exists"),
+        ("source_not_connected", "Source exists, not connected here"),
+        ("history_awaiting_clean", "History, awaiting next clean run"),
+        ("signal_sample_small", "Signal, sample too small"),
+        ("current_fault", "Faulting now"),
+        ("scheduled_decision", "Known debt, scheduled decision"),
+    ]
+    items = [
+        {"key": f"item_{i}", "title": label, "status": "PENDING", "evidence": label,
+         "operator_kind": kind, "operator_kind_label": label, "sources": []}
+        for i, (kind, label) in enumerate(labels)
+    ]
+    items.append({"key": "green", "title": "Green today", "status": "PASS",
+                  "evidence": "No caveat", "sources": []})
+    out = _run_paper_js_probe(
+        f"const items = {json.dumps(items)};\n"
+        "__paperTest.renderCoverage(items);\n"
+        "console.log(JSON.stringify({ html: elements.get('paperCoverage').innerHTML }));"
+    )
+    html = json.loads(out)["html"]
+    for _, label in labels:
+        assert label in html
+    assert "Green today" in html
+    green = html[html.index("Green today"):html.index("No caveat")]
+    assert "operator-kind" not in green
+
+
+def test_paper_track_headline_renders_from_payload_summary():
+    out = _run_paper_js_probe(
+        "const data = { route: 'track1_candidate', observed_at: '2026-09-27T00:00:00Z', payload: { epoch: 'track1', gates: [\n"
+        "  { key: 'paper_duration', status: 'PENDING', evidence: '2 paper days', metrics: {}, operator_kind: 'sample_building', operator_kind_label: 'Sample still building' },\n"
+        "], coverage: [], gaps: [], summary: { paper_track_headline: { text: '2 day(s) · 3 fill(s) · worst C1 -7.67/3 ticks · sample gap 17 · faulting now: no' } } } };\n"
+        "__paperTest.render(data);\n"
+        "const noFault = elements.get('overallReason').textContent;\n"
+        "data.payload.summary.paper_track_headline.text = '2 day(s) · 3 fill(s) · worst C1 -7.67/3 ticks · sample gap 17 · faulting now: yes';\n"
+        "__paperTest.render(data);\n"
+        "console.log(JSON.stringify({ noFault, fault: elements.get('overallReason').textContent }));"
+    )
+    values = json.loads(out)
+    assert values["noFault"].endswith("faulting now: no")
+    assert values["fault"].endswith("faulting now: yes")
+
+
+def test_paper_overall_uses_current_fault_axis_not_raw_breach_status():
+    out = _run_paper_js_probe(
+        "const data = { route: 'track1_candidate', observed_at: '2026-09-28T00:00:00Z', payload: { epoch: 'track1', gates: [\n"
+        "  { key: 'paper_duration', status: 'PENDING', evidence: '3 paper days', metrics: {}, operator_kind: 'sample_building', operator_kind_label: 'Sample still building' },\n"
+        "  { key: 'b3_reconcile', status: 'BREACH', evidence: 'historical mismatch', metrics: {}, operator_kind: 'history_awaiting_clean', operator_kind_label: 'History, awaiting next clean run' },\n"
+        "], coverage: [], gaps: [], summary: { paper_track_headline: { text: '3 day(s) · 3 fill(s) · faulting now: no' } } } };\n"
+        "__paperTest.render(data);\n"
+        "const history = { status: elements.get('overallStatus').textContent, reason: elements.get('overallReason').textContent };\n"
+        "data.payload.gates[1].operator_kind = 'current_fault';\n"
+        "data.payload.gates[1].operator_kind_label = 'Faulting now';\n"
+        "data.payload.summary.paper_track_headline.text = '3 day(s) · 3 fill(s) · faulting now: yes';\n"
+        "__paperTest.render(data);\n"
+        "const current = { status: elements.get('overallStatus').textContent, reason: elements.get('overallReason').textContent };\n"
+        "console.log(JSON.stringify({ history, current }));"
+    )
+    values = json.loads(out)
+    assert values["history"]["status"] == "INSUFFICIENT DATA"
+    assert values["history"]["reason"].endswith("faulting now: no")
+    assert values["current"]["status"] == "BREACH"
+    assert values["current"]["reason"].endswith("faulting now: yes")
 
 
 def test_price_usd_refuses_to_price_an_unreconciled_contract():
@@ -1966,7 +2110,16 @@ def test_track1_mode_does_not_call_ops_on_the_dashboard_poll_path(monkeypatch):
         assert ss.resolve_track1_only() is True
         mode = ss.scheduler_track1_mode_status()
         assert mode["track1_mode"] == "track1-only-shadow"
+        assert mode["scheduler_armed"] is False
         assert mode["legacy_entry_jobs"] == 0
+
+    monkeypatch.setattr(ss, "_running_schedulers", lambda: [{
+        "pid": 3001,
+        "started_epoch": 1_000_000,
+        "command": "pythonw.exe -m global_index.run_scheduler --port 4002 "
+                   "--track1-only-shadow --allow-orders",
+    }])
+    assert ss.scheduler_track1_mode_status()["scheduler_armed"] is True
 
 
 def test_open_issue_retirement_does_not_call_ops_on_the_dashboard_poll_path(monkeypatch,
@@ -2009,12 +2162,15 @@ def test_scheduler_age_reaches_the_payload_and_the_page():
     for field in ("running", "age_seconds", "stale_code"):
         assert field in payload["scheduler_process"], (
             f"{field} missing from the payload block: {payload['scheduler_process']}")
+    assert "order_request" in payload
+    assert "scheduler_armed" in payload["order_request"]
 
     page = (ROOT / "global_index" / "dash" / "realtime" / "realtime.js").read_text(
         encoding="utf-8")
     assert "scheduler_process" in page, (
         "nothing in realtime.js reads scheduler_process — the number reaches the API "
         "and dies there, which is exactly how a three-day-old scheduler stayed invisible")
+    assert "scheduler_armed" in page
 
 
 def test_per_file_log_scan_reproduces_the_single_pass_numbers():
@@ -2086,29 +2242,24 @@ def test_the_seam_merge_is_load_bearing_not_defensive():
     assert summary["b3_match_episodes"] + summary["b3_mismatch_episodes"] == len(merged)
 
 
-def test_a_file_that_did_not_change_is_not_read_again():
-    """Logs only grow. Re-reading 120MB because one file gained a few kilobytes was the
-    entire cost of serving this page: 25s, of which 13s was 8 million regex searches over
-    lines parsed identically the previous twenty times."""
-    import monitor.backend.paper_evidence_reader as pe
-
-    pe._log_summary_uncached(ROOT, "2026-08-10")
-    reads = []
-    original = pe._scan_one_log
-
-    def counting(path, epoch):
-        before = len(pe._file_cache)
-        out = original(path, epoch)
-        if len(pe._file_cache) != before:
-            reads.append(path.name)
-        return out
-
-    pe._scan_one_log = counting
-    try:
-        pe._log_summary_uncached(ROOT, "2026-08-10")
-    finally:
-        pe._scan_one_log = original
-    assert reads == [], f"re-read unchanged file(s): {reads}"
+#
+# test_a_file_that_did_not_change_is_not_read_again lived here and was REMOVED on 2026-09-26,
+# not repaired. Its stub had gone out of date with the scan signature, which is what surfaced
+# it — but the signature was the smaller half of the problem.
+#
+# It detected a re-read by asking whether _file_cache had GAINED an entry. After the warm-up it
+# never gains one, so the assertion was true whether the memoisation worked or not. Measured
+# with the signature repaired, the scan entered seventy-four times in both runs:
+#
+#     with the cache      the detector reported nothing
+#     cache neutralised   the detector reported nothing, every file parsed again
+#
+# A test that passes in both worlds is worse than no test, because it occupies the place where
+# a real one would go. The cost it was protecting is real, so the replacement counts the read
+# that actually costs and pins its own ability to fail:
+#
+#     monitor/test_log_cache_counts_real_reads_20260926.py
+#
 
 
 def test_episodes_are_not_split_at_a_file_boundary():
@@ -2224,7 +2375,7 @@ def test_c1_confidence_interval_is_published_beside_each_mean():
 
 
 def test_c1_spec_publishes_why_each_threshold_is_what_it_is():
-    payload = read_paper_evidence(ROOT)["payload"]
+    payload = read_paper_evidence(ROOT, route="legacy")["payload"]
     spec = ({g["key"]: g for g in payload["gates"]}["c1_slippage"]["metrics"] or {}).get("spec") or {}
     assert spec.get("open", {}).get("why_by_inst"), "no rationale for per-instrument scope"
     assert spec.get("open", {}).get("why_min_n_20"), "no rationale for the OPEN sample count"
@@ -2270,7 +2421,7 @@ def test_a_classified_b3_mismatch_reads_explained_not_passed():
     EXPLAINED buys only that a historical episode with a known and fixed cause stops
     blocking the epoch the way an unfixable gate does.
     """
-    payload = read_paper_evidence(ROOT)["payload"]
+    payload = read_paper_evidence(ROOT, route="legacy")["payload"]
     b3 = {g["key"]: g for g in payload["gates"]}["b3_reconcile"]
     klass = b3["metrics"]["classification"]
     if klass["classified_count"] and not klass["unclassified_count"]:
@@ -2383,7 +2534,7 @@ def test_a_missing_threshold_spec_is_a_spec_gap_not_a_silent_pass():
 
 def test_published_threshold_spec_carries_its_own_provenance_and_limits():
     """A go-live number shown without its derivation is an instruction, not evidence."""
-    payload = read_paper_evidence(ROOT)["payload"]
+    payload = read_paper_evidence(ROOT, route="legacy")["payload"]
     cov = {c["key"]: c for c in payload["coverage"]}
     assert "pnl_thresholds" in cov, "the approved thresholds have no panel"
     spec = (cov["pnl_thresholds"]["metrics"] or {}).get("spec") or {}
@@ -2411,7 +2562,7 @@ def test_threshold_frame_states_that_every_cluster_trades_through_it():
     So the invariant is not a date. It is that the frame carries a checked statement
     about cluster coverage, and that the check is not simply asserted.
     """
-    payload = read_paper_evidence(ROOT)["payload"]
+    payload = read_paper_evidence(ROOT, route="legacy")["payload"]
     cov = {c["key"]: c for c in payload["coverage"]}
     frame = ((cov["pnl_thresholds"]["metrics"] or {}).get("spec") or {}).get("frame") or {}
     coverage = frame.get("coverage_check") or ""
@@ -2519,7 +2670,7 @@ def test_tws_restart_has_an_evidence_panel_of_its_own():
     runner_freshness -- the target H5 removed for being wrong. Pointing at that again
     would trade one missing button for one misleading one.
     """
-    payload = read_paper_evidence(ROOT)["payload"]
+    payload = read_paper_evidence(ROOT, route="legacy")["payload"]
     cov = {c["key"]: c for c in payload["coverage"]}
     assert "tws_restart" in cov, "no TWS evidence surface exists"
     metrics = cov["tws_restart"]["metrics"] or {}
@@ -2532,7 +2683,7 @@ def test_tws_restart_has_an_evidence_panel_of_its_own():
 
 
 def test_every_gap_card_can_open_the_panel_it_refers_to():
-    payload = read_paper_evidence(ROOT)["payload"]
+    payload = read_paper_evidence(ROOT, route="legacy")["payload"]
     keys = {c["key"] for c in payload["coverage"]}
     for gap in payload.get("gaps") or []:
         related = gap.get("related_key")
@@ -2772,8 +2923,11 @@ def _ops_stub(monkeypatch, calls, *, schedulers, backends):
         # TypeError raised from inside production code — the same stale-stub family as the
         # stage-4 `_run` lambda — and this suite only trips it on the restart path, which is
         # the first caller to pass them through.
+        # 2026-09-24: `allow_orders` joined the signature (arming via `ops up --allow-orders`),
+        # and this stub turned four tests red with a TypeError from inside ops.main — the same
+        # family again. Accepted with the real default.
         lambda port, *, shadow_resume, assume_preflight_ok, track1_shadow=False,
-               track1_only=False:
+               track1_only=False, allow_orders=False:
             calls.append(("start_scheduler", port, shadow_resume, assume_preflight_ok)) or 303,
     )
     # Same stale-stub trap as start_scheduler above: `start_backend` grew the Track 1 flags
@@ -2900,7 +3054,7 @@ def test_ops_up_track1_only_tells_the_backend_too(monkeypatch):
     dispatch, which is the seam the live defect actually sat in."""
     calls = []
     ops = _ops_stub(monkeypatch, calls, schedulers=[], backends=[])
-    monkeypatch.setattr(ops, "track1_shadow_blockers", lambda *, track1_only=False: [])
+    monkeypatch.setattr(ops, "track1_shadow_blockers", lambda *, track1_only=False, allow_orders=False: [])
     rc = ops.main(["up", "--yes", "--track1-only-shadow"])
     assert rc == 0, calls
     backend = [c for c in calls if c[0] == "start_backend"]
@@ -2918,7 +3072,7 @@ def test_restart_no_scheduler_reaches_the_backend_without_touching_the_scheduler
     """
     calls = []
     ops = _ops_stub(monkeypatch, calls, schedulers=[33868], backends=[555])
-    monkeypatch.setattr(ops, "track1_shadow_blockers", lambda *, track1_only=False: [])
+    monkeypatch.setattr(ops, "track1_shadow_blockers", lambda *, track1_only=False, allow_orders=False: [])
     rc = ops.main(["restart", "--no-scheduler", "--yes", "--track1-only-shadow"])
     assert rc == 0, calls
     assert not any(c[0] == "start_scheduler" for c in calls), calls
@@ -2930,7 +3084,7 @@ def test_restart_no_scheduler_reaches_the_backend_without_touching_the_scheduler
 def test_restart_no_scheduler_also_works_for_transitional_shadow(monkeypatch):
     calls = []
     ops = _ops_stub(monkeypatch, calls, schedulers=[33868], backends=[555])
-    monkeypatch.setattr(ops, "track1_shadow_blockers", lambda *, track1_only=False: [])
+    monkeypatch.setattr(ops, "track1_shadow_blockers", lambda *, track1_only=False, allow_orders=False: [])
     assert ops.main(["restart", "--no-scheduler", "--yes", "--track1-shadow"]) == 0
     backend = [c for c in calls if c[0] == "start_backend"]
     assert backend and backend[0][3] is True and backend[0][4] is False, backend
@@ -2942,7 +3096,7 @@ def test_up_still_refuses_the_track1_flag_against_a_running_scheduler(monkeypatc
     had been switched too."""
     calls = []
     ops = _ops_stub(monkeypatch, calls, schedulers=[33868], backends=[555])
-    monkeypatch.setattr(ops, "track1_shadow_blockers", lambda *, track1_only=False: [])
+    monkeypatch.setattr(ops, "track1_shadow_blockers", lambda *, track1_only=False, allow_orders=False: [])
     assert ops.main(["up", "--yes", "--track1-only-shadow"]) == 2
     assert not any(c[0] == "start_backend" for c in calls), calls
 
@@ -2977,13 +3131,17 @@ def test_runner_positions_reader_projects_persisted_contracts(tmp_path: Path):
     path.write_text(
         '{"schema_version":1,"positions":[{"inst":"M2K","direction":"LONG",'
         '"contracts":1,"cluster":"swing","entry_day":"2026-08-10 00:00:00",'
-        '"entry_price":3025.3,"stop_order_id":"288","ignored":"value"}]}',
+        '"instrument":"M2K","qty":1,"sleeve":"swing","entry_time":"2026-08-10 15:45:00-04:00",'
+        '"entry_price":3025.3,"risk_dollars":488.48,"stop_order_id":"288","ignored":"value"}]}',
         encoding="utf-8",
     )
     result = read_runner_positions(path)
     assert result["source"] == "runner_persisted_positions"
-    assert result["payload"]["positions"][0]["contracts"] == 1
-    assert "ignored" not in result["payload"]["positions"][0]
+    row = result["payload"]["positions"][0]
+    assert row["contracts"] == 1
+    assert row["entry_time"] == "2026-08-10 15:45:00-04:00"
+    assert row["risk_dollars"] == 488.48
+    assert "ignored" not in row
 
 
 def test_report_api_omits_raw_log_lines(monkeypatch, tmp_path: Path):
@@ -2996,13 +3154,35 @@ def test_report_api_omits_raw_log_lines(monkeypatch, tmp_path: Path):
     assert "execution_quality" in report["daily"]
 
 
-def test_report_cache_signature_tracks_live_positions(tmp_path: Path):
-    positions = tmp_path / "live_positions.json"
+def test_report_cache_signature_tracks_track1_positions(tmp_path: Path):
+    positions = tmp_path / "live_positions.track1.json"
     positions.write_text('{"positions": []}', encoding="utf-8")
     before = report_reader._signature(tmp_path)
     positions.write_text('{"positions": [{"inst": "MES"}]}', encoding="utf-8")
     after = report_reader._signature(tmp_path)
     assert before != after
+
+
+def test_today_report_reads_the_active_track1_book_not_retired_legacy(
+        monkeypatch, tmp_path: Path):
+    monkeypatch.setattr(report_reader, "_signature", lambda _root: ())
+    monkeypatch.setattr(report_reader, "collect_session_report", lambda _day, _root: {
+        "day": "2026-09-28", "is_today": True, "lines": [], "positions": [],
+    })
+    (tmp_path / "live_positions.json").write_text(
+        '{"positions": []}', encoding="utf-8")
+    (tmp_path / "live_positions.track1.json").write_text(
+        '{"schema_version":2,"positions":[{"inst":"MES","direction":"LONG",'
+        '"contracts":1,"cluster":"swing","entry_day":"2026-09-25",'
+        '"entry_price":7797.25,"stop_price":7652.18,"stop_order_id":14}]}',
+        encoding="utf-8")
+
+    report = report_reader.read_report("2026-09-28", tmp_path)
+
+    assert [position["inst"] for position in report["positions"]] == ["MES"]
+    assert report["current_position_count"] == 1
+    assert report["positions_reading"]["source"] == "live_positions.track1.json"
+    assert report["positions_reading"]["status"] == "available"
 
 
 def test_report_cache_signature_tracks_trade_log(tmp_path: Path):
@@ -3048,7 +3228,8 @@ def test_execution_quality_keeps_execution_slippage_separate_from_stop_distance(
         '"ts":"2026-08-12T14:20:00Z"}\n',
         encoding="utf-8",
     )
-    result = read_execution_quality(tmp_path, "2026-08-12")
+    # Plan stage 4: the default is Track 1 now; these pin the LEGACY row shapes by name.
+    result = read_execution_quality(tmp_path, "2026-08-12", route="legacy")
     opened, signal_close = result["fills"]
     assert opened["reference_type"] == "expected_entry"
     assert opened["signed_slippage_ticks"] == 3.0
@@ -3070,7 +3251,8 @@ def test_execution_quality_computes_signed_stop_fill_slippage_and_ignores_torn_l
         '{"type":"OPEN"',
         encoding="utf-8",
     )
-    result = read_execution_quality(tmp_path, "2026-08-12")
+    # Plan stage 4: the default is Track 1 now; these pin the LEGACY row shapes by name.
+    result = read_execution_quality(tmp_path, "2026-08-12", route="legacy")
     fill = result["fills"][0]
     assert fill["reference_type"] == "stop_trigger"
     assert fill["signed_slippage_points"] == 15.0
@@ -3078,6 +3260,29 @@ def test_execution_quality_computes_signed_stop_fill_slippage_and_ignores_torn_l
     assert fill["adverse"] is True
     assert result["coverage"]["stable_execution_id_emitted"] == 1
     assert result["coverage"]["malformed_lines"] == 1
+
+
+def test_execution_quality_publishes_track1_close_pnl_for_realtime_decision(tmp_path: Path):
+    log_dir = tmp_path / "global_index" / "track1_runtime"
+    log_dir.mkdir(parents=True)
+    (log_dir / "trade_log.track1.jsonl").write_text(
+        '{"type":"CLOSE","route":"track1_candidate","inst":"M2K","cluster":"roska4_swing",'
+        '"direction":"LONG","contracts":1,"entry_day":"2026-09-24","exit_day":"2026-09-29",'
+        '"exit_reason":"MAX_HOLD","fill_price":2842.6,"pnl_sized":-72.0,'
+        '"commission":0.61,"filled_qty":1,"status":"FILLED","ts":"2026-09-29T13:31:13Z"}\n'
+        '{"type":"CLOSE","route":"track1_candidate","inst":"MYM","cluster":"roska4_swing",'
+        '"direction":"LONG","contracts":1,"entry_day":"2026-09-24","exit_day":"2026-09-29",'
+        '"exit_reason":"MAX_HOLD","fill_price":51788.0,"pnl_sized":28.0,'
+        '"commission":0.61,"filled_qty":1,"status":"FILLED","ts":"2026-09-29T13:31:15Z"}\n',
+        encoding="utf-8",
+    )
+
+    result = read_execution_quality(tmp_path, "2026-09-29")
+
+    assert result["summary"]["realized_today"] == -44.0
+    assert result["summary"]["close_count"] == 2
+    assert [fill["pnl_sized"] for fill in result["fills"]] == [-72.0, 28.0]
+    assert result["fills"][0]["entry_day"] == "2026-09-24"
 
 
 def test_static_dashboard_is_served():
@@ -3432,7 +3637,10 @@ def test_duplicate_launch_is_one_job_not_a_wall_of_phantoms(tmp_path: Path):
     # The exception must survive the cap, and the dropped frames must be counted rather than
     # silently discarded.
     assert job["diagnostics"][-1] == "TimeoutError"
-    assert job["diagnostics_omitted"] == 17
+    # 2026-10-06: 28, not 17. All 28 frames are library frames, which are now filtered before
+    # the 12-line cap (and still counted), so the cap itself drops nothing. Was 29 lines - 12.
+    assert job["diagnostics"] == ["TimeoutError"]
+    assert job["diagnostics_omitted"] == 28
 
 
 def test_same_slot_on_two_days_is_two_jobs(tmp_path: Path):
@@ -3914,10 +4122,10 @@ def test_frontend_modules_keep_data_boundaries():
     assert "decision.exits" in realtime_js
     assert "decision.rejected_detail" in realtime_js
     assert "renderDecisions(snap)" in realtime_js
-    # P2-A1 đổi `snap` thành `snapshot` trong renderMetrics: khi nguồn runner-state
-    # chết thì `snapshot` là null nên số không còn render như đang sống. Ý định của
-    # assert này — equity đến từ snapshot chứ không phải nguồn khác — giữ nguyên.
-    assert "const equity = snapshot?.equity" in realtime_js
+    assert "const equity = null;" in realtime_js
+    assert "function track1RealizedToday()" in realtime_js
+    assert "function decisionFromExecutionQuality(day)" in realtime_js
+    assert "setMetric('metricEquity', 'not measured')" in realtime_js
     assert "metricDrawdownFill" in realtime
     assert "metricDrawdownAmount" in realtime
     assert "schedule?.evidence_available" in realtime_js
@@ -4582,9 +4790,7 @@ def test_the_page_header_dates_the_track1_session_not_the_legacy_snapshot():
     js = _realtime_js()
     assert "sessionDate(snap?.date);" not in js, "the header still dates the legacy snapshot"
     assert "const t1SessionDay = state.marketView?.market_view?.session_date;" in js
-    assert "sessionDate(t1SessionDay || snap?.date)" in js, (
-        "the legacy date must remain the fallback for a machine with no Track 1 record"
-    )
+    assert "Track 1 session not recorded" in js
     # The legacy LOG fetches must keep the legacy day: asking for session events on a day the
     # legacy runner never held a session is a request that can only come back empty.
     assert "const sessionDay = latestSnap()?.date;" in js, (
@@ -4815,8 +5021,14 @@ def test_the_page_draws_the_bar_grid_apart_from_the_lanes():
     assert "mvBarGridCard(s)" in js, "the grid is built but never drawn"
     assert "function mvBarGridCard(s)" in js
     assert "s.bar_grid" in js
-    assert "one cell per bar, not per slot" in js, (
-        "nothing on the page tells the reader the grid is on a different axis from the lanes"
+    assert "Detector rules, aligned to slots" in js
+    assert "every slot gets the same hollow cell shape" in js
+    assert "no detector bar for this slot" in js
+    assert "leaves slots with no detector bar unfilled" in js, (
+        "nothing on the page tells the reader detector evidence is sparse on the slot axis"
+    )
+    assert "function mvBarToEt(raw)" in js, (
+        "bar timestamps are not mapped back to the ET slot axis before drawing"
     )
     assert ".mv2-bargrid" in css, "the grid has no fence and would read as more lanes"
 

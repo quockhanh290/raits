@@ -1,0 +1,90 @@
+{
+  "research_question": "Can causal trade-tape structure add a robust same-day edge beyond the previously tested price and tick-flow confirmation rules?",
+  "frozen_before_performance": true,
+  "frozen_at_local_date": "2026-10-03",
+  "script": "raits/research/stocks_pit_1000_tape_replay.py",
+  "script_hash": "29FAB1B9181D38DB7CE0043B8F85B7A75046B11111DC248ADD635986273AF518",
+  "technical_corrections_before_performance": [
+    "The first replay invocation stopped before selection or PnL because lit_flow_imbalance existed in both the established flow cache and the new tape cache, causing pandas merge suffixes. The tape merge was restricted to new columns only; no rule, threshold, rank, clock, or portfolio setting changed."
+  ],
+  "sample": {
+    "development": "2018-03-29 through 2021-12-31",
+    "locked_validation": "2022-01-01 through 2022-12-30"
+  },
+  "data_contract": {
+    "universe": "quarterly PIT market-cap top500 intersected with daily PIT eligibility and ADV20 >= 10m; price >= 5; abs gap <= 30%",
+    "precandidates": "previous-day open-to-15:55 return <= -5% OR opening gap >= +2%; old/manual 62 unused",
+    "signal_clock": "only Polygon trades with SIP timestamp in [09:30,10:00) ET; entry is exact 10:05 open",
+    "exit": "exact 15:55 close; post-selection 16:00 open fallback only",
+    "opening_proxy": "trade condition codes 16, 17, 25, and 55; this is opening-print participation, not auction imbalance",
+    "large_trade": "fixed as-printed trade dollar >= 100000, frozen without outcome inspection",
+    "quotes": "historical NBBO unavailable under current entitlement; no spread or quote imbalance claim",
+    "post2022": "forbidden"
+  },
+  "common_filters": {
+    "positive_0930_to_1000_price_confirmation": true,
+    "signal_trades_min": 100,
+    "signal_dollar_min": 1000000
+  },
+  "variants": [
+    {
+      "name": "yday_large_lit_sponsorship",
+      "rule": "YDAY crash/reclaim plus large-lit signed-dollar imbalance >= 0.10 and fixed-$100k trade share >= 5%",
+      "rank": "prior loss times one plus large-lit imbalance"
+    },
+    {
+      "name": "yday_broad_venue_confirmation",
+      "rule": "YDAY crash/reclaim plus positive lit flow, at least five exchanges, and exchange-dollar HHI <= 0.35",
+      "rank": "prior loss times venue breadth and inverse concentration"
+    },
+    {
+      "name": "yday_opening_print_absorption",
+      "rule": "YDAY crash/reclaim plus opening-condition prints >= 1% of dollars, their VWAP >=20 bps below 30m VWAP, and positive large-lit flow",
+      "rank": "prior loss times opening discount and large-lit imbalance"
+    },
+    {
+      "name": "gapup_large_lit_sponsorship",
+      "rule": "gap-up confirmation plus large-lit signed-dollar imbalance >= 0.10 and fixed-$100k trade share >= 5%",
+      "rank": "gap/price confirmation times one plus large-lit imbalance"
+    },
+    {
+      "name": "gapup_sweep_confirmation",
+      "rule": "gap-up confirmation plus positive lit flow, intermarket-sweep share >= 1%, and exchange-dollar HHI <= 0.45",
+      "rank": "gap/price confirmation times sweep share and lit flow"
+    }
+  ],
+  "portfolio": {
+    "selection": "up to three highest-ranked longs per day after exact-entry filtering and full refill",
+    "sic_cap": "maximum one ticker per SIC per day",
+    "weight": "20% current NAV per name; maximum 0.6x entry gross",
+    "adv_cap": "1% ADV20 per entry order",
+    "initial_equity": 100000,
+    "compounding": true
+  },
+  "costs": {
+    "base_bps_per_traded_dollar_per_side": 4,
+    "stress_bps_per_traded_dollar_per_side": 8
+  },
+  "development_gate": {
+    "active_days_min": 100,
+    "trade_legs_min": 300,
+    "cagr_min": 0.05,
+    "sharpe_min": 0.8,
+    "max_drawdown_pct_floor": -0.12,
+    "positive_years_min": 3,
+    "gross_edge_bps_per_active_day_min": 10,
+    "stress_pnl_positive": true,
+    "top10_positive_pnl_share_max": 0.5,
+    "winner": "highest base-cost Sharpe then CAGR among passers"
+  },
+  "validation_gate": {
+    "active_days_min": 20,
+    "pnl_positive": true,
+    "sharpe_min": 0.5,
+    "max_drawdown_pct_floor": -0.1,
+    "stress_pnl_positive": true,
+    "top10_positive_pnl_share_max": 0.6
+  },
+  "multiple_testing_policy": "Exactly five frozen rows. No post-result threshold, rank, clock, exit, direction, or position-count changes.",
+  "production_policy": "A validation pass permits further audit only, not production PASS."
+}

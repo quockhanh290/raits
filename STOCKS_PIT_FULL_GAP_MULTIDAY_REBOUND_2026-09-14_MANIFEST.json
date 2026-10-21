@@ -1,0 +1,65 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_GAP_MULTIDAY_REBOUND_2026-09-14",
+  "script": "raits/research/stocks_pit_full_gap_multiday_rebound.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv"
+  ],
+  "method": "Pre-registered top500 PIT gap-down/gap-up signal observed at the open, entered at close_1555, and held in overlapping 3/5/10-day buckets.",
+  "costs": "4.0 bps per entry/exit bucket notional. No financing because gross is 1x long-only.",
+  "sample_label": "Research/touched 2018-2024 only; no 2025-2026 OOS opened.",
+  "leakage_controls": "Signal uses same-day open gap, but entry is same-day close_1555; returns begin next close-to-close day. Top500 membership uses PIT market-cap snapshots via backward merge. No old manual 62 list.",
+  "rule_selection_effect": "None inside diagnostic. Side, select counts, holds, and gross fixed before running.",
+  "variants": [
+    {
+      "variant": "top500_gapdown20_hold3_gross100",
+      "side": "long_gapdown",
+      "select_n": 20,
+      "hold": 3,
+      "gross": 1.0
+    },
+    {
+      "variant": "top500_gapdown20_hold5_gross100",
+      "side": "long_gapdown",
+      "select_n": 20,
+      "hold": 5,
+      "gross": 1.0
+    },
+    {
+      "variant": "top500_gapdown20_hold10_gross100",
+      "side": "long_gapdown",
+      "select_n": 20,
+      "hold": 10,
+      "gross": 1.0
+    },
+    {
+      "variant": "top500_gapdown50_hold5_gross100",
+      "side": "long_gapdown",
+      "select_n": 50,
+      "hold": 5,
+      "gross": 1.0
+    },
+    {
+      "variant": "top500_gapup20_hold3_gross100",
+      "side": "long_gapup",
+      "select_n": 20,
+      "hold": 3,
+      "gross": 1.0
+    },
+    {
+      "variant": "top500_gapup20_hold5_gross100",
+      "side": "long_gapup",
+      "select_n": 20,
+      "hold": 5,
+      "gross": 1.0
+    }
+  ],
+  "outputs": [
+    "STOCKS_PIT_FULL_GAP_MULTIDAY_REBOUND_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_GAP_MULTIDAY_REBOUND_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_GAP_MULTIDAY_REBOUND_2026-09-14_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_GAP_MULTIDAY_REBOUND_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_GAP_MULTIDAY_REBOUND_2026-09-14_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_GAP_MULTIDAY_REBOUND_2026-09-14_QA.csv"
+  ]
+}

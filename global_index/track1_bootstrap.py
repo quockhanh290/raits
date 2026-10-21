@@ -59,6 +59,26 @@ from global_index.track1_signal_layer import (ACCOUNT, Track1Book, cut_instant_f
 BOOK_SCHEMA = 2
 
 
+def _entry_day_for_checkpoint(row: Mapping[str, Any]) -> str:
+    """The checkpoint needs the position's entry date, not necessarily its clock.
+
+    Live Track 1 books may carry the route-owned `entry_day` even when a writer has not
+    preserved `entry_time`.  Falling straight through to `row["entry_time"]` turns that
+    valid book dialect into a slot crash at checkpoint time.  Do not invent a day when
+    both fields are absent: a checkpoint seeded from a guessed date would be worse than
+    refusing to write one.
+    """
+    value = row.get("entry_day") or row.get("entry_time")
+    if not value:
+        inst = row.get("instrument") or row.get("inst") or "unknown instrument"
+        sleeve = row.get("sleeve") or row.get("cluster") or "unknown sleeve"
+        raise ValueError(
+            f"cannot checkpoint open position for {sleeve}/{inst}: "
+            "entry_day and entry_time are both absent"
+        )
+    return str(pd.Timestamp(value).date())
+
+
 def snapshot_book(book: Track1Book, *, window: str | None = None) -> dict:
     """The carried state, in the shape `restore()` reads back.
 
@@ -247,7 +267,7 @@ def checkpoint_entries(book_state: Mapping[str, Any], *, frames: Mapping[str, An
                 # two places is two chances to disagree.
                 pos = {"dir": row["direction"], "entry": row.get("entry_price"),
                        "stop": row.get("stop_price"),
-                       "entry_day": str(pd.Timestamp(row["entry_time"]).date())}
+                       "entry_day": _entry_day_for_checkpoint(row)}
             inst_day = (last_day_by_inst or {}).get(inst)
             inst_day = pd.Timestamp(inst_day).normalize() if inst_day is not None else last_day
             insts[inst] = rc.make_entry(df, inst_day, pos, route=tp.ROUTE, sleeve=sleeve,

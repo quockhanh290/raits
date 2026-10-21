@@ -1,0 +1,26 @@
+{
+  "script": "D:/raits/raits/research/stocks_pit_sector_overreaction_replay.py",
+  "scriptHash": "8180C32EBA64EC96B9E61453142F131D0FCF3AF46D31C1FA55DFCADBDB16614C",
+  "preregistration": "STOCKS_PIT_SECTOR_OVERREACTION_PREREG_2026-10-02.json",
+  "preregistrationHash": "1DD668BDBDCFF5DC2EAB75B22FFE118DC296187704B87AA63C137CAEF23428ED",
+  "inputs": {
+    "raits/data/cache/stocks_pit_1520_continuation_2018_2022/causal_features_pre1520.parquet": "9FD61A4927F8DB6F9DA4410E23214DD4395CAE5E92CCE0F67050FBA43B0365F1",
+    "raits/data/cache/stocks_pit_1520_continuation_2018_2022/causal_features_pre1520_manifest.json": "0BF96E11A7CA1EF65BDB9A17006412A115DC13501EC40E92EFEF56A1F01D6540",
+    "raits/research/stocks_pit_1520_continuation_replay.py": "6C82E69137B50357476CDC7359E438CC9A4F9B82B79397F2E51943CB80B97105"
+  },
+  "selection": {
+    "status": "KILL_NO_DEVELOPMENT_PASS",
+    "selectedVariant": null,
+    "validationOpened": false,
+    "productionPassAllowed": false
+  },
+  "development": [
+    "2018-03-29",
+    "2021-12-31"
+  ],
+  "validation": null,
+  "oldManual62Used": false,
+  "post2022Consumed": false,
+  "productionPassAllowed": false,
+  "causality": "same-date PIT SIC medians and features known at exact 15:20 entry; fixed next-session exits"
+}

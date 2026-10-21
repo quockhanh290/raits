@@ -140,31 +140,37 @@ class Slot:
     phase: str = ""
 
 
-#: Stage 5ZX. The two Calm phases, in the terms `track1_calm_a.CalmExecutionContract` declares.
-#: They are written out rather than derived from the window, because the window's low bound is
-#: the ENTRY instant and neither phase runs at it: one runs before, one after.
+#: Calm's evidence and execution instants, in the terms
+#: `track1_calm_a.CalmExecutionContract` declares.
 CALM_DECIDE_AT = (9, 32)
+CALM_EXECUTE_AT = (10, 0)
 CALM_OBSERVE_AT = (10, 2)
 
 
 def _calm_slots() -> list:
-    """Two phases, replacing the single 10:00 slot that could never pass its own gate.
+    """Record setup, execute at the 10:00 open, then confirm the reference.
 
     The old slot fired at the entry instant and needed a CLOSED 10:00 five-minute bar, which
     first exists at 10:05 — four minutes after its own deadline (Stage 5ZU). Splitting it is
     not a workaround for that: the decision genuinely is fixed by 09:31 and the price genuinely
     is not readable until 10:01, and one slot cannot be in both places.
 
-    The entry reference does not move. It is still the 10:00 OPEN.
+    The entry reference does not move. It is still the 10:00 OPEN. The middle slot is the
+    actual candidate/admission/send pass; without it the two evidence phases only produce
+    ``candidates=0`` and no paper order.
     """
     dh, dm = CALM_DECIDE_AT
+    eh, em = CALM_EXECUTE_AT
     oh, om = CALM_OBSERVE_AT
     return [
         Slot(f"TRACK1_CALM_DECIDE_{dh:02d}{dm:02d}", dh, dm, "roska4_calm", "one_shot",
              "decides from bars closed by 09:30; records intent, never a price",
              phase="DECIDE"),
+        Slot(f"TRACK1_CALM_EXECUTE_{eh:02d}{em:02d}", eh, em, "roska4_calm", "one_shot",
+             "sends at the 10:00 OPEN using the live entry reference",
+             phase="EXECUTE"),
         Slot(f"TRACK1_CALM_OBSERVE_{oh:02d}{om:02d}", oh, om, "roska4_calm", "one_shot",
-             "records the 10:00 OPEN and the stop level; entry is NOT taken late",
+             "confirms the 10:00 OPEN and the stop level after the bar closes",
              phase="OBSERVE"),
     ]
 
@@ -325,7 +331,7 @@ class SafetyJob:
     id: str
     hour: int
     minute: int
-    kind: str            # "maxhold" | "stop_repair"
+    kind: str            # "maxhold" | "stop_repair" | "time_exit"
     day_of_week: str = "mon-fri"
 
 
@@ -346,6 +352,45 @@ def _track1_sweep_hours() -> list:
     return out
 
 
+#: 2026-10-05. A sleeve whose rule is "exit at the clock" rather than "after N days".
+#:
+#: roska4_calm enters at the 10:00 open and exits at the 15:55 open; 99% of its backtest trades
+#: leave that way. Until now nothing on the route closed such a position — the 09:31 MAX_HOLD
+#: job reads a five-day rule — so an entry that filled would have been held like a swing trade.
+#: The exit is a SAFETY job (it closes, cancels the stop and writes the CLOSE row through the
+#: same runner the MAX_HOLD job uses), so it lives in this table: the scheduler registers from
+#: it and the dashboard mirrors from it, and one list cannot disagree with itself.
+#:
+#: The id deliberately does NOT start with `TRACK1_CALM_`: the job journal classifies that prefix
+#: as a Calm STRATEGY slot and would label an exit failure "no signal".
+CALM_TIME_EXIT_CLUSTER = "roska4_calm"
+
+#: Clusters meant to be flat by the end of the session they open in. The 09:31 MAX_HOLD job gives
+#: them a one-day limit, so a position the 15:55 exit failed to close is found the next morning
+#: instead of after five days.
+TRACK1_CLUSTER_MAX_HOLD = {CALM_TIME_EXIT_CLUSTER: 1}
+
+
+#: Minutes BEFORE the rule's exit instant that the exit job starts. Reviewer finding, 2026-10-05:
+#: the job loads the book, connects (a few seconds), closes, then rewrites the WHOLE positions file
+#: from what it loaded. 15:55 is also the last swing slot, which appends a row after its own fetch;
+#: an exit that started at 15:55:00 could persist after that append and drop the new swing position
+#: from the book. Starting a minute early finishes the rewrite before that slot begins (the 15:50
+#: slot is long done), and costs a fill about a minute ahead of the 15:55 open — unbiased noise on a
+#: trade that already fills some 20 s late at the other end.
+CALM_TIME_EXIT_LEAD_MINUTES = 1
+
+
+def calm_time_exit_job() -> SafetyJob:
+    """The Calm clock exit, its time read from the rule rather than written twice."""
+    from global_index.track1_calm_a import CalmAParams
+
+    hh, mm = (int(x) for x in CalmAParams().exit_time.split(":"))
+    total = hh * 60 + mm - CALM_TIME_EXIT_LEAD_MINUTES
+    hh, mm = divmod(total, 60)
+    return SafetyJob(f"track1_time_exit_calm_{hh:02d}{mm:02d}", hh, mm, "time_exit")
+
+
 def track1_safety_jobs() -> tuple:
     """The Track 1 safety schedule, one table for the scheduler AND the dashboard mirror.
 
@@ -353,7 +398,7 @@ def track1_safety_jobs() -> tuple:
     watches the only book that can hold positions (Track 1 places no orders), and adding a
     second connected child per sweep minute there would be load without a book to protect.
     """
-    jobs = [SafetyJob("track1_maxhold_exit", 9, 31, "maxhold")]
+    jobs = [SafetyJob("track1_maxhold_exit", 9, 31, "maxhold"), calm_time_exit_job()]
     jobs += [SafetyJob(f"track1_stop_repair_{h:02d}20", h, 20, "stop_repair")
              for h in _track1_sweep_hours()]
     jobs.append(SafetyJob("track1_stop_repair_sun_1830", 18, 30, "stop_repair",

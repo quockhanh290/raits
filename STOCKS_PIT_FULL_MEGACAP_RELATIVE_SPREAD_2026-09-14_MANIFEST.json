@@ -1,0 +1,83 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_MEGACAP_RELATIVE_SPREAD_2026-09-14",
+  "script": "raits/research/stocks_pit_full_megacap_relative_spread.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv"
+  ],
+  "sample_label": "Research/in-sample diagnostics across 2018-2024. 2023-2024 is touched validation, not clean unseen OOS.",
+  "method": "Pre-registered return-stream mega-cap relative-value spread: long market-cap top62 EW versus broad/top500/top200 EW benchmarks.",
+  "variants": [
+    {
+      "variant": "long_top62_short_broad_100_100",
+      "long": "market_cap_top62_equal_weight",
+      "short": "broad_pit_equal_weight",
+      "long_weight": 1.0,
+      "short_weight": 1.0,
+      "target_vol": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "long_top62_short_top500_100_100",
+      "long": "market_cap_top62_equal_weight",
+      "short": "market_cap_top500_equal_weight",
+      "long_weight": 1.0,
+      "short_weight": 1.0,
+      "target_vol": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "long_top62_short_top200_100_100",
+      "long": "market_cap_top62_equal_weight",
+      "short": "market_cap_top200_equal_weight",
+      "long_weight": 1.0,
+      "short_weight": 1.0,
+      "target_vol": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "long_top62_short_broad_150_100",
+      "long": "market_cap_top62_equal_weight",
+      "short": "broad_pit_equal_weight",
+      "long_weight": 1.5,
+      "short_weight": 1.0,
+      "target_vol": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "long_top62_short_broad_100_50",
+      "long": "market_cap_top62_equal_weight",
+      "short": "broad_pit_equal_weight",
+      "long_weight": 1.0,
+      "short_weight": 0.5,
+      "target_vol": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "long_top62_short_broad_spread_vt16_cap300",
+      "long": "market_cap_top62_equal_weight",
+      "short": "broad_pit_equal_weight",
+      "long_weight": 1.0,
+      "short_weight": 1.0,
+      "target_vol": 0.16,
+      "max_exposure": 3.0
+    },
+    {
+      "variant": "long_top62_short_broad_spread_vt25_cap400",
+      "long": "market_cap_top62_equal_weight",
+      "short": "broad_pit_equal_weight",
+      "long_weight": 1.0,
+      "short_weight": 1.0,
+      "target_vol": 0.25,
+      "max_exposure": 4.0
+    }
+  ],
+  "costs": "No additional short borrow, financing, or rebalance costs modeled; diagnostic is optimistic and must be rebuilt before promotion.",
+  "rule_selection": "None. Variant set fixed in VARIANTS before measuring.",
+  "old_62_usage": "None.",
+  "outputs": [
+    "STOCKS_PIT_FULL_MEGACAP_RELATIVE_SPREAD_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_MEGACAP_RELATIVE_SPREAD_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_MEGACAP_RELATIVE_SPREAD_2026-09-14_SPLITS.csv",
+    "STOCKS_PIT_FULL_MEGACAP_RELATIVE_SPREAD_2026-09-14_DAILY.csv"
+  ]
+}

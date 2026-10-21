@@ -1,0 +1,56 @@
+{
+  "research_question": "Do fixed semantic events extracted from complete SEC 8-K submission text produce PIT-safe sector-relative drift that survives a later calendar year?",
+  "frozen_before_content_and_performance": true,
+  "frozen_at_local_date": "2026-10-03",
+  "fetch_script": "raits/research/stocks_sec_8k_content_fetch.py",
+  "fetch_script_hash": "D53C341D85B33AEA93FF54054E259786D7AA2CF6127CE4DA7E8D1BE75C9DA677",
+  "classification_script": "raits/research/stocks_sec_8k_content_classify.py",
+  "classification_script_hash": "A029B5329A12389D1CF110E93EAC5EBE0BA20D12DD24F7AF5C2797172DA7AFEA",
+  "performance_script": "raits/research/stocks_sec_8k_content_event_map.py",
+  "performance_script_hash": "CB1125B37F7A23269CF381F28B9302DF061CE03CC5201D938C7FFDE8584CCC97",
+  "technical_corrections_before_performance": [
+    "After 5,472 discovery submissions had been cached and before any performance was measured, a fetch-only operational flag was added so resumable batches do not repeatedly scan all cached text. Accessions, raw bytes, semantic regexes, labels, outcomes, splits, gates, and selection rules are unchanged.",
+    "The normal incomplete-batch path was also changed to defer classification and omit a labels path until planned coverage is complete. This is consistent with fetch-only operation and changes no research input or rule.",
+    "After discovery fetching completed and before classification or performance, a classify-only operational flag and explicit failure accounting were added. The frozen 30 MiB limit excludes 64 oversize submissions and one SEC 404 while preserving them in status provenance; no content, label, outcome, split, gate, or selection definition changed.",
+    "The sequential local classifier timed out before writing labels. A hash-locked parallel classifier was added before any label or performance output; it imports the exact frozen regex dictionary from the fetcher and changes only local execution.",
+    "The thread-pool classifier also timed out before writing labels because Python regex normalization remained GIL-bound. It was changed to a four-process pool with progress output before any label or performance output; regexes and all research definitions are unchanged.",
+    "The ordered process-pool run stalled before its first output and was terminated without labels. The classifier now supports independent frozen-year parts followed by a strict row-count combine; this changes only scheduling and creates no partial performance input."
+  ],
+  "relationship_to_prior_work": "Prior SEC families used submission metadata items, Form 4 transactions, ownership roles, or broad form categories. This family uses fixed phrases in complete 8-K submission text and does not retest Item 2.02, deal, governance, 13D, or Form 4 definitions.",
+  "splits": {
+    "discovery": "2018-01-01 through 2020-12-31 filings; all 18,892 frozen PIT-top500 accessions are fetched before performance.",
+    "temporal_replication": "Calendar-2021 filings; content is fetched and performance scored only for semantic-class/horizon cells passing discovery.",
+    "later_data": "No 2022-2026 filing content or performance may be consumed by this family."
+  },
+  "semantic_classes": {
+    "buyback_authorization": ["authorized/approved/adopted within 180 characters of share/stock repurchase program/plan", "repurchase program/plan within 180 characters of authorized/approved/adopted"],
+    "workforce_reduction": ["reduction in workforce", "reduction-in-force", "layoffs of employees/workers", "elimination of positions/employees"],
+    "going_concern_distress": ["substantial doubt and continue as a going concern within fixed windows"],
+    "financial_restatement": ["financial statements/results should no longer be relied upon", "non-reliance on previously issued financial statements", "will restate financial statements"],
+    "cyber_incident": ["cybersecurity/cyber incident", "ransomware attack/incident", "material data breach", "unauthorized access to systems/network/data"],
+    "strategic_alternatives": ["review/explore/evaluate/consider strategic alternatives within fixed windows"]
+  },
+  "fetch_contract": {
+    "source": "Polygon SEC index supplies accession and complete-submission URL; SEC Archives supplies raw text.",
+    "universe": "Form exactly 8-K, unique accession, filing date in stage, ticker in backward-assigned quarterly PIT market-cap top500 snapshot. Old/manual 62 is excluded.",
+    "raw_preservation": "Each complete submission is gzip-cached and never deleted or rewritten. Maximum accepted raw response is 30 MiB; oversize/error rows remain explicit failures.",
+    "fair_access": "Identified User-Agent, global request rate no more than 8 requests/second, retries and resumability.",
+    "availability": "Acceptance timestamp must be parsed from the SEC submission header. Missing timestamps are excluded from performance rather than replaced with filing date."
+  },
+  "performance_contract": {
+    "entry_assignment": "Each accepted filing is assigned to the first full trading session whose 09:15 ET cutoff is strictly later than acceptance; entry is exact 09:35.",
+    "universe_and_controls": "Event ticker must pass the daily PIT eligibility filter, price >=$5, ADV20 >=$10m, and quarterly PIT top500 membership. Residual return subtracts the same-session same-SIC median return among eligible PIT top500 names; if fewer than five sector controls exist, use the PIT-top500 median.",
+    "horizons": ["09:35 to same-session 15:55", "09:35 to session-5 15:55", "09:35 to session-20 15:55"],
+    "missing_prices": "Selection occurs before outcome availability. Exact target close is preferred; otherwise use the last available close after entry and no later than target; no future price means a -100% underlying write-off before residualization.",
+    "statistics": "For each of six semantic classes and three horizons, test the mean event residual return across unique issuer/session events. Discovery direction is the sign of the mean; no class has a preassigned long/short direction.",
+    "multiple_testing": "Benjamini-Hochberg across all 18 discovery cells at q <=0.10."
+  },
+  "gates": {
+    "coverage": "At least 80 unique discovery issuer/session events, at least 15 in each of 2018, 2019, and 2020, and at least two of three annual means with the aggregate sign.",
+    "discovery": "Two-sided q <=0.10, absolute t >=2.0, and absolute residual mean >=0.15% d1, >=0.40% d5, or >=0.80% d20.",
+    "replication": "At least 20 events, same sign, directional t >=1.0, and absolute residual mean >=25% of discovery.",
+    "production": "Never granted by this diagnostic. Any replicated cell requires a separately preregistered full-refill compounding portfolio replay with transaction costs, dollar/percentage DD, concentration, and missing-price audit."
+  },
+  "selection_effect": "Rule selection is the frozen 18-cell semantic-class/horizon family. Trade selection is every causally available qualifying filing event; no ticker PnL removal, price-reaction threshold, semantic threshold tuning, class addition, or direction inversion is allowed after performance.",
+  "technical_correction_policy": "Only a documented runtime/plumbing correction before the first performance output is allowed; semantic regexes, accessions, splits, outcomes, controls, gates, and multiple-testing policy may not change."
+}

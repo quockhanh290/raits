@@ -1,0 +1,68 @@
+{
+  "script": "D:/raits/raits/research/stocks_pit_multivariate_interaction_map.py",
+  "scriptHash": "39646CED1CDC1B0253290EF236FAB23874628C7BC33141578FD98B2A07148FF2",
+  "preregistration": "STOCKS_PIT_MULTIVARIATE_INTERACTION_PREREG_2026-10-03.json",
+  "preregistrationHash": "C17598FF63E07024E2CE4A50FF852EC24E1DD23511C5626A078274101ACC0215",
+  "sklearnVersion": "1.4.2",
+  "candidates": [
+    {
+      "candidate": "tape_gap_ridge_d20",
+      "context": "tape_gap",
+      "model": "ridge",
+      "horizon": "d20"
+    },
+    {
+      "candidate": "tape_gap_hgb_d20",
+      "context": "tape_gap",
+      "model": "hgb",
+      "horizon": "d20"
+    },
+    {
+      "candidate": "tape_yday_ridge_d20",
+      "context": "tape_yday",
+      "model": "ridge",
+      "horizon": "d20"
+    },
+    {
+      "candidate": "tape_yday_hgb_d20",
+      "context": "tape_yday",
+      "model": "hgb",
+      "horizon": "d20"
+    },
+    {
+      "candidate": "broad_event_ridge_d5",
+      "context": "broad_event",
+      "model": "ridge",
+      "horizon": "d5"
+    },
+    {
+      "candidate": "broad_event_hgb_d5",
+      "context": "broad_event",
+      "model": "hgb",
+      "horizon": "d5"
+    },
+    {
+      "candidate": "broad_event_ridge_d20",
+      "context": "broad_event",
+      "model": "ridge",
+      "horizon": "d20"
+    },
+    {
+      "candidate": "broad_event_hgb_d20",
+      "context": "broad_event",
+      "model": "hgb",
+      "horizon": "d20"
+    }
+  ],
+  "selection": {
+    "candidates": 8,
+    "developmentPasses": 0,
+    "replicationPasses": 0,
+    "confirmationOpened": false,
+    "confirmationPasses": 0,
+    "productionPassAllowed": false
+  },
+  "oldManual62Used": false,
+  "post2022Consumed": false,
+  "post2021PerformanceConsumed": false
+}

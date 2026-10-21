@@ -1,0 +1,67 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_CALENDAR_RELATIVE_SPREAD_2026-09-14",
+  "script": "raits/research/stocks_pit_full_calendar_relative_spread.py",
+  "input": "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv",
+  "method": "Pre-registered calendar-conditioned market-cap relative spread with financing, borrow, and turnover costs.",
+  "financing_annual_rate": 0.025,
+  "short_borrow_annual_rate": 0.01,
+  "turnover_cost_bps": 4.0,
+  "variants": [
+    {
+      "long": "market_cap_top62_equal_weight",
+      "short": "market_cap_top200_equal_weight",
+      "window": "first5",
+      "spread_weight": 1.0
+    },
+    {
+      "long": "market_cap_top62_equal_weight",
+      "short": "market_cap_top200_equal_weight",
+      "window": "first5",
+      "spread_weight": 2.0
+    },
+    {
+      "long": "market_cap_top62_equal_weight",
+      "short": "market_cap_top200_equal_weight",
+      "window": "last2_first3",
+      "spread_weight": 1.0
+    },
+    {
+      "long": "market_cap_top62_equal_weight",
+      "short": "market_cap_top200_equal_weight",
+      "window": "last2_first3",
+      "spread_weight": 2.0
+    },
+    {
+      "long": "market_cap_top62_equal_weight",
+      "short": "market_cap_top500_equal_weight",
+      "window": "first5",
+      "spread_weight": 1.0
+    },
+    {
+      "long": "market_cap_top62_equal_weight",
+      "short": "market_cap_top500_equal_weight",
+      "window": "first5",
+      "spread_weight": 2.0
+    },
+    {
+      "long": "market_cap_top100_equal_weight",
+      "short": "market_cap_top500_equal_weight",
+      "window": "first5",
+      "spread_weight": 1.0
+    },
+    {
+      "long": "market_cap_top100_equal_weight",
+      "short": "market_cap_top500_equal_weight",
+      "window": "first5",
+      "spread_weight": 2.0
+    }
+  ],
+  "sample_label": "Research/touched 2018-2024 only; no 2025-2026 OOS opened.",
+  "leakage_controls": "Calendar labels use trading-day order only. Long/short streams use PIT market-cap benchmarks from section 6.148. No old manual 62 ticker list.",
+  "rule_selection_effect": "None inside diagnostic. Calendar windows, pairs, and weights fixed before running.",
+  "outputs": [
+    "STOCKS_PIT_FULL_CALENDAR_RELATIVE_SPREAD_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_CALENDAR_RELATIVE_SPREAD_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_CALENDAR_RELATIVE_SPREAD_2026-09-14_DAILY.csv"
+  ]
+}

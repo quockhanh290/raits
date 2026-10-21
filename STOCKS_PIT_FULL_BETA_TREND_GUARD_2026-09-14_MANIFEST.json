@@ -1,0 +1,71 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_BETA_TREND_GUARD_2026-09-14",
+  "script": "raits/research/stocks_pit_full_beta_trend_guard.py",
+  "input": "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv",
+  "sample_label": "Research/in-sample diagnostics across 2018-2024. 2023-2024 is touched validation, not clean unseen OOS.",
+  "causality": "Vol target and trailing return guard both use trailing data shifted by one day.",
+  "variants": [
+    {
+      "base": "market_cap_top62_equal_weight",
+      "variant": "top62_vt25_cap250_trail20m5_half",
+      "target_vol": 0.25,
+      "max_exposure": 2.5,
+      "lookback": 20,
+      "threshold": -0.05,
+      "guard_mult": 0.5
+    },
+    {
+      "base": "market_cap_top62_equal_weight",
+      "variant": "top62_vt25_cap250_trail60m10_half",
+      "target_vol": 0.25,
+      "max_exposure": 2.5,
+      "lookback": 60,
+      "threshold": -0.1,
+      "guard_mult": 0.5
+    },
+    {
+      "base": "market_cap_top62_equal_weight",
+      "variant": "top62_vt20_cap200_trail20m5_half",
+      "target_vol": 0.2,
+      "max_exposure": 2.0,
+      "lookback": 20,
+      "threshold": -0.05,
+      "guard_mult": 0.5
+    },
+    {
+      "base": "market_cap_top62_equal_weight",
+      "variant": "top62_vt20_cap200_trail60m10_half",
+      "target_vol": 0.2,
+      "max_exposure": 2.0,
+      "lookback": 60,
+      "threshold": -0.1,
+      "guard_mult": 0.5
+    },
+    {
+      "base": "spy_buy_hold",
+      "variant": "spy_vt20_cap200_trail20m5_half",
+      "target_vol": 0.2,
+      "max_exposure": 2.0,
+      "lookback": 20,
+      "threshold": -0.05,
+      "guard_mult": 0.5
+    },
+    {
+      "base": "spy_buy_hold",
+      "variant": "spy_vt20_cap200_trail60m10_half",
+      "target_vol": 0.2,
+      "max_exposure": 2.0,
+      "lookback": 60,
+      "threshold": -0.1,
+      "guard_mult": 0.5
+    }
+  ],
+  "rule_selection": "None. Variant set fixed in VARIANTS before measuring.",
+  "stop_condition": "About 25% CAGR with low drawdown.",
+  "outputs": [
+    "STOCKS_PIT_FULL_BETA_TREND_GUARD_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_BETA_TREND_GUARD_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_BETA_TREND_GUARD_2026-09-14_SPLITS.csv",
+    "STOCKS_PIT_FULL_BETA_TREND_GUARD_2026-09-14_DAILY.csv"
+  ]
+}

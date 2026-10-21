@@ -1,0 +1,33 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_CONDITIONAL_HEDGE_COSTAWARE_AUDIT_2026-09-17",
+  "script": "raits/research/stocks_pit_full_conditional_hedge_costaware_audit.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_BETA_VOLTARGET_EXPANSION_2026-09-14_DAILY.csv"
+  ],
+  "method": "Constituent-level rebuild of top62 vt20 plus lagged broad-PIT 20-day-loss conditional short hedge; target weights net overlapping constituents before costs.",
+  "costs": "4.0 bps full target-vector turnover, 1.0% annual borrow on net short gross, and 2.5% annual financing on gross above 1x.",
+  "sample_label": "Research/touched 2018-2024 only. 2023-2024 is touched, not clean unseen OOS. No 2025-2026 opened.",
+  "leakage_controls": "Base vol target and broad 20-day trigger are shifted/causal source rules; PIT benchmark constituents are rebuilt daily; no old manual 62 list.",
+  "rule_selection_effect": "None. The 50% and 75% hedge rows were frozen from prior diagnostics; this audit changes accounting/costs only.",
+  "trade_selection_effect": "Full daily target vectors, overlap netting, constituent refill and costs are rebuilt; no PnL subtraction.",
+  "variants": [
+    {
+      "variant": "top62_vt20_broadhedge50_costaware",
+      "hedge_weight": 0.5
+    },
+    {
+      "variant": "top62_vt20_broadhedge75_costaware",
+      "hedge_weight": 0.75
+    }
+  ],
+  "outputs": [
+    "STOCKS_PIT_FULL_CONDITIONAL_HEDGE_COSTAWARE_AUDIT_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_CONDITIONAL_HEDGE_COSTAWARE_AUDIT_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_CONDITIONAL_HEDGE_COSTAWARE_AUDIT_2026-09-17_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_CONDITIONAL_HEDGE_COSTAWARE_AUDIT_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_CONDITIONAL_HEDGE_COSTAWARE_AUDIT_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_CONDITIONAL_HEDGE_COSTAWARE_AUDIT_2026-09-17_QA.csv"
+  ]
+}

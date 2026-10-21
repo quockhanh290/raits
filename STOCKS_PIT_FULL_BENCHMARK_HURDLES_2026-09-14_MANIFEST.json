@@ -1,0 +1,29 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14",
+  "script": "raits/research/stocks_pit_full_benchmark_hurdles.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv",
+    "raits/data/cache/window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl"
+  ],
+  "sample_period": [
+    "2018-03-29",
+    "2024-12-31"
+  ],
+  "benchmarks": [
+    "broad PIT equal weight",
+    "quarterly market-cap top-N equal weight",
+    "SPY buy hold",
+    "QQQ buy hold"
+  ],
+  "old_62_usage": "SPY/QQQ ETF bars come from the Polygon62+ETF pickle only for benchmark prices; no old-62 equity universe is used for selection.",
+  "rule_selection": "None. Benchmarks are fixed before measurement.",
+  "outputs": [
+    "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_QA.csv"
+  ]
+}

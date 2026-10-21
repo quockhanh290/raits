@@ -34,6 +34,29 @@
     return (d && d.meta) || {};
   }
 
+  /* Stage 2026-09-24 (plan stage 0). This page renders the legacy runner's file, and legacy
+     entries were retired 2026-08-27 — measured the day this was written, the file was 31 days
+     old and still printed "Runner alive" and a broker equity four times the real account.
+     The server now appends `window.LIVE_DATA_PROVENANCE`; when it says stale, the whole page
+     is declared a record of that date, and the runner-alive claim is not made at all.
+     No provenance (the file opened from disk, an old backend) is treated as stale: a page
+     that cannot tell how old its data is must not present it as current. */
+  function provenance() {
+    const p = window.LIVE_DATA_PROVENANCE;
+    return p && typeof p === 'object' ? p : { stale: true, as_of: null, era: 'legacy' };
+  }
+
+  function staleBannerHtml() {
+    const p = provenance();
+    if (!p.stale) return '';
+    const when = p.as_of ? String(p.as_of).replace('T', ' ').replace(/\.\d+Z?$/, '').replace(/Z$/, '') + ' UTC' : 'an unknown time';
+    const days = Number(p.age_seconds) / 86400;
+    const ageText = Number.isFinite(days) ? ` (${days.toFixed(1)} days ago)` : '';
+    return `<div data-legacy-stale role="status" style="background:#7a2e2e;color:#fff;padding:8px 12px;font:600 13px system-ui,sans-serif">`
+      + `Legacy runner snapshot from ${esc(when)}${esc(ageText)} — NOT the current state. `
+      + `Nothing on this page describes the account, positions or connection now; the live route is shown on /realtime.</div>`;
+  }
+
   function esc(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -172,7 +195,7 @@
   function healthHtml() {
     const op = meta().operational_status || latestSnap().operational_status || {};
     const items = [
-      ['Runner', op.runner && op.runner.alive ? 'alive' : 'down', op.runner && op.runner.pid ? 'pid ' + op.runner.pid : ''],
+      ['Runner', provenance().stale ? 'unknown' : (op.runner && op.runner.alive ? 'alive' : 'down'), provenance().stale ? 'no current reading' : (op.runner && op.runner.pid ? 'pid ' + op.runner.pid : '')],
       ['Breaker', op.breaker && op.breaker.level, op.breaker ? `DD ${fmtPctAlready(op.breaker.dd_pct_display, 2)} day ${fmtPctAlready(op.breaker.day_dd_pct_display, 2)}` : ''],
       ['Regime', op.regime_freshness && op.regime_freshness.status, op.regime_freshness && op.regime_freshness.last_spy_date],
       ['Model', op.model_age && op.model_age.status, op.model_age ? `${op.model_age.model_name || ''} ${op.model_age.months_old || '--'}mo` : ''],
@@ -240,6 +263,10 @@
       renderInto('[data-error]', '<b>Live data missing.</b> Open this page beside live_state_data.js.');
       return;
     }
+    if (document.body && !document.querySelector('[data-legacy-stale]')) {
+      const banner = staleBannerHtml();
+      if (banner) document.body.insertAdjacentHTML('afterbegin', banner);
+    }
     renderBasics();
     renderInto('[data-positions]', positionRows());
     renderInto('[data-clusters]', clusterCards());
@@ -249,7 +276,7 @@
     renderCharts();
   }
 
-  window.RaitsLive = { render, stopCell, _test: { latestSnap, meta } };
+  window.RaitsLive = { render, stopCell, _test: { latestSnap, meta, provenance, staleBannerHtml } };
   window.addEventListener('DOMContentLoaded', render);
   window.addEventListener('load', renderCharts);
 }());

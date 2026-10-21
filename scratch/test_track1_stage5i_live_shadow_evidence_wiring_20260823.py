@@ -55,7 +55,7 @@ class FakeBroker:
     def disconnect(self):
         self.disconnects += 1
 
-    def fetch_bars(self, inst, through):
+    def fetch_bars(self, inst, through, *, lookback=None):
         return None
 
 

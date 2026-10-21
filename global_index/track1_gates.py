@@ -68,10 +68,18 @@ CONFIRMATION_SCHEMA = 1
 #: cannot be queried on the day (Gateway down, a second account not yet reachable), and the
 #: alternative to naming that case is an operator quietly deciding the measurement does not
 #: apply. Setting it requires a `note` saying why — see `load_confirmations`.
+#: `paper_shadow_evidence_order_block_overridden` releases NOTHING. It lifts one blocker's
+#: hold on ORDERS and leaves the blocker shut: `released()` keeps answering False, the
+#: measurement keeps running every day, and `overridden()` reports it as STILL FAILING
+#: wherever `blocking()` is reported. Operator decision 2026-09-23 — see the note in the
+#: confirmation file for the measured state it was signed against. Like every flag here it
+#: also requires a `note`, for the same reason `b1_measurement_waived` does: a decision to
+#: proceed without evidence is defensible and a record that does not say so is not.
 CONFIRMATION_FLAGS: tuple = (
     "legacy_retired_confirmed",
     "separate_account_confirmed",
     "b1_measurement_waived",
+    "paper_shadow_evidence_order_block_overridden",
 )
 CONFIRMATION_META: tuple = ("schema_version", "confirmed_by", "confirmed_at", "note")
 
@@ -124,6 +132,12 @@ def load_confirmations(path: str | Path = CONFIRMATION_PATH
     at = raw.get("confirmed_at")
     if not isinstance(at, str) or not at.strip():
         errs.append("confirmed_at must be a non-empty ISO date string")
+    if (raw.get("paper_shadow_evidence_order_block_overridden") is True
+            and not str(raw.get("note") or "").strip()):
+        errs.append("paper_shadow_evidence_order_block_overridden requires a `note` saying "
+                    "what the evidence was failing on when it was signed. A gate stepped over "
+                    "without a reason on the record is indistinguishable, six weeks later, "
+                    "from a gate that opened.")
     if raw.get("b1_measurement_waived") is True and not str(raw.get("note") or "").strip():
         errs.append("b1_measurement_waived requires a `note` saying why the account could not "
                     "be asked — a waiver with no reason is indistinguishable from a habit")
@@ -527,6 +541,17 @@ class Blocker:
     #: The one confirmation flag that lets the operator waive `also_requires_measurement` and
     #: take the fact on their own authority. Empty means nothing can waive it.
     waiver_flag: str = ""
+    #: The confirmation flag that lifts this blocker's hold on ORDERS while leaving everything
+    #: else about it alone. It does NOT release the gate: `released()` keeps answering False,
+    #: the measurement keeps running every day, and `overridden()` reports the gap out loud.
+    #:
+    #: This exists because the operator's decision on 2026-09-23 was precisely that shape —
+    #: open paper orders now, keep the evidence gate measuring exactly as it does. Setting
+    #: `blocks_orders=False` would have delivered the first half and destroyed the second: an
+    #: empty `blocking()` list and `orders_possible=True` read as a gate that PASSED, and the
+    #: evidence was failing 4 of the last 5 days that same morning. A decision to proceed
+    #: without evidence is defensible; a record that hides which one it was is not.
+    order_block_override_flag: str = ""
     depends_on: tuple = ()
 
     def measure(self) -> tuple[bool, str]:
@@ -553,6 +578,20 @@ class Blocker:
         if signed:
             return True
         return self.measure()[0]
+
+    def order_block_overridden(self, conf: Confirmations) -> bool:
+        """True when the operator has lifted this blocker's hold on orders AND it is still shut.
+
+        Both halves matter. Without the flag this is always False, so the default is untouched.
+        With the flag but a gate that would open anyway there is nothing to override, and saying
+        so would put a line on the screen on the days it means nothing — which is how a reader
+        learns to skip it on the days it means everything.
+        """
+        if not self.order_block_override_flag:
+            return False
+        if not conf.get(self.order_block_override_flag):
+            return False
+        return not self.released(conf)
 
 
 BLOCKERS: dict = {
@@ -657,6 +696,9 @@ BLOCKERS: dict = {
             "reports every check PASS. Nothing to confirm and nothing to sign: this gate "
             "opens when the evidence exists and closes again if it goes stale."),
         released_by_measurement="shadow_evidence",
+        # Operator decision 2026-09-23: paper orders open now, this gate keeps measuring.
+        # It does not release the gate — see `order_block_override_flag`.
+        order_block_override_flag="paper_shadow_evidence_order_block_overridden",
     ),
 
     "LIVE_FRAME_ADAPTER_VERIFICATION": Blocker(
@@ -889,7 +931,31 @@ def blocking(conf: "Confirmations | None" = None) -> list:
     """
     if conf is None:
         conf = current_confirmations()
-    return [b for b in BLOCKERS.values() if b.blocks_orders and not b.released(conf)]
+    return [b for b in BLOCKERS.values()
+            if b.blocks_orders and not b.released(conf)
+            and not b.order_block_overridden(conf)]
+
+
+def overridden(conf: "Confirmations | None" = None) -> list:
+    """`[(blocker, why_it_is_still_shut)]` for every gate proceeding under an override.
+
+    The other half of `blocking()`, and it must be read wherever that is. A caller that prints
+    `blocking()` alone now prints an empty list on a day when a gate is failing and being
+    stepped over, which is a worse answer than the one it replaced.
+
+    The reason string is the MEASUREMENT's own, not a summary: "orders are armed despite
+    PAPER_SHADOW_EVIDENCE" says nothing a reader can act on, while "4 FAIL day(s) in the
+    qualifying window" says which days to go and look at.
+    """
+    if conf is None:
+        conf = current_confirmations()
+    out = []
+    for b in BLOCKERS.values():
+        if not b.blocks_orders or not b.order_block_overridden(conf):
+            continue
+        ok, detail = b.measure()
+        out.append((b, detail or ("still shut" if not ok else "")))
+    return out
 
 
 def may_enable_orders(conf: "Confirmations | None" = None) -> tuple[bool, list]:

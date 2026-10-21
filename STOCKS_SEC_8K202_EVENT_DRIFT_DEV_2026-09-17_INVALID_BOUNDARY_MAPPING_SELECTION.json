@@ -1,0 +1,48 @@
+{
+  "candidates": [
+    {
+      "variant": "sec8k202_confirm_hold1",
+      "holdSessions": 1,
+      "developmentPass": false,
+      "validationPass": true,
+      "positiveDevelopmentYears": 2,
+      "developmentSharpe": 0.09653799592118234,
+      "developmentDdPct": -0.0521745607251477,
+      "developmentEntries": 1702,
+      "developmentEffectiveTickerCount": 121.46785620042577,
+      "validationPnl": 3249.810721693997,
+      "validationCost8Pnl": 1053.7717892773653,
+      "validationDdPct": -0.026801447447199034
+    },
+    {
+      "variant": "sec8k202_confirm_hold3",
+      "holdSessions": 3,
+      "developmentPass": true,
+      "validationPass": true,
+      "positiveDevelopmentYears": 4,
+      "developmentSharpe": 0.7311150546680193,
+      "developmentDdPct": -0.03957276445485214,
+      "developmentEntries": 1702,
+      "developmentEffectiveTickerCount": 113.25245767911639,
+      "validationPnl": 4927.60713951943,
+      "validationCost8Pnl": 2448.421234886526,
+      "validationDdPct": -0.031719490165406206
+    },
+    {
+      "variant": "sec8k202_confirm_hold5",
+      "holdSessions": 5,
+      "developmentPass": true,
+      "validationPass": true,
+      "positiveDevelopmentYears": 3,
+      "developmentSharpe": 0.18757391606046284,
+      "developmentDdPct": -0.0634781206980175,
+      "developmentEntries": 1702,
+      "developmentEffectiveTickerCount": 107.66476601246464,
+      "validationPnl": 4129.8422108652885,
+      "validationCost8Pnl": 1921.7671397594531,
+      "validationDdPct": -0.03799100623204299
+    }
+  ],
+  "selectedVariant": "sec8k202_confirm_hold3",
+  "familyStatus": "OOS_ELIGIBLE"
+}

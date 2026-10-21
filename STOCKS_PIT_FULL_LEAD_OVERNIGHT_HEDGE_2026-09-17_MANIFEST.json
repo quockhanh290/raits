@@ -1,0 +1,36 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LEAD_OVERNIGHT_HEDGE_2026-09-17",
+  "script": "raits/research/stocks_pit_full_lead_overnight_hedge.py",
+  "engine": "raits/research/stocks_pit_full_lead_candidate_eventtime_audit.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TRADE_EVENTS.csv",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl"
+  ],
+  "pre_registered_variants": [
+    "control",
+    "below_sma200",
+    "overnight20_negative",
+    "below_sma200_and_overnight20_negative"
+  ],
+  "hedge_rule": "When the lagged signal is true, short SPY at 0.5x equity at 15:55 and cover next session at 09:35. Charge 4 bps on both entry and exit, 1% annual borrow, and incremental 2.5% financing for the overnight gross.",
+  "signal_rules": {
+    "below_sma200": "Prior SPY 15:55 close below the 200-session SMA calculated through that same prior close.",
+    "overnight20_negative": "Compounded SPY close-to-09:35 return over the prior 20 completed sessions is negative.",
+    "below_sma200_and_overnight20_negative": "Both lagged conditions true."
+  },
+  "sample_label": "Diagnostic on touched research sample 2018-2024. No 2025-2026 opened.",
+  "selection_warning": "Family was frozen before this run but was motivated by observed 2022 overnight losses; it is not clean OOS evidence.",
+  "outputs": [
+    "STOCKS_PIT_FULL_LEAD_OVERNIGHT_HEDGE_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LEAD_OVERNIGHT_HEDGE_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_LEAD_OVERNIGHT_HEDGE_2026-09-17_SIGNALS.csv",
+    "STOCKS_PIT_FULL_LEAD_OVERNIGHT_HEDGE_2026-09-17_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_LEAD_OVERNIGHT_HEDGE_2026-09-17_SLEEVE_ATTRIBUTION.csv",
+    "STOCKS_PIT_FULL_LEAD_OVERNIGHT_HEDGE_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_LEAD_OVERNIGHT_HEDGE_2026-09-17_EVENT_LEDGER.csv",
+    "STOCKS_PIT_FULL_LEAD_OVERNIGHT_HEDGE_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_LEAD_OVERNIGHT_HEDGE_2026-09-17_QA.csv"
+  ]
+}

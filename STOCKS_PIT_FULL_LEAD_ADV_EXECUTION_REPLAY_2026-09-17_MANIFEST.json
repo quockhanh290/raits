@@ -1,0 +1,55 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LEAD_ADV_EXECUTION_REPLAY_2026-09-17",
+  "script": "raits/research/stocks_pit_full_lead_adv_execution_replay.py",
+  "engine": "raits/research/stocks_pit_full_lead_crisis_eventtime_audit.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TRADE_EVENTS.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_REVERSAL_COHORTS_2026-09-17_SIGNALS.csv",
+    "STOCKS_PIT_FULL_LEAD_MISSING_PRICE_REPLAY_2026-09-17_COVERAGE.csv",
+    "STOCKS_PIT_FULL_LEAD_CAPACITY_MARGIN_AUDIT_2026-09-17_TRADE_AUDIT.csv",
+    "raits/data/cache/window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl"
+  ],
+  "pre_registered_scenarios": [
+    {
+      "scenario": "price_replay_control",
+      "adv_gate": false,
+      "cost_bps": 4.0,
+      "financing": 0.025,
+      "borrow": 0.01
+    },
+    {
+      "scenario": "adv_gate_base4",
+      "adv_gate": true,
+      "cost_bps": 4.0,
+      "financing": 0.025,
+      "borrow": 0.01
+    },
+    {
+      "scenario": "adv_gate_cost8",
+      "adv_gate": true,
+      "cost_bps": 8.0,
+      "financing": 0.025,
+      "borrow": 0.01
+    },
+    {
+      "scenario": "adv_gate_severe12",
+      "adv_gate": true,
+      "cost_bps": 12.0,
+      "financing": 0.05,
+      "borrow": 0.03
+    }
+  ],
+  "adv_policy": "Current eligible PIT ADV20 is required for every risk increase. A sign flip may close the existing side but may not establish the opposite side. Reductions and exits remain permitted.",
+  "execution_stress": "Uniform all-in turnover costs at 4, 8, and 12 bps. Severe also uses 5% annual financing and 3% annual short borrow.",
+  "sample_label": "Touched research 2018-2024 only. No 2025-2026 opened.",
+  "selection_warning": "Frozen operational replay; no source rule or ticker re-selection.",
+  "outputs": [
+    "STOCKS_PIT_FULL_LEAD_ADV_EXECUTION_REPLAY_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LEAD_ADV_EXECUTION_REPLAY_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_LEAD_ADV_EXECUTION_REPLAY_2026-09-17_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_LEAD_ADV_EXECUTION_REPLAY_2026-09-17_EVENT_LEDGER.csv",
+    "STOCKS_PIT_FULL_LEAD_ADV_EXECUTION_REPLAY_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_LEAD_ADV_EXECUTION_REPLAY_2026-09-17_QA.csv"
+  ]
+}

@@ -74,6 +74,53 @@ logging.basicConfig(
 )
 log = logging.getLogger("update_ibkr_daily")
 
+
+#: Where this job keeps its OWN record, beside the scheduler's.
+LOG_DIR = Path(__file__).resolve().parent.parent / "monitor" / "logs"
+
+
+def _install_file_log() -> None:
+    """Keep this job's full output on disk, because the scheduler only keeps the tail.
+
+    Measured 2026-09-23. The 09:16 ET anchor check exited 1 with `COMPLETED WITH ERRORS:
+    ['MES']` and the reason was nowhere: this module logs to stderr only, the parent echoes
+    the last 25 lines of a failed child, the run printed 42, and MES is the FIRST instrument
+    processed. So the one block that said why was the one guaranteed to be cut.
+
+    That is not bad luck, it is the plumbing, and it has happened before. The parent's own
+    comment records 2026-08-04: the 13:45 pre-flight "failed on MES and the log held nothing
+    but 'exited with code 1'. A re-run later succeeded, so the cause is still unknown." Same
+    instrument, same shape, seven weeks apart, still never once observed.
+
+    A tail is the right default for a traceback and the wrong one for a job that walks five
+    instruments and fails on the first. Rather than widen the tail — which only moves where
+    the cut lands — the child keeps its own copy and nothing has to be cut at all.
+
+    Never raises. A job that cannot open its logbook still has to do its job.
+    """
+    import datetime as _d
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        path = LOG_DIR / f"update_ibkr_daily_{_d.date.today():%Y%m%d}.log"
+        for h in log.handlers:
+            if getattr(h, "baseFilename", None) == str(path):
+                return                                   # already installed this process
+        fh = logging.FileHandler(path, encoding="utf-8")
+        # The pid is in the format because two runs share a day: the 00:55 and 09:16 anchor
+        # checks and the 13:45 append all append here, and a line that cannot say which run
+        # wrote it is a line that starts an argument.
+        fh.setFormatter(logging.Formatter(
+            "%(asctime)s  pid%(process)d  %(levelname)-7s  %(name)s — %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"))
+        fh.setLevel(logging.INFO)
+        log.addHandler(fh)
+    except Exception as exc:                                          # noqa: BLE001
+        log.warning("own log file not opened (%s: %s) — continuing on stderr only",
+                    type(exc).__name__, exc)
+
+
+_install_file_log()
+
 # Largest price change, as a percentage, allowed between the parquet's last bar and
 # the first bar appended after it. Above this the append is refused — see the join
 # check in main() for why stopping beats re-anchoring.
@@ -351,6 +398,75 @@ def history_ibkr_symbol(inst: str) -> str:
 #: Where the splice sidecar lives. Named once: it was only a CLI default, so a reader
 #: elsewhere had to retype the path and a retyped path is a path that drifts.
 SPLICE_OFFSETS_PATH = "global_index/data/_ibkr_splice_offsets.json"
+
+
+
+#: Append-only record of every re-anchor, kept where git can see it.
+#:
+#: `_ibkr_splice_offsets.json` lives under `global_index/data/`, which is ignored, and it holds
+#: only the CURRENT anchor. Measured 2026-09-23: two separate investigations into the 2026-09-10
+#: roll stopped dead here. The parquet could be truncated back to any past date -- it is
+#: append-only and its history is intact -- but the offset that was in force on that date was
+#: gone, so neither incident could be reproduced and one question about them is still open.
+#:
+#: A few hundred bytes, about four writes a year.
+ANCHOR_HISTORY_PATH = Path(__file__).resolve().parent / "_ibkr_anchor_history.jsonl"
+
+
+def _anchor_history_append(*, inst, old_contract, new_contract, old_offset, new_offset,
+                           shift, anchored_at, n_overlap) -> None:
+    """Record a re-anchor. Never raises: losing the journal must not lose the re-anchor."""
+    try:
+        row = {"anchored_at": anchored_at, "inst": inst,
+               "old_contract": old_contract, "new_contract": new_contract,
+               "old_offset": old_offset, "new_offset": new_offset,
+               "shift": shift, "overlap_bars": n_overlap}
+        with open(ANCHOR_HISTORY_PATH, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row, ensure_ascii=False) + chr(10))
+    except Exception as exc:                                          # noqa: BLE001
+        log.error("anchor history not written (%s: %s) — the re-anchor itself stands",
+                  type(exc).__name__, exc)
+
+
+
+def anchor_exact_from(inst: str, path: "str | None" = None):
+    """The instant from which the store and a fresh fetch must agree EXACTLY, or None.
+
+    Bars written at or after this instant were appended under the anchor now in force, so any
+    difference at all is a real difference. Bars older than it were adjusted under an earlier
+    anchor and differ by a couple of basis points for a structural reason: the store is
+    difference-adjusted and IBKR's continuous series is ratio-adjusted, so a single additive
+    offset lines the two up at one price level and nowhere else.
+
+    Measured 2026-09-23, same instrument, same minutes, offset applied:
+
+        bars written after the last anchor   1376 of 1376 identical, std 0.000
+        bars written before it               median -1.75 (-2.3 bp), std 1.08, worst -17.25
+
+    Comparing the second population against a 1e-6 tolerance cannot pass. That is not a data
+    fault and it is not something to widen a tolerance for -- it is the wrong population.
+
+    Returns None when the field is absent, and None means "do not narrow": the caller keeps
+    comparing everything, which is the stricter behaviour and the one in force before this
+    existed. A missing field must not quietly shrink what gets checked.
+    """
+    try:
+        _off, _contract = stored_anchor(inst, path)
+    except Exception:                                                 # noqa: BLE001
+        return None
+    p = Path(path or SPLICE_OFFSETS_PATH)
+    try:
+        entry = json.loads(p.read_text(encoding="utf-8")).get(inst) or {}
+    except Exception:                                                 # noqa: BLE001
+        return None
+    raw = entry.get("exact_from") if isinstance(entry, dict) else None
+    if not raw:
+        return None
+    try:
+        import pandas as _pd
+        return _pd.Timestamp(raw)
+    except Exception:                                                 # noqa: BLE001
+        return None
 
 
 def stored_anchor(inst: str, path: "str | None" = None) -> "tuple[float, str]":
@@ -814,9 +930,31 @@ def main() -> None:
                             for _c in ("open", "high", "low", "close"):
                                 if _c in new_bars_adj.columns:
                                     new_bars_adj[_c] = new_bars_adj[_c] + _med
+                            # Stage 2026-09-23. WHEN, not just what.
+                            #
+                            # The comparison downstream can only demand an exact match on bars
+                            # written since this instant: everything older carries whatever
+                            # adjustment was in force then, and differs by a couple of basis
+                            # points for a structural reason -- the store is difference-adjusted
+                            # and IBKR's continuous series is ratio-adjusted, so one additive
+                            # offset lines them up at one price level and nowhere else.
+                            # Measured that day: bars written after the last re-anchor matched
+                            # on 1376 of 1376 minutes with standard deviation 0.000, while bars
+                            # from before it differed by a median of 2.3 bp with a spread.
+                            #
+                            # Without this field the overlap check has no way to tell the two
+                            # populations apart, so it raises on the older one every time a
+                            # window reaches back that far -- 49 slots on 2026-09-14.
+                            _anchored_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
                             splice_offsets[name] = {"offset": _new_off,
-                                                    "contract": fetched_contract}
+                                                    "contract": fetched_contract,
+                                                    "exact_from": _anchored_at}
                             offsets_dirty = True
+                            _anchor_history_append(
+                                inst=name, old_contract=stored_contract,
+                                new_contract=fetched_contract, old_offset=stored_offset,
+                                new_offset=_new_off, shift=_med, anchored_at=_anchored_at,
+                                n_overlap=len(_ov))
                             reanchored.append(name)
                             log.warning(
                                 "  %s: CONTRACT ROLLED %s -> %s — re-anchored and "

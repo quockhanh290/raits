@@ -1,0 +1,90 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_EQUITY_DD_CIRCUIT_BREAKER_2026-09-14",
+  "script": "raits/research/stocks_pit_full_equity_dd_circuit_breaker.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_BETA_VOLTARGET_EXPANSION_2026-09-14_DAILY.csv"
+  ],
+  "method": "Pre-registered lagged-equity-drawdown circuit breaker applied to selected prior signal streams.",
+  "turnover_cost_bps": 4.0,
+  "variants": [
+    {
+      "source_file": "beta_cal",
+      "source": "spyvt20c200_plus_spy_first5_x10_fin25_cost4",
+      "dd_cut": -0.1,
+      "riskoff": 0.25,
+      "recover": -0.04
+    },
+    {
+      "source_file": "beta_cal",
+      "source": "spyvt20c200_plus_spy_first5_x10_fin25_cost4",
+      "dd_cut": -0.15,
+      "riskoff": 0.25,
+      "recover": -0.06
+    },
+    {
+      "source_file": "beta_cal",
+      "source": "spyvt16c150_plus_spy_first5_x10_fin25_cost4",
+      "dd_cut": -0.1,
+      "riskoff": 0.25,
+      "recover": -0.04
+    },
+    {
+      "source_file": "beta_cal",
+      "source": "spyvt16c150_plus_spy_first5_x10_fin25_cost4",
+      "dd_cut": -0.15,
+      "riskoff": 0.25,
+      "recover": -0.06
+    },
+    {
+      "source_file": "beta_cal",
+      "source": "spyvt16c150_plus_top62_first5_x10_fin25_cost4",
+      "dd_cut": -0.1,
+      "riskoff": 0.25,
+      "recover": -0.04
+    },
+    {
+      "source_file": "beta_cal",
+      "source": "spyvt16c150_plus_top62_first5_x10_fin25_cost4",
+      "dd_cut": -0.15,
+      "riskoff": 0.25,
+      "recover": -0.06
+    },
+    {
+      "source_file": "beta",
+      "source": "top62_vt25_cap250",
+      "dd_cut": -0.1,
+      "riskoff": 0.25,
+      "recover": -0.04
+    },
+    {
+      "source_file": "beta",
+      "source": "top62_vt25_cap250",
+      "dd_cut": -0.15,
+      "riskoff": 0.25,
+      "recover": -0.06
+    },
+    {
+      "source_file": "beta",
+      "source": "spy_vt20_cap200",
+      "dd_cut": -0.1,
+      "riskoff": 0.25,
+      "recover": -0.04
+    },
+    {
+      "source_file": "beta",
+      "source": "spy_vt20_cap200",
+      "dd_cut": -0.15,
+      "riskoff": 0.25,
+      "recover": -0.06
+    }
+  ],
+  "sample_label": "Research/touched 2018-2024 only; no 2025-2026 OOS opened.",
+  "leakage_controls": "Scale for each day is based only on prior close strategy equity drawdown. No ticker picking and no old manual 62 list.",
+  "rule_selection_effect": "None inside diagnostic. Source streams and DD thresholds fixed before running.",
+  "outputs": [
+    "STOCKS_PIT_FULL_EQUITY_DD_CIRCUIT_BREAKER_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_EQUITY_DD_CIRCUIT_BREAKER_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_EQUITY_DD_CIRCUIT_BREAKER_2026-09-14_DAILY.csv"
+  ]
+}

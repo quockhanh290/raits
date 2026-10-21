@@ -1,0 +1,42 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LEAD_CAPACITY_MARGIN_AUDIT_2026-09-17",
+  "script": "raits/research/stocks_pit_full_lead_capacity_margin_audit.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_LEAD_MISSING_PRICE_REPLAY_2026-09-17_EVENT_LEDGER.csv",
+    "raits/data/cache/stocks_survivorship/polygon_universe_bulk/daily_20180102_20241231_resumable/liquidity_filter_daily_20180102_20241231_px5_adv10m_unadjusted/filtered_daily_universe.parquet",
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TRADE_EVENTS.csv"
+  ],
+  "sample_label": "Touched research 2018-2024 only. No 2025-2026 opened.",
+  "capacity_policy": "Risk increases require current eligible PIT ADV20. Reductions may use current non-eligible ADV or the latest eligible ADV no more than ten calendar days old. Missing exit ADV never blocks an exit.",
+  "margin_models": {
+    "regt_initial": {
+      "spy": 0.5,
+      "long": 0.5,
+      "short": 0.5
+    },
+    "regt_maintenance": {
+      "spy": 0.25,
+      "long": 0.25,
+      "short": 0.3
+    },
+    "pm_house": {
+      "spy": 0.15,
+      "long": 0.25,
+      "short": 0.3
+    },
+    "pm_stressed": {
+      "spy": 0.2,
+      "long": 0.3,
+      "short": 0.4
+    }
+  },
+  "margin_buffer": 1.25,
+  "selection_warning": "Operational audit of the frozen target schedule; no rule or ticker re-selection.",
+  "outputs": [
+    "STOCKS_PIT_FULL_LEAD_CAPACITY_MARGIN_AUDIT_2026-09-17_TRADE_AUDIT.csv",
+    "STOCKS_PIT_FULL_LEAD_CAPACITY_MARGIN_AUDIT_2026-09-17_CAPACITY_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LEAD_CAPACITY_MARGIN_AUDIT_2026-09-17_MARGIN_DAILY.csv",
+    "STOCKS_PIT_FULL_LEAD_CAPACITY_MARGIN_AUDIT_2026-09-17_MARGIN_SUMMARY.csv"
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "script": "D:/raits/raits/research/stocks_pit_fundamental_quality_monthly_audit.py",
+  "scriptHash": "A60C737A584B28C418A8E8FBD42C7D9034C3AE2C6073993A483F51F0D6CAC650",
+  "classification": "Post-result accounting audit; does not select or modify a strategy.",
+  "performanceBoundary": {
+    "dailyMaxDate": "2022-12-30",
+    "contribMaxDate": "2022-12-30",
+    "tradesMaxDate": "2022-12-01",
+    "factorPanelMaxDate": "2022-12-01",
+    "validationOpened": false
+  },
+  "inputs": {
+    "daily": {
+      "path": "STOCKS_PIT_FUNDAMENTAL_QUALITY_MONTHLY_2026-09-24_DAILY.csv",
+      "sha256": "E08EBDBCD3810F81182862B801EC8D62434A32F4093C3962B90DB4ED3A52D44B"
+    },
+    "contrib": {
+      "path": "STOCKS_PIT_FUNDAMENTAL_QUALITY_MONTHLY_2026-09-24_TICKER_CONTRIB.csv",
+      "sha256": "0357E1ABD123BCA6C28C5E0B00174FD87085C903B21B7B7DE77D801E3283B29C"
+    },
+    "trades": {
+      "path": "STOCKS_PIT_FUNDAMENTAL_QUALITY_MONTHLY_2026-09-24_TRADES.csv",
+      "sha256": "15B92A769BB191B3E43D87C84BB7C521C95DE921BC7E2EE38D25DFAE7031670B"
+    },
+    "factor_panel": {
+      "path": "STOCKS_PIT_FUNDAMENTAL_QUALITY_MONTHLY_2026-09-24_FACTOR_PANEL.csv",
+      "sha256": "D652EFF439EB55B658A65D90C233D0EBF16B3F0152978C5E849AB6F8B723C36C"
+    },
+    "selection": {
+      "path": "STOCKS_PIT_FUNDAMENTAL_QUALITY_MONTHLY_2026-09-24_SELECTION.json",
+      "sha256": "6AE6486FBE8E9E5D84FDCF5D46FA07A2A5E50F8A204A36B6A29709D37BE47E5F"
+    }
+  },
+  "outputs": {
+    "qa": {
+      "path": "STOCKS_PIT_FUNDAMENTAL_QUALITY_MONTHLY_2026-09-24_QA.csv",
+      "sha256": "0A6491E138262FD5ABBBC56539F82E376EB37CAEA4C654BAAFB2395A69ED5BF8"
+    },
+    "concentration": {
+      "path": "STOCKS_PIT_FUNDAMENTAL_QUALITY_MONTHLY_2026-09-24_AUDITED_CONCENTRATION.csv",
+      "sha256": "CC09C73A13CAFC751A92EF83D2B1B54711321CA9DB4710FADD0C7B0613DE585D"
+    }
+  }
+}

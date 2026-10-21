@@ -1,0 +1,65 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_SECTOR_NEUTRAL_FACTOR_2026-09-15",
+  "script": "raits/research/stocks_pit_full_sector_neutral_factor.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv"
+  ],
+  "method": "Pre-registered SIC-neutral long/short factor spreads inside PIT top500. Long and short quantiles selected within each SIC description group.",
+  "costs": "4.0 bps turnover and 1.0% annual borrow on short gross.",
+  "sample_label": "Research/touched 2018-2024 only; no 2025-2026 OOS opened.",
+  "leakage_controls": "Uses PIT market-cap snapshots via per-ticker as-of merge and lagged ret20_pre/ret60_pre/vol20_pre features. No old manual 62 list.",
+  "rule_selection_effect": "None inside diagnostic. Factor definitions, quantiles, and rebalance frequencies fixed before running.",
+  "variants": [
+    {
+      "variant": "sic_neutral_ret60_q20_weekly_gross100",
+      "score": "ret60",
+      "quantile": 0.2,
+      "freq": "W-MON",
+      "gross": 1.0
+    },
+    {
+      "variant": "sic_neutral_ret60_q30_weekly_gross100",
+      "score": "ret60",
+      "quantile": 0.3,
+      "freq": "W-MON",
+      "gross": 1.0
+    },
+    {
+      "variant": "sic_neutral_ret60_lowvol_q20_weekly_gross100",
+      "score": "ret60_lowvol",
+      "quantile": 0.2,
+      "freq": "W-MON",
+      "gross": 1.0
+    },
+    {
+      "variant": "sic_neutral_reversal20_q20_weekly_gross100",
+      "score": "reversal20",
+      "quantile": 0.2,
+      "freq": "W-MON",
+      "gross": 1.0
+    },
+    {
+      "variant": "sic_neutral_ret60_q20_monthly_gross100",
+      "score": "ret60",
+      "quantile": 0.2,
+      "freq": "M",
+      "gross": 1.0
+    },
+    {
+      "variant": "sic_neutral_ret60_lowvol_q20_monthly_gross100",
+      "score": "ret60_lowvol",
+      "quantile": 0.2,
+      "freq": "M",
+      "gross": 1.0
+    }
+  ],
+  "outputs": [
+    "STOCKS_PIT_FULL_SECTOR_NEUTRAL_FACTOR_2026-09-15_SUMMARY.csv",
+    "STOCKS_PIT_FULL_SECTOR_NEUTRAL_FACTOR_2026-09-15_YEARLY.csv",
+    "STOCKS_PIT_FULL_SECTOR_NEUTRAL_FACTOR_2026-09-15_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_SECTOR_NEUTRAL_FACTOR_2026-09-15_DAILY.csv",
+    "STOCKS_PIT_FULL_SECTOR_NEUTRAL_FACTOR_2026-09-15_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_SECTOR_NEUTRAL_FACTOR_2026-09-15_QA.csv"
+  ]
+}

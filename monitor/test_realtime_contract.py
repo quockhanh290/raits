@@ -341,14 +341,29 @@ def test_absence_of_track1_evidence_is_stated_not_silent():
     assert "did not answer" in js, "an unreachable endpoint must say so, not render blank"
 
 
-def test_the_legacy_position_panel_is_labelled_legacy_on_both_routes():
-    """During a track1-only period live_positions.json is the DRAINING legacy book. An
-    unlabelled row invites the reader to take it for Track 1 state."""
+def test_the_position_panel_names_the_book_it_reads_on_both_routes():
+    """The panel is labelled with the book it reads — never left unlabelled.
+
+    2026-09-24: this pinned "legacy / drain", which was true while the runner side of the panel
+    was live_positions.json. That morning /api/v1/runner-positions moved to Track 1's book, and
+    the pinned label began calling Track 1's two open positions legacy. The property kept is the
+    one the original docstring gave — an unlabelled row invites a wrong reading — pinned to the
+    source the panel reads now, and the old label is forbidden so it cannot drift back."""
     js, _ = _realtime_sources()
-    assert "legacy(drain) runner qty" in js
+    assert "Track 1 book qty" in js
+    assert "legacy(drain) runner qty" not in js
     for page in ("realtime", "realtime-next"):
         html = (ROOT / "global_index" / "dash" / page / "index.html").read_text(encoding="utf-8")
-        assert "Open Positions <span class=\"source-note\">legacy / drain</span>" in html, page
+        assert "Open Positions <span class=\"source-note\">Track 1 book / IBKR</span>" in html, page
+        assert "legacy / drain" not in html, page
+
+
+def test_paper_equity_tooltip_names_the_system_book_source():
+    """The headline is Track 1's 50k system book; broker equity is reference only."""
+    html = (ROOT / "global_index" / "dash" / "realtime" / "index.html").read_text(
+        encoding="utf-8")
+    assert "Track 1 system equity maintained by its own 50k book" in html
+    assert "Broker account equity is shown below for reference only" in html
 
 
 def test_all_four_readers_agree_on_which_slots_are_open(tmp_path):

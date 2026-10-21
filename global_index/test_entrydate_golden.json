@@ -1,0 +1,35 @@
+{
+  "schema": "entrydate_v2_prechange/1",
+  "captured_before_reader_change": true,
+  "files": [
+    ["live_positions.json", 0],
+    ["live_positions.json.bak", 3],
+    ["live_positions.json.prerebase.bak", 2],
+    ["live_positions.track1.json", 4],
+    ["live_positions.track1.json.before_qty_repair_20260924_232859", 3],
+    ["live_positions.track1.json.before_restore_20260925_105432", 0],
+    ["live_positions.track1.json.corrupt-20260826T113414.bak", 0],
+    ["live_positions.track1.json.pre-backfill-20260924T165053.bak", 0],
+    ["live_positions.track1.json.pre-cleanup-20260924T164932.bak", 2]
+  ],
+  "base_records": [
+    [0, "19e1c23b39c9a82a267066f4500c84698c447b32b1e599236156c12621a3f69b", "2026-08-05 00:00:00"],
+    [1, "4d9499406f4139d7d8fba63774145aa396a4f9ca82394db46992bf699fe45c81", "2026-08-05 00:00:00"],
+    [2, "93eb52e40a969dbdc0158fb8a1870122babe67abcb6d0a99dc09fe47b1c083db", "2026-08-05 00:00:00"],
+    [3, "24fd76a40c74a75d0c88bcbb9d4dc86cd0793503d48ff395da4b11eb4ed88f70", "2026-08-05 00:00:00"],
+    [4, "8aa45fb26f43265862c02ccf2daf81f972aa442c777712645892d26e448fc1ac", "2026-08-07 00:00:00"],
+    [5, "8ad5afce338e982bc160feb830118f2a1d728cdba51f420be67924990251061b", null],
+    [6, "134622cb95a2aec9040bd1e12ec771497587d6caa729cb697f899cbba64245dc", null],
+    [7, "f667041909570ce060211f0edaba9243804166567c6be2b6d1507dfa6ab2af2a", null],
+    [8, "8dc4fc057ba2a7bbc433431c8e1abce47602a6ddb2d74103b4311a832c12f9f4", null],
+    [9, "8dc4fc057ba2a7bbc433431c8e1abce47602a6ddb2d74103b4311a832c12f9f4", null]
+  ],
+  "live_records": [
+    ["M2K", "8ad5afce338e982bc160feb830118f2a1d728cdba51f420be67924990251061b", null],
+    ["MYM", "134622cb95a2aec9040bd1e12ec771497587d6caa729cb697f899cbba64245dc", null],
+    ["MNKD", "ac2b1e6e30d58431c1ef8a3736f782bcb2fc3e4b4e554defd17d29c7d6d0547e", null],
+    ["MES", "190487517f67ff693ba110cb2b2bbafb15c99baf2940d137a43f3c9c862bab4a", null]
+  ],
+  "row_count": 14,
+  "raised_count": 0
+}

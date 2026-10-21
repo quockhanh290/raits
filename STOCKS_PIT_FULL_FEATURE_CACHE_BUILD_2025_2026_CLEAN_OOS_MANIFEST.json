@@ -1,0 +1,22 @@
+{
+  "script": "raits/research/stocks_pit_full_oos_feature_cache_builder.py",
+  "sample": {
+    "warmup_start": "2024-06-01",
+    "oos_start": "2025-01-02",
+    "oos_end": "2026-09-16"
+  },
+  "inputs": [
+    "raits\\data\\cache\\polygon_5min_pit_full_2018_2024",
+    "raits\\data\\cache\\polygon_5min_pit_full_2025_2026_clean_oos",
+    "raits\\data\\cache\\window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl",
+    "STOCKS_PIT_FULL_OOS_5MIN_FETCH_SYMBOLS_2026-09-17.csv"
+  ],
+  "outputs": [
+    "raits\\data\\cache\\stocks_clean_daily_features_PIT_FULL_2025_2026_CLEAN_OOS.pkl",
+    "raits\\data\\cache\\stocks_intraday_0935_features_PIT_FULL_2025_2026_CLEAN_OOS.pkl",
+    "raits\\data\\cache\\stocks_gap_rvol30_features_PIT_FULL_2025_2026_CLEAN_OOS.pkl",
+    "STOCKS_PIT_FULL_FEATURE_CACHE_BUILD_2025_2026_CLEAN_OOS_QA.csv"
+  ],
+  "symbols_ex_spy": 614,
+  "leakage_control": "2024 raw bars provide only lagged rolling warm-up; every emitted feature row is inside the frozen OOS window."
+}

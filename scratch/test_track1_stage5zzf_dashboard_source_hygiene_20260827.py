@@ -167,12 +167,16 @@ def test_7_the_track1_baseline_is_read_first():
     b = _equity_block()
     assert "state.track1?.paper_account" in b
     # and it is preferred over both other sources
-    assert b.index("state.track1?.paper_account") < b.index("meta.broker_equity")
+    # Plan stage 2 (2026-09-24): the legacy figure is read from `legacy_payload` now, because
+    # `payload` became Track 1's. The ordering this pins is unchanged.
+    assert b.index("state.track1?.paper_account") < b.index("legacy_payload?.meta?.broker_equity")
 
 
 def test_8_the_legacy_number_may_never_be_called_the_broker_account():
     """It said `Broker acct $996,731` for three days after the reset."""
-    b = _equity_block()
+    # Code only (2026-09-24): a comment explaining the stage-2 move quotes this clause, and the
+    # raw slice found the quotation first — the trap `_code_only` exists for.
+    b = _code_only(_equity_block())
     assert "Broker acct" not in JS_CODE, "the old label is still rendered by the page"
     # and it survives in the comments on purpose, as the record of what was wrong
     assert "Broker acct" in JS, "the note explaining what this replaced was deleted too"
@@ -202,7 +206,7 @@ def test_11_a_material_divergence_is_called_out():
     # so it says WHY the figure is not the account. The pin follows the clause; the three
     # things it has always asserted are unchanged: the legacy figure is named, there IS a
     # threshold, and crossing it turns the line negative instead of sitting there quietly.
-    b = _equity_block()
+    b = _code_only(_equity_block())
     assert "Legacy runner state" in b
     assert "> 0.10" in b, "there is no threshold, so nothing can be 'material'"
     seg = b[b.index("Legacy runner state"):]

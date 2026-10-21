@@ -1,0 +1,32 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_GAP_EVENT_SAFE_DIAGNOSTIC_2026-09-14",
+  "script": "raits/research/stocks_pit_full_gap_event_safe_diagnostic.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl"
+  ],
+  "sample_period": [
+    "2018-03-29",
+    "2024-12-31"
+  ],
+  "universe": "Broad PIT eligible universe represented in PIT_FULL NOWARMUP feature caches.",
+  "entry": "09:35 entry price.",
+  "exit": "15:55 same-day exit price.",
+  "signals_known_at_entry": [
+    "overnight gap",
+    "09:30 five-minute relative volume"
+  ],
+  "external_event_labels": "Excluded; no earnings labels used.",
+  "rule_selection": "None. All variants are fixed/pre-registered in VARIANTS before measuring.",
+  "old_62_usage": "None. No old-62 ticker list/profile filter is loaded.",
+  "cost_bps_per_side": 4.0,
+  "max_names_per_side": 10,
+  "outputs": [
+    "STOCKS_PIT_FULL_GAP_EVENT_SAFE_DIAGNOSTIC_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_GAP_EVENT_SAFE_DIAGNOSTIC_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_GAP_EVENT_SAFE_DIAGNOSTIC_2026-09-14_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_GAP_EVENT_SAFE_DIAGNOSTIC_2026-09-14_EVENT_QA.csv",
+    "STOCKS_PIT_FULL_GAP_EVENT_SAFE_DIAGNOSTIC_2026-09-14_TRADES.csv",
+    "STOCKS_PIT_FULL_GAP_EVENT_SAFE_DIAGNOSTIC_2026-09-14_DAILY.csv"
+  ]
+}

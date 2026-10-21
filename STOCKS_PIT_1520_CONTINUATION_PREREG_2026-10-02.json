@@ -1,0 +1,112 @@
+{
+  "research_question": "Can a fixed 15:20 broad-PIT price/volume snapshot identify close-to-next-session continuation without a regime label?",
+  "frozen_before_performance": true,
+  "frozen_at_local_date": "2026-10-02",
+  "script": "raits/research/stocks_pit_1520_continuation_replay.py",
+  "script_hash": "6C82E69137B50357476CDC7359E438CC9A4F9B82B79397F2E51943CB80B97105",
+  "legacy_distinction": "Legacy TREND_FOLLOW scanned at 14:00 and evaluated every bar through 15:55. This is a new fixed-clock family, not a legacy replay.",
+  "technical_corrections_before_performance": [
+    "The first feature-build invocation timed out after 1000 seconds while using thread workers for pandas-heavy per-day feature extraction. It wrote no parquet, manifest, selection, return, or PnL artifact.",
+    "A process-worker retry was manually terminated before its first 50-ticker checkpoint because the same per-day slicing remained too slow. It also wrote no parquet, manifest, selection, return, or PnL artifact. The builder was vectorized by ticker before the first performance run; the panel, features, rules, dates, and gates were unchanged.",
+    "The first replay invocation stopped in trade construction before simulation, selection output, return output, or PnL because selected BIIB was halted for the scheduled next session. The missing-price contract was completed before performance: an already-selected halted name exits at its first later regular-session bar within five calendar days, with no drop or refill and borrow charged through actual exit.",
+    "The second replay invocation stopped before simulation, selection output, return output, or PnL because selected GRUB had no later bar after its final pre-delisting session. Before performance, the generic unreplayable policy was completed: if no bar exists within five calendar days, the selected leg receives a conservative 100% notional loss regardless of direction, no exit proceeds, no drop, and no refill. This is a lower bound, not a reconstructed merger consideration."
+  ],
+  "sample": {
+    "development": "2018-03-29 through 2021-12-31",
+    "locked_validation": "2022-01-01 through 2022-12-30"
+  },
+  "data_contract": {
+    "universe": "quarterly PIT market-cap top500 intersected with daily PIT eligibility and ADV20 >= 10m; price >= 5",
+    "signal_clock": "only five-minute bars with timestamp strictly before 15:20 ET; the last signal bar is 15:15 and closes at 15:20",
+    "entry": "exact 15:20 five-minute open after the 15:15 bar closes",
+    "exit_overnight": "next trading session exact 09:35 open",
+    "exit_next_1520": "next trading session exact 15:20 open",
+    "missing_exit": "post-selection first regular-session five-minute open at or after the scheduled timestamp, capped at five calendar days; if none exists, assign a conservative 100% leg-notional loss regardless of direction with no exit proceeds; the selected name is never dropped or refilled; missing entry is filtered before ranking and full refill",
+    "post2022": "forbidden"
+  },
+  "common_filters": {
+    "absolute_intraday_return_min": 0.01,
+    "signal_price_min": 5,
+    "signal_dollar_volume_min": 1000000,
+    "absolute_gap_max": 0.30
+  },
+  "feature_definitions": {
+    "intraday_return": "15:15 close divided by 09:30 open minus one",
+    "late_return": "15:15 close divided by 14:20 open minus one",
+    "volume_ratio": "cumulative 09:30-15:15 bar-dollar-volume divided by ADV20 times 70/78",
+    "persistent_direction": "intraday_return and late_return have the same sign and abs(late_return) >= 0.003",
+    "fixed_pullback_resume": "15:10 close within 0.5% of EMA20 through 15:10; 15:10 volume below prior-10 average; 15:15 volume above 1.3 times prior-10 average; direction agrees with intraday trend"
+  },
+  "variants": [
+    {
+      "name": "cs_momo_ls_overnight",
+      "rule": "top/bottom intraday return, long positive and short negative",
+      "rank": "absolute intraday return",
+      "exit": "next 09:35"
+    },
+    {
+      "name": "cs_momo_ls_next1520",
+      "rule": "top/bottom intraday return, long positive and short negative",
+      "rank": "absolute intraday return",
+      "exit": "next 15:20"
+    },
+    {
+      "name": "volume_confirmed_ls_next1520",
+      "rule": "cross-sectional momentum plus volume_ratio >= 1.2",
+      "rank": "absolute intraday return times capped volume ratio",
+      "exit": "next 15:20"
+    },
+    {
+      "name": "persistent_late_ls_next1520",
+      "rule": "cross-sectional momentum plus persistent_direction",
+      "rank": "absolute intraday return times absolute late return",
+      "exit": "next 15:20"
+    },
+    {
+      "name": "pullback_resume_long_next1520",
+      "rule": "positive intraday trend plus fixed_pullback_resume LONG",
+      "rank": "intraday return times resume-volume ratio",
+      "exit": "next 15:20"
+    }
+  ],
+  "portfolio": {
+    "long_short": "up to three names per side with matched long/short counts, 10% current NAV absolute weight each, maximum 0.6x gross",
+    "long_only": "up to three longs, 20% current NAV each, maximum 0.6x gross",
+    "sic_cap": "maximum one ticker per SIC per side",
+    "selection": "rank after exact-entry filtering; rebuild and fully refill every session",
+    "adv_cap": "1% ADV20 per entry order",
+    "initial_equity": 100000,
+    "compounding": true
+  },
+  "costs": {
+    "base_bps_per_traded_dollar_per_side": 4,
+    "stress_bps_per_traded_dollar_per_side": 8,
+    "short_borrow_annual": 0.01
+  },
+  "development_gate": {
+    "active_days_min": 200,
+    "trade_legs_min": 600,
+    "cagr_min": 0.05,
+    "sharpe_min": 0.8,
+    "max_drawdown_pct_floor": -0.12,
+    "positive_years_min": 3,
+    "gross_edge_bps_per_active_day_min": 10,
+    "stress_pnl_positive": true,
+    "top10_positive_pnl_share_max": 0.5,
+    "winner": "highest base-cost Sharpe then CAGR among passers"
+  },
+  "validation_gate": {
+    "active_days_min": 50,
+    "pnl_positive": true,
+    "sharpe_min": 0.5,
+    "max_drawdown_pct_floor": -0.1,
+    "stress_pnl_positive": true,
+    "top10_positive_pnl_share_max": 0.6
+  },
+  "benchmarks": [
+    "SPY exact 15:20-to-next-15:20 buy-and-hold session return",
+    "equal-weight eligible-universe exact 15:20-to-next-15:20 return"
+  ],
+  "multiple_testing_policy": "Exactly five frozen rows. No post-result clock, threshold, horizon, direction, rank, or position-count changes.",
+  "production_policy": "A validation pass permits further audit only, not production PASS."
+}

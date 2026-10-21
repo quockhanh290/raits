@@ -249,7 +249,12 @@ class _UntrimmedProvider:
     def __init__(self, df):
         self._df = df
 
-    def fetch_session_bars(self, inst, *, through):
+    def fetch_session_bars(self, inst, *, through, lookback=None):
+        # Accepted and ignored: this fake already holds every bar it will serve, so there
+        # is no window to size. The parameter exists because `live_frame` now sizes the
+        # fetch from the history it holds; a fake that refuses the real interface fails
+        # with TypeError instead of whatever the test is about.
+        del lookback
         return self._df
 
 

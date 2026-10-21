@@ -475,8 +475,12 @@ def test_33_nothing_in_production_imports_the_executor(tmp_path):
         for p in base.rglob("*.py"):
             # Stage 5Z: the dry-run module is an allowed consumer, and it is itself
             # imported by nothing - asserted below, so the chain stays unreachable.
+            # Test files joined the exclusions on 2026-09-24: a test importing the module
+            # under test is not a production path to a broker, and two new ones under
+            # `global_index/` were being counted as if they were. `track1_paper_send` is NOT
+            # excluded — it is a real importer and this test's own expected list names it.
             if p.stem in ("track1_paper_executor", "track1_paper_callsite") \
-                    or "scratch" in p.parts:
+                    or p.name.startswith("test_") or "scratch" in p.parts:
                 continue
             try:
                 tree = ast.parse(p.read_text(encoding="utf-8", errors="replace"))
@@ -494,6 +498,11 @@ def test_33_nothing_in_production_imports_the_executor(tmp_path):
                 if "track1_paper_executor" in mod or any(
                         "track1_paper_executor" in nm for nm in names):
                     hits.append(str(p))
+                    # One entry per FILE, not per import statement. The send wire imports the
+                    # executor lazily in three separate places, so without this the list held
+                    # the same name three times and the comparison failed while both set
+                    # differences printed empty - a message that says nothing is wrong.
+                    break
     # Stage 5ZZG. See ALLOWED_EXECUTOR_IMPORTERS below for why this is a set and not empty.
     named = sorted(Path(h).name for h in hits)
     assert named == sorted(ALLOWED_EXECUTOR_IMPORTERS), {
@@ -568,11 +577,28 @@ def test_34_the_slot_takes_an_order_gate_and_defaults_it_shut(tmp_path):
     gate = R.OrderGate(False)
     assert gate.allow_orders is False
 
-    # and the scheduler passes neither
+    # ── and the DEFAULT is still shut all the way down ──────────────────────
+    #
+    # The old form asserted the scheduler never named `order_gate`, `allow-orders` or
+    # `allow_orders` at all. On 2026-09-24 the operator made the scheduler able to pass the flag,
+    # so naming it is expected. What must remain true is the same thing this test has always been
+    # about: nothing arms unless somebody asked, so a scheduler restarted by a logon task comes
+    # back SHUT.
+    import ast as _ast
+
     src = (REPO / "global_index/run_scheduler.py").read_text(encoding="utf-8")
-    code = "\n".join(ln.split("#")[0] for ln in src.splitlines())
-    for forbidden in ("order_gate", "allow-orders", "allow_orders"):
-        assert forbidden not in code, f"the scheduler names {forbidden}"
+    tree = _ast.parse(src)
+    for fn in (n for n in _ast.walk(tree)
+               if isinstance(n, _ast.FunctionDef) and n.name == "make_scheduler"):
+        kw = {a.arg: d for a, d in zip(
+            fn.args.kwonlyargs or fn.args.args[-len(fn.args.defaults or ()):] or [],
+            fn.args.kw_defaults or fn.args.defaults or [])}
+        if "allow_orders" in kw and isinstance(kw["allow_orders"], _ast.Constant):
+            assert kw["allow_orders"].value is False, (
+                "make_scheduler defaults allow_orders to %r; a scheduler that comes back after "
+                "a reboot would come back armed" % (kw["allow_orders"].value,))
+    assert "allow_orders: bool = False" in src, (
+        "the scheduler's arming parameter no longer declares a shut default")
 
 
 def test_35_the_pure_modules_still_do_not_import_ib_insync(tmp_path):
@@ -585,47 +611,97 @@ def test_35_the_pure_modules_still_do_not_import_ib_insync(tmp_path):
                 assert "ib_insync" not in (n.module or ""), mod.__name__
 
 
-def test_36_the_real_order_gate_still_refuses_to_arm(tmp_path):
-    """The wall that matters most: the executor cannot be constructed against production."""
+def test_36_the_executor_refuses_a_gate_that_is_not_ARMED(tmp_path):
+    """The wall that matters most, and it is about the GATE, not about the calendar.
+
+    The old form asserted `may_enable_orders()` was False and named the two blockers holding it.
+    The operator opened that on 2026-09-24 with a recorded override, so the assertion moves off
+    the world state and onto the invariant that has to survive it: whatever the registry says,
+    the executor may not be constructed against a gate that is not armed.
+
+    Stated the other way — the thing this test would catch — a future edit that let the executor
+    build itself against a shut gate would make every other guard here decorative.
+    """
     from global_index import track1_gates as G
-    allowed, reasons = G.may_enable_orders()
-    assert allowed is False
-    ids = [r.split(":")[0] for r in reasons]
-    assert "B1_broker_account_or_legacy_retirement" in ids
-    assert "PAPER_SHADOW_EVIDENCE" in ids
+
+    # Whatever the registry currently answers, the production gate must agree with it rather
+    # than carry its own opinion. That is the part a stale hardcoded False was hiding.
+    allowed, _reasons = G.may_enable_orders()
     gate = X.production_gate()
-    assert gate.allow_orders is False
+    assert bool(gate.allow_orders) == bool(allowed), (
+        "the production gate disagrees with the blocker registry; one of them is guessing")
+
+    # And a SHUT gate must refuse construction, which is testable regardless of today's state.
+    class _Shut:
+        allow_orders = False
+        synthetic = False
+
     with pytest.raises(X.PaperExecutorRefused) as e:
-        X.Track1OrderExecutor(broker=FakeBroker(), gate=gate, journal_root=tmp_path)
+        X.Track1OrderExecutor(broker=FakeBroker(), gate=_Shut(), journal_root=tmp_path)
     assert e.value.code == X.NOT_ARMED
 
 
-def test_37_no_confirmation_file_and_no_approval_env(tmp_path):
-    assert os.environ.get("TRACK1_ORDERS_APPROVED") in (None, "", "0")
-    from global_index import track1_gates as G
-    assert not (REPO / G.CONFIRMATION_PATH).exists()
+def test_37_the_ambient_shell_never_carries_the_approval(tmp_path):
+    """Half of this was stale long before it went red, and the other half still matters.
 
+    STALE: it asserted the confirmation file did not exist. The operator signed it on
+    2026-08-27. A test asserting the absence of a file somebody signed six weeks earlier guards
+    nothing and reads as though the signature never happened.
 
-def test_38_no_caller_ever_passes_allow_orders(tmp_path):
-    """By AST, not by substring.
-
-    A plain `in` check on the source fails here and correctly so: run_scheduler.py both
-    documents and comments that it passes no such flag, so a search for the string matches
-    the prose forbidding the thing. Only a real string LITERAL counts.
-
-    And the flag's own DEFINITION is not a caller. `run_live_day_track1` owns the argument;
-    the claim under test is that nothing hands it over, so that file is checked separately
-    for the shape it is allowed to have.
+    STILL LIVE, and the reason the file is now checked for CONTENT instead: approval must not
+    be sitting in whatever shell happens to run things. It reaches a child because a launcher
+    was explicitly told to put it there — never because it was lying around in an environment.
     """
+    assert os.environ.get("TRACK1_ORDERS_APPROVED") in (None, "", "0"), (
+        "the order approval is set in this process's environment; anything spawned from here "
+        "inherits it, which is how a test run or an unattended restart arms a route")
+
+    from global_index import track1_gates as G
+
+    conf_path = REPO / G.CONFIRMATION_PATH
+    if not conf_path.exists():
+        return                                  # unsigned: the original state, still valid
+    conf, errors = G.load_confirmations(conf_path)
+    assert not errors, "the signed confirmation file does not validate: %r" % (errors,)
+    assert conf.confirmed_by, "a signed confirmation with nobody's name on it"
+
+
+def test_38_only_an_explicit_operator_request_passes_the_order_flag(tmp_path):
+    """By AST, not by substring — a plain `in` check matches the prose that forbids the thing.
+
+    The old claim was that NOTHING hands the flag over. On 2026-09-24 the operator made ops and
+    the scheduler able to, deliberately, so the claim narrows rather than disappearing: the flag
+    may be handed over, and only from behind a branch on an explicit request.
+
+    What it still catches is the case the old form existed for — a launcher that arms by
+    default, so a machine restarting itself comes back armed. That machine restarts itself now,
+    which makes this stricter in effect than when nothing could arm at all.
+    """
+    import ast as _ast
+
+    allowed = {"global_index/run_scheduler.py", "monitor/ops.py"}
     for rel in ("global_index/run_scheduler.py", "monitor/ops.py",
                 "global_index/track1_slots.py"):
-        p = REPO / rel
-        if not p.exists():
+        pth = REPO / rel
+        if not pth.exists():
             continue
-        literals = [n for n in ast.walk(ast.parse(p.read_text(encoding="utf-8",
-                                                              errors="replace")))
-                    if isinstance(n, ast.Constant) and n.value == "--allow-orders"]
-        assert literals == [], f"{rel} builds an argv containing --allow-orders"
+        lines = [ln.split("#")[0] for ln in pth.read_text(encoding="utf-8").splitlines()]
+        tree = _ast.parse(pth.read_text(encoding="utf-8"))
+        literals = [n for n in _ast.walk(tree)
+                    if isinstance(n, _ast.Constant) and n.value == "--allow-orders"]
+        if not literals:
+            continue
+        assert rel in allowed, (
+            "%s names the order flag and is not one of the files allowed to: %s"
+            % (rel, sorted(allowed)))
+        for n in literals:
+            ln = lines[n.lineno - 1]
+            if "add_argument" in ln or "help=" in ln or " in cmdlines" in ln:
+                continue                        # declared, documented, or read — not produced
+            window = "\n".join(lines[max(0, n.lineno - 7):n.lineno])
+            assert "allow_orders" in window and ("if " in window or "else" in window), (
+                "%s line %d produces --allow-orders with no branch on an explicit request"
+                % (rel, n.lineno))
 
 
 def test_39_the_flag_exists_only_as_its_own_argparse_definition(tmp_path):

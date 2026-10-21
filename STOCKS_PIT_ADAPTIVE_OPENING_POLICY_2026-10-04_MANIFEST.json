@@ -1,0 +1,26 @@
+{
+  "script": "D:/raits/raits/research/stocks_pit_adaptive_opening_policy.py",
+  "scriptHash": "1C1D8590C2B4303E78453975EC4DE03302E1462FBE3E2C281DE37DEA483F66AF",
+  "preregistration": "STOCKS_PIT_ADAPTIVE_OPENING_POLICY_PREREG_2026-10-04.json",
+  "preregistrationHash": "72563FF41B7EE353A32A174688F5DD5A3E47BEEE4357BF12D47742DD618D9FEE",
+  "featureCache": "raits/data/cache/polygon_stock_trades_open_2018_2022/causal_features_pre0935.parquet",
+  "featureCacheHash": "5105B2E1F7E3A2B8C39F03C17960D94458D9F86AFE57693ED3A4AE4D9953A014",
+  "exactClock": "STOCKS_PIT_OPENING_10M15M_PRICE_VOLUME_2026-10-01_EXACT_CLOCK_ROWS.csv",
+  "exactClockHash": "127E011EC9526D11E38F9EA7785AACB5E3CBBE013C7E97C3266C49BF3BEA4BE6",
+  "selection": {
+    "status": "KILL_NO_DEVELOPMENT_PASS",
+    "developmentPass": false,
+    "validationOpened": false,
+    "productionPassAllowed": false
+  },
+  "development": [
+    "2019-06-03",
+    "2021-12-31"
+  ],
+  "validation": null,
+  "oldManual62Used": false,
+  "post2022Consumed": false,
+  "productionPassAllowed": false,
+  "ruleSelectionEffect": "One frozen adaptive learning policy; no model/threshold/horizon winner is selected after returns.",
+  "tradeSelectionEffect": "Every model vintage rebuilds ranks, SIC-limited sides, exact-entry admission, abstention, scale, costs, exits, and compounding."
+}

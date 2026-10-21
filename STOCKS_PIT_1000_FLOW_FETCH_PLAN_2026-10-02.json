@@ -1,0 +1,30 @@
+{
+  "script": "D:/raits/raits/research/stocks_pit_1000_flow_fetch_plan.py",
+  "script_hash": "C1900068590B361B94CAE251199D2A16AD363EAD5CF0E1F2C2AB088F6330F299",
+  "inputs": {
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl": "C65065EA082D68544A5CD87C8DAD9A81CEE0B92A49A34D3C18C162A9EDED4AEC",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv": "C184A810909371F7DB5A3F6926417496A77B97BBAF97ED14B017E3BDD42115D4",
+    "raits/data/cache/stocks_survivorship/polygon_universe_bulk/daily_20180102_20241231_resumable/liquidity_filter_daily_20180102_20241231_px5_adv10m_unadjusted/filtered_daily_universe.parquet": "FD696E0BD91E3B951C86FFF89734AF908759E11829715B9C1983604E356E8B2C"
+  },
+  "universe": "quarterly PIT market-cap top500 intersected with daily PIT eligibility and ADV20 >= 10m",
+  "precandidates": "prev_dayret <= -5% OR opening gap >= +2%; price >= 5; absolute gap <= 30%",
+  "selection_note": "No reclaim, flow, entry availability, or future exit availability is used to form ticker-date keys",
+  "date_range": [
+    "2018-03-29",
+    "2022-12-30"
+  ],
+  "ticker_days": 28225,
+  "tickers": 706,
+  "yday_precandidates": 7084,
+  "gapup_precandidates": 22345,
+  "signal_complete": 28152,
+  "entry_complete": 28167,
+  "raw_files": 11977,
+  "raw_files_missing": 0,
+  "plan": "STOCKS_PIT_1000_FLOW_FETCH_PLAN_2026-10-02.csv",
+  "plan_hash": "AB0865B0FFCDB61C7DDD8DC2C5E6D9F44787DF927D4B6FCDFA403F1622D8CCE3",
+  "exact_clock_rows": "STOCKS_PIT_1000_FLOW_EXACT_CLOCK_ROWS_2026-10-02.csv",
+  "exact_clock_rows_hash": "549B50ABE397C9347DD363D9F414853F4109C05E42279EF4981BBC13EC48CA37",
+  "old_manual_62_used": false,
+  "post2022_consumed": false
+}

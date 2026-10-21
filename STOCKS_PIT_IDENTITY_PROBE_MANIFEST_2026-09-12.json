@@ -1,0 +1,43 @@
+{
+  "daily_universe_rows": 655690,
+  "date_policy": "parquet filters restrict to 2023-03-28 through 2024-12-31",
+  "eligible_final_symbol_days": 30122,
+  "filters": {
+    "adv20_causality": "uses prior close and prior volume only, rolling 20 with min_periods=10",
+    "min_prior_adv20": 10000000.0,
+    "min_prior_close": 3.0,
+    "security_type": "C common stocks only"
+  },
+  "identity_policy": "prototype security_id uses Databento instrument_id as DBENTO:{instrument_id}",
+  "outputs": [
+    "STOCKS_PIT_IDENTITY_PROBE_SECURITY_MASTER_2026-09-12.csv",
+    "STOCKS_PIT_IDENTITY_PROBE_TICKER_HISTORY_2026-09-12.csv",
+    "STOCKS_PIT_IDENTITY_PROBE_DAILY_UNIVERSE_2026-09-12.csv",
+    "STOCKS_PIT_IDENTITY_PROBE_QA_2026-09-12.csv",
+    "STOCKS_PIT_IDENTITY_PROBE_FOCUS_SYMBOLS_2026-09-12.csv"
+  ],
+  "purpose": "identity-layer probe for limited PIT-style daily universe",
+  "qa_status_counts": {
+    "INFO": 4,
+    "PASS": 4
+  },
+  "security_master_rows": 13994,
+  "source_classification": "raits/data/cache/research_daily/universe_classification.parquet",
+  "source_daily": "raits/data/cache/research_daily/databento_ohlcv1d.parquet",
+  "survivorship_status": "not survivorship-aware yet; no delisted/ticker-change history before source start",
+  "ticker_history_rows": 13994,
+  "windows": {
+    "avgo_split_2024_07": [
+      "2024-06-24",
+      "2024-07-26"
+    ],
+    "nvda_split_2024_06": [
+      "2024-05-20",
+      "2024-06-28"
+    ],
+    "year_end_2024_liquidity": [
+      "2024-12-02",
+      "2024-12-31"
+    ]
+  }
+}

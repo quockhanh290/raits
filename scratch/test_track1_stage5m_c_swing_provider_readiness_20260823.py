@@ -201,7 +201,7 @@ class FakeBroker:
     def disconnect(self):
         self.disconnected = True
 
-    def fetch_bars(self, inst, through=None):
+    def fetch_bars(self, inst, through=None, *, lookback=None):
         """Naive-ET bars for today, TRIMMED at `through`.
 
         The trim is not decoration. The first version returned the whole session regardless,

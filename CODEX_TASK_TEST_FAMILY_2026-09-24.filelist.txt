@@ -1,0 +1,118 @@
+FILE scratch/test_track1_stage5zb_operational_audit_20260825.py
+  - test_18_orders_are_still_impossible
+  - test_19_no_order_journal_book_or_dry_run_residue_exists
+FILE scratch/test_track1_stage5zf_ops_report_completeness_20260825.py
+  - test_28_orders_are_still_impossible
+  - test_30_no_order_journal_or_book_exists
+FILE scratch/test_track1_stage5zo_live_bar_pull_proof_20260826.py
+  - test_orders_are_still_impossible
+  - test_the_preflight_record_still_holds_the_operator_restored_seven_days
+FILE scratch/test_track1_stage5zr_b1_decision_20260826.py
+  - test_24_orders_are_still_impossible
+  - test_25_no_order_journal_exists
+FILE scratch/test_track1_stage5zzo_backend_restart_guard_20260827.py
+  - test_no_allow_orders_and_no_orders_directory
+  - test_orders_remain_impossible
+FILE scratch/test_track1_stage5zzt_schedule_mirror_spy_ladder_20260828.py
+  - test_orders_remain_impossible_and_the_blocker_is_unchanged
+  - test_this_stage_created_no_order_artefacts
+FILE scratch/test_track1_stage5zzu_recovery_stream_isolation_20260828.py
+  - test_orders_remain_impossible
+  - test_this_stage_created_no_order_artefacts
+FILE scratch/test_track1_stage5zzz_a_shadow_audit_confirmation_20260828.py
+  - test_no_order_artefacts_exist
+  - test_orders_are_still_impossible_for_real
+FILE scratch/test_track1_stage5zzz_b_strategy_diagnostics_20260828.py
+  - test_no_order_artefacts_exist
+  - test_orders_remain_impossible
+FILE scratch/test_track1_stage5zzzc_shadow_evidence_real_failures_20260828.py
+  - test_no_order_artefacts_and_the_decision_is_intact
+  - test_orders_remain_impossible
+FILE scratch/test_track1_stage5zzze_calm_two_phase_diagnostics_20260828.py
+  - test_no_order_artefacts_and_the_decision_is_intact
+  - test_orders_remain_impossible
+FILE scratch/test_track1_stage5zzzr_restart_liveness_postfix_parity_20260829.py
+  - test_no_order_path_is_reachable
+  - test_the_confirmation_record_is_present_and_carries_no_order_approval
+FILE scratch/test_track1_stage5zzzt_gate_ast_memoization_20260829.py
+  - test_no_orders_directory_and_no_subprocess_in_the_gate_path
+  - test_the_confirmation_and_override_grant_no_order_authority
+FILE scratch/test_track1_dashboard_runtime_wiring_20260824.py
+  - test_orders_remain_blocked_and_nothing_arming_exists
+FILE scratch/test_track1_explain_wiring_20260823.py
+  - test_the_run_places_no_order_and_writes_no_confirmation
+FILE scratch/test_track1_stage4_production_clean_20260823.py
+  - test_c_the_confirmation_file_still_does_not_exist
+FILE scratch/test_track1_stage5c_shadow_readiness_20260823.py
+  - test_orders_are_impossible_in_this_state
+FILE scratch/test_track1_stage5d_shadow_live_wiring_20260823.py
+  - test_orders_are_still_impossible
+FILE scratch/test_track1_stage5f_stress_live_source_20260823.py
+  - test_orders_remain_impossible
+FILE scratch/test_track1_stage5k0_operational_paths_20260823.py
+  - test_the_confirmation_file_can_never_arrive_by_checkout
+FILE scratch/test_track1_stage5p_full_shadow_readiness_20260824.py
+  - test_a_confirmation_file_fails_the_day
+FILE scratch/test_track1_stage5q_post_window_audit_20260824.py
+  - test_a_confirmation_file_fails_the_audit
+FILE scratch/test_track1_stage5t_paper_broker_path_20260825.py
+  - test_the_scheduler_slot_path_takes_no_order_gate_at_all
+FILE scratch/test_track1_stage5v1_intraday_causality_20260825.py
+  - test_orders_are_still_impossible
+FILE scratch/test_track1_stage5x_broker_readside_20260825.py
+  - test_46_orders_are_still_impossible
+FILE scratch/test_track1_stage5y_order_id_writepath_20260825.py
+  - test_49_orders_are_still_impossible
+FILE scratch/test_track1_stage5zd_signal_diagnostics_20260825.py
+  - test_42_orders_are_still_impossible
+FILE scratch/test_track1_stage5zg_route_aware_safety_reporting_20260825.py
+  - test_no_order_switch_or_confirmation_file_appeared
+FILE scratch/test_track1_stage5zh_quiet_checkpoint_audit_20260825.py
+  - test_no_order_switch_or_confirmation_file_appeared
+FILE scratch/test_track1_stage5zk_checkpoint_frames_resume_20260826.py
+  - test_no_order_switch_or_confirmation_file_appeared
+FILE scratch/test_track1_stage5zl_regime_tristate_20260826.py
+  - test_no_order_switch_or_confirmation_file_appeared
+FILE scratch/test_track1_stage5zn_planned_stop_lifecycle_20260826.py
+  - test_no_confirmation_file_appeared
+FILE scratch/test_track1_stage5zq_legacy_flat_b1_20260826.py
+  - test_35_track1_orders_are_still_impossible
+FILE scratch/test_track1_stage5zs_book_carry_forward_20260826.py
+  - test_34_orders_are_still_impossible
+FILE scratch/test_track1_stage5zzd_pre_nkd_spy_refresh_20260827.py
+  - test_14_orders_are_still_impossible
+FILE scratch/test_track1_stage5zzj_b1_operator_decision_20260827.py
+  - test_orders_remain_impossible
+FILE scratch/test_track1_stage5zzk_b1_confirmation_recognition_20260827.py
+  - test_orders_remain_impossible_in_the_real_world
+FILE scratch/test_track1_stage5zzn_scheduler_mode_enforcement_20260827.py
+  - test_no_orders_directory_is_created
+FILE scratch/test_track1_stage5zzp_strategy_levels_regime_metrics_20260828.py
+  - test_no_order_or_gate_side_effects
+FILE scratch/test_track1_stage5zzq_setup_boundaries_hmm_explain_20260828.py
+  - test_no_order_or_gate_side_effects
+FILE scratch/test_track1_stage5zzr_strategy_native_market_view_20260828.py
+  - test_no_order_or_gate_side_effects
+FILE scratch/test_track1_stage5zzw_dashboard_track1_mode_hygiene_20260828.py
+  - test_this_stage_created_no_order_artefacts
+FILE scratch/test_track1_stage5zzx_backend_console_noise_20260828.py
+  - test_orders_remain_impossible
+FILE scratch/test_track1_stage5zzzaa_evidence_taint_20260830.py
+  - test_orders_remain_impossible
+FILE scratch/test_track1_stage5zzzac_weekend_spy_pre_nkd_20260830.py
+  - test_orders_remain_impossible
+FILE scratch/test_track1_stage5zzzf_market_view_ui_contract_20260828.py
+  - test_no_order_artefacts_and_the_decision_is_intact
+FILE scratch/test_track1_stage5zzzg_swing_d1_regime_20260829.py
+  - test_no_order_artefacts_and_the_decision_is_intact
+FILE scratch/test_track1_stage5zzzm_param_obedience_20260829.py
+  - test_no_order_artefacts
+FILE scratch/test_track1_stage5zzzq_swing_causal_d1_live_20260829.py
+  - test_orders_remain_impossible_and_no_order_artefacts
+FILE scratch/test_track1_stage5zzzu_baseline_index_20260829.py
+  - test_orders_are_still_impossible
+FILE scratch/test_track1_stage5zzzv_repo_archive_20260829.py
+  - test_orders_remain_impossible
+FILE scratch/test_track1_stage5zzzw_untracked_plan_20260829.py
+  - test_orders_remain_impossible
+

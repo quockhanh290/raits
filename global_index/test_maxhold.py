@@ -205,6 +205,20 @@ class _FalseCancelBroker(MockBroker):
         return f"stp-{inst}"
 
 
+class _OpenOrdersBroker(MockBroker):
+    def __init__(self, *args, orders=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.orders = orders or []
+        self.cancelled = []
+
+    def get_open_orders(self):
+        return list(self.orders)
+
+    def cancel_order(self, order_id):
+        self.cancelled.append(str(order_id))
+        return True
+
+
 def test_mh7_orphan_alert_when_cancel_returns_false(tmp_path):
     """A stop left working after MAX_HOLD close must be reported, not assumed gone."""
     broker = _FalseCancelBroker({}, ACCOUNT)
@@ -223,6 +237,37 @@ def test_mh7_orphan_alert_when_cancel_returns_false(tmp_path):
     assert "stp-xyz" in orphan[0]["message"], (
         f"orphan alert must name the order id; got {orphan[0]['message']!r}"
     )
+
+
+def test_mh8_maxhold_cancels_matching_working_stop_when_book_lost_stop_id(tmp_path):
+    """Track 1 book repairs can lose stop_order_id; MAX_HOLD must still cancel the live STP."""
+    broker = _OpenOrdersBroker({}, ACCOUNT, orders=[
+        {"order_id": "8", "instrument": "MES", "action": "SELL",
+         "order_type": "STP", "quantity": 1, "status": "PreSubmitted"}
+    ])
+    runner = _make_runner(broker, pos_path=tmp_path / "pos.json")
+    _inject(runner, entry_day=DAY0, stop_order_id=None)
+
+    closed = runner.run_maxhold_exit(DAY5, max_hold_days=5)
+
+    assert ("MES", CLUSTER) in closed
+    assert broker.cancelled == ["8"], "matching live stop must be cancelled before it orphans"
+
+
+def test_mh9_maxhold_does_not_guess_when_multiple_stops_match(tmp_path):
+    broker = _OpenOrdersBroker({}, ACCOUNT, orders=[
+        {"order_id": "8", "instrument": "MES", "action": "SELL",
+         "order_type": "STP", "quantity": 1, "status": "PreSubmitted"},
+        {"order_id": "9", "instrument": "MES", "action": "SELL",
+         "order_type": "STP", "quantity": 1, "status": "PreSubmitted"},
+    ])
+    runner = _make_runner(broker, pos_path=tmp_path / "pos.json")
+    _inject(runner, entry_day=DAY0, stop_order_id=None)
+
+    closed = runner.run_maxhold_exit(DAY5, max_hold_days=5)
+
+    assert ("MES", CLUSTER) in closed
+    assert broker.cancelled == [], "ambiguous live stops must not be cancelled by guess"
 
 
 # ── run ───────────────────────────────────────────────────────────────────────

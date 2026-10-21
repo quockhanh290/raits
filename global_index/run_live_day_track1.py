@@ -352,6 +352,8 @@ LIVE_FRAME_REFUSED = "live_frame_refused"
 #: which passes at the wrong instant and leaves a record indistinguishable from a correct run.
 UNKNOWN_PHASE = "unknown_phase"
 DECIDED = "decided"
+KILL_SWITCH_REFUSED = "kill_switch_refused"
+RECONCILE_ENTRY_HALT = "reconcile_entry_halt"
 
 
 class _PhaseHalfComplete(Exception):
@@ -380,6 +382,57 @@ class ShadowRefused(RuntimeError):
         super().__init__(f"{code}: {detail}")
         self.code = code
         self.detail = detail
+
+
+class _EntryHaltBreaker:
+    """A breaker-shaped object for route-wide new-entry halts.
+
+    It is deliberately narrower than a kill switch: it refuses new entries through the same
+    admission hook as the circuit breaker, so the slot still observes and the safety jobs that
+    own exits/stops are not touched.
+    """
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        self.peak_equity = 0.0
+        self._day_start_equity = 0.0
+
+    def start_day(self, current_equity: float) -> None:
+        return None
+
+    def update(self, current_equity: float) -> None:
+        return None
+
+    def status(self, current_equity: float) -> dict:
+        return {"level": RECONCILE_ENTRY_HALT, "drawdown_pct": 0.0,
+                "daily_loss_pct": 0.0, "allow_new_entries": False,
+                "size_multiplier": 0.0, "reason": self.reason}
+
+
+def _kill_switch_path(root: str | Path = ".") -> Path:
+    return Path(root) / STOP_FILE
+
+
+def _kill_switch_send_summary(root: str | Path = "."):
+    p = _kill_switch_path(root)
+    if not p.exists():
+        return None
+    return _ps.SendSummary(
+        status=_ps.GATE_CLOSED,
+        reason=f"{STOP_FILE} is present at send time; new entries refused, observation kept")
+
+
+def _entry_reconcile_halt(root: str | Path = ".", *, now=None) -> str:
+    """Return a new-entry halt reason from the latest broker/book reconcile, if it failed."""
+    try:
+        from global_index import track1_b1 as _b1
+        latest = _b1.latest(root, now=now)
+    except Exception as exc:                                      # noqa: BLE001
+        # Unknown is not promoted to a mismatch here. A2 is explicitly not this batch.
+        return ""
+    if getattr(latest, "status", "") != getattr(_b1, "FAIL", "FAIL"):
+        return ""
+    return f"{latest.code}: {latest.detail}"
 
 
 def _slots_for(sleeve: str) -> list:
@@ -699,6 +752,10 @@ def observe_live_slot(sleeve: str, slot_id: str, *, now_et, provider=None,
     reason, detail, decided = DECIDED, "", True
     verdict, n_cands = None, None
     freshness_allow = accepted = n_rejected = n_explained = None
+    # None, not 0: a slot that never reached the decision block did not observe an empty
+    # book, it did not look. The other accumulators on the line above say so the same way.
+    _seeded = None
+    _breaker_state = None
     # Stage 5ZD. Pre-bound so the signal-diagnostics row can be built on EVERY path, including
     # the refusals — a slot that was refused still has something to say, and a row that only
     # existed on the happy path would be missing exactly the days worth explaining.
@@ -756,6 +813,23 @@ def observe_live_slot(sleeve: str, slot_id: str, *, now_et, provider=None,
         verdict = intra.validate(sleeve, _resample(first.frame, sleeve, _req), now_et=now_et,
                                  session_day=pd.Timestamp(day), requirement=_req,
                                  entry_quote_index=first.frame.index)
+        # 2026-10-05. EXECUTE sends orders for EVERY instrument the sleeve trades, so every one
+        # of them has to be able to answer the gate — not just whichever sorts first. The gate
+        # above read only `sorted(joined)[0]` (MES): on 2026-10-05 MES's frame ended at 09:59 and
+        # MNQ's at 10:00 at the same slot, and the verdict followed the alphabet. Fail closed: the
+        # first instrument that refuses decides the slot's refusal, with the same codes it would
+        # have carried alone, so nothing that reads them has to learn a new vocabulary.
+        if phase == "EXECUTE" and verdict.allow:
+            for _name in sorted(joined)[1:]:
+                _v = intra.validate(sleeve, _resample(joined[_name].frame, sleeve, _req),
+                                    now_et=now_et, session_day=pd.Timestamp(day),
+                                    requirement=_req, entry_quote_index=joined[_name].frame.index)
+                if not _v.allow:
+                    # Which instrument it was is in the observation record, per instrument
+                    # (`final_frame_last_ts`): this module has no logger by design, and a
+                    # refusal that only reached a log would be one nobody reads.
+                    verdict = _v
+                    break
         if not verdict.allow:
             reason, detail, decided = GATE_REFUSED, ",".join(verdict.codes), False
         else:
@@ -807,6 +881,14 @@ def observe_live_slot(sleeve: str, slot_id: str, *, now_et, provider=None,
                 # found half an hour ago and written down. All that is left is to read the
                 # price the decision named, and that comes from the joined frame below.
                 n_cands = 0
+            elif phase == "EXECUTE":
+                # This is the real 10:00 paper admission/send pass.  It must use the live
+                # entry reference now; waiting for OBSERVE would turn the 10:00-open contract
+                # into a late entry. The reference is the CLOSE of the 09:59 bar (the gate above
+                # required exactly that bar, for every instrument): the order is a market order
+                # and the 10:00 bar does not exist yet. `phase` is what tells the source so.
+                found = source.candidates(pd.Timestamp(now_et), phase="EXECUTE")
+                n_cands = len(found)
             else:
                 found = source.candidates(pd.Timestamp(now_et))
                 n_cands = len(found)
@@ -821,7 +903,7 @@ def observe_live_slot(sleeve: str, slot_id: str, *, now_et, provider=None,
             fresh_verdict = fresh.evaluate(now_et=pd.Timestamp(now_et),
                                            regime_csv=regime_csv, parquets=data_paths or {})
             freshness_allow = bool(fresh_verdict.allow)
-            if phase:
+            if phase in ("DECIDE", "OBSERVE"):
                 if not freshness_allow:
                     # The refusal IS the record, as everywhere else on this route. The reason
                     # travels in the route's own vocabulary so a reader can tell a stale daily
@@ -835,6 +917,40 @@ def observe_live_slot(sleeve: str, slot_id: str, *, now_et, provider=None,
 
             book = Track1Book(guard=make_guard(), breaker=CircuitBreaker(account=ACCOUNT),
                               enforce_windows=True)
+            # 2026-09-25. The book now starts from what the route ACTUALLY HOLDS, not empty.
+            #
+            # It started empty from the day this path was written, and three rules that read
+            # `open_book` were blind because of it: `SUPPRESS_SAME_SLEEVE` could not see a
+            # position an earlier slot opened, the cluster cap read 0% exposure against a real
+            # 3.52% of a 6% cap, and `settle_due` could not settle a row it did not know about.
+            #
+            # Measured the night it was found: the 01:25 ET slot filled MNKD, and every slot
+            # after it re-proposed the same trade. The order journal refused each one because
+            # FILLED is terminal, and the slot exited 3 — so sixteen executions in one night
+            # died on the rule that exists to stop exactly that, unable to see.
+            #
+            # And the journal's protection does not extend to tomorrow: its idempotency key
+            # carries the ref day, so the same signal on the next date is a different key and
+            # would have been sent. Measured on the real book: with the book seeded the second
+            # MNKD is `suppress_same_sleeve` ("global_nkd already holds MNKD"); with it empty it
+            # is `take`.
+            #
+            # Refuses rather than seeding a book it cannot read whole: a partially seeded book
+            # understates what the route holds while looking complete, which is the same failure
+            # one layer up.
+            try:
+                _book_path = Path(root) / POSITIONS_PATH
+                _held = sl.read_route_positions(_book_path)
+                _breaker_state = sl.apply_route_book_breaker_state(book, _book_path)
+                _seeded = sl.seed_open_positions(book, _held)
+            except sl.BootstrapRefused as _exc:
+                raise ShadowRefused(
+                    "book_unreadable",
+                    f"the route's book could not be read whole ({_exc}); a slot that cannot see "
+                    f"what it holds must not decide entries") from _exc
+            _reconcile_halt = _entry_reconcile_halt(root, now=now_et)
+            if _reconcile_halt:
+                book.breaker = _EntryHaltBreaker(_reconcile_halt)
             settlements, decisions = run_candidates(found, book=book)
             accepted = sum(1 for d in decisions if d.verdict == "take")
             n_rejected = len(decisions) - accepted
@@ -892,10 +1008,29 @@ def observe_live_slot(sleeve: str, slot_id: str, *, now_et, provider=None,
                                   str(exc).split("\n")[0][:200], False)
         _obs_refusal = (LIVE_SOURCE_NOT_READY, str(exc).split("\n")[0][:200])
 
+    _pre_send_summary = _kill_switch_send_summary(root)
     wl.slot_observed(sleeve, day, slot_id, seq=seq, decided=decided, reason=reason,
                      detail=detail or None, candidates=n_cands,
                      freshness_allow=freshness_allow, accepted=accepted,
                      rejected=n_rejected, explained=n_explained,
+                     # How many positions the route already held when this slot decided. In the
+                     # DURABLE row, not only in the return value: the scheduler drops a clean
+                     # slot's stdout by level, so a number printed there cannot be checked
+                     # afterwards -- the same filter that lost a MAX_HOLD close on 2026-08-17.
+                     # `accepted` and `rejected` mean different things depending on this number,
+                     # so a reader of this row needs it beside them.
+                     held_at_decision=_seeded,
+                     breaker_armed=(None if _breaker_state is None
+                                    else bool(_breaker_state.get("armed"))),
+                     breaker_source=(None if _breaker_state is None
+                                     else str(_breaker_state.get("source") or "")),
+                     breaker_unarmed_reason=(
+                         None if _breaker_state is None or _breaker_state.get("armed")
+                         else str(_breaker_state.get("reason") or "")),
+                     send_status=(None if _pre_send_summary is None
+                                  else _pre_send_summary.status),
+                     send_reason=(None if _pre_send_summary is None
+                                  else _pre_send_summary.reason),
                      route_hint=ROUTE,
                      gate=(None if verdict is None else bool(verdict.allow)))
 
@@ -908,10 +1043,15 @@ def observe_live_slot(sleeve: str, slot_id: str, *, now_et, provider=None,
     # It cannot change a decision. Everything it writes was recorded by the join while the
     # slot was deciding; nothing here computes a feature, calls a detector or touches a rule.
     try:
+        # `root=root`, like every other writer in this function (2026-10-06). It was missing, so a
+        # slot given a scratch root still wrote its observation row and its session bars under
+        # the process's working directory — i.e. into the real evidence tree. Harmless in
+        # production, where the root IS the working directory, and the way a test run put 86
+        # fabricated rows into 2026-10-05's real data_observation file.
         _write_data_observation(sleeve=sleeve, day=day, slot_id=slot_id,
                                 joined=_joined_for_obs, refusal=_obs_refusal,
                                 decided=decided, reason=reason, candidates=n_cands,
-                                data_paths=data_paths)
+                                data_paths=data_paths, root=root)
     except Exception as _obs_exc:                              # noqa: BLE001
         _data_observation_last_error[0] = f"{type(_obs_exc).__name__}: {_obs_exc}"
 
@@ -1011,14 +1151,17 @@ def observe_live_slot(sleeve: str, slot_id: str, *, now_et, provider=None,
     # would file the most serious outcome this route has under the same word as a stale bar.
     #
     # `decisions` is the list `run_candidates` returned, pre-bound to `[]` at the top, so every
-    # path reaches this with something. A phased Calm slot exits before the admission layer
-    # runs, so its list is empty and this sends nothing — which is correct: the decide and
-    # observe halves record intent, and the step that sends at the entry instant does not
-    # exist yet.
+    # path reaches this with something. The Calm DECIDE and OBSERVE halves exit before the
+    # admission layer runs, so their list is empty and this sends nothing — which is correct:
+    # they record intent and observe the open. The step that sends at the entry instant is the
+    # EXECUTE half (10:00), which runs admission and reaches this with its decisions; the exit
+    # at 15:55 is a separate job (`run_maxhold_exit --time-exit-cluster roska4_calm`).
     #
     # `broker` is the object the BARS came from. Nothing here builds one.
-    _send = _ps.maybe_send_orders(decisions, order_gate=gate, broker=broker,
-                                  ref_day=day, slot_id=slot_id, root=root)
+    _send = _kill_switch_send_summary(root)
+    if _send is None:
+        _send = _ps.maybe_send_orders(decisions, order_gate=gate, broker=broker,
+                                      ref_day=day, slot_id=slot_id, root=root)
 
     # Stage 5ZX — the shadow intent row. EVIDENCE ONLY, and never an order.
     #
@@ -1031,7 +1174,7 @@ def observe_live_slot(sleeve: str, slot_id: str, *, now_et, provider=None,
     # has acted — the book repair refuses to run, the call-site guard trips, the report flips
     # off NOT_PRODUCED, and the runbook says stop and investigate. A rehearsal written there
     # would make all four describe a route that traded on a day it sent nothing.
-    if phase:
+    if phase in ("DECIDE", "OBSERVE"):
         try:
             _write_shadow_intent(phase=phase, slot_id=slot_id, day=day, root=root,
                                  decided=decided, reason=reason,
@@ -1047,6 +1190,11 @@ def observe_live_slot(sleeve: str, slot_id: str, *, now_et, provider=None,
             "decided": decided, "reason": reason, "detail": detail,
             "candidates": n_cands, "freshness_allow": freshness_allow,
             "accepted": accepted, "rejected": n_rejected, "explained": n_explained,
+            # How many positions the route already held when this slot decided. A slot that
+            # seeds nothing and a slot that seeds three make different decisions from the same
+            # signal, so the count belongs in the record rather than only in the code.
+            "held_at_decision": _seeded,
+            "breaker": _breaker_state,
             "closed": closed, "send": _send.as_dict()}
 
 
@@ -1241,8 +1389,9 @@ def _carry_forward_book(book_path: str, now_et) -> "tuple[dict, str | None]":
     p = Path(book_path)
     cut = pd.Timestamp(now_et)
     fresh = {"schema_version": 2, "route": ROUTE, "window": "live",
-             "cut_instant": cut.isoformat(), "equity": 0.0,
-             "cur_day": str(cut.date()), "peak_equity": 0.0, "day_start_equity": 0.0,
+             "cut_instant": cut.isoformat(), "equity": None,
+             "cur_day": None, "peak_equity": None, "day_start_equity": None,
+             "broker_equity": None,
              "positions": [], "booked_counter": {}, "counters": {}}
     if not p.exists():
         return fresh, None
@@ -1281,7 +1430,7 @@ def _carry_forward_book(book_path: str, now_et) -> "tuple[dict, str | None]":
     # rather than inherited.
     carried = {k: prev[k] for k in fresh if k in prev}
     carried.update({"schema_version": BOOK_SCHEMA, "route": ROUTE, "window": "live",
-                    "cut_instant": cut.isoformat(), "cur_day": str(cut.date()),
+                    "cut_instant": cut.isoformat(),
                     "positions": list(positions)})
     # A field the schema declares and the previous book lacked comes back at its fresh
     # default rather than absent, so a reader never has to guess which of the two it is.
@@ -1976,14 +2125,15 @@ def main(argv=None) -> int:
     # it started. `begin` registers an atexit emitter, so no `finally` here can be forgotten.
     _tel.begin()
     ap = argparse.ArgumentParser(
-        description="Track 1 route — SHADOW ONLY. Places no orders and touches no legacy path.")
+        description="Track 1 live route. Shadow evidence is always recorded; paper orders are "
+                    "sent only when --allow-orders and the gate registry permit them.")
     ap.add_argument("--window", default="vault2026",
                     help="measured window to replay (floor | vault2025 | vault2026)")
     ap.add_argument("--source", default="replay", choices=["replay", "live", "live-shadow"],
                     help="replay = re-run a measured window (produces NO window coverage, by "
                          "design: a replay cannot testify that anyone looked at today). "
                          "live-shadow = observe today's window and write the ledger row this "
-                         "slot is entitled to; places no orders. 'live' is the candidate "
+                         "slot is entitled to; paper orders remain gate-controlled. 'live' is the candidate "
                          "source and is not implemented yet.")
     # DERIVED from the window table, not listed. It was listed until Stage 5M-C, and the list
     # still said Calm and Stress after Stage 5M-B added 23 Normal-R4 slots — so the scheduler
@@ -2006,10 +2156,10 @@ def main(argv=None) -> int:
     # NOT derived from the phase table: a typo has to be refused at argument-parse time, before
     # a process connects to anything, rather than three layers down where the refusal would be
     # one more ledger row nobody reads.
-    ap.add_argument("--phase", default="", choices=["", "DECIDE", "OBSERVE"],
-                    help="the evidence phase this slot produces (Calm only, live-shadow "
-                         "only). Empty means the sleeve is not split and gates as it always "
-                         "did. Never sends an order in any phase.")
+    ap.add_argument("--phase", default="", choices=["", "DECIDE", "EXECUTE", "OBSERVE"],
+                    help="the Calm phase this slot produces. DECIDE/OBSERVE are evidence-only; "
+                         "EXECUTE runs the normal admission and paper-send pass at 10:00. "
+                         "Empty means an unphased sleeve slot.")
     ap.add_argument("--regime-csv", default="spy_daily_live.csv")
     ap.add_argument("--out-dir", default=SHADOW_DIR)
     ap.add_argument("--as-of", default=None,
@@ -2044,8 +2194,9 @@ def main(argv=None) -> int:
     now = pd.Timestamp(a.as_of) if a.as_of else pd.Timestamp.now(tz="America/New_York")
 
     if a.source == "live-shadow":
-        # The scheduler's path. One slot, one ledger row, no orders, and no replay anywhere in
-        # it. Every refusal below is written to the row before it is printed, so a slot that
+        # The scheduler's path. One slot, one ledger row, and no replay anywhere in it. Paper
+        # sending is still controlled by the explicit order gate. Every refusal below is written
+        # to the row before it is printed, so a slot that
         # could not decide still leaves the evidence that it ran and why it stopped.
         if not a.sleeve or not a.slot_id:
             print("REFUSED — live-shadow needs --sleeve and --slot-id naming the firing slot.")
@@ -2098,6 +2249,14 @@ def main(argv=None) -> int:
         _tel.mark("reason", str(res["reason"]))
         print(f"slot {res['slot_id']} seq={res['seq']}  decided={res['decided']}  "
               f"reason={res['reason']}")
+        # What the route already held when this slot decided. A slot that saw three positions and
+        # one that saw none reach different verdicts from the same signal, and until 2026-09-25
+        # every slot saw none because the book was never read. Printed rather than left in the
+        # return value: the scheduler echoes stdout into the operational log, and a number that
+        # exists only inside the process is a number nobody can check afterwards.
+        if res.get("held_at_decision") is not None:
+            print(f"  held at decision: {res['held_at_decision']} open position(s) "
+                  f"seeded from the route book")
         if res["detail"]:
             print(f"  {res['detail']}")
         if res["closed"]:

@@ -1,0 +1,48 @@
+{
+  "script": "D:/raits/raits/research/stocks_multisleeve_post2024_replay_audit.py",
+  "scriptHash": "7515AFEEE4149C449C69B791626BEAE4DEEFD67FC51EBE5A5E24649FCAD7F858",
+  "classification": "Touched implementation replay audit; not clean OOS and not forward paper PnL.",
+  "definitions": {
+    "yearlyDrawdown": "Peak-to-trough within each calendar year after resetting the peak to year-start equity.",
+    "positiveShare": "Top positive ticker contributions divided by total positive ticker PnL; bounded to [0, 1].",
+    "netShare": "Top positive ticker contributions divided by net account PnL; may exceed 1 when losses offset winners.",
+    "effectiveTickerCount": "Inverse HHI over positive ticker PnL contributions.",
+    "sleeveMapping": "SPY is spy_first5; every non-SPY ticker is sic_pairs."
+  },
+  "inputs": {
+    "events": {
+      "path": "STOCKS_MULTISLEEVE_POST2024_IMPLEMENTATION_REPLAY_ACCOUNT_EVENTS.csv",
+      "sha256": "58B121F6031D6E261B4A85A0A7D65090FCCD35FCF0B59966A385796AFF6C546E"
+    },
+    "ticker_pnl": {
+      "path": "STOCKS_MULTISLEEVE_POST2024_IMPLEMENTATION_REPLAY_TICKER_PNL.csv",
+      "sha256": "2C4C93F03E24D03D4C0EEBAF623DE598B000BE9BA081F16A07F095A2675E986F"
+    },
+    "orders": {
+      "path": "STOCKS_MULTISLEEVE_POST2024_IMPLEMENTATION_REPLAY_ORDERS.csv",
+      "sha256": "EBB55293316949C3EF835ABDE5901EE5CA4B55B43FFE23501F89FA41DC043C4C"
+    },
+    "issues": {
+      "path": "STOCKS_MULTISLEEVE_POST2024_IMPLEMENTATION_REPLAY_ISSUES.csv",
+      "sha256": "9FDD1B7071AC191AE89E61AB79D2C8BA1AA43EA101C5C6F20F4709E637EB1DB8"
+    }
+  },
+  "outputs": {
+    "yearly": {
+      "path": "STOCKS_MULTISLEEVE_POST2024_IMPLEMENTATION_REPLAY_AUDIT_YEARLY.csv",
+      "sha256": "E90F6F05A72A22FB95CF5AD38C47B9D23847E4363E28674195B93F0B2D965C87"
+    },
+    "sleeves": {
+      "path": "STOCKS_MULTISLEEVE_POST2024_IMPLEMENTATION_REPLAY_AUDIT_SLEEVES.csv",
+      "sha256": "585A4A3983EE94495B306A0F20645338E1E0D04C2ABB4D42D79F9A6ECC4A8C6C"
+    },
+    "concentration": {
+      "path": "STOCKS_MULTISLEEVE_POST2024_IMPLEMENTATION_REPLAY_AUDIT_CONCENTRATION.csv",
+      "sha256": "F98D3448DAD006CCF52DC91E9005A71778DB00FEA5EDF627324CCCA3EE66DC8C"
+    },
+    "operations": {
+      "path": "STOCKS_MULTISLEEVE_POST2024_IMPLEMENTATION_REPLAY_AUDIT_OPERATIONS.csv",
+      "sha256": "7781650378738C8ED280A0024600F4413DDC55660DF985A04CCBBA706A0FCF1A"
+    }
+  }
+}

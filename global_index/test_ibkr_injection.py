@@ -175,7 +175,7 @@ class _MinimalBroker:
     def __init__(self):
         self.orders = []; self._eq = ACCOUNT
     def get_equity(self): return self._eq
-    def fetch_bars(self, inst, through): return pd.DataFrame()
+    def fetch_bars(self, inst, through, *, lookback=None): return pd.DataFrame()
     def get_positions(self): return []
     def send_order(self, o):
         self.orders.append(o)

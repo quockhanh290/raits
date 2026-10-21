@@ -1,0 +1,41 @@
+{
+  "spec_id": "stocks_pit_lead_crisis_v1_frozen_2026-09-17",
+  "status": "RESEARCH_FROZEN_NOT_PRODUCTION",
+  "sample": "Touched 2018-2024. 2023-2024 not clean OOS. 2025-2026 unopened.",
+  "sleeves": {
+    "core": "SPY lagged vt16, target cap 1.5x",
+    "calendar": "SPY first five trading days of month +0.5x",
+    "pairs": "quarterly same-SIC z2 hold10, target gross cap 0.5x",
+    "crisis": "PIT top500 market-residual bottom10/top10 hold3, target gross cap 0.5x, new cohorts only when lagged SPY overnight20 compounded return < 0"
+  },
+  "portfolio_controls": {
+    "hard_target_gross_cap": 3.0,
+    "marked_gross_alert": 3.0,
+    "marked_gross_force_delever_next_mark": 3.15,
+    "single_name_target_nav_cap": 0.03,
+    "trade_adv20_participation_cap": 0.01,
+    "broker_margin_policy": "Reject risk-increasing orders unless broker buying power after the proposed order is at least 1.25x the broker requirement. Candidate requires portfolio-margin approval; do not assume Reg-T supports 2.88x gross."
+  },
+  "missing_price_policy": {
+    "per_name": "Never open or increase without a current executable mark. Freeze a held missing name; submit reduction/exit at its next valid mark.",
+    "portfolio_trigger": "More than 2 simultaneously missing held names or missing held notional above 2% NAV.",
+    "action": "Block all risk-increasing orders. If breach persists for two consecutive marks, liquidate affected names at next valid marks and keep crisis/pairs sleeves disabled until one complete clean session."
+  },
+  "loss_controls": {
+    "annual_loss_budget": "Diagnostic only, excluded from frozen headline candidate.",
+    "max_drawdown_breaker": "Excluded; tested variants failed the 18% objective."
+  },
+  "execution": {
+    "pair_and_crisis_rebalance": "09:35",
+    "spy_rebalance": "15:55 for next session",
+    "base_turnover_bps": 4.0,
+    "base_financing_annual": 0.025,
+    "base_borrow_annual": 0.01
+  },
+  "production_blockers": [
+    "clean OOS",
+    "missing-mark fail-safe replay",
+    "live broker margin/buying-power validation",
+    "spread/market-impact validation beyond ADV proxy"
+  ]
+}

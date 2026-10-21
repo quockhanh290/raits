@@ -136,7 +136,7 @@ def test_the_help_text_describes_both_safety_sets():
 
 def test_the_help_counts_are_derived_and_correct():
     assert ops.track1_slot_count() == len(ts.TRACK1_SLOTS) == 70
-    assert ops.track1_safety_count() == len(ts.track1_safety_jobs()) == 11
+    assert ops.track1_safety_count() == len(ts.track1_safety_jobs()) == 12
 
 
 def test_the_start_banner_names_both_safety_sets_and_both_books():
@@ -154,7 +154,7 @@ def test_the_banner_constants_resolve_to_the_route_tables():
     assert ops._t1_const("TRACK1_POSITIONS_PATH") == "live_positions.track1.json"
     assert ops._t1_const("TRACK1_LOCK_PATH") == "runner.track1.pid"
     assert ops._t1_const("TRACK1_SAFETY_CLIENT_ID") == 90
-    assert len(ops._t1_safety()) == 11
+    assert len(ops._t1_safety()) == len(ts.track1_safety_jobs()) == 12
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -7,7 +7,7 @@ Script-style (no pytest) — run from repo root:
 
 Tests:
   T1  B1  persist + reload: position survives runner restart
-  T2  B1  corrupt file → fresh start (no crash)
+  T2  B1  corrupt file → refuse without rewrite
   T3  C1  signal_fn throws → runner does not crash; pre-set exit still runs
   T4  C4  swing cluster throws → NKD cluster still runs (call tracked)
   T5  E1  duplicate instance → second runner refuses with RunnerLockError
@@ -487,23 +487,32 @@ def test_b1_persist_reload():
             check("T1.8 exit_day matches", str(p.exit_day.date()) == "2024-06-16")
 
 
-# ─── T2: B1 corrupt file → fresh start ──────────────────────────────────────
+# ─── T2: B1 corrupt file → refuse without rewrite ───────────────────────────
 
 def test_b1_corrupt():
-    print("\nT2: B1 corrupt file → fresh start (no crash)")
+    print("\nT2: B1 corrupt file → refuse without rewrite")
     with tempfile.TemporaryDirectory() as td:
         pos_path = Path(td) / "live_positions.json"
-        pos_path.write_text("not valid json {{{")
+        original = b"not valid json {{{"
+        pos_path.write_bytes(original)
 
         broker = _empty_broker()
         try:
-            runner = _make_runner(broker, _noop_signal, positions_path=pos_path)
-            check("T2.1 no crash on corrupt file", True)
-            check("T2.2 fresh start (empty positions)", len(runner.state.open_positions) == 0,
-                  f"got {len(runner.state.open_positions)}")
+            _make_runner(broker, _noop_signal, positions_path=pos_path)
+        except RuntimeError as e:
+            msg = str(e)
+            check("T2.1 corrupt existing book raises", True)
+            check("T2.2 error names file", str(pos_path) in msg, msg)
+            check("T2.3 error names parse failure", "JSONDecodeError" in msg, msg)
         except Exception as e:
-            check("T2.1 no crash on corrupt file", False, str(e))
-            check("T2.2 fresh start (empty positions)", False, "not reached")
+            check("T2.1 corrupt existing book raises", False, f"wrong exception: {type(e).__name__}: {e}")
+            check("T2.2 error names file", False, "not reached")
+            check("T2.3 error names parse failure", False, "not reached")
+        else:
+            check("T2.1 corrupt existing book raises", False, "did not raise")
+            check("T2.2 error names file", False, "not reached")
+            check("T2.3 error names parse failure", False, "not reached")
+        check("T2.4 corrupt book bytes are unchanged", pos_path.read_bytes() == original)
 
 
 # ─── T3: C1 signal_fn throws → no crash, pre-set exit still runs ────────────
@@ -768,11 +777,29 @@ def test_ratchet_not_in_openpos():
     # executes, which may be a different process, so leaving it out of the persist
     # pair meant a restart in that window silently produced a CLOSE row with no exit
     # path -- the very hole the field was added to close.
+    # 2026-09-25. The rule was "the keys are EXACTLY the fields", and that is still the rule for
+    # facts. What joined the row is not a fact: three declared ALIASES, because the route's book
+    # and this engine's book spell the same three fields differently and a reader that knew only
+    # one spelling persisted an empty book over three live positions.
+    #
+    # Both halves are kept. A field that stops being persisted still fails, and an undeclared key
+    # still fails -- so junk cannot accumulate under cover of "it must be an alias". The alias list
+    # is imported, not restated here: a second copy would let the two drift and this check would
+    # bless the drift.
+    from global_index.runner import POSITION_FIELD_ALIASES
+
     persisted = {f.name for f in dataclasses.fields(OpenPos)}
-    check("T7.4 every OpenPos field is persisted, and nothing else is",
-          set(d.keys()) == persisted,
+    extra = set(d.keys()) - persisted
+    check("T7.4 every OpenPos field is persisted, and nothing else but declared aliases",
+          set(d.keys()) >= persisted and extra <= set(POSITION_FIELD_ALIASES),
           f"not persisted={persisted - set(d.keys())}, "
-          f"not a field={set(d.keys()) - persisted}")
+          f"undeclared={extra - set(POSITION_FIELD_ALIASES)}")
+    # And an alias must carry the SAME value as the field it aliases. A pair that disagrees is
+    # worse than a missing alias: both readers succeed and they read different positions.
+    mismatched = {a: (d.get(a), d.get(f)) for a, f in POSITION_FIELD_ALIASES.items()
+                  if a in d and d.get(a) != d.get(f)}
+    check("T7.4b every declared alias carries its field's value",
+          not mismatched, f"mismatched={mismatched}")
 
     # Round-trip, because "the key is present" is weaker than "the value comes back".
     pos.exit_reason = "CHANDELIER"

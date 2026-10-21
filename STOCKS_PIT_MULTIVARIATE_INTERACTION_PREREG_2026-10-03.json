@@ -1,0 +1,56 @@
+{
+  "research_question": "Can fixed multivariate interactions among causal tape, price, liquidity, news, EDGAR, and lagged short-interest features predict cross-sectional returns with temporal replication?",
+  "frozen_before_performance": true,
+  "frozen_at_local_date": "2026-10-03",
+  "script": "raits/research/stocks_pit_multivariate_interaction_map.py",
+  "script_hash": "39646CED1CDC1B0253290EF236FAB23874628C7BC33141578FD98B2A07148FF2",
+  "technical_corrections_before_first_output": [
+    "The first invocation computed development rows in memory but stopped before writing or printing any performance table because the zero-development-pass branch did not create empty rep_* columns. The branch now creates NaN replication columns. No candidate, feature, model parameter, outcome, split, cost, gate, or selection rule changed."
+  ],
+  "relationship_to_prior_work": "This is a new interaction family. Prior univariate results informed the use of d20 for tape, but no failed univariate direction is inverted or threshold-tuned. The broad event branch adds explicit no-news and no-filing controls that the prior news-only map could not test.",
+  "splits": {
+    "development_oof": "Expanding folds: train 2018 partial and score 2019; train 2018-2019 and score 2020. Training rows require target_date strictly before the scored year.",
+    "temporal_replication": "Fit through 2020 and score calendar-2021 entries whose target date is no later than 2021-12-31; opened only for development passers.",
+    "conditional_confirmation": "Fit through 2021 and score calendar-2022 entries whose target date is no later than 2022-12-31; opened only for replication passers.",
+    "later_data": "No 2023-2026 performance may be consumed."
+  },
+  "candidate_family": [
+    "tape_gap_ridge_d20",
+    "tape_gap_hgb_d20",
+    "tape_yday_ridge_d20",
+    "tape_yday_hgb_d20",
+    "broad_event_ridge_d5",
+    "broad_event_hgb_d5",
+    "broad_event_ridge_d20",
+    "broad_event_hgb_d20"
+  ],
+  "models": {
+    "ridge": "Ridge alpha=100 with intercept.",
+    "hgb": "HistGradientBoostingRegressor squared-error, learning_rate=0.05, max_iter=100, max_leaf_nodes=7, min_samples_leaf=200, l2_regularization=10, random_state=271828. No hyperparameter search."
+  },
+  "features": {
+    "tape": "Eighteen pre-10:00 tape fields plus prior-day return, opening gap, prior volatility, log PIT market cap, log ADV20, 09:30-to-10:00 return, log signal trade count, and log signal dollars.",
+    "broad_event": "PIT gap/momentum/volatility/sector residuals/market cap/ADV; causal news intensity with explicit no-news zero controls; next-session EDGAR filing flags with no-filing controls; and latest short-interest fields available only after a ten-session settlement lag.",
+    "transformation": "Continuous values become same-date percentile ranks in [-1,1]. Missing ranked values are zero with event/availability flags where relevant. Binary filing flags remain binary.",
+    "target_training": "Forward underlying return is winsorized at same-date 1/99 percentiles only inside each training fold. Every date receives equal aggregate sample weight.",
+    "universe": "Quarterly PIT market-cap top500 intersected with daily PIT price/liquidity eligibility. Tape rows additionally use the previously frozen YDAY or gap precandidate screen. Old/manual 62 is excluded."
+  },
+  "execution_and_missing_prices": {
+    "broad_entry": "09:35 open; d5 or d20 15:55 close.",
+    "tape_entry": "Exact 10:05 open after features end strictly before 10:00; d20 15:55 close.",
+    "fallback": "If exact target close is absent, use the last available 15:55 close strictly after entry and no later than target. If none exists, record an underlying -100% write-off. Fallback availability never affects ranking."
+  },
+  "statistics": {
+    "daily_spread": "Top predicted quintile underlying return minus bottom predicted quintile underlying return, rebuilt independently each date.",
+    "cost_proxy": "16 bps subtracted from each daily long-short cohort spread: 4 bps per side on entry and exit for both legs.",
+    "multiple_testing": "Benjamini-Hochberg across all eight development candidates at q <= 0.10."
+  },
+  "gates": {
+    "development": "q <= 0.10, net t >= 2.0, net spread >=0.40% for d5 or >=0.80% for d20, both 2019 and 2020 net spreads positive, >=80 dates and >=400 observations per side.",
+    "replication": "Net spread positive, net t >=1.0, net spread >=25% of development, >=40 dates and >=200 observations per side.",
+    "confirmation": "Net spread positive and net t >=0.5.",
+    "production": "Never granted by this map. A surviving cell requires a separately preregistered compounding full-refill portfolio replay with dollar/percentage DD and concentration."
+  },
+  "selection_effect": "The eight frozen model/context/horizon rows are the rule-selection family. Daily top/bottom cohorts are trade selection. No ticker removal, rule inversion, threshold rescue, or candidate addition is allowed after outcomes.",
+  "technical_correction_policy": "A runtime or plumbing defect discovered before the first performance table may be corrected only if recorded in this file before rerun and without changing candidates, features, model parameters, splits, costs, or gates."
+}

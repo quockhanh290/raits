@@ -1,0 +1,35 @@
+{
+  "spec_id": "stocks_polygon_financial_change_drift_v1_2026-09-24",
+  "frozen_before_performance": true,
+  "objective": "Test whether broad-PIT post-filing revenue growth and operating-margin expansion create a distinct cost-aware event sleeve that can later diversify the fixed multi-sleeve lead.",
+  "data_contract": {
+    "financials": "Polygon /vX/reference/financials quarterly rows fetched by filing_date for 2018-2024; 125679 rows and 9343 CIKs in the frozen local cache.",
+    "availability": "Exact intraday publication time is unavailable. Entry is therefore the first trading session strictly after filing_date at exact 09:35.",
+    "deduplication": "Earliest filing per CIK, fiscal year, fiscal period, and period end. Fiscal periods are Q1-Q4 only; no inferred Q4 is manufactured.",
+    "fundamentals": "Revenue YoY compares the same fiscal period to fiscal year minus one. Operating margin is operating income divided by revenue; margin change compares the same fiscal period year over year.",
+    "outlier_guards": "Require positive current and prior revenue, abs(revenue YoY)<=300%, both margins within [-200%,200%], and abs(margin YoY change)<=100 percentage points.",
+    "universe": "Quarterly PIT market-cap top500 representative per CIK, then current daily PIT liquidity eligibility and ADV20 >= $10m. No old/manual 62 input.",
+    "execution": "3% NAV requested per event, <=1% ADV20, no overlapping ticker position, deterministic CIK/ticker order, 1x hard gross cap with proportional same-timestamp refill, exact 09:35 entry and exact 15:55 scheduled exit.",
+    "costs": "4 bps base and 8 bps stress per traded notional, 1% annual short borrow, 2.5% financing above 1x."
+  },
+  "variants": [
+    {"name": "revenue_yoy20_hold5", "rule": "long revenue_yoy>=0.20; short revenue_yoy<=-0.20", "hold_sessions": 5},
+    {"name": "revenue_yoy20_hold20", "rule": "long revenue_yoy>=0.20; short revenue_yoy<=-0.20", "hold_sessions": 20},
+    {"name": "margin_yoy5_hold5", "rule": "long margin_change>=0.05; short margin_change<=-0.05", "hold_sessions": 5},
+    {"name": "margin_yoy5_hold20", "rule": "long margin_change>=0.05; short margin_change<=-0.05", "hold_sessions": 20},
+    {"name": "dual_confirm_hold5", "rule": "long revenue_yoy>=0.10 and margin_change>=0.02; short revenue_yoy<=-0.10 and margin_change<=-0.02", "hold_sessions": 5},
+    {"name": "dual_confirm_hold20", "rule": "long revenue_yoy>=0.10 and margin_change>=0.02; short revenue_yoy<=-0.10 and margin_change<=-0.02", "hold_sessions": 20}
+  ],
+  "samples": {"development": ["2018-04-27", "2022-12-30"], "validation": ["2023-01-03", "2024-12-31"], "oos_2025_2026": "PROHIBITED"},
+  "selection": {
+    "development_gates": {"entries_min": 100, "base_cagr_min": 0.02, "base_sharpe_min": 0.50, "base_dd_pct_floor": -0.10, "positive_years_min": 3, "stress_pnl_positive": true},
+    "rank": "Higher development base Sharpe, then CAGR, then less severe DD, then variant name.",
+    "validation_rows": 1,
+    "validation_gates": {"base_pnl_positive": true, "both_years_nonnegative": true, "base_sharpe_min": 0.30, "stress_pnl_positive": true, "dd_pct_floor": -0.12}
+  },
+  "bridge_if_validation_passes": "One fixed diagnostic only: 75% existing 75/25 lead net daily return plus 25% selected new sleeve base-cost return. No bridge weight search or validation reselection.",
+  "production_pass_allowed": false,
+  "pre_result_implementation_correction": "The initial execution attempts timed out before writing or printing any performance. The implementation was corrected so all variants replay only 2018-2022 for selection and only the selected row replays the full path for validation. Rules, thresholds, costs, gates, and ranking are unchanged; the corrected script was re-hashed before any result was observed.",
+  "post_result_reporting_addition": "After the terminal development failure, yearly attribution and ledger-reconciliation QA outputs were added without changing data construction, trades, returns, costs, gates, ranking, or selection. Before final reporting, missingMarks aggregation was corrected from summing a cumulative engine counter to taking its maximum/final value. The script was re-hashed and all artifacts were regenerated.",
+  "implementation_freeze": {"script": "raits/research/stocks_polygon_financial_change_drift.py", "script_hash": "E951D92E2BD32AD5F676EFFC3763A93DCF0E2404C11778FD5ADC1CC4D7BCEE18", "performance_not_yet_run": true}
+}

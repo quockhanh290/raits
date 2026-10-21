@@ -1,0 +1,105 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_MCAP_QUALITY_LOWVOL_MONTHLY_2026-09-14",
+  "script": "raits/research/stocks_pit_full_mcap_quality_lowvol_monthly.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv"
+  ],
+  "sample_label": "Research/in-sample diagnostics across 2018-2024. 2023-2024 is touched validation, not clean unseen OOS.",
+  "causality": "Monthly selection uses prior ret60_pre/vol20_pre and PIT market-cap snapshot; holdings start next trading day. Vol target is shifted by one day.",
+  "variants": [
+    {
+      "variant": "pool500_lowvol50_gross100",
+      "pool": 500,
+      "selector": "lowvol",
+      "top_n": 50,
+      "gross": 1.0,
+      "target_vol": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "pool500_lowvol100_gross100",
+      "pool": 500,
+      "selector": "lowvol",
+      "top_n": 100,
+      "gross": 1.0,
+      "target_vol": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "pool500_ret60vol50_gross100",
+      "pool": 500,
+      "selector": "ret60_over_vol",
+      "top_n": 50,
+      "gross": 1.0,
+      "target_vol": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "pool500_ret60pos_lowvol50_gross100",
+      "pool": 500,
+      "selector": "ret60_positive_lowvol",
+      "top_n": 50,
+      "gross": 1.0,
+      "target_vol": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "pool200_lowvol50_gross100",
+      "pool": 200,
+      "selector": "lowvol",
+      "top_n": 50,
+      "gross": 1.0,
+      "target_vol": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "pool200_ret60vol50_gross100",
+      "pool": 200,
+      "selector": "ret60_over_vol",
+      "top_n": 50,
+      "gross": 1.0,
+      "target_vol": null,
+      "max_exposure": 1.0
+    },
+    {
+      "variant": "pool500_lowvol50_vt20_cap200",
+      "pool": 500,
+      "selector": "lowvol",
+      "top_n": 50,
+      "gross": 1.0,
+      "target_vol": 0.2,
+      "max_exposure": 2.0
+    },
+    {
+      "variant": "pool500_ret60vol50_vt20_cap200",
+      "pool": 500,
+      "selector": "ret60_over_vol",
+      "top_n": 50,
+      "gross": 1.0,
+      "target_vol": 0.2,
+      "max_exposure": 2.0
+    },
+    {
+      "variant": "pool500_ret60pos_lowvol50_vt25_cap250",
+      "pool": 500,
+      "selector": "ret60_positive_lowvol",
+      "top_n": 50,
+      "gross": 1.0,
+      "target_vol": 0.25,
+      "max_exposure": 2.5
+    }
+  ],
+  "costs": "4.0 bps per side approximated from monthly holding turnover.",
+  "rule_selection": "None. Variant set fixed in VARIANTS before measuring.",
+  "old_62_usage": "None.",
+  "outputs": [
+    "STOCKS_PIT_FULL_MCAP_QUALITY_LOWVOL_MONTHLY_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_MCAP_QUALITY_LOWVOL_MONTHLY_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_MCAP_QUALITY_LOWVOL_MONTHLY_2026-09-14_SPLITS.csv",
+    "STOCKS_PIT_FULL_MCAP_QUALITY_LOWVOL_MONTHLY_2026-09-14_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_MCAP_QUALITY_LOWVOL_MONTHLY_2026-09-14_REBALANCES.csv",
+    "STOCKS_PIT_FULL_MCAP_QUALITY_LOWVOL_MONTHLY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_MCAP_QUALITY_LOWVOL_MONTHLY_2026-09-14_TICKER_CONTRIB.csv"
+  ]
+}

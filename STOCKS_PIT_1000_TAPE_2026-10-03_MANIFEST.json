@@ -1,0 +1,35 @@
+{
+  "script": "D:/raits/raits/research/stocks_pit_1000_tape_replay.py",
+  "scriptHash": "29FAB1B9181D38DB7CE0043B8F85B7A75046B11111DC248ADD635986273AF518",
+  "preregistration": "STOCKS_PIT_1000_TAPE_PREREG_2026-10-03.json",
+  "preregistrationHash": "C034C4BA43BCAFB1DB3F293F3C0AA1FFDD96CC5AF7BE65F722EF19A50B245FA6",
+  "inputs": {
+    "STOCKS_PIT_1000_FLOW_FETCH_PLAN_2026-10-02.csv": "AB0865B0FFCDB61C7DDD8DC2C5E6D9F44787DF927D4B6FCDFA403F1622D8CCE3",
+    "STOCKS_PIT_1000_FLOW_FETCH_PLAN_2026-10-02.json": "40923C556FF9A9294BA83E5A0BBE9D337481778350FC6857E80CE73883041330",
+    "STOCKS_PIT_1000_FLOW_EXACT_CLOCK_ROWS_2026-10-02.csv": "549B50ABE397C9347DD363D9F414853F4109C05E42279EF4981BBC13EC48CA37",
+    "raits/data/cache/polygon_stock_trades_1000_flow_2018_2022/causal_features_pre1000.parquet": "4D1E0374FAF0783A1BD577FF970EDCC55D9A804E22624CFAEFE6D64E57D24B0D",
+    "raits/data/cache/polygon_stock_trades_1000_flow_2018_2022/causal_features_pre1000_manifest.json": "F6821886A15DA8E220294F589A19944A29F6C2CF45752EA3218E9FF5DC0793FE",
+    "raits/data/cache/polygon_stock_trades_1000_flow_2018_2022/causal_tape_features_pre1000.parquet": "ABA6D178B771184D3AED778C64A64005D406A668CCE03EF598B79EEE18490095",
+    "raits/data/cache/polygon_stock_trades_1000_flow_2018_2022/causal_tape_features_pre1000_manifest.json": "5A3D2377DF24B3CEB51684D1308981D733446A777B1FD552C6C7FF0A9D9524C8",
+    "D:/raits/raits/research/stocks_pit_1000_flow_replay.py": "080F4F2C758FC3905E6B31277335818BD7AE2C26BDDD2A93AAAB218A459C65F2"
+  },
+  "selection": {
+    "status": "KILL_VALIDATION_FAIL",
+    "selectedVariant": "yday_broad_venue_confirmation",
+    "validationOpened": true,
+    "validationPass": false,
+    "productionPassAllowed": false
+  },
+  "development": [
+    "2018-03-29",
+    "2021-12-31"
+  ],
+  "validation": [
+    "2022-01-01",
+    "2022-12-30"
+  ],
+  "oldManual62Used": false,
+  "post2022Consumed": false,
+  "productionPassAllowed": false,
+  "causality": "trade tape uses SIP arrivals strictly before 10:00; exact 10:05 entry; existing audited portfolio engine"
+}

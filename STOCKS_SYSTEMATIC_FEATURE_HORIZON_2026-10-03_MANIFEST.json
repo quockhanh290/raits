@@ -1,0 +1,21 @@
+{
+  "script": "D:/raits/raits/research/stocks_systematic_feature_horizon_map.py",
+  "scriptHash": "F2A49383C336FAD0311C423991A17507745BF039DA50DA88738EC61E2D7176DF",
+  "preregistration": "STOCKS_SYSTEMATIC_FEATURE_HORIZON_PREREG_2026-10-03.json",
+  "preregistrationHash": "33ABC256273BE7E4E7847001987E8696D339836E39FEC19BCACF4BAE6AEDDE2E",
+  "inputs": {
+    "raits/data/cache/polygon_stock_trades_1000_flow_2018_2022/causal_tape_features_pre1000.parquet": "ABA6D178B771184D3AED778C64A64005D406A668CCE03EF598B79EEE18490095",
+    "STOCKS_PIT_1000_FLOW_FETCH_PLAN_2026-10-02.csv": "AB0865B0FFCDB61C7DDD8DC2C5E6D9F44787DF927D4B6FCDFA403F1622D8CCE3",
+    "STOCKS_PIT_1000_FLOW_EXACT_CLOCK_ROWS_2026-10-02.csv": "549B50ABE397C9347DD363D9F414853F4109C05E42279EF4981BBC13EC48CA37"
+  },
+  "selection": {
+    "tests": 180,
+    "discoveryPasses": 4,
+    "replicationPasses": 0,
+    "confirmationOpened": false,
+    "confirmationPasses": 0,
+    "productionPassAllowed": false
+  },
+  "oldManual62Used": false,
+  "post2022Consumed": false
+}

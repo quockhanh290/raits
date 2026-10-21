@@ -15483,3 +15483,1808 @@ monitor/backend/job_journal_reader.py, monitor/backend/schedule_status.py,
 monitor/test_dashboard_backend.py,
 scratch/test_reanchor_before_the_window_20260910.py,
 scratch/test_the_anchor_is_fixed_before_the_window_20260910.py
+
+## Task: Dữ liệu 5 phút Polygon 62 cổ phiếu 2018–2024 (2026-09-11)
+Status: DONE
+
+### Completed
+- [x] Lượt tải của Codex đã chạy xong (không chết giữa chừng): 5.208/5.208 tháng OK; chạy lại → 0 việc
+- [x] Kiểm toàn bộ: 1.761 ngày giao dịch, 8.589.852 bar, 0 trùng, 0 giá vô lý, chia tách đã điều chỉnh
+- [x] Vá META 09–30/06/2022 (thiếu do đổi mã FB→META) — kiểm lại đủ 21 ngày
+- [ ] Còn để ngỏ: BIIB thiếu 2020-11-06 và 2023-06-09 (nghi tạm ngừng giao dịch, chưa đối chiếu
+      nguồn); 14 mã-ngày thường có 60–69 bar (chủ yếu REGN 2024), chưa kiểm khung nào thiếu
+
+### Files touched
+raits/data/cache/polygon_5min_2018_2024_62/META/META_5m_2022-06.parquet,
+STOCKS_POLYGON_5MIN_2018_2024_62_FETCH_STATUS_2026-09-11.csv (thêm 1 dòng)
+
+## Task: Lead cổ phiếu B_polygon62 — tiền mặt, margin, thanh toán (2026-09-12)
+Status: OPEN — mới đo và ghi lại, CHƯA sửa code, chờ chủ dự án quyết
+
+Phạm vi: `B_polygon62_no_intraday_cap40`, bản warmup 2016-09 → chấm điểm 2018-01-02..2024-12-31.
+Hiện chỉ là nghiên cứu: trong vùng được đọc, book này chỉ có ở `raits/research/`, không có runner live.
+
+### Completed (đã đo, không sửa gì)
+- [x] Engine MUA MÀ KHÔNG KIỂM TIỀN MẶT: `stocks_one_engine_mtm_portfolio.py:348` trừ thẳng
+      `cash -= notional + entry_cost`; chặn duy nhất là gross cap (B = 1,75x → về lý thuyết cho vay tới 75% NAV).
+      Không ai thiết kế ra điều này — là tàn dư cách viết engine (vào lệnh lúc mở cửa, vị thế đáo hạn bán lúc đóng cửa).
+- [x] Đo: tiền mặt âm ngay sau khi vào lệnh ở 88/1.744 ngày, tệ nhất −$5,5k (−4,1% NAV).
+      Cả 88 ngày đều là ngày có lệnh yday (lệnh 35% NAV cộng lên ~0,6–0,68x qua đêm của broad/local).
+- [x] Đo bản không vay (gross cap B = 1,0x ≡ tiền mặt không âm với book chỉ mua):
+      P&L $106,40k vs $107,08k (−$0,68k trong 7 năm), Sharpe 1,193 = 1,193, DD −$14,13k vs −$14,22k.
+      Còn lệch −$24 do cap tính trên notional, không tính phí 4 bps.
+
+### Next steps — PHẢI XONG TRƯỚC KHI book cổ phiếu tới gần live
+- [ ] Chọn cách chặn: (a) đặt gross cap B = 1,0x trong `LEAD_PORTFOLIOS` của
+      `stocks_polygon_2018_2024_no_ml_pipeline.py`, hoặc (b) thêm kiểm tra tiền mặt thật tại dòng 348 của engine.
+      Sau khi sửa: chạy lại, xác nhận ~$106,40k / Sharpe 1,193 và 0 ngày tiền mặt âm sau khi vào lệnh.
+- [ ] Chọn loại tài khoản. Khuyến nghị: tài khoản MARGIN nhưng giữ gross cap 1,0x (không vay đồng nào).
+      Lý do: tiền bán dùng mua tiếp được ngay; tài khoản tiền mặt thì yday (mua lúc mở cửa bằng tiền của vị thế
+      bán hôm trước, bán lại 15:55 cùng ngày) có thể dính vi phạm "good faith" của Reg T.
+      Mỹ thanh toán T+1 từ 28/05/2024, trước đó T+2.
+- [ ] Nếu vẫn muốn tài khoản TIỀN MẶT: đo số ngày yday mua bằng tiền chưa thanh toán (CHƯA ĐO).
+- [ ] Xác nhận với broker thật: chính sách dùng tiền chưa thanh toán; ngưỡng pattern day trader $25k
+      (vốn $50k đang vượt ngưỡng). Đây là quy định chung, chưa đối chiếu broker cụ thể.
+- [ ] Cùng họ, chưa đo: engine coi tiền bán ra là dùng được ngay — kiểm lại khi dựng runner live.
+
+### Key decisions (2026-09-12, sau khi chủ dự án chất vấn)
+- Concentration KHÔNG phải blocker riêng — gộp vào blocker survivorship. Lý do đo được: P&L theo mã tương quan
+  0,71 với mức tăng mua-giữ 2018–24 của chính mã đó; bỏ TSLA mà giữ nguyên luật thì mã thay thế gần như
+  không bù được gì (−$29,0k so với TSLA đóng góp $26,6k).
+- Kích thước lệnh KHÔNG phải lý do WARN: cap 40%/mã đã có; yday 35% NAV nằm dưới cap, thoát trong ngày
+  (không có gap qua đêm); lệnh yday tệ nhất 7 năm −2,75% NAV (MU 2022-03-07); 7/229 lệnh lỗ quá 2% NAV.
+- Lead B vẫn WARN+ vì đúng MỘT lý do: universe current-survivor. Phép thử quyết định: universe point-in-time.
+
+### Còn mở từ các audit gần đây (6.103–6.106)
+- [ ] File equity warmup còn 976 dòng 2017 (P&L = 0) do bản code trước khi sửa ghi ra; summary/yearly đúng
+      nhưng là tính lại ngoài code → chạy lại pipeline warmup để artifact khớp code.
+- [ ] 6.104–6.106 (concentration, drop, full refill) không có script nào trong vùng được đọc → lưu script vào
+      `raits/research/` để tái lập được. (Số liệu đã được tôi dựng lại độc lập và khớp đến từng xu.)
+- [ ] Survivorship test phải CỐ ĐỊNH ngày bắt đầu dữ liệu và giao thức chọn rule trước khi chạy: WFO của
+      yday/intraday đổi rule khi đổi dữ liệu hoặc universe (ảnh hưởng ±$8k, intraday lật từ −$21k sang +$18k).
+
+### Files touched
+TASK.md (mục này). Không sửa code, không commit.
+
+---
+## Sub-task: Rà sự cố mất phiên 16/9 + gỡ cổng bằng chứng (2026-09-17, phiên Claude)
+Status: IN PROGRESS
+
+### Completed
+- [x] Truy nguyên nhân mất phiên 16/9: khởi động lại do nâng cấp Windows lúc 15/9 17:27 giờ máy
+      giết scheduler; không có cơ chế nào dựng lại. Máy sau đó ngủ đông lúc 16/9 02:18 vì pin
+      chạm ngưỡng cạn kiệt 5%, thức lại 19:00 — phủ trọn phiên ET. Hai nguyên nhân độc lập.
+- [x] Truy nguyên nhân 49/49 slot ngày 14/9 bị từ chối (overlap_disagreement): IBKR roll chuỗi
+      liên tục lúc 10/9 18:00 ET; slot "Anchor check 00:55 ET" ngày 14/9 tính lại độ lệch
+      (cộng dồn, sang MESZ6/MNQZ6/MYMZ6/M2KZ6) nhưng KHÔNG viết lại bar cũ — đúng thiết kế.
+      Ngày 14/9 cửa sổ nạp vẫn với ngược về bar trước roll nên hai nửa không thể khớp.
+      Tự lành từ 15/9. Kho parquet đã kiểm: SẠCH, không đứt giá ở mốc roll.
+- [x] Ghi mốc tài khoản giấy mới (account_baseline_audit --broker ibkr --record):
+      USD 251.259,90, không vị thế, không lệnh treo, hai sổ đều phẳng. B1 cũng PASS lại.
+      Cổng paper_account_baseline: FAIL -> PASS (đã chạy lại bảng đánh giá để xác nhận).
+- [x] Viết monitor/autostart_ops.cmd — dựng scheduler lại sau khi máy khởi động lại.
+
+### In progress
+- [ ] Đăng ký tác vụ theo lịch cho autostart_ops.cmd — công cụ của Claude bị chặn quyền tạo
+      tác vụ nền; script đã sẵn, chủ dự án chạy lệnh đăng ký. CHƯA CHẠY THỬ LẦN NÀO.
+
+### Next steps
+- [ ] Cổng bằng chứng còn 2 mục hỏng, cả hai do đúng hai ngày 14/9 và 17/9. Cần 5 ngày xét
+      liên tiếp sạch để hai ngày đó rơi khỏi cửa sổ.
+- [ ] Quyết định có làm hàng rào chồng lấn biết ngày roll hay không (nếu không, mỗi quý mất
+      một ngày bằng chứng vào kỳ roll kế tiếp ~tháng 12).
+
+### Key decisions
+- Không đụng vào parquet: đã kiểm sạch, không có gì để sửa.
+- Không nới ngưỡng nào của bảng đánh giá bằng chứng.
+
+### Files touched
+monitor/autostart_ops.cmd (mới), SCRATCHPAD.md, TASK.md,
+global_index/track1_runtime/account_baseline/account_baseline_20260918.jsonl (do công cụ ghi)
+
+---
+## Sub-task: Mất phiên 22/9 + cổng tự khởi động chưa từng chạy được (2026-09-23, phiên Claude)
+Status: IN PROGRESS — hệ đã chạy lại, lỗi gốc đã vá, còn chờ đăng ký tác vụ
+
+### Completed
+- [x] Truy nguyên nhân hệ tắt: KHÔNG phải lần reboot 15/9 như đã nghĩ. Nhật ký scheduler dừng
+      giữa nhịp tim lúc 21/9 14:43:00 giờ Calgary, không traceback, không dòng tắt. 17 giây sau,
+      Start Menu phát lệnh tắt máy thay mặt tài khoản chủ dự án (sự kiện 1074, "Other/Unplanned").
+      Fast Startup đang BẬT (HiberbootEnabled=1) nên lần tắt đó là tắt lai: giết sạch tiến trình
+      người dùng nhưng Windows vẫn báo máy chạy liền mạch từ 15/9 — đó là lý do phép đo uptime
+      đọc nhầm. Máy ở trạng thái nguồn thấp 21/9 14:43 → 22/9 15:47 (~25 giờ), phủ trọn phiên ET
+      thứ Ba 22/9. IB Gateway lần cuối mở 19/9, chết cùng lúc, không ai mở lại.
+- [x] Tổng thiệt hại tới nay: mất phiên 16/9, mất phiên 22/9, mất cửa sổ NKD đêm 22→23/9.
+      Hai lần tắt khác nguyên nhân, cùng một lỗ hổng: không có gì dựng hệ dậy.
+- [x] Dựng lại hệ (Gateway do chủ dự án mở tay, cổng 4002). scheduler + backend lên,
+      broker connected, track1_mode=track1-only-shadow đọc từ bảng tiến trình,
+      track1_scheduler_mode chuyển từ `unknown` sang `compatible`, 71/71 slot đăng ký đủ,
+      orders_possible=False (đúng thiết kế chế độ bóng).
+- [x] **Tìm ra lý do kịch bản tự khởi động 17/9 không thể chạy được lần nào.**
+      Trong `cmd_up`, bộ cờ Track 1 chỉ tới được `start_scheduler` ở nhánh `--restart-scheduler`.
+      Nhánh còn lại — `up` khi KHÔNG có gì đang chạy — gọi `start_scheduler` không kèm cờ nào,
+      nên rơi vào chế độ legacy và bị chính cổng B1 từ chối. Lời khuyên trong thông báo từ chối
+      ("start with --track1-only-shadow instead") đúng là thứ người vận hành vừa gõ.
+      → `ops up --track1-only-shadow` KHÔNG BAO GIỜ khởi động được từ trạng thái trắng,
+      mà đó chính là trạng thái sau mỗi lần máy tắt. Bản sửa cho máy vừa reboot không thể
+      chạy trên máy vừa reboot. Sổ ghi "CHƯA CHẠY THỬ LẦN NÀO" là chính xác.
+- [x] Vá `monitor/ops.py`: nhánh khởi động nguội truyền `track1_shadow`/`track1_only` xuống
+      `start_scheduler`, và miễn cổng B1 CHỈ cho `track1_only` — đúng luật nhánh
+      `--restart-scheduler` đã áp dụng. `--track1-shadow` (giữ cả 45 việc legacy) vẫn bị từ chối.
+- [x] Hai phép kiểm mới trong `monitor/test_ops.py`, 10/10 xanh, không hồi quy:
+      một phép chứng minh đường nguội giữ được cờ (đã chạy và ĐỎ trước khi vá),
+      một phép ghim rằng miễn trừ không nới sang chế độ giữ legacy.
+      Hai phép dùng cùng bộ giả lập, cùng danh sách chặn, khác đúng một cờ, cho hai kết cục
+      ngược nhau — nên không phải test xanh rỗng.
+- [x] **Chạy thử thật trên máy, không phải giả lập**: hạ hệ xuống 0 tiến trình lúc 02:57 ET
+      (slot kế tiếp 09:31 ET, biên 6,5 tiếng), rồi chạy lại ĐÚNG lệnh nằm trong kịch bản tự
+      khởi động. Trước khi vá: lỗi 2, không khởi động gì. Sau khi vá: scheduler 34400,
+      backend 43552, broker connected.
+
+### In progress
+- [ ] Đăng ký tác vụ đăng nhập — công cụ của Claude lại bị chặn quyền tạo tác vụ nền.
+      Lệnh đã đưa cho chủ dự án:
+      `schtasks /Create /TN "RAITS ops autostart" /TR "\"D:\raits\monitor\autostart_ops.cmd\"" /SC ONLOGON /DELAY 0002:00 /F`
+      CHƯA đăng ký, CHƯA chạy qua một lần đăng nhập thật.
+
+### Completed (tiếp) — cảnh báo Gateway
+- [x] Nối cảnh báo vào nhịp tim scheduler (chạy mỗi phút, cả tuần) thay vì dựng việc mới:
+      nó đã sẵn khuôn cờ chốt + dòng phục hồi. Thăm dò ĐỌC BẢNG SOCKET của hệ điều hành
+      (`psutil`), KHÔNG quay số vào Gateway — mở-đóng kết nối mỗi phút là 1.440 lần gọi
+      mỗi ngày vào nhật ký của IB và tính vào giới hạn client của nó.
+- [x] Thăm dò ba trạng thái: có / không / KHÔNG TRẢ LỜI ĐƯỢC. Gộp trạng thái thứ ba vào
+      "không" là cách biến lỗi giám sát thành báo động 3 giờ sáng về một Gateway vẫn khoẻ.
+- [x] Chống nhiễu: cần 3 nhịp liên tiếp mới gọi là sự cố; bỏ qua cửa sổ Gateway tự khởi động
+      lại hằng đêm (00:00–00:40 giờ máy — đo theo giờ MÁY, không phải ET); chốt cờ và chỉ
+      nhắc lại mỗi giờ thay vì hét 60 lần một tiếng.
+- [x] 7 phép kiểm mới, chạy ĐỎ trước khi cài đặt. Phép quan trọng nhất lái ĐÚNG closure mà
+      scheduler đăng ký (không phải bản dựng lại) — đây là phép kiểm mà nếu có từ trước thì
+      đã bắt được vụ `autostart_ops.cmd`. Một phép nữa ghim rằng thăm dò không được dùng
+      `create_connection`/`connect_ex`, vì bản cài đặt rẻ tiền đó qua hết các phép kiểm hành
+      vi mà vẫn âm thầm quay số vào IB.
+- [x] 20/20 xanh trong tệp nhịp tim, 41/41 cùng với log hygiene + ops. Trong 11 tệp kiểm khác
+      chạm scheduler: 97 xanh, 1 đỏ — đã xác minh đỏ Y HỆT trên bản gốc (git stash), tức lỗi
+      có sẵn, không do thay đổi này: `test_resume_equivalence` không tìm được ngày nào trong
+      40 phiên gần nhất thoả cả ba điều kiện.
+- [x] Khởi động lại scheduler để mã mới có hiệu lực (APScheduler chỉ đọc lúc khởi động):
+      pid 27184, backend 28372, broker connected, mọi job đăng ký lại sạch.
+- [x] Kiểm trên máy thật: thăm dò trả `True` cho cổng 4002 (Gateway đang nghe) và `False` cho
+      cổng 4001 (không ai nghe) → nó phân biệt được, nên khi Gateway chết nó sẽ trả `False`.
+      Zero dòng cảnh báo giả trong nhật ký sau khởi động lại.
+- [ ] CHƯA QUAN SÁT cảnh báo nổ trên máy thật — muốn thấy phải tắt Gateway, không đáng làm
+      lúc này. Hành vi đã được phép kiểm lái qua closure thật; lần Gateway chết tới sẽ là
+      lần quan sát đầu tiên.
+
+### Next steps
+- [ ] Ba mục còn đỏ chưa đụng: mốc tài khoản giấy quá hạn 123,6 giờ; dữ liệu SPY ngày dừng ở
+      18/9 (thiếu 22/9); kiểm B1 quá cũ. Hai mục đầu sẽ tự lành nếu preflight 13:45 ET hôm nay
+      chạy được — CHƯA XÁC MINH, phải xem lại sau 13:45 ET 23/9.
+### Đã kiểm — giả thuyết "mốc tài khoản chặn cổng bằng chứng" là SAI
+- [x] Đúng là `ab.record(...)` chỉ được gọi từ MỘT chỗ: công cụ dòng lệnh của người vận hành.
+      Không job nào của scheduler ghi lại nó, và hạn dùng là 24 giờ.
+- [x] NHƯNG cổng đọc nó bằng `latest(root)` — mốc mới nhất TẠI THỜI ĐIỂM CHẤM, không phải mốc
+      của từng ngày trong cửa sổ. Cửa sổ 5 ngày sạch tích luỹ từ kiểm toán sleeve hằng ngày,
+      hoàn toàn độc lập với mốc tài khoản. Nên đây là TIỀN KIỂM trước khi quyết, không phải
+      thước sức khoẻ liên tục — và hạn 24 giờ có chủ đích: tài khoản từng bị reset ngay dưới
+      một dấu PASS còn hạn 19,77 giờ (27/8, equity 996.875,91 so với nền khai 250.000).
+      → Ghi mốc mới ngay trước khi ra quyết định, không phải ghi hằng ngày.
+
+### Chặn thật, đo được (chạy `track1_paper_readiness` ngày 23/9)
+- [x] 8 phép chấm, 3 FAIL. Cửa sổ xét = 5 ngày 14/9, 15/9, 17/9, 18/9, 21/9 —
+      **4/5 là FAIL**, chỉ 15/9 sạch. Cho phép tối đa 0 ngày FAIL.
+- [x] Bốn ngày hỏng vì bốn lý do KHÁC NHAU, không phải một lỗi lặp:
+      · 14/9 `coverage_incomplete` + `slot_could_not_evaluate` — ngày IBKR roll chuỗi, đã ghi 17/9
+      · 17/9 `window_closed_before_scheduler_start` — cửa sổ NKD đã đóng khi người vận hành dựng
+        hệ bằng tay lúc 06:54. Đây là HỆ QUẢ TRỰC TIẾP của lần mất phiên 16/9.
+      · 18/9 `slot_runtime_over_ceiling` + `missing_slot_ids` + `timing_without_ledger_row`
+      · 21/9 `coverage_unobserved` — xem mục dưới
+- [x] **Đêm 21/9: 22/22 slot NKD được bắn, 22/22 thoát mã lỗi 1, 22/22 lỗi
+      `ConnectionRefusedError [WinError 1225]`, và 0 dòng nào nói Gateway là nguyên nhân.**
+      Scheduler khoẻ, nhịp tim đều mỗi phút. Gateway đã không nghe từ trước lần tắt máy 21/9
+      14:43 (lần mở cuối là 19/9). Đây là đúng sự im lặng mà cảnh báo Gateway ở trên vừa bịt —
+      và là bằng chứng đo được rằng cảnh báo đó đáng làm, không phải phòng xa.
+- [x] `calm_decision_evidence` FAIL độc lập: 14/9 incomplete, 17/9 incomplete, 21/9 missing.
+- [x] **Cái giá cộng dồn của mỗi phiên mất**: phiên mất KHÔNG tạo thêm ngày FAIL, nhưng cũng
+      không tạo ngày xét mới — nên các ngày hỏng cũ nằm lại trong cửa sổ 5 ngày lâu hơn.
+      16/9 và 22/9 vì vậy vừa làm hỏng 17/9, vừa giữ 14/9 và 18/9 ở lại.
+
+### Next steps (cập nhật 23/9)
+- [ ] Cần 5 ngày xét liên tiếp KHÔNG có ngày FAIL. Hiện chỉ 15/9 sạch → cần 5 ngày sạch mới.
+      Điều kiện cần: máy không tắt (tác vụ đăng nhập — CHỜ chủ dự án chạy lệnh) và Gateway
+      không chết im lặng (đã có cảnh báo, CHƯA quan sát nó nổ).
+- [ ] Truy `slot_runtime_over_ceiling` + `timing_without_ledger_row` của 18/9 — chưa đụng,
+      là họ lỗi riêng, không liên quan Gateway hay máy tắt.
+- [ ] `calm_decision_evidence` — chưa đụng.
+- [ ] Ghi mốc tài khoản + kiểm B1 mới: để SAU CÙNG, ngay trước khi ra quyết định (cả hai
+      hạn 24 giờ). Ghi bây giờ là lãng phí.
+
+### Key decisions
+- Sửa ở `ops.py` chứ không chỉ sửa kịch bản .cmd (chủ dự án chốt): cái bẫy nằm ở lệnh dùng
+  chung, để nguyên thì người gõ tay lần sau vẫn dính.
+- Giữ nguyên tính chất "scheduler đang khoẻ thì `up` không đụng vào" — bản vá không chạm nhánh đó.
+- Gateway vẫn mở tay, không dựng IBC (không cất mật khẩu vào tệp cấu hình).
+
+### Files touched
+monitor/ops.py, monitor/test_ops.py, TASK.md, SCRATCHPAD.md. Chưa commit.
+
+---
+## Sub-task: Va chạm slot ngày 18/9 — hai nửa hệ thống được thiết kế ngược nhau (2026-09-23)
+Status: ĐÃ ĐO XONG, CHỜ QUYẾT — không sửa gì
+
+### Cơ chế, đã truy tới đáy
+- [x] Slot Swing 14:50 ngày 18/9 chạy 305,7 giây (bước `observe` 305,5s). Nhịp slot là 5 phút.
+- [x] Lúc 14:55 slot kế tiếp tới hạn, `_run_guarded` thử giành khoá KHÔNG CHỜ, giành không
+      được nên **không khởi động tiến trình con nào** — chỉ ghi một bản ghi
+      `outcome="skipped_mutex"`, `runtime_s=0.0`. Nhật ký xác nhận: 12:50:00 slot 14:50 chạy,
+      12:55:00 slot 14:55 bị gạt, 12:55:10 slot 14:50 mới xong — trễ 10 giây.
+- [x] Ba dấu hiệu FAIL của ngày đó (quá trần · thiếu slot · có bản ghi thời gian mà không có
+      dòng sổ) là BA GÓC NHÌN CỦA CÙNG MỘT VA CHẠM, không phải ba lỗi.
+
+### Phát hiện chính: hai nửa được thiết kế ngược nhau, không ai hoà giải
+- [x] **Phía scheduler** ghi thẳng trong mã: slot cách nhau 5 phút, một lượt chạy có thể lâu
+      hơn thế nên **các lượt bắn chồng nhau là chuyện đã liệu trước**, và "bị gạt là kết cục
+      ĐÚNG, không phải mất mát" vì luật vào lệnh là luỹ đẳng — slot sau làm đúng việc slot
+      trước định làm. Trần thời gian của tiến trình con là `_SLOT_TIMEOUT_SECS = 20 phút`.
+- [x] **Phía kiểm toán** coi slot chạy ≥ 300 giây là FAIL, và slot bị gạt (có bản ghi thời
+      gian, không có dòng sổ) cũng là FAIL — FAIL cả ngày.
+- [x] → **Trần của runner gấp 4 lần trần của kiểm toán** (1200s so với 300s). Kiểm toán bắt
+      lỗi đúng cái hành vi mà scheduler ghi là bình thường và có chủ đích.
+- [x] Kiểm toán ĐỌC ĐƯỢC sự khác biệt nhưng không dùng: bản ghi mang sẵn
+      `outcome="skipped_mutex"`, còn `timing_ids` gom MỌI bản ghi bất kể `outcome`. Chú thích
+      ngay trên dòng đó thừa nhận nó gộp "sập" với "bị gạt vì khoá", và chọn gộp với lý do
+      "cả hai đều không phải một quan sát". Tức cũng là một lựa chọn có chủ đích.
+
+### Quy mô, đo trên toàn bộ 20 ngày có dữ liệu (452 slot Swing)
+- [x] Trung vị 156,1 giây. Chỉ **5/452 slot** chạm ngưỡng trong vòng 60 giây của trần.
+- [x] **2/20 ngày vượt trần**: 8/9 (320,8s) và 18/9 (305,7s).
+- [x] **3/20 ngày có ít nhất một slot bị gạt**: 28/8 (4 slot), 8/9 (2), 18/9 (1).
+- [x] Ngày 28/8 là ca nặng hơn và giải thích được: slot 14:50 **không ghi bản ghi nào**, treo,
+      giữ khoá, chặn đúng 4 slot = 20 phút = đúng `_SLOT_TIMEOUT_SECS`. Trần 20 phút đã hoạt
+      động đúng thiết kế; cái giá của nó là 4 slot. Phần còn lại của ngày rơi vào `incomplete`.
+- [x] **ĐÍNH CHÍNH bản báo trước**: tôi nói "biên chỉ còn 50 giây, lần lố tiếp theo là chuyện
+      khi nào" — đó là suy từ RIÊNG ngày 18/9. Trên cả 20 ngày biên thường là ~125 giây.
+      Kết luận "sẽ tái diễn" vẫn đứng, nhưng vì tần suất 2/20 ngày, không phải vì biên mỏng.
+
+### Vì sao nó chặn đường
+- Cổng đòi 5 ngày liên tiếp KHÔNG có ngày FAIL. Riêng họ lỗi này làm hỏng ~10% số ngày, nên
+  xác suất gom đủ 5 ngày sạch liên tiếp chỉ vì lý do này đã rơi về khoảng 59%. Máy chạy suốt
+  và Gateway khoẻ cũng không đủ.
+
+### Chờ quyết
+- [ ] Ai đúng: trần 300 giây của kiểm toán, hay hợp đồng "chồng lấn là bình thường" của runner?
+      KHÔNG tự sửa — cả hai đều là lựa chọn có chủ đích của hai giai đoạn khác nhau.
+
+### Files touched
+Không sửa gì. Chỉ đọc + đo.
+
+### Gốc của `observe` chậm — đã truy xong (2026-09-23)
+- [x] Mỗi slot Swing nạp **4 mã** (MES, MNQ, MYM, M2K). `live_frames` là vòng lặp **TUẦN TỰ**,
+      không song song. Mỗi lời gọi `reqHistoricalData` có trần **120 giây**.
+- [x] → **Trần lý thuyết của MỘT slot = 4 × 120 = 480 giây**, trong khi nhịp slot và trần
+      kiểm toán đều là **300 giây**. Tức thiết kế hiện tại BẢO ĐẢM rằng một đợt dữ liệu chậm
+      sẽ vượt trần kiểm toán. Đây không phải sự cố bất thường, đây là cận trên của nó.
+- [x] Đối chiếu số học khớp: trung vị 156,1s ÷ 4 = 39,0s mỗi mã; ngày 18/9 305,7 ÷ 4 = 76,4s;
+      ngày 8/9 320,8 ÷ 4 = 80,2s. Chia đều cho cả bốn → **cả bốn cùng chậm gấp đôi**, không
+      phải một lời gọi treo. Ngày 8/9 có 3 slot chậm liên tiếp (257,6 · 295,6 · 320,8) nên là
+      một đợt chậm kéo dài, không phải một lần trục trặc.
+- [x] Chú thích trong `_run` nói "reqHistoricalData không có giới hạn thời gian" — ĐÃ CŨ,
+      lời gọi thật có `timeout=120`.
+- [x] **Chỗ lãng phí đo được**: mỗi lần nạp xin `durationStr="2 D"` bar 1 phút. Với hợp đồng
+      CME (~23h/phiên) là ~2.760 bar mỗi mã mỗi lần. Chạy 23 slot/ngày × 4 mã ≈ 254.000 bar
+      tải về mỗi ngày, trong khi dữ liệu THẬT SỰ mới giữa hai slot chỉ là 5 phút × 4 mã = 20 bar.
+      Phần còn lại đã nằm sẵn trong parquet và được ghép vào ngay sau đó.
+
+### Đòn bẩy ứng viên (CHƯA LÀM, cần ràng buộc của chủ dự án)
+- [ ] Thu nhỏ cửa sổ nạp trực tiếp từ "2 D". Đây là một THAM SỐ, không phải dựng lại đường
+      dữ liệu — nhưng nó chạm phần chồng lấn dùng để ghép, và chính phép kiểm chồng lấn đó là
+      thứ đã bắt được sự cố roll ngày 14/9. Cổng bắt buộc nếu làm: phép chồng lấn phải vẫn
+      bắt được đúng ca 14/9 sau khi đổi.
+- [ ] Nạp 4 mã song song: hạ cận trên 480s về 120s, nhưng đụng luật pacing của IBKR
+      (chú thích hiện có đã nói hàng đợi 5+ hợp đồng là lý do trần bị nâng từ 60 lên 120 giây).
+      CHƯA ĐO xem IBKR chịu được bao nhiêu yêu cầu lịch sử song song.
+
+### Mốc trước khi sửa đường dữ liệu (2026-09-23)
+- [x] **Mốc đo**: `TRACK1_OVERLAP_BASELINE_2026-09-23.json` — số mốc thời gian chồng lấn của
+      từng (ngày, mã), chỉ lấy lượt chạy thật (`mode=shadow_live`), 79 cặp, 4.005 bản ghi.
+      Đây là thước cho cổng kiểm số 1: sau khi sửa, không ngày nào được ít chồng lấn hơn.
+- [x] **Mốc revert**: bản sao 4 tệp + bản vá toàn bộ thay đổi chưa commit, tại
+      `…\scratchpad\revert_2026-09-23\`. HEAD = `884b7f1`. Hai tệp sắp sửa
+      (`track1_live_source.py`, `ibkr_broker.py`) hiện SẠCH so với HEAD, nên revert riêng
+      phần này chỉ là `git checkout HEAD -- <tệp>`, không đụng các sửa khác trong phiên.
+
+### Việc tạo mốc lộ ra một lỗ hổng ĐANG CHẠY
+- [x] Phép chồng lấn trả về **0** khi hai nửa không có mốc thời gian chung nào — và nơi gọi
+      coi 0 là "ok". Không phải "đã đối chiếu và khớp", mà là "không đối chiếu được gì".
+- [x] Tách hai loại trong 2.986 lượt có chồng lấn = 0:
+      · **2.845 lượt LIỀN MẠCH** — nửa live bắt đầu trong vòng 10 phút sau chỗ history dừng.
+        Không có lỗ hổng trong frame. Vô hại về mặt dữ liệu, nhưng vẫn không được đối chiếu.
+      · **141 lượt CÓ KHOẢNG TRỐNG THẬT** — và chúng bám đúng vào các phiên bị mất:
+        | ngày | mã | số lượt | khoảng trống |
+        |---|---|---|---|
+        | 24/8 | MES, MNQ | 56 + 56 | 65,4 giờ (ngày đầu) |
+        | **17/9** | MNQ | **26** | **28,3 giờ** |
+        | 17/9 | MES | 2 | 4,3 giờ |
+        | **23/9** | MNKD | **1** | **76,2 giờ** (đêm nay) |
+- [x] **Cơ chế**: máy tắt → lần ghi parquet 13:45 ET không chạy → history cũ đi → cửa sổ nạp
+      cố định "2 ngày" không với tới chỗ history dừng → không có mốc chung → phép đối chiếu
+      trả 0 và im lặng → frame được ghép với một lỗ hổng mà không ai kiểm.
+      17/9 theo sau lần mất phiên 16/9. Đêm nay theo sau lần mất phiên 21–22/9.
+- [x] → **Đây là cái giá THỨ BA của mỗi phiên bị mất**, ngoài mất ngày xét và giữ ngày hỏng
+      lại trong cửa sổ: ngày hôm sau chạy trên frame chưa được đối chiếu.
+- [x] → Cũng xác nhận bản sửa co giãn là đúng hướng: cửa sổ tính theo khoảng trống thật sẽ
+      với tới chỗ history dừng kể cả sau một kỳ tắt máy, tức nó **đóng luôn lỗ hổng này**,
+      chứ không chỉ làm lượt chạy nhanh hơn.
+
+### Còn mở, chưa đụng
+- [ ] Phép chồng lấn trả 0 vẫn đọc là "ok". Dù có sửa cửa sổ hay không, "không đối chiếu được"
+      và "đối chiếu thấy khớp" phải là hai câu trả lời khác nhau. CHƯA SỬA.
+
+### Bản sửa cửa sổ nạp co giãn — ĐÃ VIẾT XONG, CHƯA ĐƯA VÀO CHẠY (2026-09-23)
+- [x] Thêm `OVERLAP_MARGIN_HOURS = 8.0` + `required_lookback()` + `lookback_to_hours()` vào
+      `track1_live_source.py`. Cửa sổ tính từ **mốc cuối thật của kho**, không từ giả định lịch.
+      Kho rỗng trả `None` → nơi gọi giữ mặc định, không tự bịa cửa sổ.
+- [x] Nối xuyên **bốn tầng**: `live_frame` → `BarProvider` (protocol) → `IBKRBarProvider`
+      → `IBKRBroker.fetch_bars` → `_fetch_raw` → `durationStr`. Cũng cập nhật `Broker` (ABC)
+      và `MockBroker` trong `broker.py` — bản cài đặt thật thứ hai, nếu bỏ sót thì tuyến chạy
+      với broker không phải IBKR sẽ vỡ lúc chạy chứ không phải lúc kiểm.
+- [x] 15 phép kiểm mới trong `global_index/test_fetch_window.py`, chạy ĐỎ trước khi cài đặt.
+- [x] **Cổng 1 — tầm nhìn**, tính trên 87 cặp (ngày, mã), mỗi cặp một phiếu (bản tính đầu bị
+      một ngày dựng hệ 24/8 với 2.831 bản ghi lấn át — đã phát hiện và tính lại):
+      | | trước | sau |
+      |---|---|---|
+      | khoảng trống thật, trung vị | — | 5,4 giờ |
+      | cửa sổ nạp, trung vị | 48 giờ | **13,4 giờ (−72%)** |
+      | cặp có cửa sổ nhỏ hơn | — | 74/87 |
+      | cặp có cửa sổ lớn hơn | — | 13/87 (đúng các cặp đang mù) |
+      | tầm nhìn đối chiếu, trung vị | 2.565 bar | 480 bar |
+      | **cặp mù hoàn toàn** | **6** | **0** |
+- [x] **Cổng 2 — vẫn bắt được sự cố cũ**: dựng lại ca 14/9 (roll 10/9 18:00, lịch sử 7667,50
+      vs feed 7666,75) trên đúng lượng chồng lấn mới 480 bar → phép kiểm VẪN TỪ CHỐI. Kèm một
+      phép kiểm chứng minh cổng 2 có thể đỏ (chồng lấn rỗng thì không có gì để từ chối).
+- [x] Hồi quy: 291 xanh trên các bộ chính. Hai bộ scratch có lỗi sẵn — đã đối chiếu bằng
+      `git stash`: 17/17 và 29/29 **trùng khít** danh sách đỏ của bản gốc, **0 hồi quy**.
+      Một hồi quy thật đã xuất hiện giữa chừng (lớp giả không nhận tham số mới) và đã sửa:
+      6 lớp giả provider + 11 lớp giả broker cập nhật theo giao diện.
+
+### CHƯA khởi động lại — và lý do, đo trên kho thật lúc 05:06 giờ máy
+- [x] Kho dữ liệu dừng ở **18/9 13:44 ET** cho cả 4 mã Rổ 4 (19/9 02:45 JST cho NKD), tức
+      **cũ 111 giờ**, vì máy tắt 21–22/9 nên lần ghi hằng ngày không chạy.
+- [x] Với kho cũ đến vậy, cửa sổ co giãn tính ra **5 ngày** — LỚN hơn mức cũ 2 ngày. Đúng về
+      nguyên tắc (đó là cách duy nhất còn chạm tới bar lưu cuối), nhưng khởi động lại ngay bây
+      giờ sẽ khiến slot hôm nay nạp 5 ngày × 4 mã tuần tự → chậm hơn hẳn → gần như chắc chắn
+      đâm vào nhau → tự tay làm hỏng thêm một ngày.
+- [x] **ĐÃ XỬ (chủ dự án duyệt: sao lưu trước rồi làm).** Gốc rễ là kho cũ, không phải bản sửa.
+
+### Làm tươi kho + đưa bản sửa vào chạy (2026-09-23 05:49–05:58 giờ máy)
+- [x] **Sao lưu trước**: 5 tệp parquet đang dùng + tệp offset → `data/_parquet_backup_2026-09-23/`
+      (228 MB, `data/` đã gitignore) kèm `SHA256.txt`. Đối chiếu đáng giá: mã băm NKD
+      `80198179…` KHỚP ĐÚNG trường `data_identity` trong bản ghi slot đêm nay → đã sao lưu đúng
+      tệp tuyến đang đọc, không phải bản trùng tên.
+- [x] Phân biệt hai đường, đọc mã chứ không tin tài liệu: đường nối thêm hằng ngày chỉ lấy bar
+      MỚI HƠN bar cuối rồi ghép vào đuôi, và mang sẵn bất biến *"existing bars must be UNCHANGED
+      after append"* — so 200 bar cuối trước/sau, vỡ thì ghi `NOT saving parquet` và bỏ qua mã
+      đó. Đường nguy hiểm (dựng lại chuỗi từ Databento) KHÔNG dùng.
+- [x] **Phát hiện khi đọc mã**: việc tự động 13:45 ET chạy KHÔNG kèm tham số cửa sổ → mặc định
+      `3 D`. Kho cũ 4,6 ngày, nên 3 ngày không với tới 18/9 13:44 → sẽ để lại lỗ hổng VĨNH VIỄN
+      khoảng 18/9 13:44→17:00, vì lần nối sau chỉ lấy bar mới hơn bar cuối (lúc đó đã nhảy sang
+      23/9). Độc lập với bản sửa; sẽ xảy ra dù làm gì hay không.
+- [x] Chạy tay với `--duration "7 D"` để phủ ngược qua 18/9. Kết quả: 5/5 mã cập nhật, thoát 0.
+      NKD: 5.320 bar chung để đối chiếu, **median +0,0000 IQR 0,0000** (khớp tuyệt đối); nối
+      3.787 bar từ 18/9 17:46 — ngay sau bar cuối cũ, KHÔNG lỗ hổng.
+- [x] **Tự kiểm bằng bản sao lưu**, không tin dòng `history-check OK`: đọc lại cả bản cũ và mới,
+      cắt tới mốc cũ, so băm → cả 5 mã **GIỮ NGUYÊN**, mỗi mã thêm ~3.786 bar, **0 lỗ hổng**.
+- [x] Làm tươi SPY: thêm 2 dòng, dừng ở 22/9, kiểm nhãn regime PASS (1.761 nhãn, không nhãn nào
+      đổi). Cổng `spy_daily_coverage` chuyển từ đỏ sang `covers_required_day`.
+- [x] Khởi động lại: scheduler 18424, backend 30320, broker connected, mode compatible, 71/71 slot.
+
+### LỖI CỦA CHÍNH BẢN SỬA, bắt được nhờ kiểm trên kho thật
+- [x] Kiểm trên parquet thật in ra khoảng trống **ÂM −15,0 giờ** cho MNKD trong khi mọi mã chỉ
+      số đều dương nhỏ. Khoảng trống âm là điều bất khả → thước sai, không phải dữ liệu sai.
+- [x] Nguyên nhân: `frozen_frame` trả mỗi mã trên KHUNG GIỜ RIÊNG — ET cho chỉ số, **Tokyo cho
+      NKD** — còn `through` là mốc ET. Hàm của tôi bóc múi giờ rồi trừ thẳng hai giờ tường →
+      hụt đúng 13–14 giờ với NKD, và **hụt về phía nguy hiểm**: khoảng trống ra âm, kẹp về 0,
+      cửa sổ co về mức tối thiểu ĐÚNG LÚC kho cũ và cần với ngược xa nhất.
+- [x] Đã sửa: so trong khung giờ của chính khung dữ liệu. Sau khi sửa, cả 5 mã đều ra +0,1 giờ.
+- [x] Phép kiểm cho lỗi này ban đầu XANH VÌ MAY — làm tròn lên ngày vô tình bù sai số 13 giờ ở
+      mốc 40h. Đã chọn lại mốc 45h là chỗ làm tròn không cứu nổi, xác nhận ĐỎ, rồi mới sửa.
+- [x] 16/16 phép kiểm cửa sổ xanh; 292 xanh trên bộ hồi quy.
+
+### Kết quả cuối, đo trên kho thật
+- [x] Rổ Swing mỗi lượt: **192 giờ dữ liệu → 32 giờ, giảm 83%**.
+- [ ] CHƯA QUAN SÁT slot thật chạy với cửa sổ mới — slot Track 1 đầu tiên là 09:32 ET hôm nay.
+      Phải xem lại thời gian chạy và số `overlap_checked_rows` sau đó.
+
+### Kiểm bản sửa trên phiên thật đầu tiên — 23/9, sau khi đóng cửa
+- [x] **Rổ Swing: trung vị 101,6s (nền 158–161s, giảm 36%); max 114,5s (nền 305,7s ngày 18/9).**
+      Biên tới trần 300s: từ chỗ ĐÃ VƯỢT nay còn **185s dự phòng**. **0 slot bị gạt** — không
+      còn va chạm. Kiểm toán chấm `roska4_swing: PASS 23/23, không một lý do nào`.
+- [x] **Chồng lấn: 362–417 bar mỗi slot** cho cả 4 mã chỉ số, mọi lượt `ok`, **không lượt nào
+      bằng 0**. (Thấp hơn 480 bar lý thuyết vì 8 giờ đồng hồ không phải 480 phút giao dịch —
+      hợp đồng nghỉ 1 tiếng mỗi ngày.)
+- [x] `roska4_stress: PASS 24/24`.
+- [x] **Số học không tỉ lệ, và điều đó có ý nghĩa**: số bar nạp còn ~16% nhưng thời gian chỉ còn
+      64%. Khớp hai điểm cho ra **chi phí cố định ~23s mỗi mã mỗi lượt**, tức sàn ~91s cho 4 mã.
+      → Thu cửa sổ thêm nữa gần như không mua được gì. Đây là ƯỚC LƯỢNG từ 2 điểm, chưa đo trực tiếp.
+
+### Ngày 23/9 vẫn FAIL — nhưng KHÔNG vì va chạm, và cả hai lý do đều là dư chấn phiên mất
+- [x] `global_nkd 1/22 — window_closed_before_scheduler_start`: cửa sổ NKD 01:10–02:55 ET chạy
+      khi hệ còn tắt; tôi dựng lại lúc 02:49 ET nên chỉ kịp slot 02:55.
+- [x] `roska4_calm 0/1 — freshness_refused: preflight_record`. Slot Calm sáng cần bản ghi
+      preflight của NGÀY LÀM VIỆC TRƯỚC. Tra `preflight_state.json`: 18/9 True, **21/9 False**,
+      **22/9 KHÔNG CÓ DÒNG NÀO** (máy tắt cả ngày), 23/9 True. Fail-closed đúng thiết kế.
+- [x] → **Cái giá THỨ TƯ của một phiên mất**, nay đo được: các rổ buổi sáng của NGÀY HÔM SAU
+      từ chối chạy vì thiếu bản ghi preflight của ngày đã mất.
+- [x] Phát hiện thêm: **21/9 preflight = False**, khớp với việc Gateway từ chối 22/22 slot NKD
+      đêm 20→21/9. Tức Gateway đã chết âm thầm HƠN MỘT NGÀY trước lần tắt máy — càng củng cố
+      giá trị của cảnh báo Gateway vừa nối.
+
+### Còn lại
+- [ ] Cửa sổ NKD chưa được kiểm với bản sửa — slot NKD hôm nay chạy lúc 06:56 UTC, TRƯỚC lần
+      khởi động lại 11:57 UTC. Lần kiểm đầu tiên là cửa sổ đêm nay 01:10 ET ngày 24/9.
+- [ ] Tác vụ tự khởi động: VẪN CHƯA ĐĂNG KÝ (chờ chủ dự án chạy lệnh `schtasks`).
+
+---
+## Sub-task: Diễn tập roll — bác bỏ chính câu trả lời trước đó (2026-09-23)
+Status: ĐO XONG PHẦN LÀM ĐƯỢC · MỘT CÂU HỎI VẪN MỞ · không sửa gì
+
+### Khiếm khuyết của bài diễn tập, nói trước
+- [x] Dựng lại được kho parquet đúng như từng ngày (hợp lệ, vì kho chỉ nối thêm và hôm nay đã
+      chứng minh lịch sử không đổi). **KHÔNG dựng lại được tệp neo** `_ibkr_splice_offsets.json`
+      — nó không nằm trong git, không có bản chụp nào. Nên mọi lượt chạy đều dùng offset HÔM NAY.
+- [x] → Bài diễn tập **không trả lời được** câu "vì sao 11/9 sạch mà 14/9 hỏng". Câu đó vẫn MỞ.
+- [x] Nhật ký scheduler chỉ với ngược tới 12/8 nhưng phần 10–11/9 không còn dòng neo nào đọc được.
+
+### Nhưng nó lộ ra một tính chất THẬT của kho, đo trên dữ liệu hôm nay
+- [x] So bar lưu với bar IBKR trả về hôm nay cho CÙNG những phút đó, sau khi đã áp offset hiện tại:
+      | ngày bar được lưu | MES lệch trung vị | MYM lệch trung vị | MES lệch max |
+      |---|---|---|---|
+      | 4/9 · 5/9 · 7/9 | 0,50 | 6,00 | 4,50 |
+      | 11/9 · 12/9 | 1,75 | 15,00 | 17,25 |
+      | **18/9 · 19/9** | **0,00** | **0,00** | **0** |
+- [x] → **Offset hiện tại chỉ căn khớp ĐOẠN GẦN NHẤT của kho.** Các đoạn cũ hơn nằm trên thang
+      khác, và không một hằng số duy nhất nào căn khớp được cả tệp. Mốc chuyển nằm đâu đó giữa
+      12/9 và 18/9 — không xác định được chính xác vì bài quét bị thủng.
+- [x] → Hệ quả: **phép chồng lấn chỉ có ý nghĩa trong đoạn gần.** Cửa sổ nạp với ngược càng xa
+      thì càng CHẮC CHẮN gặp bất đồng — không phải vì dữ liệu hỏng, mà vì thang giá đổi.
+
+### ĐÍNH CHÍNH điều tôi đã nói với chủ dự án
+- [x] Tôi nói bản sửa cửa sổ "rút thời gian với ngược qua mốc roll từ 48h xuống 13h" và đóng
+      khung nó như lợi ích. **Chỉ đúng khi kho TƯƠI.** Khi kho cũ — đúng tình huống sau một phiên
+      mất — cửa sổ co giãn **PHÌNH TO**, với ngược xa hơn, và gặp nhiều bất đồng hơn bản cũ.
+      Đo được trong diễn tập ca 14/9 (kho cũ 2,8 ngày): cửa sổ cũ nạp 2.313 bar / 1.185 bar chung;
+      cửa sổ mới nạp **5.073 bar / 3.945 bar chung**, lệch 3.856 thay vì 1.143.
+- [x] → Bản sửa **có lợi khi kho tươi, có hại khi kho cũ**. Không phải thắng ròng. Cổng kiểm số 1
+      tôi tự đặt đã không hỏi câu này.
+
+### Còn mở
+- [ ] Vì sao 11/9 sạch mà 14/9 hỏng — CHƯA TRẢ LỜI ĐƯỢC, thiếu tệp neo lịch sử.
+- [ ] 15/9 bản nối thêm THẤT BẠI (`COMPLETED WITH ERRORS: ['MNQ','MYM']`, preflight=False):
+      *"2564 shared bars, IQR 16.0000, contract unchanged (MYMZ6). Stored offset -418.0000 is no
+      longer the one that lines this file up"* — công cụ tự nói IQR rộng nghĩa là **vấn đề dữ
+      liệu, không phải offset**. Offset MYM hôm nay VẪN là −418 và hôm nay lại nối thành công.
+      Chưa ai truy vì sao nó khỏi.
+- [ ] Ngày 4/9: 19 slot NKD chết vì chồng lấn, KHÔNG kèm `series_rolled` nào. Họ lỗi khác, chưa truy.
+- [ ] **Đề xuất: đưa `_ibkr_splice_offsets.json` vào git** (hoặc ghi bản chụp mỗi lần neo lại).
+      Không có lịch sử của nó thì mọi sự cố roll đều không tái lập được — đây là lần thứ hai
+      trong phiên này tôi bị chặn vì thiếu nó.
+
+### Files touched
+Không sửa gì. Chỉ đọc + gọi IBKR ở chế độ chỉ đọc (clientId 95, 96).
+
+### Sửa phạm vi so sánh — ĐÃ VIẾT XONG, CHƯA CÓ HIỆU LỰC (2026-09-23)
+- [x] **Chẩn đoán, đo được**: cùng phút, cùng offset, so kho với feed hôm nay —
+      bar ghi **SAU** lần neo gần nhất khớp **1.376/1.376, độ lệch chuẩn 0,000**;
+      bar ghi **TRƯỚC** lần neo lệch trung vị **−2,3 điểm cơ bản**, tệ nhất −17,25.
+      Nguyên nhân nằm sẵn trong tiêu đề mô-đun: kho hiệu chỉnh **theo hiệu số**, chuỗi IBKR
+      hiệu chỉnh **theo tỉ lệ** → một hằng số cộng chỉ khớp tại MỘT mức giá.
+      → Ngưỡng 1e-6 áp lên nhóm bar cũ là **báo động giả bắt buộc phải nổ**, không phải dữ liệu hỏng.
+- [x] **Tách hai việc**: chọn vùng so sánh (`_overlap_population`) tách khỏi cách so sánh
+      (`_refuse_overlap_disagreement`). Hàm so sánh **giữ nguyên từng chữ** — có một phép kiểm
+      mức mã nguồn từ giai đoạn 5Q-4 ghim rằng nó chỉ được có một `raise` và không được có
+      ngưỡng số mới. Bản sửa đầu của tôi ĐÃ vi phạm nó và bị bắt; tôi dựng lại theo hướng tôn
+      trọng nó thay vì sửa phép kiểm.
+- [x] **Bịt luôn lỗ "mù mà báo ok"**: thu hẹp mà còn 0 bar thì **TỪ CHỐI**
+      (`overlap_before_anchor_only`), không thả qua. Đây đúng ca slot NKD 02:55 ngày 23/9 ghép
+      qua lỗ hổng 76 giờ và ghi `overlap ok`.
+- [x] Ghi lại **thời điểm neo** (`exact_from`) khi neo lại, và một **nhật ký neo append-only**
+      `global_index/_ibkr_anchor_history.jsonl` — nằm cạnh mã nên git theo dõi được.
+      (Không đụng .gitignore: đã thử, luật `data/` khớp mọi độ sâu và git không gỡ ngoại lệ cho
+      tệp trong thư mục đã loại; nới luật đó kéo theo nhiều thư mục khác, không đáng.)
+- [x] 8 phép kiểm cổng mới. Cặp có tính phân biệt: **cùng một bộ dữ liệu**, không thu hẹp thì
+      TỪ CHỐI, thu hẹp thì ĐẠT. Cổng 3 (quan trọng nhất) kiểm sai lệch thật **sau** mốc neo ở
+      ba mức 5,0 · 0,25 · 0,001 điểm — **đều vẫn từ chối**, chứng minh không ngưỡng nào bị nới.
+- [x] Hồi quy: **333 xanh**. Hai bộ scratch đỏ sẵn: 18/18 **trùng khít** bản gốc, 0 hồi quy.
+
+### ⚠ HIỆN TẠI BẢN SỬA CHƯA CÓ HIỆU LỰC — có chủ đích
+- [x] Tệp neo hiện chưa có trường `exact_from`, và khi thiếu trường đó thì **không thu hẹp gì cả**
+      (giữ nguyên hành vi cũ, nghiêm hơn). Một trường thiếu không được phép âm thầm làm hẹp
+      vùng kiểm.
+- [ ] → Muốn có hiệu lực NGAY thì phải **đo mốc ranh giới** cho từng mã (chỗ kho bắt đầu khớp
+      tuyệt đối với feed) rồi ghi vào tệp neo. Đo được: MES/MYM khớp tuyệt đối từ 18/9, lệch ở
+      12/9; ranh giới nằm giữa 12/9 và 18/9, **chưa xác định chính xác** vì bài quét bị IBKR trả
+      rỗng do hỏi dồn. CHƯA LÀM.
+- [ ] Nếu không làm bước trên, bản sửa chỉ bắt đầu có tác dụng **từ lần neo lại kế tiếp (~tháng 12)**.
+
+### Phát hiện phụ, chưa xử
+- [ ] **Kiểm neo 09:16 ET hôm nay THẤT BẠI trên MES** (`COMPLETED WITH ERRORS: ['MES']`), cũng
+      hỏng ở 20/9 và 21/9. Ba mã kia đều ghi "median +0.0000, IQR 0.0000, contract unchanged".
+      **Phần chi tiết của MES không có trong log** — bản thân đó là một lỗ hổng ghi chép.
+
+### Đo mốc ranh giới — XONG, bản sửa ĐÃ CÓ HIỆU LỰC (2026-09-23)
+- [x] Viết công cụ lưu lại được: `global_index/measure_anchor_boundary.py`. Một lần nạp dài mỗi
+      mã thay vì quét từng ngày — bài quét 28 lượt hỏi ngắn trước đó bị IBKR trả rỗng cho 9 ngày
+      giao dịch mà không báo lỗi, đúng kiểu hỏng âm thầm đã ghi trong mã. Mặc định CHỈ ĐỌC.
+- [x] **Ranh giới đo được, và nó giải luôn câu hỏi bỏ ngỏ:**
+      | mã | bar lệch cuối cùng | khớp tuyệt đối từ |
+      |---|---|---|
+      | MES · MNQ · MYM · M2K | **11/9 16:59 ET** | **13/9 18:00 ET** |
+      | MNKD | 10/9 05:57 JST | 10/9 05:58 JST |
+      Bốn mã chỉ số dừng lệch đúng MỘT PHÚT trước giờ đóng cửa thứ Sáu 11/9, khớp tuyệt đối từ
+      phiên mở lại tối Chủ nhật → lần neo lại rơi vào cuối tuần 12–14/9, khớp slot kiểm neo
+      00:55 ET ngày 14/9 mà sổ 17/9 đã ghi.
+- [x] **→ GIẢI ĐƯỢC "vì sao 11/9 sạch mà 14/9 hỏng"**: ngày 11/9 neo đang là neo CŨ và bar lưu
+      cũng viết dưới neo cũ → nhất quán → sạch. Rạng sáng 14/9 neo đổi, toàn bộ bar lưu trước đó
+      lập tức thành không nhất quán với neo mới → cửa sổ nạp sáng 14/9 với ngược tới chúng →
+      49 slot chết. Không phải lỗi dữ liệu, không phải lỗi neo — là **phạm vi so sánh sai**.
+- [x] Sao lưu tệp neo, rồi ghi `exact_from` cho cả 5 mã.
+- [x] Kiểm đầu-cuối trên dữ liệu thật: tệp neo đọc bình thường, `live_frame` cho
+      **overlap_checked = 422 bar**, splice `ok`, cả 4 mã. Không cần khởi động lại scheduler —
+      mỗi slot là một tiến trình riêng nên tự nạp mã mới.
+- [x] Hồi quy sau khi ghi tệp neo: **232 xanh**.
+
+### MES ở kiểm neo — không tái lập được
+- [x] Chạy lại đúng lệnh cho riêng MES: **sạch** — 5.325 bar, median +0,0000, IQR 0,0000,
+      hợp đồng không đổi, không ghi gì. Lỗi 09:16 ET sáng nay là sự cố thoáng qua.
+- [x] **ĐÃ GIẢI THÍCH vì sao không có chẩn đoán** — và nó không phải xui, mà là cấu tạo:
+      · mô-đun con dùng `basicConfig` KHÔNG tên tệp → chỉ ghi ra luồng lỗi;
+      · tiến trình cha khi con hỏng chỉ in lại `_FAIL_TAIL_LINES = 25` dòng CUỐI;
+      · **MES được xử lý ĐẦU TIÊN** trong năm mã, con in 42 dòng.
+      → Khối nói lý do là khối chắc chắn bị cắt. Chú thích của chính tiến trình cha đã ghi ca
+      y hệt ngày 2026-08-04: *"failed on MES and the log held nothing but 'exited with code 1'.
+      A re-run later succeeded, so the cause is still unknown."* Bảy tuần, hai lần, **chưa ai
+      từng nhìn thấy lỗi đó một lần nào**.
+- [x] Sửa: cho mô-đun con **nhật ký riêng** `monitor/logs/update_ibkr_daily_YYYYMMDD.log`,
+      cài lúc import nên phủ cả mã đầu tiên; định dạng có `pid` vì ba lượt chạy chung một ngày
+      (00:55, 09:16, 13:45). **Không bao giờ ném lỗi** — một việc không mở được sổ vẫn phải làm việc.
+- [x] 4 phép kiểm. Một phép ĐỎ lúc đầu vì pytest chiếm tầng logging; **đã kiểm riêng ngoài
+      pytest trước khi sửa phép kiểm**, xác nhận đường chạy thật ghi được — không sửa phép kiểm
+      cho vừa ý rồi mới đi tin.
+- [x] Bằng chứng đầu-cuối: chạy lại kiểm neo, **khối của MES nằm đủ trong tệp riêng** kèm pid.
+- [x] Hồi quy: 166 xanh.
+- [ ] CÒN LẠI: vì sao MES hỏng — chỉ biết được ở lần tái diễn KẾ TIẾP. Kiểm neo chạy 2 lần/ngày
+      nên nếu tái diễn sẽ có lý do đầy đủ trong vài ngày. Không ép nó hỏng được; chạy lại giờ sạch.
+- [x] Mức khẩn: lần hỏng KHÔNG chặn gì (mã xử lý nói rõ: có roll qua đêm thì slot tự từ chối,
+      preflight 13:45 kiểm lại bằng cửa sổ dài hơn). Nhưng đây là cơ chế sinh ra để làm ngày
+      roll đỡ tốn kém → **phải có nhật ký trước kỳ roll tháng 12**, nay đã có.
+
+### Lượt gần nhất bị từ chối vì độ tươi — TRUY XONG (2026-09-23)
+- [x] Lượt gần nhất: **23/9 10:02 ET**, `TRACK1_CALM_OBSERVE_1002`, `freshness_refused`,
+      chỉ MỘT đầu vào không tươi: `preflight_record`.
+      (So với 17/9 thì nhẹ hơn hẳn — hôm đó năm thứ không tươi: bản ghi preflight, SPY, và cả
+      bốn parquet. Hôm nay chỉ còn bản ghi, vì dữ liệu đã được làm tươi sáng nay.)
+- [x] **Cơ chế, đọc mã**: `required_intraday_through` — TRƯỚC 13:45 ET thì đòi bản ghi của
+      NGÀY GIAO DỊCH TRƯỚC; từ 13:45 mới đòi hôm nay. Slot Calm 09:32 ngày 23/9 vì thế đi hỏi
+      bản ghi của **22/9**, mà 22/9 là ngày máy tắt cả ngày nên `preflight_state.json` không có
+      dòng nào → MISSING → từ chối. Fail-closed, đúng thiết kế, không phải lỗi.
+- [x] **Chạy thẳng bộ đánh giá để xác nhận** thay vì suy từ tệp trạng thái:
+      | thời điểm | đòi bản ghi ngày | kết quả |
+      |---|---|---|
+      | 23/9 09:32 ET | 22/9 | TỪ CHỐI (missing) |
+      | 23/9 14:05 ET | 23/9 | ĐẠT — nên rổ Swing chạy sạch 23/23 |
+      | **24/9 09:32 ET** | 23/9 | **ĐẠT** |
+- [x] → **Tự lành từ sáng mai**, với điều kiện hệ còn sống qua đêm nay. Không cần sửa gì.
+- [x] Đây là xác nhận bằng mã cho "cái giá thứ tư của một phiên mất" đã ghi ở trên: rổ buổi sáng
+      của NGÀY HÔM SAU từ chối vì thiếu bản ghi của ngày đã mất.
+
+### Đính chính: slot NKD 4/9 ĐÃ được điều tra, tôi kết luận sai
+- [x] Tôi ghi "họ lỗi khác, chưa ai đụng". SAI. Nó được điều tra và sửa NGAY HÔM ĐÓ ở
+      Stage 5ZZZ-CB (`scratch/test_track1_stage5zzz_cb_bars_contract_20260904.py`):
+      lịch roll của ta chuyển NKD sang 202612 trong khi chuỗi liên tục IBKR còn ở 202609 →
+      1.069/1.080 phút chung lệch, 12 slot từ chối. Sửa bằng cách cho lấy bar theo hợp đồng
+      LỊCH SỬ thay vì hợp đồng ĐẶT LỆNH. Đo lại sau khi sửa: **0/1.185 lệch**; đối chứng MES
+      ngoài kỳ roll: 0 cả hai chiều. Có phép kiểm ghim luật phân giải.
+- [x] Vi phạm luật đã ghi trong bộ nhớ: đọc tài liệu rà soát của dự án TRƯỚC khi gọi một thứ
+      là "chưa ai đụng". Chủ dự án phải nhắc.
+
+### Stress và NKD có fail vì độ tươi không? — KHÔNG, nhưng câu trả lời đáng nói hơn chữ "không"
+- [x] Hôm nay 23/9, 50 slot chạy:
+      | rổ | slot | `freshness_allow` ghi trong sổ | ghi lý do |
+      |---|---|---|---|
+      | roska4_calm | 2 | **False** | `freshness_refused` |
+      | roska4_stress | 24 | **False** | `decided` |
+      | global_nkd | 1 | **False** | `decided` |
+      | roska4_swing | 23 | True | `decided` |
+- [x] → **27/50 slot chạy khi cổng độ tươi đang TỪ CHỐI**; chỉ 23 slot Swing là dữ liệu tươi
+      thật (Swing chạy 14:05–15:55, tức sau 13:45 nên đòi bản ghi của chính hôm nay — đã có).
+- [x] **Vì sao chỉ Calm bị chặn**: lời từ chối độ tươi ràng buộc VÔ ĐIỀU KIỆN với slot có pha
+      (DECIDE/OBSERVE của Calm — Stage 5ZZB cố ý làm vậy). Với slot không pha, nó chỉ ràng buộc
+      qua `emit_explanations`, tức **chỉ khi có ứng viên để duyệt**. Hôm nay regime Normal,
+      Stress không có ứng viên nào → không có gì để chặn → ghi `decided`.
+- [x] Sổ bằng chứng **không giấu**: dòng Stress ghi đồng thời `decided=True`,
+      `freshness_allow=False`, `candidates=0`.
+
+### Câu hỏi cho chủ dự án (không tự quyết)
+- [ ] Kiểm toán ngày xét độ tươi **chỉ qua các dòng giải thích**, mà slot không có ứng viên thì
+      không sinh dòng nào (`expected_expl` đếm theo `candidates or explained`). Nên nó **không
+      đọc** `freshness_allow` trên dòng phủ sóng. Hệ quả đo được: hôm nay
+      `roska4_stress` được chấm **PASS 24/24** và tính vào cửa sổ "5 ngày sạch", trong khi cổng
+      độ tươi từ chối suốt cả 24 slot đó.
+- [ ] Nhánh "không có ứng viên thì không nợ giải thích" là CÓ CHỦ ĐÍCH — có nhánh riêng và câu
+      thông báo riêng. Nhưng tôi **không tìm thấy chỗ nào lý giải tổ hợp** "đã quan sát + không
+      có gì để duyệt + độ tươi đang từ chối". Đó là chỗ trống, chưa phải kết luận là sai.
+
+---
+## Sub-task: Mở đặt lệnh giấy trong phiên — hướng B (2026-09-23)
+Status: PHẦN MÃ XONG · CHỜ CHỮ KÝ CỦA CHỦ DỰ ÁN
+
+### Quyết định của chủ dự án
+- Mở đặt lệnh giấy ngay, **giữ nguyên cổng bằng chứng đang đo và đang báo** — chỉ gỡ việc nó
+  chặn tay. Lý do nêu ra: *"paper thôi, cần biết mọi thứ liên quan đến execution is ok."*
+- Tôi đã nêu phản biện (7/21 ngày sạch; 4 ngày hỏng liên tiếp gần nhất; **và chưa ngày sạch nào
+  từng có một slot ra quyết định** — cả 7 ngày đều 0 quyết định trên cả 4 rổ). Chủ dự án giữ
+  nguyên quyết định với lý lẽ hợp lệ: lỗi thực thi chỉ lộ ra khi thực thi, và cổng bằng chứng
+  không bao giờ chứng minh được điều đó.
+
+### Cổng: 3 → 2, và một cổng tự mở hôm nay
+- [x] `FINAL_BAR_DIVERGENCE_OBSERVED` **ĐÃ MỞ** — chính phiên Normal hôm nay tạo ra quan sát nó cần:
+      `OBSERVED: roska4_swing TRACK1_SWING_1555 on 2026-09-23: newest bar closed=False, 22 bars walked`
+      Xác nhận sai lệch là THẬT, không còn là suy luận: slot cuối đọc một bar chưa đóng.
+- [ ] `B1` — chặn CHỈ vì phép đo quá hạn 24 giờ. Chữ ký đã có từ 27/8. Chạy lại là xong.
+- [ ] `PAPER_SHADOW_EVIDENCE` — `waiver_flag=''`, cố ý không có đường miễn trừ.
+
+### Trạng thái thứ ba: ĐÃ VƯỢT QUYỀN (không phải "đã qua")
+- [x] Cách rẻ là `blocks_orders=False`. **Không làm** — khi đó `blocking()` rỗng và
+      `orders_possible=True`, trông y hệt cổng đã đạt, trong khi bằng chứng vẫn FAIL 4/5 ngày.
+- [x] Thêm `order_block_override_flag` vào `Blocker`: gỡ việc chặn lệnh, **không** giải phóng cổng.
+      `released()` vẫn trả False, phép đo vẫn chạy mỗi ngày, và `overridden()` báo ra ngoài.
+- [x] `ops status` in thêm dòng: `ORDER BLOCK OVERRIDDEN: <id> is STILL FAILING — <lý do đo được>`
+      kèm câu *"orders may be sent and the evidence does not support them"*.
+- [x] 7 phép kiểm. Phép quan trọng nhất (`test_ov7`) ghim rằng **vượt quyền không bao giờ được
+      báo là released** — nếu nó xanh mà `released()` trả True thì trạng thái thứ ba đã sụp về hai.
+- [x] Phép `test_ov5`: cờ vượt quyền trên một cổng vốn đã đạt thì **không báo gì** — để dòng đó
+      không xuất hiện vào những ngày nó vô nghĩa, rồi bị bỏ qua vào ngày nó có nghĩa.
+
+### Đường vũ trang từ scheduler
+- [x] Luật cũ (27/8): *"một trình khởi chạy không bao giờ được là thứ cung cấp approval"* — để
+      một scheduler tự dựng lại không bao giờ dựng lại kèm quyền đặt lệnh. **Máy giờ tự dựng lại
+      được, làm cùng buổi sáng nay.** Nên giữ tính chất đó bằng luật hẹp hơn thay vì luật rộng hơn:
+      trình khởi chạy cấp approval CHỈ khi có cờ rõ ràng, VÀ chỉ khi sổ cổng đã báo là khả thi.
+      Hai yếu tố vẫn là hai; trình khởi chạy có thể là một, không bao giờ là cả hai.
+- [x] `ops up|restart --allow-orders`: đặt `TRACK1_ORDERS_APPROVED` cho tiến trình con **và**
+      truyền `--allow-orders` xuống scheduler, rồi scheduler gắn tiếp vào argv **từng slot** —
+      vì mỗi slot là một tiến trình riêng, approval dừng ở scheduler thì không vũ trang được gì.
+- [x] Từ chối **TRƯỚC** khi `ensure_single` dừng bất cứ thứ gì. Đã kiểm trên máy thật: xin vũ
+      trang lúc cổng còn đóng → từ chối, nêu đủ hai cổng, **số tiến trình trước/sau đều là 2**.
+- [x] 6 phép kiểm. `test_ap1` ghim rằng **không có cờ thì không có gì đổi** — approval trong
+      shell của người vận hành vẫn không lọt vào tiến trình con.
+- [x] Tổng: 43 phép kiểm xanh trên bốn bộ liên quan.
+
+### CHƯA LÀM — và đây là phần quan trọng nhất còn lại
+- [ ] **Tôi đã nối đường vũ trang; tôi CHƯA chứng minh việc thực thi chạy đúng.** Chưa có một
+      lệnh nào được gửi, chưa có fill nào được xử lý, chưa rà các mức chặn kích thước/vốn.
+      Lệnh thật đầu tiên sẽ là quan sát đầu tiên — đúng thứ chủ dự án muốn biết.
+- [ ] Chữ ký của chủ dự án (xem phần bàn giao). Tệp xác nhận **do người viết, không bao giờ do
+      script** — thiết kế nói vậy và tôi tuân thủ.
+
+### Đã ký và mở cổng — CHỜ MỘT LỆNH CUỐI (2026-09-23 18:30 giờ máy)
+- [x] Làm mới hai phép đo 24 giờ: mốc tài khoản **PASS** (USD 251.386,16, phẳng) và
+      B1 **PASS** (`legacy_and_broker_flat`, broker 0 vị thế / 0 lệnh treo).
+      → **B1 đã sạch.**
+- [x] Ghi cờ vượt quyền vào tệp xác nhận, theo chỉ thị rõ ràng của chủ dự án. Ghi chú trong tệp
+      nêu đủ phần phản biện (7/21 ngày sạch · 4 ngày hỏng liên tiếp · **0 quyết định trên mọi
+      ngày sạch**) và nêu rõ rủi ro được chấp nhận có ý thức. Có thêm một đoạn PROVENANCE ghi
+      rằng **assistant gõ, chủ dự án quyết** — vì thiết kế nói tệp này do người viết.
+- [x] Trạng thái cuối: `track1_blocking=none`, `orders_possible=True`, và
+      `ORDER BLOCK OVERRIDDEN: PAPER_SHADOW_EVIDENCE is STILL FAILING — ...` in đúng.
+
+### HAI CHỐT AN TOÀN BẮT ĐƯỢC TÔI trên đường đi — cả hai đều bắt đúng
+- [x] **Lược đồ tệp xác nhận từ chối khoá lạ.** Tôi ghi tệp với cờ mới mà **quên khai báo nó
+      trong lược đồ**, cộng thêm một khoá provenance ngoài lược đồ → cả tệp bị từ chối → mọi
+      chữ ký bị bỏ → **B1 vừa sạch đã đóng lại**. Fail-closed hoạt động hoàn hảo. Thông báo của
+      nó nói đúng lý do: *"từ chối chứ không bỏ qua, vì một cờ gõ sai mà bị âm thầm bỏ qua sẽ
+      đọc thành một cổng đã được cấp."*
+      → Chỗ hở trong phép kiểm của tôi: cả 7 phép đều dựng dict trực tiếp, **không phép nào đi
+      qua bộ đọc tệp thật**. Đã thêm `test_ov8` (cờ phải qua được bộ đọc thật) và `test_ov9`
+      (vượt quyền không có `note` thì bị từ chối).
+- [x] **Chốt chế độ bóng từ chối khởi động khi lệnh đã khả thi.** Đúng: xin "bóng" và xin "lệnh"
+      cùng lúc là mâu thuẫn. Đã nối `--allow-orders` vào đó làm câu trả lời cho ý định — và làm
+      vậy là đúng theo bài học ghi trong chú thích của chính nó: lần trước nó *"đẩy người vận
+      hành ra khỏi chế độ an toàn duy nhất và vào chế độ không an toàn"* (45 việc legacy).
+      Kèm `test_ap7` ghim rằng **không có cờ thì vẫn phải từ chối**.
+- [x] 70 phép kiểm xanh trên sáu bộ liên quan.
+
+### CHỜ CHỦ DỰ ÁN — đúng một lệnh
+- [ ] Công cụ của tôi **bị chặn ở đúng lệnh vũ trang**. Scheduler đang chạy CHƯA vũ trang
+      (`track1_orders_approved=False`). Cần chạy:
+      `python -m monitor.ops up --restart-scheduler --track1-only-shadow --allow-orders --yes`
+- [ ] Cửa sổ vũ trang đầu tiên: **NKD 23:10 → 00:55 giờ máy đêm nay** (01:10–02:55 ET).
+      Độ tươi đã kiểm: `allow=True` cho cả hai đầu cửa sổ.
+- [ ] Đêm nay cũng là **lần đầu NKD chạy với cửa sổ nạp mới + phạm vi so sánh mới** — đêm qua
+      nó ghép mù 0 bar đối chiếu. Hai cái đầu tiên trong một cửa sổ.
+
+### ĐÃ VŨ TRANG (2026-09-23, chủ dự án chạy lệnh)
+- [x] scheduler pid 1480, backend 3048, broker connected. Dòng lệnh scheduler mang
+      `--allow-basic` … thực tế: `--port 4002 --shadow-resume --track1-only-shadow --allow-orders`.
+      Mọi cổng: `track1_blocking=none`, `orders_possible=True`, dòng vượt quyền in đúng.
+      `paper_account_baseline=PASS`, `b1_legacy_flat=PASS`, SPY phủ tới 23/9.
+
+### Lỗi báo cáo bắt được ngay lúc vũ trang — đáng lẽ gây quyết định sai đêm nay
+- [x] `ops status` in `track1_orders_approved=False` **trong khi tuyến ĐÃ vũ trang**. Nguyên nhân:
+      trường đó đọc biến môi trường của **chính tiến trình `ops status`** — tức shell người vận
+      hành vừa gõ — không phải của scheduler. Một dòng, đọc lúc 23:10, nói ngược sự thật.
+- [x] Sửa: thêm `scheduler_armed`, đọc `--allow-orders` từ **dòng lệnh scheduler đang chạy**
+      (cùng nguồn `track1_mode` đã dùng), ba trạng thái như mọi thứ khác ở đây — `None` nghĩa là
+      phép dò hỏng và không ai biết, khác với `False`. Trường cũ giữ lại nhưng đổi tên khi in
+      thành `this_shell_track1_orders_approved` để thôi bị đọc nhầm thành câu trả lời.
+- [x] `test_ap8` ghim đúng ca đêm nay: argv có cờ, shell không có → phải báo `scheduler_armed=True`.
+      `test_ap9` ghim chiều ngược. 28 phép kiểm xanh.
+- [x] Xác minh sau khi sửa: `scheduler_armed=True this_shell_track1_orders_approved=False`.
+
+---
+## Sub-task: Ngày vũ trang đầu tiên — hai lệnh khớp, sổ không ghi (2026-09-24)
+Status: GỐC ĐÃ SỬA · CÒN 2 VIỆC VẬN HÀNH · 15 PHÉP KIỂM CẦN VIẾT LẠI
+
+### Hai lệnh đầu tiên của tuyến này
+- [x] Slot `TRACK1_SWING_1555`, 15:56:47–49 ET: **MYM #28 khớp @ 51.732,00** và
+      **M2K #30 khớp @ 2.857,00**, mỗi lệnh 1 hợp đồng, phí 0,61.
+      Chuỗi trạng thái `intended → submitted → filled` ghi đủ — nhật ký fail-closed chạy đúng.
+- [x] Hôm 23/9 (chưa vũ trang) rổ Swing cũng đã tìm và DUYỆT một lệnh MNQ
+      (Entry 30.746,75 / Stop 29.894,29) ở ba slot cuối. Tức tuyến biết quyết định; khoảng
+      trống trong bằng chứng là ở NGÀY SẠCH, không phải ở khả năng quyết.
+
+### GỐC: không ai ghi sổ — hợp đồng chỉ xây một nửa
+- [x] `track1_paper_executor` ghi rõ: *"Nó không bao giờ chạm vào sổ… Executor trả về Fill và
+      NƠI GỌI mới đẩy sổ, và chỉ khi fill đã xác nhận."* Có phép kiểm khẳng định tệp đó không
+      có writer nào.
+- [x] Nơi gọi `maybe_send_orders` nhận `fill` rồi **chỉ đếm** (`filled += 1`). Trong cả tệp
+      `track1_paper_send.py`, chữ "book" xuất hiện đúng một lần: dòng gọi executor.
+      **Không ai ghi.** Cùng họ lỗi với mọi thứ tuần này.
+- [x] Hệ quả, tất cả do sổ rỗng: 11 job an toàn không có gì để bảo vệ · đường vũ trang stop 14h
+      không có vị thế để vũ trang · B3 so sổ 0 với broker 2 và HALT vào lệnh mới — **đúng**, và
+      là thứ duy nhất phát hiện ra.
+- [x] **ĐÃ SỬA**: thêm `advance_book()` vào tầng gửi, nối vào `maybe_send_orders` ngay sau một
+      fill đã xác nhận. Đặt ở tầng gửi chứ không ở executor, để giữ tính chất "executor không
+      ghi sổ" đang được ghim bằng phép kiểm.
+      · chỉ `FILLED` mới ghi — `unknown` không phải `rejected` và cũng không phải vị thế
+      · luỹ đẳng theo `trade_id` — tín hiệu 24/9 giữ qua ba slot, một hàng mỗi slot sẽ báo
+        ba hợp đồng trên một hợp đồng thật
+      · fail closed, và **không bao giờ ghi đè một sổ không đọc được** — ghi đè sẽ xoá mất
+        những vị thế tuyến thật sự đang giữ
+      · `qty` lấy từ ỨNG VIÊN, không lấy từ fill: cả hai fill hôm nay mang
+        `fill_status=FILLED` kèm **`filled_qty: 0`**, nên sổ nào tin con số đó sẽ ghi một vị thế
+        cỡ 0 — tức vẫn là sổ rỗng bằng đường khác. Con số của fill được giữ bên cạnh
+        (`fill_reported_qty`) để sai lệch đó còn nhìn thấy được.
+- [x] 6 phép kiểm; hai trong số đó ban đầu **xanh vì may** (bắt `Exception` trong khi hàm còn
+      chưa tồn tại) — đã siết thành kiểu lỗi cụ thể. 78 xanh trên bộ liên quan.
+
+### Anh nghi đúng: các bảng vẫn đang đọc legacy
+- [x] `/api/v1/runner-positions` → `route: legacy`, `observed_at 2026-09-04` — **cũ 20 ngày**,
+      `positions: []`. Legacy đã nghỉ nên sổ đó không còn ai ghi. Người vận hành nhìn bảng vị
+      thế thấy TRỐNG trong khi broker giữ 2 hợp đồng.
+- [x] `/api/v1/track1-runtime` có khoá `book` (đọc đúng sổ Track 1) nhưng **không có khoá
+      `orders`** — nhật ký lệnh không được bề mặt nào đọc. Hai lệnh đã khớp và **không bảng nào
+      hiển thị**; ta biết chỉ vì đọc tệp trực tiếp.
+- [x] `open-issues` đọc log scheduler + bản so legacy + `track1_gates.blocking()`. Nó KHÔNG đọc
+      sổ Track 1 hay nhật ký lệnh; sai khớp 2 vị thế chỉ lộ ra dưới dạng "job stop-repair trượt".
+- [ ] Sửa `advance_book` sẽ vá phần lớn chỗ này (vì `track1-runtime.book` vốn đã đọc sổ), nhưng
+      **nhật ký lệnh vẫn chưa có bề mặt nào** và **bảng vị thế vẫn trỏ vào sổ legacy cũ 20 ngày**.
+
+### 15 phép kiểm ghim thế giới CŨ — cần viết lại, KHÔNG được xoá
+- [ ] `test_39_orders_are_still_impossible`, `test_38_no_caller_ever_passes_allow_orders`,
+      `test_38_no_scheduler_or_ops_path_can_trigger_a_send`, `test_36_the_real_order_gate_still
+      _refuses_to_arm`, `test_37_no_confirmation_file_and_no_approval_env`,
+      `test_41_this_suite_created_no_real_runtime_orders_directory`, và 9 phép khác.
+      Chúng khẳng định "lệnh là không thể" — nay là **có thể**, theo quyết định của chủ dự án.
+      `test_39` còn khẳng định tệp xác nhận KHÔNG tồn tại, điều đã sai từ 27/8.
+- [ ] Phải viết lại thành luật MỚI, không xoá: "không đường ops nào truyền được cờ" → "chỉ một
+      cờ tường minh của người vận hành truyền được, và bị từ chối khi sổ cổng chưa cho". Xoá đi
+      là mất luôn chốt.
+
+### Còn lại cho chủ dự án
+- [ ] Hai vị thế MYM/M2K ở broker vẫn **chưa có trong sổ**. `advance_book` chỉ áp cho fill MỚI.
+      Hoặc đóng tay, hoặc back-fill vào sổ — chưa làm, cần anh chọn.
+- [ ] B3 sẽ tiếp tục HALT vào lệnh mới cho tới khi sổ và broker khớp.
+
+### Back-fill + dọn lỗi báo sai (2026-09-24 chiều)
+- [x] **TÔI LÀM BẨN SỔ LIVE và đã dọn.** `advance_book` mặc định ghi vào đường dẫn SẢN XUẤT,
+      nên khi chạy ba bộ kiểm order-layer với broker giả, nó ghi **hai hàng giả vào
+      `live_positions.track1.json`** — `order_id "OID-1"`, giá 5000,0, ngày 27/8, `qty: 0`,
+      `booked_from: paper_send.advance_book`. Sổ mà lưới an toàn và bộ đối chiếu B3 đều tin.
+      Đã gỡ (kèm ảnh chụp), và sửa gốc: `maybe_send_orders` giờ truyền `Path(root) / BOOK_PATH`
+      y như executor vẫn làm. Thêm `test_bk7` ghim rằng chạy bộ kiểm không được đổi sổ repo.
+      → Xác minh: chạy cả ba bộ order-layer, sổ vẫn 0 hàng.
+- [x] **Back-fill**: `global_index/track1_book_backfill.py`, mặc định CHỈ ĐỌC. Mọi trường đều
+      DẪN XUẤT từ bằng chứng trên đĩa — nhật ký lệnh cho giá khớp, bản ghi duyệt cho chiều/cỡ/
+      stop/rủi ro. Không nhận số từ dòng lệnh, vì gõ tay là cách sinh ra một vị thế không truy
+      được. Mỗi hàng đóng dấu `booked_from="track1_book_backfill"` + lý do + thời điểm.
+      · MYM LONG 1 @ 51.732,00 stop 50.662,2857 risk $677,95 order 28
+      · M2K LONG 1 @ 2.857,00 stop 2.782,7857 risk $469,46 order 30
+- [x] Cũng đo được: hôm nay có **3 setup, 2 lệnh**. MNQ bị `GATE.CAP_CLUSTER` loại (trần gộp
+      nhóm 0,05). Tức 3 ứng viên, trần cho 2, loại 1 — quản trị rủi ro chạy đúng, không rơi âm thầm.
+
+### B1 hỏi một câu đã cũ — đã sửa
+- [x] Sau back-fill, B1 chuyển sang `FAIL (track1_book_has_positions)`: *"tuyến chưa đặt lệnh
+      nào, nên một vị thế ở đây là không giải thích được"* — trong khi tuyến vừa đặt hai. B1
+      sinh ra để trả lời "có an toàn để BẮT ĐẦU không", nên khi tuyến đã bắt đầu nó sẽ **FAIL
+      vĩnh viễn**, và vì B1 gác cổng lệnh, điều đó chặn tuyến mãi mãi.
+- [x] Sửa theo đúng lý lẽ của chính B1 (*"số không thì không cần quy thuộc"*): mặt ngược lại —
+      một hàng sổ mà **nhật ký lệnh nói FILLED** thì **đã được quy thuộc**. Thêm
+      `journal_filled_trade_ids()` (ba trạng thái: đọc được / không đọc được / không có nhật ký)
+      và mã mới `track1_holding_own_positions` = PASS, với câu nói thẳng
+      *"KHÔNG phải tài khoản phẳng — một tài khoản đã được quy thuộc."*
+      Nhánh broker cũng chỉ bỏ qua khi broker giữ **đúng cùng tập mã** với sổ (so multiset, không
+      so số lượng — hai MYM và một MYM+một M2K đều là 2).
+- [x] Và bắt được một câu báo sai nữa: `operator_line` có nhánh `status == PASS` tổng quát in
+      *"Track 1 book flat"* **trong khi sổ giữ 2 vị thế**. Dòng đó là câu người vận hành đọc
+      THAY cho phần chi tiết. Đã đổi thứ tự (mã trước, trạng thái sau) + `test_b1a6` ghim.
+- [x] 6 phép kiểm attribution + 7 book-advance = 13 xanh. Đã ghi bằng chứng B1 mới.
+- [x] Xác minh trên broker thật: `PASS (track1_holding_own_positions)`,
+      `legacy_book=0 track1_book=2 broker_positions=2 orphans=0`,
+      `track1_blocking=none orders_possible=True scheduler_armed=True`.
+
+### CÒN LẠI — hai bề mặt bảng giám sát chưa sửa
+- [ ] `/api/v1/runner-positions` vẫn `route=legacy`, `observed_at 2026-09-04` (**cũ 20 ngày**),
+      `n=0`. Bảng vị thế vẫn trỏ vào sổ legacy đã chết. `track1-runtime.book` thì ĐÚNG — hiện đủ
+      2 vị thế kèm stop và dấu `booked_from=track1_book_backfill`.
+- [ ] Nhật ký lệnh vẫn **không có bề mặt nào đọc** (`track1-runtime` không có khoá `orders`).
+- [ ] `TRACK1_STOP_REPAIR_1820 FAILED` còn ACTIVE — bằng chứng giải quyết của nó là "một lượt
+      quét sau chạy sạch", nên nó sẽ tự tắt ở lượt 20:20/22:20 ET nay sổ đã khớp. **CHƯA XÁC MINH.**
+- [ ] 15 phép kiểm ghim luật cũ vẫn đỏ, chờ viết lại (không xoá).
+
+### Ba bề mặt bảng giám sát — ĐÃ SỬA (2026-09-24 tối)
+- [x] **Nhật ký lệnh giờ có bề mặt**: thêm khoá `orders` vào `track1-runtime`. Nó đếm
+      `sent`/`filled` và — quan trọng — có trường **`filled_qty_zero`** đếm riêng những lệnh ghi
+      `FILLED` mà báo số lượng 0. Đo trên dữ liệu thật: `sent=2 filled=2 filled_qty_zero=2`.
+      In con số của broker mà không bình luận thì người đọc hiểu là không khớp gì; âm thầm thay
+      bằng cỡ dự định thì che một sai lệch thật. Nên nó được **gọi tên**.
+- [x] **Bảng vị thế**: bỏ hẳn ảnh chụp legacy khi retirement đã ký (chủ dự án yêu cầu, và phép
+      đo đồng ý — ảnh đó không được ghi từ 04/9). Giờ trả về `route=track1_candidate`,
+      `observed_at=2026-09-24T15:55:01`, **2 vị thế kèm stop**. Giữ nhánh legacy cho trường hợp
+      CHƯA retired, vì khi đó nó là sổ duy nhất có thể báo vị thế. Fail toward showing legacy
+      nếu không xác định được retirement.
+- [x] **Một chốt vừa chặn sai**: sau khi lệnh trở thành khả thi, `ops restart --no-scheduler`
+      (đường duy nhất để nạp một route API mới) bị chốt "shadow start" từ chối — về một lượt
+      khởi động **không ai yêu cầu**. Đúng họ lỗi giai đoạn 5ZZO đã sửa ở nhánh legacy và ghi
+      lại lý do. Đã miễn trừ + `test_ap10` ghim.
+- [x] Đo hiệu năng trước khi nghi phần mình thêm: `_orders` mất **0,001s = 0,0%** của endpoint.
+      `track1-runtime` chậm 41,6s qua HTTP là **có sẵn** (đã có giai đoạn 5ZZZ-S về đúng việc
+      này), không phải do thay đổi hôm nay. KHÔNG đụng vào.
+- [x] 45 phép kiểm xanh trên sáu bộ liên quan.
+
+### Còn đúng một mục chưa xác minh
+- [ ] `TRACK1_STOP_REPAIR_1820 FAILED` vẫn ACTIVE. Lượt quét 18:20 ET chạy **trước** khi
+      back-fill (18:50 ET), nên nó chưa thấy sổ đã khớp. Bằng chứng giải quyết của nó là "một
+      lượt sau chạy sạch" → lượt **20:20 ET** sẽ nói. Chưa tới giờ.
+
+### Trả lời "dashboard đã đúng hết chưa" — CHƯA, và là MỘT vấn đề chứ không phải ba
+- [x] Bỏ hẳn nhánh legacy khỏi bảng vị thế (chủ dự án: *"ko cần giữ gì cho nhánh legacy,
+      it's done deal"*). Không còn điều kiện, không còn hedge — một cuốn sổ. `test_sf5` ghim
+      rằng `read_runner_positions` không được quay lại endpoint đó.
+- [x] Rà TOÀN BỘ 10 endpoint. Kết quả:
+      | endpoint | tuổi dữ liệu | thời gian |
+      |---|---|---|
+      | runner-positions | **3,2 giờ** ✅ | 0,2s |
+      | **runner-state** | **760 giờ = 31,7 ngày** | **21,1s** |
+      | **paper-evidence** | **760 giờ** | 0,3s |
+      | **execution-quality** | **967 giờ = 40 ngày** | 0,1s |
+      | track1-runtime | — | **55,8s** |
+      | open-issues · broker · schedule-status · market-view | tươi | nhanh |
+- [x] **GỐC CHUNG, một cái**: các bề mặt cũ đều đo **tuyến LEGACY**, đã nghỉ từ 27/8.
+      `global_index/live_state_data.js` — nguồn của `runner-state`, tức bảng realtime CHÍNH —
+      ghi lần cuối **24/8 00:58**. Nó nằm trong `LEGACY_PATHS`, danh sách Track 1 **bị cấm ghi**,
+      có phép kiểm băm trước/sau để chứng minh. Chỉ runner legacy ghi nó.
+      → Không phải lỗi ghi. Là **phía ĐỌC chưa chuyển tuyến**, y hệt ca `runner-positions` vừa sửa,
+      nhưng trên bề mặt lớn nhất.
+- [ ] CHƯA SỬA: bảng realtime chính cần đọc state của Track 1 thay vì tệp legacy. Đây là việc
+      thật, không phải một dòng — payload của `live_state_data.js` giàu và bảng đọc nhiều mục.
+- [ ] CHƯA SỬA: `paper-evidence` và `execution-quality` cũng so sổ giấy LEGACY. Chúng đã tự đánh
+      dấu `counts_as_active: false` trong open-issues, nên không báo động sai — nhưng con số
+      chúng bày ra là của một tuyến đã nghỉ.
+- [ ] CHƯA SỬA: `track1-runtime` 55,8s (có sẵn, giai đoạn 5ZZZ-S). Phần tôi thêm chiếm 0,001s.
+
+---
+## Kế hoạch: chuyển bảng giám sát khỏi tuyến legacy (lập 2026-09-24)
+Status: KẾ HOẠCH — chưa làm gì
+
+### Kiểm kê: bảng realtime đọc gì từ tệp legacy
+`runner-state` ← `global_index/live_state_data.js` (ghi lần cuối 24/8 00:58, nằm trong
+`LEGACY_PATHS` mà Track 1 bị cấm ghi). Nội dung:
+
+| mục | giá trị đang bày | nguồn Track 1 tương đương | có sẵn? |
+|---|---|---|---|
+| `broker_equity` | **996.730,93** (thật: 251.341) | b1_audit / account_baseline | **CÓ** |
+| `runner_health.ibkr_connected` | `True` | ops `connection` | **CÓ** |
+| `runner_health.last_heartbeat` | **2026-08-24** | nhịp tim scheduler | **CÓ** |
+| `account` | 50.000 | `track1_params.ACCOUNT` | CÓ |
+| `clusters` | global_nkd, roska4… | sleeves Track 1 | CÓ |
+| `total_days` | 11 | số ngày trong `audits/` (21) | CÓ |
+| `paper_start` | — | bản ghi account_baseline | CÓ |
+| `net_pnl` · `final_equity` · `max_dd_*` | 408,25 / 50.408 / 0 | cần sổ giao dịch Track 1 | **KHÔNG** |
+| `operational_status` · `breaker_events` | — | breaker của Track1Book (equity đang 0,0) | MỘT PHẦN |
+| `snapshots[11]` theo ngày: `equity`, `per_cluster_pnl`, `regime_attribution`, `holding_distribution`, `running_metrics` | dữ liệu tháng 8 | **không có dạng này ở Track 1** | **KHÔNG** |
+| `backtest_calmar` · `target_dd_pct` · `hard_dd_pct` | tĩnh | cấu hình | CÓ |
+
+### Mắt xích thứ tư, phát hiện khi lập kế hoạch
+`global_index/track1_runtime/trade_log.track1.jsonl` = **0 dòng**, ghi lần cuối 25/8. Hai fill
+hôm nay vào nhật ký lệnh, KHÔNG vào sổ vị thế (đã sửa hôm nay), và **cũng không vào sổ giao
+dịch**. Cùng một cái seam. Không có nó thì mọi chuỗi lãi lỗ ở Giai đoạn 3 là bất khả.
+
+### Giai đoạn 0 — THÔI NÓI SAI (làm trước, không xây gì)
+Một con số sai được bày tự tin còn tệ hơn một ô trống: `broker_equity` 996.730 lệch 4 lần,
+và `ibkr_connected=True` đọc từ nhịp tim cũ 31 ngày là một câu khẳng định sai về hiện tại.
+- Endpoint khai rõ nguồn là legacy-era + tuổi dữ liệu, và **không mục nào được bày như hiện tại**
+  khi nguồn đã cũ.
+- **Cổng**: một phép kiểm dựng `live_state_data.js` cũ 30 ngày và khẳng định không trường nào
+  ra ngoài mà không kèm cờ "cũ"; riêng `ibkr_connected` phải thành ba trạng thái, không phải True.
+
+### Giai đoạn 1 — nối sổ giao dịch (cùng seam với `advance_book`)
+- Fill đã xác nhận phải tới **cả ba**: nhật ký lệnh · sổ vị thế · sổ giao dịch.
+- **Cổng**: một lượt gửi dưới `root` tạm ghi đủ ba tệp, và **không** chạm tệp nào trong repo
+  (đúng bài học tôi vừa trả giá hôm nay).
+
+### Giai đoạn 2 — các trường đơn lẻ (sau Giai đoạn 0)
+Thay 8 mục có nguồn Track 1 thật ở bảng trên.
+- **Cổng**: mỗi trường **hoặc** có nguồn Track 1, **hoặc** vắng mặt. Không trường nào được giữ
+  giá trị legacy. Một phép kiểm liệt kê toàn bộ khoá payload và đòi mỗi khoá khai nguồn của nó.
+
+### Giai đoạn 3 — chuỗi theo ngày (việc lớn nhất, cần Giai đoạn 1 xong)
+Dựng `snapshots[]` từ `audits/` + `window_coverage/` + `regime_label/` + sổ giao dịch.
+- **Cổng**: tái lập được một ngày đã biết tới từng xu; và chuỗi phải **TỪ CHỐI hiện một ngày
+  nó không có bằng chứng** thay vì hiện số 0 — số 0 đọc y như "không lỗ lãi gì".
+
+### Giai đoạn 4 — `paper-evidence` (760 giờ) và `execution-quality` (967 giờ)
+**ĐÃ QUYẾT (chủ dự án 2026-09-24): TRỎ SANG TRACK 1**, không cho nghỉ.
+
+`execution-quality` **tính được ngay**, không cần chờ giai đoạn nào: nhật ký lệnh có giá khớp,
+bản ghi duyệt có giá tín hiệu. Hai điểm đầu tiên đã có, đo hôm nay:
+
+| mã | giá tín hiệu | giá khớp | lệch |
+|---|---|---|---|
+| MYM | 51.747,00 | 51.732,00 | **−15,00** (có lợi cho LONG) |
+| M2K | 2.857,90 | 2.857,00 | **−0,90** (có lợi cho LONG) |
+
+Cả hai khớp tốt hơn giá tín hiệu. **Hai điểm dữ liệu không phải một ước lượng trượt giá** —
+đừng để bảng bày nó như một tỉ lệ trượt giá cho tới khi có đủ mẫu.
+
+`paper-evidence` **phụ thuộc Giai đoạn 1**: nó so lãi lỗ giấy với sổ broker, và không có sổ giao
+dịch Track 1 thì không có phía "giấy" để so.
+
+- **Cổng**: (a) không mục nào bày số legacy như số hiện tại; (b) `execution-quality` phải khai
+  SỐ MẪU bên cạnh mọi con số tổng hợp, và từ chối hiện tỉ lệ khi mẫu dưới ngưỡng đã đặt tên —
+  một tỉ lệ trượt giá tính từ hai lệnh là con số người ta sẽ đem đi quyết định.
+
+### Giai đoạn 5 — `track1-runtime` 55,8 giây
+Có sẵn từ trước (giai đoạn 5ZZZ-S). Phần thêm hôm nay chiếm 0,001s.
+- **Cổng**: đo thời gian từng thành phần TRƯỚC khi sửa gì. Không tối ưu theo cảm giác.
+
+### Thứ tự và lý do
+0 trước tất cả, vì nó rẻ nhất và bịt cái tệ nhất (số sai bày tự tin).
+1 trước 3, vì 3 không thể làm mà không có 1.
+4 đã quyết (trỏ sang Track 1): nửa `execution-quality` làm được ngay, nửa
+`paper-evidence` chờ Giai đoạn 1. 5 cuối, vì nó làm chậm chứ không làm sai.
+
+
+---
+
+## Viết lại 15 phép kiểm ghim luật cũ — XONG (2026-09-24)
+
+Mười lăm phép kiểm trong ba tệp đang ghim **thế giới trước 24/9**: không đặt được lệnh, không
+có tệp xác nhận, không có nhật ký lệnh, không tệp nguồn nào chứa cờ mở lệnh. Chủ dự án kết thúc
+thế giới đó có chủ đích, nên cả mười lăm đỏ cùng lúc. Không xoá một cái nào — mỗi cái chuyển từ
+**mô tả hiện trạng** sang **phát biểu luật**.
+
+| Tệp | Trước | Sau |
+|---|---|---|
+| 5ZZG | 33 chạy / 5 ghim luật cũ | **33/33 xanh** |
+| 5W | 50 xanh / 2 đỏ | **52/52 xanh** |
+| 5Z | 39 xanh / 5 đỏ | **44/44 xanh** |
+| 5ZZP (mới) | — | **16/16 xanh** |
+
+Tổng lượt chạy chung với tám bộ kiểm dựng hôm nay: **210 xanh**.
+
+### Mẫu chung của mọi lần viết lại
+Chỗ cũ nói "chưa có X". Chỗ mới nói "X chỉ được xuất hiện sau một nhánh hỏi xem có ai yêu cầu
+hay không". Bản mới **chặt hơn** bản cũ ở một điểm cụ thể: máy này giờ tự khởi động lại khi đăng
+nhập, nên một cờ mở lệnh đặt ngoài nhánh nghĩa là hệ thống tỉnh lại trong trạng thái đã vũ trang
+mà không có ai ở đó.
+
+### Ba điều bản cũ ghim mà thực ra đã sai từ trước khi đỏ
+- `not CONFIRMATION_PATH.exists()` — tệp xác nhận đã được ký **27/8**, sai suốt bốn tuần.
+- `not ORDERS_DIR.exists()` — thư mục nhật ký lệnh do chính route tạo hôm nay khi hai lệnh khớp.
+- Một phép kiểm quét **chữ** trong tệp nên tính cả hai module chỉ *nhắc tên* trình đặt lệnh
+  trong docstring thành "module nhập khẩu nó". Đã chuyển sang đọc cây cú pháp.
+
+### Bộ kiểm mới 5ZZP — chứng minh 15 cái kia ĐỎ ĐƯỢC
+Đây là phần không thể thiếu: một phép kiểm viết lại cho tới khi xanh trông **giống hệt** một
+phép kiểm viết lại cho tới khi không kiểm gì. 16 đột biến, mỗi đột biến là đúng cái sụp đổ mà
+phép kiểm nói nó canh; cả 16 đều bị bắt.
+
+Đột biến nặng nhất và đều bị bắt: bỏ nhánh khiến **mọi slot** scheduler sinh ra đều vũ trang ·
+`make_scheduler` mặc định `True` · ops nối cờ trên mọi lượt khởi động · `overridden()` im lặng
+(lệnh được phép chạy trong khi một cổng đang hỏng mà hồ sơ không nói) · một chốt vừa "đã giải
+phóng" vừa "đang được bỏ qua" · lượt diễn thử báo cổng giả của nó thành cổng production.
+
+**Không đột biến nào sửa tệp thật.** Tệp nguồn được sao ra `tmp_path` rồi vá trên bản sao, còn
+phần sổ sách thì vá bằng monkeypatch. Sửa tệp production trên đĩa lúc scheduler đang chạy sẽ đưa
+module đã vá cho một slot thật.
+
+### Một phát hiện đi kèm, không phải lỗi
+Phép kiểm ba trạng thái ban đầu chạy trên **cả 12** chốt và báo `B3_intraday_freshness` là một
+lỗ hổng không giải thích được. Không phải: 8 trong 12 chốt khai `blocks_orders=False` và **chưa
+giải phóng là đúng thiết kế** — đó là trạng thái thứ tư của sổ chốt, không phải một cổng mở lặng
+lẽ. Phép kiểm đã khoanh lại đúng phạm vi, kèm ghi chú vì sao.
+
+### Sweep 20:20 ET — chưa xác minh, và đã biết vì sao hai lượt trước đỏ
+Hai lượt sweep 16:20 và 18:20 ET đều báo `B3 ORPHAN: IBKR có LONG MYM/M2K mà sổ không có`.
+**Đúng ở thời điểm đó**: sổ vị thế chỉ được back-fill lúc 18:50 ET, tức sau cả hai lượt. Không
+có tệp chặn nào được ghi. Lượt **20:20 ET** là lượt đầu tiên chạy trên sổ đã có hai vị thế — đó
+mới là phép kiểm thật, và nó **chưa chạy**.
+
+## Thực hiện kế hoạch chuyển bảng giám sát — phiên raits-1e (2026-09-24 tối)
+Status: DONE — cả 6 giai đoạn (0 → 1 → 2 → 4 → 3 → 5); còn lại xem "Việc tiếp theo" cuối mục
+
+### Cổng mở đầu: sweep 20:20 ET — SẠCH (đã xác minh)
+`[TRACK1_STOP_REPAIR_2020] completed OK` lúc 20:20:09 ET, không một dòng B3/CRITICAL. Sổ vị thế
+không đổi (sha256 ce97d6de…). Mắt xích "sổ chưa có hai vị thế" là cái duy nhất; không còn cái thứ hai.
+
+### Giai đoạn 0 — XONG
+- `/api/v1/runner-state` giờ khai `source_era=legacy`, `producer` (tuyến legacy, nghỉ 27/8),
+  `stale`/`current`, và `provenance`. Quá 12 giờ (cùng ngưỡng `LEGACY_STALE_HOURS` của trang —
+  một phép kiểm ghim hai số với nhau) thì `freshness=stale` (câu trả lời của lịch giữ ở
+  `schedule_freshness`), `ibkr_connected` = `unknown` (giá trị cũ giữ ở `ibkr_connected_reported`),
+  và MỌI khối dữ liệu + mọi snapshot mang `_provenance.stale=true`.
+- `/live_state_data.js` (ba trang phone/terminal/chart-forward đọc thô) được nối thêm
+  `window.LIVE_DATA_PROVENANCE`; `shared/live.js` hiện băng đỏ "NOT the current state" và thôi
+  nói "Runner alive". Không có provenance thì coi là cũ.
+- Thanh trạng thái + danh sách sự cố của realtime thôi lấy breaker/`regime_unreliable` từ bản
+  chụp legacy cũ (`currentLegacyOps`).
+- Cổng: `monitor/test_runner_state_provenance_20260924.py` 8/8; đột biến (tắt hàm gắn nhãn) → 5
+  phép qua endpoint đỏ. Các bộ cũ: 12 đỏ **trùng khít** với bản trước khi sửa (lỗi có sẵn).
+- **Backend CHƯA nạp lại** — endpoint đang chạy vẫn là bản cũ tới khi `ops restart --no-scheduler`.
+
+### Giai đoạn 1 — XONG
+- `track1_paper_send.append_trade_open`: fill đã xác nhận → hàng OPEN trong
+  `trade_log.track1.jsonl` (khoá của hàng OPEN legacy + `route/trade_id/order_id/slot_id`),
+  không ghi trùng theo trade_id, chỉ FILLED. Nối vào `maybe_send_orders` sau `advance_book`, try riêng.
+- `advance_book(book_path=...)` và `append_trade_open(trade_log_path=...)` giờ BẮT BUỘC đường
+  dẫn — bỏ mặc định production (bài học ghi bẩn sổ chiều nay).
+- `filled_qty`: broker.Fill định nghĩa 0 = khớp đủ; ghi `filled_qty or contracts` như runner
+  legacy, giá trị thô giữ ở `fill_reported_qty`.
+- Cổng: `global_index/test_trade_log_open_20260924.py` 13/13 — một lượt gửi dưới root tạm ghi đủ
+  ba tệp, và danh sách tệp repo (gốc, global_index, cả cây track1_runtime) trước/sau KHÔNG đổi.
+  Đột biến: gỡ dây → 7 đỏ; ghi lạc một tệp dò vào track1_runtime → tl1 đỏ, nêu đúng tên tệp.
+- Back-fill hai fill hôm nay: `global_index/track1_trade_log_backfill.py --root . --day
+  2026-09-24 --write` → 2 hàng OPEN (MYM 51.732 lệnh 28, M2K 2.857 lệnh 30), dựng từ sổ vị thế và
+  đối chiếu giá với nhật ký lệnh; bản sao `trade_log.track1.jsonl.pre-backfill.bak` (0 byte).
+- **Hồi quy do tôi, trong tệp của raits-a9**: 5zzg test_8/test_13 đỏ vì `_journal_rows` đọc mọi
+  *.jsonl dưới root (giờ gồm cả sổ giao dịch). Bản trước sửa 33/33 xanh. Đã nhắn raits-a9 cách
+  sửa (rglob `track1_orders_*.jsonl`); tệp đó của nó, tôi không sửa. → raits-a9 ĐÃ SỬA
+  (`ORDER_JOURNAL_GLOB` + phép kiểm mới `test_8b`), 5zzg 34/34.
+- Kèm theo (Giai đoạn 0, phát hiện khi làm): `track1_report` nói "Track 1 has placed no orders" và
+  gắn mọi hàng nhật ký là `dry_run`/"INTENDED, not sent". Dry run KHÔNG ghi được thư mục nhật ký
+  thật (`assert_dry_run_root`), nên hàng có order_id của broker = lệnh gửi thật → nguồn giờ là
+  `paper_send` ("2 order(s) SENT … ids 28, 30, 2 filled"); đối chiếu sổ/nhật ký giờ ra PASS
+  `book_rows_all_filled` thay vì "needs real fills, which do not exist". 5zn: phép kiểm ghim literal
+  "needs paper" đổi thành ghim hành vi. 8 đỏ khác của 5zm/5zn/5zw trùng khít bản trước sửa.
+
+### Giai đoạn 2 — XONG (backend đã nạp lại 20:53 ET, đo trên endpoint thật)
+- `payload` của `/api/v1/runner-state` giờ dựng từ nguồn Track 1 (`monitor/backend/track1_meta_reader.py`);
+  mỗi khoá khai nguồn trong `payload_sources`, mỗi khoá vắng khai lý do trong `payload_absent`.
+  Bản legacy (đã gắn cũ) chuyển sang `legacy_payload`.
+- Đo thật: broker_equity **251.341,45** (B1 22:56 UTC) thay cho 996.730,93; paper_start 250.817,91 USD
+  (mốc PASS đầu tiên 27/8); total_days 22; clusters = CAPS của Track 1 (4 sleeve);
+  ibkr_connected `connected` (bộ đọc backend, ≤2 phút); last_heartbeat từ log scheduler.
+- **Lệch với bảng kiểm kê của kế hoạch**: `backtest_calmar`/`target_dd_pct`/`hard_dd_pct` được ghi
+  "CÓ — cấu hình", nhưng KHÔNG cấu hình Track 1 nào công bố chúng (quét track1_params/gates/report/
+  slots; realtime.js 5ZZZ-CG cũng nói 15% chưa đo là áp cho tuyến này) → VẮNG, có lý do.
+- Trang: số dư legacy đọc từ `legacy_payload`; hai câu "Track 1 has sent no orders" đổi thành
+  "No Track 1 trade has closed yet" (sai từ 15:55 ET 24/9).
+- Cổng: `monitor/test_runner_state_track1_payload_20260924.py` 7/7; đột biến (lọt số legacy / thêm
+  khoá không nguồn) → mỗi cái 2 đỏ. Lớp giả sửa theo giao diện mới: 5zzh `_stale_legacy`,
+  realtime_dom hai hàm dựng runner-state; 5zzf test_7/8/11 dùng `_code_only` (bẫy chú thích).
+  Toàn bộ bảng: 13 đỏ = 7 lỗi có sẵn + 6 do lớp giả, 6 cái đó giờ xanh.
+- **Xác minh lời raits-a9**: `ops status` 20:52 ET → `orders_possible=False`, B1 chặn vì mốc tài
+  khoản 24,9 giờ tuổi. Broker `working_orders=0` — hai vị thế KHÔNG có stop ở broker qua đêm
+  (thiết kế: stop Rổ 4 vũ trang 14:05 ET phiên sau).
+
+### Giai đoạn 4 — XONG theo hướng "trỏ sang Track 1" (backend nạp lại 21:08 ET, đo thật)
+- **execution-quality**: mặc định đọc `trade_log.track1.jsonl`, chỉ đếm hàng mang route Track 1;
+  legacy chỉ khi gọi `route="legacy"`. Trường `route` của hàng Track 1 là tên tuyến, KHÔNG còn bị
+  đếm là "sàn khớp lệnh". Đo thật 24/9: MYM −15 tick, M2K −9 tick (âm = có lợi).
+  Cổng `monitor/test_track1_execution_quality_20260924.py` 7/7; đột biến ép về legacy → 5 đỏ.
+- **paper-evidence**: `read_paper_evidence(root, route="track1_candidate")`. Track 1 lấy sổ giao
+  dịch/sổ vị thế/ngày kiểm toán của mình; epoch = ngày đầu tiên nhật ký lệnh có order_id của broker
+  (**2026-09-24**, không phải ngày nạp tiền 27/8); từ paper_inputs.json chỉ đọc các `*_spec`.
+  Dòng nào dựa vào nguồn Track 1 CHƯA có (live_state, log legacy, paper_pnl_compare) → `NOT_WIRED`,
+  số liệu bị xoá; mọi số đếm từ log (B3, cold start, STP) là `None` chứ không phải 0.
+  `?route=legacy` vẫn phục vụ legacy, có gắn `route`. Trang /paper ghi "Track 1 | … | 15 row(s)
+  not wired for this route yet".
+- Đo thật trên Track 1: c1_slippage **QUALITY_BREACH** (trung bình −12 tick N=2; spec lấy trị tuyệt
+  đối ≤3 tick nên một lần khớp CÓ LỢI cũng vi phạm — đúng theo spec hiện hành, N quá nhỏ để kết luận);
+  current_protection **BREACH** 0/2 có stop_order_id (khớp broker working_orders=0; cổng này không
+  biết khái niệm vũ trang trễ 14:05 ET — chưa kiểm liệu sổ Track 1 có bao giờ ghi stop_order_id).
+- Cổng `monitor/test_track1_paper_evidence_20260924.py` 8/8: tệp legacy mang số "lính canh", câu trả
+  lời Track 1 không được chứa số nào; đột biến đọc nhầm sổ vị thế legacy → phép lính canh đỏ.
+  26 lời gọi trong phép kiểm cũ đổi sang `route="legacy"` tường minh (chúng ghim logic legacy).
+- **Chưa làm (NOT_WIRED còn 15 dòng)**: quét log TRACK1_* trong ops_scheduler.err.log cho B3/STP —
+  hôm 24/9 CÓ hai đợt lệch B3 thật (16:20, 18:20 ET) mà hiện không cổng nào đếm.
+
+### Giai đoạn 3 — XONG (chuỗi theo ngày; đo thật trên endpoint)
+- `monitor/backend/track1_series_reader.py` → `payload.snapshots` của runner-state. Mỗi ngày giao dịch từ
+  epoch giấy (24/9) tới hôm nay: `evidenced` (có kiểm toán sau cửa sổ + đọc được sổ giao dịch) /
+  `pending` (hôm nay, trước ~16:15 ET) / `refused` (ngày đã qua mà không có kiểm toán). Ngày bị từ
+  chối KHÔNG có số; chuỗi cộng dồn ĐỨT từ ngày đó (None về sau).
+- P&L đã thực hiện tính từ giá khớp OPEN/CLOSE × point value × hợp đồng − phí CẢ HAI chân; KHÔNG dùng
+  `pnl_sized` (broker.Fill ghi "verify mode: from ledger"; log legacy có CLOSE giá đổi mà pnl_sized 0.0).
+- Regime: tệp ngày D kết thúc bằng nhãn tính từ giá đóng CỦA D (ghi tối D) → lấy nhãn `label_date < D`
+  (24/9: Normal, nhãn ngày 23/9).
+- Đo thật 24/9: evidenced, MYM 51.732 (lệnh 28) + M2K 2.857 (lệnh 30), phí 1,22, realised 0,00.
+- Cổng `monitor/test_track1_series_20260924.py` 7/7: tái lập 24/9 tới xu; vòng MYM 51.732→51.800 =
+  32,78 (pnl_sized=999 bị bỏ qua); ngày thiếu kiểm toán bị từ chối + đứt chuỗi. Đột biến: coi ngày
+  thiếu kiểm toán là có bằng chứng → 2 đỏ; dùng pnl_sized → 2 đỏ.
+- **Phát hiện có sẵn, đã sửa**: runner-positions phục vụ sổ Track 1 từ sáng (khoá `instrument`/`qty`),
+  trang so theo `pos.inst` → hai sự cố GIẢ "undefined runner-only position" đang hiện. Chuẩn hoá hàng
+  một lần (`normPos`). Trang giờ nói đúng: MYMZ6/M2KZ6 "unprotected — no working stop", và "stop state
+  unknown" vì sổ Track 1 không đánh dấu vũ trang trễ. Nhãn khung vị thế "legacy / drain" (sai từ sáng)
+  → "Track 1 book / IBKR" + help.html; phép kiểm hợp đồng ghim nhãn mới và CẤM nhãn cũ.
+  `observed_at` của runner-positions đổi sang UTC `…Z` (phép hợp đồng đỏ từ sáng → xanh).
+- Quét chữ hiển thị 4 trang thật (realtime/paper/analytics/phone): 0 "undefined/NaN/null", console sạch.
+
+### Giai đoạn 5 — XONG
+- 55,8s KHÔNG tái lập được. Đo trước sửa: nóng 3,35–3,69s; nguội 16,6s chạy chồng luồng làm nóng
+  paper-evidence. Log backend: làm nóng paper-evidence mất **57–80,8s** mỗi lần khởi động cho tới
+  Giai đoạn 4 (sau: 13–18,6s) — nguyên nhân KHẢ DĨ NHẤT của 55,8s (cùng lượt đo runner-state 21,1s),
+  **chưa chứng minh**.
+- cProfile: `_explanations` 3,58s, trong đó 2,79s `rglob` / 27.346 `stat` — duyệt cả cây MỘT LẦN
+  MỖI NGÀY. Đổi thành một lần duyệt, nhóm theo ngày: 3,07→0,96s, đầu ra GIỐNG HỆT bản lưu trước sửa
+  (20 ngày, 1.178 hàng). Endpoint: nóng **1,22–1,28s**, nguội **10,2s**.
+- Điểm nóng kế tiếp (không sửa): `attribution_from_path` hai lần `Path.resolve()`/tệp = 0,52s, nằm
+  trong mô-đun của cổng chấp nhận.
+- Cổng `monitor/test_track1_runtime_timing_20260924.py` 2/2 (tương đương thuật toán cũ trên cây đủ
+  3 bố cục; bộ phân giải gọi đúng 1 lần); đột biến về cách cũ → đỏ. 18 đỏ của 5q/5q1/5q2/5p TRÙNG KHÍT
+  khi hoàn nguyên → có sẵn (đếm slot trong lịch đã tăng, tệp xác nhận đã ký).
+
+### Tệp đã sửa/tạo (phiên raits-1e)
+Sửa: monitor/backend/{app.py, runner_state_reader.py, execution_quality_reader.py,
+paper_evidence_reader.py, track1_runtime_reader.py}; global_index/{track1_paper_send.py,
+track1_report.py}; global_index/dash/{realtime/realtime.js, realtime/index.html, realtime/help.html,
+realtime-next/index.html, shared/live.js, paper/paper.js}; phép kiểm: monitor/{test_dashboard_backend.py,
+test_realtime_dom.py, test_realtime_contract.py, test_paper_dom.py}, scratch/{5zn, 5zzh `_stale_legacy`,
+5zzf test_7/8/11}.
+Tạo: monitor/backend/{track1_meta_reader.py, track1_series_reader.py}; global_index/track1_trade_log_backfill.py;
+phép kiểm monitor/test_{runner_state_provenance, runner_state_track1_payload, track1_execution_quality,
+track1_paper_evidence, track1_series, track1_runtime_timing}_20260924.py, global_index/test_trade_log_open_20260924.py.
+Ghi dữ liệu: trade_log.track1.jsonl +2 hàng OPEN (back-fill, có bản .pre-backfill.bak). KHÔNG commit.
+
+### Việc tiếp theo
+- [ ] Nối quét log TRACK1_* (B3/STP) cho paper-evidence — 15 dòng đang NOT_WIRED.
+- [ ] Sổ Track 1 không ghi `stop_order_id` / `stop_deferred` → trang không phân biệt "chưa tới 14:05 ET"
+      với "mất stop". Kiểm sau 14:05 ET 25/9: stop có được đặt, và sổ có ghi lại không.
+- [ ] Cổng lệnh ĐANG ĐÓNG (mốc tài khoản >24h, không job nào tự ghi lại) — việc của chủ dự án.
+- [ ] C1 spec lấy trị tuyệt đối: một lần khớp CÓ LỢI cũng thành QUALITY_BREACH (−12 tick, N=2).
+      raits-a9 truy tới đáy: `abs(mean) > max_mean_ticks` ở paper_evidence_reader.py:1653/:1667, nhưng
+      `max_mean_ticks_rationale` trong monitor/paper_inputs.json nói bằng ngôn ngữ CHI PHÍ và `why_by_inst`
+      đặt M2K +28 và MES −4 ở hai đầu đối lập → dấu âm là phía tốt. Câu hỏi ý định — chủ dự án quyết.
+      Hai đường loại trừ nhau:
+      (A) cổng CHI PHÍ → một phía `mean > max_mean_ticks`. Cổng kiểm: +4 vẫn BREACH, −4 hết BREACH,
+          verdict của mọi hàng n ≥ min_n khác không đổi.
+      (B) cổng ĐỘ KHỚP với backtest → giữ `abs()`, nhưng đổi tên và tách thành phép đo riêng; C1 khi
+          đó không còn là cổng chi phí.
+
+### Đính chính sau báo cáo (2026-09-24 ~22:00 ET)
+- 14 đỏ của lượt hồi quy cuối: 4 phép `test_ops_*` trong test_dashboard_backend.py KHÔNG phải do cổng —
+  lớp giả `start_scheduler`/`track1_shadow_blockers` chưa nhận `allow_orders` (TypeError). Đã sửa lớp giả;
+  test_dashboard_backend.py 225/225.
+- 10 đỏ còn lại (5zm/5zn/5zw/5zzy) raits-a9 đã sửa; HAI trong số đó (cửa sổ preflight 7 ngày ghim danh
+  sách ngày cứng) không thuộc họ cổng lệnh như tôi đã gộp.
+
+
+---
+
+## Phần tiếp: ba phép kiểm nữa cùng họ, và hai câu văn nói dối (2026-09-24, tối)
+
+Mười lăm phép kiểm ban đầu chưa phải hết. Chạy rộng ra các bộ kiểm khác moi thêm **ba** cái
+cùng họ, đều ghim thế giới trước 24/9:
+
+| Bộ kiểm | Phép kiểm | Ghim cái gì | Thay bằng |
+|---|---|---|---|
+| 5ZZE | `test_19` | thư mục lệnh chưa tồn tại + tệp xác nhận chưa có | so danh sách trước/sau: **bộ kiểm này không ghi gì** |
+| 5ZZH | `test_orders_are_still_impossible` | y như trên | như trên, giữ lại đúng dòng vốn là luật: đọc bảng thì không được vũ trang gì |
+| 5ZZH | `..._blockers_come_from_the_gate_registry` | `PAPER_SHADOW_EVIDENCE` phải nằm trong `blocking()` | `blocking()` **và** `overridden()` phải đọc cùng nhau, và không chốt nào được nằm trong cả hai |
+
+Cái thứ ba đáng chú ý: `blocking()` bây giờ **nói ít hơn sự thật một cách có chủ đích** — cổng
+bằng chứng vẫn đang hỏng nhưng đã được bỏ qua, nên nó rời khỏi danh sách chặn. Ai chỉ đọc một
+nửa sẽ thấy danh sách rỗng vào đúng ngày một cổng đang hỏng và đang bị bước qua.
+
+### Cổng lệnh tự đóng lúc 20:01 ET — không ai sửa gì
+Mốc tài khoản giấy có hạn 24 giờ; bản mới nhất ghi 20:01 ET ngày 23/9, nên đúng 20:01 tối nay nó
+hết hạn → `b1_decision_evidence` đỏ → B1 chặn → `orders_possible=False`. **Không có job tự động
+ghi lại mốc đó** (TASK.md đã ghi việc này từ trước, SCRATCHPAD cũng vậy). Fail-closed chạy đúng.
+
+Hệ quả: các slot đêm nay chạy shadow, không gửi lệnh. Muốn gửi lại thì phải ghi mốc mới — một
+lệnh, cần Gateway đang chạy (đang chạy, `broker_connected=True freshness=fresh`):
+
+    python -m global_index.account_baseline_audit --broker ibkr --record
+
+**Nhưng đọc mục dưới trước khi chạy**, và biết rằng mốc mới cũng chỉ sống 24 giờ.
+
+### Hai câu văn sẽ ghi "tài khoản sạch" vào hồ sơ trong khi đang giữ hai vị thế
+Phát hiện khi đi kiểm xem lệnh ghi mốc ở trên có an toàn không. Cả hai đều là nhánh PASS nói cứng
+một câu, đúng họ với lỗi `operator_line` của B1 đã sửa chiều nay:
+
+| Chỗ | Nói | Sự thật tối nay |
+|---|---|---|
+| bản ghi PASS | "no positions, no working orders, both books flat" | đang giữ MYM + M2K |
+| `operator_line` | "broker reconcile flat" | như trên, và đây là dòng lên bảng giám sát |
+
+Mốc **vẫn PASS được** khi đang giữ vị thế — nó chỉ từ chối khi B1 báo FAIL, và B1 đang PASS với
+mã `track1_holding_own_positions`. Nên nếu không sửa, lần ghi mốc kế tiếp sẽ đóng một câu sai vào
+hồ sơ mà sau này người ta đọc để trả lời "tài khoản trông thế nào lúc tuyến này bắt đầu gửi lệnh".
+
+Đã sửa: cả hai câu giờ **đọc mã của B1** thay vì tự khẳng định. Verdict và code không đổi — đó là
+cổng của thay đổi này, và `test_2` ghim đúng điều đó. 12 phép kiểm trong
+`global_index/test_baseline_detail_matches_b1.py`, trong đó `test_8` dựng lại câu cũ bằng cách
+nạp mã nguồn thật trong bộ nhớ rồi chạy phép kiểm lên nó — để chứng minh phép kiểm đỏ được.
+
+### Một khuyết điểm thật trên bảng giám sát — đã ghi tên, chưa sửa
+Stage 5ZZZ-CM bỏ bốn tiêu đề nhóm với lý do "phạm vi từng mục vẫn nằm trên chip của dòng đó".
+**Chip đó không tồn tại.** Đo trong DOM với payload 4 mục: không nhãn nào trong TRACK 1 / LEGACY /
+BOTH ROUTES / MODEL xuất hiện ở bất kỳ đâu trong panel, và hai dòng đầu đọc y hệt nhau trong khi
+một cái là của Track 1, một cái phục vụ cả hai tuyến. `issueScope()` có đúng một lần xuất hiện
+trong tệp: chính định nghĩa của nó, không nơi gọi.
+
+Đã ghi thành `test_dom_every_row_says_whose_problem_it_is` với `xfail(strict=True)` kèm toàn bộ số
+đo. Suite vẫn xanh, khuyết điểm có tên, ngày nào chip quay lại thì nó nhảy XPASS và kêu. Không tự
+sửa realtime.js: phiên khác đang giữ tệp đó.
+
+### Trạng thái cuối
+- Không-browser: **256 xanh / 3 skip** (3 skip là đột biến cần cổng mở; cổng đóng lúc 20:01 nên
+  chúng tự skip đúng cách — không phải xanh rỗng).
+- 5ZZH browser: 35 xanh / 1 xfail / **1 đỏ** = `test_dom_legacy_appears_only_as_dated_context`,
+  do phiên khác đang chuyển bảng khỏi tuyến legacy. Đã trả lại cho họ, không sửa.
+- Sweep **20:20 ET completed OK** — lượt đầu tiên chạy trên sổ đã back-fill. Hai lượt 16:20 và
+  18:20 báo orphan là đúng ở thời điểm đó (sổ mới back-fill lúc 18:50).
+- Xác minh độc lập rằng sổ khớp broker: `b1_legacy_flat=PASS` · `track1_book=2` ·
+  `broker_positions=2` · `orphans=0`, quan sát 18:56 ET.
+
+
+---
+
+## Đóng sổ họ phép kiểm ghim luật cũ — 28 cái, không còn cái nào (2026-09-24, khuya)
+
+Phiên raits-1e báo còn "14 đỏ, đều là cái cũ, đều vì cổng lệnh đang mở và tệp xác nhận đã ký".
+Đo lại: **10 đỏ, và 2 trong 10 không liên quan gì tới cổng lệnh.**
+
+| | Báo | Đo được |
+|---|---|---|
+| số phép đỏ | 14 | **10** |
+| `monitor/test_ops.py` | 4 đỏ | **10/10 xanh**, chạy riêng và chạy chung đều không góp phép nào |
+| nguyên nhân | tất cả do cổng lệnh + tệp xác nhận | 8 đúng họ đó · **2 là cửa sổ 7 ngày trượt** |
+
+Tổng cả buổi: **15 + 3 + 10 = 28 phép kiểm** ghim luật cũ, viết lại hết, không xoá cái nào.
+
+### Hai cái không phải họ cổng lệnh
+`preflight_state.json` giữ **cửa sổ 7 ngày trượt**. Hai phép kiểm ghim nó bằng danh sách ngày
+cứng (2026-08-17…08-25, và ngày cuối 2026-08-26 ở phép thứ hai). Cửa sổ đã trượt sang
+2026-09-14…09-24 — đúng 7 ngày, không trùng, không ngày tương lai. **Không có gì sai**; nó làm
+đúng việc của nó, và hai phép kiểm đó chắc chắn sẽ đỏ theo thời gian dù không ai sửa gì.
+
+Bản viết lại giữ ba điều danh sách cứng không nói được:
+
+- đúng 7 ngày, không trùng — một bản ghi phình ra thì không còn là cửa sổ
+- không ngày nào vượt phiên ET hiện tại — **chính là sự cố 5ZL**: một ngày trong sổ mà
+  pre-flight 13:45 ET thật chưa bao giờ ghi
+- **và cửa sổ phải còn trượt** — ngày mới nhất không cách hôm nay quá 5 ngày
+
+Điều thứ ba là điều duy nhất bắt được việc pre-flight lặng lẽ ngừng chạy. Một bản ghi đã đóng
+băng trông **y hệt** một bản ghi lành mạnh nếu chỉ xem hình dạng: vẫn 7 ngày, vẫn không trùng,
+vẫn không có ngày tương lai. Danh sách ngày cứng không bao giờ phát biểu được điều đó.
+
+Thêm 4 đột biến vào 5ZZP: bản ghi lành mạnh phải XANH (không có cái này thì ba cái kia vô nghĩa —
+một luật từ chối mọi thứ cũng từ chối mọi đột biến) · đóng băng 30 ngày phải đỏ · có ngày tương
+lai phải đỏ · 8 ngày phải đỏ. Cả bốn đạt. 5ZZP giờ **20 phép / 17 xanh / 3 skip**.
+
+### Kiểm lại báo cáo của phiên kia — phần nào đúng
+- **Trượt giá khớp chéo được, và khớp.** MYM −15 ticks · M2K −9 ticks. Sổ ghi MYM −15,00 điểm
+  (tick = 1,0 điểm) và M2K −0,90 điểm (tick = 0,10 điểm → −9 ticks). Hai cách tính ra cùng số.
+  Trung bình −12 đúng bằng con số C1 báo.
+- **Sổ vị thế không đổi một byte** qua mọi lượt chạy của tôi: sha256 `ce97d6de4353d9ca` trước và
+  sau 408 phép kiểm. Nhật ký lệnh 4869 byte, sổ giao dịch 2 dòng — y nguyên.
+- **Nhật ký lệnh giờ khai đúng nguồn**: `source = paper_send`, 2 lệnh gửi thật (id 28, 30), 2 khớp,
+  trade_id khớp sổ. Trước đó mọi hàng đọc như ý định của một lượt diễn thử.
+- **`submitted = 4` cho 2 lệnh không phải hai lần gửi.** Đếm thẳng 8 hàng: mỗi lệnh có
+  `intended` → `submitted` (chưa id) → `submitted` (đã vá id từ biên nhận broker) → `filled`.
+  Đúng cơ chế mà 5ZZG `test_13` mô tả.
+
+### C1 dùng trị tuyệt đối — spec nói nó không nên
+Phiên kia phát hiện; tôi truy tới đáy. `paper_evidence_reader.py:1653` và `:1667` dùng
+`abs(mean) > max_mean_ticks`. Nhưng `max_mean_ticks_rationale` trong `monitor/paper_inputs.json`
+nói **toàn bằng ngôn ngữ chi phí**:
+
+> "each additional tick **costs** about $903/year against $6,794 of annual net" ·
+> "permitted execution **costs consuming** roughly 40% of that edge" ·
+> "allows one tick of drift **over** the model"
+
+Và `why_by_inst` nêu hai đầu đối lập: "M2K sits at **+28.00** (14x the modelled cost) and MES at
+**−4.00**" — dấu âm là phía tốt. Một khớp lệnh có lợi không ăn vào edge; nó cộng vào.
+
+Trần 3 ticks được suy ra từ đô-la mất đi trên mỗi tick chi phí. Với MYM −15 và M2K −9, cổng đáng
+lẽ đọc **PENDING** (n=2 < min_n=20), không phải QUALITY_BREACH.
+
+**Chưa sửa — đây là câu hỏi ý định thiết kế, không phải sai số bao nhiêu thì chấp nhận được.**
+Hai đường, và chúng loại trừ nhau:
+
+| | Nếu cổng này đo CHI PHÍ | Nếu cổng này đo ĐỘ KHỚP với backtest |
+|---|---|---|
+| điều kiện | `mean > 3` (một phía) | `abs(mean) > 3` như hiện tại |
+| lý do | đúng nguyên văn rationale | khớp lệch 15 ticks phía nào cũng làm lãi lỗ live rời backtest |
+| nhãn hiện tại | sai — "QUALITY_BREACH" cho một lần khớp tốt | đúng, nhưng tên phải là "độ khớp", không phải "chất lượng" |
+
+**Cổng cho bản sửa một phía**, nếu chọn đường đó: `+4` vẫn phải BREACH, `−4` không còn BREACH,
+và verdict của mọi hàng có `n >= min_n` không được đổi ở bất kỳ đâu khác. Nếu muốn giữ cả phép đo
+độ khớp thì nó là **một phép đo riêng có tên riêng**, không phải `abs()` lồng trong một cổng chi phí.
+
+### Hai chỗ nữa trong báo cáo phiên kia đáng đặt lại
+- **"hai B3 mismatch thật hôm nay chưa được cổng nào đếm"** — đúng là chưa cổng nào đếm, nhưng
+  gọi chúng là "mismatch thật cần xử lý" thì quá lời: cả hai (16:20 và 18:20 ET) **đúng ở thời
+  điểm đó** vì sổ chỉ được back-fill lúc 18:50 ET, và lượt 20:20 ET sạch. Nếu đem đếm bây giờ thì
+  đó là hai báo động đã hết hiệu lực. Cái cần nối vào cổng là **cơ chế**, không phải hai điểm dữ
+  liệu này.
+- **"55,8 giây do khởi động paper-evidence"** — họ tự dán nhãn giả thuyết, đúng. Giữ nguyên nhãn đó.
+
+### Hai vị thế qua đêm không có stop
+Đúng thiết kế (stop vũ trang 14:05 ET ngày mới). Nhưng sổ Track 1 không ghi rằng việc hoãn là có
+chủ đích, nên bảng đọc thành "unprotected". **Việc phải làm sau 14:05 ET ngày 25/9: kiểm xem stop
+có được đặt thật không.** Đây là điểm kiểm đầu tiên của cơ chế này trên tuyến Track 1.
+
+
+---
+
+## Đêm NKD 25/9: cổng mở lại, một lỗi của tôi, và hai slot "fail" thật ra là chốt chặn chạy đúng
+
+### Cách A có tác dụng
+Mốc tài khoản ghi lại lúc 01:23 ET → `orders_possible=True`. Slot **01:25 completed OK** (41s),
+gửi và khớp **MNKD LONG ×1 @ 66.145**, order 40. Lệnh paper đầu tiên của rổ NKD.
+
+### Lỗi của tôi: sổ ghi qty 0
+`advance_book` đọc `cand.contracts`, mà `track1_signal_layer.Candidate` khai trường **`qty`** và
+**không có** `contracts`. Mọi fill thật đều ghi cỡ 0. Chỗ đắt nhất: comment tôi tự viết ngay trên
+dòng đó nói đúng luật — *"sổ khoá theo số của fill sẽ ghi vị thế cỡ zero, cái sổ rỗng đi bằng
+đường khác"* — và dòng dưới nó làm đúng điều nó cấm.
+
+Vì sao qty 0 tệ hơn thiếu dòng: thiếu dòng thì thành **orphan** và B3 gào lên; qty 0 thì **trông
+như đã ghi sổ**, qua được phép kiểm tồn tại, và stop bị cỡ theo 0.
+
+Đã sửa bằng một hàm đọc `qty` → `contracts` → `fill.filled_qty`, số của fill xếp **cuối** vì nó
+báo 0 ở cả ba lần fill tới giờ. Sửa cả chỗ thứ hai cùng gốc (sổ giao dịch). 9 phép kiểm trong
+`global_index/test_book_qty_comes_from_the_candidate.py`. Dòng sai trong sổ đang chạy đã vá, đọc
+từ nhật ký lệnh (order 40, qty 1), có snapshot trước.
+
+### Hai slot 01:30 và 01:35 — tôi đã nói sai, đây là chuỗi đọc từ code
+
+Tôi đã nói chúng *"gọi send_order thật"* và *"16 lần gọi trùng vào broker nữa"*. **Sai**, và sai
+vì tin dòng đếm in ra thay vì đọc code. Chuỗi thật:
+
+1. Tín hiệu NKD giữ nguyên qua các slot → slot sau chào lại đúng ứng viên `global_nkd::MNKD::2026-09-25`.
+2. Cổng cap **cho qua** (`admitted 1`) — lớp admission không đọc nhật ký nên không biết ứng viên này đã khớp.
+3. `executor.open_position()` chạy, và việc **đầu tiên** của nó là `journal.append(INTENDED)`.
+4. Nhật ký dựng idempotency key — trùng khít với 01:25 — thấy trạng thái cuối là `FILLED`, và
+   `ALLOWED_TRANSITIONS[FILLED] = frozenset()`. `filled → intended` không phải một lịch sử có thể
+   xảy ra → `OrderJournalRefused(BAD_TRANSITION)`.
+5. Cú nổ đó xảy ra **TRƯỚC** `self.broker.send_order(...)`. **Không lệnh nào tới broker.**
+6. Vòng gửi bắt exception, đếm `unknown += 1; sent += 1` — và **đó** là lý do dòng in ra
+   `send_order calls: 1` trong khi `send_order` chưa hề được gọi.
+7. `unknown or errors` → `fatal` → slot thoát mã 3.
+
+**Bằng chứng khớp cả ba đường:** nhật ký lệnh có đúng **4 dòng, tất cả của slot 0125** — hai lần
+sau không ghi được dòng nào vì bị chặn trước lần append đầu tiên. Broker giữ **MNKD ×1**, 0 lệnh
+treo. Sổ khớp. Broker giữ ×1 **không phải may** — nó là hệ quả cấu trúc.
+
+Nói cách khác: hai slot đó "fail" **đúng như thiết kế**, và thứ chặn chúng chính là chốt được viết
+ra để chặn đúng việc này. Docstring của nhật ký nói thẳng: *"The caller must not send the order."*
+
+### Hai khuyết điểm còn lại — đều về báo cáo và vị trí, không về an toàn
+
+**1. Dòng đếm nói sai.** `sent += 1` nằm trong nhánh exception, nên nó đếm một lần thử chưa bao
+giờ tới broker. Người đọc lúc 1h30 sáng nhìn thấy `send_order calls: 1` và hiểu là đã đặt lệnh.
+Tệ hơn: nó gộp **hai chuyện khác hẳn nhau** vào một nhãn `unknown` —
+
+    nhật ký từ chối TRƯỚC khi gọi   → KHÔNG gửi, và biết chắc là không
+    send_order tự ném exception     → có thể đang sống, thật sự không biết
+
+Đúng luật ba trạng thái của dự án: gộp cái thứ nhất vào cái thứ hai làm chữ "không biết" mất nghĩa.
+
+**2. Chốt chống trùng đặt ở tuyến cuối.** Admission cho qua một ứng viên mà nhật ký đã giữ ở
+`filled`, nên mỗi slot còn lại tốn một lượt chạy đầy đủ rồi chết fatal. Không mất an toàn, nhưng
+slot thoát mã 3 và bảng đầy `ORDER UNRESOLVED` — đọc vào nặng hơn thực tế rất nhiều. Đúng cái
+§3.1 của luật làm việc: báo động không bao giờ tắt là báo động người ta học cách bỏ qua.
+
+**Cổng kiểm cho bản sửa (2), khi làm):** một ứng viên đã `filled` trong nhật ký phải bị từ chối
+**ở admission** (`admitted 0`) và `send_order` không được gọi lần nào; đồng thời một ứng viên cùng
+mã nhưng khác ngày vẫn phải qua được. **Cho bản sửa (1):** một lần bị nhật ký từ chối trước khi
+gọi phải đếm vào một ô riêng, không phải `unknown`, và `sent` chỉ tăng khi broker thật sự được gọi.
+
+### Khuyến nghị đã ĐỔI
+Trước khi đọc code tôi khuyên khởi động lại bỏ cờ `--allow-orders`. **Không cần nữa** — và đó là
+kết luận rút từ phép đo, không phải đổi ý: nhật ký chặn ở tầng cấu trúc, các slot còn lại vẫn ghi
+window coverage đủ (đã đo: 3 dòng 0125/0130/0135), nên đêm nay **không mất bằng chứng và không
+thể gửi trùng**. Dừng hay dựng lại tiến trình lúc 01:40 ET giữa cửa sổ là hành động rủi ro hơn
+việc để nó chạy.
+
+
+---
+
+## Slot NKD: sửa đúng gốc — nạp sổ vị thế vào trước khi quyết định (2026-09-25, 02:20 ET)
+
+Chủ dự án bác cách "bỏ cờ `--allow-orders` cho nó complete": đó là né, không phải sửa, và không
+trả lời được câu *"sau này scale lên 2x thì sao"*. Đúng.
+
+### Gốc: mỗi slot dựng sổ RỖNG
+`run_live_day_track1.py` tạo `Track1Book(...)` mới mỗi lượt và **không đọc**
+`live_positions.track1.json`. Ba luật cùng đọc `open_book` nên cùng mù:
+
+| Luật | Hệ quả khi sổ rỗng |
+|---|---|
+| `holders_of` → `SUPPRESS_SAME_SLEEVE` | không thấy vị thế slot trước mở → đề xuất lại đúng lệnh đó |
+| `guard.admits` | cap cụm đọc 0% trong khi `global_nkd` đang giữ 3,52% của cap 6% |
+| `settle_due` | vị thế do slot trước mở **không bao giờ** thoát hay báo được |
+
+Luật chống trùng **có thật và đứng đầu** — chủ dự án nói đúng. Nó không nổ vì cái sổ nó tra dựng
+rỗng lại mỗi lượt.
+
+### Và nhật ký KHÔNG che được đêm mai
+Khoá chống trùng chứa ngày: `track1_candidate:2026-09-25:global_nkd:MNKD:OPEN:...`. Sang ngày mới
+là khoá khác → nhật ký không từ chối. Đo trên sổ thật:
+
+    sổ nạp   →  suppress_same_sleeve   "global_nkd already holds MNKD"
+    sổ rỗng  →  take                   (mua MNKD lần thứ hai)
+
+Đó là câu trả lời cho "scale 2x" bằng số: vấn đề không phải một đêm ồn ào, mà là một tuyến **vào
+lại vị thế nó đang giữ ngay khi sang ngày**.
+
+### Bản sửa
+`track1_signal_layer.read_route_positions()` + `seed_open_positions()`, nối vào
+`observe_live_slot`. Ba quyết định thiết kế, mỗi cái có lý do:
+
+- **Không dùng lại `bootstrap_into`**: nó đòi mọi `trade_id` trong sổ phải có trong luồng ứng
+  viên hôm nay và `BootstrapRefused` nếu không — đúng cho việc resume một replay, sai ở đây vì sổ
+  có vị thế của ngày khác và rổ khác.
+- **Không nhập `track1_paper_executor.read_book`**: cổng lệnh đặt TRÊN lệnh import đó để lượt
+  không vũ trang không bao giờ nạp lớp lệnh. Nhập vào đây để đọc một tệp JSON sẽ phá tính chất đó
+  cho mọi lượt shadow. Nên luật đọc được viết lại trong tầng sở hữu câu hỏi "tuyến đang giữ gì".
+- **`exit_time` để None**: hàm này nói cái gì đang GIỮ, không quyết cái gì nên đóng. Exit thuộc
+  các sweep (`run_stop_repair`, `run_maxhold_exit`) — chúng đọc cùng sổ và ghi hàng CLOSE.
+
+Fail-closed cả hai đầu: tệp không đọc được → raise (không đọc thành "sổ rỗng"); một hàng không
+đọc được → raise (sổ nạp thiếu một vị thế mà trông như đủ là đúng lỗi này ở tầng trên); hàng
+`qty=0` → raise (chính lỗi qty của tối nay ghi ra đúng hàng đó).
+
+### Đo trên tuyến thật
+
+| Slot | accepted | rejected | held_at_decision | kết cục |
+|---|---|---|---|---|
+| 01:55 (trước sửa) | **1** | 0 | — | đề xuất trùng, exit 3 |
+| 02:10 (sửa đã sống) | 0 | 1 | — | **completed OK** |
+| 02:15 | 0 | 1 | — | **completed OK** |
+| 02:20 | 0 | 1 | **3** | **completed OK** |
+
+Slot chạy **hoàn chỉnh** và **báo đúng lý do** (`rejected 1`, suppress), thay vì chết mã 3.
+14 phép kiểm trong `global_index/test_slot_sees_what_the_route_holds.py`, gồm ca đối chứng (sổ
+rỗng vẫn `take` — nếu mất thì phép kiểm chính hết phân biệt) và một phép **ghim call site** bằng
+AST, vì cơ chế đúng mà chưa nối vào entry point là chuyện đã xảy ra nhiều lần ở đây.
+
+### `held_at_decision` phải vào hàng bền, không chỉ in ra
+Lần đầu tôi chỉ `print`. Bộ lọc của scheduler bỏ toàn bộ stdout của lượt chạy sạch — đúng bộ lọc
+đã làm mất một lần đóng MAX_HOLD ngày 2026-08-17. Nên số đó giờ nằm trong hàng
+`window_coverage` (qua `slot_observed(**extra)`), đọc lại được sau này. `accepted` và `rejected`
+có nghĩa khác nhau tuỳ số này, nên người đọc hàng đó cần nó ở ngay bên.
+
+### VIỆC CÒN LẠI TRƯỚC 14:05 ET HÔM NAY — cần chủ dự án quyết
+Sổ nạp làm **một đường code trước đây không bao giờ chạy live nay chạy được**: rổ stress dùng
+`holders_of(inst, STRESS_DISPLACES)` để **đóng cưỡng chế** vị thế Normal/Calm cùng mã. Với sổ rỗng
+nó chưa bao giờ tìm thấy gì. Với sổ nạp, một ứng viên stress **có thể phát sinh ForcedClose thật**.
+
+Đó là hành vi **có thiết kế** (stress được quyền chiếm mã của Normal/Calm), nhưng nó chưa bao giờ
+chạy trên tuyến này. Cửa sổ Rổ 4 mở 14:05 ET hôm nay và có rổ stress. Cần một lượt kiểm riêng cho
+đường displacement trước đó, hoặc một quyết định chấp nhận.
+
+### Một cái giá tôi tự tạo ra, nói rõ
+Slot **02:05 ET chết** với `NameError: name 'BookRefused' is not defined` — code nửa vời của tôi.
+Tôi sửa tệp production trong khi slot sinh ra mỗi 5 phút, và một slot bắt đúng trạng thái giữa.
+Đây là **chính luật tôi viết vào SCRATCHPAD.md tối nay** và phá trong vòng một giờ.
+
+Thiệt hại: mất một slot NKD. Không lệnh nào gửi, sổ không đổi (`cffd99ec508e4878` trước và sau),
+nhật ký vẫn đúng 4 dòng của slot 0125. Nhưng nó là một slot mất, và bài học là: sửa đường quyết
+định thì làm **ngoài cửa sổ**, hoặc dừng scheduler trước khi sửa.
+
+## Lớp rủi ro Track 1: đo lại Lô 1, và cầu dao chỉ còn một nhánh sống (2026-09-25, khuya ET)
+
+Status: IN PROGRESS — hai việc đã giao prompt, một phép hồi quy rộng đang chạy
+
+### Câu hỏi mở đầu và câu trả lời
+
+Lô 1 đổi cầu dao từ "nạp theo hằng số 50.000" sang "nạp theo quyển sổ của tuyến". Quyển sổ thật
+đang mang vốn 0, đỉnh 0, đầu ngày 0. Câu hỏi phải trả lời trước khi nhận: nó sẽ **nói là chưa vũ
+trang**, hay **tin rằng vốn bằng 0** rồi chặn sạch lệnh ngày mai?
+
+Đo trên đúng file thật: nó bỏ cầu dao ra (`breaker = None`), mở phiên trả về cho-vào-lệnh. Không
+có rủi ro chặn nhầm. Đây là hướng an toàn.
+
+### Ba thứ Lô 1 chưa làm
+
+**1. Lý do được tính rồi ném đi.** Bước nạp trả về một dict nói armed/không và vì sao. Chỗ gọi gán
+vào `_breaker_state` rồi không đọc nữa. Slot chạy **không có cầu dao nào**, và hàng bền của slot
+đó không nói gì. Chính mô tả của hàm hứa "an unarmed breaker that says why" — chỗ gọi giữ nửa
+unarmed, bỏ nửa why. Cùng họ với mọi lỗi đã đóng trong ngày, lùi ra một tầng.
+
+**2. Nhánh lỗ-4%-trong-ngày không bao giờ nổ được trên tuyến này.** Hai lý do độc lập.
+
+Lý do một, ghi đè. Mỗi slot là một tiến trình riêng nên sổ luôn mở với `cur_day = None`, và
+`begin_instant` gọi `start_day(self.equity)` — ghi đè vốn-đầu-ngày bằng vốn hiện tại. Đo:
+
+    sổ nạp đầu ngày 54.000, vốn 51.000  (ngày âm 5,6%, quá hạn 4%)
+    sau begin_instant: đầu ngày = 51.000
+    daily_loss_pct = 0.00%
+
+Quét năm mức vốn 52.000 / 49.000 / 46.500 / 44.000 / 41.000 so với đỉnh 55.000: daily luôn 0,00%.
+Nhánh sụt-từ-đỉnh thì sống thật — WARN + nửa cỡ ở ~11%, HALT ở ~15%.
+
+Lý do hai, và là lý do nặng hơn: **không có ai ghi vốn vào sổ này**. Ba ô bằng 0 trong file live,
+`b1_book_repair.py` ghi 0 có chủ đích và tự nói trong output là "RECONSTRUCTED, NOT RECOVERED". Nên
+kể cả sửa ghi đè cũng không có số nào để tính ngày. Sổ **có** mang `cur_day` — đó là mảnh duy nhất
+đã sẵn có.
+
+Hệ quả cần nói đúng: hôm nay "cầu dao Track 1" chỉ là **một hạn mức sụt-từ-đỉnh**. Gọi nó là cầu
+dao trong hàng ghi hay trên bảng là nói quá.
+
+**3. Cổng công tắc dừng ghim hàm, không ghim dây nối.** `test_b11` kiểm
+`_kill_switch_send_summary` trả về gì. Không kiểm `observe_live_slot` có bỏ qua `maybe_send_orders`
+không. Xoá dòng `if _send is None:` thì 10/10 vẫn xanh. Dây nối có thật (đọc rồi, dòng 1122-1124)
+nhưng chưa bị ghim — đúng hình dạng luật đã viết sau vụ cơ chế an toàn có code + runbook + grep mà
+không nối vào entry point nào.
+
+### Những gì Lô 1 làm đúng, đã đo
+
+- Công tắc dừng **thật sự chặn gửi lệnh**: summary dựng trước block gửi, khi có tệp stop thì lời
+  gọi gửi không bao giờ tới; hàng bền mang `send_status` + `send_reason` nên đọc lại được.
+- Halt từ reconcile chỉ chạm **vào lệnh mới**: FAIL đã ghi thì thay breaker bằng `_EntryHaltBreaker`
+  SAU bước nạp, nên halt thắng mọi thứ sổ mang. Đóng vị thế không bị chạm.
+- Hai lỗ hổng trong reader của tôi đã bịt: tệp tồn tại mà không có khoá `positions` → raise; hàng
+  không phải object → raise (trước là âm thầm bỏ).
+
+### Đã đo / chưa đo
+
+- `test_riskwire_batch1_20260925.py`: **10/10 xanh, tôi tự chạy.**
+- Hồi quy rộng — 75 tệp test có import một trong hai module bị sửa — **đang chạy** (bắt đầu 21:36
+  giờ máy, đã 27 phút CPU, 3 GB RAM, còn đang ăn CPU nên không phải treo). Chưa có kết quả. Nếu đỏ
+  thì phần trên phải viết lại.
+
+### A5 Phần 3 — đã kiểm bằng chứng, chưa chạy
+
+Ngày đề xuất cho hàng MES đứng vững: lấy `ref_day` từ chính bản ghi `state: "filled"` khớp theo
+`order_id` của hàng (không theo `trade_id`), và `created_at` 19:07:02 UTC = 15:07:02 ET rơi cùng
+ngày ET đó. Giá sổ ghi khớp `avg_price` tới từng cent. Giờ giữ 15:00 — bar mà slot 15:05 quyết.
+
+Sửa xong **không đổi gì về vận hành**: stop đã đặt không bị huỷ khi hàng chuyển sang hoãn, và giờ
+vũ trang mà ngày này hàm ý — thứ Bảy 14:00 ET — rơi trước sweep Chủ nhật 18:30, nên việc đầu tiên
+nhìn MES sau đó vẫn thấy nó đến hạn, y như hiện tại. Chỉ có hàng ghi thành đúng.
+
+`repair_mes_entry_date_20260925.py`: bốn phép kiểm độc lập + từ chối nếu hai nguồn trong nhật ký
+không đồng ý về ngày ET. Đã chứng minh nó **đỏ được**: năm đột biến trên bản copy đều bị từ chối
+đúng lý do (giá lệch, hàng đã có ngày, thiếu order_id, order_id trỏ vào không đâu, hai hàng MES mở),
+bản không đột biến vẫn exit 0. Chạy thử xanh, **chưa ghi**.
+
+### Sửa một câu của chính tôi
+
+Tôi viết "4 vị thế, 4 stop đang treo" sáng nay — đó là phía broker. Trong sổ, cả bốn hàng **có** mức
+stop, nhưng dưới tên ô `stop_price`, không phải `stop` (lần đầu tôi dò sai tên nên đọc ra như không
+có). Và **không hàng nào mang id của lệnh đang bảo vệ nó**. Liên kết vị thế ↔ lệnh stop được làm
+theo mã hợp đồng ở phía broker, không bằng id trong sổ. Lô 2 reconcile đúng theo cách đó nên chuyện
+này nhất quán, nhưng phải ghi lại: đọc riêng quyển sổ thì không biết lệnh nào bảo vệ hàng nào.
+
+### Next steps
+
+- [ ] Chờ hồi quy 75 tệp xong → điền con số vào sổ theo dõi (mục I). Nếu đỏ: xác định tệp nào và
+      fixture nào ghim sự im lặng cũ.
+- [ ] Gửi `CODEX_TASK_RISKWIRE_BATCH1_CORRECTION_2026-09-25.md`. Phần A hai việc sửa + 5 cổng (2 lần
+      phải đỏ trước). Phần B **chỉ báo cáo, không sửa dòng nào** — "ai ghi vốn" là quyết định của
+      chủ dự án. Cổng G4 cần con số hồi quy ở trên nên gửi sau khi có nó.
+- [ ] Chạy `repair_mes_entry_date_20260925.py --apply` (chủ dự án). Cửa sổ cuối tuần là lúc an toàn
+      nhất.
+- [ ] Lô 2 correction (mệnh đề "sổ rỗng thì không phải không rõ") — prompt đã viết, chưa gửi.
+- [ ] A2 vẫn của chủ dự án: sổ không đọc được bị trả lời thành sổ rỗng, trong loader mà cả hai
+      việc an toàn dùng. Sweep 00:20 ET mỗi đêm đi qua đúng nhánh đó.
+
+### Files touched
+
+CODEX_REVIEW_REGISTER_2026-09-25.md (thêm mục I, J),
+CODEX_TASK_RISKWIRE_BATCH1_CORRECTION_2026-09-25.md (mới),
+repair_mes_entry_date_20260925.py (mới, chưa chạy --apply)
+
+---
+
+## L. The wide regression landed — 203 red, and why that is not Batch 1
+
+Section I said it would be wrong if this came back red. It came back red, so here is the correction.
+
+    203 failed, 1986 passed, 5 skipped, 42m11s
+    every test file under global_index, monitor and scratch importing either changed module
+    finished 2026-09-25 22:18 machine time
+
+Saved at the repo root as REGRESSION_BASELINE_2026-09-25.txt with the sorted list of failing tests
+beside it, so the next change has a set to compare against rather than a count.
+
+### Where they are
+
+202 of the 203 are in scratch. Exactly one is in a production test directory.
+
+That one: the dashboard truthfulness test for a naked position adding a next-protection line
+asserts the protection time reads as a bare clock, and the panel now renders a weekday in front of
+it. A stale string, from the dashboard round, not from Batch 1. It is written into the paper tab
+prompt with the instruction to decide which side is right before changing either.
+
+### Why the other 202 are not Batch 1 damage
+
+Attributed by mechanism, not by a before-and-after count — and the distinction matters, so say it
+plainly: I did not run this list before Batch 1, so I cannot offer two counts. What I can offer is
+what each failure asserts, which is stronger for this particular family.
+
+The scratch directory holds dated stage-gate snapshots from August, written while this route was
+shadow-only. I read six of them. They fail because:
+
+    the go-live confirmation file exists          - it was created on purpose
+    the orders directory exists                   - the route sent orders on purpose
+    the blocker list is down to one entry         - the others were released on purpose
+    the live book is not flat                     - it holds four positions on purpose
+    the executor is imported by something         - paper sending was wired on purpose
+    the default route book path exists            - the route has a book now
+
+Every one of those assertions reads live repository state. One of these files even hardcodes the
+repository root as an absolute path. So their verdict is a function of what is on disk today, not of
+the working tree's code — which is exactly why Batch 1 cannot be their cause, and also why a
+worktree baseline at an older commit would produce the same 203 and settle nothing.
+
+A keyword scan over the 187 failure blocks the report separates cleanly puts 115 in that family
+explicitly and finds exactly one block mentioning any identifier from the changed code. I read that
+one: it asserts the default route book path does not exist. It exists. Same family.
+
+### What is still unproven
+
+That all 202 are of that family. I read six and classified the rest by what they mention. The
+remaining ones carry names of the same kind — the schedule is still sixty jobs, the journal is wired
+into nothing that runs, the live book exists and is flat — but a name is not a measurement, and this
+row stays at cannot-tell rather than being promoted.
+
+What would settle it: nothing cheap. These tests do not read the working tree, so there is no
+earlier tree to run them against. The honest resolution is the one already in place — the failing
+SET is frozen as a baseline, and the next change is judged on whether that set changes, which does
+not require knowing why any member of it is there.
+
+---
+
+## M. Paper tab phase 1 came back and withdrew my premise — 2026-09-26
+
+I sent a prompt whose main item was already fixed. The report said so, and it was right. Recorded
+here because the mechanism that produced the mistake will produce it again if it is not named.
+
+### What I claimed and what is true
+
+I claimed: zero persisted positions plus an unreadable broker renders UNKNOWN, and should render zero
+of zero. That was true when section H was written. It is not true on this tree — the Batch 2 work
+closed it after I wrote it down, and I re-read my own note instead of re-measuring the code.
+
+Verified at three layers, by me:
+
+- Backend, on a built empty-position fixture: the protection item is MISSING with the evidence line
+  reading zero of zero. Not UNKNOWN.
+- Front end: one function now decides the protection read for all three panels, and it tests the
+  position count for zero BEFORE consulting the source status. An empty book returns a neutral tone
+  and the sentence about there being nothing to protect. That is the clause I said was missing,
+  ordering included.
+- The paper DOM suite: 11 passed, run by me, 106 seconds.
+
+The fix is better than the one I asked for, because three panels that disagreed were replaced by one
+function rather than three corrected copies.
+
+### The mechanism to name
+
+A finding written down at the moment it is found becomes a claim about the past. Re-sending it later
+as an instruction turns it into a claim about the present without any new measurement. Section H said
+the test was still red; my own later run said eleven passed; I carried the older sentence forward
+into a prompt without noticing the two disagreed.
+
+The cost was small only because the report was asked to measure the red set before changing anything,
+which is the gate that caught it. That two-phase shape has now paid for itself twice in two days.
+
+### The one thing that was genuinely missing
+
+The fix covers four combinations and the suite pins three. The fourth — zero positions AND a source
+status of UNKNOWN together — is the one that decides the ordering inside the new function, and
+nothing fails today if the two branches are swapped back. That is now a required gate with its
+mutation.
+
+### The three backend failures — all three checked by me, all stale, none hiding a defect
+
+| Test | Verdict | What I checked rather than assumed |
+|---|---|---|
+| The durable-artifacts test expecting an observed protection | Stale expectation | Whether UNKNOWN swallows a recorded stop order id and loses the difference between a position with a recorded stop and one with nothing. It does not: measured on both fixtures, the id travels beside the status in two places while the status stays UNKNOWN for both. Nothing was collapsed |
+| The C1 detail test expecting the old phrase | Stale expectation | That the relabel was deliberate and complete. The status code and the stylesheet class kept their names, which is why the sibling assertions still pass; only the human-facing sentence moved from cost words to correspondence words |
+| The cache test whose counting stub lost a signature | Stale test double, and worse than the other two | Whether the missing route argument hid a cache-key collision, which would let one route return another route's parsed result. It does not: the key already carries the route beside the epoch, path, size and modification time. Production is correct, the stub is behind |
+
+The third one deserves its own line. It is not asserting the wrong thing — it is asserting nothing
+at all, because the stub raises before the cache is ever reached. So a caching test has been passing
+as a no-op for an unknown number of runs. Repairing the signature is not the deliverable; the
+deliverable is showing it go red when the memoisation is removed. If it cannot be made to fail that
+way, it was never testing the cache.
+
+That is the same family as the kill-switch gate in the other batch: a test that cannot fail has
+measured nothing, and the only way to know is to make it fail on purpose.
+
+### Sent
+
+CODEX_PAPER_TAB_PHASE2_APPROVED_2026-09-26.md — phase 2, approved, with the withdrawal at the top so
+nobody hunts a closed defect. Six gates, two of which require a red run first.
+
+## 2026-10-03 — MGC qua engine swing-TF Rổ 4 (thử nghiệm, không đụng code/config)
+- Chạy `backtest_swing_tf` nguyên trạng (ema=30, mult=2.5, max_hold=5, gap_fill, 2 tick/side, comm 1.24, nhãn SPY fit_end 2024-12-31) trên `nonequity/data/GC_continuous_1m_8y.parquet` (2018-01..2024-12-31, back-adjusted vi sai), pv=10 tick=0.10 → rt cost $5.24.
+- MGC 1 hợp đồng: 748 lệnh, net +$142, PF 1.01, WR 9.4%; gross $4.061 ≈ phí $3.920 (96,5%). Bootstrap CI95 trung bình/lệnh [-7.3, +8.4] chứa 0.
+- Nhãn fit_end 2022-12-31 (OOS thật cho 2023-24): 2023-24 n=164 net +$1.856 PF 1.42, CI [-8.1,+33.2] chứa 0. 2018-2021 âm (-$2.5k), 2022-24 dương. LONG +$1.764, SHORT -$1.623 (thiên lệch xu hướng tăng của vàng).
+- Ghép vào Rổ 4 (4 mã, cùng điều kiện): net 34.838→34.979, maxDD 5.749→5.209; tương quan ngày MGC–Rổ 4 = 0.045. Cải thiện DD đến từ luồng không tương quan có kỳ vọng ≈ 0, chưa chứng minh bền.
+- Chưa xác minh: engine control (MES +$6.500) chưa đối chiếu với số đã lưu; dữ liệu vàng dừng 2024-12-31 nên chưa có holdout 2025-26. Script: scratchpad phiên + C:\tmp\*_prod_trades.csv.
+
+## 2026-10-05 — Vì sao slot Calm 10:00 (EXECUTE) bị từ chối (chỉ điều tra, không sửa code)
+- Đo: 2/2 bản ghi (10/02, 10/05) đều `SLOT_REFUSED / gate_refused / entry_quote_absent`, `order_attempted=false`; luật Calm đều "not_reached" (bị chặn trước khi sleeve chạy).
+- Cơ chế: cổng đòi bar 1 phút stamp 10:00 trong khung của mã đứng đầu theo bảng chữ cái (MES: `sorted(joined)[0]` ở run_live_day_track1.py ~L814). Slot chạy 10:00:00–10:00:18; bar 10:00 chỉ đóng lúc 10:01:00. Khung MES kết thúc 09:59 cả hai ngày; MNQ cùng lúc có bar 10:00 → kết quả phụ thuộc IBKR có trả bar đang hình thành hay không (nguyên nhân MES≠MNQ: CHƯA đo).
+- EXECUTE dùng lại `REQUIREMENTS["roska4_calm"]` (track1_intraday.py ~L368) mà comment của chính nó (L174-177, run_live_day_track1 ~L797) nói bar 10:00 chỉ đọc được từ 10:01 → có dấu hiệu mâu thuẫn thiết kế; chờ chủ dự án xác nhận ý định.
+- Cả hai ngày DECIDE 09:32 và OBSERVE 10:02 đều NO_SIGNAL → không mất lệnh nào trong hai ngày này. Trước 10/02 không có bản ghi EXECUTE.
+- 2026-10-05 (đính chính, chưa sửa code): hướng "EXECUTE đọc giá từ bar 09:59" đã bị rút lại. Luật Calm lấy giá vào lệnh từ bar 10:00 (`_bar_open_at`) và trả None nếu thiếu → nới cổng một mình sẽ biến từ chối rõ ràng thành NO_SIGNAL im lặng; đổi sang 09:59 lại lệch định nghĩa backtest (entry = 10:00 OPEN). Phiên EXECUTE hiện chưa commit (sửa 10/01) và test_calm_execute_slot.py ghim chủ ý "EXECUTE cần 10:00 OPEN". Hướng đúng cần chủ dự án chọn: giữ 10:00 OPEN và xử lý cuộc đua lấy bar (chờ/lấy lại có hạn), kiểm cả hai mã thay vì chỉ MES.
+
+## 2026-10-05 — Rà luật backtest Calm A (đọc + dựng lại; chưa sửa code)
+- Luật: nhãn SPY-HMM phiên trước = Calm; đóng cửa phiên trước ở 1/3 dưới biên độ; phiên trước đóng ≤ mở; gap ≥ −1%; LONG, MES+MNQ, vào ở giá MỞ 10:00, thoát ở giá MỞ 15:55; stop thảm hoạ 1,5×ATR (chỉ chạm 0,6% lệnh IS: no_stop $9.718 vs atr15 $9.686). Chi phí 2 tick/chiều.
+- Số lưu (probe 2026-08-22): 349/44/28 lệnh = 421; net $9.718/$2.050/$1.185 = $12.953 (đã đối chiếu cộng). $14.776/416 dòng trong comment là TRƯỚC phí (gross), không ghi nhãn.
+- Dựng lại bằng detector thật: nhãn HMM fit_end 2022-12-31 → 405/421 dòng trùng, 385/405 cùng số điểm; IS 338 lệnh $9.355. Nhãn fit_end 2024-12-31 (MẶC ĐỊNH LIVE, track1_params HMM_FIT_END) → 381 lệnh $8.417 (2026: 40 lệnh +$167 vs +$1.451 với nhãn 2022). Danh sách đóng băng dùng nhãn 2022; live dùng 2024. Chưa rõ nhãn nào đúng cho live — cần chủ dự án quyết.
+- Sai khác giá tham chiếu 09:59 close vs 10:00 open: trung vị 1 tick, p90 2 tick, trung bình có dấu ~$0,1 → đủ nhỏ để tính stop/rủi ro.
+- Backtest thoát bằng lệnh thời gian 15:55 là cơ chế chính; live chưa có slot thoát Calm (chưa chứng minh tuyệt đối) → không có thoát thì không phải cùng chiến lược.
+
+## 2026-10-05 (tối) — Calm: vào lệnh market 10:00 + thoát 15:55 (ĐÃ SỬA CODE, CHƯA COMMIT, CHƯA KHỞI ĐỘNG LẠI SCHEDULER)
+Quyết định của chủ dự án: (1) nhãn HMM = fit_end 2024-12-31 (giữ mặc định live; danh sách đóng băng dùng nhãn 2022 → số backtest Calm đã lưu KHÔNG phải thứ live chạy; dựng lại bằng nhãn 2024: 381 lệnh/+$8.417 thay vì 433/+$12.512); (2) làm slot thoát; (3) vào lệnh market 10:00 tham chiếu 09:59.
+### Đã làm
+- [x] Vào lệnh: EXECUTE đòi bar 09:59 ĐÃ ĐÓNG (không đòi bar 10:00) cho CẢ HAI mã; candidate lập từ giá đóng 09:59 (`detect_paper_entry_for_day`, `candidates(..., phase="EXECUTE")`). Từ chối ngày phiên đóng sớm (`session_ends_before_exit`) hoặc không tra được lịch.
+- [x] Thoát: `FuturesRunner.run_time_exit(day, cluster)` + `_close_for_exit` (tách từ `run_maxhold_exit`, hành vi cũ giữ nguyên); CLI `run_maxhold_exit --time-exit-cluster roska4_calm` (chỉ kết nối khi sổ có vị thế Calm); job `track1_time_exit_calm_1555` (15:55 ET, bảng `track1_safety_jobs`); job MAX_HOLD 09:31 Track 1 nhận `--cluster-max-hold roska4_calm=1` (lưới an toàn nếu 15:55 hỏng).
+- [x] `job_journal_reader`: kiểu job mới `track1_safety_time_exit` + câu tác động (id KHÔNG được bắt đầu bằng `TRACK1_CALM_`, sẽ bị xếp vào slot chiến lược).
+- [x] Test mới: `global_index/test_calm_execute_sends_without_the_1000_bar.py` (19), `test_calm_time_exit_1555.py` (17) — đã đột biến 9 cơ chế, đều đỏ đúng test. Sửa `test_calm_execute_slot.py` (ghim ý định cũ) và 4 test scratch ghim "11 job" → 12.
+### CẦN LÀM (chủ dự án)
+- [ ] `python -m monitor.ops restart --scheduler` TRƯỚC 09:32 ET sáng mai: slot con tải mã từ đĩa NGAY (EXECUTE 10:00 sẽ dùng đường mới), nhưng job thoát 15:55 chỉ có sau khi scheduler khởi động lại (APScheduler đọc lịch lúc khởi động). Scheduler hiện chạy `--allow-orders` (từ 10/04 11:42 MDT).
+- [ ] `paper_evidence_reader._normalize_exit` chưa biết `TIME_EXIT` → CLOSE của Calm sẽ bị đếm là "chưa gắn nhãn" (tuyến dashboard).
+- [ ] Rủi ro còn lại: ngày roll hợp đồng (book `contract_month=None`); thoát chạy ~15–25s sau 15:55:00 (so với giá MỞ 15:55 của backtest) — đo độ trễ ở lần chạy thật đầu tiên; test cũ đỏ sẵn (HEAD): test_entrydate_v2 golden, test_stop_repair_slots::never_calls_run_day (comment), ~30 test scratch ghim số cũ.
+- 2026-10-05 (sau rà soát độc lập; đính chính mục trên): reviewer tìm 5 lỗi, đã kiểm trong code rồi sửa, mỗi lỗi có test + đột biến đỏ (`global_index/test_calm_review_findings_20261005.py`, 14 test):
+  1. EXECUTE thừa hưởng grace 180s → có thể gửi lệnh "10:00" lúc 10:02:30 mà `window_verdict` không bắt (candidate dated 10:00). Nay grace = 30s → `too_late`.
+  2. Slot vào lệnh đăng ký cả ở chế độ chuyển tiếp còn lưới an toàn chỉ ở `--track1-only-shadow` → nay `--allow-orders` bị bỏ (cảnh báo) nếu không phải track1-only.
+  3. Fallback tìm stop theo (mã, chiều, size) có thể hủy nhầm stop của vị thế khác → nay từ chối đoán khi sổ còn vị thế khác cùng mã/chiều/size; thoát theo giờ mà không tìm được stop thì ghi ERROR "orphan".
+  4. Job thoát ghi lại cả file vị thế, trùng slot swing 15:55 → job nay chạy sớm 1 phút: `track1_time_exit_calm_1554` (15:54 ET), fill ~1 phút trước giá mở 15:55 của backtest (đánh đổi có chủ ý).
+  5. Thoát chỉ tin sổ vị thế → nay nếu sổ không có vị thế Calm nhưng sổ lệnh có OPEN Calm hôm nay chưa đóng (hoặc không đọc được) thì thoát mã 1 + ERROR.
+  Thêm: từ chối cả ngày không giao dịch (không chỉ phiên đóng sớm). Chưa kiểm: lịch NYSE vs lịch CME ngày đóng sớm trùng nhau mọi trường hợp.
+- Lệnh vận hành sáng mai: `python -m monitor.ops restart --scheduler` TRƯỚC 09:32 ET (job thoát hiện là 15:54 ET).
+- 2026-10-05 (kiểm cuối): chạy từng tệp test của global_index+monitor trên mã cuối. 1 test đỏ do tôi (`test_g101_backend_uses_canonical_safety_schedule`: dashboard coi job thoát là "bảo vệ kế tiếp") → đã lọc `kind == "time_exit"` ở `track1_market_view._next_protection_job` + test. Còn đỏ, KHÔNG do tôi (vẫn đỏ khi gỡ job của tôi khỏi bảng / không chạm module liên quan): global_index: test_entrydate_v2 (golden), test_stop_repair_slots (comment); monitor: runner_state_provenance ×2, runner_state_track1_payload, track1_paper_evidence, realtime_skin (font), dashboard_backend ×2, dashboard_truthfulness_phase2 ×4 (Playwright timeout), log_cache_counts. test_event_playback quá 240s (chưa có kết quả).
+- 2026-10-05 (2 việc theo yêu cầu):
+  1. `paper_evidence_reader`: `TIME_EXIT` nay là lý do thoát được nhận (`_normalize_exit`). Đếm RIÊNG (`metrics.time_exits`, dòng evidence "Calm TIME_EXIT n (not one of the three paths)"), KHÔNG vào `exits` (cổng vẫn đòi đúng 3 đường swing ≥3 mỗi đường) và KHÔNG vào `labelled_exits`/`unlabelled_exits` (STRUCTURAL_GAP của swing không bị che). Test: `monitor/test_time_exit_evidence_20261005.py` (6, đột biến 3 đỏ). Quyết định mở cho chủ dự án: có muốn Calm TIME_EXIT thành đường thứ tư phải đạt ≥3 không (hiện KHÔNG).
+  2. Độ lệch thoát sớm 1 phút + vào lệnh trễ: ĐO ƯỚC LƯỢNG bằng bar 1 phút trên 381 ngày Calm (0 ngày thiếu bar, tự kiểm |open15:55−close15:54| trung vị 1 tick): thoát giữa phút 15:54 vs giá mở 15:55 = trung bình +$0,05/hợp đồng (sd $6,93, p10/p90 −$6,88/+$7,50); vào lệnh sau 16 giây vs giá mở 10:00 = +$0,41 (sd $5,64); cộng ≈ $0,46/vòng lệnh ≈ 10% phí giả định $4,71. Thiên lệch ≈ 0; phần còn lại là nhiễu. CHƯA ĐO: độ trễ thật của job thoát (kết nối + ngủ 5s + runner) và giá khớp thật. Công cụ đo thật (chỉ đọc): `python -m global_index.calm_execution_gap [--day YYYY-MM-DD]` — chạy SAU lần khớp thật đầu tiên và SAU 13:45 hôm sau (bar 15:55 chỉ vào parquet theo lần cập nhật kế tiếp); fill không đo được thì in UNMEASURED, mã thoát 2/3 khi không đo được gì. Test: `global_index/test_calm_execution_gap.py` (15, đột biến 6 đỏ).
+
+## 2026-10-06 — Calm EXECUTE 10:00 ET hỏng: IBKR trả rỗng + mã sập thay vì từ chối có tên (ĐÃ SỬA, chưa commit)
+- Đo: scheduler (khởi động lại 10/05 23:01) chạy slot 08:00:00–08:02:06 giờ máy, thoát mã 1, `AttributeError: 'NoneType' object has no attribute 'index'` ở `_overlap_population` (track1_live_source.py:811); OBSERVE 10:02 bị bỏ qua vì slot trước "còn chạy". ~126 s ≈ hạn 120 s của `reqHistoricalData`. Không có bản ghi observation cho slot (sập trước khi ghi). Hôm nay DECIDE 09:32 = NO_SIGNAL nên không mất lệnh.
+- Nguyên nhân tầng mã: `_overlap_population` (mã mới chưa commit của phiên khác) thiếu chốt `aligned is None or empty` mà `_refuse_overlap_disagreement` luôn có. Đã thêm; slot nay ghi hàng từ chối (`gate_refused: missing_session,entry_quote_absent,stale`) và observation ghi `live_rows_fetched=0` + lời của feed.
+- Nguyên nhân tầng mạng/IBKR: CHƯA XÁC ĐỊNH. Bằng chứng: 07:31 (MAX_HOLD, client 90) và 07:32 (DECIDE, client 89) vẫn tốt; 10:07 ET cùng lời gọi `sleeve_frames` chạy được (2348 bar, 9 s); internet + DNS + cổng 4002 ổn; log API của Gateway mã hóa (.ibgzenc) nên không đọc được. Không chứng minh được "mạng của máy".
+- SỰ CỐ DO TÔI GÂY RA (đã khắc phục): test slot của tôi ghi 86 dòng giả vào `data_observation_20261005.jsonl` THẬT (từ 10/05 17:11 giờ máy) và ghi đè `session_bars/MES_20261005.parquet`, `MNQ_20261005.parquet` bằng khung giả 30 dòng. Nguyên nhân: `_write_data_observation` được gọi KHÔNG truyền `root=root` (đã sửa). Đã gỡ đúng 86 dòng bằng tiêu chí khách quan (giữ 49 dòng thật, cuối là STRESS_1230 16:30:30Z; 139.078→69.962 byte), sao lưu ở scratchpad `pollution_backup_20261006/`. Hai tệp session_bars giả đã cất đi: MES/MNQ 20261005 hiện KHÔNG có tệp (nhiều khả năng đã có bản thật bị ghi đè; không khôi phục được nguyên bản — có thể dựng lại từ parquet nếu cần, và phải ghi rõ là dựng lại).
+- Test: `global_index/test_empty_feed_is_a_refusal_not_a_crash_20261006.py` (7; đột biến 2 đỏ từ thư mục nháp); mọi bộ test Calm chạy xong không đổi cây thật (so snapshot trước/sau). A/B có kiểm soát cho `root=root`: 122 test đỏ cả hai bên, tập đỏ giống hệt.
+
+## 2026-10-06 — Job view toàn `^^^^`: lọc nhiễu traceback trong job journal (ĐÃ SỬA, chưa commit, CHƯA restart backend)
+- Nguyên nhân (đo): thay đổi chưa commit trong `monitor/backend/job_journal_reader.py` (không ghi nguồn) gắn đuôi stdout/stderr của tiến trình con vào job hỏng; HEAD gắn 0 dòng cho các lỗi này. Có hiệu lực từ lần restart backend 10/05 23:01. 10/06: 189 dòng hiển thị, 46 dòng `^^^^`, 28 khung thư viện, 290 dòng bị cắt.
+- Sửa (đồng ý của chủ dự án): trong `_append_child_diagnostic`, bỏ dòng chỉ `^`/`~`, khung site-packages/stdlib/frozen kèm dòng mã dưới nó, TRƯỚC giới hạn 12 dòng; dòng bị lọc vẫn đếm vào `diagnostics_omitted`. Giữ khung của dự án + dòng lỗi.
+- Cổng: STRESS_1130 hiện `broker.connect()` + `TimeoutError`; CALM_EXECUTE_1000 hiện `_overlap_population` + `AttributeError`; 1.454 job / 23 ngày giữ nguyên id/status/reason/impact; 0 dòng `^^^^`/thư viện trên 16 job hỏng hôm nay; 5 đột biến đều đỏ. Test mới: `monitor/test_job_log_keeps_the_lines_that_say_why_20261006.py` (16) + fixture `monitor/fixtures/scheduler_1006_stress_1130_traceback.log` (dòng log thật). Sửa số ghim 17→28 trong `test_duplicate_launch_is_one_job_not_a_wall_of_phantoms` (nguyên tắc "đếm, không bỏ im lặng" giữ nguyên). Hồi quy 25 tệp có/không bộ lọc: chỉ test đó đổi; test_dashboard_backend còn 2 đỏ sẵn.
+- CẦN: restart backend (`python -m monitor.ops up`) để dashboard dùng mã mới.
+
+## 2026-10-08 — NKD hỏng 2 đêm liền: mốc tài khoản hết hạn giữa phiên; scheduler nay hỏi cổng lệnh ở MỖI slot (ĐÃ SỬA, chưa commit, CHƯA restart scheduler)
+- Đo: mốc ghi 10/05 23:01:16 → hết hạn 10/06 23:01:16 → 6 slot NKD 01:10–01:35 ET (10/07) thoát mã 2 "Nothing was run"; mốc ghi 10/06 23:35:49 → hết hạn 10/07 23:35:49 → 16 slot NKD 01:40–02:55 ET (10/08) thoát mã 2. Blocker: B1_broker_account_or_legacy_retirement. Không có bản ghi quyết định cho các slot đó. Hiện CHƯA có mốc mới.
+- Nguyên nhân thiết kế: scheduler chỉ hỏi cổng lúc khởi động rồi gắn `--allow-orders` cho cả phiên; con thấy cổng đóng → từ chối và không chạy gì.
+- Sửa: `run_scheduler._track1_gate_open_now(slot_id)` hỏi `may_enable_orders()` khi khởi chạy mỗi slot; đóng → slot chạy shadow + WARNING; không đọc được → coi là đóng; mở lại → tự bật lệnh. `track1_order_request` = ý định của người vận hành. Test: `global_index/test_order_gate_rechecked_every_slot_20261008.py` (6; đột biến 3 đỏ). Hồi quy 97 tệp test có scheduler, so với cách cũ: 96 tệp tập test đỏ giống hệt, tệp còn lại là test mới.
+- CẦN: ghi mốc (`python -m global_index.account_baseline_audit --broker ibkr --record`) nếu muốn gửi lệnh, và/hoặc `python -m monitor.ops restart --scheduler` để dùng mã mới — trước 09:32 ET.

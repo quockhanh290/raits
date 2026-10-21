@@ -1,0 +1,81 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14",
+  "script": "raits/research/stocks_pit_full_beta_plus_calendar_overlay.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BETA_VOLTARGET_EXPANSION_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv"
+  ],
+  "method": "Pre-registered moderate beta vol-target sleeve plus first-five-trading-days calendar overlay with financing and exposure-turnover cost.",
+  "financing_annual_rate": 0.025,
+  "turnover_cost_bps": 4.0,
+  "variants": [
+    {
+      "beta": "spy_vt16_cap150",
+      "overlay_base": "spy_buy_hold",
+      "overlay_exposure": 0.5
+    },
+    {
+      "beta": "spy_vt16_cap150",
+      "overlay_base": "spy_buy_hold",
+      "overlay_exposure": 1.0
+    },
+    {
+      "beta": "spy_vt20_cap200",
+      "overlay_base": "spy_buy_hold",
+      "overlay_exposure": 0.5
+    },
+    {
+      "beta": "spy_vt20_cap200",
+      "overlay_base": "spy_buy_hold",
+      "overlay_exposure": 1.0
+    },
+    {
+      "beta": "top62_vt16_cap150",
+      "overlay_base": "market_cap_top62_equal_weight",
+      "overlay_exposure": 0.5
+    },
+    {
+      "beta": "top62_vt16_cap150",
+      "overlay_base": "market_cap_top62_equal_weight",
+      "overlay_exposure": 1.0
+    },
+    {
+      "beta": "top62_vt20_cap200",
+      "overlay_base": "market_cap_top62_equal_weight",
+      "overlay_exposure": 0.5
+    },
+    {
+      "beta": "top62_vt20_cap200",
+      "overlay_base": "market_cap_top62_equal_weight",
+      "overlay_exposure": 1.0
+    },
+    {
+      "beta": "spy_vt16_cap150",
+      "overlay_base": "market_cap_top62_equal_weight",
+      "overlay_exposure": 0.5
+    },
+    {
+      "beta": "spy_vt16_cap150",
+      "overlay_base": "market_cap_top62_equal_weight",
+      "overlay_exposure": 1.0
+    },
+    {
+      "beta": "top62_vt16_cap150",
+      "overlay_base": "spy_buy_hold",
+      "overlay_exposure": 0.5
+    },
+    {
+      "beta": "top62_vt16_cap150",
+      "overlay_base": "spy_buy_hold",
+      "overlay_exposure": 1.0
+    }
+  ],
+  "sample_label": "Research/touched 2018-2024 only; no 2025-2026 OOS opened.",
+  "leakage_controls": "Calendar labels use trading-day order only; beta streams and benchmark streams come from prior PIT diagnostics. No old manual 62 ticker list.",
+  "rule_selection_effect": "None inside diagnostic. Variant grid fixed before running.",
+  "outputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_DAILY.csv"
+  ]
+}

@@ -49,10 +49,12 @@ next time the offset changes.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Iterable, Mapping
 
 import pandas as pd
+
+from global_index import track1_calm_a as _calm_a
 
 ET = "America/New_York"
 
@@ -332,10 +334,10 @@ def _span_check(name: str, idx: pd.DatetimeIndex, day: pd.Timestamp,
 #: table above is untouched, so every unsplit sleeve and every unphased call gate exactly as
 #: they did before.
 #:
-#: Calm is the only entry today, and only because its two phases read different bar sizes at
-#: different instants. Writing one requirement that admitted both would mean a gate that asks
-#: for the loosest of each pair, which is a gate that passes at 09:32 something only true at
-#: 10:01.
+#: Calm is the only entry today, and its evidence is split around an explicit 10:00 execution
+#: pass because the decision and entry reference are at different instants. Writing one
+#: requirement that admitted both evidence halves would mean a gate that asks for the loosest
+#: of each pair, which is a gate that passes at 09:32 something only true at 10:01.
 PHASE_REQUIREMENTS: dict = {
     # DECIDE. The rule is complete once today's 09:30 MINUTE bar has closed: everything else it
     # reads closed yesterday. So this validates the ONE-minute frame, spans exactly that one
@@ -363,6 +365,28 @@ PHASE_REQUIREMENTS: dict = {
         decision_grace_seconds=0,
         required_context_through="10:00",
         required_entry_quote_time="10:00"),
+    # EXECUTE is the actual paper admission/send pass at the entry instant. It uses the same
+    # causal requirement as the unphased Calm contract, then continues into admission rather
+    # than stopping after the evidence-only freshness check.
+    #
+    # ONE difference, and it is the point (2026-10-05): the quote it needs is the CLOSE of the
+    # 09:59 bar, not the 10:00 OPEN. This slot sends a market order at 10:00:00, and a minute bar
+    # stamped 10:00 closes at 10:01:00 — so asking for it refused `entry_quote_absent` on every
+    # run (2026-10-02 and 2026-10-05, 2 of 2), or passed by luck when the broker happened to
+    # return the still-forming bar (MNQ did, MES did not, on both days). The 09:59 bar has closed
+    # by 10:00:00, so the check can be answered at the instant the order is meant to go. The
+    # unphased contract and the OBSERVE half still read the 10:00 OPEN; they run after it.
+    #
+    # And a SHORT grace (reviewer finding, 2026-10-05). The unphased contract allows 180 s because
+    # an OBSERVE-style read has to wait for the 10:00 bar to close. This slot SENDS: with 180 s it
+    # could start at 10:02:30, pass the gate (the 09:59 bar exists), and send a market order two
+    # and a half minutes late — while `window_verdict`, which exists to refuse a late Calm entry,
+    # cannot see it because the candidate is dated at the 10:00 order instant. Measured slot
+    # start latency is a few seconds; 30 s keeps that and refuses anything later as `too_late`.
+    ("roska4_calm", "EXECUTE"): replace(
+        REQUIREMENTS["roska4_calm"],
+        required_entry_quote_time=_calm_a.PAPER_ENTRY_REFERENCE_BAR,
+        decision_grace_seconds=30),
 }
 
 

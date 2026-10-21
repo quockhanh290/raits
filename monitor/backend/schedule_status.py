@@ -307,6 +307,7 @@ def scheduler_track1_mode_status(processes: list[dict[str, Any]] | None = None) 
         "track1_mode": "n/a",
         "scheduler_track1_only": None,
         "track1_shadow": None,
+        "scheduler_armed": None,
         "legacy_entry_jobs": None,
     }
     if not rows:
@@ -317,8 +318,10 @@ def scheduler_track1_mode_status(processes: list[dict[str, Any]] | None = None) 
         return out
     track1_only = "--track1-only-shadow" in commands
     track1_shadow = track1_only or "--track1-shadow" in commands
+    scheduler_armed = "--allow-orders" in commands
     out["scheduler_track1_only"] = track1_only
     out["track1_shadow"] = track1_shadow
+    out["scheduler_armed"] = scheduler_armed
     out["track1_mode"] = (
         "track1-only-shadow" if track1_only else
         "track1-shadow" if track1_shadow else
@@ -408,6 +411,19 @@ def is_clean_exit(detail: str) -> bool:
 def is_debt_exit(detail: str) -> bool:
     """Thoát bình thường NHƯNG con đã ghi CRITICAL/ERROR."""
     return any(token in str(detail).lower() for token in DEBT_EXIT_TOKENS)
+
+
+ORDER_GATE_REFUSED_TOKEN = "nothing was run. re-run without --allow-orders for a shadow pass."
+
+
+def is_order_gate_refusal(detail: str) -> bool:
+    """A Track 1 child refused to run because order sending was not armed."""
+    text = str(detail or "").lower()
+    return (
+        ORDER_GATE_REFUSED_TOKEN in text
+        or ("order sending was requested and is not available" in text
+            and "nothing was run" in text)
+    )
 
 
 _cache_lock = threading.Lock()
@@ -749,6 +765,9 @@ def _evidence(
         else:
             reason, severity = "unknown", "watch"
         return {**base, "state": "skipped", "reason": reason, "severity": severity}
+    if is_order_gate_refusal(joined):
+        return {**base, "state": "skipped", "reason": "order_gate_refused",
+                "severity": "expected"}
     if "exited with code" in joined:
         return {**base, "state": "failed", "reason": "exception", "severity": "incident"}
     if is_clean_exit(joined):
@@ -893,6 +912,7 @@ def _schedule_status_body(
     log_available = bool(_log_signature(root))
     today_lines = _scheduler_lines(now_et.date(), root) if log_available else []
     _sched_state = scheduler_process_state()
+    _mode_state = scheduler_track1_mode_status()
     _started_at = _parse_iso(_sched_state.get("started_at"))
     due_evidence = [
         (_slot, _evidence(_slot, root, today_lines, _started_at)) for _slot in todays_due
@@ -1014,6 +1034,25 @@ def _schedule_status_body(
         # it had read.
         "route_mode_source": route_mode_source,
         "route_mode_known": resolved_track1_only is not None,
+        # Whether the RUNNING scheduler will pass --allow-orders to Track 1 slots.
+        #
+        # Separate from `track1_runtime.gates.orders_possible`: the gate registry can say
+        # orders MAY be enabled while the scheduler was started in shadow mode.  Separate
+        # also from this backend's environment: only the scheduler's argv determines what
+        # the next slot receives.
+        "order_request": {
+            "scheduler_armed": _mode_state.get("scheduler_armed"),
+            "source": _mode_state.get("track1_mode_source"),
+            "scheduler_running": _mode_state.get("scheduler_running"),
+            "track1_mode": _mode_state.get("track1_mode"),
+            "reading": (
+                "scheduler argv contains --allow-orders"
+                if _mode_state.get("scheduler_armed") is True else
+                "scheduler argv does not contain --allow-orders"
+                if _mode_state.get("scheduler_armed") is False else
+                "scheduler command line could not be read; order request state is unknown"
+            ),
+        },
         "evidence_available": log_available,
         "evidence": latest_evidence,
         "incidents": incidents,

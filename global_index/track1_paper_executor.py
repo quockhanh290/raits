@@ -180,9 +180,15 @@ class ProductionGate:
 
 
 def production_gate() -> ProductionGate:
-    """What the gate says right now, with no confirmations granted — which is the only state
-    it has ever been in. `blocks_orders` blockers include the two MEASURED ones, so this is a
-    live measurement, not a constant."""
+    """What the gate says right now. `blocks_orders` blockers include the MEASURED ones, so this
+    is a live reading, not a constant.
+
+    The old wording said "with no confirmations granted — which is the only state it has ever
+    been in". That stopped being true on 2026-08-27, when the operator signed the confirmation
+    file, and again on 2026-09-24, when the evidence gate was overridden so paper orders could
+    run while it keeps measuring. `may_enable_orders()` reads the signed file by default, so what
+    comes back here can be an OPEN gate — and an override still reports itself separately through
+    `overridden()`, which anyone printing this answer has to read alongside it."""
     from global_index import track1_gates as G
 
     allowed, reasons = G.may_enable_orders()

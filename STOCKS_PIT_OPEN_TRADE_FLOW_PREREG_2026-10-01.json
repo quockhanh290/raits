@@ -1,0 +1,89 @@
+{
+  "research_question": "Can causal pre-09:35 tick-trade flow condition broad-PIT opening shocks into a tradable 10-15 minute edge?",
+  "frozen_before_performance": true,
+  "frozen_at_local_date": "2026-10-01",
+  "script": "raits/research/stocks_pit_open_trade_flow.py",
+  "script_hash": "C7D8A34A99B4B2C786B1CCDDB534E8F4FEBD57CF9B481D8C30BCD6E038E6A7CD",
+  "data_contract": {
+    "universe": "quarterly PIT market-cap top500 intersected with daily PIT eligibility and ADV20 >= 10m; source ticker-days pass the causal broad opening-event screen; old/manual 62 unused",
+    "tick_source": "Polygon /v3/trades/{ticker}, 09:25 inclusive to 09:40 exclusive ET, keyed by SIP arrival timestamp",
+    "signal_clock": "only trades with sip_timestamp in [09:30:00,09:35:00) ET; tick-rule warmup may use [09:25:00,09:30:00)",
+    "execution": "exact adjusted 09:40 five-minute bar open; 10m exits at 09:50 and 15m exits at 09:55; missing scheduled bar uses first same-session five-minute open without changing membership",
+    "development": "2018-05-24 through 2021-12-31",
+    "locked_validation": "2022-01-01 through 2022-12-30; open only for the highest-ranked development passer",
+    "post2022": "forbidden",
+    "quotes": "not available under current Polygon entitlement; no spread, NBBO depth, or auction-imbalance claim"
+  },
+  "common_filters": {
+    "absolute_first5_return_min": 0.003,
+    "rvol930_min": 1.5,
+    "signal_trades_min": 100,
+    "signal_dollar_min": 1000000,
+    "trade_corrections": "exclude correction != 0",
+    "trade_signing": "causal tick rule with last nonzero sign carried forward; unresolved initial trades sign zero"
+  },
+  "hypotheses": [
+    {
+      "variant": "flow_confirmation_15m",
+      "rule": "flow_imbalance times first5 direction >= 0.15; trade in first5 direction",
+      "exit": "09:55"
+    },
+    {
+      "variant": "flow_divergence_10m",
+      "rule": "flow_imbalance times first5 direction <= -0.15; trade opposite first5 direction",
+      "exit": "09:50"
+    },
+    {
+      "variant": "late_flow_flip_10m",
+      "rule": "early imbalance times first5 direction >= 0.15 and late imbalance times direction <= -0.20; trade opposite first5 direction",
+      "exit": "09:50"
+    },
+    {
+      "variant": "large_trade_confirmation_15m",
+      "rule": "top-20%-trade-dollar imbalance times first5 direction >= 0.20 and large-trade dollar share >= 0.70; trade in first5 direction",
+      "exit": "09:55"
+    },
+    {
+      "variant": "trf_divergence_10m",
+      "rule": "TRF share >= 0.15, lit imbalance times direction >= 0.15, and TRF imbalance times direction <= -0.15; trade opposite first5 direction",
+      "exit": "09:50"
+    }
+  ],
+  "portfolio": {
+    "selection": "rank each side by abs(first5 return) times frozen microstructure strength times sqrt(capped rvol930)",
+    "book_requirement": "exactly 3 longs and 3 shorts; otherwise no trade that day",
+    "sic_cap": "maximum one ticker per SIC per side",
+    "weights": "equal 1/6 absolute NAV per name, 0.5x long plus 0.5x short",
+    "adv_cap": "each opening order <= 1% ADV20",
+    "initial_equity": 100000,
+    "compounding": true
+  },
+  "costs": {
+    "base_bps_per_traded_dollar_per_side": 4,
+    "stress_bps_per_traded_dollar_per_side": 8,
+    "short_borrow_annual": 0.01,
+    "financing": 0
+  },
+  "development_gate": {
+    "active_days_min": 100,
+    "trade_legs_min": 600,
+    "cagr_min": 0.05,
+    "sharpe_min": 0.8,
+    "max_drawdown_pct_floor": -0.12,
+    "positive_years_min": 3,
+    "gross_edge_bps_per_active_day_min": 12,
+    "stress_pnl_positive": true,
+    "top10_positive_pnl_share_max": 0.5,
+    "winner": "highest base-cost Sharpe, then CAGR, among passers"
+  },
+  "validation_gate": {
+    "active_days_min": 20,
+    "pnl_positive": true,
+    "sharpe_min": 0.5,
+    "max_drawdown_pct_floor": -0.1,
+    "stress_pnl_positive": true,
+    "top10_positive_pnl_share_max": 0.6
+  },
+  "multiple_testing_policy": "Exactly five frozen rows. No threshold, feature, horizon, weighting, name-count, or direction changes after performance is observed.",
+  "production_policy": "No result from this search is a production PASS; a validation pass only continues to execution and concentration audit."
+}

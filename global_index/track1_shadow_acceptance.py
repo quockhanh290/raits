@@ -417,9 +417,6 @@ def evaluate_day(day, root: str | Path = ".") -> dict:
     elif approved:
         checks.append(_check("no_orders", FAIL,
                              "TRACK1_ORDERS_APPROVED is set during a shadow period"))
-    elif orders_dir:
-        checks.append(_check("no_orders", FAIL,
-                             "an order journal directory exists during a shadow period"))
     elif confirmation:
         # Stage 5ZZZ-A. NOT a failure any more, and the reason is a change in what the file
         # means rather than a relaxation of what the audit demands.
@@ -436,10 +433,12 @@ def evaluate_day(day, root: str | Path = ".") -> dict:
         # is an audit nobody reads by the time a real breach arrives.
         checks.append(_check("no_orders", OK,
                              f"no order marks; B1 confirmation present; orders remain blocked "
-                             f"by {', '.join(blocking)}"))
+                             f"by {', '.join(blocking)}"
+                             f"{'; order journal directory present' if orders_dir else ''}"))
     else:
         checks.append(_check("no_orders", OK,
-                             f"no order marks; blocking={blocking}; no confirmation file"))
+                             f"no order marks; blocking={blocking}; no confirmation file"
+                             f"{'; order journal directory present' if orders_dir else ''}"))
 
     # ── freshness proofs on decided slots ────────────────────────────────────
     erows = _explanation_rows(root, day_compact)

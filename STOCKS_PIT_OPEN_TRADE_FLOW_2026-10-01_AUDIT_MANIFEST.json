@@ -1,0 +1,32 @@
+{
+  "scriptHash": "C7D8A34A99B4B2C786B1CCDDB534E8F4FEBD57CF9B481D8C30BCD6E038E6A7CD",
+  "manifestScriptHash": "C7D8A34A99B4B2C786B1CCDDB534E8F4FEBD57CF9B481D8C30BCD6E038E6A7CD",
+  "scriptHashMatch": true,
+  "preregHash": "3358A263707C08C4D00A70FE8B4D6B5EBDB72A60DD380768783A5181E7C6DC55",
+  "manifestPreregHash": "3358A263707C08C4D00A70FE8B4D6B5EBDB72A60DD380768783A5181E7C6DC55",
+  "preregHashMatch": true,
+  "featureHash": "5105B2E1F7E3A2B8C39F03C17960D94458D9F86AFE57693ED3A4AE4D9953A014",
+  "manifestFeatureHash": "5105B2E1F7E3A2B8C39F03C17960D94458D9F86AFE57693ED3A4AE4D9953A014",
+  "featureHashMatch": true,
+  "selection": {
+    "status": "KILL_NO_DEVELOPMENT_PASS",
+    "selectedVariant": null,
+    "validationOpened": false,
+    "productionPassAllowed": false
+  },
+  "developmentRows": 5,
+  "developmentPasses": 0,
+  "dailyMaxDate": "2021-12-31",
+  "tradeMaxDate": "2021-12-20",
+  "post2021PerformanceRows": 0,
+  "featureRows": 32176,
+  "featureClockViolations": 0,
+  "sideCountViolations": 0,
+  "sicCapViolations": 0,
+  "weightViolations": 0,
+  "advCapViolations": 0,
+  "maxReconciliationError": 8.003553375601767e-11,
+  "validationOpened": false,
+  "post2022Consumed": false,
+  "pass": true
+}

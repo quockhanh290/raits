@@ -1,0 +1,69 @@
+{
+  "spec_id": "stocks_final_costaware_four_sleeve_grid_v1_2026-09-24",
+  "frozen_before_performance": true,
+  "adaptive_disclosure": "Final targeted combination search over four already-researched sleeves. This is adaptive research on touched 2018-2024 and cannot create clean OOS evidence.",
+  "candidate_sleeves": {
+    "pairs": "sic_pairs_quarterly_z2_hold10",
+    "calendar": "spy_first5_x25_fin25_cost4",
+    "crisis": "overnight20_negative_05x",
+    "reversal": "market_resid_rev_10x10_hold5"
+  },
+  "grid": {
+    "weight_step": 0.125,
+    "weights_nonnegative": true,
+    "sum_weights": 1.0,
+    "minimum_nonzero_sleeves": 2,
+    "maximum_nonzero_sleeves": 4,
+    "development_only_selection": true
+  },
+  "development": {
+    "period": ["2018-04-27", "2022-12-30"],
+    "gates": {
+      "cagr_min": 0.08,
+      "dd_pct_floor": -0.12,
+      "positive_years_min": 4,
+      "spy_net_pnl_share_max": 0.65
+    },
+    "rank": "Higher CAGR, then higher Sharpe, then less severe percent DD, then canonical weight string."
+  },
+  "validation": {
+    "period": ["2023-01-03", "2024-12-31"],
+    "open_only_for_one_selected_row": true,
+    "gates": {
+      "cagr_positive": true,
+      "both_years_positive": true,
+      "dd_pct_floor": -0.15,
+      "spy_net_pnl_share_max": 0.80
+    },
+    "label": "touched validation, not clean OOS"
+  },
+  "selected_row_scale_audit": [1.0, 1.5, 2.0],
+  "shared_book_contract": {
+    "capital": 100000.0,
+    "gross_return": "Back out each source's embedded trade and borrow costs, apply fixed weights to prior shared equity, then charge shared costs once.",
+    "gross_exposure": "Additive sleeve gross with no cross-sleeve netting credit.",
+    "trade_cost_bps": 4.0,
+    "short_borrow_annual": 0.01,
+    "financing_annual": 0.025,
+    "financing_rule": "Charge max(additive gross - 1, 0) once per day.",
+    "ticker_concentration": "Gross up each source ticker ledger by reversing embedded daily costs pro rata to absolute ticker contribution; allocate shared costs pro rata to absolute combined ticker gross PnL. Zero-gross days assign cost to SPY."
+  },
+  "inputs": [
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_TURN_OF_MONTH_COSTAWARE_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_CRISIS_SLEEVE_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_CRISIS_SLEEVE_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_REVERSAL_COHORTS_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_REVERSAL_COHORTS_2026-09-17_TICKER_CONTRIB.csv"
+  ],
+  "stopping_rule": "This is the final static-weight combination grid on the touched sample. Do not refine weights after validation. If the selected row does not improve the rank-2 combo's return/DD trade-off and pass validation gates, stop combination mining.",
+  "post_run_reporting_addition": "Before final reporting, the already-selected row was also replayed continuously over full touched 2018-2024. This descriptive row changes no grid metric, gate, ranking, selected weights, or validation decision; the script was re-hashed and outputs were overwritten.",
+  "production_pass_allowed": false,
+  "oos_2025_2026": "PROHIBITED",
+  "implementation_freeze": {
+    "script": "raits/research/stocks_final_costaware_four_sleeve_grid.py",
+    "script_hash": "849FA4DFA495EBBAAC1B9870D86786C760FB202869CC76CF4CF5C605D967E62D",
+    "performance_not_yet_run": true
+  }
+}

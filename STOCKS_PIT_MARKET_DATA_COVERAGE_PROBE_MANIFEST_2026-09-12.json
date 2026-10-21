@@ -1,0 +1,28 @@
+{
+  "coverage_scope": "daily universe is broad 2023-2024 probe; 5m coverage combines current Polygon-62 + SPY and limited PIT probe fetch",
+  "daily_universe": "STOCKS_PIT_IDENTITY_PROBE_DAILY_UNIVERSE_2026-09-12.csv",
+  "dates": 68,
+  "eligible_final_rows": 30122,
+  "eligible_final_rows_with_any_5m": 30049,
+  "five_min_pickle": "raits/data/cache/window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl",
+  "focus_rows": 584,
+  "key_times": [
+    "09:30",
+    "09:35",
+    "10:00",
+    "15:55",
+    "16:00"
+  ],
+  "limited_5m_dir": "raits/data/cache/polygon_5min_pit_limited_probe_2024",
+  "not_survivorship_aware": true,
+  "outputs": [
+    "STOCKS_PIT_MARKET_DATA_COVERAGE_PROBE_2026-09-12.csv",
+    "STOCKS_PIT_MARKET_DATA_COVERAGE_PROBE_SUMMARY_2026-09-12.csv",
+    "STOCKS_PIT_MARKET_DATA_COVERAGE_PROBE_FOCUS_2026-09-12.csv"
+  ],
+  "purpose": "limited market-data coverage probe keyed by prototype security_id",
+  "rows": 655690,
+  "rows_with_any_5m": 32199,
+  "summary_rows": 73,
+  "symbols": 11902
+}

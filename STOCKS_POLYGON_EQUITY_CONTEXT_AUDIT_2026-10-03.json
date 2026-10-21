@@ -1,0 +1,66 @@
+{
+  "status": "PASS_WITH_RAW_EDGAR_DUPLICATES",
+  "fetcher": "raits/research/stocks_polygon_equity_context_fetch.py",
+  "fetcherHash": "5B1F886906620364E224840E84941D0CC1738D19C0D2D6A10199781E1E922D2E",
+  "manifestHash": "651EAFF1DAF804CB2C3093DC465C717C658192A8B3C0381588DAA71688F366BC",
+  "statusHash": "081E0CC332366A13D74333F250890238AC795E3E20C21235BA194031C3035C49",
+  "monthlyChunks": 420,
+  "results": [
+    {
+      "dataset": "dividends",
+      "files": 84,
+      "rows": 281471,
+      "minDate": "2018-01-02",
+      "maxDate": "2024-12-31",
+      "duplicates": 0,
+      "outOfMonth": 0,
+      "bytes": 17268547
+    },
+    {
+      "dataset": "splits",
+      "files": 84,
+      "rows": 7569,
+      "minDate": "2018-01-02",
+      "maxDate": "2024-12-31",
+      "duplicates": 0,
+      "outOfMonth": 0,
+      "bytes": 816705
+    },
+    {
+      "dataset": "short_interest",
+      "files": 84,
+      "rows": 840000,
+      "minDate": "2018-01-12",
+      "maxDate": "2024-12-31",
+      "duplicates": 0,
+      "outOfMonth": 0,
+      "bytes": 11750596
+    },
+    {
+      "dataset": "short_volume",
+      "files": 84,
+      "rows": 1140000,
+      "minDate": "2024-02-06",
+      "maxDate": "2024-12-31",
+      "duplicates": 0,
+      "outOfMonth": 0,
+      "bytes": 27326134
+    },
+    {
+      "dataset": "edgar_index",
+      "files": 84,
+      "rows": 7657184,
+      "minDate": "2018-01-02",
+      "maxDate": "2024-12-31",
+      "duplicates": 15936,
+      "outOfMonth": 0,
+      "bytes": 152777099
+    }
+  ],
+  "post2024Consumed": false,
+  "notes": [
+    "short_volume is empty before 2024-02-06, so it cannot support 2018-2021 development",
+    "EDGAR accession numbers legitimately map to multiple filer/ticker rows; exact duplicate rows are retained in raw cache and must be dropped downstream",
+    "reference condition and exchange tables are covered by the fetch manifest"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_FINANCING_STRESS_2026-09-14",
+  "script": "raits/research/stocks_pit_full_beta_plus_megaspread_financing_stress.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_AUDIT_2026-09-14_DAILY.csv"
+  ],
+  "method": "Apply pre-registered financing and short-borrow drag sensitivities to the fixed 6.171 audited daily return stream.",
+  "financing_annual_rates": [
+    0.0,
+    0.025,
+    0.05,
+    0.075
+  ],
+  "short_borrow_annual_rates": [
+    0.0,
+    0.01,
+    0.02,
+    0.05
+  ],
+  "sample_label": "Research/touched 2018-2024 only; no 2025-2026 OOS opened.",
+  "rule_selection_effect": "None. Sensitivity grid is diagnostic and not an optimized production rule.",
+  "outputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_FINANCING_STRESS_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_FINANCING_STRESS_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_FINANCING_STRESS_2026-09-14_DAILY.csv"
+  ]
+}

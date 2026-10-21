@@ -10,6 +10,7 @@ from typing import Any
 from global_index.session_report import collect_session_report
 from monitor.backend.job_journal_reader import read_job_journal
 from monitor.backend.runner_event_reader import read_runner_events
+from monitor.backend.runner_positions_reader import read_runner_positions
 from monitor.backend.runner_state_reader import read_runner_state
 from monitor.backend.session_event_reader import read_session_events
 from monitor.backend.execution_quality_reader import read_execution_quality
@@ -27,7 +28,9 @@ def _signature(root: Path) -> tuple[tuple[str, int, int], ...]:
             except OSError:
                 continue
             values.append((str(path.resolve()), stat.st_mtime_ns, stat.st_size))
-    positions_path = root / "live_positions.json"
+    # Reports is a Track 1 surface.  The retired legacy book must not invalidate the
+    # cache while the active book can change without invalidating it.
+    positions_path = root / "live_positions.track1.json"
     try:
         stat = positions_path.stat()
         values.append((str(positions_path.resolve()), stat.st_mtime_ns, stat.st_size))
@@ -56,6 +59,31 @@ def read_report(day: str, root: Path) -> dict[str, Any]:
         if cached is not None:
             return copy.deepcopy(cached)
     report = collect_session_report(day, root)
+    # `collect_session_report` also backs the standalone legacy report command, so keep
+    # its historical default there and replace the current-state block explicitly at the
+    # Track 1 dashboard boundary.  A failed read is metadata, never an empty book.
+    if report.get("is_today"):
+        positions_result = read_runner_positions(root / "live_positions.track1.json")
+        positions_payload = positions_result.get("payload")
+        positions_available = isinstance(positions_payload, dict)
+        positions = ((positions_payload or {}).get("positions") or [])
+        report["positions"] = positions if positions_available else []
+        report["current_position_count"] = len(positions) if positions_available else None
+        report["positions_reading"] = {
+            "source": "live_positions.track1.json",
+            "status": "available" if positions_available else "unavailable",
+            "observed_at": positions_result.get("observed_at"),
+            "error": positions_result.get("error"),
+        }
+    else:
+        report["positions"] = []
+        report["current_position_count"] = 0
+        report["positions_reading"] = {
+            "source": "live_positions.track1.json",
+            "status": "not_applicable",
+            "observed_at": None,
+            "error": None,
+        }
     raw_lines = report.get("lines", [])
     # Raw log lines are working material for the collector, not dashboard data.
     # Returning them makes a normal report several megabytes without adding UI evidence.

@@ -1,0 +1,50 @@
+{
+  "spec_id": "stocks_all_results_fixed_combo_scale_v1_2026-09-24",
+  "frozen_before_performance": true,
+  "adaptive_disclosure": "This is a post-selection execution audit of the one 50/25/25 combination selected in section 6.212. It does not create new OOS evidence and weights may not be re-optimized.",
+  "selected_sleeves": {
+    "sic_pairs_quarterly_z2_hold10": 0.5,
+    "spy_first5_x25_fin25_cost4": 0.25,
+    "long_top62_short_top200_100_100": 0.25
+  },
+  "scale_candidates": [1.0, 1.5, 2.0],
+  "selection_rule": "Report all three fixed scales. No winner is selected and no scale is promoted from this touched sample.",
+  "samples": {
+    "development": ["2018-04-27", "2022-12-30"],
+    "validation": ["2023-01-03", "2024-12-31"],
+    "oos_2025_2026": "PROHIBITED"
+  },
+  "shared_book_contract": {
+    "capital": 100000.0,
+    "gross_return": "Reconstruct each sleeve before its embedded trading, borrow, and financing costs; apply fixed sleeve weights and scale to prior shared-book equity.",
+    "gross_exposure": "Conservative additive sleeve gross; no cross-sleeve ticker or SPY netting credit.",
+    "turnover": "Fixed-weight sum of source target-weight turnover. Mega-cap spread turnover is rebuilt from daily equal-weight PIT constituents and drifted prior weights.",
+    "trade_cost_bps": 4.0,
+    "short_borrow_annual": 0.01,
+    "financing_annual": 0.025,
+    "financing_rule": "Charge max(total additive gross - 1, 0) once at shared-book level.",
+    "spread_definition": "Long quarterly PIT market-cap top62 equal weight and short quarterly PIT market-cap top200 equal weight; overlapping names are netted inside this sleeve. This is not the old manual 62.",
+    "missing_return_rule": "Only names with a valid PIT daily return enter that day's equal-weight spread legs, matching the benchmark source. Report source-return reconstruction error and name counts.",
+    "concentration": "Ticker gross return contributions are exact for SPY and the rebuilt spread. Pair ticker net contributions are grossed up by allocating the source day's embedded costs pro rata to absolute ticker contribution. Shared costs are then allocated pro rata to absolute gross ticker contribution. This preserves daily PnL exactly but ticker cost allocation is diagnostic, not an execution fill ledger."
+  },
+  "inputs": [
+    "STOCKS_ALL_RESULTS_SLEEVE_GRID_2026-09-24_SELECTION.json",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_TURN_OF_MONTH_COSTAWARE_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_MEGACAP_RELATIVE_SPREAD_2026-09-14_DAILY.csv",
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv"
+  ],
+  "audit_requirements": [
+    "Report development and touched-validation PnL, CAGR, Sharpe, dollar DD, percent DD, and yearly attribution for every scale.",
+    "Report source gross PnL, shared costs, gross and short exposure, top1/top3/top5/top10 ticker PnL shares, and effective ticker count.",
+    "Persist daily shared-book paths, source attribution, ticker attribution, cost summary, spread reconstruction QA, hashes, and manifest.",
+    "Separate the prior rule-selection effect from this fixed trade-stream scaling effect and forbid a production PASS."
+  ],
+  "implementation_freeze": {
+    "performance_not_yet_run": true,
+    "script": "raits/research/stocks_all_results_fixed_combo_scale.py",
+    "script_hash": "A07E853FDE4E19EC45BD8E9E669B14A68410286DA7D6C45C55D3C352B88B97E4"
+  }
+}

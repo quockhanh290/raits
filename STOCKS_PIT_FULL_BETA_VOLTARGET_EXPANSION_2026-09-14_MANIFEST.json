@@ -1,0 +1,65 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_BETA_VOLTARGET_EXPANSION_2026-09-14",
+  "script": "raits/research/stocks_pit_full_beta_voltarget_expansion.py",
+  "input": "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv",
+  "sample_label": "Research/in-sample diagnostics across 2018-2024. 2023-2024 is touched validation, not clean unseen OOS.",
+  "causality": "Vol target exposure uses trailing 20-day base benchmark volatility shifted by one day.",
+  "variants": [
+    {
+      "base": "market_cap_top62_equal_weight",
+      "variant": "top62_vt16_cap150",
+      "target_vol": 0.16,
+      "max_exposure": 1.5
+    },
+    {
+      "base": "market_cap_top62_equal_weight",
+      "variant": "top62_vt20_cap200",
+      "target_vol": 0.2,
+      "max_exposure": 2.0
+    },
+    {
+      "base": "market_cap_top62_equal_weight",
+      "variant": "top62_vt25_cap250",
+      "target_vol": 0.25,
+      "max_exposure": 2.5
+    },
+    {
+      "base": "market_cap_top100_equal_weight",
+      "variant": "top100_vt16_cap150",
+      "target_vol": 0.16,
+      "max_exposure": 1.5
+    },
+    {
+      "base": "market_cap_top100_equal_weight",
+      "variant": "top100_vt20_cap200",
+      "target_vol": 0.2,
+      "max_exposure": 2.0
+    },
+    {
+      "base": "market_cap_top100_equal_weight",
+      "variant": "top100_vt25_cap250",
+      "target_vol": 0.25,
+      "max_exposure": 2.5
+    },
+    {
+      "base": "spy_buy_hold",
+      "variant": "spy_vt16_cap150",
+      "target_vol": 0.16,
+      "max_exposure": 1.5
+    },
+    {
+      "base": "spy_buy_hold",
+      "variant": "spy_vt20_cap200",
+      "target_vol": 0.2,
+      "max_exposure": 2.0
+    }
+  ],
+  "rule_selection": "None. Variant set fixed in VARIANTS before measuring.",
+  "stop_condition": "Look for about 25% CAGR with materially lower drawdown than plain beta benchmarks.",
+  "outputs": [
+    "STOCKS_PIT_FULL_BETA_VOLTARGET_EXPANSION_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_BETA_VOLTARGET_EXPANSION_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_BETA_VOLTARGET_EXPANSION_2026-09-14_SPLITS.csv",
+    "STOCKS_PIT_FULL_BETA_VOLTARGET_EXPANSION_2026-09-14_DAILY.csv"
+  ]
+}

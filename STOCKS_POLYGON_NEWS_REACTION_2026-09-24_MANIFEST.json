@@ -1,0 +1,64 @@
+{
+  "script": "raits/research/stocks_polygon_news_reaction.py",
+  "scriptHash": "FAD72B35F543FE9122765E2164E850C4EBE63738961265463A42298E05B32F7A",
+  "preregistration": "STOCKS_POLYGON_NEWS_REACTION_PREREG_2026-09-24.json",
+  "preregistrationHash": "B261C52BFFF3114472C2D387A540B605F7BC35849C41EDDEE9BA5C3EFAE17BA0",
+  "inputHashes": {
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2021-04.parquet": "1E61461024954B990F1EB311957B8CF71A4624B1D89EEFACC219EBE43085BB2D",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2021-05.parquet": "4E212EC2879D98BD6513690A6366E5FD6F83FA27BD775EE95E4111EA95A25B75",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2021-06.parquet": "2B47AC662DAD764DB1795DAB1BFF57CD0B4485FD153259286ADC0C80745F85D8",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2021-07.parquet": "A389639EF87FC8E2FBECA0B204E2DEE9F678EAD39D5EA738886EB2B5B994C7DA",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2021-08.parquet": "233BC48B157D25F3B9D73457CB1FBE88A63515F5CA4DA25DA9D8E00EA84F48AA",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2021-09.parquet": "A873737639512A58E9C591059BCDF84E2D02DE573F387929EC309DE2DA18C286",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2021-10.parquet": "1B4C31D9CB4F9BF13ED645C46D28E2674AFC062733A26068C5E97063EA8B9A65",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2021-11.parquet": "EA7A54D671C03294FC7141104B14F41F5232149C0E429064C8E6CC4A794BB864",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2021-12.parquet": "894AA34A77E2738D3BDF13FE757BAC7BE1EA62FBD646137C3EF5B54FFA6964C4",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2022-01.parquet": "4C2ADF8691308FBCE36035A24BC6537C6A501B326B9AE25CDC8E5A64246465BD",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2022-02.parquet": "1C62044B0694A4580BF385F85196422300B8E0CE3AB1C706757EFD9B89F20B7C",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2022-03.parquet": "04222924405CDE5B2ADD0393A97BC6EB47FB3B235445CEF843F06593C5E87DD6",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2022-04.parquet": "A9D9618F8946480305F280934CC6F689898F009B42F667F5A113A7DA977A233B",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2022-05.parquet": "0619DA76EC0E20204236E9C7F056D7EA2B03FEE9833E5B893C57AB6E241C4661",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2022-06.parquet": "FF585F2C363D88398B4609FDCBD21A07295C05B5007D7B25AD00B39F476D61C2",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2022-07.parquet": "B837EFBBE8D8B3F446D47D8D5A24E168B81470F3087136CB2A8FF309A80233A3",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2022-08.parquet": "97AAF5663D56672A05B98B296131DCB65E96B583770D7EBDDE276608589C81E3",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2022-09.parquet": "58C1A2B1056D9777D44CF5EF9A8642935D0795F22BD3F73A261854034F0958B8",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2022-10.parquet": "8E63C130AA5EFFD6A0B76CA7D2F03D8C1B811D6D4EE0A5ED74CBD18F4577BA14",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2022-11.parquet": "673124198C73006B25F5FC60A9ACF9B17B8D375C0420079E67DD73FC835831DA",
+    "raits/data/cache/external_events/polygon_2018_2024/news/news_2022-12.parquet": "F1802776372B23FFE4759162848BA180B116373410C2393CD5E94636BE1B3467",
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl": "C65065EA082D68544A5CD87C8DAD9A81CEE0B92A49A34D3C18C162A9EDED4AEC",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl": "EEDEAACC5F5302CDD87114FA985A58BA4B32B1DA807E57AC3AFEB18D96970696",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv": "C184A810909371F7DB5A3F6926417496A77B97BBAF97ED14B017E3BDD42115D4",
+    "raits/data/cache/stocks_survivorship/polygon_universe_bulk/daily_20180102_20241231_resumable/liquidity_filter_daily_20180102_20241231_px5_adv10m_unadjusted/filtered_daily_universe.parquet": "FD696E0BD91E3B951C86FFF89734AF908759E11829715B9C1983604E356E8B2C",
+    "STOCKS_POLYGON_NEWS_REACTION_PREREG_2026-09-24.json": "B261C52BFFF3114472C2D387A540B605F7BC35849C41EDDEE9BA5C3EFAE17BA0"
+  },
+  "developmentPeriod": [
+    "2021-04-05",
+    "2022-12-30"
+  ],
+  "validationPeriodIfOpened": [
+    "2023-01-03",
+    "2024-02-29"
+  ],
+  "selection": {
+    "selectedVariant": null,
+    "status": "KILL_NO_DEVELOPMENT_PASS",
+    "validationOpened": false,
+    "productionPassAllowed": false
+  },
+  "oos2025_2026Consumed": false,
+  "oldManual62Used": false,
+  "ruleSelectionEffect": "At most one of four pre-registered rules is selected on development; validation cannot replace it.",
+  "tradeSelectionEffect": "News timing, PIT top500 membership, daily eligibility, ADV, exact prices, sizing, gross cap, and costs are replayed.",
+  "outputs": [
+    "STOCKS_POLYGON_NEWS_REACTION_2026-09-24_DEVELOPMENT.csv",
+    "STOCKS_POLYGON_NEWS_REACTION_2026-09-24_VALIDATION.csv",
+    "STOCKS_POLYGON_NEWS_REACTION_2026-09-24_SELECTION.json",
+    "STOCKS_POLYGON_NEWS_REACTION_2026-09-24_SIGNALS.csv",
+    "STOCKS_POLYGON_NEWS_REACTION_2026-09-24_DAILY.csv",
+    "STOCKS_POLYGON_NEWS_REACTION_2026-09-24_TRADES.csv",
+    "STOCKS_POLYGON_NEWS_REACTION_2026-09-24_TICKER_CONTRIB.csv",
+    "STOCKS_POLYGON_NEWS_REACTION_2026-09-24_YEARLY.csv",
+    "STOCKS_POLYGON_NEWS_REACTION_2026-09-24_QA.csv",
+    "STOCKS_POLYGON_NEWS_REACTION_2026-09-24_MANIFEST.json"
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "script": "D:/raits/raits/research/stocks_multisleeve_forward_paper.py",
+  "scriptHash": "57E3886E9D2663BC66D75B8F163BC639BC1F5C7D0D74821D4450526AECA05374",
+  "protocol": "STOCKS_MULTISLEEVE_FORWARD_PAPER_PROTOCOL_2026-09-24.json",
+  "protocolHash": "80BE07FD6913B9BA8CF462176FFC265D6ACB237EAFE4EB8D0DFDE24713F51C6C",
+  "targets": "STOCKS_MULTISLEEVE_FORWARD_PAPER_DRYRUN_2024Q4_INPUT_TARGETS.csv",
+  "targetsHash": "76225764B77FDB84CCDF62D6B5DCF7FFE2EC21181B8E8CF324CC7DF36A654E4E",
+  "market": "STOCKS_MULTISLEEVE_FORWARD_PAPER_DRYRUN_2024Q4_INPUT_MARKET.csv",
+  "marketHash": "8F18F145F8A1750D9CDB227F763DB964E244F963AC5E9B2D66A59970F39172EA",
+  "post2024Override": false,
+  "accounts": [
+    {
+      "account": "lead_1x_primary",
+      "initial_equity": 100000.0,
+      "scale": 1.0,
+      "gross_cap": 1.4,
+      "max_drawdown_halt": -0.12
+    },
+    {
+      "account": "lead_15x_challenger",
+      "initial_equity": 100000.0,
+      "scale": 1.5,
+      "gross_cap": 2.1,
+      "max_drawdown_halt": -0.15
+    }
+  ],
+  "outputs": [
+    "STOCKS_MULTISLEEVE_FORWARD_PAPER_DRYRUN_2024Q4_ACCOUNT_EVENTS.csv",
+    "STOCKS_MULTISLEEVE_FORWARD_PAPER_DRYRUN_2024Q4_ORDERS.csv",
+    "STOCKS_MULTISLEEVE_FORWARD_PAPER_DRYRUN_2024Q4_POSITIONS.csv",
+    "STOCKS_MULTISLEEVE_FORWARD_PAPER_DRYRUN_2024Q4_TICKER_PNL.csv",
+    "STOCKS_MULTISLEEVE_FORWARD_PAPER_DRYRUN_2024Q4_ISSUES.csv",
+    "STOCKS_MULTISLEEVE_FORWARD_PAPER_DRYRUN_2024Q4_SUMMARY.csv",
+    "STOCKS_MULTISLEEVE_FORWARD_PAPER_DRYRUN_2024Q4_QA.csv"
+  ],
+  "productionPassAllowed": false
+}

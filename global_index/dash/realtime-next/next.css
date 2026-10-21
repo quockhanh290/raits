@@ -932,11 +932,11 @@
 .mv2-card > .mv2-legend { padding: 7px 15px; gap: 18px; }
 
 /* ── Pane "Detector rules" ───────────────────────────────────────────────────
-   Cùng class .mv2-lane với Setup rules nhưng design cho nó thang nhỏ hơn: một ô
-   là một BAR chứ không phải một slot, và có nhiều bar hơn slot, nên ô hẹp hơn và
-   bo nhẹ hơn để hàng không vỡ thành một dãy viên thuốc. */
+   Detector verdicts are aligned onto the slot axis. Keep the exact same final
+   geometry as Setup rules and Slot decisions so switching tab or sleeve does not
+   change what one slot looks like. */
 .mv2-bargrid .mv2-lane { grid-template-columns: 246px minmax(0, 1fr) 110px; }
-.mv2-bargrid .mv2-lane-track .mv2-cell { height: 9px; border-radius: 1px; }
+.mv2-bargrid .mv2-lane-track .mv2-cell { height: 10px; border-radius: 5px; }
 
 /* ── Chart "Across the session": màu và nét theo design ──────────────────────
    Đo cạnh nhau: live dùng tím cho EMA và XANH LÁ cho đường trung bình khối
@@ -1209,6 +1209,27 @@ header .runner-header-state i { animation: none; }
 .mv2-lanes .mv2-lane:has(.mv2-dot.bad) { background: #100f12; }
 .mv2-lanes .mv2-lane:has(.mv2-dot.bad) .mv2-lane-name { border-left-color: #f2555a; }
 .mv2-lanes .mv2-lane:has(.mv2-dot.warn) .mv2-lane-name { border-left-color: #f0b429; }
+
+/* A uniform non-verdict is an answer, not an empty row. Keep all per-slot cells on their
+   original scale, but give the two answer types distinct, quiet treatments. Neither gets the
+   failed lane's red row wash or left rail, so a real failure remains the strongest signal. */
+.mv2-lanes .mv2-lane.absence-not_reached .mv2-cell.hollow {
+  border-color: #75684b;
+  border-style: dashed;
+  background: rgba(117, 104, 75, .08);
+}
+.mv2-lanes .mv2-lane.absence-not_published .mv2-cell.muted {
+  background: #303a47;
+  box-shadow: inset 0 -2px #586b82;
+}
+.mv2-lanes .mv2-lane.absence-not_reached .mv2-lane-value {
+  color: #a89978;
+  font-weight: 600;
+}
+.mv2-lanes .mv2-lane.absence-not_published .mv2-lane-value {
+  color: #91a4ba;
+  font-weight: 600;
+}
 
 /* muc 4.5 · readout của tab này là dòng duy nhất, nằm trên head, màu #8dc0f7. */
 .mv2-card-head .mv2-slot-readout { color: #8dc0f7; }

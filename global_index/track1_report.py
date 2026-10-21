@@ -18,9 +18,10 @@ has ever reached the point of proving its destination writable.
 
 What this module deliberately cannot do
 ---------------------------------------
-It cannot tell you the paper P&L, because there is none: no Track 1 order has ever been placed.
-Everything it reports about money is EXPECTED or INTENDED, sourced from the dry run, and every
-payload says `broker_verified: false` with a reason. Measured 2026-08-26 on the newest broker
+It cannot tell you the paper P&L. Until 2026-09-24 that was because no Track 1 order had ever been
+placed; from 15:55 ET that day two had filled, and the reason became that no trade has closed and
+the statement cannot attribute a fill to a route (below). Nothing it reports about money is
+verified: every payload says `broker_verified: false` with a reason. Measured 2026-08-26 on the newest broker
 statement: 37 fields, and not one of them is a route, a strategy, an order reference or a
 client id — only `ClientAccountID`, one account for both routes. So even once fills exist, a
 statement cannot say which route made them until B1 is closed. That is `route_unattributed`,
@@ -138,6 +139,7 @@ def read_book(root: str | Path = ".") -> dict:
     positions = list(state.get("positions") or [])
     return {"path": BOOK, "state": EMPTY if not positions else AVAILABLE,
             "positions": len(positions),
+            "trade_ids": sorted(str(r.get("trade_id") or "") for r in positions),
             "cut_instant": state.get("cut_instant"), "cur_day": state.get("cur_day"),
             "equity": state.get("equity"),
             "reading": ("the book exists and holds nothing — a flat route"
@@ -166,14 +168,28 @@ def read_order_journal(root: str | Path = ".") -> dict:
                 "reading": "the directory exists and holds no journal"}
     states = sorted({str(r.get("state") or "") for r in rows})
     submitted = [r for r in rows if str(r.get("state") or "") == "submitted"]
+    # 2026-09-24. Every row here was labelled `dry_run` / "INTENDED, not sent", and on that day
+    # two orders were sent and FILLED (order ids 28 and 30). A dry run cannot write this
+    # directory — `track1_paper_callsite.assert_dry_run_root` refuses the production journal
+    # root and rehearsals go to `track1_dry_run/` — so a row here carrying a BROKER order id is
+    # positive evidence of a real send. Only that evidence flips the label; a journal with no
+    # broker id anywhere keeps the old reading, because absence of an id proves nothing either way.
+    sent_ids = sorted({str(r.get("order_id")) for r in rows if str(r.get("order_id") or "")})
+    filled = sorted({str(r.get("candidate_id")) for r in rows
+                     if str(r.get("state") or "") == "filled"})
+    if sent_ids:
+        source = "paper_send"
+        reading = (f"{len(rows)} journal row(s) — {len(sent_ids)} order(s) SENT to the paper "
+                   f"broker (ids {', '.join(sent_ids)}), {len(filled)} filled")
+    else:
+        source = "dry_run" if rows else None
+        reading = (f"{len(rows)} journal row(s) — INTENDED, not sent: no row carries a broker "
+                   f"order id" if rows else "no journal rows")
     return {"path": ORDERS_DIR, "state": EMPTY if not rows else AVAILABLE,
             "rows": len(rows), "files": len(files), "malformed_lines": len(malformed),
             "order_states": states, "submitted": len(submitted),
-            # Named, never inferred: a rehearsal and a real send produce the same shape, and
-            # the only honest way to tell them apart is the gate that was open at the time.
-            "source": "dry_run" if rows else None,
-            "reading": (f"{len(rows)} journal row(s) — INTENDED, not sent: no Track 1 order "
-                        f"path has ever been armed" if rows else "no journal rows")}
+            "sent_order_ids": sent_ids, "filled_trades": filled,
+            "source": source, "reading": reading}
 
 
 def broker_evidence(root: str | Path = ".") -> dict:
@@ -189,7 +205,7 @@ def broker_evidence(root: str | Path = ".") -> dict:
     statements = sorted((root / "monitor" / "inputs" / "ibkr_flex").glob("*.csv")) \
         if (root / "monitor" / "inputs" / "ibkr_flex").is_dir() else []
     reasons = []
-    if journal["rows"] == 0 or journal.get("source") == "dry_run":
+    if journal["rows"] == 0 or journal.get("source") != "paper_send":
         reasons.append(NO_ORDERS_YET)
     if not statements:
         reasons.append(STATEMENT_UNAVAILABLE)
@@ -240,10 +256,30 @@ def open_position_parity(root: str | Path = ".") -> dict:
                 "book_positions": book["positions"], "journal_rows": 0,
                 "broker_verified": False, "attribution": ATTRIBUTION_UNKNOWN}
 
+    # 2026-09-24. This branch said matching "needs real fills, which do not exist"; from 15:55 ET
+    # that day two existed. Checked in the direction that matters: every row the BOOK holds must
+    # be a trade the JOURNAL recorded as filled — a book row with no fill behind it is a position
+    # nobody can account for. The other direction is reported, not judged: a filled open that is
+    # no longer in the book may simply have closed, and this reader does not pair closes yet.
+    if journal.get("source") == "paper_send":
+        book_ids = set(book.get("trade_ids") or [])
+        filled = set(journal.get("filled_trades") or [])
+        unexplained = sorted(book_ids - filled)
+        not_in_book = sorted(filled - book_ids)
+        return {"status": FAIL if unexplained else PASS,
+                "code": "book_row_without_fill" if unexplained else "book_rows_all_filled",
+                "detail": (f"{len(unexplained)} book row(s) have no filled order in the journal: "
+                           f"{', '.join(unexplained)}" if unexplained else
+                           f"all {len(book_ids)} book row(s) match a filled journal order")
+                          + (f"; {len(not_in_book)} filled trade(s) not in the book (closed, or "
+                             f"never booked): {', '.join(not_in_book)}" if not_in_book else ""),
+                "book_positions": book["positions"], "journal_rows": journal["rows"],
+                "broker_verified": False, "attribution": ATTRIBUTION_UNKNOWN}
+
     return {"status": UNKNOWN, "code": "not_comparable_yet",
             "detail": f"the book holds {book['positions']} position(s) against "
-                      f"{journal['rows']} journal row(s); matching them per instrument needs "
-                      f"real fills, which do not exist",
+                      f"{journal['rows']} journal row(s) and no journal row carries a broker "
+                      f"order id, so there is no fill to match a book row to",
             "book_positions": book["positions"], "journal_rows": journal["rows"],
             "broker_verified": False, "attribution": ATTRIBUTION_UNKNOWN}
 
@@ -278,8 +314,12 @@ def lifecycle(root: str | Path = ".") -> dict:
         "book_never_synthesised_over": True,
         # The one this stage cannot close, stated in its own words rather than as an absence.
         "broker_stop_verified": False,
-        "broker_stop_reason": ("no Track 1 order has ever been sent, so no stop has ever been "
-                               "placed for one to be compared against; this needs paper"),
+        # 2026-09-24: this said "no Track 1 order has ever been sent" — false from 15:55 ET that
+        # day. What stays true is narrower: nothing here compares a broker stop to its plan.
+        "broker_stop_reason": ("no Track 1 broker stop has been compared against its planned "
+                               "stop; entries arm their stop 14:05 ET the session after entry "
+                               "(track1_params arm_hour), and this reader does not read the "
+                               "broker"),
     }
 
 
@@ -294,15 +334,16 @@ def _headline(trades, book, journal, broker, parity) -> str:
         return ("Track 1 has placed no orders, so there is no profit or loss to report.")
     if not reasons:
         return "Track 1's profit and loss is verified against the broker."
-    return ("Track 1's profit and loss is not verified against the broker yet — "
-            "hover for what is missing.")
+    return ("Track 1 P&L comes from the system book; IBKR statement reconciliation is "
+            "still unavailable — hover for the evidence status.")
 
 
 def _headline_detail(trades, book, journal, broker, parity) -> str:
     """Phần kiểm kê, để dành cho tooltip. Cùng dữ liệu, khác chỗ đứng."""
     return (f"Trade log {trades['state']} ({trades['rows']} row(s)) · "
             f"book {book['state']} · order journal {journal['state']} "
-            f"({journal['rows']} intended row(s)) · open-position parity {parity['status']}.")
+            f"({journal['rows']} intended row(s)) · open-position parity {parity['status']} · "
+            f"broker evidence: {broker.get('reading') or 'unavailable'}.")
 
 
 def report(root: str | Path = ".") -> dict:

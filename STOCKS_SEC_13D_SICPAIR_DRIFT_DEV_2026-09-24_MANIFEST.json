@@ -1,0 +1,93 @@
+{
+  "script": "raits/research/stocks_sec_13d_sicpair_drift_replay.py",
+  "preregistration": "STOCKS_SEC_13D_SICPAIR_DRIFT_PREREG_2026-09-24.json",
+  "adaptiveResearch": true,
+  "stageIsolation": "Independent USD 100k books; complete scheduled holds only.",
+  "oos_2025_2026_consumed": false,
+  "inputs": [
+    "raits\\data\\cache\\external_events\\sec_submissions_pit_2018_2026\\sec_ownership_insider_events_2017_2026.csv",
+    "raits\\data\\cache\\stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits\\data\\cache\\external_universes\\market_cap_polygon\\polygon_market_cap_snapshots_pit_eligible_2018_2024.csv",
+    "raits\\data\\cache\\stocks_survivorship\\polygon_universe_bulk\\daily_20180102_20241231_resumable\\liquidity_filter_daily_20180102_20241231_px5_adv10m_unadjusted\\filtered_daily_universe.parquet",
+    "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv"
+  ],
+  "input_hashes": {
+    "raits\\data\\cache\\external_events\\sec_submissions_pit_2018_2026\\sec_ownership_insider_events_2017_2026.csv": "EA53B2BB1344AFF0470ECC549A3089FCC6CCA9FB8CF8410CA6DA1B0594E805B5",
+    "raits\\data\\cache\\external_universes\\market_cap_polygon\\polygon_market_cap_snapshots_pit_eligible_2018_2024.csv": "C184A810909371F7DB5A3F6926417496A77B97BBAF97ED14B017E3BDD42115D4",
+    "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv": "4CEBE917EDF71406E8F74A5E66CA73C313A1F546036D1D7B93EEA976494B5B09"
+  },
+  "pair_qa": {
+    "assignedInitial13dEvents": 415,
+    "mappedTop500Events": 203,
+    "executablePairsBeforeCompleteHold": 183,
+    "missingTargetEntry": 3,
+    "missingSameSicPeer": 17
+  },
+  "candidate_signal_counts": {
+    "active13d_sicpair_hold20": {
+      "development": 143,
+      "validation": 36
+    },
+    "active13d_sicpair_hold60": {
+      "development": 142,
+      "validation": 35
+    }
+  },
+  "selection": {
+    "candidates": [
+      {
+        "variant": "active13d_sicpair_hold20",
+        "developmentPass": false,
+        "validationPass": false,
+        "positiveDevelopmentYears": 1,
+        "developmentPnl": -2274.134694500899,
+        "developmentStress8Pnl": -2882.675167455731,
+        "developmentCagr": -0.004907230154696074,
+        "developmentSharpe": -0.2799011788590604,
+        "developmentStress8Sharpe": -0.35820296061521856,
+        "developmentDdDollar": -3177.8439738457964,
+        "developmentDdPct": -0.031702335473869914,
+        "developmentEntries": 130,
+        "developmentEffectiveTickerCount": 40.17632482011575,
+        "developmentTop10Share": 0.3903052286078866,
+        "developmentMarketBeta": 0.00023712130524625427,
+        "validationPnl": -1800.4073682836315,
+        "validationStress8Pnl": -1957.03596971136,
+        "validationDdPct": -0.028837631573752076,
+        "validationEntries": 33,
+        "validationEffectiveTickerCount": 13.387451230951378,
+        "validationTop10Share": 0.7277038635148411,
+        "validationMarketBeta": -0.00037542218645721256
+      },
+      {
+        "variant": "active13d_sicpair_hold60",
+        "developmentPass": false,
+        "validationPass": false,
+        "positiveDevelopmentYears": 0,
+        "developmentPnl": -9934.979429146159,
+        "developmentStress8Pnl": -10440.420912696107,
+        "developmentCagr": -0.02212805257630268,
+        "developmentSharpe": -0.8276792720564118,
+        "developmentStress8Sharpe": -0.8727894248921044,
+        "developmentDdDollar": -10426.978665093658,
+        "developmentDdPct": -0.10389276933869263,
+        "developmentEntries": 117,
+        "developmentEffectiveTickerCount": 34.19642924789011,
+        "developmentTop10Share": 0.4404910007467493,
+        "developmentMarketBeta": 0.0033353363226672258,
+        "validationPnl": 281.4051032901334,
+        "validationStress8Pnl": 143.62856464632205,
+        "validationDdPct": -0.013926432207686412,
+        "validationEntries": 28,
+        "validationEffectiveTickerCount": 15.443626303132389,
+        "validationTop10Share": 0.7303030083657567,
+        "validationMarketBeta": 0.0028164639861561805
+      }
+    ],
+    "selectedOnDevelopment": null,
+    "selectedValidationPass": false,
+    "familyStatus": "KILL_BEFORE_OOS",
+    "selectionAudit": "One development-only hold selection; validation cannot substitute the other hold."
+  },
+  "outputs_prefix": "STOCKS_SEC_13D_SICPAIR_DRIFT_DEV_2026-09-24"
+}

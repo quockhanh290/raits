@@ -64,7 +64,11 @@ ENTERED = "entered"
 #: Declared shape of each Track 1 detection window. Expected slot counts are part of the
 #: contract: without them "observed 9 slots" cannot be judged.
 WINDOWS: dict[str, dict[str, Any]] = {
-    "roska4_calm": {"label": "Calm A 10:00 ET", "expected_slots": 1,
+    # Calm has three distinct runtime instants: DECIDE at 09:32, EXECUTE at 10:00 and
+    # OBSERVE at 10:02. Keeping the old one-slot count made a new scheduler session record
+    # `registered=3` against `expected=1`, so the audit could not judge the execution slot
+    # consistently with the slot registry.
+    "roska4_calm": {"label": "Calm A 09:32/10:00/10:02 ET", "expected_slots": 3,
                     "start_et": "10:00", "end_et": "10:00"},
     "roska4_stress": {"label": "Stress 10:35-12:30 ET, every 5 min",
                       "expected_slots": 24, "start_et": "10:35", "end_et": "12:30"},

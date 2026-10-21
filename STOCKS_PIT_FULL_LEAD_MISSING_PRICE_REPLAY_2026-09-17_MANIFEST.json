@@ -1,0 +1,45 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LEAD_MISSING_PRICE_REPLAY_2026-09-17",
+  "script": "raits/research/stocks_pit_full_lead_missing_price_replay.py",
+  "engine": "raits/research/stocks_pit_full_lead_crisis_eventtime_audit.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TRADE_EVENTS.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_REVERSAL_COHORTS_2026-09-17_SIGNALS.csv",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl",
+    "raits/data/cache/polygon_5min_pit_full_2018_2024"
+  ],
+  "pre_registered_scenarios": [
+    {
+      "scenario": "feature_exact_namecap3",
+      "raw_exact": false,
+      "asof_marks": false,
+      "fail_safe": false
+    },
+    {
+      "scenario": "raw_exact_namecap3",
+      "raw_exact": true,
+      "asof_marks": false,
+      "fail_safe": false
+    },
+    {
+      "scenario": "raw_asof5_namecap3_missingfs",
+      "raw_exact": true,
+      "asof_marks": true,
+      "fail_safe": true
+    }
+  ],
+  "price_contract": "Raw exact 09:35 open is executable. A prior raw bar close available by event time and no more than five minutes old is mark-only. Missing exact execution freezes an existing holding and blocks opening/increasing that name.",
+  "sample_label": "Touched research 2018-2024 only. No 2025-2026 opened.",
+  "selection_warning": "Operational replay of frozen signals and controls, not clean OOS evidence.",
+  "outputs": [
+    "STOCKS_PIT_FULL_LEAD_MISSING_PRICE_REPLAY_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LEAD_MISSING_PRICE_REPLAY_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_LEAD_MISSING_PRICE_REPLAY_2026-09-17_COVERAGE.csv",
+    "STOCKS_PIT_FULL_LEAD_MISSING_PRICE_REPLAY_2026-09-17_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_LEAD_MISSING_PRICE_REPLAY_2026-09-17_EVENT_LEDGER.csv",
+    "STOCKS_PIT_FULL_LEAD_MISSING_PRICE_REPLAY_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_LEAD_MISSING_PRICE_REPLAY_2026-09-17_QA.csv"
+  ]
+}

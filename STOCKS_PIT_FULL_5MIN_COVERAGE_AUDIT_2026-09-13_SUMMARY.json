@@ -1,0 +1,20 @@
+{
+  "audited_files": 176028,
+  "covered_eligible_symbol_days": 3414740,
+  "dedup_plan_rows": 176028,
+  "duplicate_timestamps": 0,
+  "expected_eligible_symbol_days": 3414774,
+  "files_exist": 176028,
+  "files_fail": 0,
+  "files_pass": 176007,
+  "files_read_ok": 176028,
+  "files_warn": 21,
+  "issue_rows": 21,
+  "missing_eligible_symbol_days": 34,
+  "off_month_rows": 0,
+  "off_rth_rows": 0,
+  "raw_plan_rows": 176260,
+  "symbols": 5097,
+  "total_rows": 278880450,
+  "total_size_bytes": 11458658019
+}

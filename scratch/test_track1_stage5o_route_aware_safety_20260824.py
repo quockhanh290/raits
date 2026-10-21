@@ -134,7 +134,10 @@ def test_the_safety_table_and_the_scheduler_agree():
     ids = {j.id for j in _sched(track1_only=True).get_jobs()}
     want = {sj.id for sj in ts.track1_safety_jobs()}
     assert want <= ids, sorted(want - ids)
-    assert len(want) == 11
+    import collections
+    kinds = collections.Counter(j.kind for j in ts.track1_safety_jobs())
+    # one 09:31 max-hold, one 15:55 clock exit (2026-10-05), nine weekday sweeps + Sunday 18:30
+    assert (kinds["maxhold"], kinds["time_exit"], kinds["stop_repair"]) == (1, 1, 10), kinds
 
 
 def test_the_sweep_hours_are_derived_from_track1s_own_windows():

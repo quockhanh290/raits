@@ -1,0 +1,75 @@
+{
+  "spec_id": "stocks_sec_13d_sicpair_drift_v1_2026-09-24",
+  "frozen_before_family_performance": true,
+  "adaptive_search_disclosure": "Opened after prior broad-PIT price, SEC 8-K, Form 4, and reaction-conditioned ownership families were measured. This is adaptive research, not pristine discovery. Section 6.207 used only gap-confirmed/rejected 13D events; this family tests unconditioned medium-horizon activist drift with a pre-entry same-SIC hedge.",
+  "hypothesis": "An initial active-ownership Schedule 13D may create medium-horizon target-specific drift that survives after shorting a contemporaneous same-industry, similar-size peer.",
+  "samples": {
+    "development": ["2018-04-27", "2022-12-30"],
+    "validation": ["2023-01-03", "2024-12-31"],
+    "stage_policy": "Independent USD 100000 books. Complete scheduled hold required inside each stage; no carry or truncation across the 2022/2023 boundary.",
+    "oos_2025_2026": "PROHIBITED. No 2025-2026 prices, features, membership, or performance may be loaded."
+  },
+  "event_contract": {
+    "forms": ["SC 13D", "SCHEDULE 13D"],
+    "amendments": "Excluded",
+    "availability": "SEC acceptanceDateTime",
+    "session_assignment": "First full PIT trading session whose 09:15 America/New_York cutoff is strictly later than acceptance; lower bound is the previous session cutoff.",
+    "deduplication": "One earliest exact accession per issuer CIK and assigned session",
+    "price_reaction_filter": "None"
+  },
+  "universe_contract": {
+    "target": "Quarterly Polygon PIT market-cap top500, highest-market-cap security per issuer CIK; current price >= USD 5 and lagged ADV20 >= USD 10m.",
+    "peer": "Same quarterly PIT snapshot, same non-empty sic_description, different issuer/ticker, current PIT eligible with exact 09:35 entry; minimize absolute log-market-cap distance to target, then ticker ascending.",
+    "old_62_usage": "None"
+  },
+  "candidates": [
+    {"variant": "active13d_sicpair_hold20", "hold_sessions": 20},
+    {"variant": "active13d_sicpair_hold60", "hold_sessions": 60}
+  ],
+  "execution": {
+    "entry": "Exact 09:35 for both legs on the assigned session; skip the entire pair if either leg is unavailable.",
+    "exit": "Exact 15:55 for both legs on the scheduled hold session; if either leg is unavailable, delay the entire pair until both exact 09:35 marks exist.",
+    "sizing": "At entry, long target 3% and short peer 3% of contemporaneous NAV. Scale all same-session pairs proportionally for the 1x hard gross cap.",
+    "overlap": "Skip an event if either target or peer is already active; same-session pairs are admitted in accession/ticker order without ticker reuse.",
+    "capacity": "Each leg notional must be <=1% of its own PIT lagged ADV20.",
+    "refill": "None",
+    "costs_bps_each_trade": [4, 8],
+    "short_borrow_annual": 0.01,
+    "financing_annual_above_1x": 0.025,
+    "compounding": "Causal from current NAV"
+  },
+  "development_gates": {
+    "positive_years_min": 3,
+    "base_cagr_min": 0.02,
+    "base_sharpe_min": 0.5,
+    "base_and_stress_pnl_positive": true,
+    "dd_pct_floor": -0.12,
+    "pair_entries_min": 50,
+    "effective_ticker_count_min": 20,
+    "top10_positive_pnl_share_max": 0.65,
+    "absolute_broad_pit_beta_max": 0.25
+  },
+  "validation_gates": {
+    "base_and_stress_pnl_positive": true,
+    "both_years_nonnegative": true,
+    "dd_pct_floor": -0.10,
+    "pair_entries_min": 20,
+    "effective_ticker_count_min": 10,
+    "top10_positive_pnl_share_max": 0.75,
+    "absolute_broad_pit_beta_max": 0.25
+  },
+  "selection": {
+    "rank": "Among development-pass candidates, higher stress8 Sharpe, then higher base Sharpe, then more pair entries, then shorter hold.",
+    "isolation": "Select once on development. Validation cannot substitute the other hold."
+  },
+  "audit_requirements": [
+    "Persist mapped events, selected peers, daily/event/trade ledgers, ticker contribution, summary, yearly attribution, QA, selection, and manifest.",
+    "Report pair counts, target and peer concentration, top1/top3/top5/top10 positive-PnL shares, effective ticker count, dollar DD, percentage DD, turnover, borrow, financing, gross, missing marks, and broad-PIT beta/residual alpha.",
+    "Separate rule-selection effect from rebuilt trade-selection effect. No PnL subtraction or refill shortcut."
+  ],
+  "implementation_freeze": {
+    "family_performance_seen": false,
+    "replay_script": "raits/research/stocks_sec_13d_sicpair_drift_replay.py",
+    "script_hash": "E098D502669D9E749F01BE3371C7150769C71B5F144A084B18E1A33EBDAB5095"
+  }
+}

@@ -75,7 +75,7 @@
     <section class="header-dashboard metrics" id="metrics" aria-label="Realtime account overview">
       <div class="metrics-row metrics-lead">
       <div class="header-zone equity-zone runner-derived">
-        <span class="zone-title has-tip tip-bottom" tabindex="0" data-tooltip="Paper-trading system equity maintained by the runner ledger. This excludes the broker account's total liquidation value.">Paper Equity</span>
+        <span class="zone-title has-tip tip-bottom" tabindex="0" data-tooltip="Track 1 system equity maintained by its own 50k book. Broker account equity is shown below for reference only and is not the risk denominator.">Paper Equity</span>
         <div class="equity-line"><b id="metricEquity">--</b><strong id="performanceNet">--</strong></div>
         <small><em id="performanceReturn">--</em> <span id="performanceScope">--</span> / base <strong id="performanceBase">--</strong></small>
         <small class="broker-account-line has-tip tip-bottom" tabindex="0" data-tooltip="The IBKR paper account's own equity, shown for context only. The runner ledger above is realised-only and re-anchors at the system epoch; the two are not the same number and are not meant to reconcile here."><span id="brokerAccountContext">--</span> <a href="/paper" class="reconcile-link">Reconcile</a></small>
@@ -181,7 +181,7 @@
 
         <section class="section-band positions-section">
           <div class="section-heading compact">
-            <h2>Open Positions <span class="source-note">legacy / drain</span></h2>
+            <h2>Open Positions <span class="source-note">Track 1 book / IBKR</span></h2>
             <span class="source-note" id="positionSource" data-help="positions">IBKR unavailable</span>
           </div>
           <div class="position-grid" id="positionGrid"></div>

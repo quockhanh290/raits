@@ -69,6 +69,93 @@ logging.basicConfig(
 log = logging.getLogger("run_maxhold_exit")
 
 
+def _parse_cluster_max_hold(items) -> dict:
+    """`["roska4_calm=1"]` -> `{"roska4_calm": 1}`. A malformed item is an error, not a skip."""
+    out = {}
+    for item in items or ():
+        name, sep, days = str(item).partition("=")
+        if not sep or not name.strip():
+            raise ValueError(f"--cluster-max-hold expects CLUSTER=DAYS, got {item!r}")
+        out[name.strip()] = int(days)
+    return out
+
+
+def _book_holds_cluster(pos_path: Path, cluster: str):
+    """Does the route's book hold an open position of `cluster`? True / False / None.
+
+    Three outcomes, because "could not read the book" is not "the book is empty": the caller
+    connects on None, since a time exit that skips on a torn file leaves a position open
+    overnight, and a pointless connection costs a few seconds.
+    """
+    import json
+    try:
+        raw = json.loads(Path(pos_path).read_text(encoding="utf-8"))
+        rows = raw.get("positions") if isinstance(raw, dict) else None
+        if not isinstance(rows, list):
+            return None
+        return any(isinstance(r, dict) and str(r.get("cluster") or r.get("sleeve") or "") == cluster
+                   for r in rows)
+    except (OSError, ValueError):
+        return None
+
+
+def _unbooked_cluster_opens(cluster: str, today, trade_log_path, root) -> "tuple[list, list]":
+    """`(opens the book never learned about, problems)` for `cluster` on `today`.
+
+    The time exit closes what the BOOK says is open. A fill the book never recorded — the order
+    was acknowledged but not yet FILLED when the slot returned, or the book append failed after
+    a confirmed fill — is a broker position this job cannot see, and "the book holds nothing" would
+    then read as "nothing to do" and leave it open overnight. The order journal is the second
+    witness: an OPEN of this cluster dated today whose last state is anything but REJECTED or a
+    bare INTENDED means an order existed. It is excused only when the trade log already holds a
+    CLOSE for that instrument today (this job, or a retry of it, did its work).
+
+    `problems` is the list of things that could not be read. An unreadable journal is not an empty
+    one — the caller treats a non-empty `problems` as a failure, not as "nothing found".
+    """
+    import json
+
+    from global_index import track1_order_journal as oj
+    from global_index import track1_order_state as st
+
+    day = pd.Timestamp(today).strftime("%Y%m%d")
+    problems: list = []
+    try:
+        records, invalid = oj.read(root=root, day=day)
+    except Exception as exc:                                    # noqa: BLE001
+        return [], [f"order journal unreadable: {type(exc).__name__}: {exc}"]
+    problems.extend(f"order journal: {x}" for x in invalid)
+
+    last: dict = {}
+    for r in records:                              # file order == write order
+        if r.sleeve == cluster and r.action == "OPEN":
+            last[r.idempotency_key] = r
+    opened = sorted({(r.instrument, r.state) for r in last.values()
+                     if r.state not in (st.REJECTED, st.INTENDED)})
+    if not opened:
+        return [], problems
+
+    closed_today = set()
+    try:
+        p = Path(trade_log_path)
+        if p.exists():
+            for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    problems.append("trade log: a line could not be parsed")
+                    continue
+                if (isinstance(row, dict) and str(row.get("type")) == "CLOSE"
+                        and str(row.get("cluster")) == cluster
+                        and str(row.get("exit_day")) == pd.Timestamp(today).strftime("%Y-%m-%d")):
+                    closed_today.add(str(row.get("inst")))
+    except OSError as exc:
+        problems.append(f"trade log unreadable: {exc}")
+    return [(i, s) for i, s in opened if i not in closed_today], problems
+
+
 def main():
     ap = argparse.ArgumentParser(description="09:31 ET MAX_HOLD exit — close positions at RTH open")
     ap.add_argument("--stop-path",      default=STOP_FILE_NAME,
@@ -105,6 +192,17 @@ def main():
     ap.add_argument("--route",          default=None,
                     help="Stamp `route` on every row this run writes. REQUIRES "
                          "--trade-log-path; on its own it is refused.")
+    # 2026-10-05. A sleeve that exits by the clock rather than by hold-days (roska4_calm:
+    # in at the 10:00 open, out at the 15:55 open). Same close, same book, same trade log —
+    # only WHICH positions are due changes: every open position of this cluster, now.
+    ap.add_argument("--time-exit-cluster", default=None, metavar="CLUSTER",
+                    help="Close EVERY open position of CLUSTER at the market instead of "
+                         "applying the hold-days rule. Positions of other clusters are not "
+                         "touched. Connects only when the book holds such a position.")
+    ap.add_argument("--cluster-max-hold", action="append", default=[], metavar="CLUSTER=DAYS",
+                    help="Per-cluster override of the max-hold days (repeatable). A cluster "
+                         "meant to be flat by the end of its session uses 1, so a position "
+                         "its time exit failed to close is found the next morning.")
     a = ap.parse_args()
 
     # Before the positions check, not after: through the whole shadow period Track 1's
@@ -143,6 +241,34 @@ def main():
         log.info("No positions file found (%s) — nothing to exit.", pos_path)
         return
 
+    try:
+        cluster_max_hold = _parse_cluster_max_hold(a.cluster_max_hold)
+    except ValueError as exc:
+        log.error("[args] %s", exc)
+        return 1
+
+    # A time exit runs every session at 15:55, which is INSIDE the swing entry window — and a
+    # connected run is a B3 reconcile, i.e. one more chance to halt entries on a false mismatch
+    # at the worst moment (the stop-repair sweeps are placed to avoid exactly that). So it
+    # connects only on a day the book actually holds a position of the cluster. Unknown (a
+    # book that cannot be read) connects: skipping on a torn file would leave it open.
+    if a.time_exit_cluster and _book_holds_cluster(pos_path, a.time_exit_cluster) is False:
+        _today = pd.Timestamp.now(tz="America/New_York").normalize().tz_localize(None)
+        _unbooked, _problems = _unbooked_cluster_opens(
+            a.time_exit_cluster, _today, trade_log_path, _CWD)
+        if _unbooked or _problems:
+            # The book says flat; a second witness says an order existed (or cannot be read).
+            # Exit non-zero so the scheduler raises an incident instead of logging "nothing to do".
+            log.error("[exit] %s: the book holds no position but the order journal shows %s "
+                      "opened today and not closed%s. A broker position the book does not know "
+                      "has no clock exit — check the broker and close it by hand.",
+                      a.time_exit_cluster, _unbooked or "nothing",
+                      f" (unreadable: {'; '.join(_problems)})" if _problems else "")
+            return 1
+        log.info("No open %s position in %s — time exit has nothing to do, not connecting.",
+                 a.time_exit_cluster, pos_path)
+        return 0
+
     # ── E1 lock BEFORE connecting ────────────────────────────────────────────
     # Guard E1 ("PID lockfile prevents duplicate runner instances from submitting
     # double orders") chỉ được run_live_day dùng. Job này và stop-repair chạy trần,
@@ -177,9 +303,10 @@ def main():
             # không bao giờ tới `finally`. Đó đúng là ca đã xảy ra. atexit phủ hết.
             atexit.register(_release_lock, Path(a.lock_path))
         except RunnerLockError as exc:
-            log.error("[lock] %s — MAX_HOLD KHONG chay hom nay. Day khong phai mot slot "
-                      "bo qua vo hai: job nay chay mot lan moi ngay, nen vi the toi han "
-                      "se o lai qua dem.", exc)
+            log.error("[lock] %s — %s did not run today. This is not a harmless "
+                      "skipped slot: the job runs once per day, so a due position may "
+                      "remain open overnight.", exc,
+                      "TIME_EXIT" if a.time_exit_cluster else "MAX_HOLD")
             return 1
 
     log.info("[ibkr] Connecting → 127.0.0.1:%d clientId=%d ...", a.port, a.client_id)
@@ -221,25 +348,32 @@ def main():
                 p.inst, p.cluster, p.direction,
                 str(p.entry_day.date()) if p.entry_day else "?",
                 hold, MAX_HOLD_DAYS,
-                "CLOSE" if hold >= MAX_HOLD_DAYS else "keep",
+                ("CLOSE" if p.cluster == a.time_exit_cluster else "keep")
+                if a.time_exit_cluster else
+                ("CLOSE" if hold >= cluster_max_hold.get(p.cluster, MAX_HOLD_DAYS) else "keep"),
             )
 
         if a.dry_run:
             log.info("[dry-run] No orders sent.")
             return
 
-        closed = runner.run_maxhold_exit(today, max_hold_days=MAX_HOLD_DAYS)
+        if a.time_exit_cluster:
+            closed = runner.run_time_exit(today, a.time_exit_cluster)
+        else:
+            closed = runner.run_maxhold_exit(today, max_hold_days=MAX_HOLD_DAYS,
+                                             cluster_max_hold=cluster_max_hold or None)
 
         # [BOOKED], and log rather than print: this process has no log file of its own,
         # so everything it says goes to the scheduler, which keeps only CRITICAL/ERROR
         # lines when a run succeeds. A close is INFO and a success, so the account of
         # it was thrown away -- on 2026-08-17 that was the whole record of closing M2K.
         # The marker is what the parent keeps; see _run in run_scheduler.
+        _what = "TIME_EXIT" if a.time_exit_cluster else "MAX_HOLD"
         if closed:
             for inst, cluster in closed:
-                log.info("[BOOKED] MAX_HOLD closed %s/%s", inst, cluster)
+                log.info("[BOOKED] %s closed %s/%s", _what, inst, cluster)
         else:
-            log.info("No MAX_HOLD positions to close today.")
+            log.info("No %s positions to close today.", _what)
 
     finally:
         broker.disconnect()

@@ -1,0 +1,31 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LEAD_PERSISTENT_SPY_HEDGE_2026-09-17",
+  "script": "raits/research/stocks_pit_full_lead_persistent_spy_hedge.py",
+  "engine": "raits/research/stocks_pit_full_lead_candidate_eventtime_audit.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TRADE_EVENTS.csv",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl"
+  ],
+  "pre_registered_variants": [
+    "control",
+    "below_sma200",
+    "overnight20_negative",
+    "below_sma200_and_overnight20_negative"
+  ],
+  "hedge_rule": "Subtract 0.5x SPY exposure from the frozen core whenever the lagged state is true; hold until the state changes. Same-instrument positions are netted before turnover, financing, and PnL.",
+  "attribution": "Because hedge and core use the same SPY instrument, causal hedge effect is the full-rerun difference from control, not a separately additive sleeve ledger.",
+  "sample_label": "Diagnostic on touched research sample 2018-2024. No 2025-2026 opened.",
+  "selection_warning": "Family was frozen before this run but was motivated by observed 2022 losses; it is not clean OOS evidence.",
+  "outputs": [
+    "STOCKS_PIT_FULL_LEAD_PERSISTENT_SPY_HEDGE_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LEAD_PERSISTENT_SPY_HEDGE_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_LEAD_PERSISTENT_SPY_HEDGE_2026-09-17_STATE.csv",
+    "STOCKS_PIT_FULL_LEAD_PERSISTENT_SPY_HEDGE_2026-09-17_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_LEAD_PERSISTENT_SPY_HEDGE_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_LEAD_PERSISTENT_SPY_HEDGE_2026-09-17_EVENT_LEDGER.csv",
+    "STOCKS_PIT_FULL_LEAD_PERSISTENT_SPY_HEDGE_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_LEAD_PERSISTENT_SPY_HEDGE_2026-09-17_QA.csv"
+  ]
+}

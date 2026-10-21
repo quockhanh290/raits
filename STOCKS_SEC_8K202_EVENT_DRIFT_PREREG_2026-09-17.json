@@ -1,0 +1,138 @@
+{
+  "spec_id": "stocks_sec_8k202_event_drift_v1_2026-09-17",
+  "frozen_before_family_performance": true,
+  "hypothesis": "A PIT-timestamped earnings-result filing followed by a large opening gap and confirming first-five-minute move contains delayed price discovery beyond 09:35.",
+  "samples": {
+    "development": "2018-01-02 through 2022-12-30",
+    "validation": "2023-01-03 through 2024-12-31",
+    "oos": "2025-01-02 through 2026-09-16",
+    "oos_policy": "Run only if one development-selected variant passes every validation gate. Report all three OOS variants but judge only the frozen selected variant."
+  },
+  "event_contract": {
+    "source": "SEC EDGAR submissions JSON",
+    "forms": ["8-K"],
+    "required_item": "2.02",
+    "timestamp": "acceptanceDateTime",
+    "availability_cutoff": "09:15 America/New_York",
+    "session_assignment": "First trading session whose 09:15 ET cutoff is strictly after the SEC acceptance timestamp.",
+    "deduplication": "One event per CIK and assigned session; retain earliest accepted eligible filing.",
+    "issuer_representation": "At each quarterly PIT market-cap snapshot, retain the highest-market-cap top500 ticker per CIK to prevent duplicate share-class exposure.",
+    "amendments": "Exclude 8-K/A and all events without a parseable acceptance timestamp."
+  },
+  "signal_contract": {
+    "universe": "Quarterly Polygon PIT market-cap top500 with current-day PIT price>=5 and lagged ADV20>=10m eligibility.",
+    "gap_abs_min": 0.02,
+    "opening_rvol_min": 1.5,
+    "first5_abs_min": 0.0025,
+    "confirmation": "gap and first5_ret must have the same non-zero sign",
+    "direction": "Long positive confirmed response; short negative confirmed response.",
+    "entry": "Exact 09:35 open on assigned session.",
+    "exit": "Exact 15:55 close on the hold-th trading session, where entry session is day 1."
+  },
+  "candidate_family": [
+    {"variant": "sec8k202_confirm_hold1", "hold_sessions": 1},
+    {"variant": "sec8k202_confirm_hold3", "hold_sessions": 3},
+    {"variant": "sec8k202_confirm_hold5", "hold_sessions": 5}
+  ],
+  "portfolio_contract": {
+    "start_capital": 100000.0,
+    "entry_notional_nav": 0.03,
+    "single_issuer_cap_nav": 0.03,
+    "hard_gross_cap": 1.0,
+    "overlapping_event_policy": "Ignore a new event for an issuer while that issuer already has an active position.",
+    "capacity_policy": "Current eligible PIT ADV20 is required and entry notional must not exceed 1% of ADV20.",
+    "unused_capacity": "Remain in cash; no refill from non-event names.",
+    "missing_entry": "Skip if exact 09:35 execution is absent.",
+    "missing_mark": "A causal prior bar no more than five minutes old may mark but never execute.",
+    "missing_exit": "If exact 15:55 exit is absent, retain shares and execute at the next exact 09:35 or 15:55 price, whichever occurs first.",
+    "base_cost_bps_each_trade": 4.0,
+    "stress_cost_bps_each_trade": 8.0,
+    "short_borrow_annual": 0.01,
+    "financing_annual_above_1x": 0.025
+  },
+  "development_selection_rule": {
+    "ranking_period": "2018-2022",
+    "ranking": "Highest base-4bps daily Sharpe among variants passing every development gate.",
+    "development_gates": {
+      "pnl_positive_years_min": 3,
+      "years": 5,
+      "max_drawdown_pct_floor": -0.20,
+      "event_count_min": 100,
+      "effective_ticker_count_min": 20
+    },
+    "validation_gates_2023_2024": {
+      "base_pnl_min": 0.0,
+      "cost8_pnl_min": 0.0,
+      "max_drawdown_pct_floor": -0.15,
+      "both_calendar_year_pnl_nonnegative": true
+    },
+    "tie_break": "Shorter hold_sessions.",
+    "no_selection_result": "If no variant passes, kill the family without running OOS performance."
+  },
+  "oos_acceptance_for_selected_variant": {
+    "base_cagr_min": 0.05,
+    "base_sharpe_min": 0.70,
+    "cost8_cagr_min": 0.03,
+    "max_drawdown_pct_floor": -0.10,
+    "event_count_min": 30,
+    "effective_ticker_count_min": 20,
+    "top10_positive_ticker_pnl_share_max": 0.60,
+    "stale_execution_allowed": false
+  },
+  "audit_requirements": [
+    "Report every pre-registered variant and both cost assumptions.",
+    "Report yearly PnL, dollar and percentage drawdown, turnover, borrow, exposure, event counts, long/short counts, and top1/top3/top5/top10 concentration.",
+    "Separate family selection on development data from trade selection caused by PIT eligibility and execution availability.",
+    "Do not optimize event thresholds, cutoffs, holding periods, direction, or sizing after any family performance is read.",
+    "Do not use the old manual/restricted 62 universe."
+  ],
+  "implementation_freeze_before_performance": {
+    "sec_fetch_script": "raits/research/stocks_sec_submissions_fetch.py",
+    "sec_fetch_script_sha256": "88C47BFBD56B8842815BEDFA34BD06E66A16EEB88C79E87A3AF6F3A5F4F50C22",
+    "replay_script": "raits/research/stocks_sec_8k202_event_drift_replay.py",
+    "replay_script_sha256": "B525FD52A882C409E998C9F6ED8937DCA98D604A0E2953B8F4CEF793E3A21652",
+    "event_file": "raits/data/cache/external_events/sec_submissions_pit_2018_2026/sec_8k_item_202_events_2017_2026.csv",
+    "event_file_sha256": "9034D0E6E83E8EFDEEFB6EE6BBC444B3D1282C00EF2BD19FFEC819AC3B705226",
+    "event_rows": 28451,
+    "issuer_ciks_fetched": 843,
+    "fetch_errors": 0,
+    "performance_seen": false
+  },
+  "post_development_contract_correction": {
+    "performance_seen": true,
+    "oos_performance_seen": false,
+    "old_replay_sha256": "80B46C4BE3381D4D2D5E7776FBE41634C084C63D7869F1064BD328F39EAB6995",
+    "new_replay_sha256": "04FF42C02DA5A96EE619201F37DEBF7559BAEAB1959736BF1855165AD1CF6EC2",
+    "reason": "The first development replay enforced the 1x cap only when adding entries, allowing marked gross drift to 1.00062x for hold3 and 1.01622x for hold5. The correction proportionally reduces active positions at exact 09:35/15:55 prices whenever marked gross exceeds NAV and charges turnover cost.",
+    "rule_change": false,
+    "selection_policy": "Discard the first development selection and rerun all variants and gates after the contract correction before freezing any OOS candidate."
+  },
+  "post_development_contract_correction_2": {
+    "performance_seen": true,
+    "oos_performance_seen": false,
+    "old_replay_sha256": "04FF42C02DA5A96EE619201F37DEBF7559BAEAB1959736BF1855165AD1CF6EC2",
+    "new_replay_sha256": "475B487FCEC31A0B5C470A606913AB5F0AD5C51EB453CD789416C5E2FFEE9DF4",
+    "reason": "The first cap correction ran only before 09:35 entries, so entry costs could leave gross/NAV slightly above 1x. Its daily max-gross diagnostic also divided both timestamp gross notionals by end-of-day equity. The second correction enforces the same frozen 1x cap after entries and records each timestamp's gross against contemporaneous equity.",
+    "rule_change": false,
+    "selection_policy": "Discard the intermediate corrected development selection, rerun all variants and gates, and require event-ledger and summary max gross no greater than 1x before freezing OOS."
+  },
+  "post_development_contract_correction_3": {
+    "performance_seen": true,
+    "oos_performance_seen": false,
+    "old_replay_sha256": "475B487FCEC31A0B5C470A606913AB5F0AD5C51EB453CD789416C5E2FFEE9DF4",
+    "new_replay_sha256": "802364DD397C775FA698C4CAD50C5BC41B1C322452B46C61F05FF298C5528DAC",
+    "reason": "The second correction exposed that the cap function skipped all reductions whenever any active ticker lacked an exact execution price. The frozen missing-price rule requires retaining that locked position, but does not prohibit reducing positions with exact prices. The correction holds locked gross unchanged and proportionally reduces tradable gross, including turnover costs, to satisfy the same 1x cap.",
+    "rule_change": false,
+    "selection_policy": "Discard the prior rerun, rerun all development variants and gates, and do not freeze OOS unless both timestamp and summary gross diagnostics are no greater than 1x."
+  },
+  "post_oos_boundary_mapping_correction": {
+    "performance_seen": true,
+    "invalid_oos_performance_seen": true,
+    "old_replay_sha256": "802364DD397C775FA698C4CAD50C5BC41B1C322452B46C61F05FF298C5528DAC",
+    "new_replay_sha256": "B525FD52A882C409E998C9F6ED8937DCA98D604A0E2953B8F4CEF793E3A21652",
+    "reason": "Stage-local session assignment mapped every filing older than the sample to the first sample session. For example, a 2017 ABT filing was incorrectly assigned to 2025-01-02. The correction admits only acceptances at or after the prior trading session's 09:15 ET cutoff: 2017-12-29 for development and 2024-12-31 for OOS.",
+    "rule_change": false,
+    "invalidated_artifacts": "All prior development and OOS outputs were copied to INVALID_BOUNDARY_MAPPING names and are excluded from selection and verdicts.",
+    "selection_policy": "Rebuild development selection from corrected mappings. Only if the corrected family remains OOS eligible may a new freeze be created. Any corrected OOS replay must disclose that an invalid boundary-contaminated OOS run had already been observed."
+  }
+}

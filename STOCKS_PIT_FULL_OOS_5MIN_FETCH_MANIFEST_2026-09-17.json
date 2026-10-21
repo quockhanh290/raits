@@ -1,0 +1,16 @@
+{
+  "purpose": "Clean OOS PIT top500 plus SPY 5-minute fetch plan",
+  "frozen_spec": "STOCKS_PIT_FULL_LEAD_OOS_FROZEN_SPEC_2026-09-17.json",
+  "pit_filter": "raits/data/cache/stocks_survivorship/polygon_universe_bulk/daily_20250102_20260916_clean_oos/liquidity_filter_daily_20250102_20260916_clean_oos_px5_adv10m_unadjusted/filtered_daily_universe.parquet",
+  "market_caps": "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2025_2026_clean_oos.csv",
+  "output_dir": "raits/data/cache/polygon_5min_pit_full_2025_2026_clean_oos",
+  "start": "2025-01-02",
+  "end": "2026-09-16",
+  "symbols": 615,
+  "chunks": 10521,
+  "opened_2025_2026_oos": true,
+  "outputs": [
+    "STOCKS_PIT_FULL_OOS_5MIN_FETCH_CHUNKS_2026-09-17.csv",
+    "STOCKS_PIT_FULL_OOS_5MIN_FETCH_SYMBOLS_2026-09-17.csv"
+  ]
+}

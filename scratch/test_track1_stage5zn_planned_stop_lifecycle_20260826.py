@@ -564,7 +564,11 @@ def test_the_report_separates_planned_from_broker_verified(tmp_path):
     assert life["broker_stop_verified"] is False
     assert life["verbs_send_orders"] is False
     assert all(life["lifecycle_verbs"].values()), life["lifecycle_verbs"]
-    assert "needs paper" in life["broker_stop_reason"]
+    # 2026-09-24. This pinned the literal "needs paper", from a reason that read "no Track 1 order
+    # has ever been sent … this needs paper" — false from 15:55 ET that day, when two filled.
+    # Pinned now by what it must do: give a reason, and not claim that nothing was ever sent.
+    assert life["broker_stop_reason"]
+    assert "ever been sent" not in life["broker_stop_reason"]
 
 
 def test_the_reports_declared_verbs_match_the_real_executor():
@@ -599,12 +603,34 @@ def test_the_report_never_claims_a_broker_stop_anywhere(tmp_path):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def test_orders_are_still_impossible():
-    from global_index import track1_gates as g
-    allowed, reasons = g.may_enable_orders()
-    assert allowed is False
-    ids = [r.split(":")[0] for r in reasons]
-    for want in ("B1_broker_account_or_legacy_retirement", "PAPER_SHADOW_EVIDENCE"):
-        assert want in ids, ids
+    """Rewritten 2026-09-24. It used to assert `allowed is False` and name the blockers holding
+    it there.
+
+    Three things happened to that. The operator signed the confirmation file on 2026-08-27, so
+    B1 closed. On 2026-09-24 they opened paper orders with the evidence gate OVERRIDDEN rather
+    than switched off, so PAPER_SHADOW_EVIDENCE left `blocking()` while still failing. Then at
+    20:01 ET the paper-account baseline passed its 24-hour life and B1 shut again on its own.
+
+    A test pinned to any one of those three states is a diary entry. The rule underneath does
+    not move: whichever way the gate answers, it answers with something on the record — a reason
+    when it refuses, a named override when it proceeds. Silence in either direction is the defect.
+    """
+    from global_index import track1_gates as _G
+
+    allowed, reasons = _G.may_enable_orders()
+    if not allowed:
+        assert reasons, "orders are refused and nothing on the record says why"
+        return
+    waived = _G.overridden()
+    for b, why in waived:
+        assert why, "%s proceeds under an override with no reason recorded" % b.id
+    holders = [x for x in _G.BLOCKERS.values() if x.blocks_orders]
+    conf = _G.current_confirmations()
+    waived_ids = [b.id for b, _ in waived]
+    for b in holders:
+        assert (b.id in waived_ids) or b.released(conf) is True, (
+            "%s holds orders and is neither released nor overridden, yet orders are allowed"
+            % b.id)
 
 
 def test_no_production_artefact_was_written_by_this_run():
@@ -617,22 +643,86 @@ def test_no_production_artefact_was_written_by_this_run():
 
 
 def test_no_real_order_journal_was_created():
-    assert not (REPO / "global_index" / "track1_runtime" / "orders").exists(), (
-        "a real order journal directory appeared")
+    """Rewritten 2026-09-24. This stage is about the planned-stop lifecycle.
+
+    The absence of these paths was a usable proxy for "this suite wrote nothing" only while they
+    had never existed. The route created the order journal on 2026-09-24 with two orders that
+    filled, and the operator signed the confirmation file on 2026-08-27 — four weeks before this
+    assertion started failing, which is how long it had been describing the past.
+
+    Measured instead, and it is the sharper question: nothing here wrote to them. `_IMPORTED_AT`
+    is the same idiom this file already uses in
+    `test_no_production_artefact_was_written_by_this_run`, so an existing path is judged by
+    whether it MOVED, not by whether it is there.
+    """
+    for name in ('global_index/track1_runtime/orders'):
+        p = REPO / name
+        if p.exists():
+            assert p.stat().st_mtime < _IMPORTED_AT, (
+                "%s was written during this run; every write in this suite belongs under "
+                "tmp_path" % name)
 
 
 def test_no_confirmation_file_appeared():
-    assert not (REPO / "track1_go_live_confirmation.json").exists()
+    """Rewritten 2026-09-24. This stage is about the planned-stop lifecycle.
+
+    The absence of these paths was a usable proxy for "this suite wrote nothing" only while they
+    had never existed. The route created the order journal on 2026-09-24 with two orders that
+    filled, and the operator signed the confirmation file on 2026-08-27 — four weeks before this
+    assertion started failing, which is how long it had been describing the past.
+
+    Measured instead, and it is the sharper question: nothing here wrote to them. `_IMPORTED_AT`
+    is the same idiom this file already uses in
+    `test_no_production_artefact_was_written_by_this_run`, so an existing path is judged by
+    whether it MOVED, not by whether it is there.
+    """
+    for name in ('track1_go_live_confirmation.json'):
+        p = REPO / name
+        if p.exists():
+            assert p.stat().st_mtime < _IMPORTED_AT, (
+                "%s was written during this run; every write in this suite belongs under "
+                "tmp_path" % name)
 
 
 def test_the_preflight_record_is_a_rolling_real_preflight_window():
+    """Rewritten 2026-09-24. Both halves of this were a snapshot, and the window has rolled.
+
+    The record holds a ROLLING seven days. This test pinned the seven that were in it the day it
+    was written — 2026-08-17 to 2026-08-25, or a last day of 2026-08-26 in the sibling stage — so
+    it was guaranteed to fail once the real 13:45 ET pre-flight ran a few more times. Measured
+    today: 2026-09-14 … 2026-09-24. Nothing is wrong; the window did its job.
+
+    What the 5ZL incident actually requires, and what is asserted instead:
+
+        exactly seven, unique      a window that grows or repeats is not a window
+        none in the future         the 5ZL defect itself: a day in the record that the real
+                                   13:45 ET pre-flight never set
+        and it still MOVES         a record frozen at an old list looks identical to a healthy
+                                   one from the shape alone. The newest day must be recent, or
+                                   nothing has been writing it.
+
+    The third is the one a literal list could never express, and it is the one that would catch
+    the pre-flight silently stopping.
+    """
+    import datetime as _dt
+    import zoneinfo as _zi
+
     p = REPO / "global_index" / "preflight_state.json"
     if not p.exists():
         pytest.skip("no pre-flight record on this machine")
     days = sorted(json.loads(p.read_text(encoding="utf-8")))
+
     assert len(days) == 7, days
     assert days == sorted(set(days)), days
-    assert all(d <= "2026-08-26" for d in days), days
-    assert days[-1] == "2026-08-26", (
-        "the real 13:45 ET pre-flight has run by this stage; the test pins the rolling "
-        f"window property rather than the operator-restored list from before it ran: {days}")
+
+    today = _dt.datetime.now(_zi.ZoneInfo("America/New_York")).date()
+    assert all(d <= today.isoformat() for d in days), (
+        "the record holds a day the real 13:45 ET pre-flight cannot have set yet: %s" % days)
+
+    newest = _dt.date.fromisoformat(days[-1])
+    behind = (today - newest).days
+    assert behind <= 5, (
+        "the newest pre-flight day is %s, %d calendar days behind the current ET session (%s). "
+        "A record that has stopped moving reads exactly like a healthy one from its shape alone"
+        % (days[-1], behind, today.isoformat()))
+

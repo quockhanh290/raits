@@ -1,0 +1,53 @@
+{
+  "research_question": "Can causal 09:30-10:00 tick flow improve established YDAY-crash reclaim and gap-up confirmation strategies?",
+  "frozen_before_performance": true,
+  "frozen_at_local_date": "2026-10-02",
+  "script": "raits/research/stocks_pit_1000_flow_replay.py",
+  "script_hash": "080F4F2C758FC3905E6B31277335818BD7AE2C26BDDD2A93AAAB218A459C65F2",
+  "technical_corrections_before_performance": [
+    "The first invocation failed in load_panel with KeyError open_0930 because the exact-clock merge duplicated a plan column. No selection, return, PnL, or output artifact was produced. The merge was restricted to open_1005, close_1555, and open_1600 before the first performance run."
+  ],
+  "sample": {"development": "2018-03-29 through 2021-12-31", "locked_validation": "2022-01-01 through 2022-12-30"},
+  "data_contract": {
+    "universe": "quarterly PIT market-cap top500 intersected with daily PIT eligibility and ADV20 >= 10m; price >= 5; abs gap <= 30%",
+    "precandidates": "previous-day open-to-15:55 return <= -5% OR opening gap >= +2%",
+    "signal_clock": "only Polygon trades with SIP timestamp in [09:30,10:00) ET; tick-sign warmup may use [09:25,09:30)",
+    "price_confirmation": "09:55 five-minute bar close divided by 09:30 open minus one, required > 0",
+    "entry": "exact 10:05 five-minute open, five minutes after signal cutoff",
+    "exit": "exact 15:55 close; if absent after selection, 16:00 open fallback; future exit availability never affects selection",
+    "post2022": "forbidden"
+  },
+  "common_filters": {"signal_trades_min": 100, "signal_dollar_min": 1000000},
+  "variants": [
+    {"name": "yday_reclaim_price", "rule": "prev_dayret <= -5% and positive 09:30-10:00 reclaim", "rank": "largest prior-day loss"},
+    {"name": "yday_reclaim_flow", "rule": "price rule plus 30m flow >= 0.05 and last5 flow >= 0.05", "rank": "prior loss times persistent flow strength"},
+    {"name": "yday_reclaim_acceleration", "rule": "price rule plus last5-minus-first5 flow acceleration >= 0.25 and last5 flow > 0", "rank": "prior loss times acceleration"},
+    {"name": "gapup_confirm_price", "rule": "gap >= +2% and positive 09:30-10:00 return", "rank": "gap times capped confirmation strength"},
+    {"name": "gapup_confirm_flow", "rule": "price rule plus 30m flow >= 0.05 and last5 flow >= 0.05", "rank": "gap/confirmation times persistent flow strength"}
+  ],
+  "portfolio": {
+    "selection": "up to three highest-ranked longs each day after exact-entry filtering and full refill",
+    "sic_cap": "maximum one ticker per SIC per day",
+    "weight": "20% current NAV per name; maximum 0.6x gross",
+    "adv_cap": "1% ADV20 per entry order",
+    "initial_equity": 100000,
+    "compounding": true
+  },
+  "costs": {"base_bps_per_traded_dollar_per_side": 4, "stress_bps_per_traded_dollar_per_side": 8},
+  "development_gate": {
+    "active_days_min": 100,
+    "trade_legs_min": 300,
+    "cagr_min": 0.05,
+    "sharpe_min": 0.8,
+    "max_drawdown_pct_floor": -0.12,
+    "positive_years_min": 3,
+    "gross_edge_bps_per_active_day_min": 10,
+    "stress_pnl_positive": true,
+    "top10_positive_pnl_share_max": 0.5,
+    "winner": "highest base-cost Sharpe then CAGR among passers"
+  },
+  "validation_gate": {"active_days_min": 20, "pnl_positive": true, "sharpe_min": 0.5,
+    "max_drawdown_pct_floor": -0.1, "stress_pnl_positive": true, "top10_positive_pnl_share_max": 0.6},
+  "multiple_testing_policy": "Exactly five frozen rows. Price-only rows are benchmarks. No post-result threshold, ranking, clock, exit, direction, or position-count changes.",
+  "production_policy": "A validation pass permits further audit only, not production PASS."
+}

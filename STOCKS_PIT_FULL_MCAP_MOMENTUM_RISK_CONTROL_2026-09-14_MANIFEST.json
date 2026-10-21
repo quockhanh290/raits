@@ -1,0 +1,40 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_MCAP_MOMENTUM_RISK_CONTROL_2026-09-14",
+  "script": "raits/research/stocks_pit_full_mcap_momentum_risk_control.py",
+  "input": "STOCKS_PIT_FULL_MCAP_MOMENTUM_MONTHLY_2026-09-14_DAILY.csv",
+  "sample_label": "Research/in-sample diagnostics across 2018-2024. 2023-2024 is touched validation, not clean unseen OOS.",
+  "causality": "Vol target exposure uses trailing 20-day base strategy volatility shifted by one day.",
+  "variants": [
+    {
+      "base": "pool500_ret60_top20_gross100",
+      "variant": "pool500_ret60_top20_vt20_cap150",
+      "target_vol": 0.2,
+      "max_exposure": 1.5
+    },
+    {
+      "base": "pool500_ret60_top20_gross100",
+      "variant": "pool500_ret60_top20_vt25_cap150",
+      "target_vol": 0.25,
+      "max_exposure": 1.5
+    },
+    {
+      "base": "pool500_ret60_top10_gross100",
+      "variant": "pool500_ret60_top10_vt20_cap150",
+      "target_vol": 0.2,
+      "max_exposure": 1.5
+    },
+    {
+      "base": "pool200_ret60_top20_gross100",
+      "variant": "pool200_ret60_top20_vt20_cap150",
+      "target_vol": 0.2,
+      "max_exposure": 1.5
+    }
+  ],
+  "rule_selection": "None. Variant set fixed in VARIANTS before measuring.",
+  "outputs": [
+    "STOCKS_PIT_FULL_MCAP_MOMENTUM_RISK_CONTROL_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_MCAP_MOMENTUM_RISK_CONTROL_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_MCAP_MOMENTUM_RISK_CONTROL_2026-09-14_SPLITS.csv",
+    "STOCKS_PIT_FULL_MCAP_MOMENTUM_RISK_CONTROL_2026-09-14_DAILY.csv"
+  ]
+}

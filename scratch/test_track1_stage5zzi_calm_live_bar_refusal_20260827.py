@@ -78,7 +78,12 @@ class SilentProvider:
     name = "silent"
     last_error = ""
 
-    def fetch_session_bars(self, inst, *, through):
+    def fetch_session_bars(self, inst, *, through, lookback=None):
+        # Accepted and ignored: this fake already holds every bar it will serve, so there
+        # is no window to size. The parameter exists because `live_frame` now sizes the
+        # fetch from the history it holds; a fake that refuses the real interface fails
+        # with TypeError instead of whatever the test is about.
+        del lookback
         return None
 
 
@@ -89,7 +94,12 @@ class AnsweringProvider:
     def __init__(self, frame):
         self.frame = frame
 
-    def fetch_session_bars(self, inst, *, through):
+    def fetch_session_bars(self, inst, *, through, lookback=None):
+        # Accepted and ignored: this fake already holds every bar it will serve, so there
+        # is no window to size. The parameter exists because `live_frame` now sizes the
+        # fetch from the history it holds; a fake that refuses the real interface fails
+        # with TypeError instead of whatever the test is about.
+        del lookback
         return self.frame
 
 
@@ -211,7 +221,7 @@ class _RefusingBroker:
         self._ib = _IB()
         self.code, self.msg = code, msg
 
-    def fetch_bars(self, sym, through):
+    def fetch_bars(self, sym, through, *, lookback=None):
         self._ib.errorEvent.emit(7, self.code, self.msg, "")
         return pd.DataFrame()
 
@@ -222,7 +232,7 @@ class _QuietBroker:
     def __init__(self):
         self._ib = _IB()
 
-    def fetch_bars(self, sym, through):
+    def fetch_bars(self, sym, through, *, lookback=None):
         return pd.DataFrame()
 
 
@@ -297,7 +307,7 @@ def test_an_unrelated_error_is_not_collected():
 
 def test_a_repeated_message_is_recorded_once():
     class _Chatty(_RefusingBroker):
-        def fetch_bars(self, sym, through):
+        def fetch_bars(self, sym, through, *, lookback=None):
             for _ in range(8):
                 self._ib.errorEvent.emit(7, self.code, self.msg, "")
             return pd.DataFrame()
@@ -318,7 +328,7 @@ def test_the_handler_does_not_outlive_the_fetch():
 
 def test_the_handler_is_removed_even_when_the_fetch_raises():
     class _Exploding(_RefusingBroker):
-        def fetch_bars(self, sym, through):
+        def fetch_bars(self, sym, through, *, lookback=None):
             raise TimeoutError("gateway went away")
 
     b = _Exploding()
@@ -343,7 +353,7 @@ def test_a_broker_with_no_session_behaves_exactly_as_before():
     """Fail-soft. The listener is a diagnostic, and a diagnostic that can break a fetch is
     worse than no diagnostic — every test broker in this repo lacks `_ib`."""
     class _Plain:
-        def fetch_bars(self, sym, through):
+        def fetch_bars(self, sym, through, *, lookback=None):
             return _today_through("09:31")
 
     p = src.IBKRBarProvider(broker=_Plain())
@@ -358,7 +368,7 @@ def test_an_event_that_refuses_a_handler_does_not_break_the_fetch():
             self._ib = type("X", (), {"errorEvent": property(lambda s: (_ for _ in ()).throw(
                 RuntimeError("no")))})()
 
-        def fetch_bars(self, sym, through):
+        def fetch_bars(self, sym, through, *, lookback=None):
             return _today_through("09:31")
 
     p = src.IBKRBarProvider(broker=_Hostile())
@@ -375,7 +385,7 @@ def test_the_bar_the_gate_wants_is_the_bar_the_provider_was_asked_for():
         def __init__(self):
             self._ib = _IB()
 
-        def fetch_bars(self, sym, through):
+        def fetch_bars(self, sym, through, *, lookback=None):
             seen.append(pd.Timestamp(through))
             return pd.DataFrame()
 

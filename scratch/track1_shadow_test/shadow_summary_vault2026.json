@@ -9,7 +9,8 @@
   "allow_orders": false,
   "reasons": [],
   "confirmations": {
-   "legacy_retired_confirmed": true
+   "legacy_retired_confirmed": true,
+   "paper_shadow_evidence_order_block_overridden": true
   },
   "confirmation_source": "track1_go_live_confirmation.json",
   "confirmation_errors": []
@@ -37,42 +38,42 @@
     "name": "regime_csv",
     "status": "ok",
     "detail": "",
-    "observed": "2026-09-03",
+    "observed": "2026-09-25",
     "required": "2026-08-20"
    },
    {
     "name": "parquet:MES",
     "status": "ok",
     "detail": "",
-    "observed": "2026-09-04",
+    "observed": "2026-09-25",
     "required": "2026-08-20"
    },
    {
     "name": "parquet:MNQ",
     "status": "ok",
     "detail": "",
-    "observed": "2026-09-04",
+    "observed": "2026-09-25",
     "required": "2026-08-20"
    },
    {
     "name": "parquet:MYM",
     "status": "ok",
     "detail": "",
-    "observed": "2026-09-04",
+    "observed": "2026-09-25",
     "required": "2026-08-20"
    },
    {
     "name": "parquet:M2K",
     "status": "ok",
     "detail": "",
-    "observed": "2026-09-04",
+    "observed": "2026-09-25",
     "required": "2026-08-20"
    },
    {
     "name": "parquet:MNKD",
     "status": "ok",
     "detail": "",
-    "observed": "2026-09-04",
+    "observed": "2026-09-25",
     "required": "2026-08-20"
    },
    {
@@ -102,42 +103,42 @@
   {
    "sleeve": "roska4_swing",
    "inst": "MES",
-   "params_hash": "sha256:ff9c6ef809a999c692c45999f6241eaba008968d741392f3c32cc0d7a48733fa",
-   "resumed": null,
-   "code": "params_ok_frame_not_loaded",
-   "detail": "identity matches; the fingerprint check needs the frame and is done by the sleeve source when it loads it"
+   "params_hash": "sha256:3bfc06c346a93b0d00599e39dcbfb30fb58e3ac66d7e1c016785fadb5fa41845",
+   "resumed": false,
+   "code": "params_mismatch",
+   "detail": "stored=sha256:20fc3763d739ad6727188162854655aaa722cd8dc3deb31ba79b1a2c669fecad caller=sha256:3bfc06c346a93b0d00599e39dcbfb30fb58e3ac66d7e1c016785fadb5fa41845 stored_params='arm_hour=14:05;arm_timezone=America/New_York;calm_gate_definition=pcloc_bottom_third_of_prior_rth_range AND prior_rth_down_close_below_open AND gap_from_prev_rth_close>=-0.01 LONG MES,MNQ entry=10:00 exit=15:55 lag1;cap_family_normal_calm=0.05;cap_global_nkd=0.06;cap_roska4_calm=0.05;cap_roska4_stress=0.1;cap_roska4_swing=0.05;commission_basis=round_turn_per_contract;data_source_identity=data/cache/futures/ES_continuous_1m_8y.parquet:295654a65dab2d3cf688ae06f6962d73f0900f8a42227fd217a3690bc6fe312e;ema_period=50;fill_law=production_gap_after_15min_break;hmm_fit_end=2024-12-31;label_lag_days=0;max_hold_days=5;point_value=5;r4_range_derivation_window=floor_2018_2024_p90;r4_range_threshold=0.02652437135;r4_rel_volume_max=2;ratchet=False;regime_csv_identity=spy_daily_live.csv:acd71d5253c50f5ff5b51a57c33dfcd2680d6158d4741e27b130810bed791a99;sizing_basis=artifact_mult_x_daily_atr;slippage_ticks_per_side=2;spy_short_filter=d1_spy_close_below_sma50_for_shorts_only;spy_short_lag_days=1;spy_short_lookback=50;spy_short_source_identity=spy_daily_live.csv:acd71d5253c50f5ff5b51a57c33dfcd2680d6158d4741e27b130810bed791a99;stop_anchor=entry;stop_basis=fixed_entry_atr;stop_multiple=2;tick=0.25;tradable_symbol=MES'"
   },
   {
    "sleeve": "roska4_swing",
    "inst": "MNQ",
-   "params_hash": "sha256:3aba9eedf885b047d6a950604c94c875660e24a87ddbe30d23cb193da13faf84",
-   "resumed": null,
-   "code": "params_ok_frame_not_loaded",
-   "detail": "identity matches; the fingerprint check needs the frame and is done by the sleeve source when it loads it"
+   "params_hash": "sha256:95e6d934b5dc718e2bdf8f42015fee3001746aece4e3b26b6743a9803ae66b84",
+   "resumed": false,
+   "code": "params_mismatch",
+   "detail": "stored=sha256:79a28772617ddce045b14bf0e7df921024a9a67c27576454b27550a889ad1f0e caller=sha256:95e6d934b5dc718e2bdf8f42015fee3001746aece4e3b26b6743a9803ae66b84 stored_params='arm_hour=14:05;arm_timezone=America/New_York;calm_gate_definition=pcloc_bottom_third_of_prior_rth_range AND prior_rth_down_close_below_open AND gap_from_prev_rth_close>=-0.01 LONG MES,MNQ entry=10:00 exit=15:55 lag1;cap_family_normal_calm=0.05;cap_global_nkd=0.06;cap_roska4_calm=0.05;cap_roska4_stress=0.1;cap_roska4_swing=0.05;commission_basis=round_turn_per_contract;data_source_identity=data/cache/futures/NQ_continuous_1m_8y.parquet:bda981dcc75a3c1fcfa76451cb108b2202eb810faaaaac3323980d0df32f6739;ema_period=50;fill_law=production_gap_after_15min_break;hmm_fit_end=2024-12-31;label_lag_days=0;max_hold_days=5;point_value=2;r4_range_derivation_window=floor_2018_2024_p90;r4_range_threshold=0.02652437135;r4_rel_volume_max=2;ratchet=False;regime_csv_identity=spy_daily_live.csv:acd71d5253c50f5ff5b51a57c33dfcd2680d6158d4741e27b130810bed791a99;sizing_basis=artifact_mult_x_daily_atr;slippage_ticks_per_side=2;spy_short_filter=d1_spy_close_below_sma50_for_shorts_only;spy_short_lag_days=1;spy_short_lookback=50;spy_short_source_identity=spy_daily_live.csv:acd71d5253c50f5ff5b51a57c33dfcd2680d6158d4741e27b130810bed791a99;stop_anchor=entry;stop_basis=fixed_entry_atr;stop_multiple=2;tick=0.25;tradable_symbol=MNQ'"
   },
   {
    "sleeve": "roska4_swing",
    "inst": "MYM",
-   "params_hash": "sha256:3ce169618a3729278e450aef55cfa0d95bc5b20ebc134516d1ae70edc9ed144d",
-   "resumed": null,
-   "code": "params_ok_frame_not_loaded",
-   "detail": "identity matches; the fingerprint check needs the frame and is done by the sleeve source when it loads it"
+   "params_hash": "sha256:b236b4325ad6a2b1464dd2229a03105a7ccc1106347c084639483952e1cd8a0e",
+   "resumed": false,
+   "code": "params_mismatch",
+   "detail": "stored=sha256:451c414dc252db6cb95dcce74b9a376fad68897e3bbfbaf2e658d9ef6354c8ae caller=sha256:b236b4325ad6a2b1464dd2229a03105a7ccc1106347c084639483952e1cd8a0e stored_params='arm_hour=14:05;arm_timezone=America/New_York;calm_gate_definition=pcloc_bottom_third_of_prior_rth_range AND prior_rth_down_close_below_open AND gap_from_prev_rth_close>=-0.01 LONG MES,MNQ entry=10:00 exit=15:55 lag1;cap_family_normal_calm=0.05;cap_global_nkd=0.06;cap_roska4_calm=0.05;cap_roska4_stress=0.1;cap_roska4_swing=0.05;commission_basis=round_turn_per_contract;data_source_identity=data/cache/futures/YM_continuous_1m_8y.parquet:d709466f2b42b4b27327e2712387754e35b2c64b94258c55f011034232242420;ema_period=50;fill_law=production_gap_after_15min_break;hmm_fit_end=2024-12-31;label_lag_days=0;max_hold_days=5;point_value=0.5;r4_range_derivation_window=floor_2018_2024_p90;r4_range_threshold=0.02652437135;r4_rel_volume_max=2;ratchet=False;regime_csv_identity=spy_daily_live.csv:acd71d5253c50f5ff5b51a57c33dfcd2680d6158d4741e27b130810bed791a99;sizing_basis=artifact_mult_x_daily_atr;slippage_ticks_per_side=2;spy_short_filter=d1_spy_close_below_sma50_for_shorts_only;spy_short_lag_days=1;spy_short_lookback=50;spy_short_source_identity=spy_daily_live.csv:acd71d5253c50f5ff5b51a57c33dfcd2680d6158d4741e27b130810bed791a99;stop_anchor=entry;stop_basis=fixed_entry_atr;stop_multiple=2;tick=1;tradable_symbol=MYM'"
   },
   {
    "sleeve": "roska4_swing",
    "inst": "M2K",
-   "params_hash": "sha256:9ca7445b2f4bc45a9d922ac9d8739478af3b9ca68b32169ced0143f64af3eaf7",
-   "resumed": null,
-   "code": "params_ok_frame_not_loaded",
-   "detail": "identity matches; the fingerprint check needs the frame and is done by the sleeve source when it loads it"
+   "params_hash": "sha256:4de4847ea85153cd1de03b88608a5e2011bd84fffc5c46f82f33d4f2d376b05e",
+   "resumed": false,
+   "code": "params_mismatch",
+   "detail": "stored=sha256:ac90c2193410d2898b6e6d486eee64eb401c97a891d66fcbb9e3377798adb0e2 caller=sha256:4de4847ea85153cd1de03b88608a5e2011bd84fffc5c46f82f33d4f2d376b05e stored_params='arm_hour=14:05;arm_timezone=America/New_York;calm_gate_definition=pcloc_bottom_third_of_prior_rth_range AND prior_rth_down_close_below_open AND gap_from_prev_rth_close>=-0.01 LONG MES,MNQ entry=10:00 exit=15:55 lag1;cap_family_normal_calm=0.05;cap_global_nkd=0.06;cap_roska4_calm=0.05;cap_roska4_stress=0.1;cap_roska4_swing=0.05;commission_basis=round_turn_per_contract;data_source_identity=data/cache/futures/RTY_continuous_1m_8y.parquet:22b9fc0a784e7716259c8b3199b158ebb4f2a5504847c62123b32298f3e3ce34;ema_period=50;fill_law=production_gap_after_15min_break;hmm_fit_end=2024-12-31;label_lag_days=0;max_hold_days=5;point_value=5;r4_range_derivation_window=floor_2018_2024_p90;r4_range_threshold=0.02652437135;r4_rel_volume_max=2;ratchet=False;regime_csv_identity=spy_daily_live.csv:acd71d5253c50f5ff5b51a57c33dfcd2680d6158d4741e27b130810bed791a99;sizing_basis=artifact_mult_x_daily_atr;slippage_ticks_per_side=2;spy_short_filter=d1_spy_close_below_sma50_for_shorts_only;spy_short_lag_days=1;spy_short_lookback=50;spy_short_source_identity=spy_daily_live.csv:acd71d5253c50f5ff5b51a57c33dfcd2680d6158d4741e27b130810bed791a99;stop_anchor=entry;stop_basis=fixed_entry_atr;stop_multiple=2;tick=0.1;tradable_symbol=M2K'"
   },
   {
    "sleeve": "global_nkd",
    "inst": "MNKD",
-   "params_hash": "sha256:f5ff76cc190fbcfa5278dd46358b111bfd917a7e884353a5bf7e701d545b404c",
-   "resumed": null,
-   "code": "params_ok_frame_not_loaded",
-   "detail": "identity matches; the fingerprint check needs the frame and is done by the sleeve source when it loads it"
+   "params_hash": "sha256:391c2602979e3cb8f0cbd3c86efce88a7718c66b95e2596f52236f2d379068f3",
+   "resumed": false,
+   "code": "params_mismatch",
+   "detail": "stored=sha256:b4ddf6671c9a482e46954f75fd1cbb8318614cc9d0b9ce34a973eacf6eb9ca4b caller=sha256:391c2602979e3cb8f0cbd3c86efce88a7718c66b95e2596f52236f2d379068f3 stored_params='arm_hour=14:05;arm_timezone=Asia/Tokyo;calm_gate_definition=pcloc_bottom_third_of_prior_rth_range AND prior_rth_down_close_below_open AND gap_from_prev_rth_close>=-0.01 LONG MES,MNQ entry=10:00 exit=15:55 lag1;cap_family_normal_calm=0.05;cap_global_nkd=0.06;cap_roska4_calm=0.05;cap_roska4_stress=0.1;cap_roska4_swing=0.05;commission_basis=round_turn_per_contract;data_source_identity=global_index/data/NKD_continuous_1m_8y.parquet:5d08492a47ca50a53f0e88ed2416656798aaee61b72f5bcf262f13aa272909d3;ema_period=10;fill_law=production_gap_after_15min_break;hmm_fit_end=2024-12-31;label_lag_days=1;max_hold_days=5;point_value=0.5;r4_range_derivation_window=floor_2018_2024_p90;r4_range_threshold=0.02652437135;r4_rel_volume_max=2;ratchet=False;regime_csv_identity=spy_daily_live.csv:acd71d5253c50f5ff5b51a57c33dfcd2680d6158d4741e27b130810bed791a99;sizing_basis=artifact_mult_x_daily_atr;slippage_ticks_per_side=2;spy_short_filter=d1_spy_close_below_sma50_for_shorts_only;spy_short_lag_days=1;spy_short_lookback=50;spy_short_source_identity=spy_daily_live.csv:acd71d5253c50f5ff5b51a57c33dfcd2680d6158d4741e27b130810bed791a99;stop_anchor=entry;stop_basis=fixed_entry_atr;stop_multiple=2;tick=5;tradable_symbol=MNK'"
   }
  ],
  "candidates": 139,

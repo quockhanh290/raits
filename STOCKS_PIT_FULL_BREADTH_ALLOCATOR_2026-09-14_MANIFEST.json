@@ -1,0 +1,85 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_BREADTH_ALLOCATOR_2026-09-14",
+  "script": "raits/research/stocks_pit_full_breadth_allocator.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_BETA_VOLTARGET_EXPANSION_2026-09-14_DAILY.csv"
+  ],
+  "sample_label": "Research/in-sample diagnostics across 2018-2024. 2023-2024 is touched validation, not clean unseen OOS.",
+  "method": "Pre-registered breadth allocator. Breadth uses prev_dayret, gap, and *_pre features available before the simulated trading day.",
+  "variants": [
+    {
+      "variant": "top62_vt25_if_ret20pos55_else_vt16",
+      "base_on": "top62_vt25_cap250",
+      "base_off": "top62_vt16_cap150",
+      "condition": "ret20_pos_frac",
+      "op": ">=",
+      "threshold": 0.55
+    },
+    {
+      "variant": "top62_vt25_if_ret20pos60_else_vt16",
+      "base_on": "top62_vt25_cap250",
+      "base_off": "top62_vt16_cap150",
+      "condition": "ret20_pos_frac",
+      "op": ">=",
+      "threshold": 0.6
+    },
+    {
+      "variant": "top62_vt25_if_adv5_52_else_vt16",
+      "base_on": "top62_vt25_cap250",
+      "base_off": "top62_vt16_cap150",
+      "condition": "adv_prev_frac_ma5",
+      "op": ">=",
+      "threshold": 0.52
+    },
+    {
+      "variant": "top62_vt25_if_adv5_55_else_vt16",
+      "base_on": "top62_vt25_cap250",
+      "base_off": "top62_vt16_cap150",
+      "condition": "adv_prev_frac_ma5",
+      "op": ">=",
+      "threshold": 0.55
+    },
+    {
+      "variant": "top62_vt25_if_ret20pos55_else_cash",
+      "base_on": "top62_vt25_cap250",
+      "base_off": "cash",
+      "condition": "ret20_pos_frac",
+      "op": ">=",
+      "threshold": 0.55
+    },
+    {
+      "variant": "top62_vt25_if_adv5_52_else_cash",
+      "base_on": "top62_vt25_cap250",
+      "base_off": "cash",
+      "condition": "adv_prev_frac_ma5",
+      "op": ">=",
+      "threshold": 0.52
+    },
+    {
+      "variant": "top62_vt25_if_washout35_else_vt16",
+      "base_on": "top62_vt25_cap250",
+      "base_off": "top62_vt16_cap150",
+      "condition": "adv_prev_frac",
+      "op": "<=",
+      "threshold": 0.35
+    },
+    {
+      "variant": "top62_vt25_if_gapdown35_else_vt16",
+      "base_on": "top62_vt25_cap250",
+      "base_off": "top62_vt16_cap150",
+      "condition": "gapdown_frac",
+      "op": ">=",
+      "threshold": 0.35
+    }
+  ],
+  "rule_selection": "None. Variant set fixed in VARIANTS before measuring.",
+  "old_62_usage": "None.",
+  "outputs": [
+    "STOCKS_PIT_FULL_BREADTH_ALLOCATOR_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_BREADTH_ALLOCATOR_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_BREADTH_ALLOCATOR_2026-09-14_SPLITS.csv",
+    "STOCKS_PIT_FULL_BREADTH_ALLOCATOR_2026-09-14_DAILY.csv"
+  ]
+}

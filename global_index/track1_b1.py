@@ -54,6 +54,59 @@ UNKNOWN = "UNKNOWN"
 
 STATUSES = (PASS, FAIL, UNKNOWN)
 
+
+#: Where the route's own order journal lives, relative to a root.
+ORDERS_DIRNAME = "global_index/track1_runtime/orders"
+
+#: The one journal state that means the broker has something.
+FILLED_STATE = "filled"
+
+#: A book row whose trade_id the journal says FILLED is ATTRIBUTED to this route.
+TRACK1_BOOK_ATTRIBUTED = "track1_holding_own_positions"
+
+
+def journal_filled_trade_ids(root: "str | Path" = ".") -> tuple:
+    """`(trade_ids the order journal says FILLED, journal_readable)`.
+
+    The inverse of B1's founding rule. Its evidence says "Zero needs no attribution, which is
+    why a shared login can answer this at all" — and a position the route's OWN journal claims
+    is attributed just as surely, which is the case that did not exist until 2026-09-24 and now
+    does.
+
+    THREE answers, not two, and the second element carries the third. An unreadable journal
+    returns `(set(), False)`: "I could not read it" must never arrive as "it agrees with you",
+    because the caller's next move on agreement is to permit. Absence of any journal returns
+    `(set(), True)` — that is a knowable fact, not a failure: before the first order there is
+    no file, which is the original state B1 was written for.
+
+    Reads the trade id the journal calls `candidate_id`, which is the key the book row calls
+    `trade_id`; one name per layer is how they already are, and renaming either here would make
+    a third.
+    """
+    d = Path(root) / ORDERS_DIRNAME
+    if not d.is_dir():
+        return set(), True
+    out: set = set()
+    for p in sorted(d.glob("track1_orders_*.jsonl")):
+        try:
+            text = p.read_text(encoding="utf-8")
+        except Exception:                                             # noqa: BLE001
+            return set(), False
+        for line in text.splitlines():
+            if not line.strip():
+                continue
+            try:
+                r = json.loads(line)
+            except Exception:                                         # noqa: BLE001
+                # One unparseable line makes the whole journal untrustworthy for this purpose:
+                # the row it could not read may be the fill that would have attributed the
+                # position now being judged.
+                return set(), False
+            if str(r.get("state")) == FILLED_STATE:
+                out.add(str(r.get("candidate_id")))
+    return out, True
+
+
 # ── codes ───────────────────────────────────────────────────────────────────────
 OK = "legacy_and_broker_flat"
 
@@ -78,6 +131,7 @@ RECORD_STALE = "record_stale"
 #: quietly file a failure as a pass.
 CODE_STATUS: dict = {
     OK: PASS,
+    TRACK1_BOOK_ATTRIBUTED: PASS,
     LEGACY_BOOK_POSITIONS: FAIL,
     TRACK1_BOOK_POSITIONS: FAIL,
     BROKER_POSITIONS: FAIL,
@@ -389,7 +443,8 @@ def unprotected_positions(broker_positions: list, open_orders: list) -> list:
 
 def measure(legacy_book: BookState, track1_book: BookState, broker: BrokerEvidence,
             *, now: Any = None,
-            max_observation_minutes: int = MAX_BROKER_OBSERVATION_MINUTES) -> B1Result:
+            max_observation_minutes: int = MAX_BROKER_OBSERVATION_MINUTES,
+            root: Any = ".") -> B1Result:
     """PASS only when all five conditions hold. FAIL on a known risk, UNKNOWN on no answer.
 
     Order matters: a KNOWN risk is reported ahead of an unknown, because "there is a position
@@ -401,6 +456,21 @@ def measure(legacy_book: BookState, track1_book: BookState, broker: BrokerEviden
               "broker": broker.as_dict()}
     findings: dict = {}
 
+    # Attribution, computed once. Until 2026-09-24 the route had never placed an order, so a
+    # position in its book could only be unexplained; from that day a position the route's own
+    # journal says FILLED is attributed, which is the exact thing B1 asks for. Unreadable
+    # journal attributes nothing — see `journal_filled_trade_ids`.
+    _attributed, _journal_ok = journal_filled_trade_ids(root)
+
+    def _all_attributed(rows) -> bool:
+        if not _journal_ok or not rows:
+            return False
+        ids = {str(r.get("trade_id")) for r in rows}
+        return bool(ids) and ids <= _attributed
+
+    _t1_attributed = (track1_book.known and bool(track1_book.count)
+                      and _all_attributed(track1_book.positions))
+
     # ── known risks first ───────────────────────────────────────────────────
     if legacy_book.known and legacy_book.count:
         return _result(FAIL, LEGACY_BOOK_POSITIONS,
@@ -408,14 +478,20 @@ def measure(legacy_book: BookState, track1_book: BookState, broker: BrokerEviden
                        f"flat and Track 1 must not share the login until it is.",
                        inputs=inputs, findings={"legacy_positions": legacy_book.positions})
 
-    if track1_book.known and track1_book.count:
+    if track1_book.known and track1_book.count and not _t1_attributed:
         return _result(FAIL, TRACK1_BOOK_POSITIONS,
                        f"the Track 1 book holds {track1_book.count} position(s) before paper. "
                        f"The route has placed no order, so a position here is unexplained and "
                        f"must be investigated rather than cleared.",
                        inputs=inputs, findings={"track1_positions": track1_book.positions})
 
-    if broker.positions_known and broker.positions:
+    _brk_matches_book = False
+    if broker.positions_known and broker.positions and _t1_attributed:
+        # Not "the counts agree" — the INSTRUMENTS, multiset. Two MYM against one MYM and one
+        # M2K agrees on count and is a different account.
+        _brk_matches_book = (sorted(_inst_of(p) for p in broker.positions)
+                             == sorted(_inst_of(r) for r in track1_book.positions))
+    if broker.positions_known and broker.positions and not _brk_matches_book:
         insts = sorted({_inst_of(p) for p in broker.positions})
         # Which of them are naked travels as a FINDING on this failure rather than as a
         # status of its own. It cannot be a status: any nonzero position fails here first, so
@@ -491,6 +567,15 @@ def measure(legacy_book: BookState, track1_book: BookState, broker: BrokerEviden
                        inputs=inputs)
 
     findings["broker_observation_age_minutes"] = stale
+    if _t1_attributed:
+        findings["attributed_trade_ids"] = sorted(
+            str(r.get("trade_id")) for r in track1_book.positions)
+        return _result(PASS, TRACK1_BOOK_ATTRIBUTED,
+                       f"the Track 1 book holds {track1_book.count} position(s) and the order "
+                       f"journal says this route filled every one of them; the broker holds the "
+                       f"same instruments and no working order is orphaned. NOT a flat account "
+                       f"— an accounted-for one, which is what a shared login can be asked.",
+                       inputs=inputs, findings=findings)
     return _result(PASS, OK,
                    f"the legacy book holds nothing, the Track 1 book holds nothing, and the "
                    f"broker reports 0 position(s) and 0 working order(s) as of {stale} "
@@ -590,6 +675,11 @@ def latest(root: str | Path = ".", *, now: Any = None,
 
 def operator_line(result: B1Result) -> str:
     """One plain sentence. No identifiers, no JSON, nothing to decode."""
+    # The CODE first, then the status. A blanket PASS line said "Track 1 book flat" while the
+    # book held two positions the route had just opened — a sentence an operator reads instead
+    # of the detail, saying the opposite of the truth. There is now more than one way to pass.
+    if result.code == TRACK1_BOOK_ATTRIBUTED:
+        return "Track 1 holds its own positions; book, journal and broker agree."
     if result.status == PASS:
         return "Legacy book flat, Track 1 book flat, broker flat, no working orders."
     if result.code in (BROKER_NOT_QUERIED, BROKER_POSITIONS_UNKNOWN,
@@ -599,6 +689,8 @@ def operator_line(result: B1Result) -> str:
         return "A working order exists with no position behind it."
     if result.code == LEGACY_BOOK_POSITIONS:
         return "The legacy book still holds a position."
+    if result.code == TRACK1_BOOK_ATTRIBUTED:
+        return "Track 1 holds its own positions; book, journal and broker agree."
     if result.code == TRACK1_BOOK_POSITIONS:
         return "The Track 1 book holds a position before paper — investigate."
     if result.code == BROKER_POSITIONS:

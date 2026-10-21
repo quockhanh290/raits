@@ -1,0 +1,114 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_BETA_GOVERNOR_COSTAWARE_2026-09-14",
+  "script": "raits/research/stocks_pit_full_beta_governor_costaware.py",
+  "input": "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv",
+  "method": "Pre-registered cost-aware long-only beta governor using lagged 20-day return and lagged 20-day realized volatility.",
+  "financing_annual_rate": 0.025,
+  "turnover_cost_bps": 4.0,
+  "variants": [
+    {
+      "base": "market_cap_top62_equal_weight",
+      "target_vol": 0.2,
+      "cap": 2.0,
+      "riskoff": 0.5,
+      "ret20_cut": -0.08,
+      "vol20_cut": 0.25
+    },
+    {
+      "base": "market_cap_top62_equal_weight",
+      "target_vol": 0.25,
+      "cap": 2.5,
+      "riskoff": 0.5,
+      "ret20_cut": -0.08,
+      "vol20_cut": 0.25
+    },
+    {
+      "base": "market_cap_top62_equal_weight",
+      "target_vol": 0.25,
+      "cap": 2.0,
+      "riskoff": 0.5,
+      "ret20_cut": -0.08,
+      "vol20_cut": 0.25
+    },
+    {
+      "base": "market_cap_top62_equal_weight",
+      "target_vol": 0.25,
+      "cap": 2.5,
+      "riskoff": 0.0,
+      "ret20_cut": -0.08,
+      "vol20_cut": 0.25
+    },
+    {
+      "base": "market_cap_top62_equal_weight",
+      "target_vol": 0.25,
+      "cap": 2.5,
+      "riskoff": 0.5,
+      "ret20_cut": -0.05,
+      "vol20_cut": 0.25
+    },
+    {
+      "base": "market_cap_top62_equal_weight",
+      "target_vol": 0.25,
+      "cap": 2.5,
+      "riskoff": 0.5,
+      "ret20_cut": -0.08,
+      "vol20_cut": 0.3
+    },
+    {
+      "base": "spy_buy_hold",
+      "target_vol": 0.2,
+      "cap": 2.0,
+      "riskoff": 0.5,
+      "ret20_cut": -0.08,
+      "vol20_cut": 0.25
+    },
+    {
+      "base": "spy_buy_hold",
+      "target_vol": 0.25,
+      "cap": 2.5,
+      "riskoff": 0.5,
+      "ret20_cut": -0.08,
+      "vol20_cut": 0.25
+    },
+    {
+      "base": "spy_buy_hold",
+      "target_vol": 0.25,
+      "cap": 2.0,
+      "riskoff": 0.5,
+      "ret20_cut": -0.08,
+      "vol20_cut": 0.25
+    },
+    {
+      "base": "spy_buy_hold",
+      "target_vol": 0.25,
+      "cap": 2.5,
+      "riskoff": 0.0,
+      "ret20_cut": -0.08,
+      "vol20_cut": 0.25
+    },
+    {
+      "base": "spy_buy_hold",
+      "target_vol": 0.25,
+      "cap": 2.5,
+      "riskoff": 0.5,
+      "ret20_cut": -0.05,
+      "vol20_cut": 0.25
+    },
+    {
+      "base": "spy_buy_hold",
+      "target_vol": 0.25,
+      "cap": 2.5,
+      "riskoff": 0.5,
+      "ret20_cut": -0.08,
+      "vol20_cut": 0.3
+    }
+  ],
+  "sample_label": "Research/touched 2018-2024 only; no 2025-2026 OOS opened.",
+  "leakage_controls": "All guard inputs are shifted one day. No old manual 62 ticker list. Market-cap top62 stream comes from PIT benchmark section 6.148.",
+  "rule_selection_effect": "None inside this diagnostic. Variant grid fixed before running.",
+  "outputs": [
+    "STOCKS_PIT_FULL_BETA_GOVERNOR_COSTAWARE_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_BETA_GOVERNOR_COSTAWARE_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_BETA_GOVERNOR_COSTAWARE_2026-09-14_DAILY.csv"
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "spec_id": "stocks_sec_form4_purchase_drift_v1_2026-09-24",
+  "frozen_before_family_performance": true,
+  "prior_evidence_disclosure": "Transaction-level Form 4 cluster-plus-opening-reaction candidates were measured in section 6.208. This family removes both cluster and price-reaction conditioning and tests medium-horizon drift after exact open-market purchases. Thresholds and holds below are frozen before this family's PnL.",
+  "hypothesis": "PIT-safe open-market insider purchases contain medium-horizon issuer-specific information that does not require a same-session gap or first-five-minute confirmation.",
+  "samples": {
+    "development": "2018-04-27 through 2022-12-30",
+    "validation": "2023-01-03 through 2024-12-31",
+    "oos": "2025-2026 prohibited; no row or feature from that window may be consumed"
+  },
+  "event_contract": {
+    "source": "Official SEC quarterly Insider Transactions Data Sets joined to cached acceptance timestamps by exact accession",
+    "availability": "Assign each acceptance timestamp to the first full PIT trading session whose 09:15 ET cutoff is strictly later; entry can occur only at exact 09:35 on that assigned session.",
+    "issuer": "SEC bulk SUBMISSION issuer CIK, never the reporting-owner/entity CIK from the submissions cache",
+    "purchase": "NONDERIV_TRANS transaction code P and acquired/disposed code A",
+    "sale": "NONDERIV_TRANS transaction code S and acquired/disposed code D",
+    "dollar_notional": "Positive finite shares times positive finite price; missing price contributes zero dollars and remains in transaction coverage counts.",
+    "aggregation": "Sum all exact Form 4 accessions assigned to the same issuer/session; purchase_accessions counts exact accessions containing at least one qualifying P/A transaction.",
+    "excluded": "Derivative transactions, non-P/S codes, amendments absent from the source event inventory, and all post-2024 rows"
+  },
+  "market_contract": {
+    "universe": "Quarterly PIT market-cap top500 representative per issuer CIK, then current price>=5 and lagged ADV20>=10m",
+    "price_reaction_gate": "None",
+    "direction": "Long issuer representative only",
+    "entry": "Exact 09:35 on assigned availability session",
+    "exit": "Exact 15:55 on the hold-th session, entry session counted as day 1",
+    "stage_boundary": "Development and validation are independent $100k books. Admit an event only when its complete frozen hold exit exists inside that stage; no position or equity carries across the boundary.",
+    "benchmark": "Report broad-PIT/SPY benchmark context separately; benchmark performance cannot select a candidate"
+  },
+  "candidate_family": [
+    {
+      "variant": "form4_any_purchase_hold20",
+      "filter": "purchase_transaction_count>=1",
+      "hold_sessions": 20
+    },
+    {
+      "variant": "form4_purchase100k_hold20",
+      "filter": "purchase_dollars>=100000",
+      "hold_sessions": 20
+    },
+    {
+      "variant": "form4_netpurchase100k_hold20",
+      "filter": "purchase_dollars-sale_dollars>=100000",
+      "hold_sessions": 20
+    },
+    {
+      "variant": "form4_netpurchase100k_hold60",
+      "filter": "purchase_dollars-sale_dollars>=100000",
+      "hold_sessions": 60
+    },
+    {
+      "variant": "form4_multiaccession_purchase100k_hold20",
+      "filter": "purchase_accessions>=2 and purchase_dollars>=100000",
+      "hold_sessions": 20
+    }
+  ],
+  "portfolio_contract": {
+    "start_capital": 100000.0,
+    "entry_notional_nav": 0.03,
+    "single_issuer_cap_nav": 0.03,
+    "hard_gross_cap": 1.0,
+    "overlap": "No new position while issuer CIK is active",
+    "capacity": "Entry notional <=1% of current PIT ADV20",
+    "unused_capacity": "Cash; no replacement or refill",
+    "missing_entry": "Skip without replacement unless exact 09:35 exists",
+    "missing_exit": "Retain until next exact 09:35 or 15:55, whichever occurs first",
+    "base_cost_bps_each_trade": 4.0,
+    "stress_cost_bps_each_trade": 8.0,
+    "short_borrow_annual": 0.01,
+    "financing_annual_above_1x": 0.025
+  },
+  "selection_rule": {
+    "ranking_period": "2018-2022",
+    "ranking": "Highest base-4bps Sharpe among candidates passing every development gate",
+    "development_gates": {
+      "positive_calendar_years_min": 3,
+      "base_pnl_positive": true,
+      "stress8_pnl_positive": true,
+      "max_drawdown_pct_floor": -0.15,
+      "entry_count_min": 100,
+      "effective_ticker_count_min": 25,
+      "top10_positive_ticker_pnl_share_max": 0.60
+    },
+    "validation_gates": {
+      "base_pnl_positive": true,
+      "stress8_pnl_positive": true,
+      "both_calendar_year_base_pnl_nonnegative": true,
+      "max_drawdown_pct_floor": -0.10,
+      "entry_count_min": 40,
+      "effective_ticker_count_min": 15,
+      "top10_positive_ticker_pnl_share_max": 0.70
+    },
+    "tie_break": "Higher stress8 Sharpe, then larger entry count, then shorter hold",
+    "selection_isolation": "Select exactly once on development. Validation may pass or kill that rule but cannot substitute a runner-up."
+  },
+  "audit_requirements": [
+    "Report event/accession coverage, candidate counts, both costs, yearly PnL, dollar and percentage DD, concentration, turnover, exposure, missing marks, and long entries.",
+    "Rebuild portfolio overlap, costs, capacity, gross cap, exits, and compounding causally; no PnL subtraction or refill shortcut.",
+    "Separate development rule selection from validation trade results.",
+    "Do not use old manual/restricted 62 for issuer selection and do not consume 2025-2026 rows."
+  ],
+  "implementation_freeze": {
+    "family_performance_seen": false,
+    "replay_script": "raits/research/stocks_sec_form4_purchase_drift_replay.py",
+    "script_hash": "65FE42B1A2F51262B276A3F4763A2AB592AB7B874BC8B085E53404E92E411A6D"
+  }
+}

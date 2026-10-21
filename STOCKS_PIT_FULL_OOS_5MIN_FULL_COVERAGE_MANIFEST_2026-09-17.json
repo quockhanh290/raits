@@ -1,0 +1,12 @@
+{
+  "purpose": "Post-first-run input coverage correction: full OOS months for every pre-registered top500-union ticker plus SPY.",
+  "reason": "Membership-month-only raw coverage cannot mark or exit a position that remains open after a quarterly membership boundary.",
+  "scope_control": "Cross-product of the entire pre-registered symbol union and every OOS month; no ticker is chosen from observed PnL or missing-event output.",
+  "symbols_input": "STOCKS_PIT_FULL_OOS_5MIN_FETCH_SYMBOLS_2026-09-17.csv",
+  "output_dir": "raits\\data\\cache\\polygon_5min_pit_full_2025_2026_clean_oos",
+  "start": "2025-01-02",
+  "end": "2026-09-16",
+  "symbols": 615,
+  "chunks": 12915,
+  "output": "STOCKS_PIT_FULL_OOS_5MIN_FULL_COVERAGE_CHUNKS_2026-09-17.csv"
+}

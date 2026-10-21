@@ -1,0 +1,110 @@
+{
+  "spec_id": "stocks_sec_form4_transaction_reaction_final_v1_2026-09-18",
+  "frozen_before_transaction_level_performance": true,
+  "search_budget": "One final family. Stop this edge-search branch after the frozen development/validation verdict; do not create another family from the result.",
+  "prior_evidence_disclosure": "Form4 cluster5 metadata was already observed to have small positive aggregate PnL but failed temporal gates. This transaction-level family is a diagnostic refinement, not pristine hypothesis discovery.",
+  "hypothesis": "Open-market purchase/sale semantics can separate informative Form 4 clusters from grants, exercises, and routine filing noise after a confirmed opening response.",
+  "samples": {
+    "development": "2018-01-02 through 2022-12-30",
+    "validation": "2023-01-03 through 2024-12-31",
+    "oos": "2025-2026 prohibited for this final family regardless of result; globally touched data and search budget ends at validation"
+  },
+  "fetch_contract": {
+    "source": "Official SEC quarterly Insider Transactions Data Sets flattened from ownershipDocument XML as filed; exact SEC Archives XML is an accession-level audit/fallback source.",
+    "bulk_path": "https://dcm.sec.gov/files/structureddata/data/insider-transactions-data-sets/{year}q{quarter}_form345.zip",
+    "archive_fallback_path": "https://www.sec.gov/Archives/edgar/data/{issuer_cik_integer}/{accession_without_dashes}/{primary_document_basename}",
+    "eligible_fetch_set": "All exact Form 4 accessions in the cached PIT top500 issuer-CIK union accepted after the 2017-12-29 prior-session cutoff through 2024, joined to the official SEC bulk issuer CIK. Assign to the full PIT trading calendar first; then require issuer cluster3 and apply the frozen top500/market gate.",
+    "source_event_accessions": 332378,
+    "issuer_cluster3_sessions_before_top500_market_gate": 32938,
+    "fair_access": "Declared User-Agent and resumable local cache. Prefer 29 quarterly ZIP requests (2017Q4 and 2018Q1-2024Q4); archive fallback is no more than 8 requests/second with no refetch of valid cached XML.",
+    "implementation_amendment_before_performance": "SEC Archives returned HTTP 429 after 2,814 cached XML files. Before any transaction-level PnL replay, source transport was switched to the SEC official quarterly flattened ownership-XML data. Exact accession joins and every hypothesis, sample, transaction semantic, candidate, cost, and gate remain unchanged.",
+    "issuer_identity_audit_before_performance": "Exact bulk joins found 16 of 5,832 accessions where the submissions-cache entity CIK was a reporting owner rather than the XML issuer. Their transaction values are zeroed; any nominal cluster left with fewer than three issuer-matched Form 4 accessions is excluded. Candidate rules and performance remain unseen.",
+    "session_calendar_correction_after_invalid_replay": "The first replay exposed that the inherited section-6.207 signal file assigned SEC events using feature-cache dates, whose first intraday date is 2018-04-27, collapsing earlier 2018 filings into that date. Those artifacts are invalid and cannot support a verdict. The correction rebuilds all clusters from the full PIT filter calendar beginning 2018-01-02 and the official bulk issuer CIK. No candidate, threshold, hold, direction, cost, or gate changed after viewing the invalid replay.",
+    "no_2025_2026": true
+  },
+  "transaction_contract": {
+    "document": "ownershipDocument",
+    "scope": "nonDerivativeTransaction only",
+    "purchase": "transactionCode P with acquired/disposed code A",
+    "sale": "transactionCode S with acquired/disposed code D",
+    "dollar_notional": "transactionShares * transactionPricePerShare when both are finite and positive",
+    "missing_price": "Transaction remains counted by code but contributes zero to dollar totals and is reported in coverage QA.",
+    "ownership": "Direct and indirect holdings are both included; no beneficial-owner identity selection.",
+    "excluded": "Derivative transactions and all non-P/S codes, including grants and exercises, do not enter P/S dollar totals.",
+    "aggregation": "Sum P and S transactions across every exact Form 4 accession in the issuer-session cluster."
+  },
+  "market_contract": {
+    "event": "At least three exact Form 4 filings for issuer CIK assigned to the same PIT session.",
+    "availability": "First trading session whose 09:15 ET cutoff is strictly after each SEC acceptance timestamp.",
+    "universe": "Quarterly PIT market-cap top500 representative per CIK plus current price>=5 and lagged ADV20>=10m.",
+    "reaction": "Absolute gap>=1%, rvol930>=1.25, absolute first5>=0.20%, gap and first5 same sign.",
+    "direction": "Trade the confirmed gap/first5 sign.",
+    "entry": "Exact 09:35.",
+    "exit": "Exact 15:55 on the hold-th session, entry session counted as day 1."
+  },
+  "candidate_family": [
+    {"variant": "form4_any_purchase_confirm_hold3", "filter": "purchase_transaction_count>=1", "hold_sessions": 3},
+    {"variant": "form4_purchase100k_confirm_hold3", "filter": "purchase_dollars>=100000", "hold_sessions": 3},
+    {"variant": "form4_netpurchase100k_confirm_hold5", "filter": "purchase_dollars-sale_dollars>=100000", "hold_sessions": 5},
+    {"variant": "form4_sale1m_confirm_hold3", "filter": "sale_dollars>=1000000", "hold_sessions": 3}
+  ],
+  "portfolio_contract": {
+    "start_capital": 100000.0,
+    "entry_notional_nav": 0.03,
+    "single_issuer_cap_nav": 0.03,
+    "hard_gross_cap": 1.0,
+    "overlap": "No new position while issuer CIK is active.",
+    "capacity": "Entry notional <=1% of current PIT ADV20.",
+    "unused_capacity": "Cash; no refill.",
+    "missing_entry": "Skip without replacement unless exact 09:35 exists.",
+    "missing_exit": "Retain until next exact 09:35 or 15:55, whichever occurs first.",
+    "base_cost_bps_each_trade": 4.0,
+    "stress_cost_bps_each_trade": 8.0,
+    "short_borrow_annual": 0.01,
+    "financing_annual_above_1x": 0.025
+  },
+  "selection_rule": {
+    "ranking_period": "2018-2022",
+    "ranking": "Highest base-4bps Sharpe among candidates passing every development gate.",
+    "development_gates": {
+      "positive_calendar_years_min": 3,
+      "base_pnl_positive": true,
+      "stress8_pnl_positive": true,
+      "max_drawdown_pct_floor": -0.15,
+      "entry_count_min": 30,
+      "effective_ticker_count_min": 10,
+      "top10_positive_ticker_pnl_share_max": 0.75
+    },
+    "validation_gates": {
+      "base_pnl_positive": true,
+      "stress8_pnl_positive": true,
+      "both_calendar_year_base_pnl_nonnegative": true,
+      "max_drawdown_pct_floor": -0.10,
+      "entry_count_min": 15,
+      "effective_ticker_count_min": 8,
+      "top10_positive_ticker_pnl_share_max": 0.75
+    },
+    "tie_break": "Higher stress8 Sharpe, then larger entry count, then shorter hold.",
+    "terminal_policy": "Report continue/kill/needs audit, but do not open 2025-2026 and do not derive another candidate family."
+  },
+  "audit_requirements": [
+    "Report XML fetch/parse failures, P/S code counts, missing-price coverage, candidate counts, both costs, yearly PnL, dollar and percentage DD, concentration, turnover, borrow, exposure, and long/short entries.",
+    "Rebuild session clusters, portfolio, overlap, costs, and compounding causally; no PnL subtraction or refill shortcut.",
+    "Do not infer insider intent beyond exact Form 4 transaction codes.",
+    "Do not use old manual/restricted 62 or 2025-2026 price data."
+  ],
+  "implementation_freeze": {
+    "transaction_performance_seen": false,
+    "fetch_plan_source": "raits/data/cache/external_events/sec_submissions_pit_2018_2026/sec_ownership_insider_events_2017_2026.csv plus the full PIT filter trading calendar",
+    "fetcher_parser": "raits/research/stocks_sec_form4_transaction_fetch.py",
+    "bulk_builder": "raits/research/stocks_sec_form4_transaction_bulk_build.py",
+    "corrected_full_builder": "raits/research/stocks_sec_form4_transaction_full_build.py",
+    "replay_script": "raits/research/stocks_sec_form4_transaction_reaction_replay.py",
+    "script_hashes": {
+      "raits/research/stocks_sec_form4_transaction_fetch.py": "530531416C6384EAB31A5C2D167A9FC83274DC584A56D96D79AA15D622C95943",
+      "raits/research/stocks_sec_form4_transaction_bulk_build.py": "B3E0D42EA44009234066DC3D111B522A1F2F87B8CA2EDEF542473E1CA9306A95",
+      "raits/research/stocks_sec_form4_transaction_full_build.py": "BD4CADEE9C38036948B45A85DFEA52E0A83ECDD5804CB6296A14F1F71B6AE6A5",
+      "raits/research/stocks_sec_form4_transaction_reaction_replay.py": "095513DEDE1826428D60BF62AFBE69DE31083B943CB617662E39C6DD065C89B7"
+    }
+  }
+}

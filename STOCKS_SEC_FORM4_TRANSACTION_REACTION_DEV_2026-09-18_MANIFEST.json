@@ -1,0 +1,148 @@
+{
+  "script": "raits/research/stocks_sec_form4_transaction_reaction_replay.py",
+  "stage": "development_and_validation_only",
+  "preregistration": "STOCKS_SEC_FORM4_TRANSACTION_REACTION_PREREG_2026-09-18.json",
+  "sample": {
+    "start": "2018-01-02",
+    "end": "2024-12-31"
+  },
+  "development": {
+    "start": "2018-01-02",
+    "end": "2022-12-30"
+  },
+  "validation": {
+    "start": "2023-01-03",
+    "end": "2024-12-31"
+  },
+  "oos_2025_2026_opened": false,
+  "inputs": [
+    "raits\\data\\cache\\external_events\\sec_form4_transactions_2018_2024\\sec_form4_transaction_sessions_corrected_2018_2024.csv",
+    "raits\\data\\cache\\external_events\\sec_form4_transactions_2018_2024\\sec_form4_transaction_accessions_full_corrected_2018_2024.csv",
+    "raits\\data\\cache\\stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits\\data\\cache\\stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits\\data\\cache\\external_universes\\market_cap_polygon\\polygon_market_cap_snapshots_pit_eligible_2018_2024.csv",
+    "raits\\data\\cache\\stocks_survivorship\\polygon_universe_bulk\\daily_20180102_20241231_resumable\\liquidity_filter_daily_20180102_20241231_px5_adv10m_unadjusted\\filtered_daily_universe.parquet"
+  ],
+  "input_hashes": {
+    "raits\\data\\cache\\external_events\\sec_form4_transactions_2018_2024\\sec_form4_transaction_sessions_corrected_2018_2024.csv": "82ED8E0B6C4DB7B37297BD9B74B121AA81F1162181C5957AFC498EF0FFBD9222",
+    "raits\\data\\cache\\external_events\\sec_form4_transactions_2018_2024\\sec_form4_transaction_accessions_full_corrected_2018_2024.csv": "602487B10B5CC4B58FB3BED2EAEE383F44881036821008EBCE038DA9F311BD95",
+    "raits\\data\\cache\\external_universes\\market_cap_polygon\\polygon_market_cap_snapshots_pit_eligible_2018_2024.csv": "C184A810909371F7DB5A3F6926417496A77B97BBAF97ED14B017E3BDD42115D4"
+  },
+  "signal_qa": {
+    "plannedMetadataTransactionSessions": 32938,
+    "validIssuerClusterSessions": 32938,
+    "invalidIssuerClusterSessionsExcluded": 0,
+    "mappedTop500Sessions": 20275,
+    "eligibleFeatureSessions": 20045,
+    "reconfirmedMarketGateSessions": 707,
+    "transactionSessionsWithAllAccessionsParsed": 32938,
+    "transactionSessionsWithAnyParseFailure": 0
+  },
+  "candidate_signal_counts": {
+    "form4_any_purchase_confirm_hold3": 23,
+    "form4_purchase100k_confirm_hold3": 18,
+    "form4_netpurchase100k_confirm_hold5": 15,
+    "form4_sale1m_confirm_hold3": 179
+  },
+  "selection": {
+    "candidates": [
+      {
+        "variant": "form4_any_purchase_confirm_hold3",
+        "holdSessions": 3,
+        "developmentPass": false,
+        "validationPass": false,
+        "positiveDevelopmentYears": 3,
+        "developmentPnl": 1108.6319895941851,
+        "developmentStress8Pnl": 1062.492423644071,
+        "developmentSharpe": 0.31287628490375924,
+        "developmentStress8Sharpe": 0.3005736765822016,
+        "developmentDdDollar": -1078.9174644173909,
+        "developmentDdPct": -0.010688571379380285,
+        "developmentEntries": 19,
+        "developmentEffectiveTickerCount": 5.5388961589233565,
+        "developmentTop10Share": 1.0,
+        "validationPnl": -25.769363743485883,
+        "validationStress8Pnl": -35.451111669652164,
+        "validationDdDollar": -142.9076675457618,
+        "validationDdPct": -0.0014125128212749694,
+        "validationEntries": 4,
+        "validationEffectiveTickerCount": 1.0,
+        "validationTop10Share": 1.0
+      },
+      {
+        "variant": "form4_purchase100k_confirm_hold3",
+        "holdSessions": 3,
+        "developmentPass": false,
+        "validationPass": false,
+        "positiveDevelopmentYears": 2,
+        "developmentPnl": 1284.7366125341941,
+        "developmentStress8Pnl": 1248.267234557352,
+        "developmentSharpe": 0.36637063155852134,
+        "developmentStress8Sharpe": 0.3567774277943149,
+        "developmentDdDollar": -1080.1697078909347,
+        "developmentDdPct": -0.010688571379380285,
+        "developmentEntries": 15,
+        "developmentEffectiveTickerCount": 5.094235937926879,
+        "developmentTop10Share": 1.0,
+        "validationPnl": -23.026831774957827,
+        "validationStress8Pnl": -30.300836019130656,
+        "validationDdDollar": -76.23950987918943,
+        "validationDdPct": -0.0007527245706413499,
+        "validationEntries": 3,
+        "validationEffectiveTickerCount": 1.0,
+        "validationTop10Share": 1.0
+      },
+      {
+        "variant": "form4_netpurchase100k_confirm_hold5",
+        "holdSessions": 5,
+        "developmentPass": false,
+        "validationPass": false,
+        "positiveDevelopmentYears": 3,
+        "developmentPnl": 2528.6672292083094,
+        "developmentStress8Pnl": 2498.4955400427716,
+        "developmentSharpe": 0.6845606674469766,
+        "developmentStress8Sharpe": 0.677050257852111,
+        "developmentDdDollar": -1039.5596757394378,
+        "developmentDdPct": -0.010308169091757469,
+        "developmentEntries": 12,
+        "developmentEffectiveTickerCount": 4.918135480017721,
+        "developmentTop10Share": 1.0,
+        "validationPnl": -175.071400047731,
+        "validationStress8Pnl": -182.32414161067572,
+        "validationDdDollar": -188.8583785516821,
+        "validationDdPct": -0.0018420055937085067,
+        "validationEntries": 3,
+        "validationEffectiveTickerCount": 0.0,
+        "validationTop10Share": NaN
+      },
+      {
+        "variant": "form4_sale1m_confirm_hold3",
+        "holdSessions": 3,
+        "developmentPass": true,
+        "validationPass": false,
+        "positiveDevelopmentYears": 3,
+        "developmentPnl": 1273.583397129274,
+        "developmentStress8Pnl": 931.123822403606,
+        "developmentSharpe": 0.2553639851254627,
+        "developmentStress8Sharpe": 0.18881870779237875,
+        "developmentDdDollar": -2620.431423023285,
+        "developmentDdPct": -0.02529567115579645,
+        "developmentEntries": 141,
+        "developmentEffectiveTickerCount": 24.969653642908103,
+        "developmentTop10Share": 0.5180033132150984,
+        "validationPnl": -903.2833839017985,
+        "validationStress8Pnl": -989.677797944576,
+        "validationDdDollar": -965.3123443910008,
+        "validationDdPct": -0.009531728926838401,
+        "validationEntries": 37,
+        "validationEffectiveTickerCount": 6.206560655356918,
+        "validationTop10Share": 1.0
+      }
+    ],
+    "selectedOnDevelopment": "form4_sale1m_confirm_hold3",
+    "selectedValidationPass": false,
+    "familyStatus": "KILL_BEFORE_OOS",
+    "selectionAudit": "Variant ranked on 2018-2022 only; 2023-2024 cannot replace the selected variant."
+  },
+  "outputs_prefix": "STOCKS_SEC_FORM4_TRANSACTION_REACTION_DEV_2026-09-18"
+}

@@ -1,0 +1,119 @@
+{
+  "spec_id": "stocks_sec_material_event_reaction_v1_2026-09-17",
+  "frozen_before_family_performance": true,
+  "prior_family_audit": "Price-only overnight, 09:35, weekly-ranker, and market/SIC residual families were already exhausted in report sections 6.146, 6.167, 6.186, and 6.188. This family introduces new PIT SEC item labels.",
+  "hypothesis": "Material corporate disclosures can produce delayed price discovery or short-horizon rejection after the first five minutes, distinct from earnings-result Item 2.02 events.",
+  "samples": {
+    "development": "2018-01-02 through 2022-12-30",
+    "validation": "2023-01-03 through 2024-12-31",
+    "oos": "2025-01-02 through 2026-09-16, unopened for this label family until a candidate passes every development and validation gate",
+    "oos_disclosure": "The dates were touched by other strategy families. Any later run is family-level forward validation, not globally pristine market data."
+  },
+  "event_contract": {
+    "source": "Previously cached SEC EDGAR submissions JSON; no new network fetch",
+    "form": "8-K exactly; exclude 8-K/A",
+    "timestamp": "acceptanceDateTime",
+    "availability_cutoff": "09:15 America/New_York",
+    "session_assignment": "First trading session whose 09:15 ET cutoff is strictly after acceptance, with an explicit prior-session lower boundary.",
+    "deduplication": "One event per CIK, assigned session, and mutually exclusive event class; retain earliest acceptance.",
+    "deal_class": "Item 1.01 or 2.01, excluding any filing containing Item 2.02.",
+    "governance_class": "Item 5.02, excluding filings containing Item 2.02, 1.01, or 2.01.",
+    "issuer_representation": "At each quarterly PIT market-cap snapshot, retain the highest-market-cap top500 ticker per CIK."
+  },
+  "signal_contract": {
+    "universe": "Quarterly Polygon PIT market-cap top500 with current-day PIT price>=5 and lagged ADV20>=10m eligibility.",
+    "gap_abs_min": 0.015,
+    "opening_rvol_min": 1.25,
+    "confirmed_first5_abs_min": 0.002,
+    "rejected_first5_abs_min": 0.0035,
+    "confirmed": "Gap and first5_ret have the same non-zero sign; trade in that sign.",
+    "rejected": "Gap and first5_ret have opposite non-zero signs; trade in the first5_ret sign.",
+    "entry": "Exact 09:35 on assigned session.",
+    "exit": "Exact 15:55 on the hold-th trading session, entry session counted as day 1."
+  },
+  "candidate_family": [
+    {"variant": "deal_confirm_hold3", "event_class": "deal", "reaction": "confirmed", "hold_sessions": 3},
+    {"variant": "deal_confirm_hold5", "event_class": "deal", "reaction": "confirmed", "hold_sessions": 5},
+    {"variant": "deal_reject_hold3", "event_class": "deal", "reaction": "rejected", "hold_sessions": 3},
+    {"variant": "governance_confirm_hold3", "event_class": "governance", "reaction": "confirmed", "hold_sessions": 3}
+  ],
+  "portfolio_contract": {
+    "start_capital": 100000.0,
+    "entry_notional_nav": 0.03,
+    "single_issuer_cap_nav": 0.03,
+    "hard_gross_cap": 1.0,
+    "overlapping_event_policy": "Ignore a new event for an issuer while its representative ticker is active.",
+    "capacity_policy": "Entry notional must not exceed 1% of current PIT ADV20.",
+    "unused_capacity": "Cash; no refill.",
+    "missing_entry": "Skip without replacement if exact 09:35 is absent.",
+    "missing_exit": "Retain and execute at the next exact 09:35 or 15:55, whichever occurs first.",
+    "base_cost_bps_each_trade": 4.0,
+    "stress_cost_bps_each_trade": 8.0,
+    "short_borrow_annual": 0.01,
+    "financing_annual_above_1x": 0.025
+  },
+  "selection_rule": {
+    "ranking_period": "2018-2022",
+    "ranking": "Highest base-4bps daily Sharpe among candidates passing every development gate.",
+    "development_gates": {
+      "positive_calendar_years_min": 3,
+      "max_drawdown_pct_floor": -0.15,
+      "entry_count_min": 100,
+      "effective_ticker_count_min": 20,
+      "base_pnl_positive": true,
+      "stress8_pnl_positive": true
+    },
+    "validation_gates_2023_2024": {
+      "base_pnl_positive": true,
+      "stress8_pnl_positive": true,
+      "both_calendar_year_base_pnl_nonnegative": true,
+      "max_drawdown_pct_floor": -0.10,
+      "entry_count_min": 40,
+      "effective_ticker_count_min": 15
+    },
+    "tie_break": "Higher stress8 Sharpe, then shorter hold.",
+    "no_selection_result": "Kill before family-level OOS. Do not alter labels, thresholds, direction, holds, sizing, or costs."
+  },
+  "oos_acceptance_if_eligible": {
+    "base_cagr_min": 0.05,
+    "base_sharpe_min": 0.70,
+    "stress8_cagr_min": 0.03,
+    "max_drawdown_pct_floor": -0.10,
+    "entry_count_min": 30,
+    "effective_ticker_count_min": 20,
+    "top10_positive_ticker_pnl_share_max": 0.60,
+    "stale_execution_allowed": false
+  },
+  "audit_requirements": [
+    "Report all four candidates and both cost assumptions.",
+    "Report yearly PnL, dollar and percentage drawdown, turnover, borrow, exposure, long/short counts, and top1/top3/top5/top10 concentration.",
+    "Separate rule-selection from causal trade-selection effects.",
+    "Archive and disclose every implementation-invalid run; never silently retry after performance is visible.",
+    "Do not use the old manual/restricted 62 universe or any learned ticker list."
+  ],
+  "implementation_freeze": {
+    "performance_seen": false,
+    "label_builder": "raits/research/stocks_sec_material_events_build.py",
+    "label_builder_sha256": "551ED69EF6FFB8541E8D89AEEA52845DEAAE57150BAB9C226BB80B2F9040A93B",
+    "replay_script": "raits/research/stocks_sec_material_event_reaction_replay.py",
+    "replay_script_sha256": "F6E46E20A26241D282A66725FDC10D17762C0754CE187C66A1D1482012BACE70",
+    "raw_input": "raits/data/cache/external_events/sec_submissions_pit_2018_2026/raw",
+    "event_file": "raits/data/cache/external_events/sec_submissions_pit_2018_2026/sec_8k_material_events_2017_2026.csv",
+    "event_file_sha256": "473FB83597511D4D3715252B414E3CBF5C6E653A75125814B2DE73C9FB3BE334",
+    "event_rows": 25800,
+    "deal_rows": 10331,
+    "governance_rows": 15469,
+    "issuer_ciks": 843,
+    "duplicate_cik_accession_class": 0
+  },
+  "post_development_contract_correction": {
+    "performance_seen": true,
+    "oos_performance_seen": false,
+    "old_replay_sha256": "EB816EA2581E9D103B131F450324549A0584AA2DBB8F23952BFF98A42BF00444",
+    "new_replay_sha256": "F6E46E20A26241D282A66725FDC10D17762C0754CE187C66A1D1482012BACE70",
+    "reason": "The first development replay enforced overlapping-position exclusion by representative ticker rather than issuer CIK. The frozen contract is issuer-level; the correction derives active CIKs from live positions and excludes any new event for those issuers even if the quarterly representative ticker changed.",
+    "rule_change": false,
+    "invalidated_artifacts": "The first development outputs are retained with prefix STOCKS_SEC_MATERIAL_EVENT_REACTION_DEV_2026-09-17_INVALID_ISSUER_OVERLAP_ and excluded from selection.",
+    "selection_policy": "Rerun all candidates and both costs from scratch; only the corrected run may determine family eligibility."
+  }
+}

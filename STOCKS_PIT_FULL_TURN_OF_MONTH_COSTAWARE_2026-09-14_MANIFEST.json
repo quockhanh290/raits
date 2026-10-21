@@ -1,0 +1,63 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_TURN_OF_MONTH_COSTAWARE_2026-09-14",
+  "script": "raits/research/stocks_pit_full_turn_of_month_costaware.py",
+  "input": "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv",
+  "method": "Pre-registered turn-of-month calendar timing on PIT benchmark streams, with financing and exposure-turnover cost.",
+  "financing_annual_rate": 0.025,
+  "turnover_cost_bps": 4.0,
+  "variants": [
+    {
+      "base": "spy_buy_hold",
+      "window": "last1_first3",
+      "exposure": 3.0
+    },
+    {
+      "base": "spy_buy_hold",
+      "window": "last2_first3",
+      "exposure": 2.5
+    },
+    {
+      "base": "spy_buy_hold",
+      "window": "first5",
+      "exposure": 2.5
+    },
+    {
+      "base": "market_cap_top62_equal_weight",
+      "window": "last1_first3",
+      "exposure": 3.0
+    },
+    {
+      "base": "market_cap_top62_equal_weight",
+      "window": "last2_first3",
+      "exposure": 2.5
+    },
+    {
+      "base": "market_cap_top62_equal_weight",
+      "window": "first5",
+      "exposure": 2.5
+    },
+    {
+      "base": "market_cap_top100_equal_weight",
+      "window": "last1_first3",
+      "exposure": 3.0
+    },
+    {
+      "base": "market_cap_top100_equal_weight",
+      "window": "last2_first3",
+      "exposure": 2.5
+    },
+    {
+      "base": "market_cap_top100_equal_weight",
+      "window": "first5",
+      "exposure": 2.5
+    }
+  ],
+  "sample_label": "Research/touched 2018-2024 only; no 2025-2026 OOS opened.",
+  "leakage_controls": "Trading-day-of-month labels use only the calendar/trading dates in the benchmark file. No ticker picking, no old manual 62 list.",
+  "rule_selection_effect": "None inside diagnostic. Calendar windows and exposures fixed before running.",
+  "outputs": [
+    "STOCKS_PIT_FULL_TURN_OF_MONTH_COSTAWARE_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_TURN_OF_MONTH_COSTAWARE_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_TURN_OF_MONTH_COSTAWARE_2026-09-14_DAILY.csv"
+  ]
+}

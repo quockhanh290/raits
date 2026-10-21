@@ -1,4 +1,13 @@
-"""Read-only execution-quality evidence from the durable paper trade log."""
+"""Read-only execution-quality evidence from the durable paper trade log.
+
+Plan stage 4 (2026-09-24). This read `trade_log.jsonl` — the LEGACY route's log, whose newest row
+was 967 hours old that evening — and served it as the page's execution quality. The route that
+trades is Track 1, and its fills reach `global_index/track1_runtime/trade_log.track1.jsonl` since
+stage 1. The default is now Track 1; the legacy log is read only when asked for by name, and the
+answer says which route it describes. A Track 1 read counts only rows stamped with Track 1's
+route, the same rule `track1_report.read_trade_log` applies: a row in the right file that does
+not name the route is not counted as the route's execution.
+"""
 from __future__ import annotations
 
 import copy
@@ -14,6 +23,12 @@ from typing import Any
 _TICKS = {"MES": 0.25, "MNQ": 0.25, "MYM": 1.0, "M2K": 0.1,
           "NKD": 5.0, "MNKD": 5.0}
 _ASSUMED_SLIPPAGE_TICKS = 2.0
+#: Which log describes which route. Track 1's path is `track1_report.TRADE_LOG`, restated here
+#: rather than imported so this reader stays free of the global_index package at import time;
+#: a test holds the two equal.
+ROUTE_LOGS = {"track1_candidate": "global_index/track1_runtime/trade_log.track1.jsonl",
+              "legacy": "trade_log.jsonl"}
+DEFAULT_ROUTE = "track1_candidate"
 _lock = threading.Lock()
 _cache: dict[tuple[str, int, int, str | None], dict[str, Any]] = {}
 
@@ -37,7 +52,7 @@ def _signed_stop_slippage(record: dict[str, Any], expected: float, actual: float
     return expected - actual if str(record.get("direction", "")).upper() == "LONG" else actual - expected
 
 
-def _normalise(record: dict[str, Any], index: int) -> dict[str, Any]:
+def _normalise(record: dict[str, Any], index: int, route: str = "legacy") -> dict[str, Any]:
     trade_type = str(record.get("type", "UNKNOWN")).upper()
     direction = str(record.get("direction", "UNKNOWN")).upper()
     exit_reason = str(record.get("exit_reason") or "").upper()
@@ -98,6 +113,8 @@ def _normalise(record: dict[str, Any], index: int) -> dict[str, Any]:
     return {
         "key": f"{trade_type}:{record.get('inst', '?')}:{record.get('ts') or index}",
         "day": _day(record), "ts": record.get("ts"),
+        "entry_day": str(record.get("entry_day"))[:10] if record.get("entry_day") else None,
+        "exit_day": str(record.get("exit_day"))[:10] if record.get("exit_day") else None,
         "type": trade_type, "inst": record.get("inst"), "cluster": record.get("cluster"),
         "direction": direction, "action": action, "exit_reason": record.get("exit_reason"),
         "ordered_qty": ordered, "filled_qty": filled, "status": status, "partial": partial,
@@ -108,7 +125,12 @@ def _normalise(record: dict[str, Any], index: int) -> dict[str, Any]:
         "signed_distance_to_stop_ticks": distance_ticks,
         "adverse": slippage_ticks is not None and slippage_ticks > 0,
         "commission": _number(record.get("commission")),
-        "route": record.get("route") or record.get("exchange"),
+        "pnl_sized": _number(record.get("pnl_sized")),
+        # The execution VENUE. Legacy rows had no route tag, so `route` meant the venue there;
+        # a Track 1 row's `route` is the TRADING route name, and counting it as a venue would
+        # report "route emitted" for a field that says nothing about where the order went.
+        "route": (record.get("exchange") if route != "legacy"
+                  else record.get("route") or record.get("exchange")),
         "order_id": record.get("order_id"), "perm_id": record.get("perm_id"),
         "source": record.get("source") or "runner_trade_log",
         "exception": bool(exception_reasons), "exception_reasons": exception_reasons,
@@ -129,13 +151,17 @@ def _distribution(values: list[float]) -> dict[str, Any]:
     }
 
 
-def read_execution_quality(root: Path, day: str | None = None) -> dict[str, Any]:
-    path = root / "trade_log.jsonl"
+def read_execution_quality(root: Path, day: str | None = None,
+                           route: str = DEFAULT_ROUTE) -> dict[str, Any]:
+    rel = ROUTE_LOGS[route]
+    path = Path(root) / rel
     try:
         stat = path.stat()
     except OSError as exc:
-        return {"source": "trade_log.jsonl", "day": day, "observed_at": None,
-                "fills": [], "exceptions": [], "summary": {}, "coverage": {}, "error": str(exc)}
+        # Not produced is an answer, not a fault: a route that has never logged a fill.
+        return {"source": rel, "route": route, "day": day, "observed_at": None,
+                "state": "not_produced", "fills": [], "exceptions": [], "summary": {},
+                "coverage": {}, "error": str(exc)}
     key = (str(path.resolve()), stat.st_mtime_ns, stat.st_size, day)
     with _lock:
         cached = _cache.get(key)
@@ -157,10 +183,16 @@ def read_execution_quality(root: Path, day: str | None = None) -> dict[str, Any]
                 if isinstance(value, dict):
                     records.append(value)
     except OSError as exc:
-        return {"source": path.name, "day": day, "observed_at": None,
-                "fills": [], "exceptions": [], "summary": {}, "coverage": {}, "error": str(exc)}
+        return {"source": rel, "route": route, "day": day, "observed_at": None,
+                "state": "unreadable", "fills": [], "exceptions": [], "summary": {},
+                "coverage": {}, "error": str(exc)}
 
-    fills = [_normalise(record, index) for index, record in enumerate(records)
+    foreign = 0
+    if route != "legacy":
+        kept = [r for r in records if str(r.get("route") or "") == route]
+        foreign = len(records) - len(kept)
+        records = kept
+    fills = [_normalise(record, index, route) for index, record in enumerate(records)
              if day is None or _day(record) == day]
     execution_ticks = [item["signed_slippage_ticks"] for item in fills
                        if item["signed_slippage_ticks"] is not None]
@@ -170,6 +202,8 @@ def read_execution_quality(root: Path, day: str | None = None) -> dict[str, Any]
                   if item["reference_type"] == "stop_trigger" and item["signed_slippage_ticks"] is not None]
     signal_closes = [item for item in fills if item["type"] == "CLOSE"
                      and item["reference_type"] == "protective_stop_reference"]
+    realized_today = round(sum(item["pnl_sized"] for item in fills
+                              if item["type"] == "CLOSE" and item["pnl_sized"] is not None), 2)
     coverage = {
         "fill_records": len(fills),
         "execution_slippage_evaluable": len(execution_ticks),
@@ -178,13 +212,16 @@ def read_execution_quality(root: Path, day: str | None = None) -> dict[str, Any]
         "route_emitted": sum(item["route"] is not None for item in fills),
         "stable_execution_id_emitted": sum(item["perm_id"] is not None for item in fills),
         "malformed_lines": malformed,
+        # Rows in this route's file that do not carry its route tag — not counted above.
+        "foreign_route_rows": foreign,
     }
     def _field_status(observed: int) -> str:
         if not fills:
             return "not_observed"
         return "available" if observed == len(fills) else "missing"
     result = {
-        "source": path.name, "day": day,
+        "source": rel, "route": route, "day": day,
+        "state": "available" if records else "empty",
         "observed_at": dt.datetime.fromtimestamp(stat.st_mtime, tz=dt.timezone.utc).isoformat().replace("+00:00", "Z"),
         "assumption_ticks": _ASSUMED_SLIPPAGE_TICKS,
         "fills": fills,
@@ -194,6 +231,9 @@ def read_execution_quality(root: Path, day: str | None = None) -> dict[str, Any]
             "opens": _distribution(open_ticks),
             "stop_fills": _distribution(stop_ticks),
             "signal_market_closes_not_evaluable": len(signal_closes),
+            "realized_today": realized_today,
+            "close_count": sum(1 for item in fills if item["type"] == "CLOSE"),
+            "open_count": sum(1 for item in fills if item["type"] == "OPEN"),
         },
         "coverage": coverage,
         "gaps": [

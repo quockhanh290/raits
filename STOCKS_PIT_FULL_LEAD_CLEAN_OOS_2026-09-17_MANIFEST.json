@@ -1,0 +1,70 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17",
+  "script": "raits/research/stocks_pit_full_lead_clean_oos_replay.py",
+  "frozen_spec": "STOCKS_PIT_FULL_LEAD_OOS_FROZEN_SPEC_2026-09-17.json",
+  "sample": {
+    "start": "2025-01-02",
+    "end": "2026-09-16",
+    "warmup_start": "2024-06-01"
+  },
+  "inputs": [
+    "raits\\data\\cache\\stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits\\data\\cache\\stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits\\data\\cache\\stocks_clean_daily_features_PIT_FULL_2025_2026_CLEAN_OOS.pkl",
+    "raits\\data\\cache\\stocks_intraday_0935_features_PIT_FULL_2025_2026_CLEAN_OOS.pkl",
+    "raits\\data\\cache\\external_universes\\market_cap_polygon\\polygon_market_cap_snapshots_pit_eligible_2018_2024.csv",
+    "raits\\data\\cache\\external_universes\\market_cap_polygon\\polygon_market_cap_snapshots_pit_eligible_2025_2026_clean_oos.csv",
+    "raits\\data\\cache\\stocks_survivorship\\polygon_universe_bulk\\daily_20250102_20260916_clean_oos\\liquidity_filter_daily_20250102_20260916_clean_oos_px5_adv10m_unadjusted\\filtered_daily_universe.parquet",
+    "raits\\data\\cache\\polygon_5min_pit_full_2025_2026_clean_oos"
+  ],
+  "scenarios": [
+    {
+      "scenario": "oos_base4",
+      "cost_bps": 4.0,
+      "financing": 0.025,
+      "borrow": 0.01,
+      "missing_bps": 0.0
+    },
+    {
+      "scenario": "oos_cost8",
+      "cost_bps": 8.0,
+      "financing": 0.025,
+      "borrow": 0.01,
+      "missing_bps": 0.0
+    },
+    {
+      "scenario": "oos_severe12",
+      "cost_bps": 12.0,
+      "financing": 0.05,
+      "borrow": 0.03,
+      "missing_bps": 50.0
+    }
+  ],
+  "data_contract": "2024 is lagged feature/pair-formation warm-up only. OOS account starts at $100,000 on 2025-01-02 and no pre-OOS holdings are carried. Quarterly top500 and same-date liquidity membership use only latest available PIT snapshots/filters.",
+  "leakage_controls": "Signals use completed-session data and execute next session at exact 09:35. SPY vol and overnight gate are shifted one completed session. As-of <=5 minute prices are marks only. Missing exact execution freezes shares and blocks trades.",
+  "selection_effect": "No rule re-selection and no candidate-family search occurs in OOS. Trade selection changes only through frozen PIT membership, signals, ADV gate, caps, and missing-price policy.",
+  "verdict_checks": {
+    "base_cagr": false,
+    "cost8_cagr": false,
+    "base_dd_pct": false,
+    "missing_fail_safe": false,
+    "portfolio_margin": true
+  },
+  "verdict": "KILL",
+  "outputs": [
+    "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17_SLEEVE_ATTRIBUTION.csv",
+    "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17_EVENT_LEDGER.csv",
+    "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17_PAIR_FORMATIONS.csv",
+    "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17_PAIR_EVENTS.csv",
+    "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17_CRISIS_SIGNALS.csv",
+    "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17_PRICE_COVERAGE.csv",
+    "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17_MARGIN.csv",
+    "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17_BENCHMARK.csv",
+    "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17_QA.csv"
+  ]
+}

@@ -984,6 +984,14 @@ LABELS: dict = {
     "no_bar_provider": "Bar provider unavailable",
     "live_source_not_ready": "Live source not ready",
     "gate_refused": "Runtime gate refused the slot",
+    # Keep the gate's top-level code and the concrete failed check separate.  A slot can be
+    # refused before the detector runs (for example Calm at 10:00 when the 10:00 OPEN is not
+    # present yet); showing only `gate_refused` hides the actionable cause.
+    "entry_quote_absent": "Entry quote unavailable (10:00 OPEN not present)",
+    "entry_quote_unverified": "Entry quote could not be verified",
+    "decision_bar_absent": "Decision bar unavailable",
+    "no_candidate": "No setup/candidate was produced",
+    "no_decide_row_for_this_day": "No DECIDE setup row for this day",
     "freshness_refused": "Freshness check refused the slot",
     "stale": "Bars are stale",
     "partial_coverage": "Session bars incomplete",
@@ -1067,8 +1075,28 @@ def label(name: str) -> str:
     return LABELS.get(str(name), str(name))
 
 
-def chip(status: str) -> dict:
+def chip(status_or_row) -> dict:
+    """Return the compact job badge without hiding mixed admission outcomes.
+
+    A signal row can contain more than one candidate.  Its top-level status necessarily
+    chooses one word, but the job badge must not turn ``1 accepted, 1 rejected`` into the
+    less precise ``ACCEPTED SHADOW``.  String callers keep the historical single-status
+    labels; row callers get count-aware labels when the writer supplied the counts.
+    """
+    row = status_or_row if isinstance(status_or_row, Mapping) else None
+    status = row.get("status") if row is not None else status_or_row
     text, tone, tip = CHIPS.get(status, (str(status), "muted", ""))
+    if row is not None:
+        accepted = int(row.get("accepted") or 0)
+        rejected = int(row.get("rejected") or 0)
+        if accepted and rejected:
+            text = f"{accepted} ACCEPTED \u00b7 {rejected} REJECTED"
+            tip = (f"{accepted} candidate(s) passed shadow admission; "
+                   f"{rejected} candidate(s) were rejected in the same slot.")
+        elif status == SIGNAL_ACCEPTED_SHADOW and accepted > 1:
+            text = f"{accepted} ACCEPTED SHADOW"
+        elif status == SIGNAL_REJECTED and rejected > 1:
+            text = f"{rejected} REJECTED"
     return {"label": text, "tone": tone, "tooltip": tip, "status": status}
 
 
@@ -1184,8 +1212,8 @@ def one_line(row: Mapping) -> str:
     assert it. The dashboard renders the string; it does not compose it.
     """
     status = row.get("status") or SLOT_MISSED
-    label = _LABEL.get(status, status)
-    bits = [f"Signal: {label}"]
+    status_label = _LABEL.get(status, status)
+    bits = [f"Signal: {status_label}"]
     if status in (SLOT_MISSED, SLOT_NO_ROW):
         bits.append(row.get("reason") or ("not scheduled or never spawned"
                                           if status == SLOT_MISSED else "slot ran, no row"))
@@ -1193,7 +1221,10 @@ def one_line(row: Mapping) -> str:
     if status == SLOT_REFUSED:
         bits.append(row.get("reason") or "refused")
         if row.get("detail"):
-            bits.append(str(row["detail"])[:60])
+            # `reason` identifies the refusal layer; `detail` identifies the concrete check.
+            # Render the latter through the same operator vocabulary used by Operational
+            # details so the compact slot line does not fall back to developer codes.
+            bits.append(label(str(row["detail"]))[:80])
         return " · ".join(bits)
     if status == NO_SIGNAL:
         bits.append(f"candidates {row.get('raw_candidates', 0)}")

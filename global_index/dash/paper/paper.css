@@ -31,6 +31,14 @@
 .readiness.complete { border-left-color: var(--green); }
 .readiness.complete b { color: var(--green); }
 .readiness small, .paper-metrics small { color: var(--dim); font: 11px/1.3 var(--mono); }
+.operator-kind { width: fit-content; padding: 3px 7px; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; background: rgba(255,255,255,.018); text-transform: uppercase; font: 900 9px/1.1 var(--mono); font-style: normal; }
+.operator-kind.kind-sample-building { color: var(--blue); border-color: rgba(88,163,255,.42); background: rgba(88,163,255,.07); }
+.operator-kind.kind-no-track1-source { color: var(--violet); border-color: rgba(139,114,255,.42); background: rgba(139,114,255,.07); }
+.operator-kind.kind-source-not-connected { color: var(--violet); border-color: rgba(139,114,255,.42); background: rgba(139,114,255,.07); }
+.operator-kind.kind-history-awaiting-clean, .operator-kind.kind-history-superseded { color: var(--amber); border-color: rgba(221,163,58,.42); background: rgba(221,163,58,.07); }
+.operator-kind.kind-signal-sample-small { color: var(--amber); border-color: rgba(221,163,58,.55); background: rgba(221,163,58,.11); }
+.operator-kind.kind-current-fault { color: var(--red); border-color: rgba(240,91,97,.55); background: rgba(240,91,97,.10); }
+.operator-kind.kind-scheduled-decision { color: var(--muted); border-color: rgba(190,198,214,.35); background: rgba(190,198,214,.055); }
 .paper-tabs { border-bottom: 1px solid var(--line); }
 .paper-tabs > input { position: absolute; opacity: 0; pointer-events: none; }
 .paper-tab-nav { position: sticky; top: 0; z-index: 20; padding: 10px 24px 0; display: flex; gap: 8px; background: var(--bg); border-bottom: 1px solid var(--line); }
@@ -49,12 +57,19 @@
 .paper-metrics { padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
 .blocker-card { min-height: 268px; padding: 14px 16px; display: grid; grid-template-rows: auto auto 1fr auto; align-content: start; gap: 10px; background: var(--surface); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); box-shadow: inset 3px 0 0 var(--line-strong); }
 .blocker-card-head { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: center; }
+.blocker-card-head .operator-kind { grid-column: 1 / -1; }
 .blocker-card.pass, .blocker-card.observed { box-shadow: inset 3px 0 0 var(--green); }
 .blocker-card.pending, .blocker-card.breach-now, .blocker-card.quality-breach { box-shadow: inset 3px 0 0 var(--amber); }
 .blocker-card.breach { box-shadow: inset 3px 0 0 var(--red); }
 /* A gap is not a pending sample: it cannot close by waiting, so it reads as its own
    state rather than borrowing the amber of "in progress". */
 .blocker-card.spec-gap, .blocker-card.structural-gap { box-shadow: inset 3px 0 0 var(--violet); }
+.blocker-card.kind-card-sample-building, .coverage-item.kind-card-sample-building { box-shadow: inset 3px 0 0 var(--blue); }
+.blocker-card.kind-card-current-fault, .coverage-item.kind-card-current-fault { box-shadow: inset 3px 0 0 var(--red); }
+.blocker-card.kind-card-history-awaiting-clean, .blocker-card.kind-card-history-superseded, .coverage-item.kind-card-history-awaiting-clean, .coverage-item.kind-card-history-superseded { box-shadow: inset 3px 0 0 var(--amber); }
+.blocker-card.kind-card-source-not-connected, .blocker-card.kind-card-no-track1-source, .coverage-item.kind-card-source-not-connected, .coverage-item.kind-card-no-track1-source { box-shadow: inset 3px 0 0 var(--violet); }
+.blocker-card.kind-card-signal-sample-small, .coverage-item.kind-card-signal-sample-small { box-shadow: inset 3px 0 0 var(--amber); }
+.blocker-card.kind-card-scheduled-decision, .coverage-item.kind-card-scheduled-decision { box-shadow: inset 3px 0 0 var(--line-strong); }
 .blocker-card span { width: fit-content; padding: 3px 6px; color: var(--muted); border: 1px solid var(--line); background: rgba(255,255,255,.018); text-transform: uppercase; font: 900 10px/1 var(--mono); }
 .blocker-card.breach span { color: var(--red); }
 .blocker-card.pending span, .blocker-card.breach-now span, .blocker-card.quality-breach span { color: var(--amber); }
@@ -496,10 +511,12 @@
 .coverage-item.active { background: rgba(221,163,58,.07); box-shadow: inset 3px 0 0 var(--amber); }
 .coverage-item:hover { background: rgba(255,255,255,.035); }
 .coverage-item b { color: var(--bright); font: 700 12px/1.35 var(--mono); }
+.coverage-item .operator-kind { grid-column: 1 / -1; }
 .coverage-item p { grid-column: 1 / -1; margin: 0; color: var(--muted); font: 11px/1.45 var(--mono); }
 .coverage-item small { grid-column: 1 / -1; color: var(--dim); font: 10px/1.35 var(--mono); }
 .coverage-detail { min-width: 0; padding: 16px 18px 18px; border: 1px solid var(--line); background: rgba(255,255,255,.012); }
 .coverage-detail-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.coverage-detail-head .operator-kind { grid-column: 1 / -1; }
 .coverage-detail-head h3 { margin: 2px 0 0; color: var(--bright); font: 700 21px/1.25 var(--mono); }
 .coverage-detail-evidence { margin: 12px 0 6px; color: var(--muted); font: 13px/1.55 var(--mono); }
 .gap-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

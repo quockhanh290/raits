@@ -1,0 +1,51 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LEAD_PERSISTENT_HEDGE_STRESS_2026-09-17",
+  "script": "raits/research/stocks_pit_full_lead_persistent_hedge_stress.py",
+  "engine": "raits/research/stocks_pit_full_lead_candidate_eventtime_audit.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TRADE_EVENTS.csv",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl"
+  ],
+  "frozen_candidate": "Lead core plus pairs, with persistent -0.5x SPY exposure while lagged completed-session overnight20 compounded return is negative.",
+  "pre_registered_scenarios": [
+    {
+      "scenario": "base",
+      "cost_bps": 4.0,
+      "financing": 0.025,
+      "borrow": 0.01,
+      "missing_bps": 0.0
+    },
+    {
+      "scenario": "cost8",
+      "cost_bps": 8.0,
+      "financing": 0.025,
+      "borrow": 0.01,
+      "missing_bps": 0.0
+    },
+    {
+      "scenario": "stress",
+      "cost_bps": 8.0,
+      "financing": 0.05,
+      "borrow": 0.02,
+      "missing_bps": 25.0
+    },
+    {
+      "scenario": "severe",
+      "cost_bps": 12.0,
+      "financing": 0.05,
+      "borrow": 0.03,
+      "missing_bps": 50.0
+    }
+  ],
+  "sample_label": "Diagnostic on touched research sample 2018-2024. No 2025-2026 opened.",
+  "selection_warning": "Candidate was selected from the three-row persistent hedge diagnostic on the same touched sample; stress survival cannot establish clean robustness.",
+  "outputs": [
+    "STOCKS_PIT_FULL_LEAD_PERSISTENT_HEDGE_STRESS_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LEAD_PERSISTENT_HEDGE_STRESS_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_LEAD_PERSISTENT_HEDGE_STRESS_2026-09-17_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_LEAD_PERSISTENT_HEDGE_STRESS_2026-09-17_SLEEVE_ATTRIBUTION.csv",
+    "STOCKS_PIT_FULL_LEAD_PERSISTENT_HEDGE_STRESS_2026-09-17_QA.csv"
+  ]
+}

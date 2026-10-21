@@ -1,0 +1,63 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_LOWGROSS_SCAN_2026-09-14",
+  "script": "raits/research/stocks_pit_full_beta_plus_megaspread_lowgross_scan.py",
+  "input": "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_AUDIT_2026-09-14_DAILY.csv",
+  "method": "Pre-registered low-gross rescaling of fixed 6.171 constituent-audited SPY vt16 plus top62/top200 spread stream, with financing and borrow drag included from the start.",
+  "financing_annual_rate": 0.025,
+  "short_borrow_annual_rate": 0.01,
+  "variants": [
+    {
+      "variant": "spy075_spread050_fin25_borrow1",
+      "spy_scale": 0.75,
+      "spread_weight": 0.5
+    },
+    {
+      "variant": "spy100_spread050_fin25_borrow1",
+      "spy_scale": 1.0,
+      "spread_weight": 0.5
+    },
+    {
+      "variant": "spy125_spread050_fin25_borrow1",
+      "spy_scale": 1.25,
+      "spread_weight": 0.5
+    },
+    {
+      "variant": "spy075_spread100_fin25_borrow1",
+      "spy_scale": 0.75,
+      "spread_weight": 1.0
+    },
+    {
+      "variant": "spy100_spread100_fin25_borrow1",
+      "spy_scale": 1.0,
+      "spread_weight": 1.0
+    },
+    {
+      "variant": "spy125_spread100_fin25_borrow1",
+      "spy_scale": 1.25,
+      "spread_weight": 1.0
+    },
+    {
+      "variant": "spy075_spread150_fin25_borrow1",
+      "spy_scale": 0.75,
+      "spread_weight": 1.5
+    },
+    {
+      "variant": "spy100_spread150_fin25_borrow1",
+      "spy_scale": 1.0,
+      "spread_weight": 1.5
+    },
+    {
+      "variant": "spy125_spread150_fin25_borrow1",
+      "spy_scale": 1.25,
+      "spread_weight": 1.5
+    }
+  ],
+  "sample_label": "Research/touched 2018-2024 only; no 2025-2026 OOS opened.",
+  "rule_selection_effect": "None inside this diagnostic. Variant grid fixed before running.",
+  "old_62_usage": "None; inherited PIT market-cap top62/top200 from section 6.171.",
+  "outputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_LOWGROSS_SCAN_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_LOWGROSS_SCAN_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_BETA_PLUS_MEGASPREAD_LOWGROSS_SCAN_2026-09-14_DAILY.csv"
+  ]
+}

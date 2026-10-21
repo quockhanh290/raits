@@ -1,0 +1,67 @@
+{
+  "title": "Pre-registered broad-PIT monthly fundamental quality family",
+  "created_date": "2026-09-24",
+  "frozen_before_performance": true,
+  "audit_amendment": "After the first execution, an audit found that the engine computed but did not inspect post-2022 return paths before applying the development gate. That run is invalid and preserved under the INVALID_PREMATURE_VALIDATION prefix. The script was changed only to stop simulation at 2022 unless a development row passes; hypotheses, scores, thresholds, costs, and gates are unchanged.",
+  "objective": "Test whether latest PIT quarterly profitability and balance-sheet quality contain a large enough monthly cross-sectional stock edge after costs.",
+  "search_plan": [
+    "Profitability: operating margin, gross margin, ROA, and operating cash flow/assets.",
+    "Balance-sheet quality: current ratio, inverse liabilities/assets, and cash-minus-accounting-income accrual quality.",
+    "Composite quality: combine the two independent fundamental blocks.",
+    "Market-neutral composite: long the strongest and short the weakest composite names to separate stock alpha from market beta."
+  ],
+  "data_contract": {
+    "development": "2018-04-27 through 2022-12-30",
+    "touched_validation": "2023-01-03 through 2024-12-31; opened only after a development pass",
+    "post_2024": "Not consumed by this search",
+    "universe": "Quarterly PIT market-cap top500 intersected with the daily PIT eligible universe, ADV20 >= $10m, and an exact 09:35 price.",
+    "financial_clock": "Use only Polygon quarterly statements with filing_date strictly before the rebalance date; latest known filing per CIK; maximum age 200 calendar days.",
+    "fundamental_limits": "No annual or TTM values are synthesized because the local cache contains quarterly rows and almost no explicit Q4 rows.",
+    "rebalance": "First available trading session of each month at 09:35; hold to the next monthly 09:35 rebalance.",
+    "selection": "Cross-sectional 2.5/97.5 winsorization, SIC z-score when at least five observations otherwise global z-score, equal weight, 30 names per leg, maximum three names per SIC description.",
+    "gross": "0.95x for long-only; 0.475x long plus 0.475x short for market-neutral.",
+    "costs": "4 bps per traded dollar base, 8 bps stress, 1% annual short borrow.",
+    "missing_prices": "Existing positions carry the last mark when an exact 09:35 price is absent; no new trade is allowed without an exact price; missing marks are reported."
+  },
+  "variants": [
+    {
+      "name": "profitability_long30",
+      "book": "long_only",
+      "gate": {"min_cagr": 0.12, "min_active_cagr": 0.03}
+    },
+    {
+      "name": "balance_quality_long30",
+      "book": "long_only",
+      "gate": {"min_cagr": 0.12, "min_active_cagr": 0.03}
+    },
+    {
+      "name": "composite_long30",
+      "book": "long_only",
+      "gate": {"min_cagr": 0.12, "min_active_cagr": 0.03}
+    },
+    {
+      "name": "composite_ls30",
+      "book": "market_neutral",
+      "gate": {"min_cagr": 0.06, "min_active_cagr": 0.06}
+    }
+  ],
+  "shared_development_gate": {
+    "min_sharpe": 0.6,
+    "min_dd_pct": -0.25,
+    "min_positive_years": 4,
+    "stress_8bps_pnl_must_be_positive": true,
+    "winner": "Highest development Sharpe, then CAGR, among passing rows only."
+  },
+  "validation_gate": "Selected development winner must have positive PnL, positive active CAGR, DD no worse than -25%, positive 8 bps stress PnL, and positive PnL in both 2023 and 2024.",
+  "audit_controls": {
+    "old_manual_62_used": false,
+    "ticker_removal_or_post_period_selection": false,
+    "rule_selection_effect": "At most one development winner; validation cannot replace it.",
+    "trade_selection_effect": "Membership, latest filing, eligibility, exact price, sector cap, turnover, costs, and compounding are rebuilt at each rebalance.",
+    "production_pass_allowed": false
+  },
+  "implementation_freeze": {
+    "script": "raits/research/stocks_pit_fundamental_quality_monthly.py",
+    "script_hash": "92F27FB202CDAE44B86D4788192512DCED375AEC5C24F76277978D4530CAE157"
+  }
+}

@@ -141,6 +141,8 @@ BASE_PAYLOADS: dict[str, dict] = {
     "/api/v1/track1-runtime": {
         "route": "track1_candidate",
         "gates": {"orders_possible": True, "blocking_now": []},
+        "breaker": {"present": True, "armed": True, "level": "OK", "status": "ARMED",
+                    "allow_new_entries": True, "source": "test"},
     },
     "/api/v1/execution-quality/": {
         "source": "trade_log.jsonl", "day": "2026-08-14",
@@ -286,7 +288,7 @@ def test_healthy_page_loads_without_console_errors(realtime_server, browser_page
     browser_page.on("console", lambda msg: errors.append(msg.text)
                     if msg.type == "error" else None)
     browser_page.on("pageerror", lambda exc: errors.append(str(exc)))
-    stub_api(browser_page)
+    stub_api(browser_page, {"/api/v1/track1-runtime": _t1_with_account()})
     open_realtime(browser_page, realtime_server)
     real_errors = [item for item in errors if "favicon" not in item.lower()]
     assert not real_errors, real_errors
@@ -336,6 +338,29 @@ def test_no_content_is_clipped_off_the_right_edge(realtime_server, browser_page,
     open_realtime(browser_page, realtime_server)
     clipped = browser_page.evaluate(_CLIPPED_CONTENT)
     assert clipped == [], f"content clipped off-screen at {width}x{height}: {clipped}"
+
+
+def test_mobile_header_keeps_long_live_status_below_brand_without_overlap(
+        realtime_server, browser_page):
+    browser_page.set_viewport_size({"width": 390, "height": 844})
+    stub_api(browser_page)
+    open_realtime(browser_page, realtime_server)
+    result = browser_page.evaluate("""() => {
+      const badge = document.querySelector('.mode-badge').getBoundingClientRect();
+      const context = document.querySelector('.header-live-context');
+      document.querySelector('#runnerContext').textContent =
+        'Stale · last published 858.4h ago';
+      const live = context.getBoundingClientRect();
+      const header = document.querySelector('.app-header');
+      return {
+        headerWidth: header.scrollWidth,
+        viewportWidth: header.clientWidth,
+        overlapsBadge: !(live.left >= badge.right || live.right <= badge.left ||
+                         live.top >= badge.bottom || live.bottom <= badge.top),
+      };
+    }""")
+    assert result["headerWidth"] <= result["viewportWidth"], result
+    assert result["overlapsBadge"] is False, result
 
 
 OPEN_TWS_OUTAGE = {
@@ -551,10 +576,9 @@ def test_hmm_fit_describes_the_frozen_fit_not_the_legacy_session_count(
     assert "frozen fit" in browser_page.eval_on_selector("#modelFitStatus", "el => el.title")
 
 
-def test_hmm_fit_falls_back_to_the_legacy_log_when_no_track_1_record_exists(
+def test_hmm_fit_says_not_recorded_when_no_track_1_record_exists(
         realtime_server, browser_page):
-    """Nothing was deleted: a machine with no Track 1 regime record reads exactly as before,
-    and a day where every fit warned still must not read green."""
+    """With the retired route off the surface, no Track 1 regime record is an explicit absence."""
     view = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/track1-market-view"]))
     view["regime"] = None
     stub_api(browser_page, {"/api/v1/track1-market-view": view,
@@ -562,8 +586,10 @@ def test_hmm_fit_falls_back_to_the_legacy_log_when_no_track_1_record_exists(
     open_realtime(browser_page, realtime_server)
     assert browser_page.eval_on_selector(
         "#modelFitStatus", "el => el.className") != "positive"
-    assert "22 warn" in browser_page.eval_on_selector(
+    assert "not recorded" in browser_page.eval_on_selector(
         "#modelFitStatus", "el => el.textContent")
+    assert "legacy" not in browser_page.eval_on_selector(
+        "#modelFitStatus", "el => el.title").lower()
 
 
 def test_fit_end_keeps_the_track_1_value_and_is_not_rewritten_by_next_js(
@@ -614,9 +640,9 @@ def test_broker_account_delta_is_visible_in_equity_header(realtime_server, brows
     nothing ever calls it stale. It said `Broker acct $996,731 / -$3,749` for three days after
     the account had been reset to USD 250,817.91.
 
-    So the divergence is now measured between the RECORDED BASELINE and the legacy figure, and
-    the legacy figure may appear only under its own name and only with its age. This test holds
-    that, on the same scenario the original used.
+    The retired route no longer appears on the surface at all. This keeps the same scenario
+    but asserts the new contract: the recorded Track 1 baseline is shown and the retired-route
+    number is absent rather than relabelled.
     """
     runner = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/runner-state"]))
     runner["payload"]["meta"]["broker_equity"] = 996312.42
@@ -624,6 +650,7 @@ def test_broker_account_delta_is_visible_in_equity_header(realtime_server, brows
         "date": "2026-08-10", "equity": 1000480.0,
         "note": "connect_test_paper.py, DUR125337, CAD"}
     runner["age_seconds"] = 276575.0
+    runner["legacy_payload"] = json.loads(json.dumps(runner["payload"]))
     t1 = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/track1-runtime"]))
     t1["paper_account"] = {"status": "PASS", "code": "account_flat_and_funded",
                            "currency": "USD", "equity": 250817.91,
@@ -636,21 +663,11 @@ def test_broker_account_delta_is_visible_in_equity_header(realtime_server, brows
 
     # the account the route would actually start from
     assert "250,818" in text, text
-    # the divergence is stated, and the legacy number wears its own name and its age
-    # Stage 5ZZH restated 5ZZF's pin. The clause became "Legacy runner state stale:" so it
-    # says WHY the figure is not the account rather than only that it is old. The
-    # invariant is unchanged and is what is asserted here: the legacy figure appears
-    # under its own name, and never without its age.
-    assert "legacy runner state" in text.lower(), text
-    assert "ago" in text.lower(), "the legacy figure must never appear without its age"
-    assert " ago ago" not in text.lower(), text
-    assert "996,312" in text, text
-    assert "ago" in text.lower(), text
+    assert "legacy runner state" not in text.lower(), text
+    assert "996,312" not in text, text
     # and the cross-currency subtraction is gone in every spelling
     assert "4,168" not in text, text
     assert "Broker acct" not in text, text
-    assert browser_page.eval_on_selector(
-        "#brokerAccountContext", "el => el.classList.contains('negative')") is True
 
 
 def test_a_failed_source_is_named_in_words(realtime_server, browser_page):
@@ -880,12 +897,42 @@ def test_a_tripped_circuit_breaker_is_never_reported_as_nominal(realtime_server,
     `stripBreakerBad` có nhánh nhưng chưa test nào đi qua — nếu nó hỏng thì hỏng
     đúng lúc mọi thứ đang tệ nhất."""
     stub_api(browser_page, {
-        "/api/v1/runner-state": _runner_state_with(breaker={"level": level, "dd_pct_display": 4.2}),
+        "/api/v1/track1-runtime": {
+            "route": "track1_candidate",
+            "gates": {"orders_possible": True, "blocking_now": []},
+            "breaker": {"present": True, "armed": True, "level": level,
+                        "status": "ARMED", "allow_new_entries": False,
+                        "drawdown_pct": 0.042, "source": "track1"},
+        },
     })
     open_realtime(browser_page, realtime_server)
     rail = rail_text(browser_page)
     assert "nominal" not in rail.lower(), rail
     assert f"risk breaker {level}" in rail, rail
+
+
+def test_an_unarmed_track1_breaker_is_never_reported_as_nominal(realtime_server, browser_page):
+    stub_api(browser_page, {"/api/v1/track1-runtime": {
+        "route": "track1_candidate",
+        "gates": {"orders_possible": True, "blocking_now": []},
+        "breaker": {"present": True, "armed": False, "level": "UNARMED",
+                    "status": "UNARMED", "allow_new_entries": None,
+                    "reason": "route book carries no measured equity marks",
+                    "source": "live_positions.track1.json"},
+    }})
+    open_realtime(browser_page, realtime_server)
+    rail = rail_text(browser_page)
+    assert "nominal" not in rail.lower(), rail
+    assert "risk breaker not armed" in rail, rail
+    assert "route book carries no measured equity marks" in rail, rail
+
+
+def test_an_armed_ok_track1_breaker_does_not_add_a_rail_condition(realtime_server, browser_page):
+    stub_api(browser_page, {"/api/v1/track1-runtime": _t1_with_account()})
+    open_realtime(browser_page, realtime_server)
+    rail = rail_text(browser_page)
+    assert "systems nominal" in rail.lower(), rail
+    assert "risk breaker" not in rail.lower(), rail
 
 
 def test_a_position_the_runner_does_not_know_about_raises_an_incident(realtime_server, browser_page):
@@ -932,15 +979,18 @@ def test_numbers_from_a_dead_source_are_not_shown_as_current(realtime_server, br
     # Phải để MỘT lần poll thành công trước rồi mới giết endpoint. Nếu nó chết
     # ngay từ đầu thì state.runner chưa từng có payload, số ra "--" vì THIẾU DỮ
     # LIỆU chứ không phải vì code kiểm lỗi — test sẽ xanh mà chẳng chứng minh gì.
-    stub_api(browser_page)
+    stub_api(browser_page, {"/api/v1/track1-runtime": _t1_with_account()})
     open_realtime(browser_page, realtime_server)
     assert browser_page.eval_on_selector("#metricEquity", "el => el.textContent").strip() != "--", \
         "lan poll dau phai thanh cong thi test moi co y nghia"
 
-    browser_page.route("**/api/v1/runner-state", lambda route: route.fulfill(
+    browser_page.route("**/api/v1/track1-runtime", lambda route: route.fulfill(
         status=500, content_type="application/json", body='{"error": "boom"}'))
     browser_page.wait_for_function(
-        "() => document.getElementById('metricEquity').textContent.trim() === '--'",
+        "() => !/\\d/.test(document.getElementById('metricEquity').textContent)",
+        timeout=20_000)
+    browser_page.wait_for_function(
+        "() => document.getElementById('statusRail').innerText.toLowerCase().includes('track1-runtime')",
         timeout=20_000)
     # Stage 5ZZZ-CG. Ghim MỤC ĐÍCH — "không con số nào" — chứ không ghim chuỗi `--`.
     #
@@ -964,7 +1014,7 @@ def test_numbers_from_a_dead_source_are_not_shown_as_current(realtime_server, br
     # Nguồn broker vẫn sống nên số của nó KHÔNG được bị xoá theo.
     assert browser_page.eval_on_selector("#metricPositions", "el => el.textContent").strip() != "--"
     # Và trang vẫn phải nói ra nguồn nào hỏng.
-    assert "runner-state" in rail_text(browser_page).lower()
+    assert "track1-runtime" in rail_text(browser_page).lower()
 
 
 def test_the_fatal_banner_speaks_only_for_a_dead_backend(realtime_server, browser_page):
@@ -1117,7 +1167,57 @@ def _runner_with_legacy_equity(equity=996730.93):
     rs["payload"]["meta"]["paper_start"] = {
         "date": "2026-07-08", "equity": 1000480.0,
         "note": "connect_test_paper.py, DUR125337, CAD"}
+    # Plan stage 2 (2026-09-24): the endpoint serves the legacy file under `legacy_payload`, and
+    # the page reads the legacy figure from there. The stub follows the interface.
+    rs["legacy_payload"] = json.loads(json.dumps(rs["payload"]))
     return rs
+
+
+def test_track1_book_drives_paper_equity_base_and_risk_peak(realtime_server, browser_page):
+    t1 = _t1_with_account(251213.8)
+    t1["book"] = {
+        "present": True,
+        "account_base": 50_000.0,
+        "currency": "USD",
+        "payload": {
+            "equity": 49_956.0,
+            "peak_equity": 50_000.0,
+            "broker_equity": 251_213.8,
+            "positions": [],
+        },
+    }
+    broker = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/broker"]))
+    broker["payload"]["equity"] = 251_213.8
+    stub_api(browser_page, {
+        "/api/v1/track1-runtime": t1,
+        "/api/v1/broker": broker,
+    })
+
+    open_realtime(browser_page, realtime_server)
+
+    assert browser_page.inner_text("#metricEquity") == "USD 49,956"
+    assert browser_page.inner_text("#performanceBase") == "USD 50,000"
+    assert browser_page.inner_text("#performanceMaxDd") == "$50,000"
+    assert browser_page.inner_text("#metricDrawdownAmount") == "$44.00"
+    context = browser_page.inner_text("#brokerAccountContext")
+    assert "Broker reference" in context and "251,214" in context
+
+
+def test_decision_regime_aligns_with_first_group(realtime_server, browser_page):
+    stub_api(browser_page)
+    open_realtime(browser_page, realtime_server)
+
+    offsets = browser_page.evaluate("""() => {
+      const regime = document.querySelector('.decision-summary > div:first-child span');
+      const entered = document.querySelector(
+        '.decision-group:first-child .decision-group-head span');
+      return {
+        regime: regime.getBoundingClientRect().left,
+        entered: entered.getBoundingClientRect().left,
+      };
+    }""")
+
+    assert abs(offsets["regime"] - offsets["entered"]) <= 1, offsets
 
 
 def test_5zzf_the_account_line_shows_the_track1_baseline_not_the_stale_legacy_number(
@@ -1141,7 +1241,7 @@ def test_5zzf_the_account_line_shows_the_track1_baseline_not_the_stale_legacy_nu
     assert "-3,749" not in text and "3,749" not in text, text
 
 
-def test_5zzf_a_material_divergence_from_the_legacy_number_is_called_out(
+def test_5zzf_a_material_retired_route_divergence_is_not_rendered(
         realtime_server, browser_page):
     stub_api(browser_page, {
         "/api/v1/track1-runtime": _t1_with_account(),
@@ -1153,13 +1253,9 @@ def test_5zzf_a_material_divergence_from_the_legacy_number_is_called_out(
     # says WHY the figure is not the account rather than only that it is old. The
     # invariant is unchanged and is what is asserted here: the legacy figure appears
     # under its own name, and never without its age.
-    assert "legacy runner state" in text.lower(), text
-    assert "ago" in text.lower(), "the legacy figure must never appear without its age"
-    assert " ago ago" not in text.lower(), text
-    # and it says how old that number is, rather than presenting it as current
-    assert "ago" in text.lower(), text
-    cls = browser_page.get_attribute("#brokerAccountContext", "class") or ""
-    assert "negative" in cls, "a 299% divergence rendered as an ordinary line"
+    assert "legacy runner state" not in text.lower(), text
+    assert "996,731" not in text, text
+    assert "Broker reference" in text and "250,818" in text, text
 
 
 def test_5zzf_a_fresh_broker_reading_sits_beside_the_baseline_not_inside_it(
@@ -1175,15 +1271,15 @@ def test_5zzf_a_fresh_broker_reading_sits_beside_the_baseline_not_inside_it(
     })
     open_realtime(browser_page, realtime_server)
     text = browser_page.inner_text("#brokerAccountContext")
-    assert "Paper account" in text and "250,818" in text, text
-    assert "broker now" in text.lower(), text
+    assert "Broker reference" in text and "250,818" in text, text
+    assert "now" in text.lower(), text
     # a small legacy difference is not shouted about
     # Stage 5ZZH: the clause is now "Legacy runner state stale:". A small legacy
     # difference is still not shouted about, which is what this has always asserted.
     assert "legacy runner state" not in text.lower(), text
 
 
-def test_5zzf_without_a_baseline_the_legacy_number_appears_only_under_its_own_name(
+def test_5zzf_without_a_baseline_the_retired_route_number_is_absent(
         realtime_server, browser_page):
     t1 = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/track1-runtime"]))
     t1.pop("paper_account", None)
@@ -1196,8 +1292,9 @@ def test_5zzf_without_a_baseline_the_legacy_number_appears_only_under_its_own_na
     })
     open_realtime(browser_page, realtime_server)
     text = browser_page.inner_text("#brokerAccountContext")
-    assert "Legacy runner state" in text, text
-    assert "not the current account" in text, text
+    assert "Broker reference unavailable" in text, text
+    assert "Legacy runner state" not in text, text
+    assert "996,731" not in text, text
     assert "Broker acct" not in text, text
 
 
@@ -1262,7 +1359,7 @@ def _mv_slots(n: int, decided: int, *, signal_at: int | None = None,
         if i == missed_at:
             st, why = "missed", "no record was written for this slot"
         elif i == signal_at:
-            st, why = "signal", "decided"
+            st, why = "accepted_shadow", "shadow_only"
         elif i < decided:
             st, why = "no_signal", "decided"
         else:
@@ -1387,6 +1484,67 @@ def test_every_rule_lane_draws_one_cell_per_declared_slot(realtime_server, brows
         "els => els.map(e => e.querySelectorAll('.mv2-cell').length)")
     assert counts, "the panel drew no rule lanes at all"
     assert counts == [22] * 3, counts
+
+
+def test_all_sleeves_share_one_slot_shape_in_setup_and_detector_tabs(
+        realtime_server, browser_page):
+    market = _market_view()
+    template = market["sleeves"]["global_nkd"]
+    sleeves = {}
+    for key, label in (("global_nkd", "NKD"), ("roska4_stress", "Stress"),
+                       ("roska4_swing", "Swing")):
+        sleeve = json.loads(json.dumps(template))
+        sleeve["label"] = label
+        sleeve["coverage"]["sleeve"] = key
+        sleeve["bar_grid"] = {
+            "bars": ["2026-08-28 01:10:00-04:00"],
+            "rows": [{"gate": "regime", "cells": "P", "passed": 1,
+                      "reached": 1, "threshold": ["Normal"]}],
+        }
+        sleeves[key] = sleeve
+    market["sleeves"] = sleeves
+
+    _stub_mv(browser_page, market)
+    open_realtime(browser_page, realtime_server)
+
+    shapes = []
+    for key in sleeves:
+        browser_page.locator(f'[data-mv-tab="{key}"]').click()
+        browser_page.get_by_role("tab", name="Setup rules").click()
+        setup = browser_page.evaluate("""() => {
+          const rule = document.querySelector('.mv2-lanes .mv2-lane .mv2-cell');
+          const outcome = document.querySelector('.mv2-lane-slots .mv2-slot-outcome');
+          const shape = el => {
+            const rect = el.getBoundingClientRect();
+            return {width: rect.width, height: rect.height,
+                    radius: getComputedStyle(el).borderRadius};
+          };
+          return {rule: shape(rule), outcome: shape(outcome),
+                  oldDots: document.querySelectorAll('.mv2-slot').length};
+        }""")
+
+        browser_page.get_by_role("tab", name="Detector rules").click()
+        detector = browser_page.evaluate("""() => {
+          const rule = document.querySelector('.mv2-bargrid .mv2-lane .mv2-cell');
+          const outcome = document.querySelector('.mv2-lane-slots .mv2-slot-outcome');
+          const shape = el => {
+            const rect = el.getBoundingClientRect();
+            return {width: rect.width, height: rect.height,
+                    radius: getComputedStyle(el).borderRadius};
+          };
+          return {rule: shape(rule), outcome: shape(outcome),
+                  oldDots: document.querySelectorAll('.mv2-slot').length};
+        }""")
+        shapes.extend((setup, detector))
+
+    assert all(item["oldDots"] == 0 for item in shapes), shapes
+    assert all(abs(item["rule"]["width"] - item["outcome"]["width"]) <= 1
+               for item in shapes), shapes
+    assert {(item["rule"]["height"], item["rule"]["radius"]) for item in shapes} == {
+        (10, "5px")
+    }, shapes
+    assert {(item["outcome"]["height"], item["outcome"]["radius"])
+            for item in shapes} == {(10, "5px")}, shapes
 
 
 def test_a_lane_never_shows_a_value_the_detector_did_not_publish(realtime_server, browser_page):
@@ -2434,7 +2592,9 @@ def test_every_sleeve_count_shares_one_denominator(realtime_server, browser_page
 
 def _runtime_with_gates(orders_possible: bool, blocking=()) -> dict:
     return {"route": "track1_candidate",
-            "gates": {"orders_possible": orders_possible, "blocking_now": list(blocking)}}
+            "gates": {"orders_possible": orders_possible, "blocking_now": list(blocking)},
+            "breaker": {"present": True, "armed": True, "level": "OK", "status": "ARMED",
+                        "allow_new_entries": True, "source": "test"}}
 
 
 def test_the_top_band_says_when_no_order_can_be_placed(realtime_server, browser_page):

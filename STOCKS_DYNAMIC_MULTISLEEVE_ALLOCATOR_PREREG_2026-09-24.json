@@ -1,0 +1,40 @@
+{
+  "spec_id": "stocks_dynamic_multisleeve_allocator_v1_2026-09-24",
+  "frozen_before_performance": true,
+  "adaptive_disclosure": "New portfolio-construction family over four previously researched sleeves. The underlying edges and 2018-2024 sample are touched; this is diagnostic, not clean OOS.",
+  "source_sleeves": ["pairs", "calendar", "crisis", "reversal"],
+  "variants": [
+    {"name": "equal25_all4", "sources": ["pairs", "calendar", "crisis", "reversal"], "method": "equal", "lookback": null, "rebalance": "static", "cap": 0.25},
+    {"name": "invvol63_monthly_all4_cap50", "sources": ["pairs", "calendar", "crisis", "reversal"], "method": "inverse_vol", "lookback": 63, "min_history": 40, "rebalance": "monthly", "cap": 0.50},
+    {"name": "invvol63_quarterly_all4_cap50", "sources": ["pairs", "calendar", "crisis", "reversal"], "method": "inverse_vol", "lookback": 63, "min_history": 40, "rebalance": "quarterly", "cap": 0.50},
+    {"name": "invvol126_quarterly_all4_cap50", "sources": ["pairs", "calendar", "crisis", "reversal"], "method": "inverse_vol", "lookback": 126, "min_history": 80, "rebalance": "quarterly", "cap": 0.50},
+    {"name": "invvol63_monthly_no_crisis_cap60", "sources": ["pairs", "calendar", "reversal"], "method": "inverse_vol", "lookback": 63, "min_history": 40, "rebalance": "monthly", "cap": 0.60}
+  ],
+  "allocation_contract": {
+    "information_lag": "Weights on a rebalance date use source returns strictly before that date.",
+    "volatility_input": "Standalone source net returns under the same 4 bps trade, 1% borrow, and 2.5% financing conventions.",
+    "warmup": "Equal weight among the variant's allowed sources until minimum history exists.",
+    "cap_algorithm": "Normalize inverse volatility and iteratively redistribute weight above the fixed cap among uncapped sleeves.",
+    "between_rebalances": "Hold allocator weights constant.",
+    "allocator_turnover": "In addition to weighted source turnover, charge sum(abs(weight change) times average prior/current source gross exposure). No cross-sleeve netting credit."
+  },
+  "samples": {
+    "development": ["2018-04-27", "2022-12-30"],
+    "validation": ["2023-01-03", "2024-12-31"],
+    "full_descriptive": ["2018-04-27", "2024-12-31"],
+    "oos_2025_2026": "PROHIBITED"
+  },
+  "development_selection": {
+    "baseline": "Recompute fixed 75% pairs / 25% calendar at 1.0x in the same union-calendar engine.",
+    "gates": {"cagr_min": 0.08, "dd_pct_floor": -0.10, "positive_years_min": 4, "spy_net_pnl_share_max": 0.65, "calmar_strictly_above_baseline": true},
+    "rank": "Higher development Calmar, then CAGR, then Sharpe, then variant name.",
+    "validation_rows": 1
+  },
+  "validation_gates": {"cagr_positive": true, "both_years_positive": true, "dd_pct_floor": -0.12, "spy_net_pnl_share_max": 0.80},
+  "selected_scale_audit": [1.0, 1.5, 2.0],
+  "costs": {"trade_cost_bps": 4.0, "short_borrow_annual": 0.01, "financing_annual": 0.025},
+  "stopping_rule": "If no dynamic variant beats the lead's development Calmar under all gates, or the one selected row fails touched validation, kill this allocator family without parameter refinement.",
+  "post_run_implementation_correction": "Before final reporting, zero-weight source ticker rows were removed from ticker-count reporting. They carried exactly zero PnL, so this changes no return, drawdown, cost, concentration share, gate, rank, or selection; the script was re-hashed and outputs were overwritten.",
+  "production_pass_allowed": false,
+  "implementation_freeze": {"script": "raits/research/stocks_dynamic_multisleeve_allocator.py", "script_hash": "3EB49A9D9B2CC28D468F81225D3E9E04E791DBE79E6EA23F4912FE0A4A099594", "performance_not_yet_run": true}
+}

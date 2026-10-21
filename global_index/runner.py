@@ -1456,7 +1456,7 @@ class FuturesRunner:
                     {"inst": p.inst, "cluster": p.cluster, "error": _f.error_msg or ""},
                 )
 
-    def run_maxhold_exit(self, day, max_hold_days: int = 5) -> list:
+    def run_maxhold_exit(self, day, max_hold_days: int = 5, *, cluster_max_hold=None) -> list:
         """09:30 ET cron: close any position that has reached max_hold_days at RTH open.
 
         Called from a separate 09:31 ET cron (run_maxhold_exit.py) BEFORE the main
@@ -1466,6 +1466,13 @@ class FuturesRunner:
         If a CLOSE fails, the position stays with exit_pending=True so _retry_pending_exits()
         at the next run_day() retries it (at 14:05 ET).
 
+        `cluster_max_hold` ({cluster: days}) overrides `max_hold_days` for the clusters it
+        names and for no others; None keeps every position on `max_hold_days`, exactly as
+        before. It exists for sleeves that are meant to be flat by the end of the session they
+        open in (roska4_calm, exit 15:55): a position of theirs that is STILL here the next
+        morning is one the 15:55 time exit failed to close, and waiting five days to find it
+        is not a rule anyone chose.
+
         Returns list of (inst, cluster) pairs that were successfully closed.
         """
         today = pd.Timestamp(day).normalize()
@@ -1474,84 +1481,145 @@ class FuturesRunner:
             if p.entry_day is None:
                 continue
             hold = (today - pd.Timestamp(p.entry_day).normalize()).days
-            if hold < max_hold_days:
+            limit = (cluster_max_hold or {}).get(p.cluster, max_hold_days)
+            if hold < limit:
                 continue
             logger.info(
                 "MAX_HOLD_EXIT: %s/%s held=%d days >= %d — closing at RTH open",
-                p.inst, p.cluster, hold, max_hold_days,
+                p.inst, p.cluster, hold, limit,
             )
-            _f = self.broker.send_order(Order(
-                p.inst, "CLOSE", p.direction, p.contracts, p.cluster, day,
-                exit_day=day, pnl_sized=p.pnl_sized,
-                # P1: 09:31 ET, and the rollover step does not run on this path at all.
-                # On a Rổ 4 roll date the front month has been the NEXT one since
-                # midnight, so without this the exit sells a contract the account does
-                # not hold and opens a short instead.
-                contract_month=p.contract_month,
-            ))
-            if _f.status != "FAILED":
-                stop_order_id = p.stop_order_id
-                if stop_order_id is None:
-                    stop_order_id = self._single_working_stop_order_id(p)
-                if stop_order_id is not None:
-                    try:
-                        # Returns False on failure; it does not raise. See
-                        # _report_stop_cancel.
-                        _cancelled = self.broker.cancel_order(stop_order_id)
-                    except Exception as _e:
-                        _cancelled = False
-                        logger.error(
-                            "MAX_HOLD_EXIT: cancel_order(%s) raised for %s/%s: %s",
-                            stop_order_id, p.inst, p.cluster, _e,
-                        )
-                    if p.stop_order_id is None:
-                        p.stop_order_id = stop_order_id
-                    self._report_stop_cancel(_cancelled, p)
-                self.state.equity += p.pnl_sized
-                if _f.avg_price > 0:
-                    self._book_realised(p, _f.avg_price, _f.filled_qty or p.contracts,
-                                        why="max hold")
-                # Every close writes a CLOSE row. This path used to book the money and
-                # emit an event but never touch the trade log, so a MAX_HOLD exit left no
-                # trade record at all -- which is why exit_path_coverage read
-                # "MAX_HOLD 0" and could never fill: the samples were happening, nothing
-                # was writing them down.
-                self._append_trade({
-                    "type": "CLOSE",
-                    "inst": p.inst, "cluster": p.cluster,
-                    "direction": p.direction, "contracts": p.contracts,
-                    "entry_day": str(pd.Timestamp(p.entry_day).date()) if p.entry_day else None,
-                    "exit_day": str(pd.Timestamp(day).date()),
-                    "exit_reason": "MAX_HOLD",
-                    "expected_stop": p.stop_price,
-                    "fill_price": _f.avg_price,
-                    "pnl_sized": p.pnl_sized,
-                    "commission": _f.commission,
-                    "filled_qty": _f.filled_qty or p.contracts,
-                    "status": _f.status,
-                    "hold_days": hold,
-                    "regime": self._last_regime,
-                    "contract_month": p.contract_month,
-                })
-                self.state.open_positions = [
-                    x for x in self.state.open_positions if x is not p
-                ]
+            if self._close_for_exit(p, hold, day, exit_reason="MAX_HOLD",
+                                    tag="MAX_HOLD_EXIT", why="max hold",
+                                    retry_where="will retry at 14:05 ET run_day()",
+                                    retry_short="retry at 14:05"):
                 closed.append((p.inst, p.cluster))
-                logger.info("MAX_HOLD_EXIT: closed %s/%s", p.inst, p.cluster)
-            else:
-                p.exit_pending = True
-                logger.error(
-                    "MAX_HOLD_EXIT: CLOSE FAILED %s/%s — exit_pending=True, "
-                    "will retry at 14:05 ET run_day()",
-                    p.inst, p.cluster,
-                )
-                self._emit_event(
-                    "ALERT", "EXEC",
-                    f"MAX_HOLD_EXIT: CLOSE FAILED {p.inst}/{p.cluster} — retry at 14:05",
-                    {"inst": p.inst, "cluster": p.cluster, "hold_days": hold},
-                )
         self._persist_state()
         return closed
+
+    def run_time_exit(self, day, cluster: str) -> list:
+        """Close EVERY open position of `cluster` now, at the market. Sleeves that exit by clock.
+
+        2026-10-05, for roska4_calm: the validated rule is "enter at the 10:00 open, exit at the
+        15:55 open", and 99% of its backtest trades leave that way (the disaster stop binds on
+        0.6%). Nothing in the route closed such a position — the MAX_HOLD job reads a five-day
+        rule — so an entry that filled would have been held like a swing trade. This is the
+        missing half, and it is the SAME close the MAX_HOLD job performs (`_close_for_exit`):
+        market order, working stop cancelled, CLOSE row written, position removed.
+
+        Takes no hold-days threshold on purpose: a position of this cluster that is still open
+        at the exit instant is due, whenever it was opened, and a stale one from an earlier
+        day is more overdue, not less. Other clusters are never touched.
+
+        A failed CLOSE leaves `exit_pending=True` and the position in place; the next 09:31
+        MAX_HOLD run closes it (that job passes `cluster_max_hold` for this cluster).
+
+        Returns list of (inst, cluster) pairs that were successfully closed.
+        """
+        today = pd.Timestamp(day).normalize()
+        closed = []
+        for p in list(self.state.open_positions):
+            if p.cluster != cluster:
+                continue
+            hold = ((today - pd.Timestamp(p.entry_day).normalize()).days
+                    if p.entry_day is not None else 0)
+            logger.info("TIME_EXIT: %s/%s held=%d day(s) — closing at the market",
+                        p.inst, p.cluster, hold)
+            if self._close_for_exit(p, hold, day, exit_reason="TIME_EXIT",
+                                    tag="TIME_EXIT", why="time exit",
+                                    retry_where="will retry at the next 09:31 MAX_HOLD run",
+                                    retry_short="retry at the next 09:31 MAX_HOLD run",
+                                    stop_expected=True):
+                closed.append((p.inst, p.cluster))
+        self._persist_state()
+        return closed
+
+    def _close_for_exit(self, p, hold: int, day, *, exit_reason: str, tag: str, why: str,
+                        retry_where: str, retry_short: str, stop_expected: bool = False) -> bool:
+        """Close one position at the market and book it. True when the CLOSE did not fail.
+
+        The body `run_maxhold_exit` always had, lifted out so a clock-based exit can run the
+        identical close rather than a second implementation of it — two copies of "cancel the
+        stop, write the row, drop the position" is how an orphan stop gets left behind by one
+        of them. `exit_reason`/`tag`/`why` only label what it writes; every action is the same.
+        """
+        _f = self.broker.send_order(Order(
+            p.inst, "CLOSE", p.direction, p.contracts, p.cluster, day,
+            exit_day=day, pnl_sized=p.pnl_sized,
+            # P1: 09:31 ET, and the rollover step does not run on this path at all.
+            # On a Rổ 4 roll date the front month has been the NEXT one since
+            # midnight, so without this the exit sells a contract the account does
+            # not hold and opens a short instead.
+            contract_month=p.contract_month,
+        ))
+        if _f.status != "FAILED":
+            stop_order_id = p.stop_order_id
+            if stop_order_id is None:
+                stop_order_id = self._single_working_stop_order_id(p)
+            if stop_order_id is not None:
+                try:
+                    # Returns False on failure; it does not raise. See
+                    # _report_stop_cancel.
+                    _cancelled = self.broker.cancel_order(stop_order_id)
+                except Exception as _e:
+                    _cancelled = False
+                    logger.error(
+                        "%s: cancel_order(%s) raised for %s/%s: %s",
+                        tag, stop_order_id, p.inst, p.cluster, _e,
+                    )
+                if p.stop_order_id is None:
+                    p.stop_order_id = stop_order_id
+                self._report_stop_cancel(_cancelled, p)
+            elif stop_expected:
+                # A clock-exit sleeve has had its stop placed by a repair sweep hours ago, so "no
+                # stop id" here is an anomaly, not the ordinary case. The position is closed; a
+                # working stop that outlives it opens a NEW position when it fires. ERROR is the
+                # level the scheduler lifts into an incident.
+                logger.error(
+                    "%s: %s/%s closed but no working stop could be identified to cancel. If a "
+                    "protective STP for it still rests at the broker it is now an orphan: check "
+                    "open orders and cancel it by hand.", tag, p.inst, p.cluster)
+            self.state.equity += p.pnl_sized
+            if _f.avg_price > 0:
+                self._book_realised(p, _f.avg_price, _f.filled_qty or p.contracts,
+                                    why=why)
+            # Every close writes a CLOSE row. This path used to book the money and
+            # emit an event but never touch the trade log, so a MAX_HOLD exit left no
+            # trade record at all -- which is why exit_path_coverage read
+            # "MAX_HOLD 0" and could never fill: the samples were happening, nothing
+            # was writing them down.
+            self._append_trade({
+                "type": "CLOSE",
+                "inst": p.inst, "cluster": p.cluster,
+                "direction": p.direction, "contracts": p.contracts,
+                "entry_day": str(pd.Timestamp(p.entry_day).date()) if p.entry_day else None,
+                "exit_day": str(pd.Timestamp(day).date()),
+                "exit_reason": exit_reason,
+                "expected_stop": p.stop_price,
+                "fill_price": _f.avg_price,
+                "pnl_sized": p.pnl_sized,
+                "commission": _f.commission,
+                "filled_qty": _f.filled_qty or p.contracts,
+                "status": _f.status,
+                "hold_days": hold,
+                "regime": self._last_regime,
+                "contract_month": p.contract_month,
+            })
+            self.state.open_positions = [
+                x for x in self.state.open_positions if x is not p
+            ]
+            logger.info("%s: closed %s/%s", tag, p.inst, p.cluster)
+            return True
+        p.exit_pending = True
+        logger.error(
+            "%s: CLOSE FAILED %s/%s — exit_pending=True, %s",
+            tag, p.inst, p.cluster, retry_where,
+        )
+        self._emit_event(
+            "ALERT", "EXEC",
+            f"{tag}: CLOSE FAILED {p.inst}/{p.cluster} — {retry_short}",
+            {"inst": p.inst, "cluster": p.cluster, "hold_days": hold},
+        )
+        return False
 
     def _single_working_stop_order_id(self, p) -> str | None:
         """Find the one broker stop that protects this position when the book lost its id.
@@ -1571,6 +1639,23 @@ class FuturesRunner:
                          p.inst, p.cluster, exc)
             return None
         if orders is None:
+            return None
+        # Ownership guard (reviewer finding, 2026-10-05). The match below is by instrument, side
+        # and size — it cannot tell WHOSE stop it found. If another position in the book has the
+        # same instrument, side and size, a lone match may belong to that one, and cancelling it
+        # strips a live position of its protection to tidy up a different one. Two sleeves holding
+        # one micro of the same index is ordinary on this route, so refuse to guess.
+        _rivals = [x for x in self.state.open_positions
+                   if x is not p and str(x.inst).upper() == str(p.inst).upper()
+                   and str(x.direction).upper() == str(p.direction).upper()
+                   and int(x.contracts) == int(p.contracts)]
+        if _rivals:
+            logger.error(
+                "%s/%s has no recorded stop_order_id and the book holds %d other position(s) with "
+                "the same instrument, side and size (%s), so a working stop found by those three "
+                "fields could belong to any of them. Not guessing which one to cancel.",
+                p.inst, p.cluster, len(_rivals), ", ".join(str(x.cluster) for x in _rivals),
+            )
             return None
         action = "SELL" if str(p.direction).upper() == "LONG" else "BUY"
         matches = []

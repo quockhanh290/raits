@@ -1,0 +1,7 @@
+{
+  "script": "raits/research/stocks_sec_form4_purchase_drift_benchmark_audit.py",
+  "purpose": "Fixed post-result attribution only; cannot change family selection.",
+  "source": "STOCKS_SEC_FORM4_PURCHASE_DRIFT_DEV_2026-09-24_DAILY.csv",
+  "benchmark": "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv",
+  "output": "STOCKS_SEC_FORM4_PURCHASE_DRIFT_DEV_2026-09-24_BENCHMARK_AUDIT.csv"
+}

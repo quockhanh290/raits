@@ -1,0 +1,8 @@
+{
+  "selectedWeights": "pairs=0.750|calendar=0.250",
+  "developmentRank": 1,
+  "developmentPass": true,
+  "validationPass": true,
+  "status": "CONTINUE_DIAGNOSTIC",
+  "productionPassAllowed": false
+}

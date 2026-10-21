@@ -1,0 +1,25 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_RESIDUAL_CRISIS_SLEEVE_2026-09-17",
+  "script": "raits/research/stocks_pit_full_residual_crisis_sleeve.py",
+  "engine": "raits/research/stocks_pit_full_residual_reversal_cohorts.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_RESIDUAL_REVERSAL_COHORTS_2026-09-17_SIGNALS.csv",
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl (SPY bars only)"
+  ],
+  "pre_registered_variants": [
+    "always_on_05x",
+    "overnight20_negative_05x"
+  ],
+  "rule": "Use frozen market-residual bottom10/top10 hold3 signals at 0.5x gross. The gated row admits a new cohort only when lagged completed-session SPY overnight20 compounded return is negative; admitted cohorts retain the full three-session hold.",
+  "sample_label": "Diagnostic on touched research sample 2018-2024. No 2025-2026 opened.",
+  "selection_warning": "The source sleeve was identified as 2022-positive on this same sample; conditional use is diagnostic and cannot establish clean OOS crisis alpha.",
+  "outputs": [
+    "STOCKS_PIT_FULL_RESIDUAL_CRISIS_SLEEVE_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_CRISIS_SLEEVE_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_CRISIS_SLEEVE_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_CRISIS_SLEEVE_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_CRISIS_SLEEVE_2026-09-17_QA.csv"
+  ]
+}

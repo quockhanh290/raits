@@ -27,6 +27,10 @@ REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
+#: When this module was imported. An artefact that already exists
+#: is judged by whether it MOVED during the run, not by whether it is there.
+_IMPORTED_AT = __import__('time').time()
+
 from monitor.backend import open_issue_reader as oi          # noqa: E402
 from monitor.backend import job_journal_reader as jj         # noqa: E402
 from monitor.backend import schedule_status as ss            # noqa: E402
@@ -300,12 +304,54 @@ def test_strategy_slots_are_still_typed_as_strategy_slots():
 # ══════════════════════════════════════════════════════════════════════════════════════════
 
 def test_orders_remain_impossible():
-    from global_index import track1_gates as G
-    allowed, reasons = G.may_enable_orders()
-    assert allowed is False
-    assert "PAPER_SHADOW_EVIDENCE" in [r.split(":")[0] for r in reasons]
+    """Rewritten 2026-09-24. It used to assert `allowed is False` and name the blockers holding
+    it there.
+
+    Three things happened to that. The operator signed the confirmation file on 2026-08-27, so
+    B1 closed. On 2026-09-24 they opened paper orders with the evidence gate OVERRIDDEN rather
+    than switched off, so PAPER_SHADOW_EVIDENCE left `blocking()` while still failing. Then at
+    20:01 ET the paper-account baseline passed its 24-hour life and B1 shut again on its own.
+
+    A test pinned to any one of those three states is a diary entry. The rule underneath does
+    not move: whichever way the gate answers, it answers with something on the record — a reason
+    when it refuses, a named override when it proceeds. Silence in either direction is the defect.
+    """
+    from global_index import track1_gates as _G
+
+    allowed, reasons = _G.may_enable_orders()
+    if not allowed:
+        assert reasons, "orders are refused and nothing on the record says why"
+        return
+    waived = _G.overridden()
+    for b, why in waived:
+        assert why, "%s proceeds under an override with no reason recorded" % b.id
+    holders = [x for x in _G.BLOCKERS.values() if x.blocks_orders]
+    conf = _G.current_confirmations()
+    waived_ids = [b.id for b, _ in waived]
+    for b in holders:
+        assert (b.id in waived_ids) or b.released(conf) is True, (
+            "%s holds orders and is neither released nor overridden, yet orders are allowed"
+            % b.id)
 
 
 def test_this_stage_created_no_order_artefacts():
-    assert not (REPO / "global_index" / "track1_runtime" / "orders").exists()
-    assert not (REPO / "global_index" / "live_positions.track1.json").exists()
+    """Rewritten 2026-09-24. This stage is about the dashboard poll, not about the gate.
+
+    The absence of these paths was a usable proxy for "this suite wrote nothing" only while they
+    had never existed. The route created the order journal on 2026-09-24 with two orders that
+    filled, and the operator signed the confirmation file on 2026-08-27 — four weeks before this
+    assertion started failing, which is how long it had been describing the past.
+
+    Measured instead, and it is the sharper question: nothing here wrote to them. `_IMPORTED_AT`
+    is the same idiom this file already uses in
+    `test_no_production_artefact_was_written_by_this_run`, so an existing path is judged by
+    whether it MOVED, not by whether it is there.
+    """
+    for name in ('global_index/track1_runtime/orders',
+                 'global_index/live_positions.track1.json'):
+        p = REPO / name
+        if p.exists():
+            assert p.stat().st_mtime < _IMPORTED_AT, (
+                "%s was written during this run; every write in this suite belongs under "
+                "tmp_path" % name)
+

@@ -1,0 +1,12 @@
+{
+  "script": "D:/raits/raits/research/stocks_pit_medium_horizon_benchmark.py",
+  "scriptHash": "E5D2909C2D4FC5DA2925511F655930B7ED54D7154575395787344B2ED411C890",
+  "input": "raits/data/cache/stocks_pit_medium_horizon_2018_2021/spy_0935_open_2018_2021.parquet",
+  "inputHash": "A7F2DD6D7B7A3532CEF6287AD8A9BF1D1FC9F07EE907F2DCBB763DCE7ED641E8",
+  "fetchManifest": "raits/data/cache/stocks_pit_medium_horizon_2018_2021/spy_0935_open_2018_2021_manifest.json",
+  "fetchManifestHash": "DDE85B2EA3EFFEAA88E165B7812DF29D4ECDE4160DFC4D01F74AA67572493F91",
+  "sourcePost2021Consumed": false,
+  "method": "unadjusted SPY price-only buy-and-hold marked at each session's 09:35 five-minute aggregate open; no dividend credit",
+  "output": "STOCKS_PIT_MEDIUM_HORIZON_2026-10-03_BENCHMARK.csv",
+  "outputHash": "6808CCC945FC8D4579CD6ED47A5D4DE08AE240356D9D282AB7FFE7764CEAF1F4"
+}

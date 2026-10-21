@@ -1,0 +1,45 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_MCAP_BETA_RISK_CONTROL_2026-09-14",
+  "script": "raits/research/stocks_pit_full_mcap_beta_risk_control.py",
+  "input": "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv",
+  "variants": [
+    {
+      "base": "market_cap_top62_equal_weight",
+      "variant": "top62_voltarget_12pct_cap100",
+      "mode": "voltarget",
+      "target_vol": 0.12,
+      "max_exposure": 1.0
+    },
+    {
+      "base": "market_cap_top100_equal_weight",
+      "variant": "top100_voltarget_12pct_cap100",
+      "mode": "voltarget",
+      "target_vol": 0.12,
+      "max_exposure": 1.0
+    },
+    {
+      "base": "market_cap_top62_equal_weight",
+      "variant": "top62_trail20_loss8_half",
+      "mode": "trail20_half",
+      "threshold": -0.08,
+      "risk_exposure": 0.5
+    },
+    {
+      "base": "market_cap_top100_equal_weight",
+      "variant": "top100_trail20_loss8_half",
+      "mode": "trail20_half",
+      "threshold": -0.08,
+      "risk_exposure": 0.5
+    }
+  ],
+  "sample_label": "Research/in-sample diagnostics across 2018-2024. 2023-2024 is touched by prior research and not clean unseen OOS.",
+  "causality": "Exposure for each date uses only trailing benchmark returns shifted by one day.",
+  "rule_selection": "None. Variant set fixed in VARIANTS before measuring.",
+  "old_62_usage": "None beyond benchmark daily file provenance already documented in 6.148.",
+  "outputs": [
+    "STOCKS_PIT_FULL_MCAP_BETA_RISK_CONTROL_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_MCAP_BETA_RISK_CONTROL_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_MCAP_BETA_RISK_CONTROL_2026-09-14_SPLITS.csv",
+    "STOCKS_PIT_FULL_MCAP_BETA_RISK_CONTROL_2026-09-14_DAILY.csv"
+  ]
+}

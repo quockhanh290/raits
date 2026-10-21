@@ -1,0 +1,79 @@
+{
+  "title": "Pre-registered broad-PIT opening 10/15-minute price-volume family",
+  "created_date": "2026-10-01",
+  "frozen_before_performance": true,
+  "pre_performance_amendment": "The first execution stopped before any return was computed because the broad 09:35 cache contains no SPY row and the empty exact-clock frame exposed a date dtype mismatch. The current market input was replaced with the contemporaneous PIT top500 median first-five return, while lagged beta remains estimated against prior-session SPY returns. The exact date is normalized after extraction and the sample start is aligned to the first available 09:35 session, 2018-04-27. A second execution timed out before output while sequentially reading and hashing 16,995 monthly source files. Extraction now reads 16 files concurrently and records path, size, and selected-row count; provenance retains the raw fetch-manifest hash and the complete source inventory rather than re-reading every parquet for an individual hash. Hypothesis count, thresholds, execution clocks, costs, and gates are unchanged.",
+  "post_result_causality_correction": "The first completed performance run is invalid and preserved under the INVALID_EXIT_AVAILABILITY_LOOKAHEAD prefix. Audit found that it required the future scheduled exit bar to exist before ranking/refill. The corrected engine ranks and refills using only signal fields plus the exact 09:40 entry available at execution time. A missing scheduled exit is executed at the first available five-minute bar open through 10:30 under a fixed causal fallback; future exit availability never changes selected membership. No signal, threshold, ranking score, gate, or candidate count was changed.",
+  "causal_halt_amendment": "The first corrected execution stopped before simulation when TWTR on 2021-11-29 remained halted past the initially specified 10:30 fallback limit and resumed at 10:55. The fixed exit order now remains live until the first exact five-minute bar open through 16:00. If no same-session print exists, the engine hard-fails and no result is accepted. The halted name remains selected; no replacement or future-availability filter is allowed.",
+  "objective": "Test whether opening price displacement plus lagged volume, beta, and SIC context predicts the next 10 or 15 minutes without a regime filter.",
+  "hypothesis_families": [
+    "Residual opening shock reversal after removing lagged-beta SPY first-five and current SIC median movement.",
+    "Residual opening shock continuation after the same market and SIC residualization.",
+    "Large overnight gap rejected by the completed first-five-minute bar, followed in the first-five direction.",
+    "Large overnight gap confirmed by the completed first-five-minute bar, followed in the common direction."
+  ],
+  "causal_clock": {
+    "signal_information_cutoff": "09:35 America/New_York after the 09:30 bar has closed.",
+    "entry": "Exact open of the 09:40 five-minute bar, providing one full five-minute latency buffer.",
+    "exits": [
+      "Exact open of the 09:50 bar for a 10-minute hold.",
+      "Exact open of the 09:55 bar for a 15-minute hold."
+    ],
+    "forbidden": "No 09:35 bar field, post-entry field, intrabar stop, take-profit, daily regime, or future label may enter selection."
+  },
+  "data_contract": {
+    "development": "2018-04-27 through 2022-12-30",
+    "touched_validation": "2023-01-03 through 2024-12-31; opened only for the single development winner after all gates pass.",
+    "post_2024": "Not consumed.",
+    "universe": "Quarterly PIT market-cap top500 intersected with the daily PIT eligible universe and ADV20 >= $10m.",
+    "features_known_by_0935": [
+      "overnight gap",
+      "09:30-09:35 first-five return",
+      "09:30 volume divided by its ticker-specific prior-20-session mean",
+      "09:30 bar high-low range and close location",
+      "60-session beta estimated from prev_dayret and SPY prev_dayret, therefore ending no later than the prior session",
+      "current PIT top500 median first-five return, multiplied by lagged SPY beta as the market component",
+      "current PIT SIC median market-residual first-five return"
+    ],
+    "event_thresholds": "rvol >= 1.5, 09:30 range/open >= 0.4%, direction-adjusted close location >= 0.25; residual shock >= 0.5%, or abs gap >= 1.5% plus abs first-five >= 0.3%.",
+    "selection": "Rank by absolute directional signal times sqrt(capped rvol) times sqrt(capped range shock); require exactly five longs and five shorts after exact-price filtering; maximum two names per SIC per side.",
+    "portfolio": "Dollar neutral, 0.5x long plus 0.5x short, 10% NAV per name, daily flat at the fixed exit.",
+    "execution": "4 bps per traded dollar per side base; 8 bps per side stress; 1% annual borrow prorated by holding minutes; hard order cap 1% ADV.",
+    "missing_prices": "A name missing a required 09:30 signal field or exact 09:40 entry is excluded before ranking/refill. Exit availability is not inspected during selection. If the scheduled 09:50/09:55 exit bar is absent, keep the exit order live and fill at the first available five-minute bar open through 16:00; no post-entry replacement is allowed. No same-session print is a hard failure."
+  },
+  "variants": [
+    "residual_reversal_10m",
+    "residual_reversal_15m",
+    "residual_continuation_10m",
+    "residual_continuation_15m",
+    "gap_rejection_10m",
+    "gap_rejection_15m",
+    "gap_confirmation_10m",
+    "gap_confirmation_15m"
+  ],
+  "development_gate": {
+    "min_trade_legs": 500,
+    "min_net_cagr": 0.08,
+    "min_sharpe": 1.0,
+    "min_dd_pct": -0.10,
+    "min_positive_years": 4,
+    "min_gross_edge_bps_per_active_day": 12.0,
+    "stress_16bps_round_trip_pnl_must_be_positive": true,
+    "max_top10_positive_pnl_share": 0.5,
+    "winner": "Highest development Sharpe, then CAGR, among passing rows only."
+  },
+  "validation_gate": "The frozen development winner must have positive net and stress PnL, Sharpe >= 0.5, DD no worse than -12%, and positive PnL in both touched validation years.",
+  "audit_controls": {
+    "old_manual_62_used": false,
+    "regime_filter_used": false,
+    "post_period_ticker_removal": false,
+    "full_refill": "Signal and entry-price filtering occurs before each side is ranked and filled; future exit availability is excluded from refill decisions.",
+    "rule_selection_effect": "Only the single preregistered development winner can enter validation; validation cannot select another row.",
+    "trade_selection_effect": "PIT membership, beta, SIC residual, volume baseline, exact prices, side balance, SIC caps, ADV, costs, and compounding are rebuilt causally.",
+    "production_pass_allowed": false
+  },
+  "implementation_freeze": {
+    "script": "raits/research/stocks_pit_opening_10m15m_price_volume.py",
+    "script_hash": "C67C9B4FA1326CEA7C638559E2387AB2381EA99D747B972CFA55AB272658A2AC"
+  }
+}

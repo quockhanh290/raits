@@ -49,7 +49,7 @@ class RecordingBroker:
     def __init__(self):
         self.asked: list[str] = []
 
-    def fetch_bars(self, inst, through):
+    def fetch_bars(self, inst, through, *, lookback=None):
         self.asked.append(inst)
         idx = pd.date_range("2026-08-24 09:30", periods=3, freq="min")
         return pd.DataFrame(

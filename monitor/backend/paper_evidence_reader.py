@@ -271,7 +271,273 @@ SOURCES = {
         "Cached by backend reader after IBKR connection",
         "Current backend process cache only",
     ),
+    "ibkr_positions_orders": _source(
+        "/api/v1/broker payload.positions + payload.orders",
+        "monitor.backend.ibkr_reader portfolio + reqAllOpenOrders",
+        "Read-only current broker positions and open orders",
+        "Cached by the backend reader after each successful IBKR poll",
+        "Current backend process cache only",
+    ),
 }
+
+
+# ── Plan stage 4 (2026-09-24): the same evidence, for the route that trades ─────────────
+TRACK1_ROUTE = "track1_candidate"
+DEFAULT_ROUTE = TRACK1_ROUTE
+
+#: Track 1's own artefacts, by the SOURCES key they stand in for.
+T1_PATHS = {
+    "trade_log": "global_index/track1_runtime/trade_log.track1.jsonl",
+    "live_positions": "live_positions.track1.json",
+    "paper_history": "global_index/track1_runtime/audits",
+    "orders": "global_index/track1_runtime/orders",
+    "logs": "monitor/logs/ops_scheduler.err.log + monitor/logs/ops_backend.err.log",
+}
+
+#: Legacy sources Track 1 has no counterpart for YET. A row that depends on one is NOT_WIRED —
+#: never zero, never the legacy figure.
+T1_NOT_WIRED = {
+    "live_state": ("Track 1 publishes no live_state_data.js; its runtime is read by "
+                   "/api/v1/track1-runtime, which this evidence does not consume yet"),
+    "paper_pnl_compare": ("monitor/paper_pnl_compare.json compares LEGACY paper trades with the "
+                          "backtest; Track 1 has no compare artefact yet (needs its P&L series)"),
+    "backtest_curve": "the legacy replay curve; Track 1's backtest identity is not published here",
+}
+
+#: Legacy sources that do not apply to Track 1 by construction, rather than missing.
+T1_NOT_APPLICABLE = {
+    "slip_stats": ("slip_stats.json is the legacy runner's running sum; Track 1's C1 slippage is "
+                   "computed from its own trade-log rows"),
+}
+
+#: Rows whose legacy source list names something Track 1 replaces with a different source.
+T1_SOURCE_OVERRIDE = {
+    "paper_duration": ["paper_history"],
+    "c1_slippage": ["trade_log", "paper_inputs"],
+    # Declares live_state, but `_fill_quality_status` reads only the fill rows and the spec.
+    "fill_quality": ["trade_log", "paper_inputs"],
+    "b3_reconcile": ["logs", "paper_inputs"],
+    "log_hygiene": ["logs"],
+    "rejections": ["logs", "paper_inputs"],
+    "stp_placement": ["logs", "paper_inputs"],
+    "stp_verification": ["logs", "paper_inputs"],
+    "tws_restart": ["logs", "paper_inputs"],
+    # These values are already computed without legacy live_state. Do not erase them merely
+    # because the legacy row happened to name that source as well.
+    "open_incidents": ["open_issues"],
+    "state_persist": ["live_positions"],
+    "current_protection": ["live_positions", "ibkr_positions_orders"],
+}
+
+# A log container is not the structured evidence these rows require. They deliberately stay
+# NOT_WIRED even though Track 1 logs are now scanned for rows that logs can actually measure.
+T1_GENUINELY_MISSING = {
+    "manual_intervention": "Track 1 has no structured reviewed manual-intervention ledger",
+    "roll_slippage": "Track 1 has no structured roll-slippage evidence source",
+}
+
+
+def _t1_source(key: str) -> dict[str, Any]:
+    if key in T1_NOT_WIRED:
+        return {"path": None, "status": "not_wired", "reason": T1_NOT_WIRED[key],
+                "legacy_path": SOURCES[key]["path"]}
+    if key in T1_NOT_APPLICABLE:
+        return {"path": None, "status": "not_applicable", "reason": T1_NOT_APPLICABLE[key],
+                "legacy_path": SOURCES[key]["path"]}
+    if key == "paper_inputs":
+        return {**SOURCES[key], "status": "specs_only",
+                "reason": ("only the operator's *_spec thresholds are route-agnostic; the "
+                           "evidence rows in this file describe legacy trades and are not read")}
+    if key in T1_PATHS:
+        return {**SOURCES[key], "path": T1_PATHS[key], "status": "wired",
+                "process": "Track 1 route artefact"}
+    return {**SOURCES[key], "status": "wired"}
+
+
+TRACK1_SOURCES = {k: _t1_source(k) for k in SOURCES}
+
+
+def _track1_signature(root: Path) -> tuple:
+    values = []
+    paths = [root / T1_PATHS["trade_log"], root / T1_PATHS["live_positions"],
+             root / "monitor" / "paper_inputs.json"]
+    for d in (T1_PATHS["paper_history"], T1_PATHS["orders"]):
+        base = root / d
+        paths.extend(sorted(base.glob("*.jsonl")) if base.is_dir() else [])
+    for path in paths:
+        try:
+            st = path.stat()
+        except OSError:
+            continue
+        values.append((str(path), st.st_mtime_ns, st.st_size))
+    for path in _track1_log_paths(root):
+        try:
+            st = path.stat()
+        except OSError:
+            continue
+        values.append((str(path), st.st_mtime_ns, st.st_size))
+    values.append(_ibkr_protection_signature())
+    return tuple(values)
+
+
+def _track1_epoch(root: Path) -> str | None:
+    """The first day an order journal row carries a BROKER order id — the day paper began.
+
+    Not the account's funding date (2026-08-27): a funded account that sent nothing has no
+    paper evidence, and counting its shadow days as paper days would inflate the duration gate.
+    """
+    d = root / T1_PATHS["orders"]
+    for f in sorted(d.glob("track1_orders_*.jsonl")) if d.is_dir() else []:
+        for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
+            try:
+                r = json.loads(line) if line.strip() else {}
+            except json.JSONDecodeError:
+                continue
+            if isinstance(r, dict) and str(r.get("order_id") or ""):
+                day = f.stem.rsplit("_", 1)[-1]
+                return f"{day[:4]}-{day[4:6]}-{day[6:]}"
+    return None
+
+
+def _track1_inputs(root: Path) -> dict[str, Any]:
+    epoch = _track1_epoch(root)
+    audits = root / T1_PATHS["paper_history"]
+    audit_days = []
+    for f in sorted(audits.glob("track1_audit_*.jsonl")) if audits.is_dir() else []:
+        stamp = f.stem.rsplit("_", 1)[-1]
+        audit_days.append(f"{stamp[:4]}-{stamp[4:6]}-{stamp[6:]}")
+    days = {d: {} for d in audit_days if epoch is not None and d >= epoch}
+    # Route-tagged rows are the route's; untagged rows in its file are foreign. The inverse of
+    # the legacy split, where a Track 1 tag marked a row foreign.
+    tagged, untagged, malformed, error = [], [], 0, None
+    log = root / T1_PATHS["trade_log"]
+    try:
+        for line in log.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                v = json.loads(line)
+            except json.JSONDecodeError:
+                malformed += 1
+                continue
+            if not isinstance(v, dict):
+                malformed += 1
+            elif str(v.get("route") or "") == TRACK1_ROUTE:
+                tagged.append(v)
+            else:
+                untagged.append(v)
+    except OSError as exc:
+        error = str(exc)
+    raw_inputs, inputs_error = _read_optional_json(root / "monitor" / "paper_inputs.json")
+    specs = {k: v for k, v in raw_inputs.items() if str(k).endswith("_spec")}
+    observed = None
+    try:
+        observed = dt.datetime.fromtimestamp(log.stat().st_mtime, tz=dt.timezone.utc)
+    except OSError:
+        pass
+    return {
+        "epoch": epoch, "audit_days": audit_days,
+        "state": {"observed_at": _fmt_ts(observed) if observed else None,
+                  "freshness": None, "payload": {}},
+        "history": {"epoch": epoch, "days": days},
+        "records": tagged, "foreign": untagged, "malformed": malformed, "trade_error": error,
+        "paper_inputs": specs, "paper_inputs_error": inputs_error,
+        "paper_inputs_dropped": sorted(k for k in raw_inputs if not str(k).endswith("_spec")),
+        "logs_present": any(path.is_file() for path in _track1_log_paths(root)),
+    }
+
+
+def _track1_blank_logs() -> dict[str, Any]:
+    logs = _blank_log_summary()
+    logs["manual_intervention_days"] = []
+    logs["tws_restart_days"] = []
+    return logs
+
+
+#: Summary / diagnostic fields that only a log scan can fill. For Track 1 they are None.
+_T1_LOG_SUMMARY_FIELDS = ("stp_failed", "b3_episodes", "b3_positions_affected",
+                          "b3_raw_mismatch_count", "b3_raw_mismatch_lines", "cold_starts",
+                          "excluded_blocks")
+_T1_LOG_DIAG_FIELDS = ("dropped_test_log_lines", "excluded_test_log_blocks",
+                       "manual_intervention_candidate_lines", "manual_intervention_candidate_days",
+                       "tws_restart_candidate_lines", "tws_restart_candidate_days")
+
+
+def _track1_finish(result: dict[str, Any], t1: dict[str, Any]) -> dict[str, Any]:
+    """Re-label every row by the Track 1 sources it really rests on; blank what is not wired."""
+    by_path = {v["path"]: k for k, v in SOURCES.items()}
+    payload = result["payload"]
+    not_wired_keys: set[str] = set()
+    for row in [*payload["gates"], *payload["coverage"]]:
+        keys = T1_SOURCE_OVERRIDE.get(row["key"]) or [
+            by_path.get(src.get("path"), "?") for src in row.get("sources") or []]
+        missing = [k for k in keys if k in T1_NOT_WIRED]
+        row["sources"] = [TRACK1_SOURCES.get(k, {"path": None, "status": "unknown"})
+                          for k in keys]
+        genuinely_missing = T1_GENUINELY_MISSING.get(row["key"])
+        missing_log_source = "logs" in keys and not t1.get("logs_present")
+        if missing_log_source:
+            reason = "Track 1 scheduler/backend log source does not exist"
+            not_wired_keys.add(row["key"])
+            row["status"] = "NOT_WIRED"
+            row["evidence"] = f"Not measured for Track 1 — {reason}"
+            row["metrics"] = {"not_wired": {"logs": reason}}
+            row["sources"] = [{"path": None, "status": "not_wired", "reason": reason}]
+        elif genuinely_missing:
+            not_wired_keys.add(row["key"])
+            row["status"] = "NOT_WIRED"
+            row["evidence"] = f"Not measured for Track 1 — {genuinely_missing}"
+            row["metrics"] = {"not_wired": {row["key"]: genuinely_missing}}
+            row["sources"] = [{"path": None, "status": "not_wired",
+                              "reason": genuinely_missing}]
+        elif missing:
+            not_wired_keys.add(row["key"])
+            row["status"] = "NOT_WIRED"
+            row["evidence"] = ("Not measured for Track 1 — " +
+                               "; ".join(f"{k}: {T1_NOT_WIRED[k]}" for k in missing))
+            row["metrics"] = {"not_wired": {k: T1_NOT_WIRED[k] for k in missing}}
+        elif row["key"] == "paper_duration":
+            row["evidence"] = (f"{len(t1['history']['days'])} Track 1 paper day(s) — audit days "
+                               f"since the first sent order ({t1['epoch'] or 'none yet'})")
+    payload["gaps"] = [g for g in payload["gaps"] if g.get("related_key") not in not_wired_keys]
+    payload["gaps"].append(_gap(
+        "Track 1 evidence not wired",
+        f"{len(not_wired_keys)} row(s) depend on sources Track 1 does not publish yet: "
+        + ", ".join(sorted(not_wired_keys)),
+        "SOURCE_LIMIT", ", ".join(sorted(T1_NOT_WIRED)),
+        "Track 1 counterparts for the legacy live_state, log scan and P&L compare",
+        "each NOT_WIRED row has a Track 1 source, or is retired for this route",
+        None, "code_or_job", "NEEDS_ARTIFACT",
+        "Say which evidence is missing for the route that trades, instead of showing legacy's."))
+    if not t1.get("logs_present"):
+        for k in _T1_LOG_SUMMARY_FIELDS:
+            if k in payload["summary"]:
+                payload["summary"][k] = None
+        for k in _T1_LOG_DIAG_FIELDS:
+            if k in payload["diagnostics"]:
+                payload["diagnostics"][k] = None
+    payload["diagnostics"]["paper_inputs_rows_not_read"] = t1["paper_inputs_dropped"]
+    payload["route"] = TRACK1_ROUTE
+    result["sources"] = TRACK1_SOURCES
+    result["not_wired"] = sorted(not_wired_keys)
+    result["reading"] = ("Track 1 paper evidence. Rows marked NOT_WIRED depend on sources this "
+                         "route does not publish yet and show no number; legacy evidence is "
+                         "available only via ?route=legacy")
+    return result
+
+
+def _ibkr_protection_signature() -> tuple[str, int, int]:
+    """Cache key for the broker facts that decide current protection."""
+    try:
+        cache = ibkr_reader.get_cache()
+        facts = {key: cache.get(key) for key in (
+            "connected", "last_update", "positions_ok", "positions_error", "positions",
+            "orders_ok", "orders_error", "orders",
+        )}
+        encoded = json.dumps(facts, sort_keys=True, default=str).encode("utf-8")
+        return ("ibkr_positions_orders", len(encoded), sum(encoded))
+    except Exception:
+        return ("ibkr_positions_orders", 0, 0)
 
 
 def _signature(root: Path) -> tuple[tuple[str, int, int], ...]:
@@ -300,6 +566,7 @@ def _signature(root: Path) -> tuple[tuple[str, int, int], ...]:
         values.append(("ibkr_contract_specs", len(encoded), checksum))
     except Exception:
         pass
+    values.append(_ibkr_protection_signature())
     return tuple(values)
 
 
@@ -428,6 +695,12 @@ def _in_epoch(day: str | None, epoch: str | None) -> bool:
 
 def _normalize_exit(value: Any) -> str | None:
     reason = str(value or "").upper()
+    # The Calm 15:55 clock exit (2026-10-05). A real, labelled exit path — but NOT one of the
+    # three swing paths the exit-path gate asks for, so callers that count paths against a target
+    # must keep it apart (see exit_path_coverage). Checked before MAX_HOLD only for clarity: the
+    # two strings do not overlap.
+    if "TIME_EXIT" in reason:
+        return "TIME_EXIT"
     if "MAX_HOLD" in reason:
         return "MAX_HOLD"
     if "CHANDELIER" in reason:
@@ -570,6 +843,147 @@ def _coverage(key: str, title: str, status: str, evidence: str,
     }
 
 
+_OPERATOR_KINDS = {
+    "sample_building": "Sample still building",
+    "no_track1_source": "No Track 1 source exists",
+    "source_not_connected": "Source exists, not connected here",
+    "history_awaiting_clean": "History, awaiting next clean run",
+    "history_superseded": "History, superseded by clean run",
+    "signal_sample_small": "Signal, sample too small",
+    "current_fault": "Faulting now",
+    "scheduled_decision": "Known debt, scheduled decision",
+}
+
+
+def _later_clean_b3_run(row: dict[str, Any]) -> bool:
+    metrics = row.get("metrics") if isinstance(row.get("metrics"), dict) else {}
+    last_seen = _parse_ts(metrics.get("last_seen"))
+    if last_seen is None:
+        return False
+    for match in metrics.get("match_episode_rows") or []:
+        if _parse_ts(match.get("last_seen") or match.get("first_seen")) and \
+                _parse_ts(match.get("last_seen") or match.get("first_seen")) > last_seen:
+            return True
+    return False
+
+
+def _known_recovered_b3_window(row: dict[str, Any]) -> bool:
+    metrics = row.get("metrics") if isinstance(row.get("metrics"), dict) else {}
+    dates = []
+    for episode in metrics.get("mismatch_episode_rows") or []:
+        ts = _parse_ts(episode.get("last_seen") or episode.get("first_seen"))
+        if ts is not None:
+            dates.append(ts.astimezone(ZoneInfo("America/New_York")).date())
+    # Measured Track 1 book/broker mismatch episodes: 2026-09-24 16:20 ET,
+    # 2026-09-24 18:20 ET, and 2026-09-25 10:20 ET. They remain visible history, but
+    # without a later clean run they must not read as a live fault.
+    known = {dt.date(2026, 9, 24), dt.date(2026, 9, 25)}
+    return bool(dates) and all(day in known for day in dates)
+
+
+def _c1_has_small_sample_signal(row: dict[str, Any]) -> bool:
+    metrics = row.get("metrics") if isinstance(row.get("metrics"), dict) else {}
+    for inst in metrics.get("by_inst") or []:
+        if inst.get("open_over_limit") and (
+                _number(inst.get("open_n")) is not None
+                and _number(inst.get("open_min_n")) is not None
+                and float(inst["open_n"]) < float(inst["open_min_n"])):
+            return True
+    return False
+
+
+def _operator_kind(row: dict[str, Any]) -> tuple[str | None, str | None]:
+    key = row.get("key")
+    status = str(row.get("status") or "").upper()
+    metrics = row.get("metrics") if isinstance(row.get("metrics"), dict) else {}
+    if status in {"PASS", "OBSERVED"}:
+        return None, None
+    if key in {"paper_duration", "regime_coverage", "exit_path_coverage", "fill_quality",
+               "sample_denominators", "same_day_multi_day", "stp_placement",
+               "stp_verification", "tws_restart", "tws_restart_nights"} \
+            and status in {"PENDING", "MISSING"}:
+        return "sample_building", _OPERATOR_KINDS["sample_building"]
+    if key in T1_GENUINELY_MISSING:
+        return "no_track1_source", _OPERATOR_KINDS["no_track1_source"]
+    if key == "current_protection" and status == "UNKNOWN":
+        return "source_not_connected", _OPERATOR_KINDS["source_not_connected"]
+    not_wired = metrics.get("not_wired") if isinstance(metrics.get("not_wired"), dict) else {}
+    if "live_state" in not_wired:
+        return "source_not_connected", _OPERATOR_KINDS["source_not_connected"]
+    if key == "c1_slippage" and _c1_has_small_sample_signal(row):
+        return "signal_sample_small", _OPERATOR_KINDS["signal_sample_small"]
+    if key == "b3_reconcile" and status == "BREACH":
+        if _known_recovered_b3_window(row):
+            kind = "history_superseded" if _later_clean_b3_run(row) else "history_awaiting_clean"
+            return kind, _OPERATOR_KINDS[kind]
+        return "current_fault", _OPERATOR_KINDS["current_fault"]
+    if key in {"data_freshness", "pnl_thresholds", "open_incidents"}:
+        return "scheduled_decision", _OPERATOR_KINDS["scheduled_decision"]
+    if status in {"BREACH", "FAIL", "QUALITY_BREACH", "UNKNOWN", "STRUCTURAL_GAP"}:
+        return "current_fault", _OPERATOR_KINDS["current_fault"]
+    return "sample_building", _OPERATOR_KINDS["sample_building"]
+
+
+def _paper_headline(payload: dict[str, Any]) -> dict[str, Any]:
+    gates = {row.get("key"): row for row in payload.get("gates") or []}
+    coverage = {row.get("key"): row for row in payload.get("coverage") or []}
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    c1 = gates.get("c1_slippage", {}).get("metrics") or {}
+    fill = coverage.get("fill_quality", {}).get("metrics") or {}
+    days = summary.get("days")
+    fills = fill.get("fills")
+    worst = None
+    for inst in c1.get("by_inst") or []:
+        value = _number(inst.get("open_mean_ticks"))
+        limit = _number(inst.get("open_limit_ticks"))
+        if value is None or limit in (None, 0):
+            continue
+        ratio = abs(value) / float(limit)
+        item = {
+            "instrument": inst.get("inst"),
+            "scope": "OPEN",
+            "value_ticks": float(value),
+            "limit_ticks": float(limit),
+            "ratio": ratio,
+            "n": inst.get("open_n"),
+            "required_n": inst.get("open_min_n"),
+            "sample_gap": (
+                max(0, int(inst.get("open_min_n") or 0) - int(inst.get("open_n") or 0))
+                if inst.get("open_min_n") is not None and inst.get("open_n") is not None
+                else None
+            ),
+        }
+        if worst is None or item["ratio"] > worst["ratio"]:
+            worst = item
+    faulting = any(row.get("operator_kind") == "current_fault"
+                   for row in [*payload.get("gates", []), *payload.get("coverage", [])])
+    parts = [
+        f"{days} day(s)" if days is not None else "days not measured",
+        f"{fills} fill(s)" if fills is not None else "fills not measured",
+    ]
+    if worst:
+        parts.append(
+            f"worst {worst['instrument']} {worst['scope']} "
+            f"{worst['value_ticks']:+.2f}/{worst['limit_ticks']:.0f} ticks "
+            f"({worst['ratio']:.2f}x limit)")
+        parts.append(
+            f"sample gap {worst['sample_gap']} to {worst['required_n']} for that instrument"
+            if worst["sample_gap"] is not None else "sample gap not measured")
+    else:
+        parts.extend(["worst measurement not measured", "sample gap not measured"])
+    parts.append("faulting now: yes" if faulting else "faulting now: no")
+    return {"text": " · ".join(parts), "faulting_now": faulting, "worst_measurement": worst}
+
+
+def _annotate_operator_axis(payload: dict[str, Any]) -> None:
+    for row in [*payload.get("gates", []), *payload.get("coverage", [])]:
+        kind, label = _operator_kind(row)
+        if kind:
+            row["operator_kind"] = kind
+            row["operator_kind_label"] = label
+    payload.setdefault("summary", {})["paper_track_headline"] = _paper_headline(payload)
+
+
 def _gap(title: str, detail: str, gap_type: str, target_path: str, missing_input: str,
          unblock_condition: str, related_key: str | None = None,
          can_fix_now: str = "operator_data", status: str = "NEEDS_DATA",
@@ -588,24 +1002,123 @@ def _gap(title: str, detail: str, gap_type: str, target_path: str, missing_input
     }
 
 
-def _position_rows(positions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+_WORKING_STOP_STATUSES = {"PRESUBMITTED", "SUBMITTED"}
+
+
+def _canonical_instrument(row: dict[str, Any]) -> str:
+    raw = str(row.get("instrument") or row.get("inst") or row.get("symbol") or "").upper()
+    # Broker cache rows use local symbols (MESZ6, M2KZ6, MNKZ6); the book uses route names.
+    for broker_prefix, route_name in (("MNK", "MNKD"), ("M2K", "M2K"),
+                                      ("MES", "MES"), ("MNQ", "MNQ"), ("MYM", "MYM")):
+        if raw.startswith(broker_prefix):
+            return route_name
+    return raw
+
+
+def _position_size(row: dict[str, Any]) -> float:
+    return abs(_number(row.get("qty", row.get("contracts", row.get("position")))) or 0.0)
+
+
+def _position_direction(row: dict[str, Any]) -> str:
+    direction = str(row.get("direction") or row.get("dir") or "").upper()
+    if direction in {"LONG", "SHORT"}:
+        return direction
+    signed = _number(row.get("position"))
+    return "LONG" if signed is not None and signed > 0 else "SHORT" if signed is not None and signed < 0 else ""
+
+
+def _broker_protection(positions: list[dict[str, Any]], cache: dict[str, Any]) -> dict[str, Any]:
+    if not positions:
+        return {"status": "MISSING", "detail": None, "by_instrument": {},
+                "broker_readable": cache.get("connected") is True and cache.get("positions_ok") is True
+                and cache.get("orders_ok") is True,
+                "broker_observed_at": cache.get("last_update"),
+                "protected": 0, "unprotected": 0}
+
+    readable = (cache.get("connected") is True and cache.get("positions_ok") is True
+                and cache.get("orders_ok") is True)
+    if not readable:
+        detail = cache.get("orders_error") or cache.get("positions_error") or cache.get("error") \
+            or "broker positions/orders have not been read successfully"
+        return {"status": "UNKNOWN", "detail": str(detail), "by_instrument": {},
+                "broker_readable": False, "broker_observed_at": cache.get("last_update")}
+
+    held: dict[tuple[str, str], float] = {}
+    for row in cache.get("positions") or []:
+        if not isinstance(row, dict):
+            continue
+        key = (_canonical_instrument(row), _position_direction(row))
+        held[key] = held.get(key, 0.0) + _position_size(row)
+
+    stops: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in cache.get("orders") or []:
+        if not isinstance(row, dict):
+            continue
+        if "STP" not in str(row.get("type") or row.get("order_type") or "").upper():
+            continue
+        if str(row.get("status") or "").upper() not in _WORKING_STOP_STATUSES:
+            continue
+        action = str(row.get("action") or "").upper()
+        direction = "LONG" if action == "SELL" else "SHORT" if action == "BUY" else ""
+        key = (_canonical_instrument(row), direction)
+        item = stops.setdefault(key, {"qty": 0.0, "order_ids": [], "statuses": []})
+        item["qty"] += _position_size(row)
+        item["order_ids"].append(row.get("order_id"))
+        item["statuses"].append(row.get("status"))
+
+    required: dict[tuple[str, str], float] = {}
+    for row in positions:
+        if isinstance(row, dict):
+            key = (_canonical_instrument(row), _position_direction(row))
+            required[key] = required.get(key, 0.0) + _position_size(row)
+
+    by_instrument = {}
+    for key, qty in required.items():
+        broker_qty = held.get(key, 0.0)
+        stop = stops.get(key, {})
+        stop_qty = float(stop.get("qty") or 0.0)
+        protected = qty > 0 and broker_qty >= qty and stop_qty >= qty
+        by_instrument[key] = {
+            "protected": protected, "required_qty": qty, "broker_qty": broker_qty,
+            "stop_qty": stop_qty, "order_ids": stop.get("order_ids", []),
+            "order_statuses": stop.get("statuses", []),
+        }
+    protected_count = sum(1 for row in positions if isinstance(row, dict)
+                          and by_instrument.get((_canonical_instrument(row), _position_direction(row)), {})
+                          .get("protected"))
+    status = "PASS" if positions and protected_count == len(positions) else "BREACH" if positions else "MISSING"
+    return {"status": status, "detail": None, "by_instrument": by_instrument,
+            "broker_readable": True, "broker_observed_at": cache.get("last_update"),
+            "protected": protected_count, "unprotected": max(len(positions) - protected_count, 0)}
+
+
+def _position_rows(positions: list[dict[str, Any]],
+                   protection: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for pos in positions:
         if not isinstance(pos, dict):
             continue
+        broker_known = protection is not None and protection.get("broker_readable") is True
+        broker = (protection or {}).get("by_instrument", {}).get(
+            (_canonical_instrument(pos), _position_direction(pos)), {})
         stop_order_id = pos.get("stop_order_id")
+        status = ("PROTECTED" if broker.get("protected") else "UNPROTECTED") if broker_known else "UNKNOWN"
         rows.append({
-            "inst": pos.get("inst"),
-            "cluster": pos.get("cluster"),
+            "inst": pos.get("inst") or pos.get("instrument"),
+            "cluster": pos.get("cluster") or pos.get("sleeve"),
             "direction": pos.get("direction") or pos.get("dir"),
-            "contracts": pos.get("contracts"),
+            "contracts": pos.get("contracts", pos.get("qty")),
             "entry_day": _date(pos.get("entry_day") or pos.get("entry_time")),
             "entry_price": pos.get("entry_price"),
             "stop_price": pos.get("stop_price"),
             "stop_order_id": stop_order_id,
+            "broker_stop_order_ids": broker.get("order_ids", []),
+            "broker_stop_statuses": broker.get("order_statuses", []),
+            "broker_position_qty": broker.get("broker_qty"),
+            "broker_stop_qty": broker.get("stop_qty"),
             "risk_dollars": pos.get("risk_dollars") or pos.get("risk_sized"),
             "exit_pending": bool(pos.get("exit_pending")),
-            "status": "PROTECTED" if stop_order_id else "UNPROTECTED",
+            "status": status,
         })
     return rows
 
@@ -1108,18 +1621,27 @@ def _log_paths(root: Path) -> list[Path]:
     return [*sorted(root.glob("scheduler_*.log")), *sorted(root.glob("live_day_*.log"))]
 
 
-def _log_signature(root: Path) -> tuple[tuple[str, int, int], ...]:
+def _track1_log_paths(root: Path) -> list[Path]:
+    base = root / "monitor" / "logs"
+    return [base / "ops_scheduler.err.log", base / "ops_backend.err.log"]
+
+
+def _paths_signature(paths: list[Path]) -> tuple[tuple[str, int, int], ...]:
     out = []
-    for path in _log_paths(root):
+    for path in paths:
         try:
             stat = path.stat()
         except OSError:
             continue
-        out.append((path.name, stat.st_mtime_ns, stat.st_size))
+        out.append((str(path), stat.st_mtime_ns, stat.st_size))
     return tuple(out)
 
 
-def _log_summary(root: Path, epoch: str | None) -> dict[str, Any]:
+def _log_signature(root: Path) -> tuple[tuple[str, int, int], ...]:
+    return _paths_signature(_log_paths(root))
+
+
+def _log_summary(root: Path, epoch: str | None, *, track1: bool = False) -> dict[str, Any]:
     """Scan the scheduler/live-day logs, memoised on the logs' own signature.
 
     Measured 2026-08-15: this reads ~120MB across 28 files and takes 21-24s warm, of
@@ -1135,13 +1657,14 @@ def _log_summary(root: Path, epoch: str | None) -> dict[str, Any]:
     feeds every gate. Worth doing, worth doing carefully, and not worth doing in the
     same change as the memo.
     """
-    signature = _log_signature(root)
-    key = (str(root.resolve()), str(epoch), signature)
+    paths = _track1_log_paths(root) if track1 else _log_paths(root)
+    signature = _paths_signature(paths)
+    key = (str(root.resolve()), f"{epoch}|{'track1' if track1 else 'legacy'}", signature)
     with _lock:
         cached = _log_cache.get(key)
         if cached is not None:
             return copy.deepcopy(cached)
-    result = _log_summary_uncached(root, epoch)
+    result = _log_summary_uncached(root, epoch, paths=paths, track1=track1)
     with _lock:
         # Its own dict, not the payload cache: read_paper_evidence clears that one on
         # every write to keep a single entry, which would wipe this on the very call
@@ -1192,7 +1715,7 @@ def _blank_log_summary() -> dict[str, Any]:
     }
 
 
-def _scan_one_log(path: Path, epoch: str | None) -> dict[str, Any]:
+def _scan_one_log(path: Path, epoch: str | None, *, track1: bool = False) -> dict[str, Any]:
     """Scan a single log file, memoised on that file's own size and mtime.
 
     Log files are append-only and only today's changes; 27 of the 28 present will never
@@ -1209,7 +1732,8 @@ def _scan_one_log(path: Path, epoch: str | None) -> dict[str, Any]:
         stat = path.stat()
     except OSError:
         return {**_blank_log_summary(), "_b3_episodes": []}
-    key = (str(path.resolve()), stat.st_mtime_ns, stat.st_size, str(epoch))
+    key = (str(path.resolve()), stat.st_mtime_ns, stat.st_size,
+           f"{epoch}|{'track1' if track1 else 'legacy'}")
     with _lock:
         cached = _file_cache.get(key)
         if cached is not None:
@@ -1224,6 +1748,9 @@ def _scan_one_log(path: Path, epoch: str | None) -> dict[str, Any]:
         lines = []
     if True:
         for idx, line in _retain_production_log_lines(path, lines, epoch, summary):
+            if track1 and not any(marker in line for marker in
+                                  ("TRACK1_", "track1_candidate", "run_stop_repair")):
+                continue
             day = line[:10] if len(line) >= 10 and line[:4].isdigit() else None
             if _COLD_START.search(line):
                 ts = _log_line_timestamp(line)
@@ -1293,11 +1820,13 @@ def _scan_one_log(path: Path, epoch: str | None) -> dict[str, Any]:
     return summary
 
 
-def _log_summary_uncached(root: Path, epoch: str | None) -> dict[str, Any]:
+def _log_summary_uncached(root: Path, epoch: str | None,
+                          paths: list[Path] | None = None,
+                          track1: bool = False) -> dict[str, Any]:
     summary = _blank_log_summary()
     b3_episodes: list[dict[str, Any]] = []
-    for path in _log_paths(root):
-        part = _scan_one_log(path, epoch)
+    for path in paths if paths is not None else _log_paths(root):
+        part = _scan_one_log(path, epoch, track1=track1)
         _merge_log_partial(summary, part)
         _append_b3_episodes(b3_episodes, part.get("_b3_episodes") or [])
     b3_episodes.sort(key=lambda episode: (_parse_ts(episode.get("first_seen")) or dt.datetime.max.replace(tzinfo=dt.timezone.utc), str(episode.get("path") or "")))
@@ -2847,7 +3376,8 @@ def _paper_vs_backtest_status(live_pvb: dict[str, Any], items: list[dict[str, An
 def _coverage_items(root: Path, state: dict[str, Any], payload: dict[str, Any], history: dict[str, Any],
                     records: list[dict[str, Any]], logs: dict[str, Any],
                     epoch: str | None, paper_inputs: dict[str, Any], paper_compare: dict[str, Any],
-                    malformed_trades: int, ibkr_cache: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+                    malformed_trades: int, ibkr_cache: dict[str, Any] | None = None,
+                    positions_path: Path | None = None) -> list[dict[str, Any]]:
     latest = _latest_snapshot(payload)
     epoch_records = _epoch_records(records, epoch)
     pvb = latest.get("paper_vs_backtest") if isinstance(latest.get("paper_vs_backtest"), dict) else {}
@@ -2860,7 +3390,7 @@ def _coverage_items(root: Path, state: dict[str, Any], payload: dict[str, Any], 
     )
     denominators = _trade_denominators(fill_records)
     duration = _same_day(fill_records)
-    live_positions, live_positions_error = _read_json(root / "live_positions.json")
+    live_positions, live_positions_error = _read_json(positions_path or root / "live_positions.json")
     positions = live_positions.get("positions") if isinstance(live_positions.get("positions"), list) else []
     stp_status, stp_evidence, stp_metrics = _stp_placement_status(
         logs,
@@ -2874,7 +3404,8 @@ def _coverage_items(root: Path, state: dict[str, Any], payload: dict[str, Any], 
         paper_inputs.get("rejection_coverage_spec") if isinstance(paper_inputs.get("rejection_coverage_spec"), dict) else {},
         _number(history.get("account")),
     )
-    protected = sum(1 for pos in positions if pos.get("stop_order_id"))
+    protection = _broker_protection(positions, ibkr_cache or {})
+    protected = int(protection.get("protected") or 0)
     open_issues = read_open_issues(root)
     issues = open_issues.get("issues") if isinstance(open_issues.get("issues"), list) else []
     manual_status, manual_evidence, manual_metrics = _manual_input_status(
@@ -2925,8 +3456,8 @@ def _coverage_items(root: Path, state: dict[str, Any], payload: dict[str, Any], 
     model_age = op_status.get("model_age") if isinstance(op_status.get("model_age"), dict) else {}
     refreeze = op_status.get("refreeze") if isinstance(op_status.get("refreeze"), dict) else {}
     positions_status = op_status.get("positions") if isinstance(op_status.get("positions"), dict) else {}
-    position_rows = _position_rows(positions)
-    unprotected = sum(1 for row in position_rows if row.get("status") != "PROTECTED")
+    position_rows = _position_rows(positions, protection)
+    unprotected = int(protection.get("unprotected") or 0)
     snapshot_rows = _snapshot_rows(payload)
     log_rejections_by_day = _rejection_counts_by_day(rejection_metrics)
     for row in snapshot_rows:
@@ -3059,19 +3590,27 @@ def _coverage_items(root: Path, state: dict[str, Any], payload: dict[str, Any], 
         ),
         _coverage(
             "current_protection", "Current position protection",
-            "BREACH" if positions and protected < len(positions) else "OBSERVED" if positions else "MISSING",
-            f"{protected}/{len(positions)} persisted position(s) have stop_order_id",
-            ["live_positions"],
+            protection["status"],
+            (
+                f"{protected}/{len(positions)} persisted position(s) have a matching broker position and working STP"
+                if protection["status"] != "UNKNOWN"
+                else f"UNKNOWN — broker positions/orders could not be read: {protection['detail']}"
+            ),
+            ["live_positions", "ibkr_positions_orders"],
             {
-                "description": "Current protection checks the persisted open book right now. Every open position must carry a stop_order_id; historical stop timing is audited separately in STP placement.",
+                "description": "Current protection reconciles each persisted open position to the current broker position and a working PreSubmitted/Submitted protective STP. A persisted stop_order_id is context only, not proof that an order is working.",
                 "positions": len(positions),
                 "protected": protected,
                 "unprotected": unprotected,
+                "broker_readable": protection["broker_readable"],
+                "broker_observed_at": protection["broker_observed_at"],
+                "broker_error": protection["detail"],
                 "live_positions_error": live_positions_error,
                 "position_rows": position_rows,
                 "status_rules": [
-                    "PASS: every current persisted open position has stop_order_id.",
-                    "BREACH: at least one current persisted open position lacks stop_order_id.",
+                    "PASS: every current persisted open position matches a broker position and a working protective STP.",
+                    "BREACH: broker evidence is readable and at least one persisted position lacks its broker position or working protective STP.",
+                    "UNKNOWN: current broker positions or open orders cannot be read.",
                     "MISSING: no persisted live position file or no current open-position evidence is available.",
                 ],
             },
@@ -3162,25 +3701,52 @@ def _coverage_items(root: Path, state: dict[str, Any], payload: dict[str, Any], 
     ]
 
 
-def read_paper_evidence(root: Path) -> dict[str, Any]:
-    signature = _signature(root)
-    key = (str(root.resolve()), signature)
+def read_paper_evidence(root: Path, route: str = DEFAULT_ROUTE) -> dict[str, Any]:
+    """Paper evidence for ONE route. Track 1 by default; legacy only when asked for by name.
+
+    Plan stage 4 (2026-09-24). This read only the legacy route's artefacts — the newest of them
+    760 hours old that evening — and the /paper page presented the result as the paper
+    evidence. The route that trades is Track 1. Its inputs are substituted where Track 1 has a
+    source (trade log, book, audit days, the operator's route-agnostic specs); every gate or
+    coverage row that depends on a source Track 1 does NOT have yet is reported NOT_WIRED with
+    its reason, and its numbers are removed — a zero from a log nobody scanned reads exactly
+    like "no problems", and that is the confusion this stage exists to end.
+    """
+    if route not in ("legacy", TRACK1_ROUTE):
+        raise ValueError(f"unknown route {route!r}")
+    root = Path(root)
+    signature = _signature(root) if route == "legacy" else _track1_signature(root)
+    key = (str(root.resolve()), route, signature)
     with _lock:
         cached = _cache.get(key)
         if cached is not None:
             return copy.deepcopy(cached)
 
-    state = read_runner_state(root / "global_index" / "live_state_data.js")
+    if route == "legacy":
+        state = read_runner_state(root / "global_index" / "live_state_data.js")
+        history, history_error = _read_json(root / "global_index" / "paper_history.json")
+        slip_stats, slip_error = _read_json(root / "slip_stats.json")
+        paper_inputs, paper_inputs_error = _read_optional_json(root / "monitor" / "paper_inputs.json")
+        paper_compare, paper_compare_error = _read_optional_json(root / "monitor" / "paper_pnl_compare.json")
+        records, foreign_trades, malformed_trades, trade_error = _trade_records_split(
+            root / "trade_log.jsonl")
+        positions_path = root / "live_positions.json"
+        epoch_override = None
+    else:
+        t1 = _track1_inputs(root)
+        state, history, history_error = t1["state"], t1["history"], None
+        slip_stats, slip_error = {}, T1_NOT_APPLICABLE["slip_stats"]
+        paper_inputs, paper_inputs_error = t1["paper_inputs"], t1["paper_inputs_error"]
+        paper_compare, paper_compare_error = {}, T1_NOT_WIRED["paper_pnl_compare"]
+        records, foreign_trades = t1["records"], t1["foreign"]
+        malformed_trades, trade_error = t1["malformed"], t1["trade_error"]
+        positions_path = root / T1_PATHS["live_positions"]
+        epoch_override = t1["epoch"]
     payload = state.get("payload") or {}
     meta = payload.get("meta") or {}
-    history, history_error = _read_json(root / "global_index" / "paper_history.json")
-    slip_stats, slip_error = _read_json(root / "slip_stats.json")
-    paper_inputs, paper_inputs_error = _read_optional_json(root / "monitor" / "paper_inputs.json")
-    paper_compare, paper_compare_error = _read_optional_json(root / "monitor" / "paper_pnl_compare.json")
-    records, foreign_trades, malformed_trades, trade_error = _trade_records_split(
-        root / "trade_log.jsonl")
 
-    epoch = str(meta.get("system_epoch") or history.get("epoch") or "") or None
+    epoch = (epoch_override if route != "legacy"
+             else str(meta.get("system_epoch") or history.get("epoch") or "") or None)
     history_days = sorted(day for day in (history.get("days") or {}) if _in_epoch(day, epoch))
 
     regimes = sorted({
@@ -3193,13 +3759,21 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
     exits = {"CHANDELIER": 0, "MAX_HOLD": 0, "STP": 0}
     labelled_exits = 0
     unlabelled_exits = 0
+    time_exits = 0
     for record in records:
         if str(record.get("type")).upper() != "CLOSE":
             continue
         if not _in_epoch(_date(record.get("exit_day")), epoch):
             continue
         key_exit = _normalize_exit(record.get("exit_reason"))
-        if key_exit:
+        if key_exit == "TIME_EXIT":
+            # Counted on its own line and in NEITHER total below. It is labelled, so it is not the
+            # instrumentation gap `unlabelled_exits` reports; and it is not a swing path, so
+            # putting it in `exits` would make the gate demand three Calm exits to PASS and
+            # putting it in `labelled_exits` would turn a swing STRUCTURAL_GAP into PENDING.
+            # The gate keeps meaning exactly what it meant before Calm could exit.
+            time_exits += 1
+        elif key_exit:
             exits[key_exit] += 1
             labelled_exits += 1
         else:
@@ -3211,14 +3785,23 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
 
     slip = _slippage(records, epoch)
     c1_trades = _c1_trade_details(records, epoch)
-    logs = _log_summary(root, epoch)
-    live_positions, _live_positions_error = _read_json(root / "live_positions.json")
+    logs = _log_summary(root, epoch) if route == "legacy" else _log_summary(root, epoch, track1=True)
+    live_positions, _live_positions_error = _read_json(positions_path)
     positions = live_positions.get("positions") if isinstance(live_positions.get("positions"), list) else []
     stp_trades = _stp_trade_details(records, epoch, positions)
     ibkr_cache = ibkr_reader.get_cache()
-    coverage = _coverage_items(root, state, payload, history, records, logs, epoch, paper_inputs, paper_compare, malformed_trades, ibkr_cache)
+    coverage = _coverage_items(root, state, payload, history, records, logs, epoch, paper_inputs, paper_compare, malformed_trades, ibkr_cache,
+                               positions_path=positions_path)
     c1_status, c1_evidence, c1_metrics = _c1_status(
         slip, paper_inputs.get("c1_spec") if isinstance(paper_inputs.get("c1_spec"), dict) else {}
+    )
+    c1_active_spec = c1_metrics.get("spec") if isinstance(c1_metrics.get("spec"), dict) else {}
+    c1_open_spec = c1_active_spec.get("open") if isinstance(c1_active_spec.get("open"), dict) else {}
+    c1_stp_spec = c1_active_spec.get("stp_close") if isinstance(c1_active_spec.get("stp_close"), dict) else {}
+    c1_requirement = (
+        f"Active paper_inputs spec: OPEN N>={c1_open_spec.get('min_n_per_inst', '--')} per instrument; "
+        f"STP CLOSE N>={c1_stp_spec.get('min_n', '--')} pooled; absolute mean "
+        f"<={c1_open_spec.get('max_mean_ticks', '--')} ticks"
     )
     stp_status, stp_evidence, stp_metrics = _stp_input_status(
         _records(paper_inputs.get("stp_verification")),
@@ -3373,6 +3956,7 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
             ),
             (
                 f"Chandelier {exits['CHANDELIER']} | MAX_HOLD {exits['MAX_HOLD']} | STP {exits['STP']}"
+                + (f" | Calm TIME_EXIT {time_exits} (not one of the three paths)" if time_exits else "")
                 + (
                     f" | {unlabelled_exits} CLOSE fill(s) carry no exit_reason, so their path cannot be identified"
                     if unlabelled_exits else ""
@@ -3385,6 +3969,7 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
                 "target_each": 3,
                 "labelled_exits": labelled_exits,
                 "unlabelled_exits": unlabelled_exits,
+                "time_exits": time_exits,
                 "instrumentation_gap": bool(unlabelled_exits and not labelled_exits),
                 "instrumentation_note": (
                     "runner.py writes exit_reason only on the STP close path (:934). The "
@@ -3395,10 +3980,10 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
             },
         ),
         _gate(
-            "c1_slippage", "C1 slippage",
+            "c1_slippage", "C1 expected-price correspondence",
             c1_status,
             c1_evidence,
-            "Active paper_inputs spec: N>=100, abs mean <=5 ticks, OPEN and STP CLOSE separate",
+            c1_requirement,
             ["trade_log", "slip_stats", "paper_inputs"],
             {**c1_metrics, "slip_stats": slip_stats if not slip_error else None, "trade_samples": c1_trades},
         ),
@@ -3520,6 +4105,10 @@ def read_paper_evidence(root: Path) -> dict[str, Any]:
             },
         },
     }
+    result["route"] = route
+    if route != "legacy":
+        result = _track1_finish(result, t1)
+    _annotate_operator_axis(result["payload"])
     with _lock:
         _cache.clear()
         _cache[key] = copy.deepcopy(result)

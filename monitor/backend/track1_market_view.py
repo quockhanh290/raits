@@ -50,11 +50,13 @@ import datetime as _dt
 import re
 import threading as _threading
 
+from global_index import track1_signals as _signals
 from global_index import track1_strategy_diagnostics as _sd
 import time as _time
 import json
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 SCHEMA = "track1_market_view/1"
 ROUTE = "track1_candidate"
@@ -123,16 +125,27 @@ BAR_MINUTES = 5
 #: Slot marker vocabulary. `future` is its own value and not a missing one: a slot that has not
 #: fired yet and a slot that fired and was never recorded must not draw the same.
 SLOT_NO_SIGNAL = "no_signal"
-SLOT_SIGNAL = "signal"
+SLOT_CANDIDATE = "candidate"
+SLOT_ACCEPTED_SHADOW = "accepted_shadow"
 SLOT_REJECTED = "rejected"
 SLOT_REFUSED = "refused"
 SLOT_MISSED = "missed"
+SLOT_FIRED_NO_RECORD = "fired_no_record"
 SLOT_FUTURE = "future"
 SLOT_UNKNOWN = "unknown"
 
-_STATUS_MAP = {"NO_SIGNAL": SLOT_NO_SIGNAL, "SIGNAL": SLOT_SIGNAL, "ACCEPTED": SLOT_SIGNAL,
-               "CANDIDATE": SLOT_SIGNAL, "REJECTED": SLOT_REJECTED,
-               "SLOT_REFUSED": SLOT_REFUSED, "REFUSED": SLOT_REFUSED}
+#: This is the producer's complete vocabulary, not aliases inferred from a screenshot.
+#: `track1_signals.SignalRow.__post_init__` refuses every status outside `STATUSES`, and
+#: `track1_signals.classify` is the single writer-side function that chooses among them.
+#: Keeping each value distinct matters: a candidate admitted in shadow, a raw candidate not
+#: yet through admission, and a candidate rejected by a named rule are three different facts.
+_STATUS_MAP = {
+    _signals.SLOT_REFUSED: SLOT_REFUSED,
+    _signals.NO_SIGNAL: SLOT_NO_SIGNAL,
+    _signals.RAW_SIGNAL_FOUND: SLOT_CANDIDATE,
+    _signals.SIGNAL_REJECTED: SLOT_REJECTED,
+    _signals.SIGNAL_ACCEPTED_SHADOW: SLOT_ACCEPTED_SHADOW,
+}
 
 #: Sleeve-level states.
 ST_NOT_STARTED = "not_started"
@@ -396,8 +409,82 @@ def _signal_rows(root: Path, day: str) -> list:
     return out
 
 
-def _slots_for(sleeve: str, rows: list, now_hhmm: "str | None") -> list:
+def _jobs_for_day(journal: dict, day: str) -> dict[str, dict]:
+    """Latest execution per job id, only when its ET start belongs to the requested day."""
+    if str(journal.get("day") or "") != day:
+        return {}
+    out: dict[str, dict] = {}
+    for job in journal.get("jobs") or []:
+        try:
+            started = _dt.datetime.fromisoformat(
+                str(job.get("started_at") or "").replace("Z", "+00:00"))
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=_dt.timezone.utc)
+            if started.astimezone(ZoneInfo(ET)).date().isoformat() != day:
+                continue
+        except Exception:                                           # noqa: BLE001
+            continue
+        job_id = str(job.get("job_id") or "")
+        if job_id:
+            out[job_id] = job
+    return out
+
+
+def _job_reason(job: dict) -> str:
+    impact = str(job.get("impact") or "")
+    if impact and "unclassified error" not in impact.lower():
+        return impact
+    diagnostics = [str(line) for line in job.get("diagnostics") or [] if str(line).strip()]
+    return diagnostics[-1] if diagnostics else str(job.get("reason") or "reason not recorded")
+
+
+def _filled_execution(row: dict, filled_trades: set[str]) -> dict | None:
+    for candidate in row.get("candidates") or []:
+        trade_id = str(candidate.get("trade_id") or "")
+        if trade_id and trade_id in filled_trades:
+            return {"state": "filled", "trade_id": trade_id, "source": "paper_send"}
+    return None
+
+
+def _next_protection_job(now: _dt.datetime) -> dict | None:
+    """Next registered Track 1 job capable of arming a stop, from the canonical table."""
+    from global_index.track1_slots import track1_safety_jobs
+    from monitor.backend.schedule_status import scheduler_registers_on
+
+    local = (now.replace(tzinfo=ZoneInfo(ET)) if now.tzinfo is None
+             else now.astimezone(ZoneInfo(ET)))
+    candidates = []
+    for offset in range(8):
+        day = local.date() + _dt.timedelta(days=offset)
+        for job in track1_safety_jobs():
+            # The Calm clock exit is a safety job but not a PROTECTION job: it closes a position
+            # and cancels its stop, and returns without connecting when the book holds no Calm
+            # position, so it cannot arm a stop for a naked swing position. Offering it as "the
+            # next job that will protect you" would be false (2026-10-05).
+            if job.kind == "time_exit":
+                continue
+            if job.day_of_week == "sun":
+                registered = day.weekday() == 6
+            else:
+                registered = scheduler_registers_on(day)
+            if not registered:
+                continue
+            at = _dt.datetime.combine(
+                day, _dt.time(job.hour, job.minute), tzinfo=ZoneInfo(ET))
+            if at > local:
+                candidates.append((at, job))
+    if not candidates:
+        return None
+    at, job = min(candidates, key=lambda item: item[0])
+    return {"job_id": job.id.upper(), "at": at.astimezone(_dt.timezone.utc).isoformat()}
+
+
+def _slots_for(sleeve: str, rows: list, now_hhmm: "str | None",
+               jobs_by_id: dict[str, dict] | None = None,
+               filled_trades: set[str] | None = None) -> list:
     """Every slot the table declares, married to whatever the route recorded about it."""
+    jobs_by_id = jobs_by_id or {}
+    filled_trades = filled_trades or set()
     try:
         from global_index import track1_slots as ts
 
@@ -417,10 +504,17 @@ def _slots_for(sleeve: str, rows: list, now_hhmm: "str | None") -> list:
         r = seen.pop(s.id, None)
         if r is not None:
             raw = str(r.get("status") or "")
-            out.append({"slot_id": s.id, "time_et": hhmm,
-                        "status": _STATUS_MAP.get(raw, SLOT_UNKNOWN),
-                        "reason": str(r.get("reason") or ""),
-                        "candidate_count": int(r.get("raw_candidates") or 0)})
+            slot = {"slot_id": s.id, "time_et": hhmm,
+                    "status": _STATUS_MAP.get(raw, SLOT_UNKNOWN),
+                    # Retained even when recognised so the display word is traceable to the
+                    # producer. For an unknown, this is the raw word the mark must name.
+                    "raw_status": raw,
+                    "reason": str(r.get("reason") or ""),
+                    "candidate_count": int(r.get("raw_candidates") or 0)}
+            execution = _filled_execution(r, filled_trades)
+            if execution is not None:
+                slot["execution"] = execution
+            out.append(slot)
         elif now_hhmm is not None and hhmm > now_hhmm:
             out.append({"slot_id": s.id, "time_et": hhmm, "status": SLOT_FUTURE,
                         "reason": "has not fired yet", "candidate_count": 0})
@@ -428,14 +522,25 @@ def _slots_for(sleeve: str, rows: list, now_hhmm: "str | None") -> list:
             # Past its time and nothing recorded. NOT the same as "no signal" — nobody
             # watched, and this route has been bitten before by absence reading as a quiet
             # result.
-            out.append({"slot_id": s.id, "time_et": hhmm, "status": SLOT_MISSED,
-                        "reason": "no record was written for this slot",
-                        "candidate_count": 0})
+            job = jobs_by_id.get(s.id)
+            if job is not None:
+                out.append({"slot_id": s.id, "time_et": hhmm,
+                            "status": SLOT_FIRED_NO_RECORD,
+                            "reason": _job_reason(job), "candidate_count": 0})
+            else:
+                out.append({"slot_id": s.id, "time_et": hhmm, "status": SLOT_MISSED,
+                            "reason": "the scheduler did not launch this slot",
+                            "candidate_count": 0})
     for slot_id, r in seen.items():          # recorded but not declared — surfaced, not hidden
-        out.append({"slot_id": slot_id, "time_et": str(r.get("slot_time") or ""),
-                    "status": _STATUS_MAP.get(str(r.get("status") or ""), SLOT_UNKNOWN),
-                    "reason": str(r.get("reason") or ""),
-                    "candidate_count": int(r.get("raw_candidates") or 0)})
+        raw = str(r.get("status") or "")
+        slot = {"slot_id": slot_id, "time_et": str(r.get("slot_time") or ""),
+                "status": _STATUS_MAP.get(raw, SLOT_UNKNOWN), "raw_status": raw,
+                "reason": str(r.get("reason") or ""),
+                "candidate_count": int(r.get("raw_candidates") or 0)}
+        execution = _filled_execution(r, filled_trades)
+        if execution is not None:
+            slot["execution"] = execution
+        out.append(slot)
     return sorted(out, key=lambda s: s["time_et"])
 
 
@@ -444,7 +549,9 @@ def _slots_for(sleeve: str, rows: list, now_hhmm: "str | None") -> list:
 #: distinction between the last three is the whole reason this exists.
 CELL_PASS = "pass"
 CELL_FAIL = "fail"
+CELL_MIXED = "mixed"                    # candidates in one slot split accept/reject
 CELL_NOT_REACHED = "not_reached"        # the gate stopped the slot before this rule ran
+CELL_NOT_APPLICABLE = "not_applicable"  # no candidate existed for an admission rule
 CELL_NOT_PUBLISHED = "not_published"    # the detector evaluated it and returned no verdict
 CELL_NO_RECORD = "no_record"            # the slot's time passed and nothing was written
 CELL_FUTURE = "future"                  # its time has not come
@@ -453,8 +560,9 @@ CELL_FUTURE = "future"                  # its time has not come
 #: because "the gate stopped every slot before this rule ran" and "the detector ran it and
 #: returned nothing" send an operator to two different places.
 _LANE_ABSENCE = {
-    CELL_NOT_REACHED: "not reached — the gate stopped the slot first",
-    CELL_NOT_PUBLISHED: "value not published by the detector",
+    CELL_NOT_REACHED: "not reached - stopping rule not identified in recorded payload",
+    CELL_NOT_APPLICABLE: "not applicable - no candidate reached admission",
+    CELL_NOT_PUBLISHED: "not computed - stopping rule not identified in recorded payload",
     CELL_NO_RECORD: "no record was written for these slots",
     CELL_FUTURE: "has not run yet",
 }
@@ -462,6 +570,37 @@ _LANE_ABSENCE = {
 _CELL_FROM_SOURCE = {"not_reached": CELL_NOT_REACHED,
                      "not_exposed_by_sleeve": CELL_NOT_PUBLISHED,
                      "not_reported_by_detector": CELL_NOT_PUBLISHED}
+
+
+def _nonverdict_reason(row: dict, state: str) -> str:
+    """Derive why one rule has no verdict from failures in this slot's own chain."""
+    failed = [str(c.get("rule") or "").replace("_", " ")
+              for c in (row.get("rule_checks") or [])
+              if c.get("passed") is False and str(c.get("rule") or "")]
+    kind = "not reached" if state == CELL_NOT_REACHED else "not computed"
+    if not failed:
+        return f"{kind} - stopping rule not identified in recorded payload"
+    if failed == ["gate allow"]:
+        return f"{kind} - gate stopped the slot: gate allow failed"
+    if failed == ["freshness allow"]:
+        return f"{kind} - freshness gate stopped the slot"
+    joined = (failed[0] if len(failed) == 1
+              else ", ".join(failed[:-1]) + " and " + failed[-1])
+    return f"{kind} - setup stopped at {joined}"
+
+
+def _no_candidate_admission(row: dict, check: dict | None) -> bool:
+    """True when admission had no candidate and no earlier recorded rule blocked the setup.
+
+    If a setup rule failed, admission is genuinely *not reached* because of that blocker.
+    ``not applicable`` is reserved for slots such as NKD before its first setup, where the
+    recorded chain contains no failure and therefore admission simply had nothing to assess.
+    """
+    if not check or not check.get("not_reached"):
+        return False
+    if "no candidate reached admission" not in str(check.get("detail") or "").lower():
+        return False
+    return not any(c.get("passed") is False for c in (row.get("rule_checks") or []))
 
 
 def _threshold_display(raw) -> str:
@@ -687,26 +826,78 @@ def _rule_lanes(rows: list, sleeve: str, slots: list) -> list:
             if check is None:
                 # The rule was not evaluated for this slot at all. Not the same as failing it.
                 cells.append({"slot_id": s["slot_id"], "time_et": s["time_et"],
-                              "state": CELL_NOT_REACHED})
+                              "state": CELL_NOT_REACHED,
+                              "reason": _nonverdict_reason(row, CELL_NOT_REACHED)})
                 continue
             value = check.get("value")
             has_value = isinstance(value, (int, float, str)) and not isinstance(value, bool)
             if has_value:
                 published += 1
             passed = check.get("passed")
-            if passed is True:
+            accepted_count = int(row.get("accepted") or 0)
+            rejected_count = int(row.get("rejected") or 0)
+            counted_admission = (name == "admission_cap_result"
+                                  and (accepted_count or rejected_count))
+            if counted_admission:
+                passes += accepted_count
+                fails += rejected_count
+                if accepted_count and rejected_count:
+                    state = CELL_MIXED
+                elif accepted_count:
+                    state = CELL_PASS
+                else:
+                    state = CELL_FAIL
+            elif passed is True:
                 state, passes = CELL_PASS, passes + 1
             elif passed is False:
                 state, fails = CELL_FAIL, fails + 1
+            elif _no_candidate_admission(row, check):
+                state = CELL_NOT_APPLICABLE
             elif check.get("not_reached"):
                 state = CELL_NOT_REACHED
             else:
                 state = _CELL_FROM_SOURCE.get(str(check.get("source") or ""),
                                               CELL_NOT_PUBLISHED)
-            cells.append({"slot_id": s["slot_id"], "time_et": s["time_et"], "state": state,
-                          "value": value if has_value else None})
+            cell = {"slot_id": s["slot_id"], "time_et": s["time_et"], "state": state,
+                    "value": value if has_value else None}
+            if counted_admission:
+                cell["accepted"] = accepted_count
+                cell["rejected"] = rejected_count
+                if state == CELL_MIXED:
+                    cell["reason"] = (f"{accepted_count} admitted · "
+                                      f"{rejected_count} rejected in this slot")
+                elif state == CELL_PASS:
+                    cell["reason"] = f"{accepted_count} admitted in this slot"
+                else:
+                    cell["reason"] = f"{rejected_count} rejected in this slot"
+            elif state == CELL_NOT_APPLICABLE:
+                cell["reason"] = "not applicable - no candidate reached admission"
+            elif state in (CELL_NOT_REACHED, CELL_NOT_PUBLISHED):
+                cell["reason"] = _nonverdict_reason(row, state)
+            cells.append(cell)
 
         decided = passes + fails
+        dominant = collections.Counter(c["state"] for c in cells).most_common(1)[0][0]
+        uniform_nonverdict = (dominant if cells and all(c["state"] == dominant for c in cells)
+                              and dominant in (CELL_NOT_REACHED, CELL_NOT_APPLICABLE,
+                                               CELL_NOT_PUBLISHED)
+                              else None)
+        reasons = [str(c.get("reason") or "") for c in cells if c.get("reason")]
+        if not decided and reasons and len(set(reasons)) == 1:
+            state_display = reasons[0]
+        elif not decided and reasons:
+            kind = "not reached" if dominant == CELL_NOT_REACHED else "not computed"
+            state_display = f"{kind} - stopping rule differs by slot"
+        elif decided:
+            no_candidate = sum(c["state"] == CELL_NOT_APPLICABLE for c in cells)
+            if name == "admission_cap_result":
+                state_display = f"{passes} admitted · {fails} rejected"
+                if no_candidate:
+                    state_display += f" · {no_candidate} no candidate"
+            else:
+                state_display = f"{passes}/{decided} pass"
+        else:
+            state_display = _LANE_ABSENCE.get(dominant, "no verdict recorded")
         lanes.append({
             "rule": name,
             "label": name.replace("_", " "),
@@ -720,18 +911,39 @@ def _rule_lanes(rows: list, sleeve: str, slots: list) -> list:
             "slots_decided": decided,
             "passed": passes,
             "failed": fails,
+            "uniform_nonverdict": uniform_nonverdict,
+            "nonverdict_count": len(cells) if uniform_nonverdict else 0,
             # One line for the lane's right-hand column, and when there is no verdict it
             # names WHICH absence this is. The first version said "value not published" for
             # every undecided lane, including lanes whose slots were stopped by the gate
             # before the rule ran — two different facts printed as one sentence, which is the
             # exact collapse the missing-reason vocabulary above exists to prevent.
-            "state_display": (f"{passes}/{decided} pass" if decided
-                              else _LANE_ABSENCE.get(
-                                  collections.Counter(
-                                      c["state"] for c in cells).most_common(1)[0][0],
-                                  "no verdict recorded")),
+            "state_display": state_display,
         })
     return lanes
+
+
+def _bar_grid_payload(strategy: dict) -> "dict | None":
+    """Expose why a per-bar grid ends before the slot window does.
+
+    Normal-R4/NKD deliberately returns on the first setup.  Without this marker the remaining
+    slot-aligned cells look like missing executions even though those slots continued through
+    admission.  The marker is derived only from recorded diagnostics; it computes no strategy
+    result.
+    """
+    diagnostics = (strategy or {}).get("diagnostics") or {}
+    raw = diagnostics.get("bar_gate_grid") or None
+    if not raw:
+        return None
+    grid = dict(raw)
+    if diagnostics.get("setup") is True and diagnostics.get("last_bar_ts"):
+        grid["scan_stop"] = {
+            "reason": "first_setup_selected",
+            "bar_time": diagnostics.get("last_bar_ts"),
+            "detail": ("Detector stopped after selecting the first setup; later slots still "
+                       "ran admission against that setup."),
+        }
+    return grid
 
 
 # ── levels ──────────────────────────────────────────────────────────────────────────────
@@ -1665,7 +1877,8 @@ def _summary(sleeve: str, status: str, slots: list, levels: list, data: dict,
         head = f"Unknown · {counted} slots observed"
 
     refused = sum(1 for x in slots if x["status"] == SLOT_REFUSED)
-    signals = sum(1 for x in slots if x["status"] == SLOT_SIGNAL)
+    signals = sum(1 for x in slots if x["status"] in
+                  (SLOT_CANDIDATE, SLOT_ACCEPTED_SHADOW))
     head += " · no signal" if not signals else f" · {signals} signal(s)"
     if refused:
         head += f" · {refused} refused"
@@ -1801,7 +2014,8 @@ def _sleeve_status(slots: list, coverage: dict, spec: dict, now_hhmm: str) -> st
     if now_hhmm < spec["window_start"]:
         return ST_WAITING
     refused = [x for x in slots if x["status"] == SLOT_REFUSED]
-    decided = [x for x in slots if x["status"] in (SLOT_NO_SIGNAL, SLOT_SIGNAL)]
+    decided = [x for x in slots if x["status"] in
+               (SLOT_NO_SIGNAL, SLOT_CANDIDATE, SLOT_ACCEPTED_SHADOW, SLOT_REJECTED)]
     if refused and not decided:
         return ST_REFUSED
     if not [x for x in slots if x["status"] != SLOT_FUTURE]:
@@ -1957,8 +2171,19 @@ def build(root: str | Path = ".", *, day: str | None = None, now: Any = None,
 
     rows = _signal_rows(root, asked)
     cov = coverage if coverage is not None else _coverage(root, asked)
+    try:
+        from monitor.backend.job_journal_reader import read_job_journal
+        jobs_by_id = _jobs_for_day(read_job_journal(asked, root), asked)
+    except Exception:                                                # noqa: BLE001
+        jobs_by_id = {}
+    try:
+        from global_index import track1_report
+        filled_trades = set(track1_report.read_order_journal(root).get("filled_trades") or [])
+    except Exception:                                                # noqa: BLE001
+        filled_trades = set()
     out: dict = {"schema": SCHEMA, "generated_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
                  "route": ROUTE, "session_date": asked, "now_et": ref_et.strftime("%H:%M"),
+                 "next_protection_job": _next_protection_job(ref_et.to_pydatetime()),
                  # Stated, never inferred. A panel showing Friday on a Sunday has to say so in
                  # the payload, or the page has no honest way to label it and the reader takes
                  # a closed session for the live one.
@@ -2006,7 +2231,7 @@ def build(root: str | Path = ".", *, day: str | None = None, now: Any = None,
 
     for sleeve, spec in SLEEVES.items():
         try:
-            slots = _slots_for(sleeve, rows, now_hhmm)  # noqa: E501  (settled below)
+            slots = _slots_for(sleeve, rows, now_hhmm, jobs_by_id, filled_trades)
             # Stage 5ZZZ-CO. MỘT công cụ cho cả hai pane. Trước đây nến lấy từ bảng ghi cứng
             # và đường lấy từ khối ghi cuối cùng của ngày — hai lựa chọn độc lập, không ai
             # đối chiếu, và với một rổ bốn công cụ chúng gần như chắc chắn khác nhau.
@@ -2076,8 +2301,7 @@ def build(root: str | Path = ".", *, day: str | None = None, now: Any = None,
             # times pass and ten times fail, so the slot cell has no value, while every bar
             # cell has exactly one and never changes (865 verdicts recomputed across a
             # session, 80 distinct, zero ever different).
-            blk["bar_grid"] = ((blk.get("strategy") or {}).get("diagnostics")
-                               or {}).get("bar_gate_grid") or None
+            blk["bar_grid"] = _bar_grid_payload(blk.get("strategy") or {})
             _settle_levels_note(blk)
         except Exception as exc:                                  # noqa: BLE001
             out["sleeves"][sleeve] = {

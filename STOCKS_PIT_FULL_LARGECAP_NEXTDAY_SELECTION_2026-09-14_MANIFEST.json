@@ -1,0 +1,100 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LARGECAP_NEXTDAY_SELECTION_2026-09-14",
+  "script": "raits/research/stocks_pit_full_largecap_nextday_selection.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv"
+  ],
+  "sample_period": [
+    "2018-03-29",
+    "2024-12-31"
+  ],
+  "universe": "PIT quarterly market-cap top-N eligible stocks from broad PIT daily feature cache.",
+  "entry_exit": "Signals on date t; simulated return from t 15:55 close to next available ticker close.",
+  "leakage_controls": "Selection uses only date-t features and latest prior/equal market-cap snapshot; return starts after selection date close.",
+  "variants": [
+    {
+      "variant": "top500_ret20_top20_gross100",
+      "pool": 500,
+      "selector": "high",
+      "signal": "ret20_pre",
+      "top_n": 20,
+      "gross": 1.0,
+      "filter": "none"
+    },
+    {
+      "variant": "top500_ret20_top50_gross100",
+      "pool": 500,
+      "selector": "high",
+      "signal": "ret20_pre",
+      "top_n": 50,
+      "gross": 1.0,
+      "filter": "none"
+    },
+    {
+      "variant": "top200_ret20_top20_gross100",
+      "pool": 200,
+      "selector": "high",
+      "signal": "ret20_pre",
+      "top_n": 20,
+      "gross": 1.0,
+      "filter": "none"
+    },
+    {
+      "variant": "top500_ret60vol_top20_gross100",
+      "pool": 500,
+      "selector": "high",
+      "signal": "ret60_over_vol20",
+      "top_n": 20,
+      "gross": 1.0,
+      "filter": "none"
+    },
+    {
+      "variant": "top500_prevday_bottom20_gross100",
+      "pool": 500,
+      "selector": "low",
+      "signal": "prev_dayret",
+      "top_n": 20,
+      "gross": 1.0,
+      "filter": "ret60_positive"
+    },
+    {
+      "variant": "top500_prevday_bottom50_gross100",
+      "pool": 500,
+      "selector": "low",
+      "signal": "prev_dayret",
+      "top_n": 50,
+      "gross": 1.0,
+      "filter": "ret60_positive"
+    },
+    {
+      "variant": "top500_gap_bottom20_gross100",
+      "pool": 500,
+      "selector": "low",
+      "signal": "gap",
+      "top_n": 20,
+      "gross": 1.0,
+      "filter": "ret60_positive"
+    },
+    {
+      "variant": "top500_ret20_top20_gross150",
+      "pool": 500,
+      "selector": "high",
+      "signal": "ret20_pre",
+      "top_n": 20,
+      "gross": 1.5,
+      "filter": "none"
+    }
+  ],
+  "costs": "4.0 bps per side approximated from holding turnover.",
+  "rule_selection": "None. Variant set fixed in VARIANTS before measuring.",
+  "old_62_usage": "None.",
+  "outputs": [
+    "STOCKS_PIT_FULL_LARGECAP_NEXTDAY_SELECTION_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LARGECAP_NEXTDAY_SELECTION_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_LARGECAP_NEXTDAY_SELECTION_2026-09-14_SPLITS.csv",
+    "STOCKS_PIT_FULL_LARGECAP_NEXTDAY_SELECTION_2026-09-14_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_LARGECAP_NEXTDAY_SELECTION_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_LARGECAP_NEXTDAY_SELECTION_2026-09-14_TRADES.csv"
+  ]
+}

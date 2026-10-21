@@ -1,0 +1,101 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_WASHOUT_REBOUND_PULSE_2026-09-14",
+  "script": "raits/research/stocks_pit_full_washout_rebound_pulse.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv"
+  ],
+  "sample_period": [
+    "2018-03-29",
+    "2024-12-31"
+  ],
+  "universe": "PIT quarterly market-cap top100/top500 stocks from broad PIT daily feature cache.",
+  "entry_exit": "Trigger known after close on date t; exposure earns t close to t+1 close; hold_days extends active exposure for subsequent close-to-close intervals.",
+  "leakage_controls": "Trigger uses date-t close/breadth information only; returns start after trigger date close.",
+  "variants": [
+    {
+      "variant": "top500_broadret_m2_hold1_gross100",
+      "pool": 500,
+      "trigger": "broad_ret",
+      "op": "<=",
+      "threshold": -0.02,
+      "hold_days": 1,
+      "gross": 1.0
+    },
+    {
+      "variant": "top500_broadret_m3_hold1_gross100",
+      "pool": 500,
+      "trigger": "broad_ret",
+      "op": "<=",
+      "threshold": -0.03,
+      "hold_days": 1,
+      "gross": 1.0
+    },
+    {
+      "variant": "top500_adv20_hold1_gross100",
+      "pool": 500,
+      "trigger": "adv_frac",
+      "op": "<=",
+      "threshold": 0.2,
+      "hold_days": 1,
+      "gross": 1.0
+    },
+    {
+      "variant": "top500_adv25_hold3_gross100",
+      "pool": 500,
+      "trigger": "adv_frac",
+      "op": "<=",
+      "threshold": 0.25,
+      "hold_days": 3,
+      "gross": 1.0
+    },
+    {
+      "variant": "top500_broadret_m2_hold3_gross100",
+      "pool": 500,
+      "trigger": "broad_ret",
+      "op": "<=",
+      "threshold": -0.02,
+      "hold_days": 3,
+      "gross": 1.0
+    },
+    {
+      "variant": "top100_broadret_m2_hold3_gross150",
+      "pool": 100,
+      "trigger": "broad_ret",
+      "op": "<=",
+      "threshold": -0.02,
+      "hold_days": 3,
+      "gross": 1.5
+    },
+    {
+      "variant": "top500_gapdown35_hold1_gross100",
+      "pool": 500,
+      "trigger": "gapdown_frac",
+      "op": ">=",
+      "threshold": 0.35,
+      "hold_days": 1,
+      "gross": 1.0
+    },
+    {
+      "variant": "top500_broadret_m15_adv30_hold3_gross100",
+      "pool": 500,
+      "trigger": "combo_broadret_adv",
+      "op": "combo",
+      "threshold": 0.0,
+      "hold_days": 3,
+      "gross": 1.0
+    }
+  ],
+  "costs": "4.0 bps entry cost when pulse turns active; no explicit exit cost because cash transition is modeled as return stream diagnostic.",
+  "rule_selection": "None. Variant set fixed in VARIANTS before measuring.",
+  "old_62_usage": "None.",
+  "outputs": [
+    "STOCKS_PIT_FULL_WASHOUT_REBOUND_PULSE_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_WASHOUT_REBOUND_PULSE_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_WASHOUT_REBOUND_PULSE_2026-09-14_SPLITS.csv",
+    "STOCKS_PIT_FULL_WASHOUT_REBOUND_PULSE_2026-09-14_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_WASHOUT_REBOUND_PULSE_2026-09-14_TRIGGER_QA.csv",
+    "STOCKS_PIT_FULL_WASHOUT_REBOUND_PULSE_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_WASHOUT_REBOUND_PULSE_2026-09-14_TICKER_CONTRIB.csv"
+  ]
+}

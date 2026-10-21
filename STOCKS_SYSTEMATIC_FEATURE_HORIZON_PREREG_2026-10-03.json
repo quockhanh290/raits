@@ -1,0 +1,54 @@
+{
+  "research_question": "Which causal Polygon equity features have a cross-sectional return relationship that survives temporal replication across fixed horizons?",
+  "frozen_before_performance": true,
+  "frozen_at_local_date": "2026-10-03",
+  "script": "raits/research/stocks_systematic_feature_horizon_map.py",
+  "script_hash": "F2A49383C336FAD0311C423991A17507745BF039DA50DA88738EC61E2D7176DF",
+  "technical_corrections_before_performance": [
+    "Before the first outcome run, arbitrary short-interest settlement dates were mapped directly to the tenth market session strictly after settlement rather than using a session-index lookup that requires settlement itself to be a trading session. No feature, horizon, split, or gate changed."
+  ],
+  "splits": {
+    "discovery": "2018-03-29 through 2020-12-31",
+    "temporal_replication": "2021-01-01 through 2021-12-31",
+    "conditional_confirmation": "2022-01-01 through 2022-12-30; opened only for cells passing discovery and replication"
+  },
+  "families": {
+    "tape_yday_and_gap": [
+      "unique_exchanges", "exchange_dollar_hhi", "trf_dollar_share", "lit_flow_imbalance",
+      "large_lit_flow_imbalance", "large_trade_dollar_share_fixed100k", "block_dollar_share_size1000",
+      "sub100_share_dollar_share", "odd_lot_condition_dollar_share", "odd_lot_flow_imbalance",
+      "sweep_dollar_share", "cross_dollar_share", "official_open_dollar_share",
+      "official_open_discount_to_signal_vwap", "median_sip_latency_us", "p90_sip_latency_us",
+      "median_interarrival_us", "burst_share_top_second"
+    ],
+    "short_interest": ["log_short_interest_change", "days_to_cover", "days_to_cover_change"],
+    "news": ["article_count", "publisher_count", "single_ticker_article_share"],
+    "edgar": ["event_8k", "event_10q", "event_10k", "event_form4", "event_13dg", "event_offering"]
+  },
+  "horizons": {
+    "tape": ["10:05-to-15:55 intraday", "10:05-to-next-09:35 overnight", "10:05-to-session-5 close", "10:05-to-session-20 close"],
+    "short_news_edgar": ["09:35-to-same-session close", "09:35-to-session-5 close", "09:35-to-session-20 close"]
+  },
+  "availability": {
+    "tape": "SIP records strictly before 10:00; exact 10:05 entry",
+    "news": "same-session 09:35 only when published before 09:25 ET; otherwise next-session 09:35",
+    "edgar": "always next-session 09:35 because the index supplies filing date but not a safe intraday timestamp",
+    "short_interest": "ten market-session lag after settlement, then 09:35 entry",
+    "universe": "quarterly PIT market-cap top500 intersected with daily PIT eligibility; old/manual 62 unused"
+  },
+  "statistics": {
+    "continuous": "same-date top quintile return minus bottom quintile return",
+    "binary_edgar": "event-category mean return minus other filing-event names on the same date",
+    "p_value": "two-sided normal approximation to the t statistic of daily spreads",
+    "multiple_testing": "Benjamini-Hochberg across every frozen discovery cell at q <= 0.10"
+  },
+  "gates": {
+    "discovery_min_dates": 60,
+    "discovery_min_top_and_bottom_observations": 400,
+    "minimum_absolute_spread": {"intraday": 0.001, "overnight": 0.001, "d1": 0.0015, "d5": 0.004, "d20": 0.008},
+    "replication": "same sign, directional t >= 1.0, absolute spread >= 25% of discovery, >=20 dates and >=100 observations per side",
+    "confirmation": "same sign and directional t >= 0.5"
+  },
+  "interpretation": "This is an edge-discovery map, not a portfolio backtest or production PASS. Any surviving cell requires a separately preregistered full-refill compounding replay.",
+  "multiple_testing_policy": "No feature, horizon, direction, split, or gate changes after the first outcome run. All cells, including failures, must be retained."
+}

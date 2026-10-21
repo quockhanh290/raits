@@ -1,0 +1,56 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17",
+  "script": "raits/research/stocks_pit_full_rolling_sic_pairs.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv"
+  ],
+  "method": "Rolling PIT top500 same-SIC pairs; 120-session formation, frozen return-beta spread parameters, close signal and next-session 09:35 execution.",
+  "pair_rules": {
+    "formation_days": 120,
+    "min_observations": 100,
+    "min_correlation": 0.6,
+    "max_pairs_per_sic": 2,
+    "ticker_reuse_per_formation": false
+  },
+  "trade_rules": {
+    "entry_z": 2.0,
+    "exit_z": 0.5,
+    "max_active_pairs": 10,
+    "gross_cap": 1.0
+  },
+  "costs": "4.0 bps aggregate target-weight turnover and 1.0% annual borrow on short gross.",
+  "sample_label": "Research/touched 2018-2024 only; first valid formation requires 120 local sessions. 2023-2024 is touched, not clean unseen OOS. No 2025-2026 opened.",
+  "leakage_controls": "Formation and frozen parameters use only sessions through formation close; signals execute next session at 09:35; PIT market-cap/SIC snapshots assigned backward; no old manual 62 list.",
+  "rule_selection_effect": "None. Formation windows/frequencies, pair constraints, z thresholds, max holds, active-pair cap and costs were fixed before measuring.",
+  "trade_selection_effect": "Pairs are fully re-formed from prior data at each scheduled formation; active positions are rebuilt by the state machine, not ticker-PnL subtraction.",
+  "variants": [
+    {
+      "variant": "sic_pairs_monthly_z2_hold5",
+      "frequency": "monthly",
+      "max_hold": 5
+    },
+    {
+      "variant": "sic_pairs_monthly_z2_hold10",
+      "frequency": "monthly",
+      "max_hold": 10
+    },
+    {
+      "variant": "sic_pairs_quarterly_z2_hold10",
+      "frequency": "quarterly",
+      "max_hold": 10
+    }
+  ],
+  "outputs": [
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_FORMATIONS.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_SIGNALS.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TRADE_EVENTS.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_QA.csv"
+  ]
+}

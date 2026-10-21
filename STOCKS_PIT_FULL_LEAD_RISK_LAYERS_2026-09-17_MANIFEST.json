@@ -1,0 +1,47 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LEAD_RISK_LAYERS_2026-09-17",
+  "script": "raits/research/stocks_pit_full_lead_risk_layers.py",
+  "engine": "raits/research/stocks_pit_full_lead_candidate_eventtime_audit.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TRADE_EVENTS.csv",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl"
+  ],
+  "pre_registered_variants": [
+    {
+      "variant": "baseline",
+      "spy_cap": null,
+      "annual_loss_limit": null
+    },
+    {
+      "variant": "target_gross2",
+      "spy_cap": 1.5,
+      "annual_loss_limit": null
+    },
+    {
+      "variant": "annual_loss10",
+      "spy_cap": null,
+      "annual_loss_limit": 0.1
+    },
+    {
+      "variant": "target_gross2_annual_loss10",
+      "spy_cap": 1.5,
+      "annual_loss_limit": 0.1
+    }
+  ],
+  "target_gross_rule": "Reserve 0.5x target gross for frozen pairs and cap SPY target at 1.5x, giving a 2.0x target-gross budget. Mark-to-market gross can temporarily exceed 2.0x between rebalances.",
+  "loss_budget_rule": "At the first 15:55 equity mark at or below 90% of start-of-calendar-year equity, liquidate SPY and pairs at that 15:55 mark, charge turnover, remain flat through year-end, and reset for the next calendar year.",
+  "sample_label": "Diagnostic on touched research sample 2018-2024. No 2025-2026 opened.",
+  "selection_warning": "Risk family was frozen before this run, but it was motivated by the already-observed 2022 loss. It is diagnostic, not unseen OOS evidence.",
+  "outputs": [
+    "STOCKS_PIT_FULL_LEAD_RISK_LAYERS_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LEAD_RISK_LAYERS_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_LEAD_RISK_LAYERS_2026-09-17_TRIGGERS.csv",
+    "STOCKS_PIT_FULL_LEAD_RISK_LAYERS_2026-09-17_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_LEAD_RISK_LAYERS_2026-09-17_SLEEVE_ATTRIBUTION.csv",
+    "STOCKS_PIT_FULL_LEAD_RISK_LAYERS_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_LEAD_RISK_LAYERS_2026-09-17_EVENT_LEDGER.csv",
+    "STOCKS_PIT_FULL_LEAD_RISK_LAYERS_2026-09-17_QA.csv"
+  ]
+}

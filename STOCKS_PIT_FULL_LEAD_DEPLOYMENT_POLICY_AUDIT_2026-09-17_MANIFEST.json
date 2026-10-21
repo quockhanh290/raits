@@ -1,0 +1,21 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LEAD_DEPLOYMENT_POLICY_AUDIT_2026-09-17",
+  "script": "raits/research/stocks_pit_full_lead_deployment_policy_audit.py",
+  "inputs": [
+    "raits/data/cache/stocks_survivorship/polygon_universe_bulk/daily_20180102_20241231_resumable/liquidity_filter_daily_20180102_20241231_px5_adv10m_unadjusted/filtered_daily_universe.parquet",
+    "STOCKS_PIT_FULL_LEAD_CRISIS_EVENTTIME_AUDIT_2026-09-17_EVENT_LEDGER.csv",
+    "STOCKS_PIT_FULL_LEAD_CRISIS_EVENTTIME_AUDIT_2026-09-17_DAILY.csv"
+  ],
+  "frozen_source_hashes": {
+    "STOCKS_PIT_FULL_RESIDUAL_REVERSAL_COHORTS_2026-09-17_SIGNALS.csv": "32d875ef78ab5db8ccec327071511cc013ef77b6a211d1cf45dcc0478c90d5c5",
+    "raits/research/stocks_pit_full_lead_crisis_eventtime_audit.py": "dbf64337ec90660f34fb1007c1d6544efa3b71d7221c9f9b208504faa136e73a",
+    "raits/research/stocks_pit_full_lead_candidate_eventtime_audit.py": "99aa06c56f10b64d8bf2fc0d7742f1800bd27e04ee71405628061b00b5524e89"
+  },
+  "outputs": [
+    "STOCKS_PIT_FULL_LEAD_DEPLOYMENT_POLICY_AUDIT_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LEAD_DEPLOYMENT_POLICY_AUDIT_2026-09-17_CAPACITY_TOP.csv",
+    "STOCKS_PIT_FULL_LEAD_DEPLOYMENT_POLICY_AUDIT_2026-09-17_MISSING_EVENTS.csv",
+    "STOCKS_PIT_FULL_LEAD_DEPLOYMENT_POLICY_AUDIT_2026-09-17_FROZEN_SPEC.json"
+  ],
+  "selection_warning": "Policies are frozen after touched-sample research. Audit does not constitute production validation or clean OOS evidence."
+}

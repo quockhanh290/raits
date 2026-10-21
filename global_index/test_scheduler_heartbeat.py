@@ -234,3 +234,124 @@ def test_hb11_stall_warnings_are_never_filtered():
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+# ── IB Gateway reachability ───────────────────────────────────────────────────
+#
+# Measured 2026-09-23. IB Gateway was last launched on 19/9 and died with everything
+# else in the 21/9 hybrid shutdown. Nothing reopened it, because nothing can: it is a
+# GUI application that wants a login, so the logon task that restores the scheduler
+# restores only half the system. The scheduler can therefore come up perfectly healthy
+# with nothing to connect to, and every slot in that state fails one at a time, quietly,
+# the way the 22→23/9 NKD window did.
+#
+# The probe reads the OS socket table. It does NOT open a connection to the Gateway:
+# a connect-and-close every 60 seconds would put 1440 connection attempts a day into
+# IB's own log and count against its client limits, which is a poor way to ask "are you
+# there".
+
+def _verdict(listening, *, misses=99, minute=30, in_restart_window=False, outstanding=False):
+    from global_index.run_scheduler import gateway_alarm_verdict
+    return gateway_alarm_verdict(listening, misses=misses, minute=minute,
+                                 in_restart_window=in_restart_window,
+                                 outstanding=outstanding)
+
+
+def test_gw1_a_probe_that_cannot_answer_never_raises_an_alarm():
+    """Three states, not two — the ProcessScan lesson, one layer down.
+
+    psutil can fail or be refused the socket table. Collapsing that into "not listening"
+    is how a monitoring bug becomes a 3am alarm about a Gateway that was running fine,
+    and an alarm that has cried wolf once is an alarm the operator mutes.
+    """
+    assert _verdict(None) == "unknown"
+    assert _verdict(None, outstanding=True) == "unknown", (
+        "a failed probe must not clear a real outage either — it knows nothing")
+
+
+def test_gw2_one_missed_beat_is_not_an_outage():
+    """Gateway is restarted, upgraded and reconnected routinely; a single miss is normal."""
+    assert _verdict(False, misses=1) == "quiet"
+    assert _verdict(False, misses=2) == "quiet"
+    assert _verdict(False, misses=3) == "warn", (
+        "three consecutive minutes with nothing listening is not a blip")
+
+
+def test_gw3_the_nightly_gateway_restart_is_not_an_outage():
+    """Gateway restarts itself every day from 00:00 machine time for about half an hour.
+
+    Six NKD slots at 02:00-02:25 ET were already lost to exactly this window, refused
+    with ConnectionRefusedError [WinError 1225]. That is a known, unsolved cost — but it
+    is not news, and an alarm that fires every single night is one people learn to skip.
+    """
+    assert _verdict(False, misses=99, in_restart_window=True) == "restart_window"
+
+
+def test_gw4_a_long_outage_does_not_shout_every_minute():
+    """Latched like the stall flag, with one reminder an hour."""
+    assert _verdict(False, misses=99, outstanding=True, minute=30) == "quiet"
+    assert _verdict(False, misses=99, outstanding=True, minute=0) == "warn", (
+        "an outage lasting hours must resurface, or the one line scrolls away")
+
+
+def test_gw5_the_gateway_coming_back_is_announced():
+    """The off switch must not lag the on switch — same rule the heartbeat learned."""
+    assert _verdict(True, outstanding=True) == "recovered"
+    assert _verdict(True, outstanding=False) == "quiet", "no news is not news"
+
+
+def test_gw6_the_heartbeat_job_actually_probes_the_port(caplog, monkeypatch):
+    """Drives the REAL closure. A verdict function nothing calls is the whole defect family.
+
+    This is the test that would have caught `autostart_ops.cmd`: the logic can be right
+    in every branch and still be wired to nothing.
+    """
+    import logging
+    from global_index import run_scheduler as rs
+
+    job = _sched().get_job("heartbeat")
+    assert job is not None and getattr(job, "func", None) is not None, (
+        "no heartbeat job to drive — the locator is broken, not satisfied")
+
+    monkeypatch.setattr(rs, "_in_ibkr_restart_window", lambda: False)
+    rs._last_beat["t"] = None
+    rs._stall_outstanding["v"] = False
+    rs._gateway_missed["n"] = 0
+    rs._gateway_outstanding["v"] = False
+
+    with caplog.at_level(logging.DEBUG, logger="run_scheduler"):
+        monkeypatch.setattr(rs, "ibkr_port_is_listening", lambda port: False)
+        for _ in range(3):
+            job.func()
+        shown = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
+        assert any("GATEWAY" in m for m in shown), (
+            f"three beats with a dead Gateway and the scheduler said nothing — exactly "
+            f"the silence that lost the 22/9 night window: {shown}")
+        assert rs._gateway_outstanding["v"] is True
+
+        caplog.clear()
+        monkeypatch.setattr(rs, "ibkr_port_is_listening", lambda port: True)
+        job.func()
+        back = [r.getMessage() for r in caplog.records if r.levelno >= logging.INFO]
+        assert any("GATEWAY" in m for m in back), (
+            f"the Gateway came back and nothing marked the recovery: {back}")
+        assert rs._gateway_outstanding["v"] is False
+
+
+def test_gw7_the_probe_reads_the_socket_table_without_dialling_the_gateway():
+    """A real probe against this host, asserted on shape rather than on what is running.
+
+    Pinned because the cheap implementation — socket.create_connection — passes every
+    behavioural test above while quietly dialling IB 1440 times a day.
+    """
+    import inspect
+    from global_index.run_scheduler import ibkr_port_is_listening
+
+    src = inspect.getsource(ibkr_port_is_listening)
+    assert "create_connection" not in src and "connect_ex" not in src, (
+        "the probe opens a connection to the Gateway; read the OS socket table instead")
+
+    assert ibkr_port_is_listening(4002) in (True, False, None)
+    # Port 0 is never listened on, so this is the one answer we can assert outright
+    # without depending on what happens to be running on this machine.
+    assert ibkr_port_is_listening(0) in (False, None), "port 0 cannot be listening"

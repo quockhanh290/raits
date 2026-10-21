@@ -98,8 +98,13 @@ def test_they_are_untouched_in_the_transitional_mode(transitional, legacy_safety
 def test_track1_keeps_its_own_safety_net(track1_only):
     """Gỡ một lưới thì lưới kia phải còn. Không có phép kiểm này, bản sửa có thể bỏ
     protection của CẢ HAI tuyến mà mọi assert ở trên vẫn xanh."""
-    own = {j for j in track1_only if j.startswith(("track1_stop_repair", "track1_maxhold"))}
-    assert len(own) == len(ts.track1_safety_jobs()) == 11, sorted(own)
+    own = {j for j in track1_only
+           if j.startswith(("track1_stop_repair", "track1_maxhold", "track1_time_exit"))}
+    assert len(own) == len(ts.track1_safety_jobs()), sorted(own)
+    import collections
+    kinds = collections.Counter(j.kind for j in ts.track1_safety_jobs())
+    # one 09:31 max-hold, one 15:55 clock exit (2026-10-05), nine weekday sweeps + Sunday 18:30
+    assert (kinds["maxhold"], kinds["time_exit"], kinds["stop_repair"]) == (1, 1, 10), kinds
 
 
 def test_shared_infrastructure_survives(track1_only):

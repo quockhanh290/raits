@@ -61,9 +61,83 @@ def _read_json(path: Path) -> dict:
 
 def _book(root: Path) -> dict:
     out = _read_json(root / BOOK_PATH)
+    # The route is designed, sized, and risk-limited on its own USD 50k ledger. Publish
+    # that base beside the persisted book so clients never substitute IBKR NetLiquidation.
+    from global_index.track1_params import ACCOUNT
+    out["account_base"] = float(ACCOUNT)
+    out["currency"] = "USD"
+    out["equity_semantics"] = (
+        "Track 1 system book equity; broker equity is reference context only"
+    )
     if not out["present"]:
         out["reading"] = ("absent — the expected state during a shadow period: the route "
                           "places no orders, so it has no book to persist")
+    return out
+
+
+
+#: The route's own order journal. The only file that records what actually reached the broker.
+ORDERS_DIRNAME = "global_index/track1_runtime/orders"
+
+
+def _orders(root: Path) -> dict:
+    """What the route has actually sent, from its own journal.
+
+    Added 2026-09-24, the day it was needed and did not exist. Two orders filled at the broker
+    that afternoon and no endpoint read the journal, so the fills appeared on no panel at all —
+    they were found by opening the file. A surface that cannot show the one artefact proving an
+    order happened is a surface that cannot be used to check an order happened.
+
+    `filled_qty_zero` is named rather than smoothed. Both fills that day carried
+    `fill_status=FILLED` with `filled_qty: 0`; printing the broker's number without comment
+    teaches a reader the route filled nothing, and quietly substituting the intended size hides
+    a discrepancy that is real. So it is counted and shown.
+    """
+    d = root / ORDERS_DIRNAME
+    if not d.is_dir():
+        return {"present": False, "rows": [], "sent": 0, "filled": 0, "filled_qty_zero": 0,
+                "reading": "no order journal directory — the route has sent no order yet"}
+    files = sorted(d.glob("track1_orders_*.jsonl"))
+    if not files:
+        return {"present": False, "rows": [], "sent": 0, "filled": 0, "filled_qty_zero": 0,
+                "reading": "no order journal file — the route has sent no order yet"}
+    rows, unreadable = [], []
+    for f in files[-3:]:                     # the recent days a panel can usefully show
+        try:
+            text = f.read_text(encoding="utf-8", errors="replace")
+        except Exception as exc:             # noqa: BLE001
+            unreadable.append(f"{f.name}: {type(exc).__name__}")
+            continue
+        for line in text.splitlines():
+            if not line.strip():
+                continue
+            try:
+                r = json.loads(line)
+            except Exception:                # noqa: BLE001
+                unreadable.append(f"{f.name}: a line would not parse")
+                continue
+            rows.append({
+                "day": r.get("ref_day"), "slot_id": r.get("slot_id"),
+                "sleeve": r.get("sleeve"), "instrument": r.get("instrument"),
+                "action": r.get("action"), "state": r.get("state"),
+                "order_id": r.get("order_id"), "qty": r.get("qty"),
+                "fill_price": r.get("avg_price"), "commission": r.get("commission"),
+                "fill_reported_qty": r.get("filled_qty"), "error": r.get("error"),
+                "trade_id": r.get("candidate_id"),
+            })
+    filled = [r for r in rows if str(r.get("state")) == "filled"]
+    out = {
+        "present": True,
+        "rows": rows,
+        "sent": len({(r["trade_id"], r["action"]) for r in rows}),
+        "filled": len(filled),
+        # A FILLED order whose reported quantity is zero. Named, not averaged away.
+        "filled_qty_zero": sum(1 for r in filled if not (r.get("fill_reported_qty") or 0)),
+        "unreadable": unreadable,
+    }
+    if unreadable:
+        out["reading"] = ("part of the journal could not be read; counts below are a FLOOR, "
+                          "not a total")
     return out
 
 
@@ -517,10 +591,18 @@ def _explanations(root: Path) -> dict:
     # and the gate cannot disagree about where a day's rows live. A test asserts they find
     # the same files; the version before 5Q-1 globbed one directory too shallow and reported
     # zero rows on every real shadow day.
-    days = sorted({f.stem.replace("explanations_", "")
-                   for f in d.rglob("explanations_*.jsonl")})
-    for day in days:
-        files = acc.explanation_files(root, day)
+    # Plan stage 5 (2026-09-24). This walked the whole tree once to list the days, then once
+    # more PER DAY inside `explanation_files` — cProfile on 20 days / 1,192 files: 3.58 s of the
+    # endpoint's ~3.5 s, 2.79 s of it in `rglob` and 27,346 `stat` calls. The same resolver is
+    # called ONCE with no day (it then matches `explanations_*.jsonl` at any depth, the rule the
+    # per-day call applies to one name) and its files are grouped by the day in their name. Same
+    # files per day by construction; the before/after equality is pinned in
+    # monitor/test_track1_runtime_timing_20260924.py against output saved BEFORE this change.
+    by_day: dict = {}
+    for f in acc.explanation_files(root, ""):
+        by_day.setdefault(f.stem.replace("explanations_", ""), []).append(f)
+    for day in sorted(by_day):
+        files = by_day[day]
         out["days"][day] = sum(
             sum(1 for line in f.read_text(encoding="utf-8").splitlines() if line.strip())
             for f in files)
@@ -543,6 +625,80 @@ def _gates() -> dict:
     ok, why = g.may_enable_orders()
     return {"blocking_now": led.get("blocking_now"), "orders_possible": ok,
             "orders_detail": why if not ok else ""}
+
+
+def _latest_breaker_row(root: Path) -> dict | None:
+    """Newest durable slot row that actually reported breaker arming state."""
+    d = root / COVERAGE_DIR
+    if not d.is_dir():
+        return None
+    for f in sorted(d.glob("window_coverage_*.jsonl"), reverse=True):
+        try:
+            lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
+        except Exception:                                      # noqa: BLE001
+            continue
+        for line in reversed(lines):
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except Exception:                                  # noqa: BLE001
+                continue
+            if row.get("event") == "slot_observed" and (
+                    "breaker_armed" in row or "breaker_unarmed_reason" in row):
+                return row
+    return None
+
+
+def _num(payload: dict, key: str) -> float | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _breaker(root: Path) -> dict:
+    """Track 1's own breaker status, for reporting only.
+
+    The route's signal layer owns the arming decision, including the plausibility band that
+    refuses broker-scale values, P&L deltas, and zeros as equity marks. This reader calls that
+    same function rather than carrying a dashboard-side copy of the rule. When the book carries
+    usable marks, the display level is computed by the same CircuitBreaker class the route uses,
+    with its existing thresholds.
+    """
+    source = str(root / BOOK_PATH)
+    try:
+        from futures.circuit_breaker import CircuitBreaker
+        from global_index.track1_signal_layer import route_book_breaker_state
+
+        state = route_book_breaker_state(root / BOOK_PATH)
+    except Exception as exc:                                    # noqa: BLE001
+        return {"present": True, "armed": None, "level": "UNKNOWN",
+                "status": "UNKNOWN", "allow_new_entries": None,
+                "source": source,
+                "reason": f"breaker status could not be computed ({type(exc).__name__}: {exc})"}
+
+    source = state.get("source") or source
+    if not state["armed"]:
+        return {"present": True, "armed": False, "level": "UNARMED",
+                "status": "UNARMED", "allow_new_entries": None,
+                "source": source, "reason": state.get("reason") or "breaker was not armed"}
+
+    try:
+        cb = CircuitBreaker()
+        cb.peak_equity = state["peak_equity"]
+        cb._day_start_equity = state["day_start_equity"]
+        status = cb.status(state["equity"])
+        return {"present": True, "armed": True, "status": "ARMED",
+                "source": source, **status}
+    except Exception as exc:                                    # noqa: BLE001
+        return {"present": True, "armed": None, "level": "UNKNOWN",
+                "status": "UNKNOWN", "allow_new_entries": None,
+                "source": source,
+                "reason": f"breaker status could not be computed ({type(exc).__name__}: {exc})"}
 
 
 def _safety() -> dict:
@@ -583,6 +739,7 @@ def _audits(root: Path) -> dict:
                 "reading": "no audit directory; the post-window audit has never run here — "
                            "this is 'not judged yet', not 'passed'"}
     days: dict = {}
+    records: list[dict] = []
     for f in sorted(d.glob("track1_audit_*.jsonl")):
         for line in f.read_text(encoding="utf-8").splitlines():
             if not line.strip():
@@ -591,6 +748,7 @@ def _audits(root: Path) -> dict:
                 rec = json.loads(line)
             except Exception:                              # noqa: BLE001
                 continue
+            records.append(rec)
             day = str(rec.get("date") or rec.get("session_day") or "")
             if not day:
                 continue
@@ -603,6 +761,7 @@ def _audits(root: Path) -> dict:
                 entry["sleeves"][str(rec.get("sleeve"))] = {
                     "verdict": rec.get("verdict"), "ts": rec.get("ts"),
                     "reasons": rec.get("reasons") or [],
+                    "details": rec.get("details") or [],
                     "expected_slots": rec.get("expected_slots"),
                     "observed_slots": rec.get("observed_slots"),
                     "missing_slot_ids": rec.get("missing_slot_ids") or [],
@@ -623,6 +782,32 @@ def _audits(root: Path) -> dict:
         missing = [s for s in _audit_sleeves()
                    if s not in (days[latest]["sleeves"] if latest else {})]
         out["not_audited_yet"] = missing
+        try:
+            from global_index import track1_audit_reinterpretation as _reinterpret
+
+            reinterpretation = _reinterpret.reinterpret_day(latest, root, records=records)
+            for sleeve, info in (reinterpretation.get("sleeves") or {}).items():
+                row = ((out.get("latest") or {}).get("sleeves") or {}).get(sleeve)
+                if not row:
+                    continue
+                classification = info.get("classification") or {}
+                reevaluated = info.get("reevaluated") or {}
+                if (row.get("verdict") == "FAIL"
+                        and classification.get("solely_stale")
+                        and reevaluated.get("authoritative") is True
+                        and reevaluated.get("verdict") == "PASS"):
+                    row["stored_verdict"] = row.get("verdict")
+                    row["stored_reasons"] = list(row.get("reasons") or [])
+                    row["verdict"] = "PASS"
+                    row["reasons"] = []
+                    row["reinterpretation"] = {
+                        "status": "stored_fail_reinterpreted",
+                        "stale_reasons": classification.get("stale_reasons") or [],
+                        "why_stale": classification.get("why_stale") or {},
+                        "reevaluated_verdict": reevaluated.get("verdict"),
+                    }
+        except Exception as exc:                              # noqa: BLE001
+            out["reinterpretation_error"] = f"{type(exc).__name__}: {exc}"
     return out
 
 
@@ -793,12 +978,15 @@ def read_track1_runtime(root: str | Path = ".") -> dict:
         "source": "track1_runtime",
         "route": ROUTE,
         "book": _book(root),
+        # Added 2026-09-24: the journal is the only record that an order reached the broker.
+        "orders": _orders(root),
         "checkpoint": _checkpoint(root),
         "window_coverage": _coverage(root),
         "slot_timing": _timing(root),
         "explanations": _explanations(root),
         "audits": _audits(root),
         "gates": _gates(),
+        "breaker": _breaker(root),
         "safety": _safety(),
         "signals": _signals(root),
         "paper_account": _paper_account(root),

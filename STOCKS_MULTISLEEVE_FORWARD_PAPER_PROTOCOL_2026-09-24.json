@@ -1,0 +1,76 @@
+{
+  "title": "Frozen forward-paper protocol for the 75/25 multi-sleeve lead",
+  "created_date": "2026-09-24",
+  "status": "ARMED_FORWARD_START_PENDING_NEW_SESSION",
+  "lead": {
+    "pairs_source": "sic_pairs_quarterly_z2_hold10",
+    "pairs_weight": 0.75,
+    "calendar_source": "spy_first5_x25_fin25_cost4",
+    "calendar_weight": 0.25,
+    "signal_stream_policy": "Both paper accounts consume the identical timestamped source-target stream. Scale is the only difference."
+  },
+  "accounts": [
+    {
+      "account": "lead_1x_primary",
+      "initial_equity": 100000.0,
+      "scale": 1.0,
+      "gross_cap": 1.4,
+      "max_drawdown_halt": -0.12
+    },
+    {
+      "account": "lead_15x_challenger",
+      "initial_equity": 100000.0,
+      "scale": 1.5,
+      "gross_cap": 2.1,
+      "max_drawdown_halt": -0.15
+    }
+  ],
+  "execution_policy": {
+    "pairs_clock": "09:35 America/New_York",
+    "calendar_clock": "15:55 America/New_York",
+    "source_target_weights": "Pairs targets are gross-normalized source weights. Calendar target is SPY exposure 0.0 or 2.5.",
+    "ticker_aggregation": "Aggregate all source target weights by ticker before computing an order.",
+    "stock_single_name_abs_weight_cap": 0.10,
+    "etf_single_name_abs_weight_cap": 1.00,
+    "order_adv_participation_cap": 0.01,
+    "simulated_half_spread_and_slippage_bps_per_traded_dollar": 4.0,
+    "short_borrow_annual_rate": 0.01,
+    "financing_annual_rate_on_gross_above_1x": 0.025,
+    "borrow_policy": "No new or increased short position when borrow_available is false; covering is allowed.",
+    "missing_price_policy": "Reject new exposure without an exact clock price. Carry an existing position at its last mark for at most one session, halt new risk while stale, and record a hard violation if still stale after one session.",
+    "drawdown_policy": "At or below the account threshold, status becomes HALTED_DRAWDOWN and the next available clock targets zero. Resume requires an explicit new protocol; there is no automatic cooldown."
+  },
+  "input_contract": {
+    "targets": ["effective_date", "clock", "signal_timestamp", "source", "ticker", "source_target_weight"],
+    "flat_snapshot_ticker": "__FLAT__ with source_target_weight 0 declares a complete empty source snapshot and requires no market row.",
+    "market": ["effective_date", "clock", "timestamp", "ticker", "price", "adv20", "borrow_available", "asset_type"],
+    "allowed_clocks": ["0935", "1555"],
+    "allowed_sources": ["pairs", "calendar"],
+    "asset_types": ["stock", "etf"],
+    "causality": "signal_timestamp must be no later than the market timestamp used for the simulated fill."
+  },
+  "paper_evaluation": {
+    "minimum_sessions": 126,
+    "target_sessions": 252,
+    "rules_frozen_during_test": true,
+    "required": [
+      "No causality, gross-cap, stale-price, borrow, or ledger-reconciliation hard violation.",
+      "Report gross and net PnL, dollar and percentage drawdown, turnover, trading cost, borrow, financing, rejected/partial fills, and concentration for both accounts.",
+      "The 1.5x account is not promoted if it hits -15% drawdown or if its return uplift does not compensate financing and execution cost."
+    ],
+    "production_pass_allowed": false
+  },
+  "launch_guard": {
+    "post_2024_data_default": "REFUSE",
+    "required_cli_override": "--allow-post-2024",
+    "current_approval": true,
+    "approval_recorded": "User explicitly approved proceeding with post-2024 data on 2026-09-24. Historical 2025-2026 remains touched implementation replay, not forward paper PnL.",
+    "latest_touched_session": "2026-09-16",
+    "genuine_forward_start": "First market session strictly after 2026-09-24.",
+    "paper_pnl_before_launch": 0.0
+  },
+  "implementation_freeze": {
+    "script": "raits/research/stocks_multisleeve_forward_paper.py",
+    "script_hash": "57E3886E9D2663BC66D75B8F163BC639BC1F5C7D0D74821D4450526AECA05374"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "script": "D:/raits/raits/research/stocks_pit_medium_horizon_replay.py",
+  "scriptHash": "F0A10737D3BBAC7157514B34504B64B510414ED68EC05E8DC59D92F556D8CE5A",
+  "preregistration": "STOCKS_PIT_MEDIUM_HORIZON_PREREG_2026-10-03.json",
+  "preregistrationHash": "8382AF7AD5C22026FDD98F3FDCDCFFA502449798934317973DD499EDA27B0F2A",
+  "inputs": {
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl": "C65065EA082D68544A5CD87C8DAD9A81CEE0B92A49A34D3C18C162A9EDED4AEC",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv": "C184A810909371F7DB5A3F6926417496A77B97BBAF97ED14B017E3BDD42115D4",
+    "raits/data/cache/stocks_survivorship/polygon_universe_bulk/daily_20180102_20241231_resumable/liquidity_filter_daily_20180102_20241231_px5_adv10m_unadjusted/filtered_daily_universe.parquet": "FD696E0BD91E3B951C86FFF89734AF908759E11829715B9C1983604E356E8B2C"
+  },
+  "selection": {
+    "status": "KILL_NO_DEVELOPMENT_PASS",
+    "selectedVariant": null,
+    "validationOpened": false,
+    "productionPassAllowed": false
+  },
+  "development": [
+    "2018-03-29",
+    "2021-12-31"
+  ],
+  "validation": null,
+  "oldManual62Used": false,
+  "post2022Consumed": false,
+  "productionPassAllowed": false,
+  "causality": "T-1 daily signals; exact 09:35 non-overlapping weekly/monthly cohorts; daily MTM"
+}

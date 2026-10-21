@@ -1,0 +1,15 @@
+{
+  "chunks": 1639,
+  "date_policy": "only dates already present in 2024 probe windows; does not request 2025-2026",
+  "eligible_missing_symbol_days": 25596,
+  "max_end": "2024-12-31",
+  "min_start": "2024-05-20",
+  "output_dir": "raits/data/cache/polygon_5min_pit_limited_probe_2024",
+  "outputs": [
+    "STOCKS_PIT_LIMITED_5MIN_FETCH_SYMBOLS_2026-09-12.csv",
+    "STOCKS_PIT_LIMITED_5MIN_FETCH_CHUNKS_2026-09-12.csv"
+  ],
+  "purpose": "limited Polygon 5m fetch plan for PIT probe-window eligible symbols missing from current Polygon-62 cache",
+  "source_coverage": "STOCKS_PIT_MARKET_DATA_COVERAGE_PROBE_2026-09-12.csv",
+  "symbols": 539
+}

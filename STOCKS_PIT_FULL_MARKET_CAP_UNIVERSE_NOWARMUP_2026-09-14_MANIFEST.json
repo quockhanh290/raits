@@ -1,0 +1,69 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_MARKET_CAP_UNIVERSE_NOWARMUP_2026-09-14",
+  "market_cap_csv": "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv",
+  "source": "Polygon ticker details market_cap, fetched at quarterly PIT eligible snapshots.",
+  "top_ns": [
+    62,
+    100,
+    200,
+    500
+  ],
+  "variants": [
+    {
+      "variant": "market_cap_top62_quarterly",
+      "top_n": 62,
+      "selected_rows": 104162,
+      "selected_tickers": 97,
+      "median_names_per_day": 62.0,
+      "snapshot_count": 28,
+      "broad_rows": 14587,
+      "local_rows": 16590,
+      "yday_rows_all_modes": 296,
+      "yday_rows_rolling3": 148,
+      "gate_total": NaN,
+      "gate_pass": NaN
+    },
+    {
+      "variant": "market_cap_top100_quarterly",
+      "top_n": 100,
+      "selected_rows": 167757,
+      "selected_tickers": 164,
+      "median_names_per_day": 100.0,
+      "snapshot_count": 28,
+      "broad_rows": 22059,
+      "local_rows": 16590,
+      "yday_rows_all_modes": 262,
+      "yday_rows_rolling3": 125,
+      "gate_total": NaN,
+      "gate_pass": NaN
+    },
+    {
+      "variant": "market_cap_top200_quarterly",
+      "top_n": 200,
+      "selected_rows": 334961,
+      "selected_tickers": 331,
+      "median_names_per_day": 199.0,
+      "snapshot_count": 28,
+      "broad_rows": 29957,
+      "local_rows": 16590,
+      "yday_rows_all_modes": 433,
+      "yday_rows_rolling3": 280,
+      "gate_total": NaN,
+      "gate_pass": NaN
+    },
+    {
+      "variant": "market_cap_top500_quarterly",
+      "top_n": 500,
+      "selected_rows": 829940,
+      "selected_tickers": 772,
+      "median_names_per_day": 493.0,
+      "snapshot_count": 28,
+      "broad_rows": 31512,
+      "local_rows": 16590,
+      "yday_rows_all_modes": 437,
+      "yday_rows_rolling3": 200,
+      "gate_total": NaN,
+      "gate_pass": NaN
+    }
+  ]
+}

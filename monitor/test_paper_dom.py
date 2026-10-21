@@ -36,7 +36,7 @@ TABS = ["overview", "gates", "coverage", "gaps"]
 
 @pytest.fixture(scope="module")
 def paper_payload():
-    return read_paper_evidence(ROOT)
+    return read_paper_evidence(ROOT, route="legacy")
 
 
 @pytest.fixture(scope="module")
@@ -243,9 +243,26 @@ def test_an_empty_book_is_not_reported_as_unprotected(paper_server, page, paper_
         "current_protection": {"positions": 0, "protected": 0, "unprotected": 0}})
     open_paper(page, paper_server, empty)
     text_empty, tone_empty = _chip(page, "b3ProgressReason", "protected")
+    print(f"G1 no positions with broker: {text_empty} / {tone_empty}")
     assert "0/0" in text_empty, f"the empty-book chip did not render 0/0: {text_empty!r}"
     assert "bad" not in tone_empty, (
         f"an empty book is painted as a protection failure: {text_empty!r} -> {tone_empty!r}")
+
+    empty_unknown = _mutate(
+        paper_payload,
+        coverage_status={"current_protection": "UNKNOWN"},
+        coverage_metrics={"current_protection": {"positions": 0, "protected": 0, "unprotected": 0}},
+    )
+    open_paper(page, paper_server, empty_unknown)
+    text_empty_unknown, tone_empty_unknown = _chip(page, "b3ProgressReason", "protected")
+    print(f"G1 no positions and source UNKNOWN: {text_empty_unknown} / {tone_empty_unknown}")
+    assert "0/0" in text_empty_unknown, (
+        f"the empty+unknown chip did not render 0/0: {text_empty_unknown!r}")
+    assert "bad" not in tone_empty_unknown and "watch" not in tone_empty_unknown, (
+        "an empty book with UNKNOWN source must still render as neutral nothing-to-protect, "
+        f"got {text_empty_unknown!r} -> {tone_empty_unknown!r}")
+    assert "unknown" not in text_empty_unknown.lower(), (
+        f"the empty+unknown state followed the source UNKNOWN branch: {text_empty_unknown!r}")
 
     # Control: a real unprotected position must still be red, or the check above is
     # satisfied by a panel that simply never reports anything.
@@ -253,10 +270,24 @@ def test_an_empty_book_is_not_reported_as_unprotected(paper_server, page, paper_
         "current_protection": {"positions": 2, "protected": 1, "unprotected": 1}})
     open_paper(page, paper_server, unsafe)
     text_unsafe, tone_unsafe = _chip(page, "b3ProgressReason", "protected")
+    print(f"G1 positions with broker but one unprotected: {text_unsafe} / {tone_unsafe}")
     assert "1/2" in text_unsafe, f"the control chip did not render 1/2: {text_unsafe!r}"
     assert "bad" in tone_unsafe, (
         f"a position with no stop is not painted as a failure: {text_unsafe!r} -> {tone_unsafe!r}")
     assert tone_empty != tone_unsafe, "the two states render identically; the chip decides nothing"
+
+    unreadable = _mutate(
+        paper_payload,
+        coverage_status={"current_protection": "UNKNOWN"},
+        coverage_metrics={"current_protection": {"positions": 2, "protected": 0, "unprotected": 0}},
+    )
+    open_paper(page, paper_server, unreadable)
+    text_unreadable, tone_unreadable = _chip(page, "b3ProgressReason", "protected")
+    print(f"G1 positions without readable broker: {text_unreadable} / {tone_unreadable}")
+    assert "unknown" in text_unreadable.lower(), (
+        f"a position with unreadable broker did not say unknown: {text_unreadable!r}")
+    assert "watch" in tone_unreadable, (
+        f"a position with unreadable broker did not render watch: {text_unreadable!r} -> {tone_unreadable!r}")
 
 
 def _c1_gate(payload: dict, **metrics):

@@ -52,6 +52,14 @@ class _Sched:
         return self._job
 
 
+class _SchedById:
+    def __init__(self, jobs):
+        self._jobs = dict(jobs)
+
+    def get_job(self, _id):
+        return self._jobs.get(_id)
+
+
 @pytest.fixture(autouse=True)
 def _isolate(tmp_path, monkeypatch):
     """Never touch the real state file, and never inherit a previous test's day."""
@@ -177,6 +185,20 @@ def test_missing_job_does_not_raise(monkeypatch):
     scheduler over one exit, taking the trading day with it."""
     _at(monkeypatch, datetime(2026, 8, 10, 10, 0, tzinfo=ET))
     rs._catch_up_maxhold(_Sched(None))
+
+
+def test_legacy_maxhold_absent_in_track1_only_is_not_a_failed_catchup(monkeypatch, caplog):
+    """Track1-only mode intentionally retires the legacy max-hold job.
+
+    A scheduler restarted after 09:31 still calls the legacy catch-up helper first, but
+    the absence of `maxhold_exit` is then a mode fact rather than a production failure.
+    The Track 1 helper will judge its own marker separately.
+    """
+    _at(monkeypatch, datetime(2026, 9, 29, 10, 17, tzinfo=ET))
+    with caplog.at_level("INFO"):
+        rs._catch_up_maxhold(_SchedById({"track1_maxhold_exit": _Job()}))
+    assert not any(r.levelname in {"ERROR", "CRITICAL"} for r in caplog.records)
+    assert any("legacy max-hold catch-up skipped" in r.message for r in caplog.records)
 
 
 def test_state_survives_a_restart(tmp_path, monkeypatch):

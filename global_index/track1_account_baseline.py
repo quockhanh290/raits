@@ -320,10 +320,21 @@ def measure(account: AccountEvidence, b1: Any, *, now: Any = None,
             f"moved. The gate does not open on a WARN",
             checked, inputs, findings)
 
+    # The sentence describes what B1 REPORTED; it does not restate flatness on its own
+    # authority. Until 2026-09-24 it read "no positions, no working orders, both books flat",
+    # unconditionally, because on the day it was written a flat account was the only way to
+    # reach a PASS. Since this afternoon there is a second way: B1 answers
+    # `track1_holding_own_positions` when the route holds positions it can account for. The old
+    # sentence would then have written "no positions" into a durable record while two were
+    # open — the same defect as B1's own operator line, which said "Track 1 book flat" beside a
+    # book holding two, and for the same reason: a PASS branch asserting the prose of one code.
+    b1_code = str((inputs.get("b1") or {}).get("code") or "") or "no code recorded"
+    b1_said = str((inputs.get("b1") or {}).get("detail") or "").strip()
     return BaselineResult(
         PASS, OK,
-        f"{account.currency} {account.equity:,.2f}, no positions, no working orders, both books "
-        f"flat and route-stamped, read {stale} minute(s) ago",
+        f"{account.currency} {account.equity:,.2f}, and B1 reports {b1_code}"
+        + (f": {b1_said}" if b1_said else "")
+        + f" — read {stale} minute(s) ago",
         checked, inputs, findings)
 
 
@@ -413,6 +424,15 @@ def operator_line(result: BaselineResult) -> str:
     # a mild problem into no report at all.
     money = f"{ccy} {eq:,.0f}" if (ccy and eq is not None) else "an unrecorded amount"
     if result.status == PASS:
+        # Code before status, the same correction B1's own operator line needed this afternoon.
+        # "broker reconcile flat" was unconditional, and a PASS no longer means flat: B1 answers
+        # `track1_holding_own_positions` when the route holds positions it can account for. This
+        # is the line that reaches the dashboard, so an unconditional "flat" is the version an
+        # operator would read and believe while two positions were open.
+        b1_code = str(((result.inputs or {}).get("b1") or {}).get("code") or "")
+        if b1_code and b1_code != "legacy_and_broker_flat":
+            return (f"Paper account baseline: {money} — broker reconciles, "
+                    f"B1 reports {b1_code}")
         return f"Paper account baseline: {money} — broker reconcile flat"
     if result.status == WARN:
         return (f"Paper account baseline: {money}, expected {EXPECTED_EQUITY:,.0f} — "

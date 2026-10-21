@@ -1,0 +1,69 @@
+{
+  "script": "raits/research/stocks_sec_8k202_event_drift_replay.py",
+  "stage": "development",
+  "preregistration": "STOCKS_SEC_8K202_EVENT_DRIFT_PREREG_2026-09-17.json",
+  "sample": {
+    "start": "2018-01-02",
+    "end": "2024-12-31"
+  },
+  "inputs": [
+    "raits\\data\\cache\\external_events\\sec_submissions_pit_2018_2026\\sec_8k_item_202_events_2017_2026.csv",
+    "raits\\data\\cache\\stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits\\data\\cache\\stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits\\data\\cache\\external_universes\\market_cap_polygon\\polygon_market_cap_snapshots_pit_eligible_2018_2024.csv",
+    "raits\\data\\cache\\external_universes\\market_cap_polygon\\polygon_market_cap_snapshots_pit_eligible_2025_2026_clean_oos.csv",
+    "raits\\data\\cache\\stocks_survivorship\\polygon_universe_bulk\\daily_20180102_20241231_resumable\\liquidity_filter_daily_20180102_20241231_px5_adv10m_unadjusted\\filtered_daily_universe.parquet",
+    "raits\\data\\cache\\stocks_survivorship\\polygon_universe_bulk\\daily_20250102_20260916_clean_oos\\liquidity_filter_daily_20250102_20260916_clean_oos_px5_adv10m_unadjusted\\filtered_daily_universe.parquet"
+  ],
+  "mapped_events": 12950,
+  "signals": 2573,
+  "selection": {
+    "candidates": [
+      {
+        "variant": "sec8k202_confirm_hold1",
+        "holdSessions": 1,
+        "developmentPass": false,
+        "validationPass": true,
+        "positiveDevelopmentYears": 2,
+        "developmentSharpe": 0.09653799592118234,
+        "developmentDdPct": -0.0521745607251477,
+        "developmentEntries": 1702,
+        "developmentEffectiveTickerCount": 121.46785620042577,
+        "validationPnl": 3249.810721693997,
+        "validationCost8Pnl": 1053.7717892773653,
+        "validationDdPct": -0.026801447447199034
+      },
+      {
+        "variant": "sec8k202_confirm_hold3",
+        "holdSessions": 3,
+        "developmentPass": true,
+        "validationPass": true,
+        "positiveDevelopmentYears": 4,
+        "developmentSharpe": 0.7311150546680193,
+        "developmentDdPct": -0.03957276445485214,
+        "developmentEntries": 1702,
+        "developmentEffectiveTickerCount": 113.25245767911639,
+        "validationPnl": 4927.60713951943,
+        "validationCost8Pnl": 2448.421234886526,
+        "validationDdPct": -0.031719490165406206
+      },
+      {
+        "variant": "sec8k202_confirm_hold5",
+        "holdSessions": 5,
+        "developmentPass": true,
+        "validationPass": true,
+        "positiveDevelopmentYears": 3,
+        "developmentSharpe": 0.18757391606046284,
+        "developmentDdPct": -0.0634781206980175,
+        "developmentEntries": 1702,
+        "developmentEffectiveTickerCount": 107.66476601246464,
+        "validationPnl": 4129.8422108652885,
+        "validationCost8Pnl": 1921.7671397594531,
+        "validationDdPct": -0.03799100623204299
+      }
+    ],
+    "selectedVariant": "sec8k202_confirm_hold3",
+    "familyStatus": "OOS_ELIGIBLE"
+  },
+  "outputs_prefix": "STOCKS_SEC_8K202_EVENT_DRIFT_DEV_2026-09-17"
+}

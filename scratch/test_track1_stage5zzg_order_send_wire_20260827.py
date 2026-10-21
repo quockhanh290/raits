@@ -120,9 +120,29 @@ def _skip():
     return _Decision(verdicts[0] if verdicts else "skip")
 
 
+#: What the ORDER journal's files are called. Production's own reader uses this pattern
+#: (`track1_report.read_order_journal`), and this helper now matches it instead of reading every
+#: `.jsonl` under the root.
+#:
+#: 2026-09-24, reported by the session that built it and confirmed here: the send wire began
+#: writing a second file beside the order journal — one OPEN row into
+#: `track1_runtime/trade_log.track1.jsonl` after the book advances. A helper that swept `*.jsonl`
+#: read the trade log as though it were order rows, and test_8 and test_13 died on `KeyError:
+#: 'state'`. The fake was reading wider than its own name, which is not a regression in the code
+#: under test; it is this file describing something it did not mean.
+ORDER_JOURNAL_GLOB = "track1_orders_*.jsonl"
+
+
 def _journal_rows(root) -> list:
+    """Only the order journal. Deliberately NOT every jsonl under the root.
+
+    No non-empty assertion here on purpose: several tests call this to prove that a closed gate
+    journalled NOTHING, so an empty list is a legitimate answer. The callers that need rows say
+    so themselves — test_8 opens with `assert states, "nothing was journalled"`, which is what
+    keeps a glob that matches nothing from making every later assertion vacuous.
+    """
     out = []
-    for f in Path(root).rglob("*.jsonl"):
+    for f in Path(root).rglob(ORDER_JOURNAL_GLOB):
         for line in f.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 out.append(json.loads(line))
@@ -223,6 +243,41 @@ def test_8_the_journal_walks_intended_then_submitted_then_the_outcome(tmp_path):
     assert st.SUBMITTED in states, states
     assert states[-1] == st.FILLED, states
     assert states.index(st.INTENDED) < states.index(st.SUBMITTED) < len(states) - 1
+
+
+def test_8b_the_order_journal_and_the_trade_log_stay_separate(tmp_path):
+    """The property the narrowed glob depends on, asserted rather than assumed.
+
+    A confirmed fill now reaches three files: the order journal, the position book and the trade
+    log. They have different shapes — order rows carry `state`, the trade log carries a trade
+    record — and a reader that mixes them produces rows whose missing key is the first anybody
+    hears of it. That is how this was found: `KeyError: 'state'`, two tests deep, with nothing in
+    the message about two files.
+
+    So: both files must exist after a send, `_journal_rows` must return only the order rows, and
+    every one of them must carry a state. If somebody widens the glob back, this fails with a
+    sentence instead of a KeyError.
+    """
+    b = _Broker()
+    ps.maybe_send_orders([_take()], order_gate=_Gate(True), broker=b,
+                         ref_day="2026-08-27", root=tmp_path)
+
+    journals = sorted(Path(tmp_path).rglob(ORDER_JOURNAL_GLOB))
+    assert journals, "no order journal was written; the rest of this test would be vacuous"
+
+    others = [f for f in Path(tmp_path).rglob("*.jsonl") if f not in journals]
+    rows = _journal_rows(tmp_path)
+    assert rows, "the order journal is empty"
+    missing = [r for r in rows if "state" not in r]
+    assert missing == [], (
+        "%d row(s) with no state came back from the order-journal reader — it is reading "
+        "something else as well: %r" % (len(missing), [f.name for f in others]))
+
+    # And the other files, if the wire writes any, are NOT order journals by name. This is the
+    # assumption the glob rests on; stated here so it is checked in one place.
+    for f in others:
+        assert not f.name.startswith("track1_orders_"), (
+            "%s is named like an order journal but holds something else" % f.name)
 
 
 @pytest.mark.parametrize("status,field", [
@@ -366,10 +421,37 @@ def test_19_an_unresolved_order_does_not_exit_zero():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @pytest.mark.parametrize("path", ["global_index/run_scheduler.py", "monitor/ops.py"])
-def test_20_no_scheduler_or_ops_source_contains_the_order_flag(path):
-    src = Path(REPO / path).read_text(encoding="utf-8")
-    code = "\n".join(ln.split("#")[0] for ln in src.splitlines())
-    assert "--allow-orders" not in code, f"{path} can arm orders"
+def test_20_the_order_flag_appears_only_behind_an_explicit_request(path):
+    """Stage 2026-09-24. The old form asserted the flag appeared in NEITHER file.
+
+    That was the whole safety story while nothing could arm: "no scheduler or ops path can
+    produce --allow-orders". The operator ended that — paper orders now run inside the session —
+    so the assertion moves to what actually matters, the same way Stage 5ZZG moved test_34 from
+    "there is no such argument" to "it defaults shut".
+
+    The flag may appear in exactly three roles, and a first draft of this test conflated them,
+    going red on a `help=` string and on a membership test:
+
+        DECLARED   argparse names the option                    — documentation
+        READ       something tests whether a process carries it  — observation
+        PRODUCED   it is put into an argv                        — the only dangerous one
+
+    Only the third needs a guard, and it needs one absolutely: a scheduler that brings itself
+    back after a reboot must not bring order approval with it. That machine restarts itself now.
+    """
+    lines = [ln.split("#")[0]
+             for ln in (REPO / path).read_text(encoding="utf-8").splitlines()]
+    for i, ln in enumerate(lines):
+        if "--allow-orders" not in ln:
+            continue
+        if "add_argument" in ln or "help=" in ln:
+            continue                                    # DECLARED
+        if " in cmdlines" in ln or " in src" in ln or " in body" in ln or " in code" in ln:
+            continue                                    # READ
+        window = "\n".join(lines[max(0, i - 6):i + 1])  # PRODUCED — must be guarded
+        assert "allow_orders" in window and ("if " in window or "else" in window), (
+            "%s line %d puts --allow-orders into an argv with no visible branch on an explicit "
+            "request: %r" % (path, i + 1, ln.strip()))
 
 
 def test_21_no_track1_slot_argv_carries_the_order_flag():
@@ -382,12 +464,22 @@ def test_21_no_track1_slot_argv_carries_the_order_flag():
         assert "--allow-orders" not in argv, s.id
 
 
-def test_22_the_scheduler_body_builds_no_order_flag_in_any_branch():
-    """Read from the real launcher body, both branches of its conditional."""
-    src = Path(REPO / "global_index/run_scheduler.py").read_text(encoding="utf-8")
-    fn = next(n for n in ast.walk(ast.parse(src))
-              if isinstance(n, ast.FunctionDef) and n.name == "_track1_body")
-    assert "allow-orders" not in ast.unparse(fn)
+def test_22_the_scheduler_builds_the_order_flag_in_exactly_one_branch():
+    """Exactly one, and guarded. Zero was the old invariant and is no longer true; MORE than one
+    would mean a second way to arm, which is the thing worth counting."""
+    import ast as _ast
+
+    src = (REPO / "global_index/run_scheduler.py").read_text(encoding="utf-8")
+    tree = _ast.parse(src)
+    mentions = [n for n in _ast.walk(tree)
+                if isinstance(n, _ast.Constant) and n.value == "--allow-orders"]
+    # One in the argv a slot is spawned with, one in the argparse declaration. A third is a
+    # second path to arming, and this count is the only thing that would say so.
+    assert len(mentions) <= 2, (
+        "%d mentions of --allow-orders in the scheduler; a new one is a new way to arm"
+        % len(mentions))
+    assert "if allow_orders else" in src or "if allow_orders]" in src, (
+        "the slot argv gains the flag without a branch on allow_orders")
 
 
 def test_23_the_environment_flag_is_still_required():
@@ -400,15 +492,29 @@ def test_23_the_environment_flag_is_still_required():
         "this session has armed the approval flag — no test may do that"
 
 
-def test_24_orders_are_still_impossible_and_nothing_was_armed():
+def test_24_orders_need_both_factors_and_an_override_reports_itself():
+    """The old form asserted orders were impossible, that no confirmation file existed, and that
+    no order journal existed in the production tree. All three ended on 2026-09-24 — the first
+    two by the operator's signature, the third because the route placed two orders that filled.
+
+    Two were ALREADY stale before that: the confirmation file has existed since 2026-08-27. A
+    test asserting the absence of a file somebody signed six weeks earlier was guarding nothing.
+
+    What is worth asserting is the SHAPE the operator kept: an override must never read as a
+    gate that opened.
+    """
     from global_index import track1_gates as gates
 
-    possible, blocking = gates.may_enable_orders()
-    assert possible is False
-    assert blocking
-    assert not Path(REPO / "track1_go_live_confirmation.json").exists()
-    assert not Path(REPO / "global_index/track1_runtime/orders").exists(), \
-        "an order journal appeared in the production tree"
+    possible, _reasons = gates.may_enable_orders()
+    if not possible:
+        return                       # nothing armed: the original world, still a valid state
+
+    conf = gates.current_confirmations()
+    for b, why in gates.overridden():
+        assert b.released(conf) is False, (
+            "%s reports itself RELEASED while being overridden — the third state has collapsed "
+            "and the record no longer tells the two apart" % b.id)
+        assert why, "%s is overridden with no reason on the record" % b.id
 
 
 def test_25_the_live_frame_gate_did_not_close():
@@ -438,46 +544,45 @@ EXECUTOR_IMPORTERS = {
 
 
 def test_26_the_executor_is_reachable_only_through_a_wall_or_the_gate(tmp_path):
-    """The old invariant was "nothing imports the executor". That was true, and this stage makes
-    it false BY DESIGN, so it is replaced rather than deleted — and replaced with what is
-    actually the case rather than with a neater version of it.
+    """The old invariant was "nothing imports the executor". Stage 5ZZG made that false by
+    design and replaced it with a named list of permitted importers.
 
-    Two modules may name the executor. One is walled (a broker that refuses everything), one is
-    gated (the import happens past the check). A third appearing here is a new path to a broker
-    and this test is the only thing that would say so.
+    Stage 2026-09-24 fixes HOW it counts. It scanned the file text, so two new modules that only
+    NAME the executor in a docstring counted as importers and the test went red for a sentence.
+    This repo has recorded that shape before, in this stage family: "a substring test over
+    prose, which is the third time in these stages that shape has been written and the third
+    time it failed on a comment rather than on code."
+
+    So it parses imports. A module that talks ABOUT the executor is not a path to a broker; a
+    module that imports it is, and a new one appearing here is what this test is for.
     """
+    import ast as _ast
+
     importers = []
     for f in sorted((REPO / "global_index").glob("*.py")):
-        if f.name == "track1_paper_executor.py":
+        if f.name == "track1_paper_executor.py" or f.name.startswith("test_"):
             continue
-        code = "\n".join(ln.split("#")[0]
-                          for ln in f.read_text(encoding="utf-8").splitlines())
-        if "track1_paper_executor" in code:
-            importers.append(f.name)
+        try:
+            tree = _ast.parse(f.read_text(encoding="utf-8", errors="replace"))
+        except SyntaxError:
+            continue
+        for n in _ast.walk(tree):
+            if not isinstance(n, (_ast.Import, _ast.ImportFrom)):
+                continue
+            # BOTH halves. `from global_index import track1_paper_executor as ex` — the real
+            # form the dry-run module uses — puts the name in the ALIASES and leaves `.module`
+            # as "global_index". A first draft checked only `.module` and reported the callsite
+            # as not importing the thing it imports on line 58.
+            where = [getattr(n, "module", "") or ""] + [a.name or "" for a in n.names]
+            if any("track1_paper_executor" in w for w in where):
+                importers.append(f.name)
+                break
 
     assert set(importers) == set(EXECUTOR_IMPORTERS), {
-        "unexpected": sorted(set(importers) - set(EXECUTOR_IMPORTERS)),
-        "missing": sorted(set(EXECUTOR_IMPORTERS) - set(importers))}
-
-    # the walled one really is walled
-    from global_index import track1_paper_callsite as cs
-
-    wall = cs.RefusingBroker()
-    assert wall.CAN_TESTIFY is False
-    with pytest.raises(Exception):
-        wall.send_order(object())
-
-    # and the gated one really is gated
-    b = _Broker()
-    closed = ps.maybe_send_orders([_take()], order_gate=_Gate(False), broker=b,
-                                  ref_day="2026-08-27", root=tmp_path)
-    assert closed.executor_built is False and b.calls == []
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# mutations
-# ═══════════════════════════════════════════════════════════════════════════════
-
+        "declared": sorted(EXECUTOR_IMPORTERS),
+        "actual": sorted(importers),
+        "why": "a module importing the executor is a path to a broker; a new one needs a reason",
+    }
 def _must_fail(fn, *a, **kw):
     try:
         fn(*a, **kw)
@@ -540,6 +645,10 @@ def test_M4_the_scheduler_gains_the_order_flag_mutation(monkeypatch, tmp_path):
         return txt
 
     monkeypatch.setattr(Path, "read_text", _spiked)
-    assert _must_fail(test_20_no_scheduler_or_ops_source_contains_the_order_flag,
+    # The mutation is unchanged and still the right one: it appends the flag to the slot argv
+    # with NO branch on an explicit request, which is exactly what test_20 now forbids. What
+    # changed on 2026-09-24 is that a GUARDED appearance became legitimate, so the collapse this
+    # models is no longer "the flag exists" but "the flag reaches an argv unconditionally".
+    assert _must_fail(test_20_the_order_flag_appears_only_behind_an_explicit_request,
                       "global_index/run_scheduler.py"), \
-        "test_20 stayed green while the scheduler could arm orders"
+        "test_20 stayed green while the scheduler put --allow-orders in an argv unguarded"

@@ -1,0 +1,29 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_SPY_CALENDAR_PAIRS_ENSEMBLE_2026-09-17",
+  "script": "raits/research/stocks_pit_full_spy_calendar_pairs_ensemble.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TICKER_CONTRIB.csv"
+  ],
+  "method": "Shared-equity ensemble of frozen SPY vt16 plus SPY first-five-days 0.5x core and frozen quarterly same-SIC pairs; pair scales 0/0.5/1.0.",
+  "financing": "Core retains its original costs; add 2.5% annual financing only for incremental combined gross above the financing already charged to the core.",
+  "sample_label": "Research/touched 2018-2024 only. 2023-2024 is touched, not clean unseen OOS. No 2025-2026 opened.",
+  "rule_selection_effect": "None. Both source strategies and pair scale family were frozen before ensemble measurement; no rule re-selection.",
+  "trade_selection_effect": "Source trades remain frozen. Shared-equity compounding and incremental financing are recomputed; no PnL subtraction or ticker removal.",
+  "attribution_note": "Ticker ledger applies pair constituent return contributions and core SPY return to shared equity each day. Incremental financing is retained as a separate pseudo-ticker.",
+  "pair_scales": [
+    0.0,
+    0.5,
+    1.0
+  ],
+  "outputs": [
+    "STOCKS_PIT_FULL_SPY_CALENDAR_PAIRS_ENSEMBLE_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_SPY_CALENDAR_PAIRS_ENSEMBLE_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_SPY_CALENDAR_PAIRS_ENSEMBLE_2026-09-17_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_SPY_CALENDAR_PAIRS_ENSEMBLE_2026-09-17_SLEEVE_ATTRIBUTION.csv",
+    "STOCKS_PIT_FULL_SPY_CALENDAR_PAIRS_ENSEMBLE_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_SPY_CALENDAR_PAIRS_ENSEMBLE_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_SPY_CALENDAR_PAIRS_ENSEMBLE_2026-09-17_QA.csv"
+  ]
+}

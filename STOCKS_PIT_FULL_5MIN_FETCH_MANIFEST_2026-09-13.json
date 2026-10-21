@@ -1,0 +1,18 @@
+{
+  "chunks": 176260,
+  "created_at_utc": "2026-09-13T07:04:11.579413+00:00",
+  "eligible_symbol_days": 3414774,
+  "max_end": "2024-12-31",
+  "max_symbols": 0,
+  "min_start": "2018-01-02",
+  "oos_policy": "refuses dates after 2024-12-31",
+  "output_dir": "raits/data/cache/polygon_5min_pit_full_2018_2024",
+  "outputs": [
+    "STOCKS_PIT_FULL_5MIN_FETCH_SYMBOLS_2026-09-13.csv",
+    "STOCKS_PIT_FULL_5MIN_FETCH_CHUNKS_2026-09-13.csv"
+  ],
+  "purpose": "full PIT eligible Polygon 5-minute fetch plan for 2018-2024",
+  "source_filter": "raits/data/cache/stocks_survivorship/polygon_universe_bulk/daily_20180102_20241231_resumable/liquidity_filter_daily_20180102_20241231_px5_adv10m_unadjusted/filtered_daily_universe.parquet",
+  "symbols_planned": 5097,
+  "symbols_total": 5097
+}

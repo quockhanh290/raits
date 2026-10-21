@@ -1,0 +1,44 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_HISTORICAL_INDEX_UNIVERSE_NOWARMUP_2026-09-14",
+  "source_note": "Public reconstructed point-in-time index membership. Treat as research input, not official S&P/Nasdaq licensed data.",
+  "sources": {
+    "sp500_thuningxu": {
+      "path": "raits/data/cache/external_universes/sp500_components_history_thuningxu.csv",
+      "url": "https://github.com/thuningxu/sp500nq100",
+      "raw_url": "https://raw.githubusercontent.com/thuningxu/sp500nq100/main/sp500_components_history.csv"
+    },
+    "nasdaq100_thuningxu": {
+      "path": "raits/data/cache/external_universes/nasdaq100_components_history_thuningxu.csv",
+      "url": "https://github.com/thuningxu/sp500nq100",
+      "raw_url": "https://raw.githubusercontent.com/thuningxu/sp500nq100/main/nasdaq100_components_history.csv"
+    }
+  },
+  "variants": [
+    {
+      "variant": "sp500_thuningxu",
+      "membership_rows": 2712,
+      "membership_start": "1996-01-02",
+      "membership_end": "2026-06-02",
+      "quality_rows": 835298,
+      "quality_tickers": 651,
+      "median_names_per_day": 497.0,
+      "broad_rows": 31089,
+      "local_rows": 16590,
+      "yday_rows_all_modes": 1131,
+      "yday_rows_rolling3": 519
+    },
+    {
+      "variant": "nasdaq100_thuningxu",
+      "membership_rows": 112,
+      "membership_start": "2007-02-01",
+      "membership_end": "2026-05-18",
+      "quality_rows": 160710,
+      "quality_tickers": 152,
+      "median_names_per_day": 95.0,
+      "broad_rows": 14180,
+      "local_rows": 16590,
+      "yday_rows_all_modes": 379,
+      "yday_rows_rolling3": 239
+    }
+  ]
+}

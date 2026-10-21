@@ -1,0 +1,42 @@
+{
+  "spec_id": "stocks_all_results_second_combo_scale_v1_2026-09-24",
+  "frozen_before_performance": true,
+  "adaptive_disclosure": "This is a post-grid audit of the next-ranked development row after the section 6.212 winner. It is not a fresh search or new OOS evidence.",
+  "row_selection": "Take rank 2 from the frozen section 6.212 development grid, without using 2023-2024 results.",
+  "selected_sleeves": {
+    "sic_pairs_quarterly_z2_hold10": 0.75,
+    "spy_first5_x25_fin25_cost4": 0.25
+  },
+  "scale_candidates": [1.0, 1.5, 2.0],
+  "samples": {
+    "development": ["2018-04-27", "2022-12-30"],
+    "validation": ["2023-01-03", "2024-12-31"],
+    "oos_2025_2026": "PROHIBITED"
+  },
+  "shared_book_contract": {
+    "capital": 100000.0,
+    "gross_exposure": "Conservative additive pair and SPY sleeve gross; no cross-sleeve netting credit.",
+    "trade_cost_bps": 4.0,
+    "short_borrow_annual": 0.01,
+    "financing_annual": 0.025,
+    "financing_rule": "Charge max(total additive gross - 1, 0) once at shared-book level.",
+    "concentration": "Pair source costs are reversed pro rata to absolute ticker contribution, then shared costs are allocated pro rata to absolute daily gross ticker contribution. Daily PnL reconciles exactly, but ticker cost allocation is diagnostic."
+  },
+  "inputs": [
+    "STOCKS_ALL_RESULTS_SLEEVE_GRID_2026-09-24_GRID.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_TURN_OF_MONTH_COSTAWARE_2026-09-14_DAILY.csv"
+  ],
+  "audit_requirements": [
+    "Verify this is exactly rank 2 of the frozen development grid.",
+    "Report every scale on development and touched validation with yearly PnL, dollar and percentage DD, shared costs, source attribution, and ticker concentration.",
+    "Do not choose or alter a scale using touched validation and do not grant a production PASS."
+  ],
+  "post_run_implementation_correction": "Before reporting, zero-gross-contribution days were assigned their already-modeled shared costs to the SPY attribution row so ticker attribution reconciles. This changes no account return, trade, cost, candidate, or selection rule; the corrected script was re-hashed and all outputs were overwritten.",
+  "implementation_freeze": {
+    "performance_not_yet_run": true,
+    "script": "raits/research/stocks_all_results_second_combo_scale.py",
+    "script_hash": "F0B75EA53EA4A30B5EF8D4A5F1D2E83BEC982358B208D99E1DFB948960A5C701"
+  }
+}

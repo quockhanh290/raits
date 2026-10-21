@@ -1,0 +1,21 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_FINANCING_STRESS_2026-09-17",
+  "script": "raits/research/stocks_pit_full_rolling_sic_pairs_financing_stress.py",
+  "input": "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_DAILY.csv",
+  "source_variant": "sic_pairs_quarterly_z2_hold10",
+  "method": "Replay frozen quarterly-hold10 daily gross returns and proportional turnover/borrow at pre-registered gross multipliers; charge 2.5% annual financing on daily gross exposure above 1x.",
+  "leverage_family": [
+    1.0,
+    2.0,
+    3.0,
+    5.0
+  ],
+  "rule_selection_effect": "None. Pair formation, signals and trades remain frozen from the source result; this isolates post-selection scaling and financing effects without rule re-selection.",
+  "sample_label": "Research/touched 2018-2024 only. 2023-2024 is touched, not clean unseen OOS. No 2025-2026 opened.",
+  "outputs": [
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_FINANCING_STRESS_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_FINANCING_STRESS_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_FINANCING_STRESS_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_FINANCING_STRESS_2026-09-17_QA.csv"
+  ]
+}

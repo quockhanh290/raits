@@ -1,0 +1,49 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LEAD_POLICY_REPLAY_2026-09-17",
+  "script": "raits/research/stocks_pit_full_lead_policy_replay.py",
+  "engine": "raits/research/stocks_pit_full_lead_crisis_eventtime_audit.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TRADE_EVENTS.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_REVERSAL_COHORTS_2026-09-17_SIGNALS.csv",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl"
+  ],
+  "pre_registered_scenarios": [
+    {
+      "scenario": "unconstrained_control",
+      "name_cap": null,
+      "hard_gross_cap": null,
+      "missing_name_limit": null,
+      "missing_notional_limit": null
+    },
+    {
+      "scenario": "namecap3_gross3",
+      "name_cap": 0.03,
+      "hard_gross_cap": 3.0,
+      "missing_name_limit": null,
+      "missing_notional_limit": null
+    },
+    {
+      "scenario": "namecap3_gross3_missingfs",
+      "name_cap": 0.03,
+      "hard_gross_cap": 3.0,
+      "missing_name_limit": 2,
+      "missing_notional_limit": 0.02
+    }
+  ],
+  "name_cap_method": "When aggregate net satellite target exceeds 3% NAV in any name, proportionally scale the entire pair-plus-crisis target vector. This preserves all pair/cohort relationships and leaves unavailable gross in cash; no post-hoc PnL clipping or invented runner-up trade.",
+  "missing_policy": "No trade on a missing executable mark; held missing names freeze. A breach (>2 missing held names or >2% NAV stale notional) disables satellite targets and blocks SPY risk increases. Valid satellites exit at 09:35; missing names exit on their next valid mark. Re-enable only after one complete clean 09:35/15:55 session.",
+  "sample_label": "Touched research 2018-2024 only. No 2025-2026 opened.",
+  "selection_warning": "Operational replay of frozen policies, not new edge evidence.",
+  "outputs": [
+    "STOCKS_PIT_FULL_LEAD_POLICY_REPLAY_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LEAD_POLICY_REPLAY_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_LEAD_POLICY_REPLAY_2026-09-17_POLICY_EVENTS.csv",
+    "STOCKS_PIT_FULL_LEAD_POLICY_REPLAY_2026-09-17_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_LEAD_POLICY_REPLAY_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_LEAD_POLICY_REPLAY_2026-09-17_EVENT_LEDGER.csv",
+    "STOCKS_PIT_FULL_LEAD_POLICY_REPLAY_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_LEAD_POLICY_REPLAY_2026-09-17_QA.csv"
+  ]
+}

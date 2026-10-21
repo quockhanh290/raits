@@ -1,0 +1,95 @@
+{
+  "research_question": "Does causal pre-09:35 tick flow predict cross-sectional returns over 30 minutes, 60 minutes, or the remainder of the session?",
+  "frozen_before_performance": true,
+  "frozen_at_local_date": "2026-10-01",
+  "script": "raits/research/stocks_pit_open_trade_flow_longer_holds.py",
+  "script_hash": "6A2E990C0929376E743FC0BF4A6E4955552E91D36C6A6F93D267C6BBC0D3F365",
+  "data_contract": {
+    "universe": "quarterly PIT market-cap top500 intersected with daily PIT eligibility and ADV20 >= 10m; causal broad opening-event ticker-days; old/manual 62 unused",
+    "signal": "Polygon tick trades with sip_timestamp strictly before 09:35 ET; tick-rule warmup begins 09:25",
+    "entry": "exact 09:40 adjusted five-minute bar open",
+    "fixed_exits": "10:10 for 30m, 10:40 for 60m, 15:55 for EOD; missing scheduled bar fills at first later same-session five-minute open without changing membership",
+    "development": "2018-05-24 through 2021-12-31",
+    "locked_validation": "2022-01-01 through 2022-12-30, opened only for one development passer",
+    "post2022": "forbidden"
+  },
+  "common_filters": {
+    "absolute_first5_return_min": 0.003,
+    "rvol930_min": 1.5,
+    "signal_trades_min": 100,
+    "signal_dollar_min": 1000000
+  },
+  "hypotheses": [
+    {
+      "variant": "xs_flow_30m",
+      "score": "total pre-09:35 tick-rule dollar flow imbalance",
+      "threshold": "absolute score >= 0.15",
+      "direction": "long positive, short negative",
+      "exit": "10:10"
+    },
+    {
+      "variant": "xs_late_flow_60m",
+      "score": "09:32:30-09:35 tick-rule dollar flow imbalance",
+      "threshold": "absolute score >= 0.20",
+      "direction": "long positive, short negative",
+      "exit": "10:40"
+    },
+    {
+      "variant": "xs_large_flow_eod",
+      "score": "top-20%-trade-dollar flow imbalance",
+      "threshold": "absolute score >= 0.20 and large-trade dollar share >= 0.70",
+      "direction": "long positive, short negative",
+      "exit": "15:55"
+    },
+    {
+      "variant": "trf_lit_spread_60m",
+      "score": "TRF flow imbalance minus lit flow imbalance",
+      "threshold": "TRF dollar share >= 0.10 and absolute score >= 0.30",
+      "direction": "long positive, short negative",
+      "exit": "10:40"
+    },
+    {
+      "variant": "flow_price_rank_divergence_eod",
+      "score": "same-day PIT cross-sectional percentile rank of flow imbalance minus percentile rank of first-five return",
+      "threshold": "absolute rank difference >= 0.50",
+      "direction": "long positive divergence, short negative divergence",
+      "exit": "15:55"
+    }
+  ],
+  "selection": {
+    "rank": "absolute frozen score times sqrt(capped rvol930) times sqrt(capped absolute first5 shock)",
+    "book": "exactly 3 longs and 3 shorts or no trade",
+    "sic_cap": "one ticker per SIC per side",
+    "weights": "equal 1/6 absolute NAV per ticker, 1x gross dollar neutral",
+    "adv_cap": "1% ADV20 per opening order",
+    "initial_equity": 100000,
+    "compounding": true
+  },
+  "costs": {
+    "base_bps_per_traded_dollar_per_side": 4,
+    "stress_bps_per_traded_dollar_per_side": 8,
+    "short_borrow_annual": 0.01
+  },
+  "development_gate": {
+    "active_days_min": 100,
+    "trade_legs_min": 600,
+    "cagr_min": 0.05,
+    "sharpe_min": 0.8,
+    "max_drawdown_pct_floor": -0.12,
+    "positive_years_min": 3,
+    "gross_edge_bps_per_active_day_min": 12,
+    "stress_pnl_positive": true,
+    "top10_positive_pnl_share_max": 0.5,
+    "winner": "highest base-cost Sharpe then CAGR among passers"
+  },
+  "validation_gate": {
+    "active_days_min": 20,
+    "pnl_positive": true,
+    "sharpe_min": 0.5,
+    "max_drawdown_pct_floor": -0.1,
+    "stress_pnl_positive": true,
+    "top10_positive_pnl_share_max": 0.6
+  },
+  "multiple_testing_policy": "Exactly five fixed score/horizon rows. No post-result horizon, score, threshold, direction, book-size, or weighting changes.",
+  "production_policy": "A validation pass permits further audit only, never an immediate production PASS."
+}

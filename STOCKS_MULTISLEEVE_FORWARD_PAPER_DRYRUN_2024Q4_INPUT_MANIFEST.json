@@ -1,0 +1,26 @@
+{
+  "script": "D:/raits/raits/research/stocks_multisleeve_paper_targets_from_replay.py",
+  "scriptHash": "476FB731EA3DDE6FCB36F96375EBF242B7DF1867BE60C69ADC7C841C4258521F",
+  "start": "2024-11-01",
+  "end": "2024-12-31",
+  "targets": "STOCKS_MULTISLEEVE_FORWARD_PAPER_DRYRUN_2024Q4_INPUT_TARGETS.csv",
+  "market": "STOCKS_MULTISLEEVE_FORWARD_PAPER_DRYRUN_2024Q4_INPUT_MARKET.csv",
+  "inputs": {
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_DAILY.csv": "8AFB42001CAB5039A2EE6135C32C7EE40E71729893B3F9986FFDA55368954E16",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_SIGNALS.csv": "4CA07DC09F9289ECAC60B6218FF4258912FAE504340C1051871BC159D60A8533",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TRADE_EVENTS.csv": "8FC61AA406A66E429E1DFB772271D392F885CB9C00CEA6ADEBA0E5C38B0DB8FC",
+    "STOCKS_PIT_FULL_TURN_OF_MONTH_COSTAWARE_2026-09-14_DAILY.csv": "B1FD4D1CC81A22D01C24A19C3F8FD31F4E720DB7951FF2466BEF7D7E76813239",
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl": "C65065EA082D68544A5CD87C8DAD9A81CEE0B92A49A34D3C18C162A9EDED4AEC",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl": "EEDEAACC5F5302CDD87114FA985A58BA4B32B1DA807E57AC3AFEB18D96970696",
+    "raits/data/cache/stocks_survivorship/polygon_universe_bulk/daily_20180102_20241231_resumable/liquidity_filter_daily_20180102_20241231_px5_adv10m_unadjusted/filtered_daily_universe.parquet": "FD696E0BD91E3B951C86FFF89734AF908759E11829715B9C1983604E356E8B2C",
+    "raits/data/cache/window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl": "41DD74E36EE9BDB158CFB47811C6D4100389A63B9A7FFAFD8DA3D4780AB10DD0"
+  },
+  "assumptions": {
+    "purpose": "Historical plumbing/ledger test only; not new performance evidence.",
+    "stock_borrow_available": true,
+    "spy_adv20": 1000000000000.0,
+    "pair_target_reconstruction": "Frozen quarterly pair events and signals; equal gross per active pair.",
+    "calendar_timing": "15:55 target uses the already-frozen next-session first-five exposure."
+  },
+  "oos2025_2026Consumed": false
+}

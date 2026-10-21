@@ -1,0 +1,8 @@
+{
+  "tests": 180,
+  "discoveryPasses": 4,
+  "replicationPasses": 0,
+  "confirmationOpened": false,
+  "confirmationPasses": 0,
+  "productionPassAllowed": false
+}

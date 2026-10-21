@@ -1,0 +1,80 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_MONTHLY_LOSS_LIMITER_2026-09-14",
+  "script": "raits/research/stocks_pit_full_monthly_loss_limiter.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_BETA_VOLTARGET_EXPANSION_2026-09-14_DAILY.csv"
+  ],
+  "method": "Pre-registered monthly loss limiter using prior month-to-date strategy equity return; scale resets each month.",
+  "turnover_cost_bps": 4.0,
+  "variants": [
+    {
+      "source_file": "beta_cal",
+      "source": "spyvt20c200_plus_spy_first5_x10_fin25_cost4",
+      "mtd_cut": -0.05,
+      "riskoff": 0.25
+    },
+    {
+      "source_file": "beta_cal",
+      "source": "spyvt20c200_plus_spy_first5_x10_fin25_cost4",
+      "mtd_cut": -0.08,
+      "riskoff": 0.25
+    },
+    {
+      "source_file": "beta_cal",
+      "source": "spyvt16c150_plus_spy_first5_x10_fin25_cost4",
+      "mtd_cut": -0.05,
+      "riskoff": 0.25
+    },
+    {
+      "source_file": "beta_cal",
+      "source": "spyvt16c150_plus_spy_first5_x10_fin25_cost4",
+      "mtd_cut": -0.08,
+      "riskoff": 0.25
+    },
+    {
+      "source_file": "beta_cal",
+      "source": "spyvt16c150_plus_top62_first5_x10_fin25_cost4",
+      "mtd_cut": -0.05,
+      "riskoff": 0.25
+    },
+    {
+      "source_file": "beta_cal",
+      "source": "spyvt16c150_plus_top62_first5_x10_fin25_cost4",
+      "mtd_cut": -0.08,
+      "riskoff": 0.25
+    },
+    {
+      "source_file": "beta",
+      "source": "top62_vt25_cap250",
+      "mtd_cut": -0.05,
+      "riskoff": 0.25
+    },
+    {
+      "source_file": "beta",
+      "source": "top62_vt25_cap250",
+      "mtd_cut": -0.08,
+      "riskoff": 0.25
+    },
+    {
+      "source_file": "beta",
+      "source": "spy_vt20_cap200",
+      "mtd_cut": -0.05,
+      "riskoff": 0.25
+    },
+    {
+      "source_file": "beta",
+      "source": "spy_vt20_cap200",
+      "mtd_cut": -0.08,
+      "riskoff": 0.25
+    }
+  ],
+  "sample_label": "Research/touched 2018-2024 only; no 2025-2026 OOS opened.",
+  "leakage_controls": "Daily scale uses only prior close month-to-date strategy equity return. No ticker picking and no old manual 62 list.",
+  "rule_selection_effect": "None inside diagnostic. Source streams and MTD thresholds fixed before running.",
+  "outputs": [
+    "STOCKS_PIT_FULL_MONTHLY_LOSS_LIMITER_2026-09-14_SUMMARY.csv",
+    "STOCKS_PIT_FULL_MONTHLY_LOSS_LIMITER_2026-09-14_YEARLY.csv",
+    "STOCKS_PIT_FULL_MONTHLY_LOSS_LIMITER_2026-09-14_DAILY.csv"
+  ]
+}

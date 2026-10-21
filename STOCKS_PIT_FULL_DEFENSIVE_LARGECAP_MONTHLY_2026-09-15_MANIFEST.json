@@ -1,0 +1,95 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_DEFENSIVE_LARGECAP_MONTHLY_2026-09-15",
+  "script": "raits/research/stocks_pit_full_defensive_largecap_monthly.py",
+  "inputs": [
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv"
+  ],
+  "method": "Pre-registered monthly defensive large-cap selection from PIT top500 using lagged vol20_pre and ret60_pre.",
+  "costs": "4.0 bps per dollar of target-weight turnover; 2.5% annual financing on gross above 1x for vol-target rows.",
+  "sample_label": "Research/touched 2018-2024 only; no 2025-2026 OOS opened.",
+  "leakage_controls": "Selection uses PIT market-cap top500 and feature columns ret60_pre/vol20_pre already known before same-day close-to-close return. Rebalance is first trading day of month. No old manual 62 list.",
+  "rule_selection_effect": "None inside diagnostic. Score family, select counts, gross, target vol, and caps fixed before running.",
+  "variants": [
+    {
+      "variant": "top500_lowvol50_gross100",
+      "score": "low_vol",
+      "select_n": 50,
+      "gross": 1.0,
+      "target_vol": null,
+      "cap": 1.0
+    },
+    {
+      "variant": "top500_lowvol100_gross100",
+      "score": "low_vol",
+      "select_n": 100,
+      "gross": 1.0,
+      "target_vol": null,
+      "cap": 1.0
+    },
+    {
+      "variant": "top500_posmom_lowvol50_gross100",
+      "score": "posmom_lowvol",
+      "select_n": 50,
+      "gross": 1.0,
+      "target_vol": null,
+      "cap": 1.0
+    },
+    {
+      "variant": "top500_posmom_lowvol100_gross100",
+      "score": "posmom_lowvol",
+      "select_n": 100,
+      "gross": 1.0,
+      "target_vol": null,
+      "cap": 1.0
+    },
+    {
+      "variant": "top500_mom60_lowvol50_gross100",
+      "score": "mom60_lowvol",
+      "select_n": 50,
+      "gross": 1.0,
+      "target_vol": null,
+      "cap": 1.0
+    },
+    {
+      "variant": "top500_lowvol50_vt16_cap150",
+      "score": "low_vol",
+      "select_n": 50,
+      "gross": 1.0,
+      "target_vol": 0.16,
+      "cap": 1.5
+    },
+    {
+      "variant": "top500_posmom_lowvol50_vt16_cap150",
+      "score": "posmom_lowvol",
+      "select_n": 50,
+      "gross": 1.0,
+      "target_vol": 0.16,
+      "cap": 1.5
+    },
+    {
+      "variant": "top500_lowvol50_vt20_cap200",
+      "score": "low_vol",
+      "select_n": 50,
+      "gross": 1.0,
+      "target_vol": 0.2,
+      "cap": 2.0
+    },
+    {
+      "variant": "top500_posmom_lowvol50_vt20_cap200",
+      "score": "posmom_lowvol",
+      "select_n": 50,
+      "gross": 1.0,
+      "target_vol": 0.2,
+      "cap": 2.0
+    }
+  ],
+  "outputs": [
+    "STOCKS_PIT_FULL_DEFENSIVE_LARGECAP_MONTHLY_2026-09-15_SUMMARY.csv",
+    "STOCKS_PIT_FULL_DEFENSIVE_LARGECAP_MONTHLY_2026-09-15_YEARLY.csv",
+    "STOCKS_PIT_FULL_DEFENSIVE_LARGECAP_MONTHLY_2026-09-15_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_DEFENSIVE_LARGECAP_MONTHLY_2026-09-15_DAILY.csv",
+    "STOCKS_PIT_FULL_DEFENSIVE_LARGECAP_MONTHLY_2026-09-15_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_DEFENSIVE_LARGECAP_MONTHLY_2026-09-15_QA.csv"
+  ]
+}

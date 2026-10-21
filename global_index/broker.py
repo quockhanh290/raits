@@ -153,7 +153,7 @@ class BrokerPosition:
 class Broker(ABC):
     """Interface the runner depends on. IBKRBroker implements the same methods later."""
     @abstractmethod
-    def fetch_bars(self, inst: str, through) -> pd.DataFrame: ...
+    def fetch_bars(self, inst: str, through, *, lookback: str | None = None) -> pd.DataFrame: ...
     @abstractmethod
     def send_order(self, order: Order, *, on_submit=None) -> Fill:
         """Place an order and return its outcome.
@@ -241,7 +241,12 @@ class MockBroker(Broker):
         self._positions: list = []             # list[BrokerPosition] (allows >1 per inst)
         self.fills: list = []
 
-    def fetch_bars(self, inst: str, through) -> pd.DataFrame:
+    def fetch_bars(self, inst: str, through, *, lookback: str | None = None) -> pd.DataFrame:
+        # `lookback` sizes a REQUEST, and this broker makes none — it already holds every bar
+        # it will ever serve. Accepted rather than rejected so the one interface holds for both
+        # brokers; a signature that drifts from the real one turns a live wiring bug into a
+        # TypeError nobody sees until the connection is open.
+        del lookback
         df = self._bars.get(inst)
         if df is None:
             return pd.DataFrame()

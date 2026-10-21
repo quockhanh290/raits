@@ -1,0 +1,23 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_RESIDUAL_CRISIS_COST_STRESS_2026-09-17",
+  "script": "raits/research/stocks_pit_full_residual_crisis_cost_stress.py",
+  "engine": "raits/research/stocks_pit_full_residual_reversal_cohorts.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_RESIDUAL_REVERSAL_COHORTS_2026-09-17_SIGNALS.csv",
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl (SPY bars only)"
+  ],
+  "frozen_candidate": "Market-residual bottom10/top10 hold3, 0.5x gross, admit cohorts only when lagged SPY overnight20 is negative.",
+  "pre_registered_cost_bps": [
+    4.0,
+    8.0,
+    12.0
+  ],
+  "sample_label": "Touched research 2018-2024 only. No 2025-2026 opened.",
+  "outputs": [
+    "STOCKS_PIT_FULL_RESIDUAL_CRISIS_COST_STRESS_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_CRISIS_COST_STRESS_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_CRISIS_COST_STRESS_2026-09-17_QA.csv"
+  ]
+}

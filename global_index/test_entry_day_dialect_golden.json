@@ -1,0 +1,52 @@
+{
+  "schema": "entry_day_dialect_golden/1",
+  "captured_before_change": true,
+  "base_input_file": "test_runner_book_dialect_golden.json",
+  "files": [
+    {"path": "live_positions.json", "rows": 0},
+    {"path": "live_positions.json.bak", "rows": 3},
+    {"path": "live_positions.json.prerebase.bak", "rows": 2},
+    {"path": "live_positions.track1.json", "rows": 4},
+    {"path": "live_positions.track1.json.before_qty_repair_20260924_232859", "rows": 3},
+    {"path": "live_positions.track1.json.before_restore_20260925_105432", "rows": 0},
+    {"path": "live_positions.track1.json.corrupt-20260826T113414.bak", "rows": 0},
+    {"path": "live_positions.track1.json.pre-backfill-20260924T165053.bak", "rows": 0},
+    {"path": "live_positions.track1.json.pre-cleanup-20260924T164932.bak", "rows": 2}
+  ],
+  "base_records": [
+    {"base_index": 0, "output_sha256": "19e1c23b39c9a82a267066f4500c84698c447b32b1e599236156c12621a3f69b", "entry_day": "2026-08-05 00:00:00"},
+    {"base_index": 1, "output_sha256": "4d9499406f4139d7d8fba63774145aa396a4f9ca82394db46992bf699fe45c81", "entry_day": "2026-08-05 00:00:00"},
+    {"base_index": 2, "output_sha256": "93eb52e40a969dbdc0158fb8a1870122babe67abcb6d0a99dc09fe47b1c083db", "entry_day": "2026-08-05 00:00:00"},
+    {"base_index": 3, "output_sha256": "24fd76a40c74a75d0c88bcbb9d4dc86cd0793503d48ff395da4b11eb4ed88f70", "entry_day": "2026-08-05 00:00:00"},
+    {"base_index": 4, "output_sha256": "8aa45fb26f43265862c02ccf2daf81f972aa442c777712645892d26e448fc1ac", "entry_day": "2026-08-07 00:00:00"},
+    {"base_index": 5, "output_sha256": "8ad5afce338e982bc160feb830118f2a1d728cdba51f420be67924990251061b", "entry_day": null},
+    {"base_index": 6, "output_sha256": "134622cb95a2aec9040bd1e12ec771497587d6caa729cb697f899cbba64245dc", "entry_day": null},
+    {"base_index": 7, "output_sha256": "f667041909570ce060211f0edaba9243804166567c6be2b6d1507dfa6ab2af2a", "entry_day": null},
+    {"base_index": 8, "output_sha256": "8dc4fc057ba2a7bbc433431c8e1abce47602a6ddb2d74103b4311a832c12f9f4", "entry_day": null},
+    {"base_index": 9, "output_sha256": "8dc4fc057ba2a7bbc433431c8e1abce47602a6ddb2d74103b4311a832c12f9f4", "entry_day": null}
+  ],
+  "live_records": [
+    {
+      "path": "live_positions.track1.json", "index": 0,
+      "input": {"trade_id":"normal_r4::M2K::2026-09-24","sleeve":"roska4_swing","instrument":"M2K","direction":"LONG","qty":1,"risk_dollars":469.4643,"entry_time":"2026-09-24 15:55:00","entry_price":2857.0,"stop_price":2782.785714285714,"order_id":"30"},
+      "output_sha256": "8ad5afce338e982bc160feb830118f2a1d728cdba51f420be67924990251061b", "entry_day": null
+    },
+    {
+      "path": "live_positions.track1.json", "index": 1,
+      "input": {"trade_id":"normal_r4::MYM::2026-09-24","sleeve":"roska4_swing","instrument":"MYM","direction":"LONG","qty":1,"risk_dollars":677.9464,"entry_time":"2026-09-24 15:55:00","entry_price":51732.0,"stop_price":50662.28571428572,"order_id":"28"},
+      "output_sha256": "134622cb95a2aec9040bd1e12ec771497587d6caa729cb697f899cbba64245dc", "entry_day": null
+    },
+    {
+      "path": "live_positions.track1.json", "index": 2,
+      "input": {"trade_id":"global_nkd::MNKD::2026-09-25","sleeve":"global_nkd","instrument":"MNKD","direction":"LONG","qty":1,"risk_dollars":1761.6071428571427,"entry_time":"2026-09-25 14:20:00+09:00","entry_price":66145.0,"stop_price":63321.42857142857,"order_id":"40"},
+      "output_sha256": "ac2b1e6e30d58431c1ef8a3736f782bcb2fc3e4b4e554defd17d29c7d6d0547e", "entry_day": null
+    },
+    {
+      "path": "live_positions.track1.json", "index": 3,
+      "input": {"trade_id":"normal_r4::MES::2026-09-25","sleeve":"roska4_swing","instrument":"MES","direction":"LONG","qty":1,"risk_dollars":908.2589285714287,"entry_time":"15:00","entry_price":7797.25,"stop_price":7652.178571428572,"order_id":"68"},
+      "output_sha256": "190487517f67ff693ba110cb2b2bbafb15c99baf2940d137a43f3c9c862bab4a", "entry_day": null
+    }
+  ],
+  "row_count": 14,
+  "raised_count": 0
+}

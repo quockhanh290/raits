@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "checks": 24,
+  "discoveryCells": 18,
+  "developmentPasses": 1,
+  "replicationCells": 1,
+  "replicationPasses": 0,
+  "discoveryCoverage": {
+    "planned": 18892,
+    "fetched": 18827,
+    "explicitFailures": 65
+  },
+  "replicationCoverage": {
+    "planned": 6006,
+    "fetched": 5985,
+    "explicitFailures": 21
+  },
+  "scriptHashes": {
+    "fetch": "D53C341D85B33AEA93FF54054E259786D7AA2CF6127CE4DA7E8D1BE75C9DA677",
+    "classify": "A029B5329A12389D1CF110E93EAC5EBE0BA20D12DD24F7AF5C2797172DA7AFEA",
+    "discovery": "CB1125B37F7A23269CF381F28B9302DF061CE03CC5201D938C7FFDE8584CCC97",
+    "replication": "F26598046849B18B282AB16750EFB7E740FAFA5FC0557B5D7967A6CF87AE8FAA"
+  },
+  "preregistrationHash": "B9C086634EA67D9706D6100D3E4784993E0BABEA0E03E488FBDD6DAD9CEA30B1",
+  "replicationFreezeHash": "3F00FC46C6D131B381B215A83B35CD5498E1A0D946EA2D13CA66E5CBB9DE001A",
+  "post2021PerformanceConsumed": false
+}

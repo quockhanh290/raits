@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "checks": 33,
+  "selection": {
+    "status": "KILL_VALIDATION_FAIL",
+    "selectedVariant": "yday_broad_venue_confirmation",
+    "validationOpened": true,
+    "validationPass": false,
+    "productionPassAllowed": false
+  },
+  "maxDevelopmentDate": "2021-12-28",
+  "maxValidationDate": "2022-12-29",
+  "post2022Consumed": false,
+  "scriptHash": "29FAB1B9181D38DB7CE0043B8F85B7A75046B11111DC248ADD635986273AF518"
+}

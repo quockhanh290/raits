@@ -1,0 +1,48 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LEAD_MAXDD_CIRCUIT_BREAKERS_2026-09-17",
+  "script": "raits/research/stocks_pit_full_lead_maxdd_circuit_breakers.py",
+  "engine": "raits/research/stocks_pit_full_lead_candidate_eventtime_audit.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TRADE_EVENTS.csv",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl"
+  ],
+  "pre_registered_variants": [
+    {
+      "variant": "gross2_control",
+      "max_dd": null,
+      "reentry": null
+    },
+    {
+      "variant": "dd10_next_quarter",
+      "max_dd": 0.1,
+      "reentry": "next_quarter"
+    },
+    {
+      "variant": "dd125_cooldown63",
+      "max_dd": 0.125,
+      "reentry": "cooldown_63"
+    },
+    {
+      "variant": "dd15_spy_sma200",
+      "max_dd": 0.15,
+      "reentry": "spy_above_sma200"
+    }
+  ],
+  "gross_policy": "All rows reserve 0.5x target gross for pairs and cap SPY target at 1.5x; marked gross can drift above 2.0x.",
+  "trigger_policy": "Running high-water equity is evaluated at 09:35 and 15:55. A breach at either mark liquidates SPY and pairs at that session's 15:55 mark with turnover cost.",
+  "reentry_policy": "On re-entry the high-water mark resets to current equity. Re-entry becomes active after the named condition and SPY resumes at that session's 15:55 rebalance; pairs resume at 09:35.",
+  "sample_label": "Diagnostic on touched research sample 2018-2024. No 2025-2026 opened.",
+  "selection_warning": "Family was publicly frozen before this run but was motivated by observed drawdowns; it is not unseen OOS evidence.",
+  "outputs": [
+    "STOCKS_PIT_FULL_LEAD_MAXDD_CIRCUIT_BREAKERS_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LEAD_MAXDD_CIRCUIT_BREAKERS_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_LEAD_MAXDD_CIRCUIT_BREAKERS_2026-09-17_TRIGGERS.csv",
+    "STOCKS_PIT_FULL_LEAD_MAXDD_CIRCUIT_BREAKERS_2026-09-17_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_LEAD_MAXDD_CIRCUIT_BREAKERS_2026-09-17_SLEEVE_ATTRIBUTION.csv",
+    "STOCKS_PIT_FULL_LEAD_MAXDD_CIRCUIT_BREAKERS_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_LEAD_MAXDD_CIRCUIT_BREAKERS_2026-09-17_EVENT_LEDGER.csv",
+    "STOCKS_PIT_FULL_LEAD_MAXDD_CIRCUIT_BREAKERS_2026-09-17_QA.csv"
+  ]
+}

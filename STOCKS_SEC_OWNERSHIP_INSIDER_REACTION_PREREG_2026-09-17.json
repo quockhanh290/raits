@@ -1,0 +1,117 @@
+{
+  "spec_id": "stocks_sec_ownership_insider_reaction_v1_2026-09-17",
+  "frozen_before_family_performance": true,
+  "hypothesis": "PIT ownership disclosures and clustered insider filings create issuer-specific information-attention events whose confirmed or rejected opening response can persist beyond 09:35.",
+  "samples": {
+    "development": "2018-01-02 through 2022-12-30",
+    "validation": "2023-01-03 through 2024-12-31",
+    "oos": "2025-01-02 through 2026-09-16, closed unless one candidate passes every development and validation gate",
+    "oos_disclosure": "The dates are globally touched by other research families and cannot be marketed as pristine market-data OOS."
+  },
+  "event_contract": {
+    "source": "Previously cached SEC submissions JSON for the PIT top500 issuer-CIK union",
+    "timestamp": "acceptanceDateTime",
+    "availability_cutoff": "09:15 America/New_York",
+    "session_assignment": "First trading session whose 09:15 ET cutoff is strictly after acceptance, with an explicit prior-session lower bound.",
+    "form4_cluster3": "At least three exact Form 4 filings for one issuer CIK assigned to the same session; exclude Form 4/A. Direction is not inferred from transaction content.",
+    "form4_cluster5": "At least five exact Form 4 filings for one issuer CIK assigned to the same session; exclude Form 4/A. This is a pre-registered nested intensity threshold.",
+    "ownership_active_initial": "Exact SC 13D or SCHEDULE 13D; exclude all amendments.",
+    "ownership_passive_initial": "Exact SC 13G or SCHEDULE 13G; exclude all amendments.",
+    "deduplication": "One event per issuer CIK, assigned session, and class; earliest acceptance plus accession count is retained.",
+    "issuer_representation": "Highest-market-cap PIT top500 ticker per CIK at the latest quarterly snapshot on or before the event session."
+  },
+  "signal_contract": {
+    "universe": "Quarterly Polygon PIT market-cap top500 plus current-day PIT price>=5 and lagged ADV20>=10m eligibility.",
+    "gap_abs_min": 0.01,
+    "opening_rvol_min": 1.25,
+    "confirmed_first5_abs_min": 0.002,
+    "rejected_first5_abs_min": 0.0035,
+    "confirmed": "Gap and first5_ret have the same non-zero sign; trade that sign.",
+    "rejected": "Gap and first5_ret have opposite non-zero signs; trade the first5_ret sign.",
+    "entry": "Exact 09:35 on the assigned session.",
+    "exit": "Exact 15:55 on the hold-th session, entry session counted as day 1."
+  },
+  "candidate_family": [
+    {"variant": "form4_cluster3_confirm_hold3", "event_class": "form4_cluster3", "reaction": "confirmed", "hold_sessions": 3},
+    {"variant": "form4_cluster5_confirm_hold3", "event_class": "form4_cluster5", "reaction": "confirmed", "hold_sessions": 3},
+    {"variant": "ownership_active_confirm_hold5", "event_class": "ownership_active_initial", "reaction": "confirmed", "hold_sessions": 5},
+    {"variant": "ownership_active_reject_hold3", "event_class": "ownership_active_initial", "reaction": "rejected", "hold_sessions": 3},
+    {"variant": "ownership_passive_confirm_hold3", "event_class": "ownership_passive_initial", "reaction": "confirmed", "hold_sessions": 3}
+  ],
+  "portfolio_contract": {
+    "start_capital": 100000.0,
+    "entry_notional_nav": 0.03,
+    "single_issuer_cap_nav": 0.03,
+    "hard_gross_cap": 1.0,
+    "overlap": "No new position while issuer CIK is active.",
+    "capacity": "Entry notional <=1% of current PIT ADV20.",
+    "unused_capacity": "Cash; no refill.",
+    "missing_entry": "Skip without replacement unless exact 09:35 exists.",
+    "missing_exit": "Retain until next exact 09:35 or 15:55, whichever occurs first.",
+    "base_cost_bps_each_trade": 4.0,
+    "stress_cost_bps_each_trade": 8.0,
+    "short_borrow_annual": 0.01,
+    "financing_annual_above_1x": 0.025
+  },
+  "selection_rule": {
+    "ranking_period": "2018-2022",
+    "ranking": "Highest base-4bps daily Sharpe among candidates passing all development gates.",
+    "development_gates": {
+      "positive_calendar_years_min": 3,
+      "base_pnl_positive": true,
+      "stress8_pnl_positive": true,
+      "max_drawdown_pct_floor": -0.15,
+      "entry_count_min": 50,
+      "effective_ticker_count_min": 15,
+      "top10_positive_ticker_pnl_share_max": 0.75
+    },
+    "validation_gates": {
+      "base_pnl_positive": true,
+      "stress8_pnl_positive": true,
+      "both_calendar_year_base_pnl_nonnegative": true,
+      "max_drawdown_pct_floor": -0.10,
+      "entry_count_min": 20,
+      "effective_ticker_count_min": 10,
+      "top10_positive_ticker_pnl_share_max": 0.75
+    },
+    "tie_break": "Higher stress8 Sharpe, then larger entry count, then shorter hold.",
+    "no_selection_result": "KILL_BEFORE_OOS; do not modify forms, cluster thresholds, price filters, directions, holds, sizing, or gates."
+  },
+  "oos_acceptance_if_eligible": {
+    "base_cagr_min": 0.05,
+    "base_sharpe_min": 0.70,
+    "stress8_cagr_min": 0.03,
+    "max_drawdown_pct_floor": -0.10,
+    "entry_count_min": 30,
+    "effective_ticker_count_min": 20,
+    "top10_positive_ticker_pnl_share_max": 0.60,
+    "stale_execution_allowed": false
+  },
+  "audit_requirements": [
+    "Report all candidates, both costs, yearly PnL, dollar and percentage DD, concentration, turnover, borrow, exposure, and long/short counts.",
+    "Treat Form 4 only as filing intensity; do not claim insider buying or selling without transaction-code parsing.",
+    "Separate rule-selection effect from causal trade-selection effect.",
+    "Archive all invalid runs and disclose corrections.",
+    "Do not use the old manual/restricted 62 universe or a learned ticker list."
+  ],
+  "implementation_freeze": {
+    "performance_seen": false,
+    "inventory_script": "raits/research/stocks_sec_cached_form_inventory.py",
+    "inventory_script_sha256": "C5AE1C48E8A73235C1BA2B188980C2F22AD4E53DBF2E450CA9AF51BB95936B80",
+    "label_builder": "raits/research/stocks_sec_ownership_insider_events_build.py",
+    "label_builder_sha256": "CBD53C78C0F3BCA87FA0DAEB79A96FB657983BF519647658D2F690DE1077178D",
+    "replay_script": "raits/research/stocks_sec_ownership_insider_reaction_replay.py",
+    "replay_script_sha256": "A61AC83D7E4B0841D43ECB8AC406DF4A1B8FC44DD63AFA65C01D0E9ACD493620",
+    "raw_input": "raits/data/cache/external_events/sec_submissions_pit_2018_2026/raw",
+    "event_file": "raits/data/cache/external_events/sec_submissions_pit_2018_2026/sec_ownership_insider_events_2017_2026.csv",
+    "event_file_sha256": "EA53B2BB1344AFF0470ECC549A3089FCC6CCA9FB8CF8410CA6DA1B0594E805B5",
+    "event_rows": 480949,
+    "inventory_counts": {
+      "form4": 461404,
+      "sc13d_initial_legacy": 576,
+      "schedule13d_initial_new_name": 81,
+      "sc13g_initial_legacy": 14442,
+      "schedule13g_initial_new_name": 4446
+    }
+  }
+}

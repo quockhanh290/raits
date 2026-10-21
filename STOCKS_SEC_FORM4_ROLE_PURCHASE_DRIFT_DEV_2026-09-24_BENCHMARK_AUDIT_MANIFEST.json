@@ -1,0 +1,9 @@
+{
+  "script": "raits/research/stocks_sec_form4_role_purchase_drift_benchmark_audit.py",
+  "purpose": "Fixed post-result attribution only; cannot change family selection.",
+  "source": "STOCKS_SEC_FORM4_ROLE_PURCHASE_DRIFT_DEV_2026-09-24_DAILY.csv",
+  "source_sha256": "0664218FEDA7B569FCB41C3CEFDF5EBAE355D41EE14E946519F02D6C1176FCAC",
+  "benchmark": "STOCKS_PIT_FULL_BENCHMARK_HURDLES_2026-09-14_DAILY.csv",
+  "benchmark_sha256": "4CEBE917EDF71406E8F74A5E66CA73C313A1F546036D1D7B93EEA976494B5B09",
+  "output": "STOCKS_SEC_FORM4_ROLE_PURCHASE_DRIFT_DEV_2026-09-24_BENCHMARK_AUDIT.csv"
+}

@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "checks": 16,
+  "tests": 180,
+  "discoveryPasses": 4,
+  "replicationPasses": 0,
+  "confirmationOpened": false,
+  "scriptHash": "F2A49383C336FAD0311C423991A17507745BF039DA50DA88738EC61E2D7176DF",
+  "preregistrationHash": "33ABC256273BE7E4E7847001987E8696D339836E39FEC19BCACF4BAE6AEDDE2E",
+  "dependencies": {
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl": "C65065EA082D68544A5CD87C8DAD9A81CEE0B92A49A34D3C18C162A9EDED4AEC",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv": "C184A810909371F7DB5A3F6926417496A77B97BBAF97ED14B017E3BDD42115D4",
+    "raits/data/cache/stocks_survivorship/polygon_universe_bulk/daily_20180102_20241231_resumable/liquidity_filter_daily_20180102_20241231_px5_adv10m_unadjusted/filtered_daily_universe.parquet": "FD696E0BD91E3B951C86FFF89734AF908759E11829715B9C1983604E356E8B2C",
+    "raits/data/cache/polygon_stock_trades_1000_flow_2018_2022/causal_tape_features_pre1000.parquet": "ABA6D178B771184D3AED778C64A64005D406A668CCE03EF598B79EEE18490095",
+    "STOCKS_PIT_1000_FLOW_FETCH_PLAN_2026-10-02.csv": "AB0865B0FFCDB61C7DDD8DC2C5E6D9F44787DF927D4B6FCDFA403F1622D8CCE3",
+    "STOCKS_PIT_1000_FLOW_EXACT_CLOCK_ROWS_2026-10-02.csv": "549B50ABE397C9347DD363D9F414853F4109C05E42279EF4981BBC13EC48CA37",
+    "raits/data/cache/external_equity_context/polygon_2018_2024/manifest.json": "651EAFF1DAF804CB2C3093DC465C717C658192A8B3C0381588DAA71688F366BC",
+    "raits/data/cache/external_equity_context/polygon_2018_2024/status.csv": "081E0CC332366A13D74333F250890238AC795E3E20C21235BA194031C3035C49",
+    "raits/data/cache/external_events/polygon_2018_2024/manifest.json": "E987809E4788BC639286EF841E9D0C9EA5007AA70475576EE08FF71C7F331B17",
+    "raits/data/cache/external_events/polygon_2018_2024/status.csv": "D4BB8558C7AB81E5136AC338FCAD0DA7FD1A04C4A5F588BBC419A2FDC7D70D2C"
+  },
+  "post2022PerformanceConsumed": false
+}

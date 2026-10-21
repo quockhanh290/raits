@@ -1,0 +1,65 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LEAD_CANDIDATE_EVENTTIME_AUDIT_2026-09-17",
+  "script": "raits/research/stocks_pit_full_lead_candidate_eventtime_audit.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TRADE_EVENTS.csv",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl"
+  ],
+  "frozen_candidate": "SPY vt16 cap150 plus first-five-trading-days 0.5x plus quarterly same-SIC pairs 0.5x",
+  "method": "Single shared-equity event engine with dollar holdings. Both SPY and pairs mark at 09:35 and 15:55; pair events execute at 09:35 and SPY target exposure rebalances at 15:55 for the next session.",
+  "mark_policy": "Open positions are marked through final 15:55 and remain open; no artificial terminal liquidation. Missing prices carry the last mark and receive scenario penalty.",
+  "scenarios": [
+    {
+      "scenario": "core_control",
+      "pair_scale": 0.0,
+      "cost_bps": 4.0,
+      "financing": 0.025,
+      "borrow": 0.01,
+      "missing_bps": 0.0
+    },
+    {
+      "scenario": "base",
+      "cost_bps": 4.0,
+      "financing": 0.025,
+      "borrow": 0.01,
+      "missing_bps": 0.0
+    },
+    {
+      "scenario": "cost8",
+      "cost_bps": 8.0,
+      "financing": 0.025,
+      "borrow": 0.01,
+      "missing_bps": 0.0
+    },
+    {
+      "scenario": "stress",
+      "cost_bps": 8.0,
+      "financing": 0.05,
+      "borrow": 0.02,
+      "missing_bps": 25.0
+    },
+    {
+      "scenario": "severe",
+      "cost_bps": 12.0,
+      "financing": 0.05,
+      "borrow": 0.03,
+      "missing_bps": 50.0
+    }
+  ],
+  "sample_label": "Research/touched 2018-2024 only. 2023-2024 is touched, not clean unseen OOS. No 2025-2026 opened.",
+  "leakage_controls": "Core exposures and pair trade events are frozen causal source outputs. Event execution uses local SPY and broad-PIT 09:35/15:55 prices. No old manual 62 equity selection; old cache supplies SPY benchmark bars only.",
+  "rule_selection_effect": "None. Candidate rules, pair scale and stress matrix were frozen before measurement.",
+  "trade_selection_effect": "No source rule re-selection. Shared dollar holdings, event compounding, turnover, financing, borrow and missing-price penalties are rebuilt from events.",
+  "outputs": [
+    "STOCKS_PIT_FULL_LEAD_CANDIDATE_EVENTTIME_AUDIT_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LEAD_CANDIDATE_EVENTTIME_AUDIT_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_LEAD_CANDIDATE_EVENTTIME_AUDIT_2026-09-17_CONCENTRATION.csv",
+    "STOCKS_PIT_FULL_LEAD_CANDIDATE_EVENTTIME_AUDIT_2026-09-17_SLEEVE_ATTRIBUTION.csv",
+    "STOCKS_PIT_FULL_LEAD_CANDIDATE_EVENTTIME_AUDIT_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_LEAD_CANDIDATE_EVENTTIME_AUDIT_2026-09-17_EVENT_LEDGER.csv",
+    "STOCKS_PIT_FULL_LEAD_CANDIDATE_EVENTTIME_AUDIT_2026-09-17_TICKER_CONTRIB.csv",
+    "STOCKS_PIT_FULL_LEAD_CANDIDATE_EVENTTIME_AUDIT_2026-09-17_QA.csv"
+  ]
+}

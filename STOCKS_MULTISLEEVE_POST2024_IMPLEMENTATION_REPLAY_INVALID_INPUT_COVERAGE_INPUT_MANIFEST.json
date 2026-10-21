@@ -1,0 +1,32 @@
+{
+  "script": "D:/raits/raits/research/stocks_multisleeve_post2024_target_builder.py",
+  "scriptHash": "E2BE166ABC114FEE74C4EB9178E4440A7E33BD9281517DD2B272CA3CA6831A47",
+  "sample": [
+    "2025-01-02",
+    "2026-09-16"
+  ],
+  "sessions": 424,
+  "targets": "STOCKS_MULTISLEEVE_POST2024_IMPLEMENTATION_REPLAY_INPUT_TARGETS.csv",
+  "targetsHash": "19A0611E6AC464A80204AD9C952A7CA386C95E72DF0013A9A5C9DCD6B1BB84E0",
+  "market": "STOCKS_MULTISLEEVE_POST2024_IMPLEMENTATION_REPLAY_INPUT_MARKET.csv",
+  "marketHash": "C18EB8BAAA89F4257A995B8AA7D88EC2E2A2E36C33D3A8B9394D8D19C7C9DB69",
+  "inputs": {
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2018_2024_NOWARMUP.pkl": "C65065EA082D68544A5CD87C8DAD9A81CEE0B92A49A34D3C18C162A9EDED4AEC",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl": "EEDEAACC5F5302CDD87114FA985A58BA4B32B1DA807E57AC3AFEB18D96970696",
+    "raits/data/cache/stocks_clean_daily_features_PIT_FULL_2025_2026_CLEAN_OOS.pkl": "35E38F92F0059D240652B2A0050F4ECA218A734F2C2A710BC661649AAE4DDA28",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2025_2026_CLEAN_OOS.pkl": "619E4A071063E4D37AB41D895FC7E71CACED978D1810E4EF6E4F0BCB677AE7EC",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2018_2024.csv": "C184A810909371F7DB5A3F6926417496A77B97BBAF97ED14B017E3BDD42115D4",
+    "raits/data/cache/external_universes/market_cap_polygon/polygon_market_cap_snapshots_pit_eligible_2025_2026_clean_oos.csv": "A7951EE5D5A4459CA7DEE191E6075904B95718A0249F848BD0BEBE02FB22B264",
+    "raits/data/cache/stocks_survivorship/polygon_universe_bulk/daily_20250102_20260916_clean_oos/liquidity_filter_daily_20250102_20260916_clean_oos_px5_adv10m_unadjusted/filtered_daily_universe.parquet": "F38C046E97BF79B1A8AA0C5F8AB83941AF939CAF00D62C20363DE9D6EE0A2A49",
+    "STOCKS_PIT_FULL_LEAD_CLEAN_OOS_2026-09-17_MANIFEST.json": "A2C347C21337567765FF9DA814971CABFC56AF1F3C61B34E9947F960EEAD156F"
+  },
+  "raw5minDirectory": "raits/data/cache/polygon_5min_pit_full_2025_2026_clean_oos",
+  "rules": "Quarterly top500 same-SIC z2 hold10 max10 pairs at 75%; next-session first-five SPY x2.5 at 25%.",
+  "assumptions": {
+    "borrow_available": true,
+    "spy_adv20": 1000000000000.0,
+    "classification": "Touched implementation replay, not clean OOS and not forward paper PnL."
+  },
+  "oldManual62UsedForSelection": false,
+  "post2024ApprovalRecorded": true
+}

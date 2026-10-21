@@ -1,0 +1,22 @@
+{
+  "script": "raits/research/stocks_sec_8k202_event_drift_replay.py",
+  "stage": "oos",
+  "preregistration": "STOCKS_SEC_8K202_EVENT_DRIFT_PREREG_2026-09-17.json",
+  "sample": {
+    "start": "2025-01-02",
+    "end": "2026-09-16"
+  },
+  "inputs": [
+    "raits\\data\\cache\\external_events\\sec_submissions_pit_2018_2026\\sec_8k_item_202_events_2017_2026.csv",
+    "raits\\data\\cache\\stocks_clean_daily_features_PIT_FULL_2025_2026_CLEAN_OOS.pkl",
+    "raits\\data\\cache\\stocks_intraday_0935_features_PIT_FULL_2025_2026_CLEAN_OOS.pkl",
+    "raits\\data\\cache\\external_universes\\market_cap_polygon\\polygon_market_cap_snapshots_pit_eligible_2018_2024.csv",
+    "raits\\data\\cache\\external_universes\\market_cap_polygon\\polygon_market_cap_snapshots_pit_eligible_2025_2026_clean_oos.csv",
+    "raits\\data\\cache\\stocks_survivorship\\polygon_universe_bulk\\daily_20180102_20241231_resumable\\liquidity_filter_daily_20180102_20241231_px5_adv10m_unadjusted\\filtered_daily_universe.parquet",
+    "raits\\data\\cache\\stocks_survivorship\\polygon_universe_bulk\\daily_20250102_20260916_clean_oos\\liquidity_filter_daily_20250102_20260916_clean_oos_px5_adv10m_unadjusted\\filtered_daily_universe.parquet"
+  ],
+  "mapped_events": 3287,
+  "signals": 885,
+  "selection": null,
+  "outputs_prefix": "STOCKS_SEC_8K202_EVENT_DRIFT_OOS_2026-09-17"
+}

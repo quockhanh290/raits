@@ -1,0 +1,28 @@
+{
+  "script": "D:/raits/raits/research/stocks_pit_1000_flow_replay.py",
+  "scriptHash": "080F4F2C758FC3905E6B31277335818BD7AE2C26BDDD2A93AAAB218A459C65F2",
+  "preregistration": "STOCKS_PIT_1000_FLOW_PREREG_2026-10-02.json",
+  "preregistrationHash": "7BC646E671F616B71F8CCC6CB49483DDC7B5C37E1171075E55774484253BF31C",
+  "inputs": {
+    "STOCKS_PIT_1000_FLOW_FETCH_PLAN_2026-10-02.csv": "AB0865B0FFCDB61C7DDD8DC2C5E6D9F44787DF927D4B6FCDFA403F1622D8CCE3",
+    "STOCKS_PIT_1000_FLOW_FETCH_PLAN_2026-10-02.json": "40923C556FF9A9294BA83E5A0BBE9D337481778350FC6857E80CE73883041330",
+    "STOCKS_PIT_1000_FLOW_EXACT_CLOCK_ROWS_2026-10-02.csv": "549B50ABE397C9347DD363D9F414853F4109C05E42279EF4981BBC13EC48CA37",
+    "raits/data/cache/polygon_stock_trades_1000_flow_2018_2022/causal_features_pre1000.parquet": "4D1E0374FAF0783A1BD577FF970EDCC55D9A804E22624CFAEFE6D64E57D24B0D",
+    "raits/data/cache/polygon_stock_trades_1000_flow_2018_2022/causal_features_pre1000_manifest.json": "F6821886A15DA8E220294F589A19944A29F6C2CF45752EA3218E9FF5DC0793FE"
+  },
+  "selection": {
+    "status": "KILL_NO_DEVELOPMENT_PASS",
+    "selectedVariant": null,
+    "validationOpened": false,
+    "productionPassAllowed": false
+  },
+  "development": [
+    "2018-03-29",
+    "2021-12-31"
+  ],
+  "validation": null,
+  "oldManual62Used": false,
+  "post2022Consumed": false,
+  "productionPassAllowed": false,
+  "causality": "SIP trades strictly before 10:00; exact 10:05 entry; exact 15:55 close with post-selection 16:00-open fallback"
+}

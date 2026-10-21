@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "checks": 45,
+  "failures": [],
+  "developmentPass": false,
+  "validationOpened": false,
+  "performanceMaxDate": "2021-12-31",
+  "activeMonths": 5,
+  "activeDays": 49,
+  "scriptHash": "1C1D8590C2B4303E78453975EC4DE03302E1462FBE3E2C281DE37DEA483F66AF",
+  "auditScriptHash": "9B3CA9B18E68AD6C10ECF88486C27CDE26FFDF4A043B44B0685A343A69F0DE48",
+  "preregistrationHash": "72563FF41B7EE353A32A174688F5DD5A3E47BEEE4357BF12D47742DD618D9FEE",
+  "post2022Consumed": false
+}

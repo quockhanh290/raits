@@ -1,0 +1,32 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LEAD_2022_GUARD_DIAGNOSTIC_2026-09-17",
+  "script": "raits/research/stocks_pit_full_lead_2022_guard_diagnostic.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_BETA_PLUS_CALENDAR_OVERLAY_2026-09-14_DAILY.csv",
+    "STOCKS_PIT_FULL_ROLLING_SIC_PAIRS_2026-09-17_TRADE_EVENTS.csv",
+    "raits/data/cache/stocks_intraday_0935_features_PIT_FULL_2018_2024_NOWARMUP.pkl",
+    "raits/data/cache/window_debug_5min_POLYGON_2016WARMUP_2018_2024_62.pkl"
+  ],
+  "pre_registered_variants": [
+    "baseline",
+    "overlay_off_below_sma200",
+    "overlay_off_ret20_le_m8",
+    "beta75_overlay_off_below_sma200",
+    "cap075_below_sma200"
+  ],
+  "rules": {
+    "overlay_off_below_sma200": "Keep beta; set first-five overlay to zero when prior SPY 15:55 close is below lagged 200-session SMA.",
+    "overlay_off_ret20_le_m8": "Keep beta; set first-five overlay to zero when lagged SPY 20-session return is <= -8%.",
+    "beta75_overlay_off_below_sma200": "When below lagged SMA200, set SPY exposure to 75% of the frozen vt16 beta and remove overlay.",
+    "cap075_below_sma200": "When below lagged SMA200, cap total frozen SPY exposure at 0.75x."
+  },
+  "sample_label": "Diagnostic on touched research sample 2018-2024. No 2025-2026 opened.",
+  "selection_warning": "This family was frozen before this run, but 2022 motivated the family. Results are diagnostic and cannot establish clean OOS robustness.",
+  "execution": "Same shared-equity event-time engine, pairs, costs, financing, borrow and marks as section 6.193; only next-session SPY target exposure changes.",
+  "outputs": [
+    "STOCKS_PIT_FULL_LEAD_2022_GUARD_DIAGNOSTIC_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LEAD_2022_GUARD_DIAGNOSTIC_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_LEAD_2022_GUARD_DIAGNOSTIC_2026-09-17_STATE.csv",
+    "STOCKS_PIT_FULL_LEAD_2022_GUARD_DIAGNOSTIC_2026-09-17_DAILY.csv"
+  ]
+}

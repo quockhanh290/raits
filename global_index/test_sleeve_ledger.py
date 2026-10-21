@@ -193,5 +193,71 @@ def test_sl4_verify_mode_is_untouched(tmp_path):
     )
 
 
+def test_sl5_route_book_reads_top_level_equity_fields(tmp_path):
+    """Track 1's schema-2 book stores the live ledger at the top level.
+
+    If the runner only reads the legacy nested breaker block, the route restarts at
+    50k even after a realised close has already moved the sleeve ledger.
+    """
+    pos_file = tmp_path / "track1.json"
+    pos_file.write_text(json.dumps({
+        "schema_version": 2,
+        "route": "track1_candidate",
+        "equity": ACCOUNT - 44.0,
+        "peak_equity": ACCOUNT,
+        "day_start_equity": ACCOUNT,
+        "cur_day": "2026-09-29",
+        "broker_equity": 251_213.8,
+        "positions": [],
+    }))
+
+    runner = FuturesRunner(
+        broker=MockBroker({}, ACCOUNT), guard=_guard(), contracts_by_inst={},
+        signal_fn=lambda d, b, h: ([], []), breaker=CircuitBreaker(account=ACCOUNT),
+        positions_path=pos_file, route="track1_candidate")
+
+    assert runner.state.equity == pytest.approx(ACCOUNT - 44.0)
+    assert runner.state.breaker.peak_equity == pytest.approx(ACCOUNT)
+    assert runner.state.breaker._day_start_equity == pytest.approx(ACCOUNT)
+    assert str(pd.Timestamp(runner.state.cur_day).date()) == "2026-09-29"
+
+
+def test_sl6_route_book_persists_realised_equity_to_top_level(tmp_path):
+    """A route-stamped safety sweep must preserve the schema-2 envelope and update
+    the ledger fields inside that envelope.
+    """
+    pos_file = tmp_path / "track1.json"
+    pos_file.write_text(json.dumps({
+        "schema_version": 2,
+        "route": "track1_candidate",
+        "window": "live",
+        "equity": ACCOUNT,
+        "peak_equity": ACCOUNT,
+        "day_start_equity": ACCOUNT,
+        "cur_day": "2026-09-29",
+        "broker_equity": 251_213.8,
+        "positions": [],
+    }))
+    runner = FuturesRunner(
+        broker=MockBroker({}, ACCOUNT), guard=_guard(), contracts_by_inst={},
+        signal_fn=lambda d, b, h: ([], []), breaker=CircuitBreaker(account=ACCOUNT),
+        positions_path=pos_file, route="track1_candidate")
+
+    runner.state.equity = ACCOUNT - 44.0
+    runner.state.breaker.peak_equity = ACCOUNT
+    runner.state.breaker._day_start_equity = ACCOUNT
+    runner.state.cur_day = pd.Timestamp("2026-09-29")
+    runner._persist_state()
+
+    saved = json.loads(pos_file.read_text())
+    assert saved["schema_version"] == 2
+    assert saved["route"] == "track1_candidate"
+    assert saved["equity"] == pytest.approx(ACCOUNT - 44.0)
+    assert saved["peak_equity"] == pytest.approx(ACCOUNT)
+    assert saved["day_start_equity"] == pytest.approx(ACCOUNT)
+    assert saved["cur_day"] == "2026-09-29"
+    assert saved["broker_equity"] == pytest.approx(251_213.8)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

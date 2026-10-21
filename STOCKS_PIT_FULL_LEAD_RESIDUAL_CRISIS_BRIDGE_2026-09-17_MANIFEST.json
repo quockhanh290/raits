@@ -1,0 +1,16 @@
+{
+  "out_prefix": "STOCKS_PIT_FULL_LEAD_RESIDUAL_CRISIS_BRIDGE_2026-09-17",
+  "script": "raits/research/stocks_pit_full_lead_residual_crisis_bridge.py",
+  "inputs": [
+    "STOCKS_PIT_FULL_LEAD_CANDIDATE_EVENTTIME_AUDIT_2026-09-17_DAILY.csv",
+    "STOCKS_PIT_FULL_RESIDUAL_CRISIS_SLEEVE_2026-09-17_DAILY.csv"
+  ],
+  "method": "Shared-equity daily bridge: apply lead and frozen gated-crisis source returns to one opening equity and charge incremental 2.5% financing on proxy gross above the lead gross.",
+  "limitation": "Lead and crisis source clocks differ inside the day (lead has 09:35 and 15:55 marks; crisis is 09:35-to-09:35). This is a high-signal bridge diagnostic, not final constituent event-time execution evidence.",
+  "sample_label": "Touched research 2018-2024 only. No 2025-2026 opened.",
+  "outputs": [
+    "STOCKS_PIT_FULL_LEAD_RESIDUAL_CRISIS_BRIDGE_2026-09-17_SUMMARY.csv",
+    "STOCKS_PIT_FULL_LEAD_RESIDUAL_CRISIS_BRIDGE_2026-09-17_YEARLY.csv",
+    "STOCKS_PIT_FULL_LEAD_RESIDUAL_CRISIS_BRIDGE_2026-09-17_DAILY.csv"
+  ]
+}

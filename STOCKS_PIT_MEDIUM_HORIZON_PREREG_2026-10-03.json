@@ -1,0 +1,96 @@
+{
+  "research_question": "Can low-turnover weekly or monthly sector-neutral price factors produce a broad-PIT edge that intraday families missed?",
+  "frozen_before_performance": true,
+  "frozen_at_local_date": "2026-10-03",
+  "script": "raits/research/stocks_pit_medium_horizon_replay.py",
+  "script_hash": "F0A10737D3BBAC7157514B34504B64B510414ED68EC05E8DC59D92F556D8CE5A",
+  "sample": {
+    "development": "2018-03-29 through 2021-12-31, with every development trade exited by 2021-12-31",
+    "locked_validation": "2022-01-01 through 2022-12-30"
+  },
+  "data_contract": {
+    "universe": "quarterly PIT market-cap top500 intersected with daily PIT eligibility and ADV20 >= 10m; entry price >= 5; absolute opening gap <= 30%",
+    "signals": "ret20_pre, ret60_pre, and vol20_pre are known before the rebalance session opens",
+    "sector_definition": "PIT Polygon SIC description with minimum ten eligible names on the rebalance date",
+    "weekly_schedule": "first market session of each ISO week; exact 09:35 entry; exact 09:35 exit at the first session of the following ISO week",
+    "monthly_schedule": "first market session of each calendar month; exact 09:35 entry; exact 09:35 exit at the first session of the following month",
+    "missing_exit": "if an already-selected name lacks the exact scheduled 09:35 exit, assign a conservative 100% leg-notional loss at that rebalance regardless of direction; no delay, drop, or refill, preserving non-overlap",
+    "post2022": "forbidden"
+  },
+  "variants": [
+    {
+      "name": "weekly_sector_momo20",
+      "rule": "abs 20-session return minus SIC median >= 3%; trade with residual sign",
+      "rank": "absolute 20-session sector residual",
+      "schedule": "weekly"
+    },
+    {
+      "name": "weekly_sector_momo60",
+      "rule": "abs 60-session return minus SIC median >= 5%; trade with residual sign",
+      "rank": "absolute 60-session sector residual",
+      "schedule": "weekly"
+    },
+    {
+      "name": "weekly_sector_reversal20",
+      "rule": "abs 20-session return minus SIC median >= 5%; trade opposite residual sign",
+      "rank": "absolute 20-session sector residual",
+      "schedule": "weekly"
+    },
+    {
+      "name": "weekly_consistent_lowvol_momo",
+      "rule": "20d and 60d sector residuals have the same sign; abs residuals >= 2% and 3%; vol20_pre no greater than same-date median",
+      "rank": "absolute 20d residual plus half absolute 60d residual",
+      "schedule": "weekly"
+    },
+    {
+      "name": "monthly_sector_blend_momo",
+      "rule": "20d and 60d sector residuals have the same sign; abs residuals >= 2% and 5%; trade with sign",
+      "rank": "absolute 20d residual plus half absolute 60d residual",
+      "schedule": "monthly"
+    }
+  ],
+  "portfolio": {
+    "selection": "up to five names per side with matched long/short counts; rank after exact-entry filtering and fully refill each side",
+    "weight": "5% current NAV absolute weight per leg; maximum 0.5x gross",
+    "sic_cap": "maximum one ticker per SIC per side",
+    "adv_cap": "1% ADV20 per entry order",
+    "initial_equity": 100000,
+    "compounding": true,
+    "overlap": "none; each cohort exits at the next rebalance before the new cohort is sized"
+  },
+  "costs": {
+    "base_bps_per_traded_dollar_per_side": 4,
+    "stress_bps_per_traded_dollar_per_side": 8,
+    "short_borrow_annual": 0.01
+  },
+  "development_gate": {
+    "weekly_active_cohorts_min": 100,
+    "weekly_trade_legs_min": 600,
+    "monthly_active_cohorts_min": 36,
+    "monthly_trade_legs_min": 300,
+    "cagr_min": 0.05,
+    "sharpe_min": 0.8,
+    "max_drawdown_pct_floor": -0.12,
+    "positive_years_min": 3,
+    "weekly_gross_edge_bps_per_cohort_min": 10,
+    "monthly_gross_edge_bps_per_cohort_min": 25,
+    "stress_pnl_positive": true,
+    "top10_positive_pnl_share_max": 0.5,
+    "winner": "highest base-cost Sharpe then CAGR among passers"
+  },
+  "validation_gate": {
+    "weekly_active_cohorts_min": 25,
+    "monthly_active_cohorts_min": 9,
+    "pnl_positive": true,
+    "sharpe_min": 0.5,
+    "max_drawdown_pct_floor": -0.1,
+    "stress_pnl_positive": true,
+    "top10_positive_pnl_share_max": 0.6
+  },
+  "benchmarks": [
+    "SPY matching weekly/monthly 09:35 rebalance returns",
+    "equal-weight eligible-universe matching weekly/monthly returns"
+  ],
+  "multiple_testing_policy": "Exactly five frozen rows. No post-result threshold, rebalance day, holding period, direction, ranking, or position-count changes.",
+  "production_policy": "A validation pass permits further audit only, not production PASS."
+}

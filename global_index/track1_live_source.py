@@ -68,6 +68,7 @@ on `FrameBarProvider`, which serves frames a caller already has.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Protocol, runtime_checkable
@@ -148,6 +149,81 @@ class LiveSourceRefused(RuntimeError):
         self.detail = detail
 
 
+#: How far back the fetch reaches BEYOND the last stored bar, in hours. This is the overlap
+#: the price cross-check gets to work with, and it is the only reason the window is not simply
+#: "whatever is new".
+#:
+#: Eight hours is ~480 shared minutes. The corruption this check exists to catch is systematic,
+#: not a stray bar: the 2026-09-10 roll disagreed on 1,143 of 1,185 shared minutes, and the
+#: Nikkei clock error moved 1,050 bars by 900-1,000 points. Either would be unmissable in 480.
+#:
+#: It is a named constant and not a literal because it is the one number that trades fetch time
+#: against how much evidence the check gets. Raising it costs seconds per slot; lowering it
+#: costs sight. Nothing else in this file should be edited to tune that.
+OVERLAP_MARGIN_HOURS = 8.0
+
+#: IBKR accepts a seconds duration only up to one day; past that it must be expressed in days.
+_MAX_DURATION_SECONDS = 86400
+
+
+def lookback_to_hours(duration: str) -> float:
+    """Hours covered by an IBKR duration string. Inverse of `required_lookback`, for comparing."""
+    n, unit = str(duration).split()
+    n = float(n)
+    if unit == "S":
+        return n / 3600.0
+    if unit == "D":
+        return n * 24.0
+    if unit == "W":
+        return n * 24.0 * 7
+    raise ValueError(f"unsupported duration unit {unit!r} in {duration!r}")
+
+
+def required_lookback(frozen, through, *, margin_hours: float = OVERLAP_MARGIN_HOURS):
+    """How far back this fetch must reach, as an IBKR duration string. None when unknowable.
+
+    Sized from the last bar the history actually holds, NOT from a calendar assumption. That
+    distinction is the whole fix: a fixed `2 D` is right only while the daily append keeps
+    running, and it fails silently the moment it does not — no shared minutes, nothing to
+    compare, and a record that says `ok`.
+
+    Returning None when the history is empty is deliberate. An empty frame is not a zero gap;
+    nobody knows how far back to ask, so the caller keeps its configured default rather than
+    this function inventing one.
+    """
+    if frozen is None or len(getattr(frozen, "index", ())) == 0:
+        return None
+    last = pd.Timestamp(pd.DatetimeIndex(frozen.index)[-1])
+    now = pd.Timestamp(through)
+
+    # Compared IN THE FRAME'S OWN CLOCK, never by stripping both to wall time.
+    #
+    # `frozen_frame` returns each instrument on its session clock — America/New_York for the
+    # index futures and Asia/Tokyo for the Nikkei sleeve — while `through` is the fetch instant
+    # on the provider clock, naive ET. Subtracting the two wall clocks understates the Nikkei
+    # gap by the 13-14 hours Tokyo runs ahead, and it fails in the dangerous direction: the
+    # gap goes negative, clamps to zero, and the window collapses to the bare margin exactly
+    # when the history is stale and the fetch most needs to reach back.
+    #
+    # Measured 2026-09-23: a check against the real parquet printed a gap of -15.0h for MNKD
+    # beside small positive ones for every index future. A negative gap cannot be real, and
+    # that is the whole tell. Same family as the two parquet loaders that hand back ET and UTC
+    # for one file.
+    tz = getattr(pd.DatetimeIndex(frozen.index), "tz", None)
+    if tz is not None:
+        if now.tz is None:
+            now = now.tz_localize(PROVIDER_CLOCK)
+        now = now.tz_convert(tz)
+    elif now.tz is not None:
+        now = now.tz_localize(None)
+    gap_h = max(0.0, (now - last).total_seconds() / 3600.0)
+    total_h = gap_h + float(margin_hours)
+    seconds = math.ceil(total_h * 3600)
+    if seconds <= _MAX_DURATION_SECONDS:
+        return f"{seconds} S"
+    return f"{math.ceil(total_h / 24.0)} D"
+
+
 @runtime_checkable
 class BarProvider(Protocol):
     """Anything that can hand over today's bars.
@@ -159,7 +235,7 @@ class BarProvider(Protocol):
 
     name: str
 
-    def fetch_session_bars(self, inst: str, *, through) -> Any: ...
+    def fetch_session_bars(self, inst: str, *, through, lookback=None) -> Any: ...
 
 
 @dataclass
@@ -173,7 +249,10 @@ class FrameBarProvider:
     frames: Mapping[str, Any]
     name: str = "frames"
 
-    def fetch_session_bars(self, inst: str, *, through) -> Any:
+    def fetch_session_bars(self, inst: str, *, through, lookback=None) -> Any:
+        # `lookback` is meaningless here and accepted rather than rejected: this provider
+        # already holds every frame it will ever serve, so there is no fetch to size.
+        del lookback
         df = self.frames.get(inst)
         if df is None:
             return None
@@ -229,8 +308,12 @@ class IBKRBarProvider:
                 "session, the client id and the contract resolution.")
         return self._broker
 
-    def fetch_session_bars(self, inst: str, *, through) -> Any:
+    def fetch_session_bars(self, inst: str, *, through, lookback=None) -> Any:
         """Naive-ET bars for `inst` through `through`, straight from the broker's own path.
+
+        `lookback` is the window the CALLER sized from the history it holds. Passed straight
+        down rather than stored: the broker's own `bar_duration` is fixed for the life of the
+        connection, and a window that must follow how stale the parquet is cannot live there.
 
         `IBKRBroker.fetch_bars` already lowercases the columns, sorts the index, converts the
         exchange-local timestamps to New York and drops the zone. Re-implementing any of that
@@ -283,7 +366,7 @@ class IBKRBarProvider:
         # Naive ET, because that is the clock `IBKRBroker.fetch_bars` compares against when it
         # trims to `through`. Handing it an aware instant raises inside pandas.
         try:
-            bars = broker.fetch_bars(fetch_as, as_provider_clock(through))
+            bars = broker.fetch_bars(fetch_as, as_provider_clock(through), lookback=lookback)
             # Stage 5ZZZ-CD. Carried out to where the frame checks live. The broker knows which
             # contract it resolved and nothing downstream can see through this wrapper to it.
             self.last_bars_contract = str(getattr(broker, "last_bars_contract", "") or "")
@@ -694,10 +777,69 @@ def _refuse_series_rolled(inst: str, provider: Any) -> str:
     return fetched
 
 
+
+def _overlap_population(inst: str, aligned: Any, frozen: Any, since) -> Any:
+    """Trim the live half to the bars the CURRENT anchor owes an exact match on.
+
+    Separate from `_refuse_overlap_disagreement` on purpose. That function's premise — stated
+    in Stage 5Q-4 and pinned by a source-level test — is that the guard is right and the data
+    is wrong, so nothing may be added to it that could make it quieter. Choosing WHICH BARS to
+    compare is a different question from HOW to compare them, and keeping them apart is what
+    lets the comparison stay literally untouched while the population it runs on gets fixed.
+
+    The population was wrong. Measured 2026-09-23, same minutes, current offset applied:
+
+        written AFTER the last anchor   1376 of 1376 identical   std 0.000
+        written BEFORE it               median -2.3 bp           worst -17.25
+
+    Older bars carry an earlier adjustment, and the two series are adjusted by different
+    methods — the store by difference to a 2024 contract, IBKR's continuous series by ratio to
+    the current one — so one additive offset aligns them at a single price level and nowhere
+    else. Holding that population to 1e-6 is a false alarm that cannot not fire. It cost 49
+    slots on 2026-09-14 with the anchor already correct, and it gets more certain the further
+    back the window reaches — which is precisely what a stale store causes.
+
+    `since` of None does not narrow: a missing anchor field must never shrink what is checked.
+
+    Narrowing to NOTHING is refused here rather than handed on as an empty comparison. On
+    2026-09-23 the 02:55 NKD slot spliced across a 76-hour hole with no shared minute at all
+    and recorded `overlap ok`; "could not compare" must not keep borrowing the words of
+    "compared and agreed".
+    """
+    # 2026-10-06. An empty answer from the feed is not this function's call either, and it used
+    # to be handled one line further down: `_refuse_overlap_disagreement` has always opened with
+    # this very guard. This function runs FIRST and did not have it, so when IBKR returned no bars
+    # at the 10:00 ET Calm slot the join died on `'NoneType' object has no attribute 'index'` —
+    # a traceback, no slot record, and the next slot skipped as "still in flight" — instead of
+    # reaching the splice that names what happened.
+    if aligned is None or len(aligned.index) == 0:
+        return aligned
+    if since is None:
+        return aligned
+    shared = pd.DatetimeIndex(aligned.index).intersection(pd.DatetimeIndex(frozen.index))
+    if len(shared) == 0:
+        return aligned                      # nothing shared at all: not this function's call
+    cut = pd.Timestamp(since)
+    if cut.tz is not None and shared.tz is None:
+        cut = cut.tz_localize(None)
+    elif cut.tz is None and shared.tz is not None:
+        cut = cut.tz_localize("UTC").tz_convert(shared.tz)
+    elif cut.tz is not None and shared.tz is not None:
+        cut = cut.tz_convert(shared.tz)
+    if len(shared[shared >= cut]) == 0:
+        raise LiveSourceRefused(
+            "overlap_before_anchor_only",
+            f"{inst}: all {len(shared)} shared minute(s) predate the current anchor ({cut}), "
+            f"so not one of them can be held to an exact match and nothing is left to "
+            f"compare. A fetch that meets the store only where the anchor does not reach has "
+            f"not verified the join, it has skipped it.")
+    idx = pd.DatetimeIndex(aligned.index)
+    return aligned[idx >= cut]
+
+
 def _refuse_overlap_disagreement(inst: str, aligned: Any, frozen: Any) -> int:
     """Where the live half and history share a timestamp, the prices must match. Returns the
     number of timestamps compared.
-
     This is the check that speaks directly to the incident. When live Nikkei bars were joined
     onto Tokyo-clocked history on the wrong clock, 1,050 of them landed on labels history
     already owned — and the prices there differed by roughly 900 to 1,000 points. The join
@@ -751,7 +893,11 @@ def live_frame(inst: str, *, frozen: Any, provider: BarProvider, through) -> Joi
             "no_fetch_instant",
             f"live_frame({inst}) needs the instant the bars were fetched at. Without it a "
             f"mis-converted tail landing in the future cannot be told from late data.")
-    raw = provider.fetch_session_bars(inst, through=through)
+    # Sized here because this is the one place that holds BOTH halves: the history whose
+    # last bar sets how far back the fetch must reach, and the instant it must reach forward
+    # to. The provider knows neither.
+    lookback = required_lookback(frozen, through)
+    raw = provider.fetch_session_bars(inst, through=through, lookback=lookback)
     offered = 0 if raw is None else int(len(raw.index))
     aligned = on_frozen_clock(inst, raw, frozen)
     # Stage 5Q-3. Schema BEFORE prices: the overlap check compares values column by column and
@@ -765,7 +911,10 @@ def live_frame(inst: str, *, frozen: Any, provider: BarProvider, through) -> Joi
     # the generic refusal would then be the only thing on the record. The specific cause is
     # knowable here and the generic one is not worth taking apart twice.
     bars_contract = _refuse_series_rolled(inst, provider)
-    checked = _refuse_overlap_disagreement(inst, aligned, frozen)
+    # WHICH bars first, then the untouched comparison over them.
+    from global_index.update_ibkr_daily import anchor_exact_from as _exact_from
+    _scoped = _overlap_population(inst, aligned, frozen, _exact_from(inst))
+    checked = _refuse_overlap_disagreement(inst, _scoped, frozen)
     frame, report = guard.splice(frozen, aligned)
     return JoinedFrame(inst, frame, report,
                        getattr(provider, "name", type(provider).__name__),
@@ -841,6 +990,11 @@ SLEEVE_NOT_LIVE = "sleeve_not_live"
 STRESS_RULE_NOT_IN_PACKAGE = "stress_rule_not_in_package"
 STRESS_BREADTH_INCOMPLETE = "stress_breadth_incomplete"
 NO_SLEEVE_AT_THIS_INSTANT = "no_sleeve_at_this_instant"
+#: 2026-10-05. Calm exits by the clock at 15:55; a session that closes at 13:00 has no 15:55 to exit
+#: at. The backtest drops those days ("a session missing its own 15:55 bar cannot be traded at the
+#: price the rule names"), so the live entry has to refuse them too — otherwise the order goes in at
+#: 10:00 and the exit it was validated with cannot happen.
+SESSION_ENDS_BEFORE_EXIT = "session_ends_before_exit"
 
 HMM_FIT_END = "2024-12-31"
 
@@ -1115,11 +1269,16 @@ class LiveTrack1Source:
                 out.append(sleeve)
         return out
 
-    def candidates(self, key) -> list:
+    def candidates(self, key, *, phase: str = "") -> list:
         """Every candidate decidable at `key`, which is the slot instant.
 
         Raises `LiveSourceRefused` when the rule could not run. Returns a list — possibly
         empty — when it ran.
+
+        `phase` is only read by Calm. "EXECUTE" prices the entry from the last CLOSED bar before
+        the order instant (09:59) instead of the 10:00 OPEN, because that slot sends a market
+        order at 10:00:00 and the 10:00 bar does not exist yet. Every other value, including the
+        default, is the behaviour this method always had.
         """
         now = pd.Timestamp(key)
         day = _session_day(now)
@@ -1129,10 +1288,10 @@ class LiveTrack1Source:
                                     f"{now} is inside no Track 1 window")
         out: list = []
         for sleeve in sleeves:
-            out.extend(self._for_sleeve(sleeve, now, day))
+            out.extend(self._for_sleeve(sleeve, now, day, phase))
         return out
 
-    def _for_sleeve(self, sleeve: str, now, day) -> list:
+    def _for_sleeve(self, sleeve: str, now, day, phase: str = "") -> list:
         if sleeve == "roska4_stress":
             return self._stress_candidates(now, day)
         if sleeve == "roska4_swing":
@@ -1145,7 +1304,7 @@ class LiveTrack1Source:
                 f"{sleeve} has no Track 1 slot. The sleeves that do are "
                 f"{sorted(_live_sleeves())}, and their windows are the only instants this "
                 f"source can be asked about")
-        return self._calm_candidates(now, day)
+        return self._calm_candidates(now, day, phase)
 
     def _nkd_candidates(self, now, day) -> list:
         """MNKD at a slot between 01:10 and 02:55 ET — 14:10 onward on the Tokyo clock.
@@ -1493,7 +1652,7 @@ class LiveTrack1Source:
                         int(tp.SLEEVE_QTY["roska4_calm"])))
         return out
 
-    def _calm_candidates(self, now, day) -> list:
+    def _calm_candidates(self, now, day, phase: str = "") -> list:
         from global_index import track1_calm_a as CA
         from global_index import track1_params as tp
         from global_index.track1_signal_layer import Candidate
@@ -1502,6 +1661,26 @@ class LiveTrack1Source:
             raise LiveSourceRefused("no_bar_provider",
                                     "the live source was asked for candidates without a bar "
                                     "provider; today's session could not be read")
+        if phase == "EXECUTE":
+            # Only the slot that SENDS has to care: it is the one that creates a position the
+            # clock exit must later close. Three outcomes, not two — a calendar that cannot be
+            # read is not a calendar that says "full day", so it refuses as well.
+            try:
+                from raits.live.trading_calendar import is_early_close, is_trading_day
+                _d = pd.Timestamp(day).date()
+                _early = bool(is_early_close(_d)) or not bool(is_trading_day(_d))
+            except Exception as _exc:                          # noqa: BLE001
+                raise LiveSourceRefused(
+                    SESSION_ENDS_BEFORE_EXIT,
+                    f"no session calendar could say whether {pd.Timestamp(day).date()} runs to "
+                    f"{CA.CalmAParams().exit_time} ({type(_exc).__name__}); a position opened at "
+                    f"10:00 on an unknown day may have no exit to leave by") from _exc
+            if _early:
+                raise LiveSourceRefused(
+                    SESSION_ENDS_BEFORE_EXIT,
+                    f"{pd.Timestamp(day).date()} is an early-close or non-trading session, so "
+                    f"there is no {CA.CalmAParams().exit_time} bar to exit at; the backtest drops these days "
+                    f"and the live entry must too")
         labels = self._label_map()
         if causal_regime_label(labels, day) is None:
             raise LiveSourceRefused(
@@ -1520,7 +1699,11 @@ class LiveTrack1Source:
         for inst in insts:
             frame = joined[inst].frame
             _cg: list = []
-            setup = CA.detect_entry_for_day(
+            # EXECUTE plans against the closed 09:59 bar; every other caller reads the 10:00
+            # OPEN exactly as before. One rule, two prices — see `detect_paper_entry_for_day`.
+            _detect = (CA.detect_paper_entry_for_day if phase == "EXECUTE"
+                       else CA.detect_entry_for_day)
+            setup = _detect(
                 frame, labels, inst, day, params,
                 observer=lambda e, _cg=_cg: (_cg.append({k: v for k, v in e.items()
                                                          if k != "kind"})
@@ -1564,7 +1747,9 @@ class LiveTrack1Source:
                       "gap_from_prev_rth_close": setup.gap_from_prev_rth_close,
                       "daily_atr_causal": atr,
                       "regime_prev_session": causal_regime_label(labels, day),
-                      "risk_basis": "true_stop_distance"}))
+                      "risk_basis": "true_stop_distance",
+                      "entry_reference": ("prior_bar_close_" + CA.PAPER_ENTRY_REFERENCE_BAR
+                                          if phase == "EXECUTE" else "entry_bar_open")}))
         return out
 
     def early_exit_valuer(self, key):
