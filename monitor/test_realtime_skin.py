@@ -295,7 +295,17 @@ def test_ipad_gets_a_custom_default_but_keeps_an_explicit_choice(skin_server, sk
       Object.defineProperty(navigator, 'platform', { get: () => 'MacIntel' });
       Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 5 });
     """)
-    stub_api(skin_page)
+    issues = json.loads(json.dumps(BASE_PAYLOADS["/api/v1/open-issues"]))
+    issues["issues"] = [{
+        "key": "incident:font-check", "status": "incident", "component": "runner",
+        "title": "Font check", "problem": "The issue needs attention.",
+        "impact": "Impact prose must use the bundled iPad face.",
+        "action": "Action prose must use the bundled iPad face.",
+        "evidence": "Synthetic browser fixture", "resolution_evidence": "Test passes.",
+        "first_seen": "2026-10-21T12:00:00Z", "last_seen": "2026-10-21T12:05:00Z",
+        "occurrences": 1,
+    }]
+    stub_api(skin_page, {"/api/v1/open-issues": issues})
     open_realtime(skin_page, skin_server)
     assert skin_page.locator("html").get_attribute("data-font") == "ibm-plex"
     assert skin_page.locator("html").get_attribute("data-device") == "ipad"
@@ -303,6 +313,33 @@ def test_ipad_gets_a_custom_default_but_keeps_an_explicit_choice(skin_server, sk
         "node => getComputedStyle(node).fontFamily"
     )
     assert skin_page.evaluate("document.fonts.check('14px \\\"IBM Plex Sans\\\"')")
+    issue_prose = skin_page.locator("#openIssueDetail .issue-assessment p")
+    assert issue_prose.count() == 2
+    assert all("IBM Plex Sans" in family for family in issue_prose.evaluate_all(
+        "nodes => nodes.map(node => getComputedStyle(node).fontFamily)"
+    ))
+    fallback_text = skin_page.evaluate("""() => {
+      const misses = [];
+      for (const node of document.querySelectorAll('body *')) {
+        if (![...node.childNodes].some(child =>
+              child.nodeType === Node.TEXT_NODE && child.textContent.trim())) continue;
+        const style = getComputedStyle(node);
+        const box = node.getBoundingClientRect();
+        if (style.display === 'none' || style.visibility === 'hidden'
+            || box.width < 1 || box.height < 1) continue;
+        if (!style.fontFamily.includes('IBM Plex Sans')
+            && !style.fontFamily.includes('IBM Plex Mono')) {
+          misses.push({
+            tag: node.tagName,
+            className: String(node.className || '').slice(0, 80),
+            text: node.textContent.trim().slice(0, 80),
+            font: style.fontFamily,
+          });
+        }
+      }
+      return misses;
+    }""")
+    assert fallback_text == [], f"visible iPad text still uses fallback fonts: {fallback_text}"
 
     skin_page.evaluate("localStorage.setItem('raits-dashboard-font', 'jetbrains')")
     skin_page.reload(wait_until="domcontentloaded")
